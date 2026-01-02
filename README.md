@@ -53,7 +53,11 @@ A complete history is kept for each field, allowing you to track changes and rev
 2.  **Explore and Expand**: Use the "Brainstorm" section to explore concepts.
 3.  **Structure the Narrative**: Develop a "Synopsis" and build out the foundational "DULFS" (Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics).
 4.  **Refine the Details**: Flesh out characters, locations, and the rules of your world in their dedicated sections.
-5.  **Leverage AI**: Use the "Generate" and "Rewrite" buttons within each field to get AI assistance at any stage.
+5.  **Leverage AI**: Look for the **:wand: (Wand)** button next to any field. This opens the **Agentic Workflow Modal**, where you can trigger a 3-stage generation process:
+    - **Generate**: Creates the initial draft.
+    - **Validate/Editorial-Review**: Critiques and corrects the content.
+    - **Rewrite/Refine**: Polishes the final result for quality and style.
+    *Visualize the progress live and choose your preferred workflow depth before saving!*
 
 ## 🔄 Development Roadmap
 
@@ -61,7 +65,7 @@ A complete history is kept for each field, allowing you to track changes and rev
 The foundational data structures, history management, and the data-driven UI are complete.
 
 ### Phase 2: Advanced Agent Integration 🔄 IN PROGRESS
-Work is ongoing to implement specialized agent prompts for each workflow stage and context-aware agent switching.
+Work is ongoing to implement the specialized `:wand:` interface and the three-stage agentic workflow modal.
 
 ### Phase 3: Enhanced Field Linking 📋 PLANNED
 Future work includes a cross-referencing system between fields and smart content suggestions.
@@ -76,16 +80,15 @@ The roadmap includes multi-project support, customizable templates, and UI/UX re
 
 -   **Simplicity**: Maintain a simple, clean, and intuitive user experience that can support complex creative workflows.
 -   **Progressive Enhancement**: Prioritize core functionality, with visual polish and advanced features added iteratively.
--   **Modularity**: A modular architecture that allows for gradual feature additions and maintenance.
+-   **Manual Quality Assurance**: We prioritize manual verification and human-in-the-loop creative evaluation over automated testing, ensuring the engine feels right for writers.
 
-## 🤝 Contributing
+## 🧪 Testing Practices
 
-Contributions are welcome! We are particularly interested in:
-
--   Agent prompt optimization.
--   Workflow improvements.
--   Performance enhancements.
--   UI/UX refinements (in later phases).
+Testing is performed **manually** by running the script within the NovelAI platform. There are **no automated tests** in the project. We utilize structured **Manual Test Plan Documents** (see `PLAN.md`) to verify:
+- Core worldbuilding workflows.
+- Agentic `:wand:` generation cycles.
+- Storage persistence and data integrity.
+- UI responsiveness and accessibility.
 
 ## 📄 License
 
