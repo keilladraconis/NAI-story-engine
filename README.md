@@ -1,227 +1,96 @@
-# Story Engine
+# Story Engine: Redesign Edition
 
-A collaborative worldbuilding system designed to prepare for and enhance the NovelAI LLM-based story-writing experience. Story Engine provides conversational, semi-automatic tools for developing rich narrative universes with structured data management capabilities.
+A structured, field-based worldbuilding system designed to prepare for and enhance the NovelAI LLM-based story-writing experience. Story Engine provides intelligent tools for developing rich narrative universes through a systematic workflow with integrated agentic AI assistance.
 
 ## 🌟 Overview
 
-Story Engine is a next-generation creative assistant that bridges the gap between unstructured brainstorming and structured worldbuilding. It features an intelligent multi-agent system that helps writers develop complex narratives, characters, and settings through conversational interactions.
+Story Engine is a next-generation creative assistant that bridges the gap between unstructured brainstorming and structured worldbuilding. It features a systematic workflow with AI agents that helps writers develop complex narratives, characters, and settings through structured fields and intelligent content generation.
 
 ### Vision Statement
 
-To create a seamless loop between creative exploration and structured organization, enabling writers to build rich, interconnected universes that evolve naturally from initial concepts to detailed lorebooks and story-ready content.
+To create a seamless loop between creative exploration and structured organization, enabling writers to build rich, interconnected universes that evolve naturally from initial concepts to detailed lorebooks and story-ready content through an intuitive field-based interface.
 
-## ✨ Current Features
+## ✨ Features
 
-### 🗣️ Multi-Agent Chat System
-- **Four specialized AI agents** with distinct roles and personalities:
-  - **Sage (Brainstorm)**: Experienced creative guide for exploration and ideation
-  - **Critic & Orchestrator**: Sharp analyst that directs the creative process
-  - **Anchor (Structure)**: Methodical synthesizer that organizes scattered ideas
-  - **The Archivist**: Meticulous distiller of information for long-term memory
+### 🎯 Structured Field-Based Workflow
+A systematic process guides you through eight interconnected stages of worldbuilding, from initial idea to a fully-realized universe.
 
-### 🎯 Intelligent Agent Coordination
-- Automatic agent switching based on creative workflow state
-- Manual override for specific agent targeting
-- Configurable auto-mode for continuous creative sessions
-- Context-aware agent recommendations
+### 🤖 Integrated Agentic Assistance
+Leverage a three-stage agentic cycle (Generate, Edit, Rewrite) to create, refine, and polish your content. The system automatically selects the best AI agent for the task, or you can take manual control.
 
-### 📝 Conversational Interface
-- Real-time chat interface with AI agents
-- Agent-specific visual indicators and personas
-- Message history preservation and context management
-- Configurable system prompts and agent behaviors
+### 📚 Comprehensive Worldbuilding
+Develop everything from characters and factions to the fundamental rules of your universe, all within a unified and structured interface.
 
-## 🚀 Planned Features
+### 💾 Persistent & Portable
+Your work is automatically saved. Plus, you can export and import your story data, making your projects portable.
 
-### 🔄 Complete DULFS Ecosystem
-**Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics**
-
-- **Structured extraction** from conversation to create DULFS elements
-- **Automated categorization** of narrative components
-- **Relationship mapping** between entities
-- **Conflict analysis** and tension identification
-
-### 📚 Lorebook Integration
-- **Automatic generation** of NovelAI lorebook entries from DULFS
-- **Schema-compliant** output with strict formatting
-- **Bidirectional editing** - changes to lorebook update DULFS
-- **Magic management** for dynamic content revision
-
-### ✏️ Editable Chat Interface
-- **Semi-editable** conversation history
-- **Undo/redo** functionality for creative decisions
-- **Branching conversation** support for alternative story paths
-- **Version control** for creative iterations
-
-### 🎛️ Advanced Configuration
-- **Customizable agent prompts** and behaviors
-- **Template system** for different genres and styles
-- **Integration hooks** for external tools and workflows
-- **Export capabilities** for multiple story formats
-
-## 🏗️ Technical Architecture
-
-### Core Components
-- **`chat.ts`**: Central chat management and agent coordination
-- **`ui.ts`**: User interface components and interaction handling
-- **`hyper-generator.ts`**: Advanced text generation engine with budget management
-- **`index.ts`**: Application entry point and system initialization
-
-### Agent Framework
-Each agent extends the abstract `Agent` class with specialized parameters:
-- **Token limits** optimized for specific tasks
-- **Temperature settings** balancing creativity vs. structure
-- **Penalty parameters** controlling output focus and repetition
-- **Custom prompts** defining agent behavior and personality
-
-### Data Flow
-```
-Conversation → Agent Processing → DULFS Creation → Lorebook Generation
-     ↑                                    ↓
-     └─────────────── Revision ────────────┘
-```
+### 📖 Version History
+A complete history is kept for each field, allowing you to track changes and revert to previous versions of your work.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- NovelAI Script BuildSystem environment
-- Node.js runtime
-- TypeScript compiler
+- A NovelAI account.
+- The NovelAI Script BuildSystem environment.
 
 ### Installation
-1. Navigate to the project directory:
-   ```bash
-   cd projects/story-engine
-   ```
-
-2. Configure system prompts in `project.yaml`:
-   ```yaml
-   config:
-     - name: system_prompt
-       # Your custom system prompt
-     - name: brainstorm_prompt
-       # Sage's creative guidance prompt
-     # ... other agent prompts
-   ```
-
-3. Build and run the project:
-   ```bash
-   npm run build
-   npm run start
-   ```
-
-### Configuration Options
-
-#### System Prompt
-Configures the base LLM behavior for all agents:
-```yaml
-config:
-  - name: system_prompt
-    type: string
-    default: # Comprehensive creative writing directives
-```
-
-#### Agent-Specific Prompts
-Each agent has customizable personality and behavior:
-
-- **`brainstorm_prompt`**: Sage's conversational guidance style
-- **`critic_prompt`**: Critic's analytical and directive approach
-- **`anchor_prompt`**: Anchor's methodical structuring process
-- **`summary_prompt`**: Archivist's comprehensive summarization
+1.  Navigate to the project directory.
+2.  Run the build command:
+    ```bash
+    nibs build
+    ```
+3.  The Story Engine will then be available as a sidebar in the NovelAI interface.
 
 ## 🎮 Usage Guide
 
-### Basic Workflow
-1. **Start a conversation** with Sage for initial brainstorming
-2. **Let Critic analyze** the output and direct next steps
-3. **Use Anchor to structure** scattered ideas into organized content
-4. **Call Archivist** to create comprehensive summaries when needed
-
-### Agent Roles in Detail
-
-#### 🧠 Sage (Brainstorm Agent)
-- **Purpose**: Creative exploration and ideation
-- **Style**: Conversational, encouraging, mentor-like
-- **Output**: Open-ended questions and conceptual possibilities
-- **Best for**: Initial worldbuilding, character development, exploring themes
-
-#### 🔍 Critic & Orchestrator
-- **Purpose**: Quality assessment and process management
-- **Style**: Direct, analytical, decisive
-- **Output**: Critical analysis and specific directives
-- **Best for**: Keeping the process focused, determining next steps
-
-#### 🏗️ Anchor (Structure Agent)
-- **Purpose**: Organization and definition
-- **Style**: Calm, methodical, precise
-- **Output**: Structured summaries and organized information
-- **Best for**: Solidifying creative progress, creating documentation
-
-#### 📚 The Archivist
-- **Purpose**: Long-term memory and comprehensive documentation
-- **Style**: Impartial, focused, comprehensive
-- **Output**: Complete structured synopses
-- **Best for**: Milestone documentation, project overview
-
-### Advanced Features
-
-#### Auto Mode
-Enable continuous creative sessions:
-```typescript
-ui.agentModeSelector.onAutoCheckbox = (isChecked: boolean) => {
-  chat.autoMode = isChecked;
-  chat.autoCount = 5; // Number of auto-generations
-};
-```
-
-#### Agent Switching
-Manually target specific agents or let the system orchestrate automatically based on workflow state.
+1.  **Begin with a Spark**: Enter your initial idea in the "Story Prompt" field.
+2.  **Explore and Expand**: Use the "Brainstorm" section to explore concepts.
+3.  **Structure the Narrative**: Develop a "Synopsis" and build out the foundational "DULFS" (Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics).
+4.  **Refine the Details**: Flesh out characters, locations, and the rules of your world in their dedicated sections.
+5.  **Leverage AI**: Use the "Generate" and "Rewrite" buttons within each field to get AI assistance at any stage.
 
 ## 🔄 Development Roadmap
 
-### Phase 1: Enhanced Chat Interface (Current)
-- [ ] Editable conversation history
-- [ ] Undo/redo functionality
-- [ ] Branching conversation support
-- [ ] Version control integration
+### Phase 1: Core Architecture ✅ COMPLETE
+The foundational data structures, history management, and the data-driven UI are complete.
 
-### Phase 2: DULFS Integration
-- [ ] Automatic extraction from conversation
-- [ ] Structured data storage and management
-- [ ] Relationship mapping and visualization
-- [ ] Conflict analysis tools
+### Phase 2: Advanced Agent Integration 🔄 IN PROGRESS
+Work is ongoing to implement specialized agent prompts for each workflow stage and context-aware agent switching.
 
-### Phase 3: Lorebook Ecosystem
-- [ ] Automatic NovelAI lorebook generation
-- [ ] Schema validation and formatting
-- [ ] Bidirectional editing capabilities
-- [ ] Magic management system
+### Phase 3: Enhanced Field Linking 📋 PLANNED
+Future work includes a cross-referencing system between fields and smart content suggestions.
 
-### Phase 4: Advanced Features
-- [ ] Multi-project support
-- [ ] Collaboration tools
-- [ ] Template and genre presets
-- [ ] Export to multiple formats
+### Phase 4: Lorebook Ecosystem 📋 PLANNED
+Plans are in place for automatic lorebook generation and bidirectional editing.
+
+### Phase 5: Advanced Features 📋 PLANNED
+The roadmap includes multi-project support, customizable templates, and UI/UX refinements.
+
+## 🎨 Design Philosophy
+
+-   **Simplicity**: Maintain a simple, clean, and intuitive user experience that can support complex creative workflows.
+-   **Progressive Enhancement**: Prioritize core functionality, with visual polish and advanced features added iteratively.
+-   **Modularity**: A modular architecture that allows for gradual feature additions and maintenance.
 
 ## 🤝 Contributing
 
-Story Engine is part of the NovelAI Script BuildSystem ecosystem. Contributions are welcome in the following areas:
+Contributions are welcome! We are particularly interested in:
 
-- Agent prompt optimization
-- UI/UX improvements
-- DULFS data structure design
-- Lorebook integration features
-- Performance optimization
+-   Agent prompt optimization.
+-   Workflow improvements.
+-   Performance enhancements.
+-   UI/UX refinements (in later phases).
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ## 🙏 Acknowledgments
 
-- **Original inspiration**: OccultSage for the hyper-generator concept
-- **Current development**: Keilla
-- **System design**: NovelAI LLM integration framework
+-   **Original inspiration**: OccultSage for the hyper-generator concept
+-   **Current development**: Keilla
+-   **System design**: NovelAI LLM integration framework
+-   **Architecture guidance**: Multi-agent system best practices
 
 ## 📞 Support
 
@@ -229,4 +98,4 @@ For questions, suggestions, or bug reports, please open an issue in the project 
 
 ---
 
-*Story Engine - Where creativity meets structure, and imagination finds its foundation.*
+*Story Engine: Where creativity meets structure, and imagination finds its foundation.*

@@ -135,9 +135,6 @@ export class StructuredEditor {
   private createSidebar(): UIPart {
     return column({
       content: [
-        // Header with workflow progress
-        this.createWorkflowProgress(),
-
         // Collapsible sections for all fields
         column({
           content: Array.from(this.configs.values()).map((config) =>
@@ -149,50 +146,6 @@ export class StructuredEditor {
           },
         }),
       ],
-    });
-  }
-
-  private createWorkflowProgress(): UIPart {
-    const stages = [
-      { id: "storyPrompt", label: "Prompt" },
-      { id: "brainstorm", label: "Brainstorm" },
-      { id: "synopsis", label: "Synopsis" },
-      { id: "dulfs", label: "DULFS" },
-    ];
-
-    return row({
-      content: stages.map((stage) =>
-        column({
-          content: [
-            text({
-              text: stage.label,
-              style: {
-                "font-size": "12px",
-                "text-align": "center",
-                color: "#666",
-              },
-            }),
-            text({
-              text: "●",
-              style: {
-                "font-size": "16px",
-                "text-align": "center",
-                color: "#ccc",
-              },
-            }),
-          ],
-          style: {
-            "margin-right": "8px",
-            flex: 1,
-          },
-        }),
-      ),
-      style: {
-        "margin-bottom": "16px",
-        padding: "8px",
-        "background-color": "#f5f5f5",
-        "border-radius": "4px",
-      },
     });
   }
 
@@ -208,12 +161,6 @@ export class StructuredEditor {
         // Field description
         text({
           text: config.description,
-          style: {
-            "font-size": "12px",
-            color: "#666",
-            "margin-bottom": "8px",
-            "margin-left": "24px", // Align with icon
-          },
         }),
 
         // Text input area
@@ -223,14 +170,6 @@ export class StructuredEditor {
           initialValue: fieldState.content,
           onChange: (content: string) =>
             this.handleFieldChange(config.id, content),
-          style: {
-            "min-height": "100px",
-            "font-size": "14px",
-            "background-color": "#fafafa",
-            border: "1px solid #e0e0e0",
-            "border-radius": "4px",
-            padding: "8px",
-          },
         }),
 
         // Character count and validation
@@ -239,30 +178,19 @@ export class StructuredEditor {
             text({
               text: `Characters: ${fieldState.content.length}${config.maxCharacters ? `/${config.maxCharacters}` : ""}`,
               style: {
-                "font-size": "11px",
                 color:
                   config.maxCharacters &&
                   fieldState.content.length > config.maxCharacters
                     ? "#d32f2f"
                     : "#666",
-                "margin-left": "24px", // Align with icon
               },
             }),
           ],
-          style: {
-            "margin-top": "4px",
-          },
         }),
 
         // Action buttons (Edit, Generate, etc.)
         this.createFieldActions(config),
       ],
-      style: {
-        border: "1px solid #e0e0e0",
-        "border-radius": "4px",
-        "margin-bottom": "8px",
-        "background-color": "white",
-      },
     });
   }
 
@@ -278,16 +206,8 @@ export class StructuredEditor {
           button({
             text: "Edit",
             callback: () => this.handleFieldEdit(config.id),
-            style: {
-              "font-size": "12px",
-              padding: "4px 8px",
-              "margin-left": "24px", // Align with icon
-            },
           }),
         ],
-        style: {
-          "margin-top": "8px",
-        },
       });
     }
 
@@ -297,31 +217,12 @@ export class StructuredEditor {
         button({
           text: "Generate",
           callback: () => this.handleFieldGenerate(config.id),
-          style: {
-            "font-size": "12px",
-            padding: "4px 8px",
-            "margin-right": "8px",
-            "background-color": "#1976d2",
-            color: "white",
-            border: "none",
-            "border-radius": "3px",
-          },
         }),
         button({
           text: "Edit",
           callback: () => this.handleFieldEdit(config.id),
-          style: {
-            "font-size": "12px",
-            padding: "4px 8px",
-            "background-color": "#f5f5f5",
-            border: "1px solid #e0e0e0",
-            "border-radius": "3px",
-          },
         }),
       ],
-      style: {
-        "margin-top": "8px",
-      },
     });
   }
 
