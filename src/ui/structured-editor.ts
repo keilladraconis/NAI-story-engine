@@ -7,7 +7,7 @@ interface FieldConfig {
   description: string;
   placeholder: string;
   icon: IconId;
-  maxCharacters?: number;
+
   linkedEntities?: string[];
 }
 
@@ -31,7 +31,7 @@ export class StructuredEditor {
         description: "The initial creative spark for your story",
         placeholder: "Once upon a time in a world where...",
         icon: "bookOpen",
-        maxCharacters: 1000,
+    
       },
       {
         id: "brainstorm",
@@ -39,7 +39,7 @@ export class StructuredEditor {
         description: "Creative exploration and ideation",
         placeholder: "Let me explore the possibilities of this world...",
         icon: "cloud-lightning",
-        maxCharacters: 2000,
+
       },
       {
         id: "synopsis",
@@ -47,7 +47,7 @@ export class StructuredEditor {
         description: "Structured overview of the story",
         placeholder: "In a world where...",
         icon: "package",
-        maxCharacters: 1500,
+
       },
       {
         id: "dulfs",
@@ -56,7 +56,7 @@ export class StructuredEditor {
           "Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics",
         placeholder: "Characters, world, setting, and story elements...",
         icon: "users",
-        maxCharacters: 3000,
+    
       },
       {
         id: "dramatisPersonae",
@@ -64,7 +64,7 @@ export class StructuredEditor {
         description: "Main characters and their relationships",
         placeholder: "Character names, descriptions, motivations...",
         icon: "user",
-        maxCharacters: 2000,
+
       },
       {
         id: "universeSystems",
@@ -72,7 +72,7 @@ export class StructuredEditor {
         description: "Rules, magic, technology, and world mechanics",
         placeholder: "How this world works - magic, physics, etc...",
         icon: "settings" as IconId,
-        maxCharacters: 2000,
+
       },
       {
         id: "locations",
@@ -80,7 +80,7 @@ export class StructuredEditor {
         description: "Places where the story takes place",
         placeholder: "Settings, landmarks, environments...",
         icon: "map-pin" as IconId,
-        maxCharacters: 1500,
+
       },
       {
         id: "storyLorebooks",
@@ -88,7 +88,7 @@ export class StructuredEditor {
         description: "Integrated lorebooks for story elements",
         placeholder: "Organized lore for story-specific elements...",
         icon: "book",
-        maxCharacters: 2500,
+
       },
     ];
 
@@ -172,21 +172,7 @@ export class StructuredEditor {
             this.handleFieldChange(config.id, content),
         }),
 
-        // Character count and validation
-        row({
-          content: [
-            text({
-              text: `Characters: ${fieldState.content.length}${config.maxCharacters ? `/${config.maxCharacters}` : ""}`,
-              style: {
-                color:
-                  config.maxCharacters &&
-                  fieldState.content.length > config.maxCharacters
-                    ? "#d32f2f"
-                    : "#666",
-              },
-            }),
-          ],
-        }),
+
 
         // Action buttons (Edit, Generate, etc.)
         this.createFieldActions(config),
