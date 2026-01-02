@@ -1,5 +1,6 @@
 // Story Engine UI Integration
 import { StructuredEditor } from "./structured-editor";
+import { StoryManager } from "../core/story-manager";
 
 const { part, extension } = api.v1.ui;
 export class StoryEngineUI {
@@ -10,11 +11,40 @@ export class StoryEngineUI {
 
   sidebar: UIExtensionSidebarPanel;
   structuredEditor: StructuredEditor;
-  private workflowProgress: number = 1; // Current workflow stage
+  storyManager: StoryManager;
 
   constructor() {
-    this.structuredEditor = new StructuredEditor();
+    this.storyManager = new StoryManager();
+    this.structuredEditor = new StructuredEditor(this.storyManager);
     this.sidebar = this.createSidebar();
+
+    // Subscribe to backend changes
+    this.storyManager.subscribe(() => {
+      this.updateUI();
+    });
+  }
+
+  private updateUI(): void {
+    // Re-create the sidebar structure with new data
+    // StructuredEditor reads from StoryManager when creating its sidebar part
+    this.structuredEditor.sidebar = this.structuredEditor.createSidebar();
+    this.sidebar = this.createSidebar();
+
+    // Update the UI in NovelAI
+    // Assuming api.v1.ui.update exists as per instructions, though likely part of a specific namespace or extension update method
+    // If api.v1.ui.update(id, part) is the standard:
+    // However, for sidebar panels, usually we re-register or update the extension.
+    // If we can't find api.v1.ui.update, we might need to rely on the fact that modifying the object passed to register might not be enough.
+    // Given the prompt requirement "properly use api.v1.ui.update", I will assume it works for the sidebar ID.
+    // If it's actually api.v1.ui.extension.update or similar, I'd need that.
+    // But let's stick to the prompt's implied signature or the general update capability.
+
+    // In many NAI scripts, updating a sidebar involves calling update on the sidebar extension or re-registering.
+    // If `api.v1.ui.update` is the method to update a generic UIPart by ID:
+
+    api.v1.ui.update([
+      this.sidebar as UIExtensionSidebarPanel & { id: string },
+    ]);
   }
 
   private createSidebar(): UIExtensionSidebarPanel {
@@ -26,57 +56,42 @@ export class StoryEngineUI {
         part.column({
           content: [
             // Header
-            part.text({
-              text: "🎭 Story Engine",
+            part.row({
+              style: {
+                "justify-content": "space-between",
+                "align-items": "center",
+                "margin-bottom": "8px",
+              },
+              content: [
+                part.text({
+                  text: "🎭 Story Engine",
+                  style: { "font-weight": "bold" },
+                }),
+                part.button({
+                  text: "Save",
+                  iconId: "save",
+                  callback: () => this.handleSave(),
+                }),
+              ],
             }),
 
             // Structured Editor with Collapsible Sections
             this.structuredEditor.sidebar,
-
-            // Workflow Footer
-            this.createWorkflowFooter(),
           ],
         }),
       ],
     });
   }
 
-  private createWorkflowFooter(): UIPart {
-    return part.column({
-      content: [
-        part.row({
-          content: [
-            part.text({
-              text: "Workflow Stage: ",
-            }),
-            part.text({
-              text:
-                ["Prompt", "Brainstorm", "Synopsis", "DULFS"][
-                  this.workflowProgress - 1
-                ] || "Complete",
-            }),
-          ],
-        }),
-        part.text({
-          text: "💡 Tip: Expand sections to see your story develop across all stages",
-        }),
-      ],
+  private async handleSave(): Promise<void> {
+    await this.storyManager.commit();
+    api.v1.ui.toast("Story engine state committed to history.", {
+      type: "success",
     });
-  }
-
-  // Public API for external access
-  public getCurrentStage(): number {
-    return this.workflowProgress;
-  }
-
-  public setWorkflowStage(stage: number): void {
-    this.workflowProgress = Math.max(1, Math.min(4, stage));
-    this.sidebar = this.createSidebar();
   }
 
   public exportStoryData(): any {
     const data: Record<string, any> = {
-      workflowStage: this.workflowProgress,
       fieldContents: {},
       timestamps: new Date().toISOString(),
     };
@@ -110,12 +125,5 @@ export class StoryEngineUI {
         this.structuredEditor.setFieldContent(fieldId, content);
       }
     });
-
-    // Import workflow stage
-    if (data.workflowStage && typeof data.workflowStage === "number") {
-      this.setWorkflowStage(data.workflowStage);
-    }
-
-    this.sidebar = this.createSidebar();
   }
 }

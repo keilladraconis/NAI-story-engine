@@ -1,3 +1,5 @@
+import { FieldHistory } from "./field-history";
+
 interface StoryData {
   id: string;
   version: string;
@@ -41,17 +43,13 @@ interface DULFSField {
   linkedLorebooks: string[];
 }
 
-class StoryHistory {}
-
-class FieldHistory {}
-
 export class StoryManager {
   private static readonly KEYS = {
     STORY_DATA: "kse-story-data",
   };
 
   private currentStory?: StoryData;
-  private history?: StoryHistory;
+  private listeners: (() => void)[] = [];
 
   constructor() {
     this.initializeStory();
@@ -68,7 +66,107 @@ export class StoryManager {
       this.currentStory = this.createDefaultStoryData();
       await this.saveStoryData();
     }
-    this.history = new StoryHistory();
+    this.notifyListeners();
+  }
+
+  public subscribe(listener: () => void): () => void {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+    };
+  }
+
+  private notifyListeners(): void {
+    this.listeners.forEach((listener) => listener());
+  }
+
+  public getFieldContent(fieldId: string): string {
+    if (!this.currentStory) return "";
+
+    // Check specific fields first
+    if (fieldId === "storyPrompt") return this.currentStory.storyPrompt.content;
+    if (fieldId === "brainstorm") return this.currentStory.brainstorm.content;
+    if (fieldId === "synopsis") return this.currentStory.synopsis.content;
+
+    // Check if it's a DULFS field (not fully implemented in data structure yet, but provided for consistency)
+    // For now, return empty string or implement logic if DULFS structure allows
+    return "";
+  }
+
+  public async setFieldContent(
+    fieldId: string,
+    content: string,
+    save: boolean = false,
+  ): Promise<void> {
+    if (!this.currentStory) return;
+
+    let changed = false;
+    if (fieldId === "storyPrompt") {
+      if (this.currentStory.storyPrompt.content !== content) {
+        this.currentStory.storyPrompt.content = content;
+        changed = true;
+      }
+    } else if (fieldId === "brainstorm") {
+      if (this.currentStory.brainstorm.content !== content) {
+        this.currentStory.brainstorm.content = content;
+        changed = true;
+      }
+    } else if (fieldId === "synopsis") {
+      if (this.currentStory.synopsis.content !== content) {
+        this.currentStory.synopsis.content = content;
+        changed = true;
+      }
+    }
+
+    if (changed && save) {
+      this.currentStory.lastModified = new Date();
+      await this.saveStoryData();
+    }
+  }
+
+  public async commit(): Promise<void> {
+    if (!this.currentStory) return;
+
+    let changed = false;
+    const fields: StoryField[] = [
+      this.currentStory.storyPrompt,
+      this.currentStory.brainstorm,
+      this.currentStory.synopsis,
+    ];
+
+    for (const field of fields) {
+      const lastEntry =
+        field.history.length > 0
+          ? field.history[field.history.length - 1]
+          : null;
+
+      // Only commit if content is different from last commit
+      if (
+        (!lastEntry && field.content.trim() !== "") ||
+        (lastEntry && lastEntry.content !== field.content)
+      ) {
+        const newVersion = field.version + 1;
+        const historyEntry: FieldHistory = {
+          id: api.v1.uuid(),
+          timestamp: new Date(),
+          version: newVersion,
+          content: field.content,
+          source: "commit",
+        };
+
+        field.history.push(historyEntry);
+        field.version = newVersion;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.currentStory.lastModified = new Date();
+      await this.saveStoryData(true); // Save and notify
+      api.v1.log("Story state committed to history.");
+    } else {
+      api.v1.log("No changes to commit.");
+    }
   }
 
   private createDefaultStoryData(): StoryData {
@@ -76,7 +174,7 @@ export class StoryManager {
       id: "current-story",
       version: "0.1.0",
 
-      // Workflow stages
+      // Primary components
       storyPrompt: {
         id: "storyPrompt",
         type: "prompt",
@@ -113,10 +211,13 @@ export class StoryManager {
     };
   }
 
-  private async saveStoryData(): Promise<void> {
+  public async saveStoryData(notify: boolean = true): Promise<void> {
     await api.v1.storyStorage.set(
       StoryManager.KEYS.STORY_DATA,
       this.currentStory,
     );
+    if (notify) {
+      this.notifyListeners();
+    }
   }
 }
