@@ -30,6 +30,7 @@ export class StructuredEditor {
   }
 
   private async syncFieldsFromStorage(): Promise<void> {
+    let anyChanged = false;
     for (const config of this.configs.values()) {
       // We use the storage key directly from storyStorage
       const savedContent = await api.v1.storyStorage.get(
@@ -37,7 +38,12 @@ export class StructuredEditor {
       );
       if (savedContent && typeof savedContent === "string") {
         await this.storyManager.setFieldContent(config.id, savedContent, false);
+        anyChanged = true;
       }
+    }
+
+    if (anyChanged) {
+      await this.storyManager.saveStoryData(true);
     }
   }
 
@@ -192,35 +198,40 @@ export class StructuredEditor {
     this.storyManager.setFieldContent(fieldId, content);
   }
 
-  private handleFieldGenerate(fieldId: string): void {
+  private async handleFieldGenerate(fieldId: string): Promise<void> {
     const config = this.configs.get(fieldId);
     if (!config) return;
 
     // Placeholder for generation logic
     api.v1.log(`Generating content for ${config.label}`);
 
-    // This would integrate with the AgentCycle system
-    // For now, just show a placeholder
     const currentContent = this.storyManager.getFieldContent(fieldId);
     const newContent =
-      currentContent + `\n\n[Generated content for ${config.label}]`;
+      currentContent +
+      (currentContent ? "\n" : "") +
+      `[Generated content for ${config.label} at ${new Date().toLocaleTimeString()}]`;
 
-    this.storyManager.setFieldContent(fieldId, newContent);
+    // 1. Update StoryManager (in-memory)
+    await this.storyManager.setFieldContent(fieldId, newContent, false);
+
+    // 2. Update the storage key used by the UI part so it reflects the change
+    await api.v1.storyStorage.set(`kse-field-${fieldId}`, newContent);
+
+    // 3. Commit to history (this will also save STORY_DATA and notify listeners)
+    await this.storyManager.commit();
+
+    api.v1.ui.toast(`Generated content for ${config.label}`, {
+      type: "success",
+    });
   }
 
-  private handleFieldEdit(_fieldId: string): void {
-    // Focus the field (would need additional UI integration)
-    api.v1.log(`Editing field`);
+  private handleFieldEdit(fieldId: string): void {
+    const config = this.configs.get(fieldId);
+    if (!config) return;
 
-    // We need to trigger a re-render to reflect the expanded state change
-    // Since this is a local UI state change, we might need a way to tell the parent to re-render
-    // or we can update the StoryManager with a dummy change, OR better:
-    // StoryEngineUI should handle re-renders.
-    // Ideally StructuredEditor would emit an event.
-    // For now, we'll just rely on the user manually expanding if this doesn't work perfectly,
-    // or we can hack it by calling a refresh method if we had one.
-    // Given the constraints, I will leave it as updating state.
-    // If we want to force update, we might need to expose a method or callback.
+    // Focus or simple interaction placeholder
+    api.v1.log(`Editing field: ${config.label}`);
+    api.v1.ui.toast(`Ready to edit ${config.label}`, { type: "info" });
   }
 
   // Public methods for external access
