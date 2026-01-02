@@ -13,13 +13,19 @@ To create a seamless loop between creative exploration and structured organizati
 ## ✨ Features
 
 ### 🎯 Structured Field-Based Workflow
-A systematic process guides you through eight interconnected stages of worldbuilding, from initial idea to a fully-realized universe.
+A systematic process guides you through eight interconnected stages of worldbuilding:
+1. **Story Prompt**: The initial spark.
+2. **Brainstorm**: Creative exploration.
+3. **Synopsis**: Structured summary.
+4. **DULFS**: A sub-structure of condensed, formatted lists including:
+    - **Dramatis Personae**: Characters.
+    - **Universe Systems**: Rules and mechanics.
+    - **Locations**: Settings.
+    - **Factions**: Groups and organizations.
+    - **Situational Dynamics**: Active forces and tensions.
 
-### 🤖 Integrated Agentic Assistance
-Leverage a three-stage agentic cycle (Generate, Edit, Rewrite) to create, refine, and polish your content. The system automatically selects the best AI agent for the task, or you can take manual control.
-
-### 📚 Comprehensive Worldbuilding
-Develop everything from characters and factions to the fundamental rules of your universe, all within a unified and structured interface.
+### 📚 Lorebook Integration
+Unlike other data, Lorebooks are not a field in themselves. The Story Engine uses the NovelAI Scripting API to link DULFS items directly to your story's Lorebook entries, ensuring your worldbuilding is immediately available to the LLM.
 
 ### 💾 Persistent & Portable
 Your work is automatically saved. Plus, you can export and import your story data, making your projects portable.
