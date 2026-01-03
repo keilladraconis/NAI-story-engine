@@ -47,6 +47,7 @@ const Strategies: Record<string, StrategyFn> = {
       params: {
         temperature: 1.35,
         min_p: 0.1,
+        repetition_penalty: 1.05,
         maxTokens: 1024,
       },
     };
@@ -79,15 +80,16 @@ const Strategies: Record<string, StrategyFn> = {
     return {
       messages,
       params: {
-        temperature: 1.0,
+        temperature: 1.1,
         min_p: 0.05,
+        repetition_penalty: 1.1,
         maxTokens: 1536,
       },
     };
   },
 
   // Review - The Editor
-  // Low temperature for analytical precision
+  // Low temperature for analytical precision, high repetition penalty to prevent outputting the story
   "review:default": async (session, manager, base) => {
     const userPrompt = (await api.v1.config.get("critique_prompt")) || "";
     const contentToReview = session.cycles.generate.content;
@@ -114,14 +116,16 @@ const Strategies: Record<string, StrategyFn> = {
       messages,
       params: {
         temperature: 0.4,
+        min_p: 0.02,
+        repetition_penalty: 1.2,
         frequency_penalty: 0.1,
-        maxTokens: 2048, // Needs full length to output full text
+        maxTokens: 2048,
       },
     };
   },
 
   // Refine - The Polisher
-  // Standard temperature for fluid prose
+  // Standard temperature for fluid prose, low repetition penalty for style
   "refine:default": async (session, manager, base) => {
     const userPrompt = (await api.v1.config.get("refine_prompt")) || "";
     const contentToRefine = session.cycles.generate.content;
@@ -150,6 +154,7 @@ const Strategies: Record<string, StrategyFn> = {
       params: {
         temperature: 0.8,
         min_p: 0.02,
+        repetition_penalty: 1.02,
         maxTokens: 2048,
       },
     };
