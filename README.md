@@ -57,7 +57,7 @@ A complete history is kept for each field, allowing you to track changes and rev
     - **Generate**: Creates the initial draft.
     - **Validate/Editorial-Review**: Critiques and corrects the content.
     - **Rewrite/Refine**: Polishes the final result for quality and style.
-    *Visualize the progress live and choose your preferred workflow depth before saving!*
+    *Use the tabs to view each stage, click **Ignite** to generate content, or check **Auto-Advance** to run the full cycle automatically!*
 
 ## 🔄 Development Roadmap
 

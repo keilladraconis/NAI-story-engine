@@ -7,10 +7,16 @@ export interface AgentCycle {
 export interface FieldSession {
   fieldId: string;
   originalContent: string;
-  currentContent: string;
-  cycles: AgentCycle[];
+  currentContent: string; // The final result or currently previewed content
+  selectedStage: "generate" | "review" | "refine";
+  isAuto: boolean;
+  cycles: {
+    generate: AgentCycle;
+    review: AgentCycle;
+    refine: AgentCycle;
+  };
   isActive: boolean;
-  progress: string;
+  progress: string; // Keep for backward compat or logging
 }
 
 export class AgentCycleManager {
@@ -21,13 +27,15 @@ export class AgentCycleManager {
       fieldId,
       originalContent,
       currentContent: originalContent,
-      cycles: [
-        { stage: "generate", content: "", status: "idle" },
-        { stage: "review", content: "", status: "idle" },
-        { stage: "refine", content: "", status: "idle" },
-      ],
+      selectedStage: "generate",
+      isAuto: false,
+      cycles: {
+        generate: { stage: "generate", content: "", status: "idle" },
+        review: { stage: "review", content: "", status: "idle" },
+        refine: { stage: "refine", content: "", status: "idle" },
+      },
       isActive: true,
-      progress: "Session started. Ready to generate.",
+      progress: "Session started.",
     };
     this.sessions.set(fieldId, session);
     return session;

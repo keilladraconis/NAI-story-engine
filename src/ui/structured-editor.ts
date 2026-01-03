@@ -1,7 +1,7 @@
 import { StoryManager } from "../core/story-manager";
 import { AgentCycleManager, FieldSession } from "../core/agent-cycle";
 
-const { column, row, text, button, multilineTextInput, collapsibleSection } =
+const { column, row, text, button, multilineTextInput, collapsibleSection, checkboxInput } =
   api.v1.ui.part;
 
 interface FieldConfig {
@@ -164,9 +164,12 @@ export class StructuredEditor {
   }
 
   private createFieldActions(config: FieldConfig): UIPart {
-    const isPrimaryField = ["storyPrompt", "brainstorm", "synopsis"].includes(
-      config.id,
-    );
+    // Story Prompt is user-only, no AI generation
+    if (config.id === "storyPrompt") {
+      return row({ content: [] });
+    }
+
+    const isPrimaryField = ["brainstorm", "synopsis"].includes(config.id);
 
     if (isPrimaryField) {
       return row({
@@ -206,30 +209,105 @@ export class StructuredEditor {
     let modalInstance: any = null;
 
     const renderModalContent = () => {
+      const activeStage = session.selectedStage;
+      const activeContent = session.cycles[activeStage].content;
+
       return [
         column({
           id: `wand-modal-container-${config.id}`,
           content: [
+            // Stage Selection
             text({
-              text: "Progress Visualization:",
+              text: "Workflow Stage:",
               style: { "font-weight": "bold", "margin-top": "8px" },
             }),
-            multilineTextInput({
-              id: "wand-progress",
-              initialValue: session.progress,
-              onChange: (val) => {
-                session.progress = val;
-              },
+            row({
+              id: "wand-stage-selector",
+              style: { "align-items": "center", "margin-bottom": "16px", gap: "16px" },
+              content: [
+                row({
+                  content: [
+                    button({
+                      text: "1. Generate",
+                      iconId: "file-text",
+                      style:
+                        activeStage === "generate"
+                          ? { "background-color": "rgb(245, 243, 194)", color: "black" }
+                          : {},
+                      callback: () => {
+                        session.selectedStage = "generate";
+                        update();
+                      },
+                    }),
+                    button({
+                      text: "2. Review",
+                      iconId: "eye",
+                      style:
+                        activeStage === "review"
+                          ? { "background-color": "rgb(245, 243, 194)", color: "black" }
+                          : {},
+                      callback: () => {
+                        session.selectedStage = "review";
+                        update();
+                      },
+                    }),
+                    button({
+                      text: "3. Refine",
+                      iconId: "feather",
+                      style:
+                        activeStage === "refine"
+                          ? { "background-color": "rgb(245, 243, 194)", color: "black" }
+                          : {},
+                      callback: () => {
+                        session.selectedStage = "refine";
+                        update();
+                      },
+                    }),
+                  ],
+                  style: { gap: "8px" },
+                }),
+                checkboxInput({
+                  id: "wand-auto-checkbox",
+                  label: "Auto-Advance",
+                  initialValue: session.isAuto,
+                  onChange: (val) => {
+                    session.isAuto = val;
+                  },
+                }),
+              ],
             }),
+
+            // Active Stage Content
+            text({
+              text: `Stage Output (${activeStage.toUpperCase()}):`,
+              style: { "font-weight": "bold" },
+            }),
+            multilineTextInput({
+              id: "wand-stage-content",
+              initialValue: activeContent,
+              placeholder: `Output for ${activeStage} stage will appear here...`,
+              onChange: (val) => {
+                session.cycles[activeStage].content = val;
+                session.currentContent = val;
+              },
+              style: { height: "200px" },
+            }),
+
+            // Actions
             row({
               id: "wand-action-row",
               style: { "margin-top": "24px", "justify-content": "space-between" },
               content: [
                 button({
-                  id: "wand-generate-btn",
-                  text: "Generate",
+                  id: "wand-ignite-btn",
+                  text: "⚡ Ignite",
+                  style: { "font-weight": "bold" },
                   callback: () => {
-                    this.runMvpGeneration(session, update);
+                    if (session.isAuto) {
+                       this.runAutoSimulation(session, update);
+                    } else {
+                       this.runStageSimulation(session, update);
+                    }
                   },
                 }),
                 row({
@@ -237,14 +315,16 @@ export class StructuredEditor {
                   content: [
                     button({
                       id: "wand-save-btn",
-                      text: "Save",
+                      text: "Save to Field",
                       callback: () => {
+                        // Ensure we save the content of the currently viewed stage
+                        session.currentContent = session.cycles[activeStage].content;
                         this.saveWandResult(session, modalInstance);
                       },
                     }),
                     button({
                       id: "wand-discard-btn",
-                      text: "Discard",
+                      text: "Close",
                       callback: () => {
                         this.agentCycleManager.endSession(session.fieldId);
                         if (modalInstance) modalInstance.close();
@@ -278,25 +358,62 @@ export class StructuredEditor {
     });
   }
 
-  private async runMvpGeneration(
+  private async runAutoSimulation(
     session: FieldSession,
     updateFn: () => void,
   ): Promise<void> {
-    session.progress = "Running 3-stage cycle...\n";
+    const stages: ("generate" | "review" | "refine")[] = ["generate", "review", "refine"];
+    const startIndex = stages.indexOf(session.selectedStage);
+    
+    // Iterate from current stage to the end
+    for (let i = startIndex; i < stages.length; i++) {
+        session.selectedStage = stages[i];
+        updateFn(); // Switch tab
+        await this.runStageSimulation(session, updateFn);
+        
+        // Small pause between stages for visual clarity
+        if (i < stages.length - 1) {
+            await api.v1.timers.sleep(500);
+        }
+    }
+
+    // Automatically disable auto after completion
+    session.isAuto = false;
+    updateFn();
+  }
+
+  private async runStageSimulation(
+    session: FieldSession,
+    updateFn: () => void,
+  ): Promise<void> {
+    const stage = session.selectedStage;
+    
+    // Set status to running (visual indicator could be added later)
+    session.cycles[stage].status = "running";
     updateFn();
 
+    // Simulate work
     await api.v1.timers.sleep(1000);
-    session.progress += "> [Stage 1: Generate] Drafting content...\n";
-    updateFn();
 
-    await api.v1.timers.sleep(1500);
-    session.progress += "> [Stage 2: Review] Critiquing draft...\n";
-    updateFn();
+    const timestamp = new Date().toLocaleTimeString();
+    let result = "";
 
-    await api.v1.timers.sleep(1500);
-    session.progress += "> [Stage 3: Refine] Polishing final version...\n";
-    session.currentContent = `[Result of generation for ${session.fieldId} at ${new Date().toLocaleTimeString()}]\nThis is the high-quality refined content based on your prompt.`;
-    session.progress += "\n✅ Generation complete!";
+    switch (stage) {
+      case "generate":
+        result = `[DRAFT generated at ${timestamp}]\nHere is a creative draft based on the original prompt. It explores the core concepts but might need polishing.`;
+        break;
+      case "review":
+        result = `[CRITIQUE generated at ${timestamp}]\n- The tone is consistent.\n- Consider expanding on the motivations.\n- The pacing feels a bit rushed in the second half.`;
+        break;
+      case "refine":
+        result = `[FINAL POLISH generated at ${timestamp}]\nThis is the refined version of the story element. It incorporates the feedback from the review stage, smoothing out the pacing and deepening the character motivations for a cohesive narrative experience.`;
+        break;
+    }
+
+    session.cycles[stage].content = result;
+    session.cycles[stage].status = "completed";
+    session.currentContent = result; // Sync for saving
+    
     updateFn();
   }
 
