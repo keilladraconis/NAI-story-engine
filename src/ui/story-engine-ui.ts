@@ -25,6 +25,7 @@ export class StoryEngineUI {
       this.storyManager,
       this.agentCycleManager,
       this.agentWorkflowService,
+      () => this.updateUI(),
     );
     this.sidebar = this.createSidebar();
 

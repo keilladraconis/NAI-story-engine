@@ -61,12 +61,36 @@ export class StoryManager {
     );
 
     if (savedData) {
-      this.currentStory = savedData;
+      this.currentStory = this.validateAndMigrate(savedData);
     } else {
       this.currentStory = this.createDefaultStoryData();
       await this.saveStoryData();
     }
     this.notifyListeners();
+  }
+
+  private validateAndMigrate(data: any): StoryData {
+    const defaultData = this.createDefaultStoryData();
+    
+    // Ensure root object exists
+    if (!data) return defaultData;
+
+    // specific field check and migration
+    if (!data.storyPrompt) data.storyPrompt = defaultData.storyPrompt;
+    if (!data.brainstorm) data.brainstorm = defaultData.brainstorm;
+    if (!data.worldSnapshot) data.worldSnapshot = defaultData.worldSnapshot;
+    
+    // Arrays
+    if (!Array.isArray(data.dramatisPersonae)) data.dramatisPersonae = [];
+    if (!Array.isArray(data.universeSystems)) data.universeSystems = [];
+    if (!Array.isArray(data.locations)) data.locations = [];
+    if (!Array.isArray(data.factions)) data.factions = [];
+    if (!Array.isArray(data.situationalDynamics)) data.situationalDynamics = [];
+
+    // Version check could go here
+    data.version = defaultData.version; 
+
+    return data as StoryData;
   }
 
   public subscribe(listener: () => void): () => void {

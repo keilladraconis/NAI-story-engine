@@ -21,20 +21,24 @@ export class StructuredEditor {
   private storyManager: StoryManager;
   private agentCycleManager: AgentCycleManager;
   private agentWorkflowService: AgentWorkflowService;
+  private onUpdateCallback: () => void;
 
   constructor(
     storyManager: StoryManager,
     agentCycleManager: AgentCycleManager,
     agentWorkflowService: AgentWorkflowService,
+    onUpdateCallback: () => void = () => {},
   ) {
     this.storyManager = storyManager;
     this.agentCycleManager = agentCycleManager;
     this.agentWorkflowService = agentWorkflowService;
+    this.onUpdateCallback = onUpdateCallback;
     this.initializeFieldConfigs();
-    this.sidebar = column({ content: [] }); // Placeholder
+    this.sidebar = this.createSidebar();
 
     this.syncFieldsFromStorage().then(() => {
-      this.sidebar = this.createSidebar();
+      // If sync changed anything, it would have triggered a save & notify
+      // which StoryEngineUI listens to.
     });
   }
 
@@ -142,6 +146,19 @@ export class StructuredEditor {
   }
 
   private createFieldSection(config: FieldConfig): UIPart {
+    const session = this.agentCycleManager.getSession(config.id);
+
+    // If there is an active session (Wand Mode), render the workflow UI inline
+    if (session) {
+      return collapsibleSection({
+        title: `${config.label} (Wand Active)`,
+        iconId: config.icon,
+        storageKey: `story:kse-section-${config.id}`,
+        content: this.createWorkflowUI(session, config),
+      });
+    }
+
+    // Standard View
     const content = this.storyManager.getFieldContent(config.id);
 
     return collapsibleSection({
@@ -168,6 +185,216 @@ export class StructuredEditor {
         this.createFieldActions(config),
       ],
     });
+  }
+
+  private createWorkflowUI(session: FieldSession, config: FieldConfig): UIPart[] {
+    const activeStage = session.selectedStage;
+    
+    // Debug logging for runtime error investigation
+    if (!session.cycles || !session.cycles[activeStage]) {
+      api.v1.log(`[UI Error] Invalid session state for ${config.id}. Stage: ${activeStage}, Cycles: ${JSON.stringify(Object.keys(session.cycles || {}))}`);
+      // Fallback to prevent crash
+      return [
+        text({ text: `Error: Invalid session state. Please close and retry.` }),
+        button({ text: "Close", callback: () => {
+          this.agentCycleManager.endSession(config.id);
+          this.onUpdateCallback();
+        }})
+      ];
+    }
+
+    const activeContent = session.cycles[activeStage].content;
+    const update = () => this.onUpdateCallback();
+
+    return [
+      column({
+        id: `wand-container-${config.id}`,
+        content: [
+          // Stage Selection
+          text({
+            text: "Workflow Stage:",
+            style: { "font-weight": "bold", "margin-top": "8px" },
+          }),
+          row({
+            id: `wand-stage-selector-${config.id}`,
+            style: { "align-items": "center", "margin-bottom": "16px", gap: "16px" },
+            content: [
+              row({
+                content: [
+                  button({
+                    text: "1. Generate",
+                    iconId: "file-text",
+                    style:
+                      activeStage === "generate"
+                        ? { "background-color": "rgb(245, 243, 194)", color: "black" }
+                        : {},
+                    callback: () => {
+                      session.selectedStage = "generate";
+                      update();
+                    },
+                  }),
+                  button({
+                    text: "2. Review",
+                    iconId: "eye",
+                    style:
+                      activeStage === "review"
+                        ? { "background-color": "rgb(245, 243, 194)", color: "black" }
+                        : {},
+                    callback: () => {
+                      session.selectedStage = "review";
+                      update();
+                    },
+                  }),
+                  button({
+                    text: "3. Refine",
+                    iconId: "feather",
+                    style:
+                      activeStage === "refine"
+                        ? { "background-color": "rgb(245, 243, 194)", color: "black" }
+                        : {},
+                    callback: () => {
+                      session.selectedStage = "refine";
+                      update();
+                    },
+                  }),
+                ],
+                style: { gap: "8px" },
+              }),
+              checkboxInput({
+                id: `wand-auto-checkbox-${config.id}`,
+                label: "Auto-Advance",
+                initialValue: session.isAuto,
+                onChange: (val) => {
+                  session.isAuto = val;
+                },
+              }),
+            ],
+          }),
+
+          // Active Stage Content
+          text({
+            text: `Stage Output (${activeStage.toUpperCase()}):`,
+            style: { "font-weight": "bold" },
+          }),
+          multilineTextInput({
+            id: `wand-stage-content-${config.id}`,
+            initialValue: activeContent,
+            placeholder: `Output for ${activeStage} stage will appear here...`,
+            onChange: (val) => {
+              session.cycles[activeStage].content = val;
+              session.currentContent = val;
+            },
+            style: { height: "200px" },
+          }),
+
+          // Actions
+          row({
+            id: `wand-action-row-${config.id}`,
+            style: { "margin-top": "24px", "justify-content": "space-between" },
+            content: [
+              (() => {
+                if (session.budgetState === "waiting_for_user") {
+                  return button({
+                    id: `wand-continue-btn-${config.id}`,
+                    text: "⚠️ Continue",
+                    style: {
+                      "background-color": "#fff3cd",
+                      color: "#856404",
+                      "font-weight": "bold",
+                    },
+                    callback: () => {
+                      if (session.budgetResolver) {
+                        session.budgetState = "waiting_for_timer";
+                        session.budgetResolver();
+                        session.budgetResolver = undefined;
+                        update();
+                      }
+                    },
+                  });
+                }
+                if (session.budgetState === "waiting_for_timer") {
+                  return button({
+                    id: `wand-wait-btn-${config.id}`,
+                    text: "⏳ Refilling...",
+                    style: {
+                      "background-color": "#e2e3e5",
+                      color: "#383d41",
+                    },
+                    callback: () => {
+                      // Allow cancel during wait
+                      if (session.cancellationSignal) {
+                        session.cancellationSignal.cancel();
+                        api.v1.ui.toast("Wait cancelled", { type: "info" });
+                        update();
+                      }
+                    },
+                  });
+                }
+                if (session.cycles[activeStage].status === "running") {
+                  return button({
+                    id: `wand-cancel-btn-${config.id}`,
+                    text: "🚫 Cancel",
+                    style: {
+                      "font-weight": "bold",
+                      "background-color": "#ffcccc",
+                      color: "red",
+                    },
+                    callback: () => {
+                      if (session.cancellationSignal) {
+                        session.cancellationSignal.cancel();
+                        api.v1.ui.toast("Generation cancelled", {
+                          type: "info",
+                        });
+                        update();
+                      }
+                    },
+                  });
+                }
+                return button({
+                  id: `wand-ignite-btn-${config.id}`,
+                  text: "⚡ Ignite",
+                  style: { "font-weight": "bold" },
+                  callback: () => {
+                    if (session.isAuto) {
+                      this.agentWorkflowService.runAutoGeneration(session, update);
+                    } else {
+                      this.agentWorkflowService.runStageGeneration(session, update);
+                    }
+                  },
+                });
+              })(),
+              row({
+                id: `wand-save-discard-row-${config.id}`,
+                content: [
+                  button({
+                    id: `wand-save-btn-${config.id}`,
+                    text: "Save & Close",
+                    callback: () => {
+                      // Ensure we save the content of the currently viewed stage
+                      session.currentContent = session.cycles[activeStage].content;
+                      this.saveWandResult(session);
+                    },
+                  }),
+                  button({
+                    id: `wand-discard-btn-${config.id}`,
+                    text: "Close",
+                    callback: () => {
+                      // Close means cancel any running gen and revert UI
+                      if (session.cancellationSignal) {
+                        session.cancellationSignal.cancel();
+                      }
+                      this.agentCycleManager.endSession(session.fieldId);
+                      update();
+                    },
+                  }),
+                ],
+                style: { gap: "8px" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ];
   }
 
   private createFieldActions(config: FieldConfig): UIPart {
@@ -204,226 +431,17 @@ export class StructuredEditor {
     const config = this.configs.get(fieldId);
     if (!config) return;
 
-    this.showWandModal(config);
-  }
-
-  private async showWandModal(config: FieldConfig): Promise<void> {
-    const session = this.agentCycleManager.startSession(
+    // Start a new session
+    this.agentCycleManager.startSession(
       config.id,
       this.storyManager.getFieldContent(config.id),
     );
-
-    let modalInstance: any = null;
-
-    const renderModalContent = () => {
-      const activeStage = session.selectedStage;
-      const activeContent = session.cycles[activeStage].content;
-
-      return [
-        column({
-          id: `wand-modal-container-${config.id}`,
-          content: [
-            // Stage Selection
-            text({
-              text: "Workflow Stage:",
-              style: { "font-weight": "bold", "margin-top": "8px" },
-            }),
-            row({
-              id: "wand-stage-selector",
-              style: { "align-items": "center", "margin-bottom": "16px", gap: "16px" },
-              content: [
-                row({
-                  content: [
-                    button({
-                      text: "1. Generate",
-                      iconId: "file-text",
-                      style:
-                        activeStage === "generate"
-                          ? { "background-color": "rgb(245, 243, 194)", color: "black" }
-                          : {},
-                      callback: () => {
-                        session.selectedStage = "generate";
-                        update();
-                      },
-                    }),
-                    button({
-                      text: "2. Review",
-                      iconId: "eye",
-                      style:
-                        activeStage === "review"
-                          ? { "background-color": "rgb(245, 243, 194)", color: "black" }
-                          : {},
-                      callback: () => {
-                        session.selectedStage = "review";
-                        update();
-                      },
-                    }),
-                    button({
-                      text: "3. Refine",
-                      iconId: "feather",
-                      style:
-                        activeStage === "refine"
-                          ? { "background-color": "rgb(245, 243, 194)", color: "black" }
-                          : {},
-                      callback: () => {
-                        session.selectedStage = "refine";
-                        update();
-                      },
-                    }),
-                  ],
-                  style: { gap: "8px" },
-                }),
-                checkboxInput({
-                  id: "wand-auto-checkbox",
-                  label: "Auto-Advance",
-                  initialValue: session.isAuto,
-                  onChange: (val) => {
-                    session.isAuto = val;
-                  },
-                }),
-              ],
-            }),
-
-            // Active Stage Content
-            text({
-              text: `Stage Output (${activeStage.toUpperCase()}):`,
-              style: { "font-weight": "bold" },
-            }),
-            multilineTextInput({
-              id: "wand-stage-content",
-              initialValue: activeContent,
-              placeholder: `Output for ${activeStage} stage will appear here...`,
-              onChange: (val) => {
-                session.cycles[activeStage].content = val;
-                session.currentContent = val;
-              },
-              style: { height: "200px" },
-            }),
-
-            // Actions
-            row({
-              id: "wand-action-row",
-              style: { "margin-top": "24px", "justify-content": "space-between" },
-              content: [
-                (() => {
-                  if (session.budgetState === "waiting_for_user") {
-                    return button({
-                      id: "wand-continue-btn",
-                      text: "⚠️ Continue",
-                      style: {
-                        "background-color": "#fff3cd",
-                        color: "#856404",
-                        "font-weight": "bold",
-                      },
-                      callback: () => {
-                        if (session.budgetResolver) {
-                          session.budgetState = "waiting_for_timer";
-                          session.budgetResolver();
-                          session.budgetResolver = undefined;
-                          update();
-                        }
-                      },
-                    });
-                  }
-                  if (session.budgetState === "waiting_for_timer") {
-                    return button({
-                      id: "wand-wait-btn",
-                      text: "⏳ Refilling...",
-                      style: {
-                        "background-color": "#e2e3e5",
-                        color: "#383d41",
-                      },
-                      callback: () => {
-                        // Allow cancel during wait
-                        if (session.cancellationSignal) {
-                          session.cancellationSignal.cancel();
-                          api.v1.ui.toast("Wait cancelled", { type: "info" });
-                        }
-                      },
-                    });
-                  }
-                  if (session.cycles[activeStage].status === "running") {
-                    return button({
-                      id: "wand-cancel-btn",
-                      text: "🚫 Cancel",
-                      style: {
-                        "font-weight": "bold",
-                        "background-color": "#ffcccc",
-                        color: "red",
-                      },
-                      callback: () => {
-                        if (session.cancellationSignal) {
-                          session.cancellationSignal.cancel();
-                          api.v1.ui.toast("Generation cancelled", {
-                            type: "info",
-                          });
-                        }
-                      },
-                    });
-                  }
-                  return button({
-                    id: "wand-ignite-btn",
-                    text: "⚡ Ignite",
-                    style: { "font-weight": "bold" },
-                    callback: () => {
-                      if (session.isAuto) {
-                        this.agentWorkflowService.runAutoGeneration(session, update);
-                      } else {
-                        this.agentWorkflowService.runStageGeneration(session, update);
-                      }
-                    },
-                  });
-                })(),
-                row({
-                  id: "wand-save-discard-row",
-                  content: [
-                    button({
-                      id: "wand-save-btn",
-                      text: "Save to Field",
-                      callback: () => {
-                        // Ensure we save the content of the currently viewed stage
-                        session.currentContent = session.cycles[activeStage].content;
-                        this.saveWandResult(session, modalInstance);
-                      },
-                    }),
-                    button({
-                      id: "wand-discard-btn",
-                      text: "Close",
-                      callback: () => {
-                        this.agentCycleManager.endSession(session.fieldId);
-                        if (modalInstance) modalInstance.close();
-                      },
-                    }),
-                  ],
-                  style: { gap: "8px" },
-                }),
-              ],
-            }),
-          ],
-        }),
-      ];
-    };
-
-    const update = () => {
-      if (modalInstance) {
-        try {
-          const content = renderModalContent();
-          modalInstance.update({ content });
-        } catch (e) {
-          api.v1.log(`[Wand] Error during update: ${e}`);
-        }
-      }
-    };
-
-    modalInstance = await api.v1.ui.modal.open({
-      title: `🪄 Agentic Workflow: ${config.label}`,
-      size: "medium",
-      content: renderModalContent(),
-    });
+    
+    // Trigger UI update to switch to Wand Mode
+    this.onUpdateCallback();
   }
 
-
-  private async saveWandResult(session: FieldSession, modal: any): Promise<void> {
+  private async saveWandResult(session: FieldSession): Promise<void> {
     if (!session.currentContent) {
       api.v1.ui.toast("No content to save.", { type: "warning" });
       return;
@@ -445,23 +463,13 @@ export class StructuredEditor {
     // 3. Commit to history
     await this.storyManager.commit();
 
-    // 4. Force update the UI part just in case
-    try {
-      await api.v1.ui.updateParts([
-        {
-          id: `field-${session.fieldId}`,
-          initialValue: session.currentContent,
-        } as any,
-      ]);
-    } catch (e) {
-      // Ignore
-    }
-
     api.v1.ui.toast(`Saved generated content to ${session.fieldId}`, {
       type: "success",
     });
+    
+    // End session and revert UI
     this.agentCycleManager.endSession(session.fieldId);
-    modal.close();
+    this.onUpdateCallback();
   }
 
   private handleFieldChange(fieldId: string, content: string): void {

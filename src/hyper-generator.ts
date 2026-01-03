@@ -1,11 +1,12 @@
 /** HYPER GENERATOR
  * License: MIT; Credit to OccultSage for the original form and inspiration
  * Authors: Keilla
- * Version: 0.4.0
+ * Version: 0.4.1
  */
 
 /** Changes
  * hyperContextBuilder signature modified to receive enable_thinking boolean. Thoughts require a contentless assistant suffix on the messages.
+ * hyperContextBuilder tail-slicing-appending removed. Causes issues with careful prompting and prefill.
  */
 
 // ===== CONSTANTS =====
@@ -173,40 +174,11 @@ export function hyperContextBuilder(
   rest: Message[],
   thinking: boolean = false,
 ): Message[] {
-  const TAIL_THRESHOLD = 500;
-  const head = rest.slice(0, -1);
-  const tail = rest.at(-1);
-  if (tail && tail.content && tail.content.length > TAIL_THRESHOLD) {
-    const newlinePos = tail.content.slice(0, -TAIL_THRESHOLD).lastIndexOf("\n");
-    if (newlinePos > 0) {
-      const newHead = [
-        ...head,
-        {
-          ...tail,
-          content: tail.content.slice(0, newlinePos),
-        },
-      ];
-      const newTail = {
-        ...tail,
-        content: tail.content.slice(newlinePos + 1),
-      };
-      return [
-        system,
-        ...newHead,
-        user,
-        assistant,
-        newTail,
-        ...(thinking ? [{ role: "assistant" as const }] : []), // If thinking, append an empty assistant, required to activate thoughts.
-      ];
-    }
-  }
-
   return [
     system,
-    ...head,
+    ...rest,
     user,
     assistant,
-    ...(tail ? [tail] : []),
     ...(thinking ? [{ role: "assistant" as const }] : []), // If thinking, append an empty assistant, required to activate thoughts.
   ];
 }

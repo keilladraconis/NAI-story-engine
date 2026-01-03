@@ -22,6 +22,38 @@ const fixSpacing = (text: string): string => {
   return text.replace(/\n/g, "\n\n").trim();
 };
 
+const applyReviewTags = (original: string, review: string): string => {
+  if (!review) return original;
+  
+  const lines = review.split('\n');
+  const patches: { index: number; tag: string }[] = [];
+
+  for (const line of lines) {
+    // Match [TAG] || "locator"
+    // We allow for some flexibility in whitespace
+    const match = line.match(/^\[([A-Z_]+)\]\s*\|\|\s*"(.*)"$/);
+    if (match) {
+      const tag = match[1];
+      const locator = match[2];
+      
+      // specific strategy: find the first occurrence of the locator
+      const idx = original.indexOf(locator);
+      if (idx !== -1) {
+        patches.push({ index: idx, tag: `[${tag}] ` });
+      }
+    }
+  }
+
+  // Sort by index descending to avoid shifting indices when inserting
+  patches.sort((a, b) => b.index - a.index);
+
+  let patched = original;
+  for (const patch of patches) {
+    patched = patched.slice(0, patch.index) + patch.tag + patched.slice(patch.index);
+  }
+  return patched;
+};
+
 const Strategies: Record<string, StrategyFn> = {
   // Generate (Default / Brainstorm) - The Ideator
   // High creativity, divergent thinking
@@ -99,7 +131,7 @@ const Strategies: Record<string, StrategyFn> = {
       {
         role: "assistant",
         content:
-          "I have annotated the text with tags. Here is the marked-up content:",
+          "I will review the text and provide structured directives in the format '[TAG] || \"locator substring\"':\n",
       },
       [
         {
@@ -130,6 +162,8 @@ const Strategies: Record<string, StrategyFn> = {
     const userPrompt = (await api.v1.config.get("refine_prompt")) || "";
     const contentToRefine = session.cycles.generate.content;
     const critique = session.cycles.review.content;
+    const patchedContent = applyReviewTags(contentToRefine, critique);
+    
     const messages = hyperContextBuilder(
       base.systemMsg,
       { role: "user", content: fixSpacing(userPrompt) },
@@ -144,9 +178,9 @@ const Strategies: Record<string, StrategyFn> = {
         },
         {
           role: "assistant",
-          content: fixSpacing(`DRAFT CONTENT:\n${contentToRefine}`),
+          content: fixSpacing(`DRAFT CONTENT:\n${patchedContent}`),
         },
-        { role: "user", content: fixSpacing(`CRITIQUE:\n${critique}`) },
+        // { role: "user", content: fixSpacing(`CRITIQUE:\n${critique}`) },
       ],
     );
     return {

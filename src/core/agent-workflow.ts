@@ -69,7 +69,7 @@ export class AgentWorkflowService {
       if (!session.cancellationSignal)
         throw new Error("Failed to create cancellation signal");
 
-      const result = await hyperGenerate(
+      let result = await hyperGenerate(
         messages,
         {
           maxTokens: 2048,
@@ -97,6 +97,10 @@ export class AgentWorkflowService {
         session.cancellationSignal,
       );
 
+      if (stage === "review") {
+        result = this.cleanReviewOutput(result);
+      }
+
       session.cycles[stage].content = result;
       session.cycles[stage].status = "completed";
       session.currentContent = result;
@@ -123,5 +127,17 @@ export class AgentWorkflowService {
       }
       updateFn();
     }
+  }
+
+  private cleanReviewOutput(content: string): string {
+    const lines = content.split("\n");
+    const validLines = lines.filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return false;
+      // Validates format: [TAG] || "locator"
+      // Allows optional spaces around ||
+      return /^\[[A-Z_]+\]\s*\|\|\s*".*"$/.test(trimmed);
+    });
+    return validLines.join("\n");
   }
 }
