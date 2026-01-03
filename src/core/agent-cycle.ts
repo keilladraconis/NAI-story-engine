@@ -10,6 +10,10 @@ export interface FieldSession {
   currentContent: string; // The final result or currently previewed content
   selectedStage: "generate" | "review" | "refine";
   isAuto: boolean;
+  cancellationSignal?: CancellationSignal;
+  budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
+  budgetResolver?: () => void;
+  budgetWaitTime?: number;
   cycles: {
     generate: AgentCycle;
     review: AgentCycle;

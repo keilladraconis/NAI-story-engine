@@ -1,5 +1,9 @@
 import { StoryManager } from "../core/story-manager";
 import { AgentCycleManager, FieldSession } from "../core/agent-cycle";
+import {
+  hyperGenerate,
+  hyperContextBuilder,
+} from "../hyper-generator";
 
 const { column, row, text, button, multilineTextInput, collapsibleSection, checkboxInput } =
   api.v1.ui.part;
@@ -298,18 +302,75 @@ export class StructuredEditor {
               id: "wand-action-row",
               style: { "margin-top": "24px", "justify-content": "space-between" },
               content: [
-                button({
-                  id: "wand-ignite-btn",
-                  text: "⚡ Ignite",
-                  style: { "font-weight": "bold" },
-                  callback: () => {
-                    if (session.isAuto) {
-                       this.runAutoSimulation(session, update);
-                    } else {
-                       this.runStageSimulation(session, update);
-                    }
-                  },
-                }),
+                (() => {
+                  if (session.budgetState === "waiting_for_user") {
+                    return button({
+                      id: "wand-continue-btn",
+                      text: "⚠️ Continue",
+                      style: {
+                        "background-color": "#fff3cd",
+                        color: "#856404",
+                        "font-weight": "bold",
+                      },
+                      callback: () => {
+                        if (session.budgetResolver) {
+                          session.budgetState = "waiting_for_timer";
+                          session.budgetResolver();
+                          session.budgetResolver = undefined;
+                          update();
+                        }
+                      },
+                    });
+                  }
+                  if (session.budgetState === "waiting_for_timer") {
+                    return button({
+                      id: "wand-wait-btn",
+                      text: "⏳ Refilling...",
+                      style: {
+                        "background-color": "#e2e3e5",
+                        color: "#383d41",
+                      },
+                      callback: () => {
+                        // Allow cancel during wait
+                        if (session.cancellationSignal) {
+                          session.cancellationSignal.cancel();
+                          api.v1.ui.toast("Wait cancelled", { type: "info" });
+                        }
+                      },
+                    });
+                  }
+                  if (session.cycles[activeStage].status === "running") {
+                    return button({
+                      id: "wand-cancel-btn",
+                      text: "🚫 Cancel",
+                      style: {
+                        "font-weight": "bold",
+                        "background-color": "#ffcccc",
+                        color: "red",
+                      },
+                      callback: () => {
+                        if (session.cancellationSignal) {
+                          session.cancellationSignal.cancel();
+                          api.v1.ui.toast("Generation cancelled", {
+                            type: "info",
+                          });
+                        }
+                      },
+                    });
+                  }
+                  return button({
+                    id: "wand-ignite-btn",
+                    text: "⚡ Ignite",
+                    style: { "font-weight": "bold" },
+                    callback: () => {
+                      if (session.isAuto) {
+                        this.runAutoGeneration(session, update);
+                      } else {
+                        this.runStageGeneration(session, update);
+                      }
+                    },
+                  });
+                })(),
                 row({
                   id: "wand-save-discard-row",
                   content: [
@@ -358,7 +419,7 @@ export class StructuredEditor {
     });
   }
 
-  private async runAutoSimulation(
+  private async runAutoGeneration(
     session: FieldSession,
     updateFn: () => void,
   ): Promise<void> {
@@ -367,9 +428,20 @@ export class StructuredEditor {
     
     // Iterate from current stage to the end
     for (let i = startIndex; i < stages.length; i++) {
+        // If cancelled during auto-run, stop
+        if (session.cancellationSignal && session.cancellationSignal.cancelled) {
+            break;
+        }
+
         session.selectedStage = stages[i];
         updateFn(); // Switch tab
-        await this.runStageSimulation(session, updateFn);
+        
+        const success = await this.runStageGeneration(session, updateFn);
+        if (!success) {
+            session.isAuto = false;
+            updateFn();
+            break;
+        }
         
         // Small pause between stages for visual clarity
         if (i < stages.length - 1) {
@@ -382,39 +454,134 @@ export class StructuredEditor {
     updateFn();
   }
 
-  private async runStageSimulation(
+  private async runStageGeneration(
     session: FieldSession,
     updateFn: () => void,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const stage = session.selectedStage;
-    
-    // Set status to running (visual indicator could be added later)
     session.cycles[stage].status = "running";
-    updateFn();
-
-    // Simulate work
-    await api.v1.timers.sleep(1000);
-
-    const timestamp = new Date().toLocaleTimeString();
-    let result = "";
-
-    switch (stage) {
-      case "generate":
-        result = `[DRAFT generated at ${timestamp}]\nHere is a creative draft based on the original prompt. It explores the core concepts but might need polishing.`;
-        break;
-      case "review":
-        result = `[CRITIQUE generated at ${timestamp}]\n- The tone is consistent.\n- Consider expanding on the motivations.\n- The pacing feels a bit rushed in the second half.`;
-        break;
-      case "refine":
-        result = `[FINAL POLISH generated at ${timestamp}]\nThis is the refined version of the story element. It incorporates the feedback from the review stage, smoothing out the pacing and deepening the character motivations for a cohesive narrative experience.`;
-        break;
-    }
-
-    session.cycles[stage].content = result;
-    session.cycles[stage].status = "completed";
-    session.currentContent = result; // Sync for saving
+    session.cycles[stage].content = ""; // Clear previous content
+    session.currentContent = ""; 
     
+    // @ts-ignore
+    session.cancellationSignal = await api.v1.createCancellationSignal();
     updateFn();
+
+    try {
+      // 1. Load Prompts
+      const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
+      const storyPromptContent = this.storyManager.getFieldContent("storyPrompt");
+
+      let userPrompt = "";
+      let contextMessages: Message[] = [];
+      const systemMsg: Message = { role: "system", content: systemPrompt };
+
+      // 2. Build Context based on Stage
+      if (stage === "generate") {
+        const promptKey =
+          session.fieldId === "brainstorm"
+            ? "brainstorm_prompt"
+            : "brainstorm_prompt"; // Fallback for others
+        userPrompt = (await api.v1.config.get(promptKey)) || "";
+
+        contextMessages = hyperContextBuilder(
+          systemMsg,
+          { role: "user", content: userPrompt },
+          { role: "assistant", content: "" },
+          [{ role: "user", content: `STORY PROMPT:\n${storyPromptContent}` }],
+        );
+      } else if (stage === "review") {
+        userPrompt = (await api.v1.config.get("critique_prompt")) || "";
+        const contentToReview = session.cycles.generate.content;
+
+        contextMessages = hyperContextBuilder(
+          systemMsg,
+          { role: "user", content: userPrompt },
+          { role: "assistant", content: "" },
+          [
+            { role: "user", content: `STORY PROMPT:\n${storyPromptContent}` },
+            {
+              role: "assistant",
+              content: `CONTENT TO REVIEW:\n${contentToReview}`,
+            },
+          ],
+        );
+      } else if (stage === "refine") {
+        userPrompt = (await api.v1.config.get("refine_prompt")) || "";
+        const contentToRefine = session.cycles.generate.content;
+        const critique = session.cycles.review.content;
+
+        contextMessages = hyperContextBuilder(
+          systemMsg,
+          { role: "user", content: userPrompt },
+          { role: "assistant", content: "" },
+          [
+            { role: "user", content: `STORY PROMPT:\n${storyPromptContent}` },
+            {
+              role: "assistant",
+              content: `DRAFT CONTENT:\n${contentToRefine}`,
+            },
+            { role: "user", content: `CRITIQUE:\n${critique}` },
+          ],
+        );
+      }
+
+      // 3. Generate
+      if (!session.cancellationSignal) throw new Error("Failed to create cancellation signal");
+
+      const result = await hyperGenerate(
+        contextMessages,
+        {
+          maxTokens: 2048,
+          minTokens: 50,
+          onBudgetWait: (available, needed, time) => {
+            session.budgetState = "waiting_for_user";
+            session.budgetWaitTime = time;
+            updateFn();
+            return new Promise<void>((resolve) => {
+              session.budgetResolver = resolve;
+            });
+          },
+          onBudgetResume: (available) => {
+            session.budgetState = "normal";
+            updateFn();
+          },
+        },
+        (text) => {
+          session.cycles[stage].content += text; // Append delta
+          session.currentContent = session.cycles[stage].content;
+          updateFn();
+        },
+        "background",
+        session.cancellationSignal,
+      );
+
+      session.cycles[stage].content = result;
+      session.cycles[stage].status = "completed";
+      session.currentContent = result;
+      return true;
+    } catch (e: any) {
+      if (
+        e.message &&
+        (e.message.includes("cancelled") || e.message.includes("Aborted"))
+      ) {
+        session.cycles[stage].status = "idle";
+        api.v1.log("Generation cancelled");
+        return false;
+      } else {
+        session.cycles[stage].status = "idle";
+        api.v1.ui.toast(`Generation failed: ${e.message}`, { type: "error" });
+        api.v1.log(`Generation failed: ${e}`);
+        return false;
+      }
+    } finally {
+      session.cancellationSignal = undefined;
+      // Ensure we don't leave it in running state if something weird happened
+      if (session.cycles[stage].status === "running") {
+        session.cycles[stage].status = "idle";
+      }
+      updateFn();
+    }
   }
 
   private async saveWandResult(session: FieldSession, modal: any): Promise<void> {
