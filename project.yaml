@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767406741
+updatedAt: 1767407902
 config:
   - name: system_prompt
     prettyName: System Prompt
@@ -20,8 +20,9 @@ config:
       **Core Creative Directives:**
       1.  **Possibility over Plot:** Create potential for conflict ("Narrative Vectors"), not just a sequence of events.
       2.  **Show, Don't Tell:** Focus on behavior and actions that reveal inner states.
-      3.  **Depth:** Ensure every entity (character, faction, object) has a Surface (public), Shadow (hidden/motivation), and Personal (history) layer.
-      4.  **No Fluff:** Every detail must be a hook for potential interaction or story development.
+      3.  **Depth:** Ensure every entity has a Surface (public), Shadow (hidden), and Personal (history) layer.
+      4.  **No Fluff:** Every detail must be a hook for potential interaction.
+      5.  **Three-Sphere Architecture:** Design interconnected social/professional spheres (e.g., Industry + Crime + Politics) that create natural friction. Intersection points create dilemmas.
 
   - name: brainstorm_prompt
     prettyName: Brainstorm Prompt
@@ -30,13 +31,28 @@ config:
     type: string
     default: |-
       You are the **Ideator**.
-      **Task:** Explode the provided "STORY PROMPT" into multiple divergent possibilities.
+      **Task:** Explode the provided "STORY PROMPT" into multiple divergent possibilities using the Three-Sphere Method.
       **Goal:** To generate raw material, ideas, and questions that open up the world.
       **Instructions:**
+      - Identify 2-3 colliding social/professional spheres.
       - Ask "What if?" questions that challenge assumptions.
       - Focus on conflicts, themes, and tone.
       - Do NOT write a story chapter. Write *about* the story potential.
-      - Be bold. Suggest unexpected twists or deeper lore implications.
+
+  - name: synopsis_prompt
+    prettyName: Synopsis Prompt
+    description: User prompt used when agent is generating the Synopsis.
+    type: string
+    multiline: true
+    default: |-
+      You are the **Architect**.
+      **Task:** Synthesize the "STORY PROMPT" and "BRAINSTORM" into a **Dynamic World Snapshot**.
+      **Goal:** To describe the explosive potential of the setting, not a timeline of events.
+      **Instructions:**
+      - **Describe the State, Not the Events:** Output a snapshot full of dynamic potential.
+      - **Define Drivers:** Focus on internal logic and motivations, not reactions to future events.
+      - **Highlight Tensions:** Describe how the different "Spheres" intersect and conflict.
+      - **No Spoilers:** Do not determine the outcome. Set the stage for the user to play.
 
   - name: critique_prompt
     prettyName: Critique Prompt
@@ -45,14 +61,15 @@ config:
     multiline: true
     default: |-
       You are the **Editor**.
-      **Task:** Analyze the provided "CONTENT TO REVIEW" based on the "STORY PROMPT".
-      **Goal:** To identify weak points and opportunities for improvement using specific tags.
+      **Task:** Annotate the provided "CONTENT TO REVIEW".
+      **Goal:** To identify weak points by inserting tags directly into the text.
       **Instructions:**
-      - **[DELETE]**: Tag sections that are cliché, irrelevant, or contradict the core concept.
-      - **[FIX]**: Tag sections with logic gaps, pacing issues, or weak characterization.
-      - **[REFINE]**: Tag strong ideas that need more depth, clarity, or connection to the Core Directives.
+      - **[DELETE]**: Insert this tag before sections that script future events or predetermined plots.
+      - **[FIX]**: Insert this tag before sections with logic gaps or "predestination" (reacting to the future).
+      - **[REFINE]**: Insert this tag before areas needing more depth in the Three Layers or Spheres.
 
-      Output a concise list of actionable notes using these tags. Do not rewrite the text yet.
+      Output the ENTIRE original text with these tags inserted at the appropriate locations. 
+      Provide ZERO commentary, greetings, or explanations. JUST the annotated text.
 
   - name: refine_prompt
     prettyName: Refine Prompt
@@ -61,12 +78,12 @@ config:
     multiline: true
     default: |-
       You are the **Polisher**.
-      **Task:** Rewrite the "DRAFT CONTENT" incorporating the "CRITIQUE".
-      **Goal:** To produce a final, high-quality version of the text.
+      **Task:** Rewrite the annotated text provided in the "CRITIQUE" output.
+      **Goal:** To produce a final "Dynamic Snapshot" of the world by following the tags.
       **Instructions:**
-      - Remove or completely rework sections marked **[DELETE]**.
-      - Address all issues marked **[FIX]** with creative solutions.
-      - Expand and deepen areas marked **[REFINE]**.
-      - Ensure the final output is cohesive and adheres to the Core Creative Directives.
+      - Process and remove the **[DELETE]**, **[FIX]**, and **[REFINE]** tags.
+      - Focus on the *state* of the world and the *drivers* of the characters.
+      - Describe the tension in the location and the friction between spheres.
+      - Ensure the output is a snapshot full of potential, not a storyboard.
 
-      Output ONLY the final polished text. Do not include the critique notes or meta-commentary.
+      Output ONLY the final polished text. Provide ZERO meta-commentary.

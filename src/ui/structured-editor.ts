@@ -478,18 +478,29 @@ export class StructuredEditor {
 
       // 2. Build Context based on Stage
       if (stage === "generate") {
-        const promptKey =
-          session.fieldId === "brainstorm"
-            ? "brainstorm_prompt"
-            : "brainstorm_prompt"; // Fallback for others
-        userPrompt = (await api.v1.config.get(promptKey)) || "";
-
-        contextMessages = hyperContextBuilder(
-          systemMsg,
-          { role: "user", content: userPrompt },
-          { role: "assistant", content: "" },
-          [{ role: "user", content: `STORY PROMPT:\n${storyPromptContent}` }],
-        );
+        if (session.fieldId === "synopsis") {
+          userPrompt = (await api.v1.config.get("synopsis_prompt")) || "";
+          const brainstormContent = this.storyManager.getFieldContent("brainstorm");
+          
+          contextMessages = hyperContextBuilder(
+            systemMsg,
+            { role: "user", content: userPrompt },
+            { role: "assistant", content: "" },
+            [
+              { role: "user", content: `STORY PROMPT:\n${storyPromptContent}` },
+              { role: "user", content: `BRAINSTORM MATERIAL:\n${brainstormContent}` },
+            ],
+          );
+        } else {
+          // Default (Brainstorm)
+          userPrompt = (await api.v1.config.get("brainstorm_prompt")) || "";
+          contextMessages = hyperContextBuilder(
+            systemMsg,
+            { role: "user", content: userPrompt },
+            { role: "assistant", content: "" },
+            [{ role: "user", content: `STORY PROMPT:\n${storyPromptContent}` }],
+          );
+        }
       } else if (stage === "review") {
         userPrompt = (await api.v1.config.get("critique_prompt")) || "";
         const contentToReview = session.cycles.generate.content;
