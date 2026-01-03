@@ -57,7 +57,7 @@ const applyReviewTags = (original: string, review: string): string => {
 const Strategies: Record<string, StrategyFn> = {
   // Generate (Default / Brainstorm) - The Ideator
   // High creativity, divergent thinking
-  "generate:default": async (session, manager, base) => {
+  "generate:default": async (_session, _manager, base) => {
     const userPrompt = (await api.v1.config.get("brainstorm_prompt")) || "";
     const messages = hyperContextBuilder(
       base.systemMsg,
@@ -87,7 +87,7 @@ const Strategies: Record<string, StrategyFn> = {
 
   // Generate (Dynamic World Snapshot) - The Architect
   // Balanced structure and creativity
-  "generate:worldSnapshot": async (session, manager, base) => {
+  "generate:worldSnapshot": async (_session, manager, base) => {
     const userPrompt = (await api.v1.config.get("world_snapshot_prompt")) || "";
     const brainstormContent = manager.getFieldContent("brainstorm");
     const messages = hyperContextBuilder(
@@ -122,7 +122,7 @@ const Strategies: Record<string, StrategyFn> = {
 
   // Review - The Editor
   // Low temperature for analytical precision, high repetition penalty to prevent outputting the story
-  "review:default": async (session, manager, base) => {
+  "review:default": async (session, _manager, base) => {
     const userPrompt = (await api.v1.config.get("critique_prompt")) || "";
     const contentToReview = session.cycles.generate.content;
     const messages = hyperContextBuilder(
@@ -158,7 +158,7 @@ const Strategies: Record<string, StrategyFn> = {
 
   // Refine - The Polisher
   // Standard temperature for fluid prose, low repetition penalty for style
-  "refine:default": async (session, manager, base) => {
+  "refine:default": async (session, _manager, base) => {
     const userPrompt = (await api.v1.config.get("refine_prompt")) || "";
     const contentToRefine = session.cycles.generate.content;
     const critique = session.cycles.review.content;

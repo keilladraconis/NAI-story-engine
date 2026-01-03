@@ -6,7 +6,7 @@ import { ContextStrategyFactory } from "./context-strategies";
 export class AgentWorkflowService {
   private contextFactory: ContextStrategyFactory;
 
-  constructor(private storyManager: StoryManager) {
+  constructor(storyManager: StoryManager) {
     this.contextFactory = new ContextStrategyFactory(storyManager);
   }
 
@@ -75,7 +75,7 @@ export class AgentWorkflowService {
           maxTokens: 2048,
           minTokens: 50,
           ...params,
-          onBudgetWait: (available, needed, time) => {
+          onBudgetWait: (_1, _2, time) => {
             session.budgetState = "waiting_for_user";
             session.budgetWaitTime = time;
             updateFn();
@@ -83,7 +83,7 @@ export class AgentWorkflowService {
               session.budgetResolver = resolve;
             });
           },
-          onBudgetResume: (available) => {
+          onBudgetResume: () => {
             session.budgetState = "normal";
             updateFn();
           },
