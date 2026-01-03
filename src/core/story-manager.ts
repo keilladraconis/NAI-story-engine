@@ -61,36 +61,12 @@ export class StoryManager {
     );
 
     if (savedData) {
-      this.currentStory = this.validateAndMigrate(savedData);
+      this.currentStory = savedData;
     } else {
       this.currentStory = this.createDefaultStoryData();
       await this.saveStoryData();
     }
     this.notifyListeners();
-  }
-
-  private validateAndMigrate(data: any): StoryData {
-    const defaultData = this.createDefaultStoryData();
-    
-    // Ensure root object exists
-    if (!data) return defaultData;
-
-    // specific field check and migration
-    if (!data.storyPrompt) data.storyPrompt = defaultData.storyPrompt;
-    if (!data.brainstorm) data.brainstorm = defaultData.brainstorm;
-    if (!data.worldSnapshot) data.worldSnapshot = defaultData.worldSnapshot;
-    
-    // Arrays
-    if (!Array.isArray(data.dramatisPersonae)) data.dramatisPersonae = [];
-    if (!Array.isArray(data.universeSystems)) data.universeSystems = [];
-    if (!Array.isArray(data.locations)) data.locations = [];
-    if (!Array.isArray(data.factions)) data.factions = [];
-    if (!Array.isArray(data.situationalDynamics)) data.situationalDynamics = [];
-
-    // Version check could go here
-    data.version = defaultData.version; 
-
-    return data as StoryData;
   }
 
   public subscribe(listener: () => void): () => void {
@@ -107,14 +83,13 @@ export class StoryManager {
   public getFieldContent(fieldId: string): string {
     if (!this.currentStory) return "";
 
-    // Check specific fields first
-    if (fieldId === "storyPrompt") return this.currentStory.storyPrompt.content;
-    if (fieldId === "brainstorm") return this.currentStory.brainstorm.content;
+    // Check specific fields first with optional chaining for safety
+    if (fieldId === "storyPrompt") return this.currentStory.storyPrompt?.content || "";
+    if (fieldId === "brainstorm") return this.currentStory.brainstorm?.content || "";
     if (fieldId === "worldSnapshot")
-      return this.currentStory.worldSnapshot.content;
+      return this.currentStory.worldSnapshot?.content || "";
 
     // Check if it's a DULFS field (not fully implemented in data structure yet, but provided for consistency)
-    // For now, return empty string or implement logic if DULFS structure allows
     return "";
   }
 
