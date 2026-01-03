@@ -1,6 +1,9 @@
 import { FieldSession, AgentCycleManager } from "../core/agent-cycle";
 import { AgentWorkflowService } from "../core/agent-workflow";
-import { createHeaderWithToggle, createToggleableContent } from "./ui-components";
+import {
+  createHeaderWithToggle,
+  createToggleableContent,
+} from "./ui-components";
 
 const { column, row, text, button, checkboxInput } = api.v1.ui.part;
 
@@ -8,7 +11,7 @@ export class WandUI {
   constructor(
     private agentCycleManager: AgentCycleManager,
     private agentWorkflowService: AgentWorkflowService,
-    private onUpdateCallback: () => void
+    private onUpdateCallback: () => void,
   ) {}
 
   public createWorkflowUI(
@@ -16,14 +19,14 @@ export class WandUI {
     fieldId: string,
     isEditMode: boolean,
     onToggleEditMode: () => void,
-    onSave: (session: FieldSession) => void
+    onSave: (session: FieldSession) => void,
   ): UIPart[] {
     const activeStage = session.selectedStage;
 
     // Debug logging for runtime error investigation
     if (!session.cycles || !session.cycles[activeStage]) {
       api.v1.log(
-        `[UI Error] Invalid session state for ${fieldId}. Stage: ${activeStage}`
+        `[UI Error] Invalid session state for ${fieldId}. Stage: ${activeStage}`,
       );
       return [
         text({ text: `Error: Invalid session state. Please close and retry.` }),
@@ -54,7 +57,7 @@ export class WandUI {
           createHeaderWithToggle(
             `Stage Output (${activeStage.toUpperCase()}):`,
             isEditMode,
-            onToggleEditMode
+            onToggleEditMode,
           ),
 
           // Active Stage Content
@@ -67,7 +70,7 @@ export class WandUI {
               session.cycles[activeStage].content = val;
               session.currentContent = val;
             },
-            { height: "200px" }
+            { height: "100%" },
           ),
 
           // Actions
@@ -80,7 +83,7 @@ export class WandUI {
   private createStageSelector(
     session: FieldSession,
     fieldId: string,
-    activeStage: "generate" | "review" | "refine"
+    activeStage: "generate" | "review" | "refine",
   ): UIPart {
     const update = () => this.onUpdateCallback();
     return row({
@@ -144,7 +147,7 @@ export class WandUI {
     session: FieldSession,
     fieldId: string,
     activeStage: "generate" | "review" | "refine",
-    onSave: (session: FieldSession) => void
+    onSave: (session: FieldSession) => void,
   ): UIPart {
     const update = () => this.onUpdateCallback();
     return row({

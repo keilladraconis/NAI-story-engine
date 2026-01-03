@@ -135,8 +135,8 @@ export class AgentWorkflowService {
       const trimmed = line.trim();
       if (!trimmed) return false;
       // Validates format: [TAG] || "locator"
-      // Allows optional spaces around ||
-      return /^\[[A-Z_]+\]\s*\|\|\s*".*"$/.test(trimmed);
+      // Allows optional spaces around || and optional markdown bolding **
+      return /^(\*\*)?\[[A-Z_]+\](\*\*)?\s*\|\|\s*".*"$/.test(trimmed);
     });
     return validLines.join("\n");
   }

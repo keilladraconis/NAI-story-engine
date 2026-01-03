@@ -19,22 +19,26 @@ const fixSpacing = (text: string): string => {
   return text.replace(/\n/g, "\n\n").trim();
 };
 
+const normalizeQuotes = (str: string): string => {
+  return str.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
+};
+
 const applyReviewTags = (original: string, review: string): string => {
   if (!review) return original;
 
   const lines = review.split("\n");
   const patches: { index: number; tag: string }[] = [];
+  const normalizedOriginal = normalizeQuotes(original);
 
   for (const line of lines) {
-    // Match [TAG] || "locator"
-    // We allow for some flexibility in whitespace
-    const match = line.match(/^\[([A-Z_]+)\]\s*\|\|\s*"(.*)"$/);
+    // Match [TAG] || "locator", optionally with markdown bolding around the tag
+    const match = line.match(/^(\*\*)?\[([A-Z_]+)\](\*\*)?\s*\|\|\s*"(.*)"$/);
     if (match) {
-      const tag = match[1];
-      const locator = match[2];
+      const tag = match[2];
+      const locator = normalizeQuotes(match[4]);
 
-      // specific strategy: find the first occurrence of the locator
-      const idx = original.indexOf(locator);
+      // Find the occurrence using normalized versions
+      const idx = normalizedOriginal.indexOf(locator);
       if (idx !== -1) {
         patches.push({ index: idx, tag: `[${tag}] ` });
       }
@@ -145,9 +149,9 @@ const Strategies: Record<string, StrategyFn> = {
     return {
       messages,
       params: {
-        temperature: 0.4,
+        temperature: 0.3,
         min_p: 0.02,
-        repetition_penalty: 1.2,
+        repetition_penalty: 1.1,
         frequency_penalty: 0.1,
         maxTokens: 1024,
       },
@@ -161,6 +165,7 @@ const Strategies: Record<string, StrategyFn> = {
     const contentToRefine = session.cycles.generate.content;
     const critique = session.cycles.review.content;
     const patchedContent = applyReviewTags(contentToRefine, critique);
+    api.v1.log(`[ContextStrategy] Patched content for Refine:\n${patchedContent}`);
 
     const messages = hyperContextBuilder(
       base.systemMsg,
