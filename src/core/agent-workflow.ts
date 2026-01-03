@@ -63,17 +63,18 @@ export class AgentWorkflowService {
     updateFn();
 
     try {
-      const contextMessages = await this.contextFactory.build(session);
+      const { messages, params } = await this.contextFactory.build(session);
 
       // 3. Generate
       if (!session.cancellationSignal)
         throw new Error("Failed to create cancellation signal");
 
       const result = await hyperGenerate(
-        contextMessages,
+        messages,
         {
           maxTokens: 2048,
           minTokens: 50,
+          ...params,
           onBudgetWait: (available, needed, time) => {
             session.budgetState = "waiting_for_user";
             session.budgetWaitTime = time;

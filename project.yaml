@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767410912
+updatedAt: 1767411745
 config:
   - name: system_prompt
     prettyName: System Prompt
@@ -39,9 +39,9 @@ config:
       - Focus on conflicts, themes, and tone.
       - Do NOT write a story chapter. Write *about* the story potential.
 
-  - name: synopsis_prompt
-    prettyName: Synopsis Prompt
-    description: User prompt used when agent is generating the Synopsis.
+  - name: world_snapshot_prompt
+    prettyName: Dynamic World Snapshot Prompt
+    description: User prompt used when agent is generating the Dynamic World Snapshot.
     type: string
     multiline: true
     default: |-

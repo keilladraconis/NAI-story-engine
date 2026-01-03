@@ -16,7 +16,7 @@ To create a seamless loop between creative exploration and structured organizati
 A systematic process guides you through eight interconnected stages of worldbuilding:
 1. **Story Prompt**: The initial spark.
 2. **Brainstorm**: Creative exploration.
-3. **Synopsis**: Structured summary.
+3. **Dynamic World Snapshot**: A snapshot of the world full of dynamic potential.
 4. **DULFS**: A sub-structure of condensed, formatted lists including:
     - **Dramatis Personae**: Characters.
     - **Universe Systems**: Rules and mechanics.
@@ -51,12 +51,13 @@ A complete history is kept for each field, allowing you to track changes and rev
 
 1.  **Begin with a Spark**: Enter your initial idea in the "Story Prompt" field.
 2.  **Explore and Expand**: Use the "Brainstorm" section to explore concepts.
-3.  **Structure the Narrative**: Develop a "Synopsis" and build out the foundational "DULFS" (Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics).
+3.  **Structure the Narrative**: Develop a "Dynamic World Snapshot" and build out the foundational "DULFS" (Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics).
 4.  **Refine the Details**: Flesh out characters, locations, and the rules of your world in their dedicated sections.
 5.  **Leverage AI**: Look for the **:wand: (Wand)** button next to any field. This opens the **Agentic Workflow Modal**, where you can trigger a 3-stage generation process:
-    - **Generate (The Ideator)**: Creates the initial draft using the Three-Sphere Method.
-    - **Validate (The Editor)**: Critiques the content and inserts inline tags for improvement.
-    - **Rewrite (The Polisher)**: Produces the final, high-quality dynamic snapshot.
+    - **Generate (The Ideator)**: Creates the initial draft using the Three-Sphere Method (High Creativity).
+    - **Validate (The Editor)**: Critiques the content and inserts inline tags for improvement (High Precision).
+    - **Rewrite (The Polisher)**: Produces the final, high-quality dynamic world snapshot (Balanced Flow).
+    *Each agent utilizes a distinct "Creative Profile" (Temperature, Top K, Min P) tailored to their specific role.*
     *Use the tabs to view each stage, click **Ignite** to generate content, or check **Auto-Advance** to run the full cycle automatically!*
 
 ## 🔄 Development Roadmap

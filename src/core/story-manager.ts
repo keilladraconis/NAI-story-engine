@@ -7,7 +7,7 @@ interface StoryData {
   // Workflow stages
   storyPrompt: StoryField;
   brainstorm: StoryField;
-  synopsis: StoryField;
+  worldSnapshot: StoryField;
 
   // DULFS components
   dramatisPersonae: DULFSField[];
@@ -22,7 +22,7 @@ interface StoryData {
 
 interface StoryField {
   id: string;
-  type: "prompt" | "brainstorm" | "synopsis" | "dulfs";
+  type: "prompt" | "brainstorm" | "worldSnapshot" | "dulfs";
   content: string;
   version: number;
   history: FieldHistory[];
@@ -86,7 +86,8 @@ export class StoryManager {
     // Check specific fields first
     if (fieldId === "storyPrompt") return this.currentStory.storyPrompt.content;
     if (fieldId === "brainstorm") return this.currentStory.brainstorm.content;
-    if (fieldId === "synopsis") return this.currentStory.synopsis.content;
+    if (fieldId === "worldSnapshot")
+      return this.currentStory.worldSnapshot.content;
 
     // Check if it's a DULFS field (not fully implemented in data structure yet, but provided for consistency)
     // For now, return empty string or implement logic if DULFS structure allows
@@ -111,9 +112,9 @@ export class StoryManager {
         this.currentStory.brainstorm.content = content;
         changed = true;
       }
-    } else if (fieldId === "synopsis") {
-      if (this.currentStory.synopsis.content !== content) {
-        this.currentStory.synopsis.content = content;
+    } else if (fieldId === "worldSnapshot") {
+      if (this.currentStory.worldSnapshot.content !== content) {
+        this.currentStory.worldSnapshot.content = content;
         changed = true;
       }
     }
@@ -131,7 +132,7 @@ export class StoryManager {
     const fields: StoryField[] = [
       this.currentStory.storyPrompt,
       this.currentStory.brainstorm,
-      this.currentStory.synopsis,
+      this.currentStory.worldSnapshot,
     ];
 
     for (const field of fields) {
@@ -191,9 +192,9 @@ export class StoryManager {
         history: [],
         linkedEntities: [],
       },
-      synopsis: {
-        id: "synopsis",
-        type: "synopsis",
+      worldSnapshot: {
+        id: "worldSnapshot",
+        type: "worldSnapshot",
         content: "",
         version: 0,
         history: [],

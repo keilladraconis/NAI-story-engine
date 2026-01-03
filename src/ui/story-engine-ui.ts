@@ -110,7 +110,7 @@ export class StoryEngineUI {
     const fieldIds = [
       "storyPrompt",
       "brainstorm",
-      "synopsis",
+      "worldSnapshot",
       "dulfs",
       "dramatisPersonae",
       "universeSystems",

@@ -73,10 +73,10 @@ export class StructuredEditor {
         icon: "cloud-lightning",
       },
       {
-        id: "synopsis",
-        label: "Synopsis/Summary",
-        description: "Structured overview of the story",
-        placeholder: "In a world where...",
+        id: "worldSnapshot",
+        label: "Dynamic World Snapshot",
+        description: "A snapshot of the world full of dynamic potential",
+        placeholder: "The state of the world, its drivers, and tensions...",
         icon: "package",
       },
       // DULFS and other fields omitted from direct StoryManager sync for now due to type mismatch
@@ -176,7 +176,7 @@ export class StructuredEditor {
       return row({ content: [] });
     }
 
-    const isPrimaryField = ["brainstorm", "synopsis"].includes(config.id);
+    const isPrimaryField = ["brainstorm", "worldSnapshot"].includes(config.id);
 
     if (isPrimaryField) {
       return row({
