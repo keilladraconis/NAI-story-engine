@@ -1,7 +1,4 @@
-import {
-  hyperContextBuilder,
-  HyperGenerationParams,
-} from "../hyper-generator";
+import { hyperContextBuilder, HyperGenerationParams } from "../hyper-generator";
 import { StoryManager } from "./story-manager";
 import { FieldSession } from "./agent-cycle";
 
@@ -24,8 +21,8 @@ const fixSpacing = (text: string): string => {
 
 const applyReviewTags = (original: string, review: string): string => {
   if (!review) return original;
-  
-  const lines = review.split('\n');
+
+  const lines = review.split("\n");
   const patches: { index: number; tag: string }[] = [];
 
   for (const line of lines) {
@@ -35,7 +32,7 @@ const applyReviewTags = (original: string, review: string): string => {
     if (match) {
       const tag = match[1];
       const locator = match[2];
-      
+
       // specific strategy: find the first occurrence of the locator
       const idx = original.indexOf(locator);
       if (idx !== -1) {
@@ -49,7 +46,8 @@ const applyReviewTags = (original: string, review: string): string => {
 
   let patched = original;
   for (const patch of patches) {
-    patched = patched.slice(0, patch.index) + patch.tag + patched.slice(patch.index);
+    patched =
+      patched.slice(0, patch.index) + patch.tag + patched.slice(patch.index);
   }
   return patched;
 };
@@ -80,7 +78,7 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 1.35,
         min_p: 0.1,
         repetition_penalty: 1.05,
-        maxTokens: 1024,
+        maxTokens: 2048,
       },
     };
   },
@@ -151,7 +149,7 @@ const Strategies: Record<string, StrategyFn> = {
         min_p: 0.02,
         repetition_penalty: 1.2,
         frequency_penalty: 0.1,
-        maxTokens: 2048,
+        maxTokens: 1024,
       },
     };
   },
@@ -163,7 +161,7 @@ const Strategies: Record<string, StrategyFn> = {
     const contentToRefine = session.cycles.generate.content;
     const critique = session.cycles.review.content;
     const patchedContent = applyReviewTags(contentToRefine, critique);
-    
+
     const messages = hyperContextBuilder(
       base.systemMsg,
       { role: "user", content: fixSpacing(userPrompt) },

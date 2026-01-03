@@ -51,6 +51,7 @@ export const createToggleableContent = (
         border: "1px solid rgba(128, 128, 128, 0.2)",
         "border-radius": "4px",
         "min-height": "100px",
+        height: "100%",
         ...style,
       },
     });
