@@ -47,7 +47,6 @@ export const createToggleableContent = (
       text: content || "_No content._",
       markdown: true,
       style: {
-        "white-space": "pre-wrap",
         padding: "8px",
         border: "1px solid rgba(128, 128, 128, 0.2)",
         "border-radius": "4px",
