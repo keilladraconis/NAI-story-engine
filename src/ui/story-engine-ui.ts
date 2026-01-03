@@ -2,6 +2,7 @@
 import { StructuredEditor } from "./structured-editor";
 import { StoryManager } from "../core/story-manager";
 import { AgentCycleManager } from "../core/agent-cycle";
+import { AgentWorkflowService } from "../core/agent-workflow";
 
 const { part, extension } = api.v1.ui;
 export class StoryEngineUI {
@@ -14,13 +15,16 @@ export class StoryEngineUI {
   structuredEditor: StructuredEditor;
   storyManager: StoryManager;
   agentCycleManager: AgentCycleManager;
+  agentWorkflowService: AgentWorkflowService;
 
   constructor() {
     this.storyManager = new StoryManager();
     this.agentCycleManager = new AgentCycleManager();
+    this.agentWorkflowService = new AgentWorkflowService(this.storyManager);
     this.structuredEditor = new StructuredEditor(
       this.storyManager,
       this.agentCycleManager,
+      this.agentWorkflowService,
     );
     this.sidebar = this.createSidebar();
 

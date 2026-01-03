@@ -1,9 +1,6 @@
 import { StoryManager } from "../core/story-manager";
 import { AgentCycleManager, FieldSession } from "../core/agent-cycle";
-import {
-  hyperGenerate,
-  hyperContextBuilder,
-} from "../hyper-generator";
+import { AgentWorkflowService } from "../core/agent-workflow";
 
 const { column, row, text, button, multilineTextInput, collapsibleSection, checkboxInput } =
   api.v1.ui.part;
@@ -23,10 +20,16 @@ export class StructuredEditor {
   sidebar: UIPart;
   private storyManager: StoryManager;
   private agentCycleManager: AgentCycleManager;
+  private agentWorkflowService: AgentWorkflowService;
 
-  constructor(storyManager: StoryManager, agentCycleManager: AgentCycleManager) {
+  constructor(
+    storyManager: StoryManager,
+    agentCycleManager: AgentCycleManager,
+    agentWorkflowService: AgentWorkflowService,
+  ) {
     this.storyManager = storyManager;
     this.agentCycleManager = agentCycleManager;
+    this.agentWorkflowService = agentWorkflowService;
     this.initializeFieldConfigs();
     this.sidebar = column({ content: [] }); // Placeholder
 
@@ -364,9 +367,9 @@ export class StructuredEditor {
                     style: { "font-weight": "bold" },
                     callback: () => {
                       if (session.isAuto) {
-                        this.runAutoGeneration(session, update);
+                        this.agentWorkflowService.runAutoGeneration(session, update);
                       } else {
-                        this.runStageGeneration(session, update);
+                        this.agentWorkflowService.runStageGeneration(session, update);
                       }
                     },
                   });
@@ -419,181 +422,6 @@ export class StructuredEditor {
     });
   }
 
-  private async runAutoGeneration(
-    session: FieldSession,
-    updateFn: () => void,
-  ): Promise<void> {
-    const stages: ("generate" | "review" | "refine")[] = ["generate", "review", "refine"];
-    const startIndex = stages.indexOf(session.selectedStage);
-    
-    // Iterate from current stage to the end
-    for (let i = startIndex; i < stages.length; i++) {
-        // If cancelled during auto-run, stop
-        if (session.cancellationSignal && session.cancellationSignal.cancelled) {
-            break;
-        }
-
-        session.selectedStage = stages[i];
-        updateFn(); // Switch tab
-        
-        const success = await this.runStageGeneration(session, updateFn);
-        if (!success) {
-            session.isAuto = false;
-            updateFn();
-            break;
-        }
-        
-        // Small pause between stages for visual clarity
-        if (i < stages.length - 1) {
-            await api.v1.timers.sleep(500);
-        }
-    }
-
-    // Automatically disable auto after completion
-    session.isAuto = false;
-    updateFn();
-  }
-
-  private async runStageGeneration(
-    session: FieldSession,
-    updateFn: () => void,
-  ): Promise<boolean> {
-    const stage = session.selectedStage;
-    session.cycles[stage].status = "running";
-    session.cycles[stage].content = ""; // Clear previous content
-    session.currentContent = ""; 
-    
-    // @ts-ignore
-    session.cancellationSignal = await api.v1.createCancellationSignal();
-    updateFn();
-
-    try {
-      // 1. Load Prompts
-      const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
-      const storyPromptContent = this.storyManager.getFieldContent("storyPrompt");
-
-      let userPrompt = "";
-      let contextMessages: Message[] = [];
-      const systemMsg: Message = { role: "system", content: systemPrompt };
-
-      // 2. Build Context based on Stage
-      if (stage === "generate") {
-        if (session.fieldId === "synopsis") {
-          userPrompt = (await api.v1.config.get("synopsis_prompt")) || "";
-          const brainstormContent = this.storyManager.getFieldContent("brainstorm");
-          
-          contextMessages = hyperContextBuilder(
-            systemMsg,
-            { role: "user", content: userPrompt },
-            { role: "assistant", content: "" },
-            [
-              { role: "user", content: `STORY PROMPT:\n${storyPromptContent}` },
-              { role: "user", content: `BRAINSTORM MATERIAL:\n${brainstormContent}` },
-            ],
-          );
-        } else {
-          // Default (Brainstorm)
-          userPrompt = (await api.v1.config.get("brainstorm_prompt")) || "";
-          contextMessages = hyperContextBuilder(
-            systemMsg,
-            { role: "user", content: userPrompt },
-            { role: "assistant", content: "" },
-            [{ role: "user", content: `STORY PROMPT:\n${storyPromptContent}` }],
-          );
-        }
-      } else if (stage === "review") {
-        userPrompt = (await api.v1.config.get("critique_prompt")) || "";
-        const contentToReview = session.cycles.generate.content;
-
-        contextMessages = hyperContextBuilder(
-          systemMsg,
-          { role: "user", content: userPrompt },
-          { role: "assistant", content: "" },
-          [
-            { role: "user", content: `STORY PROMPT:\n${storyPromptContent}` },
-            {
-              role: "assistant",
-              content: `CONTENT TO REVIEW:\n${contentToReview}`,
-            },
-          ],
-        );
-      } else if (stage === "refine") {
-        userPrompt = (await api.v1.config.get("refine_prompt")) || "";
-        const contentToRefine = session.cycles.generate.content;
-        const critique = session.cycles.review.content;
-
-        contextMessages = hyperContextBuilder(
-          systemMsg,
-          { role: "user", content: userPrompt },
-          { role: "assistant", content: "" },
-          [
-            { role: "user", content: `STORY PROMPT:\n${storyPromptContent}` },
-            {
-              role: "assistant",
-              content: `DRAFT CONTENT:\n${contentToRefine}`,
-            },
-            { role: "user", content: `CRITIQUE:\n${critique}` },
-          ],
-        );
-      }
-
-      // 3. Generate
-      if (!session.cancellationSignal) throw new Error("Failed to create cancellation signal");
-
-      const result = await hyperGenerate(
-        contextMessages,
-        {
-          maxTokens: 2048,
-          minTokens: 50,
-          onBudgetWait: (available, needed, time) => {
-            session.budgetState = "waiting_for_user";
-            session.budgetWaitTime = time;
-            updateFn();
-            return new Promise<void>((resolve) => {
-              session.budgetResolver = resolve;
-            });
-          },
-          onBudgetResume: (available) => {
-            session.budgetState = "normal";
-            updateFn();
-          },
-        },
-        (text) => {
-          session.cycles[stage].content += text; // Append delta
-          session.currentContent = session.cycles[stage].content;
-          updateFn();
-        },
-        "background",
-        session.cancellationSignal,
-      );
-
-      session.cycles[stage].content = result;
-      session.cycles[stage].status = "completed";
-      session.currentContent = result;
-      return true;
-    } catch (e: any) {
-      if (
-        e.message &&
-        (e.message.includes("cancelled") || e.message.includes("Aborted"))
-      ) {
-        session.cycles[stage].status = "idle";
-        api.v1.log("Generation cancelled");
-        return false;
-      } else {
-        session.cycles[stage].status = "idle";
-        api.v1.ui.toast(`Generation failed: ${e.message}`, { type: "error" });
-        api.v1.log(`Generation failed: ${e}`);
-        return false;
-      }
-    } finally {
-      session.cancellationSignal = undefined;
-      // Ensure we don't leave it in running state if something weird happened
-      if (session.cycles[stage].status === "running") {
-        session.cycles[stage].status = "idle";
-      }
-      updateFn();
-    }
-  }
 
   private async saveWandResult(session: FieldSession, modal: any): Promise<void> {
     if (!session.currentContent) {
