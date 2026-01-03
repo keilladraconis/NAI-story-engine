@@ -1,6 +1,7 @@
 // Story Engine UI Integration
 import { StructuredEditor } from "./structured-editor";
 import { StoryManager } from "../core/story-manager";
+import { AgentCycleManager } from "../core/agent-cycle";
 
 const { part, extension } = api.v1.ui;
 export class StoryEngineUI {
@@ -12,10 +13,15 @@ export class StoryEngineUI {
   sidebar: UIExtensionSidebarPanel;
   structuredEditor: StructuredEditor;
   storyManager: StoryManager;
+  agentCycleManager: AgentCycleManager;
 
   constructor() {
     this.storyManager = new StoryManager();
-    this.structuredEditor = new StructuredEditor(this.storyManager);
+    this.agentCycleManager = new AgentCycleManager();
+    this.structuredEditor = new StructuredEditor(
+      this.storyManager,
+      this.agentCycleManager,
+    );
     this.sidebar = this.createSidebar();
 
     // Subscribe to backend changes

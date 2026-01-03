@@ -1,4 +1,5 @@
 import { StoryManager } from "../core/story-manager";
+import { AgentCycleManager, FieldSession } from "../core/agent-cycle";
 
 const { column, row, text, button, multilineTextInput, collapsibleSection } =
   api.v1.ui.part;
@@ -17,16 +18,17 @@ export class StructuredEditor {
   private configs: Map<string, FieldConfig> = new Map();
   sidebar: UIPart;
   private storyManager: StoryManager;
+  private agentCycleManager: AgentCycleManager;
 
-  constructor(storyManager: StoryManager) {
+  constructor(storyManager: StoryManager, agentCycleManager: AgentCycleManager) {
     this.storyManager = storyManager;
+    this.agentCycleManager = agentCycleManager;
     this.initializeFieldConfigs();
+    this.sidebar = column({ content: [] }); // Placeholder
+
     this.syncFieldsFromStorage().then(() => {
       this.sidebar = this.createSidebar();
-      // Re-trigger a UI update through the manager if needed,
-      // but here we are just initializing.
     });
-    this.sidebar = this.createSidebar();
   }
 
   private async syncFieldsFromStorage(): Promise<void> {
@@ -166,25 +168,20 @@ export class StructuredEditor {
       config.id,
     );
 
-    if (!isPrimaryField) {
-      // For secondary fields, just show a simple edit button
+    if (isPrimaryField) {
       return row({
         content: [
           button({
-            text: "Edit",
-            callback: () => this.handleFieldEdit(config.id),
+            text: "🪄 Wand",
+            callback: () => this.handleWandClick(config.id),
           }),
         ],
       });
     }
 
-    // For primary fields, show action buttons
+    // For secondary fields, just show a simple edit button
     return row({
       content: [
-        button({
-          text: "Generate",
-          callback: () => this.handleFieldGenerate(config.id),
-        }),
         button({
           text: "Edit",
           callback: () => this.handleFieldEdit(config.id),
@@ -193,36 +190,160 @@ export class StructuredEditor {
     });
   }
 
-  private handleFieldChange(fieldId: string, content: string): void {
-    // Update StoryManager which will trigger UI updates via the listener in StoryEngineUI
-    this.storyManager.setFieldContent(fieldId, content);
-  }
-
-  private async handleFieldGenerate(fieldId: string): Promise<void> {
+  private handleWandClick(fieldId: string): void {
     const config = this.configs.get(fieldId);
     if (!config) return;
 
-    // Placeholder for generation logic
-    api.v1.log(`Generating content for ${config.label}`);
+    this.showWandModal(config);
+  }
 
-    const currentContent = this.storyManager.getFieldContent(fieldId);
-    const newContent =
-      currentContent +
-      (currentContent ? "\n" : "") +
-      `[Generated content for ${config.label} at ${new Date().toLocaleTimeString()}]`;
+  private async showWandModal(config: FieldConfig): Promise<void> {
+    const session = this.agentCycleManager.startSession(
+      config.id,
+      this.storyManager.getFieldContent(config.id),
+    );
 
-    // 1. Update StoryManager (in-memory)
-    await this.storyManager.setFieldContent(fieldId, newContent, false);
+    let modalInstance: any = null;
 
-    // 2. Update the storage key used by the UI part so it reflects the change
-    await api.v1.storyStorage.set(`kse-field-${fieldId}`, newContent);
+    const renderModalContent = () => {
+      return [
+        column({
+          id: `wand-modal-container-${config.id}`,
+          content: [
+            text({
+              text: "Progress Visualization:",
+              style: { "font-weight": "bold", "margin-top": "8px" },
+            }),
+            multilineTextInput({
+              id: "wand-progress",
+              initialValue: session.progress,
+              onChange: (val) => {
+                session.progress = val;
+              },
+            }),
+            row({
+              id: "wand-action-row",
+              style: { "margin-top": "24px", "justify-content": "space-between" },
+              content: [
+                button({
+                  id: "wand-generate-btn",
+                  text: "Generate",
+                  callback: () => {
+                    this.runMvpGeneration(session, update);
+                  },
+                }),
+                row({
+                  id: "wand-save-discard-row",
+                  content: [
+                    button({
+                      id: "wand-save-btn",
+                      text: "Save",
+                      callback: () => {
+                        this.saveWandResult(session, modalInstance);
+                      },
+                    }),
+                    button({
+                      id: "wand-discard-btn",
+                      text: "Discard",
+                      callback: () => {
+                        this.agentCycleManager.endSession(session.fieldId);
+                        if (modalInstance) modalInstance.close();
+                      },
+                    }),
+                  ],
+                  style: { gap: "8px" },
+                }),
+              ],
+            }),
+          ],
+        }),
+      ];
+    };
 
-    // 3. Commit to history (this will also save STORY_DATA and notify listeners)
+    const update = () => {
+      if (modalInstance) {
+        try {
+          const content = renderModalContent();
+          modalInstance.update({ content });
+        } catch (e) {
+          api.v1.log(`[Wand] Error during update: ${e}`);
+        }
+      }
+    };
+
+    modalInstance = await api.v1.ui.modal.open({
+      title: `🪄 Agentic Workflow: ${config.label}`,
+      size: "medium",
+      content: renderModalContent(),
+    });
+  }
+
+  private async runMvpGeneration(
+    session: FieldSession,
+    updateFn: () => void,
+  ): Promise<void> {
+    session.progress = "Running 3-stage cycle...\n";
+    updateFn();
+
+    await api.v1.timers.sleep(1000);
+    session.progress += "> [Stage 1: Generate] Drafting content...\n";
+    updateFn();
+
+    await api.v1.timers.sleep(1500);
+    session.progress += "> [Stage 2: Review] Critiquing draft...\n";
+    updateFn();
+
+    await api.v1.timers.sleep(1500);
+    session.progress += "> [Stage 3: Refine] Polishing final version...\n";
+    session.currentContent = `[Result of generation for ${session.fieldId} at ${new Date().toLocaleTimeString()}]\nThis is the high-quality refined content based on your prompt.`;
+    session.progress += "\n✅ Generation complete!";
+    updateFn();
+  }
+
+  private async saveWandResult(session: FieldSession, modal: any): Promise<void> {
+    if (!session.currentContent) {
+      api.v1.ui.toast("No content to save.", { type: "warning" });
+      return;
+    }
+
+    // 1. Update the specific storage key bound to the UI input FIRST
+    await api.v1.storyStorage.set(
+      `kse-field-${session.fieldId}`,
+      session.currentContent,
+    );
+
+    // 2. Update the Manager (Source of Truth) silently
+    await this.storyManager.setFieldContent(
+      session.fieldId,
+      session.currentContent,
+      false, // Do NOT notify yet
+    );
+
+    // 3. Commit to history
     await this.storyManager.commit();
 
-    api.v1.ui.toast(`Generated content for ${config.label}`, {
+    // 4. Force update the UI part just in case
+    try {
+      await api.v1.ui.updateParts([
+        {
+          id: `field-${session.fieldId}`,
+          initialValue: session.currentContent,
+        } as any,
+      ]);
+    } catch (e) {
+      // Ignore
+    }
+
+    api.v1.ui.toast(`Saved generated content to ${session.fieldId}`, {
       type: "success",
     });
+    this.agentCycleManager.endSession(session.fieldId);
+    modal.close();
+  }
+
+  private handleFieldChange(fieldId: string, content: string): void {
+    // Update StoryManager which will trigger UI updates via the listener in StoryEngineUI
+    this.storyManager.setFieldContent(fieldId, content);
   }
 
   private handleFieldEdit(fieldId: string): void {
