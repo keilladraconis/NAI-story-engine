@@ -54,9 +54,9 @@ A complete history is kept for each field, allowing you to track changes and rev
 3.  **Structure the Narrative**: Develop a "Synopsis" and build out the foundational "DULFS" (Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics).
 4.  **Refine the Details**: Flesh out characters, locations, and the rules of your world in their dedicated sections.
 5.  **Leverage AI**: Look for the **:wand: (Wand)** button next to any field. This opens the **Agentic Workflow Modal**, where you can trigger a 3-stage generation process:
-    - **Generate**: Creates the initial draft.
-    - **Validate/Editorial-Review**: Critiques and corrects the content.
-    - **Rewrite/Refine**: Polishes the final result for quality and style.
+    - **Generate (The Ideator)**: Creates the initial draft using the Three-Sphere Method.
+    - **Validate (The Editor)**: Critiques the content and inserts inline tags for improvement.
+    - **Rewrite (The Polisher)**: Produces the final, high-quality dynamic snapshot.
     *Use the tabs to view each stage, click **Ignite** to generate content, or check **Auto-Advance** to run the full cycle automatically!*
 
 ## 🔄 Development Roadmap
