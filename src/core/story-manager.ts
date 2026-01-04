@@ -27,6 +27,7 @@ interface StoryField {
   version: number;
   history: FieldHistory[];
   linkedEntities: string[]; // References to DULFS entities
+  data?: any; // Generic container for field-specific structured data (e.g. Brainstorm cards)
 }
 
 interface DULFSField {
@@ -190,6 +191,7 @@ export class StoryManager {
         version: 0,
         history: [],
         linkedEntities: [],
+        data: { cards: [] }, // Initialize with empty card stack
       },
       worldSnapshot: {
         id: "worldSnapshot",
@@ -209,6 +211,23 @@ export class StoryManager {
 
       lastModified: new Date(),
     };
+  }
+
+  public getBrainstormData(): any {
+    if (!this.currentStory) return { cards: [] };
+    // Ensure data object exists
+    if (!this.currentStory.brainstorm.data) {
+      this.currentStory.brainstorm.data = { cards: [] };
+    }
+    return this.currentStory.brainstorm.data;
+  }
+
+  public setBrainstormCards(cards: any[]): void {
+    if (!this.currentStory) return;
+    if (!this.currentStory.brainstorm.data) {
+      this.currentStory.brainstorm.data = { cards: [] };
+    }
+    this.currentStory.brainstorm.data.cards = cards;
   }
 
   public async saveStoryData(notify: boolean = true): Promise<void> {
