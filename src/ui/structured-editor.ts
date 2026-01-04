@@ -72,7 +72,6 @@ export class StructuredEditor {
         // Collapsible sections for all fields
         column({
           content: Array.from(this.configs.values())
-            .filter((config) => config.id !== "brainstorm")
             .map((config) =>
             this.createFieldSection(config),
           ),
@@ -140,7 +139,7 @@ export class StructuredEditor {
     const buttons: any[] = []; // using any to avoid strict UIPart type issues if not imported
 
     // Wand Button (Primary fields only)
-    const isPrimaryField = ["brainstorm", "worldSnapshot"].includes(config.id);
+    const isPrimaryField = ["worldSnapshot"].includes(config.id);
     if (isPrimaryField) {
       buttons.push(
         button({

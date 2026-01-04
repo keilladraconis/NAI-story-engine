@@ -16,13 +16,6 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     icon: "bookOpen",
   },
   {
-    id: "brainstorm",
-    label: "Brainstorm",
-    description: "Creative exploration and ideation",
-    placeholder: "Let me explore the possibilities of this world...",
-    icon: "cloud-lightning",
-  },
-  {
     id: "worldSnapshot",
     label: "Dynamic World Snapshot",
     description: "A snapshot of the world full of dynamic potential",

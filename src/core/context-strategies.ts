@@ -91,7 +91,7 @@ const Strategies: Record<string, StrategyFn> = {
   // Balanced structure and creativity
   "generate:worldSnapshot": async (_session, manager, base) => {
     const userPrompt = (await api.v1.config.get("world_snapshot_prompt")) || "";
-    const brainstormContent = manager.getFieldContent("brainstorm");
+    const brainstormContent = manager.getConsolidatedBrainstorm();
     const messages = hyperContextBuilder(
       base.systemMsg,
       { role: "user", content: fixSpacing(userPrompt) },

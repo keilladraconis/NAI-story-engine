@@ -245,6 +245,18 @@ export class StoryManager {
     this.currentStory.brainstorm.data.messages = messages;
   }
 
+  public getConsolidatedBrainstorm(): string {
+    const messages = this.getBrainstormMessages();
+    if (messages.length === 0) return "";
+
+    return messages
+      .map((msg) => {
+        const role = msg.role === "user" ? "User" : "Assistant";
+        return `${role}: ${msg.content}`;
+      })
+      .join("\n\n");
+  }
+
   public async saveStoryData(notify: boolean = true): Promise<void> {
     await api.v1.storyStorage.set(
       StoryManager.KEYS.STORY_DATA,
