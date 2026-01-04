@@ -4,9 +4,8 @@ import { AgentWorkflowService } from "../core/agent-workflow";
 import { FIELD_CONFIGS, FieldConfig } from "../config/field-definitions";
 import { createHeaderWithToggle, createToggleableContent } from "./ui-components";
 import { WandUI } from "./wand-ui";
-import { BrainstormUI } from "./brainstorm-ui";
 
-const { column, row, button, collapsibleSection, text } = api.v1.ui.part;
+const { column, row, button, collapsibleSection } = api.v1.ui.part;
 
 export class StructuredEditor {
   private configs: Map<string, FieldConfig> = new Map();
@@ -16,7 +15,6 @@ export class StructuredEditor {
   private onUpdateCallback: () => void;
   private editModes: Map<string, boolean> = new Map();
   private wandUI: WandUI;
-  private brainstormUI: BrainstormUI;
 
   constructor(
     storyManager: StoryManager,
@@ -28,7 +26,6 @@ export class StructuredEditor {
     this.agentCycleManager = agentCycleManager;
     this.onUpdateCallback = onUpdateCallback;
     this.wandUI = new WandUI(agentCycleManager, agentWorkflowService, onUpdateCallback);
-    this.brainstormUI = new BrainstormUI(storyManager, onUpdateCallback);
 
     this.initializeFieldConfigs();
     this.sidebar = this.createSidebar();
@@ -74,7 +71,9 @@ export class StructuredEditor {
       content: [
         // Collapsible sections for all fields
         column({
-          content: Array.from(this.configs.values()).map((config) =>
+          content: Array.from(this.configs.values())
+            .filter((config) => config.id !== "brainstorm")
+            .map((config) =>
             this.createFieldSection(config),
           ),
           style: {
@@ -87,24 +86,6 @@ export class StructuredEditor {
   }
 
   private createFieldSection(config: FieldConfig): UIPart {
-    // Special handling for Brainstorm field
-    if (config.id === "brainstorm") {
-      return collapsibleSection({
-        title: config.label,
-        iconId: config.icon,
-        storageKey: `story:kse-section-${config.id}`,
-        content: [
-          text({ 
-            text: config.description, 
-            style: { "font-style": "italic", opacity: "0.8", "margin-bottom": "8px" } 
-          }),
-          
-          // Custom Brainstorm Card Interface
-          this.brainstormUI.createUI(),
-        ],
-      });
-    }
-
     const session = this.agentCycleManager.getSession(config.id);
 
     // If there is an active session (Wand Mode), render the workflow UI inline

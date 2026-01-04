@@ -3,6 +3,7 @@ import { StructuredEditor } from "./structured-editor";
 import { StoryManager } from "../core/story-manager";
 import { AgentCycleManager } from "../core/agent-cycle";
 import { AgentWorkflowService } from "../core/agent-workflow";
+import { BrainstormUI } from "./brainstorm-ui";
 
 const { part, extension } = api.v1.ui;
 export class StoryEngineUI {
@@ -16,6 +17,7 @@ export class StoryEngineUI {
   storyManager: StoryManager;
   agentCycleManager: AgentCycleManager;
   agentWorkflowService: AgentWorkflowService;
+  brainstormUI: BrainstormUI;
 
   constructor() {
     this.storyManager = new StoryManager();
@@ -27,6 +29,7 @@ export class StoryEngineUI {
       this.agentWorkflowService,
       () => this.updateUI(),
     );
+    this.brainstormUI = new BrainstormUI(this.storyManager);
     this.sidebar = this.createSidebar();
 
     // Subscribe to backend changes

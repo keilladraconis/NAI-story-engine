@@ -8,7 +8,10 @@ const log = api.v1.log;
   try {
     const storyEngineUI = new StoryEngineUI();
 
-    api.v1.ui.register([storyEngineUI.sidebar]);
+    api.v1.ui.register([
+      storyEngineUI.sidebar,
+      storyEngineUI.brainstormUI.sidebar
+    ]);
   } catch (e) {
     log("Startup error:", e);
   }

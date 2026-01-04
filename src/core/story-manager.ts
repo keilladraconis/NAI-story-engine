@@ -191,7 +191,7 @@ export class StoryManager {
         version: 0,
         history: [],
         linkedEntities: [],
-        data: { cards: [] }, // Initialize with empty card stack
+        data: { messages: [] }, // Initialize with empty chat history
       },
       worldSnapshot: {
         id: "worldSnapshot",
@@ -213,21 +213,36 @@ export class StoryManager {
     };
   }
 
-  public getBrainstormData(): any {
-    if (!this.currentStory) return { cards: [] };
+  public getBrainstormMessages(): { role: string; content: string }[] {
+    if (!this.currentStory) return [];
     // Ensure data object exists
     if (!this.currentStory.brainstorm.data) {
-      this.currentStory.brainstorm.data = { cards: [] };
+      this.currentStory.brainstorm.data = { messages: [] };
     }
-    return this.currentStory.brainstorm.data;
+    // Migration check: if 'cards' exists but 'messages' doesn't, reset to empty messages
+    if (!this.currentStory.brainstorm.data.messages && this.currentStory.brainstorm.data.cards) {
+       this.currentStory.brainstorm.data = { messages: [] };
+    }
+    return this.currentStory.brainstorm.data.messages || [];
   }
 
-  public setBrainstormCards(cards: any[]): void {
+  public addBrainstormMessage(role: string, content: string): void {
     if (!this.currentStory) return;
     if (!this.currentStory.brainstorm.data) {
-      this.currentStory.brainstorm.data = { cards: [] };
+      this.currentStory.brainstorm.data = { messages: [] };
     }
-    this.currentStory.brainstorm.data.cards = cards;
+    if (!this.currentStory.brainstorm.data.messages) {
+      this.currentStory.brainstorm.data.messages = [];
+    }
+    this.currentStory.brainstorm.data.messages.push({ role, content });
+  }
+
+  public setBrainstormMessages(messages: { role: string; content: string }[]): void {
+    if (!this.currentStory) return;
+    if (!this.currentStory.brainstorm.data) {
+      this.currentStory.brainstorm.data = { messages: [] };
+    }
+    this.currentStory.brainstorm.data.messages = messages;
   }
 
   public async saveStoryData(notify: boolean = true): Promise<void> {

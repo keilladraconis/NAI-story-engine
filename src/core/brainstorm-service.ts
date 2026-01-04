@@ -1,5 +1,4 @@
 import { StoryManager } from "./story-manager";
-import { BrainstormCard, BrainstormManager } from "./brainstorm-cards";
 import { hyperGenerate } from "../hyper-generator";
 
 export class BrainstormService {
@@ -9,85 +8,100 @@ export class BrainstormService {
     this.storyManager = storyManager;
   }
 
-  public async generateBurst(
-    cards: BrainstormCard[],
-    userDirective: string,
+  public async sendChat(
+    userMessage: string,
     onDelta: (text: string) => void
-  ): Promise<BrainstormCard[]> {
+  ): Promise<void> {
+    const isInitialOrEmpty = !userMessage.trim();
+
+    // 1. Add User Message to History if not empty
+    if (!isInitialOrEmpty) {
+      this.storyManager.addBrainstormMessage("user", userMessage);
+      await this.storyManager.saveStoryData(false);
+    }
+
+    // 2. Prepare Context
     const storyPrompt = this.storyManager.getFieldContent("storyPrompt");
     const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
     
-    const messages = this.buildPrompt(systemPrompt, storyPrompt, cards, userDirective);
+    // Get history (includes the message we just added)
+    const history = this.storyManager.getBrainstormMessages();
+    
+    // Build Prompt
+    const messages = this.buildPrompt(systemPrompt, storyPrompt, history, isInitialOrEmpty);
 
-    // We'll capture the full text to parse at the end, 
-    let fullText = "";
-
+    let fullResponse = "";
     const cancellationSignal = await api.v1.createCancellationSignal();
 
-    await hyperGenerate(
-      messages,
-      {
-        maxTokens: 500, // Slightly more for better thoughts
-        minTokens: 50,
-        temperature: 1.1, // Adjusted for creative but coherent bursts
-      },
-      (text) => {
-        fullText += text;
-        onDelta(fullText);
-      },
-      "background",
-      cancellationSignal
-    );
+    try {
+      await hyperGenerate(
+        messages,
+        {
+          maxTokens: 300, // Reduced to encourage concise, conversational responses
+          minTokens: 10,
+          temperature: 0.9, // Balanced creativity
+        },
+        (text) => {
+          fullResponse += text;
+          onDelta(fullResponse);
+        },
+        "background",
+        cancellationSignal
+      );
 
-    // Parse the full text into cards
-    return BrainstormManager.parseOutputToCards(fullText, cards.length);
+      // 3. Add Assistant Message to History
+      this.storyManager.addBrainstormMessage("assistant", fullResponse);
+      await this.storyManager.saveStoryData(true); // Save and notify UI
+    } catch (e) {
+      api.v1.log("Brainstorm generation failed", e);
+      throw e;
+    }
   }
 
-  private buildPrompt(systemPrompt: string, storyPrompt: string, cards: BrainstormCard[], directive: string): any[] {
-    const accepted = cards.filter(c => c.status === "accepted");
-    const rejected = cards.filter(c => c.status === "rejected");
+  public async clearHistory(): Promise<void> {
+    this.storyManager.setBrainstormMessages([]);
+    await this.storyManager.saveStoryData(true);
+  }
 
-    // Take the last ~10 accepted cards for context to keep it relevant
-    const recentAccepted = accepted.slice(-10);
-    
-    // Take the last ~5 rejected for negative constraints
-    const recentRejected = rejected.slice(-5);
+  private buildPrompt(
+    systemPrompt: string, 
+    storyPrompt: string, 
+    history: { role: string; content: string }[],
+    isInitialOrEmpty: boolean
+  ): any[] {
+    const systemMsg = `${systemPrompt}\n\n[BRAINSTORMING MODE]
+You are a creative co-author. Your goal is to have a back-and-forth conversation.
+IMPORTANT:
+- Keep responses SHORT (under 100 words).
+- Focus on ONE specific idea or question at a time.
+- Do NOT dump lists of ideas.
+- Be casual but insightful. Ask follow-up questions to dig deeper.`;
 
-    let systemMsg = `${systemPrompt}\n\n[BRAINSTORMING MODE]
-Your goal is to generate 3-5 distinct, high-impact worldbuilding ideas based on the user's Story Prompt.
-
-Output Format:
-Each idea must be on a new line.
-[Category] The idea content...
-
-Categories can be anything (e.g., [Theme], [Setting], [Character], [Conflict], [Magic]).
-Keep ideas concise (1-2 sentences).
-`;
-
-    if (recentRejected.length > 0) {
-      systemMsg += `
-Avoid ideas similar to these rejected ones:
-`;
-      recentRejected.forEach(c => systemMsg += `- ${c.content}\n`);
-    }
-
-    const messages = [
-      { role: "system", content: systemMsg },
-      { role: "user", content: `Story Prompt: ${storyPrompt}` }
+    const messages: any[] = [
+      { role: "system", content: systemMsg }
     ];
 
-    if (recentAccepted.length > 0) {
-       let historyMsg = "Here are some ideas I've already accepted:\n";
-       recentAccepted.forEach(c => historyMsg += `[${c.tag}] ${c.content}\n`);
-       messages.push({ role: "assistant", content: historyMsg });
+    if (storyPrompt) {
+      messages.push({ 
+        role: "user", 
+        content: `Here is the current Story Prompt I am working on:\n${storyPrompt}\n\nLet's brainstorm based on this.` 
+      });
+      messages.push({
+        role: "assistant",
+        content: "Understood. I'm ready to help you develop this story. What specific aspect would you like to discuss?"
+      });
     }
 
-    let nextUserMsg = "Generate 3-5 NEW ideas.";
-    if (directive) {
-      nextUserMsg += ` Focus on: ${directive}`;
-    }
+    // Append Chat History
+    const recentHistory = history.slice(-20);
+    recentHistory.forEach(msg => {
+      messages.push({ role: msg.role, content: msg.content });
+    });
 
-    messages.push({ role: "user", content: nextUserMsg });
+    // If empty send, add a nudge
+    if (isInitialOrEmpty) {
+      messages.push({ role: "user", content: "Continue brainstorming on your own. Surprise me with some new ideas or deep-dives into the existing ones." });
+    }
 
     return messages;
   }
