@@ -145,9 +145,12 @@ export class AgentWorkflowService {
     try {
       const { messages, params } = await this.contextFactory.build(session);
 
+      // Capture original content for Refine "overwrite" effect
+      const originalDraft = session.currentContent;
+
       // Only clear currentContent if we are going to write to it (replace)
       // Done AFTER building context so we don't lose the input!
-      if (stage !== "review") {
+      if (stage === "generate") {
         session.currentContent = "";
         updateFn(); // Reflect clear in UI
       }
@@ -186,6 +189,11 @@ export class AgentWorkflowService {
               processReviewLine(lines.shift()!);
             }
             reviewBuffer = lines[0];
+          } else if (stage === "refine") {
+            // Overwrite visualization: New Content + Cursor + Remaining Old Content
+            const newLen = session.cycles[stage].content.length;
+            const tail = originalDraft.slice(newLen);
+            session.currentContent = session.cycles[stage].content + "✍️" + tail;
           } else {
             session.currentContent = session.cycles[stage].content;
           }
@@ -211,7 +219,7 @@ export class AgentWorkflowService {
       if (stage !== "review") {
         session.currentContent = result;
       }
-      
+
       await this.storyManager.saveFieldDraft(session.fieldId, session.currentContent);
       return true;
     } catch (e: any) {
