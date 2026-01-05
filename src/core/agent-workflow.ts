@@ -3,14 +3,26 @@ import { FieldSession } from "./agent-cycle";
 import { hyperGenerate } from "../hyper-generator";
 import { ContextStrategyFactory } from "./context-strategies";
 import { ReviewPatcher } from "./review-patcher";
+import {
+  StageHandler,
+  GenerateStageHandler,
+  ReviewStageHandler,
+  RefineStageHandler,
+} from "./stage-handlers";
 
 export class AgentWorkflowService {
   private contextFactory: ContextStrategyFactory;
   private reviewPatcher: ReviewPatcher;
+  private handlers: Record<string, StageHandler>;
 
   constructor(private storyManager: StoryManager) {
     this.contextFactory = new ContextStrategyFactory(storyManager);
     this.reviewPatcher = new ReviewPatcher(storyManager);
+    this.handlers = {
+      generate: new GenerateStageHandler(storyManager),
+      review: new ReviewStageHandler(this.reviewPatcher),
+      refine: new RefineStageHandler(storyManager),
+    };
   }
 
   public async runAutoGeneration(
@@ -57,18 +69,14 @@ export class AgentWorkflowService {
     updateFn: () => void,
   ): Promise<boolean> {
     const stage = session.selectedStage;
+    const handler = this.handlers[stage];
+    
     session.cycles[stage].status = "running";
-    session.cycles[stage].content = ""; // Clear previous content
+    session.cycles[stage].content = ""; 
 
-    // Review streaming state
-    let reviewBuffer = "";
-
-    // Strip existing tags if starting a review
-    if (stage === "review") {
-      this.reviewPatcher.stripTags(session.fieldId);
-      updateFn();
-    }
-
+    // 1. Stage-specific Start
+    await handler.onStart(session);
+    
     // @ts-ignore
     session.cancellationSignal = await api.v1.createCancellationSignal();
     updateFn();
@@ -76,15 +84,8 @@ export class AgentWorkflowService {
     try {
       const { messages, params } = await this.contextFactory.build(session);
 
-      // Capture original content for Refine "overwrite" effect
+      // Capture original content for handlers that need it (Refine)
       const originalDraft = this.storyManager.getFieldContent(session.fieldId);
-
-      // Only clear currentContent if we are going to write to it (replace)
-      // Done AFTER building context so we don't lose the input!
-      if (stage === "generate") {
-        this.storyManager.saveFieldDraft(session.fieldId, "");
-        updateFn(); // Reflect clear in UI
-      }
 
       // 3. Generate
       if (!session.cancellationSignal)
@@ -111,46 +112,21 @@ export class AgentWorkflowService {
         },
         (text) => {
           session.cycles[stage].content += text; // Append delta
-
-          if (stage === "review") {
-            reviewBuffer += text;
-            const lines = reviewBuffer.split("\n");
-            // Process complete lines, keep the remainder
-            while (lines.length > 1) {
-              const line = lines.shift()!;
-              this.reviewPatcher.processReviewLine(session.fieldId, line);
-            }
-            reviewBuffer = lines[0];
-          } else if (stage === "refine") {
-            // Overwrite visualization: New Content + Cursor + Remaining Old Content
-            const newLen = session.cycles[stage].content.length;
-            const tail = originalDraft.slice(newLen);
-            this.storyManager.saveFieldDraft(session.fieldId, session.cycles[stage].content + "✍️" + tail);
-          } else {
-            this.storyManager.saveFieldDraft(session.fieldId, session.cycles[stage].content);
-          }
+          
+          // Delegate stream handling
+          handler.onStream(session, text, session.cycles[stage].content, originalDraft);
+          
           updateFn();
         },
         "background",
         session.cancellationSignal,
       );
 
-      // Process remaining buffer for review
-      if (stage === "review" && reviewBuffer.trim()) {
-        this.reviewPatcher.processReviewLine(session.fieldId, reviewBuffer);
-      }
-
-      if (stage === "review") {
-        result = this.cleanReviewOutput(result);
-        api.v1.log(`[Review Stage Completed]:\n${result}`);
-      }
+      // 4. Stage-specific Completion
+      result = await handler.onComplete(session, result);
 
       session.cycles[stage].content = result;
       session.cycles[stage].status = "completed";
-
-      if (stage !== "review") {
-        await this.storyManager.saveFieldDraft(session.fieldId, result);
-      }
 
       return true;
     } catch (e: any) {
@@ -175,17 +151,5 @@ export class AgentWorkflowService {
       }
       updateFn();
     }
-  }
-
-  private cleanReviewOutput(content: string): string {
-    const lines = content.split("\n");
-    const validLines = lines.filter((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return false;
-      // Validates format: [TAG] || "locator"
-      // Allows optional spaces around || and optional markdown bolding **
-      return /^(\*\*)?\[[A-Z_]+\](\*\*)?\s*\|\|\s*".*"$/.test(trimmed);
-    });
-    return validLines.join("\n");
   }
 }
