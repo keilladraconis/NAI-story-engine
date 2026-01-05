@@ -89,8 +89,8 @@ export class WandUI {
   public createInlineControlCluster(
     session: FieldSession,
     fieldId: string,
-    onSave: (session: FieldSession) => void,
-    onDiscard: (session: FieldSession) => void,
+    onSave?: (session: FieldSession) => void,
+    onDiscard?: (session: FieldSession) => void,
   ): UIPart {
     const activeStage = session.selectedStage;
     return column({
@@ -169,108 +169,125 @@ export class WandUI {
     session: FieldSession,
     fieldId: string,
     activeStage: "generate" | "review" | "refine",
-    onSave: (session: FieldSession) => void,
-    onDiscard: (session: FieldSession) => void,
+    onSave?: (session: FieldSession) => void,
+    onDiscard?: (session: FieldSession) => void,
   ): UIPart {
     const update = () => this.onUpdateCallback();
+
+    const leftControls = (() => {
+      if (session.budgetState === "waiting_for_user") {
+        return button({
+          id: `wand-continue-btn-${fieldId}`,
+          text: "⚠️ Continue",
+          style: {
+            "background-color": "#fff3cd",
+            color: "#856404",
+            "font-weight": "bold",
+          },
+          callback: () => {
+            if (session.budgetResolver) {
+              session.budgetState = "waiting_for_timer";
+              session.budgetResolver();
+              session.budgetResolver = undefined;
+              update();
+            }
+          },
+        });
+      }
+      if (session.budgetState === "waiting_for_timer") {
+        return button({
+          id: `wand-wait-btn-${fieldId}`,
+          text: "⏳ Refilling...",
+          style: {
+            "background-color": "#e2e3e5",
+            color: "#383d41",
+          },
+          callback: () => {
+            // Allow cancel during wait
+            if (session.cancellationSignal) {
+              session.cancellationSignal.cancel();
+              api.v1.ui.toast("Wait cancelled", { type: "info" });
+              update();
+            }
+          },
+        });
+      }
+      if (session.cycles[activeStage].status === "running") {
+        return button({
+          id: `wand-cancel-btn-${fieldId}`,
+          text: "🚫 Cancel",
+          style: {
+            "font-weight": "bold",
+            "background-color": "#ffcccc",
+            color: "red",
+          },
+          callback: () => {
+            if (session.cancellationSignal) {
+              session.cancellationSignal.cancel();
+              api.v1.ui.toast("Generation cancelled", {
+                type: "info",
+              });
+              update();
+            }
+          },
+        });
+      }
+      return button({
+        id: `wand-ignite-btn-${fieldId}`,
+        text: "⚡ Ignite",
+        style: { "font-weight": "bold" },
+        callback: () => {
+          if (session.isAuto) {
+            this.agentWorkflowService.runAutoGeneration(session, update);
+          } else {
+            this.agentWorkflowService.runStageGeneration(session, update);
+          }
+        },
+      });
+    })();
+
+    const rightControls = (() => {
+      const buttons = [];
+      if (onSave) {
+        buttons.push(
+          button({
+            id: `wand-save-btn-${fieldId}`,
+            text: "Save",
+            callback: () => {
+              // Ensure we save the content of the currently viewed stage
+              session.currentContent = session.cycles[activeStage].content;
+              onSave(session);
+            },
+          }),
+        );
+      }
+      if (onDiscard) {
+        buttons.push(
+          button({
+            id: `wand-discard-btn-${fieldId}`,
+            text: "Discard",
+            callback: () => {
+              onDiscard(session);
+            },
+          }),
+        );
+      }
+      if (buttons.length === 0) return null;
+
+      return row({
+        id: `wand-save-discard-row-${fieldId}`,
+        content: buttons,
+        style: { gap: "8px" },
+      });
+    })();
+
+    const rowContent: any[] = [leftControls];
+    if (rightControls) rowContent.push(rightControls);
+
     return row({
       id: `wand-action-row-${fieldId}`,
       style: { "margin-top": "24px", "justify-content": "space-between" },
-      content: [
-        (() => {
-          if (session.budgetState === "waiting_for_user") {
-            return button({
-              id: `wand-continue-btn-${fieldId}`,
-              text: "⚠️ Continue",
-              style: {
-                "background-color": "#fff3cd",
-                color: "#856404",
-                "font-weight": "bold",
-              },
-              callback: () => {
-                if (session.budgetResolver) {
-                  session.budgetState = "waiting_for_timer";
-                  session.budgetResolver();
-                  session.budgetResolver = undefined;
-                  update();
-                }
-              },
-            });
-          }
-          if (session.budgetState === "waiting_for_timer") {
-            return button({
-              id: `wand-wait-btn-${fieldId}`,
-              text: "⏳ Refilling...",
-              style: {
-                "background-color": "#e2e3e5",
-                color: "#383d41",
-              },
-              callback: () => {
-                // Allow cancel during wait
-                if (session.cancellationSignal) {
-                  session.cancellationSignal.cancel();
-                  api.v1.ui.toast("Wait cancelled", { type: "info" });
-                  update();
-                }
-              },
-            });
-          }
-          if (session.cycles[activeStage].status === "running") {
-            return button({
-              id: `wand-cancel-btn-${fieldId}`,
-              text: "🚫 Cancel",
-              style: {
-                "font-weight": "bold",
-                "background-color": "#ffcccc",
-                color: "red",
-              },
-              callback: () => {
-                if (session.cancellationSignal) {
-                  session.cancellationSignal.cancel();
-                  api.v1.ui.toast("Generation cancelled", {
-                    type: "info",
-                  });
-                  update();
-                }
-              },
-            });
-          }
-          return button({
-            id: `wand-ignite-btn-${fieldId}`,
-            text: "⚡ Ignite",
-            style: { "font-weight": "bold" },
-            callback: () => {
-              if (session.isAuto) {
-                this.agentWorkflowService.runAutoGeneration(session, update);
-              } else {
-                this.agentWorkflowService.runStageGeneration(session, update);
-              }
-            },
-          });
-        })(),
-        row({
-          id: `wand-save-discard-row-${fieldId}`,
-          content: [
-            button({
-              id: `wand-save-btn-${fieldId}`,
-              text: "Save",
-              callback: () => {
-                // Ensure we save the content of the currently viewed stage
-                session.currentContent = session.cycles[activeStage].content;
-                onSave(session);
-              },
-            }),
-            button({
-              id: `wand-discard-btn-${fieldId}`,
-              text: "Discard",
-              callback: () => {
-                onDiscard(session);
-              },
-            }),
-          ],
-          style: { gap: "8px" },
-        }),
-      ],
+      content: rowContent,
     });
   }
 }

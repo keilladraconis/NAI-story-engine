@@ -56,7 +56,11 @@ export class AgentWorkflowService {
     const stage = session.selectedStage;
     session.cycles[stage].status = "running";
     session.cycles[stage].content = ""; // Clear previous content
-    session.currentContent = "";
+    
+    // Only clear currentContent if we are going to write to it (replace)
+    if (stage !== "review") {
+      session.currentContent = "";
+    }
 
     // @ts-ignore
     session.cancellationSignal = await api.v1.createCancellationSignal();
@@ -90,7 +94,9 @@ export class AgentWorkflowService {
         },
         (text) => {
           session.cycles[stage].content += text; // Append delta
-          session.currentContent = session.cycles[stage].content;
+          if (stage !== "review") {
+            session.currentContent = session.cycles[stage].content;
+          }
           updateFn();
         },
         "background",
@@ -99,11 +105,15 @@ export class AgentWorkflowService {
 
       if (stage === "review") {
         result = this.cleanReviewOutput(result);
+        api.v1.log(`[Review Stage Completed]:\n${result}`);
       }
 
       session.cycles[stage].content = result;
       session.cycles[stage].status = "completed";
-      session.currentContent = result;
+      
+      if (stage !== "review") {
+        session.currentContent = result;
+      }
       return true;
     } catch (e: any) {
       if (

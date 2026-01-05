@@ -51,6 +51,18 @@ export class StructuredEditor {
       );
       if (savedContent && typeof savedContent === "string") {
         await this.storyManager.setFieldContent(config.id, savedContent, false);
+
+        // Also sync any active session (e.g. WorldSnapshot)
+        const session = this.agentCycleManager.getSession(config.id);
+        if (session) {
+          session.currentContent = savedContent;
+          session.originalContent = savedContent;
+          const activeStage = session.selectedStage;
+          if (session.cycles[activeStage]) {
+            session.cycles[activeStage].content = savedContent;
+          }
+        }
+
         anyChanged = true;
       }
     }
@@ -134,7 +146,7 @@ export class StructuredEditor {
             isEditMode,
             session.currentContent,
             config.placeholder,
-            undefined,
+            `story:kse-field-${config.id}`,
             (val) => {
               if (session) {
                 session.currentContent = val;
@@ -143,18 +155,14 @@ export class StructuredEditor {
                 if (session.cycles[activeStage]) {
                   session.cycles[activeStage].content = val;
                 }
+                // Live save to StoryManager
+                this.storyManager.setFieldContent(config.id, val, false);
               }
             },
           ),
           this.wandUI.createInlineControlCluster(
             session,
             config.id,
-            (s) => this.saveWandResult(s),
-            (s) => {
-              if (s.cancellationSignal) s.cancellationSignal.cancel();
-              this.agentCycleManager.endSession(s.fieldId);
-              this.onUpdateCallback();
-            },
           ),
         ],
       });

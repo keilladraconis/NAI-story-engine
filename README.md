@@ -5,9 +5,10 @@ Story Engine is a structured, field-based worldbuilding system for the NovelAI s
 ## Features
 
 -   **Structured Workflow:** Guides you from an initial prompt to a fully realized world through defined fields (Brainstorm, World Snapshot, DULFS, etc.).
--   **AI "Wand":** An integrated agentic cycle (Generate -> Review -> Refine) helps you create and polish content for each field.
+-   **AI "Wand":** An integrated, **inline** agentic cycle (Generate -> Review -> Refine) helps you create and polish content directly within your workflow.
+-   **Live Editing:** Fields like World Snapshot support direct editing with auto-save, working seamlessly alongside AI generation.
 -   **Markdown Support:** Read your worldbuilding notes in a clean, rendered Markdown view.
--   **Edit Mode:** Toggle into edit mode to make manual adjustments or corrections.
+-   **Toggleable Views:** Switch between a clean Markdown reading mode and an editing mode.
 -   **History Tracking:** Keep track of changes and versions for every field.
 
 ## Setup
