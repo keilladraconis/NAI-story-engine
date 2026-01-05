@@ -2,10 +2,10 @@ import { StoryManager } from "../core/story-manager";
 import { AgentCycleManager, FieldSession } from "../core/agent-cycle";
 import { AgentWorkflowService } from "../core/agent-workflow";
 import { FIELD_CONFIGS, FieldConfig, FieldID } from "../config/field-definitions";
-import { createHeaderWithToggle, createToggleableContent } from "./ui-components";
 import { WandUI } from "./wand-ui";
+import { getFieldStrategy, RenderContext } from "./field-strategies";
 
-const { column, row, button, collapsibleSection } = api.v1.ui.part;
+const { column, collapsibleSection } = api.v1.ui.part;
 
 export class StructuredEditor {
   private configs: Map<FieldID, FieldConfig> = new Map();
@@ -95,142 +95,41 @@ export class StructuredEditor {
   }
 
   private createFieldSection(config: FieldConfig): UIPart {
-    const isEditMode = this.editModes.get(config.id) || false;
-    const content = this.storyManager.getFieldContent(config.id);
-
-    // 1. Story Prompt Special Case
-    if (config.id === FieldID.StoryPrompt) {
-      return collapsibleSection({
-        title: config.label,
-        iconId: config.icon,
-        storageKey: `story:kse-section-${config.id}`,
-        content: [
-          api.v1.ui.part.text({
-            text: config.description,
-            style: {
-              "font-style": "italic",
-              opacity: "0.8",
-              "margin-bottom": "8px",
-            },
-          }),
-          api.v1.ui.part.multilineTextInput({
-            placeholder: config.placeholder,
-            initialValue: content,
-            storageKey: `story:kse-field-${config.id}`,
-            onChange: (newContent: string) =>
-              this.handleFieldChange(config.id, newContent),
-          }),
-          this.createFieldActions(config),
-        ],
-      });
-    }
-
-    // 2. World Snapshot Special Case (Inline Wand)
-    if (config.id === FieldID.WorldSnapshot) {
-      let session = this.agentCycleManager.getSession(config.id);
-      if (!session) {
-        session = this.agentCycleManager.startSession(config.id);
-      }
-
-      return collapsibleSection({
-        title: config.label,
-        iconId: config.icon,
-        storageKey: `story:kse-section-${config.id}`,
-        content: [
-          createHeaderWithToggle(config.description, isEditMode, () =>
-            this.toggleEditMode(config.id),
-          ),
-          createToggleableContent(
-            isEditMode,
-            this.storyManager.getFieldContent(config.id),
-            config.placeholder,
-            `story:kse-field-${config.id}`,
-            (val) => {
-              if (session) {
-                // Update active stage content to keep in sync
-                const activeStage = session.selectedStage;
-                if (session.cycles[activeStage]) {
-                  session.cycles[activeStage].content = val;
-                }
-                // Live save to StoryManager
-                this.storyManager.setFieldContent(config.id, val, false);
-              }
-            },
-          ),
-          this.wandUI.createInlineControlCluster(
-            session,
-            config.id,
-          ),
-        ],
-      });
-    }
-
     const session = this.agentCycleManager.getSession(config.id);
-
-    // 3. Generic Wand Mode
-    if (session) {
-      const wandEditKey = `wand-${config.id}`;
-      const isWandEditMode = this.editModes.get(wandEditKey) || false;
-
-      return collapsibleSection({
-        title: `${config.label} (Wand Active)`,
-        iconId: config.icon,
-        storageKey: `story:kse-section-${config.id}`,
-        content: this.wandUI.createWorkflowUI(
-          session,
-          config.id,
-          isWandEditMode,
-          () => this.toggleEditMode(wandEditKey),
-          (s) => this.saveWandResult(s)
-        ),
-      });
+    
+    // Determine edit mode state key
+    // For ActiveWand, we need a specific key. The strategy selection logic matches this.
+    // However, the context creation needs to know WHICH key to pass.
+    
+    // Logic from previous implementation:
+    // Standard/Snapshot/Prompt: `config.id`
+    // Generic Wand: `wand-${config.id}`
+    
+    // We can infer the key based on whether we have a session AND NOT World Snapshot
+    let editModeKey: string = config.id;
+    if (session && config.id !== FieldID.WorldSnapshot) {
+      editModeKey = `wand-${config.id}`;
     }
 
-    // 4. Standard View
+    const context: RenderContext = {
+      config,
+      storyManager: this.storyManager,
+      agentCycleManager: this.agentCycleManager,
+      wandUI: this.wandUI,
+      editModeState: this.editModes.get(editModeKey) || false,
+      toggleEditMode: () => this.toggleEditMode(editModeKey),
+      handleFieldChange: (c) => this.handleFieldChange(config.id, c),
+      handleWandClick: () => this.handleWandClick(config.id),
+      saveWandResult: (s) => this.saveWandResult(s),
+    };
+
+    const strategy = getFieldStrategy(config, this.agentCycleManager);
+
     return collapsibleSection({
-      title: config.label,
+      title: strategy.getTitle(context),
       iconId: config.icon,
       storageKey: `story:kse-section-${config.id}`,
-      content: [
-        // Field header with description and toggle
-        createHeaderWithToggle(config.description, isEditMode, () =>
-          this.toggleEditMode(config.id),
-        ),
-
-        // Text input area or Markdown view
-        createToggleableContent(
-          isEditMode,
-          content,
-          config.placeholder,
-          `story:kse-field-${config.id}`,
-          (newContent: string) => this.handleFieldChange(config.id, newContent),
-        ),
-
-        // Action buttons (Generate, etc.)
-        this.createFieldActions(config),
-      ],
-    });
-  }
-
-  private createFieldActions(config: FieldConfig): UIPart {
-    const buttons: any[] = []; // using any to avoid strict UIPart type issues if not imported
-
-    // Wand Button (Primary fields only)
-    const isPrimaryField = [FieldID.WorldSnapshot].includes(config.id);
-    if (isPrimaryField) {
-      buttons.push(
-        button({
-          text: "🪄 Wand",
-          callback: () => this.handleWandClick(config.id),
-        }),
-      );
-    }
-
-    if (buttons.length === 0) return row({ content: [] });
-
-    return row({
-      content: buttons,
-      style: { gap: "8px", "margin-top": "8px" },
+      content: strategy.renderContent(context),
     });
   }
 
