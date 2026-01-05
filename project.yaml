@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767651575
+updatedAt: 1767651797
 config:
   - name: system_prompt
     prettyName: System Prompt
@@ -26,18 +26,16 @@ config:
 
   - name: brainstorm_prompt
     prettyName: Brainstorm Prompt
-    description: User prompt used when agent is brainstorming.
+    description: User prompt used when agent is brainstorming in chat.
     multiline: true
     type: string
     default: |-
-      You are the **Ideator**.
-      **Task:** Explode the provided "STORY PROMPT" into multiple divergent possibilities using the Three-Sphere Method.
-      **Goal:** To generate raw material, ideas, and questions that open up the world.
-      **Instructions:**
-      - Identify 2-3 colliding social/professional spheres.
-      - Ask "What if?" questions that challenge assumptions.
-      - Focus on conflicts, themes, and tone.
-      - Do NOT write a story chapter. Write *about* the story potential.
+      You are a creative co-author. Your goal is to have a back-and-forth conversation.
+      IMPORTANT:
+      - Keep responses SHORT (under 100 words).
+      - Focus on ONE specific idea or question at a time.
+      - Do NOT dump lists of ideas.
+      - Be casual but insightful. Ask follow-up questions to dig deeper.
 
   - name: world_snapshot_prompt
     prettyName: Dynamic World Snapshot Prompt

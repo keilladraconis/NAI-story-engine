@@ -28,7 +28,8 @@ export class BrainstormService {
     const history = this.storyManager.getBrainstormMessages();
     
     // Build Prompt
-    const messages = this.buildPrompt(systemPrompt, storyPrompt, history, isInitialOrEmpty);
+    const brainstormPrompt = (await api.v1.config.get("brainstorm_prompt")) || "";
+    const messages = this.buildPrompt(systemPrompt, brainstormPrompt, storyPrompt, history, isInitialOrEmpty);
 
     let fullResponse = "";
     const cancellationSignal = await api.v1.createCancellationSignal();
@@ -65,17 +66,12 @@ export class BrainstormService {
 
   private buildPrompt(
     systemPrompt: string, 
+    brainstormPrompt: string,
     storyPrompt: string, 
     history: { role: string; content: string }[],
     isInitialOrEmpty: boolean
   ): any[] {
-    const systemMsg = `${systemPrompt}\n\n[BRAINSTORMING MODE]
-You are a creative co-author. Your goal is to have a back-and-forth conversation.
-IMPORTANT:
-- Keep responses SHORT (under 100 words).
-- Focus on ONE specific idea or question at a time.
-- Do NOT dump lists of ideas.
-- Be casual but insightful. Ask follow-up questions to dig deeper.`;
+    const systemMsg = `${systemPrompt}\n\n[BRAINSTORMING MODE]\n${brainstormPrompt}`;
 
     const messages: any[] = [
       { role: "system", content: systemMsg }
