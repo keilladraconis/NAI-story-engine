@@ -57,10 +57,7 @@ export class AgentWorkflowService {
     session.cycles[stage].status = "running";
     session.cycles[stage].content = ""; // Clear previous content
 
-    // Only clear currentContent if we are going to write to it (replace)
-    if (stage !== "review") {
-      session.currentContent = "";
-    }
+    // session.currentContent clearing moved to after context build
 
     // Review streaming state
     let reviewBuffer = "";
@@ -147,6 +144,13 @@ export class AgentWorkflowService {
 
     try {
       const { messages, params } = await this.contextFactory.build(session);
+
+      // Only clear currentContent if we are going to write to it (replace)
+      // Done AFTER building context so we don't lose the input!
+      if (stage !== "review") {
+        session.currentContent = "";
+        updateFn(); // Reflect clear in UI
+      }
 
       // 3. Generate
       if (!session.cancellationSignal)
