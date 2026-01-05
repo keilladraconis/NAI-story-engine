@@ -110,6 +110,32 @@ export class StructuredEditor {
     const content = this.storyManager.getFieldContent(config.id);
     const isEditMode = this.editModes.get(config.id) || false;
 
+    if (config.id === FieldID.StoryPrompt) {
+      return collapsibleSection({
+        title: config.label,
+        iconId: config.icon,
+        storageKey: `story:kse-section-${config.id}`,
+        content: [
+          api.v1.ui.part.text({
+            text: config.description,
+            style: {
+              "font-style": "italic",
+              opacity: "0.8",
+              "margin-bottom": "8px",
+            },
+          }),
+          api.v1.ui.part.multilineTextInput({
+            placeholder: config.placeholder,
+            initialValue: content,
+            storageKey: `story:kse-field-${config.id}`,
+            onChange: (newContent: string) =>
+              this.handleFieldChange(config.id, newContent),
+          }),
+          this.createFieldActions(config),
+        ],
+      });
+    }
+
     return collapsibleSection({
       title: config.label,
       iconId: config.icon,
