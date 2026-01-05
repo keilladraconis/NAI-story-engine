@@ -63,3 +63,69 @@ export const createToggleableContent = (
     });
   }
 };
+
+export interface GenerateButtonState {
+    isRunning: boolean;
+    budgetState?: "waiting_for_user" | "waiting_for_timer" | "normal";
+}
+
+export const createResponsiveGenerateButton = (
+    id: string,
+    state: GenerateButtonState,
+    actions: {
+        onStart: () => void;
+        onCancel: () => void;
+        onContinue?: () => void; // For budget warning
+    },
+    label: string = "Ignite"
+): UIPart => {
+    if (state.budgetState === "waiting_for_user") {
+        return button({
+            id: `${id}-continue`,
+            text: "⚠️ Continue",
+            style: {
+                "background-color": "#fff3cd",
+                color: "#856404",
+                "font-weight": "bold",
+            },
+            callback: () => {
+                if (actions.onContinue) actions.onContinue();
+            }
+        });
+    }
+
+    if (state.budgetState === "waiting_for_timer") {
+        return button({
+            id: `${id}-wait`,
+            text: "⏳ Refilling...",
+            style: {
+                "background-color": "#e2e3e5",
+                color: "#383d41",
+            },
+            callback: () => {
+                 // Allow canceling the wait
+                 actions.onCancel();
+            }
+        });
+    }
+
+    if (state.isRunning) {
+        return button({
+            id: `${id}-cancel`,
+            text: "🚫 Cancel",
+            style: {
+                "font-weight": "bold",
+                "background-color": "#ffcccc",
+                color: "red",
+            },
+            callback: () => actions.onCancel()
+        });
+    }
+
+    return button({
+        id: `${id}-ignite`,
+        text: `⚡ ${label}`,
+        style: { "font-weight": "bold" },
+        callback: () => actions.onStart()
+    });
+};

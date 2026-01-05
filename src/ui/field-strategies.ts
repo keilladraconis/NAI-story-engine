@@ -5,6 +5,7 @@ import { WandUI } from "./wand-ui";
 import {
   createHeaderWithToggle,
   createToggleableContent,
+  createResponsiveGenerateButton
 } from "./ui-components";
 
 const { row, column, text, multilineTextInput, button } = api.v1.ui.part;
@@ -23,6 +24,8 @@ export interface RenderContext {
   getItemEditMode?: (itemId: string) => boolean;
   toggleItemEditMode?: (itemId: string) => void;
   runListGeneration?: () => Promise<void>;
+  getListGenerationState?: () => { isRunning: boolean; signal?: any };
+  cancelListGeneration?: () => void;
 }
 
 export interface FieldRenderStrategy {
@@ -51,13 +54,16 @@ export class ListFieldStrategy implements FieldRenderStrategy {
       getItemEditMode,
       toggleItemEditMode,
       runListGeneration,
+      getListGenerationState,
+      cancelListGeneration
     } = context;
 
     const list = storyManager.getDulfsList(config.id);
+    const genState = getListGenerationState ? getListGenerationState() : { isRunning: false };
 
     // --- Actions Row ---
     const actionsRow = row({
-      style: { "margin-bottom": "12px", gap: "8px" },
+      style: { "margin-bottom": "12px", gap: "8px", "align-items": "center" },
       content: [
         button({
           text: "Add Entry",
@@ -83,19 +89,20 @@ export class ListFieldStrategy implements FieldRenderStrategy {
             storyManager.clearDulfsList(config.id);
           },
         }),
-        button({
-          text: "Generate",
-          iconId: "zap",
-          callback: () => {
-            if (runListGeneration) {
-              runListGeneration();
-            } else {
-              api.v1.ui.toast("Generation service not available.", {
-                type: "error",
-              });
-            }
-          },
-        }),
+        // Responsive Generate Button
+        createResponsiveGenerateButton(
+            `list-gen-btn-${config.id}`,
+            { isRunning: genState.isRunning },
+            {
+                onStart: () => {
+                    if (runListGeneration) runListGeneration();
+                },
+                onCancel: () => {
+                    if (cancelListGeneration) cancelListGeneration();
+                }
+            },
+            "Generate"
+        )
       ],
     });
 

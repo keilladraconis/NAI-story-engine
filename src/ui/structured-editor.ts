@@ -135,6 +135,8 @@ export class StructuredEditor {
       getItemEditMode: (itemId) => this.getItemEditMode(config.id, itemId),
       toggleItemEditMode: (itemId) => this.toggleItemEditMode(config.id, itemId),
       runListGeneration: () => this.agentWorkflowService.runListGeneration(config.id, this.onUpdateCallback),
+      getListGenerationState: () => this.agentWorkflowService.getListGenerationState(config.id),
+      cancelListGeneration: () => this.agentWorkflowService.cancelListGeneration(config.id),
     };
 
     const strategy = getFieldStrategy(config);

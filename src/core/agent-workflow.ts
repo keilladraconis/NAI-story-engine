@@ -16,6 +16,9 @@ export class AgentWorkflowService {
   private reviewPatcher: ReviewPatcher;
   private handlers: Record<string, StageHandler>;
 
+  // Track list generation state: fieldId -> { isRunning, signal }
+  private listGenerationState: Map<string, { isRunning: boolean; signal?: any }> = new Map();
+
   constructor(private storyManager: StoryManager) {
     this.contextFactory = new ContextStrategyFactory(storyManager);
     this.reviewPatcher = new ReviewPatcher(storyManager);
@@ -24,6 +27,17 @@ export class AgentWorkflowService {
       review: new ReviewStageHandler(this.reviewPatcher),
       refine: new RefineStageHandler(storyManager),
     };
+  }
+
+  public getListGenerationState(fieldId: string) {
+    return this.listGenerationState.get(fieldId) || { isRunning: false };
+  }
+
+  public cancelListGeneration(fieldId: string) {
+    const state = this.listGenerationState.get(fieldId);
+    if (state && state.signal) {
+        state.signal.cancel();
+    }
   }
 
   private parseListLine(line: string, fieldId: string): { name: string, description: string, content: string } | null {
@@ -66,6 +80,8 @@ export class AgentWorkflowService {
     updateFn: () => void
   ): Promise<void> {
     const cancellationSignal = await api.v1.createCancellationSignal();
+    this.listGenerationState.set(fieldId, { isRunning: true, signal: cancellationSignal });
+    updateFn();
     
     try {
         const { messages, params } = await this.contextFactory.buildDulfsContext(fieldId);
@@ -125,7 +141,12 @@ export class AgentWorkflowService {
         }
 
     } catch (e: any) {
-        api.v1.ui.toast(`List generation failed: ${e.message}`, { type: "error" });
+        if (!e.message.includes("cancelled")) {
+            api.v1.ui.toast(`List generation failed: ${e.message}`, { type: "error" });
+        }
+    } finally {
+        this.listGenerationState.set(fieldId, { isRunning: false, signal: undefined });
+        updateFn();
     }
   }
 

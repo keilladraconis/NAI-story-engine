@@ -1,5 +1,6 @@
 import { FieldSession } from "../core/agent-cycle";
 import { AgentWorkflowService } from "../core/agent-workflow";
+import { createResponsiveGenerateButton } from "./ui-components";
 
 const { column, row, button, checkboxInput } = api.v1.ui.part;
 
@@ -97,77 +98,38 @@ export class WandUI {
   ): UIPart {
     const update = () => this.onUpdateCallback();
 
-    const leftControls = (() => {
-      if (session.budgetState === "waiting_for_user") {
-        return button({
-          id: `wand-continue-btn-${fieldId}`,
-          text: "⚠️ Continue",
-          style: {
-            "background-color": "#fff3cd",
-            color: "#856404",
-            "font-weight": "bold",
-          },
-          callback: () => {
-            if (session.budgetResolver) {
-              session.budgetState = "waiting_for_timer";
-              session.budgetResolver();
-              session.budgetResolver = undefined;
-              update();
-            }
-          },
-        });
-      }
-      if (session.budgetState === "waiting_for_timer") {
-        return button({
-          id: `wand-wait-btn-${fieldId}`,
-          text: "⏳ Refilling...",
-          style: {
-            "background-color": "#e2e3e5",
-            color: "#383d41",
-          },
-          callback: () => {
-            // Allow cancel during wait
-            if (session.cancellationSignal) {
-              session.cancellationSignal.cancel();
-              api.v1.ui.toast("Wait cancelled", { type: "info" });
-              update();
-            }
-          },
-        });
-      }
-      if (session.cycles[activeStage].status === "running") {
-        return button({
-          id: `wand-cancel-btn-${fieldId}`,
-          text: "🚫 Cancel",
-          style: {
-            "font-weight": "bold",
-            "background-color": "#ffcccc",
-            color: "red",
-          },
-          callback: () => {
-            if (session.cancellationSignal) {
-              session.cancellationSignal.cancel();
-              api.v1.ui.toast("Generation cancelled", {
-                type: "info",
-              });
-              update();
-            }
-          },
-        });
-      }
-      return button({
-        id: `wand-ignite-btn-${fieldId}`,
-        text: "⚡ Ignite",
-        style: { "font-weight": "bold" },
-        callback: () => {
+    const generateBtn = createResponsiveGenerateButton(
+      `wand-btn-${fieldId}`,
+      {
+        isRunning: session.cycles[activeStage].status === "running",
+        budgetState: session.budgetState
+      },
+      {
+        onStart: () => {
           if (session.isAuto) {
             this.agentWorkflowService.runAutoGeneration(session, update);
           } else {
             this.agentWorkflowService.runStageGeneration(session, update);
           }
         },
-      });
-    })();
+        onCancel: () => {
+            if (session.cancellationSignal) {
+                session.cancellationSignal.cancel();
+                api.v1.ui.toast("Operation cancelled", { type: "info" });
+                update();
+            }
+        },
+        onContinue: () => {
+            if (session.budgetResolver) {
+                session.budgetState = "waiting_for_timer";
+                session.budgetResolver();
+                session.budgetResolver = undefined;
+                update();
+            }
+        }
+      },
+      "Ignite"
+    );
 
     const rightControls = (() => {
       const buttons = [];
@@ -203,7 +165,7 @@ export class WandUI {
       });
     })();
 
-    const rowContent: any[] = [leftControls];
+    const rowContent: any[] = [generateBtn];
     if (rightControls) rowContent.push(rightControls);
 
     return row({
