@@ -55,7 +55,6 @@ export class StructuredEditor {
         // Also sync any active session (e.g. WorldSnapshot)
         const session = this.agentCycleManager.getSession(config.id);
         if (session) {
-          session.originalContent = savedContent;
           const activeStage = session.selectedStage;
           if (session.cycles[activeStage]) {
             session.cycles[activeStage].content = savedContent;
@@ -130,7 +129,7 @@ export class StructuredEditor {
     if (config.id === FieldID.WorldSnapshot) {
       let session = this.agentCycleManager.getSession(config.id);
       if (!session) {
-        session = this.agentCycleManager.startSession(config.id, content);
+        session = this.agentCycleManager.startSession(config.id);
       }
 
       return collapsibleSection({
@@ -242,7 +241,6 @@ export class StructuredEditor {
     // Start a new session
     this.agentCycleManager.startSession(
       config.id,
-      this.storyManager.getFieldContent(config.id),
     );
     
     // Trigger UI update to switch to Wand Mode

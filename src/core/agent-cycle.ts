@@ -6,7 +6,6 @@ export interface AgentCycle {
 
 export interface FieldSession {
   fieldId: string;
-  originalContent: string;
   selectedStage: "generate" | "review" | "refine";
   isAuto: boolean;
   cancellationSignal?: CancellationSignal;
@@ -18,17 +17,14 @@ export interface FieldSession {
     review: AgentCycle;
     refine: AgentCycle;
   };
-  isActive: boolean;
-  progress: string; // Keep for backward compat or logging
 }
 
 export class AgentCycleManager {
   private sessions: Map<string, FieldSession> = new Map();
 
-  public startSession(fieldId: string, originalContent: string): FieldSession {
+  public startSession(fieldId: string): FieldSession {
     const session: FieldSession = {
       fieldId,
-      originalContent,
       selectedStage: "generate",
       isAuto: false,
       cycles: {
@@ -36,8 +32,6 @@ export class AgentCycleManager {
         review: { stage: "review", content: "", status: "idle" },
         refine: { stage: "refine", content: "", status: "idle" },
       },
-      isActive: true,
-      progress: "Session started.",
     };
     this.sessions.set(fieldId, session);
     return session;
