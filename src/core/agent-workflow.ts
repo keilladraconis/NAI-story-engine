@@ -2,12 +2,15 @@ import { StoryManager } from "./story-manager";
 import { FieldSession } from "./agent-cycle";
 import { hyperGenerate } from "../hyper-generator";
 import { ContextStrategyFactory } from "./context-strategies";
+import { ReviewPatcher } from "./review-patcher";
 
 export class AgentWorkflowService {
   private contextFactory: ContextStrategyFactory;
+  private reviewPatcher: ReviewPatcher;
 
   constructor(private storyManager: StoryManager) {
     this.contextFactory = new ContextStrategyFactory(storyManager);
+    this.reviewPatcher = new ReviewPatcher(storyManager);
   }
 
   public async runAutoGeneration(
@@ -62,83 +65,9 @@ export class AgentWorkflowService {
 
     // Strip existing tags if starting a review
     if (stage === "review") {
-      const currentDraft = this.storyManager.getFieldContent(session.fieldId);
-      const tagRegex = /\[[A-Z_]+\] /g;
-      if (tagRegex.test(currentDraft)) {
-        api.v1.log("[AgentWorkflow] Stripping existing tags before Review.");
-        const cleanDraft = currentDraft.replace(tagRegex, "");
-        this.storyManager.saveFieldDraft(
-          session.fieldId,
-          cleanDraft,
-        );
-        updateFn();
-      }
+      this.reviewPatcher.stripTags(session.fieldId);
+      updateFn();
     }
-
-    const processReviewLine = (line: string) => {
-      const trimmed = line.trim();
-      const match = trimmed.match(
-        /^(\*\*)?\[([A-Z_]+)\](\*\*)?\s*\|\|\s*"(.*)"$/,
-      );
-      if (match) {
-        const tag = match[2];
-        const rawLocator = match[4];
-
-        api.v1.log(`[Review Patcher] Processing: [${tag}] || "${rawLocator}"`);
-
-        // Strategy: Prefix Match with Fuzzy Punctuation
-        // 1. Split locator into tokens
-        const tokens = rawLocator.trim().split(/\s+/);
-        if (tokens.length === 0) return;
-
-        // 2. Take first 5 words
-        const searchTokens = tokens.slice(0, 5);
-
-        // 3. Create pattern parts
-        const regexParts = searchTokens.map((token) => {
-          // Replace any non-alphanumeric character with '.' (wildcard)
-          return token
-            .split("")
-            .map((char) => (/\w/.test(char) ? char : "."))
-            .join("");
-        });
-
-        // 4. Join with fuzzy separator (allowing whitespace, markdown, punctuation)
-        const pattern = regexParts.join("[\\W\\s]+");
-        api.v1.log(`[Review Patcher] Prefix Pattern: ${pattern}`);
-
-        try {
-          const regex = new RegExp(pattern, "i"); // Case insensitive
-
-          // Search from the top (allows out-of-order matching)
-          const currentDraft = this.storyManager.getFieldContent(session.fieldId);
-          const searchMatch = regex.exec(currentDraft);
-
-          if (searchMatch) {
-            const matchedText = searchMatch[0];
-            const absoluteIdx = searchMatch.index;
-
-            api.v1.log(
-              `[Review Patcher] Found match: "${matchedText.substring(0, 20)}..." at index ${absoluteIdx}`,
-            );
-
-            const tagInsert = `[${tag}] `;
-            const newDraft =
-              currentDraft.slice(0, absoluteIdx) +
-              tagInsert +
-              currentDraft.slice(absoluteIdx);
-            
-            this.storyManager.saveFieldDraft(session.fieldId, newDraft);
-          } else {
-            api.v1.log(
-              `[Review Patcher] Failed to find locator: "${rawLocator}"`,
-            );
-          }
-        } catch (e) {
-          api.v1.log(`[Review Patcher] Regex Error: ${e}`);
-        }
-      }
-    };
 
     // @ts-ignore
     session.cancellationSignal = await api.v1.createCancellationSignal();
@@ -188,7 +117,8 @@ export class AgentWorkflowService {
             const lines = reviewBuffer.split("\n");
             // Process complete lines, keep the remainder
             while (lines.length > 1) {
-              processReviewLine(lines.shift()!);
+              const line = lines.shift()!;
+              this.reviewPatcher.processReviewLine(session.fieldId, line);
             }
             reviewBuffer = lines[0];
           } else if (stage === "refine") {
@@ -207,7 +137,7 @@ export class AgentWorkflowService {
 
       // Process remaining buffer for review
       if (stage === "review" && reviewBuffer.trim()) {
-        processReviewLine(reviewBuffer);
+        this.reviewPatcher.processReviewLine(session.fieldId, reviewBuffer);
       }
 
       if (stage === "review") {
