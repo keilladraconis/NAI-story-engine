@@ -1,6 +1,7 @@
 import { hyperContextBuilder, HyperGenerationParams } from "../hyper-generator";
 import { StoryManager } from "./story-manager";
 import { FieldSession } from "./agent-cycle";
+import { FieldID } from "../config/field-definitions";
 
 export interface StrategyResult {
   messages: Message[];
@@ -203,7 +204,7 @@ export class ContextStrategyFactory {
 
   async build(session: FieldSession): Promise<StrategyResult> {
     const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
-    const storyPrompt = this.storyManager.getFieldContent("storyPrompt");
+    const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
 
     const baseContext = {
       systemMsg: {
@@ -222,7 +223,7 @@ export class ContextStrategyFactory {
   private getStrategyKey(session: FieldSession): string {
     const stage = session.selectedStage;
     if (stage === "generate") {
-      if (session.fieldId === "worldSnapshot") return "generate:worldSnapshot";
+      if (session.fieldId === FieldID.WorldSnapshot) return "generate:worldSnapshot";
       return "generate:default";
     }
     return `${stage}:default`;

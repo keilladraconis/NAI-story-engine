@@ -1,14 +1,14 @@
 import { StoryManager } from "../core/story-manager";
 import { AgentCycleManager, FieldSession } from "../core/agent-cycle";
 import { AgentWorkflowService } from "../core/agent-workflow";
-import { FIELD_CONFIGS, FieldConfig } from "../config/field-definitions";
+import { FIELD_CONFIGS, FieldConfig, FieldID } from "../config/field-definitions";
 import { createHeaderWithToggle, createToggleableContent } from "./ui-components";
 import { WandUI } from "./wand-ui";
 
 const { column, row, button, collapsibleSection } = api.v1.ui.part;
 
 export class StructuredEditor {
-  private configs: Map<string, FieldConfig> = new Map();
+  private configs: Map<FieldID, FieldConfig> = new Map();
   sidebar: UIPart;
   private storyManager: StoryManager;
   private agentCycleManager: AgentCycleManager;
@@ -139,7 +139,7 @@ export class StructuredEditor {
     const buttons: any[] = []; // using any to avoid strict UIPart type issues if not imported
 
     // Wand Button (Primary fields only)
-    const isPrimaryField = ["worldSnapshot"].includes(config.id);
+    const isPrimaryField = [FieldID.WorldSnapshot].includes(config.id);
     if (isPrimaryField) {
       buttons.push(
         button({
@@ -158,7 +158,7 @@ export class StructuredEditor {
   }
 
   private handleWandClick(fieldId: string): void {
-    const config = this.configs.get(fieldId);
+    const config = this.configs.get(fieldId as FieldID);
     if (!config) return;
 
     // Start a new session

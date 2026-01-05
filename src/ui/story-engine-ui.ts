@@ -4,6 +4,7 @@ import { StoryManager } from "../core/story-manager";
 import { AgentCycleManager } from "../core/agent-cycle";
 import { AgentWorkflowService } from "../core/agent-workflow";
 import { BrainstormUI } from "./brainstorm-ui";
+import { FieldID } from "../config/field-definitions";
 
 const { part, extension } = api.v1.ui;
 export class StoryEngineUI {
@@ -111,18 +112,7 @@ export class StoryEngineUI {
     };
 
     // Export all field contents
-    const fieldIds = [
-      "storyPrompt",
-      "brainstorm",
-      "worldSnapshot",
-      "dulfs",
-      "dramatisPersonae",
-      "universeSystems",
-      "locations",
-      "storyLorebooks",
-    ];
-
-    fieldIds.forEach((fieldId) => {
+    Object.values(FieldID).forEach((fieldId) => {
       data.fieldContents[fieldId] =
         this.structuredEditor.getFieldContent(fieldId);
     });

@@ -1,20 +1,24 @@
 import { FieldHistory } from "./field-history";
+import { FieldID } from "../config/field-definitions";
 
 interface StoryData {
   id: string;
   version: string;
 
   // Workflow stages
-  storyPrompt: StoryField;
-  brainstorm: StoryField;
-  worldSnapshot: StoryField;
+  [FieldID.StoryPrompt]: StoryField;
+  [FieldID.Brainstorm]: StoryField;
+  [FieldID.WorldSnapshot]: StoryField;
 
   // DULFS components
-  dramatisPersonae: DULFSField[];
-  universeSystems: DULFSField[];
-  locations: DULFSField[];
-  factions: DULFSField[];
-  situationalDynamics: DULFSField[];
+  [FieldID.DramatisPersonae]: DULFSField[];
+  [FieldID.UniverseSystems]: DULFSField[];
+  [FieldID.Locations]: DULFSField[];
+  [FieldID.Factions]: DULFSField[];
+  [FieldID.SituationalDynamics]: DULFSField[];
+  // Dulfs placeholder
+  [FieldID.Dulfs]?: any;
+  [FieldID.StoryLorebooks]?: any;
 
   // History and metadata
   lastModified: Date;
@@ -83,14 +87,15 @@ export class StoryManager {
 
   public getFieldContent(fieldId: string): string {
     if (!this.currentStory) return "";
+    
+    // Cast to any to allow dynamic access by string ID
+    const field = (this.currentStory as any)[fieldId];
+    
+    // If it's a StoryField, return content
+    if (field && typeof field === "object" && "content" in field) {
+        return field.content;
+    }
 
-    // Check specific fields first with optional chaining for safety
-    if (fieldId === "storyPrompt") return this.currentStory.storyPrompt?.content || "";
-    if (fieldId === "brainstorm") return this.currentStory.brainstorm?.content || "";
-    if (fieldId === "worldSnapshot")
-      return this.currentStory.worldSnapshot?.content || "";
-
-    // Check if it's a DULFS field (not fully implemented in data structure yet, but provided for consistency)
     return "";
   }
 
@@ -101,22 +106,15 @@ export class StoryManager {
   ): Promise<void> {
     if (!this.currentStory) return;
 
+    const storyAny = this.currentStory as any;
+    const field = storyAny[fieldId];
     let changed = false;
-    if (fieldId === "storyPrompt") {
-      if (this.currentStory.storyPrompt.content !== content) {
-        this.currentStory.storyPrompt.content = content;
-        changed = true;
-      }
-    } else if (fieldId === "brainstorm") {
-      if (this.currentStory.brainstorm.content !== content) {
-        this.currentStory.brainstorm.content = content;
-        changed = true;
-      }
-    } else if (fieldId === "worldSnapshot") {
-      if (this.currentStory.worldSnapshot.content !== content) {
-        this.currentStory.worldSnapshot.content = content;
-        changed = true;
-      }
+
+    if (field && typeof field === "object" && "content" in field) {
+        if (field.content !== content) {
+            field.content = content;
+            changed = true;
+        }
     }
 
     if (changed && save) {
@@ -129,13 +127,15 @@ export class StoryManager {
     if (!this.currentStory) return;
 
     let changed = false;
-    const fields: StoryField[] = [
-      this.currentStory.storyPrompt,
-      this.currentStory.brainstorm,
-      this.currentStory.worldSnapshot,
+    
+    // Iterate over known text fields
+    const textFields = [
+        this.currentStory[FieldID.StoryPrompt],
+        this.currentStory[FieldID.Brainstorm],
+        this.currentStory[FieldID.WorldSnapshot],
     ];
 
-    for (const field of fields) {
+    for (const field of textFields) {
       const lastEntry =
         field.history.length > 0
           ? field.history[field.history.length - 1]
@@ -176,16 +176,16 @@ export class StoryManager {
       version: "0.1.0",
 
       // Primary components
-      storyPrompt: {
-        id: "storyPrompt",
+      [FieldID.StoryPrompt]: {
+        id: FieldID.StoryPrompt,
         type: "prompt",
         content: "",
         version: 0,
         history: [],
         linkedEntities: [],
       },
-      brainstorm: {
-        id: "brainstorm",
+      [FieldID.Brainstorm]: {
+        id: FieldID.Brainstorm,
         type: "brainstorm",
         content: "",
         version: 0,
@@ -193,8 +193,8 @@ export class StoryManager {
         linkedEntities: [],
         data: { messages: [] }, // Initialize with empty chat history
       },
-      worldSnapshot: {
-        id: "worldSnapshot",
+      [FieldID.WorldSnapshot]: {
+        id: FieldID.WorldSnapshot,
         type: "worldSnapshot",
         content: "",
         version: 0,
@@ -203,11 +203,11 @@ export class StoryManager {
       },
 
       // DULFS components (start empty)
-      dramatisPersonae: [],
-      universeSystems: [],
-      locations: [],
-      factions: [],
-      situationalDynamics: [],
+      [FieldID.DramatisPersonae]: [],
+      [FieldID.UniverseSystems]: [],
+      [FieldID.Locations]: [],
+      [FieldID.Factions]: [],
+      [FieldID.SituationalDynamics]: [],
 
       lastModified: new Date(),
     };
@@ -215,34 +215,41 @@ export class StoryManager {
 
   public getBrainstormMessages(): { role: string; content: string }[] {
     if (!this.currentStory) return [];
+    
+    const brainstorm = this.currentStory[FieldID.Brainstorm];
+    
     // Ensure data object exists
-    if (!this.currentStory.brainstorm.data) {
-      this.currentStory.brainstorm.data = { messages: [] };
+    if (!brainstorm.data) {
+      brainstorm.data = { messages: [] };
     }
     // Migration check: if 'cards' exists but 'messages' doesn't, reset to empty messages
-    if (!this.currentStory.brainstorm.data.messages && this.currentStory.brainstorm.data.cards) {
-       this.currentStory.brainstorm.data = { messages: [] };
+    if (!brainstorm.data.messages && brainstorm.data.cards) {
+       brainstorm.data = { messages: [] };
     }
-    return this.currentStory.brainstorm.data.messages || [];
+    return brainstorm.data.messages || [];
   }
 
   public addBrainstormMessage(role: string, content: string): void {
     if (!this.currentStory) return;
-    if (!this.currentStory.brainstorm.data) {
-      this.currentStory.brainstorm.data = { messages: [] };
+    const brainstorm = this.currentStory[FieldID.Brainstorm];
+
+    if (!brainstorm.data) {
+      brainstorm.data = { messages: [] };
     }
-    if (!this.currentStory.brainstorm.data.messages) {
-      this.currentStory.brainstorm.data.messages = [];
+    if (!brainstorm.data.messages) {
+      brainstorm.data.messages = [];
     }
-    this.currentStory.brainstorm.data.messages.push({ role, content });
+    brainstorm.data.messages.push({ role, content });
   }
 
   public setBrainstormMessages(messages: { role: string; content: string }[]): void {
     if (!this.currentStory) return;
-    if (!this.currentStory.brainstorm.data) {
-      this.currentStory.brainstorm.data = { messages: [] };
+    const brainstorm = this.currentStory[FieldID.Brainstorm];
+    
+    if (!brainstorm.data) {
+      brainstorm.data = { messages: [] };
     }
-    this.currentStory.brainstorm.data.messages = messages;
+    brainstorm.data.messages = messages;
   }
 
   public getConsolidatedBrainstorm(): string {
