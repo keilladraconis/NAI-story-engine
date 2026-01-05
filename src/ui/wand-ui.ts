@@ -74,10 +74,32 @@ export class WandUI {
           ),
 
           // Actions
-          this.createActionRow(session, fieldId, activeStage, onSave),
+          this.createActionRow(session, fieldId, activeStage, onSave, () => {
+            if (session.cancellationSignal) {
+              session.cancellationSignal.cancel();
+            }
+            this.agentCycleManager.endSession(session.fieldId);
+            this.onUpdateCallback();
+          }),
         ],
       }),
     ];
+  }
+
+  public createInlineControlCluster(
+    session: FieldSession,
+    fieldId: string,
+    onSave: (session: FieldSession) => void,
+    onDiscard: (session: FieldSession) => void,
+  ): UIPart {
+    const activeStage = session.selectedStage;
+    return column({
+      style: { "margin-top": "16px" },
+      content: [
+        this.createStageSelector(session, fieldId, activeStage),
+        this.createActionRow(session, fieldId, activeStage, onSave, onDiscard),
+      ],
+    });
   }
 
   private createStageSelector(
@@ -148,6 +170,7 @@ export class WandUI {
     fieldId: string,
     activeStage: "generate" | "review" | "refine",
     onSave: (session: FieldSession) => void,
+    onDiscard: (session: FieldSession) => void,
   ): UIPart {
     const update = () => this.onUpdateCallback();
     return row({
@@ -230,7 +253,7 @@ export class WandUI {
           content: [
             button({
               id: `wand-save-btn-${fieldId}`,
-              text: "Save & Close",
+              text: "Save",
               callback: () => {
                 // Ensure we save the content of the currently viewed stage
                 session.currentContent = session.cycles[activeStage].content;
@@ -239,14 +262,9 @@ export class WandUI {
             }),
             button({
               id: `wand-discard-btn-${fieldId}`,
-              text: "Close",
+              text: "Discard",
               callback: () => {
-                // Close means cancel any running gen and revert UI
-                if (session.cancellationSignal) {
-                  session.cancellationSignal.cancel();
-                }
-                this.agentCycleManager.endSession(session.fieldId);
-                update();
+                onDiscard(session);
               },
             }),
           ],

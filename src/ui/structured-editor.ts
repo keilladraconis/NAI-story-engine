@@ -85,31 +85,10 @@ export class StructuredEditor {
   }
 
   private createFieldSection(config: FieldConfig): UIPart {
-    const session = this.agentCycleManager.getSession(config.id);
-
-    // If there is an active session (Wand Mode), render the workflow UI inline
-    if (session) {
-      const wandEditKey = `wand-${config.id}`;
-      const isWandEditMode = this.editModes.get(wandEditKey) || false;
-
-      return collapsibleSection({
-        title: `${config.label} (Wand Active)`,
-        iconId: config.icon,
-        storageKey: `story:kse-section-${config.id}`,
-        content: this.wandUI.createWorkflowUI(
-          session,
-          config.id,
-          isWandEditMode,
-          () => this.toggleEditMode(wandEditKey),
-          (s) => this.saveWandResult(s)
-        ),
-      });
-    }
-
-    // Standard View
-    const content = this.storyManager.getFieldContent(config.id);
     const isEditMode = this.editModes.get(config.id) || false;
+    const content = this.storyManager.getFieldContent(config.id);
 
+    // 1. Story Prompt Special Case
     if (config.id === FieldID.StoryPrompt) {
       return collapsibleSection({
         title: config.label,
@@ -136,6 +115,73 @@ export class StructuredEditor {
       });
     }
 
+    // 2. World Snapshot Special Case (Inline Wand)
+    if (config.id === FieldID.WorldSnapshot) {
+      let session = this.agentCycleManager.getSession(config.id);
+      if (!session) {
+        session = this.agentCycleManager.startSession(config.id, content);
+      }
+
+      return collapsibleSection({
+        title: config.label,
+        iconId: config.icon,
+        storageKey: `story:kse-section-${config.id}`,
+        content: [
+          createHeaderWithToggle(config.description, isEditMode, () =>
+            this.toggleEditMode(config.id),
+          ),
+          createToggleableContent(
+            isEditMode,
+            session.currentContent,
+            config.placeholder,
+            undefined,
+            (val) => {
+              if (session) {
+                session.currentContent = val;
+                // Update active stage content to keep in sync
+                const activeStage = session.selectedStage;
+                if (session.cycles[activeStage]) {
+                  session.cycles[activeStage].content = val;
+                }
+              }
+            },
+          ),
+          this.wandUI.createInlineControlCluster(
+            session,
+            config.id,
+            (s) => this.saveWandResult(s),
+            (s) => {
+              if (s.cancellationSignal) s.cancellationSignal.cancel();
+              this.agentCycleManager.endSession(s.fieldId);
+              this.onUpdateCallback();
+            },
+          ),
+        ],
+      });
+    }
+
+    const session = this.agentCycleManager.getSession(config.id);
+
+    // 3. Generic Wand Mode
+    if (session) {
+      const wandEditKey = `wand-${config.id}`;
+      const isWandEditMode = this.editModes.get(wandEditKey) || false;
+
+      return collapsibleSection({
+        title: `${config.label} (Wand Active)`,
+        iconId: config.icon,
+        storageKey: `story:kse-section-${config.id}`,
+        content: this.wandUI.createWorkflowUI(
+          session,
+          config.id,
+          isWandEditMode,
+          () => this.toggleEditMode(wandEditKey),
+          (s) => this.saveWandResult(s)
+        ),
+      });
+    }
+
+    // 4. Standard View
     return collapsibleSection({
       title: config.label,
       iconId: config.icon,
@@ -143,7 +189,7 @@ export class StructuredEditor {
       content: [
         // Field header with description and toggle
         createHeaderWithToggle(config.description, isEditMode, () =>
-          this.toggleEditMode(config.id)
+          this.toggleEditMode(config.id),
         ),
 
         // Text input area or Markdown view
@@ -152,7 +198,7 @@ export class StructuredEditor {
           content,
           config.placeholder,
           `story:kse-field-${config.id}`,
-          (newContent: string) => this.handleFieldChange(config.id, newContent)
+          (newContent: string) => this.handleFieldChange(config.id, newContent),
         ),
 
         // Action buttons (Generate, etc.)
