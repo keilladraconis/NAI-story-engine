@@ -6,6 +6,7 @@ const log = api.v1.log;
 
 (async () => {
   try {
+    await api.v1.permissions.request(["lorebookEdit"]);
     const storyEngineUI = new StoryEngineUI();
 
     api.v1.ui.register([

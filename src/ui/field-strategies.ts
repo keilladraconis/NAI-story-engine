@@ -8,7 +8,7 @@ import {
   createResponsiveGenerateButton
 } from "./ui-components";
 
-const { row, column, text, multilineTextInput, button } = api.v1.ui.part;
+const { row, column, text, multilineTextInput, button, checkboxInput } = api.v1.ui.part;
 
 export interface RenderContext {
   config: FieldConfig;
@@ -60,6 +60,7 @@ export class ListFieldStrategy implements FieldRenderStrategy {
 
     const list = storyManager.getDulfsList(config.id);
     const genState = getListGenerationState ? getListGenerationState() : { isRunning: false };
+    const isEnabled = storyManager.isDulfsEnabled(config.id);
 
     // --- Actions Row ---
     const actionsRow = row({
@@ -102,7 +103,15 @@ export class ListFieldStrategy implements FieldRenderStrategy {
                 }
             },
             "Generate"
-        )
+        ),
+        // Enabled Checkbox
+        checkboxInput({
+            label: "Lorebook",
+            initialValue: isEnabled,
+            onChange: (val) => {
+                storyManager.setDulfsEnabled(config.id, val);
+            }
+        })
       ],
     });
 
@@ -126,11 +135,11 @@ export class ListFieldStrategy implements FieldRenderStrategy {
           column({
             style: { "flex-grow": "1" },
             content: [
-              createToggleableContent(
+            createToggleableContent(
                 isEditing,
                 item.content,
                 "Entry details...",
-                `story:kse-field-${config.id}-${item.id}`,
+                undefined, // No storage key to prevent sync conflicts; StoryManager is source of truth
                 (newContent) => {
                   storyManager.updateDulfsItem(config.id, item.id, {
                     content: newContent,
