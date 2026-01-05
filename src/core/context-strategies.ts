@@ -51,7 +51,7 @@ const Strategies: Record<string, StrategyFn> = {
       params: {
         temperature: 1.35,
         min_p: 0.1,
-        repetition_penalty: 1.05,
+        presence_penalty: 0.05,
         maxTokens: 2048,
       },
     };
@@ -86,7 +86,7 @@ const Strategies: Record<string, StrategyFn> = {
       params: {
         temperature: 1.1,
         min_p: 0.05,
-        repetition_penalty: 1.1,
+        presence_penalty: 0.1,
         maxTokens: 1536,
       },
     };
@@ -121,8 +121,8 @@ const Strategies: Record<string, StrategyFn> = {
       params: {
         temperature: 0.3,
         min_p: 0.02,
-        repetition_penalty: 1.1,
-        frequency_penalty: 0.1,
+        presence_penalty: 0.1,
+        frequency_penalty: 0.02,
         maxTokens: 1024,
       },
     };
@@ -160,7 +160,7 @@ const Strategies: Record<string, StrategyFn> = {
       params: {
         temperature: 0.8,
         min_p: 0.02,
-        repetition_penalty: 1.02,
+        presence_penalty: 0.02,
         maxTokens: 2048,
       },
     };
@@ -186,6 +186,77 @@ export class ContextStrategyFactory {
     const strategy = Strategies[key] || Strategies["generate:default"];
 
     return strategy(session, this.storyManager, baseContext);
+  }
+
+  async buildDulfsContext(fieldId: string): Promise<StrategyResult> {
+    const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
+    const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
+    const worldSnapshot = this.storyManager.getFieldContent(FieldID.WorldSnapshot);
+
+    const baseContext = {
+      systemMsg: {
+        role: "system" as const,
+        content: fixSpacing(systemPrompt),
+      },
+    };
+
+    let userInstruction = "";
+    let exampleFormat = "";
+
+    switch (fieldId) {
+        case FieldID.DramatisPersonae:
+            userInstruction = "Generate a list of interesting characters for this story. Focus on their core motivations and unique behavioral tells.";
+            exampleFormat = "Format each line exactly as: [First and Last Name] ([gender], [age], [occupation]): [core motivation], [behavioral tell]";
+            break;
+        case FieldID.UniverseSystems:
+            userInstruction = "Generate a list of key universe systems, magic rules, or technological principles.";
+            exampleFormat = "Format each line as: [System Name]: [Concise Description]";
+            break;
+        case FieldID.Locations:
+            userInstruction = "Generate a list of significant locations, landmarks, or environments.";
+            exampleFormat = "Format each line as: [Location Name]: [Concise Description]";
+            break;
+        case FieldID.Factions:
+            userInstruction = "Generate a list of major factions, guilds, or political groups.";
+            exampleFormat = "Format each line as: [Faction Name]: [Concise Description]";
+            break;
+        case FieldID.SituationalDynamics:
+            userInstruction = "Generate a list of current conflicts, pending events, or tensions.";
+            exampleFormat = "Format each line as: [Event/Dynamic]: [Concise Description]";
+            break;
+        default:
+            userInstruction = "Generate a list of items for this category.";
+            exampleFormat = "Format each line as: [Item Name]: [Description]";
+    }
+
+    const messages = hyperContextBuilder(
+      baseContext.systemMsg,
+      { role: "user", content: fixSpacing(`${userInstruction}\n${exampleFormat}`) },
+      {
+        role: "assistant",
+        content: "Here is the list of items:\n",
+      },
+      [
+        {
+          role: "user",
+          content: fixSpacing(`STORY PROMPT:\n${storyPrompt}`),
+        },
+        {
+          role: "user",
+          content: fixSpacing(`WORLD SNAPSHOT:\n${worldSnapshot}`),
+        },
+      ],
+    );
+
+    return {
+      messages,
+      params: {
+        temperature: 1.2,
+        min_p: 0.05,
+        presence_penalty: 0.05,
+        maxTokens: 1024,
+      },
+    };
   }
 
   private getStrategyKey(session: FieldSession): string {

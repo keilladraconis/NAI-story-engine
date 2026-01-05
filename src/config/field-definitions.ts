@@ -8,7 +8,7 @@ export enum FieldID {
   Locations = "locations",
   StoryLorebooks = "storyLorebooks",
   Factions = "factions",
-  SituationalDynamics = "situationalDynamics"
+  SituationalDynamics = "situationalDynamics",
 }
 
 export interface FieldConfig {
@@ -18,7 +18,7 @@ export interface FieldConfig {
   placeholder: string;
   icon: IconId;
   linkedEntities?: string[];
-  layout?: "default" | "inline-wand";
+  layout?: "default" | "inline-wand" | "list";
 }
 
 export const FIELD_CONFIGS: FieldConfig[] = [
@@ -48,9 +48,10 @@ export const FIELD_CONFIGS: FieldConfig[] = [
   {
     id: FieldID.DramatisPersonae,
     label: "Dramatis Personae",
-    description: "Main characters and their relationships",
+    description: "Characters by name, age, description, tell",
     placeholder: "Character names, descriptions, motivations...",
     icon: "user",
+    layout: "list",
   },
   {
     id: FieldID.UniverseSystems,
@@ -58,6 +59,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     description: "Rules, magic, technology, and world mechanics",
     placeholder: "How this world works - magic, physics, etc...",
     icon: "settings" as IconId,
+    layout: "list",
   },
   {
     id: FieldID.Locations,
@@ -65,6 +67,23 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     description: "Places where the story takes place",
     placeholder: "Settings, landmarks, environments...",
     icon: "map-pin" as IconId,
+    layout: "list",
+  },
+  {
+    id: FieldID.Factions,
+    label: "Factions",
+    description: "Groups, organizations, and their agendas",
+    placeholder: "Factions, guilds, political parties...",
+    icon: "users",
+    layout: "list",
+  },
+  {
+    id: FieldID.SituationalDynamics,
+    label: "Situational Dynamics",
+    description: "Current conflicts, tensions, and events",
+    placeholder: "Active conflicts, pending events...",
+    icon: "activity",
+    layout: "list",
   },
   {
     id: FieldID.StoryLorebooks,

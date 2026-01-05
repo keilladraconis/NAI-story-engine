@@ -34,7 +34,7 @@ interface StoryField {
   data?: any; // Generic container for field-specific structured data (e.g. Brainstorm cards)
 }
 
-interface DULFSField {
+export interface DULFSField {
   id: string;
   category:
     | "dramatisPersonae"
@@ -42,6 +42,7 @@ interface DULFSField {
     | "locations"
     | "factions"
     | "situationalDynamics";
+  content: string;
   name: string;
   description: string;
   attributes: Record<string, any>;
@@ -97,6 +98,52 @@ export class StoryManager {
     }
 
     return "";
+  }
+
+  public getDulfsList(fieldId: string): DULFSField[] {
+    if (!this.currentStory) return [];
+    const field = (this.currentStory as any)[fieldId];
+    if (Array.isArray(field)) {
+      return field as DULFSField[];
+    }
+    return [];
+  }
+
+  public async addDulfsItem(fieldId: string, item: DULFSField): Promise<void> {
+    if (!this.currentStory) return;
+    const list = this.getDulfsList(fieldId);
+    list.push(item);
+    // Explicitly re-assign to ensure it updates if it was a copy (though it's ref)
+    (this.currentStory as any)[fieldId] = list; 
+    this.currentStory.lastModified = new Date();
+    await this.saveStoryData();
+  }
+
+  public async updateDulfsItem(fieldId: string, itemId: string, updates: Partial<DULFSField>): Promise<void> {
+    if (!this.currentStory) return;
+    const list = this.getDulfsList(fieldId);
+    const index = list.findIndex(i => i.id === itemId);
+    if (index !== -1) {
+      list[index] = { ...list[index], ...updates };
+      this.currentStory.lastModified = new Date();
+      await this.saveStoryData();
+    }
+  }
+
+  public async removeDulfsItem(fieldId: string, itemId: string): Promise<void> {
+    if (!this.currentStory) return;
+    const list = this.getDulfsList(fieldId);
+    const newList = list.filter(i => i.id !== itemId);
+    (this.currentStory as any)[fieldId] = newList;
+    this.currentStory.lastModified = new Date();
+    await this.saveStoryData();
+  }
+
+  public async clearDulfsList(fieldId: string): Promise<void> {
+     if (!this.currentStory) return;
+     (this.currentStory as any)[fieldId] = [];
+     this.currentStory.lastModified = new Date();
+     await this.saveStoryData();
   }
 
   public async setFieldContent(

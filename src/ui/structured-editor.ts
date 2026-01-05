@@ -12,6 +12,7 @@ export class StructuredEditor {
   sidebar: UIPart;
   private storyManager: StoryManager;
   private agentCycleManager: AgentCycleManager;
+  private agentWorkflowService: AgentWorkflowService;
   private onUpdateCallback: () => void;
   private editModes: Map<string, boolean> = new Map();
   private wandUI: WandUI;
@@ -24,6 +25,7 @@ export class StructuredEditor {
   ) {
     this.storyManager = storyManager;
     this.agentCycleManager = agentCycleManager;
+    this.agentWorkflowService = agentWorkflowService;
     this.onUpdateCallback = onUpdateCallback;
     this.wandUI = new WandUI(agentWorkflowService, onUpdateCallback);
 
@@ -42,9 +44,25 @@ export class StructuredEditor {
     this.onUpdateCallback();
   }
 
+  private getItemEditMode(fieldId: string, itemId: string): boolean {
+    return this.editModes.get(`${fieldId}-${itemId}`) || false;
+  }
+
+  private toggleItemEditMode(fieldId: string, itemId: string): void {
+    const key = `${fieldId}-${itemId}`;
+    const current = this.editModes.get(key) || false;
+    this.editModes.set(key, !current);
+    this.onUpdateCallback();
+  }
+
   private async syncFieldsFromStorage(): Promise<void> {
     let anyChanged = false;
     for (const config of this.configs.values()) {
+      // For lists, we don't sync from simple strings yet. 
+      // The StoryManager handles the source of truth for lists.
+      // So we skip list fields for this simple sync check or handle them differently if needed.
+      if (config.layout === 'list') continue;
+
       // We use the storage key directly from storyStorage
       const savedContent = await api.v1.storyStorage.get(
         `kse-field-${config.id}`,
@@ -113,6 +131,10 @@ export class StructuredEditor {
       handleFieldChange: (c) => this.handleFieldChange(config.id, c),
       handleWandClick: () => this.handleWandClick(config.id),
       saveWandResult: (s) => this.saveWandResult(s),
+      // List specific
+      getItemEditMode: (itemId) => this.getItemEditMode(config.id, itemId),
+      toggleItemEditMode: (itemId) => this.toggleItemEditMode(config.id, itemId),
+      runListGeneration: () => this.agentWorkflowService.runListGeneration(config.id, this.onUpdateCallback),
     };
 
     const strategy = getFieldStrategy(config);

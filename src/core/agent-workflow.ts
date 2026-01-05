@@ -1,8 +1,9 @@
-import { StoryManager } from "./story-manager";
+import { StoryManager, DULFSField } from "./story-manager";
 import { FieldSession } from "./agent-cycle";
 import { hyperGenerate } from "../hyper-generator";
 import { ContextStrategyFactory } from "./context-strategies";
 import { ReviewPatcher } from "./review-patcher";
+import { FieldID } from "../config/field-definitions";
 import {
   StageHandler,
   GenerateStageHandler,
@@ -23,6 +24,109 @@ export class AgentWorkflowService {
       review: new ReviewStageHandler(this.reviewPatcher),
       refine: new RefineStageHandler(storyManager),
     };
+  }
+
+  private parseListLine(line: string, fieldId: string): { name: string, description: string, content: string } | null {
+    let clean = line.trim();
+
+    // Still strip list markers because models are stubborn, and they shouldn't be part of the final data
+    clean = clean.replace(/^[-*+]\s+/, "");
+    clean = clean.replace(/^\d+[\.)]\s+/, "");
+
+    if (fieldId === FieldID.DramatisPersonae) {
+        // Regex for: Name (gender, age, occupation): motivation, tell
+        // Hammer: must have the parens with commas and a colon
+        const dpRegex = /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*(.+)$/;
+        const match = clean.match(dpRegex);
+        if (match) {
+            return {
+                name: match[1].trim(),
+                description: match[5].trim(),
+                content: clean
+            };
+        }
+    } else {
+        // Hammer: Name: Description
+        const genericRegex = /^([^:]+):\s*(.+)$/;
+        const match = clean.match(genericRegex);
+        if (match) {
+            return {
+                name: match[1].trim(),
+                description: match[2].trim(),
+                content: clean
+            };
+        }
+    }
+
+    return null;
+  }
+
+  public async runListGeneration(
+    fieldId: string,
+    updateFn: () => void
+  ): Promise<void> {
+    const cancellationSignal = await api.v1.createCancellationSignal();
+    
+    try {
+        const { messages, params } = await this.contextFactory.buildDulfsContext(fieldId);
+        
+        let buffer = "";
+
+        await hyperGenerate(
+            messages,
+            {
+                maxTokens: 2048,
+                minTokens: 50,
+                ...params,
+            },
+            (text) => {
+                buffer += text;
+                const lines = buffer.split("\n");
+                // Keep the last segment as it might be incomplete
+                buffer = lines.pop() || "";
+                
+                for (const line of lines) {
+                    const parsed = this.parseListLine(line, fieldId);
+                    if (parsed) {
+                        const newItem: DULFSField = {
+                            id: api.v1.uuid(),
+                            category: fieldId as any,
+                            content: parsed.content,
+                            name: parsed.name,
+                            description: parsed.description,
+                            attributes: {},
+                            linkedLorebooks: []
+                        };
+                        this.storyManager.addDulfsItem(fieldId, newItem);
+                        updateFn();
+                    }
+                }
+            },
+            "background",
+            cancellationSignal
+        );
+
+        // Process any remaining buffer
+        if (buffer.trim().length > 0) {
+             const parsed = this.parseListLine(buffer, fieldId);
+             if (parsed) {
+                const newItem: DULFSField = {
+                    id: api.v1.uuid(),
+                    category: fieldId as any,
+                    content: parsed.content,
+                    name: parsed.name,
+                    description: parsed.description,
+                    attributes: {},
+                    linkedLorebooks: []
+                };
+                this.storyManager.addDulfsItem(fieldId, newItem);
+                updateFn();
+             }
+        }
+
+    } catch (e: any) {
+        api.v1.ui.toast(`List generation failed: ${e.message}`, { type: "error" });
+    }
   }
 
   public async runAutoGeneration(
