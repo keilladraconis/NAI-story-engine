@@ -68,7 +68,6 @@ export class WandUI {
             undefined, // No storage key for wand scratchpad
             (val) => {
               session.cycles[activeStage].content = val;
-              session.currentContent = val;
             },
             { height: "100%" },
           ),
@@ -255,7 +254,6 @@ export class WandUI {
             text: "Save",
             callback: () => {
               // Ensure we save the content of the currently viewed stage
-              session.currentContent = session.cycles[activeStage].content;
               onSave(session);
             },
           }),

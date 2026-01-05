@@ -7,7 +7,6 @@ export interface AgentCycle {
 export interface FieldSession {
   fieldId: string;
   originalContent: string;
-  currentContent: string; // The final result or currently previewed content
   selectedStage: "generate" | "review" | "refine";
   isAuto: boolean;
   cancellationSignal?: CancellationSignal;
@@ -30,7 +29,6 @@ export class AgentCycleManager {
     const session: FieldSession = {
       fieldId,
       originalContent,
-      currentContent: originalContent,
       selectedStage: "generate",
       isAuto: false,
       cycles: {

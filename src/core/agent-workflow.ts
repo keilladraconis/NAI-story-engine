@@ -57,20 +57,19 @@ export class AgentWorkflowService {
     session.cycles[stage].status = "running";
     session.cycles[stage].content = ""; // Clear previous content
 
-    // session.currentContent clearing moved to after context build
-
     // Review streaming state
     let reviewBuffer = "";
 
     // Strip existing tags if starting a review
     if (stage === "review") {
+      const currentDraft = this.storyManager.getFieldContent(session.fieldId);
       const tagRegex = /\[[A-Z_]+\] /g;
-      if (tagRegex.test(session.currentContent)) {
+      if (tagRegex.test(currentDraft)) {
         api.v1.log("[AgentWorkflow] Stripping existing tags before Review.");
-        session.currentContent = session.currentContent.replace(tagRegex, "");
+        const cleanDraft = currentDraft.replace(tagRegex, "");
         this.storyManager.saveFieldDraft(
           session.fieldId,
-          session.currentContent,
+          cleanDraft,
         );
         updateFn();
       }
@@ -112,7 +111,8 @@ export class AgentWorkflowService {
           const regex = new RegExp(pattern, "i"); // Case insensitive
 
           // Search from the top (allows out-of-order matching)
-          const searchMatch = regex.exec(session.currentContent);
+          const currentDraft = this.storyManager.getFieldContent(session.fieldId);
+          const searchMatch = regex.exec(currentDraft);
 
           if (searchMatch) {
             const matchedText = searchMatch[0];
@@ -123,10 +123,12 @@ export class AgentWorkflowService {
             );
 
             const tagInsert = `[${tag}] `;
-            session.currentContent =
-              session.currentContent.slice(0, absoluteIdx) +
+            const newDraft =
+              currentDraft.slice(0, absoluteIdx) +
               tagInsert +
-              session.currentContent.slice(absoluteIdx);
+              currentDraft.slice(absoluteIdx);
+            
+            this.storyManager.saveFieldDraft(session.fieldId, newDraft);
           } else {
             api.v1.log(
               `[Review Patcher] Failed to find locator: "${rawLocator}"`,
@@ -146,12 +148,12 @@ export class AgentWorkflowService {
       const { messages, params } = await this.contextFactory.build(session);
 
       // Capture original content for Refine "overwrite" effect
-      const originalDraft = session.currentContent;
+      const originalDraft = this.storyManager.getFieldContent(session.fieldId);
 
       // Only clear currentContent if we are going to write to it (replace)
       // Done AFTER building context so we don't lose the input!
       if (stage === "generate") {
-        session.currentContent = "";
+        this.storyManager.saveFieldDraft(session.fieldId, "");
         updateFn(); // Reflect clear in UI
       }
 
@@ -193,9 +195,9 @@ export class AgentWorkflowService {
             // Overwrite visualization: New Content + Cursor + Remaining Old Content
             const newLen = session.cycles[stage].content.length;
             const tail = originalDraft.slice(newLen);
-            session.currentContent = session.cycles[stage].content + "✍️" + tail;
+            this.storyManager.saveFieldDraft(session.fieldId, session.cycles[stage].content + "✍️" + tail);
           } else {
-            session.currentContent = session.cycles[stage].content;
+            this.storyManager.saveFieldDraft(session.fieldId, session.cycles[stage].content);
           }
           updateFn();
         },
@@ -217,10 +219,9 @@ export class AgentWorkflowService {
       session.cycles[stage].status = "completed";
 
       if (stage !== "review") {
-        session.currentContent = result;
+        await this.storyManager.saveFieldDraft(session.fieldId, result);
       }
 
-      await this.storyManager.saveFieldDraft(session.fieldId, session.currentContent);
       return true;
     } catch (e: any) {
       if (

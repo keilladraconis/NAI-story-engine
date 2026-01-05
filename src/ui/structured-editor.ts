@@ -55,7 +55,6 @@ export class StructuredEditor {
         // Also sync any active session (e.g. WorldSnapshot)
         const session = this.agentCycleManager.getSession(config.id);
         if (session) {
-          session.currentContent = savedContent;
           session.originalContent = savedContent;
           const activeStage = session.selectedStage;
           if (session.cycles[activeStage]) {
@@ -144,12 +143,11 @@ export class StructuredEditor {
           ),
           createToggleableContent(
             isEditMode,
-            session.currentContent,
+            this.storyManager.getFieldContent(config.id),
             config.placeholder,
             `story:kse-field-${config.id}`,
             (val) => {
               if (session) {
-                session.currentContent = val;
                 // Update active stage content to keep in sync
                 const activeStage = session.selectedStage;
                 if (session.cycles[activeStage]) {
@@ -252,7 +250,8 @@ export class StructuredEditor {
   }
 
   private async saveWandResult(session: FieldSession): Promise<void> {
-    if (!session.currentContent) {
+    const content = session.cycles[session.selectedStage].content;
+    if (!content) {
       api.v1.ui.toast("No content to save.", { type: "warning" });
       return;
     }
@@ -260,13 +259,13 @@ export class StructuredEditor {
     // 1. Update the specific storage key bound to the UI input FIRST
     await api.v1.storyStorage.set(
       `kse-field-${session.fieldId}`,
-      session.currentContent,
+      content,
     );
 
     // 2. Update the Manager (Source of Truth) silently
     await this.storyManager.setFieldContent(
       session.fieldId,
-      session.currentContent,
+      content,
       false, // Do NOT notify yet
     );
 

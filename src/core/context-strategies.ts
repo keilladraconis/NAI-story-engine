@@ -130,9 +130,9 @@ const Strategies: Record<string, StrategyFn> = {
 
   // Refine - The Polisher
   // Standard temperature for fluid prose, low repetition penalty for style
-  "refine:default": async (session, _manager, base) => {
+  "refine:default": async (session, manager, base) => {
     const userPrompt = (await api.v1.config.get("refine_prompt")) || "";
-    const contentToRefine = session.currentContent;
+    const contentToRefine = manager.getFieldContent(session.fieldId);
     
     api.v1.log(`[ContextStrategy] Refining content length: ${contentToRefine.length}`);
 
