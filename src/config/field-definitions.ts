@@ -18,6 +18,7 @@ export interface FieldConfig {
   placeholder: string;
   icon: IconId;
   linkedEntities?: string[];
+  layout?: "default" | "inline-wand";
 }
 
 export const FIELD_CONFIGS: FieldConfig[] = [
@@ -34,6 +35,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     description: "A snapshot of the world full of dynamic potential",
     placeholder: "The state of the world, its drivers, and tensions...",
     icon: "package",
+    layout: "inline-wand",
   },
   {
     id: FieldID.Dulfs,

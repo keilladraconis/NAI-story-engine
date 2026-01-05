@@ -1,89 +1,13 @@
-import { FieldSession, AgentCycleManager } from "../core/agent-cycle";
+import { FieldSession } from "../core/agent-cycle";
 import { AgentWorkflowService } from "../core/agent-workflow";
-import {
-  createHeaderWithToggle,
-  createToggleableContent,
-} from "./ui-components";
 
-const { column, row, text, button, checkboxInput } = api.v1.ui.part;
+const { column, row, button, checkboxInput } = api.v1.ui.part;
 
 export class WandUI {
   constructor(
-    private agentCycleManager: AgentCycleManager,
     private agentWorkflowService: AgentWorkflowService,
     private onUpdateCallback: () => void,
   ) {}
-
-  public createWorkflowUI(
-    session: FieldSession,
-    fieldId: string,
-    isEditMode: boolean,
-    onToggleEditMode: () => void,
-    onSave: (session: FieldSession) => void,
-  ): UIPart[] {
-    const activeStage = session.selectedStage;
-
-    // Debug logging for runtime error investigation
-    if (!session.cycles || !session.cycles[activeStage]) {
-      api.v1.log(
-        `[UI Error] Invalid session state for ${fieldId}. Stage: ${activeStage}`,
-      );
-      return [
-        text({ text: `Error: Invalid session state. Please close and retry.` }),
-        button({
-          text: "Close",
-          callback: () => {
-            this.agentCycleManager.endSession(fieldId);
-            this.onUpdateCallback();
-          },
-        }),
-      ];
-    }
-
-    const activeContent = session.cycles[activeStage].content;
-
-    return [
-      column({
-        id: `wand-container-${fieldId}`,
-        content: [
-          // Stage Selection
-          text({
-            text: "Workflow Stage:",
-            style: { "font-weight": "bold", "margin-top": "8px" },
-          }),
-          this.createStageSelector(session, fieldId, activeStage),
-
-          // Active Stage Content Header + Toggle
-          createHeaderWithToggle(
-            `Stage Output (${activeStage.toUpperCase()}):`,
-            isEditMode,
-            onToggleEditMode,
-          ),
-
-          // Active Stage Content
-          createToggleableContent(
-            isEditMode,
-            activeContent,
-            `Output for ${activeStage} stage will appear here...`,
-            undefined, // No storage key for wand scratchpad
-            (val) => {
-              session.cycles[activeStage].content = val;
-            },
-            { height: "100%" },
-          ),
-
-          // Actions
-          this.createActionRow(session, fieldId, activeStage, onSave, () => {
-            if (session.cancellationSignal) {
-              session.cancellationSignal.cancel();
-            }
-            this.agentCycleManager.endSession(session.fieldId);
-            this.onUpdateCallback();
-          }),
-        ],
-      }),
-    ];
-  }
 
   public createInlineControlCluster(
     session: FieldSession,

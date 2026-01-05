@@ -25,7 +25,7 @@ export class StructuredEditor {
     this.storyManager = storyManager;
     this.agentCycleManager = agentCycleManager;
     this.onUpdateCallback = onUpdateCallback;
-    this.wandUI = new WandUI(agentCycleManager, agentWorkflowService, onUpdateCallback);
+    this.wandUI = new WandUI(agentWorkflowService, onUpdateCallback);
 
     this.initializeFieldConfigs();
     this.sidebar = this.createSidebar();
@@ -95,21 +95,13 @@ export class StructuredEditor {
   }
 
   private createFieldSection(config: FieldConfig): UIPart {
-    const session = this.agentCycleManager.getSession(config.id);
-    
     // Determine edit mode state key
-    // For ActiveWand, we need a specific key. The strategy selection logic matches this.
-    // However, the context creation needs to know WHICH key to pass.
-    
     // Logic from previous implementation:
     // Standard/Snapshot/Prompt: `config.id`
-    // Generic Wand: `wand-${config.id}`
+    // Generic Wand (Legacy): `wand-${config.id}` (Removed)
     
-    // We can infer the key based on whether we have a session AND NOT World Snapshot
-    let editModeKey: string = config.id;
-    if (session && config.id !== FieldID.WorldSnapshot) {
-      editModeKey = `wand-${config.id}`;
-    }
+    // We can infer the key based on whether we have a session AND NOT Inline Wand
+    const editModeKey: string = config.id;
 
     const context: RenderContext = {
       config,
@@ -123,7 +115,7 @@ export class StructuredEditor {
       saveWandResult: (s) => this.saveWandResult(s),
     };
 
-    const strategy = getFieldStrategy(config, this.agentCycleManager);
+    const strategy = getFieldStrategy(config);
 
     return collapsibleSection({
       title: strategy.getTitle(context),
