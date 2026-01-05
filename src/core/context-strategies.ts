@@ -20,42 +20,11 @@ const fixSpacing = (text: string): string => {
   return text.replace(/\n/g, "\n\n").trim();
 };
 
-const normalizeQuotes = (str: string): string => {
+export const normalizeQuotes = (str: string): string => {
   return str.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
 };
 
-const applyReviewTags = (original: string, review: string): string => {
-  if (!review) return original;
 
-  const lines = review.split("\n");
-  const patches: { index: number; tag: string }[] = [];
-  const normalizedOriginal = normalizeQuotes(original);
-
-  for (const line of lines) {
-    // Match [TAG] || "locator", optionally with markdown bolding around the tag
-    const match = line.match(/^(\*\*)?\[([A-Z_]+)\](\*\*)?\s*\|\|\s*"(.*)"$/);
-    if (match) {
-      const tag = match[2];
-      const locator = normalizeQuotes(match[4]);
-
-      // Find the occurrence using normalized versions
-      const idx = normalizedOriginal.indexOf(locator);
-      if (idx !== -1) {
-        patches.push({ index: idx, tag: `[${tag}] ` });
-      }
-    }
-  }
-
-  // Sort by index descending to avoid shifting indices when inserting
-  patches.sort((a, b) => b.index - a.index);
-
-  let patched = original;
-  for (const patch of patches) {
-    patched =
-      patched.slice(0, patch.index) + patch.tag + patched.slice(patch.index);
-  }
-  return patched;
-};
 
 const Strategies: Record<string, StrategyFn> = {
   // Generate (Default / Brainstorm) - The Ideator
@@ -163,10 +132,9 @@ const Strategies: Record<string, StrategyFn> = {
   // Standard temperature for fluid prose, low repetition penalty for style
   "refine:default": async (session, _manager, base) => {
     const userPrompt = (await api.v1.config.get("refine_prompt")) || "";
-    const contentToRefine = session.cycles.generate.content;
-    const critique = session.cycles.review.content;
-    const patchedContent = applyReviewTags(contentToRefine, critique);
-    api.v1.log(`[ContextStrategy] Patched content for Refine:\n${patchedContent}`);
+    const contentToRefine = session.currentContent;
+    
+    api.v1.log(`[ContextStrategy] Refining content length: ${contentToRefine.length}`);
 
     const messages = hyperContextBuilder(
       base.systemMsg,
@@ -182,7 +150,7 @@ const Strategies: Record<string, StrategyFn> = {
         },
         {
           role: "assistant",
-          content: fixSpacing(`DRAFT CONTENT:\n${patchedContent}`),
+          content: fixSpacing(`DRAFT CONTENT:\n${contentToRefine}`),
         },
         // { role: "user", content: fixSpacing(`CRITIQUE:\n${critique}`) },
       ],

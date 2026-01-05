@@ -273,4 +273,11 @@ export class StoryManager {
       this.notifyListeners();
     }
   }
+
+  public async saveFieldDraft(fieldId: string, content: string): Promise<void> {
+    // Update internal memory without triggering full save
+    await this.setFieldContent(fieldId, content, false);
+    // Save to the draft storage key used by the UI
+    await api.v1.storyStorage.set(`kse-field-${fieldId}`, content);
+  }
 }
