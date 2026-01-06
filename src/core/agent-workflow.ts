@@ -288,6 +288,21 @@ export class AgentWorkflowService {
     try {
       const { messages, params } = await this.contextFactory.build(session);
 
+      // Detect assistant pre-fill
+      let prefill = "";
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg && lastMsg.role === "assistant" && lastMsg.content) {
+          prefill = lastMsg.content;
+      }
+
+      // Only initialize content with pre-fill for 'generate' stage.
+      // For 'review' and 'refine', the pre-fill is just transition talk and shouldn't be in the field content.
+      if (stage === "generate") {
+          session.cycles[stage].content = prefill;
+      } else {
+          session.cycles[stage].content = "";
+      }
+
       // Capture original content for handlers that need it (Refine)
       const originalDraft = this.storyManager.getFieldContent(session.fieldId);
 
@@ -295,7 +310,7 @@ export class AgentWorkflowService {
       if (!session.cancellationSignal)
         throw new Error("Failed to create cancellation signal");
 
-      let result = await hyperGenerate(
+      await hyperGenerate(
         messages,
         {
           maxTokens: 2048,
@@ -332,9 +347,12 @@ export class AgentWorkflowService {
       );
 
       // 4. Stage-specific Completion
-      result = await handler.onComplete(session, result);
+      // Use the accumulated content from streaming, as it correctly includes the pre-fill for 'generate' 
+      // and excludes it for others (as initialized above).
+      const totalAccumulated = session.cycles[stage].content;
+      const completionResult = await handler.onComplete(session, totalAccumulated);
 
-      session.cycles[stage].content = result;
+      session.cycles[stage].content = completionResult;
       session.cycles[stage].status = "completed";
 
       return true;

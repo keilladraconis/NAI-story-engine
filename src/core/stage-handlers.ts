@@ -51,8 +51,11 @@ export class RefineStageHandler implements StageHandler {
     originalDraft: string
   ): void {
     // Visual overwrite effect: New Content + Cursor + Remaining Old Content
+    // We try to match character by character to find where the "new" text diverges from the "old" text
+    // but for simplicity, we just use the length of the accumulated text.
     const newLen = accumulated.length;
-    const tail = originalDraft.slice(newLen);
+    const tail = originalDraft.length > newLen ? originalDraft.slice(newLen) : "";
+    
     this.storyManager.saveFieldDraft(
       session.fieldId,
       accumulated + "✍️" + tail

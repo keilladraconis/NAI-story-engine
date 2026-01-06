@@ -20,7 +20,7 @@ interface StoryData {
   [FieldID.SituationalDynamics]: DULFSField[];
 
   // Lorebook Integration
-  dulfsCategoryId?: string;
+  dulfsCategoryIds: Record<string, string>; // FieldID -> CategoryID
   dulfsEntryIds: Record<string, string>; // FieldID -> EntryID
   dulfsEnabled: Record<string, boolean>; // FieldID -> boolean
 
@@ -55,6 +55,7 @@ export interface DULFSField {
   description: string;
   attributes: Record<string, any>;
   linkedLorebooks: string[];
+  lorebookContent?: string;
 }
 
 export class StoryManager {
@@ -76,10 +77,17 @@ export class StoryManager {
 
     if (savedData) {
       this.currentStory = savedData;
-      // Migration: Ensure dulfsEntryIds exists
-      if (this.currentStory && !this.currentStory.dulfsEntryIds) {
-        this.currentStory.dulfsEntryIds = {};
+      // Migration: Ensure dulfsCategoryIds exists
+      if (this.currentStory && !this.currentStory.dulfsCategoryIds) {
+        this.currentStory.dulfsCategoryIds = {};
+        // Transfer old single category if it exists
+        if ((this.currentStory as any).dulfsCategoryId) {
+          // We'll let ensureDulfsCategory handle the mapping later,
+          // but we clear the old field to avoid confusion.
+          delete (this.currentStory as any).dulfsCategoryId;
+        }
       }
+      // Migration: Ensure dulfsEntryIds exists
       // Migration: Ensure dulfsEnabled exists
       if (this.currentStory && !this.currentStory.dulfsEnabled) {
         this.currentStory.dulfsEnabled = {};
@@ -141,6 +149,22 @@ export class StoryManager {
   public getFieldContent(fieldId: string): string {
     if (!this.currentStory) return "";
 
+    // Handle lorebook item reference: fieldId:itemId OR lorebook:entryId
+    if (fieldId.includes(":")) {
+      const [prefix, id] = fieldId.split(":");
+      
+      let item: DULFSField | undefined;
+      if (prefix === "lorebook") {
+        const match = this.findDulfsByLorebookId(id);
+        item = match ? match.item : undefined;
+      } else {
+        const list = this.getDulfsList(prefix);
+        item = list.find((i) => i.id === id);
+      }
+      
+      return item ? item.lorebookContent || "" : "";
+    }
+
     // Cast to any to allow dynamic access by string ID
     const field = (this.currentStory as any)[fieldId];
 
@@ -187,6 +211,7 @@ export class StoryManager {
     this.currentStory.lastModified = new Date();
     await this.saveStoryData();
     await this.syncDulfsLorebook(fieldId);
+    await this.syncIndividualLorebook(fieldId, item.id);
   }
 
   public async updateDulfsItem(
@@ -202,13 +227,36 @@ export class StoryManager {
       list[index] = { ...list[index], ...updates };
       this.currentStory.lastModified = new Date();
       await this.saveStoryData(notify);
-      await this.syncDulfsLorebook(fieldId);
+
+      // If lorebookContent or name changed, sync individual lorebook
+      // ONLY sync if notify is true (final save) to avoid lag during streaming
+      if (
+        notify &&
+        (updates.lorebookContent !== undefined || updates.name !== undefined)
+      ) {
+        await this.syncIndividualLorebook(fieldId, itemId);
+      } else if (notify) {
+        await this.syncDulfsLorebook(fieldId);
+      }
     }
   }
 
   public async removeDulfsItem(fieldId: string, itemId: string): Promise<void> {
     if (!this.currentStory) return;
+
+    // Cleanup individual lorebook if it exists
     const list = this.getDulfsList(fieldId);
+    const item = list.find((i) => i.id === itemId);
+    if (item && item.linkedLorebooks.length > 0) {
+      for (const entryId of item.linkedLorebooks) {
+        try {
+          await api.v1.lorebook.removeEntry(entryId);
+        } catch (e) {
+          // Ignore
+        }
+      }
+    }
+
     const newList = list.filter((i) => i.id !== itemId);
     (this.currentStory as any)[fieldId] = newList;
     this.currentStory.lastModified = new Date();
@@ -226,29 +274,32 @@ export class StoryManager {
 
   // --- Lorebook Integration ---
 
-  private async ensureDulfsCategory(): Promise<string> {
+  private async ensureDulfsCategory(fieldId: string): Promise<string> {
     if (!this.currentStory) throw new Error("No story data");
 
-    if (this.currentStory.dulfsCategoryId) {
-      const existing = await api.v1.lorebook.category(
-        this.currentStory.dulfsCategoryId,
-      );
+    const categoryId = this.currentStory.dulfsCategoryIds[fieldId];
+    if (categoryId) {
+      const existing = await api.v1.lorebook.category(categoryId);
       if (existing) {
-        return this.currentStory.dulfsCategoryId;
+        return categoryId;
       }
     }
+
+    const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
+    const categoryName = config ? `SE: ${config.label}` : "SE: DULFS";
 
     const catId = api.v1.uuid();
     try {
       await api.v1.lorebook.createCategory({
         id: catId,
-        name: "Story-Engine: DULFS",
+        name: categoryName,
         enabled: true,
+        settings: { entryHeader: "---" },
       });
-      this.currentStory.dulfsCategoryId = catId;
+      this.currentStory.dulfsCategoryIds[fieldId] = catId;
       await this.saveStoryData();
     } catch (e) {
-      api.v1.log("Error creating DULFS category:", e);
+      api.v1.log(`Error creating DULFS category for ${fieldId}:`, e);
     }
     return catId;
   }
@@ -269,7 +320,7 @@ export class StoryManager {
       textContent += "(Empty)";
     }
 
-    const categoryId = await this.ensureDulfsCategory();
+    const categoryId = await this.ensureDulfsCategory(fieldId);
 
     // Check for existing entry
     const entryId = this.currentStory.dulfsEntryIds[fieldId];
@@ -343,6 +394,108 @@ export class StoryManager {
     }
   }
 
+  private async syncIndividualLorebook(
+    fieldId: string,
+    itemId: string,
+  ): Promise<void> {
+    if (!this.currentStory) return;
+
+    const list = this.getDulfsList(fieldId);
+    const item = list.find((i) => i.id === itemId);
+    if (!item) return;
+
+    const categoryId = await this.ensureDulfsCategory(fieldId);
+    const isEnabled = this.isDulfsEnabled(fieldId);
+    const textContent = item.lorebookContent || "";
+
+    // Check if we already have a linked lorebook
+    let entryId =
+      item.linkedLorebooks.length > 0 ? item.linkedLorebooks[0] : null;
+
+    if (entryId) {
+      try {
+        const existing = await api.v1.lorebook.entry(entryId);
+        if (existing) {
+          await api.v1.lorebook.updateEntry(entryId, {
+            displayName: item.name,
+            text: textContent,
+            category: categoryId,
+            enabled: isEnabled,
+          });
+          return;
+        }
+      } catch (e) {
+        api.v1.log(
+          `Failed to update individual lorebook ${entryId}, recreating...`,
+          e,
+        );
+      }
+    }
+
+    // Create new entry
+    await this.createIndividualLorebookEntry(
+      fieldId,
+      itemId,
+      item.name,
+      textContent,
+      categoryId,
+      isEnabled,
+    );
+  }
+
+  private async createIndividualLorebookEntry(
+    fieldId: string,
+    itemId: string,
+    name: string,
+    text: string,
+    categoryId: string,
+    enabled: boolean,
+  ): Promise<void> {
+    if (!this.currentStory) return;
+    try {
+      const newId = api.v1.uuid();
+      await api.v1.lorebook.createEntry({
+        id: newId,
+        displayName: name,
+        text: text,
+        category: categoryId,
+        keys: [name], // Use name as key
+        enabled: enabled,
+      });
+
+      // Update item's linkedLorebooks
+      const list = this.getDulfsList(fieldId);
+      const index = list.findIndex((i) => i.id === itemId);
+      if (index !== -1) {
+        list[index].linkedLorebooks = [newId];
+        await this.saveStoryData();
+      }
+    } catch (e) {
+      api.v1.log("Error creating individual lorebook entry:", e);
+    }
+  }
+
+  public findDulfsByLorebookId(
+    entryId: string,
+  ): { fieldId: string; item: DULFSField } | null {
+    const fields = [
+      FieldID.DramatisPersonae,
+      FieldID.UniverseSystems,
+      FieldID.Locations,
+      FieldID.Factions,
+      FieldID.SituationalDynamics,
+    ];
+
+    for (const fid of fields) {
+      const list = this.getDulfsList(fid);
+      const item = list.find((i) => i.linkedLorebooks.includes(entryId));
+      if (item) {
+        return { fieldId: fid, item };
+      }
+    }
+    return null;
+  }
+
   public isAttgEnabled(): boolean {
     return this.currentStory?.attgEnabled || false;
   }
@@ -405,6 +558,21 @@ export class StoryManager {
     sync: boolean = true,
   ): Promise<void> {
     if (!this.currentStory) return;
+
+    // Handle lorebook item reference: fieldId:itemId OR lorebook:entryId
+    if (fieldId.includes(":")) {
+      const [prefix, id] = fieldId.split(":");
+      
+      if (prefix === "lorebook") {
+        const match = this.findDulfsByLorebookId(id);
+        if (match) {
+          await this.updateDulfsItem(match.fieldId, match.item.id, { lorebookContent: content }, save);
+        }
+      } else {
+        await this.updateDulfsItem(prefix, id, { lorebookContent: content }, save);
+      }
+      return;
+    }
 
     const storyAny = this.currentStory as any;
     const field = storyAny[fieldId];
@@ -538,6 +706,7 @@ export class StoryManager {
       [FieldID.SituationalDynamics]: [],
 
       // Lorebook
+      dulfsCategoryIds: {},
       dulfsEntryIds: {},
       dulfsEnabled: {},
 

@@ -195,9 +195,10 @@ const Strategies: Record<string, StrategyFn> = {
   "generate:attg": async (_session, _manager, base) => {
     const messages = hyperContextBuilder(
       base.systemMsg,
-      { 
-          role: "user", 
-          content: "Generate a single ATTG block for this story. \n\nCRITICAL: Output ONLY the block. No Markdown, no headers, no conversational filler, no extra text. \n\nEXAMPLE:\n[ Author: Stephen King; Tags: horror, supernatural, small town; Title: The Mist; Genre: Horror ]" 
+      {
+        role: "user",
+        content:
+          "Generate a single ATTG block for this story. \n\nCRITICAL: Output ONLY the block. No Markdown, no headers, no conversational filler, no extra text. \n\nEXAMPLE:\n[ Author: Stephen King; Tags: horror, supernatural, small town; Title: The Mist; Genre: Horror ]",
       },
       {
         role: "assistant",
@@ -235,7 +236,8 @@ const Strategies: Record<string, StrategyFn> = {
       base.systemMsg,
       {
         role: "user",
-        content: "Generate a style guideline block for this story. \n\nCRITICAL: Output ONLY the block. No Markdown, no conversational filler. \n\nEXAMPLE:\n[ Write in a style that conveys the following: hard-boiled noir, cynical narration, short punchy sentences, focus on sensory grit ]",
+        content:
+          "Generate a style guideline block for this story. \n\nCRITICAL: Output ONLY the block. No Markdown, no conversational filler. \n\nEXAMPLE:\n[ Write in a style that conveys the following: hard-boiled noir, cynical narration, short punchy sentences, focus on sensory grit ]",
       },
       {
         role: "assistant",
@@ -263,6 +265,104 @@ const Strategies: Record<string, StrategyFn> = {
         maxTokens: 128,
         minTokens: 10,
         stopSequences: ["]"],
+      },
+    };
+  },
+
+  // Generate (Lorebook)
+  "generate:lorebook": async (session, manager, base) => {
+    let itemName = "the entity";
+    let itemDesc = "";
+
+    if (session.fieldId.startsWith("lorebook:")) {
+      const entryId = session.fieldId.split(":")[1];
+      const match = manager.findDulfsByLorebookId(entryId);
+      if (match) {
+        itemName = match.item.name;
+        itemDesc = match.item.content;
+      }
+    } else {
+      const [fieldId, itemId] = session.fieldId.split(":");
+      const list = manager.getDulfsList(fieldId);
+      const item = list.find((i) => i.id === itemId);
+      if (item) {
+        itemName = item.name;
+        itemDesc = item.content;
+      }
+    }
+
+    const formatInstruction = `
+Generate a lorebook entry for "${itemName}".
+You MUST follow this EXACT format. Line-by-line structure is essential.
+
+FORMAT:
+\`\`\`
+[Full Name]
+Type: [character, location, faction, etc.]
+Setting: original
+Age: [number or N/A]
+Gender: [male, female, etc.]
+[Race, optional]: [fey, orc, halfling, etc.]
+[Species, optional]: [animal species if applicable]
+Occupation: [role/job]
+Height: [cm] cm ([feet]'[inches]")
+Weight: [kg] kg ([lbs] lbs)
+BWH: [bust]-[waist]-[hip] cm ([bust][cup]-[waist]-[hip] in) / CWH: [chest]-[waist]-[hip] cm ([chest]-[waist]-[hip] in)
+Talents: [3-4 key skills]
+Body: [brief physical descriptors]
+Hair: [color, length, style]
+Eyes: [color, quality]
+Personality: [3-4 traits]
+Description: [Physical presence, mannerisms, sensory details. ~100-150 words.]
+Quotes: "[Character-defining statement]" \u2014Character Name
+Core Conflict:
+- Axis: [fundamental duality]
+- Pillar (Self): [internal manifestation]
+- Pillar (World): [external role]
+- Source: [formative past event]
+\`\`\`
+
+WRONG example (DO NOT DO THIS):
+\`\`\`
+[Character Name], Type: character, Setting: original, Age: 25...
+\`\`\`
+
+CRITICAL RULES:
+- If character is female, use BWH with cup size. If not, use CWH.
+- For non-English settings, add native name field immediately after character name.
+- Deviate from standard attributes only if it makes sense for the category (e.g. Locations don't need Age).
+- NO Markdown formatting (no bolding, no italics) inside the entry.
+- NO conversational filler. Start immediately with the name in brackets.
+`;
+
+    const messages = hyperContextBuilder(
+      base.systemMsg,
+      { role: "user", content: fixSpacing(formatInstruction) },
+      {
+        role: "assistant",
+        content: `${itemName}\n`,
+      },
+      [
+        {
+          role: "user",
+          content: fixSpacing(`STORY PROMPT:\n${base.storyPrompt}`),
+        },
+        {
+          role: "user",
+          content: fixSpacing(
+            `ENTITY DATA:\nName: ${itemName}\nDescription: ${itemDesc}`,
+          ),
+        },
+      ],
+    );
+
+    return {
+      messages,
+      params: {
+        temperature: 0.8,
+        min_p: 0.05,
+        presence_penalty: 0.1,
+        maxTokens: 1536,
       },
     };
   },
@@ -394,6 +494,7 @@ export class ContextStrategyFactory {
   private getStrategyKey(session: FieldSession): string {
     const stage = session.selectedStage;
     if (stage === "generate") {
+      if (session.fieldId.includes(":")) return "generate:lorebook";
       if (session.fieldId === FieldID.WorldSnapshot)
         return "generate:worldSnapshot";
       if (session.fieldId === FieldID.ATTG) return "generate:attg";

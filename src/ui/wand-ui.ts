@@ -15,13 +15,14 @@ export class WandUI {
     fieldId: string,
     onSave?: (session: FieldSession) => void,
     onDiscard?: (session: FieldSession) => void,
+    onUpdate?: () => void,
   ): UIPart {
     const activeStage = session.selectedStage;
     return column({
       style: { "margin-top": "16px" },
       content: [
-        this.createStageSelector(session, fieldId, activeStage),
-        this.createActionRow(session, fieldId, activeStage, onSave, onDiscard),
+        this.createStageSelector(session, fieldId, activeStage, onUpdate),
+        this.createActionRow(session, fieldId, activeStage, onSave, onDiscard, onUpdate),
       ],
     });
   }
@@ -30,8 +31,9 @@ export class WandUI {
     session: FieldSession,
     fieldId: string,
     activeStage: "generate" | "review" | "refine",
+    onUpdate?: () => void,
   ): UIPart {
-    const update = () => this.onUpdateCallback();
+    const update = onUpdate || (() => this.onUpdateCallback());
     return row({
       id: `wand-stage-selector-${fieldId}`,
       style: { "align-items": "center", "margin-bottom": "16px", gap: "16px" },
@@ -95,8 +97,9 @@ export class WandUI {
     activeStage: "generate" | "review" | "refine",
     onSave?: (session: FieldSession) => void,
     onDiscard?: (session: FieldSession) => void,
+    onUpdate?: () => void,
   ): UIPart {
-    const update = () => this.onUpdateCallback();
+    const update = onUpdate || (() => this.onUpdateCallback());
 
     const generateBtn = createResponsiveGenerateButton(
       `wand-btn-${fieldId}`,

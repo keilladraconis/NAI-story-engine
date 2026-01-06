@@ -38,6 +38,10 @@ export class StructuredEditor {
     });
   }
 
+  public getWandUI(): WandUI {
+    return this.wandUI;
+  }
+
   private toggleEditMode(fieldId: string): void {
     const current = this.editModes.get(fieldId) || false;
     this.editModes.set(fieldId, !current);

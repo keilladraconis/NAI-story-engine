@@ -160,6 +160,20 @@ export class ListFieldStrategy implements FieldRenderStrategy {
     const actionsRow = row({
       style: { "margin-bottom": "12px", gap: "8px", "align-items": "center" },
       content: [
+        // Responsive Generate Button
+        createResponsiveGenerateButton(
+          `list-gen-btn-${config.id}`,
+          { isRunning: genState.isRunning },
+          {
+            onStart: () => {
+              if (runListGeneration) runListGeneration();
+            },
+            onCancel: () => {
+              if (cancelListGeneration) cancelListGeneration();
+            },
+          },
+          "Generate",
+        ),
         button({
           text: "Add Entry",
           iconId: "plus",
@@ -184,20 +198,6 @@ export class ListFieldStrategy implements FieldRenderStrategy {
             storyManager.clearDulfsList(config.id);
           },
         }),
-        // Responsive Generate Button
-        createResponsiveGenerateButton(
-          `list-gen-btn-${config.id}`,
-          { isRunning: genState.isRunning },
-          {
-            onStart: () => {
-              if (runListGeneration) runListGeneration();
-            },
-            onCancel: () => {
-              if (cancelListGeneration) cancelListGeneration();
-            },
-          },
-          "Generate",
-        ),
         // Enabled Checkbox
         checkboxInput({
           label: "Lorebook",

@@ -7,11 +7,12 @@ const log = api.v1.log;
 (async () => {
   try {
     await api.v1.permissions.request(["lorebookEdit", "storyEdit"]);
-    const storyEngineUI = new StoryEngineUI();
+    const ui = new StoryEngineUI();
 
     api.v1.ui.register([
-      storyEngineUI.sidebar,
-      storyEngineUI.brainstormUI.sidebar,
+      ui.sidebar,
+      ui.brainstormUI.sidebar,
+      ui.lorebookPanel,
     ]);
   } catch (e) {
     log("Startup error:", e);
