@@ -9,6 +9,8 @@ interface StoryData {
   [FieldID.StoryPrompt]: StoryField;
   [FieldID.Brainstorm]: StoryField;
   [FieldID.WorldSnapshot]: StoryField;
+  [FieldID.ATTG]: StoryField;
+  [FieldID.Style]: StoryField;
 
   // DULFS components
   [FieldID.DramatisPersonae]: DULFSField[];
@@ -22,13 +24,17 @@ interface StoryData {
   dulfsEntryIds: Record<string, string>; // FieldID -> EntryID
   dulfsEnabled: Record<string, boolean>; // FieldID -> boolean
 
+  // Generator Sync
+  attgEnabled: boolean;
+  styleEnabled: boolean;
+
   // History and metadata
   lastModified: Date;
 }
 
 interface StoryField {
   id: string;
-  type: "prompt" | "brainstorm" | "worldSnapshot" | "dulfs";
+  type: "prompt" | "brainstorm" | "worldSnapshot" | "dulfs" | "attg" | "style";
   content: string;
   version: number;
   history: FieldHistory[];
@@ -77,6 +83,36 @@ export class StoryManager {
       // Migration: Ensure dulfsEnabled exists
       if (this.currentStory && !this.currentStory.dulfsEnabled) {
           this.currentStory.dulfsEnabled = {};
+      }
+      
+      // Migration: Ensure ATTG and Style fields exist
+      if (this.currentStory && !this.currentStory[FieldID.ATTG]) {
+          this.currentStory[FieldID.ATTG] = {
+            id: FieldID.ATTG,
+            type: "attg",
+            content: "",
+            version: 0,
+            history: [],
+            linkedEntities: [],
+          };
+      }
+      if (this.currentStory && !this.currentStory[FieldID.Style]) {
+          this.currentStory[FieldID.Style] = {
+            id: FieldID.Style,
+            type: "style",
+            content: "",
+            version: 0,
+            history: [],
+            linkedEntities: [],
+          };
+      }
+
+      // Migration: Generator Sync
+      if (this.currentStory && typeof this.currentStory.attgEnabled === 'undefined') {
+          this.currentStory.attgEnabled = false;
+      }
+      if (this.currentStory && typeof this.currentStory.styleEnabled === 'undefined') {
+          this.currentStory.styleEnabled = false;
       }
     } else {
       this.currentStory = this.createDefaultStoryData();
@@ -273,10 +309,72 @@ export class StoryManager {
     }
   }
 
+  public isAttgEnabled(): boolean {
+      return this.currentStory?.attgEnabled || false;
+  }
+
+  public async setAttgEnabled(enabled: boolean): Promise<void> {
+      if (!this.currentStory) return;
+      this.currentStory.attgEnabled = enabled;
+      await this.saveStoryData();
+      if (enabled) {
+          await this.syncAttgToMemory(this.getFieldContent(FieldID.ATTG));
+      }
+  }
+
+  public isStyleEnabled(): boolean {
+      return this.currentStory?.styleEnabled || false;
+  }
+
+  public async setStyleEnabled(enabled: boolean): Promise<void> {
+      if (!this.currentStory) return;
+      this.currentStory.styleEnabled = enabled;
+      await this.saveStoryData();
+      if (enabled) {
+          await this.syncStyleToAN(this.getFieldContent(FieldID.Style));
+      }
+  }
+
+  private async syncAttgToMemory(content: string): Promise<void> {
+      // Basic validation: must start with [ and contain Author:
+      if (!content.trim().startsWith("[") || !content.includes("Author:")) return;
+
+      const currentMemory = await api.v1.memory.get();
+      let lines = currentMemory.split("\n");
+      
+      // Regex: Starts with [, contains Author:, ends with ] (loosely)
+      const attgRegex = /^\s*\[\s*Author:.*\]\s*$/i;
+
+      if (lines.length > 0 && attgRegex.test(lines[0])) {
+          lines[0] = content;
+      } else {
+          lines.unshift(content);
+      }
+      await api.v1.memory.set(lines.join("\n"));
+  }
+
+  private async syncStyleToAN(content: string): Promise<void> {
+      // Basic validation
+      if (!content.trim().startsWith("[") || !content.includes("Style:")) return;
+
+      const currentAN = await api.v1.an.get();
+      let lines = currentAN.split("\n");
+
+      const styleRegex = /^\s*\[\s*Style:.*\]\s*$/i;
+
+      if (lines.length > 0 && styleRegex.test(lines[0])) {
+          lines[0] = content;
+      } else {
+          lines.unshift(content);
+      }
+      await api.v1.an.set(lines.join("\n"));
+  }
+
   public async setFieldContent(
     fieldId: string,
     content: string,
     save: boolean = false,
+    sync: boolean = true
   ): Promise<void> {
     if (!this.currentStory) return;
 
@@ -288,6 +386,16 @@ export class StoryManager {
         if (field.content !== content) {
             field.content = content;
             changed = true;
+        }
+    }
+
+    if (changed && sync) {
+        // Trigger Syncs
+        if (fieldId === FieldID.ATTG && this.currentStory.attgEnabled) {
+            await this.syncAttgToMemory(content);
+        }
+        if (fieldId === FieldID.Style && this.currentStory.styleEnabled) {
+            await this.syncStyleToAN(content);
         }
     }
 
@@ -307,6 +415,8 @@ export class StoryManager {
         this.currentStory[FieldID.StoryPrompt],
         this.currentStory[FieldID.Brainstorm],
         this.currentStory[FieldID.WorldSnapshot],
+        this.currentStory[FieldID.ATTG],
+        this.currentStory[FieldID.Style],
     ];
 
     for (const field of textFields) {
@@ -358,6 +468,22 @@ export class StoryManager {
         history: [],
         linkedEntities: [],
       },
+      [FieldID.ATTG]: {
+        id: FieldID.ATTG,
+        type: "attg",
+        content: "",
+        version: 0,
+        history: [],
+        linkedEntities: [],
+      },
+      [FieldID.Style]: {
+        id: FieldID.Style,
+        type: "style",
+        content: "",
+        version: 0,
+        history: [],
+        linkedEntities: [],
+      },
       [FieldID.Brainstorm]: {
         id: FieldID.Brainstorm,
         type: "brainstorm",
@@ -386,6 +512,10 @@ export class StoryManager {
       // Lorebook
       dulfsEntryIds: {},
       dulfsEnabled: {},
+
+      // Sync
+      attgEnabled: false,
+      styleEnabled: false,
 
       lastModified: new Date(),
     };
@@ -453,8 +583,8 @@ export class StoryManager {
   }
 
   public async saveFieldDraft(fieldId: string, content: string): Promise<void> {
-    // Update internal memory without triggering full save
-    await this.setFieldContent(fieldId, content, false);
+    // Update internal memory without triggering full save or sync
+    await this.setFieldContent(fieldId, content, false, false);
     // Save to the draft storage key used by the UI
     await api.v1.storyStorage.set(`kse-field-${fieldId}`, content);
   }

@@ -137,6 +137,12 @@ export class StructuredEditor {
       runListGeneration: () => this.agentWorkflowService.runListGeneration(config.id, this.onUpdateCallback),
       getListGenerationState: () => this.agentWorkflowService.getListGenerationState(config.id),
       cancelListGeneration: () => this.agentWorkflowService.cancelListGeneration(config.id),
+      // Generator Sync
+      setAttgEnabled: (enabled) => this.storyManager.setAttgEnabled(enabled),
+      isAttgEnabled: () => this.storyManager.isAttgEnabled(),
+      setStyleEnabled: (enabled) => this.storyManager.setStyleEnabled(enabled),
+      isStyleEnabled: () => this.storyManager.isStyleEnabled(),
+      runSimpleGeneration: () => this.agentWorkflowService.runSimpleGeneration(config.id, this.onUpdateCallback),
     };
 
     const strategy = getFieldStrategy(config);

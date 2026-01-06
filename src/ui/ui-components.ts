@@ -44,10 +44,10 @@ export const createToggleableContent = (
     });
   } else {
     // Process content to preserve line breaks in NovelAI's markdown renderer
-    const processedContent = (content || "_No content._").replace(
-      /\n/g,
-      "  \n",
-    );
+    // Escape '[' to prevent markdown link reference definitions like '[Author]: ...' from hiding text
+    const processedContent = (content || "_No content._")
+        .replace(/\n/g, "  \n")
+        .replace(/\[/g, "\\[");
 
     return text({
       text: processedContent,

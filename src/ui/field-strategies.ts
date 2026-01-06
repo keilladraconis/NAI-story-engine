@@ -5,10 +5,11 @@ import { WandUI } from "./wand-ui";
 import {
   createHeaderWithToggle,
   createToggleableContent,
-  createResponsiveGenerateButton
+  createResponsiveGenerateButton,
 } from "./ui-components";
 
-const { row, column, text, multilineTextInput, button, checkboxInput } = api.v1.ui.part;
+const { row, column, text, multilineTextInput, button, checkboxInput } =
+  api.v1.ui.part;
 
 export interface RenderContext {
   config: FieldConfig;
@@ -26,6 +27,12 @@ export interface RenderContext {
   runListGeneration?: () => Promise<void>;
   getListGenerationState?: () => { isRunning: boolean; signal?: any };
   cancelListGeneration?: () => void;
+  // Generator Sync
+  setAttgEnabled?: (enabled: boolean) => Promise<void>;
+  isAttgEnabled?: () => boolean;
+  setStyleEnabled?: (enabled: boolean) => Promise<void>;
+  isStyleEnabled?: () => boolean;
+  runSimpleGeneration?: () => Promise<void>;
 }
 
 export interface FieldRenderStrategy {
@@ -42,6 +49,91 @@ function createFieldActions(_context: RenderContext): UIPart {
 
 // --- Strategies ---
 
+export class GeneratorFieldStrategy implements FieldRenderStrategy {
+  getTitle(context: RenderContext): string {
+    return context.config.label;
+  }
+
+  renderContent(context: RenderContext): UIPart[] {
+    const {
+      config,
+      storyManager,
+      editModeState,
+      toggleEditMode,
+      handleFieldChange,
+      runSimpleGeneration,
+      getListGenerationState,
+      cancelListGeneration,
+      setAttgEnabled,
+      isAttgEnabled,
+      setStyleEnabled,
+      isStyleEnabled,
+    } = context;
+
+    const genState = getListGenerationState
+      ? getListGenerationState()
+      : { isRunning: false };
+
+    // Determine sync checkbox
+    let syncCheckbox: UIPart = null;
+    if (config.id === FieldID.ATTG && isAttgEnabled && setAttgEnabled) {
+      syncCheckbox = checkboxInput({
+        label: "Memory",
+        initialValue: isAttgEnabled(),
+        onChange: (val) => setAttgEnabled(val),
+      });
+    } else if (
+      config.id === FieldID.Style &&
+      isStyleEnabled &&
+      setStyleEnabled
+    ) {
+      syncCheckbox = checkboxInput({
+        label: "Author's Note",
+        initialValue: isStyleEnabled(),
+        onChange: (val) => setStyleEnabled(val),
+      });
+    }
+
+    const actionsRow = row({
+      style: {
+        "margin-top": "8px",
+        "justify-content": "space-between",
+        "align-items": "center",
+      },
+      content: [
+        createResponsiveGenerateButton(
+          `gen-btn-${config.id}`,
+          { isRunning: genState.isRunning },
+          {
+            onStart: () => {
+              if (runSimpleGeneration) runSimpleGeneration();
+            },
+            onCancel: () => {
+              if (cancelListGeneration) cancelListGeneration();
+            },
+          },
+          "Generate",
+        ),
+        syncCheckbox || row({ content: [] }),
+      ],
+    });
+
+    const content = storyManager.getFieldContent(config.id);
+
+    return [
+      createHeaderWithToggle(config.description, editModeState, toggleEditMode),
+      createToggleableContent(
+        editModeState,
+        content,
+        config.placeholder,
+        `story:kse-field-${config.id}`,
+        (newContent: string) => handleFieldChange(newContent),
+      ),
+      actionsRow,
+    ];
+  }
+}
+
 export class ListFieldStrategy implements FieldRenderStrategy {
   getTitle(context: RenderContext): string {
     return context.config.label;
@@ -55,11 +147,13 @@ export class ListFieldStrategy implements FieldRenderStrategy {
       toggleItemEditMode,
       runListGeneration,
       getListGenerationState,
-      cancelListGeneration
+      cancelListGeneration,
     } = context;
 
     const list = storyManager.getDulfsList(config.id);
-    const genState = getListGenerationState ? getListGenerationState() : { isRunning: false };
+    const genState = getListGenerationState
+      ? getListGenerationState()
+      : { isRunning: false };
     const isEnabled = storyManager.isDulfsEnabled(config.id);
 
     // --- Actions Row ---
@@ -92,26 +186,26 @@ export class ListFieldStrategy implements FieldRenderStrategy {
         }),
         // Responsive Generate Button
         createResponsiveGenerateButton(
-            `list-gen-btn-${config.id}`,
-            { isRunning: genState.isRunning },
-            {
-                onStart: () => {
-                    if (runListGeneration) runListGeneration();
-                },
-                onCancel: () => {
-                    if (cancelListGeneration) cancelListGeneration();
-                }
+          `list-gen-btn-${config.id}`,
+          { isRunning: genState.isRunning },
+          {
+            onStart: () => {
+              if (runListGeneration) runListGeneration();
             },
-            "Generate"
+            onCancel: () => {
+              if (cancelListGeneration) cancelListGeneration();
+            },
+          },
+          "Generate",
         ),
         // Enabled Checkbox
         checkboxInput({
-            label: "Lorebook",
-            initialValue: isEnabled,
-            onChange: (val) => {
-                storyManager.setDulfsEnabled(config.id, val);
-            }
-        })
+          label: "Lorebook",
+          initialValue: isEnabled,
+          onChange: (val) => {
+            storyManager.setDulfsEnabled(config.id, val);
+          },
+        }),
       ],
     });
 
@@ -135,7 +229,7 @@ export class ListFieldStrategy implements FieldRenderStrategy {
           column({
             style: { "flex-grow": "1" },
             content: [
-            createToggleableContent(
+              createToggleableContent(
                 isEditing,
                 item.content,
                 "Entry details...",
@@ -303,6 +397,10 @@ export function getFieldStrategy(config: FieldConfig): FieldRenderStrategy {
 
   if (config.layout === "list") {
     return new ListFieldStrategy();
+  }
+
+  if (config.layout === "generator") {
+    return new GeneratorFieldStrategy();
   }
 
   return new StandardFieldStrategy();

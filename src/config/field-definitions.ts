@@ -7,6 +7,8 @@ export enum FieldID {
   Locations = "locations",
   Factions = "factions",
   SituationalDynamics = "situationalDynamics",
+  ATTG = "attg",
+  Style = "style",
 }
 
 export interface FieldConfig {
@@ -16,7 +18,7 @@ export interface FieldConfig {
   placeholder: string;
   icon: IconId;
   linkedEntities?: string[];
-  layout?: "default" | "inline-wand" | "list";
+  layout?: "default" | "inline-wand" | "list" | "generator";
 }
 
 export const FIELD_CONFIGS: FieldConfig[] = [
@@ -74,5 +76,21 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Active conflicts, pending events...",
     icon: "activity",
     layout: "list",
+  },
+  {
+    id: FieldID.ATTG,
+    label: "ATTG",
+    description: "Author, Title, Tags, Genre block",
+    placeholder: "[ Author: ...; Tags: ...; Title: ...; Genre: ... ]",
+    icon: "tag",
+    layout: "generator",
+  },
+  {
+    id: FieldID.Style,
+    label: "Style Guidelines",
+    description: "Writing style instructions for the AI",
+    placeholder: "[ Style: ... ]",
+    icon: "feather",
+    layout: "generator",
   },
 ];

@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767659982
+updatedAt: 1767662279
 config:
   - name: system_prompt
     prettyName: System Prompt
@@ -24,6 +24,7 @@ config:
       4.  **No Fluff:** Every detail must be a hook for potential interaction.
       5.  **Three-Sphere Architecture:** Design interconnected social/professional spheres (e.g., Industry + Crime + Politics) that create natural friction. Intersection points create dilemmas.
 
+      Where indicated by `[placeholder]`, replace placeholders.
   - name: brainstorm_prompt
     prettyName: Brainstorm Prompt
     description: User prompt used when agent is brainstorming in chat.

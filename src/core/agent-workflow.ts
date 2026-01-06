@@ -17,7 +17,10 @@ export class AgentWorkflowService {
   private handlers: Record<string, StageHandler>;
 
   // Track list generation state: fieldId -> { isRunning, signal }
-  private listGenerationState: Map<string, { isRunning: boolean; signal?: any }> = new Map();
+  private listGenerationState: Map<
+    string,
+    { isRunning: boolean; signal?: any }
+  > = new Map();
 
   constructor(private storyManager: StoryManager) {
     this.contextFactory = new ContextStrategyFactory(storyManager);
@@ -36,11 +39,14 @@ export class AgentWorkflowService {
   public cancelListGeneration(fieldId: string) {
     const state = this.listGenerationState.get(fieldId);
     if (state && state.signal) {
-        state.signal.cancel();
+      state.signal.cancel();
     }
   }
 
-  private parseListLine(line: string, fieldId: string): { name: string, description: string, content: string } | null {
+  private parseListLine(
+    line: string,
+    fieldId: string,
+  ): { name: string; description: string; content: string } | null {
     let clean = line.trim();
 
     // Still strip list markers because models are stubborn, and they shouldn't be part of the final data
@@ -48,28 +54,28 @@ export class AgentWorkflowService {
     clean = clean.replace(/^\d+[\.)]\s+/, "");
 
     if (fieldId === FieldID.DramatisPersonae) {
-        // Regex for: Name (gender, age, occupation): motivation, tell
-        // Hammer: must have the parens with commas and a colon
-        const dpRegex = /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*(.+)$/;
-        const match = clean.match(dpRegex);
-        if (match) {
-            return {
-                name: match[1].trim(),
-                description: match[5].trim(),
-                content: clean
-            };
-        }
+      // Regex for: Name (gender, age, occupation): motivation, tell
+      // Hammer: must have the parens with commas and a colon
+      const dpRegex = /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*(.+)$/;
+      const match = clean.match(dpRegex);
+      if (match) {
+        return {
+          name: match[1].trim(),
+          description: match[5].trim(),
+          content: clean,
+        };
+      }
     } else {
-        // Hammer: Name: Description
-        const genericRegex = /^([^:]+):\s*(.+)$/;
-        const match = clean.match(genericRegex);
-        if (match) {
-            return {
-                name: match[1].trim(),
-                description: match[2].trim(),
-                content: clean
-            };
-        }
+      // Hammer: Name: Description
+      const genericRegex = /^([^:]+):\s*(.+)$/;
+      const match = clean.match(genericRegex);
+      if (match) {
+        return {
+          name: match[1].trim(),
+          description: match[2].trim(),
+          content: clean,
+        };
+      }
     }
 
     return null;
@@ -77,76 +83,140 @@ export class AgentWorkflowService {
 
   public async runListGeneration(
     fieldId: string,
-    updateFn: () => void
+    updateFn: () => void,
   ): Promise<void> {
     const cancellationSignal = await api.v1.createCancellationSignal();
-    this.listGenerationState.set(fieldId, { isRunning: true, signal: cancellationSignal });
+    this.listGenerationState.set(fieldId, {
+      isRunning: true,
+      signal: cancellationSignal,
+    });
     updateFn();
-    
+
     try {
-        const { messages, params } = await this.contextFactory.buildDulfsContext(fieldId);
-        
-        let buffer = "";
+      const { messages, params } =
+        await this.contextFactory.buildDulfsContext(fieldId);
 
-        await hyperGenerate(
-            messages,
-            {
-                maxTokens: 2048,
-                minTokens: 50,
-                ...params,
-            },
-            (text) => {
-                buffer += text;
-                const lines = buffer.split("\n");
-                // Keep the last segment as it might be incomplete
-                buffer = lines.pop() || "";
-                
-                for (const line of lines) {
-                    const parsed = this.parseListLine(line, fieldId);
-                    if (parsed) {
-                        const newItem: DULFSField = {
-                            id: api.v1.uuid(),
-                            category: fieldId as any,
-                            content: parsed.content,
-                            name: parsed.name,
-                            description: parsed.description,
-                            attributes: {},
-                            linkedLorebooks: []
-                        };
-                        this.storyManager.addDulfsItem(fieldId, newItem);
-                        updateFn();
-                    }
-                }
-            },
-            "background",
-            cancellationSignal
-        );
+      let buffer = "";
 
-        // Process any remaining buffer
-        if (buffer.trim().length > 0) {
-             const parsed = this.parseListLine(buffer, fieldId);
-             if (parsed) {
-                const newItem: DULFSField = {
-                    id: api.v1.uuid(),
-                    category: fieldId as any,
-                    content: parsed.content,
-                    name: parsed.name,
-                    description: parsed.description,
-                    attributes: {},
-                    linkedLorebooks: []
-                };
-                this.storyManager.addDulfsItem(fieldId, newItem);
-                updateFn();
-             }
+      await hyperGenerate(
+        messages,
+        {
+          maxTokens: 2048,
+          minTokens: 50,
+          ...params,
+        },
+        (text) => {
+          buffer += text;
+          const lines = buffer.split("\n");
+          // Keep the last segment as it might be incomplete
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const parsed = this.parseListLine(line, fieldId);
+            if (parsed) {
+              const newItem: DULFSField = {
+                id: api.v1.uuid(),
+                category: fieldId as any,
+                content: parsed.content,
+                name: parsed.name,
+                description: parsed.description,
+                attributes: {},
+                linkedLorebooks: [],
+              };
+              this.storyManager.addDulfsItem(fieldId, newItem);
+              updateFn();
+            }
+          }
+        },
+        "background",
+        cancellationSignal,
+      );
+
+      // Process any remaining buffer
+      if (buffer.trim().length > 0) {
+        const parsed = this.parseListLine(buffer, fieldId);
+        if (parsed) {
+          const newItem: DULFSField = {
+            id: api.v1.uuid(),
+            category: fieldId as any,
+            content: parsed.content,
+            name: parsed.name,
+            description: parsed.description,
+            attributes: {},
+            linkedLorebooks: [],
+          };
+          this.storyManager.addDulfsItem(fieldId, newItem);
+          updateFn();
         }
-
+      }
     } catch (e: any) {
-        if (!e.message.includes("cancelled")) {
-            api.v1.ui.toast(`List generation failed: ${e.message}`, { type: "error" });
-        }
+      if (!e.message.includes("cancelled")) {
+        api.v1.ui.toast(`List generation failed: ${e.message}`, {
+          type: "error",
+        });
+      }
     } finally {
-        this.listGenerationState.set(fieldId, { isRunning: false, signal: undefined });
-        updateFn();
+      this.listGenerationState.set(fieldId, {
+        isRunning: false,
+        signal: undefined,
+      });
+      updateFn();
+    }
+  }
+
+  public async runSimpleGeneration(
+    fieldId: string,
+    updateFn: () => void,
+  ): Promise<void> {
+    const cancellationSignal = await api.v1.createCancellationSignal();
+    this.listGenerationState.set(fieldId, {
+      isRunning: true,
+      signal: cancellationSignal,
+    });
+    updateFn();
+
+    try {
+      const fakeSession = {
+        id: "temp",
+        fieldId: fieldId,
+        selectedStage: "generate",
+        cycles: {},
+        history: [],
+        isAuto: false,
+      } as unknown as FieldSession;
+
+      const { messages, params } = await this.contextFactory.build(fakeSession);
+
+      let buffer = "";
+      await this.storyManager.saveFieldDraft(fieldId, "");
+
+      await hyperGenerate(
+        messages,
+        {
+          maxTokens: 256,
+          ...params,
+          minTokens: params.minTokens || 50,
+        },
+        (text) => {
+          buffer += text;
+          this.storyManager.saveFieldDraft(fieldId, buffer);
+          updateFn();
+        },
+        "background",
+        cancellationSignal,
+      );
+
+      await this.storyManager.setFieldContent(fieldId, buffer, true, true);
+    } catch (e: any) {
+      if (!e.message.includes("cancelled")) {
+        api.v1.ui.toast(`Generation failed: ${e.message}`, { type: "error" });
+      }
+    } finally {
+      this.listGenerationState.set(fieldId, {
+        isRunning: false,
+        signal: undefined,
+      });
+      updateFn();
     }
   }
 
@@ -195,13 +265,13 @@ export class AgentWorkflowService {
   ): Promise<boolean> {
     const stage = session.selectedStage;
     const handler = this.handlers[stage];
-    
+
     session.cycles[stage].status = "running";
-    session.cycles[stage].content = ""; 
+    session.cycles[stage].content = "";
 
     // 1. Stage-specific Start
     await handler.onStart(session);
-    
+
     // @ts-ignore
     session.cancellationSignal = await api.v1.createCancellationSignal();
     updateFn();
@@ -237,10 +307,15 @@ export class AgentWorkflowService {
         },
         (text) => {
           session.cycles[stage].content += text; // Append delta
-          
+
           // Delegate stream handling
-          handler.onStream(session, text, session.cycles[stage].content, originalDraft);
-          
+          handler.onStream(
+            session,
+            text,
+            session.cycles[stage].content,
+            originalDraft,
+          );
+
           updateFn();
         },
         "background",
