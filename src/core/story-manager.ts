@@ -16,9 +16,6 @@ interface StoryData {
   [FieldID.Locations]: DULFSField[];
   [FieldID.Factions]: DULFSField[];
   [FieldID.SituationalDynamics]: DULFSField[];
-  // Dulfs placeholder
-  [FieldID.Dulfs]?: any;
-  [FieldID.StoryLorebooks]?: any;
 
   // Lorebook Integration
   dulfsCategoryId?: string;

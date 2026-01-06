@@ -2,11 +2,9 @@ export enum FieldID {
   StoryPrompt = "storyPrompt",
   Brainstorm = "brainstorm",
   WorldSnapshot = "worldSnapshot",
-  Dulfs = "dulfs",
   DramatisPersonae = "dramatisPersonae",
   UniverseSystems = "universeSystems",
   Locations = "locations",
-  StoryLorebooks = "storyLorebooks",
   Factions = "factions",
   SituationalDynamics = "situationalDynamics",
 }
@@ -36,14 +34,6 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "The state of the world, its drivers, and tensions...",
     icon: "package",
     layout: "inline-wand",
-  },
-  {
-    id: FieldID.Dulfs,
-    label: "DULFS",
-    description:
-      "Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics",
-    placeholder: "Characters, world, setting, and story elements...",
-    icon: "users",
   },
   {
     id: FieldID.DramatisPersonae,
@@ -84,12 +74,5 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Active conflicts, pending events...",
     icon: "activity",
     layout: "list",
-  },
-  {
-    id: FieldID.StoryLorebooks,
-    label: "Story Lorebooks",
-    description: "Integrated lorebooks for story elements",
-    placeholder: "Organized lore for story-specific elements...",
-    icon: "book",
   },
 ];

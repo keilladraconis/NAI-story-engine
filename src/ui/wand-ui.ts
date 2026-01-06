@@ -102,7 +102,7 @@ export class WandUI {
       `wand-btn-${fieldId}`,
       {
         isRunning: session.cycles[activeStage].status === "running",
-        budgetState: session.budgetState
+        budgetState: session.budgetState,
       },
       {
         onStart: () => {
@@ -113,22 +113,22 @@ export class WandUI {
           }
         },
         onCancel: () => {
-            if (session.cancellationSignal) {
-                session.cancellationSignal.cancel();
-                api.v1.ui.toast("Operation cancelled", { type: "info" });
-                update();
-            }
+          if (session.cancellationSignal) {
+            session.cancellationSignal.cancel();
+            api.v1.ui.toast("Operation cancelled", { type: "info" });
+            update();
+          }
         },
         onContinue: () => {
-            if (session.budgetResolver) {
-                session.budgetState = "waiting_for_timer";
-                session.budgetResolver();
-                session.budgetResolver = undefined;
-                update();
-            }
-        }
+          if (session.budgetResolver) {
+            session.budgetState = "waiting_for_timer";
+            session.budgetResolver();
+            session.budgetResolver = undefined;
+            update();
+          }
+        },
       },
-      "Ignite"
+      "Generate",
     );
 
     const rightControls = (() => {
