@@ -187,8 +187,14 @@ export class AgentWorkflowService {
 
       const { messages, params } = await this.contextFactory.build(fakeSession);
 
+      // Find assistant pre-fill if it exists
       let buffer = "";
-      await this.storyManager.saveFieldDraft(fieldId, "");
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg && lastMsg.role === "assistant" && lastMsg.content) {
+          buffer = lastMsg.content;
+      }
+
+      await this.storyManager.saveFieldDraft(fieldId, buffer);
 
       await hyperGenerate(
         messages,
@@ -198,9 +204,12 @@ export class AgentWorkflowService {
           minTokens: params.minTokens || 50,
         },
         (text) => {
-          buffer += text;
-          this.storyManager.saveFieldDraft(fieldId, buffer);
-          updateFn();
+            // Only update if we actually got text (prevents empty chunk spam)
+            if (text) {
+                buffer += text;
+                this.storyManager.saveFieldDraft(fieldId, buffer);
+                updateFn();
+            }
         },
         "background",
         cancellationSignal,

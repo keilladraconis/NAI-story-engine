@@ -78,41 +78,47 @@ export class StoryManager {
       this.currentStory = savedData;
       // Migration: Ensure dulfsEntryIds exists
       if (this.currentStory && !this.currentStory.dulfsEntryIds) {
-          this.currentStory.dulfsEntryIds = {};
+        this.currentStory.dulfsEntryIds = {};
       }
       // Migration: Ensure dulfsEnabled exists
       if (this.currentStory && !this.currentStory.dulfsEnabled) {
-          this.currentStory.dulfsEnabled = {};
+        this.currentStory.dulfsEnabled = {};
       }
-      
+
       // Migration: Ensure ATTG and Style fields exist
       if (this.currentStory && !this.currentStory[FieldID.ATTG]) {
-          this.currentStory[FieldID.ATTG] = {
-            id: FieldID.ATTG,
-            type: "attg",
-            content: "",
-            version: 0,
-            history: [],
-            linkedEntities: [],
-          };
+        this.currentStory[FieldID.ATTG] = {
+          id: FieldID.ATTG,
+          type: "attg",
+          content: "",
+          version: 0,
+          history: [],
+          linkedEntities: [],
+        };
       }
       if (this.currentStory && !this.currentStory[FieldID.Style]) {
-          this.currentStory[FieldID.Style] = {
-            id: FieldID.Style,
-            type: "style",
-            content: "",
-            version: 0,
-            history: [],
-            linkedEntities: [],
-          };
+        this.currentStory[FieldID.Style] = {
+          id: FieldID.Style,
+          type: "style",
+          content: "",
+          version: 0,
+          history: [],
+          linkedEntities: [],
+        };
       }
 
       // Migration: Generator Sync
-      if (this.currentStory && typeof this.currentStory.attgEnabled === 'undefined') {
-          this.currentStory.attgEnabled = false;
+      if (
+        this.currentStory &&
+        typeof this.currentStory.attgEnabled === "undefined"
+      ) {
+        this.currentStory.attgEnabled = false;
       }
-      if (this.currentStory && typeof this.currentStory.styleEnabled === 'undefined') {
-          this.currentStory.styleEnabled = false;
+      if (
+        this.currentStory &&
+        typeof this.currentStory.styleEnabled === "undefined"
+      ) {
+        this.currentStory.styleEnabled = false;
       }
     } else {
       this.currentStory = this.createDefaultStoryData();
@@ -134,13 +140,13 @@ export class StoryManager {
 
   public getFieldContent(fieldId: string): string {
     if (!this.currentStory) return "";
-    
+
     // Cast to any to allow dynamic access by string ID
     const field = (this.currentStory as any)[fieldId];
-    
+
     // If it's a StoryField, return content
     if (field && typeof field === "object" && "content" in field) {
-        return field.content;
+      return field.content;
     }
 
     return "";
@@ -161,7 +167,10 @@ export class StoryManager {
     return this.currentStory.dulfsEnabled[fieldId] !== false;
   }
 
-  public async setDulfsEnabled(fieldId: string, enabled: boolean): Promise<void> {
+  public async setDulfsEnabled(
+    fieldId: string,
+    enabled: boolean,
+  ): Promise<void> {
     if (!this.currentStory) return;
     this.currentStory.dulfsEnabled[fieldId] = enabled;
     this.currentStory.lastModified = new Date();
@@ -174,16 +183,21 @@ export class StoryManager {
     const list = this.getDulfsList(fieldId);
     list.push(item);
     // Explicitly re-assign to ensure it updates if it was a copy (though it's ref)
-    (this.currentStory as any)[fieldId] = list; 
+    (this.currentStory as any)[fieldId] = list;
     this.currentStory.lastModified = new Date();
     await this.saveStoryData();
     await this.syncDulfsLorebook(fieldId);
   }
 
-  public async updateDulfsItem(fieldId: string, itemId: string, updates: Partial<DULFSField>, notify: boolean = false): Promise<void> {
+  public async updateDulfsItem(
+    fieldId: string,
+    itemId: string,
+    updates: Partial<DULFSField>,
+    notify: boolean = false,
+  ): Promise<void> {
     if (!this.currentStory) return;
     const list = this.getDulfsList(fieldId);
-    const index = list.findIndex(i => i.id === itemId);
+    const index = list.findIndex((i) => i.id === itemId);
     if (index !== -1) {
       list[index] = { ...list[index], ...updates };
       this.currentStory.lastModified = new Date();
@@ -195,7 +209,7 @@ export class StoryManager {
   public async removeDulfsItem(fieldId: string, itemId: string): Promise<void> {
     if (!this.currentStory) return;
     const list = this.getDulfsList(fieldId);
-    const newList = list.filter(i => i.id !== itemId);
+    const newList = list.filter((i) => i.id !== itemId);
     (this.currentStory as any)[fieldId] = newList;
     this.currentStory.lastModified = new Date();
     await this.saveStoryData();
@@ -203,11 +217,11 @@ export class StoryManager {
   }
 
   public async clearDulfsList(fieldId: string): Promise<void> {
-     if (!this.currentStory) return;
-     (this.currentStory as any)[fieldId] = [];
-     this.currentStory.lastModified = new Date();
-     await this.saveStoryData();
-     await this.syncDulfsLorebook(fieldId);
+    if (!this.currentStory) return;
+    (this.currentStory as any)[fieldId] = [];
+    this.currentStory.lastModified = new Date();
+    await this.saveStoryData();
+    await this.syncDulfsLorebook(fieldId);
   }
 
   // --- Lorebook Integration ---
@@ -216,23 +230,25 @@ export class StoryManager {
     if (!this.currentStory) throw new Error("No story data");
 
     if (this.currentStory.dulfsCategoryId) {
-        const existing = await api.v1.lorebook.category(this.currentStory.dulfsCategoryId);
-        if (existing) {
-            return this.currentStory.dulfsCategoryId;
-        }
+      const existing = await api.v1.lorebook.category(
+        this.currentStory.dulfsCategoryId,
+      );
+      if (existing) {
+        return this.currentStory.dulfsCategoryId;
+      }
     }
 
     const catId = api.v1.uuid();
     try {
-        await api.v1.lorebook.createCategory({
-            id: catId,
-            name: "Story-Engine: DULFS",
-            enabled: true
-        });
-        this.currentStory.dulfsCategoryId = catId;
-        await this.saveStoryData();
+      await api.v1.lorebook.createCategory({
+        id: catId,
+        name: "Story-Engine: DULFS",
+        enabled: true,
+      });
+      this.currentStory.dulfsCategoryId = catId;
+      await this.saveStoryData();
     } catch (e) {
-        api.v1.log("Error creating DULFS category:", e);
+      api.v1.log("Error creating DULFS category:", e);
     }
     return catId;
   }
@@ -241,140 +257,152 @@ export class StoryManager {
     if (!this.currentStory) return;
 
     const list = this.getDulfsList(fieldId);
-    const config = FIELD_CONFIGS.find(c => c.id === fieldId);
+    const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
     const label = config ? config.label : fieldId;
     const isEnabled = this.isDulfsEnabled(fieldId);
 
     // Format content
     let textContent = `${label}\n`;
     if (list.length > 0) {
-        textContent += list.map(item => `- ${item.content}`).join("\n");
+      textContent += list.map((item) => `- ${item.content}`).join("\n");
     } else {
-        textContent += "(Empty)";
+      textContent += "(Empty)";
     }
 
     const categoryId = await this.ensureDulfsCategory();
-    
+
     // Check for existing entry
     const entryId = this.currentStory.dulfsEntryIds[fieldId];
 
     let entryExists = false;
     if (entryId) {
-        const existing = await api.v1.lorebook.entry(entryId);
-        if (existing) {
-            entryExists = true;
-        }
+      const existing = await api.v1.lorebook.entry(entryId);
+      if (existing) {
+        entryExists = true;
+      }
     }
 
     if (entryExists && entryId) {
-        try {
-            await api.v1.lorebook.updateEntry(entryId, {
-                text: textContent,
-                category: categoryId,
-                enabled: isEnabled 
-            });
-        } catch (e) {
-             // Redundancy: if update fails, recreate
-             api.v1.log(`Failed to update DULFS entry ${entryId}, recreating...`, e);
-             await this.createDulfsLorebookEntry(fieldId, label, textContent, categoryId, isEnabled);
-        }
+      try {
+        await api.v1.lorebook.updateEntry(entryId, {
+          text: textContent,
+          category: categoryId,
+          enabled: isEnabled,
+        });
+      } catch (e) {
+        // Redundancy: if update fails, recreate
+        api.v1.log(`Failed to update DULFS entry ${entryId}, recreating...`, e);
+        await this.createDulfsLorebookEntry(
+          fieldId,
+          label,
+          textContent,
+          categoryId,
+          isEnabled,
+        );
+      }
     } else {
-        await this.createDulfsLorebookEntry(fieldId, label, textContent, categoryId, isEnabled);
+      await this.createDulfsLorebookEntry(
+        fieldId,
+        label,
+        textContent,
+        categoryId,
+        isEnabled,
+      );
     }
   }
 
-  private async createDulfsLorebookEntry(fieldId: string, label: string, text: string, categoryId: string, enabled: boolean): Promise<void> {
+  private async createDulfsLorebookEntry(
+    fieldId: string,
+    label: string,
+    text: string,
+    categoryId: string,
+    enabled: boolean,
+  ): Promise<void> {
     if (!this.currentStory) return;
     try {
-        const newId = api.v1.uuid();
-        await api.v1.lorebook.createEntry({
-            id: newId,
-            displayName: label,
-            text: text,
-            category: categoryId,
-            keys: [], // No keys, relying on random chance
-            advancedConditions: [
-                {
-                    type: "random",
-                    chance: 0.1
-                }
-            ],
-            enabled: enabled,
-            forceActivation: false
-        });
-        this.currentStory.dulfsEntryIds[fieldId] = newId;
-        await this.saveStoryData();
+      const newId = api.v1.uuid();
+      await api.v1.lorebook.createEntry({
+        id: newId,
+        displayName: label,
+        text: text,
+        category: categoryId,
+        keys: [], // No keys, relying on random chance
+        advancedConditions: [
+          {
+            type: "random",
+            chance: 0.1,
+          },
+        ],
+        enabled: enabled,
+        forceActivation: false,
+      });
+      this.currentStory.dulfsEntryIds[fieldId] = newId;
+      await this.saveStoryData();
     } catch (e) {
-        api.v1.log("Error creating DULFS entry:", e);
+      api.v1.log("Error creating DULFS entry:", e);
     }
   }
 
   public isAttgEnabled(): boolean {
-      return this.currentStory?.attgEnabled || false;
+    return this.currentStory?.attgEnabled || false;
   }
 
   public async setAttgEnabled(enabled: boolean): Promise<void> {
-      if (!this.currentStory) return;
-      this.currentStory.attgEnabled = enabled;
-      await this.saveStoryData();
-      if (enabled) {
-          await this.syncAttgToMemory(this.getFieldContent(FieldID.ATTG));
-      }
+    if (!this.currentStory) return;
+    this.currentStory.attgEnabled = enabled;
+    await this.saveStoryData();
+    if (enabled) {
+      await this.syncAttgToMemory(this.getFieldContent(FieldID.ATTG));
+    }
   }
 
   public isStyleEnabled(): boolean {
-      return this.currentStory?.styleEnabled || false;
+    return this.currentStory?.styleEnabled || false;
   }
 
   public async setStyleEnabled(enabled: boolean): Promise<void> {
-      if (!this.currentStory) return;
-      this.currentStory.styleEnabled = enabled;
-      await this.saveStoryData();
-      if (enabled) {
-          await this.syncStyleToAN(this.getFieldContent(FieldID.Style));
-      }
+    if (!this.currentStory) return;
+    this.currentStory.styleEnabled = enabled;
+    await this.saveStoryData();
+    if (enabled) {
+      await this.syncStyleToAN(this.getFieldContent(FieldID.Style));
+    }
   }
 
   private async syncAttgToMemory(content: string): Promise<void> {
-      // Basic validation: must start with [ and contain Author:
-      if (!content.trim().startsWith("[") || !content.includes("Author:")) return;
+    const currentMemory = await api.v1.memory.get();
+    let lines = currentMemory.split("\n");
 
-      const currentMemory = await api.v1.memory.get();
-      let lines = currentMemory.split("\n");
-      
-      // Regex: Starts with [, contains Author:, ends with ] (loosely)
-      const attgRegex = /^\s*\[\s*Author:.*\]\s*$/i;
+    // Regex: Starts with [, contains Author:, ends with ] (loosely)
+    const attgRegex = /^\s*\[\s*Author:.*\]\s*$/i;
 
-      if (lines.length > 0 && attgRegex.test(lines[0])) {
-          lines[0] = content;
-      } else {
-          lines.unshift(content);
-      }
-      await api.v1.memory.set(lines.join("\n"));
+    if (lines.length > 0 && attgRegex.test(lines[0])) {
+      lines[0] = content;
+    } else {
+      lines.unshift(content);
+    }
+    await api.v1.memory.set(lines.join("\n"));
   }
 
   private async syncStyleToAN(content: string): Promise<void> {
-      // Basic validation
-      if (!content.trim().startsWith("[") || !content.includes("Style:")) return;
+    const currentAN = await api.v1.an.get();
+    let lines = currentAN.split("\n");
 
-      const currentAN = await api.v1.an.get();
-      let lines = currentAN.split("\n");
+    const styleRegex = /^\s*\[\s*Style:.*\]\s*$/i;
 
-      const styleRegex = /^\s*\[\s*Style:.*\]\s*$/i;
-
-      if (lines.length > 0 && styleRegex.test(lines[0])) {
-          lines[0] = content;
-      } else {
-          lines.unshift(content);
-      }
-      await api.v1.an.set(lines.join("\n"));
+    if (lines.length > 0 && styleRegex.test(lines[0])) {
+      lines[0] = content;
+    } else {
+      lines.unshift(content);
+    }
+    await api.v1.an.set(lines.join("\n"));
   }
 
   public async setFieldContent(
     fieldId: string,
     content: string,
     save: boolean = false,
-    sync: boolean = true
+    sync: boolean = true,
   ): Promise<void> {
     if (!this.currentStory) return;
 
@@ -383,20 +411,20 @@ export class StoryManager {
     let changed = false;
 
     if (field && typeof field === "object" && "content" in field) {
-        if (field.content !== content) {
-            field.content = content;
-            changed = true;
-        }
+      if (field.content !== content) {
+        field.content = content;
+        changed = true;
+      }
     }
 
     if (changed && sync) {
-        // Trigger Syncs
-        if (fieldId === FieldID.ATTG && this.currentStory.attgEnabled) {
-            await this.syncAttgToMemory(content);
-        }
-        if (fieldId === FieldID.Style && this.currentStory.styleEnabled) {
-            await this.syncStyleToAN(content);
-        }
+      // Trigger Syncs
+      if (fieldId === FieldID.ATTG && this.currentStory.attgEnabled) {
+        await this.syncAttgToMemory(content);
+      }
+      if (fieldId === FieldID.Style && this.currentStory.styleEnabled) {
+        await this.syncStyleToAN(content);
+      }
     }
 
     if (changed && save) {
@@ -409,14 +437,14 @@ export class StoryManager {
     if (!this.currentStory) return;
 
     let changed = false;
-    
+
     // Iterate over known text fields
     const textFields = [
-        this.currentStory[FieldID.StoryPrompt],
-        this.currentStory[FieldID.Brainstorm],
-        this.currentStory[FieldID.WorldSnapshot],
-        this.currentStory[FieldID.ATTG],
-        this.currentStory[FieldID.Style],
+      this.currentStory[FieldID.StoryPrompt],
+      this.currentStory[FieldID.Brainstorm],
+      this.currentStory[FieldID.WorldSnapshot],
+      this.currentStory[FieldID.ATTG],
+      this.currentStory[FieldID.Style],
     ];
 
     for (const field of textFields) {
@@ -523,16 +551,16 @@ export class StoryManager {
 
   public getBrainstormMessages(): { role: string; content: string }[] {
     if (!this.currentStory) return [];
-    
+
     const brainstorm = this.currentStory[FieldID.Brainstorm];
-    
+
     // Ensure data object exists
     if (!brainstorm.data) {
       brainstorm.data = { messages: [] };
     }
     // Migration check: if 'cards' exists but 'messages' doesn't, reset to empty messages
     if (!brainstorm.data.messages && brainstorm.data.cards) {
-       brainstorm.data = { messages: [] };
+      brainstorm.data = { messages: [] };
     }
     return brainstorm.data.messages || [];
   }
@@ -550,10 +578,12 @@ export class StoryManager {
     brainstorm.data.messages.push({ role, content });
   }
 
-  public setBrainstormMessages(messages: { role: string; content: string }[]): void {
+  public setBrainstormMessages(
+    messages: { role: string; content: string }[],
+  ): void {
     if (!this.currentStory) return;
     const brainstorm = this.currentStory[FieldID.Brainstorm];
-    
+
     if (!brainstorm.data) {
       brainstorm.data = { messages: [] };
     }

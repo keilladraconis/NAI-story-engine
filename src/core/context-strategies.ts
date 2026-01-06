@@ -195,10 +195,13 @@ const Strategies: Record<string, StrategyFn> = {
   "generate:attg": async (_session, _manager, base) => {
     const messages = hyperContextBuilder(
       base.systemMsg,
-      { role: "user", content: "Generate an ATTG block for this story." },
+      { 
+          role: "user", 
+          content: "Generate a single ATTG block for this story. \n\nCRITICAL: Output ONLY the block. No Markdown, no headers, no conversational filler, no extra text. \n\nEXAMPLE:\n[ Author: Stephen King; Tags: horror, supernatural, small town; Title: The Mist; Genre: Horror ]" 
+      },
       {
         role: "assistant",
-        content: "Here is the ATTG block:",
+        content: "[ Author:",
       },
       [
         {
@@ -208,7 +211,7 @@ const Strategies: Record<string, StrategyFn> = {
         {
           role: "user",
           content: fixSpacing(
-            `INSTRUCTION:\n- Write the ATTG block: [ Author: [author]; Tags: [comma-separated-tags]; Title: [title]; Genre: [genre] ]\n- Pick a well-known author that fits the story\n- DO NOT use the anonymous author`,
+            `INSTRUCTION:\n- Complete the ATTG block: [ Author: [author]; Tags: [comma-separated-tags]; Title: [title]; Genre: [genre] ]\n- Pick a well-known author that fits the story\n- DO NOT use the anonymous author\n- DO NOT use any markdown bolding (**).\n- OUTPUT ONLY THE BLOCK.`,
           ),
         },
       ],
@@ -216,10 +219,12 @@ const Strategies: Record<string, StrategyFn> = {
     return {
       messages,
       params: {
-        temperature: 1.0,
+        temperature: 0.8,
         min_p: 0.05,
         presence_penalty: 0.0,
         maxTokens: 128,
+        minTokens: 10,
+        stopSequences: ["]"],
       },
     };
   },
@@ -230,11 +235,11 @@ const Strategies: Record<string, StrategyFn> = {
       base.systemMsg,
       {
         role: "user",
-        content: "Generate a style guideline block for this story.",
+        content: "Generate a style guideline block for this story. \n\nCRITICAL: Output ONLY the block. No Markdown, no conversational filler. \n\nEXAMPLE:\n[ Write in a style that conveys the following: hard-boiled noir, cynical narration, short punchy sentences, focus on sensory grit ]",
       },
       {
         role: "assistant",
-        content: "Here is the Style block:",
+        content: "[ Write in a style that conveys the following:",
       },
       [
         {
@@ -244,7 +249,7 @@ const Strategies: Record<string, StrategyFn> = {
         {
           role: "user",
           content: fixSpacing(
-            `INSTRUCTION:\n- Write in a style that conveys the following: [concise style guidance limit 80 words]\n- Format the output strictly as: [ Write in a style that conveys the following: ... ]`,
+            `INSTRUCTION:\n- Write in a style that conveys the following: [concise style guidance limit 80 words]\n- Format the output strictly as: [ Write in a style that conveys the following: ... ]\n- DO NOT use any markdown bolding (**).\n- OUTPUT ONLY THE BLOCK.`,
           ),
         },
       ],
@@ -252,10 +257,12 @@ const Strategies: Record<string, StrategyFn> = {
     return {
       messages,
       params: {
-        temperature: 1.0,
+        temperature: 0.8,
         min_p: 0.05,
         presence_penalty: 0.0,
         maxTokens: 128,
+        minTokens: 10,
+        stopSequences: ["]"],
       },
     };
   },
