@@ -467,7 +467,7 @@ export class ContextStrategyFactory {
     session: FieldSession,
     tag: string,
     locator: string,
-    _prefill: string,
+    prefill: string,
   ): Promise<StrategyResult> {
     const worldSnapshot = this.storyManager.getFieldContent(
       FieldID.WorldSnapshot,
@@ -486,16 +486,19 @@ CRITICAL RULES:
 2. NO commentary, NO tags, NO quotes, NO markdown formatting (like bolding) unless it was already present.
 3. Maintain the EXACT tone, style, and TENSE of the original.
 4. DO NOT include any of the surrounding context in your output. Your replacement will be directly swapped into the original text.
-5. BE CONCISE. Do NOT add unnecessary detail, flavor, or "depth".
-6. If the tag is [DELETE] or [REPETITION] and you are asked for a replacement, providing an empty string or a significantly shorter version is acceptable.`;
+5. BE CONCISE and PUNCHY. Do NOT add unnecessary detail or "depth".
+6. If the tag is [DELETE], [REPETITION], [PLOTTING], or [FLUFF], providing an empty string or a significantly shorter version is often the correct action.`;
 
     const tagPrompts: Record<string, string> = {
       FIX: "Repair grammatical, syntactical, or formatting errors. DO NOT EXPAND.",
-      LOGIC: "Repair causal logic, consistency, or factual errors. Keep same length and tense.",
-      PLOTTING: "Remove future scripting or forced plot. Keep same length and tense.",
-      FLUFF: "Remove filler while retaining all meaning. Reduce length drastically.",
-      REPETITION: "Remove or merge this redundant phrase. Output ONLY the necessary replacement (often much shorter or empty).",
-      FORMAT: "Fix structural formatting. Keep same length.",
+      LOGIC: "Repair causal logic or consistency errors. Ensure internal coherence.",
+      PLOTTING:
+        "Remove future scripting, inevitable outcomes, or forced plot. Replace with static tension, current character drivers, or environmental potential. Can be much shorter.",
+      FLUFF:
+        "Remove generic filler or purple prose. Retain core meaning while reducing length drastically.",
+      REPETITION:
+        "Remove or merge this redundant phrase. Output ONLY the necessary replacement (often much shorter or empty).",
+      FORMAT: "Fix structural formatting to match requirements.",
     };
 
     const reviewInstruction =
@@ -506,7 +509,7 @@ CRITICAL RULES:
       {
         role: "user",
         content: fixSpacing(
-          `REFINEMENT TARGET [${tag}]:\n"${locator}"\n\nINSTRUCTION:\n${reviewInstruction}\n\nExecute. Output ONLY the replacement text.`,
+          `CONTEXT BEFORE TARGET:\n...${prefill}\n\nREFINEMENT TARGET [${tag}]:\n"${locator}"\n\nINSTRUCTION:\n${reviewInstruction}\n\nExecute. Output ONLY the replacement text.`,
         ),
       },
       {

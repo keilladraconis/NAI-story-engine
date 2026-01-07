@@ -159,10 +159,27 @@ export class RefineStageHandler implements StageHandler {
           },
           (delta) => {
             patch += delta;
-            // Clean patch: remove prefill if model repeated it
+            // Clean patch: remove prefixes if model repeated them
             let cleanPatch = patch.trim();
-            if (cleanPatch.startsWith("REPLACEMENT TEXT:")) {
-              cleanPatch = cleanPatch.replace("REPLACEMENT TEXT:", "").trim();
+            const prefixes = [
+              "REPLACEMENT TEXT:",
+              "REPLACEMENT:",
+              "OUTPUT:",
+              "FINAL TEXT:",
+            ];
+            for (const pref of prefixes) {
+              if (cleanPatch.toUpperCase().startsWith(pref)) {
+                cleanPatch = cleanPatch.slice(pref.length).trim();
+              }
+            }
+
+            // Strip accidental surrounding quotes if model added them but they weren't in locator
+            if (
+              cleanPatch.startsWith('"') &&
+              cleanPatch.endsWith('"') &&
+              !locator.startsWith('"')
+            ) {
+              cleanPatch = cleanPatch.slice(1, -1).trim();
             }
 
             // Intermediate visual update: show the patch being applied
@@ -179,8 +196,25 @@ export class RefineStageHandler implements StageHandler {
 
         // Clean final patch
         let finalPatch = patch.trim();
-        if (finalPatch.startsWith("REPLACEMENT TEXT:")) {
-          finalPatch = finalPatch.replace("REPLACEMENT TEXT:", "").trim();
+        const prefixes = [
+          "REPLACEMENT TEXT:",
+          "REPLACEMENT:",
+          "OUTPUT:",
+          "FINAL TEXT:",
+        ];
+        for (const pref of prefixes) {
+          if (finalPatch.toUpperCase().startsWith(pref)) {
+            finalPatch = finalPatch.slice(pref.length).trim();
+          }
+        }
+
+        // Strip accidental surrounding quotes
+        if (
+          finalPatch.startsWith('"') &&
+          finalPatch.endsWith('"') &&
+          !locator.startsWith('"')
+        ) {
+          finalPatch = finalPatch.slice(1, -1).trim();
         }
 
         // Apply the final patch to the currentText for the next iteration
