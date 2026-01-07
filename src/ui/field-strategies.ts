@@ -40,13 +40,6 @@ export interface FieldRenderStrategy {
   renderContent(context: RenderContext): UIPart[];
 }
 
-// --- Helper for Action Buttons ---
-function createFieldActions(_context: RenderContext): UIPart {
-  // Currently, no standard fields trigger the Wand via a button.
-  // The logic is reserved for future expansion (e.g. enabling Modal Wand for DULFS).
-  return row({ content: [] });
-}
-
 // --- Strategies ---
 
 export class GeneratorFieldStrategy implements FieldRenderStrategy {
@@ -304,7 +297,6 @@ export class StoryPromptStrategy implements FieldRenderStrategy {
         storageKey: `story:kse-field-${config.id}`,
         onChange: (newContent: string) => handleFieldChange(newContent),
       }),
-      createFieldActions(context),
     ];
   }
 }
@@ -379,7 +371,6 @@ export class StandardFieldStrategy implements FieldRenderStrategy {
         `story:kse-field-${config.id}`,
         (newContent: string) => handleFieldChange(newContent),
       ),
-      createFieldActions(context),
     ];
   }
 }

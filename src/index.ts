@@ -8,6 +8,7 @@ const log = api.v1.log;
   try {
     await api.v1.permissions.request(["lorebookEdit", "storyEdit"]);
     const ui = new StoryEngineUI();
+    await ui.init();
 
     api.v1.ui.register([
       ui.sidebar,

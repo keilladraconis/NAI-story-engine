@@ -61,6 +61,12 @@ export class StoryEngineUI {
     });
   }
 
+  public async init(): Promise<void> {
+    await this.storyManager.initializeStory();
+    this.updateUI();
+    this.updateLorebookUI();
+  }
+
   private updateUI(): void {
     // Re-create the sidebar structure with new data
     this.structuredEditor.sidebar = this.structuredEditor.createSidebar();

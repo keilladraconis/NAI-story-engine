@@ -14,13 +14,14 @@ export class StoryManager {
   private historyService: HistoryService;
   private brainstormDataManager: BrainstormDataManager;
 
+  private saveTimeout?: any;
+
   constructor() {
     this.dataManager = new StoryDataManager();
     this.migrationService = new MigrationService();
     this.lorebookSyncService = new LorebookSyncService(this.dataManager);
     this.historyService = new HistoryService(this.dataManager);
     this.brainstormDataManager = new BrainstormDataManager(this.dataManager);
-    this.initializeStory();
   }
 
   async initializeStory(): Promise<void> {
@@ -29,9 +30,36 @@ export class StoryManager {
     if (savedData) {
       const migrated = this.migrationService.migrate(savedData);
       this.dataManager.setData(migrated);
+      // Sync global data TO individual field keys to ensure UI components are in sync
+      await this.syncToIndividualKeys();
     } else {
       this.dataManager.setData(this.dataManager.createDefaultData());
       await this.dataManager.save();
+      await this.syncToIndividualKeys();
+    }
+  }
+
+  /**
+   * Syncs the current memory state to individual kse-field keys.
+   * This ensures that UI components using storageKey start with the correct value.
+   */
+  private async syncToIndividualKeys(): Promise<void> {
+    const data = this.dataManager.data;
+    if (!data) return;
+
+    const fields = [
+      FieldID.StoryPrompt,
+      FieldID.Brainstorm,
+      FieldID.WorldSnapshot,
+      FieldID.ATTG,
+      FieldID.Style,
+    ];
+
+    for (const fieldId of fields) {
+      const field = this.dataManager.getStoryField(fieldId);
+      if (field) {
+        await api.v1.storyStorage.set(`kse-field-${fieldId}`, field.content);
+      }
     }
   }
 
@@ -234,9 +262,29 @@ export class StoryManager {
       }
     }
 
-    if (changed && save) {
-      data.lastModified = new Date();
-      await this.dataManager.save();
+    if (changed) {
+      // Always sync to individual key for UI responsiveness and draft persistence
+      // Only for non-item fields (simple field IDs)
+      if (!fieldId.includes(":")) {
+        await api.v1.storyStorage.set(`kse-field-${fieldId}`, content);
+      }
+
+      if (save) {
+        data.lastModified = new Date();
+        await this.dataManager.save();
+      } else {
+        // Debounced auto-save of the global blob
+        if (this.saveTimeout !== undefined) {
+          await api.v1.timers.clearTimeout(this.saveTimeout);
+        }
+        
+        this.saveTimeout = await api.v1.timers.setTimeout(async () => {
+          data.lastModified = new Date();
+          await this.dataManager.save();
+          api.v1.log(`Auto-saved global story data (${fieldId})`);
+          this.saveTimeout = undefined;
+        }, 5000); // 5 second debounce
+      }
     }
   }
 

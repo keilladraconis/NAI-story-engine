@@ -19,6 +19,8 @@ export interface FieldConfig {
   icon: IconId;
   linkedEntities?: string[];
   layout?: "default" | "inline-wand" | "list" | "generator";
+  generationInstruction?: string;
+  exampleFormat?: string;
 }
 
 export const FIELD_CONFIGS: FieldConfig[] = [
@@ -44,6 +46,8 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Character names, descriptions, motivations...",
     icon: "user",
     layout: "list",
+    generationInstruction: "Generate a list of interesting characters for this story. Focus on their core motivations and unique behavioral tells.",
+    exampleFormat: "Format each line exactly as: [First and Last Name] ([gender], [age], [occupation]): [core motivation], [behavioral tell]",
   },
   {
     id: FieldID.UniverseSystems,
@@ -52,6 +56,8 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "How this world works - magic, physics, etc...",
     icon: "settings" as IconId,
     layout: "list",
+    generationInstruction: "Generate a list of key universe systems, magic rules, or technological principles. Describe the mechanic or rule concisely.",
+    exampleFormat: "Format each line as: [System Name]: [Description of mechanic or rule]",
   },
   {
     id: FieldID.Locations,
@@ -60,6 +66,8 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Settings, landmarks, environments...",
     icon: "map-pin" as IconId,
     layout: "list",
+    generationInstruction: "Generate a list of significant locations. Include atmospheric anchors, sensory details, and inherent tensions.",
+    exampleFormat: "Format each line as: [Location Name]: [atmospheric anchors], [sensory details], [inherent tensions or key functions]",
   },
   {
     id: FieldID.Factions,
@@ -68,6 +76,8 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Factions, guilds, political parties...",
     icon: "users",
     layout: "list",
+    generationInstruction: "Generate a list of major factions, guilds, or political groups. Describe their core ideology, goal, and internal structure.",
+    exampleFormat: "Format each line as: [Faction Name]: [description of ideology, goal, structure]",
   },
   {
     id: FieldID.SituationalDynamics,
@@ -76,6 +86,8 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Active conflicts, pending events...",
     icon: "activity",
     layout: "list",
+    generationInstruction: "Generate a list of current conflicts, pending events, or tensions that involve multiple characters with no suggested resolution.",
+    exampleFormat: "Format each line as: [Dynamic Name]: [a state of being or point of friction...]",
   },
   {
     id: FieldID.ATTG,

@@ -31,11 +31,6 @@ export class StructuredEditor {
 
     this.initializeFieldConfigs();
     this.sidebar = this.createSidebar();
-
-    this.syncFieldsFromStorage().then(() => {
-      // If sync changed anything, it would have triggered a save & notify
-      // which StoryEngineUI listens to.
-    });
   }
 
   public getWandUI(): WandUI {
@@ -57,39 +52,6 @@ export class StructuredEditor {
     const current = this.editModes.get(key) || false;
     this.editModes.set(key, !current);
     this.onUpdateCallback();
-  }
-
-  private async syncFieldsFromStorage(): Promise<void> {
-    let anyChanged = false;
-    for (const config of this.configs.values()) {
-      // For lists, we don't sync from simple strings yet. 
-      // The StoryManager handles the source of truth for lists.
-      // So we skip list fields for this simple sync check or handle them differently if needed.
-      if (config.layout === 'list') continue;
-
-      // We use the storage key directly from storyStorage
-      const savedContent = await api.v1.storyStorage.get(
-        `kse-field-${config.id}`,
-      );
-      if (savedContent && typeof savedContent === "string") {
-        await this.storyManager.setFieldContent(config.id, savedContent, false);
-
-        // Also sync any active session (e.g. WorldSnapshot)
-        const session = this.agentCycleManager.getSession(config.id);
-        if (session) {
-          const activeStage = session.selectedStage;
-          if (session.cycles[activeStage]) {
-            session.cycles[activeStage].content = savedContent;
-          }
-        }
-
-        anyChanged = true;
-      }
-    }
-
-    if (anyChanged) {
-      await this.storyManager.saveStoryData(true);
-    }
   }
 
   private initializeFieldConfigs(): void {
@@ -179,20 +141,13 @@ export class StructuredEditor {
       return;
     }
 
-    // 1. Update the specific storage key bound to the UI input FIRST
-    await api.v1.storyStorage.set(
-      `kse-field-${session.fieldId}`,
-      content,
-    );
-
-    // 2. Update the Manager (Source of Truth) silently
-    await this.storyManager.setFieldContent(
+    // Use saveFieldDraft to update both memory and individual storage key
+    await this.storyManager.saveFieldDraft(
       session.fieldId,
       content,
-      false, // Do NOT notify yet
     );
 
-    // 3. Commit to history
+    // Commit to history
     await this.storyManager.commit();
 
     api.v1.ui.toast(`Saved generated content to ${session.fieldId}`, {

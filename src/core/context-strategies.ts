@@ -17,6 +17,11 @@ type StrategyFn = (
   base: { systemMsg: Message; storyPrompt: string },
 ) => Promise<StrategyResult>;
 
+/**
+ * Strictly double every newline character. 
+ * This is required for GLM-4.6 compatibility as it tends to collapse single newlines
+ * in certain prompt contexts, leading to merged blocks of text.
+ */
 const fixSpacing = (text: string): string => {
   if (!text) return "";
   // Strictly double every newline character for GLM-4.6 compatibility
@@ -365,45 +370,9 @@ export class ContextStrategyFactory {
       },
     };
 
-    let userInstruction = "";
-    let exampleFormat = "";
-
-    switch (fieldId) {
-      case FieldID.DramatisPersonae:
-        userInstruction =
-          "Generate a list of interesting characters for this story. Focus on their core motivations and unique behavioral tells.";
-        exampleFormat =
-          "Format each line exactly as: [First and Last Name] ([gender], [age], [occupation]): [core motivation], [behavioral tell]";
-        break;
-      case FieldID.UniverseSystems:
-        userInstruction =
-          "Generate a list of key universe systems, magic rules, or technological principles. Describe the mechanic or rule concisely.";
-        exampleFormat =
-          "Format each line as: [System Name]: [Description of mechanic or rule]";
-        break;
-      case FieldID.Locations:
-        userInstruction =
-          "Generate a list of significant locations. Include atmospheric anchors, sensory details, and inherent tensions.";
-        exampleFormat =
-          "Format each line as: [Location Name]: [atmospheric anchors], [sensory details], [inherent tensions or key functions]";
-        break;
-      case FieldID.Factions:
-        userInstruction =
-          "Generate a list of major factions, guilds, or political groups. Describe their core ideology, goal, and internal structure.";
-        exampleFormat =
-          "Format each line as: [Faction Name]: [description of ideology, goal, structure]";
-        break;
-      case FieldID.SituationalDynamics:
-        userInstruction =
-          "Generate a list of current conflicts, pending events, or tensions that involve multiple characters with no suggested resolution.";
-        // We use a prefix 'Dynamic' to satisfy the parser's Name: Content requirement
-        exampleFormat =
-          "Format each line as: [Dynamic Name]: [a state of being or point of friction...]";
-        break;
-      default:
-        userInstruction = "Generate a list of items for this category.";
-        exampleFormat = "Format each line as: [Item Name]: [Description]";
-    }
+    const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
+    const userInstruction = config?.generationInstruction || "Generate a list of items for this category.";
+    const exampleFormat = config?.exampleFormat || "Format each line as: [Item Name]: [Description]";
 
     // Build context blocks
     const contextBlocks: Message[] = [
