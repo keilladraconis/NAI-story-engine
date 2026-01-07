@@ -21,7 +21,7 @@ const fixSpacing = (text: string): string => {
 };
 
 export const normalizeQuotes = (str: string): string => {
-  return str.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
+  return str.replace(/[\u2018\u2019]/g, "'" ).replace(/[\u201C\u201D]/g, '"');
 };
 
 const getAllDulfsContext = (
@@ -118,7 +118,17 @@ const Strategies: Record<string, StrategyFn> = {
   // Review - The Editor
   // Low temperature for analytical precision, high repetition penalty to prevent outputting the story
   "review:default": async (session, _manager, base) => {
-    const userPrompt = (await api.v1.config.get("critique_prompt")) || "";
+    let userPrompt = (await api.v1.config.get("critique_prompt")) || "";
+
+    // If this is a lorebook entry, append specific critique instructions
+    if (session.fieldId.includes(":")) {
+      const lorebookCrit =
+        (await api.v1.config.get("lorebook_critique_instructions")) || "";
+      if (lorebookCrit) {
+        userPrompt += "\n\n" + lorebookCrit;
+      }
+    }
+
     const contentToReview = session.cycles.generate.content;
     const messages = hyperContextBuilder(
       base.systemMsg,
@@ -193,12 +203,12 @@ const Strategies: Record<string, StrategyFn> = {
 
   // Generate (ATTG)
   "generate:attg": async (_session, _manager, base) => {
+    const userPrompt = (await api.v1.config.get("attg_generate_prompt")) || "";
     const messages = hyperContextBuilder(
       base.systemMsg,
       {
         role: "user",
-        content:
-          "Generate a single ATTG block for this story. \n\nCRITICAL: Output ONLY the block. No Markdown, no headers, no conversational filler, no extra text. \n\nEXAMPLE:\n[ Author: Stephen King; Tags: horror, supernatural, small town; Title: The Mist; Genre: Horror ]",
+        content: fixSpacing(userPrompt),
       },
       {
         role: "assistant",
@@ -208,12 +218,6 @@ const Strategies: Record<string, StrategyFn> = {
         {
           role: "user",
           content: fixSpacing(`STORY PROMPT:\n${base.storyPrompt}`),
-        },
-        {
-          role: "user",
-          content: fixSpacing(
-            `INSTRUCTION:\n- Complete the ATTG block: [ Author: [author]; Tags: [comma-separated-tags]; Title: [title]; Genre: [genre] ]\n- Pick a well-known author that fits the story\n- DO NOT use the anonymous author\n- DO NOT use any markdown bolding (**).\n- OUTPUT ONLY THE BLOCK.`,
-          ),
         },
       ],
     );
@@ -232,12 +236,12 @@ const Strategies: Record<string, StrategyFn> = {
 
   // Generate (Style)
   "generate:style": async (_session, _manager, base) => {
+    const userPrompt = (await api.v1.config.get("style_generate_prompt")) || "";
     const messages = hyperContextBuilder(
       base.systemMsg,
       {
         role: "user",
-        content:
-          "Generate a style guideline block for this story. \n\nCRITICAL: Output ONLY the block. No Markdown, no conversational filler. \n\nEXAMPLE:\n[ Write in a style that conveys the following: hard-boiled noir, cynical narration, short punchy sentences, focus on sensory grit ]",
+        content: fixSpacing(userPrompt),
       },
       {
         role: "assistant",
@@ -247,12 +251,6 @@ const Strategies: Record<string, StrategyFn> = {
         {
           role: "user",
           content: fixSpacing(`STORY PROMPT:\n${base.storyPrompt}`),
-        },
-        {
-          role: "user",
-          content: fixSpacing(
-            `INSTRUCTION:\n- Write in a style that conveys the following: [concise style guidance limit 80 words]\n- Format the output strictly as: [ Write in a style that conveys the following: ... ]\n- DO NOT use any markdown bolding (**).\n- OUTPUT ONLY THE BLOCK.`,
-          ),
         },
       ],
     );
@@ -291,49 +289,8 @@ const Strategies: Record<string, StrategyFn> = {
       }
     }
 
-    const formatInstruction = `
-Generate a lorebook entry for "${itemName}".
-You MUST follow this EXACT format. Line-by-line structure is essential.
-
-FORMAT:
-\`\`\`
-[Full Name]
-Type: [character, location, faction, etc.]
-Setting: original
-Age: [number or N/A]
-Gender: [male, female, etc.]
-[Race, optional]: [fey, orc, halfling, etc.]
-[Species, optional]: [animal species if applicable]
-Occupation: [role/job]
-Height: [cm] cm ([feet]'[inches]")
-Weight: [kg] kg ([lbs] lbs)
-BWH: [bust]-[waist]-[hip] cm ([bust][cup]-[waist]-[hip] in) / CWH: [chest]-[waist]-[hip] cm ([chest]-[waist]-[hip] in)
-Talents: [3-4 key skills]
-Body: [brief physical descriptors]
-Hair: [color, length, style]
-Eyes: [color, quality]
-Personality: [3-4 traits]
-Description: [Physical presence, mannerisms, sensory details. ~100-150 words.]
-Quotes: "[Character-defining statement]" \u2014Character Name
-Core Conflict:
-- Axis: [fundamental duality]
-- Pillar (Self): [internal manifestation]
-- Pillar (World): [external role]
-- Source: [formative past event]
-\`\`\`
-
-WRONG example (DO NOT DO THIS):
-\`\`\`
-[Character Name], Type: character, Setting: original, Age: 25...
-\`\`\`
-
-CRITICAL RULES:
-- If character is female, use BWH with cup size. If not, use CWH.
-- For non-English settings, add native name field immediately after character name.
-- Deviate from standard attributes only if it makes sense for the category (e.g. Locations don't need Age).
-- NO Markdown formatting (no bolding, no italics) inside the entry.
-- NO conversational filler. Start immediately with the name in brackets.
-`;
+    const configPrompt = (await api.v1.config.get("lorebook_generate_prompt")) || "";
+    const formatInstruction = configPrompt.replace("[itemName]", itemName);
 
     const messages = hyperContextBuilder(
       base.systemMsg,
