@@ -36,6 +36,12 @@ The project runs within the NovelAI platform. After building the project, the "S
 
 A `PLAN.md` file is present, and it maintains an outline and implementation guide for the project. It should be updated frequently as development proceeds, and when the trajectory differs, update the file to match the latest development trajectory.
 
+## Code Review
+
+Any current architecture or tech debt concerns are noted in the `CODEREVIEW.md` file.
+
+You may periodically read the codebase and give an honest review of the overall architecture, structure, patterns and practices. Identify any dead code that can be deleted, or even unused files. Look for antipatterns and code smells. Look for wonky or inconsistent style. Find similar subroutines and note whether they can be refactored. Summarize your findings as HIGH, MEDIUM, LOW and write them to a `CODEREVIEW.md` file. If you identify any other things which could be helpful to your understanding as a coding LLM, update your `GEMINI.md` file.   
+
 ## API
 
 This script is hosted in the browser in a web worker, and only has access to native Javascript APIs offered by quickjs, and the NovelAI Scripting API: `external/script-types.d.ts`. You should consult this file often to confirm API interfaces.

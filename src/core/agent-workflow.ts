@@ -1,6 +1,6 @@
 import { StoryManager, DULFSField } from "./story-manager";
 import { FieldSession } from "./agent-cycle";
-import { hyperGenerate } from "../hyper-generator";
+import { hyperGenerate } from "../../lib/hyper-generator";
 import { ContextStrategyFactory } from "./context-strategies";
 import { ReviewPatcher } from "./review-patcher";
 import { FieldID } from "../config/field-definitions";

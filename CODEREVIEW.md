@@ -1,28 +1,13 @@
 # Code Review - Story Engine
 
 ## Summary
-The Story Engine codebase demonstrates a solid foundation with clear separation of concerns in some areas (Strategy Pattern for rendering and stage handlers), but suffers from a "God Object" anti-pattern in `StoryManager` and redundant synchronization logic that could lead to data inconsistency.
+The Story Engine codebase demonstrates a solid foundation with clear separation of concerns (Strategy Pattern for rendering and stage handlers). Recent refactoring has decomposed the `StoryManager` god object into specialized services, though some architectural risks regarding redundant synchronization remain.
 
 ---
 
 ## [HIGH] Architectural & Structural Issues
 
-### 1. `StoryManager` as a God Object
-**Location:** `src/core/story-manager.ts`
-`StoryManager` is currently responsible for:
-- State management of the entire story.
-- Migration logic for older data versions.
-- Lorebook entry creation, updating, and syncing.
-- History management and committing changes.
-- Syncing content to NovelAI's Memory and Author's Note.
-
-**Recommendation:** Decompose `StoryManager` into specialized services:
-- `StoryDataManager`: Pure state management.
-- `MigrationService`: Handles data upgrades.
-- `LorebookSyncService`: Manages interaction with the Lorebook API.
-- `HistoryService`: Manages `FieldHistory` and versioning.
-
-### 2. Redundant Synchronization & Race Conditions
+### 1. Redundant Synchronization & Race Conditions
 **Location:** `src/ui/structured-editor.ts`, `src/core/story-manager.ts`
 The system attempts to sync from both a global `kse-story-data` key and individual `kse-field-${id}` keys. 
 - `StructuredEditor.syncFieldsFromStorage` pulls from individual keys on startup and overwrites `StoryManager` state.
@@ -57,22 +42,18 @@ The Lorebook panel provides "Save" and "Discard" buttons for Wand sessions, but 
 ## [LOW] Style, Dead Code & Refinement
 
 ### 1. Dead Code
-- `src/ui/colors.ts`: `NAI_NAVY` is unused. `NAI_YELLOW` is hardcoded elsewhere.
-- `src/core/field-history.ts`: `FieldHistoryManager` is an empty class.
+- `src/ui/colors.ts`: `NAI_NAVY` is unused.
 - `createFieldActions` in `src/ui/field-strategies.ts` is a no-op placeholder.
 
 ### 2. Wonky Style Choices
-- **Emoji Cursor:** `RefineStageHandler` inserts a `✍️` emoji into the draft during streaming. While creative, it can interfere with user interaction if they try to edit or copy during generation.
 - **Newline Doubling:** `fixSpacing` in `ContextStrategies.ts` doubles all newlines. This is noted as a GLM-4.6 compatibility fix, but should be documented more clearly if it applies to all models or just specific ones.
-- **Hardcoded Colors:** Colors from `colors.ts` are hardcoded as strings in `wand-ui.ts` instead of using the exported constants.
 
-### 3. Frequent Casting to `any`
-**Location:** `src/core/story-manager.ts`
-Extensive use of `(this.currentStory as any)[fieldId]` for dynamic access.
-**Recommendation:** Use a proper `Record<FieldID, StoryField | DULFSField[]>` or similar mapping in the `StoryData` interface to improve type safety.
+### 3. Casting to `any`
+**Location:** `src/core/story-data-manager.ts`, `src/core/story-manager.ts`
+While type-safe getters (`getStoryField`, `getDulfsList`) have been added, dynamic access for adding/removing items by ID still relies on `any` casts.
+**Recommendation:** Continue refining the `StoryData` interface or using mapped types to further reduce remaining `any` usage.
 
 ---
 
 ## Refactoring Suggestions
 - **DULFS Parsing:** `AgentWorkflowService.parseListLine` uses regexes that could be centralized or simplified.
-- **Brainstorm Service:** The brainstorm logic is split between `StoryManager` (data) and `BrainstormService` (generation). The data methods in `StoryManager` could be moved to a dedicated service or sub-manager.

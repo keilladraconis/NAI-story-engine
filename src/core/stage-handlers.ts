@@ -58,7 +58,7 @@ export class RefineStageHandler implements StageHandler {
     
     this.storyManager.saveFieldDraft(
       session.fieldId,
-      accumulated + "✍️" + tail
+      accumulated + tail
     );
   }
 

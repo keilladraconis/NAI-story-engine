@@ -1,6 +1,7 @@
 import { FieldSession } from "../core/agent-cycle";
 import { AgentWorkflowService } from "../core/agent-workflow";
 import { createResponsiveGenerateButton } from "./ui-components";
+import { NAI_YELLOW } from "./colors";
 
 const { column, row, button, checkboxInput } = api.v1.ui.part;
 
@@ -45,7 +46,7 @@ export class WandUI {
               iconId: "file-text",
               style:
                 activeStage === "generate"
-                  ? { "background-color": "rgb(245, 243, 194)", color: "black" }
+                  ? { "background-color": NAI_YELLOW, color: "black" }
                   : {},
               callback: () => {
                 session.selectedStage = "generate";
@@ -57,7 +58,7 @@ export class WandUI {
               iconId: "eye",
               style:
                 activeStage === "review"
-                  ? { "background-color": "rgb(245, 243, 194)", color: "black" }
+                  ? { "background-color": NAI_YELLOW, color: "black" }
                   : {},
               callback: () => {
                 session.selectedStage = "review";
@@ -69,7 +70,7 @@ export class WandUI {
               iconId: "feather",
               style:
                 activeStage === "refine"
-                  ? { "background-color": "rgb(245, 243, 194)", color: "black" }
+                  ? { "background-color": NAI_YELLOW, color: "black" }
                   : {},
               callback: () => {
                 session.selectedStage = "refine";

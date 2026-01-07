@@ -11,5 +11,3 @@ export interface FieldHistory {
     linkedEntities?: string[]; // Track which entities were linked at this version
   };
 }
-
-export class FieldHistoryManager {}

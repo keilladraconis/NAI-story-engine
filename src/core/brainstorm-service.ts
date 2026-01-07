@@ -1,5 +1,5 @@
 import { StoryManager } from "./story-manager";
-import { hyperGenerate } from "../hyper-generator";
+import { hyperGenerate } from "../../lib/hyper-generator";
 
 export class BrainstormService {
   private storyManager: StoryManager;
