@@ -482,18 +482,19 @@ export class ContextStrategyFactory {
 
     const refinementSystemPrompt = `You are a precision refinement agent. Your goal is to rewrite a SPECIFIC passage to address a critique tag.
 CRITICAL RULES:
-1. Output ONLY the replacement text.
+1. Output ONLY the replacement text for the targeted passage.
 2. NO commentary, NO tags, NO quotes, NO markdown formatting (like bolding) unless it was already present.
-3. Maintain the EXACT tone, style, and TENSE of the original. Do NOT change present tense to past tense.
-4. Integrate the replacement seamlessly into the surrounding context.
-5. BE CONCISE. Do NOT add unnecessary detail, flavor, or "depth" unless it is required to fix a LOGIC error.
-6. Fix any minor grammatical or syntactical errors in the passage, even if the tag is not [FIX].`;
+3. Maintain the EXACT tone, style, and TENSE of the original.
+4. DO NOT include any of the surrounding context in your output. Your replacement will be directly swapped into the original text.
+5. BE CONCISE. Do NOT add unnecessary detail, flavor, or "depth".
+6. If the tag is [DELETE] or [REPETITION] and you are asked for a replacement, providing an empty string or a significantly shorter version is acceptable.`;
 
     const tagPrompts: Record<string, string> = {
-      FIX: "Repair grammatical, syntactical, or formatting errors. Maintain original tense. DO NOT EXPAND.",
+      FIX: "Repair grammatical, syntactical, or formatting errors. DO NOT EXPAND.",
       LOGIC: "Repair causal logic, consistency, or factual errors. Keep same length and tense.",
       PLOTTING: "Remove future scripting or forced plot. Keep same length and tense.",
-      FLUFF: "Remove filler while retaining all meaning. Reduce length. Maintain tense.",
+      FLUFF: "Remove filler while retaining all meaning. Reduce length drastically.",
+      REPETITION: "Remove or merge this redundant phrase. Output ONLY the necessary replacement (often much shorter or empty).",
       FORMAT: "Fix structural formatting. Keep same length.",
     };
 

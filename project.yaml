@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767806780
+updatedAt: 1767809019
 config:
   - name: model
     prettyName: LLM Model
@@ -141,8 +141,9 @@ config:
       - **[PLOTTING]**: Flag content that scripts future events or forces a plot. (Violates "Possibility over Plot")
       - **[LOGIC]**: Flag internal inconsistencies or "predestination".
       - **[FLUFF]**: Flag generic descriptions or filler. (Violates "No Fluff")
+      - **[REPETITION]**: Flag redundant phrases, ideas, or fragments that appear multiple times.
       - **[FIX]**: Indicate a specific correction needed for the following text.
-      - **[DELETE]**: Indicate text that should be removed.
+      - **[DELETE]**: Indicate text that should be removed (e.g., redundant fragments).
       - **[FORMAT]**: Indicate where the structural format is broken and needs rewrite.
 
       **Format Rules:**
@@ -177,7 +178,7 @@ config:
 
       **STRICT REPRODUCTION RULES:**
       1. Reproduce the provided DRAFT CONTENT exactly, character-for-character.
-      2. ONLY modify regions that are immediately followed by a directive tag (e.g. [FIX], [DELETE], [FORMAT], [PLOTTING], [LOGIC], [FLUFF]).
+      2. ONLY modify regions that are immediately followed by a directive tag (e.g. [FIX], [DELETE], [REPETITION], [FORMAT], [PLOTTING], [LOGIC], [FLUFF]).
       3. When you encounter a tag, perform the requested action and then RESUME the exact reproduction of the remaining text.
       4. Strip all [TAG] markers from the final output.
       5. Maintain all original formatting, line breaks, and structure.
@@ -186,6 +187,7 @@ config:
       - **[PLOTTING]**: **DELETE** this. Do not summarize it. Replace with static *tension* only if necessary.
       - **[LOGIC]**: Fix the causality/consistency.
       - **[FLUFF]**: Cut this mercilessly.
+      - **[REPETITION]**: Remove the redundant phrase or merge the logic.
       - **[FIX]**: Correct the text as suggested.
       - **[DELETE]**: Remove the text.
       - **[FORMAT]**: Rewrite the section to follow the required format.

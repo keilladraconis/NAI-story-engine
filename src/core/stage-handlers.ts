@@ -88,22 +88,30 @@ export class RefineStageHandler implements StageHandler {
 
     // Use current draft as the base for patching
     let currentText = this.storyManager.getFieldContent(session.fieldId);
+    const originalText = currentText;
 
-    for (const line of lines) {
+    // Pre-parse patches and find their locations in the original text
+    const patches = lines
+      .map((line) => {
+        const match = line.match(
+          /^(\*\*)?\[([A-Z_]+)\](\*\*)?\s*\|\|\s*"(.*)"$/,
+        );
+        if (!match) return null;
+        const tag = match[2];
+        const locator = match[4];
+        const range = this.reviewPatcher.findLocatorRange(originalText, locator);
+        return { tag, locator, range };
+      })
+      .filter((p): p is { tag: string; locator: string; range: { start: number; end: number } } => !!(p && p.range));
+
+    // Sort patches from END to START. 
+    // This ensures that modifying the text doesn't invalidate the indices of patches that come earlier.
+    patches.sort((a, b) => b.range.start - a.range.start);
+
+    for (const entry of patches) {
       if (session.cancellationSignal?.cancelled) break;
 
-      const match = line.match(/^(\*\*)?\[([A-Z_]+)\](\*\*)?\s*\|\|\s*"(.*)"$/);
-      if (!match) continue;
-
-      const tag = match[2];
-      const locator = match[4];
-
-      // Find locator in the current (possibly already patched) text
-      const range = this.reviewPatcher.findLocatorRange(currentText, locator);
-      if (!range) {
-        api.v1.log(`[Refine] Could not find locator: "${locator}"`);
-        continue;
-      }
+      const { tag, locator, range } = entry;
 
       if (tag === "DELETE") {
         currentText =
