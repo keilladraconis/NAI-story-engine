@@ -1,4 +1,4 @@
-import { FieldID } from "../config/field-definitions";
+import { FieldID, FIELD_CONFIGS } from "../config/field-definitions";
 
 export interface StoryField {
   id: string;
@@ -105,53 +105,16 @@ export class StoryDataManager {
 
   public async save(): Promise<void> {
     if (!this.currentStory) return;
-    await api.v1.storyStorage.set(StoryDataManager.KEYS.STORY_DATA, this.currentStory);
+    await api.v1.storyStorage.set(
+      StoryDataManager.KEYS.STORY_DATA,
+      this.currentStory,
+    );
   }
 
   public createDefaultData(): StoryData {
-    return {
+    const data: any = {
       id: "current-story",
       version: "0.1.0",
-
-      // Primary components
-      [FieldID.StoryPrompt]: {
-        id: FieldID.StoryPrompt,
-        type: "prompt",
-        content: "",
-        linkedEntities: [],
-      },
-      [FieldID.ATTG]: {
-        id: FieldID.ATTG,
-        type: "attg",
-        content: "",
-        linkedEntities: [],
-      },
-      [FieldID.Style]: {
-        id: FieldID.Style,
-        type: "style",
-        content: "",
-        linkedEntities: [],
-      },
-      [FieldID.Brainstorm]: {
-        id: FieldID.Brainstorm,
-        type: "brainstorm",
-        content: "",
-        linkedEntities: [],
-        data: { messages: [] },
-      },
-      [FieldID.WorldSnapshot]: {
-        id: FieldID.WorldSnapshot,
-        type: "worldSnapshot",
-        content: "",
-        linkedEntities: [],
-      },
-
-      // DULFS components
-      [FieldID.DramatisPersonae]: [],
-      [FieldID.UniverseSystems]: [],
-      [FieldID.Locations]: [],
-      [FieldID.Factions]: [],
-      [FieldID.SituationalDynamics]: [],
 
       // Lorebook
       dulfsCategoryIds: {},
@@ -164,5 +127,26 @@ export class StoryDataManager {
 
       lastModified: new Date(),
     };
+
+    // Initialize fields from configurations
+    for (const config of FIELD_CONFIGS) {
+      if (config.layout === "list") {
+        data[config.id] = [];
+      } else {
+        data[config.id] = {
+          id: config.id,
+          type: config.fieldType || "prompt",
+          content: "",
+          linkedEntities: [],
+        };
+
+        // Specialized initialization
+        if (config.id === FieldID.Brainstorm) {
+          data[config.id].data = { messages: [] };
+        }
+      }
+    }
+
+    return data as StoryData;
   }
 }

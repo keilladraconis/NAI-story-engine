@@ -19,8 +19,10 @@ export interface FieldConfig {
   icon: IconId;
   linkedEntities?: string[];
   layout?: "default" | "inline-wand" | "list" | "generator";
+  fieldType?: "prompt" | "brainstorm" | "worldSnapshot" | "dulfs" | "attg" | "style";
   generationInstruction?: string;
   exampleFormat?: string;
+  hidden?: boolean;
 }
 
 export const FIELD_CONFIGS: FieldConfig[] = [
@@ -30,6 +32,16 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     description: "The initial creative spark for your story",
     placeholder: "Once upon a time in a world where...",
     icon: "bookOpen",
+    fieldType: "prompt",
+  },
+  {
+    id: FieldID.Brainstorm,
+    label: "Brainstorm",
+    description: "Brainstorming chat history and consolidated material",
+    placeholder: "",
+    icon: "cloud-lightning" as IconId,
+    hidden: true,
+    fieldType: "brainstorm",
   },
   {
     id: FieldID.WorldSnapshot,
@@ -38,6 +50,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "The state of the world, its drivers, and tensions...",
     icon: "package",
     layout: "inline-wand",
+    fieldType: "worldSnapshot",
   },
   {
     id: FieldID.DramatisPersonae,
@@ -46,6 +59,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Character names, descriptions, motivations...",
     icon: "user",
     layout: "list",
+    fieldType: "dulfs",
     generationInstruction: "Generate a list of interesting characters for this story. Focus on their core motivations and unique behavioral tells.",
     exampleFormat: "Format each line exactly as: [First and Last Name] ([gender], [age], [occupation]): [core motivation], [behavioral tell]",
   },
@@ -56,6 +70,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "How this world works - magic, physics, etc...",
     icon: "settings" as IconId,
     layout: "list",
+    fieldType: "dulfs",
     generationInstruction: "Generate a list of key universe systems, magic rules, or technological principles. Describe the mechanic or rule concisely.",
     exampleFormat: "Format each line as: [System Name]: [Description of mechanic or rule]",
   },
@@ -66,6 +81,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Settings, landmarks, environments...",
     icon: "map-pin" as IconId,
     layout: "list",
+    fieldType: "dulfs",
     generationInstruction: "Generate a list of significant locations. Include atmospheric anchors, sensory details, and inherent tensions.",
     exampleFormat: "Format each line as: [Location Name]: [atmospheric anchors], [sensory details], [inherent tensions or key functions]",
   },
@@ -76,6 +92,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Factions, guilds, political parties...",
     icon: "users",
     layout: "list",
+    fieldType: "dulfs",
     generationInstruction: "Generate a list of major factions, guilds, or political groups. Describe their core ideology, goal, and internal structure.",
     exampleFormat: "Format each line as: [Faction Name]: [description of ideology, goal, structure]",
   },
@@ -86,6 +103,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Active conflicts, pending events...",
     icon: "activity",
     layout: "list",
+    fieldType: "dulfs",
     generationInstruction: "Generate a list of current conflicts, pending events, or tensions that involve multiple characters with no suggested resolution.",
     exampleFormat: "Format each line as: [Dynamic Name]: [a state of being or point of friction...]",
   },
@@ -96,6 +114,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "[ Author: ...; Tags: ...; Title: ...; Genre: ... ]",
     icon: "tag",
     layout: "generator",
+    fieldType: "attg",
   },
   {
     id: FieldID.Style,
@@ -104,5 +123,14 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "[ Style: ... ]",
     icon: "feather",
     layout: "generator",
+    fieldType: "style",
   },
 ];
+
+export const LIST_FIELD_IDS = FIELD_CONFIGS.filter(
+  (c) => c.layout === "list",
+).map((c) => c.id);
+
+export const TEXT_FIELD_IDS = FIELD_CONFIGS.filter(
+  (c) => c.layout !== "list",
+).map((c) => c.id);

@@ -1,4 +1,8 @@
-import { FieldID } from "../config/field-definitions";
+import {
+  FieldID,
+  TEXT_FIELD_IDS,
+  LIST_FIELD_IDS,
+} from "../config/field-definitions";
 import { StoryDataManager, StoryField, DULFSField } from "./story-data-manager";
 import { LorebookSyncService } from "./lorebook-sync-service";
 import { BrainstormDataManager } from "./brainstorm-data-manager";
@@ -32,23 +36,11 @@ export class StoryManager {
     }
   }
 
-  /**
-   * Syncs the current memory state to individual kse-field keys.
-   * This ensures that UI components using storageKey start with the correct value.
-   */
   private async syncToIndividualKeys(): Promise<void> {
     const data = this.dataManager.data;
     if (!data) return;
 
-    const fields = [
-      FieldID.StoryPrompt,
-      FieldID.Brainstorm,
-      FieldID.WorldSnapshot,
-      FieldID.ATTG,
-      FieldID.Style,
-    ];
-
-    for (const fieldId of fields) {
+    for (const fieldId of TEXT_FIELD_IDS) {
       const field = this.dataManager.getStoryField(fieldId);
       if (field) {
         await api.v1.storyStorage.set(`kse-field-${fieldId}`, field.content);
@@ -168,15 +160,7 @@ export class StoryManager {
   }
 
   public findDulfsByLorebookId(entryId: string): { fieldId: string; item: DULFSField } | null {
-    const fields = [
-      FieldID.DramatisPersonae,
-      FieldID.UniverseSystems,
-      FieldID.Locations,
-      FieldID.Factions,
-      FieldID.SituationalDynamics,
-    ];
-
-    for (const fid of fields) {
+    for (const fid of LIST_FIELD_IDS) {
       const list = this.getDulfsList(fid);
       const item = list.find((i) => i.linkedLorebooks.includes(entryId));
       if (item) {

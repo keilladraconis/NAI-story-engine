@@ -4,7 +4,11 @@ import {
 } from "../../lib/hyper-generator";
 import { StoryManager } from "./story-manager";
 import { FieldSession } from "./agent-cycle";
-import { FieldID, FIELD_CONFIGS } from "../config/field-definitions";
+import {
+  FieldID,
+  FIELD_CONFIGS,
+  LIST_FIELD_IDS,
+} from "../config/field-definitions";
 
 export interface StrategyResult {
   messages: Message[];
@@ -29,16 +33,8 @@ const fixSpacing = (text: string): string => {
 };
 
 const getShortDulfsContext = (manager: StoryManager): string => {
-  const fields = [
-    FieldID.DramatisPersonae,
-    FieldID.UniverseSystems,
-    FieldID.Locations,
-    FieldID.Factions,
-    FieldID.SituationalDynamics,
-  ];
-
   let context = "";
-  for (const fid of fields) {
+  for (const fid of LIST_FIELD_IDS) {
     const list = manager.getDulfsList(fid);
     if (list.length > 0) {
       const config = FIELD_CONFIGS.find((c) => c.id === fid);
@@ -57,16 +53,8 @@ const getAllDulfsContext = (
   manager: StoryManager,
   excludeFieldId: string,
 ): string => {
-  const fields = [
-    FieldID.DramatisPersonae,
-    FieldID.UniverseSystems,
-    FieldID.Locations,
-    FieldID.Factions,
-    FieldID.SituationalDynamics,
-  ];
-
   let context = "";
-  for (const fid of fields) {
+  for (const fid of LIST_FIELD_IDS) {
     if (fid === excludeFieldId) continue;
     const list = manager.getDulfsList(fid);
     if (list.length > 0) {

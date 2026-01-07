@@ -66,6 +66,7 @@ export class StructuredEditor {
         // Collapsible sections for all fields
         column({
           content: Array.from(this.configs.values())
+            .filter((config) => !config.hidden)
             .map((config) =>
             this.createFieldSection(config),
           ),

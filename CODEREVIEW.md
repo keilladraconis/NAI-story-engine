@@ -7,11 +7,12 @@ The Story Engine codebase is well-structured, following service-oriented and str
 
 ## HIGH Priority
 
-### 1. Brittle Field Syncing Logic
+### 1. Brittle Field Syncing Logic [FINISHED]
 **Location:** `StoryManager.syncToIndividualKeys`
 **Finding:** The service manually lists "text fields" (StoryPrompt, Brainstorm, etc.).
 **Issue:** If a new field is added to `field-definitions.ts`, it must be manually added to this list. This is an anti-pattern that leads to "forgotten" fields not being synced.
 **Refactor:** Centralize the categorization of fields (e.g., `isTextField`, `isListField`) within `field-definitions.ts` or as static helpers on `FieldID`.
+**Status:** Completed. Field metadata (fieldType, hidden) added to FIELD_CONFIGS. TEXT_FIELD_IDS and LIST_FIELD_IDS are now derived from configurations. StoryManager and StoryDataManager refactored to be data-driven.
 
 ### 2. Dual-Storage Desync Risk
 **Location:** `StoryManager.setFieldContent`, `StructuredEditor`, `field-strategies.ts`
