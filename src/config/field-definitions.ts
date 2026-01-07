@@ -11,6 +11,40 @@ export enum FieldID {
   Style = "style",
 }
 
+export type DulfsFieldID =
+  | FieldID.DramatisPersonae
+  | FieldID.UniverseSystems
+  | FieldID.Locations
+  | FieldID.Factions
+  | FieldID.SituationalDynamics;
+
+export type TextFieldID =
+  | FieldID.StoryPrompt
+  | FieldID.Brainstorm
+  | FieldID.WorldSnapshot
+  | FieldID.ATTG
+  | FieldID.Style;
+
+export function isDulfsField(id: string): id is DulfsFieldID {
+  return [
+    FieldID.DramatisPersonae,
+    FieldID.UniverseSystems,
+    FieldID.Locations,
+    FieldID.Factions,
+    FieldID.SituationalDynamics,
+  ].includes(id as FieldID);
+}
+
+export function isTextField(id: string): id is TextFieldID {
+  return [
+    FieldID.StoryPrompt,
+    FieldID.Brainstorm,
+    FieldID.WorldSnapshot,
+    FieldID.ATTG,
+    FieldID.Style,
+  ].includes(id as FieldID);
+}
+
 export interface FieldConfig {
   id: FieldID;
   label: string;

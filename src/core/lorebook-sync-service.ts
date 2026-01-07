@@ -39,7 +39,7 @@ export class LorebookSyncService {
     const data = this.dataManager.data;
     if (!data) return;
 
-    const list = (data as any)[fieldId] as DULFSField[];
+    const list = this.dataManager.getDulfsList(fieldId);
     const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
     const label = config ? config.label : fieldId;
     const isEnabled = data.dulfsEnabled[fieldId] !== false;
@@ -113,7 +113,7 @@ export class LorebookSyncService {
     const data = this.dataManager.data;
     if (!data) return;
 
-    const list = (data as any)[fieldId] as DULFSField[];
+    const list = this.dataManager.getDulfsList(fieldId);
     const item = list?.find((i) => i.id === itemId);
     if (!item) return;
 
@@ -164,7 +164,7 @@ export class LorebookSyncService {
         enabled: enabled,
       });
 
-      const list = (data as any)[fieldId] as DULFSField[];
+      const list = this.dataManager.getDulfsList(fieldId);
       const index = list?.findIndex((i) => i.id === itemId);
       if (index !== -1 && list) {
         list[index].linkedLorebooks = [newId];

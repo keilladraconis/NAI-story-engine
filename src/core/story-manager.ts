@@ -1,7 +1,4 @@
-import {
-  FieldID,
-  LIST_FIELD_IDS,
-} from "../config/field-definitions";
+import { FieldID, LIST_FIELD_IDS } from "../config/field-definitions";
 import { StoryDataManager, StoryField, DULFSField } from "./story-data-manager";
 import { LorebookSyncService } from "./lorebook-sync-service";
 import { BrainstormDataManager } from "./brainstorm-data-manager";
@@ -22,7 +19,9 @@ export class StoryManager {
   }
 
   async initializeStory(): Promise<void> {
-    const savedData = await api.v1.storyStorage.get(StoryDataManager.KEYS.STORY_DATA);
+    const savedData = await api.v1.storyStorage.get(
+      StoryDataManager.KEYS.STORY_DATA,
+    );
 
     if (savedData) {
       this.dataManager.setData(savedData);
@@ -40,7 +39,7 @@ export class StoryManager {
     // Handle lorebook item reference: fieldId:itemId OR lorebook:entryId
     if (fieldId.includes(":")) {
       const [prefix, id] = fieldId.split(":");
-      
+
       let item: DULFSField | undefined;
       if (prefix === "lorebook") {
         const match = this.findDulfsByLorebookId(id);
@@ -49,7 +48,7 @@ export class StoryManager {
         const list = this.getDulfsList(prefix);
         item = list.find((i) => i.id === id);
       }
-      
+
       return item ? item.lorebookContent || "" : "";
     }
 
@@ -67,11 +66,13 @@ export class StoryManager {
     return data.dulfsEnabled[fieldId] !== false;
   }
 
-  public async setDulfsEnabled(fieldId: string, enabled: boolean): Promise<void> {
+  public async setDulfsEnabled(
+    fieldId: string,
+    enabled: boolean,
+  ): Promise<void> {
     const data = this.dataManager.data;
     if (!data) return;
     data.dulfsEnabled[fieldId] = enabled;
-    data.lastModified = new Date();
     await this.dataManager.save();
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
   }
@@ -81,8 +82,7 @@ export class StoryManager {
     if (!data) return;
     const list = this.getDulfsList(fieldId);
     list.push(item);
-    (data as any)[fieldId] = list; // Still need cast for dynamic assignment by ID
-    data.lastModified = new Date();
+    this.dataManager.setDulfsList(fieldId, list);
     await this.dataManager.save();
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
     await this.lorebookSyncService.syncIndividualLorebook(fieldId, item.id);
@@ -100,10 +100,13 @@ export class StoryManager {
     const index = list.findIndex((i) => i.id === itemId);
     if (index !== -1) {
       list[index] = { ...list[index], ...updates };
-      data.lastModified = new Date();
+      this.dataManager.setDulfsList(fieldId, list);
       await this.saveStoryData(notify);
 
-      if (notify && (updates.lorebookContent !== undefined || updates.name !== undefined)) {
+      if (
+        notify &&
+        (updates.lorebookContent !== undefined || updates.name !== undefined)
+      ) {
         await this.lorebookSyncService.syncIndividualLorebook(fieldId, itemId);
       } else if (notify) {
         await this.lorebookSyncService.syncDulfsLorebook(fieldId);
@@ -128,8 +131,7 @@ export class StoryManager {
     }
 
     const newList = list.filter((i) => i.id !== itemId);
-    (data as any)[fieldId] = newList;
-    data.lastModified = new Date();
+    this.dataManager.setDulfsList(fieldId, newList);
     await this.dataManager.save();
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
   }
@@ -137,13 +139,14 @@ export class StoryManager {
   public async clearDulfsList(fieldId: string): Promise<void> {
     const data = this.dataManager.data;
     if (!data) return;
-    (data as any)[fieldId] = [];
-    data.lastModified = new Date();
+    this.dataManager.setDulfsList(fieldId, []);
     await this.dataManager.save();
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
   }
 
-  public findDulfsByLorebookId(entryId: string): { fieldId: string; item: DULFSField } | null {
+  public findDulfsByLorebookId(
+    entryId: string,
+  ): { fieldId: string; item: DULFSField } | null {
     for (const fid of LIST_FIELD_IDS) {
       const list = this.getDulfsList(fid);
       const item = list.find((i) => i.linkedLorebooks.includes(entryId));
@@ -164,7 +167,9 @@ export class StoryManager {
     data.attgEnabled = enabled;
     await this.dataManager.save();
     if (enabled) {
-      await this.lorebookSyncService.syncAttgToMemory(this.getFieldContent(FieldID.ATTG));
+      await this.lorebookSyncService.syncAttgToMemory(
+        this.getFieldContent(FieldID.ATTG),
+      );
     }
   }
 
@@ -178,7 +183,9 @@ export class StoryManager {
     data.styleEnabled = enabled;
     await this.dataManager.save();
     if (enabled) {
-      await this.lorebookSyncService.syncStyleToAN(this.getFieldContent(FieldID.Style));
+      await this.lorebookSyncService.syncStyleToAN(
+        this.getFieldContent(FieldID.Style),
+      );
     }
   }
 
@@ -196,10 +203,20 @@ export class StoryManager {
       if (prefix === "lorebook") {
         const match = this.findDulfsByLorebookId(id);
         if (match) {
-          await this.updateDulfsItem(match.fieldId, match.item.id, { lorebookContent: content }, save);
+          await this.updateDulfsItem(
+            match.fieldId,
+            match.item.id,
+            { lorebookContent: content },
+            save,
+          );
         }
       } else {
-        await this.updateDulfsItem(prefix, id, { lorebookContent: content }, save);
+        await this.updateDulfsItem(
+          prefix,
+          id,
+          { lorebookContent: content },
+          save,
+        );
       }
       return;
     }
@@ -225,16 +242,14 @@ export class StoryManager {
 
     if (changed) {
       if (save) {
-        data.lastModified = new Date();
         await this.dataManager.save();
       } else {
         // Debounced auto-save of the global blob
         if (this.saveTimeout !== undefined) {
           await api.v1.timers.clearTimeout(this.saveTimeout);
         }
-        
+
         this.saveTimeout = await api.v1.timers.setTimeout(async () => {
-          data.lastModified = new Date();
           await this.dataManager.save();
           api.v1.log(`Auto-saved global story data (${fieldId})`);
           this.saveTimeout = undefined;
@@ -251,7 +266,9 @@ export class StoryManager {
     this.brainstormDataManager.addMessage(role, content);
   }
 
-  public setBrainstormMessages(messages: { role: string; content: string }[]): void {
+  public setBrainstormMessages(
+    messages: { role: string; content: string }[],
+  ): void {
     this.brainstormDataManager.setMessages(messages);
   }
 

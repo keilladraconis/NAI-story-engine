@@ -1,4 +1,9 @@
-import { FieldID, FIELD_CONFIGS } from "../config/field-definitions";
+import {
+  FieldID,
+  FIELD_CONFIGS,
+  isDulfsField,
+  isTextField,
+} from "../config/field-definitions";
 
 export interface StoryField {
   id: string;
@@ -50,9 +55,6 @@ export interface StoryData {
   // Generator Sync
   attgEnabled: boolean;
   styleEnabled: boolean;
-
-  // History and metadata
-  lastModified: Date;
 }
 
 export class StoryDataManager {
@@ -87,20 +89,32 @@ export class StoryDataManager {
 
   public getStoryField(id: string): StoryField | undefined {
     if (!this.currentStory) return undefined;
-    const field = (this.currentStory as any)[id];
-    if (field && typeof field === "object" && "content" in field) {
-      return field as StoryField;
+    if (isTextField(id)) {
+      return this.currentStory[id];
     }
     return undefined;
   }
 
+  public setStoryField(id: string, field: StoryField): void {
+    if (!this.currentStory) return;
+    if (isTextField(id)) {
+      this.currentStory[id] = field;
+    }
+  }
+
   public getDulfsList(id: string): DULFSField[] {
     if (!this.currentStory) return [];
-    const list = (this.currentStory as any)[id];
-    if (Array.isArray(list)) {
-      return list as DULFSField[];
+    if (isDulfsField(id)) {
+      return this.currentStory[id];
     }
     return [];
+  }
+
+  public setDulfsList(id: string, list: DULFSField[]): void {
+    if (!this.currentStory) return;
+    if (isDulfsField(id)) {
+      this.currentStory[id] = list;
+    }
   }
 
   public async save(): Promise<void> {
@@ -112,7 +126,7 @@ export class StoryDataManager {
   }
 
   public createDefaultData(): StoryData {
-    const data: any = {
+    const data: Partial<StoryData> = {
       id: "current-story",
       version: "0.1.0",
 
@@ -124,16 +138,14 @@ export class StoryDataManager {
       // Sync
       attgEnabled: false,
       styleEnabled: false,
-
-      lastModified: new Date(),
     };
 
     // Initialize fields from configurations
     for (const config of FIELD_CONFIGS) {
       if (config.layout === "list") {
-        data[config.id] = [];
+        (data as any)[config.id] = [];
       } else {
-        data[config.id] = {
+        const field: StoryField = {
           id: config.id,
           type: config.fieldType || "prompt",
           content: "",
@@ -142,8 +154,10 @@ export class StoryDataManager {
 
         // Specialized initialization
         if (config.id === FieldID.Brainstorm) {
-          data[config.id].data = { messages: [] };
+          field.data = { messages: [] };
         }
+
+        (data as any)[config.id] = field;
       }
     }
 
