@@ -47,10 +47,21 @@ export class ReviewPatcher {
       const regex = new RegExp(pattern, "i");
       const match = regex.exec(text);
       if (match) {
-        return {
-          start: match.index,
-          end: match.index + match[0].length,
-        };
+        let start = match.index;
+        let end = match.index + match[0].length;
+
+        // Expand to include surrounding markdown
+        while (start > 0 && /[*_~`]/.test(text[start - 1])) start--;
+        while (end < text.length && /[*_~`]/.test(text[end])) end++;
+
+        // If the match ends at a word boundary but there's a trailing punctuation 
+        // that looks like it belongs to the sentence we're replacing, consume it.
+        // But only if the locator itself didn't already have punctuation at the end.
+        if (!/[\.\!\?]$/.test(match[0]) && end < text.length && /[\.\!\?]/.test(text[end])) {
+            end++;
+        }
+
+        return { start, end };
       }
     } catch (e) {
       api.v1.log(`[ReviewPatcher] findLocatorRange Regex Error: ${e}`);
@@ -63,20 +74,22 @@ export class ReviewPatcher {
     const tokens = locator.trim().split(/\s+/);
     if (tokens.length === 0) return null;
 
-    // 2. Take all words (up to a reasonable limit to avoid crazy regex)
-    const searchTokens = tokens.slice(0, 15);
+    // 2. Use up to 100 tokens to ensure we cover the full span
+    const searchTokens = tokens.slice(0, 100);
 
     // 3. Create pattern parts
     const regexParts = searchTokens.map((token) => {
       // Replace any non-alphanumeric character with '.' (wildcard)
+      // but escape it if it's a special regex char that we want to treat as a wildcard
       return token
         .split("")
-        .map((char) => (/\w/.test(char) ? char : "."))
+        .map((char) => (/\w/.test(char) ? char : "[\\W_]"))
         .join("");
     });
 
-    // 4. Join with fuzzy separator (allowing whitespace, markdown, punctuation)
-    return regexParts.join("[\\W\\s]+");
+    // 4. Join with fuzzy separator (allowing whitespace, markdown, punctuation, and slight gaps)
+    // We allow 0-20 characters of non-word stuff between tokens to account for heavy markdown
+    return regexParts.join("[\\W\\s]{0,20}");
   }
 
   private applyPatch(

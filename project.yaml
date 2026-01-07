@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767798895
+updatedAt: 1767806780
 config:
   - name: model
     prettyName: LLM Model
@@ -77,6 +77,7 @@ config:
       - **Describe the State, Not the Events:** Output a snapshot full of dynamic potential.
       - **Define Drivers:** Focus on internal logic and motivations, not reactions to future events.
       - **Highlight Tensions:** Describe how the different "Spheres" intersect and conflict.
+      - **Be Concise:** Every word must count. Avoid flowery prose and redundancy.
       - **No Spoilers:** Do not determine the outcome. Set the stage for the user to play.
 
   - name: lorebook_generate_prompt
@@ -140,7 +141,6 @@ config:
       - **[PLOTTING]**: Flag content that scripts future events or forces a plot. (Violates "Possibility over Plot")
       - **[LOGIC]**: Flag internal inconsistencies or "predestination".
       - **[FLUFF]**: Flag generic descriptions or filler. (Violates "No Fluff")
-      - **[DEPTH]**: Flag flat areas needing friction. (Violates "Three-Sphere Architecture")
       - **[FIX]**: Indicate a specific correction needed for the following text.
       - **[DELETE]**: Indicate text that should be removed.
       - **[FORMAT]**: Indicate where the structural format is broken and needs rewrite.
@@ -177,7 +177,7 @@ config:
 
       **STRICT REPRODUCTION RULES:**
       1. Reproduce the provided DRAFT CONTENT exactly, character-for-character.
-      2. ONLY modify regions that are immediately followed by a directive tag (e.g. [FIX], [DELETE], [FORMAT], [PLOTTING], [LOGIC], [FLUFF], [DEPTH]).
+      2. ONLY modify regions that are immediately followed by a directive tag (e.g. [FIX], [DELETE], [FORMAT], [PLOTTING], [LOGIC], [FLUFF]).
       3. When you encounter a tag, perform the requested action and then RESUME the exact reproduction of the remaining text.
       4. Strip all [TAG] markers from the final output.
       5. Maintain all original formatting, line breaks, and structure.
@@ -186,7 +186,6 @@ config:
       - **[PLOTTING]**: **DELETE** this. Do not summarize it. Replace with static *tension* only if necessary.
       - **[LOGIC]**: Fix the causality/consistency.
       - **[FLUFF]**: Cut this mercilessly.
-      - **[DEPTH]**: Add specific friction/history.
       - **[FIX]**: Correct the text as suggested.
       - **[DELETE]**: Remove the text.
       - **[FORMAT]**: Rewrite the section to follow the required format.

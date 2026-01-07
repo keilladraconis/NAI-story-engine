@@ -151,10 +151,16 @@ export class RefineStageHandler implements StageHandler {
           },
           (delta) => {
             patch += delta;
+            // Clean patch: remove prefill if model repeated it
+            let cleanPatch = patch.trim();
+            if (cleanPatch.startsWith("REPLACEMENT TEXT:")) {
+              cleanPatch = cleanPatch.replace("REPLACEMENT TEXT:", "").trim();
+            }
+
             // Intermediate visual update: show the patch being applied
             const previewText =
               currentText.slice(0, range.start) +
-              patch +
+              cleanPatch +
               currentText.slice(range.end);
             this.storyManager.saveFieldDraft(session.fieldId, previewText);
             updateFn();
@@ -163,10 +169,16 @@ export class RefineStageHandler implements StageHandler {
           session.cancellationSignal,
         );
 
+        // Clean final patch
+        let finalPatch = patch.trim();
+        if (finalPatch.startsWith("REPLACEMENT TEXT:")) {
+          finalPatch = finalPatch.replace("REPLACEMENT TEXT:", "").trim();
+        }
+
         // Apply the final patch to the currentText for the next iteration
         currentText =
           currentText.slice(0, range.start) +
-          patch +
+          finalPatch +
           currentText.slice(range.end);
         this.storyManager.saveFieldDraft(session.fieldId, currentText);
         updateFn();

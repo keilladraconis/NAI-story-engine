@@ -1,12 +1,13 @@
 /** HYPER GENERATOR
  * License: MIT; Credit to OccultSage for the original form and inspiration
  * Authors: Keilla
- * Version: 0.4.1
+ * Version: 0.4.2
  */
 
 /** Changes
  * hyperContextBuilder signature modified to receive enable_thinking boolean. Thoughts require a contentless assistant suffix on the messages.
  * hyperContextBuilder tail-slicing-appending removed. Causes issues with careful prompting and prefill.
+ * Exponential backoff scaled up to powers of 3, maxing at 243 seconds.
  */
 
 // ===== CONSTANTS =====
@@ -63,7 +64,8 @@ export interface OnBudgetResumeCallback {
 
 class TransientError extends Error {}
 
-function isTransientError(e: unknown): boolean {
+function isTransientError(e: Error): boolean {
+  hyperLog("Transient Error:", e.message);
   const msg =
     e instanceof Error
       ? e.message
@@ -415,7 +417,7 @@ async function hyperGenerateWithRetry(
   } catch (e: any) {
     if (isTransientError(e) || /in progress/.test(e.message)) {
       if (params.maxRetries && params.maxRetries > 0) {
-        await api.v1.timers.sleep(2000 ** (5 - params.maxRetries));
+        await api.v1.timers.sleep(3 ** (5 - params.maxRetries) * 1000);
         return hyperGenerateWithRetry(
           messages,
           { ...params, maxRetries: params.maxRetries - 1 },

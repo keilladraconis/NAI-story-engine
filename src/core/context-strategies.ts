@@ -139,7 +139,7 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 1.1,
         min_p: 0.05,
         presence_penalty: 0.1,
-        maxTokens: 1536,
+        maxTokens: 1024,
       },
     };
   },
@@ -171,7 +171,10 @@ const Strategies: Record<string, StrategyFn> = {
       {
         role: "assistant",
         content:
-          "I will review the text and provide structured directives in the format '[TAG] || \"locator substring\"':\n",
+          "I will review the text and provide structured directives in the format '[TAG] || \"locator substring\"'.\n" +
+          "I will be highly selective, only tagging passages that truly need improvement.\n" +
+          "I will use [FIX] for grammatical/syntactical errors and [LOGIC] for consistency, causal errors, or missing logical steps.\n" +
+          "I will NOT tag passages for 'depth' or 'flavor' unless there is a logic error; I prioritize conciseness.\n",
       },
       [
         {
@@ -464,9 +467,8 @@ export class ContextStrategyFactory {
     session: FieldSession,
     tag: string,
     locator: string,
-    prefill: string,
+    _prefill: string,
   ): Promise<StrategyResult> {
-    const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
     const worldSnapshot = this.storyManager.getFieldContent(
       FieldID.WorldSnapshot,
     );
@@ -478,34 +480,37 @@ export class ContextStrategyFactory {
       config?.generationInstruction || "Generate narrative content.";
     const genOutput = session.cycles.generate.content;
 
+    const refinementSystemPrompt = `You are a precision refinement agent. Your goal is to rewrite a SPECIFIC passage to address a critique tag.
+CRITICAL RULES:
+1. Output ONLY the replacement text.
+2. NO commentary, NO tags, NO quotes, NO markdown formatting (like bolding) unless it was already present.
+3. Maintain the EXACT tone, style, and TENSE of the original. Do NOT change present tense to past tense.
+4. Integrate the replacement seamlessly into the surrounding context.
+5. BE CONCISE. Do NOT add unnecessary detail, flavor, or "depth" unless it is required to fix a LOGIC error.
+6. Fix any minor grammatical or syntactical errors in the passage, even if the tag is not [FIX].`;
+
     const tagPrompts: Record<string, string> = {
-      FIX: "Review the generate agent's formatting and content instructions and repair the following passage so that it conforms. Limit: 50 words.",
-      DEPTH:
-        "Review the generate agent's content instructions and the scenario context and rewrite this section, adding depth. Limit: 75 words.",
-      PLOTTING:
-        "Remove any future scripting or forced plot from this passage, replacing it with static narrative tension. Limit: 30 words.",
-      LOGIC:
-        "Repair the internal consistency and causal logic of this passage. Limit: 50 words.",
-      FLUFF:
-        "Condense this passage by removing filler while retaining all essential sensory and narrative information. Limit: 30 words.",
-      FORMAT:
-        "Rewrite this passage to strictly adhere to the required structural format.",
+      FIX: "Repair grammatical, syntactical, or formatting errors. Maintain original tense. DO NOT EXPAND.",
+      LOGIC: "Repair causal logic, consistency, or factual errors. Keep same length and tense.",
+      PLOTTING: "Remove future scripting or forced plot. Keep same length and tense.",
+      FLUFF: "Remove filler while retaining all meaning. Reduce length. Maintain tense.",
+      FORMAT: "Fix structural formatting. Keep same length.",
     };
 
     const reviewInstruction =
-      tagPrompts[tag] || `Refine the following passage marked with [${tag}].`;
+      tagPrompts[tag] || `Refine this passage to address [${tag}].`;
 
     const messages = hyperContextBuilder(
-      { role: "system", content: fixSpacing(systemPrompt) },
+      { role: "system", content: fixSpacing(refinementSystemPrompt) },
       {
         role: "user",
         content: fixSpacing(
-          `REFINEMENT TARGET [${tag}]:\n"${locator}"\n\nINSTRUCTION:\n${reviewInstruction}\n\nCRITICAL: Output ONLY the replacement text. Do not include tags like [${tag}], do not use markdown bolding, and do not provide any commentary or concluding markers.\n\nExecute.`,
+          `REFINEMENT TARGET [${tag}]:\n"${locator}"\n\nINSTRUCTION:\n${reviewInstruction}\n\nExecute. Output ONLY the replacement text.`,
         ),
       },
       {
         role: "assistant",
-        content: prefill,
+        content: "REPLACEMENT TEXT:\n",
       },
       [
         {
@@ -535,7 +540,7 @@ export class ContextStrategyFactory {
       messages,
       params: {
         temperature: 0.7,
-        maxTokens: 128,
+        maxTokens: 512,
         minTokens: 2,
         stop: ["\n\n", "[", "<"], // Stop if it tries to escape or start a new tag
       },
