@@ -32,11 +32,12 @@ The Story Engine codebase is well-structured, following service-oriented and str
 
 ## MEDIUM Priority
 
-### 1. Unified Context Strategies
+### 1. Unified Context Strategies [FINISHED]
 **Location:** `src/core/context-strategies.ts`
 **Finding:** `getShortDulfsContext` and `getAllDulfsContext` are substantially similar.
 **Issue:** Code duplication for building world element strings.
-**Refactor:** Create a single `buildDulfsContextString(manager, mode: 'short' | 'full', excludeId?: string)` helper.
+**Refactor:** Created a single `buildDulfsContextString(manager, mode: 'short' | 'full', excludeId?: string)` helper.
+**Status:** Completed. Unified DULFS context building into a single strategy helper.
 
 ### 2. Wonky Prompt Workarounds (`fixSpacing`)
 **Location:** `src/core/context-strategies.ts`

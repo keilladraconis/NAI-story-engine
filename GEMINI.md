@@ -41,6 +41,9 @@ Any current architecture or tech debt concerns are noted in the `CODEREVIEW.md` 
 
 You may periodically read the codebase and give an honest review of the overall architecture, structure, patterns and practices. Identify any dead code that can be deleted, or even unused files. Look for antipatterns and code smells. Look for wonky or inconsistent style. Find similar subroutines and note whether they can be refactored. Summarize your findings as HIGH, MEDIUM, LOW and write them to a `CODEREVIEW.md` file. If you identify any other things which could be helpful to your understanding as a coding LLM, update your `GEMINI.md` file.   
 
+## Documentation
+**CRITICAL**: After completing any code modification or task, you MUST update relevant documentation, including `GEMINI.md`, `CODEREVIEW.md`, and `PLAN.md`, to reflect the current state of the project and any architectural changes.
+
 ## API
 
 This script is hosted in the browser in a web worker, and only has access to native Javascript APIs offered by quickjs, and the NovelAI Scripting API: `external/script-types.d.ts`. You should consult this file often to confirm API interfaces.
@@ -74,7 +77,7 @@ When debugging issues, you may add debugging log statements and provide the user
 
 ### Key Patterns
 - **Strategy Pattern**: Extensively used for field rendering (`FieldRenderStrategy`) and AI stage handling (`StageHandler`).
-- **Context Construction**: `ContextStrategyFactory` builds model-specific prompts based on the current field and session state.
+- **Context Construction**: `ContextStrategyFactory` builds model-specific prompts based on the current field and session state. DULFS (world element) context building is unified via `buildDulfsContextString` to ensure consistency between short and full context modes.
 - **Fuzzy Patching**: `ReviewPatcher` uses a 5-word prefix fuzzy matching strategy to apply AI-suggested tags to field drafts.
 - **Hyper-Generator**: The project uses `lib/hyper-generator.ts` for advanced generation control, including continuation handling and token budget management.
 

@@ -32,14 +32,24 @@ const fixSpacing = (text: string): string => {
   return text.replace(/\n/g, "\n\n").trim();
 };
 
-const getShortDulfsContext = (manager: StoryManager): string => {
+const buildDulfsContextString = (
+  manager: StoryManager,
+  mode: "short" | "full",
+  excludeId?: string,
+): string => {
   let context = "";
   for (const fid of LIST_FIELD_IDS) {
+    if (fid === excludeId) continue;
     const list = manager.getDulfsList(fid);
-    if (list.length > 0) {
-      const config = FIELD_CONFIGS.find((c) => c.id === fid);
-      const label = config ? config.label.toUpperCase() : fid.toUpperCase();
+    if (list.length === 0) continue;
+
+    const config = FIELD_CONFIGS.find((c) => c.id === fid);
+    const label = config ? config.label.toUpperCase() : fid.toUpperCase();
+
+    if (mode === "short") {
       context += `${label}: ${list.map((i) => i.name).join(", ")}\n`;
+    } else {
+      context += `${label}:\n${list.map((i) => `- ${i.content}`).join("\n")}\n\n`;
     }
   }
   return context.trim();
@@ -47,23 +57,6 @@ const getShortDulfsContext = (manager: StoryManager): string => {
 
 export const normalizeQuotes = (str: string): string => {
   return str.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
-};
-
-const getAllDulfsContext = (
-  manager: StoryManager,
-  excludeFieldId: string,
-): string => {
-  let context = "";
-  for (const fid of LIST_FIELD_IDS) {
-    if (fid === excludeFieldId) continue;
-    const list = manager.getDulfsList(fid);
-    if (list.length > 0) {
-      const config = FIELD_CONFIGS.find((c) => c.id === fid);
-      const label = config ? config.label.toUpperCase() : fid.toUpperCase();
-      context += `${label}:\n${list.map((i) => `- ${i.content}`).join("\n")}\n\n`;
-    }
-  }
-  return context.trim();
 };
 
 const Strategies: Record<string, StrategyFn> = {
@@ -148,7 +141,7 @@ const Strategies: Record<string, StrategyFn> = {
 
     const contentToReview = session.cycles.generate.content;
     const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
-    const dulfs = getShortDulfsContext(manager);
+    const dulfs = buildDulfsContextString(manager, "short");
     const config = FIELD_CONFIGS.find((c) => c.id === session.fieldId);
     const genInstruction =
       config?.generationInstruction || "Generate narrative content.";
@@ -388,7 +381,11 @@ export class ContextStrategyFactory {
     const worldSnapshot = this.storyManager.getFieldContent(
       FieldID.WorldSnapshot,
     );
-    const existingDulfs = getAllDulfsContext(this.storyManager, fieldId);
+    const existingDulfs = buildDulfsContextString(
+      this.storyManager,
+      "full",
+      fieldId,
+    );
 
     const baseContext = {
       systemMsg: {
@@ -461,7 +458,7 @@ export class ContextStrategyFactory {
     const worldSnapshot = this.storyManager.getFieldContent(
       FieldID.WorldSnapshot,
     );
-    const dulfs = getShortDulfsContext(this.storyManager);
+    const dulfs = buildDulfsContextString(this.storyManager, "short");
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
 
     const config = FIELD_CONFIGS.find((c) => c.id === session.fieldId);
