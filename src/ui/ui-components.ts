@@ -29,16 +29,15 @@ export const createToggleableContent = (
   isEditMode: boolean,
   content: string,
   placeholder: string,
-  storageKey: string | undefined, // undefined for wand content (handled by session)
+  inputId: string | undefined, // ID for the input element
   onChange: (val: string) => void,
   style: any = {},
 ): UIPart => {
   if (isEditMode) {
     return multilineTextInput({
-      id: storageKey ? `input-${storageKey}` : undefined, // Ensure ID if needed, or rely on internal logic
+      id: inputId,
       placeholder: placeholder,
       initialValue: content,
-      storageKey: storageKey,
       onChange: onChange,
       style: style,
     });

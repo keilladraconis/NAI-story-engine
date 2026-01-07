@@ -27,24 +27,9 @@ export class StoryManager {
 
     if (savedData) {
       this.dataManager.setData(savedData);
-      // Sync global data TO individual field keys to ensure UI components are in sync
-      await this.syncToIndividualKeys();
     } else {
       this.dataManager.setData(this.dataManager.createDefaultData());
       await this.dataManager.save();
-      await this.syncToIndividualKeys();
-    }
-  }
-
-  private async syncToIndividualKeys(): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
-
-    for (const fieldId of TEXT_FIELD_IDS) {
-      const field = this.dataManager.getStoryField(fieldId);
-      if (field) {
-        await api.v1.storyStorage.set(`kse-field-${fieldId}`, field.content);
-      }
     }
   }
 
@@ -240,12 +225,6 @@ export class StoryManager {
     }
 
     if (changed) {
-      // Always sync to individual key for UI responsiveness and draft persistence
-      // Only for non-item fields (simple field IDs)
-      if (!fieldId.includes(":")) {
-        await api.v1.storyStorage.set(`kse-field-${fieldId}`, content);
-      }
-
       if (save) {
         data.lastModified = new Date();
         await this.dataManager.save();
@@ -290,6 +269,5 @@ export class StoryManager {
 
   public async saveFieldDraft(fieldId: string, content: string): Promise<void> {
     await this.setFieldContent(fieldId, content, false, false);
-    await api.v1.storyStorage.set(`kse-field-${fieldId}`, content);
   }
 }

@@ -119,7 +119,7 @@ export class GeneratorFieldStrategy implements FieldRenderStrategy {
         editModeState,
         content,
         config.placeholder,
-        `story:kse-field-${config.id}`,
+        `input-field-${config.id}`,
         (newContent: string) => handleFieldChange(newContent),
       ),
       actionsRow,
@@ -292,9 +292,9 @@ export class StoryPromptStrategy implements FieldRenderStrategy {
         },
       }),
       multilineTextInput({
+        id: `input-field-${config.id}`,
         placeholder: config.placeholder,
         initialValue: content,
-        storageKey: `story:kse-field-${config.id}`,
         onChange: (newContent: string) => handleFieldChange(newContent),
       }),
     ];
@@ -328,7 +328,7 @@ export class InlineWandStrategy implements FieldRenderStrategy {
         editModeState,
         storyManager.getFieldContent(config.id),
         config.placeholder,
-        `story:kse-field-${config.id}`,
+        `input-field-${config.id}`,
         (val) => {
           if (session) {
             // Update active stage content to keep in sync
@@ -368,7 +368,7 @@ export class StandardFieldStrategy implements FieldRenderStrategy {
         editModeState,
         content,
         config.placeholder,
-        `story:kse-field-${config.id}`,
+        `input-field-${config.id}`,
         (newContent: string) => handleFieldChange(newContent),
       ),
     ];

@@ -14,11 +14,12 @@ The Story Engine codebase is well-structured, following service-oriented and str
 **Refactor:** Centralize the categorization of fields (e.g., `isTextField`, `isListField`) within `field-definitions.ts` or as static helpers on `FieldID`.
 **Status:** Completed. Field metadata (fieldType, hidden) added to FIELD_CONFIGS. TEXT_FIELD_IDS and LIST_FIELD_IDS are now derived from configurations. StoryManager and StoryDataManager refactored to be data-driven.
 
-### 2. Dual-Storage Desync Risk
+### 2. Dual-Storage Desync Risk [FINISHED]
 **Location:** `StoryManager.setFieldContent`, `StructuredEditor`, `field-strategies.ts`
 **Finding:** The system uses both a global blob (`kse-story-data`) and individual keys (`kse-field-${fieldId}`) for persistence.
-**Issue:** UI components often bind directly to `storageKey` (e.g., `createToggleableContent`). While this provides "free" persistence, it can bypass the `StoryManager` logic (like sync to AN/Memory) unless the `onChange` callback perfectly mirrors the global state. The "Debounced Auto-save" in `StoryManager` is a good safeguard, but the source of truth feels split.
-**Recommendation:** Ensure `StoryManager` is the *only* entity that performs `api.v1.storyStorage.set` for core data. UI components should use `initialValue` + `onChange` rather than `storageKey` for fields that require complex side-effects.
+**Issue:** UI components often bind directly to `storageKey` (e.g., `createToggleableContent`). While this provides "free" persistence, it can bypass the `StoryManager` logic (like sync to AN/Memory) unless the `onChange` callback perfectly mirrors the global state.
+**Refactor:** Removed `storageKey` from UI components (`createToggleableContent`, `multilineTextInput`). `StoryManager` is now the *only* entity that performs `api.v1.storyStorage.set` for core data. UI components use `initialValue` + `onChange` and are driven by the central `StoryManager` state.
+**Status:** Completed. Refactored UI components and strategies to remove direct storage binding.
 
 ### 3. Logic Bloat in `RefineStageHandler`
 **Location:** `src/core/stage-handlers.ts`

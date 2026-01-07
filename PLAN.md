@@ -70,6 +70,7 @@
 
 ### Refactoring & Code Quality
 - **Modular UI**: Extracted reusable components (`createHeaderWithToggle`, `createToggleableContent`) to `src/ui/ui-components.ts`.
+- **Single Source of Truth**: Removed direct `storageKey` binding in UI components to ensure `StoryManager` is the sole entity managing persistence, preventing desync between global data and individual field keys.
 - **Wand UI**: Encapsulated all Wand-related UI logic in `src/ui/wand-ui.ts`.
 - **Configuration**: Centralized field definitions in `src/config/field-definitions.ts`.
 - **Cleanup**: Removed unused variables and dead code in `AgentWorkflowService` and `ContextStrategies`.

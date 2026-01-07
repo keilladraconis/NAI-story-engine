@@ -144,7 +144,7 @@ export class StoryEngineUI {
                 this.lorebookEditMode,
                 this.storyManager.getFieldContent(sessionId),
                 "Lorebook text will appear here...",
-                `story:kse-field-${sessionId}`, // Using the colon format for storage key too
+                `input-field-${sessionId}`, // Changed from storageKey to id
                 (val) => {
                   if (session) {
                     // Update active stage content to keep in sync
