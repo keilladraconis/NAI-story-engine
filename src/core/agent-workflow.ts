@@ -96,6 +96,7 @@ export class AgentWorkflowService {
       const { messages, params } =
         await this.contextFactory.buildDulfsContext(fieldId);
 
+      const model = (await api.v1.config.get("model")) || "glm-4-6";
       let buffer = "";
 
       await hyperGenerate(
@@ -103,6 +104,7 @@ export class AgentWorkflowService {
         {
           maxTokens: 2048,
           minTokens: 50,
+          model,
           ...params,
         },
         (text) => {
@@ -193,25 +195,27 @@ export class AgentWorkflowService {
       let buffer = "";
       const lastMsg = messages[messages.length - 1];
       if (lastMsg && lastMsg.role === "assistant" && lastMsg.content) {
-          buffer = lastMsg.content;
+        buffer = lastMsg.content;
       }
 
       await this.storyManager.saveFieldDraft(fieldId, buffer);
+      const model = (await api.v1.config.get("model")) || "glm-4-6";
 
       await hyperGenerate(
         messages,
         {
           maxTokens: 256,
+          model,
           ...params,
           minTokens: params.minTokens || 50,
         },
         (text) => {
-            // Only update if we actually got text (prevents empty chunk spam)
-            if (text) {
-                buffer += text;
-                this.storyManager.saveFieldDraft(fieldId, buffer);
-                updateFn();
-            }
+          // Only update if we actually got text (prevents empty chunk spam)
+          if (text) {
+            buffer += text;
+            this.storyManager.saveFieldDraft(fieldId, buffer);
+            updateFn();
+          }
         },
         "background",
         cancellationSignal,
@@ -296,15 +300,15 @@ export class AgentWorkflowService {
       let prefill = "";
       const lastMsg = messages[messages.length - 1];
       if (lastMsg && lastMsg.role === "assistant" && lastMsg.content) {
-          prefill = lastMsg.content;
+        prefill = lastMsg.content;
       }
 
       // Only initialize content with pre-fill for 'generate' stage.
       // For 'review' and 'refine', the pre-fill is just transition talk and shouldn't be in the field content.
       if (stage === "generate") {
-          session.cycles[stage].content = prefill;
+        session.cycles[stage].content = prefill;
       } else {
-          session.cycles[stage].content = "";
+        session.cycles[stage].content = "";
       }
 
       // Capture original content for handlers that need it (Refine)
@@ -313,12 +317,14 @@ export class AgentWorkflowService {
       // 3. Generate
       if (!session.cancellationSignal)
         throw new Error("Failed to create cancellation signal");
+      const model = (await api.v1.config.get("model")) || "glm-4-6";
 
       await hyperGenerate(
         messages,
         {
           maxTokens: 2048,
           minTokens: 50,
+          model,
           ...params,
           onBudgetWait: (_1, _2, time) => {
             session.budgetState = "waiting_for_user";
@@ -356,10 +362,13 @@ export class AgentWorkflowService {
       }
 
       // 4. Stage-specific Completion
-      // Use the accumulated content from streaming, as it correctly includes the pre-fill for 'generate' 
+      // Use the accumulated content from streaming, as it correctly includes the pre-fill for 'generate'
       // and excludes it for others (as initialized above).
       const totalAccumulated = session.cycles[stage].content;
-      const completionResult = await handler.onComplete(session, totalAccumulated);
+      const completionResult = await handler.onComplete(
+        session,
+        totalAccumulated,
+      );
 
       session.cycles[stage].content = completionResult;
       session.cycles[stage].status = "completed";

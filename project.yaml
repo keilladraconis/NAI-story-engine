@@ -6,8 +6,34 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767749986
+updatedAt: 1767793996
 config:
+  - name: model
+    prettyName: LLM Model
+    description: Which model to use for generation
+    type: select
+    default: glm-4-6
+    options:
+      - label: GLM 4.6
+        value: glm-4-6
+      - label: Blue
+        value: blue
+      - label: Red
+        value: red
+      - label: Green
+        value: green
+      - label: Purple
+        value: purple
+      - label: Pink
+        value: pink
+      - label: Yellow
+        value: yellow
+      - label: White
+        value: white
+      - label: Black
+        value: black
+      - label: Violet
+        value: violet
   - name: system_prompt
     prettyName: System Prompt
     description: Configure the base system prompt used by all aspects of Story Engine
@@ -171,8 +197,8 @@ config:
     type: string
     multiline: true
     default: |-
-      Generate a single ATTG block for this story. 
-      CRITICAL: Output ONLY the block. No Markdown, no headers, no conversational filler, no extra text. 
+      Generate a single ATTG block for this story.
+      CRITICAL: Output ONLY the block. No Markdown, no headers, no conversational filler, no extra text.
 
       EXAMPLE:
       [ Author: Stephen King; Tags: horror, supernatural, small town; Title: The Mist; Genre: Horror ]
@@ -189,8 +215,8 @@ config:
     type: string
     multiline: true
     default: |-
-      Generate a style guideline block for this story. 
-      CRITICAL: Output ONLY the block. No Markdown, no conversational filler. 
+      Generate a style guideline block for this story.
+      CRITICAL: Output ONLY the block. No Markdown, no conversational filler.
 
       EXAMPLE:
       [ Write in a style that conveys the following: hard-boiled noir, cynical narration, short punchy sentences, focus on sensory grit ]

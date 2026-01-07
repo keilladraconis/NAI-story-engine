@@ -7,13 +7,7 @@ The Story Engine codebase has been significantly improved by consolidating stora
 
 ## [MEDIUM] Architectural & Structural Issues
 
-### 1. Brittle Fuzzy Matching in `ReviewPatcher`
-**Location:** `src/core/review-patcher.ts`
-`buildFuzzyPattern` uses the first 5 words of a locator to create a regex.
-**Risk:** In repetitive prose, this may match the wrong paragraph. If the AI provides a locator that exists multiple times, only the first one is patched.
-**Recommendation:** Consider using more robust anchors or providing the AI with line numbers/indices if possible, although the current "locator" approach is more resilient to minor edits.
-
-### 2. UI Inconsistency in Wand Controls
+### 1. UI Inconsistency in Wand Controls
 **Location:** `src/ui/field-strategies.ts`, `src/ui/story-engine-ui.ts`
 The Lorebook panel provides "Save" and "Discard" buttons for Wand sessions, but the "Inline Wand" fields (like World Snapshot) do not. Users must use the global "Save" button in the sidebar to commit changes, which is not intuitive for field-specific generation.
 
