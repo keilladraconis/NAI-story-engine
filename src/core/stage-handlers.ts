@@ -84,54 +84,22 @@ export class RefineStageHandler implements StageHandler {
     updateFn: () => void,
   ): Promise<boolean> {
     const reviewContent = session.cycles.review.content;
-    const lines = reviewContent.split("\n").filter((l) => l.trim());
 
     // Use current draft as the base for patching
     let currentText = this.storyManager.getFieldContent(session.fieldId);
     const originalText = currentText;
 
     // Pre-parse patches and find their locations in the original text
-    const rawPatches = lines
-      .map((line) => {
-        const match = line.match(
-          /^(\*\*)?((?:\[[A-Z_]+\])+)(\*\*)?\s*\|\|\s*"(.*)"$/,
-        );
-        if (!match) return null;
-        const tagsMatch = match[2];
-        const tags = tagsMatch
-          .slice(1, -1)
-          .split("][");
-        const locator = match[4];
-        const range = this.reviewPatcher.findLocatorRange(originalText, locator);
-        return { tags, locator, range };
-      })
-      .filter((p): p is { tags: string[]; locator: string; range: { start: number; end: number } } => !!(p && p.range));
-
-    // Sort by start position to detect overlaps
-    rawPatches.sort((a, b) => a.range.start - b.range.start);
+    const rawPatches = this.reviewPatcher.getPatchesFromReview(
+      reviewContent,
+      originalText,
+    );
 
     // Merge overlapping or identical ranges
-    const mergedPatches: { tags: string[]; locator: string; range: { start: number; end: number } }[] = [];
-    for (const patch of rawPatches) {
-      const last = mergedPatches[mergedPatches.length - 1];
-      if (last && patch.range.start < last.range.end) {
-        // Overlap detected: extend range and add tags
-        last.range.end = Math.max(last.range.end, patch.range.end);
-        for (const t of patch.tags) {
-          if (!last.tags.includes(t)) {
-            last.tags.push(t);
-          }
-        }
-        // Update locator to the full merged text
-        last.locator = originalText.slice(last.range.start, last.range.end);
-      } else {
-        mergedPatches.push({
-          tags: [...patch.tags],
-          locator: patch.locator,
-          range: { ...patch.range }
-        });
-      }
-    }
+    const mergedPatches = this.reviewPatcher.mergePatches(
+      rawPatches,
+      originalText,
+    );
 
     // Sort patches from END to START for safe replacement
     mergedPatches.sort((a, b) => b.range.start - a.range.start);
@@ -140,7 +108,6 @@ export class RefineStageHandler implements StageHandler {
       if (session.cancellationSignal?.cancelled) break;
 
       const { tags, locator, range } = entry;
-      const tag = tags[0]; // Use primary tag for basic logic, but pass all to refiner
 
       if (tags.includes("DELETE")) {
         currentText =
@@ -188,40 +155,11 @@ export class RefineStageHandler implements StageHandler {
           },
           (delta) => {
             patch += delta;
-            // Clean patch: remove prefixes if model repeated them
-            let cleanPatch = patch.trim();
-            const prefixes = [
-              "REPLACEMENT TEXT:",
-              "REPLACEMENT:",
-              "OUTPUT:",
-              "FINAL TEXT:",
-              "FIXED TEXT:",
-              "NEW TEXT:",
-              `REPLACEMENT FOR [${tag}]:`,
-            ];
-            for (const pref of prefixes) {
-              if (cleanPatch.toUpperCase().startsWith(pref)) {
-                cleanPatch = cleanPatch.slice(pref.length).trim();
-              }
-            }
-
-            // Strip accidental surrounding quotes if model added them but they weren't in locator
-            if (
-              cleanPatch.startsWith('"') &&
-              cleanPatch.endsWith('"') &&
-              !locator.startsWith('"')
-            ) {
-              cleanPatch = cleanPatch.slice(1, -1).trim();
-            }
-
-            // If the model repeats the locator itself at the start, strip it
-            if (cleanPatch.startsWith(locator) && cleanPatch.length > locator.length) {
-                const remainder = cleanPatch.slice(locator.length).trim();
-                // If it starts with a transition word like "is" or ":" we might have caught a partial repeat
-                if (remainder.startsWith(":") || remainder.startsWith(" -")) {
-                    cleanPatch = remainder.slice(1).trim();
-                }
-            }
+            const cleanPatch = this.reviewPatcher.cleanPatch(
+              patch,
+              locator,
+              tags,
+            );
 
             // Intermediate visual update: show the patch being applied
             const previewText =
@@ -235,39 +173,8 @@ export class RefineStageHandler implements StageHandler {
           session.cancellationSignal,
         );
 
-        // Clean final patch
-        let finalPatch = patch.trim();
-        const prefixes = [
-          "REPLACEMENT TEXT:",
-          "REPLACEMENT:",
-          "OUTPUT:",
-          "FINAL TEXT:",
-          "FIXED TEXT:",
-          "NEW TEXT:",
-          `REPLACEMENT FOR [${tag}]:`,
-        ];
-        for (const pref of prefixes) {
-          if (finalPatch.toUpperCase().startsWith(pref)) {
-            finalPatch = finalPatch.slice(pref.length).trim();
-          }
-        }
-
-        // Strip accidental surrounding quotes
-        if (
-          finalPatch.startsWith('"') &&
-          finalPatch.endsWith('"') &&
-          !locator.startsWith('"')
-        ) {
-          finalPatch = finalPatch.slice(1, -1).trim();
-        }
-
-        // Final check for locator repetition
-        if (finalPatch.startsWith(locator) && finalPatch.length > locator.length) {
-             const remainder = finalPatch.slice(locator.length).trim();
-             if (remainder.startsWith(":") || remainder.startsWith(" -")) {
-                finalPatch = remainder.slice(1).trim();
-             }
-        }
+        // Finalize the patch
+        const finalPatch = this.reviewPatcher.cleanPatch(patch, locator, tags);
 
         // Apply the final patch to the currentText for the next iteration
         currentText =

@@ -1,5 +1,11 @@
 import { StoryManager } from "./story-manager";
 
+export interface PatchEntry {
+  tags: string[];
+  locator: string;
+  range: { start: number; end: number };
+}
+
 export class ReviewPatcher {
   constructor(private storyManager: StoryManager) {}
 
@@ -40,6 +46,111 @@ export class ReviewPatcher {
     } catch (e) {
       api.v1.log(`[ReviewPatcher] Regex Error: ${e}`);
     }
+  }
+
+  /**
+   * Parses review content into PatchEntries, finding their ranges in the original text.
+   */
+  public getPatchesFromReview(
+    reviewContent: string,
+    originalText: string,
+  ): PatchEntry[] {
+    const lines = reviewContent.split("\n").filter((l) => l.trim());
+
+    return lines
+      .map((line) => {
+        const match = line.match(
+          /^(\*\*)?((?:\[[A-Z_]+\])+)(\*\*)?\s*\|\|\s*"(.*)"$/,
+        );
+        if (!match) return null;
+        const tagsMatch = match[2];
+        const tags = tagsMatch.slice(1, -1).split("][");
+        const locator = match[4];
+        const range = this.findLocatorRange(originalText, locator);
+        return range ? { tags, locator, range } : null;
+      })
+      .filter((p): p is PatchEntry => !!p);
+  }
+
+  /**
+   * Merges overlapping or identical ranges in a list of PatchEntries.
+   */
+  public mergePatches(
+    patches: PatchEntry[],
+    originalText: string,
+  ): PatchEntry[] {
+    if (patches.length === 0) return [];
+
+    // Sort by start position to detect overlaps
+    const sorted = [...patches].sort((a, b) => a.range.start - b.range.start);
+    const merged: PatchEntry[] = [];
+
+    for (const patch of sorted) {
+      const last = merged[merged.length - 1];
+      if (last && patch.range.start < last.range.end) {
+        // Overlap detected: extend range and add tags
+        last.range.end = Math.max(last.range.end, patch.range.end);
+        for (const t of patch.tags) {
+          if (!last.tags.includes(t)) {
+            last.tags.push(t);
+          }
+        }
+        // Update locator to the full merged text
+        last.locator = originalText.slice(last.range.start, last.range.end);
+      } else {
+        merged.push({
+          tags: [...patch.tags],
+          locator: patch.locator,
+          range: { ...patch.range },
+        });
+      }
+    }
+
+    return merged;
+  }
+
+  /**
+   * Cleans a generated patch by removing common model prefixes and accidental artifacts.
+   */
+  public cleanPatch(patch: string, locator: string, tags: string[]): string {
+    let cleaned = patch.trim();
+
+    // 1. Remove common prefixes
+    const prefixes = [
+      "REPLACEMENT TEXT:",
+      "REPLACEMENT:",
+      "OUTPUT:",
+      "FINAL TEXT:",
+      "FIXED TEXT:",
+      "NEW TEXT:",
+      ...tags.map((t) => `REPLACEMENT FOR [${t}]:`),
+    ];
+
+    for (const pref of prefixes) {
+      if (cleaned.toUpperCase().startsWith(pref)) {
+        cleaned = cleaned.slice(pref.length).trim();
+      }
+    }
+
+    // 2. Strip accidental surrounding quotes if model added them but they weren't in locator
+    if (
+      cleaned.startsWith('"') &&
+      cleaned.endsWith('"') &&
+      !locator.startsWith('"')
+    ) {
+      cleaned = cleaned.slice(1, -1).trim();
+    }
+
+    // 3. If the model repeats the locator itself at the start, strip it
+    if (cleaned.startsWith(locator) && cleaned.length > locator.length) {
+      const remainder = cleaned.slice(locator.length).trim();
+      // If it starts with a transition word like "is" or ":" we might have caught a partial repeat
+      if (remainder.startsWith(":") || remainder.startsWith(" -")) {
+        cleaned = remainder.slice(1).trim();
+      }
+    }
+
+    return cleaned;
   }
 
   public findLocatorRange(

@@ -1,6 +1,5 @@
 import {
   FieldID,
-  TEXT_FIELD_IDS,
   LIST_FIELD_IDS,
 } from "../config/field-definitions";
 import { StoryDataManager, StoryField, DULFSField } from "./story-data-manager";

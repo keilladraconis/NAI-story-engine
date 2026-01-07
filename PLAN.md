@@ -41,7 +41,7 @@
 - **Architectural Cleanup (Jan 5 2026)**:
     - **Single Source of Truth**: Removed `session.currentContent` in favor of direct `StoryManager` interaction.
     - **Strategy Patterns**: Implemented `StageHandler` (Generate/Review/Refine) and `FieldRenderStrategy` (Inline/Standard) to eliminate conditional spaghetti code.
-    - **Review Patcher**: Extracted fuzzy-prefix patching logic into a dedicated service.
+    - **Review Patcher**: Extracted fuzzy-prefix patching logic and iterative refinement/cleaning logic (from `RefineStageHandler`) into a dedicated service.
     - **Configuration**: Brainstorm prompts are now fully configurable via `project.yaml`.
     - **Cleanup**: Removed dead code (`ActiveWandStrategy`, `createWorkflowUI`).
 

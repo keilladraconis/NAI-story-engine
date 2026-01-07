@@ -70,7 +70,7 @@ When debugging issues, you may add debugging log statements and provide the user
 - **Single Source of Truth**: `StoryManager` acts as the central hub for story data, but `StructuredEditor` also interacts directly with `storyStorage` via `kse-field-${id}` keys. This creates a risk of desync if the dual-storage strategy is not strictly managed.
 - **Agent Cycle**: Managed by `AgentCycleManager` and executed by `AgentWorkflowService`. It uses a strategy pattern (`StageHandler`) to handle the Generate, Review, and Refine stages.
 - **Lorebook Integration**: DULFS (Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics) are automatically synced to NovelAI Lorebook categories and entries.
-- **Tech Debt**: Brittle field syncing logic relies on manual lists in `StoryManager`. `RefineStageHandler` contains complex iterative patching logic that should be refactored into a service.
+- **Tech Debt**: The system has been refactored to use data-driven field management, removing brittle manual lists. Iterative patching logic has been extracted from `RefineStageHandler` into `ReviewPatcher`.
 
 ### Key Patterns
 - **Strategy Pattern**: Extensively used for field rendering (`FieldRenderStrategy`) and AI stage handling (`StageHandler`).

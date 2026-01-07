@@ -21,11 +21,12 @@ The Story Engine codebase is well-structured, following service-oriented and str
 **Refactor:** Removed `storageKey` from UI components (`createToggleableContent`, `multilineTextInput`). `StoryManager` is now the *only* entity that performs `api.v1.storyStorage.set` for core data. UI components use `initialValue` + `onChange` and are driven by the central `StoryManager` state.
 **Status:** Completed. Refactored UI components and strategies to remove direct storage binding.
 
-### 3. Logic Bloat in `RefineStageHandler`
+### 3. Logic Bloat in `RefineStageHandler` [FINISHED]
 **Location:** `src/core/stage-handlers.ts`
 **Finding:** The `overrideGeneration` method in `RefineStageHandler` is nearly 200 lines of complex text patching, regex cleaning, and iterative generation logic.
 **Issue:** This makes the handler difficult to unit test and violates the Single Responsibility Principle.
 **Refactor:** Extract the iterative patching and "cleaning" logic (prefixes like `REPLACEMENT TEXT:`) into `ReviewPatcher` or a new `PatchingService`.
+**Status:** Completed. Logic for parsing, merging, and cleaning patches extracted into `ReviewPatcher`. `RefineStageHandler` refactored to use these centralized methods.
 
 ---
 
