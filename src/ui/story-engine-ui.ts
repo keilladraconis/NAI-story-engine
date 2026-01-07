@@ -246,11 +246,6 @@ export class StoryEngineUI {
                   text: "🎭 Story Engine",
                   style: { "font-weight": "bold" },
                 }),
-                part.button({
-                  text: "Save",
-                  iconId: "save",
-                  callback: () => this.handleSave(),
-                }),
               ],
             }),
 
@@ -259,13 +254,6 @@ export class StoryEngineUI {
           ],
         }),
       ],
-    });
-  }
-
-  private async handleSave(): Promise<void> {
-    await this.storyManager.commit();
-    api.v1.ui.toast("Story engine state committed to history.", {
-      type: "success",
     });
   }
 

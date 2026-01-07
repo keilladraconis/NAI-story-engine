@@ -1,26 +1,81 @@
-# Code Review - Story Engine
+# Code Review: Story Engine (January 2026)
 
-## Summary
-The Story Engine codebase has been significantly improved by consolidating storage logic into a single source of truth (`StoryManager`) and moving field-specific instructions into configurations. Architectural risks regarding race conditions in storage have been mitigated through debounced saving and explicit initialization sync.
-
----
-
-## [MEDIUM] Architectural & Structural Issues
-
-### 1. UI Inconsistency in Wand Controls
-**Location:** `src/ui/field-strategies.ts`, `src/ui/story-engine-ui.ts`
-The Lorebook panel provides "Save" and "Discard" buttons for Wand sessions, but the "Inline Wand" fields (like World Snapshot) do not. Users must use the global "Save" button in the sidebar to commit changes, which is not intuitive for field-specific generation.
+## Overview
+The Story Engine codebase is well-structured, following service-oriented and strategy patterns. It demonstrates a clear separation between data management, workflow orchestration, and UI rendering. However, as the project has evolved (specifically the recent refactoring of Agent Workflows), several inconsistencies, redundancies, and "wonky" patterns have emerged.
 
 ---
 
-## [LOW] Style, Dead Code & Refinement
+## HIGH Priority
 
-### 1. Casting to `any`
-**Location:** `src/core/story-data-manager.ts`, `src/core/story-manager.ts`
-While type-safe getters (`getStoryField`, `getDulfsList`) have been added, dynamic access for adding/removing items by ID still relies on `any` casts.
-**Recommendation:** Continue refining the `StoryData` interface or using mapped types to further reduce remaining `any` usage.
+### 1. Brittle Field Syncing & History Logic
+**Location:** `StoryManager.syncToIndividualKeys`, `HistoryService.commit`
+**Finding:** Both services manually list "text fields" (StoryPrompt, Brainstorm, etc.).
+**Issue:** If a new field is added to `field-definitions.ts`, it must be manually added to these two separate lists. This is an anti-pattern that leads to "forgotten" fields not being synced or versioned.
+**Refactor:** Centralize the categorization of fields (e.g., `isTextField`, `isListField`) within `field-definitions.ts` or as static helpers on `FieldID`.
+
+### 2. Dual-Storage Desync Risk
+**Location:** `StoryManager.setFieldContent`, `StructuredEditor`, `field-strategies.ts`
+**Finding:** The system uses both a global blob (`kse-story-data`) and individual keys (`kse-field-${fieldId}`) for persistence.
+**Issue:** UI components often bind directly to `storageKey` (e.g., `createToggleableContent`). While this provides "free" persistence, it can bypass the `StoryManager` logic (like sync to AN/Memory or history tracking) unless the `onChange` callback perfectly mirrors the global state. The "Debounced Auto-save" in `StoryManager` is a good safeguard, but the source of truth feels split.
+**Recommendation:** Ensure `StoryManager` is the *only* entity that performs `api.v1.storyStorage.set` for core data. UI components should use `initialValue` + `onChange` rather than `storageKey` for fields that require complex side-effects.
+
+### 3. Logic Bloat in `RefineStageHandler`
+**Location:** `src/core/stage-handlers.ts`
+**Finding:** The `overrideGeneration` method in `RefineStageHandler` is nearly 200 lines of complex text patching, regex cleaning, and iterative generation logic.
+**Issue:** This makes the handler difficult to unit test and violates the Single Responsibility Principle.
+**Refactor:** Extract the iterative patching and "cleaning" logic (prefixes like `REPLACEMENT TEXT:`) into `ReviewPatcher` or a new `PatchingService`.
 
 ---
 
-## Refactoring Suggestions
-- **DULFS Parsing:** `AgentWorkflowService.parseListLine` uses regexes that could be centralized or simplified.
+## MEDIUM Priority
+
+### 1. Unified Context Strategies
+**Location:** `src/core/context-strategies.ts`
+**Finding:** `getShortDulfsContext` and `getAllDulfsContext` are substantially similar.
+**Issue:** Code duplication for building world element strings.
+**Refactor:** Create a single `buildDulfsContextString(manager, mode: 'short' | 'full', excludeId?: string)` helper.
+
+### 2. Wonky Prompt Workarounds (`fixSpacing`)
+**Location:** `src/core/context-strategies.ts`
+**Finding:** `fixSpacing` (doubling `\n`) is called manually on almost every string in every strategy.
+**Issue:** This is a leak of model-specific quirks (GLM-4.6) into the high-level strategy logic.
+**Refactor:** Move this into `hyperContextBuilder` or a dedicated prompt-assembly service so strategies can work with clean strings.
+
+### 3. Dynamic Property Access (Type Safety)
+**Location:** `StoryDataManager.getStoryField`, `StoryManager.addDulfsItem`
+**Finding:** Frequent use of `(data as any)[fieldId]`.
+**Issue:** This bypasses TypeScript's type checking for the `StoryData` interface.
+**Refactor:** Use a discriminated union or a strict mapping object to access fields by ID, ensuring that the compiler knows whether it's getting a `StoryField` or a `DULFSField[]`.
+
+### 4. Wand Session Inconsistency
+**Location:** `InlineWandStrategy` (in `field-strategies.ts`) vs `StandardFieldStrategy`
+**Finding:** `InlineWandStrategy` automatically starts an agent session if one doesn't exist.
+**Issue:** This means fields like "World Snapshot" have a persistent session object in memory forever, while "Synopsis" (standard) does not. This leads to diverging logic paths in how "current content" is displayed during generation.
+
+---
+
+## LOW Priority
+
+### 1. Dead Code & Comments
+**Location:** `StructuredEditor.createFieldSection`
+**Finding:** Comments still refer to "Generic Wand (Legacy)" and "Removed".
+**Action:** Clean up comments and ensure `ActiveWandStrategy` remnants are fully purged.
+
+### 2. Brainstorm Delegate Overload
+**Location:** `StoryManager.ts`
+**Finding:** `StoryManager` has multiple methods (`getBrainstormMessages`, `addBrainstormMessage`, etc.) that simply wrap `BrainstormDataManager`.
+**Action:** While this keeps the API flat, it's starting to bloat `StoryManager`. Consider exposing the data managers directly or grouping them.
+
+### 3. Inconsistent UUID Usage
+**Location:** `AgentWorkflowService` vs `ListFieldStrategy`
+**Finding:** `AgentWorkflowService` generates IDs during generation, but `ListFieldStrategy` generates them during manual "Add Entry".
+**Action:** Centralize entity creation in `StoryManager` to ensure consistent defaults.
+
+---
+
+## Refactoring Roadmap
+
+1.  **Phase 1 (Centralization)**: Move field metadata (type, layout, sync-targets) into `FieldID` or a metadata registry. Update `StoryManager` and `HistoryService` to use this registry.
+2.  **Phase 2 (Decoupling)**: Extract patching/cleaning logic from `RefineStageHandler`.
+3.  **Phase 3 (Prompting)**: Move `fixSpacing` into the `hyper-generator` wrapper or a prompt-building utility.
+4.  **Phase 4 (Type Safety)**: Refactor `StoryDataManager` to use typed accessors for fields.
