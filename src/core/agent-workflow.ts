@@ -189,7 +189,6 @@ export class AgentWorkflowService {
         fieldId: fieldId,
         selectedStage: "generate",
         cycles: {},
-        history: [],
         isAuto: false,
       } as unknown as FieldSession;
 

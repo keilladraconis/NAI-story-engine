@@ -6,10 +6,9 @@ The system's goal is to bridge the gap between unstructured brainstorming and st
 
 Key features include:
 - **Structured Field-Based Workflow**: An 8-stage process (Story Prompt, Brainstorm, Synopsis, DULFS, etc.) that guides the writer from an initial idea to a fully developed world.
-- **Integrated Agentic Assistance**: A three-stage "agentic cycle" (Generate, Edit/Correct, Rewrite/Refine) for AI-powered content creation and refinement within each field.
-- **Data-Driven Architecture**: A hierarchical data structure (`StoryData`) managed by a central `StoryManager` (`src/core/story-manager.ts`).
-- **Complete Versioning**: Every field's content has a full history, managed by `FieldHistoryManager` (`src/core/field-history.ts`), allowing for tracking changes and reverting to previous versions.
-- **Collapsible & Toggleable UI**: The user interface is built with data-driven collapsible sections. Fields feature a toggleable view, allowing users to switch between a clean Markdown reading mode and an editing mode.
+-   **Integrated Agentic Assistance**: A three-stage "agentic cycle" (Generate, Edit/Correct, Rewrite/Refine) for AI-powered content creation and refinement within each field.
+-   **Data-Driven Architecture**: A hierarchical data structure (`StoryData`) managed by a central `StoryManager` (`src/core/story-manager.ts`).
+-   **Collapsible & Toggleable UI**: The user interface is built with data-driven collapsible sections. Fields feature a toggleable view, allowing users to switch between a clean Markdown reading mode and an editing mode.
 - **Refined Wand UI**: The AI generation ("Wand") interface offers a streamlined experience with stage selection, preview/edit toggles for generated content, and clear action states.
 
 # Building and Running
@@ -68,9 +67,10 @@ When debugging issues, you may add debugging log statements and provide the user
 ## Architectural Insights
 
 ### Data Flow & State Management
-- **Single Source of Truth**: `StoryManager` acts as the central hub for story data, but `StructuredEditor` also interacts directly with `storyStorage` via `kse-field-${id}` keys.
+- **Single Source of Truth**: `StoryManager` acts as the central hub for story data, but `StructuredEditor` also interacts directly with `storyStorage` via `kse-field-${id}` keys. This creates a risk of desync if the dual-storage strategy is not strictly managed.
 - **Agent Cycle**: Managed by `AgentCycleManager` and executed by `AgentWorkflowService`. It uses a strategy pattern (`StageHandler`) to handle the Generate, Review, and Refine stages.
 - **Lorebook Integration**: DULFS (Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics) are automatically synced to NovelAI Lorebook categories and entries.
+- **Tech Debt**: Brittle field syncing logic relies on manual lists in `StoryManager`. `RefineStageHandler` contains complex iterative patching logic that should be refactored into a service.
 
 ### Key Patterns
 - **Strategy Pattern**: Extensively used for field rendering (`FieldRenderStrategy`) and AI stage handling (`StageHandler`).

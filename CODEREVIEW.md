@@ -1,22 +1,22 @@
 # Code Review: Story Engine (January 2026)
 
 ## Overview
-The Story Engine codebase is well-structured, following service-oriented and strategy patterns. It demonstrates a clear separation between data management, workflow orchestration, and UI rendering. However, as the project has evolved (specifically the recent refactoring of Agent Workflows), several inconsistencies, redundancies, and "wonky" patterns have emerged.
+The Story Engine codebase is well-structured, following service-oriented and strategy patterns. It demonstrates a clear separation between data management, workflow orchestration, and UI rendering.
 
 ---
 
 ## HIGH Priority
 
-### 1. Brittle Field Syncing & History Logic
-**Location:** `StoryManager.syncToIndividualKeys`, `HistoryService.commit`
-**Finding:** Both services manually list "text fields" (StoryPrompt, Brainstorm, etc.).
-**Issue:** If a new field is added to `field-definitions.ts`, it must be manually added to these two separate lists. This is an anti-pattern that leads to "forgotten" fields not being synced or versioned.
+### 1. Brittle Field Syncing Logic
+**Location:** `StoryManager.syncToIndividualKeys`
+**Finding:** The service manually lists "text fields" (StoryPrompt, Brainstorm, etc.).
+**Issue:** If a new field is added to `field-definitions.ts`, it must be manually added to this list. This is an anti-pattern that leads to "forgotten" fields not being synced.
 **Refactor:** Centralize the categorization of fields (e.g., `isTextField`, `isListField`) within `field-definitions.ts` or as static helpers on `FieldID`.
 
 ### 2. Dual-Storage Desync Risk
 **Location:** `StoryManager.setFieldContent`, `StructuredEditor`, `field-strategies.ts`
 **Finding:** The system uses both a global blob (`kse-story-data`) and individual keys (`kse-field-${fieldId}`) for persistence.
-**Issue:** UI components often bind directly to `storageKey` (e.g., `createToggleableContent`). While this provides "free" persistence, it can bypass the `StoryManager` logic (like sync to AN/Memory or history tracking) unless the `onChange` callback perfectly mirrors the global state. The "Debounced Auto-save" in `StoryManager` is a good safeguard, but the source of truth feels split.
+**Issue:** UI components often bind directly to `storageKey` (e.g., `createToggleableContent`). While this provides "free" persistence, it can bypass the `StoryManager` logic (like sync to AN/Memory) unless the `onChange` callback perfectly mirrors the global state. The "Debounced Auto-save" in `StoryManager` is a good safeguard, but the source of truth feels split.
 **Recommendation:** Ensure `StoryManager` is the *only* entity that performs `api.v1.storyStorage.set` for core data. UI components should use `initialValue` + `onChange` rather than `storageKey` for fields that require complex side-effects.
 
 ### 3. Logic Bloat in `RefineStageHandler`

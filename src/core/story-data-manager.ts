@@ -1,12 +1,9 @@
-import { FieldHistory } from "./field-history";
 import { FieldID } from "../config/field-definitions";
 
 export interface StoryField {
   id: string;
   type: "prompt" | "brainstorm" | "worldSnapshot" | "dulfs" | "attg" | "style";
   content: string;
-  version: number;
-  history: FieldHistory[];
   linkedEntities: string[]; // References to DULFS entities
   data?: any; // Generic container for field-specific structured data (e.g. Brainstorm cards)
 }
@@ -121,32 +118,24 @@ export class StoryDataManager {
         id: FieldID.StoryPrompt,
         type: "prompt",
         content: "",
-        version: 0,
-        history: [],
         linkedEntities: [],
       },
       [FieldID.ATTG]: {
         id: FieldID.ATTG,
         type: "attg",
         content: "",
-        version: 0,
-        history: [],
         linkedEntities: [],
       },
       [FieldID.Style]: {
         id: FieldID.Style,
         type: "style",
         content: "",
-        version: 0,
-        history: [],
         linkedEntities: [],
       },
       [FieldID.Brainstorm]: {
         id: FieldID.Brainstorm,
         type: "brainstorm",
         content: "",
-        version: 0,
-        history: [],
         linkedEntities: [],
         data: { messages: [] },
       },
@@ -154,8 +143,6 @@ export class StoryDataManager {
         id: FieldID.WorldSnapshot,
         type: "worldSnapshot",
         content: "",
-        version: 0,
-        history: [],
         linkedEntities: [],
       },
 

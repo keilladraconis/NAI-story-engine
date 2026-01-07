@@ -9,7 +9,6 @@ Story Engine is a structured, field-based worldbuilding system for the NovelAI s
 -   **Live Editing:** Fields like World Snapshot support direct editing with auto-save, working seamlessly alongside AI generation.
 -   **Markdown Support:** Read your worldbuilding notes in a clean, rendered Markdown view.
 -   **Toggleable Views:** Switch between a clean Markdown reading mode and an editing mode.
--   **History Tracking:** Keep track of changes and versions for every field.
 
 ## Setup
 

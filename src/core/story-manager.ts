@@ -1,26 +1,20 @@
 import { FieldID } from "../config/field-definitions";
 import { StoryDataManager, StoryField, DULFSField } from "./story-data-manager";
-import { MigrationService } from "./migration-service";
 import { LorebookSyncService } from "./lorebook-sync-service";
-import { HistoryService } from "./history-service";
 import { BrainstormDataManager } from "./brainstorm-data-manager";
 
 export { StoryField, DULFSField };
 
 export class StoryManager {
   private dataManager: StoryDataManager;
-  private migrationService: MigrationService;
   private lorebookSyncService: LorebookSyncService;
-  private historyService: HistoryService;
   private brainstormDataManager: BrainstormDataManager;
 
   private saveTimeout?: any;
 
   constructor() {
     this.dataManager = new StoryDataManager();
-    this.migrationService = new MigrationService();
     this.lorebookSyncService = new LorebookSyncService(this.dataManager);
-    this.historyService = new HistoryService(this.dataManager);
     this.brainstormDataManager = new BrainstormDataManager(this.dataManager);
   }
 
@@ -28,8 +22,7 @@ export class StoryManager {
     const savedData = await api.v1.storyStorage.get(StoryDataManager.KEYS.STORY_DATA);
 
     if (savedData) {
-      const migrated = this.migrationService.migrate(savedData);
-      this.dataManager.setData(migrated);
+      this.dataManager.setData(savedData);
       // Sync global data TO individual field keys to ensure UI components are in sync
       await this.syncToIndividualKeys();
     } else {
@@ -285,15 +278,6 @@ export class StoryManager {
           this.saveTimeout = undefined;
         }, 5000); // 5 second debounce
       }
-    }
-  }
-
-  public async commit(): Promise<void> {
-    const committed = await this.historyService.commit();
-    if (committed) {
-      api.v1.log("Story state committed to history.");
-    } else {
-      api.v1.log("No changes to commit.");
     }
   }
 

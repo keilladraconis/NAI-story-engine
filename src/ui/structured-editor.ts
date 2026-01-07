@@ -147,9 +147,6 @@ export class StructuredEditor {
       content,
     );
 
-    // Commit to history
-    await this.storyManager.commit();
-
     api.v1.ui.toast(`Saved generated content to ${session.fieldId}`, {
       type: "success",
     });
