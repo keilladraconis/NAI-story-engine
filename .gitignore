@@ -13,8 +13,6 @@ external/
 *.swp
 *.swo
 *~
-GEMINI.md
-PLAN.md
 
 # OS
 .DS_Store

@@ -1,4 +1,7 @@
-import { hyperContextBuilder, HyperGenerationParams } from "../hyper-generator";
+import {
+  hyperContextBuilder,
+  HyperGenerationParams,
+} from "../../lib/hyper-generator";
 import { StoryManager } from "./story-manager";
 import { FieldSession } from "./agent-cycle";
 import { FieldID, FIELD_CONFIGS } from "../config/field-definitions";
@@ -21,7 +24,7 @@ const fixSpacing = (text: string): string => {
 };
 
 export const normalizeQuotes = (str: string): string => {
-  return str.replace(/[\u2018\u2019]/g, "'" ).replace(/[\u201C\u201D]/g, '"');
+  return str.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
 };
 
 const getAllDulfsContext = (
@@ -289,7 +292,8 @@ const Strategies: Record<string, StrategyFn> = {
       }
     }
 
-    const configPrompt = (await api.v1.config.get("lorebook_generate_prompt")) || "";
+    const configPrompt =
+      (await api.v1.config.get("lorebook_generate_prompt")) || "";
     const formatInstruction = configPrompt.replace("[itemName]", itemName);
 
     const messages = hyperContextBuilder(
