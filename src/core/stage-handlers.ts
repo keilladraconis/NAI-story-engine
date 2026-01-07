@@ -166,6 +166,9 @@ export class RefineStageHandler implements StageHandler {
               "REPLACEMENT:",
               "OUTPUT:",
               "FINAL TEXT:",
+              "FIXED TEXT:",
+              "NEW TEXT:",
+              `REPLACEMENT FOR [${tag}]:`,
             ];
             for (const pref of prefixes) {
               if (cleanPatch.toUpperCase().startsWith(pref)) {
@@ -180,6 +183,15 @@ export class RefineStageHandler implements StageHandler {
               !locator.startsWith('"')
             ) {
               cleanPatch = cleanPatch.slice(1, -1).trim();
+            }
+
+            // If the model repeats the locator itself at the start, strip it
+            if (cleanPatch.startsWith(locator) && cleanPatch.length > locator.length) {
+                const remainder = cleanPatch.slice(locator.length).trim();
+                // If it starts with a transition word like "is" or ":" we might have caught a partial repeat
+                if (remainder.startsWith(":") || remainder.startsWith(" -")) {
+                    cleanPatch = remainder.slice(1).trim();
+                }
             }
 
             // Intermediate visual update: show the patch being applied
@@ -201,6 +213,9 @@ export class RefineStageHandler implements StageHandler {
           "REPLACEMENT:",
           "OUTPUT:",
           "FINAL TEXT:",
+          "FIXED TEXT:",
+          "NEW TEXT:",
+          `REPLACEMENT FOR [${tag}]:`,
         ];
         for (const pref of prefixes) {
           if (finalPatch.toUpperCase().startsWith(pref)) {
@@ -215,6 +230,14 @@ export class RefineStageHandler implements StageHandler {
           !locator.startsWith('"')
         ) {
           finalPatch = finalPatch.slice(1, -1).trim();
+        }
+
+        // Final check for locator repetition
+        if (finalPatch.startsWith(locator) && finalPatch.length > locator.length) {
+             const remainder = finalPatch.slice(locator.length).trim();
+             if (remainder.startsWith(":") || remainder.startsWith(" -")) {
+                finalPatch = remainder.slice(1).trim();
+             }
         }
 
         // Apply the final patch to the currentText for the next iteration

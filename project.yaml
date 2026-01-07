@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767817922
+updatedAt: 1767820590
 config:
   - name: model
     prettyName: LLM Model
@@ -74,11 +74,12 @@ config:
       **Task:** Synthesize the "STORY PROMPT" and "BRAINSTORM" into a **Dynamic World Snapshot**.
       **Goal:** To describe the explosive potential of the setting, not a timeline of events.
       **Instructions:**
-      - **Describe the State, Not the Events:** Output a snapshot full of dynamic potential.
-      - **Define Drivers:** Focus on internal logic and motivations, not reactions to future events.
-      - **Highlight Tensions:** Describe how the different "Spheres" intersect and conflict.
-      - **Be Concise:** Every word must count. Avoid flowery prose and redundancy.
-      - **No Spoilers:** Do not determine the outcome. Set the stage for the user to play.
+      - **Describe the State, Not the Events:** Output a snapshot of the world *as it stands now*.
+      - **Define Drivers:** Focus on internal logic, biological imperatives, and social pressures.
+      - **Highlight Tensions:** Describe how the different "Spheres" (Social, Personal, Institutional) intersect.
+      - **Prohibited: Scenario Scripting:** Do NOT write "If X happens, then Y". Do NOT write "Miller will eventually...".
+      - **Prohibited: Outcome Determination:** Do NOT decide if the secret is discovered. Describe the *factors* that make discovery a risk.
+      - **Narrative Vectors:** Instead of writing a scene, describe a "Vector"—a direction of pressure. (e.g., "The bloodstained ledger is a paper trail Miller cannot ignore," NOT "Miller will find the ledger and arrest the Kingpin.")
 
   - name: lorebook_generate_prompt
     prettyName: Lorebook Generate Prompt
@@ -138,9 +139,13 @@ config:
       **Task:** Analyze the "CONTENT TO REVIEW" against the Core Directives.
       **Goal:** Output a structured list of directives using the format `[TAG] || "locator"`.
       **Instructions:**
-      - **[PLOTTING]**: Flag content that determines specific future outcomes, forces character actions, or scripts events. (Violates "Possibility over Plot"). 
-        *Example of Plotting:* "They will eventually betray each other." 
-        *Example of Tension (Do NOT tag):* "Their mutual distrust is a powder keg."
+      - **[PLOTTING]**: Flag content that scripts future scenes, determines specific outcomes, or forces character strategies.
+        *Plotting (Tag This):* "The discovery of the bloodstained ledger will lead to a shootout at the docks." (Scripts future outcome)
+        *Plotting (Tag This):* "Miller must now rely on his ex-wife to launder the money." (Forces character strategy)
+        *Plotting (Tag This):* "The Kingpin has already discovered Miller's true identity." (Prematurely determines a major plot revelation)
+        *Tension (Do NOT Tag):* "The ledger is a ticking time bomb in Miller's desk." (Describes inherent risk)
+        *Tension (Do NOT Tag):* "The act of investigation is a minefield where every step could be his last." (Metaphorical description of potential)
+        *Behavior (Do NOT Tag):* "Miller spends his nights obsessing over the ledger, drinking cheap scotch." (Describes current behavior/state)
       - **[LOGIC]**: Flag internal inconsistencies, "predestination", or causal gaps.
       - **[FLUFF]**: Flag generic descriptions, purple prose, or filler that doesn't add hook potential.
       - **[REPETITION]**: Flag redundant phrases, ideas, or fragments that appear multiple times.
