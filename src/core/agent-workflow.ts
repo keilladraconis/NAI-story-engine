@@ -132,6 +132,8 @@ export class AgentWorkflowService {
         cancellationSignal,
       );
 
+      if (cancellationSignal.cancelled) return;
+
       // Process any remaining buffer
       if (buffer.trim().length > 0) {
         const parsed = this.parseListLine(buffer, fieldId);
@@ -215,6 +217,8 @@ export class AgentWorkflowService {
         cancellationSignal,
       );
 
+      if (cancellationSignal.cancelled) return;
+
       await this.storyManager.setFieldContent(fieldId, buffer, true, true);
     } catch (e: any) {
       if (!e.message.includes("cancelled")) {
@@ -242,8 +246,8 @@ export class AgentWorkflowService {
 
     // Iterate from current stage to the end
     for (let i = startIndex; i < stages.length; i++) {
-      // If cancelled during auto-run, stop
-      if (session.cancellationSignal && session.cancellationSignal.cancelled) {
+      // If auto-advance was disabled (e.g. by manual cancel), stop
+      if (!session.isAuto) {
         break;
       }
 
@@ -251,7 +255,7 @@ export class AgentWorkflowService {
       updateFn(); // Switch tab
 
       const success = await this.runStageGeneration(session, updateFn);
-      if (!success) {
+      if (!success || !session.isAuto) {
         session.isAuto = false;
         updateFn();
         break;
@@ -345,6 +349,11 @@ export class AgentWorkflowService {
         "background",
         session.cancellationSignal,
       );
+
+      if (session.cancellationSignal.cancelled) {
+        session.cycles[stage].status = "idle";
+        return false;
+      }
 
       // 4. Stage-specific Completion
       // Use the accumulated content from streaming, as it correctly includes the pre-fill for 'generate' 

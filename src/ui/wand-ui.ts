@@ -118,6 +118,7 @@ export class WandUI {
         },
         onCancel: () => {
           if (session.cancellationSignal) {
+            session.isAuto = false;
             session.cancellationSignal.cancel();
             api.v1.ui.toast("Operation cancelled", { type: "info" });
             update();
