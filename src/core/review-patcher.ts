@@ -36,13 +36,35 @@ export class ReviewPatcher {
     }
   }
 
+  public findLocatorRange(
+    text: string,
+    locator: string,
+  ): { start: number; end: number } | null {
+    const pattern = this.buildFuzzyPattern(locator);
+    if (!pattern) return null;
+
+    try {
+      const regex = new RegExp(pattern, "i");
+      const match = regex.exec(text);
+      if (match) {
+        return {
+          start: match.index,
+          end: match.index + match[0].length,
+        };
+      }
+    } catch (e) {
+      api.v1.log(`[ReviewPatcher] findLocatorRange Regex Error: ${e}`);
+    }
+    return null;
+  }
+
   private buildFuzzyPattern(locator: string): string | null {
     // 1. Split locator into tokens
     const tokens = locator.trim().split(/\s+/);
     if (tokens.length === 0) return null;
 
-    // 2. Take first 5 words
-    const searchTokens = tokens.slice(0, 5);
+    // 2. Take all words (up to a reasonable limit to avoid crazy regex)
+    const searchTokens = tokens.slice(0, 15);
 
     // 3. Create pattern parts
     const regexParts = searchTokens.map((token) => {

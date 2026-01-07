@@ -59,6 +59,10 @@ The project follows standard TypeScript and Prettier conventions. The code is we
 
 There are no automated tests in the project. Testing is done manually by running the script within the NovelAI platform.
 
+**CRITICAL**: You MUST always verify that the project compiles successfully by running `nibs build` before concluding any task that involves code modifications.
+
+**CRITICAL**: If the user has made specific changes or deletions to the codebase, do NOT revert or undo them unless explicitly asked. Respect the user's modifications as intentional. This is a hard rule: NEVER casually undo a user's edit.
+
 When debugging issues, you may add debugging log statements and provide the user with a test plan. The user can then supply the log output in response after executing the test plan.
 
 ## Architectural Insights

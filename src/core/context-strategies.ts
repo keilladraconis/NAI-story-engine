@@ -18,7 +18,7 @@ type StrategyFn = (
 ) => Promise<StrategyResult>;
 
 /**
- * Strictly double every newline character. 
+ * Strictly double every newline character.
  * This is required for GLM-4.6 compatibility as it tends to collapse single newlines
  * in certain prompt contexts, leading to merged blocks of text.
  */
@@ -26,6 +26,27 @@ const fixSpacing = (text: string): string => {
   if (!text) return "";
   // Strictly double every newline character for GLM-4.6 compatibility
   return text.replace(/\n/g, "\n\n").trim();
+};
+
+const getShortDulfsContext = (manager: StoryManager): string => {
+  const fields = [
+    FieldID.DramatisPersonae,
+    FieldID.UniverseSystems,
+    FieldID.Locations,
+    FieldID.Factions,
+    FieldID.SituationalDynamics,
+  ];
+
+  let context = "";
+  for (const fid of fields) {
+    const list = manager.getDulfsList(fid);
+    if (list.length > 0) {
+      const config = FIELD_CONFIGS.find((c) => c.id === fid);
+      const label = config ? config.label.toUpperCase() : fid.toUpperCase();
+      context += `${label}: ${list.map((i) => i.name).join(", ")}\n`;
+    }
+  }
+  return context.trim();
 };
 
 export const normalizeQuotes = (str: string): string => {
@@ -125,7 +146,7 @@ const Strategies: Record<string, StrategyFn> = {
 
   // Review - The Editor
   // Low temperature for analytical precision, high repetition penalty to prevent outputting the story
-  "review:default": async (session, _manager, base) => {
+  "review:default": async (session, manager, base) => {
     let userPrompt = (await api.v1.config.get("critique_prompt")) || "";
 
     // If this is a lorebook entry, append specific critique instructions
@@ -138,6 +159,12 @@ const Strategies: Record<string, StrategyFn> = {
     }
 
     const contentToReview = session.cycles.generate.content;
+    const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
+    const dulfs = getShortDulfsContext(manager);
+    const config = FIELD_CONFIGS.find((c) => c.id === session.fieldId);
+    const genInstruction =
+      config?.generationInstruction || "Generate narrative content.";
+
     const messages = hyperContextBuilder(
       base.systemMsg,
       { role: "user", content: fixSpacing(userPrompt) },
@@ -149,10 +176,18 @@ const Strategies: Record<string, StrategyFn> = {
       [
         {
           role: "user",
-          content: fixSpacing(`STORY PROMPT:\n${base.storyPrompt}`),
+          content: fixSpacing(`WORLD SNAPSHOT:\n${worldSnapshot}`),
         },
         {
-          role: "assistant",
+          role: "user",
+          content: fixSpacing(`WORLD ELEMENTS:\n${dulfs}`),
+        },
+        {
+          role: "user",
+          content: fixSpacing(`GENERATE INSTRUCTION:\n${genInstruction}`),
+        },
+        {
+          role: "user",
           content: fixSpacing(`CONTENT TO REVIEW:\n${contentToReview}`),
         },
       ],
@@ -371,8 +406,12 @@ export class ContextStrategyFactory {
     };
 
     const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
-    const userInstruction = config?.generationInstruction || "Generate a list of items for this category.";
-    const exampleFormat = config?.exampleFormat || "Format each line as: [Item Name]: [Description]";
+    const userInstruction =
+      config?.generationInstruction ||
+      "Generate a list of items for this category.";
+    const exampleFormat =
+      config?.exampleFormat ||
+      "Format each line as: [Item Name]: [Description]";
 
     // Build context blocks
     const contextBlocks: Message[] = [
@@ -417,6 +456,88 @@ export class ContextStrategyFactory {
         min_p: 0.05,
         presence_penalty: 0.05,
         maxTokens: 1024,
+      },
+    };
+  }
+
+  async buildRefinementPatchContext(
+    session: FieldSession,
+    tag: string,
+    locator: string,
+    prefill: string,
+  ): Promise<StrategyResult> {
+    const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
+    const worldSnapshot = this.storyManager.getFieldContent(
+      FieldID.WorldSnapshot,
+    );
+    const dulfs = getShortDulfsContext(this.storyManager);
+    const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
+
+    const config = FIELD_CONFIGS.find((c) => c.id === session.fieldId);
+    const genInstruction =
+      config?.generationInstruction || "Generate narrative content.";
+    const genOutput = session.cycles.generate.content;
+
+    const tagPrompts: Record<string, string> = {
+      FIX: "Review the generate agent's formatting and content instructions and repair the following passage so that it conforms. Limit: 50 words.",
+      DEPTH:
+        "Review the generate agent's content instructions and the scenario context and rewrite this section, adding depth. Limit: 75 words.",
+      PLOTTING:
+        "Remove any future scripting or forced plot from this passage, replacing it with static narrative tension. Limit: 30 words.",
+      LOGIC:
+        "Repair the internal consistency and causal logic of this passage. Limit: 50 words.",
+      FLUFF:
+        "Condense this passage by removing filler while retaining all essential sensory and narrative information. Limit: 30 words.",
+      FORMAT:
+        "Rewrite this passage to strictly adhere to the required structural format.",
+    };
+
+    const reviewInstruction =
+      tagPrompts[tag] || `Refine the following passage marked with [${tag}].`;
+
+    const messages = hyperContextBuilder(
+      { role: "system", content: fixSpacing(systemPrompt) },
+      {
+        role: "user",
+        content: fixSpacing(
+          `REFINEMENT TARGET [${tag}]:\n"${locator}"\n\nINSTRUCTION:\n${reviewInstruction}\n\nCRITICAL: Output ONLY the replacement text. Do not include tags like [${tag}], do not use markdown bolding, and do not provide any commentary or concluding markers.\n\nExecute.`,
+        ),
+      },
+      {
+        role: "assistant",
+        content: prefill,
+      },
+      [
+        {
+          role: "user",
+          content: fixSpacing(`STORY PROMPT:\n${storyPrompt}`),
+        },
+        {
+          role: "user",
+          content: fixSpacing(`WORLD SNAPSHOT:\n${worldSnapshot}`),
+        },
+        {
+          role: "user",
+          content: fixSpacing(`WORLD ELEMENTS:\n${dulfs}`),
+        },
+        {
+          role: "user",
+          content: fixSpacing(`GENERATE INSTRUCTION:\n${genInstruction}`),
+        },
+        {
+          role: "user",
+          content: fixSpacing(`GENERATE OUTPUT:\n${genOutput}`),
+        },
+      ],
+    );
+
+    return {
+      messages,
+      params: {
+        temperature: 0.7,
+        maxTokens: 128,
+        minTokens: 2,
+        stop: ["\n\n", "[", "<"], // Stop if it tries to escape or start a new tag
       },
     };
   }

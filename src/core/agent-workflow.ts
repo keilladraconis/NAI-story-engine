@@ -28,7 +28,11 @@ export class AgentWorkflowService {
     this.handlers = {
       generate: new GenerateStageHandler(storyManager),
       review: new ReviewStageHandler(this.reviewPatcher),
-      refine: new RefineStageHandler(storyManager),
+      refine: new RefineStageHandler(
+        storyManager,
+        this.contextFactory,
+        this.reviewPatcher,
+      ),
     };
   }
 
@@ -291,6 +295,21 @@ export class AgentWorkflowService {
 
     // @ts-ignore
     session.cancellationSignal = await api.v1.createCancellationSignal();
+
+    // 2. Check for Override
+    if (handler.overrideGeneration) {
+      const success = await handler.overrideGeneration(session, updateFn);
+      if (success) {
+        const finalResult = session.cycles[stage].content;
+        const completionResult = await handler.onComplete(session, finalResult);
+        session.cycles[stage].content = completionResult;
+        session.cycles[stage].status = "completed";
+      } else {
+        session.cycles[stage].status = "idle";
+      }
+      return success;
+    }
+
     updateFn();
 
     try {
