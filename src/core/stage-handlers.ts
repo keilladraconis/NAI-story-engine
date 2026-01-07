@@ -91,29 +91,58 @@ export class RefineStageHandler implements StageHandler {
     const originalText = currentText;
 
     // Pre-parse patches and find their locations in the original text
-    const patches = lines
+    const rawPatches = lines
       .map((line) => {
         const match = line.match(
-          /^(\*\*)?\[([A-Z_]+)\](\*\*)?\s*\|\|\s*"(.*)"$/,
+          /^(\*\*)?((?:\[[A-Z_]+\])+)(\*\*)?\s*\|\|\s*"(.*)"$/,
         );
         if (!match) return null;
-        const tag = match[2];
+        const tagsMatch = match[2];
+        const tags = tagsMatch
+          .slice(1, -1)
+          .split("][");
         const locator = match[4];
         const range = this.reviewPatcher.findLocatorRange(originalText, locator);
-        return { tag, locator, range };
+        return { tags, locator, range };
       })
-      .filter((p): p is { tag: string; locator: string; range: { start: number; end: number } } => !!(p && p.range));
+      .filter((p): p is { tags: string[]; locator: string; range: { start: number; end: number } } => !!(p && p.range));
 
-    // Sort patches from END to START. 
-    // This ensures that modifying the text doesn't invalidate the indices of patches that come earlier.
-    patches.sort((a, b) => b.range.start - a.range.start);
+    // Sort by start position to detect overlaps
+    rawPatches.sort((a, b) => a.range.start - b.range.start);
 
-    for (const entry of patches) {
+    // Merge overlapping or identical ranges
+    const mergedPatches: { tags: string[]; locator: string; range: { start: number; end: number } }[] = [];
+    for (const patch of rawPatches) {
+      const last = mergedPatches[mergedPatches.length - 1];
+      if (last && patch.range.start < last.range.end) {
+        // Overlap detected: extend range and add tags
+        last.range.end = Math.max(last.range.end, patch.range.end);
+        for (const t of patch.tags) {
+          if (!last.tags.includes(t)) {
+            last.tags.push(t);
+          }
+        }
+        // Update locator to the full merged text
+        last.locator = originalText.slice(last.range.start, last.range.end);
+      } else {
+        mergedPatches.push({
+          tags: [...patch.tags],
+          locator: patch.locator,
+          range: { ...patch.range }
+        });
+      }
+    }
+
+    // Sort patches from END to START for safe replacement
+    mergedPatches.sort((a, b) => b.range.start - a.range.start);
+
+    for (const entry of mergedPatches) {
       if (session.cancellationSignal?.cancelled) break;
 
-      const { tag, locator, range } = entry;
+      const { tags, locator, range } = entry;
+      const tag = tags[0]; // Use primary tag for basic logic, but pass all to refiner
 
-      if (tag === "DELETE") {
+      if (tags.includes("DELETE")) {
         currentText =
           currentText.slice(0, range.start) + currentText.slice(range.end);
         this.storyManager.saveFieldDraft(session.fieldId, currentText);
@@ -128,7 +157,7 @@ export class RefineStageHandler implements StageHandler {
       const { messages, params } =
         await this.contextFactory.buildRefinementPatchContext(
           session,
-          tag,
+          tags.join(", "),
           locator,
           prefill,
         );
@@ -310,9 +339,8 @@ export class ReviewStageHandler implements StageHandler {
     const validLines = lines.filter((line) => {
       const trimmed = line.trim();
       if (!trimmed) return false;
-      // Validates format: [TAG] || "locator"
-      // Allows optional spaces around || and optional markdown bolding **
-      return /^(\\*\\*)?\[[A-Z_]+\](\\*\\*)?\s*\|\|\s*".*"$/.test(trimmed);
+      // Validates format: [TAG1][TAG2] || "locator"
+      return /^(\\*\\*)?((?:\[[A-Z_]+\])+)(\\*\\*)?\s*\|\|\s*".*"$/.test(trimmed);
     });
     return validLines.join("\n");
   }

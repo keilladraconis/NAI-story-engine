@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767820590
+updatedAt: 1767822290
 config:
   - name: model
     prettyName: LLM Model
@@ -148,7 +148,6 @@ config:
         *Behavior (Do NOT Tag):* "Miller spends his nights obsessing over the ledger, drinking cheap scotch." (Describes current behavior/state)
       - **[LOGIC]**: Flag internal inconsistencies, "predestination", or causal gaps.
       - **[FLUFF]**: Flag generic descriptions, purple prose, or filler that doesn't add hook potential.
-      - **[REPETITION]**: Flag redundant phrases, ideas, or fragments that appear multiple times.
       - **[FIX]**: Indicate a specific correction needed for the following text.
       - **[DELETE]**: Indicate text that should be removed entirely.
       - **[FORMAT]**: Indicate where the structural format is broken and needs rewrite.
@@ -156,7 +155,7 @@ config:
       **Format Rules:**
       - Output MUST be a list of lines.
       - Each line MUST follow the exact format: `[TAG] || "exact text from source"`
-      - The "locator" must be a unique substring from the text.
+      - The "locator" must be a unique substring from the text. Use at least 3-4 words if possible to ensure context.
       - Do NOT output the full text.
       - Do NOT use markdown bolding (**) for the tags.
       - If the entry is perfect, provide NO directives.
@@ -173,7 +172,7 @@ config:
 
       **STRICT REPRODUCTION RULES:**
       1. Reproduce the provided DRAFT CONTENT exactly, character-for-character.
-      2. ONLY modify regions that are immediately followed by a directive tag (e.g. [FIX], [DELETE], [REPETITION], [FORMAT], [PLOTTING], [LOGIC], [FLUFF]).
+      2. ONLY modify regions that are immediately followed by a directive tag (e.g. [FIX], [DELETE], [FORMAT], [PLOTTING], [LOGIC], [FLUFF]).
       3. When you encounter a tag, perform the requested action and then RESUME the exact reproduction of the remaining text.
       4. Strip all [TAG] markers from the final output.
       5. Maintain all original formatting, line breaks, and structure.
@@ -182,7 +181,6 @@ config:
       - **[PLOTTING]**: Remove future scripting. Replace with static tension or present-tense potential. Can be shorter.
       - **[LOGIC]**: Fix the causality/consistency.
       - **[FLUFF]**: Cut this mercilessly.
-      - **[REPETITION]**: Remove the redundant phrase or merge the logic.
       - **[FIX]**: Correct the text as suggested.
       - **[DELETE]**: Remove the text.
       - **[FORMAT]**: Rewrite the section to follow the required format.

@@ -483,22 +483,21 @@ export class ContextStrategyFactory {
 
     const refinementSystemPrompt = `You are a precision refinement agent. Your goal is to rewrite a SPECIFIC targeted passage to address a critique tag.
 CRITICAL RULES:
-1. Output ONLY the replacement text for the targeted passage. 
+1. Output ONLY the replacement text for the targeted passage.
 2. NO introductory text (e.g., "Here is the fix:"), NO commentary, NO tags, NO markdown headers.
 3. Maintain the EXACT tone, style, and TENSE of the original.
 4. DO NOT include the "CONTEXT BEFORE TARGET" or the "REFINEMENT TARGET" itself in your output. Your output will be DIRECTLY substituted into the text.
 5. If the tag is [PLOTTING], remove future scripting, forced strategies, or premature revelations. Replace with static tension, inherent risk, or present-tense character behavior.
-6. If the tag is [DELETE], [REPETITION], or [FLUFF], providing an empty string or a significantly shorter version is often the correct action.`;
+6. If the tag is [DELETE], or [FLUFF], providing an empty string or a significantly shorter version is often the correct action.`;
 
     const tagPrompts: Record<string, string> = {
       FIX: "Repair grammatical, syntactical, or formatting errors. Output ONLY the corrected text.",
-      LOGIC: "Repair causal logic or consistency errors. Output ONLY the corrected text.",
+      LOGIC:
+        "Repair causal logic or consistency errors. Output ONLY the corrected text.",
       PLOTTING:
         "Remove future scripting, inevitable outcomes, or forced plot. Replace with static tension, current character drivers, or environmental potential. Do NOT use future tense. Can be much shorter.",
       FLUFF:
         "Remove generic filler or purple prose. Retain core meaning while reducing length drastically. Output ONLY the result.",
-      REPETITION:
-        "Remove or merge this redundant phrase. Output ONLY the necessary replacement (often much shorter or empty).",
       FORMAT: "Fix structural formatting to match requirements.",
     };
 

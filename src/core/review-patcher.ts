@@ -15,22 +15,28 @@ export class ReviewPatcher {
 
   public processReviewLine(fieldId: string, line: string): void {
     const trimmed = line.trim();
-    // Validates format: [TAG] || "locator"
-    // Allows optional spaces around || and optional markdown bolding **
+    // Validates format: [TAG1][TAG2] || "locator"
     const match = trimmed.match(
-      /^(\*\*)?\[([A-Z_]+)\](\*\*)?\s*\|\|\s*"(.*)"$/,
+      /^(\*\*)?((?:\[[A-Z_]+\])+)(\*\*)?\s*\|\|\s*"(.*)"$/,
     );
 
     if (!match) return;
 
-    const tag = match[2];
+    const tagsStr = match[2];
     const rawLocator = match[4];
+
+    // Safeguard: Single-word locators for FLUFF are usually counter-productive
+    // and lead to text mangling. We require at least two words for these tags.
+    if (tagsStr.includes("FLUFF") && !rawLocator.trim().includes(" ")) {
+      return;
+    }
 
     const pattern = this.buildFuzzyPattern(rawLocator);
     if (!pattern) return;
 
     try {
-      this.applyPatch(fieldId, pattern, tag, rawLocator);
+      // For visual feedback in the text during review, we just insert the tags string
+      this.applyPatch(fieldId, pattern, tagsStr, rawLocator);
     } catch (e) {
       api.v1.log(`[ReviewPatcher] Regex Error: ${e}`);
     }
@@ -54,11 +60,15 @@ export class ReviewPatcher {
         while (start > 0 && /[*_~`]/.test(text[start - 1])) start--;
         while (end < text.length && /[*_~`]/.test(text[end])) end++;
 
-        // If the match ends at a word boundary but there's a trailing punctuation 
+        // If the match ends at a word boundary but there's a trailing punctuation
         // that looks like it belongs to the sentence we're replacing, consume it.
         // But only if the locator itself didn't already have punctuation at the end.
-        if (!/[\.\!\?]$/.test(match[0]) && end < text.length && /[\.\!\?]/.test(text[end])) {
-            end++;
+        if (
+          !/[\.\!\?]$/.test(match[0]) &&
+          end < text.length &&
+          /[\.\!\?]/.test(text[end])
+        ) {
+          end++;
         }
 
         return { start, end };
@@ -95,7 +105,7 @@ export class ReviewPatcher {
   private applyPatch(
     fieldId: string,
     pattern: string,
-    tag: string,
+    tagsStr: string,
     rawLocator: string,
   ): void {
     const regex = new RegExp(pattern, "i"); // Case insensitive
@@ -105,7 +115,7 @@ export class ReviewPatcher {
     if (searchMatch) {
       const absoluteIdx = searchMatch.index;
 
-      const tagInsert = `[${tag}] `;
+      const tagInsert = `${tagsStr} `;
       const newDraft =
         currentDraft.slice(0, absoluteIdx) +
         tagInsert +
