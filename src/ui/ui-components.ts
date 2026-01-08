@@ -37,6 +37,30 @@ export const createHeaderWithToggle = (
   });
 };
 
+const calculateTextAreaHeight = (content: string): string => {
+  const LINE_HEIGHT = 10;
+  const CHARS_PER_LINE = 60;
+  const PADDING = 24;
+  const MIN_HEIGHT = 100;
+
+  if (!content) return `${MIN_HEIGHT}px`;
+
+  const lines = content.split("\n");
+  let totalLines = 0;
+
+  for (const line of lines) {
+    if (line.length === 0) {
+      totalLines += 1;
+    } else {
+      totalLines += Math.ceil(line.length / CHARS_PER_LINE);
+    }
+  }
+
+  totalLines = Math.max(1, totalLines);
+  const height = Math.max(MIN_HEIGHT, totalLines * LINE_HEIGHT + PADDING);
+  return `${height}px`;
+};
+
 export const createToggleableContent = (
   isEditMode: boolean,
   content: string,
@@ -46,19 +70,23 @@ export const createToggleableContent = (
   style: any = {},
 ): UIPart => {
   if (isEditMode) {
+    const autoHeight = calculateTextAreaHeight(content);
     return multilineTextInput({
       id: inputId,
       placeholder: placeholder,
       initialValue: content,
       onChange: onChange,
-      style: style,
+      style: {
+        height: autoHeight,
+        ...style,
+      },
     });
   } else {
     // Process content to preserve line breaks in NovelAI's markdown renderer
     // Escape '[' to prevent markdown link reference definitions like '[Author]: ...' from hiding text
     const processedContent = (content || "_No content._")
-        .replace(/\n/g, "  \n")
-        .replace(/\[/g, "\\[");
+      .replace(/\n/g, "  \n")
+      .replace(/\[/g, "\\[");
 
     return text({
       text: processedContent,
