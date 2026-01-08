@@ -109,7 +109,7 @@ export class StructuredEditor {
       // List specific
       getItemEditMode: (itemId) => this.getItemEditMode(config.id, itemId),
       toggleItemEditMode: (itemId) => this.toggleItemEditMode(config.id, itemId),
-      runListGeneration: () => this.agentWorkflowService.runListGeneration(config.id, this.onUpdateCallback),
+      runListGeneration: () => this.agentWorkflowService.requestListGeneration(config.id, this.onUpdateCallback),
       getListGenerationState: () => this.agentWorkflowService.getListGenerationState(config.id),
       cancelListGeneration: () => this.agentWorkflowService.cancelListGeneration(config.id),
       // Generator Sync
@@ -117,7 +117,8 @@ export class StructuredEditor {
       isAttgEnabled: () => this.storyManager.isAttgEnabled(),
       setStyleEnabled: (enabled) => this.storyManager.setStyleEnabled(enabled),
       isStyleEnabled: () => this.storyManager.isStyleEnabled(),
-      runFieldGeneration: (fieldId) => this.agentWorkflowService.runFieldGeneration(fieldId, this.onUpdateCallback),
+      runFieldGeneration: (fieldId) => this.agentWorkflowService.requestFieldGeneration(fieldId, this.onUpdateCallback),
+      cancelFieldGeneration: (fieldId) => this.agentWorkflowService.cancelFieldGeneration(fieldId),
     };
 
     const strategy = getFieldStrategy(config);

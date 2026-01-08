@@ -118,17 +118,19 @@ export class StoryEngineUI {
 
         const session = this.agentWorkflowService.getSession(sessionId);
         const isRunning = session?.isRunning || false;
+        const isQueued = session?.isQueued || false;
         const budgetState = session?.budgetState;
 
         const genButton = createResponsiveGenerateButton(
           `gen-btn-${sessionId}`,
           {
             isRunning,
+            isQueued,
             budgetState,
           },
           {
             onStart: () => {
-              this.agentWorkflowService.runFieldGeneration(sessionId, () => {
+              this.agentWorkflowService.requestFieldGeneration(sessionId, () => {
                 this.updateLorebookUI();
                 // Also sync to NovelAI Lorebook on completion or chunk
                 const content = this.storyManager.getFieldContent(sessionId);
@@ -136,9 +138,7 @@ export class StoryEngineUI {
               });
             },
             onCancel: () => {
-              if (session?.cancellationSignal) {
-                session.cancellationSignal.cancel();
-              }
+              this.agentWorkflowService.cancelFieldGeneration(sessionId);
             },
             onContinue: () => {
               if (session?.budgetResolver) {

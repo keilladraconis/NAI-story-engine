@@ -21,9 +21,10 @@ export interface BaseRenderContext {
 export interface ListRenderContext extends BaseRenderContext {
   getItemEditMode: (itemId: string) => boolean;
   toggleItemEditMode: (itemId: string) => void;
-  runListGeneration: () => Promise<void>;
+  runListGeneration: () => void;
   getListGenerationState: () => {
     isRunning: boolean;
+    isQueued?: boolean;
     signal?: any;
     budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
     budgetResolver?: () => void;
@@ -39,7 +40,8 @@ export interface TextRenderContext extends BaseRenderContext {
   isAttgEnabled?: () => boolean;
   setStyleEnabled?: (enabled: boolean) => Promise<void>;
   isStyleEnabled?: () => boolean;
-  runFieldGeneration?: (fieldId: string) => Promise<void>;
+  runFieldGeneration?: (fieldId: string) => void;
+  cancelFieldGeneration?: (fieldId: string) => void;
 }
 
 export type RenderContext = ListRenderContext & TextRenderContext;
@@ -82,6 +84,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
           `list-gen-btn-${config.id}`,
           {
             isRunning: genState.isRunning,
+            isQueued: genState.isQueued,
             budgetState: genState.budgetState,
           },
           {
@@ -238,6 +241,7 @@ export class TextFieldStrategy implements FieldRenderStrategy<TextRenderContext>
       setStyleEnabled,
       isStyleEnabled,
       runFieldGeneration,
+      cancelFieldGeneration,
       currentContent,
     } = context;
 
@@ -272,6 +276,7 @@ export class TextFieldStrategy implements FieldRenderStrategy<TextRenderContext>
       `gen-btn-${config.id}`,
       {
         isRunning: session?.isRunning || false,
+        isQueued: session?.isQueued,
         budgetState: session?.budgetState,
       },
       {
@@ -284,8 +289,8 @@ export class TextFieldStrategy implements FieldRenderStrategy<TextRenderContext>
           }
         },
         onCancel: () => {
-          if (session?.cancellationSignal) {
-            session.cancellationSignal.cancel();
+          if (cancelFieldGeneration) {
+            cancelFieldGeneration(config.id);
           }
         },
         onContinue: () => {

@@ -89,4 +89,8 @@ When debugging issues, you may add debugging log statements and provide the user
     - **Stability**: High.
     - **Maintenance**: All identified issues (Medium & Low) resolved.
     - **Refactoring**: Architecture is clean and decoupled.
+- **Generation Queue (Jan 2026)**: Implemented a global generation queue in `AgentWorkflowService`.
+    - Prevents concurrent generation requests which could cause chaotic UI states.
+    - Added "Queued" state to the responsive generate button with cancellation support.
+    - Unified List and Field generation under a single task queue system.
 

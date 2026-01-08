@@ -5,6 +5,7 @@ import { ContextStrategyFactory } from "./context-strategies";
 export interface FieldSession {
   fieldId: string;
   isRunning: boolean;
+  isQueued?: boolean;
   cancellationSignal?: CancellationSignal;
   budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
   budgetResolver?: () => void;
@@ -15,11 +16,18 @@ export class AgentWorkflowService {
   private contextFactory: ContextStrategyFactory;
   private sessions: Map<string, FieldSession> = new Map();
 
+  private taskQueue: Array<
+    | { type: "field"; fieldId: string; updateFn: () => void }
+    | { type: "list"; fieldId: string; updateFn: () => void }
+  > = [];
+  private isGlobalGenerating: boolean = false;
+
   // Track list generation state: fieldId -> { isRunning, signal }
   private listGenerationState: Map<
     string,
     {
       isRunning: boolean;
+      isQueued?: boolean;
       signal?: CancellationSignal;
       budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
       budgetResolver?: () => void;
@@ -49,19 +57,111 @@ export class AgentWorkflowService {
   }
 
   public cancelListGeneration(fieldId: string) {
+    // Check queue first
+    const queueIndex = this.taskQueue.findIndex(
+      (t) => t.type === "list" && t.fieldId === fieldId,
+    );
+    if (queueIndex !== -1) {
+      const task = this.taskQueue.splice(queueIndex, 1)[0];
+      const state = this.listGenerationState.get(fieldId);
+      if (state) {
+        state.isQueued = false;
+        state.isRunning = false;
+      }
+      if (task.updateFn) task.updateFn();
+      return;
+    }
+
     const state = this.listGenerationState.get(fieldId);
     if (state && state.signal) {
       state.signal.cancel();
     }
   }
 
-  public async runListGeneration(
+  public cancelFieldGeneration(fieldId: string) {
+    // Check queue first
+    const queueIndex = this.taskQueue.findIndex(
+      (t) => t.type === "field" && t.fieldId === fieldId,
+    );
+    if (queueIndex !== -1) {
+      const task = this.taskQueue.splice(queueIndex, 1)[0];
+      const session = this.getSession(fieldId);
+      if (session) {
+        session.isQueued = false;
+      }
+      if (task.updateFn) task.updateFn();
+      return;
+    }
+
+    const session = this.getSession(fieldId);
+    if (session && session.cancellationSignal) {
+      session.cancellationSignal.cancel();
+    }
+  }
+
+  public requestListGeneration(fieldId: string, updateFn: () => void) {
+    const state = this.listGenerationState.get(fieldId) || { isRunning: false };
+    this.listGenerationState.set(fieldId, state);
+
+    if (this.isGlobalGenerating || state.isRunning) {
+      state.isQueued = true;
+      this.taskQueue.push({ type: "list", fieldId, updateFn });
+      updateFn();
+    } else {
+      this.isGlobalGenerating = true;
+      this._runListGeneration(fieldId, updateFn);
+    }
+  }
+
+  public requestFieldGeneration(fieldId: string, updateFn: () => void) {
+    const session = this.getSession(fieldId) || this.startSession(fieldId);
+    if (this.isGlobalGenerating || session.isRunning) {
+      session.isQueued = true;
+      this.taskQueue.push({ type: "field", fieldId, updateFn });
+      updateFn();
+    } else {
+      this.isGlobalGenerating = true;
+      this._runFieldGeneration(fieldId, updateFn);
+    }
+  }
+
+  private async processQueue() {
+    if (this.taskQueue.length === 0) {
+      this.isGlobalGenerating = false;
+      return;
+    }
+
+    const nextTask = this.taskQueue.shift();
+    if (!nextTask) {
+      this.isGlobalGenerating = false;
+      return;
+    }
+
+    if (nextTask.type === "field") {
+      const session = this.getSession(nextTask.fieldId);
+      if (session) {
+        session.isQueued = false;
+        nextTask.updateFn(); // Update UI to show running
+      }
+      await this._runFieldGeneration(nextTask.fieldId, nextTask.updateFn);
+    } else if (nextTask.type === "list") {
+      const state = this.listGenerationState.get(nextTask.fieldId);
+      if (state) {
+        state.isQueued = false;
+        nextTask.updateFn();
+      }
+      await this._runListGeneration(nextTask.fieldId, nextTask.updateFn);
+    }
+  }
+
+  private async _runListGeneration(
     fieldId: string,
     updateFn: () => void,
   ): Promise<void> {
     const cancellationSignal = await api.v1.createCancellationSignal();
     const state = {
       isRunning: true,
+      isQueued: false,
       signal: cancellationSignal,
       budgetState: "normal" as const,
     };
@@ -173,13 +273,15 @@ export class AgentWorkflowService {
     } finally {
       this.listGenerationState.set(fieldId, {
         isRunning: false,
+        isQueued: false,
         signal: undefined,
       });
       updateFn();
+      this.processQueue();
     }
   }
 
-  public async runFieldGeneration(
+  private async _runFieldGeneration(
     fieldId: string,
     updateFn: () => void,
   ): Promise<void> {
@@ -275,6 +377,7 @@ export class AgentWorkflowService {
       session.isRunning = false;
       session.cancellationSignal = undefined;
       updateFn();
+      this.processQueue();
     }
   }
 }

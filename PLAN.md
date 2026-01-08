@@ -53,9 +53,12 @@
 
 *(Note: "Content Extraction" is currently handled via generative context strategies rather than extraction from existing story text.)*
 
-### 📋 **Phase 4: Advanced Features & Polish - PLANNED**
+### 📋 **Phase 4: Advanced Features & Polish - IN PROGRESS**
 **Status**: Active / Post-MVP
 **Priority**: MEDIUM
+
+#### Completed Features (Phase 4):
+- [x] **Generation Queue**: Implemented a global queue to prevent concurrent generation requests, ensuring sequential execution and reducing UI chaos. Users can cancel queued items.
 
 #### Planned Features:
 - Multi-project support

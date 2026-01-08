@@ -105,6 +105,7 @@ export const createToggleableContent = (
 
 export interface GenerateButtonState {
   isRunning: boolean;
+  isQueued?: boolean;
   budgetState?: "waiting_for_user" | "waiting_for_timer" | "normal";
 }
 
@@ -118,6 +119,21 @@ export const createResponsiveGenerateButton = (
   },
   label: string = "Generate",
 ): UIPart => {
+  if (state.isQueued) {
+    return button({
+      id: `${id}-queued`,
+      text: "⏳ Queued",
+      style: {
+        "background-color": "#e2e3e5",
+        color: "#383d41",
+        cursor: "pointer",
+      },
+      callback: () => {
+        actions.onCancel();
+      },
+    });
+  }
+
   if (state.budgetState === "waiting_for_user") {
     return button({
       id: `${id}-continue`,
