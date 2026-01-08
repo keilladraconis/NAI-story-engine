@@ -1,4 +1,4 @@
-import { FieldID, LIST_FIELD_IDS } from "../config/field-definitions";
+import { FieldID, LIST_FIELD_IDS, TEXT_FIELD_IDS } from "../config/field-definitions";
 import { StoryDataManager, StoryField, DULFSField } from "./story-data-manager";
 import { LorebookSyncService } from "./lorebook-sync-service";
 import { BrainstormDataManager } from "./brainstorm-data-manager";
@@ -313,6 +313,41 @@ export class StoryManager {
 
   public getConsolidatedBrainstorm(): string {
     return this.brainstormDataManager.getConsolidated();
+  }
+
+  public async clearAllStoryData(): Promise<void> {
+    // 1. Clear DULFS fields (handles lorebook cleanup)
+    for (const fieldId of LIST_FIELD_IDS) {
+      await this.clearDulfsList(fieldId);
+    }
+
+    // 2. Clear Text fields (excluding Brainstorm)
+    for (const fieldId of TEXT_FIELD_IDS) {
+      if (fieldId === FieldID.Brainstorm) continue; // Do not clear brainstorm
+
+      // Handle ATTG/Style special cases for cleanup
+      if (fieldId === FieldID.ATTG) {
+        if (this.isAttgEnabled()) {
+          // Sync empty string to memory first to clear it
+          await this.setFieldContent(fieldId, "", false, true);
+          await this.setAttgEnabled(false);
+        } else {
+          await this.setFieldContent(fieldId, "", false, false);
+        }
+      } else if (fieldId === FieldID.Style) {
+        if (this.isStyleEnabled()) {
+          // Sync empty string to memory first to clear it
+          await this.setFieldContent(fieldId, "", false, true);
+          await this.setStyleEnabled(false);
+        } else {
+          await this.setFieldContent(fieldId, "", false, false);
+        }
+      } else {
+        await this.setFieldContent(fieldId, "", false, true);
+      }
+    }
+
+    await this.saveStoryData(true);
   }
 
   public async saveStoryData(notify: boolean = true): Promise<void> {

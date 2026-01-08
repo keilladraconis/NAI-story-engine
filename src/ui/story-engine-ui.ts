@@ -29,6 +29,7 @@ export class StoryEngineUI {
   private selectedLorebookEntryId?: string;
   private selectedLorebookCategoryId?: string;
   private lorebookEditMode: boolean = false;
+  private showClearConfirm: boolean = false;
 
   constructor() {
     this.storyManager = new StoryManager();
@@ -231,6 +232,61 @@ export class StoryEngineUI {
   }
 
   private createSidebar(): UIExtensionSidebarPanel {
+    const headerContent: UIPart[] = [
+      part.text({
+        text: "🎭 Story Engine",
+        style: { "font-weight": "bold" },
+      }),
+    ];
+
+    if (this.showClearConfirm) {
+      headerContent.push(
+        part.row({
+          style: { gap: "8px", "align-items": "center" },
+          content: [
+            part.text({
+              text: "Clear All?",
+              style: { color: "red", "font-weight": "bold", "font-size": "0.9em" },
+            }),
+            part.button({
+              text: "Yes",
+              style: {
+                "background-color": "rgba(255, 0, 0, 0.1)",
+                color: "red",
+                padding: "2px 8px",
+                "font-size": "0.8em",
+              },
+              callback: async () => {
+                await this.storyManager.clearAllStoryData();
+                this.showClearConfirm = false;
+                this.updateUI();
+              },
+            }),
+            part.button({
+              text: "No",
+              style: { padding: "2px 8px", "font-size": "0.8em" },
+              callback: () => {
+                this.showClearConfirm = false;
+                this.updateUI();
+              },
+            }),
+          ],
+        }),
+      );
+    } else {
+      headerContent.push(
+        part.button({
+          text: "Clear All",
+          iconId: "trash-2",
+          style: { padding: "4px 8px", "font-size": "0.8em", opacity: "0.7" },
+          callback: () => {
+            this.showClearConfirm = true;
+            this.updateUI();
+          },
+        }),
+      );
+    }
+
     return extension.sidebarPanel({
       id: StoryEngineUI.KEYS.SIDEBAR_ID,
       name: "Story Engine",
@@ -245,12 +301,7 @@ export class StoryEngineUI {
                 "align-items": "center",
                 "margin-bottom": "8px",
               },
-              content: [
-                part.text({
-                  text: "🎭 Story Engine",
-                  style: { "font-weight": "bold" },
-                }),
-              ],
+              content: headerContent,
             }),
 
             // Structured Editor with Collapsible Sections
