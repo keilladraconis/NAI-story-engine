@@ -1,10 +1,8 @@
 // Story Engine UI Integration
 import { StructuredEditor } from "./structured-editor";
 import { StoryManager } from "../core/story-manager";
-import { AgentCycleManager } from "../core/agent-cycle";
 import { AgentWorkflowService } from "../core/agent-workflow";
 import { BrainstormUI } from "./brainstorm-ui";
-import { FieldID } from "../config/field-definitions";
 
 import {
   createHeaderWithToggle,
@@ -24,7 +22,6 @@ export class StoryEngineUI {
   lorebookPanel: UIExtensionLorebookPanel;
   structuredEditor: StructuredEditor;
   storyManager: StoryManager;
-  agentCycleManager: AgentCycleManager;
   agentWorkflowService: AgentWorkflowService;
   brainstormUI: BrainstormUI;
 
@@ -35,11 +32,9 @@ export class StoryEngineUI {
 
   constructor() {
     this.storyManager = new StoryManager();
-    this.agentCycleManager = new AgentCycleManager();
     this.agentWorkflowService = new AgentWorkflowService(this.storyManager);
     this.structuredEditor = new StructuredEditor(
       this.storyManager,
-      this.agentCycleManager,
       this.agentWorkflowService,
       () => this.updateUI(),
     );
@@ -54,10 +49,15 @@ export class StoryEngineUI {
     });
 
     // Handle lorebook selection hook
-    api.v1.hooks.register("onLorebookEntrySelected", (params) => {
+    api.v1.hooks.register("onLorebookEntrySelected", async (params) => {
       this.selectedLorebookEntryId = params.entryId;
       this.selectedLorebookCategoryId = params.categoryId;
       this.lorebookEditMode = false; // Reset to preview on selection
+
+      if (params.entryId) {
+        await this.loadLorebookEntry(params.entryId);
+      }
+
       this.updateLorebookUI();
     });
   }
@@ -66,6 +66,22 @@ export class StoryEngineUI {
     await this.storyManager.initializeStory();
     this.updateUI();
     this.updateLorebookUI();
+  }
+
+  private async loadLorebookEntry(entryId: string): Promise<void> {
+    const dulfsMatch = this.storyManager.findDulfsByLorebookId(entryId);
+    if (dulfsMatch) {
+      const sessionId = `lorebook:${entryId}`;
+      let session = this.agentWorkflowService.getSession(sessionId);
+      if (!session) {
+        this.agentWorkflowService.startSession(sessionId);
+        // Initialize with current lorebook text if possible
+        const entry = await api.v1.lorebook.entry(entryId);
+        if (entry && entry.text) {
+          await this.storyManager.setFieldContent(sessionId, entry.text, false);
+        }
+      }
+    }
   }
 
   private updateUI(): void {
@@ -99,34 +115,24 @@ export class StoryEngineUI {
         const { item } = dulfsMatch;
         const sessionId = `lorebook:${entryId}`;
 
-        let session = this.agentCycleManager.getSession(sessionId);
-        if (!session) {
-          session = this.agentCycleManager.startSession(sessionId);
-          // Initialize with current lorebook text if possible
-          api.v1.lorebook.entry(entryId).then((entry) => {
-            if (entry && entry.text && session) {
-              this.storyManager.setFieldContent(sessionId, entry.text, false);
-              this.updateLorebookUI();
-            }
-          });
-        }
+        const session = this.agentWorkflowService.getSession(sessionId);
+        const isRunning = session?.isRunning || false;
+        const budgetState = session?.budgetState;
 
         const genButton = createResponsiveGenerateButton(
           `gen-btn-${sessionId}`,
           {
-            isRunning: session.isRunning,
-            budgetState: session.budgetState,
+            isRunning,
+            budgetState,
           },
           {
             onStart: () => {
-              if (session) {
-                this.agentWorkflowService.runFieldGeneration(session, () => {
-                  this.updateLorebookUI();
-                  // Also sync to NovelAI Lorebook on completion or chunk
-                  const content = this.storyManager.getFieldContent(sessionId);
-                  api.v1.lorebook.updateEntry(entryId, { text: content });
-                });
-              }
+              this.agentWorkflowService.runFieldGeneration(sessionId, () => {
+                this.updateLorebookUI();
+                // Also sync to NovelAI Lorebook on completion or chunk
+                const content = this.storyManager.getFieldContent(sessionId);
+                api.v1.lorebook.updateEntry(entryId, { text: content });
+              });
             },
             onCancel: () => {
               if (session?.cancellationSignal) {
@@ -252,32 +258,6 @@ export class StoryEngineUI {
           ],
         }),
       ],
-    });
-  }
-
-  public exportStoryData(): any {
-    const data: Record<string, any> = {
-      fieldContents: {},
-      timestamps: new Date().toISOString(),
-    };
-
-    // Export all field contents
-    Object.values(FieldID).forEach((fieldId) => {
-      data.fieldContents[fieldId] =
-        this.structuredEditor.getFieldContent(fieldId);
-    });
-
-    return data;
-  }
-
-  public importStoryData(data: any): void {
-    if (!data || !data.fieldContents) return;
-
-    // Import field contents
-    Object.entries(data.fieldContents).forEach(([fieldId, content]) => {
-      if (typeof content === "string") {
-        this.structuredEditor.setFieldContent(fieldId, content);
-      }
     });
   }
 }

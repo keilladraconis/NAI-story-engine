@@ -1,5 +1,4 @@
 import { StoryManager } from "../core/story-manager";
-import { AgentCycleManager } from "../core/agent-cycle";
 import { AgentWorkflowService } from "../core/agent-workflow";
 import { FIELD_CONFIGS, FieldConfig, FieldID } from "../config/field-definitions";
 import { getFieldStrategy, RenderContext } from "./field-strategies";
@@ -10,19 +9,16 @@ export class StructuredEditor {
   private configs: Map<FieldID, FieldConfig> = new Map();
   sidebar: UIPart;
   private storyManager: StoryManager;
-  private agentCycleManager: AgentCycleManager;
   private agentWorkflowService: AgentWorkflowService;
   private onUpdateCallback: () => void;
   private editModes: Map<string, boolean> = new Map();
 
   constructor(
     storyManager: StoryManager,
-    agentCycleManager: AgentCycleManager,
     agentWorkflowService: AgentWorkflowService,
     onUpdateCallback: () => void = () => {},
   ) {
     this.storyManager = storyManager;
-    this.agentCycleManager = agentCycleManager;
     this.agentWorkflowService = agentWorkflowService;
     this.onUpdateCallback = onUpdateCallback;
 
@@ -84,7 +80,7 @@ export class StructuredEditor {
     const context: RenderContext = {
       config,
       storyManager: this.storyManager,
-      agentCycleManager: this.agentCycleManager,
+      agentWorkflowService: this.agentWorkflowService,
       editModeState: this.editModes.get(editModeKey) || false,
       toggleEditMode: () => this.toggleEditMode(editModeKey),
       handleFieldChange: (c) => this.handleFieldChange(config.id, c),
@@ -99,7 +95,7 @@ export class StructuredEditor {
       isAttgEnabled: () => this.storyManager.isAttgEnabled(),
       setStyleEnabled: (enabled) => this.storyManager.setStyleEnabled(enabled),
       isStyleEnabled: () => this.storyManager.isStyleEnabled(),
-      runFieldGeneration: (s) => this.agentWorkflowService.runFieldGeneration(s, this.onUpdateCallback),
+      runFieldGeneration: (fieldId) => this.agentWorkflowService.runFieldGeneration(fieldId, this.onUpdateCallback),
     };
 
     const strategy = getFieldStrategy(config);

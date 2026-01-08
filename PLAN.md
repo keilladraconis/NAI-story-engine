@@ -71,9 +71,8 @@
 
 ### Core Components
 - **`story-manager.ts`**: Central data management.
-- **`agent-cycle.ts`**: Agentic processing system state.
 - **`structured-editor.ts`**: Main editor UI orchestrator.
-- **`agent-workflow.ts`**: Simplified generation logic.
+- **`agent-workflow.ts`**: Simplified generation logic and session management.
 - **`hyper-generator.ts`**: NovelAI generation API wrapper.
 
 ## 📅 Development Timeline

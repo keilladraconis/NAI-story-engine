@@ -1,11 +1,20 @@
 import { StoryManager, DULFSField } from "./story-manager";
-import { FieldSession } from "./agent-cycle";
 import { hyperGenerate } from "../../lib/hyper-generator";
 import { ContextStrategyFactory } from "./context-strategies";
 import { FieldID } from "../config/field-definitions";
 
+export interface FieldSession {
+  fieldId: string;
+  isRunning: boolean;
+  cancellationSignal?: CancellationSignal;
+  budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
+  budgetResolver?: () => void;
+  budgetWaitTime?: number;
+}
+
 export class AgentWorkflowService {
   private contextFactory: ContextStrategyFactory;
+  private sessions: Map<string, FieldSession> = new Map();
 
   // Track list generation state: fieldId -> { isRunning, signal }
   private listGenerationState: Map<
@@ -15,6 +24,19 @@ export class AgentWorkflowService {
 
   constructor(private storyManager: StoryManager) {
     this.contextFactory = new ContextStrategyFactory(storyManager);
+  }
+
+  public getSession(fieldId: string): FieldSession | undefined {
+    return this.sessions.get(fieldId);
+  }
+
+  public startSession(fieldId: string): FieldSession {
+    const session: FieldSession = {
+      fieldId,
+      isRunning: false,
+    };
+    this.sessions.set(fieldId, session);
+    return session;
   }
 
   public getListGenerationState(fieldId: string) {
@@ -154,9 +176,10 @@ export class AgentWorkflowService {
   }
 
   public async runFieldGeneration(
-    session: FieldSession,
+    fieldId: string,
     updateFn: () => void,
   ): Promise<void> {
+    const session = this.getSession(fieldId) || this.startSession(fieldId);
     session.isRunning = true;
     session.cancellationSignal = await api.v1.createCancellationSignal();
     updateFn();
@@ -207,7 +230,12 @@ export class AgentWorkflowService {
 
       if (session.cancellationSignal.cancelled) return;
 
-      await this.storyManager.setFieldContent(session.fieldId, buffer, true, true);
+      await this.storyManager.setFieldContent(
+        session.fieldId,
+        buffer,
+        true,
+        true,
+      );
     } catch (e: any) {
       if (!e.message.includes("cancelled")) {
         api.v1.ui.toast(`Generation failed: ${e.message}`, { type: "error" });

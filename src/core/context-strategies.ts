@@ -3,7 +3,7 @@ import {
   HyperGenerationParams,
 } from "../../lib/hyper-generator";
 import { StoryManager } from "./story-manager";
-import { FieldSession } from "./agent-cycle";
+import { FieldSession } from "./agent-workflow";
 import {
   FieldID,
   FIELD_CONFIGS,

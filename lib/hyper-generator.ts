@@ -7,7 +7,7 @@
 /** Changes
  * hyperContextBuilder signature modified to receive enable_thinking boolean. Thoughts require a contentless assistant suffix on the messages.
  * hyperContextBuilder tail-slicing-appending removed. Causes issues with careful prompting and prefill.
- * Exponential backoff scaled up to powers of 3, maxing at 243 seconds.
+ * Exponential backoff .......
  */
 
 // ===== CONSTANTS =====
@@ -417,7 +417,8 @@ async function hyperGenerateWithRetry(
   } catch (e: any) {
     if (isTransientError(e) || /in progress/.test(e.message)) {
       if (params.maxRetries && params.maxRetries > 0) {
-        await api.v1.timers.sleep(3 ** (5 - params.maxRetries) * 1000);
+        // Gonna have to refactor this into a loop to track the actual exponential backoff towards max retries.
+        await api.v1.timers.sleep(2 ** (8 - params.maxRetries) * 1000);
         return hyperGenerateWithRetry(
           messages,
           { ...params, maxRetries: params.maxRetries - 1 },

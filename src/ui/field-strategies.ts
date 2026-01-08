@@ -1,6 +1,6 @@
 import { FieldConfig, FieldID } from "../config/field-definitions";
 import { StoryManager, DULFSField } from "../core/story-manager";
-import { AgentCycleManager, FieldSession } from "../core/agent-cycle";
+import { AgentWorkflowService } from "../core/agent-workflow";
 import {
   createHeaderWithToggle,
   createToggleableContent,
@@ -13,7 +13,7 @@ const { row, column, text, button, checkboxInput } =
 export interface RenderContext {
   config: FieldConfig;
   storyManager: StoryManager;
-  agentCycleManager: AgentCycleManager;
+  agentWorkflowService: AgentWorkflowService;
   editModeState: boolean; // The specific boolean for this field/mode
   toggleEditMode: () => void;
   handleFieldChange: (content: string) => void;
@@ -28,7 +28,7 @@ export interface RenderContext {
   isAttgEnabled?: () => boolean;
   setStyleEnabled?: (enabled: boolean) => Promise<void>;
   isStyleEnabled?: () => boolean;
-  runFieldGeneration?: (session: FieldSession) => Promise<void>;
+  runFieldGeneration?: (fieldId: string) => Promise<void>;
 }
 
 export interface FieldRenderStrategy {
@@ -193,7 +193,7 @@ export class TextFieldStrategy implements FieldRenderStrategy {
     const {
       config,
       storyManager,
-      agentCycleManager,
+      agentWorkflowService,
       editModeState,
       toggleEditMode,
       handleFieldChange,
@@ -205,7 +205,7 @@ export class TextFieldStrategy implements FieldRenderStrategy {
     } = context;
 
     const content = storyManager.getFieldContent(config.id);
-    const session = agentCycleManager.getSession(config.id);
+    const session = agentWorkflowService.getSession(config.id);
 
     // Sync Checkbox (for ATTG/Style)
     let syncCheckbox: UIPart = null;
@@ -240,8 +240,7 @@ export class TextFieldStrategy implements FieldRenderStrategy {
       {
         onStart: () => {
           if (runFieldGeneration) {
-            const s = session || agentCycleManager.startSession(config.id);
-            runFieldGeneration(s);
+            runFieldGeneration(config.id);
           }
         },
         onCancel: () => {

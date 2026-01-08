@@ -5,19 +5,11 @@ The Story Engine codebase has undergone a successful simplification, moving from
 
 ---
 
-## HIGH Priority
+## HIGH Priority (Resolved)
 
-### 1. Incomplete Data Export/Import
-**Location:** `StoryEngineUI.exportStoryData` and `importStoryData`
-**Finding:** These methods only iterate over `FieldID` and use `getFieldContent`/`setFieldContent`. 
-**Issue:** `getFieldContent` for list-based fields (DULFS) returns an empty string or formatted text, not the structured data. Consequently, exporting a story currently **loses all character, location, faction, and system data**, as well as the entire Brainstorm chat history.
-**Refactor:** Export the entire `StoryData` object from `StoryDataManager` instead of trying to rebuild it field-by-field from the UI layer.
-
-### 2. Async Race Condition in Lorebook UI
+### 1. Async Race Condition in Lorebook UI - ✅ COMPLETED
 **Location:** `StoryEngineUI.createLorebookPanel`
-**Finding:** The logic `api.v1.lorebook.entry(entryId).then(...)` is located directly inside the rendering function.
-**Issue:** Every time the Lorebook UI re-renders (which can be frequent), it triggers a new asynchronous fetch. This can lead to race conditions where older requests resolve after newer ones, or simply cause unnecessary API pressure.
-**Refactor:** Move the entry fetching and session initialization logic into the `onLorebookEntrySelected` hook or a dedicated controller method that only runs once per selection.
+**Refactor:** Moved entry fetching and session initialization into `onLorebookEntrySelected` and `loadLorebookEntry`. This ensures loading happens once per selection, preventing race conditions and redundant API calls.
 
 ---
 
@@ -60,7 +52,8 @@ The Story Engine codebase has undergone a successful simplification, moving from
 
 ## Refactoring Roadmap (Updated)
 
-1.  **Phase 1 (Data Integrity)**: Fix `exportStoryData` to include the full `StoryData` blob and brainstorm history.
-2.  **Phase 2 (Lifecycle)**: Move async entry loading out of the render loop in `StoryEngineUI`.
-3.  **Phase 3 (DRY)**: Refactor `LorebookSyncService` and `ContextStrategies` to remove duplicated logic and fix spacing consistency.
-4.  **Phase 4 (Type Safety)**: Address the remaining `any` casts in `StoryDataManager.createDefaultData`.
+1.  **Phase 1 (Lifecycle)**: ✅ COMPLETED. Moved async entry loading out of the render loop and consolidated session management into `AgentWorkflowService`.
+
+2.  **Phase 2 (DRY)**: Refactor `LorebookSyncService` and `ContextStrategies` to remove duplicated logic and fix spacing consistency.
+
+3.  **Phase 3 (Type Safety)**: Address the remaining `any` casts in `StoryDataManager.createDefaultData`.
