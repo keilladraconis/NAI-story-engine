@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767897686
+updatedAt: 1767899324
 config:
   - name: model
     prettyName: LLM Model
@@ -150,6 +150,27 @@ config:
       - Deviate from standard attributes only if it makes sense for the category (e.g. Locations don't need Age).
       - NO Markdown formatting (no bolding, no italics) inside the entry.
       - NO conversational filler. Start immediately with the name in brackets.
+
+  - name: lorebook_keys_prompt
+    prettyName: Lorebook Keys Prompt
+    description: Prompt for generating Lorebook keys.
+    type: string
+    multiline: true
+    default: |-
+      Generate a list of activation keys (triggers) for this Lorebook entry.
+      The keys should include the character/place name, aliases, titles, and unique identifiers.
+      CRITICAL: Output ONLY the comma-separated list of keys. No other text.
+
+      EXAMPLE:
+      Entry: [Gandalf] ...
+      Output: Gandalf, Gandalf the Grey, Mithrandir, The Grey Pilgrim
+
+      INSTRUCTION:
+      - Read the provided Lorebook Entry.
+      - Extract all names, titles, aliases, and unique terms that should trigger this entry.
+      - Output them as a simple comma-separated list.
+      - DO NOT include common words that would trigger false positives (e.g. "The", "Man").
+      - LIMIT to the most important 5-10 keys.
 
   - name: critique_prompt
     prettyName: Critique Prompt

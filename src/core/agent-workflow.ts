@@ -299,6 +299,13 @@ export class AgentWorkflowService {
         true,
         true,
       );
+
+      // Automatically generate keys for Lorebook entries
+      if (session.fieldId.startsWith("lorebook:")) {
+        const entryId = session.fieldId.split(":")[1];
+        api.v1.ui.toast("Generating Lorebook Keys...", { type: "info" });
+        await this.storyManager.generateLorebookKeys(entryId, buffer);
+      }
     } catch (e: any) {
       if (!e.message.includes("cancelled")) {
         api.v1.ui.toast(`Generation failed: ${e.message}`, { type: "error" });

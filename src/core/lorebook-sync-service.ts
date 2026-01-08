@@ -1,5 +1,6 @@
 import { StoryDataManager } from "./story-data-manager";
 import { FIELD_CONFIGS } from "../config/field-definitions";
+import { hyperGenerate } from "../../lib/hyper-generator";
 
 export class LorebookSyncService {
   constructor(private dataManager: StoryDataManager) {}
@@ -103,7 +104,6 @@ export class LorebookSyncService {
         displayName: label,
         text: text,
         category: categoryId,
-        keys: [],
         advancedConditions: [{ type: "random", chance: 0.1 }],
         enabled: enabled,
         forceActivation: false,
@@ -125,7 +125,6 @@ export class LorebookSyncService {
 
     const isEnabled = data.dulfsEnabled[fieldId] !== false;
     const categoryId = await this.ensureDulfsCategory(fieldId, isEnabled);
-    const textContent = item.lorebookContent || item.content || "";
 
     let entryId = item.linkedLorebooks.length > 0 ? item.linkedLorebooks[0] : null;
 
@@ -133,18 +132,19 @@ export class LorebookSyncService {
       try {
         const existing = await api.v1.lorebook.entry(entryId);
         if (existing) {
-          const currentKeys = existing.keys || [];
-          const newKeys = currentKeys.includes(item.name)
-            ? currentKeys
-            : [...currentKeys, item.name];
-
-          await api.v1.lorebook.updateEntry(entryId, {
+          const update: any = {
             displayName: item.name,
-            text: textContent,
             category: categoryId,
-            keys: newKeys,
             enabled: isEnabled,
-          });
+          };
+
+          // Only update text if lorebookContent is explicitly set.
+          // This prevents overwriting manual user edits in NAI UI with the DULFS description.
+          if (item.lorebookContent !== undefined) {
+            update.text = item.lorebookContent;
+          }
+
+          await api.v1.lorebook.updateEntry(entryId, update);
           return;
         }
       } catch (e) {
@@ -152,6 +152,7 @@ export class LorebookSyncService {
       }
     }
 
+    const textContent = item.lorebookContent || "";
     await this.createIndividualLorebookEntry(fieldId, itemId, item.name, textContent, categoryId, isEnabled);
   }
 
@@ -172,7 +173,6 @@ export class LorebookSyncService {
         displayName: name,
         text: text,
         category: categoryId,
-        keys: [name],
         enabled: enabled,
       });
 
@@ -184,6 +184,44 @@ export class LorebookSyncService {
       }
     } catch (e) {
       api.v1.log("Error creating individual lorebook entry:", e);
+    }
+  }
+
+  public async generateAndSyncKeys(entryId: string, content: string): Promise<void> {
+    const promptTemplate = (await api.v1.config.get("lorebook_keys_prompt")) as string;
+    if (!promptTemplate) return;
+
+    const prompt = `${promptTemplate}\n\nENTRY:\n${content}`;
+    const model = (await api.v1.config.get("model")) || "glm-4-6";
+
+    const messages = [{ role: "user" as const, content: prompt }];
+    let buffer = "";
+
+    try {
+      await hyperGenerate(
+        messages,
+        {
+          model,
+          maxTokens: 100,
+          minTokens: 1,
+        },
+        (text) => {
+          buffer += text;
+        },
+        "background"
+      );
+
+      const cleanBuffer = buffer.trim();
+      const keys = cleanBuffer
+        .split(",")
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0);
+
+      if (keys.length > 0) {
+        await api.v1.lorebook.updateEntry(entryId, { keys });
+      }
+    } catch (e) {
+      api.v1.log("Error generating lorebook keys:", e);
     }
   }
 

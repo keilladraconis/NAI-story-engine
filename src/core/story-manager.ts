@@ -350,6 +350,10 @@ export class StoryManager {
     await this.saveStoryData(true);
   }
 
+  public async generateLorebookKeys(entryId: string, content: string): Promise<void> {
+    await this.lorebookSyncService.generateAndSyncKeys(entryId, content);
+  }
+
   public async saveStoryData(notify: boolean = true): Promise<void> {
     await this.dataManager.save();
     if (notify) {
