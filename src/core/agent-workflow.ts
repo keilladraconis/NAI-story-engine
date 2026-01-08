@@ -21,7 +21,7 @@ export class AgentWorkflowService {
     string,
     {
       isRunning: boolean;
-      signal?: any;
+      signal?: CancellationSignal;
       budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
       budgetResolver?: () => void;
       budgetWaitTime?: number;
@@ -116,8 +116,8 @@ export class AgentWorkflowService {
 
       const applyFilters = (t: string) => {
         let out = t;
-        if ((result as any).filters) {
-          for (const filter of (result as any).filters) {
+        if (result.filters) {
+          for (const filter of result.filters) {
             out = filter(out);
           }
         }

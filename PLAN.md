@@ -60,7 +60,6 @@
 #### Planned Features:
 - Multi-project support
 - Template and genre presets
-- Export to multiple formats
 - CSS styling refinement
 - Optimization of re-rendering logic during streaming generation.
 

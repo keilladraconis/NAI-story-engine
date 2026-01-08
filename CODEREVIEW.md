@@ -14,26 +14,7 @@ Current focus should be on tightening type safety (removing residual `any` usage
 
 ## MEDIUM Priority
 
-### 1. Type Safety in `AgentWorkflowService`
-**Location:** `src/core/agent-workflow.ts`
-**Finding:**
-- `listGenerationState` defines `signal?: any`. It should be typed as `CancellationSignal` (from the NAI API types).
-- `runListGeneration` casts `result` to `any` to access `filters` (`(result as any).filters`). This is unnecessary as `StrategyResult` in `context-strategies.ts` correctly includes the optional `filters` property.
-**Recommendation:** Remove the `any` cast and type `signal` correctly.
-
-### 2. Type Safety in `StoryManager`
-**Location:** `src/core/story-manager.ts`
-**Finding:**
-- `saveTimeout` and `syncTimeout` are typed as `any`.
-- `api.v1.timers.setTimeout` returns a `Promise<number>` (the timer ID).
-**Recommendation:** Type these as `number | undefined` and await the `setTimeout` call correctly (which is already being done), storing the numeric ID.
-
-### 3. Missing Import/Export for Full State
-**Location:** `src/core/story-manager.ts` / `src/core/story-data-manager.ts`
-**Finding:**
-- While `StoryManager` handles persistence to `api.v1.storyStorage`, there is no mechanism to export the entire `StoryData` object (including DULFS lists and Brainstorm history) to a JSON file for user backup or transfer.
-- Existing NAI Lorebook export only handles the synchronized Lorebook entries, not the Story Engine metadata (like Brainstorm history or draft states).
-**Recommendation:** Implement `exportStoryData` and `importStoryData` methods in `StoryManager` and expose them in the UI (likely in a Settings or "Project" tab).
+*None identified.*
 
 ---
 

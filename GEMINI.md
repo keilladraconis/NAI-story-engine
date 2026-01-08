@@ -86,7 +86,6 @@ When debugging issues, you may add debugging log statements and provide the user
 - **Data-Driven UI**: `FIELD_CONFIGS` drives the generation of the `StructuredEditor` interface.
 - **Current Status (Jan 8, 2026)**: Code review completed. 
     - **Stability**: High.
-    - **Gaps**: Import/Export feature is missing (Priority Medium).
-    - **Maintenance**: Minor type safety cleanups needed in `AgentWorkflowService` and `StoryManager`.
+    - **Maintenance**: Type safety cleanups completed.
     - **Refactoring**: `ListFieldStrategy` logic could be further decoupled.
 

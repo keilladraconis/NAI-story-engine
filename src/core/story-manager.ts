@@ -10,8 +10,8 @@ export class StoryManager {
   private lorebookSyncService: LorebookSyncService;
   private brainstormDataManager: BrainstormDataManager;
 
-  private saveTimeout?: any;
-  private syncTimeout?: any;
+  private saveTimeout?: number;
+  private syncTimeout?: number;
 
   constructor() {
     this.dataManager = new StoryDataManager();
