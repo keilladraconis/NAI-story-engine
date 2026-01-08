@@ -9,7 +9,7 @@ export class SegaModal {
 
   constructor(
     private service: SegaService,
-    private agentWorkflow: AgentWorkflowService
+    private agentWorkflow: AgentWorkflowService,
   ) {}
 
   public async show() {
@@ -26,12 +26,14 @@ export class SegaModal {
     });
 
     this.service.setUpdateCallback(() => {
-      this.modal.update(this.renderContent());
+      this.modal.update({ content: this.renderContent() });
     });
 
     // Wait for close
-    await this.modal.promise;
-    
+    await this.modal.closed;
+
+    this.service.cancel();
+
     // Detach callback
     this.service.setUpdateCallback(() => {});
   }
@@ -42,42 +44,46 @@ export class SegaModal {
         style: { gap: "16px", height: "100%" },
         content: [
           text({
-            text: "Select fields to generate. S.E.G.A. will process them sequentially. New Lorebook entries created during the process will be added to the queue automatically.",
+            text: "S.E.G.A. will process empty fields sequentially. New Lorebook entries created during the process will be added to the queue automatically.",
             style: { opacity: "0.8", "margin-bottom": "8px" },
           }),
-          
+
           // List of items
           column({
-            style: { 
-                flex: "1", 
-                border: "1px solid rgba(128,128,128,0.2)", 
-                "border-radius": "4px",
-                padding: "8px",
-                "max-height": "500px",
-                "overflow-y": "auto"
+            style: {
+              flex: "1",
+              border: "1px solid rgba(128,128,128,0.2)",
+              "border-radius": "4px",
+              padding: "8px",
+              "max-height": "500px",
+              "overflow-y": "auto",
             },
             content: [
               column({
                 style: { gap: "4px" },
-                content: this.service.items.map(item => this.renderItem(item))
-              })
-            ]
+                content: this.service.items.map((item) =>
+                  this.renderItem(item),
+                ),
+              }),
+            ],
           }),
 
           // Footer with Master Button
           row({
-            style: { "justify-content": "center", "padding-top": "16px", "border-top": "1px solid rgba(128,128,128,0.2)" },
-            content: [this.renderMasterButton()]
-          })
-        ]
-      })
+            style: {
+              "justify-content": "center",
+              "padding-top": "16px",
+              "border-top": "1px solid rgba(128,128,128,0.2)",
+            },
+            content: [this.renderMasterButton()],
+          }),
+        ],
+      }),
     ];
   }
 
   private renderItem(item: SegaItem): UIPart {
-    const isRunning = this.service.isRunning;
-    
-    let statusIcon = "circle";
+    let statusIcon: IconId = "circle";
     let statusColor = "gray";
     let statusOpacity = "0.3";
 
@@ -94,55 +100,68 @@ export class SegaModal {
       statusColor = "#2196f3"; // Blue
       statusOpacity = "1";
     } else if (item.status === "error") {
-      statusIcon = "alert-circle";
+      statusIcon = "alert";
       statusColor = "#f44336"; // Red
       statusOpacity = "1";
     }
 
-    const canToggle = !isRunning && (item.status === "blank" || item.status === "checked");
-
     return row({
-      style: { 
-        "align-items": "center", 
-        padding: "4px 8px", 
-        "background-color": item.status === "generating" ? "rgba(33, 150, 243, 0.1)" : "transparent",
+      style: {
+        "align-items": "center",
+        padding: "4px 8px",
+        "background-color":
+          item.status === "generating"
+            ? "rgba(33, 150, 243, 0.1)"
+            : "transparent",
         "border-radius": "4px",
-        gap: "12px"
+        gap: "12px",
       },
       content: [
         button({
-          iconId: statusIcon as any,
+          iconId: statusIcon,
           text: "", // Icon only
-          style: {  
-              color: statusColor, 
-              opacity: statusOpacity,
-              background: "transparent",
-              border: "none",
-              padding: "0",
-              width: "24px",
-              height: "24px",
-              cursor: canToggle ? "pointer" : "default"
+          style: {
+            color: statusColor,
+            opacity: statusOpacity,
+            background: "transparent",
+            border: "none",
+            padding: "0",
+            width: "24px",
+            height: "24px",
+            cursor: "default",
           },
-          callback: canToggle ? () => this.service.toggleItem(item.id) : () => {}
+          callback: () => {},
         }),
         column({
           style: { gap: "2px", flex: "1" },
           content: [
-            text({ 
+            text({
               text: item.label,
-              style: { "font-weight": item.status === "generating" ? "bold" : "normal" }
+              style: {
+                "font-weight": item.status === "generating" ? "bold" : "normal",
+              },
             }),
-            item.status === "error" ? text({
-                text: item.error || "Error",
-                style: { color: "red", "font-size": "0.8em" }
-            }) : null
-          ].filter(Boolean) as UIPart[]
+            item.status === "error"
+              ? text({
+                  text: item.error || "Error",
+                  style: { color: "red", "font-size": "0.8em" },
+                })
+              : null,
+          ].filter(Boolean) as UIPart[],
         }),
-        item.type === "lorebook" ? text({
-            text: "Lorebook",
-            style: { "font-size": "0.7em", opacity: "0.5", border: "1px solid gray", "border-radius": "4px", padding: "1px 4px" }
-        }) : null
-      ].filter(Boolean) as UIPart[]
+        item.type === "lorebook"
+          ? text({
+              text: "Lorebook",
+              style: {
+                "font-size": "0.7em",
+                opacity: "0.5",
+                border: "1px solid gray",
+                "border-radius": "4px",
+                padding: "1px 4px",
+              },
+            })
+          : null,
+      ].filter(Boolean) as UIPart[],
     });
   }
 
@@ -150,55 +169,57 @@ export class SegaModal {
     const isRunning = this.service.isRunning;
     const currentId = this.service.currentFieldId;
 
-    let budgetState: "normal" | "waiting_for_user" | "waiting_for_timer" = "normal";
-    
+    let budgetState: "normal" | "waiting_for_user" | "waiting_for_timer" =
+      "normal";
+
     // Look up budget state if running
     if (currentId) {
-        // Check list generation state first
-        let state = this.agentWorkflow.getListGenerationState(currentId);
-        if (!state.isRunning) {
-            // Check field session
-            const session = this.agentWorkflow.getSession(currentId);
-            if (session) {
-                budgetState = session.budgetState || "normal";
-            }
-        } else {
-            budgetState = state.budgetState || "normal";
+      // Check list generation state first
+      let state = this.agentWorkflow.getListGenerationState(currentId);
+      if (!state.isRunning) {
+        // Check field session
+        const session = this.agentWorkflow.getSession(currentId);
+        if (session) {
+          budgetState = session.budgetState || "normal";
         }
+      } else {
+        budgetState = state.budgetState || "normal";
+      }
     }
 
     return createResponsiveGenerateButton(
-        "sega-master-btn",
-        {
-            isRunning: isRunning,
-            isQueued: false, // We handle queuing internally
-            budgetState: budgetState
+      "sega-master-btn",
+      {
+        isRunning: isRunning,
+        isQueued: false, // We handle queuing internally
+        budgetState: budgetState,
+      },
+      {
+        onStart: () => {
+          this.service.startQueue();
         },
-        {
-            onStart: () => {
-                this.service.startQueue();
-            },
-            onCancel: () => {
-                this.service.cancel();
-            },
-            onContinue: () => {
-                 // Trigger resolve on the *current* session
-                 if (currentId) {
-                     const session = this.agentWorkflow.getSession(currentId);
-                     if (session && session.budgetResolver) {
-                         session.budgetResolver();
-                         return;
-                     }
-                     
-                     // Check list state
-                     const listState = this.agentWorkflow.getListGenerationState(currentId);
-                     if (listState && listState.budgetResolver) {
-                         listState.budgetResolver();
-                     }
-                 }
+        onCancel: () => {
+          this.service.cancel();
+        },
+        onContinue: () => {
+          // Trigger resolve on the *current* session
+          if (currentId) {
+            const session = this.agentWorkflow.getSession(currentId);
+            if (session && session.budgetResolver) {
+              session.budgetResolver();
+              return;
             }
+
+            // Check list state
+            const listState =
+              this.agentWorkflow.getListGenerationState(currentId);
+            if (listState && listState.budgetResolver) {
+              listState.budgetResolver();
+            }
+          }
         },
-        "S.E.G.A. Start"
+      },
+      "S.E.G.A. Start",
     );
   }
 }

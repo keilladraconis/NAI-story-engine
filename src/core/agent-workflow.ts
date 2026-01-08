@@ -10,11 +10,13 @@ export interface FieldSession {
   budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
   budgetResolver?: () => void;
   budgetWaitTime?: number;
+  error?: string;
 }
 
 export class AgentWorkflowService {
   private contextFactory: ContextStrategyFactory;
   private sessions: Map<string, FieldSession> = new Map();
+  private listeners: Array<(fieldId: string) => void> = [];
 
   private taskQueue: Array<
     | { type: "field"; fieldId: string; updateFn: () => void }
@@ -32,11 +34,29 @@ export class AgentWorkflowService {
       budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
       budgetResolver?: () => void;
       budgetWaitTime?: number;
+      error?: string;
     }
   > = new Map();
 
   constructor(private storyManager: StoryManager) {
     this.contextFactory = new ContextStrategyFactory(storyManager);
+  }
+
+  public subscribe(listener: (fieldId: string) => void) {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+    };
+  }
+
+  private notify(fieldId: string) {
+    for (const listener of this.listeners) {
+      try {
+        listener(fieldId);
+      } catch (e) {
+        api.v1.log(`Workflow listener error: ${e}`);
+      }
+    }
   }
 
   public getSession(fieldId: string): FieldSession | undefined {
@@ -101,27 +121,40 @@ export class AgentWorkflowService {
 
   public requestListGeneration(fieldId: string, updateFn: () => void) {
     const state = this.listGenerationState.get(fieldId) || { isRunning: false };
+    state.error = undefined;
     this.listGenerationState.set(fieldId, state);
+
+    const wrappedUpdate = () => {
+      updateFn();
+      this.notify(fieldId);
+    };
 
     if (this.isGlobalGenerating || state.isRunning) {
       state.isQueued = true;
-      this.taskQueue.push({ type: "list", fieldId, updateFn });
-      updateFn();
+      this.taskQueue.push({ type: "list", fieldId, updateFn: wrappedUpdate });
+      wrappedUpdate();
     } else {
       this.isGlobalGenerating = true;
-      this._runListGeneration(fieldId, updateFn);
+      this._runListGeneration(fieldId, wrappedUpdate);
     }
   }
 
   public requestFieldGeneration(fieldId: string, updateFn: () => void) {
     const session = this.getSession(fieldId) || this.startSession(fieldId);
+    session.error = undefined;
+
+    const wrappedUpdate = () => {
+      updateFn();
+      this.notify(fieldId);
+    };
+
     if (this.isGlobalGenerating || session.isRunning) {
       session.isQueued = true;
-      this.taskQueue.push({ type: "field", fieldId, updateFn });
-      updateFn();
+      this.taskQueue.push({ type: "field", fieldId, updateFn: wrappedUpdate });
+      wrappedUpdate();
     } else {
       this.isGlobalGenerating = true;
-      this._runFieldGeneration(fieldId, updateFn);
+      this._runFieldGeneration(fieldId, wrappedUpdate);
     }
   }
 
@@ -164,6 +197,7 @@ export class AgentWorkflowService {
       isQueued: false,
       signal: cancellationSignal,
       budgetState: "normal" as const,
+      error: undefined as string | undefined,
     };
     this.listGenerationState.set(fieldId, state);
     updateFn();
@@ -266,16 +300,19 @@ export class AgentWorkflowService {
       }
     } catch (e: any) {
       if (!e.message.includes("cancelled")) {
+        const state = this.listGenerationState.get(fieldId);
+        if (state) state.error = e.message;
         api.v1.ui.toast(`List generation failed: ${e.message}`, {
           type: "error",
         });
       }
     } finally {
-      this.listGenerationState.set(fieldId, {
-        isRunning: false,
-        isQueued: false,
-        signal: undefined,
-      });
+      const state = this.listGenerationState.get(fieldId);
+      if (state) {
+        state.isRunning = false;
+        state.isQueued = false;
+        state.signal = undefined;
+      }
       updateFn();
       this.processQueue();
     }
@@ -371,6 +408,7 @@ export class AgentWorkflowService {
       }
     } catch (e: any) {
       if (!e.message.includes("cancelled")) {
+        session.error = e.message;
         api.v1.ui.toast(`Generation failed: ${e.message}`, { type: "error" });
       }
     } finally {

@@ -13,8 +13,6 @@ export interface SegaItem {
 export class SegaService {
   private _items: SegaItem[] = [];
   private _isRunning: boolean = false;
-  private _currentFieldId?: string;
-  private _cancellationSignal?: CancellationSignal;
   
   private updateCallback?: () => void;
 
@@ -24,6 +22,12 @@ export class SegaService {
   ) {
     // Listen for new DULFS items/Lorebooks
     this.storyManager.subscribe(() => this.checkForNewItems());
+    
+    // Subscribe to workflow updates
+    this.agentWorkflow.subscribe((fieldId) => {
+      this.syncItemStatus(fieldId);
+      if (this.updateCallback) this.updateCallback();
+    });
   }
 
   public setUpdateCallback(cb: () => void) {
@@ -39,7 +43,7 @@ export class SegaService {
   }
 
   public get currentFieldId(): string | undefined {
-    return this._currentFieldId;
+    return this._items.find(i => i.status === "generating")?.id;
   }
 
   public initialize() {
@@ -61,7 +65,6 @@ export class SegaService {
     }
 
     // 2. Add existing Lorebooks managed by Story Engine
-    // We scan DULFS lists for items with linked lorebooks
     this.scanForLorebooks();
   }
 
@@ -74,16 +77,14 @@ export class SegaService {
         if (item.linkedLorebooks && item.linkedLorebooks.length > 0) {
           for (const entryId of item.linkedLorebooks) {
             const id = `lorebook:${entryId}`;
-            // Check if already in list
             if (this._items.find(i => i.id === id)) continue;
 
-            // Check content
             const content = this.storyManager.getFieldContent(id);
             const hasContent = content && content.trim().length > 0;
 
             this._items.push({
               id,
-              label: `${item.name} (${config.label})`, // e.g. "Gandalf (Dramatis Personae)"
+              label: `${item.name} (${config.label})`,
               type: "lorebook",
               status: hasContent ? "checked" : "blank"
             });
@@ -93,8 +94,51 @@ export class SegaService {
     }
   }
 
+  private syncItemStatus(fieldId: string) {
+    const item = this._items.find(i => i.id === fieldId);
+    if (!item) return;
+
+    const config = FIELD_CONFIGS.find(c => c.id === fieldId);
+    const isList = config?.layout === "list";
+
+    if (isList) {
+      const state = this.agentWorkflow.getListGenerationState(fieldId);
+      if (state.isRunning) item.status = "generating";
+      else if (state.isQueued) item.status = "queued";
+      else if (state.error) {
+        item.status = "error";
+        item.error = state.error;
+      } else {
+        const content = this.storyManager.getDulfsList(fieldId);
+        item.status = content.length > 0 ? "checked" : "blank";
+      }
+    } else {
+      const session = this.agentWorkflow.getSession(fieldId);
+      if (session?.isRunning) item.status = "generating";
+      else if (session?.isQueued) item.status = "queued";
+      else if (session?.error) {
+        item.status = "error";
+        item.error = session.error;
+      } else {
+        const content = this.storyManager.getFieldContent(fieldId);
+        item.status = content && content.trim().length > 0 ? "checked" : "blank";
+      }
+    }
+
+    this.checkGlobalCompletion();
+  }
+
+  private checkGlobalCompletion() {
+    if (!this._isRunning) return;
+
+    const hasActive = this._items.some(i => i.status === "queued" || i.status === "generating");
+    if (!hasActive) {
+      this._isRunning = false;
+      api.v1.ui.toast("S.E.G.A. Cycle Complete!", { type: "success" });
+    }
+  }
+
   private checkForNewItems() {
-    // Only add new items if we are running or initialized
     if (this._items.length === 0) return;
 
     const dulfsFields = FIELD_CONFIGS.filter(c => c.layout === "list");
@@ -108,20 +152,22 @@ export class SegaService {
             const id = `lorebook:${entryId}`;
             if (this._items.find(i => i.id === id)) continue;
 
-            // New item found
             const content = this.storyManager.getFieldContent(id);
             const hasContent = content && content.trim().length > 0;
             
-            // If running, auto-queue it if blank
-            const status = this._isRunning && !hasContent ? "queued" : (hasContent ? "checked" : "blank");
-
-            this._items.push({
+            const itemToPush: SegaItem = {
               id,
               label: `${item.name}`,
               type: "lorebook",
-              status
-            });
+              status: hasContent ? "checked" : "blank"
+            };
+
+            this._items.push(itemToPush);
             changed = true;
+
+            if (this._isRunning && !hasContent) {
+               this.triggerItem(itemToPush);
+            }
           }
         }
       }
@@ -132,144 +178,54 @@ export class SegaService {
     }
   }
 
-  public async startQueue() {
+  public startQueue() {
     if (this._isRunning) return;
     
-    // Queue all blank items
     let hasWork = false;
     for (const item of this._items) {
       if (item.status === "blank") {
-        item.status = "queued";
         hasWork = true;
+        this.triggerItem(item);
       }
     }
 
-    if (!hasWork) {
-      // Nothing to do
-      return;
+    if (hasWork) {
+      this._isRunning = true;
+      if (this.updateCallback) this.updateCallback();
     }
-
-    this._isRunning = true;
-    this._cancellationSignal = await api.v1.createCancellationSignal();
-    if (this.updateCallback) this.updateCallback();
-
-    this.processNext();
   }
 
-  private async processNext() {
-    if (!this._isRunning || (this._cancellationSignal && this._cancellationSignal.cancelled)) {
-      this._isRunning = false;
-      this._currentFieldId = undefined;
-      // Reset queued items to blank
-      this._items.forEach(i => {
-        if (i.status === "queued" || i.status === "generating") i.status = "blank";
-      });
-      if (this.updateCallback) this.updateCallback();
-      return;
-    }
-
-    const nextItem = this._items.find(i => i.status === "queued");
-    if (!nextItem) {
-      // Done!
-      this._isRunning = false;
-      this._currentFieldId = undefined;
-      api.v1.ui.toast("S.E.G.A. Cycle Complete!", { type: "success" });
-      if (this.updateCallback) this.updateCallback();
-      return;
-    }
-
-    // Start generating
-    nextItem.status = "generating";
-    this._currentFieldId = nextItem.id;
-    if (this.updateCallback) this.updateCallback();
-
-    try {
-      if (nextItem.type === "field" && FIELD_CONFIGS.find(c => c.id === nextItem.id)?.layout === "list") {
-        // DULFS List Generation
-        await new Promise<void>((resolve) => {
-           // We need to wrap the updateFn to detect completion, but AgentWorkflow doesn't return a promise easily 
-           // actually requestListGeneration takes an updateFn.
-           
-           // We'll poll or check state? 
-           // Better: AgentWorkflowService._runListGeneration is async but requestListGeneration is void.
-           // However, AgentWorkflowService manages the queue.
-           // Since we want to control the queue *here* (SEGA is a master queue), we should ideally wait for the generation to finish.
-           
-           // But AgentWorkflowService is designed to run in background.
-           // We can't await `requestListGeneration`. 
-           
-           // Hack: We can poll the session state.
-           this.agentWorkflow.requestListGeneration(nextItem.id, () => {
-             // This updateFn is called on state changes.
-             const state = this.agentWorkflow.getListGenerationState(nextItem.id);
-             if (this.updateCallback) this.updateCallback(); // Update our UI to reflect budget states from underlying service
-             
-             if (!state.isRunning && !state.isQueued) {
-                // Finished
-                resolve();
-             }
-           });
-        });
-      } else {
-        // Text Field Generation (or Lorebook)
-        await new Promise<void>((resolve) => {
-           this.agentWorkflow.requestFieldGeneration(nextItem.id, () => {
-             const session = this.agentWorkflow.getSession(nextItem.id);
-             if (this.updateCallback) this.updateCallback();
-
-             if (session && !session.isRunning && !session.isQueued) {
-               resolve();
-             }
-           });
-        });
-      }
-
-      // Check content to confirm success (optional, but good for status)
-      // const content = this.storyManager.getFieldContent(nextItem.id);
-      // For DULFS, "content" isn't the list, but we assume success if it finished without error.
-      // Ideally we'd check if list has items.
-      
-      nextItem.status = "checked";
-    } catch (e: any) {
-      api.v1.log(e);
-      nextItem.status = "error";
-      nextItem.error = e.message;
-    } finally {
-      this._currentFieldId = undefined;
-      // Small delay to let UI settle?
-      await new Promise<void>(r => api.v1.timers.setTimeout(() => r(), 100));
-      this.processNext();
+  private triggerItem(item: SegaItem) {
+    const isList = FIELD_CONFIGS.find(c => c.id === item.id)?.layout === "list";
+    if (isList) {
+      this.agentWorkflow.requestListGeneration(item.id, () => {});
+    } else {
+      this.agentWorkflow.requestFieldGeneration(item.id, () => {});
     }
   }
 
   public cancel() {
     this._isRunning = false;
-    if (this._cancellationSignal) this._cancellationSignal.cancel();
-    
-    if (this._currentFieldId) {
-        // Cancel the underlying generation
-        if (FIELD_CONFIGS.find(c => c.id === this._currentFieldId)?.layout === "list") {
-            this.agentWorkflow.cancelListGeneration(this._currentFieldId);
+    for (const item of this._items) {
+      if (item.status === "generating" || item.status === "queued") {
+        const isList = FIELD_CONFIGS.find(c => c.id === item.id)?.layout === "list";
+        if (isList) {
+          this.agentWorkflow.cancelListGeneration(item.id);
         } else {
-            this.agentWorkflow.cancelFieldGeneration(this._currentFieldId);
+          this.agentWorkflow.cancelFieldGeneration(item.id);
         }
+        // Status will be updated via workflow subscription
+      }
     }
-
-    // Reset queue
-     this._items.forEach(i => {
-        if (i.status === "queued" || i.status === "generating") i.status = "blank";
-      });
-      
     if (this.updateCallback) this.updateCallback();
   }
 
   public toggleItem(id: string) {
-    if (this._isRunning) return; // Locked while running
+    if (this._isRunning) return;
     const item = this._items.find(i => i.id === id);
     if (item) {
       if (item.status === "checked") item.status = "blank";
       else if (item.status === "blank") item.status = "checked";
-      // Ignore others
     }
     if (this.updateCallback) this.updateCallback();
   }
