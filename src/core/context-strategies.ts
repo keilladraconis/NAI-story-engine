@@ -259,6 +259,7 @@ const Strategies: Record<string, StrategyFn> = {
   "generate:lorebook": async (session, manager, base) => {
     let itemName = "the entity";
     let itemDesc = "";
+    let categoryId = "generic";
 
     if (session.fieldId.startsWith("lorebook:")) {
       const entryId = session.fieldId.split(":")[1];
@@ -266,9 +267,11 @@ const Strategies: Record<string, StrategyFn> = {
       if (match) {
         itemName = match.item.name;
         itemDesc = match.item.content;
+        categoryId = match.fieldId;
       }
     } else {
       const [fieldId, itemId] = session.fieldId.split(":");
+      categoryId = fieldId;
       const list = manager.getDulfsList(fieldId);
       const item = list.find((i) => i.id === itemId);
       if (item) {
@@ -277,13 +280,24 @@ const Strategies: Record<string, StrategyFn> = {
       }
     }
 
-    const configPrompt =
+    const basePrompt =
       (await api.v1.config.get("lorebook_generate_prompt")) || "";
-    const formatInstruction = configPrompt.replace("[itemName]", itemName);
+    
+    // Select specific template based on category
+    let templateKey = "lorebook_template_character"; // Default fallback
+    if (categoryId === "dramatis_personae") templateKey = "lorebook_template_character";
+    else if (categoryId === "locations") templateKey = "lorebook_template_location";
+    else if (categoryId === "factions") templateKey = "lorebook_template_faction";
+    else if (categoryId === "universe_systems") templateKey = "lorebook_template_system";
+    else if (categoryId === "situational_dynamics") templateKey = "lorebook_template_dynamic";
+    
+    const templateContent = (await api.v1.config.get(templateKey)) || "";
+
+    const combinedInstruction = `${basePrompt.replace("[itemName]", itemName)}\n\nTASK: Fill in the following Template for "${itemName}". Replace the placeholders with generated content.\n\nTEMPLATE:\n${templateContent}`;
 
     const messages = contextBuilder(
       base.systemMsg,
-      { role: "user", content: formatInstruction },
+      { role: "user", content: combinedInstruction },
       {
         role: "assistant",
         content: `${itemName}\n`,

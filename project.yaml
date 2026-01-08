@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767900279
+updatedAt: 1767902126
 config:
   - name: model
     prettyName: LLM Model
@@ -105,17 +105,41 @@ config:
 
   - name: lorebook_generate_prompt
     prettyName: Lorebook Generate Prompt
-    description: Prompt for generating Lorebook entries.
+    description: Smart prompt for generating diverse Lorebook entries (Characters,
+      Locations, Systems).
     type: string
     multiline: true
     default: |-
-      Generate a lorebook entry for "[itemName]".
-      You MUST follow this EXACT format. Line-by-line structure is essential.
+      You are the **Archivist**.
+      Generate a structured Lorebook Entry for "[itemName]".
 
-      FORMAT:
-      ```
-      [Full Name]
-      Type: [character, location, faction, etc.]
+      **Format Rules:**
+      1. **Header:** Start with four dashes (`----`).
+      2. **Identity:**
+         - Line 1: `[Entry Name]`
+         - Line 2: `Type: [Category]` (e.g. Character, Location, Faction, System, Item)
+         - Line 3: `Setting: original`
+      3. **Attributes:** Add `[Key]: [Value]` pairs RELEVANT to the Type.
+         - *Character:* Age, Gender, Role, Appearance, Personality.
+         - *Location:* Climate, Terrain, Population, Key Features.
+         - *Faction:* Leader, Goals, Resources, Rivals.
+         - *Object/System:* Origin, Function, Rules, Cost.
+      4. **Description:** Follow with free text focusing on history, nature, and narrative potential.
+
+      **Content Directives:**
+      - **Characters:** Focus on internal conflicts (Surface/Shadow/Personal) and motivations. **NO** future plotting or "if/then" scripts.
+      - **General:** Focus on "Narrative Vectors"—how this entry creates conflict or opportunity.
+      - **Adaptability:** DO NOT include irrelevant fields (e.g. no "Gender" for a City).
+      - **Structure:** Maintain the strict line-by-line format for the header and attributes.
+
+  - name: lorebook_template_character
+    prettyName: Lorebook Template (Character)
+    description: Strict template for Character entries.
+    type: string
+    multiline: true
+    default: |-
+      [Entry Name]
+      Type: Character
       Setting: original
       Age: [number or N/A]
       Gender: [male, female, etc.]
@@ -137,19 +161,78 @@ config:
       - Pillar (Self): [internal manifestation]
       - Pillar (World): [external role]
       - Source: [formative past event]
-      ```
 
-      WRONG example (DO NOT DO THIS):
-      ```
-      [Character Name], Type: character, Setting: original, Age: 25...
-      ```
+  - name: lorebook_template_location
+    prettyName: Lorebook Template (Location)
+    description: Strict template for Location entries.
+    type: string
+    multiline: true
+    default: |-
+      [Entry Name]
+      Type: Location
+      Setting: original
+      Region: [City, Continent, or Sector]
+      Climate: [Atmosphere, smell, lighting, temperature]
+      Population: [Demographics/Crowd density]
+      Danger Level: [Low/Medium/High/Extreme]
+      Economy: [Main exports/trade/resources]
+      Key Factions: [Controlling groups]
+      Description: [Visuals, history, and layout. ~100 words.]
+      Hidden Aspects: [Secrets or underground elements]
+      Narrative Vector: [How this location drives conflict or opportunity]
 
-      CRITICAL RULES:
-      - If character is female, use BWH with cup size. If not, use CWH.
-      - For non-English settings, add native name field immediately after character name.
-      - Deviate from standard attributes only if it makes sense for the category (e.g. Locations don't need Age).
-      - NO Markdown formatting (no bolding, no italics) inside the entry.
-      - NO conversational filler. Start immediately with the name in brackets.
+  - name: lorebook_template_faction
+    prettyName: Lorebook Template (Faction)
+    description: Strict template for Faction entries.
+    type: string
+    multiline: true
+    default: |-
+      [Entry Name]
+      Type: Faction
+      Setting: original
+      Leader: [Name or Title]
+      Alignment: [Ideology, Goal, or Moral Compass]
+      Assets: [Resources, territories, tech, manpower]
+      Rivals: [Enemy factions or opposing groups]
+      Structure: [Hierarchy type: Hierarchical, Cell-based, Decentralized]
+      Description: [History, modus operandi, public face vs. private reality. ~100 words.]
+      Agenda: [Current active goal]
+      Narrative Vector: [How they are destabilizing or changing the status quo]
+
+  - name: lorebook_template_system
+    prettyName: Lorebook Template (World System)
+    description: Strict template for World Systems (Magic, Tech, Cosmology).
+    type: string
+    multiline: true
+    default: |-
+      [Entry Name]
+      Type: System
+      Setting: original
+      Domain: [Magic / Technology / Biology / Physics / Divine]
+      Origin: [Ancient / Modern / Alien / Unknown]
+      Rules: [Hard limits or laws of how it works]
+      Cost/Risk: [Price of usage or danger involved]
+      Accessibility: [Who can use it? Specialists, everyone, or artifacts?]
+      Description: [Mechanics, function, and appearance. ~100 words.]
+      Societal Impact: [How it shapes the culture, economy, or war]
+      Narrative Vector: [Current instability, evolution, or crisis related to this system]
+
+  - name: lorebook_template_dynamic
+    prettyName: Lorebook Template (Situational Dynamic)
+    description: Strict template for Situational Dynamics (Tensions, Vectors).
+    type: string
+    multiline: true
+    default: |-
+      [Entry Name]
+      Type: Situational Dynamic
+      Setting: original
+      Scope: [Local / Regional / Global]
+      Primary Actors: [Factions or characters involved]
+      Stakes: [What is to be gained or lost?]
+      Tension Source: [Resource scarcity / Ideological / Revenge / Mystery]
+      Description: [The nature of the conflict or situation. ~100 words.]
+      Trigger Event: [What recent event escalated this?]
+      Narrative Vector: [The direction this situation is heading if unchecked]
 
   - name: lorebook_keys_prompt
     prettyName: Lorebook Keys Prompt

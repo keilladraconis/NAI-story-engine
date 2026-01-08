@@ -33,6 +33,7 @@ export interface ListRenderContext extends BaseRenderContext {
 
 export interface TextRenderContext extends BaseRenderContext {
   handleFieldChange: (content: string) => void;
+  currentContent?: string;
   // Generator Sync
   setAttgEnabled?: (enabled: boolean) => Promise<void>;
   isAttgEnabled?: () => boolean;
@@ -271,9 +272,10 @@ export class TextFieldStrategy implements FieldRenderStrategy<TextRenderContext>
       setStyleEnabled,
       isStyleEnabled,
       runFieldGeneration,
+      currentContent,
     } = context;
 
-    const content = storyManager.getFieldContent(config.id);
+    const content = currentContent !== undefined ? currentContent : storyManager.getFieldContent(config.id);
     const session = agentWorkflowService.getSession(config.id);
 
     // Sync Checkbox (for ATTG/Style)
@@ -308,6 +310,9 @@ export class TextFieldStrategy implements FieldRenderStrategy<TextRenderContext>
       },
       {
         onStart: () => {
+          if (editModeState) {
+            toggleEditMode();
+          }
           if (runFieldGeneration) {
             runFieldGeneration(config.id);
           }

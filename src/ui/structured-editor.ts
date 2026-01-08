@@ -12,6 +12,7 @@ export class StructuredEditor {
   private agentWorkflowService: AgentWorkflowService;
   private onUpdateCallback: () => void;
   private editModes: Map<string, boolean> = new Map();
+  private drafts: Map<string, string> = new Map();
 
   constructor(
     storyManager: StoryManager,
@@ -27,8 +28,27 @@ export class StructuredEditor {
   }
 
   private toggleEditMode(fieldId: string): void {
-    const current = this.editModes.get(fieldId) || false;
-    this.editModes.set(fieldId, !current);
+    const isEditing = this.editModes.get(fieldId) || false;
+
+    if (isEditing) {
+      // Switching from Edit to Preview -> SAVE
+      // Check if we have a draft for this field
+      if (this.drafts.has(fieldId)) {
+        const draft = this.drafts.get(fieldId);
+        // Only save if draft is defined
+        if (draft !== undefined) {
+           this.storyManager.setFieldContent(fieldId, draft);
+        }
+        // Clear draft after saving
+        this.drafts.delete(fieldId);
+      }
+    } else {
+      // Switching from Preview to Edit -> Initialize Draft
+      const content = this.storyManager.getFieldContent(fieldId);
+      this.drafts.set(fieldId, content);
+    }
+
+    this.editModes.set(fieldId, !isEditing);
     this.onUpdateCallback();
   }
 
@@ -76,14 +96,16 @@ export class StructuredEditor {
     
     // We can infer the key based on whether we have a session AND NOT Inline Generation
     const editModeKey: string = config.id;
+    const isEditing = this.editModes.get(editModeKey) || false;
 
     const context: RenderContext = {
       config,
       storyManager: this.storyManager,
       agentWorkflowService: this.agentWorkflowService,
-      editModeState: this.editModes.get(editModeKey) || false,
+      editModeState: isEditing,
       toggleEditMode: () => this.toggleEditMode(editModeKey),
       handleFieldChange: (c) => this.handleFieldChange(config.id, c),
+      currentContent: isEditing ? this.drafts.get(config.id) : undefined,
       // List specific
       getItemEditMode: (itemId) => this.getItemEditMode(config.id, itemId),
       toggleItemEditMode: (itemId) => this.toggleItemEditMode(config.id, itemId),
@@ -109,8 +131,15 @@ export class StructuredEditor {
   }
 
   private handleFieldChange(fieldId: string, content: string): void {
-    // Update StoryManager which will trigger UI updates via the listener in StoryEngineUI
-    this.storyManager.setFieldContent(fieldId, content);
+    const isEditing = this.editModes.get(fieldId) || false;
+    
+    if (isEditing) {
+      // Update draft
+      this.drafts.set(fieldId, content);
+    } else {
+      // Update StoryManager directly (fallback or non-edit updates)
+      this.storyManager.setFieldContent(fieldId, content);
+    }
   }
 
   // Public methods for external access

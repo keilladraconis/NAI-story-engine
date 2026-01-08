@@ -77,6 +77,7 @@ When debugging issues, you may add debugging log statements and provide the user
 - A custom Lorebook Panel integration allows for AI-assisted editing of individual lorebook entries managed by Story Engine.
 - **DULFS Lorebook Sync**: List items now support name editing which automatically triggers a debounced (2s) re-sync to the NovelAI Lorebook, updating both individual entries (display names and keys) and the full list summary.
 - **Enablement Propagation**: Enabling or disabling a DULFS field in the sidebar now correctly propagates that status to the corresponding NovelAI Lorebook categories and entries.
+- **Standardized Toggle Behavior**: `toggleableContent` now consistently uses a Pencil icon for Edit and a Disk icon for Save/Preview. Text fields implement a draft system where changes are stored locally and only committed to `StoryManager` (and side effects triggered) upon clicking Save. Generation automatically saves drafts before running.
 
 ## Architectural Overhaul (Jan 2026)
 - **Simplified Workflow**: Removed `WandUI`, `ReviewPatcher`, and `StageHandlers`. The system now focuses on high-quality single-pass generation.

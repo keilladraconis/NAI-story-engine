@@ -5,7 +5,10 @@ import { hyperGenerate } from "../../lib/hyper-generator";
 export class LorebookSyncService {
   constructor(private dataManager: StoryDataManager) {}
 
-  public async ensureDulfsCategory(fieldId: string, enabled: boolean = true): Promise<string> {
+  public async ensureDulfsCategory(
+    fieldId: string,
+    enabled: boolean = true,
+  ): Promise<string> {
     const data = this.dataManager.data;
     if (!data) throw new Error("No story data");
 
@@ -30,7 +33,7 @@ export class LorebookSyncService {
         id: catId,
         name: categoryName,
         enabled: enabled,
-        settings: { entryHeader: "---" },
+        settings: { entryHeader: "----" },
       });
       data.dulfsCategoryIds[fieldId] = catId;
       await this.dataManager.save();
@@ -53,7 +56,11 @@ export class LorebookSyncService {
     let textContent = `${label}\n`;
     if (list && list.length > 0) {
       textContent += list
-        .map((item) => (item.name ? `- **${item.name}**: ${item.content}` : `- ${item.content}`))
+        .map((item) =>
+          item.name
+            ? `- **${item.name}**: ${item.content}`
+            : `- ${item.content}`,
+        )
         .join("\n");
     } else {
       textContent += "(Empty)";
@@ -81,10 +88,22 @@ export class LorebookSyncService {
         });
       } catch (e) {
         api.v1.log(`Failed to update DULFS entry ${entryId}, recreating...`, e);
-        await this.createDulfsLorebookEntry(fieldId, label, textContent, categoryId, isEnabled);
+        await this.createDulfsLorebookEntry(
+          fieldId,
+          label,
+          textContent,
+          categoryId,
+          isEnabled,
+        );
       }
     } else {
-      await this.createDulfsLorebookEntry(fieldId, label, textContent, categoryId, isEnabled);
+      await this.createDulfsLorebookEntry(
+        fieldId,
+        label,
+        textContent,
+        categoryId,
+        isEnabled,
+      );
     }
   }
 
@@ -115,7 +134,10 @@ export class LorebookSyncService {
     }
   }
 
-  public async syncIndividualLorebook(fieldId: string, itemId: string): Promise<void> {
+  public async syncIndividualLorebook(
+    fieldId: string,
+    itemId: string,
+  ): Promise<void> {
     const data = this.dataManager.data;
     if (!data) return;
 
@@ -126,7 +148,8 @@ export class LorebookSyncService {
     const isEnabled = data.dulfsEnabled[fieldId] !== false;
     const categoryId = await this.ensureDulfsCategory(fieldId, isEnabled);
 
-    let entryId = item.linkedLorebooks.length > 0 ? item.linkedLorebooks[0] : null;
+    let entryId =
+      item.linkedLorebooks.length > 0 ? item.linkedLorebooks[0] : null;
 
     if (entryId) {
       try {
@@ -148,12 +171,22 @@ export class LorebookSyncService {
           return;
         }
       } catch (e) {
-        api.v1.log(`Failed to update individual lorebook ${entryId}, recreating...`, e);
+        api.v1.log(
+          `Failed to update individual lorebook ${entryId}, recreating...`,
+          e,
+        );
       }
     }
 
     const textContent = item.lorebookContent || "";
-    await this.createIndividualLorebookEntry(fieldId, itemId, item.name, textContent, categoryId, isEnabled);
+    await this.createIndividualLorebookEntry(
+      fieldId,
+      itemId,
+      item.name,
+      textContent,
+      categoryId,
+      isEnabled,
+    );
   }
 
   private async createIndividualLorebookEntry(
@@ -187,8 +220,13 @@ export class LorebookSyncService {
     }
   }
 
-  public async generateAndSyncKeys(entryId: string, content: string): Promise<void> {
-    const promptTemplate = (await api.v1.config.get("lorebook_keys_prompt")) as string;
+  public async generateAndSyncKeys(
+    entryId: string,
+    content: string,
+  ): Promise<void> {
+    const promptTemplate = (await api.v1.config.get(
+      "lorebook_keys_prompt",
+    )) as string;
     if (!promptTemplate) return;
 
     const prompt = `${promptTemplate}\n\nENTRY:\n${content}`;
@@ -208,7 +246,7 @@ export class LorebookSyncService {
         (text) => {
           buffer += text;
         },
-        "background"
+        "background",
       );
 
       const cleanBuffer = buffer.trim();

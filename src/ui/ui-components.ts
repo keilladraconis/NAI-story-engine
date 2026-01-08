@@ -8,8 +8,8 @@ export const createHeaderWithToggle = (
 ): UIPart => {
   const buttons: UIPart[] = [
     button({
-      text: isEditMode ? "Preview" : "Edit",
-      iconId: isEditMode ? "eye" : "edit-3",
+      text: isEditMode ? "Save" : "Edit",
+      iconId: isEditMode ? "save" : "edit-3",
       callback: onToggle,
     }),
   ];

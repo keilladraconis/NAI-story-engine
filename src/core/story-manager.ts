@@ -123,7 +123,7 @@ export class StoryManager {
           await this.dataManager.save();
           // api.v1.log(`Auto-saved DULFS data (${fieldId})`);
           this.saveTimeout = undefined;
-        }, 5000); // 5 second debounce for storage
+        }, 250); // 250ms debounce for storage
       }
 
       if (syncToLorebook) {
@@ -148,7 +148,7 @@ export class StoryManager {
             );
           }
           this.syncTimeout = undefined;
-        }, 2000); // 2 second debounce for sync
+        }, 500); // 500ms debounce for sync
       }
     }
   }
@@ -292,7 +292,7 @@ export class StoryManager {
           await this.dataManager.save();
           api.v1.log(`Auto-saved global story data (${fieldId})`);
           this.saveTimeout = undefined;
-        }, 5000); // 5 second debounce
+        }, 250); // 250ms debounce
       }
     }
   }
