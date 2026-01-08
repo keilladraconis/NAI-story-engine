@@ -14,7 +14,17 @@ export type TextFilter = (text: string) => string;
 
 export const Filters = {
   scrubBrackets: (t: string) => t.replace(/[\[\]]/g, ""),
-  scrubMarkdown: (t: string) => t.replace(/[*_`#~>]/g, ""),
+  scrubMarkdown: (t: string) => {
+    if (!t) return "";
+    return t
+      .replace(/\*\*(.*?)\*\*/g, "$1") // Bold **
+      .replace(/\*(.*?)\*/g, "$1") // Italic *
+      .replace(/__(.*?)__/g, "$1") // Bold __
+      .replace(/_(.*?)_/g, "$1") // Italic _
+      .replace(/\[(.*?)\]\(.*?\)/g, "$1") // Links
+      .replace(/^#+\s+/gm, "") // Headers
+      .replace(/`{1,3}(.*?)`{1,3}/g, "$1"); // Code
+  },
   normalizeQuotes: (t: string) =>
     t.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"'),
 };
@@ -381,13 +391,13 @@ export class ContextStrategyFactory {
         presence_penalty: 0.05,
         maxTokens: 1024,
       },
+      filters: [Filters.scrubMarkdown],
     };
 
     if (config?.filters) {
-      result.filters = [];
       for (const filterKey of config.filters) {
         if (Filters[filterKey]) {
-          result.filters.push(Filters[filterKey]);
+          result.filters!.push(Filters[filterKey]);
         }
       }
     }

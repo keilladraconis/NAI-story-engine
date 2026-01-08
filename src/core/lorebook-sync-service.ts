@@ -133,11 +133,16 @@ export class LorebookSyncService {
       try {
         const existing = await api.v1.lorebook.entry(entryId);
         if (existing) {
+          const currentKeys = existing.keys || [];
+          const newKeys = currentKeys.includes(item.name)
+            ? currentKeys
+            : [...currentKeys, item.name];
+
           await api.v1.lorebook.updateEntry(entryId, {
             displayName: item.name,
             text: textContent,
             category: categoryId,
-            keys: [item.name],
+            keys: newKeys,
             enabled: isEnabled,
           });
           return;
@@ -180,6 +185,49 @@ export class LorebookSyncService {
     } catch (e) {
       api.v1.log("Error creating individual lorebook entry:", e);
     }
+  }
+
+  public async removeDulfsLorebook(fieldId: string): Promise<void> {
+    const data = this.dataManager.data;
+    if (!data) return;
+
+    // 1. Remove individual item entries
+    const list = this.dataManager.getDulfsList(fieldId);
+    for (const item of list) {
+      if (item.linkedLorebooks && item.linkedLorebooks.length > 0) {
+        for (const entryId of item.linkedLorebooks) {
+          try {
+            await api.v1.lorebook.removeEntry(entryId);
+          } catch (e) {
+            // Ignore if entry already gone
+          }
+        }
+      }
+    }
+
+    // 2. Remove summary entry
+    const summaryEntryId = data.dulfsEntryIds[fieldId];
+    if (summaryEntryId) {
+      try {
+        await api.v1.lorebook.removeEntry(summaryEntryId);
+      } catch (e) {
+        // Ignore
+      }
+      delete data.dulfsEntryIds[fieldId];
+    }
+
+    // 3. Remove category
+    const categoryId = data.dulfsCategoryIds[fieldId];
+    if (categoryId) {
+      try {
+        await api.v1.lorebook.removeCategory(categoryId);
+      } catch (e) {
+        // Ignore
+      }
+      delete data.dulfsCategoryIds[fieldId];
+    }
+
+    await this.dataManager.save();
   }
 
   private async syncToHeader(

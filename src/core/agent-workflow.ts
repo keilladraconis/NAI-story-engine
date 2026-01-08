@@ -19,7 +19,13 @@ export class AgentWorkflowService {
   // Track list generation state: fieldId -> { isRunning, signal }
   private listGenerationState: Map<
     string,
-    { isRunning: boolean; signal?: any }
+    {
+      isRunning: boolean;
+      signal?: any;
+      budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
+      budgetResolver?: () => void;
+      budgetWaitTime?: number;
+    }
   > = new Map();
 
   constructor(private storyManager: StoryManager) {
@@ -50,7 +56,7 @@ export class AgentWorkflowService {
     }
   }
 
-  private parseListLine(
+  public parseListLine(
     line: string,
     fieldId: string,
   ): { name: string; description: string; content: string } | null {
@@ -93,10 +99,12 @@ export class AgentWorkflowService {
     updateFn: () => void,
   ): Promise<void> {
     const cancellationSignal = await api.v1.createCancellationSignal();
-    this.listGenerationState.set(fieldId, {
+    const state = {
       isRunning: true,
       signal: cancellationSignal,
-    });
+      budgetState: "normal" as const,
+    };
+    this.listGenerationState.set(fieldId, state);
     updateFn();
 
     try {
@@ -123,15 +131,39 @@ export class AgentWorkflowService {
           minTokens: 50,
           model,
           ...params,
+          onBudgetWait: (_1, _2, time) => {
+            const s = this.listGenerationState.get(fieldId);
+            if (s) {
+              s.budgetState = "waiting_for_user";
+              s.budgetWaitTime = time;
+              updateFn();
+              return new Promise<void>((resolve) => {
+                s.budgetResolver = () => {
+                  s.budgetState = "waiting_for_timer";
+                  updateFn();
+                  resolve();
+                };
+              });
+            }
+            return Promise.resolve();
+          },
+          onBudgetResume: () => {
+            const s = this.listGenerationState.get(fieldId);
+            if (s) {
+              s.budgetState = "normal";
+              updateFn();
+            }
+          },
         },
         (text) => {
-          buffer += applyFilters(text);
+          buffer += text;
           const lines = buffer.split("\n");
           // Keep the last segment as it might be incomplete
           buffer = lines.pop() || "";
 
           for (const line of lines) {
-            const parsed = this.parseListLine(line, fieldId);
+            const filteredLine = applyFilters(line);
+            const parsed = this.parseListLine(filteredLine, fieldId);
             if (parsed) {
               const newItem: DULFSField = {
                 id: api.v1.uuid(),
@@ -155,7 +187,8 @@ export class AgentWorkflowService {
 
       // Process any remaining buffer
       if (buffer.trim().length > 0) {
-        const parsed = this.parseListLine(buffer, fieldId);
+        const filteredBuffer = applyFilters(buffer);
+        const parsed = this.parseListLine(filteredBuffer, fieldId);
         if (parsed) {
           const newItem: DULFSField = {
             id: api.v1.uuid(),
@@ -230,7 +263,11 @@ export class AgentWorkflowService {
             session.budgetWaitTime = time;
             updateFn();
             return new Promise<void>((resolve) => {
-              session.budgetResolver = resolve;
+              session.budgetResolver = () => {
+                session.budgetState = "waiting_for_timer";
+                updateFn();
+                resolve();
+              };
             });
           },
           onBudgetResume: () => {

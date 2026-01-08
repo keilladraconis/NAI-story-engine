@@ -7,7 +7,7 @@ import {
   createResponsiveGenerateButton,
 } from "./ui-components";
 
-const { row, column, text, button, checkboxInput, textInput } =
+const { row, column, text, button, checkboxInput } =
   api.v1.ui.part;
 
 export interface BaseRenderContext {
@@ -22,7 +22,12 @@ export interface ListRenderContext extends BaseRenderContext {
   getItemEditMode: (itemId: string) => boolean;
   toggleItemEditMode: (itemId: string) => void;
   runListGeneration: () => Promise<void>;
-  getListGenerationState: () => { isRunning: boolean; signal?: any };
+  getListGenerationState: () => {
+    isRunning: boolean;
+    signal?: any;
+    budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
+    budgetResolver?: () => void;
+  };
   cancelListGeneration: () => void;
 }
 
@@ -54,6 +59,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
     const {
       config,
       storyManager,
+      agentWorkflowService,
       getItemEditMode,
       toggleItemEditMode,
       runListGeneration,
@@ -74,13 +80,19 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
         // Responsive Generate Button
         createResponsiveGenerateButton(
           `list-gen-btn-${config.id}`,
-          { isRunning: genState.isRunning },
+          {
+            isRunning: genState.isRunning,
+            budgetState: genState.budgetState,
+          },
           {
             onStart: () => {
               if (runListGeneration) runListGeneration();
             },
             onCancel: () => {
               if (cancelListGeneration) cancelListGeneration();
+            },
+            onContinue: () => {
+              if (genState.budgetResolver) genState.budgetResolver();
             },
           },
           "Generate",
@@ -123,33 +135,50 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
     // --- List Items ---
     const itemsUI = list.map((item) => {
       const isEditing = getItemEditMode ? getItemEditMode(item.id) : false;
-      const toggle = toggleItemEditMode
-        ? () => toggleItemEditMode(item.id)
-        : () => {};
+      const toggle = () => {
+        if (toggleItemEditMode) {
+          if (isEditing) {
+            // Saving: Parse and Sync
+            // Fetch latest content from store as it was updated during typing
+            const currentList = storyManager.getDulfsList(config.id);
+            const currentItem = currentList.find((i) => i.id === item.id);
+            if (currentItem) {
+              const parsed = agentWorkflowService.parseListLine(
+                currentItem.content,
+                config.id,
+              );
+              if (parsed) {
+                storyManager.updateDulfsItem(
+                  config.id,
+                  item.id,
+                  {
+                    name: parsed.name,
+                    description: parsed.description,
+                    // Content is already updated, but we include it to trigger the sync logic if needed
+                    // though sync logic checks lorebookContent/name/content updates.
+                    // We need to pass at least one property to satisfy the type or just reliance on side effect?
+                    // Actually updateDulfsItem merges updates.
+                  },
+                  false,
+                  true, // Sync to Lorebook
+                );
+              } else {
+                // Fallback: just sync what we have if parse fails
+                storyManager.updateDulfsItem(
+                  config.id,
+                  item.id,
+                  {},
+                  false,
+                  true,
+                );
+              }
+            }
+          }
+          toggleItemEditMode(item.id);
+        }
+      };
 
       const contentParts: UIPart[] = [];
-
-      if (isEditing) {
-        contentParts.push(
-          textInput({
-            placeholder: "Name/Title...",
-            initialValue: item.name,
-            onChange: (newName) => {
-              storyManager.updateDulfsItem(config.id, item.id, {
-                name: newName,
-              });
-            },
-            style: { "margin-bottom": "4px", "font-weight": "bold" },
-          }),
-        );
-      } else if (item.name) {
-        contentParts.push(
-          text({
-            text: item.name,
-            style: { "font-weight": "bold", "margin-bottom": "4px" },
-          }),
-        );
-      }
 
       contentParts.push(
         createToggleableContent(
@@ -158,9 +187,16 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
           "Entry details...",
           undefined, // No storage key to prevent sync conflicts; StoryManager is source of truth
           (newContent) => {
-            storyManager.updateDulfsItem(config.id, item.id, {
-              content: newContent,
-            });
+            // Update local state but DO NOT sync to Lorebook yet
+            storyManager.updateDulfsItem(
+              config.id,
+              item.id,
+              {
+                content: newContent,
+              },
+              false,
+              false, // No sync
+            );
           },
           { "min-height": "60px", width: "100%" },
         ),
@@ -185,7 +221,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
             style: { "margin-left": "4px", gap: "4px" },
             content: [
               button({
-                iconId: isEditing ? "eye" : "edit-3",
+                iconId: isEditing ? "save" : "edit-3",
                 callback: toggle,
                 style: { width: "30px", padding: "8px" },
               }),

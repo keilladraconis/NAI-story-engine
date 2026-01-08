@@ -100,6 +100,7 @@ export class StoryManager {
     itemId: string,
     updates: Partial<DULFSField>,
     notify: boolean = false,
+    syncToLorebook: boolean = true,
   ): Promise<void> {
     const data = this.dataManager.data;
     if (!data) return;
@@ -108,27 +109,47 @@ export class StoryManager {
     if (index !== -1) {
       list[index] = { ...list[index], ...updates };
       this.dataManager.setDulfsList(fieldId, list);
-      await this.saveStoryData(notify);
 
-      // Debounced sync to Lorebook
-      if (this.syncTimeout !== undefined) {
-        await api.v1.timers.clearTimeout(this.syncTimeout);
+      if (notify) {
+        await this.dataManager.save();
+        this.dataManager.notifyListeners();
+      } else {
+        // Debounced auto-save
+        if (this.saveTimeout !== undefined) {
+          await api.v1.timers.clearTimeout(this.saveTimeout);
+        }
+
+        this.saveTimeout = await api.v1.timers.setTimeout(async () => {
+          await this.dataManager.save();
+          // api.v1.log(`Auto-saved DULFS data (${fieldId})`);
+          this.saveTimeout = undefined;
+        }, 5000); // 5 second debounce for storage
       }
 
-      this.syncTimeout = await api.v1.timers.setTimeout(async () => {
-        // Always sync the full list summary
-        await this.lorebookSyncService.syncDulfsLorebook(fieldId);
-
-        // Also sync the individual entry if relevant fields changed
-        if (
-          updates.lorebookContent !== undefined ||
-          updates.name !== undefined ||
-          updates.content !== undefined
-        ) {
-          await this.lorebookSyncService.syncIndividualLorebook(fieldId, itemId);
+      if (syncToLorebook) {
+        // Debounced sync to Lorebook
+        if (this.syncTimeout !== undefined) {
+          await api.v1.timers.clearTimeout(this.syncTimeout);
         }
-        this.syncTimeout = undefined;
-      }, 2000); // 2 second debounce for sync
+
+        this.syncTimeout = await api.v1.timers.setTimeout(async () => {
+          // Always sync the full list summary
+          await this.lorebookSyncService.syncDulfsLorebook(fieldId);
+
+          // Also sync the individual entry if relevant fields changed
+          if (
+            updates.lorebookContent !== undefined ||
+            updates.name !== undefined ||
+            updates.content !== undefined
+          ) {
+            await this.lorebookSyncService.syncIndividualLorebook(
+              fieldId,
+              itemId,
+            );
+          }
+          this.syncTimeout = undefined;
+        }, 2000); // 2 second debounce for sync
+      }
     }
   }
 
@@ -157,9 +178,9 @@ export class StoryManager {
   public async clearDulfsList(fieldId: string): Promise<void> {
     const data = this.dataManager.data;
     if (!data) return;
+    await this.lorebookSyncService.removeDulfsLorebook(fieldId);
     this.dataManager.setDulfsList(fieldId, []);
     await this.saveStoryData(true);
-    await this.lorebookSyncService.syncDulfsLorebook(fieldId);
   }
 
   public findDulfsByLorebookId(
