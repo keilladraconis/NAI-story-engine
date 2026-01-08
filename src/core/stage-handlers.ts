@@ -199,11 +199,13 @@ export class RefineStageHandler implements StageHandler {
 
 export class ReviewStageHandler implements StageHandler {
   private buffer: string = "";
+  private processedLines: Set<string> = new Set();
 
   constructor(private reviewPatcher: ReviewPatcher) {}
 
   async onStart(session: FieldSession): Promise<void> {
     this.buffer = ""; // Reset buffer
+    this.processedLines.clear();
     this.reviewPatcher.stripTags(session.fieldId);
   }
 
@@ -218,8 +220,11 @@ export class ReviewStageHandler implements StageHandler {
 
     // Process complete lines, keep the remainder
     while (lines.length > 1) {
-      const line = lines.shift()!;
-      this.reviewPatcher.processReviewLine(session.fieldId, line);
+      const line = lines.shift()!.trim();
+      if (line && !this.processedLines.has(line)) {
+        this.reviewPatcher.processReviewLine(session.fieldId, line);
+        this.processedLines.add(line);
+      }
     }
     this.buffer = lines[0];
   }
@@ -229,8 +234,10 @@ export class ReviewStageHandler implements StageHandler {
     finalResult: string,
   ): Promise<string> {
     // Process any remaining buffer
-    if (this.buffer.trim()) {
-      this.reviewPatcher.processReviewLine(_session.fieldId, this.buffer);
+    const finalBuffer = this.buffer.trim();
+    if (finalBuffer && !this.processedLines.has(finalBuffer)) {
+      this.reviewPatcher.processReviewLine(_session.fieldId, finalBuffer);
+      this.processedLines.add(finalBuffer);
     }
 
     const cleaned = this.cleanReviewOutput(finalResult);
@@ -243,11 +250,18 @@ export class ReviewStageHandler implements StageHandler {
 
   private cleanReviewOutput(content: string): string {
     const lines = content.split("\n");
+    const seen = new Set<string>();
     const validLines = lines.filter((line) => {
       const trimmed = line.trim();
-      if (!trimmed) return false;
+      if (!trimmed || seen.has(trimmed)) return false;
       // Validates format: [TAG1][TAG2] || "locator"
-      return /^(\\*\\*)?((?:\[[A-Z_]+\])+)(\\*\\*)?\s*\|\|\s*".*"$/.test(trimmed);
+      const isValid =
+        /^(\*\*?)?((?:\[[A-Z_]+\])+)(\*\*?)?\s*\|\|\s*".*"$/.test(trimmed);
+      if (isValid) {
+        seen.add(trimmed);
+        return true;
+      }
+      return false;
     });
     return validLines.join("\n");
   }

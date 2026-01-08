@@ -182,12 +182,14 @@ const Strategies: Record<string, StrategyFn> = {
       { role: "user", content: fixSpacing(userPrompt) },
       {
         role: "assistant",
-        content:
+        content: fixSpacing(
           "I will review the text and provide structured directives in the format '[TAG] || \"locator substring\"'.\n" +
-          "I will be highly selective, only tagging passages that truly need improvement.\n" +
-          "I will NOT tag present-tense descriptions of behavior, inherent risks, or metaphorical tensions as [PLOTTING].\n" +
-          "I will use [FIX] for grammatical/syntactical errors and [LOGIC] for consistency, causal errors, or missing logical steps.\n" +
-          "I will NOT tag passages for 'depth' or 'flavor' unless there is a logic error; I prioritize conciseness.\n",
+            "I will be highly selective, only tagging passages that truly need improvement.\n" +
+            "I will NOT tag present-tense descriptions of behavior, inherent risks, or metaphorical tensions as [PLOTTING].\n" +
+            "I will use [FIX] for grammatical/syntactical errors and [LOGIC] for consistency, causal errors, or missing logical steps.\n" +
+            "I will NOT tag passages for 'depth' or 'flavor' unless there is a logic error; I prioritize conciseness.\n" +
+            "I will NOT repeat the same critique for multiple similar passages.",
+        ),
       },
       [
         {
@@ -214,7 +216,7 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 0.3,
         min_p: 0.02,
         presence_penalty: 0.1,
-        frequency_penalty: 0.02,
+        frequency_penalty: 0.4,
         maxTokens: 1024,
       },
     };
