@@ -11,6 +11,7 @@ export class StoryManager {
   private brainstormDataManager: BrainstormDataManager;
 
   private saveTimeout?: any;
+  private syncTimeout?: any;
 
   constructor() {
     this.dataManager = new StoryDataManager();
@@ -73,8 +74,14 @@ export class StoryManager {
     const data = this.dataManager.data;
     if (!data) return;
     data.dulfsEnabled[fieldId] = enabled;
-    await this.dataManager.save();
+    await this.saveStoryData(true);
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
+
+    // Also sync all individual items to update their enabled status
+    const list = this.getDulfsList(fieldId);
+    for (const item of list) {
+      await this.lorebookSyncService.syncIndividualLorebook(fieldId, item.id);
+    }
   }
 
   public async addDulfsItem(fieldId: string, item: DULFSField): Promise<void> {
@@ -83,7 +90,7 @@ export class StoryManager {
     const list = this.getDulfsList(fieldId);
     list.push(item);
     this.dataManager.setDulfsList(fieldId, list);
-    await this.dataManager.save();
+    await this.saveStoryData(true);
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
     await this.lorebookSyncService.syncIndividualLorebook(fieldId, item.id);
   }
@@ -103,14 +110,25 @@ export class StoryManager {
       this.dataManager.setDulfsList(fieldId, list);
       await this.saveStoryData(notify);
 
-      if (
-        notify &&
-        (updates.lorebookContent !== undefined || updates.name !== undefined)
-      ) {
-        await this.lorebookSyncService.syncIndividualLorebook(fieldId, itemId);
-      } else if (notify) {
-        await this.lorebookSyncService.syncDulfsLorebook(fieldId);
+      // Debounced sync to Lorebook
+      if (this.syncTimeout !== undefined) {
+        await api.v1.timers.clearTimeout(this.syncTimeout);
       }
+
+      this.syncTimeout = await api.v1.timers.setTimeout(async () => {
+        // Always sync the full list summary
+        await this.lorebookSyncService.syncDulfsLorebook(fieldId);
+
+        // Also sync the individual entry if relevant fields changed
+        if (
+          updates.lorebookContent !== undefined ||
+          updates.name !== undefined ||
+          updates.content !== undefined
+        ) {
+          await this.lorebookSyncService.syncIndividualLorebook(fieldId, itemId);
+        }
+        this.syncTimeout = undefined;
+      }, 2000); // 2 second debounce for sync
     }
   }
 
@@ -132,7 +150,7 @@ export class StoryManager {
 
     const newList = list.filter((i) => i.id !== itemId);
     this.dataManager.setDulfsList(fieldId, newList);
-    await this.dataManager.save();
+    await this.saveStoryData(true);
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
   }
 
@@ -140,7 +158,7 @@ export class StoryManager {
     const data = this.dataManager.data;
     if (!data) return;
     this.dataManager.setDulfsList(fieldId, []);
-    await this.dataManager.save();
+    await this.saveStoryData(true);
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
   }
 

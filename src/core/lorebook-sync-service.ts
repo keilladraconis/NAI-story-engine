@@ -4,7 +4,7 @@ import { FIELD_CONFIGS } from "../config/field-definitions";
 export class LorebookSyncService {
   constructor(private dataManager: StoryDataManager) {}
 
-  public async ensureDulfsCategory(fieldId: string): Promise<string> {
+  public async ensureDulfsCategory(fieldId: string, enabled: boolean = true): Promise<string> {
     const data = this.dataManager.data;
     if (!data) throw new Error("No story data");
 
@@ -12,6 +12,10 @@ export class LorebookSyncService {
     if (categoryId) {
       const existing = await api.v1.lorebook.category(categoryId);
       if (existing) {
+        // Update category enabled state if it changed
+        if (existing.enabled !== enabled) {
+          await api.v1.lorebook.updateCategory(categoryId, { enabled });
+        }
         return categoryId;
       }
     }
@@ -24,7 +28,7 @@ export class LorebookSyncService {
       await api.v1.lorebook.createCategory({
         id: catId,
         name: categoryName,
-        enabled: true,
+        enabled: enabled,
         settings: { entryHeader: "---" },
       });
       data.dulfsCategoryIds[fieldId] = catId;
@@ -47,12 +51,14 @@ export class LorebookSyncService {
     // Format content
     let textContent = `${label}\n`;
     if (list && list.length > 0) {
-      textContent += list.map((item) => `- ${item.content}`).join("\n");
+      textContent += list
+        .map((item) => (item.name ? `- **${item.name}**: ${item.content}` : `- ${item.content}`))
+        .join("\n");
     } else {
       textContent += "(Empty)";
     }
 
-    const categoryId = await this.ensureDulfsCategory(fieldId);
+    const categoryId = await this.ensureDulfsCategory(fieldId, isEnabled);
 
     // Check for existing entry
     const entryId = data.dulfsEntryIds[fieldId];
@@ -117,9 +123,9 @@ export class LorebookSyncService {
     const item = list?.find((i) => i.id === itemId);
     if (!item) return;
 
-    const categoryId = await this.ensureDulfsCategory(fieldId);
     const isEnabled = data.dulfsEnabled[fieldId] !== false;
-    const textContent = item.lorebookContent || "";
+    const categoryId = await this.ensureDulfsCategory(fieldId, isEnabled);
+    const textContent = item.lorebookContent || item.content || "";
 
     let entryId = item.linkedLorebooks.length > 0 ? item.linkedLorebooks[0] : null;
 
@@ -131,6 +137,7 @@ export class LorebookSyncService {
             displayName: item.name,
             text: textContent,
             category: categoryId,
+            keys: [item.name],
             enabled: isEnabled,
           });
           return;

@@ -100,11 +100,21 @@ export class AgentWorkflowService {
     updateFn();
 
     try {
-      const { messages, params } =
-        await this.contextFactory.buildDulfsContext(fieldId);
+      const result = await this.contextFactory.buildDulfsContext(fieldId);
+      const { messages, params } = result;
 
       const model = (await api.v1.config.get("model")) || "glm-4-6";
       let buffer = "";
+
+      const applyFilters = (t: string) => {
+        let out = t;
+        if ((result as any).filters) {
+          for (const filter of (result as any).filters) {
+            out = filter(out);
+          }
+        }
+        return out;
+      };
 
       await hyperGenerate(
         messages,
@@ -115,7 +125,7 @@ export class AgentWorkflowService {
           ...params,
         },
         (text) => {
-          buffer += text;
+          buffer += applyFilters(text);
           const lines = buffer.split("\n");
           // Keep the last segment as it might be incomplete
           buffer = lines.pop() || "";
@@ -185,7 +195,8 @@ export class AgentWorkflowService {
     updateFn();
 
     try {
-      const { messages, params } = await this.contextFactory.build(session);
+      const result = await this.contextFactory.build(session);
+      const { messages, params } = result;
 
       // Find assistant pre-fill if it exists
       let buffer = "";
@@ -196,6 +207,16 @@ export class AgentWorkflowService {
 
       await this.storyManager.saveFieldDraft(session.fieldId, buffer);
       const model = (await api.v1.config.get("model")) || "glm-4-6";
+
+      const applyFilters = (t: string) => {
+        let out = t;
+        if (result.filters) {
+          for (const filter of result.filters) {
+            out = filter(out);
+          }
+        }
+        return out;
+      };
 
       await hyperGenerate(
         messages,
@@ -219,7 +240,7 @@ export class AgentWorkflowService {
         },
         (text) => {
           if (text) {
-            buffer += text;
+            buffer += applyFilters(text);
             this.storyManager.saveFieldDraft(session.fieldId, buffer);
             updateFn();
           }

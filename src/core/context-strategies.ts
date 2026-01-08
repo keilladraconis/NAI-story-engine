@@ -10,9 +10,19 @@ import {
   LIST_FIELD_IDS,
 } from "../config/field-definitions";
 
+export type TextFilter = (text: string) => string;
+
+export const Filters = {
+  scrubBrackets: (t: string) => t.replace(/[\[\]]/g, ""),
+  scrubMarkdown: (t: string) => t.replace(/[*_`#~>]/g, ""),
+  normalizeQuotes: (t: string) =>
+    t.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"'),
+};
+
 export interface StrategyResult {
   messages: Message[];
   params: Partial<HyperGenerationParams>;
+  filters?: TextFilter[];
 }
 
 type StrategyFn = (
@@ -265,6 +275,7 @@ const Strategies: Record<string, StrategyFn> = {
         presence_penalty: 0.1,
         maxTokens: 1536,
       },
+      filters: [Filters.scrubBrackets],
     };
   },
 };
@@ -287,7 +298,20 @@ export class ContextStrategyFactory {
     const key = this.getStrategyKey(session);
     const strategy = Strategies[key] || Strategies["generate:default"];
 
-    return strategy(session, this.storyManager, baseContext);
+    const result = await strategy(session, this.storyManager, baseContext);
+
+    // Apply filters from config if present
+    const config = FIELD_CONFIGS.find((c) => c.id === session.fieldId);
+    if (config?.filters) {
+      result.filters = result.filters || [];
+      for (const filterKey of config.filters) {
+        if (Filters[filterKey]) {
+          result.filters.push(Filters[filterKey]);
+        }
+      }
+    }
+
+    return result;
   }
 
   async buildDulfsContext(fieldId: string): Promise<StrategyResult> {
@@ -349,7 +373,7 @@ export class ContextStrategyFactory {
       contextBlocks,
     );
 
-    return {
+    const result: StrategyResult = {
       messages,
       params: {
         temperature: 1.2,
@@ -358,6 +382,17 @@ export class ContextStrategyFactory {
         maxTokens: 1024,
       },
     };
+
+    if (config?.filters) {
+      result.filters = [];
+      for (const filterKey of config.filters) {
+        if (Filters[filterKey]) {
+          result.filters.push(Filters[filterKey]);
+        }
+      }
+    }
+
+    return result;
   }
 
   private getStrategyKey(session: FieldSession): string {

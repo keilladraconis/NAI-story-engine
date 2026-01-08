@@ -56,6 +56,7 @@ export interface FieldConfig {
   fieldType?: "prompt" | "brainstorm" | "worldSnapshot" | "dulfs" | "attg" | "style";
   generationInstruction?: string;
   exampleFormat?: string;
+  filters?: ("scrubBrackets" | "scrubMarkdown" | "normalizeQuotes")[];
   hidden?: boolean;
 }
 
@@ -68,6 +69,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     icon: "bookOpen",
     fieldType: "prompt",
     generationInstruction: "Synthesize the brainstorming session into a high-level thematic starting point, including protagonist, key themes, and genre.",
+    filters: ["scrubBrackets"],
   },
   {
     id: FieldID.Brainstorm,
@@ -85,6 +87,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "The state of the world, its drivers, and tensions...",
     icon: "package",
     fieldType: "worldSnapshot",
+    filters: ["scrubBrackets"],
   },
   {
     id: FieldID.DramatisPersonae,
@@ -96,6 +99,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     fieldType: "dulfs",
     generationInstruction: "Generate a list of interesting characters for this story. Focus on their core motivations and unique behavioral tells.",
     exampleFormat: "Format each line exactly as: [First and Last Name] ([gender], [age], [occupation]): [core motivation], [behavioral tell]",
+    filters: ["scrubBrackets"],
   },
   {
     id: FieldID.UniverseSystems,
@@ -107,6 +111,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     fieldType: "dulfs",
     generationInstruction: "Generate a list of key universe systems, magic rules, or technological principles. Describe the mechanic or rule concisely.",
     exampleFormat: "Format each line as: [System Name]: [Description of mechanic or rule]",
+    filters: ["scrubBrackets"],
   },
   {
     id: FieldID.Locations,
@@ -118,6 +123,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     fieldType: "dulfs",
     generationInstruction: "Generate a list of significant locations. Include atmospheric anchors, sensory details, and inherent tensions.",
     exampleFormat: "Format each line as: [Location Name]: [atmospheric anchors], [sensory details], [inherent tensions or key functions]",
+    filters: ["scrubBrackets"],
   },
   {
     id: FieldID.Factions,
@@ -129,6 +135,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     fieldType: "dulfs",
     generationInstruction: "Generate a list of major factions, guilds, or political groups. Describe their core ideology, goal, and internal structure.",
     exampleFormat: "Format each line as: [Faction Name]: [description of ideology, goal, structure]",
+    filters: ["scrubBrackets"],
   },
   {
     id: FieldID.SituationalDynamics,
@@ -140,6 +147,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     fieldType: "dulfs",
     generationInstruction: "Generate a list of current conflicts, pending events, or tensions that involve multiple characters with no suggested resolution.",
     exampleFormat: "Format each line as: [Dynamic Name]: [a state of being or point of friction...]",
+    filters: ["scrubBrackets"],
   },
   {
     id: FieldID.ATTG,

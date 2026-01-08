@@ -54,6 +54,7 @@ This script is hosted in the browser in a web worker, and only has access to nat
 
 The project follows standard TypeScript and Prettier conventions. The code is well-structured and uses modern TypeScript features.
 
+- **External Libraries**: Files in the `lib/` directory are considered external dependencies and MUST NOT be modified. If changes are needed, implement them in the `src/` directory by wrapping or extending the library functionality.
 - **UI Components**: Reusable UI logic is extracted into `src/ui/ui-components.ts`.
 - **Configuration**: Field definitions are centralized in `src/config/field-definitions.ts`.
 
@@ -74,6 +75,8 @@ When debugging issues, you may add debugging log statements and provide the user
 - `StoryManager` is the single source of truth for all data, utilizing `StoryDataManager` for persistence and `LorebookSyncService` for NAI integration.
 - The system supports "Inline Wand" generation for text fields and specialized list generation for DULFS categories.
 - A custom Lorebook Panel integration allows for AI-assisted editing of individual lorebook entries managed by Story Engine.
+- **DULFS Lorebook Sync**: List items now support name editing which automatically triggers a debounced (2s) re-sync to the NovelAI Lorebook, updating both individual entries (display names and keys) and the full list summary.
+- **Enablement Propagation**: Enabling or disabling a DULFS field in the sidebar now correctly propagates that status to the corresponding NovelAI Lorebook categories and entries.
 
 ## Architectural Overhaul (Jan 2026)
 - **Simplified Workflow**: Removed `WandUI`, `ReviewPatcher`, and `StageHandlers`. The system now focuses on high-quality single-pass generation.

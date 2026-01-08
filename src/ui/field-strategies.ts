@@ -7,7 +7,7 @@ import {
   createResponsiveGenerateButton,
 } from "./ui-components";
 
-const { row, column, text, button, checkboxInput } =
+const { row, column, text, button, checkboxInput, textInput } =
   api.v1.ui.part;
 
 export interface BaseRenderContext {
@@ -127,6 +127,45 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
         ? () => toggleItemEditMode(item.id)
         : () => {};
 
+      const contentParts: UIPart[] = [];
+
+      if (isEditing) {
+        contentParts.push(
+          textInput({
+            placeholder: "Name/Title...",
+            initialValue: item.name,
+            onChange: (newName) => {
+              storyManager.updateDulfsItem(config.id, item.id, {
+                name: newName,
+              });
+            },
+            style: { "margin-bottom": "4px", "font-weight": "bold" },
+          }),
+        );
+      } else if (item.name) {
+        contentParts.push(
+          text({
+            text: item.name,
+            style: { "font-weight": "bold", "margin-bottom": "4px" },
+          }),
+        );
+      }
+
+      contentParts.push(
+        createToggleableContent(
+          isEditing,
+          item.content,
+          "Entry details...",
+          undefined, // No storage key to prevent sync conflicts; StoryManager is source of truth
+          (newContent) => {
+            storyManager.updateDulfsItem(config.id, item.id, {
+              content: newContent,
+            });
+          },
+          { "min-height": "60px", width: "100%" },
+        ),
+      );
+
       return row({
         style: {
           "margin-bottom": "8px",
@@ -139,20 +178,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
           // Item Content (grows to fill space)
           column({
             style: { "flex-grow": "1" },
-            content: [
-              createToggleableContent(
-                isEditing,
-                item.content,
-                "Entry details...",
-                undefined, // No storage key to prevent sync conflicts; StoryManager is source of truth
-                (newContent) => {
-                  storyManager.updateDulfsItem(config.id, item.id, {
-                    content: newContent,
-                  });
-                },
-                { "min-height": "60px", width: "100%" },
-              ),
-            ],
+            content: contentParts,
           }),
           // Action Buttons (Compact column)
           column({
