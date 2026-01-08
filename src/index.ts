@@ -10,11 +10,7 @@ const log = api.v1.log;
     const ui = new StoryEngineUI();
     await ui.init();
 
-    api.v1.ui.register([
-      ui.sidebar,
-      ui.brainstormUI.sidebar,
-      ui.lorebookPanel,
-    ]);
+    api.v1.ui.register([ui.brainstormUI.sidebar, ui.sidebar, ui.lorebookPanel]);
   } catch (e) {
     log("Startup error:", e);
   }

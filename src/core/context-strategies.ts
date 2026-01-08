@@ -90,6 +90,37 @@ const Strategies: Record<string, StrategyFn> = {
     };
   },
 
+  // Generate (Story Prompt) - The Initiator
+  // Takes brainstorm chat and turns it into a high-level premise
+  "generate:storyPrompt": async (_session, manager, base) => {
+    const userPrompt = (await api.v1.config.get("story_prompt_generate_prompt")) || "";
+    const brainstormContent = manager.getConsolidatedBrainstorm();
+    const messages = hyperContextBuilder(
+      base.systemMsg,
+      { role: "user", content: fixSpacing(userPrompt) },
+      {
+        role: "assistant",
+        content:
+          "Here is the story prompt based on our brainstorming session:",
+      },
+      [
+        {
+          role: "user",
+          content: fixSpacing(`BRAINSTORM MATERIAL:\n${brainstormContent}`),
+        },
+      ],
+    );
+    return {
+      messages,
+      params: {
+        temperature: 1.1,
+        min_p: 0.05,
+        presence_penalty: 0.1,
+        maxTokens: 1024,
+      },
+    };
+  },
+
   // Generate (Dynamic World Snapshot) - The Architect
   // Balanced structure and creativity
   "generate:worldSnapshot": async (_session, manager, base) => {
@@ -540,6 +571,8 @@ CRITICAL RULES:
     const stage = session.selectedStage;
     if (stage === "generate") {
       if (session.fieldId.includes(":")) return "generate:lorebook";
+      if (session.fieldId === FieldID.StoryPrompt)
+        return "generate:storyPrompt";
       if (session.fieldId === FieldID.WorldSnapshot)
         return "generate:worldSnapshot";
       if (session.fieldId === FieldID.ATTG) return "generate:attg";

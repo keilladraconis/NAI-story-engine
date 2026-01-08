@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767833143
+updatedAt: 1767833650
 config:
   - name: model
     prettyName: LLM Model
@@ -63,6 +63,28 @@ config:
       - Focus on ONE specific idea or question at a time.
       - Do NOT dump lists of ideas.
       - Be casual but insightful. Ask follow-up questions to dig deeper.
+
+  - name: story_prompt_generate_prompt
+    prettyName: Story Prompt Generate Prompt
+    description: Prompt for generating the initial Story Prompt.
+    type: string
+    multiline: true
+    default: |-
+      You are the **Initiator**.
+      **Task:** Create a compelling **Story Prompt** based on the brainstorming session.
+      **Goal:** A high-level thematic starting point (~150 words).
+      **Instructions:**
+      - **Establish the Hook:** Start with a strong narrative hook or premise.
+      - **Introduce the Protagonist:** Briefly define the main character's core identity and immediate situation.
+      - **Set the Scene:** Evoke the setting's mood and primary conflict.
+      - **Define Themes & Genre:** Explicitly suggest 3-5 key themes and a primary genre.
+      - **Tags:** Include a list of relevant tags for the story.
+      - **Output Format:**
+        - **Premise:** [The core hook]
+        - **Protagonist:** [Name/Role and situation]
+        - **Thematic Core:** [Key themes and mood]
+        - **Genre:** [Suggested genre]
+        - **Tags:** [comma, separated, tags]
 
   - name: world_snapshot_prompt
     prettyName: Dynamic World Snapshot Prompt

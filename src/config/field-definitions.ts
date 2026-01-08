@@ -67,6 +67,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Once upon a time in a world where...",
     icon: "bookOpen",
     fieldType: "prompt",
+    generationInstruction: "Synthesize the brainstorming session into a high-level thematic starting point, including protagonist, key themes, and genre.",
   },
   {
     id: FieldID.Brainstorm,
