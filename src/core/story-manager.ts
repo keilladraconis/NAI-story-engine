@@ -1,4 +1,4 @@
-import { FieldID, LIST_FIELD_IDS, TEXT_FIELD_IDS } from "../config/field-definitions";
+import { FieldID, LIST_FIELD_IDS, TEXT_FIELD_IDS, FIELD_CONFIGS } from "../config/field-definitions";
 import { StoryDataManager, StoryField, DULFSField } from "./story-data-manager";
 import { LorebookSyncService } from "./lorebook-sync-service";
 import { BrainstormDataManager } from "./brainstorm-data-manager";
@@ -10,8 +10,7 @@ export class StoryManager {
   private lorebookSyncService: LorebookSyncService;
   private brainstormDataManager: BrainstormDataManager;
 
-  private saveTimeout?: number;
-  private syncTimeout?: number;
+  private debounceMap: Map<string, number> = new Map();
 
   constructor() {
     this.dataManager = new StoryDataManager();
@@ -34,6 +33,86 @@ export class StoryManager {
 
   public subscribe(listener: () => void): () => void {
     return this.dataManager.subscribe(listener);
+  }
+
+  private async debounceAction(
+    key: string,
+    action: () => Promise<void>,
+    delay: number,
+  ): Promise<void> {
+    if (this.debounceMap.has(key)) {
+      await api.v1.timers.clearTimeout(this.debounceMap.get(key)!);
+    }
+    const id = await api.v1.timers.setTimeout(async () => {
+      await action();
+      this.debounceMap.delete(key);
+    }, delay);
+    this.debounceMap.set(key, id);
+  }
+
+  public parseListLine(
+    line: string,
+    fieldId: string,
+  ): { name: string; description: string; content: string } | null {
+    let clean = line.trim();
+
+    // Still strip list markers because models are stubborn
+    clean = clean.replace(/^[-*+]\s+/, "");
+    clean = clean.replace(/^\d+[\.)]\s+/, "");
+
+    const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
+
+    if (fieldId === FieldID.DramatisPersonae) {
+      const dpRegex =
+        config?.parsingRegex ||
+        /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*(.+)$/;
+      const match = clean.match(dpRegex);
+      if (match) {
+        return {
+          name: match[1].trim(),
+          description: match[5].trim(),
+          content: clean,
+        };
+      }
+    } else {
+      const genericRegex = config?.parsingRegex || /^([^:]+):\s*(.+)$/;
+      const match = clean.match(genericRegex);
+      if (match) {
+        return {
+          name: match[1].trim(),
+          description: match[2].trim(),
+          content: clean,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  public async parseAndUpdateDulfsItem(
+    fieldId: string,
+    itemId: string,
+  ): Promise<void> {
+    const list = this.getDulfsList(fieldId);
+    const item = list.find((i) => i.id === itemId);
+    if (!item) return;
+
+    const parsed = this.parseListLine(item.content, fieldId);
+    if (parsed) {
+      await this.updateDulfsItem(
+        fieldId,
+        itemId,
+        {
+          name: parsed.name,
+          description: parsed.description,
+        },
+        false,
+        true,
+      );
+    } else {
+      // Fallback sync
+      await this.updateDulfsItem(fieldId, itemId, {}, false, true);
+    }
   }
 
   public getFieldContent(fieldId: string): string {
@@ -114,41 +193,33 @@ export class StoryManager {
         await this.dataManager.save();
         this.dataManager.notifyListeners();
       } else {
-        // Debounced auto-save
-        if (this.saveTimeout !== undefined) {
-          await api.v1.timers.clearTimeout(this.saveTimeout);
-        }
-
-        this.saveTimeout = await api.v1.timers.setTimeout(async () => {
-          await this.dataManager.save();
-          // api.v1.log(`Auto-saved DULFS data (${fieldId})`);
-          this.saveTimeout = undefined;
-        }, 250); // 250ms debounce for storage
+        await this.debounceAction(
+          `save-${fieldId}`,
+          async () => {
+            await this.dataManager.save();
+          },
+          250,
+        );
       }
 
       if (syncToLorebook) {
-        // Debounced sync to Lorebook
-        if (this.syncTimeout !== undefined) {
-          await api.v1.timers.clearTimeout(this.syncTimeout);
-        }
-
-        this.syncTimeout = await api.v1.timers.setTimeout(async () => {
-          // Always sync the full list summary
-          await this.lorebookSyncService.syncDulfsLorebook(fieldId);
-
-          // Also sync the individual entry if relevant fields changed
-          if (
-            updates.lorebookContent !== undefined ||
-            updates.name !== undefined ||
-            updates.content !== undefined
-          ) {
-            await this.lorebookSyncService.syncIndividualLorebook(
-              fieldId,
-              itemId,
-            );
-          }
-          this.syncTimeout = undefined;
-        }, 500); // 500ms debounce for sync
+        await this.debounceAction(
+          `sync-${fieldId}`,
+          async () => {
+            await this.lorebookSyncService.syncDulfsLorebook(fieldId);
+            if (
+              updates.lorebookContent !== undefined ||
+              updates.name !== undefined ||
+              updates.content !== undefined
+            ) {
+              await this.lorebookSyncService.syncIndividualLorebook(
+                fieldId,
+                itemId,
+              );
+            }
+          },
+          500,
+        );
       }
     }
   }
@@ -283,16 +354,14 @@ export class StoryManager {
       if (save) {
         await this.dataManager.save();
       } else {
-        // Debounced auto-save of the global blob
-        if (this.saveTimeout !== undefined) {
-          await api.v1.timers.clearTimeout(this.saveTimeout);
-        }
-
-        this.saveTimeout = await api.v1.timers.setTimeout(async () => {
-          await this.dataManager.save();
-          api.v1.log(`Auto-saved global story data (${fieldId})`);
-          this.saveTimeout = undefined;
-        }, 250); // 250ms debounce
+        await this.debounceAction(
+          `save-global-${fieldId}`,
+          async () => {
+            await this.dataManager.save();
+            api.v1.log(`Auto-saved global story data (${fieldId})`);
+          },
+          250,
+        );
       }
     }
   }

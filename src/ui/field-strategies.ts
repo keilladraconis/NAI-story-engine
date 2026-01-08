@@ -60,7 +60,6 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
     const {
       config,
       storyManager,
-      agentWorkflowService,
       getItemEditMode,
       toggleItemEditMode,
       runListGeneration,
@@ -140,40 +139,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
         if (toggleItemEditMode) {
           if (isEditing) {
             // Saving: Parse and Sync
-            // Fetch latest content from store as it was updated during typing
-            const currentList = storyManager.getDulfsList(config.id);
-            const currentItem = currentList.find((i) => i.id === item.id);
-            if (currentItem) {
-              const parsed = agentWorkflowService.parseListLine(
-                currentItem.content,
-                config.id,
-              );
-              if (parsed) {
-                storyManager.updateDulfsItem(
-                  config.id,
-                  item.id,
-                  {
-                    name: parsed.name,
-                    description: parsed.description,
-                    // Content is already updated, but we include it to trigger the sync logic if needed
-                    // though sync logic checks lorebookContent/name/content updates.
-                    // We need to pass at least one property to satisfy the type or just reliance on side effect?
-                    // Actually updateDulfsItem merges updates.
-                  },
-                  false,
-                  true, // Sync to Lorebook
-                );
-              } else {
-                // Fallback: just sync what we have if parse fails
-                storyManager.updateDulfsItem(
-                  config.id,
-                  item.id,
-                  {},
-                  false,
-                  true,
-                );
-              }
-            }
+            storyManager.parseAndUpdateDulfsItem(config.id, item.id);
           }
           toggleItemEditMode(item.id);
         }

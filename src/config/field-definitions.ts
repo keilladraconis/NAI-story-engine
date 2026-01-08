@@ -58,6 +58,7 @@ export interface FieldConfig {
   exampleFormat?: string;
   filters?: ("scrubBrackets" | "scrubMarkdown" | "normalizeQuotes")[];
   hidden?: boolean;
+  parsingRegex?: RegExp;
 }
 
 export const FIELD_CONFIGS: FieldConfig[] = [
@@ -100,6 +101,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     generationInstruction: "Generate a list of interesting characters for this story. Focus on their core motivations and unique behavioral tells.",
     exampleFormat: "Format each line exactly as: [First and Last Name] ([gender], [age], [occupation]): [core motivation], [behavioral tell]",
     filters: ["scrubBrackets"],
+    parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*(.+)$/,
   },
   {
     id: FieldID.UniverseSystems,
@@ -112,6 +114,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     generationInstruction: "Generate a list of key universe systems, magic rules, or technological principles. Describe the mechanic or rule concisely.",
     exampleFormat: "Format each line as: [System Name]: [Description of mechanic or rule]",
     filters: ["scrubBrackets"],
+    parsingRegex: /^([^:]+):\s*(.+)$/,
   },
   {
     id: FieldID.Locations,
@@ -124,6 +127,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     generationInstruction: "Generate a list of significant locations. Include atmospheric anchors, sensory details, and inherent tensions.",
     exampleFormat: "Format each line as: [Location Name]: [atmospheric anchors], [sensory details], [inherent tensions or key functions]",
     filters: ["scrubBrackets"],
+    parsingRegex: /^([^:]+):\s*(.+)$/,
   },
   {
     id: FieldID.Factions,
@@ -136,6 +140,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     generationInstruction: "Generate a list of major factions, guilds, or political groups. Describe their core ideology, goal, and internal structure.",
     exampleFormat: "Format each line as: [Faction Name]: [description of ideology, goal, structure]",
     filters: ["scrubBrackets"],
+    parsingRegex: /^([^:]+):\s*(.+)$/,
   },
   {
     id: FieldID.SituationalDynamics,
@@ -148,6 +153,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     generationInstruction: "Generate a list of current conflicts, pending events, or tensions that involve multiple characters with no suggested resolution.",
     exampleFormat: "Format each line as: [Dynamic Name]: [a state of being or point of friction...]",
     filters: ["scrubBrackets"],
+    parsingRegex: /^([^:]+):\s*(.+)$/,
   },
   {
     id: FieldID.ATTG,

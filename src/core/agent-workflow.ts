@@ -1,7 +1,6 @@
 import { StoryManager, DULFSField } from "./story-manager";
 import { hyperGenerate } from "../../lib/hyper-generator";
 import { ContextStrategyFactory } from "./context-strategies";
-import { FieldID } from "../config/field-definitions";
 
 export interface FieldSession {
   fieldId: string;
@@ -54,44 +53,6 @@ export class AgentWorkflowService {
     if (state && state.signal) {
       state.signal.cancel();
     }
-  }
-
-  public parseListLine(
-    line: string,
-    fieldId: string,
-  ): { name: string; description: string; content: string } | null {
-    let clean = line.trim();
-
-    // Still strip list markers because models are stubborn, and they shouldn't be part of the final data
-    clean = clean.replace(/^[-*+]\s+/, "");
-    clean = clean.replace(/^\d+[\.)]\s+/, "");
-
-    if (fieldId === FieldID.DramatisPersonae) {
-      // Regex for: Name (gender, age, occupation): motivation, tell
-      // Hammer: must have the parens with commas and a colon
-      const dpRegex = /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*(.+)$/;
-      const match = clean.match(dpRegex);
-      if (match) {
-        return {
-          name: match[1].trim(),
-          description: match[5].trim(),
-          content: clean,
-        };
-      }
-    } else {
-      // Hammer: Name: Description
-      const genericRegex = /^([^:]+):\s*(.+)$/;
-      const match = clean.match(genericRegex);
-      if (match) {
-        return {
-          name: match[1].trim(),
-          description: match[2].trim(),
-          content: clean,
-        };
-      }
-    }
-
-    return null;
   }
 
   public async runListGeneration(
@@ -163,7 +124,7 @@ export class AgentWorkflowService {
 
           for (const line of lines) {
             const filteredLine = applyFilters(line);
-            const parsed = this.parseListLine(filteredLine, fieldId);
+            const parsed = this.storyManager.parseListLine(filteredLine, fieldId);
             if (parsed) {
               const newItem: DULFSField = {
                 id: api.v1.uuid(),
@@ -188,7 +149,7 @@ export class AgentWorkflowService {
       // Process any remaining buffer
       if (buffer.trim().length > 0) {
         const filteredBuffer = applyFilters(buffer);
-        const parsed = this.parseListLine(filteredBuffer, fieldId);
+        const parsed = this.storyManager.parseListLine(filteredBuffer, fieldId);
         if (parsed) {
           const newItem: DULFSField = {
             id: api.v1.uuid(),
