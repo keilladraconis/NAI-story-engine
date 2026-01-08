@@ -9,6 +9,7 @@ import { FieldID } from "../config/field-definitions";
 import {
   createHeaderWithToggle,
   createToggleableContent,
+  createResponsiveGenerateButton,
 } from "./ui-components";
 
 const { part, extension } = api.v1.ui;
@@ -95,7 +96,7 @@ export class StoryEngineUI {
       const dulfsMatch = this.storyManager.findDulfsByLorebookId(entryId);
 
       if (dulfsMatch) {
-        const { fieldId, item } = dulfsMatch;
+        const { item } = dulfsMatch;
         const sessionId = `lorebook:${entryId}`;
 
         let session = this.agentCycleManager.getSession(sessionId);
@@ -104,14 +105,42 @@ export class StoryEngineUI {
           // Initialize with current lorebook text if possible
           api.v1.lorebook.entry(entryId).then((entry) => {
             if (entry && entry.text && session) {
-              session.cycles.generate.content = entry.text;
-              session.cycles.generate.status = "completed";
+              this.storyManager.setFieldContent(sessionId, entry.text, false);
               this.updateLorebookUI();
             }
           });
         }
 
-        const activeStage = session.selectedStage;
+        const genButton = createResponsiveGenerateButton(
+          `gen-btn-${sessionId}`,
+          {
+            isRunning: session.isRunning,
+            budgetState: session.budgetState,
+          },
+          {
+            onStart: () => {
+              if (session) {
+                this.agentWorkflowService.runFieldGeneration(session, () => {
+                  this.updateLorebookUI();
+                  // Also sync to NovelAI Lorebook on completion or chunk
+                  const content = this.storyManager.getFieldContent(sessionId);
+                  api.v1.lorebook.updateEntry(entryId, { text: content });
+                });
+              }
+            },
+            onCancel: () => {
+              if (session?.cancellationSignal) {
+                session.cancellationSignal.cancel();
+              }
+            },
+            onContinue: () => {
+              if (session?.budgetResolver) {
+                session.budgetResolver();
+              }
+            },
+          },
+          "Generate",
+        );
 
         panelContent = [
           part.column({
@@ -138,50 +167,20 @@ export class StoryEngineUI {
                   this.lorebookEditMode = !this.lorebookEditMode;
                   this.updateLorebookUI();
                 },
+                genButton,
               ),
 
               createToggleableContent(
                 this.lorebookEditMode,
                 this.storyManager.getFieldContent(sessionId),
                 "Lorebook text will appear here...",
-                `input-field-${sessionId}`, // Changed from storageKey to id
+                `input-field-${sessionId}`,
                 (val) => {
-                  if (session) {
-                    // Update active stage content to keep in sync
-                    if (session.cycles[activeStage]) {
-                      session.cycles[activeStage].content = val;
-                    }
-                    // Live save to StoryManager
-                    this.storyManager.setFieldContent(sessionId, val, false);
-                  }
+                  this.storyManager.setFieldContent(sessionId, val, false);
+                  // Sync to NovelAI Lorebook
+                  api.v1.lorebook.updateEntry(entryId, { text: val });
                 },
                 { "min-height": "300px" },
-              ),
-
-              // Wand UI
-              this.structuredEditor.getWandUI().createInlineControlCluster(
-                session,
-                sessionId,
-                async (s) => {
-                  // Save to Lorebook
-                  const content = s.cycles[s.selectedStage].content;
-                  await api.v1.lorebook.updateEntry(entryId, { text: content });
-                  // Also update local store
-                  this.storyManager.updateDulfsItem(
-                    fieldId,
-                    item.id,
-                    { lorebookContent: content },
-                    true,
-                  );
-                  api.v1.ui.toast("Lorebook entry updated");
-                  this.updateLorebookUI();
-                },
-                (s) => {
-                  // Discard
-                  s.cycles[s.selectedStage].content = "";
-                  this.updateLorebookUI();
-                },
-                () => this.updateLorebookUI(),
               ),
             ],
           }),
@@ -197,17 +196,16 @@ export class StoryEngineUI {
         ];
       }
     } else if (categoryId) {
-      panelContent = [
-        part.column({
-          style: { padding: "16px", "text-align": "center", opacity: "0.6" },
-          content: [
-            part.text({
-              text: "Select an entry to use the Story Engine Wand.",
-            }),
-          ],
-        }),
-      ];
-    } else {
+              panelContent = [
+                part.column({
+                  style: { padding: "16px", "text-align": "center", opacity: "0.6" },
+                  content: [
+                    part.text({
+                      text: "Select an entry to use the Story Engine Generator.",
+                    }),
+                  ],
+                }),
+              ];    } else {
       panelContent = [
         part.column({
           style: { padding: "16px", "text-align": "center", opacity: "0.6" },

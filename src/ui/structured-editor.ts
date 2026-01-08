@@ -1,8 +1,7 @@
 import { StoryManager } from "../core/story-manager";
-import { AgentCycleManager, FieldSession } from "../core/agent-cycle";
+import { AgentCycleManager } from "../core/agent-cycle";
 import { AgentWorkflowService } from "../core/agent-workflow";
 import { FIELD_CONFIGS, FieldConfig, FieldID } from "../config/field-definitions";
-import { WandUI } from "./wand-ui";
 import { getFieldStrategy, RenderContext } from "./field-strategies";
 
 const { column, collapsibleSection } = api.v1.ui.part;
@@ -15,7 +14,6 @@ export class StructuredEditor {
   private agentWorkflowService: AgentWorkflowService;
   private onUpdateCallback: () => void;
   private editModes: Map<string, boolean> = new Map();
-  private wandUI: WandUI;
 
   constructor(
     storyManager: StoryManager,
@@ -27,14 +25,9 @@ export class StructuredEditor {
     this.agentCycleManager = agentCycleManager;
     this.agentWorkflowService = agentWorkflowService;
     this.onUpdateCallback = onUpdateCallback;
-    this.wandUI = new WandUI(agentWorkflowService, onUpdateCallback);
 
     this.initializeFieldConfigs();
     this.sidebar = this.createSidebar();
-  }
-
-  public getWandUI(): WandUI {
-    return this.wandUI;
   }
 
   private toggleEditMode(fieldId: string): void {
@@ -83,22 +76,18 @@ export class StructuredEditor {
     // Determine edit mode state key
     // Logic from previous implementation:
     // Standard/Snapshot/Prompt: `config.id`
-    // Generic Wand (Legacy): `wand-${config.id}` (Removed)
+    // Generic Generation (Legacy): `gen-${config.id}` (Removed)
     
-    // We can infer the key based on whether we have a session AND NOT Inline Wand
+    // We can infer the key based on whether we have a session AND NOT Inline Generation
     const editModeKey: string = config.id;
 
     const context: RenderContext = {
       config,
       storyManager: this.storyManager,
       agentCycleManager: this.agentCycleManager,
-      wandUI: this.wandUI,
       editModeState: this.editModes.get(editModeKey) || false,
       toggleEditMode: () => this.toggleEditMode(editModeKey),
       handleFieldChange: (c) => this.handleFieldChange(config.id, c),
-      handleWandClick: () => this.handleWandClick(config.id),
-      saveWandResult: (s) => this.saveWandResult(s),
-      handleWandDiscard: () => this.handleWandDiscard(config.id),
       // List specific
       getItemEditMode: (itemId) => this.getItemEditMode(config.id, itemId),
       toggleItemEditMode: (itemId) => this.toggleItemEditMode(config.id, itemId),
@@ -110,7 +99,7 @@ export class StructuredEditor {
       isAttgEnabled: () => this.storyManager.isAttgEnabled(),
       setStyleEnabled: (enabled) => this.storyManager.setStyleEnabled(enabled),
       isStyleEnabled: () => this.storyManager.isStyleEnabled(),
-      runSimpleGeneration: () => this.agentWorkflowService.runSimpleGeneration(config.id, this.onUpdateCallback),
+      runFieldGeneration: (s) => this.agentWorkflowService.runFieldGeneration(s, this.onUpdateCallback),
     };
 
     const strategy = getFieldStrategy(config);
@@ -121,46 +110,6 @@ export class StructuredEditor {
       storageKey: `story:kse-section-${config.id}`,
       content: strategy.renderContent(context),
     });
-  }
-
-  private handleWandClick(fieldId: string): void {
-    const config = this.configs.get(fieldId as FieldID);
-    if (!config) return;
-
-    // Start a new session
-    this.agentCycleManager.startSession(
-      config.id,
-    );
-    
-    // Trigger UI update to switch to Wand Mode
-    this.onUpdateCallback();
-  }
-
-  private async saveWandResult(session: FieldSession): Promise<void> {
-    const content = session.cycles[session.selectedStage].content;
-    if (!content) {
-      api.v1.ui.toast("No content to save.", { type: "warning" });
-      return;
-    }
-
-    // Use saveFieldDraft to update both memory and individual storage key
-    await this.storyManager.saveFieldDraft(
-      session.fieldId,
-      content,
-    );
-
-    api.v1.ui.toast(`Saved generated content to ${session.fieldId}`, {
-      type: "success",
-    });
-    
-    // End session and revert UI
-    this.agentCycleManager.endSession(session.fieldId);
-    this.onUpdateCallback();
-  }
-
-  private handleWandDiscard(fieldId: string): void {
-    this.agentCycleManager.endSession(fieldId);
-    this.onUpdateCallback();
   }
 
   private handleFieldChange(fieldId: string, content: string): void {

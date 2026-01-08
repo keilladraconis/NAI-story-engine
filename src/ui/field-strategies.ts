@@ -1,7 +1,6 @@
 import { FieldConfig, FieldID } from "../config/field-definitions";
 import { StoryManager, DULFSField } from "../core/story-manager";
 import { AgentCycleManager, FieldSession } from "../core/agent-cycle";
-import { WandUI } from "./wand-ui";
 import {
   createHeaderWithToggle,
   createToggleableContent,
@@ -15,13 +14,9 @@ export interface RenderContext {
   config: FieldConfig;
   storyManager: StoryManager;
   agentCycleManager: AgentCycleManager;
-  wandUI: WandUI;
   editModeState: boolean; // The specific boolean for this field/mode
   toggleEditMode: () => void;
   handleFieldChange: (content: string) => void;
-  handleWandClick: () => void;
-  saveWandResult: (session: FieldSession) => void;
-  handleWandDiscard: () => void;
   // List-specific
   getItemEditMode?: (itemId: string) => boolean;
   toggleItemEditMode?: (itemId: string) => void;
@@ -33,7 +28,7 @@ export interface RenderContext {
   isAttgEnabled?: () => boolean;
   setStyleEnabled?: (enabled: boolean) => Promise<void>;
   isStyleEnabled?: () => boolean;
-  runSimpleGeneration?: () => Promise<void>;
+  runFieldGeneration?: (session: FieldSession) => Promise<void>;
 }
 
 export interface FieldRenderStrategy {
@@ -199,17 +194,14 @@ export class TextFieldStrategy implements FieldRenderStrategy {
       config,
       storyManager,
       agentCycleManager,
-      wandUI,
       editModeState,
       toggleEditMode,
       handleFieldChange,
-      handleWandClick,
-      saveWandResult,
-      handleWandDiscard,
       setAttgEnabled,
       isAttgEnabled,
       setStyleEnabled,
       isStyleEnabled,
+      runFieldGeneration,
     } = context;
 
     const content = storyManager.getFieldContent(config.id);
@@ -239,12 +231,39 @@ export class TextFieldStrategy implements FieldRenderStrategy {
       });
     }
 
+    const genButton = createResponsiveGenerateButton(
+      `gen-btn-${config.id}`,
+      {
+        isRunning: session?.isRunning || false,
+        budgetState: session?.budgetState,
+      },
+      {
+        onStart: () => {
+          if (runFieldGeneration) {
+            const s = session || agentCycleManager.startSession(config.id);
+            runFieldGeneration(s);
+          }
+        },
+        onCancel: () => {
+          if (session?.cancellationSignal) {
+            session.cancellationSignal.cancel();
+          }
+        },
+        onContinue: () => {
+          if (session?.budgetResolver) {
+            session.budgetResolver();
+          }
+        },
+      },
+      "Generate",
+    );
+
     const parts: UIPart[] = [
       createHeaderWithToggle(
         config.description,
         editModeState,
         toggleEditMode,
-        !session ? handleWandClick : undefined,
+        genButton,
       ),
       createToggleableContent(
         editModeState,
@@ -252,15 +271,7 @@ export class TextFieldStrategy implements FieldRenderStrategy {
         config.placeholder,
         `input-field-${config.id}`,
         (val) => {
-          if (session) {
-            const activeStage = session.selectedStage;
-            if (session.cycles[activeStage]) {
-              session.cycles[activeStage].content = val;
-            }
-            storyManager.setFieldContent(config.id, val, false);
-          } else {
-            handleFieldChange(val);
-          }
+          handleFieldChange(val);
         },
       ),
     ];
@@ -271,17 +282,6 @@ export class TextFieldStrategy implements FieldRenderStrategy {
           style: { "margin-top": "4px", "justify-content": "flex-end" },
           content: [syncCheckbox],
         }),
-      );
-    }
-
-    if (session) {
-      parts.push(
-        wandUI.createInlineControlCluster(
-          session,
-          config.id,
-          saveWandResult,
-          handleWandDiscard,
-        ),
       );
     }
 

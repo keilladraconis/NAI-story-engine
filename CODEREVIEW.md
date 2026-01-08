@@ -21,12 +21,10 @@ The Story Engine codebase is well-structured, following service-oriented and str
 **Refactor:** Removed `storageKey` from UI components (`createToggleableContent`, `multilineTextInput`). `StoryManager` is now the *only* entity that performs `api.v1.storyStorage.set` for core data. UI components use `initialValue` + `onChange` and are driven by the central `StoryManager` state.
 **Status:** Completed. Refactored UI components and strategies to remove direct storage binding.
 
-### 3. Logic Bloat in `RefineStageHandler` [FINISHED]
+### 3. Logic Bloat in `RefineStageHandler` [REMOVED]
 **Location:** `src/core/stage-handlers.ts`
-**Finding:** The `overrideGeneration` method in `RefineStageHandler` is nearly 200 lines of complex text patching, regex cleaning, and iterative generation logic.
-**Issue:** This makes the handler difficult to unit test and violates the Single Responsibility Principle.
-**Refactor:** Extract the iterative patching and "cleaning" logic (prefixes like `REPLACEMENT TEXT:`) into `ReviewPatcher` or a new `PatchingService`.
-**Status:** Completed. Logic for parsing, merging, and cleaning patches extracted into `ReviewPatcher`. `RefineStageHandler` refactored to use these centralized methods.
+**Finding:** The `overrideGeneration` method in `RefineStageHandler` was nearly 200 lines of complex text patching.
+**Status:** Cut. The entire "Review" and "Refine" workflow has been removed from the project to simplify the architecture and focus on a more reliable single-stage generation model.
 
 ---
 
@@ -34,10 +32,9 @@ The Story Engine codebase is well-structured, following service-oriented and str
 
 ### 1. Unified Context Strategies [FINISHED]
 **Location:** `src/core/context-strategies.ts`
-**Finding:** `getShortDulfsContext` and `getAllDulfsContext` are substantially similar.
-**Issue:** Code duplication for building world element strings.
-**Refactor:** Created a single `buildDulfsContextString(manager, mode: 'short' | 'full', excludeId?: string)` helper.
-**Status:** Completed. Unified DULFS context building into a single strategy helper.
+**Finding:** `getShortDulfsContext` and `getAllDulfsContext` were substantially similar.
+**Refactor:** Unified DULFS context building. Removed review/refine strategies.
+**Status:** Completed.
 
 ### 2. Wonky Prompt Workarounds (`fixSpacing`)
 **Location:** `src/core/context-strategies.ts`
@@ -52,21 +49,21 @@ The Story Engine codebase is well-structured, following service-oriented and str
 **Refactor:** Use a discriminated union or a strict mapping object to access fields by ID, ensuring that the compiler knows whether it's getting a `StoryField` or a `DULFSField[]`.
 **Status:** Completed. Introduced `DulfsFieldID` and `TextFieldID` type unions and type guards. Refactored `StoryDataManager` and `StoryManager` to use type-safe accessors and setters, removing `any` casts from core data logic.
 
-### 4. Wand Session Inconsistency [FINISHED]
+### 4. Generator Session Inconsistency [FINISHED]
 **Location:** `InlineWandStrategy` (in `field-strategies.ts`) vs `StandardFieldStrategy` vs `GeneratorFieldStrategy`
-**Finding:** Different strategies handled agent sessions inconsistently (auto-start vs button-start vs custom "Simple Generation").
-**Issue:** Diverging logic paths and inconsistent UX for similar text-based fields.
-**Refactor:** Unified `InlineWandStrategy`, `StandardFieldStrategy`, and `GeneratorFieldStrategy` into a single `TextFieldStrategy`. All text fields (Story Prompt, World Snapshot, ATTG, Style, etc.) now use a consistent button-triggered agentic workflow. Specialized sync logic (Memory/AN) is preserved within the unified strategy.
-**Status:** Completed. Fully unified text field architecture.
+**Finding:** Different strategies handled agent sessions inconsistently.
+**Refactor:** Unified into a single `TextFieldStrategy` with a header-integrated `createResponsiveGenerateButton`. Removed the multi-stage "Generator" control cluster.
+**Status:** Completed. Fully simplified and unified generation architecture.
 
 ---
 
 ## LOW Priority
 
-### 1. Dead Code & Comments
-**Location:** `StructuredEditor.createFieldSection`
-**Finding:** Comments still refer to "Generic Wand (Legacy)" and "Removed".
-**Action:** Clean up comments and ensure `ActiveWandStrategy` remnants are fully purged.
+### 1. Dead Code & Comments [FINISHED]
+**Location:** `StructuredEditor.createFieldSection`, `GenerationUI`
+**Finding:** Unused classes and legacy comments.
+**Action:** Deleted `src/ui/wand-ui.ts`, `src/core/review-patcher.ts`, and `src/core/stage-handlers.ts`. Purged all stage-related logic from the project.
+**Status:** Completed.
 
 ### 2. Brainstorm Delegate Overload
 **Location:** `StoryManager.ts`

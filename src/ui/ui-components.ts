@@ -4,9 +4,9 @@ export const createHeaderWithToggle = (
   description: string,
   isEditMode: boolean,
   onToggle: () => void,
-  onWand?: () => void,
+  generateButton?: UIPart,
 ): UIPart => {
-  const buttons = [
+  const buttons: UIPart[] = [
     button({
       text: isEditMode ? "Preview" : "Edit",
       iconId: isEditMode ? "eye" : "edit-3",
@@ -14,14 +14,8 @@ export const createHeaderWithToggle = (
     }),
   ];
 
-  if (onWand) {
-    buttons.push(
-      button({
-        text: "Wand",
-        iconId: "zap",
-        callback: onWand,
-      }),
-    );
+  if (generateButton) {
+    buttons.push(generateButton);
   }
 
   return row({

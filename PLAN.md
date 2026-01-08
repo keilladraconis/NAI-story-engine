@@ -20,31 +20,24 @@
    - `StructuredEditor` with collapsible sections.
    - **Toggleable View**: Fields support Markdown reading mode and Text editing mode.
 
-### ✅ **Phase 2: Advanced Agent Integration - COMPLETE**
-**Status**: The three-stage agentic cycle (Wand) is fully implemented and integrated.
-**Refinement (Jan 2026)**: Major UX overhaul to remove modality and improve data flow.
+### ✅ **Phase 2: Simplified Agent Integration - COMPLETE**
+**Status**: The simplified, single-stage generation workflow is fully implemented.
+**Refinement (Jan 2026)**: Decisions were made to cut the "Review" and "Refine" stages to focus on a more direct and reliable generation experience.
 
 #### Features Implemented:
-- **The Wand Interface**: Refactored from a modal to an **inline, non-modal control cluster** that sits directly within the field.
-- **Three-Stage Cycle**: 
-    - **Generate**: Live text streaming into the editor.
-    - **Review**: **Streaming Patcher** that inserts critique tags directly into the text using robust fuzzy-prefix matching (supports Markdown & out-of-order tags).
-    - **Refine**: Consumes the tagged text to produce a polished final version.
+- **Simplified Generate Interface**: Replaced the multi-stage control cluster with a direct **responsive generate button** in the field header.
+- **Direct-to-Field Generation**: Content now streams directly into the field's draft state, with live updates to the UI and immediate persistence.
+- **Budget-Aware Generation**: Integrated budget warning and refill handling directly into the generate button.
+- **Lorebook Synchronization**: Generation in the Lorebook panel now automatically syncs with the NovelAI Lorebook on each update.
 - **Live Editing**: 
-    - **World Snapshot**: Text input is now directly bound to `StoryManager` with auto-save, allowing seamless manual edits alongside AI generation.
-    - **No-Save UI**: Removed "Save/Discard" buttons in favor of immediate persistence.
-- **Field-Specific UX**:
-    - **Story Prompt**: Simplified to a clean, plain-text multiline input without toggle complexity.
-    - **Wand UI**: Unified stage selector and "Ignite" controls.
-- **Unified Text Fields**: All text-based fields (Story Prompt, World Snapshot, ATTG, Style Guidelines) have been unified under a single `TextFieldStrategy`. Removed auto-start sessions and specialized "Generator" layouts in favor of a consistent, button-triggered agentic workflow. This ensures uniform logic for generation, review, and refinement while preserving specialized synchronization (Memory/AN) for relevant fields.
-- **Context Strategies**: Specialized prompt engineering for "Brainstorm" (Ideator) and "World Snapshot" (Architect).
-- **Refactoring**: Decoupled UI logic into `WandUI` and reusable components.
-- **Architectural Cleanup (Jan 5 2026)**:
-    - **Single Source of Truth**: Removed `session.currentContent` in favor of direct `StoryManager` interaction.
-    - **Strategy Patterns**: Implemented `StageHandler` (Generate/Review/Refine) and `FieldRenderStrategy` (Inline/Standard) to eliminate conditional spaghetti code.
-    - **Review Patcher**: Extracted fuzzy-prefix patching logic and iterative refinement/cleaning logic (from `RefineStageHandler`) into a dedicated service.
-    - **Configuration**: Brainstorm prompts are now fully configurable via `project.yaml`.
-    - **Cleanup**: Removed dead code (`ActiveWandStrategy`, `createWorkflowUI`).
+    - **World Snapshot**: Text input is directly bound to `StoryManager` with auto-save.
+- **Unified Text Fields**: All text-based fields (Story Prompt, World Snapshot, ATTG, Style Guidelines) use the same simplified generation logic.
+- **Context Strategies**: Specialized prompt engineering for "Brainstorm" (Ideator), "World Snapshot" (Architect), and other specific fields.
+- **Cleanup (Jan 8 2026)**:
+    - **Removed Stages**: Deleted "Review" and "Refine" stages and associated logic (`ReviewPatcher`, `StageHandler`).
+    - **Removed Generation UI Cluster**: Deleted `WandUI` and its inline control cluster in favor of header-integrated buttons.
+    - **Simplified Sessions**: `FieldSession` now only tracks general generation state (running, cancellation, budget).
+
 
 ### 🔄 **Phase 3: Deep Worldbuilding (DULFS) - PARTIALLY COMPLETE**
 **Status**: Active
@@ -72,7 +65,7 @@
 ### Refactoring & Code Quality
 - **Modular UI**: Extracted reusable components (`createHeaderWithToggle`, `createToggleableContent`) to `src/ui/ui-components.ts`.
 - **Single Source of Truth**: Removed direct `storageKey` binding in UI components to ensure `StoryManager` is the sole entity managing persistence, preventing desync between global data and individual field keys.
-- **Wand UI**: Encapsulated all Wand-related UI logic in `src/ui/wand-ui.ts`.
+- **Simplified Workflow**: Removed `WandUI`, `ReviewPatcher`, and `StageHandlers` to focus on a direct-to-field generation model.
 - **Configuration**: Centralized field definitions in `src/config/field-definitions.ts`.
 - **Cleanup**: Removed unused variables and dead code in `AgentWorkflowService` and `ContextStrategies`.
 
@@ -80,7 +73,7 @@
 - **`story-manager.ts`**: Central data management.
 - **`agent-cycle.ts`**: Agentic processing system state.
 - **`structured-editor.ts`**: Main editor UI orchestrator.
-- **`wand-ui.ts`**: Specialized UI for the AI generation workflow.
+- **`agent-workflow.ts`**: Simplified generation logic.
 - **`hyper-generator.ts`**: NovelAI generation API wrapper.
 
 ## 📅 Development Timeline
@@ -88,11 +81,12 @@
 ### Sprint 1 (Completed) - Core Architecture
 - ✅ Data structures, Storage, Basic UI.
 
-### Sprint 2 (Completed) - Agent Integration & UX
-- ✅ Wand Modal UI with Markdown/Edit toggles.
-- ✅ 3-Stage Agent Logic (Generate -> Review -> Refine).
+### Sprint 2 (Completed) - Agent Integration & UX Simplification
+- ✅ Single-stage generation workflow.
+- ✅ Header-integrated responsive generate button.
 - ✅ Context Strategy Factory.
 - ✅ UI Refactoring and Modularization.
+- ✅ Removal of complex Review/Refine cycles.
 
 ### Sprint 3 (Next) - DULFS & Lorebooks
 - 🔄 **DULFS UI**: List management interface.
@@ -102,7 +96,7 @@
 ## 📋 Manual Testing & Quality Assurance
 All verification is performed manually within the NovelAI platform.
 - **Build Verification**: `nibs build` passes cleanly.
-- **UI Verification**: Manual check of toggle buttons, Wand workflow, and field persistence.
+- **UI Verification**: Manual check of toggle buttons, Generate workflow, and field persistence.
 
 ## 🚀 Risk Mitigation
 - **Storage**: Defensive coding for data persistence.

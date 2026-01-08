@@ -156,112 +156,6 @@ const Strategies: Record<string, StrategyFn> = {
     };
   },
 
-  // Review - The Editor
-  // Low temperature for analytical precision, high repetition penalty to prevent outputting the story
-  "review:default": async (session, manager, base) => {
-    let userPrompt = (await api.v1.config.get("critique_prompt")) || "";
-
-    // If this is a lorebook entry, append specific critique instructions
-    if (session.fieldId.includes(":")) {
-      const lorebookCrit =
-        (await api.v1.config.get("lorebook_critique_instructions")) || "";
-      if (lorebookCrit) {
-        userPrompt += "\n\n" + lorebookCrit;
-      }
-    }
-
-    const contentToReview = session.cycles.generate.content;
-    const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
-    const dulfs = buildDulfsContextString(manager, "short");
-    const config = FIELD_CONFIGS.find((c) => c.id === session.fieldId);
-    const genInstruction =
-      config?.generationInstruction || "Generate narrative content.";
-
-    const messages = hyperContextBuilder(
-      base.systemMsg,
-      { role: "user", content: fixSpacing(userPrompt) },
-      {
-        role: "assistant",
-        content: fixSpacing(
-          "I will review the text and provide structured directives in the format '[TAG] || \"locator substring\"'.\n" +
-            "I will be highly selective, only tagging passages that truly need improvement.\n" +
-            "I will NOT tag present-tense descriptions of behavior, inherent risks, or metaphorical tensions as [PLOTTING].\n" +
-            "I will use [FIX] for grammatical/syntactical errors and [LOGIC] for consistency, causal errors, or missing logical steps.\n" +
-            "I will NOT tag passages for 'depth' or 'flavor' unless there is a logic error; I prioritize conciseness.\n" +
-            "I will NOT repeat the same critique for multiple similar passages.",
-        ),
-      },
-      [
-        {
-          role: "user",
-          content: fixSpacing(`WORLD SNAPSHOT:\n${worldSnapshot}`),
-        },
-        {
-          role: "user",
-          content: fixSpacing(`WORLD ELEMENTS:\n${dulfs}`),
-        },
-        {
-          role: "user",
-          content: fixSpacing(`GENERATE INSTRUCTION:\n${genInstruction}`),
-        },
-        {
-          role: "user",
-          content: fixSpacing(`CONTENT TO REVIEW:\n${contentToReview}`),
-        },
-      ],
-    );
-    return {
-      messages,
-      params: {
-        temperature: 0.3,
-        min_p: 0.02,
-        presence_penalty: 0.1,
-        frequency_penalty: 0.4,
-        maxTokens: 1024,
-      },
-    };
-  },
-
-  // Refine - The Polisher
-  // Standard temperature for fluid prose, low repetition penalty for style
-  "refine:default": async (session, manager, base) => {
-    const userPrompt = (await api.v1.config.get("refine_prompt")) || "";
-    const contentToRefine = manager.getFieldContent(session.fieldId);
-
-    api.v1.log(
-      `[ContextStrategy] Refining content length: ${contentToRefine.length}`,
-    );
-
-    const messages = hyperContextBuilder(
-      base.systemMsg,
-      { role: "user", content: fixSpacing(userPrompt) },
-      {
-        role: "assistant",
-        content: "Here is the finalized text, stripped of tags and polished:",
-      },
-      [
-        {
-          role: "user",
-          content: fixSpacing(`STORY PROMPT:\n${base.storyPrompt}`),
-        },
-        {
-          role: "assistant",
-          content: fixSpacing(`DRAFT CONTENT:\n${contentToRefine}`),
-        },
-        // { role: "user", content: fixSpacing(`CRITIQUE:\n${critique}`) },
-      ],
-    );
-    return {
-      messages,
-      params: {
-        temperature: 0.8,
-        min_p: 0.02,
-        presence_penalty: 0.02,
-        maxTokens: 2048,
-      },
-    };
-  },
-
   // Generate (ATTG)
   "generate:attg": async (_session, _manager, base) => {
     const userPrompt = (await api.v1.config.get("attg_generate_prompt")) || "";
@@ -454,10 +348,6 @@ export class ContextStrategyFactory {
       });
     }
 
-    // Add current list content to avoid dupes?
-    // Usually standard generation appends or fills.
-    // For now we just give context.
-
     const messages = hyperContextBuilder(
       baseContext.systemMsg,
       {
@@ -482,105 +372,14 @@ export class ContextStrategyFactory {
     };
   }
 
-  async buildRefinementPatchContext(
-    session: FieldSession,
-    tag: string,
-    locator: string,
-    prefill: string,
-  ): Promise<StrategyResult> {
-    const worldSnapshot = this.storyManager.getFieldContent(
-      FieldID.WorldSnapshot,
-    );
-    const dulfs = buildDulfsContextString(this.storyManager, "short");
-    const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
-
-    const config = FIELD_CONFIGS.find((c) => c.id === session.fieldId);
-    const genInstruction =
-      config?.generationInstruction || "Generate narrative content.";
-    const genOutput = session.cycles.generate.content;
-
-    const refinementSystemPrompt = `You are a precision refinement agent. Your goal is to rewrite a SPECIFIC targeted passage to address a critique tag.
-CRITICAL RULES:
-1. Output ONLY the replacement text for the targeted passage.
-2. NO introductory text (e.g., "Here is the fix:"), NO commentary, NO tags, NO markdown headers.
-3. Maintain the EXACT tone, style, and TENSE of the original.
-4. DO NOT include the "CONTEXT BEFORE TARGET" or the "REFINEMENT TARGET" itself in your output. Your output will be DIRECTLY substituted into the text.
-5. If the tag is [PLOTTING], remove future scripting, forced strategies, or premature revelations. Replace with static tension, inherent risk, or present-tense character behavior.
-6. If the tag is [DELETE], or [FLUFF], providing an empty string or a significantly shorter version is often the correct action.`;
-
-    const tagPrompts: Record<string, string> = {
-      FIX: "Repair grammatical, syntactical, or formatting errors. Output ONLY the corrected text.",
-      LOGIC:
-        "Repair causal logic or consistency errors. Output ONLY the corrected text.",
-      PLOTTING:
-        "Remove future scripting, inevitable outcomes, or forced plot. Replace with static tension, current character drivers, or environmental potential. Do NOT use future tense. Can be much shorter.",
-      FLUFF:
-        "Remove generic filler or purple prose. Retain core meaning while reducing length drastically. Output ONLY the result.",
-      FORMAT: "Fix structural formatting to match requirements.",
-    };
-
-    const reviewInstruction =
-      tagPrompts[tag] || `Refine this passage to address [${tag}].`;
-
-    const messages = hyperContextBuilder(
-      { role: "system", content: fixSpacing(refinementSystemPrompt) },
-      {
-        role: "user",
-        content: fixSpacing(
-          `CONTEXT BEFORE TARGET:\n...${prefill}\n\nREFINEMENT TARGET [${tag}]:\n"${locator}"\n\nINSTRUCTION:\n${reviewInstruction}\n\nExecute. Output ONLY the replacement text.`,
-        ),
-      },
-      {
-        role: "assistant",
-        content: "REPLACEMENT TEXT:\n",
-      },
-      [
-        {
-          role: "user",
-          content: fixSpacing(`STORY PROMPT:\n${storyPrompt}`),
-        },
-        {
-          role: "user",
-          content: fixSpacing(`WORLD SNAPSHOT:\n${worldSnapshot}`),
-        },
-        {
-          role: "user",
-          content: fixSpacing(`WORLD ELEMENTS:\n${dulfs}`),
-        },
-        {
-          role: "user",
-          content: fixSpacing(`GENERATE INSTRUCTION:\n${genInstruction}`),
-        },
-        {
-          role: "user",
-          content: fixSpacing(`GENERATE OUTPUT:\n${genOutput}`),
-        },
-      ],
-    );
-
-    return {
-      messages,
-      params: {
-        temperature: 0.3, // Lowered for precision
-        maxTokens: 512,
-        minTokens: 0,
-        stop: ["\n\n", "[", "<"], // Stop if it tries to escape or start a new tag
-      },
-    };
-  }
-
   private getStrategyKey(session: FieldSession): string {
-    const stage = session.selectedStage;
-    if (stage === "generate") {
-      if (session.fieldId.includes(":")) return "generate:lorebook";
-      if (session.fieldId === FieldID.StoryPrompt)
-        return "generate:storyPrompt";
-      if (session.fieldId === FieldID.WorldSnapshot)
-        return "generate:worldSnapshot";
-      if (session.fieldId === FieldID.ATTG) return "generate:attg";
-      if (session.fieldId === FieldID.Style) return "generate:style";
-      return "generate:default";
-    }
-    return `${stage}:default`;
+    if (session.fieldId.includes(":")) return "generate:lorebook";
+    if (session.fieldId === FieldID.StoryPrompt)
+      return "generate:storyPrompt";
+    if (session.fieldId === FieldID.WorldSnapshot)
+      return "generate:worldSnapshot";
+    if (session.fieldId === FieldID.ATTG) return "generate:attg";
+    if (session.fieldId === FieldID.Style) return "generate:style";
+    return "generate:default";
   }
 }
