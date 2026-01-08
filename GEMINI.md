@@ -67,18 +67,18 @@ There are no automated tests in the project. Testing is done manually by running
 
 When debugging issues, you may add debugging log statements and provide the user with a test plan. The user can then supply the log output in response after executing the test plan.
 
-## Architectural Insights
+### Gemini Added Memories
+- The Brainstorm feature has been refactored from a card-based UI to a chat-based message stream interface and moved to its own sidebar tab.
+- The codebase uses a `FieldID` enum and a strategy pattern for rendering (`FieldRenderStrategy`).
+- Multi-stage generation (Review/Refine) has been removed in favor of a simpler, more reliable direct-to-field generation model.
+- `StoryManager` is the single source of truth for all data, utilizing `StoryDataManager` for persistence and `LorebookSyncService` for NAI integration.
+- The system supports "Inline Wand" generation for text fields and specialized list generation for DULFS categories.
+- A custom Lorebook Panel integration allows for AI-assisted editing of individual lorebook entries managed by Story Engine.
 
-### Data Flow & State Management
-- **Single Source of Truth**: `StoryManager` acts as the central hub for story data. UI components are driven by `StoryManager` state.
-- **Agent Cycle**: Managed by `AgentCycleManager` and executed by `AgentWorkflowService`. It provides a simplified single-stage generation workflow.
-- **Lorebook Integration**: DULFS (Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics) are automatically synced to NovelAI Lorebook categories and entries.
-- **Tech Debt Cleanup**: Removed multi-stage generation logic (`ReviewPatcher`, `StageHandler`, `WandUI`) to simplify the system and improve reliability.
+## Architectural Overhaul (Jan 2026)
+- **Simplified Workflow**: Removed `WandUI`, `ReviewPatcher`, and `StageHandlers`. The system now focuses on high-quality single-pass generation.
+- **Strategy Pattern**: UI rendering is decoupled via `ListFieldStrategy` and `TextFieldStrategy`.
+- **Context Management**: Prompt building is centralized in `ContextStrategyFactory`, using `hyper-generator` for long-form output.
+- **Data-Driven UI**: `FIELD_CONFIGS` drives the generation of the `StructuredEditor` interface.
+- **Known Issues**: Export/Import currently lacks DULFS/Brainstorm support; Lorebook UI has potential async race conditions in the render loop.
 
-### Key Patterns
-- **Strategy Pattern**: Used for field rendering (`FieldRenderStrategy`). All text-based fields (Prompt, Snapshot, ATTG, Style) are handled by a single `TextFieldStrategy` with integrated generation controls.
-- **Context Construction**: `ContextStrategyFactory` builds model-specific prompts based on the current field and session state.
-- **Hyper-Generator**: The project uses `lib/hyper-generator.ts` for advanced generation control, including continuation handling and token budget management.
-
-### Known Oddities
-- **Newline Doubling**: Prompt construction doubles all newlines (`fixSpacing`) for backend compatibility.

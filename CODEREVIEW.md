@@ -1,85 +1,66 @@
 # Code Review: Story Engine (January 2026)
 
 ## Overview
-The Story Engine codebase is well-structured, following service-oriented and strategy patterns. It demonstrates a clear separation between data management, workflow orchestration, and UI rendering.
+The Story Engine codebase has undergone a successful simplification, moving from a complex multi-stage agentic workflow to a streamlined, strategy-based architecture. The core data management is centralized, and the UI is data-driven. However, some critical gaps remain in data persistence (export/import) and some minor architectural inconsistencies persist.
 
 ---
 
 ## HIGH Priority
 
-### 1. Brittle Field Syncing Logic [FINISHED]
-**Location:** `StoryManager.syncToIndividualKeys`
-**Finding:** The service manually lists "text fields" (StoryPrompt, Brainstorm, etc.).
-**Issue:** If a new field is added to `field-definitions.ts`, it must be manually added to this list. This is an anti-pattern that leads to "forgotten" fields not being synced.
-**Refactor:** Centralize the categorization of fields (e.g., `isTextField`, `isListField`) within `field-definitions.ts` or as static helpers on `FieldID`.
-**Status:** Completed. Field metadata (fieldType, hidden) added to FIELD_CONFIGS. TEXT_FIELD_IDS and LIST_FIELD_IDS are now derived from configurations. StoryManager and StoryDataManager refactored to be data-driven.
+### 1. Incomplete Data Export/Import
+**Location:** `StoryEngineUI.exportStoryData` and `importStoryData`
+**Finding:** These methods only iterate over `FieldID` and use `getFieldContent`/`setFieldContent`. 
+**Issue:** `getFieldContent` for list-based fields (DULFS) returns an empty string or formatted text, not the structured data. Consequently, exporting a story currently **loses all character, location, faction, and system data**, as well as the entire Brainstorm chat history.
+**Refactor:** Export the entire `StoryData` object from `StoryDataManager` instead of trying to rebuild it field-by-field from the UI layer.
 
-### 2. Dual-Storage Desync Risk [FINISHED]
-**Location:** `StoryManager.setFieldContent`, `StructuredEditor`, `field-strategies.ts`
-**Finding:** The system uses both a global blob (`kse-story-data`) and individual keys (`kse-field-${fieldId}`) for persistence.
-**Issue:** UI components often bind directly to `storageKey` (e.g., `createToggleableContent`). While this provides "free" persistence, it can bypass the `StoryManager` logic (like sync to AN/Memory) unless the `onChange` callback perfectly mirrors the global state.
-**Refactor:** Removed `storageKey` from UI components (`createToggleableContent`, `multilineTextInput`). `StoryManager` is now the *only* entity that performs `api.v1.storyStorage.set` for core data. UI components use `initialValue` + `onChange` and are driven by the central `StoryManager` state.
-**Status:** Completed. Refactored UI components and strategies to remove direct storage binding.
-
-### 3. Logic Bloat in `RefineStageHandler` [REMOVED]
-**Location:** `src/core/stage-handlers.ts`
-**Finding:** The `overrideGeneration` method in `RefineStageHandler` was nearly 200 lines of complex text patching.
-**Status:** Cut. The entire "Review" and "Refine" workflow has been removed from the project to simplify the architecture and focus on a more reliable single-stage generation model.
+### 2. Async Race Condition in Lorebook UI
+**Location:** `StoryEngineUI.createLorebookPanel`
+**Finding:** The logic `api.v1.lorebook.entry(entryId).then(...)` is located directly inside the rendering function.
+**Issue:** Every time the Lorebook UI re-renders (which can be frequent), it triggers a new asynchronous fetch. This can lead to race conditions where older requests resolve after newer ones, or simply cause unnecessary API pressure.
+**Refactor:** Move the entry fetching and session initialization logic into the `onLorebookEntrySelected` hook or a dedicated controller method that only runs once per selection.
 
 ---
 
 ## MEDIUM Priority
 
-### 1. Unified Context Strategies [FINISHED]
+### 1. Redundant Sync Logic
+**Location:** `LorebookSyncService.syncAttgToMemory` and `syncStyleToAN`
+**Finding:** These two methods are 90% identical, differing only in the regex used and the NAI API called (`api.v1.memory` vs `api.v1.an`).
+**Refactor:** Create a private helper `syncToHeader(content, regex, getter, setter)` to handle the unshifting/replacing logic.
+
+### 2. `RenderContext` Bloat
+**Location:** `src/ui/field-strategies.ts`
+**Finding:** `RenderContext` contains a large number of optional methods (`getItemEditMode`, `runListGeneration`, `setAttgEnabled`, etc.).
+**Issue:** This is a "God Object" anti-pattern for the strategy pattern. It makes it hard to see which strategy actually requires which data.
+**Refactor:** Split `RenderContext` into more specific interfaces or use a more decoupled event-bus/action approach for UI interactions.
+
+### 3. Inconsistent Prompt Spacing (`fixSpacing`)
 **Location:** `src/core/context-strategies.ts`
-**Finding:** `getShortDulfsContext` and `getAllDulfsContext` were substantially similar.
-**Refactor:** Unified DULFS context building. Removed review/refine strategies.
-**Status:** Completed.
-
-### 2. Wonky Prompt Workarounds (`fixSpacing`)
-**Location:** `src/core/context-strategies.ts`
-**Finding:** `fixSpacing` (doubling `\n`) is called manually on almost every string in every strategy.
-**Issue:** This is a leak of model-specific quirks (GLM-4.6) into the high-level strategy logic.
-**Refactor:** Move this into `hyperContextBuilder` or a dedicated prompt-assembly service so strategies can work with clean strings.
-
-### 3. Dynamic Property Access (Type Safety) [FINISHED]
-**Location:** `StoryDataManager.getStoryField`, `StoryManager.addDulfsItem`
-**Finding:** Frequent use of `(data as any)[fieldId]`.
-**Issue:** This bypasses TypeScript's type checking for the `StoryData` interface.
-**Refactor:** Use a discriminated union or a strict mapping object to access fields by ID, ensuring that the compiler knows whether it's getting a `StoryField` or a `DULFSField[]`.
-**Status:** Completed. Introduced `DulfsFieldID` and `TextFieldID` type unions and type guards. Refactored `StoryDataManager` and `StoryManager` to use type-safe accessors and setters, removing `any` casts from core data logic.
-
-### 4. Generator Session Inconsistency [FINISHED]
-**Location:** `InlineWandStrategy` (in `field-strategies.ts`) vs `StandardFieldStrategy` vs `GeneratorFieldStrategy`
-**Finding:** Different strategies handled agent sessions inconsistently.
-**Refactor:** Unified into a single `TextFieldStrategy` with a header-integrated `createResponsiveGenerateButton`. Removed the multi-stage "Generator" control cluster.
-**Status:** Completed. Fully simplified and unified generation architecture.
+**Finding:** While `fixSpacing` is used on most blocks, it is missing from `userInstruction` and `exampleFormat` in `buildDulfsContext`.
+**Issue:** While these are usually short, GLM-4.6's sensitivity to newlines means consistency is key to avoiding merged instruction blocks.
+**Refactor:** Move `fixSpacing` into a central prompt-assembly utility or the `hyper-generator` itself to ensure uniform application.
 
 ---
 
 ## LOW Priority
 
-### 1. Dead Code & Comments [FINISHED]
-**Location:** `StructuredEditor.createFieldSection`, `GenerationUI`
-**Finding:** Unused classes and legacy comments.
-**Action:** Deleted `src/ui/wand-ui.ts`, `src/core/review-patcher.ts`, and `src/core/stage-handlers.ts`. Purged all stage-related logic from the project.
-**Status:** Completed.
+### 1. Stateless Strategy Instantiation
+**Location:** `src/ui/field-strategies.ts` -> `getFieldStrategy`
+**Finding:** Returns `new ListFieldStrategy()` or `new TextFieldStrategy()` on every call.
+**Issue:** These classes are stateless. Instantiating them repeatedly is slightly inefficient (though negligible in JS) and adds GC pressure.
+**Refactor:** Use singletons or just export the instances.
 
-### 2. Brainstorm Delegate Overload
-**Location:** `StoryManager.ts`
-**Finding:** `StoryManager` has multiple methods (`getBrainstormMessages`, `addBrainstormMessage`, etc.) that simply wrap `BrainstormDataManager`.
-**Action:** While this keeps the API flat, it's starting to bloat `StoryManager`. Consider exposing the data managers directly or grouping them.
-
-### 3. Inconsistent UUID Usage
-**Location:** `AgentWorkflowService` vs `ListFieldStrategy`
-**Finding:** `AgentWorkflowService` generates IDs during generation, but `ListFieldStrategy` generates them during manual "Add Entry".
-**Action:** Centralize entity creation in `StoryManager` to ensure consistent defaults.
+### 2. Redundant UI Object Re-creations
+**Location:** `StoryEngineUI.updateUI` and `BrainstormUI.updateUI`
+**Finding:** The entire `sidebar` or `sidebarPanel` object is re-assigned by calling `createSidebar()`.
+**Issue:** While NAI's `api.v1.ui.update` requires the panel object, the internal state of `StructuredEditor` and `BrainstormUI` should ideally be more stable.
+**Refactor:** Ensure `createSidebar` is as lightweight as possible, or consider if the NAI API allows updating just the `content` property of an existing panel reference.
 
 ---
 
-## Refactoring Roadmap
+## Refactoring Roadmap (Updated)
 
-1.  **Phase 1 (Centralization)**: Move field metadata (type, layout, sync-targets) into `FieldID` or a metadata registry. Update `StoryManager` and `HistoryService` to use this registry.
-2.  **Phase 2 (Decoupling)**: Extract patching/cleaning logic from `RefineStageHandler`.
-3.  **Phase 3 (Prompting)**: Move `fixSpacing` into the `hyper-generator` wrapper or a prompt-building utility.
-4.  **Phase 4 (Type Safety)**: Refactor `StoryDataManager` to use typed accessors for fields.
+1.  **Phase 1 (Data Integrity)**: Fix `exportStoryData` to include the full `StoryData` blob and brainstorm history.
+2.  **Phase 2 (Lifecycle)**: Move async entry loading out of the render loop in `StoryEngineUI`.
+3.  **Phase 3 (DRY)**: Refactor `LorebookSyncService` and `ContextStrategies` to remove duplicated logic and fix spacing consistency.
+4.  **Phase 4 (Type Safety)**: Address the remaining `any` casts in `StoryDataManager.createDefaultData`.
