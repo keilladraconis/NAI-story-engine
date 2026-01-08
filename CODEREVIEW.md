@@ -15,32 +15,29 @@ The Story Engine codebase has undergone a successful simplification, moving from
 
 ## MEDIUM Priority
 
-### 1. Redundant Sync Logic
+### 1. Redundant Sync Logic - ✅ COMPLETED
 **Location:** `LorebookSyncService.syncAttgToMemory` and `syncStyleToAN`
 **Finding:** These two methods are 90% identical, differing only in the regex used and the NAI API called (`api.v1.memory` vs `api.v1.an`).
-**Refactor:** Create a private helper `syncToHeader(content, regex, getter, setter)` to handle the unshifting/replacing logic.
+**Refactor:** Created a private helper `syncToHeader(content, regex, getter, setter)` to handle the unshifting/replacing logic.
 
-### 2. `RenderContext` Bloat
+### 2. `RenderContext` Bloat - ✅ COMPLETED
 **Location:** `src/ui/field-strategies.ts`
-**Finding:** `RenderContext` contains a large number of optional methods (`getItemEditMode`, `runListGeneration`, `setAttgEnabled`, etc.).
-**Issue:** This is a "God Object" anti-pattern for the strategy pattern. It makes it hard to see which strategy actually requires which data.
-**Refactor:** Split `RenderContext` into more specific interfaces or use a more decoupled event-bus/action approach for UI interactions.
+**Finding:** `RenderContext` contained a large number of optional methods.
+**Refactor:** Split `RenderContext` into `BaseRenderContext`, `TextRenderContext`, and `ListRenderContext`. Strategies now use generic types to specify their required context.
 
-### 3. Inconsistent Prompt Spacing (`fixSpacing`)
+### 3. Inconsistent Prompt Spacing (`fixSpacing`) - ✅ COMPLETED
 **Location:** `src/core/context-strategies.ts`
-**Finding:** While `fixSpacing` is used on most blocks, it is missing from `userInstruction` and `exampleFormat` in `buildDulfsContext`.
-**Issue:** While these are usually short, GLM-4.6's sensitivity to newlines means consistency is key to avoiding merged instruction blocks.
-**Refactor:** Move `fixSpacing` into a central prompt-assembly utility or the `hyper-generator` itself to ensure uniform application.
+**Finding:** While `fixSpacing` is used on most blocks, it was missing from some blocks in `buildDulfsContext`.
+**Refactor:** Moved `fixSpacing` into `lib/hyper-generator.ts` and updated `hyperContextBuilder` to apply it uniformly to all messages.
 
 ---
 
 ## LOW Priority
 
-### 1. Stateless Strategy Instantiation
+### 1. Stateless Strategy Instantiation - ✅ COMPLETED
 **Location:** `src/ui/field-strategies.ts` -> `getFieldStrategy`
 **Finding:** Returns `new ListFieldStrategy()` or `new TextFieldStrategy()` on every call.
-**Issue:** These classes are stateless. Instantiating them repeatedly is slightly inefficient (though negligible in JS) and adds GC pressure.
-**Refactor:** Use singletons or just export the instances.
+**Refactor:** Using singletons for strategies.
 
 ### 2. Redundant UI Object Re-creations
 **Location:** `StoryEngineUI.updateUI` and `BrainstormUI.updateUI`
@@ -48,12 +45,17 @@ The Story Engine codebase has undergone a successful simplification, moving from
 **Issue:** While NAI's `api.v1.ui.update` requires the panel object, the internal state of `StructuredEditor` and `BrainstormUI` should ideally be more stable.
 **Refactor:** Ensure `createSidebar` is as lightweight as possible, or consider if the NAI API allows updating just the `content` property of an existing panel reference.
 
+### 3. Type Safety in `createDefaultData` - ✅ COMPLETED
+**Location:** `src/core/story-data-manager.ts`
+**Finding:** Used `(data as any)` when initializing fields.
+**Refactor:** Used type guards (`isDulfsField`, `isTextField`) to ensure type-safe assignment to `Partial<StoryData>`.
+
 ---
 
 ## Refactoring Roadmap (Updated)
 
 1.  **Phase 1 (Lifecycle)**: ✅ COMPLETED. Moved async entry loading out of the render loop and consolidated session management into `AgentWorkflowService`.
 
-2.  **Phase 2 (DRY)**: Refactor `LorebookSyncService` and `ContextStrategies` to remove duplicated logic and fix spacing consistency.
+2.  **Phase 2 (DRY)**: ✅ COMPLETED. Refactored `LorebookSyncService` and `ContextStrategies` to remove duplicated logic and fix spacing consistency.
 
-3.  **Phase 3 (Type Safety)**: Address the remaining `any` casts in `StoryDataManager.createDefaultData`.
+3.  **Phase 3 (Type Safety)**: ✅ COMPLETED. Addressed the remaining `any` casts in `StoryDataManager.createDefaultData`.

@@ -154,6 +154,16 @@ function hyperLog(...args: any[]) {
 }
 
 /**
+ * Strictly double every newline character.
+ * This is required for GLM-4.6 compatibility as it tends to collapse single newlines
+ * in certain prompt contexts, leading to merged blocks of text.
+ */
+export const fixSpacing = (text: string): string => {
+  if (!text) return "";
+  return text.replace(/\n/g, "\n\n").trim();
+};
+
+/**
  * hyperContextBuilder This function solves for needing to construct a context
  * optimal for token cache performance and instruction, while also providing the
  * 'continuation' context at the end of the message list such that the LLM
@@ -176,11 +186,16 @@ export function hyperContextBuilder(
   rest: Message[],
   thinking: boolean = false,
 ): Message[] {
+  const fix = (m: Message): Message => ({
+    ...m,
+    content: m.content ? fixSpacing(m.content) : m.content,
+  });
+
   return [
-    system,
-    ...rest,
-    user,
-    assistant,
+    fix(system),
+    ...rest.map(fix),
+    fix(user),
+    fix(assistant),
     ...(thinking ? [{ role: "assistant" as const }] : []), // If thinking, append an empty assistant, required to activate thoughts.
   ];
 }

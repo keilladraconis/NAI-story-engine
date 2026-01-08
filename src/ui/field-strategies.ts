@@ -10,19 +10,24 @@ import {
 const { row, column, text, button, checkboxInput } =
   api.v1.ui.part;
 
-export interface RenderContext {
+export interface BaseRenderContext {
   config: FieldConfig;
   storyManager: StoryManager;
   agentWorkflowService: AgentWorkflowService;
   editModeState: boolean; // The specific boolean for this field/mode
   toggleEditMode: () => void;
+}
+
+export interface ListRenderContext extends BaseRenderContext {
+  getItemEditMode: (itemId: string) => boolean;
+  toggleItemEditMode: (itemId: string) => void;
+  runListGeneration: () => Promise<void>;
+  getListGenerationState: () => { isRunning: boolean; signal?: any };
+  cancelListGeneration: () => void;
+}
+
+export interface TextRenderContext extends BaseRenderContext {
   handleFieldChange: (content: string) => void;
-  // List-specific
-  getItemEditMode?: (itemId: string) => boolean;
-  toggleItemEditMode?: (itemId: string) => void;
-  runListGeneration?: () => Promise<void>;
-  getListGenerationState?: () => { isRunning: boolean; signal?: any };
-  cancelListGeneration?: () => void;
   // Generator Sync
   setAttgEnabled?: (enabled: boolean) => Promise<void>;
   isAttgEnabled?: () => boolean;
@@ -31,19 +36,21 @@ export interface RenderContext {
   runFieldGeneration?: (fieldId: string) => Promise<void>;
 }
 
-export interface FieldRenderStrategy {
-  getTitle(context: RenderContext): string;
-  renderContent(context: RenderContext): UIPart[];
+export type RenderContext = ListRenderContext & TextRenderContext;
+
+export interface FieldRenderStrategy<T extends BaseRenderContext = RenderContext> {
+  getTitle(context: T): string;
+  renderContent(context: T): UIPart[];
 }
 
 // --- Strategies ---
 
-export class ListFieldStrategy implements FieldRenderStrategy {
-  getTitle(context: RenderContext): string {
+export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext> {
+  getTitle(context: ListRenderContext): string {
     return context.config.label;
   }
 
-  renderContent(context: RenderContext): UIPart[] {
+  renderContent(context: ListRenderContext): UIPart[] {
     const {
       config,
       storyManager,
@@ -184,12 +191,12 @@ export class ListFieldStrategy implements FieldRenderStrategy {
   }
 }
 
-export class TextFieldStrategy implements FieldRenderStrategy {
-  getTitle(context: RenderContext): string {
+export class TextFieldStrategy implements FieldRenderStrategy<TextRenderContext> {
+  getTitle(context: TextRenderContext): string {
     return context.config.label;
   }
 
-  renderContent(context: RenderContext): UIPart[] {
+  renderContent(context: TextRenderContext): UIPart[] {
     const {
       config,
       storyManager,
@@ -290,10 +297,13 @@ export class TextFieldStrategy implements FieldRenderStrategy {
 
 // --- Factory ---
 
-export function getFieldStrategy(config: FieldConfig): FieldRenderStrategy {
+const listStrategy = new ListFieldStrategy();
+const textStrategy = new TextFieldStrategy();
+
+export function getFieldStrategy(config: FieldConfig): FieldRenderStrategy<any> {
   if (config.layout === "list") {
-    return new ListFieldStrategy();
+    return listStrategy;
   }
 
-  return new TextFieldStrategy();
+  return textStrategy;
 }

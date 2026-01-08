@@ -175,29 +175,40 @@ export class LorebookSyncService {
     }
   }
 
-  public async syncAttgToMemory(content: string): Promise<void> {
-    const currentMemory = await api.v1.memory.get();
-    let lines = currentMemory.split("\n");
-    const attgRegex = /^\s*\[\s*Author:.*\]\s*$/i;
+  private async syncToHeader(
+    content: string,
+    regex: RegExp,
+    getter: () => Promise<string>,
+    setter: (content: string) => Promise<void>,
+  ): Promise<void> {
+    const current = await getter();
+    const lines = current.split("\n");
 
-    if (lines.length > 0 && attgRegex.test(lines[0])) {
+    if (lines.length > 0 && regex.test(lines[0])) {
       lines[0] = content;
     } else {
       lines.unshift(content);
     }
-    await api.v1.memory.set(lines.join("\n"));
+    await setter(lines.join("\n"));
+  }
+
+  public async syncAttgToMemory(content: string): Promise<void> {
+    const attgRegex = /^\s*\[\s*Author:.*\]\s*$/i;
+    await this.syncToHeader(
+      content,
+      attgRegex,
+      () => api.v1.memory.get(),
+      (text) => api.v1.memory.set(text),
+    );
   }
 
   public async syncStyleToAN(content: string): Promise<void> {
-    const currentAN = await api.v1.an.get();
-    let lines = currentAN.split("\n");
     const styleRegex = /^\s*\[\s*Style:.*\]\s*$/i;
-
-    if (lines.length > 0 && styleRegex.test(lines[0])) {
-      lines[0] = content;
-    } else {
-      lines.unshift(content);
-    }
-    await api.v1.an.set(lines.join("\n"));
+    await this.syncToHeader(
+      content,
+      styleRegex,
+      () => api.v1.an.get(),
+      (text) => api.v1.an.set(text),
+    );
   }
 }

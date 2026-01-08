@@ -21,17 +21,6 @@ type StrategyFn = (
   base: { systemMsg: Message; storyPrompt: string },
 ) => Promise<StrategyResult>;
 
-/**
- * Strictly double every newline character.
- * This is required for GLM-4.6 compatibility as it tends to collapse single newlines
- * in certain prompt contexts, leading to merged blocks of text.
- */
-const fixSpacing = (text: string): string => {
-  if (!text) return "";
-  // Strictly double every newline character for GLM-4.6 compatibility
-  return text.replace(/\n/g, "\n\n").trim();
-};
-
 const buildDulfsContextString = (
   manager: StoryManager,
   mode: "short" | "full",
@@ -66,7 +55,7 @@ const Strategies: Record<string, StrategyFn> = {
     const userPrompt = (await api.v1.config.get("brainstorm_prompt")) || "";
     const messages = hyperContextBuilder(
       base.systemMsg,
-      { role: "user", content: fixSpacing(userPrompt) },
+      { role: "user", content: userPrompt },
       {
         role: "assistant",
         content:
@@ -75,7 +64,7 @@ const Strategies: Record<string, StrategyFn> = {
       [
         {
           role: "user",
-          content: fixSpacing(`STORY PROMPT:\n${base.storyPrompt}`),
+          content: `STORY PROMPT:\n${base.storyPrompt}`,
         },
       ],
     );
@@ -97,7 +86,7 @@ const Strategies: Record<string, StrategyFn> = {
     const brainstormContent = manager.getConsolidatedBrainstorm();
     const messages = hyperContextBuilder(
       base.systemMsg,
-      { role: "user", content: fixSpacing(userPrompt) },
+      { role: "user", content: userPrompt },
       {
         role: "assistant",
         content:
@@ -106,7 +95,7 @@ const Strategies: Record<string, StrategyFn> = {
       [
         {
           role: "user",
-          content: fixSpacing(`BRAINSTORM MATERIAL:\n${brainstormContent}`),
+          content: `BRAINSTORM MATERIAL:\n${brainstormContent}`,
         },
       ],
     );
@@ -128,7 +117,7 @@ const Strategies: Record<string, StrategyFn> = {
     const brainstormContent = manager.getConsolidatedBrainstorm();
     const messages = hyperContextBuilder(
       base.systemMsg,
-      { role: "user", content: fixSpacing(userPrompt) },
+      { role: "user", content: userPrompt },
       {
         role: "assistant",
         content:
@@ -137,11 +126,11 @@ const Strategies: Record<string, StrategyFn> = {
       [
         {
           role: "user",
-          content: fixSpacing(`STORY PROMPT:\n${base.storyPrompt}`),
+          content: `STORY PROMPT:\n${base.storyPrompt}`,
         },
         {
           role: "user",
-          content: fixSpacing(`BRAINSTORM MATERIAL:\n${brainstormContent}`),
+          content: `BRAINSTORM MATERIAL:\n${brainstormContent}`,
         },
       ],
     );
@@ -163,7 +152,7 @@ const Strategies: Record<string, StrategyFn> = {
       base.systemMsg,
       {
         role: "user",
-        content: fixSpacing(userPrompt),
+        content: userPrompt,
       },
       {
         role: "assistant",
@@ -172,7 +161,7 @@ const Strategies: Record<string, StrategyFn> = {
       [
         {
           role: "user",
-          content: fixSpacing(`STORY PROMPT:\n${base.storyPrompt}`),
+          content: `STORY PROMPT:\n${base.storyPrompt}`,
         },
       ],
     );
@@ -196,7 +185,7 @@ const Strategies: Record<string, StrategyFn> = {
       base.systemMsg,
       {
         role: "user",
-        content: fixSpacing(userPrompt),
+        content: userPrompt,
       },
       {
         role: "assistant",
@@ -205,7 +194,7 @@ const Strategies: Record<string, StrategyFn> = {
       [
         {
           role: "user",
-          content: fixSpacing(`STORY PROMPT:\n${base.storyPrompt}`),
+          content: `STORY PROMPT:\n${base.storyPrompt}`,
         },
       ],
     );
@@ -250,7 +239,7 @@ const Strategies: Record<string, StrategyFn> = {
 
     const messages = hyperContextBuilder(
       base.systemMsg,
-      { role: "user", content: fixSpacing(formatInstruction) },
+      { role: "user", content: formatInstruction },
       {
         role: "assistant",
         content: `${itemName}\n`,
@@ -258,13 +247,12 @@ const Strategies: Record<string, StrategyFn> = {
       [
         {
           role: "user",
-          content: fixSpacing(`STORY PROMPT:\n${base.storyPrompt}`),
+          content: `STORY PROMPT:\n${base.storyPrompt}`,
         },
         {
           role: "user",
-          content: fixSpacing(
+          content:
             `ENTITY DATA:\nName: ${itemName}\nDescription: ${itemDesc}`,
-          ),
         },
       ],
     );
@@ -291,7 +279,7 @@ export class ContextStrategyFactory {
     const baseContext = {
       systemMsg: {
         role: "system" as const,
-        content: fixSpacing(systemPrompt),
+        content: systemPrompt,
       },
       storyPrompt: storyPrompt,
     };
@@ -317,7 +305,7 @@ export class ContextStrategyFactory {
     const baseContext = {
       systemMsg: {
         role: "system" as const,
-        content: fixSpacing(systemPrompt),
+        content: systemPrompt,
       },
     };
 
@@ -333,18 +321,18 @@ export class ContextStrategyFactory {
     const contextBlocks: Message[] = [
       {
         role: "user",
-        content: fixSpacing(`STORY PROMPT:\n${storyPrompt}`),
+        content: `STORY PROMPT:\n${storyPrompt}`,
       },
       {
         role: "user",
-        content: fixSpacing(`WORLD SNAPSHOT:\n${worldSnapshot}`),
+        content: `WORLD SNAPSHOT:\n${worldSnapshot}`,
       },
     ];
 
     if (existingDulfs) {
       contextBlocks.push({
         role: "user",
-        content: fixSpacing(`EXISTING WORLD ELEMENTS:\n${existingDulfs}`),
+        content: `EXISTING WORLD ELEMENTS:\n${existingDulfs}`,
       });
     }
 
@@ -352,7 +340,7 @@ export class ContextStrategyFactory {
       baseContext.systemMsg,
       {
         role: "user",
-        content: fixSpacing(`${userInstruction}\n${exampleFormat}`),
+        content: `${userInstruction}\n${exampleFormat}`,
       },
       {
         role: "assistant",

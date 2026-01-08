@@ -142,22 +142,27 @@ export class StoryDataManager {
 
     // Initialize fields from configurations
     for (const config of FIELD_CONFIGS) {
+      const id = config.id;
       if (config.layout === "list") {
-        (data as any)[config.id] = [];
+        if (isDulfsField(id)) {
+          data[id] = [];
+        }
       } else {
         const field: StoryField = {
-          id: config.id,
+          id: id,
           type: config.fieldType || "prompt",
           content: "",
           linkedEntities: [],
         };
 
         // Specialized initialization
-        if (config.id === FieldID.Brainstorm) {
+        if (id === FieldID.Brainstorm) {
           field.data = { messages: [] };
         }
 
-        (data as any)[config.id] = field;
+        if (isTextField(id)) {
+          data[id] = field;
+        }
       }
     }
 
