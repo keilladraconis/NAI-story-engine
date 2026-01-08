@@ -1,4 +1,4 @@
-import { StoryDataManager, DULFSField } from "./story-data-manager";
+import { StoryDataManager } from "./story-data-manager";
 import { FIELD_CONFIGS } from "../config/field-definitions";
 
 export class LorebookSyncService {

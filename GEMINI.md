@@ -70,13 +70,13 @@ When debugging issues, you may add debugging log statements and provide the user
 ## Architectural Insights
 
 ### Data Flow & State Management
-- **Single Source of Truth**: `StoryManager` acts as the central hub for story data, but `StructuredEditor` also interacts directly with `storyStorage` via `kse-field-${id}` keys. This creates a risk of desync if the dual-storage strategy is not strictly managed.
+- **Single Source of Truth**: `StoryManager` acts as the central hub for story data. UI components are driven by `StoryManager` state, and direct `storyStorage` bindings in UI components have been removed to prevent desync.
 - **Agent Cycle**: Managed by `AgentCycleManager` and executed by `AgentWorkflowService`. It uses a strategy pattern (`StageHandler`) to handle the Generate, Review, and Refine stages.
 - **Lorebook Integration**: DULFS (Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics) are automatically synced to NovelAI Lorebook categories and entries.
 - **Tech Debt**: The system has been refactored to use data-driven field management, removing brittle manual lists. Iterative patching logic has been extracted from `RefineStageHandler` into `ReviewPatcher`.
 
 ### Key Patterns
-- **Strategy Pattern**: Extensively used for field rendering (`FieldRenderStrategy`) and AI stage handling (`StageHandler`).
+- **Strategy Pattern**: Extensively used for field rendering (`FieldRenderStrategy`) and AI stage handling (`StageHandler`). All text-based fields (Prompt, Snapshot, ATTG, Style) are now handled by a single `TextFieldStrategy` to ensure consistent session management and UI behavior.
 - **Context Construction**: `ContextStrategyFactory` builds model-specific prompts based on the current field and session state. DULFS (world element) context building is unified via `buildDulfsContextString` to ensure consistency between short and full context modes.
 - **Fuzzy Patching**: `ReviewPatcher` uses a 5-word prefix fuzzy matching strategy to apply AI-suggested tags to field drafts.
 - **Hyper-Generator**: The project uses `lib/hyper-generator.ts` for advanced generation control, including continuation handling and token budget management.

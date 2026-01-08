@@ -36,6 +36,7 @@
 - **Field-Specific UX**:
     - **Story Prompt**: Simplified to a clean, plain-text multiline input without toggle complexity.
     - **Wand UI**: Unified stage selector and "Ignite" controls.
+- **Unified Text Fields**: All text-based fields (Story Prompt, World Snapshot, ATTG, Style Guidelines) have been unified under a single `TextFieldStrategy`. Removed auto-start sessions and specialized "Generator" layouts in favor of a consistent, button-triggered agentic workflow. This ensures uniform logic for generation, review, and refinement while preserving specialized synchronization (Memory/AN) for relevant fields.
 - **Context Strategies**: Specialized prompt engineering for "Brainstorm" (Ideator) and "World Snapshot" (Architect).
 - **Refactoring**: Decoupled UI logic into `WandUI` and reusable components.
 - **Architectural Cleanup (Jan 5 2026)**:

@@ -52,7 +52,7 @@ export interface FieldConfig {
   placeholder: string;
   icon: IconId;
   linkedEntities?: string[];
-  layout?: "default" | "inline-wand" | "list" | "generator";
+  layout?: "default" | "list";
   fieldType?: "prompt" | "brainstorm" | "worldSnapshot" | "dulfs" | "attg" | "style";
   generationInstruction?: string;
   exampleFormat?: string;
@@ -83,7 +83,6 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     description: "A snapshot of the world full of dynamic potential",
     placeholder: "The state of the world, its drivers, and tensions...",
     icon: "package",
-    layout: "inline-wand",
     fieldType: "worldSnapshot",
   },
   {
@@ -147,7 +146,6 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     description: "Author, Title, Tags, Genre block",
     placeholder: "[ Author: ...; Tags: ...; Title: ...; Genre: ... ]",
     icon: "tag",
-    layout: "generator",
     fieldType: "attg",
   },
   {
@@ -156,7 +154,6 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     description: "Writing style instructions for the AI",
     placeholder: "[ Style: ... ]",
     icon: "feather",
-    layout: "generator",
     fieldType: "style",
   },
 ];

@@ -4,7 +4,26 @@ export const createHeaderWithToggle = (
   description: string,
   isEditMode: boolean,
   onToggle: () => void,
+  onWand?: () => void,
 ): UIPart => {
+  const buttons = [
+    button({
+      text: isEditMode ? "Preview" : "Edit",
+      iconId: isEditMode ? "eye" : "edit-3",
+      callback: onToggle,
+    }),
+  ];
+
+  if (onWand) {
+    buttons.push(
+      button({
+        text: "Wand",
+        iconId: "zap",
+        callback: onWand,
+      }),
+    );
+  }
+
   return row({
     style: {
       "justify-content": "space-between",
@@ -16,10 +35,9 @@ export const createHeaderWithToggle = (
         text: description,
         style: { "font-style": "italic", opacity: "0.8" },
       }),
-      button({
-        text: isEditMode ? "Preview" : "Edit",
-        iconId: isEditMode ? "eye" : "edit-3",
-        callback: onToggle,
+      row({
+        style: { gap: "8px" },
+        content: buttons,
       }),
     ],
   });

@@ -98,6 +98,7 @@ export class StructuredEditor {
       handleFieldChange: (c) => this.handleFieldChange(config.id, c),
       handleWandClick: () => this.handleWandClick(config.id),
       saveWandResult: (s) => this.saveWandResult(s),
+      handleWandDiscard: () => this.handleWandDiscard(config.id),
       // List specific
       getItemEditMode: (itemId) => this.getItemEditMode(config.id, itemId),
       toggleItemEditMode: (itemId) => this.toggleItemEditMode(config.id, itemId),
@@ -154,6 +155,11 @@ export class StructuredEditor {
     
     // End session and revert UI
     this.agentCycleManager.endSession(session.fieldId);
+    this.onUpdateCallback();
+  }
+
+  private handleWandDiscard(fieldId: string): void {
+    this.agentCycleManager.endSession(fieldId);
     this.onUpdateCallback();
   }
 

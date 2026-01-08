@@ -8,7 +8,7 @@ import {
   createResponsiveGenerateButton,
 } from "./ui-components";
 
-const { row, column, text, multilineTextInput, button, checkboxInput } =
+const { row, column, text, button, checkboxInput } =
   api.v1.ui.part;
 
 export interface RenderContext {
@@ -21,6 +21,7 @@ export interface RenderContext {
   handleFieldChange: (content: string) => void;
   handleWandClick: () => void;
   saveWandResult: (session: FieldSession) => void;
+  handleWandDiscard: () => void;
   // List-specific
   getItemEditMode?: (itemId: string) => boolean;
   toggleItemEditMode?: (itemId: string) => void;
@@ -41,91 +42,6 @@ export interface FieldRenderStrategy {
 }
 
 // --- Strategies ---
-
-export class GeneratorFieldStrategy implements FieldRenderStrategy {
-  getTitle(context: RenderContext): string {
-    return context.config.label;
-  }
-
-  renderContent(context: RenderContext): UIPart[] {
-    const {
-      config,
-      storyManager,
-      editModeState,
-      toggleEditMode,
-      handleFieldChange,
-      runSimpleGeneration,
-      getListGenerationState,
-      cancelListGeneration,
-      setAttgEnabled,
-      isAttgEnabled,
-      setStyleEnabled,
-      isStyleEnabled,
-    } = context;
-
-    const genState = getListGenerationState
-      ? getListGenerationState()
-      : { isRunning: false };
-
-    // Determine sync checkbox
-    let syncCheckbox: UIPart = null;
-    if (config.id === FieldID.ATTG && isAttgEnabled && setAttgEnabled) {
-      syncCheckbox = checkboxInput({
-        label: "Memory",
-        initialValue: isAttgEnabled(),
-        onChange: (val) => setAttgEnabled(val),
-      });
-    } else if (
-      config.id === FieldID.Style &&
-      isStyleEnabled &&
-      setStyleEnabled
-    ) {
-      syncCheckbox = checkboxInput({
-        label: "Author's Note",
-        initialValue: isStyleEnabled(),
-        onChange: (val) => setStyleEnabled(val),
-      });
-    }
-
-    const actionsRow = row({
-      style: {
-        "margin-top": "8px",
-        "justify-content": "space-between",
-        "align-items": "center",
-      },
-      content: [
-        createResponsiveGenerateButton(
-          `gen-btn-${config.id}`,
-          { isRunning: genState.isRunning },
-          {
-            onStart: () => {
-              if (runSimpleGeneration) runSimpleGeneration();
-            },
-            onCancel: () => {
-              if (cancelListGeneration) cancelListGeneration();
-            },
-          },
-          "Generate",
-        ),
-        syncCheckbox || row({ content: [] }),
-      ],
-    });
-
-    const content = storyManager.getFieldContent(config.id);
-
-    return [
-      createHeaderWithToggle(config.description, editModeState, toggleEditMode),
-      createToggleableContent(
-        editModeState,
-        content,
-        config.placeholder,
-        `input-field-${config.id}`,
-        (newContent: string) => handleFieldChange(newContent),
-      ),
-      actionsRow,
-    ];
-  }
-}
 
 export class ListFieldStrategy implements FieldRenderStrategy {
   getTitle(context: RenderContext): string {
@@ -273,35 +189,7 @@ export class ListFieldStrategy implements FieldRenderStrategy {
   }
 }
 
-export class StoryPromptStrategy implements FieldRenderStrategy {
-  getTitle(context: RenderContext): string {
-    return context.config.label;
-  }
-
-  renderContent(context: RenderContext): UIPart[] {
-    const { config, storyManager, handleFieldChange } = context;
-    const content = storyManager.getFieldContent(config.id);
-
-    return [
-      text({
-        text: config.description,
-        style: {
-          "font-style": "italic",
-          opacity: "0.8",
-          "margin-bottom": "8px",
-        },
-      }),
-      multilineTextInput({
-        id: `input-field-${config.id}`,
-        placeholder: config.placeholder,
-        initialValue: content,
-        onChange: (newContent: string) => handleFieldChange(newContent),
-      }),
-    ];
-  }
-}
-
-export class InlineWandStrategy implements FieldRenderStrategy {
+export class TextFieldStrategy implements FieldRenderStrategy {
   getTitle(context: RenderContext): string {
     return context.config.label;
   }
@@ -314,85 +202,99 @@ export class InlineWandStrategy implements FieldRenderStrategy {
       wandUI,
       editModeState,
       toggleEditMode,
-    } = context;
-
-    // Ensure session exists (Inline Wand specific logic)
-    let session = agentCycleManager.getSession(config.id);
-    if (!session) {
-      session = agentCycleManager.startSession(config.id);
-    }
-
-    return [
-      createHeaderWithToggle(config.description, editModeState, toggleEditMode),
-      createToggleableContent(
-        editModeState,
-        storyManager.getFieldContent(config.id),
-        config.placeholder,
-        `input-field-${config.id}`,
-        (val) => {
-          if (session) {
-            // Update active stage content to keep in sync
-            const activeStage = session.selectedStage;
-            if (session.cycles[activeStage]) {
-              session.cycles[activeStage].content = val;
-            }
-            // Live save to StoryManager
-            storyManager.setFieldContent(config.id, val, false);
-          }
-        },
-      ),
-      wandUI.createInlineControlCluster(session, config.id),
-    ];
-  }
-}
-
-export class StandardFieldStrategy implements FieldRenderStrategy {
-  getTitle(context: RenderContext): string {
-    return context.config.label;
-  }
-
-  renderContent(context: RenderContext): UIPart[] {
-    const {
-      config,
-      storyManager,
-      editModeState,
-      toggleEditMode,
       handleFieldChange,
+      handleWandClick,
+      saveWandResult,
+      handleWandDiscard,
+      setAttgEnabled,
+      isAttgEnabled,
+      setStyleEnabled,
+      isStyleEnabled,
     } = context;
 
     const content = storyManager.getFieldContent(config.id);
+    const session = agentCycleManager.getSession(config.id);
 
-    return [
-      createHeaderWithToggle(config.description, editModeState, toggleEditMode),
+    // Sync Checkbox (for ATTG/Style)
+    let syncCheckbox: UIPart = null;
+    if (
+      config.id === FieldID.ATTG &&
+      isAttgEnabled &&
+      setAttgEnabled
+    ) {
+      syncCheckbox = checkboxInput({
+        label: "Sync to Memory",
+        initialValue: isAttgEnabled(),
+        onChange: (val) => setAttgEnabled(val),
+      });
+    } else if (
+      config.id === FieldID.Style &&
+      isStyleEnabled &&
+      setStyleEnabled
+    ) {
+      syncCheckbox = checkboxInput({
+        label: "Sync to Author's Note",
+        initialValue: isStyleEnabled(),
+        onChange: (val) => setStyleEnabled(val),
+      });
+    }
+
+    const parts: UIPart[] = [
+      createHeaderWithToggle(
+        config.description,
+        editModeState,
+        toggleEditMode,
+        !session ? handleWandClick : undefined,
+      ),
       createToggleableContent(
         editModeState,
         content,
         config.placeholder,
         `input-field-${config.id}`,
-        (newContent: string) => handleFieldChange(newContent),
+        (val) => {
+          if (session) {
+            const activeStage = session.selectedStage;
+            if (session.cycles[activeStage]) {
+              session.cycles[activeStage].content = val;
+            }
+            storyManager.setFieldContent(config.id, val, false);
+          } else {
+            handleFieldChange(val);
+          }
+        },
       ),
     ];
+
+    if (syncCheckbox) {
+      parts.push(
+        row({
+          style: { "margin-top": "4px", "justify-content": "flex-end" },
+          content: [syncCheckbox],
+        }),
+      );
+    }
+
+    if (session) {
+      parts.push(
+        wandUI.createInlineControlCluster(
+          session,
+          config.id,
+          saveWandResult,
+          handleWandDiscard,
+        ),
+      );
+    }
+
+    return parts.filter((x) => x !== null) as UIPart[];
   }
 }
 
 // --- Factory ---
 
 export function getFieldStrategy(config: FieldConfig): FieldRenderStrategy {
-  if (config.id === FieldID.StoryPrompt) {
-    return new StoryPromptStrategy();
-  }
-
-  if (config.layout === "inline-wand") {
-    return new InlineWandStrategy();
-  }
-
   if (config.layout === "list") {
     return new ListFieldStrategy();
   }
 
-  if (config.layout === "generator") {
-    return new GeneratorFieldStrategy();
-  }
-
-  return new StandardFieldStrategy();
+  return new TextFieldStrategy();
 }

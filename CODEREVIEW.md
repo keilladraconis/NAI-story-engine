@@ -45,16 +45,19 @@ The Story Engine codebase is well-structured, following service-oriented and str
 **Issue:** This is a leak of model-specific quirks (GLM-4.6) into the high-level strategy logic.
 **Refactor:** Move this into `hyperContextBuilder` or a dedicated prompt-assembly service so strategies can work with clean strings.
 
-### 3. Dynamic Property Access (Type Safety)
+### 3. Dynamic Property Access (Type Safety) [FINISHED]
 **Location:** `StoryDataManager.getStoryField`, `StoryManager.addDulfsItem`
 **Finding:** Frequent use of `(data as any)[fieldId]`.
 **Issue:** This bypasses TypeScript's type checking for the `StoryData` interface.
 **Refactor:** Use a discriminated union or a strict mapping object to access fields by ID, ensuring that the compiler knows whether it's getting a `StoryField` or a `DULFSField[]`.
+**Status:** Completed. Introduced `DulfsFieldID` and `TextFieldID` type unions and type guards. Refactored `StoryDataManager` and `StoryManager` to use type-safe accessors and setters, removing `any` casts from core data logic.
 
-### 4. Wand Session Inconsistency
-**Location:** `InlineWandStrategy` (in `field-strategies.ts`) vs `StandardFieldStrategy`
-**Finding:** `InlineWandStrategy` automatically starts an agent session if one doesn't exist.
-**Issue:** This means fields like "World Snapshot" have a persistent session object in memory forever, while "Synopsis" (standard) does not. This leads to diverging logic paths in how "current content" is displayed during generation.
+### 4. Wand Session Inconsistency [FINISHED]
+**Location:** `InlineWandStrategy` (in `field-strategies.ts`) vs `StandardFieldStrategy` vs `GeneratorFieldStrategy`
+**Finding:** Different strategies handled agent sessions inconsistently (auto-start vs button-start vs custom "Simple Generation").
+**Issue:** Diverging logic paths and inconsistent UX for similar text-based fields.
+**Refactor:** Unified `InlineWandStrategy`, `StandardFieldStrategy`, and `GeneratorFieldStrategy` into a single `TextFieldStrategy`. All text fields (Story Prompt, World Snapshot, ATTG, Style, etc.) now use a consistent button-triggered agentic workflow. Specialized sync logic (Memory/AN) is preserved within the unified strategy.
+**Status:** Completed. Fully unified text field architecture.
 
 ---
 
