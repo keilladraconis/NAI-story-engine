@@ -59,6 +59,7 @@
 
 #### Completed Features (Phase 4):
 - [x] **Generation Queue**: Implemented a global queue to prevent concurrent generation requests, ensuring sequential execution and reducing UI chaos. Users can cancel queued items.
+- [x] **Context Optimization**: Re-engineered `ContextStrategyFactory` to maximize token caching efficiency. Context is now layered strictly: `System` -> `Story Prompt` -> `World Snapshot` -> `Volatile Data` -> `Task`. DULFS and World Snapshot are now injected into downstream generations (Lorebook, ATTG, Style).
 
 #### Planned Features:
 - Multi-project support

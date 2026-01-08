@@ -53,7 +53,13 @@ export interface FieldConfig {
   icon: IconId;
   linkedEntities?: string[];
   layout?: "default" | "list";
-  fieldType?: "prompt" | "brainstorm" | "worldSnapshot" | "dulfs" | "attg" | "style";
+  fieldType?:
+    | "prompt"
+    | "brainstorm"
+    | "worldSnapshot"
+    | "dulfs"
+    | "attg"
+    | "style";
   generationInstruction?: string;
   exampleFormat?: string;
   filters?: ("scrubBrackets" | "scrubMarkdown" | "normalizeQuotes")[];
@@ -69,7 +75,8 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Once upon a time in a world where...",
     icon: "bookOpen",
     fieldType: "prompt",
-    generationInstruction: "Synthesize the brainstorming session into a high-level thematic starting point, including protagonist, key themes, and genre.",
+    generationInstruction:
+      "Synthesize the brainstorming session into a high-level thematic starting point, including protagonist, key themes, and genre.",
     filters: ["scrubBrackets"],
   },
   {
@@ -98,8 +105,10 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     icon: "user",
     layout: "list",
     fieldType: "dulfs",
-    generationInstruction: "Generate a list of interesting characters for this story. Focus on their core motivations and unique behavioral tells.",
-    exampleFormat: "Format each line exactly as: [First and Last Name] ([gender], [age], [occupation]): [core motivation], [behavioral tell]",
+    generationInstruction:
+      "Generate a list of interesting characters for this story. Focus on their core motivations and unique behavioral tells.",
+    exampleFormat:
+      "Format each line exactly as: [First and Last Name] ([gender], [age], [occupation]): [core motivation], [behavioral tell]",
     filters: ["scrubBrackets"],
     parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*(.+)$/,
   },
@@ -111,8 +120,10 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     icon: "settings" as IconId,
     layout: "list",
     fieldType: "dulfs",
-    generationInstruction: "Generate a list of key universe systems, magic rules, or technological principles. Describe the mechanic or rule concisely.",
-    exampleFormat: "Format each line as: [System Name]: [Description of mechanic or rule]",
+    generationInstruction:
+      "Generate a list of key universe systems, magic rules, or technological principles. Describe the mechanic or rule concisely.",
+    exampleFormat:
+      "Format each line as: [System Name]: [Description of mechanic or rule]",
     filters: ["scrubBrackets"],
     parsingRegex: /^([^:]+):\s*(.+)$/,
   },
@@ -124,8 +135,10 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     icon: "map-pin" as IconId,
     layout: "list",
     fieldType: "dulfs",
-    generationInstruction: "Generate a list of significant locations. Include atmospheric anchors, sensory details, and inherent tensions.",
-    exampleFormat: "Format each line as: [Location Name]: [atmospheric anchors], [sensory details], [inherent tensions or key functions]",
+    generationInstruction:
+      "Generate a list of significant locations. Include atmospheric anchors, sensory details, and inherent tensions.",
+    exampleFormat:
+      "Format each line as: [Location Name]: [atmospheric anchors], [concise sensory details], [concise inherent tensions or key functions]",
     filters: ["scrubBrackets"],
     parsingRegex: /^([^:]+):\s*(.+)$/,
   },
@@ -137,8 +150,10 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     icon: "users",
     layout: "list",
     fieldType: "dulfs",
-    generationInstruction: "Generate a list of major factions, guilds, or political groups. Describe their core ideology, goal, and internal structure.",
-    exampleFormat: "Format each line as: [Faction Name]: [description of ideology, goal, structure]",
+    generationInstruction:
+      "Generate a list of major factions, guilds, or political groups. Describe their core ideology, goal, and internal structure.",
+    exampleFormat:
+      "Format each line as: [Faction Name]: [concise description of ideology, goal, structure]",
     filters: ["scrubBrackets"],
     parsingRegex: /^([^:]+):\s*(.+)$/,
   },
@@ -150,8 +165,10 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     icon: "activity",
     layout: "list",
     fieldType: "dulfs",
-    generationInstruction: "Generate a list of current conflicts, pending events, or tensions that involve multiple characters with no suggested resolution.",
-    exampleFormat: "Format each line as: [Dynamic Name]: [a state of being or point of friction...]",
+    generationInstruction:
+      "Generate a list of current conflicts, pending events, or tensions that involve multiple characters with no suggested resolution.",
+    exampleFormat:
+      "Format each line as: [Dynamic Name]: [a state of being or point of friction...]",
     filters: ["scrubBrackets"],
     parsingRegex: /^([^:]+):\s*(.+)$/,
   },

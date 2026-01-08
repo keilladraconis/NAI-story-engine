@@ -3,6 +3,8 @@ import { StructuredEditor } from "./structured-editor";
 import { StoryManager } from "../core/story-manager";
 import { AgentWorkflowService } from "../core/agent-workflow";
 import { BrainstormUI } from "./brainstorm-ui";
+import { SegaService } from "../core/sega-service";
+import { SegaModal } from "./sega-modal";
 
 import {
   createHeaderWithToggle,
@@ -24,6 +26,7 @@ export class StoryEngineUI {
   storyManager: StoryManager;
   agentWorkflowService: AgentWorkflowService;
   brainstormUI: BrainstormUI;
+  segaService: SegaService;
 
   // Selected state
   private selectedLorebookEntryId?: string;
@@ -34,6 +37,7 @@ export class StoryEngineUI {
   constructor() {
     this.storyManager = new StoryManager();
     this.agentWorkflowService = new AgentWorkflowService(this.storyManager);
+    this.segaService = new SegaService(this.storyManager, this.agentWorkflowService);
     this.structuredEditor = new StructuredEditor(
       this.storyManager,
       this.agentWorkflowService,
@@ -236,6 +240,15 @@ export class StoryEngineUI {
       part.text({
         text: "🎭 Story Engine",
         style: { "font-weight": "bold" },
+      }),
+      part.button({
+        text: "S.E.G.A.",
+        iconId: "play-circle",
+        style: { padding: "4px 8px", "font-size": "0.8em", "background-color": "#2196f3", color: "white" },
+        callback: () => {
+          const modal = new SegaModal(this.segaService, this.agentWorkflowService);
+          modal.show();
+        },
       }),
     ];
 

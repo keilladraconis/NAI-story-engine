@@ -1,6 +1,4 @@
-import {
-  HyperGenerationParams,
-} from "../../lib/hyper-generator";
+import { HyperGenerationParams } from "../../lib/hyper-generator";
 import { StoryManager } from "./story-manager";
 import { FieldSession } from "./agent-workflow";
 import {
@@ -22,12 +20,7 @@ const contextBuilder = (
     content: m.content ? m.content.trim() : m.content,
   });
 
-  return [
-    clean(system),
-    ...rest.map(clean),
-    clean(user),
-    clean(assistant),
-  ];
+  return [clean(system), ...rest.map(clean), clean(user), clean(assistant)];
 };
 
 export type TextFilter = (text: string) => string;
@@ -124,15 +117,15 @@ const Strategies: Record<string, StrategyFn> = {
   // Generate (Story Prompt) - The Initiator
   // Takes brainstorm chat and turns it into a high-level premise
   "generate:storyPrompt": async (_session, manager, base) => {
-    const userPrompt = (await api.v1.config.get("story_prompt_generate_prompt")) || "";
+    const userPrompt =
+      (await api.v1.config.get("story_prompt_generate_prompt")) || "";
     const brainstormContent = manager.getConsolidatedBrainstorm();
     const messages = contextBuilder(
       base.systemMsg,
       { role: "user", content: userPrompt },
       {
         role: "assistant",
-        content:
-          "Here is the story prompt based on our brainstorming session:",
+        content: "Here is the story prompt based on our brainstorming session:",
       },
       [
         {
@@ -183,15 +176,16 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 1.1,
         min_p: 0.05,
         presence_penalty: 0.1,
-        maxTokens: 1024,
+        maxTokens: 2048,
       },
       prefixBehavior: "trim",
     };
   },
 
   // Generate (ATTG)
-  "generate:attg": async (_session, _manager, base) => {
+  "generate:attg": async (_session, manager, base) => {
     const userPrompt = (await api.v1.config.get("attg_generate_prompt")) || "";
+    const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
     const messages = contextBuilder(
       base.systemMsg,
       {
@@ -206,6 +200,10 @@ const Strategies: Record<string, StrategyFn> = {
         {
           role: "user",
           content: `STORY PROMPT:\n${base.storyPrompt}`,
+        },
+        {
+          role: "user",
+          content: `WORLD SNAPSHOT:\n${worldSnapshot}`,
         },
       ],
     );
@@ -223,8 +221,9 @@ const Strategies: Record<string, StrategyFn> = {
   },
 
   // Generate (Style)
-  "generate:style": async (_session, _manager, base) => {
+  "generate:style": async (_session, manager, base) => {
     const userPrompt = (await api.v1.config.get("style_generate_prompt")) || "";
+    const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
     const messages = contextBuilder(
       base.systemMsg,
       {
@@ -239,6 +238,10 @@ const Strategies: Record<string, StrategyFn> = {
         {
           role: "user",
           content: `STORY PROMPT:\n${base.storyPrompt}`,
+        },
+        {
+          role: "user",
+          content: `WORLD SNAPSHOT:\n${worldSnapshot}`,
         },
       ],
     );
@@ -282,16 +285,23 @@ const Strategies: Record<string, StrategyFn> = {
 
     const basePrompt =
       (await api.v1.config.get("lorebook_generate_prompt")) || "";
-    
+
     // Select specific template based on category
     let templateKey = "lorebook_template_character"; // Default fallback
-    if (categoryId === "dramatis_personae") templateKey = "lorebook_template_character";
-    else if (categoryId === "locations") templateKey = "lorebook_template_location";
-    else if (categoryId === "factions") templateKey = "lorebook_template_faction";
-    else if (categoryId === "universe_systems") templateKey = "lorebook_template_system";
-    else if (categoryId === "situational_dynamics") templateKey = "lorebook_template_dynamic";
-    
+    if (categoryId === "dramatis_personae")
+      templateKey = "lorebook_template_character";
+    else if (categoryId === "locations")
+      templateKey = "lorebook_template_location";
+    else if (categoryId === "factions")
+      templateKey = "lorebook_template_faction";
+    else if (categoryId === "universe_systems")
+      templateKey = "lorebook_template_system";
+    else if (categoryId === "situational_dynamics")
+      templateKey = "lorebook_template_dynamic";
+
     const templateContent = (await api.v1.config.get(templateKey)) || "";
+    const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
+    const dulfsContext = buildDulfsContextString(manager, "short", categoryId);
 
     const combinedInstruction = `${basePrompt.replace("[itemName]", itemName)}\n\nTASK: Fill in the following Template for "${itemName}". Replace the placeholders with generated content.\n\nTEMPLATE:\n${templateContent}`;
 
@@ -309,8 +319,15 @@ const Strategies: Record<string, StrategyFn> = {
         },
         {
           role: "user",
-          content:
-            `ENTITY DATA:\nName: ${itemName}\nDescription: ${itemDesc}`,
+          content: `WORLD SNAPSHOT:\n${worldSnapshot}`,
+        },
+        {
+          role: "user",
+          content: `ESTABLISHED WORLD ELEMENTS:\n${dulfsContext}`,
+        },
+        {
+          role: "user",
+          content: `ENTITY DATA:\nName: ${itemName}\nDescription: ${itemDesc}`,
         },
       ],
     );
@@ -427,7 +444,7 @@ export class ContextStrategyFactory {
         temperature: 1.2,
         min_p: 0.05,
         presence_penalty: 0.05,
-        maxTokens: 1024,
+        maxTokens: 700,
       },
       filters: [Filters.scrubMarkdown],
     };
@@ -445,8 +462,7 @@ export class ContextStrategyFactory {
 
   private getStrategyKey(session: FieldSession): string {
     if (session.fieldId.includes(":")) return "generate:lorebook";
-    if (session.fieldId === FieldID.StoryPrompt)
-      return "generate:storyPrompt";
+    if (session.fieldId === FieldID.StoryPrompt) return "generate:storyPrompt";
     if (session.fieldId === FieldID.WorldSnapshot)
       return "generate:worldSnapshot";
     if (session.fieldId === FieldID.ATTG) return "generate:attg";

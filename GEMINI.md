@@ -78,7 +78,7 @@ When debugging issues, you may add debugging log statements and provide the user
 - **DULFS Lorebook Sync**: List items now support name editing which automatically triggers a debounced (2s) re-sync to the NovelAI Lorebook, updating both individual entries (display names and keys) and the full list summary.
 - **Enablement Propagation**: Enabling or disabling a DULFS field in the sidebar now correctly propagates that status to the corresponding NovelAI Lorebook categories and entries.
 - **Standardized Toggle Behavior**: `toggleableContent` now consistently uses a Pencil icon for Edit and a Disk icon for Save/Preview. Text fields implement a draft system where changes are stored locally and only committed to `StoryManager` (and side effects triggered) upon clicking Save. Generation automatically saves drafts before running.
-- **Auto-Height TextFields**: `toggleableContent` fields in edit mode now estimate their required height based on content length and line count, improving the editing UX without needing manual resizing.
+- **Context Optimization (Jan 2026)**: Refined context construction for `ContextStrategyFactory`. `World Snapshot` and `DULFS` summaries are now systematically included in downstream generations (`generate:lorebook`, `generate:attg`, `generate:style`) to improve coherence and maximize token caching efficiency. The context order is strictly: `System` -> `Story Prompt` -> `World Snapshot` -> `DULFS/Volatile` -> `Task`.
 
 ## Architectural Overhaul (Jan 2026)
 - **Simplified Workflow**: Removed `WandUI`, `ReviewPatcher`, and `StageHandlers`. The system now focuses on high-quality single-pass generation.
@@ -89,8 +89,3 @@ When debugging issues, you may add debugging log statements and provide the user
     - **Stability**: High.
     - **Maintenance**: All identified issues (Medium & Low) resolved.
     - **Refactoring**: Architecture is clean and decoupled.
-- **Generation Queue (Jan 2026)**: Implemented a global generation queue in `AgentWorkflowService`.
-    - Prevents concurrent generation requests which could cause chaotic UI states.
-    - Added "Queued" state to the responsive generate button with cancellation support.
-    - Unified List and Field generation under a single task queue system.
-
