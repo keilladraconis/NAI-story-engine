@@ -33,6 +33,7 @@ export interface StrategyResult {
   messages: Message[];
   params: Partial<HyperGenerationParams>;
   filters?: TextFilter[];
+  prefixBehavior?: "trim" | "keep";
 }
 
 type StrategyFn = (
@@ -96,6 +97,7 @@ const Strategies: Record<string, StrategyFn> = {
         presence_penalty: 0.05,
         maxTokens: 2048,
       },
+      prefixBehavior: "trim",
     };
   },
 
@@ -127,6 +129,7 @@ const Strategies: Record<string, StrategyFn> = {
         presence_penalty: 0.1,
         maxTokens: 1024,
       },
+      prefixBehavior: "trim",
     };
   },
 
@@ -162,6 +165,7 @@ const Strategies: Record<string, StrategyFn> = {
         presence_penalty: 0.1,
         maxTokens: 1024,
       },
+      prefixBehavior: "trim",
     };
   },
 

@@ -234,8 +234,13 @@ export class AgentWorkflowService {
       // Find assistant pre-fill if it exists
       let buffer = "";
       const lastMsg = messages[messages.length - 1];
+      // Default behavior is 'keep' to maintain backward compatibility and support strictly formatted fields
+      const prefixBehavior = result.prefixBehavior || "keep";
+
       if (lastMsg && lastMsg.role === "assistant" && lastMsg.content) {
-        buffer = lastMsg.content;
+        if (prefixBehavior === "keep") {
+          buffer = lastMsg.content;
+        }
       }
 
       await this.storyManager.saveFieldDraft(session.fieldId, buffer);
