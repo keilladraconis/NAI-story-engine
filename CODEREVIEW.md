@@ -25,10 +25,10 @@ The Story Engine codebase has undergone a successful simplification, moving from
 **Finding:** `RenderContext` contained a large number of optional methods.
 **Refactor:** Split `RenderContext` into `BaseRenderContext`, `TextRenderContext`, and `ListRenderContext`. Strategies now use generic types to specify their required context.
 
-### 3. Inconsistent Prompt Spacing (`fixSpacing`) - ✅ COMPLETED
-**Location:** `src/core/context-strategies.ts`
-**Finding:** While `fixSpacing` is used on most blocks, it was missing from some blocks in `buildDulfsContext`.
-**Refactor:** Moved `fixSpacing` into `lib/hyper-generator.ts` and updated `hyperContextBuilder` to apply it uniformly to all messages.
+### 3. Inconsistent Prompt Spacing (`fixSpacing`) - ❌ REVERTED
+**Priority:** LOW
+**Finding:** The `fixSpacing` function in `hyperContextBuilder` was forcing double-newlines to accommodate older models (GLM-4.6 behavior), but this caused excessive spacing with current models.
+**Refactor:** `hyperContextBuilder` usage was replaced with a local `contextBuilder` in `src/core/context-strategies.ts` that removes this double-spacing logic.
 
 ---
 

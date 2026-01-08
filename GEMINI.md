@@ -83,5 +83,6 @@ When debugging issues, you may add debugging log statements and provide the user
 - **Strategy Pattern**: UI rendering is decoupled via `ListFieldStrategy` and `TextFieldStrategy`.
 - **Context Management**: Prompt building is centralized in `ContextStrategyFactory`, using `hyper-generator` for long-form output.
 - **Data-Driven UI**: `FIELD_CONFIGS` drives the generation of the `StructuredEditor` interface.
+- **Fixes**: Replaced `hyperContextBuilder` usage in `src/core/context-strategies.ts` with a local `contextBuilder` implementation. This removes the forced double-newline behavior ("fixSpacing") from the library, resolving the issue where generated text (especially Lorebooks) appeared double-spaced.
 - **Known Issues**: Export/Import currently lacks DULFS/Brainstorm support; Lorebook UI has potential async race conditions in the render loop.
 

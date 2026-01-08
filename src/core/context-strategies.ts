@@ -1,5 +1,4 @@
 import {
-  hyperContextBuilder,
   HyperGenerationParams,
 } from "../../lib/hyper-generator";
 import { StoryManager } from "./story-manager";
@@ -9,6 +8,27 @@ import {
   FIELD_CONFIGS,
   LIST_FIELD_IDS,
 } from "../config/field-definitions";
+
+// Local implementation of context builder that avoids the "double newline" behavior
+// of the library version, which causes double-spaced generation.
+const contextBuilder = (
+  system: Message,
+  user: Message,
+  assistant: Message,
+  rest: Message[],
+): Message[] => {
+  const clean = (m: Message): Message => ({
+    ...m,
+    content: m.content ? m.content.trim() : m.content,
+  });
+
+  return [
+    clean(system),
+    ...rest.map(clean),
+    clean(user),
+    clean(assistant),
+  ];
+};
 
 export type TextFilter = (text: string) => string;
 
@@ -74,7 +94,7 @@ const Strategies: Record<string, StrategyFn> = {
   // High creativity, divergent thinking
   "generate:default": async (_session, _manager, base) => {
     const userPrompt = (await api.v1.config.get("brainstorm_prompt")) || "";
-    const messages = hyperContextBuilder(
+    const messages = contextBuilder(
       base.systemMsg,
       { role: "user", content: userPrompt },
       {
@@ -106,7 +126,7 @@ const Strategies: Record<string, StrategyFn> = {
   "generate:storyPrompt": async (_session, manager, base) => {
     const userPrompt = (await api.v1.config.get("story_prompt_generate_prompt")) || "";
     const brainstormContent = manager.getConsolidatedBrainstorm();
-    const messages = hyperContextBuilder(
+    const messages = contextBuilder(
       base.systemMsg,
       { role: "user", content: userPrompt },
       {
@@ -138,7 +158,7 @@ const Strategies: Record<string, StrategyFn> = {
   "generate:worldSnapshot": async (_session, manager, base) => {
     const userPrompt = (await api.v1.config.get("world_snapshot_prompt")) || "";
     const brainstormContent = manager.getConsolidatedBrainstorm();
-    const messages = hyperContextBuilder(
+    const messages = contextBuilder(
       base.systemMsg,
       { role: "user", content: userPrompt },
       {
@@ -172,7 +192,7 @@ const Strategies: Record<string, StrategyFn> = {
   // Generate (ATTG)
   "generate:attg": async (_session, _manager, base) => {
     const userPrompt = (await api.v1.config.get("attg_generate_prompt")) || "";
-    const messages = hyperContextBuilder(
+    const messages = contextBuilder(
       base.systemMsg,
       {
         role: "user",
@@ -205,7 +225,7 @@ const Strategies: Record<string, StrategyFn> = {
   // Generate (Style)
   "generate:style": async (_session, _manager, base) => {
     const userPrompt = (await api.v1.config.get("style_generate_prompt")) || "";
-    const messages = hyperContextBuilder(
+    const messages = contextBuilder(
       base.systemMsg,
       {
         role: "user",
@@ -261,7 +281,7 @@ const Strategies: Record<string, StrategyFn> = {
       (await api.v1.config.get("lorebook_generate_prompt")) || "";
     const formatInstruction = configPrompt.replace("[itemName]", itemName);
 
-    const messages = hyperContextBuilder(
+    const messages = contextBuilder(
       base.systemMsg,
       { role: "user", content: formatInstruction },
       {
@@ -374,7 +394,7 @@ export class ContextStrategyFactory {
       });
     }
 
-    const messages = hyperContextBuilder(
+    const messages = contextBuilder(
       baseContext.systemMsg,
       {
         role: "user",
