@@ -78,7 +78,12 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
 
     // --- Actions Row ---
     const actionsRow = row({
-      style: { "margin-bottom": "12px", gap: "8px", "align-items": "center" },
+      style: {
+        "margin-bottom": "12px",
+        gap: "4px",
+        "align-items": "center",
+        "flex-wrap": "wrap",
+      },
       content: [
         // Responsive Generate Button
         createResponsiveGenerateButton(
@@ -105,6 +110,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
         button({
           text: "Add Entry",
           iconId: "plus",
+          style: { padding: "4px 8px" },
           callback: () => {
             const newItem: DULFSField = {
               id: api.v1.uuid(),
@@ -121,6 +127,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
         button({
           text: "Clear All",
           iconId: "trash-2",
+          style: { padding: "4px 8px" },
           callback: () => {
             // Simple confirmation could be added here if possible, for now direct action
             storyManager.clearDulfsList(config.id);

@@ -11,6 +11,7 @@ export const createHeaderWithToggle = (
       text: isEditMode ? "Save" : "Edit",
       iconId: isEditMode ? "save" : "edit-3",
       callback: onToggle,
+      style: { padding: "4px 8px" },
     }),
   ];
 
@@ -23,14 +24,16 @@ export const createHeaderWithToggle = (
       "justify-content": "space-between",
       "align-items": "center",
       "margin-bottom": "8px",
+      "flex-wrap": "wrap",
+      gap: "4px",
     },
     content: [
       text({
         text: description,
-        style: { "font-style": "italic", opacity: "0.8" },
+        style: { "font-style": "italic", opacity: "0.8", "flex-shrink": "1" },
       }),
       row({
-        style: { gap: "8px" },
+        style: { gap: "4px", "flex-wrap": "wrap" },
         content: buttons,
       }),
     ],
@@ -128,6 +131,7 @@ export const createResponsiveGenerateButton = (
         "background-color": "#e2e3e5",
         color: "#383d41",
         cursor: "pointer",
+        padding: "4px 8px",
       },
       callback: () => {
         actions.onCancel();
@@ -143,6 +147,7 @@ export const createResponsiveGenerateButton = (
         "background-color": "#fff3cd",
         color: "#856404",
         "font-weight": "bold",
+        padding: "4px 8px",
       },
       callback: () => {
         if (actions.onContinue) actions.onContinue();
@@ -162,6 +167,7 @@ export const createResponsiveGenerateButton = (
       style: {
         "background-color": "#e2e3e5",
         color: "#383d41",
+        padding: "4px 8px",
       },
       callback: () => {
         // Allow canceling the wait
@@ -178,6 +184,7 @@ export const createResponsiveGenerateButton = (
         "font-weight": "bold",
         "background-color": "#ffcccc",
         color: "red",
+        padding: "4px 8px",
       },
       callback: () => actions.onCancel(),
     });
@@ -186,7 +193,7 @@ export const createResponsiveGenerateButton = (
   return button({
     id: `${id}-ignite`,
     text: `⚡ ${label}`,
-    style: { "font-weight": "bold" },
+    style: { "font-weight": "bold", padding: "4px 8px" },
     callback: () => actions.onStart(),
   });
 };
