@@ -178,7 +178,7 @@ export class StoryManager {
     fieldId: string,
     itemId: string,
     updates: Partial<DULFSField>,
-    notify: boolean = false,
+    notify: boolean | "none" = false,
     syncToLorebook: boolean = true,
   ): Promise<void> {
     const data = this.dataManager.data;
@@ -189,10 +189,10 @@ export class StoryManager {
       list[index] = { ...list[index], ...updates };
       this.dataManager.setDulfsList(fieldId, list);
 
-      if (notify) {
+      if (notify === true) {
         await this.dataManager.save();
         this.dataManager.notifyListeners();
-      } else {
+      } else if (notify === false) {
         await this.debounceAction(
           `save-${fieldId}`,
           async () => {
@@ -201,6 +201,7 @@ export class StoryManager {
           250,
         );
       }
+      // If notify === "none", skip save/debounce
 
       if (syncToLorebook) {
         await this.debounceAction(
@@ -302,7 +303,7 @@ export class StoryManager {
   public async setFieldContent(
     fieldId: string,
     content: string,
-    save: boolean = false,
+    save: boolean | "none" = false,
     sync: boolean = true,
   ): Promise<void> {
     const data = this.dataManager.data;
@@ -351,9 +352,9 @@ export class StoryManager {
     }
 
     if (changed) {
-      if (save) {
+      if (save === true) {
         await this.dataManager.save();
-      } else {
+      } else if (save === false) {
         await this.debounceAction(
           `save-global-${fieldId}`,
           async () => {
@@ -363,6 +364,7 @@ export class StoryManager {
           250,
         );
       }
+      // If save === "none", do nothing (content is updated in memory)
     }
   }
 
@@ -431,6 +433,6 @@ export class StoryManager {
   }
 
   public async saveFieldDraft(fieldId: string, content: string): Promise<void> {
-    await this.setFieldContent(fieldId, content, false, false);
+    await this.setFieldContent(fieldId, content, "none", false);
   }
 }
