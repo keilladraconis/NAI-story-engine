@@ -165,7 +165,20 @@ export class SegaModal {
 
   private renderMasterButton(): UIPart {
     const isRunning = this.service.isRunning;
-    const currentId = this.service.currentFieldId;
+    let currentId = this.service.currentFieldId;
+
+    // Fallback: If running but no currentId found (race condition or sync delay),
+    // check workflow directly for any active item in our list.
+    if (isRunning && !currentId) {
+      for (const item of this.service.items) {
+        const session = this.agentWorkflow.getSession(item.id);
+        const listState = this.agentWorkflow.getListGenerationState(item.id);
+        if (session?.isRunning || listState?.isRunning) {
+          currentId = item.id;
+          break;
+        }
+      }
+    }
 
     let budgetState: "normal" | "waiting_for_user" | "waiting_for_timer" =
       "normal";
