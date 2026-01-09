@@ -31,6 +31,8 @@ The project runs within the NovelAI platform. After building the project, the "S
 
 # Development Conventions
 
+NEVER attempt to create git commits.
+
 ## Planning and Coordination
 
 A `PLAN.md` file is present, and it maintains an outline and implementation guide for the project. It should be updated frequently as development proceeds, and when the trajectory differs, update the file to match the latest development trajectory.

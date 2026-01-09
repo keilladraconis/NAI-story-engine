@@ -1,13 +1,13 @@
 /** HYPER GENERATOR
  * License: MIT; Credit to OccultSage for the original form and inspiration
  * Authors: Keilla
- * Version: 0.4.2
+ * Version: 0.4.1
  */
 
 /** Changes
  * hyperContextBuilder signature modified to receive enable_thinking boolean. Thoughts require a contentless assistant suffix on the messages.
  * hyperContextBuilder tail-slicing-appending removed. Causes issues with careful prompting and prefill.
- * Exponential backoff .......
+ * Refactored `hyperGenerateWithRetry` in `lib/hyper-generator.ts` to use a loop-based approach with proper exponential backoff (`2^attempts * 1000` ms), replacing the recursive implementation.
  * Context sample removed.
  */
 
@@ -63,7 +63,7 @@ export interface OnBudgetResumeCallback {
 
 // ===== ERROR HANDLING =====
 
-class TransientError extends Error {}
+class TransientError extends Error { }
 
 function isTransientError(e: Error): boolean {
   hyperLog("Transient Error:", e.message);
@@ -267,7 +267,7 @@ async function showContinueModal(
 export async function hyperGenerate(
   messages: Message[],
   params: HyperGenerationParams,
-  callback: (text: string, final: boolean) => void = () => {},
+  callback: (text: string, final: boolean) => void = () => { },
   behaviour?: "background" | "blocking",
   signal?: CancellationSignal,
 ): Promise<string> {
@@ -281,7 +281,7 @@ export async function hyperGenerate(
   const choiceHandler =
     callback !== undefined
       ? (choices: GenerationChoice[], final: boolean): void =>
-          callback(choices[0] ? choices[0].text : "", final)
+        callback(choices[0] ? choices[0].text : "", final)
       : undefined;
 
   // Find system message if present
@@ -397,49 +397,51 @@ export async function hyperGenerate(
 async function hyperGenerateWithRetry(
   messages: Message[],
   params: HyperGenerationParams,
-  callback: (choices: GenerationChoice[], final: boolean) => void = () => {},
+  callback: (choices: GenerationChoice[], final: boolean) => void = () => { },
   behaviour?: "background" | "blocking",
   signal?: CancellationSignal,
 ): Promise<GenerationResponse> {
-  const max_tokens = await ensureOutputBudget(
-    params.maxTokens
-      ? Math.min(params.maxTokens, API_GENERATE_LIMIT)
-      : API_GENERATE_LIMIT,
-    params.onBudgetWait,
-    params.onBudgetResume,
-  );
+  const maxRetries = params.maxRetries ?? 5;
+  let attempts = 0;
 
-  try {
-    hyperLog(`Generating ${max_tokens} tokens...`);
-    return await api.v1.generate(
-      [...messages],
-      {
-        ...sliceGenerateParams(params),
-        max_tokens,
-      },
-      callback,
-      behaviour,
-      signal,
+  while (true) {
+    const max_tokens = await ensureOutputBudget(
+      params.maxTokens
+        ? Math.min(params.maxTokens, API_GENERATE_LIMIT)
+        : API_GENERATE_LIMIT,
+      params.onBudgetWait,
+      params.onBudgetResume,
     );
-  } catch (e: any) {
-    if (isTransientError(e) || /in progress/.test(e.message)) {
-      if (params.maxRetries && params.maxRetries > 0) {
-        // Gonna have to refactor this into a loop to track the actual exponential backoff towards max retries.
-        await api.v1.timers.sleep(2 ** (8 - params.maxRetries) * 1000);
-        return hyperGenerateWithRetry(
-          messages,
-          { ...params, maxRetries: params.maxRetries - 1 },
-          callback,
-          behaviour,
-          signal,
+
+    try {
+      hyperLog(`Generating ${max_tokens} tokens...`);
+      return await api.v1.generate(
+        [...messages],
+        {
+          ...sliceGenerateParams(params),
+          max_tokens,
+        },
+        callback,
+        behaviour,
+        signal,
+      );
+    } catch (e: any) {
+      if (isTransientError(e) || /in progress/.test(e.message)) {
+        attempts++;
+        if (attempts > maxRetries) {
+          throw new TransientError(
+            `[generateWithRetry] Transient error encountered and retries exhausted after ${attempts} attempts.`,
+          );
+        }
+
+        const delay = Math.pow(2, attempts) * 1000;
+        hyperLog(
+          `Transient error: ${e.message}. Retrying in ${delay}ms (Attempt ${attempts}/${maxRetries})...`,
         );
+        await api.v1.timers.sleep(delay);
       } else {
-        throw new TransientError(
-          "[generateWithRetry] Transient error encountered and retries exhausted.",
-        );
+        throw e;
       }
-    } else {
-      throw e;
     }
   }
 }
