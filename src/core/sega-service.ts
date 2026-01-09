@@ -8,6 +8,7 @@ export interface SegaItem {
   type: "field" | "lorebook";
   status: "checked" | "blank" | "queued" | "generating" | "error";
   error?: string;
+  categoryId?: string;
 }
 
 export class SegaService {
@@ -63,6 +64,7 @@ export class SegaService {
         label: config.label,
         type: "field",
         status: hasContent ? "checked" : "blank",
+        categoryId: config.id,
       });
     }
 
@@ -89,6 +91,7 @@ export class SegaService {
               label: `${item.name} (${config.label})`,
               type: "lorebook",
               status: hasContent ? "checked" : "blank",
+              categoryId: config.id,
             });
           }
         }
@@ -165,6 +168,7 @@ export class SegaService {
               label: `${item.name}`,
               type: "lorebook",
               status: hasContent ? "checked" : "blank",
+              categoryId: config.id,
             };
 
             this._items.push(itemToPush);
@@ -186,16 +190,43 @@ export class SegaService {
   public startQueue() {
     if (this._isRunning) return;
 
-    let hasWork = false;
-    for (const item of this._items) {
-      if (item.status === "blank") {
-        hasWork = true;
-        this.triggerItem(item);
+    const itemsToQueue = this._items.filter((i) => i.status === "blank");
+    if (itemsToQueue.length === 0) return;
+
+    // Group items by categoryId to interleave them
+    const groups = new Map<string, SegaItem[]>();
+    const categories: string[] = [];
+
+    for (const item of itemsToQueue) {
+      const cat = item.categoryId || "other";
+      if (!groups.has(cat)) {
+        groups.set(cat, []);
+        categories.push(cat);
+      }
+      groups.get(cat)!.push(item);
+    }
+
+    // Interleave
+    const interleaved: SegaItem[] = [];
+    let maxLen = 0;
+    for (const group of groups.values()) {
+      if (group.length > maxLen) maxLen = group.length;
+    }
+
+    for (let i = 0; i < maxLen; i++) {
+      for (const cat of categories) {
+        const group = groups.get(cat)!;
+        if (i < group.length) {
+          interleaved.push(group[i]);
+        }
       }
     }
 
-    if (hasWork) {
+    if (interleaved.length > 0) {
       this._isRunning = true;
+      for (const item of interleaved) {
+        this.triggerItem(item);
+      }
       if (this.updateCallback) this.updateCallback();
     }
   }

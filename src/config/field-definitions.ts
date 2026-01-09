@@ -98,21 +98,6 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     filters: ["scrubBrackets"],
   },
   {
-    id: FieldID.DramatisPersonae,
-    label: "Dramatis Personae",
-    description: "Characters by name, age, description, tell",
-    placeholder: "Character names, descriptions, motivations...",
-    icon: "user",
-    layout: "list",
-    fieldType: "dulfs",
-    generationInstruction:
-      "Generate a list of interesting characters for this story. Focus on their core motivations and unique behavioral tells.",
-    exampleFormat:
-      "Format each line exactly as: [First and Last Name] ([gender], [age], [occupation]): [core motivation], [behavioral tell]",
-    filters: ["scrubBrackets"],
-    parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*(.+)$/,
-  },
-  {
     id: FieldID.UniverseSystems,
     label: "Universe Systems",
     description: "Rules, magic, technology, and world mechanics",
@@ -121,24 +106,9 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     layout: "list",
     fieldType: "dulfs",
     generationInstruction:
-      "Generate a list of key universe systems, magic rules, or technological principles. Describe the mechanic or rule concisely.",
+      "Generate a list of 2-5 key universe systems, magic rules, or technological principles. Describe the mechanic or rule concisely.",
     exampleFormat:
       "Format each line as: [System Name]: [Description of mechanic or rule]",
-    filters: ["scrubBrackets"],
-    parsingRegex: /^([^:]+):\s*(.+)$/,
-  },
-  {
-    id: FieldID.Locations,
-    label: "Locations",
-    description: "Places where the story takes place",
-    placeholder: "Settings, landmarks, environments...",
-    icon: "map-pin" as IconId,
-    layout: "list",
-    fieldType: "dulfs",
-    generationInstruction:
-      "Generate a list of significant locations. Include atmospheric anchors, sensory details, and inherent tensions.",
-    exampleFormat:
-      "Format each line as: [Location Name]: [atmospheric anchors], [concise sensory details], [concise inherent tensions or key functions]",
     filters: ["scrubBrackets"],
     parsingRegex: /^([^:]+):\s*(.+)$/,
   },
@@ -151,9 +121,40 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     layout: "list",
     fieldType: "dulfs",
     generationInstruction:
-      "Generate a list of major factions, guilds, or political groups. Describe their core ideology, goal, and internal structure.",
+      "Generate a list of 1-4 major factions, guilds, or political groups. Describe their core ideology, goal, and internal structure.",
     exampleFormat:
       "Format each line as: [Faction Name]: [concise description of ideology, goal, structure]",
+    filters: ["scrubBrackets"],
+    parsingRegex: /^([^:]+):\s*(.+)$/,
+  },
+  {
+    id: FieldID.DramatisPersonae,
+    label: "Dramatis Personae",
+    description: "Characters by name, age, description, tell",
+    placeholder: "Character names, descriptions, motivations...",
+    icon: "user",
+    layout: "list",
+    fieldType: "dulfs",
+    generationInstruction:
+      "Generate a list of 2-5 interesting characters for this story. Focus on their core motivations and unique behavioral tells.",
+    exampleFormat:
+      "Format each line exactly as: [First and Last Name] ([gender], [age], [occupation]): [core motivation], [behavioral tell]",
+    filters: ["scrubBrackets"],
+    parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*(.+)$/,
+  },
+
+  {
+    id: FieldID.Locations,
+    label: "Locations",
+    description: "Places where the story takes place",
+    placeholder: "Settings, landmarks, environments...",
+    icon: "map-pin" as IconId,
+    layout: "list",
+    fieldType: "dulfs",
+    generationInstruction:
+      "Generate a list of 1-5 significant locations. Include atmospheric anchors, sensory details, and inherent tensions.",
+    exampleFormat:
+      "Format each line as: [Location Name]: [atmospheric anchors], [concise sensory details], [concise inherent tensions or key functions]",
     filters: ["scrubBrackets"],
     parsingRegex: /^([^:]+):\s*(.+)$/,
   },
@@ -166,7 +167,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     layout: "list",
     fieldType: "dulfs",
     generationInstruction:
-      "Generate a list of current conflicts, pending events, or tensions that involve multiple characters with no suggested resolution.",
+      "Generate a list of 2-4 current conflicts, pending events, or tensions that involve multiple characters with no suggested resolution.",
     exampleFormat:
       "Format each line as: [Dynamic Name]: [a state of being or point of friction...]",
     filters: ["scrubBrackets"],
