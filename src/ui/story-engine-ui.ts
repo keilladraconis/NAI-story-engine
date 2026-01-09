@@ -124,6 +124,7 @@ export class StoryEngineUI {
         const isRunning = session?.isRunning || false;
         const isQueued = session?.isQueued || false;
         const budgetState = session?.budgetState;
+        const budgetTimeRemaining = session?.budgetTimeRemaining;
 
         const genButton = createResponsiveGenerateButton(
           `gen-btn-${sessionId}`,
@@ -131,6 +132,7 @@ export class StoryEngineUI {
             isRunning,
             isQueued,
             budgetState,
+            budgetTimeRemaining,
           },
           {
             onStart: () => {

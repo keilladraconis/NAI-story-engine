@@ -53,7 +53,7 @@
 
 *(Note: "Content Extraction" is currently handled via generative context strategies rather than extraction from existing story text.)*
 
-### 📋 **Phase 4: Advanced Features & Polish - IN PROGRESS**
+### 📋 **Phase 4: Advanced Features & Polish - COMPLETE**
 **Status**: Active / Post-MVP
 **Priority**: MEDIUM
 
@@ -62,11 +62,12 @@
 - [x] **Context Optimization**: Re-engineered `ContextStrategyFactory` to maximize token caching efficiency. Context is now layered strictly: `System` -> `Story Prompt` -> `World Snapshot` -> `Volatile Data` -> `Task`. DULFS and World Snapshot are now injected into downstream generations (Lorebook, ATTG, Style).
 - [x] **Robust Cancellation**: Updated `SegaModal` and `AgentWorkflowService` to ensure reliable cancellation and cleanup, even during budget wait states.
 
-#### Planned Features:
-- Multi-project support
-- Template and genre presets
-- CSS styling refinement
-- Optimization of re-rendering logic during streaming generation.
+## Feature Requests
+
+### Use with existing stories
+- Story generator could read your existing story as context for generating "Story Prompt", "Dynamic World Snapshot", etc.
+- might be a bit unpredictable with incorporating existing characters?
+- +1
 
 ## 🏗️ Technical Implementation Details
 
