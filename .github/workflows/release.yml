@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'project.yaml'
+  workflow_dispatch:
 
 permissions:
   contents: write
