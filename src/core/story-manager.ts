@@ -5,6 +5,8 @@ import { BrainstormDataManager } from "./brainstorm-data-manager";
 
 export { StoryField, DULFSField };
 
+export type PersistenceMode = "immediate" | "debounce" | "none";
+
 export class StoryManager {
   private dataManager: StoryDataManager;
   private lorebookSyncService: LorebookSyncService;
@@ -106,12 +108,12 @@ export class StoryManager {
           name: parsed.name,
           description: parsed.description,
         },
-        false,
+        "debounce",
         true,
       );
     } else {
       // Fallback sync
-      await this.updateDulfsItem(fieldId, itemId, {}, false, true);
+      await this.updateDulfsItem(fieldId, itemId, {}, "debounce", true);
     }
   }
 
@@ -178,7 +180,7 @@ export class StoryManager {
     fieldId: string,
     itemId: string,
     updates: Partial<DULFSField>,
-    notify: boolean | "none" = false,
+    persistence: PersistenceMode = "debounce",
     syncToLorebook: boolean = true,
   ): Promise<void> {
     const data = this.dataManager.data;
@@ -189,10 +191,10 @@ export class StoryManager {
       list[index] = { ...list[index], ...updates };
       this.dataManager.setDulfsList(fieldId, list);
 
-      if (notify === true) {
+      if (persistence === "immediate") {
         await this.dataManager.save();
         this.dataManager.notifyListeners();
-      } else if (notify === false) {
+      } else if (persistence === "debounce") {
         await this.debounceAction(
           `save-${fieldId}`,
           async () => {
@@ -201,7 +203,7 @@ export class StoryManager {
           250,
         );
       }
-      // If notify === "none", skip save/debounce
+      // If persistence === "none", skip save/debounce
 
       if (syncToLorebook) {
         await this.debounceAction(
@@ -303,7 +305,7 @@ export class StoryManager {
   public async setFieldContent(
     fieldId: string,
     content: string,
-    save: boolean | "none" = false,
+    persistence: PersistenceMode = "debounce",
     sync: boolean = true,
   ): Promise<void> {
     const data = this.dataManager.data;
@@ -318,7 +320,7 @@ export class StoryManager {
             match.fieldId,
             match.item.id,
             { lorebookContent: content },
-            save,
+            persistence,
           );
         }
       } else {
@@ -326,7 +328,7 @@ export class StoryManager {
           prefix,
           id,
           { lorebookContent: content },
-          save,
+          persistence,
         );
       }
       return;
@@ -352,9 +354,9 @@ export class StoryManager {
     }
 
     if (changed) {
-      if (save === true) {
+      if (persistence === "immediate") {
         await this.dataManager.save();
-      } else if (save === false) {
+      } else if (persistence === "debounce") {
         await this.debounceAction(
           `save-global-${fieldId}`,
           async () => {
@@ -364,7 +366,7 @@ export class StoryManager {
           250,
         );
       }
-      // If save === "none", do nothing (content is updated in memory)
+      // If persistence === "none", do nothing (content is updated in memory)
     }
   }
 
@@ -400,21 +402,21 @@ export class StoryManager {
       if (fieldId === FieldID.ATTG) {
         if (this.isAttgEnabled()) {
           // Sync empty string to memory first to clear it
-          await this.setFieldContent(fieldId, "", false, true);
+          await this.setFieldContent(fieldId, "", "none", true);
           await this.setAttgEnabled(false);
         } else {
-          await this.setFieldContent(fieldId, "", false, false);
+          await this.setFieldContent(fieldId, "", "none", false);
         }
       } else if (fieldId === FieldID.Style) {
         if (this.isStyleEnabled()) {
           // Sync empty string to memory first to clear it
-          await this.setFieldContent(fieldId, "", false, true);
+          await this.setFieldContent(fieldId, "", "none", true);
           await this.setStyleEnabled(false);
         } else {
-          await this.setFieldContent(fieldId, "", false, false);
+          await this.setFieldContent(fieldId, "", "none", false);
         }
       } else {
-        await this.setFieldContent(fieldId, "", false, true);
+        await this.setFieldContent(fieldId, "", "none", true);
       }
     }
 

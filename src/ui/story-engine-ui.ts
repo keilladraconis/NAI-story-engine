@@ -83,7 +83,7 @@ export class StoryEngineUI {
         // Initialize with current lorebook text if possible
         const entry = await api.v1.lorebook.entry(entryId);
         if (entry && entry.text) {
-          await this.storyManager.setFieldContent(sessionId, entry.text, false);
+          await this.storyManager.setFieldContent(sessionId, entry.text, "debounce");
         }
       }
     }
@@ -187,7 +187,7 @@ export class StoryEngineUI {
                 "Lorebook text will appear here...",
                 `input-field-${sessionId}`,
                 (val) => {
-                  this.storyManager.setFieldContent(sessionId, val, false);
+                  this.storyManager.setFieldContent(sessionId, val, "debounce");
                   // Sync to NovelAI Lorebook
                   api.v1.lorebook.updateEntry(entryId, { text: val });
                 },

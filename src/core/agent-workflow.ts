@@ -399,7 +399,7 @@ export class AgentWorkflowService {
       await this.storyManager.setFieldContent(
         session.fieldId,
         buffer,
-        true,
+        "immediate",
         true,
       );
 

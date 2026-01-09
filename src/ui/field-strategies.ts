@@ -164,7 +164,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
               {
                 content: newContent,
               },
-              false,
+              "debounce",
               false, // No sync
             );
           },
