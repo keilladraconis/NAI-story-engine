@@ -74,7 +74,6 @@ export class SegaService {
 
   private scanForLorebooks() {
     const dulfsFields = FIELD_CONFIGS.filter((c) => c.layout === "list");
-    const foundItems: SegaItem[] = [];
 
     for (const config of dulfsFields) {
       const list = this.storyManager.getDulfsList(config.id);
@@ -83,13 +82,11 @@ export class SegaService {
           for (const entryId of item.linkedLorebooks) {
             const id = `lorebook:${entryId}`;
             if (this._items.find((i) => i.id === id)) continue;
-            // Also check if we already found it in this pass (duplicate guard)
-            if (foundItems.find((i) => i.id === id)) continue;
 
             const content = this.storyManager.getFieldContent(id);
             const hasContent = content && content.trim().length > 0;
 
-            foundItems.push({
+            this._items.push({
               id,
               label: `${item.name} (${config.label})`,
               type: "lorebook",
@@ -100,40 +97,6 @@ export class SegaService {
         }
       }
     }
-
-    // Interleave lorebooks to ensure display order matches execution
-    const interleaved = this.interleaveItems(foundItems);
-    this._items.push(...interleaved);
-  }
-
-  private interleaveItems(items: SegaItem[]): SegaItem[] {
-    const groups = new Map<string, SegaItem[]>();
-    const categories: string[] = [];
-
-    for (const item of items) {
-      const cat = item.categoryId || "other";
-      if (!groups.has(cat)) {
-        groups.set(cat, []);
-        categories.push(cat);
-      }
-      groups.get(cat)!.push(item);
-    }
-
-    const interleaved: SegaItem[] = [];
-    let maxLen = 0;
-    for (const group of groups.values()) {
-      if (group.length > maxLen) maxLen = group.length;
-    }
-
-    for (let i = 0; i < maxLen; i++) {
-      for (const cat of categories) {
-        const group = groups.get(cat)!;
-        if (i < group.length) {
-          interleaved.push(group[i]);
-        }
-      }
-    }
-    return interleaved;
   }
 
   private syncItemStatus(fieldId: string) {
@@ -171,39 +134,7 @@ export class SegaService {
       }
     }
 
-    this.checkPhaseTransition();
     this.checkGlobalCompletion();
-  }
-
-  private hasActiveFields(): boolean {
-    return this._items.some(
-      (i) =>
-        i.type === "field" &&
-        (i.status === "generating" || i.status === "queued"),
-    );
-  }
-
-  private checkPhaseTransition() {
-    if (!this._isRunning) return;
-
-    // Check if any fields are still active
-    const active = this.hasActiveFields();
-    if (active) return;
-
-    // Phase 1 (Fields) is complete.
-    // Now discover new lorebooks (Wait to discover)
-    this.checkForNewItems();
-
-    // Now queue any blank lorebooks (Wait to queue)
-    const blankLorebooks = this._items.filter(
-      (i) => i.type === "lorebook" && i.status === "blank",
-    );
-
-    if (blankLorebooks.length > 0) {
-      for (const lb of blankLorebooks) {
-        this.triggerItem(lb);
-      }
-    }
   }
 
   private checkGlobalCompletion() {
@@ -219,16 +150,10 @@ export class SegaService {
   }
 
   private checkForNewItems() {
-    // If we are running and still in Field phase, DO NOT discover/queue lorebooks yet.
-    if (this._isRunning && this.hasActiveFields()) {
-      return;
-    }
-
     if (this._items.length === 0) return;
 
     const dulfsFields = FIELD_CONFIGS.filter((c) => c.layout === "list");
     let changed = false;
-    const newItems: SegaItem[] = [];
 
     for (const config of dulfsFields) {
       const list = this.storyManager.getDulfsList(config.id);
@@ -237,29 +162,27 @@ export class SegaService {
           for (const entryId of item.linkedLorebooks) {
             const id = `lorebook:${entryId}`;
             if (this._items.find((i) => i.id === id)) continue;
-            if (newItems.find((i) => i.id === id)) continue;
 
             const content = this.storyManager.getFieldContent(id);
             const hasContent = content && content.trim().length > 0;
 
-            const itemToPush: SegaItem = {
+            const newItem: SegaItem = {
               id,
               label: `${item.name}`,
               type: "lorebook",
               status: hasContent ? "checked" : "blank",
               categoryId: config.id,
             };
-            newItems.push(itemToPush);
+            this._items.push(newItem);
+            changed = true;
+
+            // If running, queue it immediately
+            if (this._isRunning && newItem.status === "blank") {
+                this.triggerItem(newItem);
+            }
           }
         }
       }
-    }
-
-    const interleavedNew = this.interleaveItems(newItems);
-    for (const item of interleavedNew) {
-      this._items.push(item);
-      changed = true;
-      // We do not trigger here. checkPhaseTransition triggers them if running.
     }
 
     if (changed && this.updateCallback) {
@@ -273,25 +196,9 @@ export class SegaService {
     const itemsToQueue = this._items.filter((i) => i.status === "blank");
     if (itemsToQueue.length === 0) return;
 
-    const fields = itemsToQueue.filter((i) => i.type === "field");
-    const lorebooks = itemsToQueue.filter((i) => i.type === "lorebook");
-
-    // Interleave fields (for robustness)
-    const interleavedFields = this.interleaveItems(fields);
-
-    // If we have fields, queue them. Lorebooks will be picked up by checkPhaseTransition when fields finish.
-    if (interleavedFields.length > 0) {
-      this._isRunning = true;
-      for (const item of interleavedFields) {
+    this._isRunning = true;
+    for (const item of itemsToQueue) {
         this.triggerItem(item);
-      }
-    } else if (lorebooks.length > 0) {
-      // If no fields, start lorebooks directly
-      const interleavedLorebooks = this.interleaveItems(lorebooks);
-      this._isRunning = true;
-      for (const item of interleavedLorebooks) {
-        this.triggerItem(item);
-      }
     }
 
     if (this._isRunning && this.updateCallback) this.updateCallback();

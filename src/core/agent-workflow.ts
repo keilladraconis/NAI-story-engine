@@ -97,8 +97,13 @@ export class AgentWorkflowService {
     }
 
     const state = this.listGenerationState.get(fieldId);
-    if (state && state.signal) {
-      state.signal.cancel();
+    if (state) {
+      if (state.budgetResolver) {
+        state.budgetResolver(); // Unblock budget wait
+      }
+      if (state.signal) {
+        state.signal.cancel();
+      }
     }
   }
 
@@ -118,8 +123,13 @@ export class AgentWorkflowService {
     }
 
     const session = this.getSession(fieldId);
-    if (session && session.cancellationSignal) {
-      session.cancellationSignal.cancel();
+    if (session) {
+      if (session.budgetResolver) {
+        session.budgetResolver(); // Unblock budget wait
+      }
+      if (session.cancellationSignal) {
+        session.cancellationSignal.cancel();
+      }
     }
   }
 

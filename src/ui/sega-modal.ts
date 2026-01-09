@@ -26,14 +26,20 @@ export class SegaModal {
     });
 
     this.service.setUpdateCallback(() => {
-      this.modal.update({ content: this.renderContent() });
+      if (this.modal) {
+        this.modal.update({ content: this.renderContent() });
+      }
     });
 
-    // Wait for close
-    await this.modal.closed;
-    // Detach callback
-    this.service.setUpdateCallback(() => {});
-    this.service.cancel();
+    try {
+      // Wait for close
+      await this.modal.closed;
+    } finally {
+      // Detach callback and cancel to prevent rogue updates
+      this.modal = undefined;
+      this.service.setUpdateCallback(() => {});
+      this.service.cancel();
+    }
   }
 
   private renderContent(): UIPart[] {
@@ -182,6 +188,7 @@ export class SegaModal {
 
     let budgetState: "normal" | "waiting_for_user" | "waiting_for_timer" =
       "normal";
+    let budgetTimeRemaining: number | undefined = undefined;
 
     // Look up budget state if running
     if (currentId) {
@@ -192,9 +199,11 @@ export class SegaModal {
         const session = this.agentWorkflow.getSession(currentId);
         if (session) {
           budgetState = session.budgetState || "normal";
+          budgetTimeRemaining = session.budgetTimeRemaining;
         }
       } else {
         budgetState = state.budgetState || "normal";
+        budgetTimeRemaining = state.budgetTimeRemaining;
       }
     }
 
@@ -204,6 +213,7 @@ export class SegaModal {
         isRunning: isRunning,
         isQueued: false, // We handle queuing internally
         budgetState: budgetState,
+        budgetTimeRemaining: budgetTimeRemaining,
       },
       {
         onStart: () => {
