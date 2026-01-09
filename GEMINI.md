@@ -31,7 +31,7 @@ The project runs within the NovelAI platform. After building the project, the "S
 
 # Development Conventions
 
-NEVER attempt to create git commits.
+**CRITICAL**: Making or preparing git commits is strictly prohibited.
 
 ## Planning and Coordination
 
@@ -44,6 +44,7 @@ Any current architecture or tech debt concerns are noted in the `CODEREVIEW.md` 
 You may periodically read the codebase and give an honest review of the overall architecture, structure, patterns and practices. Identify any dead code that can be deleted, or even unused files. Look for antipatterns and code smells. Look for wonky or inconsistent style. Find similar subroutines and note whether they can be refactored. Summarize your findings as HIGH, MEDIUM, LOW and write them to a `CODEREVIEW.md` file. If you identify any other things which could be helpful to your understanding as a coding LLM, update your `GEMINI.md` file.   
 
 ## Documentation
+
 **CRITICAL**: After completing any code modification or task, you MUST update relevant documentation, including `GEMINI.md`, `CODEREVIEW.md`, and `PLAN.md`, to reflect the current state of the project and any architectural changes.
 
 ## API
@@ -94,6 +95,8 @@ When debugging issues, you may add debugging log statements and provide the user
 - **Strategy Pattern**: UI rendering is decoupled via `ListFieldStrategy` and `TextFieldStrategy`.
 - **Context Management**: Prompt building is centralized in `ContextStrategyFactory`, using `hyper-generator` for long-form output.
 - **Data-Driven UI**: `FIELD_CONFIGS` drives the generation of the `StructuredEditor` interface.
+- **Dramatis Personae Tuning (Jan 9, 2026)**: Updated `Dramatis Personae` configuration to explicitly request Protagonist/Antagonist and replaced the abstract placeholder format with a concrete example (e.g., "Kael (Male, 34, Smuggler)...") to prevent literal placeholder generation and ensure key characters are included.
+- **DULFS Tuning (Jan 9, 2026)**: Applied the "Concrete Example" strategy to all DULFS fields (`Locations`, `Factions`, `Universe Systems`, `Situational Dynamics`) to prevent literal placeholder generation. Tuned `buildDulfsContext` parameters (Temp: 1.1, Presence Penalty: 0.1) to further discourage repetition and improve focus.
     - **Current Status (Jan 9, 2026)**: Code review completed. 
     - **Stability**: High.
     - **Maintenance**: Minor type safety and deduplication opportunities noted in `CODEREVIEW.md`.

@@ -108,7 +108,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     generationInstruction:
       "Generate a list of 2-5 key universe systems, magic rules, or technological principles. Describe the mechanic or rule concisely.",
     exampleFormat:
-      "Format each line as: [System Name]: [Description of mechanic or rule]",
+      "Format each line as: System Name: Description of mechanic or rule\nExample: Aetheric Resonance: High-frequency crystals can levitate heavy objects when sung to at specific pitches",
     filters: ["scrubBrackets"],
     parsingRegex: /^([^:]+):\s*(.+)$/,
   },
@@ -123,7 +123,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     generationInstruction:
       "Generate a list of 1-4 major factions, guilds, or political groups. Describe their core ideology, goal, and internal structure.",
     exampleFormat:
-      "Format each line as: [Faction Name]: [concise description of ideology, goal, structure]",
+      "Format each line as: Faction Name: Ideology, Goal, Structure\nExample: The Iron Pact: Militaristic isolationism, To protect the borders from invaders, Strict hierarchy based on combat merit",
     filters: ["scrubBrackets"],
     parsingRegex: /^([^:]+):\s*(.+)$/,
   },
@@ -136,9 +136,9 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     layout: "list",
     fieldType: "dulfs",
     generationInstruction:
-      "Generate a list of 2-5 interesting characters for this story. Focus on their core motivations and unique behavioral tells.",
+      "Generate a list of 3-6 major characters, explicitly including the Protagonist and Antagonist. Focus on their core motivations and unique behavioral tells.",
     exampleFormat:
-      "Format each line exactly as: [First and Last Name] ([gender], [age], [occupation]): [core motivation], [behavioral tell]",
+      "Format each line as: Name (Gender, Age, Role): Core motivation, Unique behavioral tell\nExample: Kael (Male, 34, Smuggler): To pay off his life debt, Rubs a coin when calculating odds",
     filters: ["scrubBrackets"],
     parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*(.+)$/,
   },
@@ -154,7 +154,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     generationInstruction:
       "Generate a list of 1-5 significant locations. Include atmospheric anchors, sensory details, and inherent tensions.",
     exampleFormat:
-      "Format each line as: [Location Name]: [atmospheric anchors], [concise sensory details], [concise inherent tensions or key functions]",
+      "Format each line as: Location Name: Atmosphere, Sensory details, Tensions\nExample: The Sunken Market: Claustrophobic and damp, Smell of salt and rotting wood, Constant fear of structural collapse",
     filters: ["scrubBrackets"],
     parsingRegex: /^([^:]+):\s*(.+)$/,
   },
@@ -169,7 +169,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     generationInstruction:
       "Generate a list of 2-4 current conflicts, pending events, or tensions that involve multiple characters with no suggested resolution.",
     exampleFormat:
-      "Format each line as: [Dynamic Name]: [a state of being or point of friction...]",
+      "Format each line as: Dynamic Name: Description of the conflict or event\nExample: The Succession Crisis: Three heirs vying for the throne after the Emperor's sudden death",
     filters: ["scrubBrackets"],
     parsingRegex: /^([^:]+):\s*(.+)$/,
   },

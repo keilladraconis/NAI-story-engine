@@ -450,9 +450,9 @@ export class ContextStrategyFactory {
     const result: StrategyResult = {
       messages,
       params: {
-        temperature: 1.2,
+        temperature: 1.1,
         min_p: 0.05,
-        presence_penalty: 0.05,
+        presence_penalty: 0.1,
         maxTokens: 700,
       },
       filters: [Filters.scrubMarkdown],
