@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1767999664
+updatedAt: 1768000869
 config:
   - name: model
     prettyName: LLM Model

@@ -40,7 +40,7 @@ jobs:
 
       - name: Build
         if: steps.check_tag.outputs.exists == 'false'
-        run: npx --yes nibs build
+        run: npx --yes nibs-cli build
 
       - name: Create Release
         if: steps.check_tag.outputs.exists == 'false'
