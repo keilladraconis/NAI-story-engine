@@ -13,16 +13,16 @@ export interface SegaItem {
 export class SegaService {
   private _items: SegaItem[] = [];
   private _isRunning: boolean = false;
-  
+
   private updateCallback?: () => void;
 
   constructor(
     private storyManager: StoryManager,
-    private agentWorkflow: AgentWorkflowService
+    private agentWorkflow: AgentWorkflowService,
   ) {
     // Listen for new DULFS items/Lorebooks
     this.storyManager.subscribe(() => this.checkForNewItems());
-    
+
     // Subscribe to workflow updates
     this.agentWorkflow.subscribe((fieldId) => {
       this.syncItemStatus(fieldId);
@@ -43,24 +43,26 @@ export class SegaService {
   }
 
   public get currentFieldId(): string | undefined {
-    return this._items.find(i => i.status === "generating")?.id;
+    return this._items.find((i) => i.status === "generating")?.id;
   }
 
   public initialize() {
     this._items = [];
-    
+
     // 1. Add all structured fields
     for (const config of FIELD_CONFIGS) {
       if (config.id === FieldID.Brainstorm) continue; // Skip Brainstorm
-      
+
       const content = this.storyManager.getFieldContent(config.id);
-      const hasContent = content && content.trim().length > 0;
-      
+      const dulfsList = this.storyManager.getDulfsList(config.id);
+      let hasContent =
+        (content && content.trim().length > 0) || dulfsList.length > 0;
+
       this._items.push({
         id: config.id,
         label: config.label,
         type: "field",
-        status: hasContent ? "checked" : "blank"
+        status: hasContent ? "checked" : "blank",
       });
     }
 
@@ -69,15 +71,15 @@ export class SegaService {
   }
 
   private scanForLorebooks() {
-    const dulfsFields = FIELD_CONFIGS.filter(c => c.layout === "list");
-    
+    const dulfsFields = FIELD_CONFIGS.filter((c) => c.layout === "list");
+
     for (const config of dulfsFields) {
       const list = this.storyManager.getDulfsList(config.id);
       for (const item of list) {
         if (item.linkedLorebooks && item.linkedLorebooks.length > 0) {
           for (const entryId of item.linkedLorebooks) {
             const id = `lorebook:${entryId}`;
-            if (this._items.find(i => i.id === id)) continue;
+            if (this._items.find((i) => i.id === id)) continue;
 
             const content = this.storyManager.getFieldContent(id);
             const hasContent = content && content.trim().length > 0;
@@ -86,7 +88,7 @@ export class SegaService {
               id,
               label: `${item.name} (${config.label})`,
               type: "lorebook",
-              status: hasContent ? "checked" : "blank"
+              status: hasContent ? "checked" : "blank",
             });
           }
         }
@@ -95,10 +97,10 @@ export class SegaService {
   }
 
   private syncItemStatus(fieldId: string) {
-    const item = this._items.find(i => i.id === fieldId);
+    const item = this._items.find((i) => i.id === fieldId);
     if (!item) return;
 
-    const config = FIELD_CONFIGS.find(c => c.id === fieldId);
+    const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
     const isList = config?.layout === "list";
 
     if (isList) {
@@ -121,7 +123,8 @@ export class SegaService {
         item.error = session.error;
       } else {
         const content = this.storyManager.getFieldContent(fieldId);
-        item.status = content && content.trim().length > 0 ? "checked" : "blank";
+        item.status =
+          content && content.trim().length > 0 ? "checked" : "blank";
       }
     }
 
@@ -131,7 +134,9 @@ export class SegaService {
   private checkGlobalCompletion() {
     if (!this._isRunning) return;
 
-    const hasActive = this._items.some(i => i.status === "queued" || i.status === "generating");
+    const hasActive = this._items.some(
+      (i) => i.status === "queued" || i.status === "generating",
+    );
     if (!hasActive) {
       this._isRunning = false;
       api.v1.ui.toast("S.E.G.A. Cycle Complete!", { type: "success" });
@@ -141,7 +146,7 @@ export class SegaService {
   private checkForNewItems() {
     if (this._items.length === 0) return;
 
-    const dulfsFields = FIELD_CONFIGS.filter(c => c.layout === "list");
+    const dulfsFields = FIELD_CONFIGS.filter((c) => c.layout === "list");
     let changed = false;
 
     for (const config of dulfsFields) {
@@ -150,23 +155,23 @@ export class SegaService {
         if (item.linkedLorebooks && item.linkedLorebooks.length > 0) {
           for (const entryId of item.linkedLorebooks) {
             const id = `lorebook:${entryId}`;
-            if (this._items.find(i => i.id === id)) continue;
+            if (this._items.find((i) => i.id === id)) continue;
 
             const content = this.storyManager.getFieldContent(id);
             const hasContent = content && content.trim().length > 0;
-            
+
             const itemToPush: SegaItem = {
               id,
               label: `${item.name}`,
               type: "lorebook",
-              status: hasContent ? "checked" : "blank"
+              status: hasContent ? "checked" : "blank",
             };
 
             this._items.push(itemToPush);
             changed = true;
 
             if (this._isRunning && !hasContent) {
-               this.triggerItem(itemToPush);
+              this.triggerItem(itemToPush);
             }
           }
         }
@@ -180,7 +185,7 @@ export class SegaService {
 
   public startQueue() {
     if (this._isRunning) return;
-    
+
     let hasWork = false;
     for (const item of this._items) {
       if (item.status === "blank") {
@@ -196,7 +201,8 @@ export class SegaService {
   }
 
   private triggerItem(item: SegaItem) {
-    const isList = FIELD_CONFIGS.find(c => c.id === item.id)?.layout === "list";
+    const isList =
+      FIELD_CONFIGS.find((c) => c.id === item.id)?.layout === "list";
     if (isList) {
       this.agentWorkflow.requestListGeneration(item.id, () => {});
     } else {
@@ -208,7 +214,8 @@ export class SegaService {
     this._isRunning = false;
     for (const item of this._items) {
       if (item.status === "generating" || item.status === "queued") {
-        const isList = FIELD_CONFIGS.find(c => c.id === item.id)?.layout === "list";
+        const isList =
+          FIELD_CONFIGS.find((c) => c.id === item.id)?.layout === "list";
         if (isList) {
           this.agentWorkflow.cancelListGeneration(item.id);
         } else {
@@ -222,7 +229,7 @@ export class SegaService {
 
   public toggleItem(id: string) {
     if (this._isRunning) return;
-    const item = this._items.find(i => i.id === id);
+    const item = this._items.find((i) => i.id === id);
     if (item) {
       if (item.status === "checked") item.status = "blank";
       else if (item.status === "blank") item.status = "checked";

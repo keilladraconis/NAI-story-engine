@@ -287,17 +287,26 @@ const Strategies: Record<string, StrategyFn> = {
       (await api.v1.config.get("lorebook_generate_prompt")) || "";
 
     // Select specific template based on category
-    let templateKey = "lorebook_template_character"; // Default fallback
-    if (categoryId === "dramatis_personae")
-      templateKey = "lorebook_template_character";
-    else if (categoryId === "locations")
-      templateKey = "lorebook_template_location";
-    else if (categoryId === "factions")
-      templateKey = "lorebook_template_faction";
-    else if (categoryId === "universe_systems")
-      templateKey = "lorebook_template_system";
-    else if (categoryId === "situational_dynamics")
-      templateKey = "lorebook_template_dynamic";
+    let templateKey;
+    switch (categoryId) {
+      case "dramatisPersonae":
+        templateKey = "lorebook_template_character";
+        break;
+      case "locations":
+        templateKey = "lorebook_template_location";
+        break;
+      case "factions":
+        templateKey = "lorebook_template_faction";
+        break;
+      case "universeSystems":
+        templateKey = "lorebook_template_system";
+        break;
+      case "situationalDynamics":
+        templateKey = "lorebook_template_dynamic";
+        break;
+      default:
+        templateKey = "lorebook_template_character";
+    }
 
     const templateContent = (await api.v1.config.get(templateKey)) || "";
     const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);

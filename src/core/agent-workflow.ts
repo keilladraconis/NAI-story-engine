@@ -258,7 +258,10 @@ export class AgentWorkflowService {
 
           for (const line of lines) {
             const filteredLine = applyFilters(line);
-            const parsed = this.storyManager.parseListLine(filteredLine, fieldId);
+            const parsed = this.storyManager.parseListLine(
+              filteredLine,
+              fieldId,
+            );
             if (parsed) {
               const newItem: DULFSField = {
                 id: api.v1.uuid(),
@@ -403,7 +406,6 @@ export class AgentWorkflowService {
       // Automatically generate keys for Lorebook entries
       if (session.fieldId.startsWith("lorebook:")) {
         const entryId = session.fieldId.split(":")[1];
-        api.v1.ui.toast("Generating Lorebook Keys...", { type: "info" });
         await this.storyManager.generateLorebookKeys(entryId, buffer);
       }
     } catch (e: any) {

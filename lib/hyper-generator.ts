@@ -8,6 +8,7 @@
  * hyperContextBuilder signature modified to receive enable_thinking boolean. Thoughts require a contentless assistant suffix on the messages.
  * hyperContextBuilder tail-slicing-appending removed. Causes issues with careful prompting and prefill.
  * Exponential backoff .......
+ * Context sample removed.
  */
 
 // ===== CONSTANTS =====
@@ -334,15 +335,6 @@ export async function hyperGenerate(
         role: "user" as const,
         content: continuationPrompt,
       });
-
-    const sample = context.reduce(
-      (a, b): string => (b.content ? a + b.content : a),
-      "",
-    );
-    hyperLog(
-      "Context sample:",
-      `${sample.slice(0, 40)} ... ${sample.slice(-1000)}`,
-    );
 
     const response = await hyperGenerateWithRetry(
       context,

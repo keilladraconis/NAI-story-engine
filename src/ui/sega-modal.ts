@@ -31,11 +31,9 @@ export class SegaModal {
 
     // Wait for close
     await this.modal.closed;
-
-    this.service.cancel();
-
     // Detach callback
     this.service.setUpdateCallback(() => {});
+    this.service.cancel();
   }
 
   private renderContent(): UIPart[] {
