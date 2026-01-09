@@ -207,16 +207,17 @@ export class StoryEngineUI {
         ];
       }
     } else if (categoryId) {
-              panelContent = [
-                part.column({
-                  style: { padding: "16px", "text-align": "center", opacity: "0.6" },
-                  content: [
-                    part.text({
-                      text: "Select an entry to use the Story Engine Generator.",
-                    }),
-                  ],
-                }),
-              ];    } else {
+      panelContent = [
+        part.column({
+          style: { padding: "16px", "text-align": "center", opacity: "0.6" },
+          content: [
+            part.text({
+              text: "Select an entry to use the Story Engine Generator.",
+            }),
+          ],
+        }),
+      ];
+    } else {
       panelContent = [
         part.column({
           style: { padding: "16px", "text-align": "center", opacity: "0.6" },
@@ -244,7 +245,7 @@ export class StoryEngineUI {
       part.button({
         text: "S.E.G.A.",
         iconId: "play-circle",
-        style: { padding: "4px 8px", "font-size": "0.8em", "background-color": "#2196f3", color: "white" },
+        style: { padding: "4px 8px", "font-size": "0.8em" },
         callback: () => {
           const modal = new SegaModal(this.segaService, this.agentWorkflowService);
           modal.show();
