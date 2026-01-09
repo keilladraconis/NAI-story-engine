@@ -28,6 +28,7 @@ export interface ListRenderContext extends BaseRenderContext {
     signal?: any;
     budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
     budgetResolver?: () => void;
+    budgetTimeRemaining?: number;
   };
   cancelListGeneration: () => void;
 }
@@ -86,6 +87,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
             isRunning: genState.isRunning,
             isQueued: genState.isQueued,
             budgetState: genState.budgetState,
+            budgetTimeRemaining: genState.budgetTimeRemaining,
           },
           {
             onStart: () => {
@@ -278,6 +280,7 @@ export class TextFieldStrategy implements FieldRenderStrategy<TextRenderContext>
         isRunning: session?.isRunning || false,
         isQueued: session?.isQueued,
         budgetState: session?.budgetState,
+        budgetTimeRemaining: session?.budgetTimeRemaining,
       },
       {
         onStart: () => {

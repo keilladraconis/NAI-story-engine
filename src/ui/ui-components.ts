@@ -107,6 +107,7 @@ export interface GenerateButtonState {
   isRunning: boolean;
   isQueued?: boolean;
   budgetState?: "waiting_for_user" | "waiting_for_timer" | "normal";
+  budgetTimeRemaining?: number;
 }
 
 export const createResponsiveGenerateButton = (
@@ -150,9 +151,14 @@ export const createResponsiveGenerateButton = (
   }
 
   if (state.budgetState === "waiting_for_timer") {
+    const remaining = state.budgetTimeRemaining
+      ? Math.ceil(state.budgetTimeRemaining / 1000)
+      : 0;
+    const timeText = remaining > 0 ? ` ${remaining}s` : "...";
+
     return button({
       id: `${id}-wait`,
-      text: "⏳ Refilling...",
+      text: `⏳ Waiting...${timeText}`,
       style: {
         "background-color": "#e2e3e5",
         color: "#383d41",

@@ -11,6 +11,8 @@ export interface FieldSession {
   budgetResolver?: () => void;
   budgetWaitTime?: number;
   error?: string;
+  budgetTimeRemaining?: number;
+  budgetWaitEndTime?: number;
 }
 
 export class AgentWorkflowService {
@@ -35,6 +37,8 @@ export class AgentWorkflowService {
       budgetResolver?: () => void;
       budgetWaitTime?: number;
       error?: string;
+      budgetTimeRemaining?: number;
+      budgetWaitEndTime?: number;
     }
   > = new Map();
 
@@ -187,6 +191,41 @@ export class AgentWorkflowService {
     }
   }
 
+  private startBudgetTimer(
+    fieldId: string,
+    waitEndTime: number,
+    updateFn: () => void,
+    type: "field" | "list",
+  ) {
+    const checkTimer = () => {
+      let state: any;
+      if (type === "field") {
+        state = this.sessions.get(fieldId);
+      } else {
+        state = this.listGenerationState.get(fieldId);
+      }
+
+      if (
+        !state ||
+        !state.isRunning ||
+        state.budgetState !== "waiting_for_timer"
+      ) {
+        return;
+      }
+
+      const now = Date.now();
+      const remaining = Math.max(0, waitEndTime - now);
+      state.budgetTimeRemaining = remaining;
+      updateFn();
+
+      if (remaining > 0) {
+        // Use 1000ms update interval for smoother countdown
+        api.v1.timers.setTimeout(checkTimer, 1000);
+      }
+    };
+    checkTimer();
+  }
+
   private async _runListGeneration(
     fieldId: string,
     updateFn: () => void,
@@ -198,6 +237,9 @@ export class AgentWorkflowService {
       signal: cancellationSignal,
       budgetState: "normal" as const,
       error: undefined as string | undefined,
+      budgetWaitTime: undefined as number | undefined,
+      budgetTimeRemaining: undefined as number | undefined,
+      budgetWaitEndTime: undefined as number | undefined,
     };
     this.listGenerationState.set(fieldId, state);
     updateFn();
@@ -231,10 +273,21 @@ export class AgentWorkflowService {
             if (s) {
               s.budgetState = "waiting_for_user";
               s.budgetWaitTime = time;
+              // Calculate end time now, relative to when we got the wait signal
+              s.budgetWaitEndTime = Date.now() + time;
               updateFn();
               return new Promise<void>((resolve) => {
                 s.budgetResolver = () => {
                   s.budgetState = "waiting_for_timer";
+                  // Start timer loop
+                  if (s.budgetWaitEndTime) {
+                    this.startBudgetTimer(
+                      fieldId,
+                      s.budgetWaitEndTime,
+                      updateFn,
+                      "list",
+                    );
+                  }
                   updateFn();
                   resolve();
                 };
@@ -246,6 +299,7 @@ export class AgentWorkflowService {
             const s = this.listGenerationState.get(fieldId);
             if (s) {
               s.budgetState = "normal";
+              s.budgetTimeRemaining = undefined;
               updateFn();
             }
           },
@@ -328,6 +382,9 @@ export class AgentWorkflowService {
     const session = this.getSession(fieldId) || this.startSession(fieldId);
     session.isRunning = true;
     session.cancellationSignal = await api.v1.createCancellationSignal();
+    session.budgetWaitTime = undefined;
+    session.budgetTimeRemaining = undefined;
+    session.budgetWaitEndTime = undefined;
     updateFn();
 
     try {
@@ -369,10 +426,19 @@ export class AgentWorkflowService {
           onBudgetWait: (_1, _2, time) => {
             session.budgetState = "waiting_for_user";
             session.budgetWaitTime = time;
+            session.budgetWaitEndTime = Date.now() + time;
             updateFn();
             return new Promise<void>((resolve) => {
               session.budgetResolver = () => {
                 session.budgetState = "waiting_for_timer";
+                if (session.budgetWaitEndTime) {
+                  this.startBudgetTimer(
+                    fieldId,
+                    session.budgetWaitEndTime,
+                    updateFn,
+                    "field",
+                  );
+                }
                 updateFn();
                 resolve();
               };
@@ -380,6 +446,7 @@ export class AgentWorkflowService {
           },
           onBudgetResume: () => {
             session.budgetState = "normal";
+            session.budgetTimeRemaining = undefined;
             updateFn();
           },
         },
