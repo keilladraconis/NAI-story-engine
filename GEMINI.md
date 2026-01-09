@@ -87,6 +87,7 @@ When debugging issues, you may add debugging log statements and provide the user
 - **Live Budget Timer (Jan 9, 2026)**: Implemented a live countdown timer for the "Budget Wait" state. The UI now displays "Waiting... Xs" instead of a static message. This utilizes a recursive `api.v1.timers.setTimeout` loop in `AgentWorkflowService` to track remaining time and update the UI every second. `FieldSession` and `listGenerationState` now track `budgetWaitEndTime` and `budgetTimeRemaining`.
 - **S.E.G.A. Simplification (Jan 9, 2026)**: Reverted the complex interleaving and phase-based queuing strategy in `SegaService`. The system now uses a straightforward "queue all blank items" approach and dynamically adds discovered lorebooks to the queue without complex phase transitions.
 - **HyperGenerator Refactor (Jan 9, 2026)**: Refactored `hyperGenerateWithRetry` in `lib/hyper-generator.ts` to use a loop-based approach with proper exponential backoff (`2^attempts * 1000` ms), replacing the recursive implementation.
+- **Persistence Fix (Jan 9, 2026)**: Fixed a critical bug where generated content was lost on reload because `StoryManager.setFieldContent` skipped saving if the in-memory content (updated during streaming) matched the final content. It now enforces a save when `persistence` is `"immediate"`, regardless of the `changed` flag.
 
 ## Architectural Overhaul (Jan 2026)
 - **Simplified Workflow**: Removed `WandUI`, `ReviewPatcher`, and `StageHandlers`. The system now focuses on high-quality single-pass generation.

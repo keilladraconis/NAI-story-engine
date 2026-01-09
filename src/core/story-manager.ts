@@ -353,10 +353,10 @@ export class StoryManager {
       }
     }
 
-    if (changed) {
+    if (changed || persistence === "immediate") {
       if (persistence === "immediate") {
         await this.dataManager.save();
-      } else if (persistence === "debounce") {
+      } else if (changed && persistence === "debounce") {
         await this.debounceAction(
           `save-global-${fieldId}`,
           async () => {
