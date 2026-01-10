@@ -58,9 +58,11 @@ type StrategyFn = (
 const buildDulfsContextString = (
   manager: StoryManager,
   mode: "short" | "full",
+  excludeFieldId?: string,
 ): string => {
   let context = "";
   for (const fid of LIST_FIELD_IDS) {
+    if (fid === excludeFieldId) continue;
     const list = manager.getDulfsList(fid);
     if (list.length === 0) continue;
 
@@ -392,7 +394,18 @@ export class ContextStrategyFactory {
     const worldSnapshot = this.storyManager.getFieldContent(
       FieldID.WorldSnapshot,
     );
-    const existingDulfs = buildDulfsContextString(this.storyManager, "full");
+    const existingDulfs = buildDulfsContextString(
+      this.storyManager,
+      "full",
+      fieldId,
+    );
+
+    const currentList = this.storyManager.getDulfsList(fieldId);
+    let currentContentPrefill = "";
+    if (currentList.length > 0) {
+      currentContentPrefill =
+        currentList.map((i) => i.content).join("\n") + "\n";
+    }
 
     const baseContext = {
       systemMsg: {
@@ -436,7 +449,7 @@ export class ContextStrategyFactory {
       },
       {
         role: "assistant",
-        content: "Here is the list of items:\n",
+        content: "Here is the list of items:\n" + currentContentPrefill,
       },
       contextBlocks,
     );
@@ -448,6 +461,7 @@ export class ContextStrategyFactory {
         min_p: 0.05,
         presence_penalty: 0.1,
         maxTokens: 700,
+        minTokens: currentContentPrefill ? 0 : 50,
       },
       filters: [Filters.scrubMarkdown],
     };

@@ -94,8 +94,8 @@ _(Note: "Content Extraction" is currently handled via generative context strateg
 [x] indicates votes
 
 - [3] Apparently after generating multiple lorebooks, lorebook generation goes haywire. Observed in "Universe Systems". Maybe rolling context window is too big? Correction: might have been `violet` being insane.
-- [2] DULFS looping/insanity while generating.
-- [1] DULFS continuous generation regenerates existing characters
+- [2] DULFS looping/insanity while generating. Also might be from `violet`.
+- **FIXED** [1] DULFS continuous generation regenerates existing characters
 
 ## 🏗️ Technical Implementation Details
 
