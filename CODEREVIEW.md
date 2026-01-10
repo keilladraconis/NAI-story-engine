@@ -1,38 +1,72 @@
-# Code Review: Story Engine (January 2026)
+# Code Review - Jan 10, 2026
 
-## Overview
+## Executive Summary
 
-The codebase remains highly stable and well-structured following the recent architectural overhaul. The new **S.E.G.A.** implementation effectively orchestrates generation tasks in the background, and the **Strategy Pattern** for UI rendering significantly decouples display logic from business rules.
+The project has successfully transitioned to the new architectural patterns (Strategy Pattern for UI, single-source-of-truth `StoryManager`). However, `StoryManager` is accumulating responsibilities that violate the Single Responsibility Principle, effectively becoming a "God Object." Additionally, the `AgentWorkflowService` is carrying complex, duplicated state logic for different generation modes.
 
-## Strengths
+## Priority Levels
 
-- **Decoupled Architecture**: Separation of concerns between `StoryManager` (Data), `AgentWorkflowService` (Process), and `SegaService` (Orchestration) is excellent.
-- **Robust State Management**: The `StoryManager` acts as a reliable single source of truth with proper persistence modes (`immediate`, `debounce`, `none`) handling the high-frequency updates from streaming generation.
-- **Budget Handling**: The recursive timer loop in `AgentWorkflowService` provides a smooth user experience for budget waits.
-- **Background Processing**: The `SegaService` design as a passive background listener/trigger is efficient and cleaner than the previous modal-based approach.
+- **[HIGH]**: Critical architectural violations or complexity risks.
+- **[MEDIUM]**: Type safety issues, hardcoded values, or maintainability concerns.
+- **[LOW]**: Stylistic inconsistencies, minor documentation gaps, or dead code.
 
-## Improvements & Technical Debt
+---
 
-### 1. Type Safety (Low Priority)
+## 1. Architecture & Patterns [HIGH]
 
-There are a few instances of `as any` casting related to `DULFSField.category`.
+### `StoryManager` as "God Object"
+**Location**: `src/core/story-manager.ts`
+**Issue**: The `StoryManager` class is responsible for too many distinct domains:
+1.  Data Persistence (loading/saving).
+2.  State Management (subscribers, debouncing).
+3.  Lorebook Synchronization orchestration.
+4.  **Parsing Logic**: `parseListLine` (lines 60-95) contains specific regex logic for parsing list items. This is business logic that belongs in a `ParsingStrategy` or within the `FieldDefinition` configuration helpers, not the central state manager.
+5.  **DULFS Logic**: `parseAndUpdateDulfsItem` tightly couples the manager to specific field behaviors.
 
-- **Location**: `src/core/agent-workflow.ts` (List generation) and `src/ui/field-strategies.ts` (Add Entry).
-- **Issue**: `fieldId` is cast to `any` to satisfy the `category` literal union type.
-- **Recommendation**: Import `DulfsFieldID` and cast `fieldId as DulfsFieldID` to verify type safety if feasible, or maintain current behavior as low risk.
+**Recommendation**: Extract parsing logic into a `ContentParsingService` or move it to the `FieldStrategy` classes. `StoryManager` should only store and retrieve data, delegating *interpretation* of that data to strategies.
 
-### 2. Magic Numbers (Low Priority)
+### `AgentWorkflowService` Complexity
+**Location**: `src/core/agent-workflow.ts`
+**Issue**: This service manages two distinct state machines: one for standard Field Generation and one for List (DULFS) Generation.
+- This results in duplicated state tracking properties (e.g., `listGenerationState` vs `session`).
+- It leads to complex conditional logic in `startSession` to determine which path to take.
+- The mixing of these concerns makes the class difficult to test and maintain (approx. 500 lines).
 
-- **Location**: `src/ui/ui-components.ts` -> `calculateTextAreaHeight`
-- **Issue**: Hardcoded constants for line height and characters per line.
-- **Recommendation**: Accept these as parameters or move to a configuration object if UI customization becomes a priority.
+**Recommendation**: Split into `FieldGenerationService` and `ListGenerationService`, coordinated by a thinner `AgentWorkflowFacade`.
 
-## Metrics
+---
 
-- **Files**: 14 source files
-- **Complexity**: Low. Logic is well-distributed.
-- **Dead Code**: None identified.
+## 2. Type Safety [MEDIUM]
 
-## Status
+### Loose Typing (`any`)
+**Locations**: `src/core/agent-workflow.ts`, `src/core/story-data-manager.ts`, `src/ui/field-strategies.ts`
+**Issue**: There are approximately 19 instances of `any` in the codebase.
+- **`StoryDataManager`**: Attributes are often typed as `any` or loose objects, reducing type safety for structured data access.
+- **`AgentWorkflowService`**: Error handling and internal state updates often bypass type checks.
+- **`FieldRenderStrategy`**: Category mapping uses `as any` assertions.
 
-**GREEN**: Ready for further feature development. No blocking issues.
+**Recommendation**: Define explicit interfaces for `StoryFieldAttributes` and generic types for `StoryDataManager` getters/setters.
+
+---
+
+## 3. Configuration & Hardcoding [MEDIUM]
+
+### Hardcoded Model & Timeouts
+**Locations**: `src/core/story-manager.ts`, `src/core/agent-workflow.ts`
+**Issue**:
+- **Model Names**: Strings like "glm-4-9b" are hardcoded in the logic. If NAI updates models, these will break.
+- **Timeouts**: Debounce delays (250ms, 500ms) are hardcoded magic numbers.
+
+**Recommendation**: Move all model names and timing constants to `src/config/constants.ts` or `src/config/app-config.ts`.
+
+---
+
+## 4. Documentation & Consistency [LOW]
+
+### Terminology
+**Issue**: The acronym "DULFS" is used heavily in the code (`DULFSField`, `updateDulfsItem`), but there is no central definition or type alias that explicitly groups these fields in the code (other than `LIST_FIELD_IDS`).
+**Recommendation**: Create a `DulfsFieldID` type alias in `field-definitions.ts` to formalize this grouping.
+
+### Stale Documentation
+**Issue**: `README.md` mentions "Refine" under Usage, which now refers to manual editing rather than the old "Refine Stage" AI agent. This is technically accurate but potentially confusing to legacy users.
+**Recommendation**: Clarify `README.md` to explicitly state that the AI-driven "Refine" stage has been replaced by "Direct Edit" capabilities.
