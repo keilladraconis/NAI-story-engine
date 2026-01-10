@@ -130,11 +130,12 @@ export class BrainstormUI {
         column({
           content: [
             text({
-              text: isUser ? "You" : "Assistant",
+              text: isUser ? "You" : "Brainstorm",
               style: {
                 "font-size": "0.7em",
                 opacity: 0.7,
                 "margin-bottom": "2px",
+                "user-select": "text",
               },
             }),
             text({

@@ -73,21 +73,14 @@ _(Note: "Content Extraction" is currently handled via generative context strateg
 
 - **Editable Brainstorm Chat**: As a user, I may be conversing with brainstorm when I want to influence slightly what they say, correcting a misspoken word or phrase. I should be able to "retry" a message, delete it, or edit it.
 - **Incorporate existing story context into Story Prompt, DWS, etc**: As a user, I have an existing story which I want to bootstrap into Story Engine, so if I generate a Story Prompt it should write based on the current content of the story, if one is present.
-- **Brainstorm Agent Personality Refinement**: As a user, I find brainstorm's response-query pattern un-fun to interact with. I want brainstorm to have a more casual conversation with me, while still helping me follow the Core Principles.
+- **Brainstorm Agent Personality Refinement - COMPLETE**: As a user, I find brainstorm's response-query pattern un-fun to interact with. I want brainstorm to have a more casual conversation with me, while still helping me follow the Core Principles.
 - **SEGA Background**: As a user, I want to be able to turn on "S.E.G.A." And let it automatically, randomly, iterate through the ungenerated items and generate them in the background while I write the first couple chapters of my story.
 
 ## Feature Requests
 
 [x] indicates votes
 
-- [7] Story generator could read your existing story as context for generating "Story Prompt", "Dynamic World Snapshot", etc.
-  - might be a bit unpredictable with incorporating existing characters?
-- [8] Editable Brainstorm chat
-- [1] Tear down SEGA modal, make SEGA something turned on and runs in the background. And it should randomly pick things to generate.
-- [2] Brainstorm agent personality adjustment. Can we make brainstorm more... chatty, like a friend, rather than such an incisive answers-with-a-question Editor?
-- [5] Brainstorm chat has "retry" button to remove and regenerate the most recent message.
-  Clutters the UI... should we encourage user to treat chat like chatting with a friend, rather than a robot you can wipe and reset? Might need to reframe "Brainstorm" purpose as a way of "direction" but also expansion of ideas.
-- [1] Add brainstorm chat context to DULFS generation
+- [0] Custom DULFS categories. What if user wants to have "Spaceships" as a category, or "Laws"?
 
 ## Bugs
 

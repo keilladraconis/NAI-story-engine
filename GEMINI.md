@@ -76,6 +76,7 @@ When debugging issues, you may add debugging log statements and provide the user
 
 ### Gemini Added Memories
 
+- Brainstorm personality updated to be casual, subtle, and conversational (Jan 10, 2026). Replaced rigid "always ask questions" constraint with an instructional assistant prefill and reduced `maxTokens` to 200 for better brevity.
 - The Brainstorm feature has been refactored from a card-based UI to a chat-based message stream interface and moved to its own sidebar tab.
 - The codebase uses a `FieldID` enum and a strategy pattern for rendering (`FieldRenderStrategy`).
 - Multi-stage generation (Review/Refine) has been removed in favor of a simpler, more reliable direct-to-field generation model.

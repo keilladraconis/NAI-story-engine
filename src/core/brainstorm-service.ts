@@ -46,10 +46,10 @@ export class BrainstormService {
       await hyperGenerate(
         messages,
         {
-          maxTokens: 300, // Reduced to encourage concise, conversational responses
+          maxTokens: 200,
           minTokens: 10,
           model,
-          temperature: 0.9, // Balanced creativity
+          temperature: 1, // Higher creativity for casual conversation
         },
         (text) => {
           fullResponse += text;
@@ -92,7 +92,7 @@ export class BrainstormService {
       messages.push({
         role: "assistant",
         content:
-          "Understood. I'm ready to help you develop this story. What specific aspect would you like to discuss?",
+          "Understood. I will be a creative partner to the user, offering casual reactions and jamming on ideas without over-explaining. I'll keep my responses short, punchy, and focused on one thing at a time.\n[Continue:]\n",
       });
     }
 
