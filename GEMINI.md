@@ -94,6 +94,7 @@ When debugging issues, you may add debugging log statements and provide the user
 - **S.E.G.A. Simplification (Jan 9, 2026)**: Reverted the complex interleaving and phase-based queuing strategy in `SegaService`. The system now uses a straightforward "queue all blank items" approach and dynamically adds discovered lorebooks to the queue without complex phase transitions.
 - **HyperGenerator Refactor (Jan 9, 2026)**: Refactored `hyperGenerateWithRetry` in `lib/hyper-generator.ts` to use a loop-based approach with proper exponential backoff (`2^attempts * 1000` ms), replacing the recursive implementation.
 - **Persistence Fix (Jan 9, 2026)**: Fixed a critical bug where generated content was lost on reload because `StoryManager.setFieldContent` skipped saving if the in-memory content (updated during streaming) matched the final content. It now enforces a save when `persistence` is `"immediate"`, regardless of the `changed` flag.
+- **S.E.G.A. Background Service (Jan 10, 2026)**: Completely refactored S.E.G.A. from a modal-based queue to a background service. It now passively runs in the background, listening for workflow idle states to randomly select and generate "blank" fields or lorebooks. The UI was updated to a simple toggle button in the sidebar header with visual feedback (Orange/Fast-Forward).
 
 ## Architectural Overhaul (Jan 2026)
 
@@ -104,7 +105,7 @@ When debugging issues, you may add debugging log statements and provide the user
 - **Dramatis Personae Tuning (Jan 9, 2026)**: Updated `Dramatis Personae` configuration to explicitly request Protagonist/Antagonist and replaced the abstract placeholder format with a concrete example (e.g., "Kael (Male, 34, Smuggler)...") to prevent literal placeholder generation and ensure key characters are included.
 - DULFS Tuning (Jan 9, 2026): Applied the "Concrete Example" strategy to all DULFS fields (`Locations`, `Factions`, `Universe Systems`, `Situational Dynamics`) to prevent literal placeholder generation. Tuned `buildDulfsContext` parameters (Temp: 1.1, Presence Penalty: 0.1) to further discourage repetition and improve focus.
 - **DULFS Generation Fix (Jan 10, 2026)**: Modified `buildDulfsContext` to include the currently generating list's content in the Assistant's prefill and exclude it from the "EXISTING WORLD ELEMENTS" context block. Also sets `minTokens: 0` when prefilling existing items, allowing the LLM to stop early if it determines the list is complete.
-  - **Current Status (Jan 9, 2026)**: Code review completed.
+  - **Current Status (Jan 10, 2026)**: Code review completed.
   - **Stability**: High.
   - **Maintenance**: Minor type safety and deduplication opportunities noted in `CODEREVIEW.md`.
   - **Refactoring**: Architecture is clean and decoupled.

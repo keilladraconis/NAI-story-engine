@@ -4,7 +4,6 @@ import { StoryManager } from "../core/story-manager";
 import { AgentWorkflowService } from "../core/agent-workflow";
 import { BrainstormUI } from "./brainstorm-ui";
 import { SegaService } from "../core/sega-service";
-import { SegaModal } from "./sega-modal";
 
 import {
   createHeaderWithToggle,
@@ -41,6 +40,7 @@ export class StoryEngineUI {
       this.storyManager,
       this.agentWorkflowService,
     );
+    this.segaService.setUpdateCallback(() => this.updateUI());
     this.structuredEditor = new StructuredEditor(
       this.storyManager,
       this.agentWorkflowService,
@@ -249,6 +249,8 @@ export class StoryEngineUI {
   }
 
   private createSidebar(): UIExtensionSidebarPanel {
+    const isSegaRunning = this.segaService.isRunning;
+
     const headerContent: UIPart[] = [
       part.text({
         text: "🎭 Story Engine",
@@ -256,14 +258,14 @@ export class StoryEngineUI {
       }),
       part.button({
         text: "S.E.G.A.",
-        iconId: "play-circle",
-        style: { padding: "4px 8px", "font-size": "0.8em" },
+        iconId: isSegaRunning ? "fast-forward" : "play-circle",
+        style: {
+          padding: "4px 8px",
+          "font-size": "0.8em",
+          color: isSegaRunning ? "#ff9800" : undefined,
+        },
         callback: () => {
-          const modal = new SegaModal(
-            this.segaService,
-            this.agentWorkflowService,
-          );
-          modal.show();
+          this.segaService.toggle();
         },
       }),
     ];

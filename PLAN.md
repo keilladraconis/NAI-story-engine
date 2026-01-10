@@ -68,13 +68,15 @@ _(Note: "Content Extraction" is currently handled via generative context strateg
 - [x] **Generation Queue**: Implemented a global queue to prevent concurrent generation requests, ensuring sequential execution and reducing UI chaos. Users can cancel queued items.
 - [x] **Context Optimization**: Re-engineered `ContextStrategyFactory` to maximize token caching efficiency. Context is now layered strictly: `System` -> `Story Prompt` -> `World Snapshot` -> `Volatile Data` -> `Task`. DULFS and World Snapshot are now injected into downstream generations (Lorebook, ATTG, Style).
 - [x] **Robust Cancellation**: Updated `SegaModal` and `AgentWorkflowService` to ensure reliable cancellation and cleanup, even during budget wait states.
+- [x] **Background S.E.G.A.**: Refactored S.E.G.A. from a modal to a background service that randomly selects and generates blank fields while the user works.
 
 ### **Phase 5: Bug Bashing and Refinement**
 
-- **Editable Brainstorm Chat - COMPLETE**: As a user, I may be conversing with brainstorm when I want to influence slightly what they say, correcting a misspoken word or phrase. I should be able to "retry" a message, delete it, or edit it.
+- [x] **Editable Brainstorm Chat - COMPLETE**: As a user, I may be conversing with brainstorm when I want to influence slightly what they say, correcting a misspoken word or phrase. I should be able to "retry" a message, delete it, or edit it.
 - **Incorporate existing story context into Story Prompt, DWS, etc**: As a user, I have an existing story which I want to bootstrap into Story Engine, so if I generate a Story Prompt it should write based on the current content of the story, if one is present.
-- **Brainstorm Agent Personality Refinement - COMPLETE**: As a user, I find brainstorm's response-query pattern un-fun to interact with. I want brainstorm to have a more casual conversation with me, while still helping me follow the Core Principles.
-- **SEGA Background**: As a user, I want to be able to turn on "S.E.G.A." And let it automatically, randomly, iterate through the ungenerated items and generate them in the background while I write the first couple chapters of my story.
+- [x] **Brainstorm Agent Personality Refinement - COMPLETE**: As a user, I find brainstorm's response-query pattern un-fun to interact with. I want brainstorm to have a more casual conversation with me, while still helping me follow the Core Principles.
+- [x] **SEGA Background - COMPLETE**: As a user, I want to be able to turn on "S.E.G.A." And let it automatically, randomly, iterate through the ungenerated items and generate them in the background while I write the first couple chapters of my story.
+- **Incorporate Brainstorm as most-recent context for Field, Lorebook generation**: As a user, I want to be able to use brainstorm to discuss specifics about a character or group of characters, and have that discussion incorporated into my generations.
 
 ## Feature Requests
 
@@ -107,6 +109,7 @@ _(Note: "Content Extraction" is currently handled via generative context strateg
 - **`structured-editor.ts`**: Main editor UI orchestrator.
 - **`agent-workflow.ts`**: Simplified generation logic and session management.
 - **`hyper-generator.ts`**: NovelAI generation API wrapper.
+- **`sega-service.ts`**: Background orchestration for S.E.G.A.
 
 ## 📅 Development Timeline
 
@@ -127,6 +130,11 @@ _(Note: "Content Extraction" is currently handled via generative context strateg
 - ✅ **DULFS UI**: List management interface.
 - ✅ **Lorebook API**: Integration with NovelAI's lorebook system.
 - ✅ **Lorebook Panel**: dedicated generation UI for entries.
+
+### Sprint 4 (Completed) - S.E.G.A. Background Service
+
+- ✅ **Background Service**: Refactored S.E.G.A. to run as a non-intrusive background process.
+- ✅ **UI Toggle**: Replaced modal with a simple toggle button in the sidebar header.
 
 ## 📋 Manual Testing & Quality Assurance
 

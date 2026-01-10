@@ -60,13 +60,13 @@ export class BrainstormService {
     //    Then we generate.
 
     const msg = history[index];
-    
+
     if (msg.role === "assistant") {
       // Truncate to index-1 (removing this assistant message and any following)
       const newHistory = history.slice(0, index);
       this.storyManager.setBrainstormMessages(newHistory);
       await this.storyManager.saveStoryData(true);
-      
+
       // Generate
       await this.generateResponse(false, onDelta);
     } else {
@@ -74,7 +74,7 @@ export class BrainstormService {
       const newHistory = history.slice(0, index + 1);
       this.storyManager.setBrainstormMessages(newHistory);
       await this.storyManager.saveStoryData(true);
-      
+
       // Generate
       await this.generateResponse(false, onDelta);
     }

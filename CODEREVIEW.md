@@ -2,13 +2,14 @@
 
 ## Overview
 
-The codebase remains highly stable and well-structured following the recent architectural overhaul. The new **S.E.G.A.** implementation effectively orchestrates generation tasks, and the **Strategy Pattern** for UI rendering significantly decouples display logic from business rules.
+The codebase remains highly stable and well-structured following the recent architectural overhaul. The new **S.E.G.A.** implementation effectively orchestrates generation tasks in the background, and the **Strategy Pattern** for UI rendering significantly decouples display logic from business rules.
 
 ## Strengths
 
 - **Decoupled Architecture**: Separation of concerns between `StoryManager` (Data), `AgentWorkflowService` (Process), and `SegaService` (Orchestration) is excellent.
 - **Robust State Management**: The `StoryManager` acts as a reliable single source of truth with proper persistence modes (`immediate`, `debounce`, `none`) handling the high-frequency updates from streaming generation.
 - **Budget Handling**: The recursive timer loop in `AgentWorkflowService` provides a smooth user experience for budget waits.
+- **Background Processing**: The `SegaService` design as a passive background listener/trigger is efficient and cleaner than the previous modal-based approach.
 
 ## Improvements & Technical Debt
 
@@ -20,13 +21,7 @@ There are a few instances of `as any` casting related to `DULFSField.category`.
 - **Issue**: `fieldId` is cast to `any` to satisfy the `category` literal union type.
 - **Recommendation**: Import `DulfsFieldID` and cast `fieldId as DulfsFieldID` to verify type safety if feasible, or maintain current behavior as low risk.
 
-### 2. Code Duplication (Low Priority)
-
-- **Location**: `src/core/sega-service.ts`
-- **Issue**: Logic for scanning DULFS lists to find linked lorebooks exists in both `scanForLorebooks` (init) and `checkForNewItems` (runtime update).
-- **Recommendation**: Extract the lorebook discovery logic into a private helper method to ensure consistent behavior.
-
-### 3. Magic Numbers (Low Priority)
+### 2. Magic Numbers (Low Priority)
 
 - **Location**: `src/ui/ui-components.ts` -> `calculateTextAreaHeight`
 - **Issue**: Hardcoded constants for line height and characters per line.
@@ -36,7 +31,7 @@ There are a few instances of `as any` casting related to `DULFSField.category`.
 
 - **Files**: 14 source files
 - **Complexity**: Low. Logic is well-distributed.
-- **Dead Code**: None identified. `clearAllStoryData` is correctly utilized in `StoryEngineUI`.
+- **Dead Code**: None identified.
 
 ## Status
 

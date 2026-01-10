@@ -279,14 +279,9 @@ export class AgentWorkflowService {
           model,
           ...params,
           onBudgetWait: (_1, _2, time) => {
-            const s = this.listGenerationState.get(fieldId);
-            if (s) {
-              s.budgetState = "waiting_for_user";
-              s.budgetWaitTime = time;
-              // Calculate end time now, relative to when we got the wait signal
-              s.budgetWaitEndTime = Date.now() + time;
-              updateFn();
-              return new Promise<void>((resolve) => {
+            return new Promise<void>((resolve) => {
+              const s = this.listGenerationState.get(fieldId);
+              if (s) {
                 s.budgetResolver = () => {
                   s.budgetState = "waiting_for_timer";
                   // Start timer loop
@@ -301,9 +296,15 @@ export class AgentWorkflowService {
                   updateFn();
                   resolve();
                 };
-              });
-            }
-            return Promise.resolve();
+                s.budgetState = "waiting_for_user";
+                s.budgetWaitTime = time;
+                // Calculate end time now, relative to when we got the wait signal
+                s.budgetWaitEndTime = Date.now() + time;
+                updateFn();
+              } else {
+                resolve();
+              }
+            });
           },
           onBudgetResume: () => {
             const s = this.listGenerationState.get(fieldId);
@@ -434,10 +435,6 @@ export class AgentWorkflowService {
           ...params,
           minTokens: params.minTokens || 50,
           onBudgetWait: (_1, _2, time) => {
-            session.budgetState = "waiting_for_user";
-            session.budgetWaitTime = time;
-            session.budgetWaitEndTime = Date.now() + time;
-            updateFn();
             return new Promise<void>((resolve) => {
               session.budgetResolver = () => {
                 session.budgetState = "waiting_for_timer";
@@ -452,6 +449,10 @@ export class AgentWorkflowService {
                 updateFn();
                 resolve();
               };
+              session.budgetState = "waiting_for_user";
+              session.budgetWaitTime = time;
+              session.budgetWaitEndTime = Date.now() + time;
+              updateFn();
             });
           },
           onBudgetResume: () => {
