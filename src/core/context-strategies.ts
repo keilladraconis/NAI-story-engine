@@ -55,7 +55,7 @@ type StrategyFn = (
   base: { systemMsg: Message; storyPrompt: string },
 ) => Promise<StrategyResult>;
 
-const buildDulfsContextString = (
+export const buildDulfsContextString = (
   manager: StoryManager,
   mode: "short" | "full",
   excludeFieldId?: string,
@@ -186,6 +186,7 @@ const Strategies: Record<string, StrategyFn> = {
   "generate:attg": async (_session, manager, base) => {
     const userPrompt = (await api.v1.config.get("attg_generate_prompt")) || "";
     const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
+    const brainstormContent = manager.getConsolidatedBrainstorm();
     const messages = contextBuilder(
       base.systemMsg,
       {
@@ -204,6 +205,10 @@ const Strategies: Record<string, StrategyFn> = {
         {
           role: "user",
           content: `WORLD SNAPSHOT:\n${worldSnapshot}`,
+        },
+        {
+          role: "user",
+          content: `BRAINSTORM MATERIAL:\n${brainstormContent}`,
         },
       ],
     );
@@ -224,6 +229,7 @@ const Strategies: Record<string, StrategyFn> = {
   "generate:style": async (_session, manager, base) => {
     const userPrompt = (await api.v1.config.get("style_generate_prompt")) || "";
     const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
+    const brainstormContent = manager.getConsolidatedBrainstorm();
     const messages = contextBuilder(
       base.systemMsg,
       {
@@ -242,6 +248,10 @@ const Strategies: Record<string, StrategyFn> = {
         {
           role: "user",
           content: `WORLD SNAPSHOT:\n${worldSnapshot}`,
+        },
+        {
+          role: "user",
+          content: `BRAINSTORM MATERIAL:\n${brainstormContent}`,
         },
       ],
     );
@@ -310,6 +320,7 @@ const Strategies: Record<string, StrategyFn> = {
 
     const templateContent = (await api.v1.config.get(templateKey)) || "";
     const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
+    const brainstormContent = manager.getConsolidatedBrainstorm();
     const dulfsContext = buildDulfsContextString(manager, "short");
 
     const combinedInstruction = `${basePrompt.replace("[itemName]", itemName)}\n\nTASK: Fill in the following Template for "${itemName}". Replace the placeholders with generated content.\n\nTEMPLATE:\n${templateContent}`;
@@ -329,6 +340,10 @@ const Strategies: Record<string, StrategyFn> = {
         {
           role: "user",
           content: `WORLD SNAPSHOT:\n${worldSnapshot}`,
+        },
+        {
+          role: "user",
+          content: `BRAINSTORM MATERIAL:\n${brainstormContent}`,
         },
         {
           role: "user",
@@ -431,6 +446,10 @@ export class ContextStrategyFactory {
       {
         role: "user",
         content: `WORLD SNAPSHOT:\n${worldSnapshot}`,
+      },
+      {
+        role: "user",
+        content: `BRAINSTORM MATERIAL:\n${this.storyManager.getConsolidatedBrainstorm()}`,
       },
     ];
 

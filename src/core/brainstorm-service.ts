@@ -1,5 +1,7 @@
 import { StoryManager } from "./story-manager";
 import { hyperGenerate } from "../../lib/hyper-generator";
+import { buildDulfsContextString } from "./context-strategies";
+import { FieldID } from "../config/field-definitions";
 
 export class BrainstormService {
   private storyManager: StoryManager;
@@ -85,7 +87,14 @@ export class BrainstormService {
     onDelta: (text: string) => void,
   ): Promise<void> {
     // 2. Prepare Context
-    const storyPrompt = this.storyManager.getFieldContent("storyPrompt");
+    const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
+    const worldSnapshot = this.storyManager.getFieldContent(
+      FieldID.WorldSnapshot,
+    );
+    const attg = this.storyManager.getFieldContent(FieldID.ATTG);
+    const style = this.storyManager.getFieldContent(FieldID.Style);
+    const dulfsContext = buildDulfsContextString(this.storyManager, "short");
+
     const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
 
     // Get history
@@ -97,7 +106,7 @@ export class BrainstormService {
     const messages = this.buildPrompt(
       systemPrompt,
       brainstormPrompt,
-      storyPrompt,
+      { storyPrompt, worldSnapshot, attg, style, dulfsContext },
       history,
       isInitialOrEmpty,
     );
@@ -110,7 +119,7 @@ export class BrainstormService {
       await hyperGenerate(
         messages,
         {
-          maxTokens: 300, // Updated memory says 300
+          maxTokens: 300,
           minTokens: 10,
           model,
           temperature: 1,
@@ -140,7 +149,13 @@ export class BrainstormService {
   private buildPrompt(
     systemPrompt: string,
     brainstormPrompt: string,
-    storyPrompt: string,
+    context: {
+      storyPrompt: string;
+      worldSnapshot: string;
+      attg: string;
+      style: string;
+      dulfsContext: string;
+    },
     history: { role: string; content: string }[],
     isInitialOrEmpty: boolean,
   ): any[] {
@@ -148,15 +163,40 @@ export class BrainstormService {
 
     const messages: any[] = [{ role: "system", content: systemMsg }];
 
-    if (storyPrompt) {
+    // Build Context Block
+    let contextBlock = "Here is the current state of the story:\n";
+    let hasContext = false;
+
+    if (context.storyPrompt) {
+      contextBlock += `STORY PROMPT:\n${context.storyPrompt}\n\n`;
+      hasContext = true;
+    }
+    if (context.worldSnapshot) {
+      contextBlock += `WORLD SNAPSHOT:\n${context.worldSnapshot}\n\n`;
+      hasContext = true;
+    }
+    if (context.attg) {
+      contextBlock += `ATTG:\n${context.attg}\n\n`;
+      hasContext = true;
+    }
+    if (context.style) {
+      contextBlock += `STYLE:\n${context.style}\n\n`;
+      hasContext = true;
+    }
+    if (context.dulfsContext) {
+      contextBlock += `ESTABLISHED WORLD ELEMENTS:\n${context.dulfsContext}\n\n`;
+      hasContext = true;
+    }
+
+    if (hasContext) {
       messages.push({
         role: "user",
-        content: `Here is the current Story Prompt I am working on:\n${storyPrompt}\n\nLet's brainstorm based on this.`,
+        content: `${contextBlock}Let's brainstorm based on this context.`,
       });
       messages.push({
         role: "assistant",
         content:
-          "Understood. I will be a creative partner to the user, offering casual reactions and jamming on ideas without over-explaining. I'll keep my responses short, punchy, and focused on one thing at a time.\n[Continue:]\n",
+          "Understood. I will be a creative partner to the user, offering casual reactions and jamming on ideas without over-explaining. I'll keep my responses short, punchy, and focused on one thing at a time. I have the full story context in mind.\n[Continue:]\n",
       });
     }
 

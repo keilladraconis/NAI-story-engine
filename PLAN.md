@@ -76,12 +76,11 @@ _(Note: "Content Extraction" is currently handled via generative context strateg
 - **Incorporate existing story context into Story Prompt, DWS, etc**: As a user, I have an existing story which I want to bootstrap into Story Engine, so if I generate a Story Prompt it should write based on the current content of the story, if one is present.
 - [x] **Brainstorm Agent Personality Refinement - COMPLETE**: As a user, I find brainstorm's response-query pattern un-fun to interact with. I want brainstorm to have a more casual conversation with me, while still helping me follow the Core Principles.
 - [x] **SEGA Background - COMPLETE**: As a user, I want to be able to turn on "S.E.G.A." And let it automatically, randomly, iterate through the ungenerated items and generate them in the background while I write the first couple chapters of my story.
-- **Incorporate Brainstorm as most-recent context for Field, Lorebook generation**: As a user, I want to be able to use brainstorm to discuss specifics about a character or group of characters, and have that discussion incorporated into my generations.
+- [x] **Incorporate Brainstorm as most-recent context for Field, Lorebook generation**: As a user, I want to be able to use brainstorm to discuss specifics about a character or group of characters, and have that discussion incorporated into my generations.
 
 ## Feature Requests
 
 [x] indicates votes
-
 - [0] Custom DULFS categories. What if user wants to have "Spaceships" as a category, or "Laws"?
 
 ## Bugs
