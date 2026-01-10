@@ -1,5 +1,6 @@
 import { BrainstormService } from "../core/brainstorm-service";
 import { StoryManager } from "../core/story-manager";
+import { calculateTextAreaHeight } from "./ui-components";
 
 const { column, row, button, text, multilineTextInput } = api.v1.ui.part;
 const { sidebarPanel } = api.v1.ui.extension;
@@ -17,6 +18,8 @@ export class BrainstormUI {
   private inputValue: string = "";
   private isGenerating: boolean = false;
   private streamingContent: string = "";
+  private editingIndex: number | null = null;
+  private editValue: string = "";
 
   constructor(storyManager: StoryManager) {
     this.storyManager = storyManager;
@@ -70,14 +73,20 @@ export class BrainstormUI {
     // Render Streaming Message (if any) - goes at the very bottom (first in reversed list)
     if (this.isGenerating && this.streamingContent) {
       messageParts.push(
-        this.renderMessageBubble("assistant", this.streamingContent, true),
+        this.renderMessageBubble("assistant", this.streamingContent, -1, true),
       );
     }
 
     // Render History (Reversed so latest is at the top of the array, which is the bottom of the UI due to column-reverse)
-    const reversedHistory = [...history].reverse();
+    // We need to map original indices to the reversed items
+    const reversedHistory = history
+      .map((msg, idx) => ({ ...msg, idx }))
+      .reverse();
+
     reversedHistory.forEach((msg) => {
-      messageParts.push(this.renderMessageBubble(msg.role, msg.content));
+      messageParts.push(
+        this.renderMessageBubble(msg.role, msg.content, msg.idx),
+      );
     });
 
     if (messageParts.length === 0) {
@@ -113,6 +122,7 @@ export class BrainstormUI {
   private renderMessageBubble(
     role: string,
     content: string,
+    index: number,
     isStreaming: boolean = false,
   ): UIPart {
     const isUser = role === "user";
@@ -122,26 +132,148 @@ export class BrainstormUI {
     const align = isUser ? "flex-end" : "flex-start";
     const radius = isUser ? "12px 12px 0 12px" : "12px 12px 12px 0";
 
-    // Format content (basic markdown support via 'markdown: true')
+    // Edit Mode
+    if (this.editingIndex === index && !isStreaming) {
+      return row({
+        content: [
+          column({
+            content: [
+              text({
+                text: isUser ? "Editing You" : "Editing Brainstorm",
+                style: {
+                  "font-size": "0.7em",
+                  opacity: 0.7,
+                  "margin-bottom": "2px",
+                },
+              }),
+              multilineTextInput({
+                initialValue: this.editValue,
+                onChange: (val) => (this.editValue = val),
+                style: {
+                  height: calculateTextAreaHeight(this.editValue),
+                  "margin-bottom": "8px",
+                },
+              }),
+              row({
+                content: [
+                  button({
+                    text: "Cancel",
+                    callback: () => this.handleCancelEdit(),
+                    style: {
+                      flex: 1,
+                      "background-color": "transparent",
+                      opacity: 0.8,
+                    },
+                  }),
+                  button({
+                    text: "Save",
+                    iconId: "save",
+                    callback: () => this.handleSaveEdit(),
+                    style: { flex: 1 },
+                  }),
+                ],
+                style: { gap: "8px" },
+              }),
+            ],
+            style: {
+              "background-color": bgColor,
+              padding: "10px",
+              "border-radius": radius,
+              "max-width": "85%",
+              width: "100%", // Full width within max-width constraint
+            },
+          }),
+        ],
+        style: {
+          "justify-content": align,
+          width: "100%",
+        },
+      });
+    }
+
+    // Normal View
     const processedContent = content.replace(/\n/g, "  \n");
+
+    const actionButtons: UIPart[] = [];
+    if (!isStreaming) {
+      // Edit Button
+      actionButtons.push(
+        button({
+          iconId: "edit-3",
+          callback: () => this.handleEdit(index, content),
+          style: {
+            width: "24px",
+            height: "24px",
+            padding: "2px",
+            "background-color": "transparent",
+            opacity: 0.5,
+          },
+        }),
+      );
+
+      // Retry Button (Assistant only, or User to regenerate response)
+      // "Retry" on User message -> Truncate future, regen response to this.
+      // "Retry" on Assistant message -> Truncate this + future, regen response to previous.
+      actionButtons.push(
+        button({
+          iconId: "refresh-cw",
+          callback: () => this.handleRetry(index),
+          style: {
+            width: "24px",
+            height: "24px",
+            padding: "2px",
+            "background-color": "transparent",
+            opacity: 0.5,
+          },
+        }),
+      );
+
+      // Delete Button
+      actionButtons.push(
+        button({
+          iconId: "trash-2",
+          callback: () => this.handleDelete(index),
+          style: {
+            width: "24px",
+            height: "24px",
+            padding: "2px",
+            "background-color": "transparent",
+            opacity: 0.5,
+            color: "rgba(255, 100, 100, 0.8)",
+          },
+        }),
+      );
+    }
 
     return row({
       content: [
         column({
           content: [
-            text({
-              text: isUser ? "You" : "Brainstorm",
-              style: {
-                "font-size": "0.7em",
-                opacity: 0.7,
-                "margin-bottom": "2px",
-                "user-select": "text",
-              },
+            row({
+              content: [
+                text({
+                  text: isUser ? "You" : "Brainstorm",
+                  style: {
+                    "font-size": "0.7em",
+                    opacity: 0.7,
+                    "margin-bottom": "2px",
+                    flex: 1,
+                  },
+                }),
+                // Actions Row (Top Right)
+                !isStreaming
+                  ? row({
+                      content: actionButtons,
+                      style: { gap: "4px" },
+                    })
+                  : text({ text: "" }),
+              ],
+              style: { "align-items": "center", "margin-bottom": "4px" },
             }),
             text({
               text: processedContent,
               markdown: true,
-              style: { "word-break": "break-word" },
+              style: { "word-break": "break-word", "user-select": "text" },
             }),
           ],
           style: {
@@ -158,6 +290,66 @@ export class BrainstormUI {
         width: "100%",
       },
     });
+  }
+
+  private handleEdit(index: number, content: string) {
+    this.editingIndex = index;
+    this.editValue = content;
+    this.updateUI();
+  }
+
+  private handleCancelEdit() {
+    this.editingIndex = null;
+    this.editValue = "";
+    this.updateUI();
+  }
+
+  private async handleSaveEdit() {
+    if (this.editingIndex !== null) {
+      await this.brainstormService.editMessage(
+        this.editingIndex,
+        this.editValue,
+      );
+      this.editingIndex = null;
+      this.editValue = "";
+      this.updateUI();
+    }
+  }
+
+  private async handleDelete(index: number) {
+    // Direct delete without confirmation for now as api.v1.ui.confirm is not available
+    await this.brainstormService.deleteMessage(index);
+    this.updateUI();
+  }
+
+  private async handleRetry(index: number) {
+    if (this.isGenerating) return;
+
+    // Direct retry without confirmation
+    this.isGenerating = true;
+    this.streamingContent = "";
+
+    // Optimistic UI update handled by service truncating history,
+    // but we need to start showing the spinner/streaming bubble.
+    // The service.retryMessage will truncate -> save -> we see history update.
+    // Then it starts generating -> onDelta -> we see streaming bubble.
+
+    const retryPromise = this.brainstormService.retryMessage(index, (delta) => {
+      this.streamingContent = delta;
+      this.updateUI();
+    });
+
+    this.updateUI();
+
+    try {
+      await retryPromise;
+    } catch (e) {
+      api.v1.ui.toast("Failed to regenerate", { type: "error" });
+    } finally {
+      this.isGenerating = false;
+      this.streamingContent = "";
+      this.updateUI();
+    }
   }
 
   private createInputArea(): UIPart {

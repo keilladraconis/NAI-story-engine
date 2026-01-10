@@ -40,7 +40,7 @@ export const createHeaderWithToggle = (
   });
 };
 
-const calculateTextAreaHeight = (content: string): string => {
+export const calculateTextAreaHeight = (content: string): string => {
   const LINE_HEIGHT = 10;
   const CHARS_PER_LINE = 60;
   const PADDING = 24;

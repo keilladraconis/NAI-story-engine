@@ -20,11 +20,75 @@ export class BrainstormService {
       await this.storyManager.saveStoryData(false);
     }
 
+    await this.generateResponse(isInitialOrEmpty, onDelta);
+  }
+
+  public async editMessage(index: number, newContent: string): Promise<void> {
+    const history = this.storyManager.getBrainstormMessages();
+    if (index >= 0 && index < history.length) {
+      history[index].content = newContent;
+      this.storyManager.setBrainstormMessages(history);
+      await this.storyManager.saveStoryData(true);
+    }
+  }
+
+  public async deleteMessage(index: number): Promise<void> {
+    const history = this.storyManager.getBrainstormMessages();
+    if (index >= 0 && index < history.length) {
+      history.splice(index, 1);
+      this.storyManager.setBrainstormMessages(history);
+      await this.storyManager.saveStoryData(true);
+    }
+  }
+
+  public async retryMessage(
+    index: number,
+    onDelta: (text: string) => void,
+  ): Promise<void> {
+    const history = this.storyManager.getBrainstormMessages();
+    if (index < 0 || index >= history.length) return;
+
+    // We want to regenerate the message at 'index'.
+    // Logic:
+    // 1. If it's an Assistant message:
+    //    We remove it (and anything after it? - Standard behavior is truncate future)
+    //    Then we generate a response to the history ending at index-1.
+    // 2. If it's a User message:
+    //    We shouldn't "retry" a user message in the sense of AI generation.
+    //    The user probably wants to "Regenerate response TO this message".
+    //    So we truncate history to 'index' (inclusive), keeping this user message.
+    //    Then we generate.
+
+    const msg = history[index];
+    
+    if (msg.role === "assistant") {
+      // Truncate to index-1 (removing this assistant message and any following)
+      const newHistory = history.slice(0, index);
+      this.storyManager.setBrainstormMessages(newHistory);
+      await this.storyManager.saveStoryData(true);
+      
+      // Generate
+      await this.generateResponse(false, onDelta);
+    } else {
+      // User message: Truncate to index (keeping this message) and removing subsequent
+      const newHistory = history.slice(0, index + 1);
+      this.storyManager.setBrainstormMessages(newHistory);
+      await this.storyManager.saveStoryData(true);
+      
+      // Generate
+      await this.generateResponse(false, onDelta);
+    }
+  }
+
+  private async generateResponse(
+    isInitialOrEmpty: boolean,
+    onDelta: (text: string) => void,
+  ): Promise<void> {
     // 2. Prepare Context
     const storyPrompt = this.storyManager.getFieldContent("storyPrompt");
     const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
 
-    // Get history (includes the message we just added)
+    // Get history
     const history = this.storyManager.getBrainstormMessages();
 
     // Build Prompt
@@ -46,10 +110,10 @@ export class BrainstormService {
       await hyperGenerate(
         messages,
         {
-          maxTokens: 200,
+          maxTokens: 300, // Updated memory says 300
           minTokens: 10,
           model,
-          temperature: 1, // Higher creativity for casual conversation
+          temperature: 1,
         },
         (text) => {
           fullResponse += text;

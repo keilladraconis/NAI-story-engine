@@ -71,7 +71,7 @@ _(Note: "Content Extraction" is currently handled via generative context strateg
 
 ### **Phase 5: Bug Bashing and Refinement**
 
-- **Editable Brainstorm Chat**: As a user, I may be conversing with brainstorm when I want to influence slightly what they say, correcting a misspoken word or phrase. I should be able to "retry" a message, delete it, or edit it.
+- **Editable Brainstorm Chat - COMPLETE**: As a user, I may be conversing with brainstorm when I want to influence slightly what they say, correcting a misspoken word or phrase. I should be able to "retry" a message, delete it, or edit it.
 - **Incorporate existing story context into Story Prompt, DWS, etc**: As a user, I have an existing story which I want to bootstrap into Story Engine, so if I generate a Story Prompt it should write based on the current content of the story, if one is present.
 - **Brainstorm Agent Personality Refinement - COMPLETE**: As a user, I find brainstorm's response-query pattern un-fun to interact with. I want brainstorm to have a more casual conversation with me, while still helping me follow the Core Principles.
 - **SEGA Background**: As a user, I want to be able to turn on "S.E.G.A." And let it automatically, randomly, iterate through the ungenerated items and generate them in the background while I write the first couple chapters of my story.
