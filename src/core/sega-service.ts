@@ -119,7 +119,7 @@ export class SegaService {
       }
     } else {
       const session = this.agentWorkflow.getSession(fieldId);
-      
+
       if (session?.isRunning) {
         item.status = "generating";
       } else if (session?.isQueued) {
@@ -178,7 +178,7 @@ export class SegaService {
 
             // If running, queue it immediately
             if (this._isRunning && newItem.status === "blank") {
-                this.triggerItem(newItem);
+              this.triggerItem(newItem);
             }
           }
         }
@@ -198,7 +198,7 @@ export class SegaService {
 
     this._isRunning = true;
     for (const item of itemsToQueue) {
-        this.triggerItem(item);
+      this.triggerItem(item);
     }
 
     if (this._isRunning && this.updateCallback) this.updateCallback();

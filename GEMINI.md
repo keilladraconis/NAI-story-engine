@@ -5,6 +5,7 @@ This project, "Story Engine," is a structured, field-based worldbuilding system 
 The system's goal is to bridge the gap between unstructured brainstorming and structured worldbuilding. It provides a systematic, data-driven workflow with integrated AI assistance to help writers develop rich narrative universes.
 
 Key features include:
+
 - **Structured Field-Based Workflow**: An 8-stage process (Story Prompt, Brainstorm, Synopsis, DULFS, etc.) that guides the writer from an initial idea to a fully developed world.
 - **Direct AI Generation**: Integrated single-stage "Generator" for AI-powered content creation within each field, with real-time streaming directly into the field content.
 - **Data-Driven Architecture**: A hierarchical data structure (`StoryData`) managed by a central `StoryManager` (`src/core/story-manager.ts`).
@@ -20,7 +21,7 @@ This is a NovelAI Script BuildSystem project.
 To build the project, run the following command in the root directory:
 
 ```bash
-nibs build
+npm run build
 ```
 
 This will compile the TypeScript code and register the Story Engine sidebar in NovelAI.
@@ -33,6 +34,8 @@ The project runs within the NovelAI platform. After building the project, the "S
 
 **CRITICAL**: Making or preparing git commits is strictly prohibited.
 
+Format all code with the `npm run format` script.
+
 ## Planning and Coordination
 
 A `PLAN.md` file is present, and it maintains an outline and implementation guide for the project. It should be updated frequently as development proceeds, and when the trajectory differs, update the file to match the latest development trajectory.
@@ -41,7 +44,7 @@ A `PLAN.md` file is present, and it maintains an outline and implementation guid
 
 Any current architecture or tech debt concerns are noted in the `CODEREVIEW.md` file.
 
-You may periodically read the codebase and give an honest review of the overall architecture, structure, patterns and practices. Identify any dead code that can be deleted, or even unused files. Look for antipatterns and code smells. Look for wonky or inconsistent style. Find similar subroutines and note whether they can be refactored. Summarize your findings as HIGH, MEDIUM, LOW and write them to a `CODEREVIEW.md` file. If you identify any other things which could be helpful to your understanding as a coding LLM, update your `GEMINI.md` file.   
+You may periodically read the codebase and give an honest review of the overall architecture, structure, patterns and practices. Identify any dead code that can be deleted, or even unused files. Look for antipatterns and code smells. Look for wonky or inconsistent style. Find similar subroutines and note whether they can be refactored. Summarize your findings as HIGH, MEDIUM, LOW and write them to a `CODEREVIEW.md` file. If you identify any other things which could be helpful to your understanding as a coding LLM, update your `GEMINI.md` file.
 
 ## Documentation
 
@@ -72,6 +75,7 @@ There are no automated tests in the project. Testing is done manually by running
 When debugging issues, you may add debugging log statements and provide the user with a test plan. The user can then supply the log output in response after executing the test plan.
 
 ### Gemini Added Memories
+
 - The Brainstorm feature has been refactored from a card-based UI to a chat-based message stream interface and moved to its own sidebar tab.
 - The codebase uses a `FieldID` enum and a strategy pattern for rendering (`FieldRenderStrategy`).
 - Multi-stage generation (Review/Refine) has been removed in favor of a simpler, more reliable direct-to-field generation model.
@@ -91,13 +95,14 @@ When debugging issues, you may add debugging log statements and provide the user
 - **Persistence Fix (Jan 9, 2026)**: Fixed a critical bug where generated content was lost on reload because `StoryManager.setFieldContent` skipped saving if the in-memory content (updated during streaming) matched the final content. It now enforces a save when `persistence` is `"immediate"`, regardless of the `changed` flag.
 
 ## Architectural Overhaul (Jan 2026)
+
 - **Simplified Workflow**: Removed `WandUI`, `ReviewPatcher`, and `StageHandlers`. The system now focuses on high-quality single-pass generation.
 - **Strategy Pattern**: UI rendering is decoupled via `ListFieldStrategy` and `TextFieldStrategy`.
 - **Context Management**: Prompt building is centralized in `ContextStrategyFactory`, using `hyper-generator` for long-form output.
 - **Data-Driven UI**: `FIELD_CONFIGS` drives the generation of the `StructuredEditor` interface.
 - **Dramatis Personae Tuning (Jan 9, 2026)**: Updated `Dramatis Personae` configuration to explicitly request Protagonist/Antagonist and replaced the abstract placeholder format with a concrete example (e.g., "Kael (Male, 34, Smuggler)...") to prevent literal placeholder generation and ensure key characters are included.
 - **DULFS Tuning (Jan 9, 2026)**: Applied the "Concrete Example" strategy to all DULFS fields (`Locations`, `Factions`, `Universe Systems`, `Situational Dynamics`) to prevent literal placeholder generation. Tuned `buildDulfsContext` parameters (Temp: 1.1, Presence Penalty: 0.1) to further discourage repetition and improve focus.
-    - **Current Status (Jan 9, 2026)**: Code review completed. 
-    - **Stability**: High.
-    - **Maintenance**: Minor type safety and deduplication opportunities noted in `CODEREVIEW.md`.
-    - **Refactoring**: Architecture is clean and decoupled.
+  - **Current Status (Jan 9, 2026)**: Code review completed.
+  - **Stability**: High.
+  - **Maintenance**: Minor type safety and deduplication opportunities noted in `CODEREVIEW.md`.
+  - **Refactoring**: Architecture is clean and decoupled.

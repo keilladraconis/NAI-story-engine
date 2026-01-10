@@ -15,8 +15,8 @@
     "noFallthroughCasesInSwitch": true,
     "noEmit": true,
     "typeRoots": ["./external", "./node_modules/@types"],
-    "rewriteRelativeImportExtensions": true,
+    "rewriteRelativeImportExtensions": true
   },
   "include": ["src/**/*", "external/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

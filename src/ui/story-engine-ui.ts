@@ -37,7 +37,10 @@ export class StoryEngineUI {
   constructor() {
     this.storyManager = new StoryManager();
     this.agentWorkflowService = new AgentWorkflowService(this.storyManager);
-    this.segaService = new SegaService(this.storyManager, this.agentWorkflowService);
+    this.segaService = new SegaService(
+      this.storyManager,
+      this.agentWorkflowService,
+    );
     this.structuredEditor = new StructuredEditor(
       this.storyManager,
       this.agentWorkflowService,
@@ -83,7 +86,11 @@ export class StoryEngineUI {
         // Initialize with current lorebook text if possible
         const entry = await api.v1.lorebook.entry(entryId);
         if (entry && entry.text) {
-          await this.storyManager.setFieldContent(sessionId, entry.text, "debounce");
+          await this.storyManager.setFieldContent(
+            sessionId,
+            entry.text,
+            "debounce",
+          );
         }
       }
     }
@@ -136,12 +143,15 @@ export class StoryEngineUI {
           },
           {
             onStart: () => {
-              this.agentWorkflowService.requestFieldGeneration(sessionId, () => {
-                this.updateLorebookUI();
-                // Also sync to NovelAI Lorebook on completion or chunk
-                const content = this.storyManager.getFieldContent(sessionId);
-                api.v1.lorebook.updateEntry(entryId, { text: content });
-              });
+              this.agentWorkflowService.requestFieldGeneration(
+                sessionId,
+                () => {
+                  this.updateLorebookUI();
+                  // Also sync to NovelAI Lorebook on completion or chunk
+                  const content = this.storyManager.getFieldContent(sessionId);
+                  api.v1.lorebook.updateEntry(entryId, { text: content });
+                },
+              );
             },
             onCancel: () => {
               this.agentWorkflowService.cancelFieldGeneration(sessionId);
@@ -249,7 +259,10 @@ export class StoryEngineUI {
         iconId: "play-circle",
         style: { padding: "4px 8px", "font-size": "0.8em" },
         callback: () => {
-          const modal = new SegaModal(this.segaService, this.agentWorkflowService);
+          const modal = new SegaModal(
+            this.segaService,
+            this.agentWorkflowService,
+          );
           modal.show();
         },
       }),
@@ -262,7 +275,11 @@ export class StoryEngineUI {
           content: [
             part.text({
               text: "Clear All?",
-              style: { color: "red", "font-weight": "bold", "font-size": "0.9em" },
+              style: {
+                color: "red",
+                "font-weight": "bold",
+                "font-size": "0.9em",
+              },
             }),
             part.button({
               text: "Yes",

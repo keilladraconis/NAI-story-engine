@@ -1,0 +1,28 @@
+{
+  "name": "nai-story-engine",
+  "version": "0.1.4",
+  "description": "NovelAI Story Engine",
+  "homepage": "https://github.com/keilladraconis/NAI-story-engine#readme",
+  "bugs": {
+    "url": "https://github.com/keilladraconis/NAI-story-engine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/keilladraconis/NAI-story-engine.git"
+  },
+  "license": "MIT",
+  "author": "keilla draconis",
+  "type": "commonjs",
+  "main": "src/index.ts",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "build": "nibs build",
+    "format": "prettier -w ."
+  },
+  "devDependencies": {
+    "nibs-cli": "^4.1.0",
+    "prettier": "^3.7.4"
+  }
+}

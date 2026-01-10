@@ -63,7 +63,7 @@ export interface OnBudgetResumeCallback {
 
 // ===== ERROR HANDLING =====
 
-class TransientError extends Error { }
+class TransientError extends Error {}
 
 function isTransientError(e: Error): boolean {
   hyperLog("Transient Error:", e.message);
@@ -267,7 +267,7 @@ async function showContinueModal(
 export async function hyperGenerate(
   messages: Message[],
   params: HyperGenerationParams,
-  callback: (text: string, final: boolean) => void = () => { },
+  callback: (text: string, final: boolean) => void = () => {},
   behaviour?: "background" | "blocking",
   signal?: CancellationSignal,
 ): Promise<string> {
@@ -281,7 +281,7 @@ export async function hyperGenerate(
   const choiceHandler =
     callback !== undefined
       ? (choices: GenerationChoice[], final: boolean): void =>
-        callback(choices[0] ? choices[0].text : "", final)
+          callback(choices[0] ? choices[0].text : "", final)
       : undefined;
 
   // Find system message if present
@@ -397,7 +397,7 @@ export async function hyperGenerate(
 async function hyperGenerateWithRetry(
   messages: Message[],
   params: HyperGenerationParams,
-  callback: (choices: GenerationChoice[], final: boolean) => void = () => { },
+  callback: (choices: GenerationChoice[], final: boolean) => void = () => {},
   behaviour?: "background" | "blocking",
   signal?: CancellationSignal,
 ): Promise<GenerationResponse> {

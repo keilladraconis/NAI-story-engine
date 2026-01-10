@@ -1,6 +1,10 @@
 import { StoryManager } from "../core/story-manager";
 import { AgentWorkflowService } from "../core/agent-workflow";
-import { FIELD_CONFIGS, FieldConfig, FieldID } from "../config/field-definitions";
+import {
+  FIELD_CONFIGS,
+  FieldConfig,
+  FieldID,
+} from "../config/field-definitions";
 import { getFieldStrategy, RenderContext } from "./field-strategies";
 
 const { column, collapsibleSection } = api.v1.ui.part;
@@ -37,7 +41,7 @@ export class StructuredEditor {
         const draft = this.drafts.get(fieldId);
         // Only save if draft is defined
         if (draft !== undefined) {
-           this.storyManager.setFieldContent(fieldId, draft);
+          this.storyManager.setFieldContent(fieldId, draft);
         }
         // Clear draft after saving
         this.drafts.delete(fieldId);
@@ -76,9 +80,7 @@ export class StructuredEditor {
         column({
           content: Array.from(this.configs.values())
             .filter((config) => !config.hidden)
-            .map((config) =>
-            this.createFieldSection(config),
-          ),
+            .map((config) => this.createFieldSection(config)),
           style: {
             gap: "8px",
             "margin-top": "16px",
@@ -93,7 +95,7 @@ export class StructuredEditor {
     // Logic from previous implementation:
     // Standard/Snapshot/Prompt: `config.id`
     // Generic Generation (Legacy): `gen-${config.id}` (Removed)
-    
+
     // We can infer the key based on whether we have a session AND NOT Inline Generation
     const editModeKey: string = config.id;
     const isEditing = this.editModes.get(editModeKey) || false;
@@ -108,17 +110,29 @@ export class StructuredEditor {
       currentContent: isEditing ? this.drafts.get(config.id) : undefined,
       // List specific
       getItemEditMode: (itemId) => this.getItemEditMode(config.id, itemId),
-      toggleItemEditMode: (itemId) => this.toggleItemEditMode(config.id, itemId),
-      runListGeneration: () => this.agentWorkflowService.requestListGeneration(config.id, this.onUpdateCallback),
-      getListGenerationState: () => this.agentWorkflowService.getListGenerationState(config.id),
-      cancelListGeneration: () => this.agentWorkflowService.cancelListGeneration(config.id),
+      toggleItemEditMode: (itemId) =>
+        this.toggleItemEditMode(config.id, itemId),
+      runListGeneration: () =>
+        this.agentWorkflowService.requestListGeneration(
+          config.id,
+          this.onUpdateCallback,
+        ),
+      getListGenerationState: () =>
+        this.agentWorkflowService.getListGenerationState(config.id),
+      cancelListGeneration: () =>
+        this.agentWorkflowService.cancelListGeneration(config.id),
       // Generator Sync
       setAttgEnabled: (enabled) => this.storyManager.setAttgEnabled(enabled),
       isAttgEnabled: () => this.storyManager.isAttgEnabled(),
       setStyleEnabled: (enabled) => this.storyManager.setStyleEnabled(enabled),
       isStyleEnabled: () => this.storyManager.isStyleEnabled(),
-      runFieldGeneration: (fieldId) => this.agentWorkflowService.requestFieldGeneration(fieldId, this.onUpdateCallback),
-      cancelFieldGeneration: (fieldId) => this.agentWorkflowService.cancelFieldGeneration(fieldId),
+      runFieldGeneration: (fieldId) =>
+        this.agentWorkflowService.requestFieldGeneration(
+          fieldId,
+          this.onUpdateCallback,
+        ),
+      cancelFieldGeneration: (fieldId) =>
+        this.agentWorkflowService.cancelFieldGeneration(fieldId),
     };
 
     const strategy = getFieldStrategy(config);
@@ -133,7 +147,7 @@ export class StructuredEditor {
 
   private handleFieldChange(fieldId: string, content: string): void {
     const isEditing = this.editModes.get(fieldId) || false;
-    
+
     if (isEditing) {
       // Update draft
       this.drafts.set(fieldId, content);

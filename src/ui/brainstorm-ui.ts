@@ -204,10 +204,13 @@ export class BrainstormUI {
     this.streamingContent = ""; // Start with empty, or "..."
 
     // Start generation (which adds user message to history immediately)
-    const generatePromise = this.brainstormService.sendChat(message, (deltaText) => {
+    const generatePromise = this.brainstormService.sendChat(
+      message,
+      (deltaText) => {
         this.streamingContent = deltaText;
         this.updateUI();
-    });
+      },
+    );
 
     // Immediate update to show the new user message (now in history)
     this.updateUI();

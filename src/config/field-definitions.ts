@@ -136,7 +136,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     layout: "list",
     fieldType: "dulfs",
     generationInstruction:
-      "Generate a list of 3-6 major characters, explicitly including the Protagonist and Antagonist. Focus on their core motivations and unique behavioral tells.",
+      "Generate a list of 3-6 major characters. Do not repeat any characters. Focus on their core motivations and unique behavioral tells.",
     exampleFormat:
       "Format each line as: Name (Gender, Age, Role): Core motivation, Unique behavioral tell\nExample: Kael (Male, 34, Smuggler): To pay off his life debt, Rubs a coin when calculating odds",
     filters: ["scrubBrackets"],

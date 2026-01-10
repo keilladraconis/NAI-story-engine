@@ -7,8 +7,7 @@ import {
   createResponsiveGenerateButton,
 } from "./ui-components";
 
-const { row, column, text, button, checkboxInput } =
-  api.v1.ui.part;
+const { row, column, text, button, checkboxInput } = api.v1.ui.part;
 
 export interface BaseRenderContext {
   config: FieldConfig;
@@ -47,7 +46,9 @@ export interface TextRenderContext extends BaseRenderContext {
 
 export type RenderContext = ListRenderContext & TextRenderContext;
 
-export interface FieldRenderStrategy<T extends BaseRenderContext = RenderContext> {
+export interface FieldRenderStrategy<
+  T extends BaseRenderContext = RenderContext,
+> {
   getTitle(context: T): string;
   renderContent(context: T): UIPart[];
 }
@@ -254,16 +255,15 @@ export class TextFieldStrategy implements FieldRenderStrategy<TextRenderContext>
       currentContent,
     } = context;
 
-    const content = currentContent !== undefined ? currentContent : storyManager.getFieldContent(config.id);
+    const content =
+      currentContent !== undefined
+        ? currentContent
+        : storyManager.getFieldContent(config.id);
     const session = agentWorkflowService.getSession(config.id);
 
     // Sync Checkbox (for ATTG/Style)
     let syncCheckbox: UIPart = null;
-    if (
-      config.id === FieldID.ATTG &&
-      isAttgEnabled &&
-      setAttgEnabled
-    ) {
+    if (config.id === FieldID.ATTG && isAttgEnabled && setAttgEnabled) {
       syncCheckbox = checkboxInput({
         label: "Sync to Memory",
         initialValue: isAttgEnabled(),
@@ -348,7 +348,9 @@ export class TextFieldStrategy implements FieldRenderStrategy<TextRenderContext>
 const listStrategy = new ListFieldStrategy();
 const textStrategy = new TextFieldStrategy();
 
-export function getFieldStrategy(config: FieldConfig): FieldRenderStrategy<any> {
+export function getFieldStrategy(
+  config: FieldConfig,
+): FieldRenderStrategy<any> {
   if (config.layout === "list") {
     return listStrategy;
   }

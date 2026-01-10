@@ -1,4 +1,9 @@
-import { FieldID, LIST_FIELD_IDS, TEXT_FIELD_IDS, FIELD_CONFIGS } from "../config/field-definitions";
+import {
+  FieldID,
+  LIST_FIELD_IDS,
+  TEXT_FIELD_IDS,
+  FIELD_CONFIGS,
+} from "../config/field-definitions";
 import { StoryDataManager, StoryField, DULFSField } from "./story-data-manager";
 import { LorebookSyncService } from "./lorebook-sync-service";
 import { BrainstormDataManager } from "./brainstorm-data-manager";
@@ -423,7 +428,10 @@ export class StoryManager {
     await this.saveStoryData(true);
   }
 
-  public async generateLorebookKeys(entryId: string, content: string): Promise<void> {
+  public async generateLorebookKeys(
+    entryId: string,
+    content: string,
+  ): Promise<void> {
     await this.lorebookSyncService.generateAndSyncKeys(entryId, content);
   }
 

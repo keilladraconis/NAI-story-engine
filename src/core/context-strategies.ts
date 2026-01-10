@@ -58,11 +58,9 @@ type StrategyFn = (
 const buildDulfsContextString = (
   manager: StoryManager,
   mode: "short" | "full",
-  excludeId?: string,
 ): string => {
   let context = "";
   for (const fid of LIST_FIELD_IDS) {
-    if (fid === excludeId) continue;
     const list = manager.getDulfsList(fid);
     if (list.length === 0) continue;
 
@@ -310,7 +308,7 @@ const Strategies: Record<string, StrategyFn> = {
 
     const templateContent = (await api.v1.config.get(templateKey)) || "";
     const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
-    const dulfsContext = buildDulfsContextString(manager, "short", categoryId);
+    const dulfsContext = buildDulfsContextString(manager, "short");
 
     const combinedInstruction = `${basePrompt.replace("[itemName]", itemName)}\n\nTASK: Fill in the following Template for "${itemName}". Replace the placeholders with generated content.\n\nTEMPLATE:\n${templateContent}`;
 
@@ -394,11 +392,7 @@ export class ContextStrategyFactory {
     const worldSnapshot = this.storyManager.getFieldContent(
       FieldID.WorldSnapshot,
     );
-    const existingDulfs = buildDulfsContextString(
-      this.storyManager,
-      "full",
-      fieldId,
-    );
+    const existingDulfs = buildDulfsContextString(this.storyManager, "full");
 
     const baseContext = {
       systemMsg: {
