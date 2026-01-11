@@ -16,15 +16,15 @@ The project has successfully transitioned to the new architectural patterns (Str
 
 ### `StoryManager` as "God Object"
 **Location**: `src/core/story-manager.ts`
-**Status**: Partially Addressed (Jan 2026)
+**Status**: Addressed (Jan 2026)
 **Issue**: The `StoryManager` class is responsible for too many distinct domains:
 1.  Data Persistence (loading/saving).
 2.  State Management (subscribers, debouncing).
 3.  Lorebook Synchronization orchestration.
 4.  **Parsing Logic**: *addressed* - Extracted to `ContentParsingService`.
-5.  **DULFS Logic**: `parseAndUpdateDulfsItem` still couples the manager to specific field behaviors (though parsing is now delegated).
+5.  **DULFS Logic**: *addressed* - Extracted to `DulfsService`.
 
-**Recommendation**: Continue delegating logic. `StoryManager` should ideally only store and retrieve data.
+**Recommendation**: `StoryManager` now acts as a facade, delegating specialized logic to services (`DulfsService`, `ContentParsingService`, `LorebookSyncService`) while maintaining a unified API for the UI.
 
 ### `AgentWorkflowService` Complexity
 **Location**: `src/core/agent-workflow.ts`
