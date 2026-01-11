@@ -17,6 +17,7 @@
   "directories": {
     "lib": "lib"
   },
+  "packageManager": "npm@11.7.0",
   "scripts": {
     "build": "nibs build",
     "format": "prettier -w ."
