@@ -2,11 +2,11 @@ import {
   FieldID,
   LIST_FIELD_IDS,
   TEXT_FIELD_IDS,
-  FIELD_CONFIGS,
 } from "../config/field-definitions";
 import { StoryDataManager, StoryField, DULFSField } from "./story-data-manager";
 import { LorebookSyncService } from "./lorebook-sync-service";
 import { BrainstormDataManager } from "./brainstorm-data-manager";
+import { ContentParsingService } from "./content-parsing-service";
 
 export { StoryField, DULFSField };
 
@@ -16,6 +16,7 @@ export class StoryManager {
   private dataManager: StoryDataManager;
   private lorebookSyncService: LorebookSyncService;
   private brainstormDataManager: BrainstormDataManager;
+  private parsingService: ContentParsingService;
 
   private debounceMap: Map<string, number> = new Map();
 
@@ -23,6 +24,7 @@ export class StoryManager {
     this.dataManager = new StoryDataManager();
     this.lorebookSyncService = new LorebookSyncService(this.dataManager);
     this.brainstormDataManager = new BrainstormDataManager(this.dataManager);
+    this.parsingService = new ContentParsingService();
   }
 
   async initializeStory(): Promise<void> {
@@ -57,45 +59,6 @@ export class StoryManager {
     this.debounceMap.set(key, id);
   }
 
-  public parseListLine(
-    line: string,
-    fieldId: string,
-  ): { name: string; description: string; content: string } | null {
-    let clean = line.trim();
-
-    // Still strip list markers because models are stubborn
-    clean = clean.replace(/^[-*+]\s+/, "");
-    clean = clean.replace(/^\d+[\.)]\s+/, "");
-
-    const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
-
-    if (fieldId === FieldID.DramatisPersonae) {
-      const dpRegex =
-        config?.parsingRegex ||
-        /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*(.+)$/;
-      const match = clean.match(dpRegex);
-      if (match) {
-        return {
-          name: match[1].trim(),
-          description: match[5].trim(),
-          content: clean,
-        };
-      }
-    } else {
-      const genericRegex = config?.parsingRegex || /^([^:]+):\s*(.+)$/;
-      const match = clean.match(genericRegex);
-      if (match) {
-        return {
-          name: match[1].trim(),
-          description: match[2].trim(),
-          content: clean,
-        };
-      }
-    }
-
-    return null;
-  }
-
   public async parseAndUpdateDulfsItem(
     fieldId: string,
     itemId: string,
@@ -104,7 +67,7 @@ export class StoryManager {
     const item = list.find((i) => i.id === itemId);
     if (!item) return;
 
-    const parsed = this.parseListLine(item.content, fieldId);
+    const parsed = this.parsingService.parseListLine(item.content, fieldId);
     if (parsed) {
       await this.updateDulfsItem(
         fieldId,

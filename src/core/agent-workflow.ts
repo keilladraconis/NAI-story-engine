@@ -1,6 +1,7 @@
 import { StoryManager, DULFSField } from "./story-manager";
 import { hyperGenerate } from "../../lib/hyper-generator";
 import { ContextStrategyFactory } from "./context-strategies";
+import { ContentParsingService } from "./content-parsing-service";
 
 export interface FieldSession {
   fieldId: string;
@@ -17,6 +18,7 @@ export interface FieldSession {
 
 export class AgentWorkflowService {
   private contextFactory: ContextStrategyFactory;
+  private parsingService: ContentParsingService;
   private sessions: Map<string, FieldSession> = new Map();
   private listeners: Array<(fieldId: string) => void> = [];
 
@@ -44,6 +46,7 @@ export class AgentWorkflowService {
 
   constructor(private storyManager: StoryManager) {
     this.contextFactory = new ContextStrategyFactory(storyManager);
+    this.parsingService = new ContentParsingService();
   }
 
   public subscribe(listener: (fieldId: string) => void) {
@@ -323,7 +326,7 @@ export class AgentWorkflowService {
 
           for (const line of lines) {
             const filteredLine = applyFilters(line);
-            const parsed = this.storyManager.parseListLine(
+            const parsed = this.parsingService.parseListLine(
               filteredLine,
               fieldId,
             );
@@ -351,7 +354,10 @@ export class AgentWorkflowService {
       // Process any remaining buffer
       if (buffer.trim().length > 0) {
         const filteredBuffer = applyFilters(buffer);
-        const parsed = this.storyManager.parseListLine(filteredBuffer, fieldId);
+        const parsed = this.parsingService.parseListLine(
+          filteredBuffer,
+          fieldId,
+        );
         if (parsed) {
           const newItem: DULFSField = {
             id: api.v1.uuid(),

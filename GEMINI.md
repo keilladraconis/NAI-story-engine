@@ -105,7 +105,5 @@ When debugging issues, you may add debugging log statements and provide the user
 - **Dramatis Personae Tuning (Jan 9, 2026)**: Updated `Dramatis Personae` configuration to explicitly request Protagonist/Antagonist and replaced the abstract placeholder format with a concrete example (e.g., "Kael (Male, 34, Smuggler)...") to prevent literal placeholder generation and ensure key characters are included.
 - DULFS Tuning (Jan 9, 2026): Applied the "Concrete Example" strategy to all DULFS fields (`Locations`, `Factions`, `Universe Systems`, `Situational Dynamics`) to prevent literal placeholder generation. Tuned `buildDulfsContext` parameters (Temp: 1.1, Presence Penalty: 0.1) to further discourage repetition and improve focus.
 - **DULFS Generation Fix (Jan 10, 2026)**: Modified `buildDulfsContext` to include the currently generating list's content in the Assistant's prefill and exclude it from the "EXISTING WORLD ELEMENTS" context block. Also sets `minTokens: 0` when prefilling existing items, allowing the LLM to stop early if it determines the list is complete.
-  - **Current Status (Jan 10, 2026)**: Code review completed.
-  - **Stability**: High.
-  - **Maintenance**: Minor type safety and deduplication opportunities noted in `CODEREVIEW.md`.
-  - **Refactoring**: Architecture is clean and decoupled.
+- **Content Parsing Extraction (Jan 10, 2026)**: Extracted list parsing logic from `StoryManager` to a new `ContentParsingService` to reduce the responsibilities of the "God Object" `StoryManager`. Both `StoryManager` and `AgentWorkflowService` now utilize this service for parsing content.
+  - **Current Status (Jan 9, 2026)**: Code review completed.
