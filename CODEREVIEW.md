@@ -28,12 +28,13 @@ The project has successfully transitioned to the new architectural patterns (Str
 
 ### `AgentWorkflowService` Complexity
 **Location**: `src/core/agent-workflow.ts`
+**Status**: Addressed (Jan 2026)
 **Issue**: This service manages two distinct state machines: one for standard Field Generation and one for List (DULFS) Generation.
 - This results in duplicated state tracking properties (e.g., `listGenerationState` vs `session`).
 - It leads to complex conditional logic in `startSession` to determine which path to take.
 - The mixing of these concerns makes the class difficult to test and maintain (approx. 500 lines).
 
-**Recommendation**: Split into `FieldGenerationService` and `ListGenerationService`, coordinated by a thinner `AgentWorkflowFacade`.
+**Resolution**: Split into `FieldGenerationService` and `ListGenerationService`, coordinated by a thinner `AgentWorkflowService` acting as a facade. `FieldSession` and `ListSession` interfaces have been standardized in `src/core/generation-types.ts`.
 
 ---
 

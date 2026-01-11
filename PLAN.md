@@ -101,6 +101,7 @@ _(Note: "Content Extraction" is currently handled via generative context strateg
 - **Configuration**: Centralized field definitions in `src/config/field-definitions.ts`.
 - **Cleanup**: Removed unused variables and dead code in `AgentWorkflowService` and `ContextStrategies`.
 - **Fixes**: Resolved double-spacing issues in generation by replacing `hyperContextBuilder` with a local implementation.
+- **AgentWorkflow Refactor (Jan 2026)**: Split `AgentWorkflowService` into a facade coordinating `FieldGenerationService` and `ListGenerationService`, simplifying the core workflow logic and separating concerns.
 
 ### Core Components
 

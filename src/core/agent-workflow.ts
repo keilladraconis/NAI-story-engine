@@ -1,25 +1,15 @@
-import { StoryManager, DULFSField } from "./story-manager";
-import { hyperGenerate } from "../../lib/hyper-generator";
+import { StoryManager } from "./story-manager";
 import { ContextStrategyFactory } from "./context-strategies";
 import { ContentParsingService } from "./content-parsing-service";
+import { FieldSession, ListSession } from "./generation-types";
+import { FieldGenerationService } from "./field-generation-service";
+import { ListGenerationService } from "./list-generation-service";
 
-export interface FieldSession {
-  fieldId: string;
-  isRunning: boolean;
-  isQueued?: boolean;
-  cancellationSignal?: CancellationSignal;
-  budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
-  budgetResolver?: () => void;
-  budgetWaitTime?: number;
-  error?: string;
-  budgetTimeRemaining?: number;
-  budgetWaitEndTime?: number;
-}
+export { FieldSession, ListSession } from "./generation-types";
 
 export class AgentWorkflowService {
-  private contextFactory: ContextStrategyFactory;
-  private parsingService: ContentParsingService;
   private sessions: Map<string, FieldSession> = new Map();
+  private listGenerationState: Map<string, ListSession> = new Map();
   private listeners: Array<(fieldId: string) => void> = [];
 
   private taskQueue: Array<
@@ -28,25 +18,22 @@ export class AgentWorkflowService {
   > = [];
   private isGlobalGenerating: boolean = false;
 
-  // Track list generation state: fieldId -> { isRunning, signal }
-  private listGenerationState: Map<
-    string,
-    {
-      isRunning: boolean;
-      isQueued?: boolean;
-      signal?: CancellationSignal;
-      budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
-      budgetResolver?: () => void;
-      budgetWaitTime?: number;
-      error?: string;
-      budgetTimeRemaining?: number;
-      budgetWaitEndTime?: number;
-    }
-  > = new Map();
+  private fieldService: FieldGenerationService;
+  private listService: ListGenerationService;
 
-  constructor(private storyManager: StoryManager) {
-    this.contextFactory = new ContextStrategyFactory(storyManager);
-    this.parsingService = new ContentParsingService();
+  constructor(storyManager: StoryManager) {
+    const contextFactory = new ContextStrategyFactory(storyManager);
+    const parsingService = new ContentParsingService();
+
+    this.fieldService = new FieldGenerationService(
+      storyManager,
+      contextFactory
+    );
+    this.listService = new ListGenerationService(
+      storyManager,
+      contextFactory,
+      parsingService
+    );
   }
 
   public subscribe(listener: (fieldId: string) => void) {
@@ -79,14 +66,19 @@ export class AgentWorkflowService {
     return session;
   }
 
-  public getListGenerationState(fieldId: string) {
-    return this.listGenerationState.get(fieldId) || { isRunning: false };
+  public getListGenerationState(fieldId: string): ListSession {
+    return (
+      this.listGenerationState.get(fieldId) || {
+        fieldId,
+        isRunning: false,
+      }
+    );
   }
 
   public cancelListGeneration(fieldId: string) {
     // Check queue first
     const queueIndex = this.taskQueue.findIndex(
-      (t) => t.type === "list" && t.fieldId === fieldId,
+      (t) => t.type === "list" && t.fieldId === fieldId
     );
     if (queueIndex !== -1) {
       const task = this.taskQueue.splice(queueIndex, 1)[0];
@@ -104,8 +96,8 @@ export class AgentWorkflowService {
       if (state.budgetResolver) {
         state.budgetResolver(); // Unblock budget wait
       }
-      if (state.signal) {
-        state.signal.cancel();
+      if (state.cancellationSignal) {
+        state.cancellationSignal.cancel();
       }
     }
   }
@@ -113,7 +105,7 @@ export class AgentWorkflowService {
   public cancelFieldGeneration(fieldId: string) {
     // Check queue first
     const queueIndex = this.taskQueue.findIndex(
-      (t) => t.type === "field" && t.fieldId === fieldId,
+      (t) => t.type === "field" && t.fieldId === fieldId
     );
     if (queueIndex !== -1) {
       const task = this.taskQueue.splice(queueIndex, 1)[0];
@@ -137,7 +129,7 @@ export class AgentWorkflowService {
   }
 
   public requestListGeneration(fieldId: string, updateFn: () => void) {
-    const state = this.listGenerationState.get(fieldId) || { isRunning: false };
+    const state = this.getListGenerationState(fieldId);
     state.error = undefined;
     this.listGenerationState.set(fieldId, state);
 
@@ -152,7 +144,9 @@ export class AgentWorkflowService {
       wrappedUpdate();
     } else {
       this.isGlobalGenerating = true;
-      this._runListGeneration(fieldId, wrappedUpdate);
+      this.listService
+        .run(fieldId, state, wrappedUpdate)
+        .finally(() => this.processQueue());
     }
   }
 
@@ -171,7 +165,9 @@ export class AgentWorkflowService {
       wrappedUpdate();
     } else {
       this.isGlobalGenerating = true;
-      this._runFieldGeneration(fieldId, wrappedUpdate);
+      this.fieldService
+        .run(session, wrappedUpdate)
+        .finally(() => this.processQueue());
     }
   }
 
@@ -192,316 +188,18 @@ export class AgentWorkflowService {
       if (session) {
         session.isQueued = false;
         nextTask.updateFn(); // Update UI to show running
+        await this.fieldService.run(session, nextTask.updateFn);
       }
-      await this._runFieldGeneration(nextTask.fieldId, nextTask.updateFn);
     } else if (nextTask.type === "list") {
-      const state = this.listGenerationState.get(nextTask.fieldId);
+      const state = this.getListGenerationState(nextTask.fieldId);
       if (state) {
         state.isQueued = false;
         nextTask.updateFn();
+        await this.listService.run(nextTask.fieldId, state, nextTask.updateFn);
       }
-      await this._runListGeneration(nextTask.fieldId, nextTask.updateFn);
     }
-  }
-
-  private startBudgetTimer(
-    fieldId: string,
-    waitEndTime: number,
-    updateFn: () => void,
-    type: "field" | "list",
-  ) {
-    const checkTimer = () => {
-      let state: any;
-      if (type === "field") {
-        state = this.sessions.get(fieldId);
-      } else {
-        state = this.listGenerationState.get(fieldId);
-      }
-
-      if (
-        !state ||
-        !state.isRunning ||
-        state.budgetState !== "waiting_for_timer"
-      ) {
-        return;
-      }
-
-      const now = Date.now();
-      const remaining = Math.max(0, waitEndTime - now);
-      state.budgetTimeRemaining = remaining;
-      updateFn();
-
-      if (remaining > 0) {
-        // Use 1000ms update interval for smoother countdown
-        api.v1.timers.setTimeout(checkTimer, 1000);
-      }
-    };
-    checkTimer();
-  }
-
-  private async _runListGeneration(
-    fieldId: string,
-    updateFn: () => void,
-  ): Promise<void> {
-    const cancellationSignal = await api.v1.createCancellationSignal();
-    const state = {
-      isRunning: true,
-      isQueued: false,
-      signal: cancellationSignal,
-      budgetState: "normal" as const,
-      error: undefined as string | undefined,
-      budgetWaitTime: undefined as number | undefined,
-      budgetTimeRemaining: undefined as number | undefined,
-      budgetWaitEndTime: undefined as number | undefined,
-    };
-    this.listGenerationState.set(fieldId, state);
-    updateFn();
-
-    try {
-      const result = await this.contextFactory.buildDulfsContext(fieldId);
-      const { messages, params } = result;
-
-      const model = (await api.v1.config.get("model")) || "glm-4-6";
-      let buffer = "";
-
-      const applyFilters = (t: string) => {
-        let out = t;
-        if (result.filters) {
-          for (const filter of result.filters) {
-            out = filter(out);
-          }
-        }
-        return out;
-      };
-
-      await hyperGenerate(
-        messages,
-        {
-          maxTokens: 2048,
-          minTokens: 50,
-          model,
-          ...params,
-          onBudgetWait: (_1, _2, time) => {
-            return new Promise<void>((resolve) => {
-              const s = this.listGenerationState.get(fieldId);
-              if (s) {
-                s.budgetResolver = () => {
-                  s.budgetState = "waiting_for_timer";
-                  // Start timer loop
-                  if (s.budgetWaitEndTime) {
-                    this.startBudgetTimer(
-                      fieldId,
-                      s.budgetWaitEndTime,
-                      updateFn,
-                      "list",
-                    );
-                  }
-                  updateFn();
-                  resolve();
-                };
-                s.budgetState = "waiting_for_user";
-                s.budgetWaitTime = time;
-                // Calculate end time now, relative to when we got the wait signal
-                s.budgetWaitEndTime = Date.now() + time;
-                updateFn();
-              } else {
-                resolve();
-              }
-            });
-          },
-          onBudgetResume: () => {
-            const s = this.listGenerationState.get(fieldId);
-            if (s) {
-              s.budgetState = "normal";
-              s.budgetTimeRemaining = undefined;
-              updateFn();
-            }
-          },
-        },
-        (text) => {
-          buffer += text;
-          const lines = buffer.split("\n");
-          // Keep the last segment as it might be incomplete
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            const filteredLine = applyFilters(line);
-            const parsed = this.parsingService.parseListLine(
-              filteredLine,
-              fieldId,
-            );
-            if (parsed) {
-              const newItem: DULFSField = {
-                id: api.v1.uuid(),
-                category: fieldId as any,
-                content: parsed.content,
-                name: parsed.name,
-                description: parsed.description,
-                attributes: {},
-                linkedLorebooks: [],
-              };
-              this.storyManager.addDulfsItem(fieldId, newItem);
-              updateFn();
-            }
-          }
-        },
-        "background",
-        cancellationSignal,
-      );
-
-      if (cancellationSignal.cancelled) return;
-
-      // Process any remaining buffer
-      if (buffer.trim().length > 0) {
-        const filteredBuffer = applyFilters(buffer);
-        const parsed = this.parsingService.parseListLine(
-          filteredBuffer,
-          fieldId,
-        );
-        if (parsed) {
-          const newItem: DULFSField = {
-            id: api.v1.uuid(),
-            category: fieldId as any,
-            content: parsed.content,
-            name: parsed.name,
-            description: parsed.description,
-            attributes: {},
-            linkedLorebooks: [],
-          };
-          this.storyManager.addDulfsItem(fieldId, newItem);
-          updateFn();
-        }
-      }
-    } catch (e: any) {
-      if (!e.message.includes("cancelled")) {
-        const state = this.listGenerationState.get(fieldId);
-        if (state) state.error = e.message;
-        api.v1.ui.toast(`List generation failed: ${e.message}`, {
-          type: "error",
-        });
-      }
-    } finally {
-      const state = this.listGenerationState.get(fieldId);
-      if (state) {
-        state.isRunning = false;
-        state.isQueued = false;
-        state.signal = undefined;
-      }
-      updateFn();
-      this.processQueue();
-    }
-  }
-
-  private async _runFieldGeneration(
-    fieldId: string,
-    updateFn: () => void,
-  ): Promise<void> {
-    const session = this.getSession(fieldId) || this.startSession(fieldId);
-    session.isRunning = true;
-    session.cancellationSignal = await api.v1.createCancellationSignal();
-    session.budgetWaitTime = undefined;
-    session.budgetTimeRemaining = undefined;
-    session.budgetWaitEndTime = undefined;
-    updateFn();
-
-    try {
-      const result = await this.contextFactory.build(session);
-      const { messages, params } = result;
-
-      // Find assistant pre-fill if it exists
-      let buffer = "";
-      const lastMsg = messages[messages.length - 1];
-      // Default behavior is 'keep' to maintain backward compatibility and support strictly formatted fields
-      const prefixBehavior = result.prefixBehavior || "keep";
-
-      if (lastMsg && lastMsg.role === "assistant" && lastMsg.content) {
-        if (prefixBehavior === "keep") {
-          buffer = lastMsg.content;
-        }
-      }
-
-      await this.storyManager.saveFieldDraft(session.fieldId, buffer);
-      const model = (await api.v1.config.get("model")) || "glm-4-6";
-
-      const applyFilters = (t: string) => {
-        let out = t;
-        if (result.filters) {
-          for (const filter of result.filters) {
-            out = filter(out);
-          }
-        }
-        return out;
-      };
-
-      await hyperGenerate(
-        messages,
-        {
-          maxTokens: 2048,
-          model,
-          ...params,
-          minTokens: params.minTokens || 50,
-          onBudgetWait: (_1, _2, time) => {
-            return new Promise<void>((resolve) => {
-              session.budgetResolver = () => {
-                session.budgetState = "waiting_for_timer";
-                if (session.budgetWaitEndTime) {
-                  this.startBudgetTimer(
-                    fieldId,
-                    session.budgetWaitEndTime,
-                    updateFn,
-                    "field",
-                  );
-                }
-                updateFn();
-                resolve();
-              };
-              session.budgetState = "waiting_for_user";
-              session.budgetWaitTime = time;
-              session.budgetWaitEndTime = Date.now() + time;
-              updateFn();
-            });
-          },
-          onBudgetResume: () => {
-            session.budgetState = "normal";
-            session.budgetTimeRemaining = undefined;
-            updateFn();
-          },
-        },
-        (text) => {
-          if (text) {
-            buffer += applyFilters(text);
-            this.storyManager.saveFieldDraft(session.fieldId, buffer);
-            updateFn();
-          }
-        },
-        "background",
-        session.cancellationSignal,
-      );
-
-      if (session.cancellationSignal.cancelled) return;
-
-      await this.storyManager.setFieldContent(
-        session.fieldId,
-        buffer,
-        "immediate",
-        true,
-      );
-
-      // Automatically generate keys for Lorebook entries
-      if (session.fieldId.startsWith("lorebook:")) {
-        const entryId = session.fieldId.split(":")[1];
-        await this.storyManager.generateLorebookKeys(entryId, buffer);
-      }
-    } catch (e: any) {
-      if (!e.message.includes("cancelled")) {
-        session.error = e.message;
-        api.v1.ui.toast(`Generation failed: ${e.message}`, { type: "error" });
-      }
-    } finally {
-      session.isRunning = false;
-      session.cancellationSignal = undefined;
-      updateFn();
-      this.processQueue();
-    }
+    
+    // Process next item recursively (since run awaited)
+    this.processQueue();
   }
 }
