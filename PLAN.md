@@ -107,6 +107,8 @@ The goal of this phase is to address outstanding nit-picks and sub-optimal UX an
 - [x] Attempt to unify `FieldGenerationService` with `ListGenerationService`, the latter is just a consecutive execution of the former. Change "Generate/Add", to "Generate Batch" and "Generate One"
 - [x] Clean up ULFS lorebook templates. Allow for non-original settings.
 - [x] Allow inclusion of story context into brainstorm, other fields.
+- [ ] ?? Dynamic World Snapshot acts more like a snapshot. Keeps track of how 'old' it is in terms of story generations. Periodically becomes "invalid" and can be regenerated, based on current story context.
+- [ ] Github release workflow should append version to file name.
 
 ### **Phase 8: Scenario Modality**
 
