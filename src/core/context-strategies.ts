@@ -577,9 +577,9 @@ export class ContextStrategyFactory {
       baseContext.systemMsg,
       {
         role: "user",
-        content: `Generate a comma-separated list of 5-10 new, unique names/subjects for the category '${label}'.
+        content: `Generate a list of 5-10 new, unique names/subjects for the category '${label}'.
 ${config?.listGenerationInstruction || ""}
-Output ONLY the comma-separated names, no other text.`,
+Output ONLY the names, separated by newlines, no other text.`,
       },
       {
         role: "assistant",

@@ -198,11 +198,11 @@ export class DulfsListStrategy implements GenerationStrategy {
   ): Promise<void> {
     if (!session.dulfsFieldId) return;
 
-    // Parse comma-separated list
-    // Clean up markdown list syntax if present (e.g. "1. Name")
-    const cleaned = finalText.replace(/^\d+\.\s*/gm, "");
+    // Parse newline-separated list
+    // Clean up markdown list syntax if present (e.g. "1. Name", "- Name")
+    const cleaned = finalText.replace(/^[\d-]+\.\s*|^\s*-\s*/gm, "");
     const names = cleaned
-      .split(/,|\\n/) // Split by comma or newline
+      .split(/\r?\n/) // Split by newline
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 

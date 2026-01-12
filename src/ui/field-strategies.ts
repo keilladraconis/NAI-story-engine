@@ -120,7 +120,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
               if (genState.budgetResolver) genState.budgetResolver();
             },
           },
-          "Generate Names",
+          "Generate Items",
         ),
         button({
           text: "Add Entry",
