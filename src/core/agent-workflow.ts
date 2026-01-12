@@ -104,7 +104,9 @@ export class AgentWorkflowService {
       return;
     }
 
-    if (this.brainstormSession.budgetResolver) {
+    if (this.brainstormSession.budgetRejecter) {
+      this.brainstormSession.budgetRejecter("Cancelled");
+    } else if (this.brainstormSession.budgetResolver) {
       this.brainstormSession.budgetResolver();
     }
     if (this.brainstormSession.cancellationSignal) {
@@ -130,7 +132,9 @@ export class AgentWorkflowService {
 
     const state = this.listGenerationState.get(fieldId);
     if (state) {
-      if (state.budgetResolver) {
+      if (state.budgetRejecter) {
+        state.budgetRejecter("Cancelled");
+      } else if (state.budgetResolver) {
         state.budgetResolver(); // Unblock budget wait
       }
       if (state.cancellationSignal) {
@@ -156,7 +160,9 @@ export class AgentWorkflowService {
 
     const session = this.getSession(fieldId);
     if (session) {
-      if (session.budgetResolver) {
+      if (session.budgetRejecter) {
+        session.budgetRejecter("Cancelled");
+      } else if (session.budgetResolver) {
         session.budgetResolver(); // Unblock budget wait
       }
       if (session.cancellationSignal) {
@@ -216,31 +222,30 @@ export class AgentWorkflowService {
         session.cancellationSignal,
         {
           onBudgetWait: (_1, _2, time) => {
-            return new Promise<void>((resolve) => {
+            return new Promise<void>((resolve, reject) => {
               session.budgetResolver = () => {
                 session.budgetState = "waiting_for_timer";
-                if (session.budgetWaitEndTime) {
-                  // Start timer
-                  const checkTimer = () => {
-                    if (
-                      !session.isRunning ||
-                      session.budgetState !== "waiting_for_timer" ||
-                      !session.budgetWaitEndTime
-                    )
-                      return;
-                    const now = Date.now();
-                    const remaining = Math.ceil(
-                      Math.max(0, session.budgetWaitEndTime - now) / 1000,
-                    );
-                    session.budgetTimeRemaining = remaining;
-                    updateFn();
-                    if (remaining > 0)
-                      api.v1.timers.setTimeout(checkTimer, 1000);
-                  };
-                  checkTimer();
-                }
+                const targetEnd = Date.now() + time;
+                session.budgetWaitEndTime = targetEnd;
+
+                const tick = () => {
+                  if (!session.isRunning) return;
+                  const now = Date.now();
+                  if (now >= targetEnd) {
+                    resolve();
+                    return;
+                  }
+                  session.budgetTimeRemaining = Math.ceil(
+                    Math.max(0, targetEnd - now) / 1000,
+                  );
+                  updateFn();
+                  api.v1.timers.setTimeout(tick, 1000);
+                };
+                tick();
                 updateFn();
-                resolve();
+              };
+              session.budgetRejecter = (reason) => {
+                reject(reason || "Cancelled");
               };
               session.budgetState = "waiting_for_user";
               session.budgetWaitTime = time;
@@ -251,6 +256,8 @@ export class AgentWorkflowService {
           onBudgetResume: () => {
             session.budgetState = "normal";
             session.budgetTimeRemaining = undefined;
+            session.budgetResolver = undefined;
+            session.budgetRejecter = undefined;
             updateFn();
           },
         },
@@ -262,6 +269,11 @@ export class AgentWorkflowService {
     } finally {
       session.isRunning = false;
       session.cancellationSignal = undefined;
+      session.budgetState = undefined;
+      session.budgetTimeRemaining = undefined;
+      session.budgetWaitEndTime = undefined;
+      session.budgetResolver = undefined;
+      session.budgetRejecter = undefined;
       updateFn();
     }
   }

@@ -100,9 +100,10 @@ The goal of this phase is to address outstanding nit-picks and sub-optimal UX an
 
 #### Features
 
-- [ ] Brainstorm UI shows queueing/waiting status of brainstorm chat.
+- [x] Brainstorm UI shows queueing/waiting status of brainstorm chat.
 - [ ] Optional binding of Story Prompt and/or World Snapshot to lorebooks.
 - [ ] Evaluate factoring Queued Generation / Waiting from `agent-workflow.ts` as a stand-alone library or companion to `HyperGenerate`.
+- [ ] Attempt to unify `FieldGenerationService` with `ListGenerationService`, the latter is just a consecutive execution of the former.
 - [ ] Clean up ULFS lorebook templates. Allow for non-original settings.
 
 ### **Phase 8: Scenario Modality**

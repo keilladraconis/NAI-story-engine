@@ -57,14 +57,28 @@ export class FieldGenerationService {
           ...params,
           minTokens: params.minTokens || 50,
           onBudgetWait: (_1, _2, time) => {
-            return new Promise<void>((resolve) => {
+            return new Promise<void>((resolve, reject) => {
               session.budgetResolver = () => {
                 session.budgetState = "waiting_for_timer";
-                if (session.budgetWaitEndTime) {
-                  this.startBudgetTimer(session, updateFn);
-                }
+                const targetEnd = Date.now() + time;
+                session.budgetWaitEndTime = targetEnd;
+
+                const tick = () => {
+                  if (!session.isRunning) return;
+                  const now = Date.now();
+                  if (now >= targetEnd) {
+                    resolve();
+                    return;
+                  }
+                  session.budgetTimeRemaining = Math.max(0, targetEnd - now);
+                  updateFn();
+                  api.v1.timers.setTimeout(tick, 1000);
+                };
+                tick();
                 updateFn();
-                resolve();
+              };
+              session.budgetRejecter = (reason) => {
+                reject(reason || "Cancelled");
               };
               session.budgetState = "waiting_for_user";
               session.budgetWaitTime = time;
@@ -75,6 +89,8 @@ export class FieldGenerationService {
           onBudgetResume: () => {
             session.budgetState = "normal";
             session.budgetTimeRemaining = undefined;
+            session.budgetResolver = undefined;
+            session.budgetRejecter = undefined;
             updateFn();
           },
         },
@@ -111,29 +127,12 @@ export class FieldGenerationService {
     } finally {
       session.isRunning = false;
       session.cancellationSignal = undefined;
+      session.budgetState = undefined;
+      session.budgetTimeRemaining = undefined;
+      session.budgetWaitEndTime = undefined;
+      session.budgetResolver = undefined;
+      session.budgetRejecter = undefined;
       updateFn();
     }
-  }
-
-  private startBudgetTimer(session: FieldSession, updateFn: () => void) {
-    const checkTimer = () => {
-      if (
-        !session.isRunning ||
-        session.budgetState !== "waiting_for_timer" ||
-        !session.budgetWaitEndTime
-      ) {
-        return;
-      }
-
-      const now = Date.now();
-      const remaining = Math.max(0, session.budgetWaitEndTime - now);
-      session.budgetTimeRemaining = remaining;
-      updateFn();
-
-      if (remaining > 0) {
-        api.v1.timers.setTimeout(checkTimer, 1000);
-      }
-    };
-    checkTimer();
   }
 }

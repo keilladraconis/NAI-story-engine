@@ -61,7 +61,7 @@ This project is a **NovelAI Script**.
 - `src/core/`: The brain of the engine. Handles `StoryManager`, `AgentWorkflow`, and `LorebookSync`.
 - `src/ui/`: All visual components, including the `StructuredEditor` and `SegaModal`.
 - `src/config/`: Configuration files, primarily `field-definitions.ts`.
-- `src/lib/`: External utilities and the `hyper-generator`.
+- `src/lib/`: External utilities and the `hyper-generator`. Closed for modification except in certain circumstances.
 
 ## Development Conventions
 
@@ -88,7 +88,6 @@ The project follows standard TypeScript and Prettier conventions. The code is we
 - **External Libraries**: Files in the `lib/` directory are considered external dependencies and MUST NOT be modified. If changes are needed, implement them in the `src/` directory by wrapping or extending the library functionality.
 - **UI Components**: Reusable UI logic is extracted into `src/ui/ui-components.ts`.
 - **Configuration**: Field definitions are centralized in `src/config/field-definitions.ts`.
-
 
 ## 🤝 Contributing
 

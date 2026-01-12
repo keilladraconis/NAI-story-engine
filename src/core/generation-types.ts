@@ -5,6 +5,7 @@ export interface GenerationSession {
   cancellationSignal?: CancellationSignal;
   budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
   budgetResolver?: () => void;
+  budgetRejecter?: (reason?: any) => void;
   budgetWaitTime?: number;
   budgetTimeRemaining?: number;
   budgetWaitEndTime?: number;
