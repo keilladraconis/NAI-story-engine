@@ -20,10 +20,12 @@
   "packageManager": "npm@11.7.0",
   "scripts": {
     "build": "nibs build",
-    "format": "prettier -w ."
+    "format": "prettier -w .",
+    "test": "vitest run"
   },
   "devDependencies": {
     "nibs-cli": "^4.1.0",
-    "prettier": "^3.7.4"
+    "prettier": "^3.7.4",
+    "vitest": "^4.0.17"
   }
 }

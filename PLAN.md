@@ -78,6 +78,22 @@ _(Note: "Content Extraction" is currently handled via generative context strateg
 - [x] **SEGA Background - COMPLETE**: As a user, I want to be able to turn on "S.E.G.A." And let it automatically, randomly, iterate through the ungenerated items and generate them in the background while I write the first couple chapters of my story.
 - [x] **Incorporate Brainstorm as most-recent context for Field, Lorebook generation**: As a user, I want to be able to use brainstorm to discuss specifics about a character or group of characters, and have that discussion incorporated into my generations.
 
+### ✅ **Phase 6: Quality Assurance & Testing - COMPLETE**
+
+**Status**: Unit testing for core logic is established.
+**Goal**: Ensure reliability of data management, parsing, and debouncing logic.
+
+#### Features Implemented:
+
+- **Vitest Integration**: Set up Vitest as the testing framework for the project.
+- **Mock Scripting Environment**: Created a comprehensive setup to stub the NovelAI Scripting API (`api.v1.*`), allowing tests to run in a standard Node.js environment.
+- **Core Unit Tests**:
+  - `ContentParsingService`: Verified parsing of list items and Dramatis Personae.
+  - `BrainstormDataManager`: Verified message management and consolidation.
+  - `Debouncer`: Verified asynchronous debouncing and cancellation logic.
+  - `StoryDataManager`: Verified default data creation, field access, and persistence triggering.
+- **Test Automation**: Added `npm run test` script for easy verification of core logic changes.
+
 ## Feature Requests
 
 [x] indicates votes

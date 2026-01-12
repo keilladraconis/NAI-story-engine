@@ -11,24 +11,24 @@ Key features include:
 - **Data-Driven Architecture**: A hierarchical data structure (`StoryData`) managed by a central `StoryManager` (`src/core/story-manager.ts`).
 - **Collapsible & Toggleable UI**: The user interface is built with data-driven collapsible sections. Fields feature a toggleable view, allowing users to switch between a clean Markdown reading mode and an editing mode.
 - **Streamlined Generation UI**: A responsive generation button integrated into field headers that handles state (running, budget, cancellation) and provides immediate feedback.
+- **Automated Testing**: Unit tests for core business logic using Vitest, with a mocked environment for the NovelAI Scripting API.
 
 # Building and Running
+...
+## Testing Practices
 
-This is a NovelAI Script BuildSystem project.
+Automated unit tests are located in the `tests/` directory and focus on the `@src/core/**` business logic. UI components are tested manually.
 
-## Building the project
-
-To build the project, run the following command in the root directory:
-
+**Test Command**:
 ```bash
-npm run build
+npm run test
 ```
 
-This will compile the TypeScript code and register the Story Engine sidebar in NovelAI.
+**CRITICAL**: You MUST always verify that the project compiles successfully by running `npm run build` before concluding any task that involves code modifications. In addition, you should run `npm run test` if you have modified files in `src/core/`.
 
-## Running the project
+**CRITICAL**: If the user has made specific changes or deletions to the codebase, do NOT revert or undo them unless explicitly asked. Respect the user's modifications as intentional. This is a hard rule: NEVER casually undo a user's edit.
 
-The project runs within the NovelAI platform. After building the project, the "Story Engine" sidebar will be available in the NovelAI UI.
+When debugging issues, you may add debugging log statements and provide the user with a test plan. The user can then supply the log output in response after executing the test plan.
 
 # Development Conventions
 
@@ -64,17 +64,7 @@ The project follows standard TypeScript and Prettier conventions. The code is we
 - **UI Components**: Reusable UI logic is extracted into `src/ui/ui-components.ts`.
 - **Configuration**: Field definitions are centralized in `src/config/field-definitions.ts`.
 
-## Testing Practices
-
-There are no automated tests in the project. Testing is done manually by running the script within the NovelAI platform.
-
-**CRITICAL**: You MUST always verify that the project compiles successfully by running `nibs build` before concluding any task that involves code modifications.
-
-**CRITICAL**: If the user has made specific changes or deletions to the codebase, do NOT revert or undo them unless explicitly asked. Respect the user's modifications as intentional. This is a hard rule: NEVER casually undo a user's edit.
-
-When debugging issues, you may add debugging log statements and provide the user with a test plan. The user can then supply the log output in response after executing the test plan.
-
-### Gemini Added Memories
+# Gemini Added Memories
 
 - Brainstorm personality updated to be casual, subtle, and conversational (Jan 10, 2026). Replaced rigid "always ask questions" constraint with an instructional assistant prefill and reduced `maxTokens` to 200 for better brevity.
 - The Brainstorm feature has been refactored from a card-based UI to a chat-based message stream interface and moved to its own sidebar tab.
