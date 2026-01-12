@@ -73,6 +73,15 @@ describe("ContentParsingService", () => {
       expect(result?.description).toBe("A massive fortress.");
     });
 
+    it("should parse multi-line content correctly", () => {
+      const text = "The Citadel: A massive fortress.\nIt spans three mountains.\nVery well guarded.";
+      const result = service.parseDulfsItem(text, FieldID.Locations);
+
+      expect(result).not.toBeNull();
+      expect(result?.name).toBe("The Citadel");
+      expect(result?.description).toBe("A massive fortress.\nIt spans three mountains.\nVery well guarded.");
+    });
+
     it("should use specific field parsing if fieldId is provided", () => {
       const text = "Kael (Male, 34, Smuggler): To pay off his life debt";
       // Provide DramatisPersonae ID to trigger the specific regex fallback

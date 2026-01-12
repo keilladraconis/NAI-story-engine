@@ -669,7 +669,7 @@ Output ONLY the names, separated by newlines, no other text.`,
         content: `Complete the details for the ${label} entry named "${itemName}".
 ${config?.generationInstruction || ""}
 ${config?.exampleFormat ? `Format: ${config.exampleFormat}` : ""}
-Write exactly ONE single line.`,
+Keep the description concise and focused on narrative potential.`,
       },
       {
         role: "assistant",

@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1768256624
+updatedAt: 1768257227
 config:
   - name: model
     prettyName: LLM Model
@@ -122,18 +122,14 @@ config:
          - Line 1: `[Entry Name]`
          - Line 2: `Type: [Category]` (e.g. Character, Location, Faction, System, Item)
          - Line 3: `Setting: original`
-      3. **Attributes:** Add `[Key]: [Value]` pairs RELEVANT to the Type.
-         - *Character:* Age, Gender, Role, Appearance, Personality.
-         - *Location:* Climate, Terrain, Population, Key Features.
-         - *Faction:* Leader, Goals, Resources, Rivals.
-         - *Object/System:* Origin, Function, Rules, Cost.
-      4. **Description:** Follow with free text focusing on history, nature, and narrative potential.
+      3. **Attributes:** Add a few essential `[Key]: [Value]` pairs RELEVANT to the Type to establish core facts.
+      4. **Description:** Follow with rich, descriptive free text focusing on history, sensory details, and narrative potential.
 
       **Content Directives:**
-      - **Characters:** Focus on internal conflicts (Surface/Shadow/Personal) and motivations. **NO** future plotting or "if/then" scripts.
+      - **Characters:** Focus on internal conflicts (Surface/Shadow/Personal) and motivations.
       - **General:** Focus on "Narrative Vectors"—how this entry creates conflict or opportunity.
-      - **Adaptability:** DO NOT include irrelevant fields (e.g. no "Gender" for a City).
-      - **Structure:** Maintain the strict line-by-line format for the header and attributes.
+      - **Adaptability:** DO NOT include irrelevant fields.
+      - **Structure:** Maintain the strict line-by-line format for the identity and attributes, but allow the description to flow naturally.
 
   - name: lorebook_template_character
     prettyName: Lorebook Template (Character)
@@ -167,7 +163,7 @@ config:
 
   - name: lorebook_template_location
     prettyName: Lorebook Template (Location)
-    description: Strict template for Location entries.
+    description: Template for Location entries.
     type: string
     multiline: true
     default: |-
@@ -175,18 +171,13 @@ config:
       Type: Location
       Setting: original
       Region: [City, Continent, or Sector]
-      Climate: [Atmosphere, smell, lighting, temperature]
-      Population: [Demographics/Crowd density]
-      Danger Level: [Low/Medium/High/Extreme]
-      Economy: [Main exports/trade/resources]
-      Key Factions: [Controlling groups]
-      Description: [Visuals, history, and layout. ~100 words.]
-      Hidden Aspects: [Secrets or underground elements]
+      Climate/Atmosphere: [Weather, lighting, smell, and general "vibe"]
+      Description: [Visuals, history, and layout. ~150 words. Focus on specific landmarks and how the environment affects those within it.]
       Narrative Vector: [How this location drives conflict or opportunity]
 
   - name: lorebook_template_faction
     prettyName: Lorebook Template (Faction)
-    description: Strict template for Faction entries.
+    description: Template for Faction entries.
     type: string
     multiline: true
     default: |-
@@ -194,35 +185,27 @@ config:
       Type: Faction
       Setting: original
       Leader: [Name or Title]
-      Alignment: [Ideology, Goal, or Moral Compass]
-      Assets: [Resources, territories, tech, manpower]
-      Rivals: [Enemy factions or opposing groups]
-      Structure: [Hierarchy type: Hierarchical, Cell-based, Decentralized]
-      Description: [History, modus operandi, public face vs. private reality. ~100 words.]
-      Agenda: [Current active goal]
+      Goal: [Their primary ambition or ideological compass]
+      Description: [History, resources, and modus operandi. ~150 words. Contrast their public face with their private reality.]
       Narrative Vector: [How they are destabilizing or changing the status quo]
 
   - name: lorebook_template_system
     prettyName: Lorebook Template (World System)
-    description: Strict template for World Systems (Magic, Tech, Cosmology).
+    description: Template for World Systems (Magic, Tech, Cosmology, Law).
     type: string
     multiline: true
     default: |-
       [Entry Name]
       Type: System
       Setting: original
-      Domain: [Magic / Technology / Biology / Physics / Divine]
-      Origin: [Ancient / Modern / Alien / Unknown]
-      Rules: [Hard limits or laws of how it works]
-      Cost/Risk: [Price of usage or danger involved]
-      Accessibility: [Who can use it? Specialists, everyone, or artifacts?]
-      Description: [Mechanics, function, and appearance. ~100 words.]
-      Societal Impact: [How it shapes the culture, economy, or war]
+      Domain: [Magic / Technology / Biology / Physics / Divine / Law]
+      Rules/Cost: [Fundamental mechanics, statutes, or limits, and the price/risk of usage/violation]
+      Description: [Mechanics, function, or legal framework. ~150 words. Focus on how this system shapes culture, economy, or warfare.]
       Narrative Vector: [Current instability, evolution, or crisis related to this system]
 
   - name: lorebook_template_dynamic
     prettyName: Lorebook Template (Situational Dynamic)
-    description: Strict template for Situational Dynamics (Tensions, Vectors).
+    description: Template for Situational Dynamics (Tensions, Vectors).
     type: string
     multiline: true
     default: |-
@@ -231,10 +214,7 @@ config:
       Setting: original
       Scope: [Local / Regional / Global]
       Primary Actors: [Factions or characters involved]
-      Stakes: [What is to be gained or lost?]
-      Tension Source: [Resource scarcity / Ideological / Revenge / Mystery]
-      Description: [The nature of the conflict or situation. ~100 words.]
-      Trigger Event: [What recent event escalated this?]
+      Description: [The nature of the conflict or situation, including the stakes and recent trigger events. ~150 words.]
       Narrative Vector: [The direction this situation is heading if unchecked]
 
   - name: lorebook_keys_prompt

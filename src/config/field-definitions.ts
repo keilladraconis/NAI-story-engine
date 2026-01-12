@@ -101,17 +101,17 @@ export const FIELD_CONFIGS: FieldConfig[] = [
   {
     id: FieldID.UniverseSystems,
     label: "Universe Systems",
-    description: "Rules, magic, technology, and world mechanics",
-    placeholder: "How this world works - magic, physics, etc...",
+    description: "Rules, magic, technology, laws, and world mechanics",
+    placeholder: "How this world works - magic, physics, laws...",
     icon: "settings" as IconId,
     layout: "list",
     fieldType: "dulfs",
     generationInstruction:
-      "Describe the key universe system, magic rule, or technological principle concisely.",
+      "Describe the key universe system, law, or technological principle, its mechanics/terms, and its broader impact on the world.",
     exampleFormat:
-      "System Name: Description of mechanic or rule. Example: Aetheric Resonance: High-frequency crystals can levitate heavy objects when sung to at specific pitches",
+      "System Name: Description of mechanic, societal impact, and rules. Example: Aetheric Resonance: High-frequency crystals can levitate heavy objects when sung to at specific pitches. This system forms the backbone of the empire's sky-fleets but causes 'harmonic sickness' in long-term pilots.",
     filters: ["scrubBrackets"],
-    parsingRegex: /^([^:]+):\s*(.+)$/,
+    parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
   {
     id: FieldID.Factions,
@@ -122,11 +122,11 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     layout: "list",
     fieldType: "dulfs",
     generationInstruction:
-      "Describe the core ideology, goal, and internal structure of the faction or group.",
+      "Describe the faction's core ideology, history, and its role in the world's power dynamics.",
     exampleFormat:
-      "Faction Name: Ideology, Goal, Structure. Example: The Iron Pact: Militaristic isolationism, To protect the borders from invaders, Strict hierarchy based on combat merit",
+      "Faction Name: Goal, history, and public face vs. private reality. Example: The Iron Pact: A militaristic group dedicated to border protection. Publicly they are heroes, but privately they are hoarding ancient artifacts to trigger a pre-emptive strike against their rivals.",
     filters: ["scrubBrackets"],
-    parsingRegex: /^([^:]+):\s*(.+)$/,
+    parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
   {
     id: FieldID.DramatisPersonae,
@@ -143,7 +143,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     exampleFormat:
       "Name (Gender, Age, Role): Core motivation, Unique behavioral tell. Example: Kael (Male, 34, Smuggler): To pay off his life debt, Rubs a coin when calculating odds",
     filters: ["scrubBrackets"],
-    parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*(.+)$/,
+    parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*([\s\S]+)$/,
   },
 
   {
@@ -157,9 +157,9 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     generationInstruction:
       "Include atmospheric anchors, sensory details, and inherent tensions of the location.",
     exampleFormat:
-      "Location Name: Atmosphere, Sensory details, Tensions. Example: The Sunken Market: Claustrophobic and damp, Smell of salt and rotting wood, Constant fear of structural collapse",
+      "Location Name: Atmosphere, history, and landmarks. Example: The Sunken Market: A damp, claustrophobic bazaar built into the ruins of an old dam. The air smells of salt and rotting wood, and the constant groaning of the rusted supports reminds everyone of the impending flood.",
     filters: ["scrubBrackets"],
-    parsingRegex: /^([^:]+):\s*(.+)$/,
+    parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
   {
     id: FieldID.SituationalDynamics,
@@ -172,9 +172,9 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     generationInstruction:
       "Describe a current conflict, pending event, or tension that involve multiple characters with no suggested resolution.",
     exampleFormat:
-      "Dynamic Name: Description of the conflict or event. Example: The Succession Crisis: Three heirs vying for the throne after the Emperor's sudden death",
+      "Dynamic Name: The nature of the conflict, the stakes, and the primary actors. Example: The Succession Crisis: Three heirs are vying for the throne after the Emperor's sudden death. The city is on the brink of civil war as the military and the merchant guilds begin taking sides.",
     filters: ["scrubBrackets"],
-    parsingRegex: /^([^:]+):\s*(.+)$/,
+    parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
   {
     id: FieldID.ATTG,
