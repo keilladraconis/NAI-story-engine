@@ -36,6 +36,8 @@ The project has successfully transitioned to the new architectural patterns (Str
 
 **Resolution**: Split into `FieldGenerationService` and `ListGenerationService`, coordinated by a thinner `AgentWorkflowService` acting as a facade. `FieldSession` and `ListSession` interfaces have been standardized in `src/core/generation-types.ts`.
 
+**Update (Jan 12, 2026)**: Further simplified by unifying `FieldGenerationService`, `ListGenerationService`, and `BrainstormService` into a single `UnifiedGenerationService`. Sequential DULFS generation implemented to reduce parsing complexity.
+
 ---
 
 ## 2. Type Safety [MEDIUM]

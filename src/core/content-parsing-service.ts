@@ -46,4 +46,25 @@ export class ContentParsingService {
 
     return null;
   }
+
+  /**
+   * Parses a generated string into a structured list item.
+   */
+  public parseDulfsItem(text: string, fieldId?: string): ParsedListItem | null {
+    if (fieldId) {
+      return this.parseListLine(text, fieldId);
+    }
+
+    // 3. Generic fallback if no fieldId provided
+    const singleLineMatch = text.match(/^([^:]+):\s*(.+)$/);
+    if (singleLineMatch) {
+      return {
+        name: singleLineMatch[1].trim(),
+        description: singleLineMatch[2].trim(),
+        content: singleLineMatch[2].trim(),
+      };
+    }
+
+    return null;
+  }
 }

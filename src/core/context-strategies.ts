@@ -9,7 +9,7 @@ import {
 
 // Local implementation of context builder that avoids the "double newline" behavior
 // of the library version, which causes double-spaced generation.
-const contextBuilder = (
+export const contextBuilder = (
   system: Message,
   user: Message,
   assistant: Message,
@@ -403,7 +403,87 @@ export class ContextStrategyFactory {
     return result;
   }
 
-  async buildDulfsContext(fieldId: string): Promise<StrategyResult> {
+  async buildBrainstormContext(
+    isInitialOrEmpty: boolean,
+  ): Promise<StrategyResult> {
+    const history = this.storyManager.getBrainstormMessages();
+    const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
+    const brainstormPrompt =
+      (await api.v1.config.get("brainstorm_prompt")) || "";
+    const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
+    const worldSnapshot = this.storyManager.getFieldContent(
+      FieldID.WorldSnapshot,
+    );
+    const attg = this.storyManager.getFieldContent(FieldID.ATTG);
+    const style = this.storyManager.getFieldContent(FieldID.Style);
+    const dulfsContext = buildDulfsContextString(this.storyManager, "short");
+
+    const systemMsg = `${systemPrompt}\n\n[BRAINSTORMING MODE]\n${brainstormPrompt}`;
+    const messages: Message[] = [{ role: "system", content: systemMsg }];
+
+    // Build Context Block
+    let contextBlock = "Here is the current state of the story:\n";
+    let hasContext = false;
+
+    if (storyPrompt) {
+      contextBlock += `STORY PROMPT:\n${storyPrompt}\n\n`;
+      hasContext = true;
+    }
+    if (worldSnapshot) {
+      contextBlock += `WORLD SNAPSHOT:\n${worldSnapshot}\n\n`;
+      hasContext = true;
+    }
+    if (attg) {
+      contextBlock += `ATTG:\n${attg}\n\n`;
+      hasContext = true;
+    }
+    if (style) {
+      contextBlock += `STYLE:\n${style}\n\n`;
+      hasContext = true;
+    }
+    if (dulfsContext) {
+      contextBlock += `ESTABLISHED WORLD ELEMENTS:\n${dulfsContext}\n\n`;
+      hasContext = true;
+    }
+
+    if (hasContext) {
+      messages.push({
+        role: "user",
+        content: `${contextBlock}Let's brainstorm based on this context.`,
+      });
+      messages.push({
+        role: "assistant",
+        content:
+          "Understood. I will be a creative partner to the user, offering casual reactions and jamming on ideas without over-explaining. I'll keep my responses short, punchy, and focused on one thing at a time. I have the full story context in mind.\n[Continue:]\n",
+      });
+    }
+
+    // Append Chat History
+    const recentHistory = history.slice(-20);
+    recentHistory.forEach((msg) => {
+      messages.push({ role: msg.role as any, content: msg.content });
+    });
+
+    // If empty send, add a nudge
+    if (isInitialOrEmpty) {
+      messages.push({
+        role: "user",
+        content:
+          "Continue brainstorming on your own. Surprise me with some new ideas or deep-dives into the existing ones.",
+      });
+    }
+
+    return {
+      messages,
+      params: {
+        maxTokens: 300,
+        minTokens: 10,
+        temperature: 1,
+      },
+    };
+  }
+
+  async buildDulfsItemContext(fieldId: string): Promise<StrategyResult> {
     const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
     const worldSnapshot = this.storyManager.getFieldContent(
@@ -412,15 +492,26 @@ export class ContextStrategyFactory {
     const existingDulfs = buildDulfsContextString(
       this.storyManager,
       "full",
-      fieldId,
+      fieldId, // Exclude current field's content from the general summary to avoid duplication if we handle it separately
     );
 
+    // Get the current list content to show what exists in THIS category
     const currentList = this.storyManager.getDulfsList(fieldId);
-    let currentContentPrefill = "";
+    let currentCategoryContext = "";
     if (currentList.length > 0) {
-      currentContentPrefill =
-        currentList.map((i) => i.content).join("\n") + "\n";
+      currentCategoryContext =
+        `EXISTING ITEMS IN THIS CATEGORY:\n` +
+        currentList
+          .map((i) => `Name: ${i.name}\nContent: ${i.content}`)
+          .join("\n---\n") +
+        "\n\n";
     }
+
+    const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
+    // Modified instruction for single item - strictly single line
+    const userInstruction = `Generate exactly ONE new unique item for the category '${fieldId}'.\nProvide the item as a single line of text following the format below.\nDo not duplicate existing items.`;
+    const exampleFormat =
+      config?.exampleFormat || "Format: [Item Name]: [Description]";
 
     const baseContext = {
       systemMsg: {
@@ -429,15 +520,6 @@ export class ContextStrategyFactory {
       },
     };
 
-    const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
-    const userInstruction =
-      config?.generationInstruction ||
-      "Generate a list of items for this category.";
-    const exampleFormat =
-      config?.exampleFormat ||
-      "Format each line as: [Item Name]: [Description]";
-
-    // Build context blocks
     const contextBlocks: Message[] = [
       {
         role: "user",
@@ -456,7 +538,14 @@ export class ContextStrategyFactory {
     if (existingDulfs) {
       contextBlocks.push({
         role: "user",
-        content: `EXISTING WORLD ELEMENTS:\n${existingDulfs}`,
+        content: `OTHER ESTABLISHED WORLD ELEMENTS:\n${existingDulfs}`,
+      });
+    }
+
+    if (currentCategoryContext) {
+      contextBlocks.push({
+        role: "user",
+        content: currentCategoryContext,
       });
     }
 
@@ -464,25 +553,31 @@ export class ContextStrategyFactory {
       baseContext.systemMsg,
       {
         role: "user",
-        content: `${userInstruction}\n${exampleFormat}`,
+        content: `${userInstruction}\n${exampleFormat}\n\nGenerate ONE item now.`,
       },
+      // Removed assistant prefill "Name:"
       {
         role: "assistant",
-        content: "Here is the list of items:\n" + currentContentPrefill,
+        content: "",
       },
       contextBlocks,
     );
+    // Remove empty assistant message if present
+    if (messages[messages.length - 1].content === "") {
+      messages.pop();
+    }
 
     const result: StrategyResult = {
       messages,
       params: {
-        temperature: 1.1,
+        temperature: 1.15, // Slightly higher creativity for new items
         min_p: 0.05,
-        presence_penalty: 0.1,
-        maxTokens: 700,
-        minTokens: currentContentPrefill ? 0 : 50,
+        presence_penalty: 0.1, // Discourage repetition
+        maxTokens: 500, // Enough for one item
+        minTokens: 20,
       },
       filters: [Filters.scrubMarkdown],
+      prefixBehavior: "trim",
     };
 
     if (config?.filters) {

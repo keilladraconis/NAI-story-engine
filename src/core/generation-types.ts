@@ -1,7 +1,14 @@
 export interface GenerationSession {
-  fieldId: string;
+  id: string; // Unique ID for this generation task
+  fieldId: string; // The target field ID (or "brainstorm")
+  type: "field" | "dulfs-item" | "brainstorm";
+  
+  // State
   isRunning: boolean;
   isQueued?: boolean;
+  error?: string;
+  
+  // Budget / Cancellation
   cancellationSignal?: CancellationSignal;
   budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
   budgetResolver?: () => void;
@@ -9,17 +16,14 @@ export interface GenerationSession {
   budgetWaitTime?: number;
   budgetTimeRemaining?: number;
   budgetWaitEndTime?: number;
-  error?: string;
+
+  // Specific Params
+  isInitial?: boolean; // For brainstorm
+  dulfsFieldId?: string; // For dulfs-item, the category ID
+  outputBuffer?: string; // Accumulate output here
 }
 
-export interface FieldSession extends GenerationSession {
-  // Specific to field generation if any
-}
-
-export interface ListSession extends GenerationSession {
-  // Specific to list generation if any
-}
-
-export interface BrainstormSession extends GenerationSession {
-  // Specific to brainstorm generation if any
-}
+// Backward compatibility / convenience aliases if needed
+export type FieldSession = GenerationSession;
+export type ListSession = GenerationSession;
+export type BrainstormSession = GenerationSession;
