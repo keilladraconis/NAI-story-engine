@@ -40,6 +40,9 @@ export interface StoryData {
   [FieldID.ATTG]: StoryField;
   [FieldID.Style]: StoryField;
 
+  // Global Settings
+  setting: string;
+
   // DULFS components
   [FieldID.DramatisPersonae]: DULFSField[];
   [FieldID.UniverseSystems]: DULFSField[];
@@ -133,6 +136,7 @@ export class StoryDataManager {
     const data: Partial<StoryData> = {
       id: "current-story",
       version: "0.1.0",
+      setting: "Original",
 
       // Lorebook
       dulfsCategoryIds: {},

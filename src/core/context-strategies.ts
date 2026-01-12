@@ -52,7 +52,7 @@ export interface StrategyResult {
 type StrategyFn = (
   session: FieldSession,
   manager: StoryManager,
-  base: { systemMsg: Message; storyPrompt: string },
+  base: { systemMsg: Message; storyPrompt: string; setting: string },
 ) => Promise<StrategyResult>;
 
 export const buildDulfsContextString = (
@@ -100,6 +100,10 @@ const Strategies: Record<string, StrategyFn> = {
           role: "user",
           content: `STORY PROMPT:\n${base.storyPrompt}`,
         },
+        {
+          role: "user",
+          content: `SETTING:\n${base.setting}`,
+        },
       ],
     );
     return {
@@ -128,6 +132,10 @@ const Strategies: Record<string, StrategyFn> = {
         content: "Here is the story prompt based on our brainstorming session:",
       },
       [
+        {
+          role: "user",
+          content: `SETTING:\n${base.setting}`,
+        },
         {
           role: "user",
           content: `BRAINSTORM MATERIAL:\n${brainstormContent}`,
@@ -166,6 +174,10 @@ const Strategies: Record<string, StrategyFn> = {
         },
         {
           role: "user",
+          content: `SETTING:\n${base.setting}`,
+        },
+        {
+          role: "user",
           content: `BRAINSTORM MATERIAL:\n${brainstormContent}`,
         },
       ],
@@ -201,6 +213,10 @@ const Strategies: Record<string, StrategyFn> = {
         {
           role: "user",
           content: `STORY PROMPT:\n${base.storyPrompt}`,
+        },
+        {
+          role: "user",
+          content: `SETTING:\n${base.setting}`,
         },
         {
           role: "user",
@@ -244,6 +260,10 @@ const Strategies: Record<string, StrategyFn> = {
         {
           role: "user",
           content: `STORY PROMPT:\n${base.storyPrompt}`,
+        },
+        {
+          role: "user",
+          content: `SETTING:\n${base.setting}`,
         },
         {
           role: "user",
@@ -330,12 +350,16 @@ const Strategies: Record<string, StrategyFn> = {
       { role: "user", content: combinedInstruction },
       {
         role: "assistant",
-        content: `${itemName}\n`,
+        content: `Name: ${itemName}\nSetting: ${base.setting}\n`,
       },
       [
         {
           role: "user",
           content: `STORY PROMPT:\n${base.storyPrompt}`,
+        },
+        {
+          role: "user",
+          content: `SETTING:\n${base.setting}`,
         },
         {
           role: "user",
@@ -375,6 +399,7 @@ export class ContextStrategyFactory {
   async build(session: FieldSession): Promise<StrategyResult> {
     const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
+    const setting = this.storyManager.getSetting();
 
     const baseContext = {
       systemMsg: {
@@ -382,6 +407,7 @@ export class ContextStrategyFactory {
         content: systemPrompt,
       },
       storyPrompt: storyPrompt,
+      setting: setting,
     };
 
     const key = this.getStrategyKey(session);
@@ -411,6 +437,7 @@ export class ContextStrategyFactory {
     const brainstormPrompt =
       (await api.v1.config.get("brainstorm_prompt")) || "";
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
+    const setting = this.storyManager.getSetting();
     const worldSnapshot = this.storyManager.getFieldContent(
       FieldID.WorldSnapshot,
     );
@@ -427,6 +454,10 @@ export class ContextStrategyFactory {
 
     if (storyPrompt) {
       contextBlock += `STORY PROMPT:\n${storyPrompt}\n\n`;
+      hasContext = true;
+    }
+    if (setting) {
+      contextBlock += `SETTING:\n${setting}\n\n`;
       hasContext = true;
     }
     if (worldSnapshot) {
@@ -486,6 +517,7 @@ export class ContextStrategyFactory {
   async buildDulfsListContext(fieldId: string): Promise<StrategyResult> {
     const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
+    const setting = this.storyManager.getSetting();
     const worldSnapshot = this.storyManager.getFieldContent(
       FieldID.WorldSnapshot,
     );
@@ -511,6 +543,10 @@ export class ContextStrategyFactory {
       {
         role: "user",
         content: `STORY PROMPT:\n${storyPrompt}`,
+      },
+      {
+        role: "user",
+        content: `SETTING:\n${setting}`,
       },
       {
         role: "user",
@@ -571,6 +607,7 @@ Output ONLY the comma-separated names, no other text.`,
   ): Promise<StrategyResult> {
     const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
+    const setting = this.storyManager.getSetting();
     const worldSnapshot = this.storyManager.getFieldContent(
       FieldID.WorldSnapshot,
     );
@@ -603,6 +640,10 @@ Output ONLY the comma-separated names, no other text.`,
       {
         role: "user",
         content: `STORY PROMPT:\n${storyPrompt}`,
+      },
+      {
+        role: "user",
+        content: `SETTING:\n${setting}`,
       },
       {
         role: "user",

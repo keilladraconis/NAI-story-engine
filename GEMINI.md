@@ -36,7 +36,12 @@
     - `generationInstruction` is now exclusively used for Phase 2 (Content Generation) in `buildDulfsContentContext`.
   - **DULFS Prefill & Sync (Jan 12, 2026)**: Implemented assistant prefilling for DULFS content generation. The AI is now nudged with the item name and the appropriate format prefix (e.g., `Name (` for characters or `Name: ` for others). Added logic to `DulfsService.updateDulfsItem` to automatically update the raw `content` field when an item's `name` is edited in the UI, ensuring consistency across the system and in Lorebook synchronization.
   - **DULFS Format Reinforcement (Jan 12, 2026)**: Re-integrated `exampleFormat` into the DULFS content generation prompt (Phase 2). This ensures that complex formats like `Dramatis Personae` (which require Gender, Age, Role structure) are correctly adhered to by the LLM, working in tandem with the assistant prefill.
-- **AgentWorkflow Refactor (Jan 10, 2026)**: Split `AgentWorkflowService` into a facade coordinating `FieldGenerationService` and `ListGenerationService`. Defined `FieldSession` and `ListSession` in `src/core/generation-types.ts` to unify state tracking interfaces. This reduces complexity in the main workflow service and strictly separates text and list generation logic.
+  - **AgentWorkflow Refactor (Jan 10, 2026)**: Split `AgentWorkflowService` into a facade coordinating `FieldGenerationService` and `ListGenerationService`. Defined `FieldSession` and `ListSession` in `src/core/generation-types.ts` to unify state tracking interfaces. This reduces complexity in the main workflow service and strictly separates text and list generation logic.
+  - **Setting Field (Jan 12, 2026)**: Added a global "Setting" field (default: "Original") to the top of the Story Engine sidebar. This field is injected into all context generation blocks (`STORY PROMPT`, `SETTING`, `WORLD SNAPSHOT`, etc.) to guide the AI. It is also explicitly included in Lorebook generation prefills (`Name: ...\nSetting: ...\n`) to ensure consistent setting application in generated entries.
+
+  - **Current Status (Jan 12, 2026)**: Code review completed.
+  - **Stability**: High.
+  - **Maintenance**: Minor type safety and deduplication opportunities noted in `CODEREVIEW.md`.
 - **Library Extraction (Jan 12, 2026)**: Extracted generation queueing, notification, and budget timing logic into a reusable library `lib/generation-queue.ts`. This library introduces `GenX` (Generation eXchange) for managing serial task execution and `BudgetTimer` for handling countdown logic, decoupling these infrastructure concerns from `AgentWorkflowService` and `UnifiedGenerationService`.
 
   - **Current Status (Jan 12, 2026)**: Refactoring completed.

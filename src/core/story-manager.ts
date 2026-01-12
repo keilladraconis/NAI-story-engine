@@ -67,6 +67,19 @@ export class StoryManager {
     await this.dulfsService.parseAndUpdateDulfsItem(fieldId, itemId);
   }
 
+  public getSetting(): string {
+    return this.dataManager.data?.setting || "Original";
+  }
+
+  public async setSetting(value: string): Promise<void> {
+    const data = this.dataManager.data;
+    if (!data) return;
+    if (data.setting !== value) {
+      data.setting = value;
+      await this.dataManager.save();
+    }
+  }
+
   public getFieldContent(fieldId: string): string {
     // Handle lorebook item reference: fieldId:itemId OR lorebook:entryId
     if (fieldId.includes(":")) {
@@ -326,40 +339,47 @@ export class StoryManager {
   }
 
   public async clearAllStoryData(): Promise<void> {
-    // 1. Clear DULFS fields (handles lorebook cleanup)
+    const data = this.dataManager.data;
+    if (!data) return;
+
+    // 1. Clear DULFS fields (Deletes all DULFS Lorebook content and categories)
     for (const fieldId of LIST_FIELD_IDS) {
       await this.clearDulfsList(fieldId);
     }
 
-    // 2. Clear Text fields (excluding Brainstorm)
-    for (const fieldId of TEXT_FIELD_IDS) {
-      if (fieldId === FieldID.Brainstorm) continue; // Do not clear brainstorm
+    // 2. Clear External Memory (ATTG / Style)
+    if (data.attgEnabled) {
+      await this.lorebookSyncService.syncAttgToMemory("");
+    }
+    if (data.styleEnabled) {
+      await this.lorebookSyncService.syncStyleToAN("");
+    }
 
-      // Handle ATTG/Style special cases for cleanup
-      if (fieldId === FieldID.ATTG) {
-        if (this.isAttgEnabled()) {
-          // Sync empty string to memory first to clear it
-          await this.setFieldContent(fieldId, "", "none", true);
-          await this.setAttgEnabled(false);
-        } else {
-          await this.setFieldContent(fieldId, "", "none", false);
-        }
-      } else if (fieldId === FieldID.Style) {
-        if (this.isStyleEnabled()) {
-          // Sync empty string to memory first to clear it
-          await this.setFieldContent(fieldId, "", "none", true);
-          await this.setStyleEnabled(false);
-        } else {
-          await this.setFieldContent(fieldId, "", "none", false);
-        }
-      } else {
-        await this.setFieldContent(fieldId, "", "none", true);
-        if (this.isTextFieldLorebookEnabled(fieldId)) {
-          await this.setTextFieldLorebookEnabled(fieldId, false);
+    // 3. Delete Text Field Lorebook Entries (Prevent orphans)
+    // We must manually delete them because we are about to lose their IDs by resetting the state.
+    for (const fieldId of TEXT_FIELD_IDS) {
+      const entryId = data.textFieldEntryIds[fieldId];
+      if (entryId) {
+        try {
+          await api.v1.lorebook.removeEntry(entryId);
+        } catch (e) {
+          // Ignore if already gone
         }
       }
     }
 
+    // 4. Create Fresh State
+    const defaultData = this.dataManager.createDefaultData();
+
+    // 5. Preserve Brainstorm Data
+    // We want to keep the chat history even if we clear the structured data
+    const oldBrainstorm = this.dataManager.getStoryField(FieldID.Brainstorm);
+    if (oldBrainstorm) {
+      defaultData[FieldID.Brainstorm] = oldBrainstorm;
+    }
+
+    // 6. Apply Fresh State
+    this.dataManager.setData(defaultData);
     await this.saveStoryData(true);
   }
 

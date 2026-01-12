@@ -348,6 +348,28 @@ export class StoryEngineUI {
               content: headerContent,
             }),
 
+            // Setting Field
+            part.row({
+              style: {
+                "align-items": "center",
+                gap: "8px",
+                "margin-bottom": "8px",
+                padding: "0 4px",
+              },
+              content: [
+                part.text({
+                  text: "Setting:",
+                  style: { "font-weight": "bold", "font-size": "0.9em", opacity: "0.8" },
+                }),
+                part.textInput({
+                  initialValue: this.storyManager.getSetting(),
+                  placeholder: "e.g., Original, Star Wars, Harry Potter...",
+                  onChange: (val) => this.storyManager.setSetting(val),
+                  style: { flex: "1" },
+                }),
+              ],
+            }),
+
             // Structured Editor with Collapsible Sections
             this.structuredEditor.sidebar,
           ],
