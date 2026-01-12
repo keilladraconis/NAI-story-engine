@@ -59,6 +59,12 @@ export class StoryEngineUI {
       this.updateLorebookUI();
     });
 
+    // Subscribe to workflow updates (for streaming generation)
+    this.agentWorkflowService.subscribe(() => {
+      this.updateUI();
+      this.updateLorebookUI();
+    });
+
     // Handle lorebook selection hook
     api.v1.hooks.register("onLorebookEntrySelected", async (params) => {
       this.selectedLorebookEntryId = params.entryId;

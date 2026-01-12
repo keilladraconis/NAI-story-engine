@@ -5,6 +5,7 @@ import { FIELD_CONFIGS, FieldID } from "../config/field-definitions";
 export class SegaService {
   private _isRunning: boolean = false;
   private currentSegaId?: string;
+  private bootstrapIds: Set<string> = new Set();
   private updateCallback?: () => void;
 
   constructor(
@@ -33,9 +34,110 @@ export class SegaService {
 
   public start() {
     if (this._isRunning) return;
+
+    // Fast S.E.G.A. check: if Story Prompt, ATTG and Style are empty and unbound, offer to bootstrap
+    if (this.shouldTriggerFastSega()) {
+      this.showFastSegaModal();
+      return;
+    }
+
+    this._startNormal();
+  }
+
+  private _startNormal() {
     this._isRunning = true;
     api.v1.ui.toast("S.E.G.A. Background Generation Started");
     this.tryNext();
+    if (this.updateCallback) this.updateCallback();
+  }
+
+  private shouldTriggerFastSega(): boolean {
+    const prompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
+    const attg = this.storyManager.getFieldContent(FieldID.ATTG);
+    const style = this.storyManager.getFieldContent(FieldID.Style);
+
+    const promptUnbound = !this.storyManager.isTextFieldLorebookEnabled(
+      FieldID.StoryPrompt,
+    );
+    const attgUnbound = !this.storyManager.isAttgEnabled();
+    const styleUnbound = !this.storyManager.isStyleEnabled();
+
+    const isEmpty = (s: string) => !s || s.trim().length === 0;
+
+    return (
+      isEmpty(prompt) &&
+      promptUnbound &&
+      isEmpty(attg) &&
+      attgUnbound &&
+      isEmpty(style) &&
+      styleUnbound
+    );
+  }
+
+  private async showFastSegaModal() {
+    const modal = await api.v1.ui.modal.open({
+      title: "Bootstrap Story from Brainstorm?",
+      size: "small",
+      content: [
+        {
+          type: "text",
+          text: "Story Prompt, ATTG, and Style Guidelines are empty. Would you like to queue their generation and bind them to Lorebook, Memory, and Author's Note so you can immediately start writing?",
+        },
+        {
+          type: "row",
+          spacing: "end",
+          style: { marginTop: "15px" },
+          content: [
+            {
+              type: "button",
+              text: "Yes!",
+              callback: async () => {
+                await modal.close();
+                await this.bootstrapFastSega();
+              },
+            },
+            {
+              type: "button",
+              text: "No",
+              style: { marginLeft: "10px" },
+              callback: async () => {
+                await modal.close();
+                // If no, we just don't start SEGA as per user request
+                if (this.updateCallback) this.updateCallback();
+              },
+            },
+          ],
+        },
+      ],
+    });
+  }
+
+  private async bootstrapFastSega() {
+    // 1. Bind fields
+    await this.storyManager.setTextFieldLorebookEnabled(
+      FieldID.StoryPrompt,
+      true,
+    );
+    await this.storyManager.setAttgEnabled(true);
+    await this.storyManager.setStyleEnabled(true);
+
+    // 2. Queue generations
+    // Note: They will be queued sequentially by AgentWorkflowService
+    this.bootstrapIds.add(FieldID.StoryPrompt);
+    this.bootstrapIds.add(FieldID.ATTG);
+    this.bootstrapIds.add(FieldID.Style);
+
+    this.agentWorkflow.requestFieldGeneration(FieldID.StoryPrompt, () => {});
+    this.agentWorkflow.requestFieldGeneration(FieldID.ATTG, () => {});
+    this.agentWorkflow.requestFieldGeneration(FieldID.Style, () => {});
+
+    // 3. Start SEGA in normal mode
+    this._isRunning = true;
+    api.v1.ui.toast("Bootstrap started. S.E.G.A. active.");
+
+    // Trigger the next random item (it will be queued after the above three)
+    this.tryNext();
+
     if (this.updateCallback) this.updateCallback();
   }
 
@@ -57,41 +159,52 @@ export class SegaService {
       this.currentSegaId = undefined;
     }
 
+    this.bootstrapIds.clear();
+
     if (this.updateCallback) this.updateCallback();
   }
 
   private onWorkflowUpdate(fieldId: string) {
     if (!this._isRunning) return;
 
-    // We only care if the updated field is the one we are currently managing
-    if (fieldId === this.currentSegaId) {
-      const isList = FIELD_CONFIGS.some(
-        (c) => c.id === fieldId && c.layout === "list",
-      );
-      let isActive = false;
-      let budgetResolver: (() => void) | undefined;
-      let budgetState: string | undefined;
+    const isCurrentSega = fieldId === this.currentSegaId;
+    const isBootstrap = this.bootstrapIds.has(fieldId);
 
-      if (isList) {
-        const state = this.agentWorkflow.getListGenerationState(fieldId);
-        isActive = state.isRunning || state.isQueued || false;
-        budgetResolver = state.budgetResolver;
-        budgetState = state.budgetState;
-      } else {
-        const session = this.agentWorkflow.getSession(fieldId);
-        isActive = session?.isRunning || session?.isQueued || false;
-        budgetResolver = session?.budgetResolver;
-        budgetState = session?.budgetState;
+    // We only care if the updated field is managed by SEGA
+    if (!isCurrentSega && !isBootstrap) return;
+
+    const isList = FIELD_CONFIGS.some(
+      (c) => c.id === fieldId && c.layout === "list",
+    );
+    let isActive = false;
+    let budgetResolver: (() => void) | undefined;
+    let budgetState: string | undefined;
+
+    if (isList) {
+      const state = this.agentWorkflow.getListGenerationState(fieldId);
+      isActive = state.isRunning || state.isQueued || false;
+      budgetResolver = state.budgetResolver;
+      budgetState = state.budgetState;
+    } else {
+      const session = this.agentWorkflow.getSession(fieldId);
+      isActive = session?.isRunning || session?.isQueued || false;
+      budgetResolver = session?.budgetResolver;
+      budgetState = session?.budgetState;
+    }
+
+    // Auto-resolve budget wait for S.E.G.A. items
+    if (isActive && budgetState === "waiting_for_user" && budgetResolver) {
+      budgetResolver();
+      return;
+    }
+
+    if (!isActive) {
+      // Generation finished, errored, or was cancelled
+      if (isBootstrap) {
+        this.bootstrapIds.delete(fieldId);
       }
 
-      // Auto-resolve budget wait for S.E.G.A. items
-      if (isActive && budgetState === "waiting_for_user" && budgetResolver) {
-        budgetResolver();
-        return;
-      }
-
-      if (!isActive) {
-        // Generation finished, errored, or was cancelled
+      if (isCurrentSega) {
         this.currentSegaId = undefined;
         // Wait a brief moment before trying the next one to allow UI updates/cleanup
         api.v1.timers.setTimeout(() => this.tryNext(), 1000);

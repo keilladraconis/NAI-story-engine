@@ -259,11 +259,13 @@ export class StoryManager {
     if (changed || persistence === "immediate") {
       if (persistence === "immediate") {
         await this.dataManager.save();
+        this.dataManager.notifyListeners();
       } else if (changed && persistence === "debounce") {
         await this.debounceAction(
           `save-global-${fieldId}`,
           async () => {
             await this.dataManager.save();
+            this.dataManager.notifyListeners();
             api.v1.log(`Auto-saved global story data (${fieldId})`);
           },
           250,
@@ -320,6 +322,9 @@ export class StoryManager {
         }
       } else {
         await this.setFieldContent(fieldId, "", "none", true);
+        if (this.isTextFieldLorebookEnabled(fieldId)) {
+          await this.setTextFieldLorebookEnabled(fieldId, false);
+        }
       }
     }
 
