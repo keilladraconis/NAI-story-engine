@@ -105,8 +105,8 @@ The goal of this phase is to address outstanding nit-picks and sub-optimal UX an
 - [x] Fast S.E.G.A. mode. After brainstorming, if user activates SEGA while Story Prompt, ATTG and Style Guidelines are empty and unbound, open a modal confirmation to "Bootstrap Story from Brainstorm? (Generate Story Prompt, ATTG, Style Guidelines and bind to lorebook, Memory, AN)
 - [x] Evaluate factoring Queued Generation / Waiting from `agent-workflow.ts` as a stand-alone library or companion to `HyperGenerate`.
 - [x] Attempt to unify `FieldGenerationService` with `ListGenerationService`, the latter is just a consecutive execution of the former. Change "Generate/Add", to "Generate Batch" and "Generate One"
-- [ ] Clean up ULFS lorebook templates. Allow for non-original settings.
-- [ ] Allow inclusion of story context into brainstorm, other fields.
+- [x] Clean up ULFS lorebook templates. Allow for non-original settings.
+- [x] Allow inclusion of story context into brainstorm, other fields.
 
 ### **Phase 8: Scenario Modality**
 

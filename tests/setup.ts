@@ -44,7 +44,9 @@ const apiMock = {
     },
     ui: {
       toast: vi.fn()
-    }
+    },
+    buildContext: vi.fn().mockResolvedValue([]),
+    maxTokens: vi.fn().mockResolvedValue(8192),
   }
 };
 

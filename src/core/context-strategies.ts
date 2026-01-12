@@ -52,7 +52,12 @@ export interface StrategyResult {
 type StrategyFn = (
   session: FieldSession,
   manager: StoryManager,
-  base: { systemMsg: Message; storyPrompt: string; setting: string },
+  base: {
+    systemMsg: Message;
+    storyPrompt: string;
+    setting: string;
+    storyContext: Message[];
+  },
 ) => Promise<StrategyResult>;
 
 export const buildDulfsContextString = (
@@ -96,6 +101,7 @@ const Strategies: Record<string, StrategyFn> = {
           "I will explore the narrative vectors and three-sphere frictions:",
       },
       [
+        ...base.storyContext,
         {
           role: "user",
           content: `STORY PROMPT:\n${base.storyPrompt}`,
@@ -132,6 +138,7 @@ const Strategies: Record<string, StrategyFn> = {
         content: "Here is the story prompt based on our brainstorming session:",
       },
       [
+        ...base.storyContext,
         {
           role: "user",
           content: `SETTING:\n${base.setting}`,
@@ -168,6 +175,7 @@ const Strategies: Record<string, StrategyFn> = {
           "Here is the dynamic world snapshot, focusing on drivers and tensions:",
       },
       [
+        ...base.storyContext,
         {
           role: "user",
           content: `STORY PROMPT:\n${base.storyPrompt}`,
@@ -210,6 +218,7 @@ const Strategies: Record<string, StrategyFn> = {
         content: "[ Author:",
       },
       [
+        ...base.storyContext,
         {
           role: "user",
           content: `STORY PROMPT:\n${base.storyPrompt}`,
@@ -257,6 +266,7 @@ const Strategies: Record<string, StrategyFn> = {
         content: "[ Write in a style that conveys the following:",
       },
       [
+        ...base.storyContext,
         {
           role: "user",
           content: `STORY PROMPT:\n${base.storyPrompt}`,
@@ -345,6 +355,7 @@ const Strategies: Record<string, StrategyFn> = {
 
     const combinedInstruction = `${basePrompt.replace("[itemName]", itemName)}\n\nTASK: Fill in the following Template for "${itemName}". Replace the placeholders with generated content.\n\nTEMPLATE:\n${templateContent}`;
 
+    // Note: base.storyContext is intentionally EXCLUDED from lorebook generation
     const messages = contextBuilder(
       base.systemMsg,
       { role: "user", content: combinedInstruction },
@@ -396,10 +407,31 @@ const Strategies: Record<string, StrategyFn> = {
 export class ContextStrategyFactory {
   constructor(private storyManager: StoryManager) {}
 
+  private async getStoryContextMessages(
+    reduction: number = 3000,
+  ): Promise<Message[]> {
+    try {
+      const messages = await api.v1.buildContext({
+        contextLimitReduction: reduction,
+      });
+      // Filter out system messages to avoid duplication with our custom system prompts
+      return messages.filter((m) => m.role !== "system");
+    } catch (e) {
+      api.v1.log("Failed to build story context via api.v1.buildContext", e);
+      return [];
+    }
+  }
+
   async build(session: FieldSession): Promise<StrategyResult> {
     const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
     const setting = this.storyManager.getSetting();
+
+    const key = this.getStrategyKey(session);
+    let storyContext: Message[] = [];
+    if (key !== "generate:lorebook") {
+      storyContext = await this.getStoryContextMessages(4000);
+    }
 
     const baseContext = {
       systemMsg: {
@@ -408,9 +440,9 @@ export class ContextStrategyFactory {
       },
       storyPrompt: storyPrompt,
       setting: setting,
+      storyContext: storyContext,
     };
 
-    const key = this.getStrategyKey(session);
     const strategy = Strategies[key] || Strategies["generate:default"];
 
     const result = await strategy(session, this.storyManager, baseContext);
@@ -447,6 +479,10 @@ export class ContextStrategyFactory {
 
     const systemMsg = `${systemPrompt}\n\n[BRAINSTORMING MODE]\n${brainstormPrompt}`;
     const messages: Message[] = [{ role: "system", content: systemMsg }];
+
+    // Inject Story Context
+    const storyContext = await this.getStoryContextMessages(4000);
+    messages.push(...storyContext);
 
     // Build Context Block
     let contextBlock = "Here is the current state of the story:\n";
@@ -539,7 +575,10 @@ export class ContextStrategyFactory {
       storyPrompt: storyPrompt,
     };
 
+    const storyContext = await this.getStoryContextMessages(4000);
+
     const contextBlocks: Message[] = [
+      ...storyContext,
       {
         role: "user",
         content: `STORY PROMPT:\n${storyPrompt}`,
@@ -636,7 +675,10 @@ Output ONLY the names, separated by newlines, no other text.`,
       storyPrompt: storyPrompt,
     };
 
+    const storyContext = await this.getStoryContextMessages(4000);
+
     const contextBlocks: Message[] = [
+      ...storyContext,
       {
         role: "user",
         content: `STORY PROMPT:\n${storyPrompt}`,
