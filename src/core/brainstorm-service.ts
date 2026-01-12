@@ -10,19 +10,11 @@ export class BrainstormService {
     this.storyManager = storyManager;
   }
 
-  public async sendChat(
-    userMessage: string,
-    onDelta: (text: string) => void,
-  ): Promise<void> {
-    const isInitialOrEmpty = !userMessage.trim();
-
-    // 1. Add User Message to History if not empty
-    if (!isInitialOrEmpty) {
-      this.storyManager.addBrainstormMessage("user", userMessage);
+  public async addUserMessage(content: string): Promise<void> {
+    if (content.trim()) {
+      this.storyManager.addBrainstormMessage("user", content);
       await this.storyManager.saveStoryData(false);
     }
-
-    await this.generateResponse(isInitialOrEmpty, onDelta);
   }
 
   public async editMessage(index: number, newContent: string): Promise<void> {
@@ -43,48 +35,37 @@ export class BrainstormService {
     }
   }
 
-  public async retryMessage(
-    index: number,
-    onDelta: (text: string) => void,
-  ): Promise<void> {
+  public async prepareRetry(index: number): Promise<void> {
     const history = this.storyManager.getBrainstormMessages();
     if (index < 0 || index >= history.length) return;
 
-    // We want to regenerate the message at 'index'.
-    // Logic:
-    // 1. If it's an Assistant message:
-    //    We remove it (and anything after it? - Standard behavior is truncate future)
-    //    Then we generate a response to the history ending at index-1.
-    // 2. If it's a User message:
-    //    We shouldn't "retry" a user message in the sense of AI generation.
-    //    The user probably wants to "Regenerate response TO this message".
-    //    So we truncate history to 'index' (inclusive), keeping this user message.
-    //    Then we generate.
-
     const msg = history[index];
+    let newHistory: typeof history;
 
     if (msg.role === "assistant") {
       // Truncate to index-1 (removing this assistant message and any following)
-      const newHistory = history.slice(0, index);
-      this.storyManager.setBrainstormMessages(newHistory);
-      await this.storyManager.saveStoryData(true);
-
-      // Generate
-      await this.generateResponse(false, onDelta);
+      newHistory = history.slice(0, index);
     } else {
       // User message: Truncate to index (keeping this message) and removing subsequent
-      const newHistory = history.slice(0, index + 1);
-      this.storyManager.setBrainstormMessages(newHistory);
-      await this.storyManager.saveStoryData(true);
-
-      // Generate
-      await this.generateResponse(false, onDelta);
+      newHistory = history.slice(0, index + 1);
     }
+
+    this.storyManager.setBrainstormMessages(newHistory);
+    await this.storyManager.saveStoryData(true);
   }
 
-  private async generateResponse(
+  public async generateResponse(
     isInitialOrEmpty: boolean,
     onDelta: (text: string) => void,
+    cancellationSignal?: CancellationSignal,
+    options?: {
+      onBudgetWait?: (
+        chk: unknown,
+        resolve: unknown,
+        time: number,
+      ) => Promise<void>;
+      onBudgetResume?: () => void;
+    },
   ): Promise<void> {
     // 2. Prepare Context
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
@@ -112,7 +93,9 @@ export class BrainstormService {
     );
 
     let fullResponse = "";
-    const cancellationSignal = await api.v1.createCancellationSignal();
+    // If no signal provided (legacy call), create one that won't be cancelled externally
+    const signal =
+      cancellationSignal || (await api.v1.createCancellationSignal());
     const model = (await api.v1.config.get("model")) || "glm-4-6";
 
     try {
@@ -123,19 +106,24 @@ export class BrainstormService {
           minTokens: 10,
           model,
           temperature: 1,
+          onBudgetWait: options?.onBudgetWait,
+          onBudgetResume: options?.onBudgetResume,
         },
         (text) => {
           fullResponse += text;
           onDelta(fullResponse);
         },
         "background",
-        cancellationSignal,
+        signal,
       );
 
       // 3. Add Assistant Message to History
       this.storyManager.addBrainstormMessage("assistant", fullResponse);
       await this.storyManager.saveStoryData(true); // Save and notify UI
     } catch (e) {
+      if (e === "Cancelled") {
+        throw e;
+      }
       api.v1.log("Brainstorm generation failed", e);
       throw e;
     }

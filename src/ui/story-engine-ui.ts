@@ -46,7 +46,10 @@ export class StoryEngineUI {
       this.agentWorkflowService,
       () => this.updateUI(),
     );
-    this.brainstormUI = new BrainstormUI(this.storyManager);
+    this.brainstormUI = new BrainstormUI(
+      this.storyManager,
+      this.agentWorkflowService,
+    );
     this.sidebar = this.createSidebar();
     this.lorebookPanel = this.createLorebookPanel();
 

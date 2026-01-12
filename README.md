@@ -63,6 +63,33 @@ This project is a **NovelAI Script**.
 - `src/config/`: Configuration files, primarily `field-definitions.ts`.
 - `src/lib/`: External utilities and the `hyper-generator`.
 
+## Development Conventions
+
+Format all code with the `npm run format` script.
+
+### Planning and Coordination
+
+A `PLAN.md` file is present, and it maintains an outline and implementation guide for the project. It should be updated frequently as development proceeds, and when the trajectory differs, update the file to match the latest development trajectory.
+
+### Code Review
+
+Any current architecture or tech debt concerns are noted in the `CODEREVIEW.md` file. We monitor for dead code, unused files, antipatterns and code smells. Excess complexity, DRY violation, inconsistent style, and other refactoring opportunities. Findings are summarized as HIGH, MEDIUM and LOW.
+
+### API
+
+This script is hosted in the browser in a web worker, and only has access to native Javascript APIs offered by quickjs, and the NovelAI Scripting API: `external/script-types.d.ts`.
+
+**Crucial Environment Note**: Typical DOM/Node APIs like `setTimeout`, `clearTimeout`, and `setInterval` are **unavailable**. Use the `api.v1.timers` namespace instead. Note that in this environment, `setTimeout` and `clearTimeout` are **asynchronous** and return Promises.
+
+### Coding Style
+
+The project follows standard TypeScript and Prettier conventions. The code is well-structured and uses modern TypeScript features.
+
+- **External Libraries**: Files in the `lib/` directory are considered external dependencies and MUST NOT be modified. If changes are needed, implement them in the `src/` directory by wrapping or extending the library functionality.
+- **UI Components**: Reusable UI logic is extracted into `src/ui/ui-components.ts`.
+- **Configuration**: Field definitions are centralized in `src/config/field-definitions.ts`.
+
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please review `GEMINI.md` and `PLAN.md` to understand the architectural decisions and current roadmap before submitting a PR.

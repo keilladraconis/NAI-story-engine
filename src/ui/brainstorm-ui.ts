@@ -1,5 +1,5 @@
-import { BrainstormService } from "../core/brainstorm-service";
 import { StoryManager } from "../core/story-manager";
+import { AgentWorkflowService } from "../core/agent-workflow";
 import { calculateTextAreaHeight } from "./ui-components";
 
 const { column, row, button, text, multilineTextInput } = api.v1.ui.part;
@@ -12,25 +12,35 @@ export class BrainstormUI {
 
   public sidebar: UIExtensionSidebarPanel;
   private storyManager: StoryManager;
-  private brainstormService: BrainstormService;
+  private agentWorkflowService: AgentWorkflowService;
 
   // Local State
   private inputValue: string = "";
-  private isGenerating: boolean = false;
   private streamingContent: string = "";
   private editingIndex: number | null = null;
   private editValue: string = "";
 
-  constructor(storyManager: StoryManager) {
+  constructor(
+    storyManager: StoryManager,
+    agentWorkflowService: AgentWorkflowService,
+  ) {
     this.storyManager = storyManager;
-    this.brainstormService = new BrainstormService(storyManager);
+    this.agentWorkflowService = agentWorkflowService;
 
     this.sidebar = this.createSidebar();
 
     // Subscribe to story manager updates to refresh chat history
     this.storyManager.subscribe(() => {
+      const session = this.agentWorkflowService.getBrainstormSession();
       // Only refresh if we are not currently generating (streaming handles its own updates)
-      if (!this.isGenerating) {
+      if (!session.isRunning) {
+        this.updateUI();
+      }
+    });
+
+    // Subscribe to workflow updates
+    this.agentWorkflowService.subscribe((fieldId) => {
+      if (fieldId === "brainstorm") {
         this.updateUI();
       }
     });
@@ -47,7 +57,7 @@ export class BrainstormUI {
     return sidebarPanel({
       id: BrainstormUI.KEYS.SIDEBAR_ID,
       name: "Brainstorm",
-      iconId: "cloud-lightning", // Using a relevant icon
+      iconId: "cloud-lightning",
       content: [
         column({
           content: [
@@ -68,17 +78,24 @@ export class BrainstormUI {
 
   private createMessageList(): UIPart {
     const history = this.storyManager.getBrainstormMessages();
+    const session = this.agentWorkflowService.getBrainstormSession();
     const messageParts: UIPart[] = [];
 
+    const isGenerating =
+      session.isRunning &&
+      !session.isQueued &&
+      (!session.budgetState || session.budgetState === "normal");
+
     // Render Streaming Message (if any) - goes at the very bottom (first in reversed list)
-    if (this.isGenerating && this.streamingContent) {
+    if (isGenerating) {
+      // Use streaming content or "Thinking..." if empty
+      const displayContent = this.streamingContent || "...";
       messageParts.push(
-        this.renderMessageBubble("assistant", this.streamingContent, -1, true),
+        this.renderMessageBubble("assistant", displayContent, -1, true),
       );
     }
 
     // Render History (Reversed so latest is at the top of the array, which is the bottom of the UI due to column-reverse)
-    // We need to map original indices to the reversed items
     const reversedHistory = history
       .map((msg, idx) => ({ ...msg, idx }))
       .reverse();
@@ -89,7 +106,7 @@ export class BrainstormUI {
       );
     });
 
-    if (messageParts.length === 0) {
+    if (messageParts.length === 0 && !isGenerating) {
       return column({
         content: [
           text({
@@ -194,37 +211,40 @@ export class BrainstormUI {
     // Normal View
     const processedContent = content.replace(/\n/g, "  \n");
 
+    const session = this.agentWorkflowService.getBrainstormSession();
+    const isBusy = session.isRunning || session.isQueued;
+
     const actionButtons: UIPart[] = [];
     if (!isStreaming) {
       // Edit Button
       actionButtons.push(
         button({
           iconId: "edit-3",
-          callback: () => this.handleEdit(index, content),
+          callback: () => !isBusy && this.handleEdit(index, content),
           style: {
             width: "24px",
             height: "24px",
             padding: "2px",
             "background-color": "transparent",
-            opacity: 0.5,
+            opacity: isBusy ? 0.2 : 0.5,
           },
+          disabled: isBusy,
         }),
       );
 
-      // Retry Button (Assistant only, or User to regenerate response)
-      // "Retry" on User message -> Truncate future, regen response to this.
-      // "Retry" on Assistant message -> Truncate this + future, regen response to previous.
+      // Retry Button
       actionButtons.push(
         button({
           iconId: "refresh-cw",
-          callback: () => this.handleRetry(index),
+          callback: () => !isBusy && this.handleRetry(index),
           style: {
             width: "24px",
             height: "24px",
             padding: "2px",
             "background-color": "transparent",
-            opacity: 0.5,
+            opacity: isBusy ? 0.2 : 0.5,
           },
+          disabled: isBusy,
         }),
       );
 
@@ -232,15 +252,16 @@ export class BrainstormUI {
       actionButtons.push(
         button({
           iconId: "trash-2",
-          callback: () => this.handleDelete(index),
+          callback: () => !isBusy && this.handleDelete(index),
           style: {
             width: "24px",
             height: "24px",
             padding: "2px",
             "background-color": "transparent",
-            opacity: 0.5,
+            opacity: isBusy ? 0.2 : 0.5,
             color: "rgba(255, 100, 100, 0.8)",
           },
+          disabled: isBusy,
         }),
       );
     }
@@ -260,7 +281,7 @@ export class BrainstormUI {
                     flex: 1,
                   },
                 }),
-                // Actions Row (Top Right)
+                // Actions Row
                 !isStreaming
                   ? row({
                       content: actionButtons,
@@ -306,7 +327,7 @@ export class BrainstormUI {
 
   private async handleSaveEdit() {
     if (this.editingIndex !== null) {
-      await this.brainstormService.editMessage(
+      await this.agentWorkflowService.brainstormService.editMessage(
         this.editingIndex,
         this.editValue,
       );
@@ -317,42 +338,59 @@ export class BrainstormUI {
   }
 
   private async handleDelete(index: number) {
-    // Direct delete without confirmation for now as api.v1.ui.confirm is not available
-    await this.brainstormService.deleteMessage(index);
+    await this.agentWorkflowService.brainstormService.deleteMessage(index);
     this.updateUI();
   }
 
   private async handleRetry(index: number) {
-    if (this.isGenerating) return;
+    const session = this.agentWorkflowService.getBrainstormSession();
+    if (session.isRunning || session.isQueued) return;
 
-    // Direct retry without confirmation
-    this.isGenerating = true;
+    // Truncate history
+    await this.agentWorkflowService.brainstormService.prepareRetry(index);
+
     this.streamingContent = "";
-
-    // Optimistic UI update handled by service truncating history,
-    // but we need to start showing the spinner/streaming bubble.
-    // The service.retryMessage will truncate -> save -> we see history update.
-    // Then it starts generating -> onDelta -> we see streaming bubble.
-
-    const retryPromise = this.brainstormService.retryMessage(index, (delta) => {
-      this.streamingContent = delta;
-      this.updateUI();
-    });
-
     this.updateUI();
 
-    try {
-      await retryPromise;
-    } catch (e) {
-      api.v1.ui.toast("Failed to regenerate", { type: "error" });
-    } finally {
-      this.isGenerating = false;
-      this.streamingContent = "";
-      this.updateUI();
-    }
+    this.agentWorkflowService.requestBrainstormGeneration(
+      false,
+      (delta) => {
+        this.streamingContent = delta;
+        this.updateUI();
+      },
+      () => this.updateUI(),
+    );
   }
 
   private createInputArea(): UIPart {
+    const session = this.agentWorkflowService.getBrainstormSession();
+    const isBusy = session.isRunning || session.isQueued;
+
+    let buttonText = "Send";
+    let buttonIcon: any = "send";
+    let onCallback: () => void | Promise<void> = () => this.handleSend();
+
+    if (session.isQueued) {
+      buttonText = "Queued";
+      buttonIcon = "clock";
+      onCallback = () => this.agentWorkflowService.cancelBrainstormGeneration();
+    } else if (session.budgetState === "waiting_for_user") {
+      buttonText = "Continue...?";
+      buttonIcon = "play";
+      onCallback = () => {
+        if (session.budgetResolver) session.budgetResolver();
+      };
+    } else if (session.budgetState === "waiting_for_timer") {
+      const remaining = session.budgetTimeRemaining || 0;
+      buttonText = `Waiting... (${remaining}s)`;
+      buttonIcon = "hourglass";
+      onCallback = () => this.agentWorkflowService.cancelBrainstormGeneration();
+    } else if (session.isRunning) {
+      buttonText = "Thinking...";
+      buttonIcon = "loader";
+      onCallback = () => this.agentWorkflowService.cancelBrainstormGeneration();
+    }
+
     return column({
       content: [
         multilineTextInput({
@@ -361,8 +399,9 @@ export class BrainstormUI {
           onChange: (val) => {
             this.inputValue = val;
           },
-          onSubmit: () => this.handleSend(),
+          onSubmit: () => !isBusy && this.handleSend(),
           style: { "min-height": "60px", "max-height": "120px" },
+          disabled: isBusy,
         }),
         row({
           content: [
@@ -370,13 +409,20 @@ export class BrainstormUI {
               text: "Clear Chat",
               callback: () => this.handleClear(),
               style: { flex: 0.3 },
+              disabled: isBusy,
             }),
             button({
-              text: this.isGenerating ? "Thinking..." : "Send",
-              iconId: "send",
-              callback: () => this.handleSend(),
-              disabled: this.isGenerating,
-              style: { flex: 0.7, "font-weight": "bold" },
+              text: buttonText,
+              iconId: buttonIcon,
+              callback: onCallback,
+              disabled: false, // Always enabled so we can cancel if needed
+              style: {
+                flex: 0.7,
+                "font-weight": "bold",
+                "background-color": isBusy
+                  ? "rgba(255, 100, 100, 0.2)"
+                  : undefined,
+              },
             }),
           ],
           style: { gap: "8px", "margin-top": "8px" },
@@ -391,36 +437,30 @@ export class BrainstormUI {
   }
 
   private async handleSend() {
+    const session = this.agentWorkflowService.getBrainstormSession();
+    if (session.isRunning || session.isQueued) return;
+
     const message = this.inputValue;
-    this.inputValue = ""; // Clear input immediately
-    this.isGenerating = true;
-    this.streamingContent = ""; // Start with empty, or "..."
+    this.inputValue = "";
+    this.streamingContent = "";
 
-    // Start generation (which adds user message to history immediately)
-    const generatePromise = this.brainstormService.sendChat(
-      message,
-      (deltaText) => {
-        this.streamingContent = deltaText;
-        this.updateUI();
-      },
-    );
+    // Add user message immediately
+    await this.agentWorkflowService.brainstormService.addUserMessage(message);
 
-    // Immediate update to show the new user message (now in history)
     this.updateUI();
 
-    try {
-      await generatePromise;
-    } catch (e) {
-      api.v1.ui.toast("Failed to generate response", { type: "error" });
-    } finally {
-      this.isGenerating = false;
-      this.streamingContent = "";
-      this.updateUI(); // Final update
-    }
+    this.agentWorkflowService.requestBrainstormGeneration(
+      !message.trim(), // isInitial if message was empty
+      (delta) => {
+        this.streamingContent = delta;
+        this.updateUI();
+      },
+      () => this.updateUI(),
+    );
   }
 
   private async handleClear() {
-    await this.brainstormService.clearHistory();
+    await this.agentWorkflowService.brainstormService.clearHistory();
     api.v1.ui.toast("Brainstorm history cleared", { type: "info" });
     this.updateUI();
   }

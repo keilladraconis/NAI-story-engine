@@ -94,9 +94,25 @@ _(Note: "Content Extraction" is currently handled via generative context strateg
   - `StoryDataManager`: Verified default data creation, field access, and persistence triggering.
 - **Test Automation**: Added `npm run test` script for easy verification of core logic changes.
 
+### **Phase 7: Further usability improvements**
+
+The goal of this phase is to address outstanding nit-picks and sub-optimal UX and bugs related to the existing UI components and systems.
+
+#### Features
+
+- [ ] Brainstorm UI shows queueing/waiting status of brainstorm chat.
+- [ ] Optional binding of Story Prompt and/or World Snapshot to lorebooks.
+- [ ] Evaluate factoring Queued Generation / Waiting from `agent-workflow.ts` as a stand-alone library or companion to `HyperGenerate`.
+- [ ] Clean up ULFS lorebook templates. Allow for non-original settings.
+
+### **Phase 8: Scenario Modality**
+
+The goal of this phase is to expand the viability of Story Engine to accommodate different "flavors" or "templates" of scenario. The default follows the "Three Sphere, Three Layer" world-building structure. However, this is not as well-suited to narrower-scope stories, fanfiction, episodes and vignettes, other casual kinds of scenarios. Speculative right now, design forthcoming...
+
 ## Feature Requests
 
 [x] indicates votes
+
 - [0] Custom DULFS categories. What if user wants to have "Spaceships" as a category, or "Laws"?
 
 ## Bugs
@@ -105,7 +121,7 @@ _(Note: "Content Extraction" is currently handled via generative context strateg
 
 - [3] Apparently after generating multiple lorebooks, lorebook generation goes haywire. Observed in "Universe Systems". Maybe rolling context window is too big? Correction: might have been `violet` being insane.
 - [2] DULFS looping/insanity while generating. Also might be from `violet`.
-- **FIXED** [1] DULFS continuous generation regenerates existing characters
+- [ ] After discussing additional characters in brainstorm, DP generate doesn't add more characters.
 
 ## 🏗️ Technical Implementation Details
 

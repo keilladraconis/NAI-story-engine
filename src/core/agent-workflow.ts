@@ -1,25 +1,37 @@
 import { StoryManager } from "./story-manager";
 import { ContextStrategyFactory } from "./context-strategies";
 import { ContentParsingService } from "./content-parsing-service";
-import { FieldSession, ListSession } from "./generation-types";
+import { FieldSession, ListSession, BrainstormSession } from "./generation-types";
 import { FieldGenerationService } from "./field-generation-service";
 import { ListGenerationService } from "./list-generation-service";
+import { BrainstormService } from "./brainstorm-service";
 
-export { FieldSession, ListSession } from "./generation-types";
+export { FieldSession, ListSession, BrainstormSession } from "./generation-types";
 
 export class AgentWorkflowService {
   private sessions: Map<string, FieldSession> = new Map();
   private listGenerationState: Map<string, ListSession> = new Map();
+  private brainstormSession: BrainstormSession = {
+    fieldId: "brainstorm",
+    isRunning: false,
+  };
   private listeners: Array<(fieldId: string) => void> = [];
 
   private taskQueue: Array<
     | { type: "field"; fieldId: string; updateFn: () => void }
     | { type: "list"; fieldId: string; updateFn: () => void }
+    | {
+        type: "brainstorm";
+        updateFn: () => void;
+        isInitial: boolean;
+        onDelta: (t: string) => void;
+      }
   > = [];
   private isGlobalGenerating: boolean = false;
 
   private fieldService: FieldGenerationService;
   private listService: ListGenerationService;
+  public brainstormService: BrainstormService;
 
   constructor(storyManager: StoryManager) {
     const contextFactory = new ContextStrategyFactory(storyManager);
@@ -34,6 +46,7 @@ export class AgentWorkflowService {
       contextFactory,
       parsingService
     );
+    this.brainstormService = new BrainstormService(storyManager);
   }
 
   public subscribe(listener: (fieldId: string) => void) {
@@ -73,6 +86,30 @@ export class AgentWorkflowService {
         isRunning: false,
       }
     );
+  }
+
+  public getBrainstormSession(): BrainstormSession {
+    return this.brainstormSession;
+  }
+
+  public cancelBrainstormGeneration() {
+    const queueIndex = this.taskQueue.findIndex(
+      (t) => t.type === "brainstorm",
+    );
+    if (queueIndex !== -1) {
+      const task = this.taskQueue.splice(queueIndex, 1)[0];
+      this.brainstormSession.isQueued = false;
+      this.brainstormSession.isRunning = false;
+      if (task.updateFn) task.updateFn();
+      return;
+    }
+
+    if (this.brainstormSession.budgetResolver) {
+      this.brainstormSession.budgetResolver();
+    }
+    if (this.brainstormSession.cancellationSignal) {
+      this.brainstormSession.cancellationSignal.cancel();
+    }
   }
 
   public cancelListGeneration(fieldId: string) {
@@ -127,6 +164,108 @@ export class AgentWorkflowService {
       }
     }
   }
+
+  public requestBrainstormGeneration(
+    isInitial: boolean,
+    onDelta: (text: string) => void,
+    updateFn: () => void,
+  ) {
+    const session = this.brainstormSession;
+    session.error = undefined;
+
+    const wrappedUpdate = () => {
+      updateFn();
+      this.notify("brainstorm");
+    };
+
+    if (this.isGlobalGenerating || session.isRunning) {
+      session.isQueued = true;
+      this.taskQueue.push({
+        type: "brainstorm",
+        isInitial,
+        onDelta,
+        updateFn: wrappedUpdate,
+      });
+      wrappedUpdate();
+    } else {
+      this.isGlobalGenerating = true;
+      this.executeBrainstorm(session, isInitial, onDelta, wrappedUpdate).finally(
+        () => this.processQueue(),
+      );
+    }
+  }
+
+  private async executeBrainstorm(
+    session: BrainstormSession,
+    isInitial: boolean,
+    onDelta: (text: string) => void,
+    updateFn: () => void,
+  ) {
+    session.isRunning = true;
+    session.isQueued = false;
+    session.budgetWaitTime = undefined;
+    session.budgetTimeRemaining = undefined;
+    session.budgetWaitEndTime = undefined;
+    updateFn();
+
+    try {
+      session.cancellationSignal = await api.v1.createCancellationSignal();
+      await this.brainstormService.generateResponse(
+        isInitial,
+        onDelta,
+        session.cancellationSignal,
+        {
+          onBudgetWait: (_1, _2, time) => {
+            return new Promise<void>((resolve) => {
+              session.budgetResolver = () => {
+                session.budgetState = "waiting_for_timer";
+                if (session.budgetWaitEndTime) {
+                  // Start timer
+                  const checkTimer = () => {
+                    if (
+                      !session.isRunning ||
+                      session.budgetState !== "waiting_for_timer" ||
+                      !session.budgetWaitEndTime
+                    )
+                      return;
+                    const now = Date.now();
+                    const remaining = Math.ceil(
+                      Math.max(0, session.budgetWaitEndTime - now) / 1000,
+                    );
+                    session.budgetTimeRemaining = remaining;
+                    updateFn();
+                    if (remaining > 0)
+                      api.v1.timers.setTimeout(checkTimer, 1000);
+                  };
+                  checkTimer();
+                }
+                updateFn();
+                resolve();
+              };
+              session.budgetState = "waiting_for_user";
+              session.budgetWaitTime = time;
+              session.budgetWaitEndTime = Date.now() + time;
+              updateFn();
+            });
+          },
+          onBudgetResume: () => {
+            session.budgetState = "normal";
+            session.budgetTimeRemaining = undefined;
+            updateFn();
+          },
+        },
+      );
+    } catch (e: any) {
+      if (e !== "Cancelled") {
+        session.error = e.message || String(e);
+      }
+    } finally {
+      session.isRunning = false;
+      session.cancellationSignal = undefined;
+      updateFn();
+    }
+  }
+
 
   public requestListGeneration(fieldId: string, updateFn: () => void) {
     const state = this.getListGenerationState(fieldId);
@@ -197,6 +336,16 @@ export class AgentWorkflowService {
         nextTask.updateFn();
         await this.listService.run(nextTask.fieldId, state, nextTask.updateFn);
       }
+    } else if (nextTask.type === "brainstorm") {
+      const session = this.brainstormSession;
+      session.isQueued = false;
+      nextTask.updateFn();
+      await this.executeBrainstorm(
+        session,
+        nextTask.isInitial,
+        nextTask.onDelta,
+        nextTask.updateFn,
+      );
     }
     
     // Process next item recursively (since run awaited)

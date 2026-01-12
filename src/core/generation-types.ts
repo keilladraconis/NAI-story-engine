@@ -18,3 +18,7 @@ export interface FieldSession extends GenerationSession {
 export interface ListSession extends GenerationSession {
   // Specific to list generation if any
 }
+
+export interface BrainstormSession extends GenerationSession {
+  // Specific to brainstorm generation if any
+}
