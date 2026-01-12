@@ -20,6 +20,7 @@ export interface GenerationSession {
   // Specific Params
   isInitial?: boolean; // For brainstorm
   dulfsFieldId?: string; // For dulfs-item, the category ID
+  dulfsItemId?: string; // For dulfs-item, the specific item ID
   outputBuffer?: string; // Accumulate output here
 }
 

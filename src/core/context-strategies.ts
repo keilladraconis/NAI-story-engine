@@ -483,7 +483,92 @@ export class ContextStrategyFactory {
     };
   }
 
-  async buildDulfsItemContext(fieldId: string): Promise<StrategyResult> {
+  async buildDulfsListContext(fieldId: string): Promise<StrategyResult> {
+    const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
+    const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
+    const worldSnapshot = this.storyManager.getFieldContent(
+      FieldID.WorldSnapshot,
+    );
+    const attg = this.storyManager.getFieldContent(FieldID.ATTG);
+    const style = this.storyManager.getFieldContent(FieldID.Style);
+
+    // Existing items to avoid duplicates
+    const currentList = this.storyManager.getDulfsList(fieldId);
+    const existingNames = currentList.map((i) => i.name).join(", ");
+
+    const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
+    const label = config ? config.label : fieldId;
+
+    const baseContext = {
+      systemMsg: {
+        role: "system" as const,
+        content: systemPrompt,
+      },
+      storyPrompt: storyPrompt,
+    };
+
+    const contextBlocks: Message[] = [
+      {
+        role: "user",
+        content: `STORY PROMPT:\n${storyPrompt}`,
+      },
+      {
+        role: "user",
+        content: `WORLD SNAPSHOT:\n${worldSnapshot}`,
+      },
+      {
+        role: "user",
+        content: `ATTG:\n${attg}`,
+      },
+      {
+        role: "user",
+        content: `STYLE:\n${style}`,
+      },
+      {
+        role: "user",
+        content: `BRAINSTORM MATERIAL:\n${this.storyManager.getConsolidatedBrainstorm()}`,
+      },
+    ];
+
+    if (existingNames) {
+      contextBlocks.push({
+        role: "user",
+        content: `EXISTING ${label.toUpperCase()} (Do not repeat):\n${existingNames}`,
+      });
+    }
+
+    const messages = contextBuilder(
+      baseContext.systemMsg,
+      {
+        role: "user",
+        content: `Generate a comma-separated list of 5-10 new, unique names/subjects for the category '${label}'.
+${config?.listGenerationInstruction || ""}
+Output ONLY the comma-separated names, no other text.`,
+      },
+      {
+        role: "assistant",
+        content: "",
+      },
+      contextBlocks,
+    );
+
+    return {
+      messages,
+      params: {
+        temperature: 1.2,
+        min_p: 0.1,
+        presence_penalty: 0.1,
+        maxTokens: 512,
+        minTokens: 10,
+      },
+      prefixBehavior: "trim",
+    };
+  }
+
+  async buildDulfsContentContext(
+    fieldId: string,
+    itemId: string,
+  ): Promise<StrategyResult> {
     const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
     const worldSnapshot = this.storyManager.getFieldContent(
@@ -491,33 +576,27 @@ export class ContextStrategyFactory {
     );
     const existingDulfs = buildDulfsContextString(
       this.storyManager,
-      "full",
-      fieldId, // Exclude current field's content from the general summary to avoid duplication if we handle it separately
+      "short",
+      fieldId,
     );
 
-    // Get the current list content to show what exists in THIS category
-    const currentList = this.storyManager.getDulfsList(fieldId);
-    let currentCategoryContext = "";
-    if (currentList.length > 0) {
-      currentCategoryContext =
-        `EXISTING ITEMS IN THIS CATEGORY:\n` +
-        currentList
-          .map((i) => `Name: ${i.name}\nContent: ${i.content}`)
-          .join("\n---\n") +
-        "\n\n";
-    }
+    const list = this.storyManager.getDulfsList(fieldId);
+    const item = list.find((i) => i.id === itemId);
+    if (!item) throw new Error("Item not found");
 
+    const itemName = item.name;
     const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
-    // Modified instruction for single item - strictly single line
-    const userInstruction = `Generate exactly ONE new unique item for the category '${fieldId}'.\nProvide the item as a single line of text following the format below.\nDo not duplicate existing items.`;
-    const exampleFormat =
-      config?.exampleFormat || "Format: [Item Name]: [Description]";
+    const label = config ? config.label : fieldId;
+
+    const prefill =
+      fieldId === FieldID.DramatisPersonae ? `${itemName} (` : `${itemName}: `;
 
     const baseContext = {
       systemMsg: {
         role: "system" as const,
         content: systemPrompt,
       },
+      storyPrompt: storyPrompt,
     };
 
     const contextBlocks: Message[] = [
@@ -542,51 +621,34 @@ export class ContextStrategyFactory {
       });
     }
 
-    if (currentCategoryContext) {
-      contextBlocks.push({
-        role: "user",
-        content: currentCategoryContext,
-      });
-    }
-
     const messages = contextBuilder(
       baseContext.systemMsg,
       {
         role: "user",
-        content: `${userInstruction}\n${exampleFormat}\n\nGenerate ONE item now.`,
+        content: `Complete the details for the ${label} entry named "${itemName}".
+${config?.generationInstruction || ""}
+${config?.exampleFormat ? `Format: ${config.exampleFormat}` : ""}
+Write exactly ONE single line.`,
       },
-      // Removed assistant prefill "Name:"
       {
         role: "assistant",
-        content: "",
+        content: prefill,
       },
       contextBlocks,
     );
-    // Remove empty assistant message if present
-    if (messages[messages.length - 1].content === "") {
-      messages.pop();
-    }
 
     const result: StrategyResult = {
       messages,
       params: {
-        temperature: 1.15, // Slightly higher creativity for new items
+        temperature: 0.85,
         min_p: 0.05,
-        presence_penalty: 0.1, // Discourage repetition
-        maxTokens: 500, // Enough for one item
+        presence_penalty: 0.05,
+        maxTokens: 1024,
         minTokens: 20,
       },
       filters: [Filters.scrubMarkdown],
-      prefixBehavior: "trim",
+      prefixBehavior: "keep",
     };
-
-    if (config?.filters) {
-      for (const filterKey of config.filters) {
-        if (Filters[filterKey]) {
-          result.filters!.push(Filters[filterKey]);
-        }
-      }
-    }
 
     return result;
   }

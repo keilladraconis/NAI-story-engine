@@ -126,7 +126,7 @@ export const createResponsiveGenerateButton = (
   if (state.isQueued) {
     return button({
       id: `${id}-queued`,
-      text: "⏳ Queued",
+      text: `⏳${label.length > 0 ? " Queued" : ""}`,
       style: {
         "background-color": "#e2e3e5",
         color: "#383d41",
@@ -142,7 +142,7 @@ export const createResponsiveGenerateButton = (
   if (state.budgetState === "waiting_for_user") {
     return button({
       id: `${id}-continue`,
-      text: "⚠️ Continue",
+      text: `⚠️${label.length > 0 ? " Continue" : ""}`,
       style: {
         "background-color": "#fff3cd",
         color: "#856404",
@@ -163,7 +163,7 @@ export const createResponsiveGenerateButton = (
 
     return button({
       id: `${id}-wait`,
-      text: `⏳ Waiting...${timeText}`,
+      text: `⏳${label.length > 0 ? " Waiting..." + timeText : timeText}`,
       style: {
         "background-color": "#e2e3e5",
         color: "#383d41",
@@ -179,7 +179,7 @@ export const createResponsiveGenerateButton = (
   if (state.isRunning) {
     return button({
       id: `${id}-cancel`,
-      text: "🚫 Cancel",
+      text: `🚫${label.length > 0 ? " Cancel" : ""}`,
       style: {
         "font-weight": "bold",
         "background-color": "#ffcccc",

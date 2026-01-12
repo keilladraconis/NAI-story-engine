@@ -115,6 +115,38 @@ export class StoryManager {
     );
   }
 
+  public async mergeDulfsNames(
+    fieldId: string,
+    names: string[],
+  ): Promise<void> {
+    const list = this.getDulfsList(fieldId);
+    const existingNames = new Set(list.map((i) => i.name.toLowerCase().trim()));
+    let added = false;
+
+    for (const rawName of names) {
+      const name = rawName.trim();
+      if (!name) continue;
+      if (existingNames.has(name.toLowerCase())) continue;
+
+      const newItem: DULFSField = {
+        id: api.v1.uuid(),
+        category: fieldId as any,
+        content: "",
+        name: name,
+        description: "",
+        attributes: {},
+        linkedLorebooks: [],
+      };
+      // Direct add without full save yet
+      await this.dulfsService.addDulfsItem(fieldId, newItem, async () => {});
+      added = true;
+    }
+
+    if (added) {
+      await this.saveStoryData(true);
+    }
+  }
+
   public async updateDulfsItem(
     fieldId: string,
     itemId: string,

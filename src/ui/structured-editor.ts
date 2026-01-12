@@ -121,6 +121,17 @@ export class StructuredEditor {
         this.agentWorkflowService.getListGenerationState(config.id),
       cancelListGeneration: () =>
         this.agentWorkflowService.cancelListGeneration(config.id),
+      runDulfsItemGeneration: (itemId) =>
+        this.agentWorkflowService.requestDulfsContentGeneration(
+          config.id,
+          itemId,
+          this.onUpdateCallback,
+        ),
+      getItemGenerationState: (itemId) => {
+        // We use {fieldId}:{itemId} as the session key for item generation
+        const sessionKey = `${config.id}:${itemId}`;
+        return this.agentWorkflowService.getSession(sessionKey);
+      },
       // Generator Sync
       setAttgEnabled: (enabled) => this.storyManager.setAttgEnabled(enabled),
       isAttgEnabled: () => this.storyManager.isAttgEnabled(),

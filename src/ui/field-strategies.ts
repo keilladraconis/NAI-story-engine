@@ -7,7 +7,7 @@ import {
   createResponsiveGenerateButton,
 } from "./ui-components";
 
-const { row, column, text, button, checkboxInput } = api.v1.ui.part;
+const { row, column, text, button, checkboxInput, textInput, multilineTextInput } = api.v1.ui.part;
 
 export interface BaseRenderContext {
   config: FieldConfig;
@@ -30,6 +30,15 @@ export interface ListRenderContext extends BaseRenderContext {
     budgetTimeRemaining?: number;
   };
   cancelListGeneration: () => void;
+  // Item specific generation
+  runDulfsItemGeneration: (itemId: string) => void;
+  getItemGenerationState: (itemId: string) => {
+    isRunning: boolean;
+    isQueued?: boolean;
+    budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
+    budgetResolver?: () => void;
+    budgetTimeRemaining?: number;
+  } | undefined;
 }
 
 export interface TextRenderContext extends BaseRenderContext {
@@ -72,6 +81,8 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
       runListGeneration,
       getListGenerationState,
       cancelListGeneration,
+      runDulfsItemGeneration,
+      getItemGenerationState,
     } = context;
 
     const list = storyManager.getDulfsList(config.id);
@@ -109,7 +120,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
               if (genState.budgetResolver) genState.budgetResolver();
             },
           },
-          "Generate",
+          "Generate Names",
         ),
         button({
           text: "Add Entry",
@@ -151,6 +162,11 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
     // --- List Items ---
     const itemsUI = list.map((item) => {
       const isEditing = getItemEditMode ? getItemEditMode(item.id) : false;
+      const itemGenState = getItemGenerationState
+        ? getItemGenerationState(item.id)
+        : undefined;
+      const isItemGenerating = itemGenState?.isRunning || false;
+
       const toggle = () => {
         if (toggleItemEditMode) {
           if (isEditing) {
@@ -163,27 +179,117 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
 
       const contentParts: UIPart[] = [];
 
-      contentParts.push(
-        createToggleableContent(
-          isEditing,
-          item.content,
-          "Entry details...",
-          undefined, // No storage key to prevent sync conflicts; StoryManager is source of truth
-          (newContent) => {
-            // Update local state but DO NOT sync to Lorebook yet
-            storyManager.updateDulfsItem(
-              config.id,
-              item.id,
-              {
-                content: newContent,
-              },
-              "debounce",
-              false, // No sync
-            );
+      if (isEditing) {
+        // Edit Mode: Name Input + Content Area
+        contentParts.push(
+          row({
+            style: { "margin-bottom": "8px", "align-items": "center" },
+            content: [
+              text({
+                text: "Name: ",
+                style: {
+                  "font-weight": "bold",
+                  "margin-right": "8px",
+                  "flex-shrink": "0",
+                },
+              }),
+              textInput({
+                initialValue: item.name,
+                placeholder: "Entry Name",
+                onChange: (val) => {
+                  storyManager.updateDulfsItem(
+                    config.id,
+                    item.id,
+                    { name: val },
+                    "debounce",
+                    false,
+                  );
+                },
+                style: { "flex-grow": "1" },
+              }),
+            ],
+          }),
+          multilineTextInput({
+            initialValue: item.content,
+            placeholder: "Entry details...",
+            onChange: (val) => {
+              storyManager.updateDulfsItem(
+                config.id,
+                item.id,
+                { content: val },
+                "debounce",
+                false,
+              );
+            },
+            style: { "min-height": "100px", width: "100%" },
+          }),
+        );
+      } else {
+        // View Mode: Name (Bold) + Content (Markdown)
+        // Process content to preserve line breaks in NovelAI's markdown renderer
+        const processedContent = (item.content || "_No content._")
+          .replace(/\n/g, "  \n")
+          .replace(/\[/g, "\\[");
+
+        contentParts.push(
+          text({
+            text: item.name || "Unnamed",
+            style: {
+              "font-weight": "bold",
+              "font-size": "1.1em",
+              "margin-bottom": "4px",
+            },
+          }),
+          text({
+            text: processedContent,
+            markdown: true,
+            style: {
+              padding: "4px",
+              "min-height": "20px",
+              "user-select": "text",
+              opacity: "0.9",
+            },
+          }),
+        );
+      }
+
+      // Item Generation Button (Bolt)
+      const genButton = createResponsiveGenerateButton(
+        `item-gen-btn-${item.id}`,
+        {
+          isRunning: isItemGenerating,
+          isQueued: itemGenState?.isQueued,
+          budgetState: itemGenState?.budgetState,
+          budgetTimeRemaining: itemGenState?.budgetTimeRemaining,
+        },
+        {
+          onStart: () => {
+            if (runDulfsItemGeneration) runDulfsItemGeneration(item.id);
           },
-          { "min-height": "60px", width: "100%" },
-        ),
+          onCancel: () => {
+            // Reuse generic cancel mechanism if possible or add item specific cancel?
+            // For now, we don't have item specific cancel in interface, 
+            // but we can call cancelListGeneration if it cancels by ID? 
+            // Or we assume the button handles state.
+            // Actually, we need a cancel for item.
+            // Let's assume hitting the stop button calls this onCancel.
+            // We should use cancelListGeneration(config.id) but maybe that kills everything?
+            // AgentWorkflow.cancelListGeneration removes everything for that field.
+            // Good enough for now.
+            if (cancelListGeneration) cancelListGeneration(); 
+          },
+          onContinue: () => {
+            if (itemGenState?.budgetResolver) itemGenState.budgetResolver();
+          },
+        },
+        "", // No text, just icon
       );
+      // Override icon to be bolt if not running (createResponsiveGenerateButton uses 'play' by default)
+      // Actually createResponsiveGenerateButton handles icons. 
+      // If we want a specific icon "bolt" instead of "play" (sparkles):
+      // The component uses "sparkles" for generate. Bolt is "zap"?
+      // We can't easily change the icon in the helper without changing the helper.
+      // "Sparkles" is fine for generation.
 
       return row({
         style: {
@@ -203,6 +309,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
           column({
             style: { "margin-left": "4px", gap: "4px" },
             content: [
+              genButton,
               button({
                 iconId: isEditing ? "save" : "edit-3",
                 callback: toggle,

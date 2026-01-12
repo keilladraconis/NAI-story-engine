@@ -69,7 +69,28 @@ export class DulfsService {
     const list = this.getDulfsList(fieldId);
     const index = list.findIndex((i) => i.id === itemId);
     if (index !== -1) {
-      list[index] = { ...list[index], ...updates };
+      const oldItem = list[index];
+      let newItem = { ...oldItem, ...updates };
+
+      // Sync name into content if name changed
+      if (updates.name !== undefined && updates.name !== oldItem.name) {
+        if (!newItem.content || newItem.content.trim() === "") {
+          // Initialize content if empty
+          newItem.content =
+            fieldId === "dramatisPersonae"
+              ? `${updates.name} (Gender, Age, Role): `
+              : `${updates.name}: `;
+        } else {
+          // Replace name part in existing content
+          if (fieldId === "dramatisPersonae") {
+            newItem.content = newItem.content.replace(/^[^:(]+/, updates.name);
+          } else {
+            newItem.content = newItem.content.replace(/^[^:]+/, updates.name);
+          }
+        }
+      }
+
+      list[index] = newItem;
       this.dataManager.setDulfsList(fieldId, list);
 
       if (persistence === "immediate") {
@@ -116,7 +137,22 @@ export class DulfsService {
     const item = list.find((i) => i.id === itemId);
     if (!item) return;
 
-    const parsed = this.parsingService.parseListLine(item.content, fieldId);
+    // Try parsing the content directly
+    let parsed = this.parsingService.parseListLine(item.content, fieldId);
+
+    // If it fails, try prepending the name (common in the new two-phase workflow)
+    if (!parsed && item.name) {
+      let fullLine = "";
+      if (fieldId === "dramatisPersonae") {
+        // Name (Gender, Age, Role): ...
+        fullLine = `${item.name}${item.content.startsWith(" ") ? "" : " "}${item.content}`;
+      } else {
+        // Name: Description
+        fullLine = `${item.name}${item.content.startsWith(":") ? "" : ": "}${item.content}`;
+      }
+      parsed = this.parsingService.parseListLine(fullLine, fieldId);
+    }
+
     if (parsed) {
       await this.updateDulfsItem(
         fieldId,

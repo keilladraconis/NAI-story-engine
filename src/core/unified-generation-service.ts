@@ -1,6 +1,5 @@
-import { StoryManager, DULFSField } from "./story-manager";
+import { StoryManager } from "./story-manager";
 import { ContextStrategyFactory, StrategyResult } from "./context-strategies";
-import { ContentParsingService } from "./content-parsing-service";
 import { GenerationSession } from "./generation-types";
 import { hyperGenerate } from "../../lib/hyper-generator";
 
@@ -188,21 +187,18 @@ export class FieldGenerationStrategy implements GenerationStrategy {
   }
 }
 
-export class DulfsItemStrategy implements GenerationStrategy {
-  constructor(
-    private contextFactory: ContextStrategyFactory,
-    private parsingService: ContentParsingService,
-  ) {}
+export class DulfsListStrategy implements GenerationStrategy {
+  constructor(private contextFactory: ContextStrategyFactory) {}
 
   async buildContext(session: GenerationSession): Promise<StrategyResult> {
     if (!session.dulfsFieldId) throw new Error("Missing dulfsFieldId");
-    return this.contextFactory.buildDulfsItemContext(session.dulfsFieldId);
+    return this.contextFactory.buildDulfsListContext(session.dulfsFieldId);
   }
 
   async onDelta(
     session: GenerationSession,
     buffer: string,
-    manager: StoryManager,
+    _manager: StoryManager,
     updateFn: () => void,
   ): Promise<void> {
     session.outputBuffer = buffer;
@@ -217,22 +213,74 @@ export class DulfsItemStrategy implements GenerationStrategy {
   ): Promise<void> {
     if (!session.dulfsFieldId) return;
 
-    const parsed = this.parsingService.parseDulfsItem(finalText, session.dulfsFieldId);
-    if (parsed) {
-      const newItem: DULFSField = {
-        id: api.v1.uuid(),
-        category: session.dulfsFieldId as any,
-        content: parsed.content,
-        name: parsed.name,
-        description: parsed.description,
-        attributes: {},
-        linkedLorebooks: [],
-      };
-      manager.addDulfsItem(session.dulfsFieldId, newItem);
-      api.v1.ui.toast(`Generated ${parsed.name}`);
+    // Parse comma-separated list
+    // Clean up markdown list syntax if present (e.g. "1. Name")
+    const cleaned = finalText.replace(/^\d+\.\s*/gm, "");
+    const names = cleaned
+      .split(/,|\\n/) // Split by comma or newline
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    if (names.length > 0) {
+      await manager.mergeDulfsNames(session.dulfsFieldId, names);
+      api.v1.ui.toast(`Added ${names.length} items to list`);
     } else {
-      api.v1.ui.toast("Failed to parse generated item", { type: "warning" });
-      api.v1.log("Failed to parse DULFS item:", finalText);
+      api.v1.ui.toast("No new items generated", { type: "warning" });
+    }
+    updateFn();
+  }
+}
+
+export class DulfsContentStrategy implements GenerationStrategy {
+  constructor(private contextFactory: ContextStrategyFactory) {}
+
+  async buildContext(session: GenerationSession): Promise<StrategyResult> {
+    if (!session.dulfsFieldId || !session.dulfsItemId) {
+      throw new Error("Missing dulfsFieldId or dulfsItemId");
+    }
+    return this.contextFactory.buildDulfsContentContext(
+      session.dulfsFieldId,
+      session.dulfsItemId,
+    );
+  }
+
+  async onDelta(
+    session: GenerationSession,
+    buffer: string,
+    manager: StoryManager,
+    updateFn: () => void,
+  ): Promise<void> {
+    if (session.dulfsFieldId && session.dulfsItemId) {
+      await manager.updateDulfsItem(
+        session.dulfsFieldId,
+        session.dulfsItemId,
+        { content: buffer },
+        "none", // Stream to memory only
+        false, // No sync yet
+      );
+    }
+    updateFn();
+  }
+
+  async onComplete(
+    session: GenerationSession,
+    manager: StoryManager,
+    finalText: string,
+    updateFn: () => void,
+  ): Promise<void> {
+    if (session.dulfsFieldId && session.dulfsItemId) {
+      await manager.updateDulfsItem(
+        session.dulfsFieldId,
+        session.dulfsItemId,
+        { content: finalText },
+        "immediate", // Save and sync
+        true,
+      );
+      // Auto-parse to update description and sync fully
+      await manager.parseAndUpdateDulfsItem(
+        session.dulfsFieldId,
+        session.dulfsItemId,
+      );
     }
     updateFn();
   }
@@ -249,9 +297,9 @@ export class BrainstormStrategy implements GenerationStrategy {
   }
 
   async onDelta(
-    session: GenerationSession,
+    _session: GenerationSession,
     buffer: string,
-    manager: StoryManager,
+    _manager: StoryManager,
     updateFn: () => void,
   ): Promise<void> {
     if (this.onDeltaCallback) {
@@ -261,7 +309,7 @@ export class BrainstormStrategy implements GenerationStrategy {
   }
 
   async onComplete(
-    session: GenerationSession,
+    _session: GenerationSession,
     manager: StoryManager,
     finalText: string,
     updateFn: () => void,

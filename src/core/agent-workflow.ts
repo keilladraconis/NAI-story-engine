@@ -1,11 +1,11 @@
 import { StoryManager } from "./story-manager";
 import { ContextStrategyFactory } from "./context-strategies";
-import { ContentParsingService } from "./content-parsing-service";
 import { GenerationSession } from "./generation-types";
 import {
   UnifiedGenerationService,
   FieldGenerationStrategy,
-  DulfsItemStrategy,
+  DulfsListStrategy,
+  DulfsContentStrategy,
   BrainstormStrategy,
   GenerationStrategy,
 } from "./unified-generation-service";
@@ -42,11 +42,9 @@ export class AgentWorkflowService {
   private generationService: UnifiedGenerationService;
   public brainstormService: BrainstormService; // Public for data ops
   private contextFactory: ContextStrategyFactory;
-  private parsingService: ContentParsingService;
 
   constructor(storyManager: StoryManager) {
     this.contextFactory = new ContextStrategyFactory(storyManager);
-    this.parsingService = new ContentParsingService();
 
     this.generationService = new UnifiedGenerationService(
       storyManager,
@@ -107,7 +105,6 @@ export class AgentWorkflowService {
 
   public cancelListGeneration(fieldId: string) {
     // Cancel all tasks for this list field
-    // 1. Remove from queue
     this.taskQueue = this.taskQueue.filter((t) => {
       if (t.session.dulfsFieldId === fieldId) {
         if (t.updateFn) t.updateFn();
@@ -116,23 +113,8 @@ export class AgentWorkflowService {
       return true;
     });
 
-    // 2. Cancel running task if it matches
     const listState = this.listGenerationState.get(fieldId);
     if (listState) {
-        // We can't cancel the *list state*, we must cancel the *active session*
-        // But we don't track the active session ID for the list easily here.
-        // However, UnifiedGenerationService.run respects cancellationSignal.
-        // If we want to cancel the CURRENTLY running item for this list:
-        // We need to find the session that is running and has dulfsFieldId === fieldId.
-        // But we don't have a global running session list exposed.
-        // Workaround: The `listState` we return to UI is just a state tracker.
-        // To strictly cancel, we rely on the fact that `isGlobalGenerating` handles one task.
-        // If the current task belongs to this list, cancel it.
-        // This is complex.
-        // Simpler: Just clear the queue (done above).
-        // And if a task is running, we can't easily reach into it unless we stored the active session.
-        // Let's rely on queue clearing. The current item will finish (or we could try to signal it).
-        
         listState.isRunning = false;
         listState.isQueued = false;
         this.listGenerationState.set(fieldId, listState);
@@ -198,59 +180,56 @@ export class AgentWorkflowService {
   }
 
   public requestListGeneration(fieldId: string, updateFn: () => void) {
+    // This is for Phase 1: Generating the list of NAMES
     const listState = this.getListGenerationState(fieldId);
     listState.error = undefined;
     listState.isRunning = true;
     this.listGenerationState.set(fieldId, listState);
 
     const wrappedUpdate = () => {
-      // Check if any tasks for this field are left in queue
-      // Note: we check dulfsFieldId match
-      const hasMore = this.taskQueue.some(
-        (t) => t.session.dulfsFieldId === fieldId,
-      );
-      
-      // If no more in queue, and the current task (if any) is finishing... 
-      // Actually, wrappedUpdate is called BY the task.
-      // If we are here, it means the task called update.
-      // We don't know if the task is done or just streaming.
-      // But `isRunning` on the *item session* will tell us.
-      
-      // BUT, we want to update the LIST state.
-      // If queue is empty AND no item is currently running for this list?
-      // Determining "currently running" is hard without tracking.
-      
-      // Simplified: We set listState.isRunning = true at start.
-      // We rely on the queue processing to know when we are "done done"?
-      // Or: We pass a "final" callback to the LAST task?
-      
-      // Alternative: Just update UI. The UI spins if listState.isRunning is true.
-      // We need to set it to false eventually.
-      // We can do this by checking the queue count in the *Queue Processor*.
-      
+      // If the task is done (not in queue, not running), update state
+      // Logic handled in executeTask finally block
       updateFn();
       this.notify(fieldId);
     };
 
-    // Queue 3 items
-    for (let i = 0; i < 3; i++) {
-      const itemSession: GenerationSession = {
-        id: api.v1.uuid(),
-        fieldId: `${fieldId}:item:${api.v1.uuid()}`, // Unique ID for the task
-        dulfsFieldId: fieldId,
-        type: "dulfs-item",
-        isRunning: false,
-      };
+    const itemSession: GenerationSession = {
+      id: api.v1.uuid(),
+      fieldId: `${fieldId}:list-gen`, // Unique ID for the task
+      dulfsFieldId: fieldId,
+      type: "dulfs-item", // Re-using type or should I change?
+      // Note: "dulfs-item" type triggers the finally block logic to clear listState.
+      // This is exactly what we want for the main list generation button.
+      isRunning: false,
+    };
 
-      const strategy = new DulfsItemStrategy(
-        this.contextFactory,
-        this.parsingService,
-      );
-      
-      this.queueTask(itemSession, strategy, wrappedUpdate);
-    }
+    const strategy = new DulfsListStrategy(this.contextFactory);
+    this.queueTask(itemSession, strategy, wrappedUpdate);
     
     wrappedUpdate();
+  }
+
+  public requestDulfsContentGeneration(
+    fieldId: string,
+    itemId: string,
+    updateFn: () => void
+  ) {
+    // This is for Phase 2: Generating CONTENT for a specific item
+    // We track this session individually so we can show a spinner on the item
+    const sessionKey = `${fieldId}:${itemId}`;
+    const session = this.getSession(sessionKey) || this.startSession(sessionKey);
+    session.error = undefined;
+    session.dulfsFieldId = fieldId;
+    session.dulfsItemId = itemId;
+    session.type = "field"; // Treat as a field so it doesn't interfere with listState
+    
+    const wrappedUpdate = () => {
+      updateFn();
+      this.notify(fieldId); // Notify the list field to re-render
+    };
+
+    const strategy = new DulfsContentStrategy(this.contextFactory);
+    this.queueTask(session, strategy, wrappedUpdate);
   }
 
   public requestFieldGeneration(fieldId: string, updateFn: () => void) {
@@ -292,9 +271,9 @@ export class AgentWorkflowService {
     try {
       await this.generationService.run(session, strategy, updateFn);
     } finally {
-      // Check if this was a list item, and if it was the last one
+      // Check if this was a list item (Phase 1), and if it was the last one
       if (session.type === "dulfs-item" && session.dulfsFieldId) {
-          const remainingForList = this.taskQueue.filter(t => t.session.dulfsFieldId === session.dulfsFieldId).length;
+          const remainingForList = this.taskQueue.filter(t => t.session.dulfsFieldId === session.dulfsFieldId && t.session.type === "dulfs-item").length;
           if (remainingForList === 0) {
               const listState = this.listGenerationState.get(session.dulfsFieldId);
               if (listState) {
