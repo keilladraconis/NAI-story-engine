@@ -1,5 +1,5 @@
 import { StoryDataManager } from "./story-data-manager";
-import { FIELD_CONFIGS } from "../config/field-definitions";
+import { FIELD_CONFIGS, FieldID } from "../config/field-definitions";
 import { hyperGenerate } from "../../lib/hyper-generator";
 
 export class LorebookSyncService {
@@ -8,6 +8,7 @@ export class LorebookSyncService {
   public async ensureDulfsCategory(
     fieldId: string,
     enabled: boolean = true,
+    overrideName?: string,
   ): Promise<string> {
     const data = this.dataManager.data;
     if (!data) throw new Error("No story data");
@@ -25,7 +26,11 @@ export class LorebookSyncService {
     }
 
     const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
-    const categoryName = config ? `SE: ${config.label}` : "SE: DULFS";
+    const categoryName = overrideName
+      ? overrideName
+      : config
+      ? `SE: ${config.label}`
+      : "SE: DULFS";
 
     const catId = api.v1.uuid();
     try {
@@ -312,19 +317,19 @@ export class LorebookSyncService {
     getter: () => Promise<string>,
     setter: (content: string) => Promise<void>,
   ): Promise<void> {
-    const current = await getter();
-    const lines = current.split("\n");
+    let current = await getter();
 
-    if (lines.length > 0 && regex.test(lines[0])) {
-      lines[0] = content;
-    } else {
-      lines.unshift(content);
-    }
-    await setter(lines.join("\n"));
+    // Remove all existing occurrences
+    current = current.replace(regex, "").trim();
+
+    // Prepend new content
+    const newText = content + (current ? "\n" : "") + current;
+
+    await setter(newText);
   }
 
   public async syncAttgToMemory(content: string): Promise<void> {
-    const attgRegex = /^\s*\[\s*Author:.*\]\s*$/i;
+    const attgRegex = /\[\s*Author:[\s\S]*?\]/gi;
     await this.syncToHeader(
       content,
       attgRegex,
@@ -334,12 +339,116 @@ export class LorebookSyncService {
   }
 
   public async syncStyleToAN(content: string): Promise<void> {
-    const styleRegex = /^\s*\[\s*Style:.*\]\s*$/i;
+    const styleRegex = /\[\s*Style:[\s\S]*?\]/gi;
     await this.syncToHeader(
       content,
       styleRegex,
       () => api.v1.an.get(),
       (text) => api.v1.an.set(text),
     );
+  }
+
+  public async syncTextField(fieldId: string): Promise<void> {
+    const data = this.dataManager.data;
+    if (!data) return;
+
+    const field = this.dataManager.getStoryField(fieldId);
+    if (!field) return;
+
+    let isEnabled = data.textFieldEnabled[fieldId] === true;
+    const content = field.content;
+
+    // Determine Category Logic
+    let categoryKey = fieldId;
+    let categoryName: string | undefined;
+
+    if (fieldId === FieldID.StoryPrompt || fieldId === FieldID.WorldSnapshot) {
+      categoryKey = "se_basics";
+      categoryName = "SE: Basics";
+      // Category is enabled if EITHER is enabled
+      const promptEnabled = data.textFieldEnabled[FieldID.StoryPrompt] === true;
+      const snapshotEnabled =
+        data.textFieldEnabled[FieldID.WorldSnapshot] === true;
+      const categoryEnabled = promptEnabled || snapshotEnabled;
+
+      // We ensure the category with the combined enabled state
+      // but passed isEnabled (param 2) is used for the entry logic if we didn't override it.
+      // Actually ensureDulfsCategory uses param 2 to set category.enabled.
+      // So we must pass the combined state.
+      await this.ensureDulfsCategory(
+        categoryKey,
+        categoryEnabled,
+        categoryName,
+      );
+    } else {
+      await this.ensureDulfsCategory(fieldId, isEnabled);
+    }
+
+    // Retrieve the category ID (it might have been just created)
+    const categoryId = data.dulfsCategoryIds[categoryKey];
+
+    const entryId = data.textFieldEntryIds[fieldId];
+    let entryExists = false;
+
+    if (entryId) {
+      const existing = await api.v1.lorebook.entry(entryId);
+      if (existing) {
+        entryExists = true;
+        try {
+          // If enabled/content changed, update
+          await api.v1.lorebook.updateEntry(entryId, {
+            text: content,
+            category: categoryId,
+            enabled: isEnabled,
+            forceActivation: isEnabled, // Always on if enabled
+          });
+        } catch (e) {
+          api.v1.log(
+            `Failed to update text field entry ${entryId}, recreating...`,
+            e,
+          );
+          entryExists = false; // Trigger recreation
+        }
+      }
+    }
+
+    if (!entryExists && isEnabled) {
+      // Only create if enabled. If disabled and missing, do nothing.
+      const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
+      const label = config ? config.label : fieldId;
+      await this.createTextFieldEntry(
+        fieldId,
+        label,
+        content,
+        categoryId,
+        isEnabled,
+      );
+    }
+  }
+
+  private async createTextFieldEntry(
+    fieldId: string,
+    label: string,
+    text: string,
+    categoryId: string,
+    enabled: boolean,
+  ): Promise<void> {
+    const data = this.dataManager.data;
+    if (!data) return;
+    try {
+      const newId = api.v1.uuid();
+      await api.v1.lorebook.createEntry({
+        id: newId,
+        displayName: label,
+        text: text,
+        category: categoryId,
+        enabled: enabled,
+        forceActivation: enabled,
+      });
+      data.textFieldEntryIds[fieldId] = newId;
+      await this.dataManager.save();
+    } catch (e) {
+      api.v1.log("Error creating text field lorebook entry:", e);
+    }
   }
 }

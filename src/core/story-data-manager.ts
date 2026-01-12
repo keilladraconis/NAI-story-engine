@@ -52,6 +52,10 @@ export interface StoryData {
   dulfsEntryIds: Record<string, string>; // FieldID -> EntryID
   dulfsEnabled: Record<string, boolean>; // FieldID -> boolean
 
+  // Text Field Lorebook Integration
+  textFieldEntryIds: Record<string, string>; // FieldID -> EntryID
+  textFieldEnabled: Record<string, boolean>; // FieldID -> boolean
+
   // Generator Sync
   attgEnabled: boolean;
   styleEnabled: boolean;
@@ -134,6 +138,9 @@ export class StoryDataManager {
       dulfsCategoryIds: {},
       dulfsEntryIds: {},
       dulfsEnabled: {},
+      
+      textFieldEntryIds: {},
+      textFieldEnabled: {},
 
       // Sync
       attgEnabled: false,

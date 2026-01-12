@@ -184,6 +184,22 @@ export class StoryManager {
     }
   }
 
+  public isTextFieldLorebookEnabled(fieldId: string): boolean {
+    return this.dataManager.data?.textFieldEnabled?.[fieldId] === true;
+  }
+
+  public async setTextFieldLorebookEnabled(
+    fieldId: string,
+    enabled: boolean,
+  ): Promise<void> {
+    const data = this.dataManager.data;
+    if (!data) return;
+
+    data.textFieldEnabled[fieldId] = enabled;
+    await this.dataManager.save();
+    await this.lorebookSyncService.syncTextField(fieldId);
+  }
+
   public async setFieldContent(
     fieldId: string,
     content: string,
@@ -226,12 +242,17 @@ export class StoryManager {
       }
     }
 
-    if (changed && sync) {
+    // Force sync if explicitly requested with immediate persistence (end of generation),
+    // or if content changed and sync is requested.
+    if ((changed || persistence === "immediate") && sync) {
       if (fieldId === FieldID.ATTG && data.attgEnabled) {
         await this.lorebookSyncService.syncAttgToMemory(content);
       }
       if (fieldId === FieldID.Style && data.styleEnabled) {
         await this.lorebookSyncService.syncStyleToAN(content);
+      }
+      if (this.isTextFieldLorebookEnabled(fieldId)) {
+        await this.lorebookSyncService.syncTextField(fieldId);
       }
     }
 

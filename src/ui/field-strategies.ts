@@ -42,6 +42,9 @@ export interface TextRenderContext extends BaseRenderContext {
   isStyleEnabled?: () => boolean;
   runFieldGeneration?: (fieldId: string) => void;
   cancelFieldGeneration?: (fieldId: string) => void;
+  // Lorebook Sync
+  setIsTextFieldLorebookEnabled?: (enabled: boolean) => Promise<void>;
+  isTextFieldLorebookEnabled?: () => boolean;
 }
 
 export type RenderContext = ListRenderContext & TextRenderContext;
@@ -253,6 +256,8 @@ export class TextFieldStrategy implements FieldRenderStrategy<TextRenderContext>
       runFieldGeneration,
       cancelFieldGeneration,
       currentContent,
+      setIsTextFieldLorebookEnabled,
+      isTextFieldLorebookEnabled,
     } = context;
 
     const content =
@@ -261,7 +266,7 @@ export class TextFieldStrategy implements FieldRenderStrategy<TextRenderContext>
         : storyManager.getFieldContent(config.id);
     const session = agentWorkflowService.getSession(config.id);
 
-    // Sync Checkbox (for ATTG/Style)
+    // Sync Checkbox (for ATTG/Style or Lorebook Binding)
     let syncCheckbox: UIPart = null;
     if (config.id === FieldID.ATTG && isAttgEnabled && setAttgEnabled) {
       syncCheckbox = checkboxInput({
@@ -278,6 +283,17 @@ export class TextFieldStrategy implements FieldRenderStrategy<TextRenderContext>
         label: "Sync to Author's Note",
         initialValue: isStyleEnabled(),
         onChange: (val) => setStyleEnabled(val),
+      });
+    } else if (
+      (config.id === FieldID.StoryPrompt ||
+        config.id === FieldID.WorldSnapshot) &&
+      isTextFieldLorebookEnabled &&
+      setIsTextFieldLorebookEnabled
+    ) {
+      syncCheckbox = checkboxInput({
+        label: "Bind to Lorebook",
+        initialValue: isTextFieldLorebookEnabled(),
+        onChange: (val) => setIsTextFieldLorebookEnabled(val),
       });
     }
 

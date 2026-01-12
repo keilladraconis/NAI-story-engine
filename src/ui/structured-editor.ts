@@ -126,6 +126,10 @@ export class StructuredEditor {
       isAttgEnabled: () => this.storyManager.isAttgEnabled(),
       setStyleEnabled: (enabled) => this.storyManager.setStyleEnabled(enabled),
       isStyleEnabled: () => this.storyManager.isStyleEnabled(),
+      setIsTextFieldLorebookEnabled: async (enabled) =>
+        this.storyManager.setTextFieldLorebookEnabled(config.id, enabled),
+      isTextFieldLorebookEnabled: () =>
+        this.storyManager.isTextFieldLorebookEnabled(config.id),
       runFieldGeneration: (fieldId) =>
         this.agentWorkflowService.requestFieldGeneration(
           fieldId,
