@@ -2,6 +2,7 @@ import { StoryManager } from "./story-manager";
 import { ContextStrategyFactory, StrategyResult } from "./context-strategies";
 import { GenerationSession } from "./generation-types";
 import { hyperGenerate } from "../../lib/hyper-generator";
+import { BudgetTimer } from "../../lib/gen-x";
 
 export interface GenerationStrategy {
   buildContext(session: GenerationSession): Promise<StrategyResult>;
@@ -20,9 +21,7 @@ export interface GenerationStrategy {
 }
 
 export class UnifiedGenerationService {
-  constructor(
-    private storyManager: StoryManager,
-  ) {}
+  constructor(private storyManager: StoryManager) {}
 
   public async run(
     session: GenerationSession,
@@ -74,23 +73,9 @@ export class UnifiedGenerationService {
           onBudgetWait: (_1, _2, time) => {
             return new Promise<void>((resolve, reject) => {
               session.budgetResolver = () => {
-                session.budgetState = "waiting_for_timer";
-                const targetEnd = Date.now() + time;
-                session.budgetWaitEndTime = targetEnd;
-
-                const tick = () => {
-                  if (!session.isRunning) return;
-                  const now = Date.now();
-                  if (now >= targetEnd) {
-                    resolve();
-                    return;
-                  }
-                  session.budgetTimeRemaining = Math.max(0, targetEnd - now);
-                  updateFn();
-                  api.v1.timers.setTimeout(tick, 1000);
-                };
-                tick();
-                updateFn();
+                BudgetTimer.start(session, time, updateFn)
+                  .then(resolve)
+                  .catch(reject);
               };
               session.budgetRejecter = (reason) => {
                 reject(reason || "Cancelled");
