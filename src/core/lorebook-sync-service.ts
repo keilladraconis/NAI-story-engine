@@ -61,11 +61,7 @@ export class LorebookSyncService {
     let textContent = `${label}\n`;
     if (list && list.length > 0) {
       textContent += list
-        .map((item) =>
-          item.name
-            ? `- **${item.name}**: ${item.content}`
-            : `- ${item.content}`,
-        )
+        .map((item) => (item.name ? `- **${item.name}**` : `- Unnamed`))
         .join("\n");
     } else {
       textContent += "(Empty)";
