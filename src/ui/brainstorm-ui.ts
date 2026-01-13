@@ -16,7 +16,6 @@ export class BrainstormUI {
 
   // Local State
   private inputValue: string = "";
-  private streamingContent: string = "";
   private editingIndex: number | null = null;
   private editValue: string = "";
 
@@ -32,7 +31,7 @@ export class BrainstormUI {
     // Subscribe to story manager updates to refresh chat history
     this.storyManager.subscribe(() => {
       const session = this.agentWorkflowService.getBrainstormSession();
-      // Only refresh if we are not currently generating (streaming handles its own updates)
+      // Only refresh if we are not currently generating (streaming handles its own updates via workflow sub)
       if (!session.isRunning) {
         this.updateUI();
       }
@@ -89,7 +88,7 @@ export class BrainstormUI {
     // Render Streaming Message (if any) - goes at the very bottom (first in reversed list)
     if (isGenerating) {
       // Use streaming content or "Thinking..." if empty
-      const displayContent = this.streamingContent || "...";
+      const displayContent = session.outputBuffer || "...";
       messageParts.push(
         this.renderMessageBubble("assistant", displayContent, -1, true),
       );
@@ -349,17 +348,9 @@ export class BrainstormUI {
     // Truncate history
     await this.agentWorkflowService.brainstormService.prepareRetry(index);
 
-    this.streamingContent = "";
     this.updateUI();
 
-    this.agentWorkflowService.requestBrainstormGeneration(
-      false,
-      (delta) => {
-        this.streamingContent = delta;
-        this.updateUI();
-      },
-      () => this.updateUI(),
-    );
+    this.agentWorkflowService.requestBrainstormGeneration(false);
   }
 
   private createInputArea(): UIPart {
@@ -442,7 +433,6 @@ export class BrainstormUI {
 
     const message = this.inputValue;
     this.inputValue = "";
-    this.streamingContent = "";
 
     // Add user message immediately
     await this.agentWorkflowService.brainstormService.addUserMessage(message);
@@ -451,11 +441,6 @@ export class BrainstormUI {
 
     this.agentWorkflowService.requestBrainstormGeneration(
       !message.trim(), // isInitial if message was empty
-      (delta) => {
-        this.streamingContent = delta;
-        this.updateUI();
-      },
-      () => this.updateUI(),
     );
   }
 

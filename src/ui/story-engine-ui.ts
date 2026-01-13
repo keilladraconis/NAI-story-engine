@@ -40,12 +40,14 @@ export class StoryEngineUI {
       this.storyManager,
       this.agentWorkflowService,
     );
-    this.segaService.setUpdateCallback(() => this.updateUI());
+    this.segaService.subscribe(() => this.updateUI());
+
     this.structuredEditor = new StructuredEditor(
       this.storyManager,
       this.agentWorkflowService,
-      () => this.updateUI(),
     );
+    this.structuredEditor.subscribe(() => this.updateUI());
+
     this.brainstormUI = new BrainstormUI(
       this.storyManager,
       this.agentWorkflowService,

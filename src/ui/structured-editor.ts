@@ -6,26 +6,25 @@ import {
   FieldID,
 } from "../config/field-definitions";
 import { getFieldStrategy, RenderContext } from "./field-strategies";
+import { Subscribable } from "../core/subscribable";
 
 const { column, collapsibleSection } = api.v1.ui.part;
 
-export class StructuredEditor {
+export class StructuredEditor extends Subscribable<void> {
   private configs: Map<FieldID, FieldConfig> = new Map();
   sidebar: UIPart;
   private storyManager: StoryManager;
   private agentWorkflowService: AgentWorkflowService;
-  private onUpdateCallback: () => void;
   private editModes: Map<string, boolean> = new Map();
   private drafts: Map<string, string> = new Map();
 
   constructor(
     storyManager: StoryManager,
     agentWorkflowService: AgentWorkflowService,
-    onUpdateCallback: () => void = () => {},
   ) {
+    super();
     this.storyManager = storyManager;
     this.agentWorkflowService = agentWorkflowService;
-    this.onUpdateCallback = onUpdateCallback;
 
     this.initializeFieldConfigs();
     this.sidebar = this.createSidebar();
@@ -53,7 +52,7 @@ export class StructuredEditor {
     }
 
     this.editModes.set(fieldId, !isEditing);
-    this.onUpdateCallback();
+    this.notify();
   }
 
   private getItemEditMode(fieldId: string, itemId: string): boolean {
@@ -64,7 +63,7 @@ export class StructuredEditor {
     const key = `${fieldId}-${itemId}`;
     const current = this.editModes.get(key) || false;
     this.editModes.set(key, !current);
-    this.onUpdateCallback();
+    this.notify();
   }
 
   private initializeFieldConfigs(): void {
@@ -113,10 +112,7 @@ export class StructuredEditor {
       toggleItemEditMode: (itemId) =>
         this.toggleItemEditMode(config.id, itemId),
       runListGeneration: () =>
-        this.agentWorkflowService.requestListGeneration(
-          config.id,
-          this.onUpdateCallback,
-        ),
+        this.agentWorkflowService.requestListGeneration(config.id),
       getListGenerationState: () =>
         this.agentWorkflowService.getListGenerationState(config.id),
       cancelListGeneration: () =>
@@ -125,7 +121,6 @@ export class StructuredEditor {
         this.agentWorkflowService.requestDulfsContentGeneration(
           config.id,
           itemId,
-          this.onUpdateCallback,
         ),
       getItemGenerationState: (itemId) => {
         // We use {fieldId}:{itemId} as the session key for item generation
@@ -142,10 +137,7 @@ export class StructuredEditor {
       isTextFieldLorebookEnabled: () =>
         this.storyManager.isTextFieldLorebookEnabled(config.id),
       runFieldGeneration: (fieldId) =>
-        this.agentWorkflowService.requestFieldGeneration(
-          fieldId,
-          this.onUpdateCallback,
-        ),
+        this.agentWorkflowService.requestFieldGeneration(fieldId),
       cancelFieldGeneration: (fieldId) =>
         this.agentWorkflowService.cancelFieldGeneration(fieldId),
     };

@@ -190,24 +190,24 @@ export class AgentWorkflowService {
 
   public requestBrainstormGeneration(
     isInitial: boolean,
-    onDelta: (text: string) => void,
-    updateFn: () => void,
+    updateFn: () => void = () => {},
   ) {
     const session = this.brainstormSession;
     session.error = undefined;
     session.isInitial = isInitial;
+    session.outputBuffer = undefined; // Reset buffer
 
     const wrappedUpdate = () => {
       updateFn();
       this.notify("brainstorm");
     };
 
-    const strategy = new BrainstormStrategy(this.contextFactory, onDelta);
+    const strategy = new BrainstormStrategy(this.contextFactory);
 
     this.queueTask(session, strategy, wrappedUpdate);
   }
 
-  public requestListGeneration(fieldId: string, updateFn: () => void) {
+  public requestListGeneration(fieldId: string, updateFn: () => void = () => {}) {
     // This is for Phase 1: Generating the list of NAMES
     const listState = this.getListGenerationState(fieldId);
     listState.error = undefined;
@@ -240,7 +240,7 @@ export class AgentWorkflowService {
   public requestDulfsContentGeneration(
     fieldId: string,
     itemId: string,
-    updateFn: () => void,
+    updateFn: () => void = () => {},
   ) {
     // This is for Phase 2: Generating CONTENT for a specific item
     // We track this session individually so we can show a spinner on the item
@@ -261,7 +261,7 @@ export class AgentWorkflowService {
     this.queueTask(session, strategy, wrappedUpdate);
   }
 
-  public requestFieldGeneration(fieldId: string, updateFn: () => void) {
+  public requestFieldGeneration(fieldId: string, updateFn: () => void = () => {}) {
     const session = this.getSession(fieldId) || this.startSession(fieldId);
     session.error = undefined;
 

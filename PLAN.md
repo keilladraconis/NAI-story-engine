@@ -108,12 +108,13 @@ The goal of this phase is to address outstanding nit-picks and sub-optimal UX an
 - [x] Clean up ULFS lorebook templates. Allow for non-original settings.
 - [x] Allow inclusion of story context into brainstorm, other fields.
 - [x] Github release workflow should append version to file name.
-- [ ] Fix data update handling. All UI elements should simply be subscribers to the story manager or story data. Same for everything else that needs to know about data updates. No more update callbacks set all over the place. Story manager subscribes to generation-X. Fix the whole data flow and make it clean and straightforward.
+- [x] Fix data update handling. All UI elements should simply be subscribers to the story manager or story data. Same for everything else that needs to know about data updates. No more update callbacks set all over the place. Story manager subscribes to generation-X. Fix the whole data flow and make it clean and straightforward.
 - [ ] Situational Dynamics tuning; Keep it from being "absolutely everyone"
 
 #### Bugs
 - [x] After discussing additional characters in brainstorm, DP generate doesn't add more characters.
 - [ ] SEGA doesn't continue after waiting for generation.
+- [ ] SEGA doesn't respect that list item contents must be filled before generating lorebook. (Maybe ditch contents and just include the story and other lorebooks into generation context?)
 
 ### **Phase 8: Scenario Modality**
 

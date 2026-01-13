@@ -273,33 +273,29 @@ export class DulfsContentStrategy implements GenerationStrategy {
 }
 
 export class BrainstormStrategy implements GenerationStrategy {
-  constructor(
-    private contextFactory: ContextStrategyFactory,
-    private onDeltaCallback?: (text: string) => void,
-  ) {}
+  constructor(private contextFactory: ContextStrategyFactory) {}
 
   async buildContext(session: GenerationSession): Promise<StrategyResult> {
     return this.contextFactory.buildBrainstormContext(!!session.isInitial);
   }
 
   async onDelta(
-    _session: GenerationSession,
+    session: GenerationSession,
     buffer: string,
     _manager: StoryManager,
     updateFn: () => void,
   ): Promise<void> {
-    if (this.onDeltaCallback) {
-      this.onDeltaCallback(buffer);
-    }
+    session.outputBuffer = buffer;
     updateFn();
   }
 
   async onComplete(
-    _session: GenerationSession,
+    session: GenerationSession,
     manager: StoryManager,
     finalText: string,
     updateFn: () => void,
   ): Promise<void> {
+    session.outputBuffer = undefined; // Clear buffer on completion
     manager.addBrainstormMessage("assistant", finalText);
     await manager.saveStoryData(true);
     updateFn();
