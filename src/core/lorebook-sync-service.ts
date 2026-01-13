@@ -355,6 +355,9 @@ export class LorebookSyncService {
     const field = this.dataManager.getStoryField(fieldId);
     if (!field) return;
 
+    if (!data.textFieldEnabled) data.textFieldEnabled = {};
+    if (!data.textFieldEntryIds) data.textFieldEntryIds = {};
+
     let isEnabled = data.textFieldEnabled[fieldId] === true;
     const content = field.content;
 
@@ -445,6 +448,7 @@ export class LorebookSyncService {
         enabled: enabled,
         forceActivation: enabled,
       });
+      if (!data.textFieldEntryIds) data.textFieldEntryIds = {};
       data.textFieldEntryIds[fieldId] = newId;
       await this.dataManager.save();
     } catch (e) {

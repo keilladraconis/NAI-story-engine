@@ -230,7 +230,9 @@ export class StoryManager {
   }
 
   public isTextFieldLorebookEnabled(fieldId: string): boolean {
-    return this.dataManager.data?.textFieldEnabled?.[fieldId] === true;
+    const data = this.dataManager.data;
+    if (!data || !data.textFieldEnabled) return false;
+    return data.textFieldEnabled[fieldId] === true;
   }
 
   public async setTextFieldLorebookEnabled(
@@ -239,6 +241,10 @@ export class StoryManager {
   ): Promise<void> {
     const data = this.dataManager.data;
     if (!data) return;
+
+    if (!data.textFieldEnabled) {
+      data.textFieldEnabled = {};
+    }
 
     data.textFieldEnabled[fieldId] = enabled;
     await this.dataManager.save();

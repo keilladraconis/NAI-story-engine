@@ -79,8 +79,52 @@ export class StoryDataManager {
   }
 
   public setData(data: StoryData): void {
-    this.currentStory = data;
+    if (!data) {
+      api.v1.log("Attempted to set null/undefined story data. Initializing default.");
+      this.currentStory = this.createDefaultData();
+    } else {
+      this.currentStory = this.validateAndMigrate(data);
+    }
     this.notifyListeners();
+  }
+
+  private validateAndMigrate(data: StoryData): StoryData {
+    if (!data) return this.createDefaultData();
+    
+    // Ensure basic objects exist
+    data.dulfsCategoryIds = data.dulfsCategoryIds || {};
+    data.dulfsEntryIds = data.dulfsEntryIds || {};
+    data.dulfsEnabled = data.dulfsEnabled || {};
+    data.textFieldEntryIds = data.textFieldEntryIds || {};
+    data.textFieldEnabled = data.textFieldEnabled || {};
+    
+    data.setting = data.setting || "Original";
+    data.attgEnabled = data.attgEnabled || false;
+    data.styleEnabled = data.styleEnabled || false;
+
+    // Ensure all fields are initialized
+    for (const config of FIELD_CONFIGS) {
+      const id = config.id;
+      if (config.layout === "list") {
+        if (isDulfsField(id)) {
+          data[id] = data[id] || [];
+        }
+      } else {
+        if (isTextField(id) && !data[id]) {
+          data[id] = {
+            id: id,
+            type: config.fieldType || "prompt",
+            content: "",
+            linkedEntities: [],
+          };
+          if (id === FieldID.Brainstorm) {
+            data[id].data = { messages: [] };
+          }
+        }
+      }
+    }
+
+    return data;
   }
 
   public subscribe(listener: () => void): () => void {
@@ -133,7 +177,7 @@ export class StoryDataManager {
   }
 
   public createDefaultData(): StoryData {
-    const data: Partial<StoryData> = {
+    const data: any = {
       id: "current-story",
       version: "0.1.0",
       setting: "Original",
@@ -151,13 +195,11 @@ export class StoryDataManager {
       styleEnabled: false,
     };
 
-    // Initialize fields from configurations
+    // Initialize all fields from configurations to ensure they are never undefined
     for (const config of FIELD_CONFIGS) {
       const id = config.id;
       if (config.layout === "list") {
-        if (isDulfsField(id)) {
-          data[id] = [];
-        }
+        data[id] = [];
       } else {
         const field: StoryField = {
           id: id,
@@ -166,14 +208,11 @@ export class StoryDataManager {
           linkedEntities: [],
         };
 
-        // Specialized initialization
         if (id === FieldID.Brainstorm) {
           field.data = { messages: [] };
         }
 
-        if (isTextField(id)) {
-          data[id] = field;
-        }
+        data[id] = field;
       }
     }
 
