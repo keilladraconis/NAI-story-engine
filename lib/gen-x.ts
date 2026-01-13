@@ -7,6 +7,9 @@
  * 
  * Dependencies:
  * - Requires 'api' global object for timers (setTimeout).
+ * 
+ * Design Goals?
+ * - Maybe this can replace hyperGenerator. Be a clean wrapper around generate API, but handle transient errors.
  */
 
 // --- Budget / Timer Logic ---

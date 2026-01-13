@@ -107,12 +107,21 @@ The goal of this phase is to address outstanding nit-picks and sub-optimal UX an
 - [x] Attempt to unify `FieldGenerationService` with `ListGenerationService`, the latter is just a consecutive execution of the former. Change "Generate/Add", to "Generate Batch" and "Generate One"
 - [x] Clean up ULFS lorebook templates. Allow for non-original settings.
 - [x] Allow inclusion of story context into brainstorm, other fields.
-- [ ] ?? Dynamic World Snapshot acts more like a snapshot. Keeps track of how 'old' it is in terms of story generations. Periodically becomes "invalid" and can be regenerated, based on current story context.
-- [ ] Github release workflow should append version to file name.
+- [x] Github release workflow should append version to file name.
+- [ ] Fix data update handling. All UI elements should simply be subscribers to the story manager or story data. Same for everything else that needs to know about data updates. No more update callbacks set all over the place. Story manager subscribes to generation-X. Fix the whole data flow and make it clean and straightforward.
+- [ ] Situational Dynamics tuning; Keep it from being "absolutely everyone"
+
+#### Bugs
+- [x] After discussing additional characters in brainstorm, DP generate doesn't add more characters.
+- [ ] SEGA doesn't continue after waiting for generation.
 
 ### **Phase 8: Scenario Modality**
 
 The goal of this phase is to expand the viability of Story Engine to accommodate different "flavors" or "templates" of scenario. The default follows the "Three Sphere, Three Layer" world-building structure. However, this is not as well-suited to narrower-scope stories, fanfiction, episodes and vignettes, other casual kinds of scenarios. Speculative right now, design forthcoming...
+
+#### Features
+- [ ] Reconsider utility of DULFS "content"
+- [ ] Reconsider utility of Dynamic World Snapshot
 
 ## Feature Requests
 
@@ -126,7 +135,6 @@ The goal of this phase is to expand the viability of Story Engine to accommodate
 
 - [3] Apparently after generating multiple lorebooks, lorebook generation goes haywire. Observed in "Universe Systems". Maybe rolling context window is too big? Correction: might have been `violet` being insane.
 - [2] DULFS looping/insanity while generating. Also might be from `violet`.
-- [ ] After discussing additional characters in brainstorm, DP generate doesn't add more characters.
 
 ## 🏗️ Technical Implementation Details
 
