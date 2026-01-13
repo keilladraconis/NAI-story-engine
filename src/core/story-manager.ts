@@ -113,19 +113,11 @@ export class StoryManager {
     fieldId: string,
     enabled: boolean,
   ): Promise<void> {
-    await this.dulfsService.setDulfsEnabled(
-      fieldId,
-      enabled,
-      this.saveStoryData.bind(this),
-    );
+    await this.dulfsService.setDulfsEnabled(fieldId, enabled);
   }
 
   public async addDulfsItem(fieldId: string, item: DULFSField): Promise<void> {
-    await this.dulfsService.addDulfsItem(
-      fieldId,
-      item,
-      this.saveStoryData.bind(this),
-    );
+    await this.dulfsService.addDulfsItem(fieldId, item);
   }
 
   public async mergeDulfsNames(
@@ -151,7 +143,7 @@ export class StoryManager {
         linkedLorebooks: [],
       };
       // Direct add without full save yet
-      await this.dulfsService.addDulfsItem(fieldId, newItem, async () => {});
+      await this.dulfsService.addDulfsItem(fieldId, newItem);
       added = true;
     }
 
@@ -177,18 +169,11 @@ export class StoryManager {
   }
 
   public async removeDulfsItem(fieldId: string, itemId: string): Promise<void> {
-    await this.dulfsService.removeDulfsItem(
-      fieldId,
-      itemId,
-      this.saveStoryData.bind(this),
-    );
+    await this.dulfsService.removeDulfsItem(fieldId, itemId);
   }
 
   public async clearDulfsList(fieldId: string): Promise<void> {
-    await this.dulfsService.clearDulfsList(
-      fieldId,
-      this.saveStoryData.bind(this),
-    );
+    await this.dulfsService.clearDulfsList(fieldId);
   }
 
   public findDulfsByLorebookId(
@@ -310,13 +295,13 @@ export class StoryManager {
     if (changed || persistence === "immediate") {
       if (persistence === "immediate") {
         await this.dataManager.save();
-        this.dataManager.notifyListeners();
+        this.dataManager.notify();
       } else if (changed && persistence === "debounce") {
         await this.debounceAction(
           `save-global-${fieldId}`,
           async () => {
             await this.dataManager.save();
-            this.dataManager.notifyListeners();
+            this.dataManager.notify();
             api.v1.log(`Auto-saved global story data (${fieldId})`);
           },
           250,
@@ -399,7 +384,7 @@ export class StoryManager {
   public async saveStoryData(notify: boolean = true): Promise<void> {
     await this.dataManager.save();
     if (notify) {
-      this.dataManager.notifyListeners();
+      this.dataManager.notify();
     }
   }
 

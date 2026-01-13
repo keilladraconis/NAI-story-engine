@@ -64,15 +64,18 @@ export interface StoryData {
   styleEnabled: boolean;
 }
 
-export class StoryDataManager {
+import { Subscribable } from "./subscribable";
+
+export class StoryDataManager extends Subscribable<void> {
   public static readonly KEYS = {
     STORY_DATA: "kse-story-data",
   };
 
   private currentStory?: StoryData;
-  private listeners: (() => void)[] = [];
 
-  constructor() {}
+  constructor() {
+    super();
+  }
 
   public get data(): StoryData | undefined {
     return this.currentStory;
@@ -85,7 +88,7 @@ export class StoryDataManager {
     } else {
       this.currentStory = this.validateAndMigrate(data);
     }
-    this.notifyListeners();
+    this.notify();
   }
 
   private validateAndMigrate(data: StoryData): StoryData {
@@ -125,17 +128,6 @@ export class StoryDataManager {
     }
 
     return data;
-  }
-
-  public subscribe(listener: () => void): () => void {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter((l) => l !== listener);
-    };
-  }
-
-  public notifyListeners(): void {
-    this.listeners.forEach((listener) => listener());
   }
 
   public getStoryField(id: string): StoryField | undefined {

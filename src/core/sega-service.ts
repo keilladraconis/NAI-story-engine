@@ -1,23 +1,20 @@
 import { StoryManager } from "./story-manager";
 import { AgentWorkflowService } from "./agent-workflow";
 import { FIELD_CONFIGS, FieldID } from "../config/field-definitions";
+import { Subscribable } from "./subscribable";
 
-export class SegaService {
+export class SegaService extends Subscribable<void> {
   private _isRunning: boolean = false;
   private currentSegaId?: string;
   private bootstrapIds: Set<string> = new Set();
-  private updateCallback?: () => void;
 
   constructor(
     private storyManager: StoryManager,
     private agentWorkflow: AgentWorkflowService,
   ) {
+    super();
     // Subscribe to workflow updates to track completion
     this.agentWorkflow.subscribe((fieldId) => this.onWorkflowUpdate(fieldId));
-  }
-
-  public setUpdateCallback(cb: () => void) {
-    this.updateCallback = cb;
   }
 
   public get isRunning(): boolean {
@@ -48,7 +45,7 @@ export class SegaService {
     this._isRunning = true;
     api.v1.ui.toast("S.E.G.A. Background Generation Started");
     this.tryNext();
-    if (this.updateCallback) this.updateCallback();
+    this.notify();
   }
 
   private shouldTriggerFastSega(): boolean {
@@ -103,7 +100,7 @@ export class SegaService {
               callback: async () => {
                 await modal.close();
                 // If no, we just don't start SEGA as per user request
-                if (this.updateCallback) this.updateCallback();
+                this.notify();
               },
             },
           ],
@@ -138,7 +135,7 @@ export class SegaService {
     // Trigger the next random item (it will be queued after the above three)
     this.tryNext();
 
-    if (this.updateCallback) this.updateCallback();
+    this.notify();
   }
 
   public stop() {
@@ -161,7 +158,7 @@ export class SegaService {
 
     this.bootstrapIds.clear();
 
-    if (this.updateCallback) this.updateCallback();
+    this.notify();
   }
 
   private onWorkflowUpdate(fieldId: string) {
@@ -222,7 +219,7 @@ export class SegaService {
       api.v1.ui.toast("S.E.G.A. Cycle Complete - No more blank fields!", {
         type: "success",
       });
-      if (this.updateCallback) this.updateCallback();
+      this.notify();
       return;
     }
 

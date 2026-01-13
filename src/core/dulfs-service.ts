@@ -27,12 +27,12 @@ export class DulfsService {
   public async setDulfsEnabled(
     fieldId: string,
     enabled: boolean,
-    saveCallback: (notify: boolean) => Promise<void>,
   ): Promise<void> {
     const data = this.dataManager.data;
     if (!data) return;
     data.dulfsEnabled[fieldId] = enabled;
-    await saveCallback(true);
+    await this.dataManager.save();
+    this.dataManager.notify();
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
 
     // Also sync all individual items to update their enabled status
@@ -42,17 +42,14 @@ export class DulfsService {
     }
   }
 
-  public async addDulfsItem(
-    fieldId: string,
-    item: DULFSField,
-    saveCallback: (notify: boolean) => Promise<void>,
-  ): Promise<void> {
+  public async addDulfsItem(fieldId: string, item: DULFSField): Promise<void> {
     const data = this.dataManager.data;
     if (!data) return;
     const list = this.getDulfsList(fieldId);
     list.push(item);
     this.dataManager.setDulfsList(fieldId, list);
-    await saveCallback(true);
+    await this.dataManager.save();
+    this.dataManager.notify();
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
     await this.lorebookSyncService.syncIndividualLorebook(fieldId, item.id);
   }
@@ -95,12 +92,13 @@ export class DulfsService {
 
       if (persistence === "immediate") {
         await this.dataManager.save();
-        this.dataManager.notifyListeners();
+        this.dataManager.notify();
       } else if (persistence === "debounce") {
         await this.debouncer.debounceAction(
           `save-${fieldId}`,
           async () => {
             await this.dataManager.save();
+            this.dataManager.notify();
           },
           250,
         );
@@ -173,7 +171,6 @@ export class DulfsService {
   public async removeDulfsItem(
     fieldId: string,
     itemId: string,
-    saveCallback: (notify: boolean) => Promise<void>,
   ): Promise<void> {
     const data = this.dataManager.data;
     if (!data) return;
@@ -192,19 +189,18 @@ export class DulfsService {
 
     const newList = list.filter((i) => i.id !== itemId);
     this.dataManager.setDulfsList(fieldId, newList);
-    await saveCallback(true);
+    await this.dataManager.save();
+    this.dataManager.notify();
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
   }
 
-  public async clearDulfsList(
-    fieldId: string,
-    saveCallback: (notify: boolean) => Promise<void>,
-  ): Promise<void> {
+  public async clearDulfsList(fieldId: string): Promise<void> {
     const data = this.dataManager.data;
     if (!data) return;
     await this.lorebookSyncService.removeDulfsLorebook(fieldId);
     this.dataManager.setDulfsList(fieldId, []);
-    await saveCallback(true);
+    await this.dataManager.save();
+    this.dataManager.notify();
   }
 
   public findDulfsByLorebookId(
