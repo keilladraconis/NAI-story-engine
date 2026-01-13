@@ -7,7 +7,7 @@ import {
   createResponsiveGenerateButton,
 } from "./ui-components";
 
-const { row, column, text, button, checkboxInput, textInput, multilineTextInput } = api.v1.ui.part;
+const { row, column, text, button, checkboxInput, textInput } = api.v1.ui.part;
 
 export interface BaseRenderContext {
   config: FieldConfig;
@@ -31,7 +31,7 @@ export interface ListRenderContext extends BaseRenderContext {
   };
   cancelListGeneration: () => void;
   // Item specific generation
-  runDulfsItemGeneration: (itemId: string) => void;
+  runDulfsItemGeneration: (itemId: string) => void; // Deprecated in favor of runFieldGeneration with lorebook ID
   getItemGenerationState: (itemId: string) => {
     isRunning: boolean;
     isQueued?: boolean;
@@ -39,6 +39,9 @@ export interface ListRenderContext extends BaseRenderContext {
     budgetResolver?: () => void;
     budgetTimeRemaining?: number;
   } | undefined;
+  // Field/Lorebook Generation
+  runFieldGeneration?: (fieldId: string) => void;
+  cancelFieldGeneration?: (fieldId: string) => void;
 }
 
 export interface TextRenderContext extends BaseRenderContext {
@@ -76,13 +79,14 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
     const {
       config,
       storyManager,
+      agentWorkflowService,
       getItemEditMode,
       toggleItemEditMode,
       runListGeneration,
       getListGenerationState,
       cancelListGeneration,
-      runDulfsItemGeneration,
-      getItemGenerationState,
+      runFieldGeneration,
+      cancelFieldGeneration,
     } = context;
 
     const list = storyManager.getDulfsList(config.id);
@@ -161,96 +165,98 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
 
     // --- List Items ---
     const itemsUI = list.map((item) => {
-      const isEditing = getItemEditMode ? getItemEditMode(item.id) : false;
-      const itemGenState = getItemGenerationState
-        ? getItemGenerationState(item.id)
+      // Ensure linked lorebook exists (create on fly if missing logic handled elsewhere or assumed)
+      let linkedId = item.linkedLorebooks[0];
+      if (!linkedId) {
+        // Trigger sync if missing
+        storyManager.updateDulfsItem(config.id, item.id, {}, "none", true);
+      }
+
+      const sessionId = linkedId ? `lorebook:${linkedId}` : undefined;
+      const session = sessionId
+        ? agentWorkflowService.getSession(sessionId)
         : undefined;
-      const isItemGenerating = itemGenState?.isRunning || false;
+
+      const isEditing = getItemEditMode ? getItemEditMode(item.id) : false;
+      const isItemGenerating = session?.isRunning || false;
+
+      // Determine Status Icon
+      // Logic:
+      // - If no linkedId: Warning (Unlinked)
+      // - If linkedId && hasContent: Check/Book (Ready)
+      // - If linkedId && !hasContent: Circle/BookOpen (Empty)
+      let statusIcon: IconId = "alertTriangle";
+      let statusColor = "orange";
+      let statusTitle = "Unlinked / Syncing...";
+
+      const hasContent = !!(
+        item.lorebookContent && item.lorebookContent.length > 0
+      );
+
+      if (linkedId) {
+        if (hasContent) {
+          statusIcon = "bookOpen"; // Or 'file-text' or 'check-circle'
+          statusColor = "green";
+          statusTitle = "Lorebook Entry Generated";
+        } else {
+          statusIcon = "book"; // Or 'circle'
+          statusColor = "gray";
+          statusTitle = "Lorebook Entry Empty";
+        }
+      }
+
+      const statusIndicator = button({
+        iconId: statusIcon,
+        text: "", // Icon only
+        style: {
+          color: statusColor,
+          padding: "4px",
+          width: "24px",
+          border: "none",
+          background: "transparent",
+        },
+        callback: () => {
+          // Maybe show a toast with statusTitle?
+          api.v1.ui.toast(statusTitle);
+        },
+      });
 
       const toggle = () => {
         if (toggleItemEditMode) {
           if (isEditing) {
-            // Saving: Parse and Sync
-            storyManager.parseAndUpdateDulfsItem(config.id, item.id);
+            // Saving is handled by onChange in the input
           }
           toggleItemEditMode(item.id);
         }
       };
 
-      const contentParts: UIPart[] = [];
-
+      // Item Name Display/Input
+      let namePart: UIPart;
       if (isEditing) {
-        // Edit Mode: Name Input + Content Area
-        contentParts.push(
-          row({
-            style: { "margin-bottom": "8px", "align-items": "center" },
-            content: [
-              text({
-                text: "Name: ",
-                style: {
-                  "font-weight": "bold",
-                  "margin-right": "8px",
-                  "flex-shrink": "0",
-                },
-              }),
-              textInput({
-                initialValue: item.name,
-                placeholder: "Entry Name",
-                onChange: (val) => {
-                  storyManager.updateDulfsItem(
-                    config.id,
-                    item.id,
-                    { name: val },
-                    "debounce",
-                    false,
-                  );
-                },
-                style: { "flex-grow": "1" },
-              }),
-            ],
-          }),
-          multilineTextInput({
-            initialValue: item.content,
-            placeholder: "Entry details...",
-            onChange: (val) => {
-              storyManager.updateDulfsItem(
-                config.id,
-                item.id,
-                { content: val },
-                "debounce",
-                false,
-              );
-            },
-            style: { "min-height": "100px", width: "100%" },
-          }),
-        );
+        namePart = textInput({
+          initialValue: item.name,
+          placeholder: "Entry Name",
+          onChange: (val) => {
+            storyManager.updateDulfsItem(
+              config.id,
+              item.id,
+              { name: val },
+              "debounce",
+              false,
+            );
+          },
+          style: { "flex-grow": "1" },
+        });
       } else {
-        // View Mode: Name (Bold) + Content (Markdown)
-        // Process content to preserve line breaks in NovelAI's markdown renderer
-        const processedContent = (item.content || "_No content._")
-          .replace(/\n/g, "  \n")
-          .replace(/\[/g, "\\[");
-
-        contentParts.push(
-          text({
-            text: item.name || "Unnamed",
-            style: {
-              "font-weight": "bold",
-              "font-size": "1.1em",
-              "margin-bottom": "4px",
-            },
-          }),
-          text({
-            text: processedContent,
-            markdown: true,
-            style: {
-              padding: "4px",
-              "min-height": "20px",
-              "user-select": "text",
-              opacity: "0.9",
-            },
-          }),
-        );
+        namePart = text({
+          text: item.name || "Unnamed",
+          style: {
+            "font-weight": "bold",
+            "flex-grow": "1",
+            "padding-left": "4px",
+            "align-self": "center",
+          },
+        });
       }
 
       // Item Generation Button (Bolt)
@@ -258,71 +264,57 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
         `item-gen-btn-${item.id}`,
         {
           isRunning: isItemGenerating,
-          isQueued: itemGenState?.isQueued,
-          budgetState: itemGenState?.budgetState,
-          budgetTimeRemaining: itemGenState?.budgetTimeRemaining,
+          isQueued: session?.isQueued,
+          budgetState: session?.budgetState,
+          budgetTimeRemaining: session?.budgetTimeRemaining,
         },
         {
           onStart: () => {
-            if (runDulfsItemGeneration) runDulfsItemGeneration(item.id);
+            if (linkedId && runFieldGeneration) {
+              runFieldGeneration(`lorebook:${linkedId}`);
+            } else {
+              api.v1.ui.toast(
+                "No linked lorebook entry found. Try waiting a moment.",
+                { type: "warning" },
+              );
+            }
           },
           onCancel: () => {
-            // Reuse generic cancel mechanism if possible or add item specific cancel?
-            // For now, we don't have item specific cancel in interface, 
-            // but we can call cancelListGeneration if it cancels by ID? 
-            // Or we assume the button handles state.
-            // Actually, we need a cancel for item.
-            // Let's assume hitting the stop button calls this onCancel.
-            // We should use cancelListGeneration(config.id) but maybe that kills everything?
-            // AgentWorkflow.cancelListGeneration removes everything for that field.
-            // Good enough for now.
-            if (cancelListGeneration) cancelListGeneration(); 
+            if (linkedId && cancelFieldGeneration) {
+              cancelFieldGeneration(`lorebook:${linkedId}`);
+            }
           },
           onContinue: () => {
-            if (itemGenState?.budgetResolver) itemGenState.budgetResolver();
+            if (session?.budgetResolver) session.budgetResolver();
           },
         },
         "", // No text, just icon
       );
-      // Override icon to be bolt if not running (createResponsiveGenerateButton uses 'play' by default)
-      // Actually createResponsiveGenerateButton handles icons. 
-      // If we want a specific icon "bolt" instead of "play" (sparkles):
-      // The component uses "sparkles" for generate. Bolt is "zap"?
-      // We can't easily change the icon in the helper without changing the helper.
-      // "Sparkles" is fine for generation.
 
       return row({
         style: {
-          "margin-bottom": "8px",
+          "margin-bottom": "4px",
           border: "1px solid rgba(128, 128, 128, 0.1)",
           "border-radius": "4px",
-          padding: "4px",
-          "align-items": "start",
+          padding: "2px 4px",
+          "align-items": "center",
+          gap: "4px",
         },
         content: [
-          // Item Content (grows to fill space)
-          column({
-            style: { "flex-grow": "1" },
-            content: contentParts,
+          statusIndicator,
+          namePart,
+          genButton,
+          button({
+            iconId: isEditing ? "save" : "edit-3",
+            callback: toggle,
+            style: { width: "24px", padding: "4px" },
           }),
-          // Action Buttons (Compact column)
-          column({
-            style: { "margin-left": "4px", gap: "4px" },
-            content: [
-              genButton,
-              button({
-                iconId: isEditing ? "save" : "edit-3",
-                callback: toggle,
-                style: { width: "30px", padding: "8px" },
-              }),
-              button({
-                iconId: "trash",
-                callback: () => {
-                  storyManager.removeDulfsItem(config.id, item.id);
-                },
-                style: { width: "30px", padding: "8px" },
-              }),
-            ],
+          button({
+            iconId: "trash",
+            callback: () => {
+              storyManager.removeDulfsItem(config.id, item.id);
+            },
+            style: { width: "24px", padding: "4px" },
           }),
         ],
       });

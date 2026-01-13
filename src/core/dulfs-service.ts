@@ -69,23 +69,9 @@ export class DulfsService {
       const oldItem = list[index];
       let newItem = { ...oldItem, ...updates };
 
-      // Sync name into content if name changed
-      if (updates.name !== undefined && updates.name !== oldItem.name) {
-        if (!newItem.content || newItem.content.trim() === "") {
-          // Initialize content if empty
-          newItem.content =
-            fieldId === "dramatisPersonae"
-              ? `${updates.name} (Gender, Age, Role): `
-              : `${updates.name}: `;
-        } else {
-          // Replace name part in existing content
-          if (fieldId === "dramatisPersonae") {
-            newItem.content = newItem.content.replace(/^[^:(]+/, updates.name);
-          } else {
-            newItem.content = newItem.content.replace(/^[^:]+/, updates.name);
-          }
-        }
-      }
+      // Sync name into content if name changed - DEPRECATED/REMOVED
+      // We no longer maintain item.content as the primary source.
+      // Lorebook content is managed via linkedLorebooks.
 
       list[index] = newItem;
       this.dataManager.setDulfsList(fieldId, list);
