@@ -67,17 +67,22 @@ export const buildDulfsContextString = (
 ): string => {
   let context = "";
   for (const fid of LIST_FIELD_IDS) {
-    if (fid === excludeFieldId) continue;
-    const list = manager.getDulfsList(fid);
-    if (list.length === 0) continue;
-
+    const summary = manager.getDulfsSummary(fid);
     const config = FIELD_CONFIGS.find((c) => c.id === fid);
     const label = config ? config.label.toUpperCase() : fid.toUpperCase();
 
-    if (mode === "short") {
-      context += `${label}: ${list.map((i) => i.name).join(", ")}\n`;
+    if (summary && summary.trim().length > 0) {
+      // Always include summary if available, as it is high-value context
+      context += `${label} OVERVIEW:\n${summary}\n\n`;
     } else {
-      context += `${label}:\n${list.map((i) => `- ${i.content}`).join("\n")}\n\n`;
+      // Fallback: List names if no summary
+      // Respect excludeFieldId for raw lists to avoid redundancy/recursion issues
+      if (fid === excludeFieldId) continue;
+
+      const list = manager.getDulfsList(fid);
+      if (list.length === 0) continue;
+
+      context += `${label}: ${list.map((i) => i.name).join(", ")}\n\n`;
     }
   }
   return context.trim();
@@ -734,6 +739,86 @@ Keep the description concise and focused on narrative potential.`,
     };
 
     return result;
+  }
+
+  async buildDulfsSummaryContext(fieldId: string): Promise<StrategyResult> {
+    const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
+    const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
+    const setting = this.storyManager.getSetting();
+
+    const list = this.storyManager.getDulfsList(fieldId);
+    let allContent = "";
+    let count = 0;
+
+    for (const item of list) {
+      // Use lorebookContent primarily
+      const content = item.lorebookContent || item.content || "";
+      // Only include if content is substantial
+      if (content.trim().length > 10) {
+        allContent += `--- ${item.name} ---\n${content}\n\n`;
+        count++;
+      }
+    }
+
+    if (count === 0) {
+      // No content to summarize
+      // Return a dummy result that produces an empty or status message
+      return {
+        messages: [
+          { role: "system", content: "No content available to summarize." },
+        ],
+        params: { maxTokens: 10 },
+      };
+    }
+
+    let instruction = "";
+    if (fieldId === FieldID.DramatisPersonae) {
+      instruction = `Summarize each character in a SINGLE terse line using this exact format:
+- {Full Name} ({Gender}, {Age}, {Role}): {Very concise summary of function/conflict}
+
+Example:
+- John Doe (Male, 34, Detective): Cynical investigator obsessed with the case, battling alcoholism.`;
+    } else {
+      instruction = `Summarize each entry in a SINGLE terse line using this exact format:
+- {Name}: {Very concise summary of definition/function}
+
+Example:
+- The Spire: Central governace hub, source of the city's power grid.`;
+    }
+
+    const messages = contextBuilder(
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content: `You are a summarization engine.
+${instruction}
+
+Constraint: Do not include entries that are not listed in the DATA below.
+Constraint: Be extremely brief. No flowery language.
+
+DATA:
+${allContent}`,
+      },
+      {
+        role: "assistant",
+        content: "", // Empty assistant to start fresh
+      },
+      [
+        { role: "user", content: `STORY PROMPT:\n${storyPrompt}` },
+        { role: "user", content: `SETTING:\n${setting}` },
+      ],
+    );
+
+    return {
+      messages,
+      params: {
+        temperature: 0.5, // Lower temperature for strict formatting
+        min_p: 0.1,
+        presence_penalty: 0.0,
+        maxTokens: 1024,
+      },
+      prefixBehavior: "trim",
+    };
   }
 
   private getStrategyKey(session: FieldSession): string {

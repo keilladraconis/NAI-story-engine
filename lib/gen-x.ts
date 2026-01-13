@@ -29,6 +29,75 @@ export interface BudgetTracked {
 }
 
 export class BudgetTimer {
+  private static activeWait: { resolve: () => void; state: BudgetTracked } | null = null;
+  private static initialized = false;
+
+  private static init() {
+    if (this.initialized) return;
+    this.initialized = true;
+    
+    const listener = (data: any) => {
+       if (BudgetTimer.activeWait && data && data.scriptInitiated === false) {
+          // User manually triggered generation. Unblock the wait.
+          BudgetTimer.activeWait.resolve();
+          BudgetTimer.activeWait = null;
+       }
+    };
+
+    if ((api as any).v1?.events?.on) {
+      (api as any).v1.events.on("generationRequested", listener);
+    }
+  }
+
+  /**
+   * Manages the "Waiting for User" phase of a budget wait.
+   * Sets state to "waiting_for_user" and waits for either:
+   * 1. Manual resolution via state.budgetResolver() (e.g. user clicked "Continue")
+   * 2. "generationRequested" event with scriptInitiated=false (user clicked Generate or triggered via keybind)
+   * 
+   * Once triggered, it automatically calls BudgetTimer.start() to begin the countdown.
+   * 
+   * @param state The state object to track
+   * @param durationMs The duration of the budget wait
+   * @param updateFn Callback to notify UI
+   */
+  static waitForBudget(
+    state: BudgetTracked,
+    durationMs: number,
+    updateFn: () => void
+  ): Promise<void> {
+    BudgetTimer.init();
+
+    return new Promise((resolve, reject) => {
+      
+      const proceed = () => {
+        if (BudgetTimer.activeWait?.state === state) {
+            BudgetTimer.activeWait = null;
+        }
+        
+        BudgetTimer.start(state, durationMs, updateFn)
+          .then(resolve)
+          .catch(reject);
+      };
+
+      // Register this session as the active waiter
+      BudgetTimer.activeWait = { resolve: proceed, state };
+
+      state.budgetResolver = () => proceed();
+      state.budgetRejecter = (reason) => {
+        if (BudgetTimer.activeWait?.state === state) {
+            BudgetTimer.activeWait = null;
+        }
+        reject(reason || "Cancelled");
+      };
+      
+      state.budgetState = "waiting_for_user";
+      state.budgetWaitTime = durationMs;
+      state.budgetWaitEndTime = Date.now() + durationMs;
+      updateFn();
+    });
+  }
+
   /**
    * Starts a countdown timer for a budget wait.
    * Updates the state object and calls updateFn on each tick.

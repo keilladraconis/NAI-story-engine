@@ -120,6 +120,35 @@ export class StoryManager {
     await this.dulfsService.addDulfsItem(fieldId, item);
   }
 
+  public getDulfsSummary(fieldId: string): string {
+    return this.dataManager.getDulfsSummary(fieldId);
+  }
+
+  public async setDulfsSummary(
+    fieldId: string,
+    summary: string,
+    persistence: PersistenceMode = "debounce",
+  ): Promise<void> {
+    const current = this.getDulfsSummary(fieldId);
+    if (current !== summary) {
+      this.dataManager.setDulfsSummary(fieldId, summary);
+      
+      if (persistence === "immediate") {
+        await this.dataManager.save();
+        this.dataManager.notify();
+      } else if (persistence === "debounce") {
+        await this.debounceAction(
+          `save-summary-${fieldId}`,
+          async () => {
+            await this.dataManager.save();
+            this.dataManager.notify();
+          },
+          1000,
+        );
+      }
+    }
+  }
+
   public async mergeDulfsNames(
     fieldId: string,
     names: string[],

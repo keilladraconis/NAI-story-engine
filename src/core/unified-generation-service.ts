@@ -71,20 +71,7 @@ export class UnifiedGenerationService {
           ...params,
           minTokens: params.minTokens || 50,
           onBudgetWait: (_1, _2, time) => {
-            return new Promise<void>((resolve, reject) => {
-              session.budgetResolver = () => {
-                BudgetTimer.start(session, time, updateFn)
-                  .then(resolve)
-                  .catch(reject);
-              };
-              session.budgetRejecter = (reason) => {
-                reject(reason || "Cancelled");
-              };
-              session.budgetState = "waiting_for_user";
-              session.budgetWaitTime = time;
-              session.budgetWaitEndTime = Date.now() + time;
-              updateFn();
-            });
+            return BudgetTimer.waitForBudget(session, time, updateFn);
           },
           onBudgetResume: () => {
             session.budgetState = "normal";
@@ -297,6 +284,36 @@ export class BrainstormStrategy implements GenerationStrategy {
     session.outputBuffer = undefined; // Clear buffer on completion
     manager.addBrainstormMessage("assistant", finalText);
     await manager.saveStoryData(true);
+    updateFn();
+  }
+}
+
+export class DulfsSummaryStrategy implements GenerationStrategy {
+  constructor(private contextFactory: ContextStrategyFactory) {}
+
+  async buildContext(session: GenerationSession): Promise<StrategyResult> {
+    if (!session.dulfsFieldId) throw new Error("Missing dulfsFieldId");
+    return this.contextFactory.buildDulfsSummaryContext(session.dulfsFieldId);
+  }
+
+  async onDelta(
+    session: GenerationSession,
+    buffer: string,
+    _manager: StoryManager,
+    updateFn: () => void,
+  ): Promise<void> {
+    // Could expose stream here if UI supports it
+    updateFn();
+  }
+
+  async onComplete(
+    session: GenerationSession,
+    manager: StoryManager,
+    finalText: string,
+    updateFn: () => void,
+  ): Promise<void> {
+    if (!session.dulfsFieldId) return;
+    await manager.setDulfsSummary(session.dulfsFieldId, finalText, "immediate");
     updateFn();
   }
 }
