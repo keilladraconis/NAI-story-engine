@@ -54,6 +54,7 @@ export interface StoryData {
   dulfsCategoryIds: Record<string, string>; // FieldID -> CategoryID
   dulfsEntryIds: Record<string, string>; // FieldID -> EntryID
   dulfsEnabled: Record<string, boolean>; // FieldID -> boolean
+  dulfsSummaries: Record<string, string>; // FieldID -> Summary Text
 
   // Text Field Lorebook Integration
   textFieldEntryIds: Record<string, string>; // FieldID -> EntryID
@@ -98,6 +99,7 @@ export class StoryDataManager extends Subscribable<void> {
     data.dulfsCategoryIds = data.dulfsCategoryIds || {};
     data.dulfsEntryIds = data.dulfsEntryIds || {};
     data.dulfsEnabled = data.dulfsEnabled || {};
+    data.dulfsSummaries = data.dulfsSummaries || {};
     data.textFieldEntryIds = data.textFieldEntryIds || {};
     data.textFieldEnabled = data.textFieldEnabled || {};
     
@@ -160,6 +162,16 @@ export class StoryDataManager extends Subscribable<void> {
     }
   }
 
+  public getDulfsSummary(id: string): string {
+    if (!this.currentStory) return "";
+    return this.currentStory.dulfsSummaries[id] || "";
+  }
+
+  public setDulfsSummary(id: string, summary: string): void {
+    if (!this.currentStory) return;
+    this.currentStory.dulfsSummaries[id] = summary;
+  }
+
   public async save(): Promise<void> {
     if (!this.currentStory) return;
     await api.v1.storyStorage.set(
@@ -178,6 +190,7 @@ export class StoryDataManager extends Subscribable<void> {
       dulfsCategoryIds: {},
       dulfsEntryIds: {},
       dulfsEnabled: {},
+      dulfsSummaries: {},
       
       textFieldEntryIds: {},
       textFieldEnabled: {},

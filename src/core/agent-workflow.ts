@@ -6,6 +6,7 @@ import {
   FieldGenerationStrategy,
   DulfsListStrategy,
   DulfsContentStrategy,
+  DulfsSummaryStrategy,
   BrainstormStrategy,
   GenerationStrategy,
 } from "./unified-generation-service";
@@ -235,6 +236,26 @@ export class AgentWorkflowService {
     this.queueTask(itemSession, strategy, wrappedUpdate);
 
     wrappedUpdate();
+  }
+
+  public requestDulfsSummaryGeneration(
+    fieldId: string,
+    updateFn: () => void = () => {},
+  ) {
+    const sessionKey = `summary:${fieldId}`;
+    const session =
+      this.getSession(sessionKey) || this.startSession(sessionKey);
+    session.error = undefined;
+    session.dulfsFieldId = fieldId;
+    session.type = "dulfs-summary";
+
+    const wrappedUpdate = () => {
+      updateFn();
+      this.notify(fieldId);
+    };
+
+    const strategy = new DulfsSummaryStrategy(this.contextFactory);
+    this.queueTask(session, strategy, wrappedUpdate);
   }
 
   public requestDulfsContentGeneration(

@@ -1,6 +1,6 @@
 import { FieldConfig, FieldID } from "../config/field-definitions";
 import { StoryManager, DULFSField } from "../core/story-manager";
-import { AgentWorkflowService } from "../core/agent-workflow";
+import { AgentWorkflowService, GenerationSession } from "../core/agent-workflow";
 import {
   createHeaderWithToggle,
   createToggleableContent,
@@ -42,6 +42,13 @@ export interface ListRenderContext extends BaseRenderContext {
   // Field/Lorebook Generation
   runFieldGeneration?: (fieldId: string) => void;
   cancelFieldGeneration?: (fieldId: string) => void;
+
+  // Summary Generation
+  runSummaryGeneration?: () => void;
+  cancelSummaryGeneration?: () => void;
+  getSummaryGenerationState?: () => GenerationSession | undefined;
+  getSummaryVisibility?: () => boolean;
+  toggleSummaryVisibility?: () => void;
 }
 
 export interface TextRenderContext extends BaseRenderContext {
@@ -87,6 +94,11 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
       cancelListGeneration,
       runFieldGeneration,
       cancelFieldGeneration,
+      runSummaryGeneration,
+      cancelSummaryGeneration,
+      getSummaryGenerationState,
+      getSummaryVisibility,
+      toggleSummaryVisibility,
     } = context;
 
     const list = storyManager.getDulfsList(config.id);
@@ -94,6 +106,113 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
       ? getListGenerationState()
       : { isRunning: false };
     const isEnabled = storyManager.isDulfsEnabled(config.id);
+
+    // --- Summary Section ---
+    const summary = storyManager.getDulfsSummary(config.id);
+    const summarySession = getSummaryGenerationState
+      ? getSummaryGenerationState()
+      : undefined;
+    const isSummaryVisible = getSummaryVisibility
+      ? getSummaryVisibility()
+      : false;
+
+    const headerButtons: UIPart[] = [];
+
+    // Toggle Visibility Button
+    headerButtons.push(
+      button({
+        iconId: isSummaryVisible ? "eye-off" : "eye",
+        callback: () => toggleSummaryVisibility && toggleSummaryVisibility(),
+        style: {
+          padding: "4px",
+          width: "24px",
+          border: "none",
+          background: "transparent",
+        },
+      }),
+    );
+
+    // Generate Button
+    headerButtons.push(
+      createResponsiveGenerateButton(
+        `summary-gen-${config.id}`,
+        {
+          isRunning: summarySession?.isRunning || false,
+          isQueued: summarySession?.isQueued,
+          budgetState: summarySession?.budgetState,
+          budgetTimeRemaining: summarySession?.budgetTimeRemaining,
+        },
+        {
+          onStart: () => runSummaryGeneration && runSummaryGeneration(),
+          onCancel: () => cancelSummaryGeneration && cancelSummaryGeneration(),
+          onContinue: () =>
+            summarySession?.budgetResolver && summarySession.budgetResolver(),
+        },
+        "", // Icon only
+      ),
+    );
+
+    // Clear Button
+    headerButtons.push(
+      button({
+        iconId: "trash-2",
+        callback: () => storyManager.setDulfsSummary(config.id, ""),
+        style: {
+          padding: "4px",
+          width: "24px",
+          border: "none",
+          background: "transparent",
+        },
+      }),
+    );
+
+    const summaryContentParts: UIPart[] = [
+      row({
+        style: {
+          "justify-content": "space-between",
+          "align-items": "center",
+        },
+        content: [
+          text({
+            text: "Category Summary",
+            style: {
+              "font-weight": "bold",
+              "font-size": "0.9em",
+              opacity: "0.7",
+            },
+          }),
+          row({ style: { gap: "2px" }, content: headerButtons }),
+        ],
+      }),
+    ];
+
+    if (isSummaryVisible) {
+      summaryContentParts.push(
+        text({
+          text: summary || "_No summary generated._",
+          markdown: true,
+          style: {
+            "margin-top": "4px",
+            padding: "6px",
+            border: "1px solid rgba(128,128,128,0.2)",
+            "border-radius": "4px",
+            "background-color": "rgba(255,255,255,0.05)",
+            "font-size": "0.9em",
+            "white-space": "pre-wrap",
+          },
+        }),
+      );
+    }
+
+    const summaryUI = column({
+      style: {
+        "margin-bottom": "8px",
+        "background-color": "rgba(0,0,0,0.02)",
+        padding: "4px",
+        "border-radius": "4px",
+      },
+      content: summaryContentParts,
+    });
 
     // --- Actions Row ---
     const actionsRow = row({
@@ -329,6 +448,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
           "margin-bottom": "8px",
         },
       }),
+      summaryUI,
       column({ content: itemsUI }),
       actionsRow, // Moved to bottom
     ];

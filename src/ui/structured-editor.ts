@@ -140,6 +140,24 @@ export class StructuredEditor extends Subscribable<void> {
         this.agentWorkflowService.requestFieldGeneration(fieldId),
       cancelFieldGeneration: (fieldId) =>
         this.agentWorkflowService.cancelFieldGeneration(fieldId),
+      
+      // Summary
+      runSummaryGeneration: () =>
+        this.agentWorkflowService.requestDulfsSummaryGeneration(config.id),
+      cancelSummaryGeneration: () =>
+        this.agentWorkflowService.cancelFieldGeneration(`summary:${config.id}`),
+      getSummaryGenerationState: () =>
+        this.agentWorkflowService.getSession(`summary:${config.id}`),
+      
+      // Summary Visibility
+      getSummaryVisibility: () =>
+        this.editModes.get(`summary-visible:${config.id}`) || false,
+      toggleSummaryVisibility: () => {
+        const key = `summary-visible:${config.id}`;
+        const current = this.editModes.get(key) || false;
+        this.editModes.set(key, !current);
+        this.notify();
+      },
     };
 
     const strategy = getFieldStrategy(config);

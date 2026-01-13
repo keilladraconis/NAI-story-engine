@@ -1,7 +1,7 @@
 export interface GenerationSession {
   id: string; // Unique ID for this generation task
   fieldId: string; // The target field ID (or "brainstorm")
-  type: "field" | "dulfs-item" | "brainstorm";
+  type: "field" | "dulfs-item" | "dulfs-list" | "dulfs-summary" | "brainstorm";
   
   // State
   isRunning: boolean;
