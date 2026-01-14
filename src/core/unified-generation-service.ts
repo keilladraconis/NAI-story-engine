@@ -4,6 +4,7 @@ import { GenerationSession } from "./generation-types";
 import { hyperGenerate } from "../../lib/hyper-generator";
 import { BudgetTimer } from "../../lib/gen-x";
 import { Subscribable } from "./subscribable";
+import { APP_CONFIG } from "../config/app-config";
 
 export interface GenerationStrategy {
   buildContext(session: GenerationSession): Promise<StrategyResult>;
@@ -52,7 +53,7 @@ export class UnifiedGenerationService extends Subscribable<string> {
         }
       }
 
-      const model = (await api.v1.config.get("model")) || "glm-4-6";
+      const model = (await api.v1.config.get("model")) || APP_CONFIG.MODELS.DEFAULT;
 
       const applyFilters = (t: string) => {
         let out = t;
@@ -144,7 +145,6 @@ export class FieldGenerationStrategy implements GenerationStrategy {
       session.fieldId,
       finalText,
       "immediate",
-      true,
     );
     if (session.fieldId.startsWith("lorebook:")) {
       const entryId = session.fieldId.split(":")[1];
@@ -217,7 +217,6 @@ export class DulfsContentStrategy implements GenerationStrategy {
         session.dulfsItemId,
         { content: buffer },
         "none", // Stream to memory only
-        false, // No sync yet
       );
     }
   }
@@ -233,7 +232,6 @@ export class DulfsContentStrategy implements GenerationStrategy {
         session.dulfsItemId,
         { content: finalText },
         "immediate", // Save and sync
-        true,
       );
       // Auto-parse to update description and sync fully
       await manager.parseAndUpdateDulfsItem(

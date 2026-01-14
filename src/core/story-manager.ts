@@ -1,7 +1,5 @@
 import {
   FieldID,
-  LIST_FIELD_IDS,
-  TEXT_FIELD_IDS,
 } from "../config/field-definitions";
 import {
   StoryDataManager,
@@ -15,6 +13,7 @@ import { ContentParsingService } from "./content-parsing-service";
 import { DulfsService } from "./dulfs-service";
 import { Debouncer } from "./debouncer";
 import { Store, Listener, Action } from "./store";
+import { APP_CONFIG } from "../config/app-config";
 
 export { StoryField, DULFSField };
 
@@ -38,6 +37,8 @@ export class StoryManager {
       this.store,
       this.dispatch,
     );
+    this.lorebookSyncService.start(); // Start reactive listeners
+
     this.brainstormDataManager = new BrainstormDataManager(
       this.store,
       this.dispatch,
@@ -47,7 +48,6 @@ export class StoryManager {
     this.dulfsService = new DulfsService(
       this.store,
       this.dispatch,
-      this.lorebookSyncService,
       this.parsingService,
     );
 
@@ -64,7 +64,7 @@ export class StoryManager {
           await this.dataManager.save();
           api.v1.log("Auto-saved story data");
         },
-        1000,
+        APP_CONFIG.DEBOUNCE.SAVE,
       );
     });
   }
@@ -153,10 +153,12 @@ export class StoryManager {
     enabled: boolean,
   ): Promise<void> {
     await this.dulfsService.setDulfsEnabled(fieldId, enabled);
+    // Sync handled by LorebookSyncService reaction
   }
 
   public async addDulfsItem(fieldId: string, item: DULFSField): Promise<void> {
     await this.dulfsService.addDulfsItem(fieldId, item);
+    // Sync handled by LorebookSyncService reaction
   }
 
   public getDulfsSummary(fieldId: string): string {
@@ -209,13 +211,11 @@ export class StoryManager {
     itemId: string,
     updates: Partial<DULFSField>,
     persistence: PersistenceMode = "debounce",
-    syncToLorebook: boolean = true,
   ): Promise<void> {
     await this.dulfsService.updateDulfsItem(
       fieldId,
       itemId,
-      updates,
-      syncToLorebook,
+      updates
     );
     if (persistence === "immediate") {
       await this.saveStoryData();
@@ -242,11 +242,7 @@ export class StoryManager {
 
   public async setAttgEnabled(enabled: boolean): Promise<void> {
     this.dispatch((store) => store.update((s) => (s.attgEnabled = enabled)));
-    if (enabled) {
-      await this.lorebookSyncService.syncAttgToMemory(
-        this.getFieldContent(FieldID.ATTG),
-      );
-    }
+    // Sync handled by LorebookSyncService reaction
   }
 
   public isStyleEnabled(): boolean {
@@ -255,11 +251,7 @@ export class StoryManager {
 
   public async setStyleEnabled(enabled: boolean): Promise<void> {
     this.dispatch((store) => store.update((s) => (s.styleEnabled = enabled)));
-    if (enabled) {
-      await this.lorebookSyncService.syncStyleToAN(
-        this.getFieldContent(FieldID.Style),
-      );
-    }
+    // Sync handled by LorebookSyncService reaction
   }
 
   public isTextFieldLorebookEnabled(fieldId: string): boolean {
@@ -277,17 +269,14 @@ export class StoryManager {
         s.textFieldEnabled = { ...s.textFieldEnabled, [fieldId]: enabled };
       }),
     );
-    await this.lorebookSyncService.syncTextField(fieldId);
+    // Sync handled by LorebookSyncService reaction
   }
 
   public async setFieldContent(
     fieldId: string,
     content: string,
     persistence: PersistenceMode = "debounce",
-    sync: boolean = true,
   ): Promise<void> {
-    const data = this.store.get();
-
     if (fieldId.includes(":")) {
       const [prefix, id] = fieldId.split(":");
       if (prefix === "lorebook") {
@@ -312,30 +301,15 @@ export class StoryManager {
     }
 
     // Direct field update
-    let changed = false;
     this.dispatch((store) =>
       store.update((s) => {
         const field = s[fieldId as keyof StoryData] as StoryField;
         if (field && field.content !== content) {
           // Replace object to trigger store change detection
           (s as any)[fieldId] = { ...field, content };
-          changed = true;
         }
       }),
     );
-
-    // Sync logic (side effects)
-    if ((changed || persistence === "immediate") && sync) {
-      if (fieldId === FieldID.ATTG && data.attgEnabled) {
-        await this.lorebookSyncService.syncAttgToMemory(content);
-      }
-      if (fieldId === FieldID.Style && data.styleEnabled) {
-        await this.lorebookSyncService.syncStyleToAN(content);
-      }
-      if (this.isTextFieldLorebookEnabled(fieldId)) {
-        await this.lorebookSyncService.syncTextField(fieldId);
-      }
-    }
 
     if (persistence === "immediate") {
       await this.saveStoryData();
@@ -363,41 +337,18 @@ export class StoryManager {
   public async clearAllStoryData(): Promise<void> {
     const data = this.store.get();
 
-    // 1. Clear DULFS fields (Deletes all DULFS Lorebook content and categories)
-    for (const fieldId of LIST_FIELD_IDS) {
-      await this.clearDulfsList(fieldId);
-    }
-
-    // 2. Clear External Memory (ATTG / Style)
-    if (data.attgEnabled) {
-      await this.lorebookSyncService.syncAttgToMemory("");
-    }
-    if (data.styleEnabled) {
-      await this.lorebookSyncService.syncStyleToAN("");
-    }
-
-    // 3. Delete Text Field Lorebook Entries
-    for (const fieldId of TEXT_FIELD_IDS) {
-      const entryId = data.textFieldEntryIds[fieldId];
-      if (entryId) {
-        try {
-          await api.v1.lorebook.removeEntry(entryId);
-        } catch (e) {
-          // Ignore
-        }
-      }
-    }
-
-    // 4. Create Fresh State
+    // Create Fresh State
     const defaultData = this.dataManager.createDefaultData();
 
-    // 5. Preserve Brainstorm Data
+    // Preserve Brainstorm Data
     const oldBrainstorm = data[FieldID.Brainstorm];
     if (oldBrainstorm) {
       defaultData[FieldID.Brainstorm] = oldBrainstorm;
     }
 
-    // 6. Apply Fresh State
+    // Apply Fresh State
+    // The Store reaction in LorebookSyncService will detect the missing IDs 
+    // (via diff.previous) and clean up the external Lorebook entries.
     this.dispatch((store) =>
       store.update((s) => {
         Object.assign(s, defaultData);
@@ -421,6 +372,6 @@ export class StoryManager {
   }
 
   public async saveFieldDraft(fieldId: string, content: string): Promise<void> {
-    await this.setFieldContent(fieldId, content, "none", false);
+    await this.setFieldContent(fieldId, content, "none");
   }
 }

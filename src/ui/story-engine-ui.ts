@@ -212,8 +212,6 @@ export class StoryEngineUI {
                 `input-field-${sessionId}`,
                 (val) => {
                   this.storyManager.setFieldContent(sessionId, val, "debounce");
-                  // Sync to NovelAI Lorebook
-                  api.v1.lorebook.updateEntry(entryId, { text: val });
                 },
                 { "min-height": "300px" },
               ),

@@ -1,4 +1,5 @@
 ## Gemini Added Memories
+
 - The Brainstorm feature has been refactored from a card-based UI to a chat-based message stream interface and moved to its own sidebar tab.
 - The Brainstorm agent has been optimized for short, conversational responses (max 300 tokens) to avoid relentless spewing of text.
 - Ctrl+Enter is now bound to send in the Brainstorm chat, and the UI update delay has been fixed by rendering the user message immediately upon sending.
@@ -25,8 +26,8 @@
 - **Robust Cancellation (Jan 12, 2026)**: Enhanced the cancellation logic for generation sessions. Clicking "Waiting..." during a budget pause now triggers a rejection of the budget wait promise via `budgetRejecter`, ensuring that `hyperGenerate` aborts immediately rather than proceeding when the budget becomes available. This applies to Field, List, and Brainstorm generation. Brainstorm UI now prompts "Continue...?" when waiting for user confirmation.
 - **Fast S.E.G.A. Mode (Jan 12, 2026)**: Implemented "Fast S.E.G.A." mode for quick bootstrapping. If S.E.G.A. is activated while Story Prompt, ATTG, and Style Guidelines are empty and unbound, a modal prompts the user to bootstrap the story. If accepted, it automatically binds these fields (to Lorebook, Memory, and Author's Note respectively), queues their generation, and then proceeds with normal background generation. These bootstrap tasks are tracked by `SegaService` to ensure auto-resolution of budget waits.
 - **UI Refresh Fixes (Jan 12, 2026)**: Fixed issues where streaming output wasn't visible and the UI didn't update after generation.
-    - Subscribed `StoryEngineUI` to `AgentWorkflowService` to trigger re-renders during streaming.
-    - Updated `StoryManager.setFieldContent` to explicitly notify listeners after saving (both for `immediate` and `debounce` persistence), ensuring the UI reflects final generation states.
+  - Subscribed `StoryEngineUI` to `AgentWorkflowService` to trigger re-renders during streaming.
+  - Updated `StoryManager.setFieldContent` to explicitly notify listeners after saving (both for `immediate` and `debounce` persistence), ensuring the UI reflects final generation states.
   - **Unified Generation Service (Jan 12, 2026)**: Unified `FieldGenerationService`, `ListGenerationService`, and `BrainstormService` (generation logic) into a single `UnifiedGenerationService`. This uses a Strategy pattern (`GenerationStrategy`) to handle specific behaviors for fields, DULFS items, and brainstorming.
   - **Sequential DULFS Generation (Jan 12, 2026)**: Refactored DULFS generation to queue N (default 3) sequential "dulfs-item" generation tasks instead of a single list generation task. This simplifies parsing and improves reliability. Added `parseDulfsItem` to `ContentParsingService` for multi-line item parsing.
   - **DULFS Prompt Tuning (Jan 12, 2026)**: Reverted DULFS generation prompts to request single-line items instead of structured key/value pairs to resolve parsing issues with complex fields like `Dramatis Personae`. Updated `parseDulfsItem` to fallback to field-specific regex parsing (via `parseListLine`) when multi-line parsing fails.
@@ -42,12 +43,12 @@
   - **Current Status (Jan 12, 2026)**: Code review completed.
   - **Stability**: High.
   - **Maintenance**: Minor type safety and deduplication opportunities noted in `CODEREVIEW.md`.
-- **Library Extraction (Jan 12, 2026)**: Extracted generation queueing, notification, and budget timing logic into a reusable library `lib/generation-queue.ts`. This library introduces `GenX` (Generation eXchange) for managing serial task execution and `BudgetTimer` for handling countdown logic, decoupling these infrastructure concerns from `AgentWorkflowService` and `UnifiedGenerationService`.
 
+- **Library Extraction (Jan 12, 2026)**: Extracted generation queueing, notification, and budget timing logic into a reusable library `lib/generation-queue.ts`. This library introduces `GenX` (Generation eXchange) for managing serial task execution and `BudgetTimer` for handling countdown logic, decoupling these infrastructure concerns from `AgentWorkflowService` and `UnifiedGenerationService`.
   - **Current Status (Jan 12, 2026)**: Refactoring completed.
   - **Stability**: High.
   - **Maintenance**: `AgentWorkflowService` is now much thinner, delegating queue management to the generic library.
   - **Refactoring**: Architecture is cleaner; generic queue logic is isolated.
   - **DULFS Workflow Refactor (Jan 12, 2026)**: Split DULFS generation into two phases. Phase 1 ("Generate Names") produces a comma-separated list of subjects which are merged into the list as named items with empty content. Phase 2 ("Content Generation") allows users to trigger generation for specific items via a "Bolt" button, filling in their details. Implemented via `DulfsListStrategy` and `DulfsContentStrategy`.
 
-  - **Current Status (Jan 12, 2026)**: Code review completed.  
+  - **Current Status (Jan 12, 2026)**: Code review completed.

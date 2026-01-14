@@ -11,10 +11,9 @@ const apiMock = {
       dispose: vi.fn()
     })),
     timers: {
-      setTimeout: vi.fn((cb, delay) => Promise.resolve(setTimeout(cb, delay) as any)),
+      setTimeout: vi.fn((cb, delay) => setTimeout(cb, delay) as any),
       clearTimeout: vi.fn((id) => {
         clearTimeout(id);
-        return Promise.resolve();
       })
     },
     config: {

@@ -1,0 +1,19 @@
+export const APP_CONFIG = {
+  MODELS: {
+    DEFAULT: "glm-4-6",
+    FAST: "glm-4-9b",
+  },
+  DEBOUNCE: {
+    SAVE: 1000,
+    SYNC_GLOBAL: 500,
+    SYNC_TEXT: 1000,
+    SYNC_LIST: 1000,
+    SYNC_ITEM_NEW: 500,
+    SYNC_ITEM_UPDATE: 2000,
+    SYNC_CLEANUP: 100,
+  },
+  LOREBOOK: {
+    RANDOM_CHANCE_SUMMARY: 0.1,
+    CATEGORY_PREFIX: "SE: ",
+  }
+};

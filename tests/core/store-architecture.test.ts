@@ -98,7 +98,7 @@ describe('StoryManager Integration', () => {
     const listener = vi.fn();
     manager.store.subscribe(listener);
 
-    await manager.setFieldContent(FieldID.StoryPrompt, "New Prompt", "none", false);
+    await manager.setFieldContent(FieldID.StoryPrompt, "New Prompt", "none");
 
     const data = manager.store.get();
     expect(data[FieldID.StoryPrompt].content).toBe("New Prompt");
@@ -116,7 +116,7 @@ describe('StoryManager Integration', () => {
     // BUT checking if the store reaction also works requires waiting for debounce.
     // Instead, let's check explicit save path first.
     
-    await manager.setFieldContent(FieldID.StoryPrompt, "Saved", "immediate", false);
+    await manager.setFieldContent(FieldID.StoryPrompt, "Saved", "immediate");
     
     expect(api.v1.storyStorage.set).toHaveBeenCalled();
   });

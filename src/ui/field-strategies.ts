@@ -291,7 +291,7 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
       let linkedId = item.linkedLorebooks[0];
       if (!linkedId) {
         // Trigger sync if missing
-        storyManager.updateDulfsItem(config.id, item.id, {}, "none", true);
+        storyManager.updateDulfsItem(config.id, item.id, {}, "none");
       }
 
       const sessionId = linkedId ? `lorebook:${linkedId}` : undefined;
@@ -364,7 +364,6 @@ export class ListFieldStrategy implements FieldRenderStrategy<ListRenderContext>
               item.id,
               { name: val },
               "debounce",
-              false,
             );
           },
           style: { "flex-grow": "1" },
