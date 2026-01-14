@@ -10,11 +10,20 @@ const apiMock = {
       cancel: vi.fn(),
       dispose: vi.fn()
     })),
+    events: {
+        on: vi.fn()
+    },
     timers: {
       setTimeout: vi.fn((cb, delay) => setTimeout(cb, delay) as any),
       clearTimeout: vi.fn((id) => {
         clearTimeout(id);
-      })
+      }),
+      sleep: vi.fn((ms) => new Promise(resolve => setTimeout(resolve, ms)))
+    },
+    script: {
+        getAllowedOutput: vi.fn(() => 10000),
+        getTimeUntilAllowedOutput: vi.fn(() => 0),
+        waitForAllowedOutput: vi.fn().mockResolvedValue(undefined)
     },
     config: {
       get: vi.fn().mockResolvedValue(undefined)
@@ -44,6 +53,7 @@ const apiMock = {
     ui: {
       toast: vi.fn()
     },
+    generate: vi.fn(),
     buildContext: vi.fn().mockResolvedValue([]),
     maxTokens: vi.fn().mockResolvedValue(8192),
   }

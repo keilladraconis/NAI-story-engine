@@ -7,12 +7,13 @@ import {
   TEXT_FIELD_IDS,
 } from "../config/field-definitions";
 import { APP_CONFIG } from "../config/app-config";
-import { hyperGenerate } from "../../lib/hyper-generator";
+import { GenX } from "../../lib/gen-x";
 import { Debouncer } from "./debouncer";
 
 export class LorebookSyncService {
   private debouncer = new Debouncer();
   private isSubscribed = false;
+  private genX = new GenX();
 
   constructor(
     private store: Store<StoryData>,
@@ -486,10 +487,13 @@ export class LorebookSyncService {
     let buffer = "";
 
     try {
-      await hyperGenerate(
+      await this.genX.generate(
         messages,
-        { model, maxTokens: 100, minTokens: 1 },
-        (text) => (buffer += text),
+        { model, max_tokens: 100, minTokens: 1 },
+        (choices) => {
+          const text = choices[0]?.text;
+          if (text) buffer += text;
+        },
         "background"
       );
 

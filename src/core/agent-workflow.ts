@@ -11,7 +11,6 @@ import {
   GenerationStrategy,
 } from "./unified-generation-service";
 import { BrainstormService } from "./brainstorm-service";
-import { GenX, QueueItem } from "../../lib/gen-x";
 
 export {
   GenerationSession,
@@ -20,15 +19,12 @@ export {
   BrainstormSession,
 } from "./generation-types";
 
-interface Task {
-  session: GenerationSession;
-  strategy: GenerationStrategy;
-}
-
 export class AgentWorkflowService {
   private sessions: Map<string, GenerationSession> = new Map();
   // We keep list state separately for UI tracking of "is list generating?"
   private listGenerationState: Map<string, GenerationSession> = new Map();
+  private activeListTasks: Map<string, Set<GenerationSession>> = new Map();
+
   private brainstormSession: GenerationSession = {
     id: "brainstorm-session",
     fieldId: "brainstorm",
@@ -36,8 +32,6 @@ export class AgentWorkflowService {
     isRunning: false,
   };
   private listeners: Array<(fieldId: string) => void> = [];
-
-  private queueManager: GenX<Task>;
 
   private generationService: UnifiedGenerationService;
   public brainstormService: BrainstormService; // Public for data ops
@@ -49,42 +43,6 @@ export class AgentWorkflowService {
     this.generationService = new UnifiedGenerationService(storyManager);
     this.generationService.subscribe((fieldId) => this.notify(fieldId));
     this.brainstormService = new BrainstormService(storyManager);
-
-    this.queueManager = new GenX<Task>(async (item) => {
-      const { session, strategy } = item.data;
-
-      session.isQueued = false;
-
-      try {
-        await this.generationService.run(session, strategy);
-      } finally {
-        // Check if this was a list item (Phase 1), and if it was the last one
-        if (session.type === "dulfs-item" && session.dulfsFieldId) {
-          const queue = this.queueManager.getQueue();
-          const remainingForList = queue.filter(
-            (t) =>
-              t.data.session.dulfsFieldId === session.dulfsFieldId &&
-              t.data.session.type === "dulfs-item",
-          ).length;
-          if (remainingForList === 0) {
-            const listState = this.listGenerationState.get(
-              session.dulfsFieldId,
-            );
-            if (listState) {
-              listState.isRunning = false;
-              this.notify(session.dulfsFieldId);
-            }
-          }
-        }
-      }
-    });
-
-    // Propagate queue events to listeners
-    this.queueManager.subscribe((_, item) => {
-      if (item) {
-        this.notify(item.data.session.fieldId);
-      }
-    });
   }
 
   public subscribe(listener: (fieldId: string) => void) {
@@ -135,58 +93,31 @@ export class AgentWorkflowService {
   }
 
   public cancelBrainstormGeneration() {
-    this.cancelTask(this.brainstormSession.fieldId);
+    this.cancelSession(this.brainstormSession);
   }
 
   public cancelListGeneration(fieldId: string) {
-    // Cancel all tasks for this list field
-    const cancelled = this.queueManager.cancel(
-      (item) => item.data.session.dulfsFieldId === fieldId,
-    );
-    this.handleCancelledTasks(cancelled);
-
-    const listState = this.listGenerationState.get(fieldId);
-    if (listState) {
-      listState.isRunning = false;
-      listState.isQueued = false;
-      this.listGenerationState.set(fieldId, listState);
-      this.notify(fieldId);
+    const tasks = this.activeListTasks.get(fieldId);
+    if (tasks) {
+      for (const session of tasks) {
+        this.cancelSession(session);
+      }
+      // The finally block in requestListGeneration will handle state cleanup
     }
   }
 
   public cancelFieldGeneration(fieldId: string) {
-    this.cancelTask(fieldId);
-  }
-
-  private cancelTask(targetId: string) {
-    const cancelled = this.queueManager.cancel(
-      (item) => item.data.session.fieldId === targetId,
-    );
-    this.handleCancelledTasks(cancelled);
-  }
-
-  private handleCancelledTasks(items: QueueItem<Task>[]) {
-    for (const item of items) {
-      const { session } = item.data;
-      session.isQueued = false;
-
-      // Stop timer/budget wait
-      if (session.budgetRejecter) {
-        session.budgetRejecter("Cancelled");
-      } else if (session.budgetResolver) {
-        session.budgetResolver();
-      }
-
-      // Stop generation
-      if (session.cancellationSignal) {
-        session.cancellationSignal.cancel();
-      }
-
-      // Force stop BudgetTimer loop if active
-      session.isRunning = false;
-
-      this.notify(session.fieldId);
+    const session = this.sessions.get(fieldId);
+    if (session) {
+      this.cancelSession(session);
     }
+  }
+
+  private cancelSession(session: GenerationSession) {
+    if (session.cancellationSignal) session.cancellationSignal.cancel();
+    // Budget rejection happens via GenX signal handling mostly, but if manually waiting:
+    if (session.budgetRejecter) session.budgetRejecter("Cancelled");
+    this.notify(session.fieldId);
   }
 
   public requestBrainstormGeneration(isInitial: boolean) {
@@ -196,8 +127,7 @@ export class AgentWorkflowService {
     session.outputBuffer = undefined; // Reset buffer
 
     const strategy = new BrainstormStrategy(this.contextFactory);
-
-    this.queueTask(session, strategy);
+    this.runTask(session, strategy);
   }
 
   public requestListGeneration(fieldId: string) {
@@ -218,8 +148,27 @@ export class AgentWorkflowService {
       isRunning: false,
     };
 
+    // Track task
+    let tasks = this.activeListTasks.get(fieldId);
+    if (!tasks) {
+      tasks = new Set();
+      this.activeListTasks.set(fieldId, tasks);
+    }
+    tasks.add(itemSession);
+
     const strategy = new DulfsListStrategy(this.contextFactory);
-    this.queueTask(itemSession, strategy);
+    
+    // Run and Cleanup
+    this.runTask(itemSession, strategy).finally(() => {
+      const currentTasks = this.activeListTasks.get(fieldId);
+      if (currentTasks) {
+        currentTasks.delete(itemSession);
+        if (currentTasks.size === 0) {
+           listState.isRunning = false;
+           this.notify(fieldId);
+        }
+      }
+    });
   }
 
   public requestDulfsSummaryGeneration(fieldId: string) {
@@ -231,7 +180,7 @@ export class AgentWorkflowService {
     session.type = "dulfs-summary";
 
     const strategy = new DulfsSummaryStrategy(this.contextFactory);
-    this.queueTask(session, strategy);
+    this.runTask(session, strategy);
   }
 
   public requestDulfsContentGeneration(fieldId: string, itemId: string) {
@@ -246,7 +195,7 @@ export class AgentWorkflowService {
     session.type = "field"; // Treat as a field so it doesn't interfere with listState
 
     const strategy = new DulfsContentStrategy(this.contextFactory);
-    this.queueTask(session, strategy);
+    this.runTask(session, strategy);
   }
 
   public requestFieldGeneration(fieldId: string) {
@@ -254,18 +203,18 @@ export class AgentWorkflowService {
     session.error = undefined;
 
     const strategy = new FieldGenerationStrategy(this.contextFactory);
-    this.queueTask(session, strategy);
+    this.runTask(session, strategy);
   }
 
-  private queueTask(
+  private async runTask(
     session: GenerationSession,
     strategy: GenerationStrategy,
   ) {
-    session.isQueued = true;
-    this.queueManager.enqueue({
-      id: session.fieldId,
-      data: { session, strategy },
-    });
-    this.notify(session.fieldId);
+    try {
+      await this.generationService.run(session, strategy);
+    } catch (e) {
+      // Error handling is mostly in generationService
+      api.v1.log(`Task error for ${session.fieldId}:`, e);
+    }
   }
 }

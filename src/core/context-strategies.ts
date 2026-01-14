@@ -1,4 +1,3 @@
-import { HyperGenerationParams } from "../../lib/hyper-generator";
 import { StoryManager } from "./story-manager";
 import { FieldSession } from "./agent-workflow";
 import {
@@ -6,6 +5,16 @@ import {
   FIELD_CONFIGS,
   LIST_FIELD_IDS,
 } from "../config/field-definitions";
+
+export interface GenerationParams {
+  max_tokens?: number;
+  minTokens?: number;
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  stop?: string[];
+  [key: string]: any;
+}
 
 // Local implementation of context builder that avoids the "double newline" behavior
 // of the library version, which causes double-spaced generation.
@@ -44,7 +53,7 @@ export const Filters = {
 
 export interface StrategyResult {
   messages: Message[];
-  params: Partial<HyperGenerationParams>;
+  params: GenerationParams;
   filters?: TextFilter[];
   prefixBehavior?: "trim" | "keep";
 }
@@ -122,7 +131,7 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 1.35,
         min_p: 0.1,
         presence_penalty: 0.05,
-        maxTokens: 2048,
+        max_tokens: 2048,
       },
       prefixBehavior: "trim",
     };
@@ -159,7 +168,7 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 1.1,
         min_p: 0.05,
         presence_penalty: 0.1,
-        maxTokens: 1024,
+        max_tokens: 1024,
       },
       prefixBehavior: "trim",
     };
@@ -200,7 +209,7 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 1.1,
         min_p: 0.05,
         presence_penalty: 0.1,
-        maxTokens: 2048,
+        max_tokens: 2048,
       },
       prefixBehavior: "trim",
     };
@@ -247,7 +256,7 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 0.8,
         min_p: 0.05,
         presence_penalty: 0.0,
-        maxTokens: 128,
+        max_tokens: 128,
         minTokens: 10,
         stopSequences: ["]"],
       },
@@ -295,7 +304,7 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 0.8,
         min_p: 0.05,
         presence_penalty: 0.0,
-        maxTokens: 128,
+        max_tokens: 128,
         minTokens: 10,
         stopSequences: ["]"],
       },
@@ -401,7 +410,7 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 0.8,
         min_p: 0.05,
         presence_penalty: 0.1,
-        maxTokens: 1536,
+        max_tokens: 1536,
       },
       filters: [Filters.scrubBrackets],
     };
@@ -547,7 +556,7 @@ export class ContextStrategyFactory {
     return {
       messages,
       params: {
-        maxTokens: 300,
+        max_tokens: 300,
         minTokens: 10,
         temperature: 1,
       },
@@ -637,7 +646,7 @@ Output ONLY the names, separated by newlines, no other text.`,
         temperature: 1.2,
         min_p: 0.1,
         presence_penalty: 0.1,
-        maxTokens: 512,
+        max_tokens: 512,
         minTokens: 10,
       },
       prefixBehavior: "trim",
@@ -729,7 +738,7 @@ Keep the description concise and focused on narrative potential.`,
         temperature: 0.85,
         min_p: 0.05,
         presence_penalty: 0.05,
-        maxTokens: 1024,
+        max_tokens: 1024,
         minTokens: 20,
       },
       filters: [Filters.scrubMarkdown],
@@ -765,7 +774,7 @@ Keep the description concise and focused on narrative potential.`,
         messages: [
           { role: "system", content: "No content available to summarize." },
         ],
-        params: { maxTokens: 10 },
+        params: { max_tokens: 10 },
       };
     }
 
@@ -813,7 +822,7 @@ ${allContent}`,
         temperature: 0.5, // Lower temperature for strict formatting
         min_p: 0.1,
         presence_penalty: 0.0,
-        maxTokens: 1024,
+        max_tokens: 1024,
       },
       prefixBehavior: "trim",
     };

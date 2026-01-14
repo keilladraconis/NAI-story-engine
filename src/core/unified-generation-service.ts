@@ -1,8 +1,7 @@
 import { StoryManager } from "./story-manager";
 import { ContextStrategyFactory, StrategyResult } from "./context-strategies";
 import { GenerationSession } from "./generation-types";
-import { hyperGenerate } from "../../lib/hyper-generator";
-import { BudgetTimer } from "../../lib/gen-x";
+import { GenX } from "../../lib/gen-x";
 import { Subscribable } from "./subscribable";
 import { APP_CONFIG } from "../config/app-config";
 
@@ -21,6 +20,8 @@ export interface GenerationStrategy {
 }
 
 export class UnifiedGenerationService extends Subscribable<string> {
+  private genX: GenX = new GenX();
+
   constructor(private storyManager: StoryManager) {
     super();
   }
@@ -37,6 +38,26 @@ export class UnifiedGenerationService extends Subscribable<string> {
     session.budgetWaitEndTime = undefined;
     session.error = undefined;
     notify();
+
+    // Sync GenX state to session
+    const unsubscribe = this.genX.subscribe((state) => {
+      // Only update if this session is the one running? 
+      // Since GenX is single threaded, if we are in 'run', we are likely the active one 
+      // OR we are queued. GenX state reflects the *global* generation state.
+      // We map relevant budget/status info to the session.
+      
+      if (state.status === "waiting_for_user" || state.status === "waiting_for_budget") {
+          session.budgetState = state.budgetState;
+          session.budgetTimeRemaining = state.budgetTimeRemaining;
+          session.budgetWaitEndTime = state.budgetWaitEndTime;
+          session.budgetResolver = state.budgetResolver;
+          session.budgetRejecter = state.budgetRejecter;
+      } else if (state.status === "generating") {
+          session.budgetState = "normal";
+          session.budgetTimeRemaining = undefined;
+      }
+      notify();
+    });
 
     try {
       const result = await strategy.buildContext(session);
@@ -65,25 +86,16 @@ export class UnifiedGenerationService extends Subscribable<string> {
         return out;
       };
 
-      await hyperGenerate(
-        messages,
+      await this.genX.generate(
+        messages as any,
         {
-          maxTokens: 2048,
+          max_tokens: 2048,
           model,
           ...params,
-          minTokens: params.minTokens || 50,
-          onBudgetWait: (_1, _2, time) => {
-            return BudgetTimer.waitForBudget(session, time, notify);
-          },
-          onBudgetResume: () => {
-            session.budgetState = "normal";
-            session.budgetTimeRemaining = undefined;
-            session.budgetResolver = undefined;
-            session.budgetRejecter = undefined;
-            notify();
-          },
+          minTokens: params.minTokens || 50
         },
-        async (text) => {
+        async (choices) => {
+          const text = choices[0]?.text;
           if (text) {
             const filtered = applyFilters(text);
             buffer += filtered;
@@ -107,6 +119,7 @@ export class UnifiedGenerationService extends Subscribable<string> {
         });
       }
     } finally {
+      unsubscribe();
       session.isRunning = false;
       session.cancellationSignal = undefined;
       session.budgetState = undefined;
