@@ -1,28 +1,29 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { BrainstormDataManager } from '../../src/core/brainstorm-data-manager';
-import { StoryDataManager } from '../../src/core/story-data-manager';
+import { StoryDataManager, StoryData } from '../../src/core/story-data-manager';
+import { Store } from '../../src/core/store';
 import { FieldID } from '../../src/config/field-definitions';
 
 describe('BrainstormDataManager', () => {
+  let manager: BrainstormDataManager;
+  let store: Store<StoryData>;
   let dataManager: StoryDataManager;
-  let brainstormDataManager: BrainstormDataManager;
 
   beforeEach(() => {
     dataManager = new StoryDataManager();
-    // Initialize with default data
-    dataManager.setData(dataManager.createDefaultData());
-    brainstormDataManager = new BrainstormDataManager(dataManager);
+    store = new Store<StoryData>(dataManager.createDefaultData());
+    manager = new BrainstormDataManager(store);
   });
 
   it('should return empty array if no messages exist', () => {
-    expect(brainstormDataManager.getMessages()).toEqual([]);
+    expect(manager.getMessages()).toEqual([]);
   });
 
   it('should add and retrieve messages', () => {
-    brainstormDataManager.addMessage('user', 'Hello');
-    brainstormDataManager.addMessage('assistant', 'Hi there');
+    manager.addMessage('user', 'Hello');
+    manager.addMessage('assistant', 'Hi there');
 
-    const messages = brainstormDataManager.getMessages();
+    const messages = manager.getMessages();
     expect(messages).toHaveLength(2);
     expect(messages[0]).toEqual({ role: 'user', content: 'Hello' });
     expect(messages[1]).toEqual({ role: 'assistant', content: 'Hi there' });
@@ -30,29 +31,28 @@ describe('BrainstormDataManager', () => {
 
   it('should set messages', () => {
     const newMessages = [
-      { role: 'user', content: 'Test 1' },
-      { role: 'assistant', content: 'Test 2' }
+      { role: 'user', content: 'One' },
+      { role: 'assistant', content: 'Two' }
     ];
-    brainstormDataManager.setMessages(newMessages);
-    expect(brainstormDataManager.getMessages()).toEqual(newMessages);
+    manager.setMessages(newMessages);
+    expect(manager.getMessages()).toEqual(newMessages);
   });
 
   it('should consolidate messages into a string', () => {
-    brainstormDataManager.addMessage('user', 'Topic A');
-    brainstormDataManager.addMessage('assistant', 'Reaction B');
+    manager.addMessage('user', 'Hello');
+    manager.addMessage('assistant', 'Hi');
 
-    const consolidated = brainstormDataManager.getConsolidated();
-    expect(consolidated).toContain('User: Topic A');
-    expect(consolidated).toContain('Assistant: Reaction B');
-    expect(consolidated).toBe('User: Topic A\n\nAssistant: Reaction B');
+    const consolidated = manager.getConsolidated();
+    expect(consolidated).toBe('User: Hello\n\nAssistant: Hi');
   });
 
   it('should handle migration from old card format', () => {
-    const data = dataManager.data!;
-    data[FieldID.Brainstorm].data = { cards: [{ text: 'Old Card' }] };
-    
-    // Should clear and return empty array if messages are missing but cards exist
-    expect(brainstormDataManager.getMessages()).toEqual([]);
-    expect(data[FieldID.Brainstorm].data.messages).toEqual([]);
+    // Manually inject "old" format into store
+    store.update(s => {
+        const brainstorm = s[FieldID.Brainstorm];
+        brainstorm.data = { cards: [{ id: '1', content: 'Old card' }] };
+    });
+
+    expect(manager.getMessages()).toEqual([]);
   });
 });

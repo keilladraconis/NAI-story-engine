@@ -65,18 +65,12 @@ export interface StoryData {
   styleEnabled: boolean;
 }
 
-import { Subscribable } from "./subscribable";
-
-export class StoryDataManager extends Subscribable<void> {
+export class StoryDataManager {
   public static readonly KEYS = {
     STORY_DATA: "kse-story-data",
   };
 
   private currentStory?: StoryData;
-
-  constructor() {
-    super();
-  }
 
   public get data(): StoryData | undefined {
     return this.currentStory;
@@ -86,91 +80,9 @@ export class StoryDataManager extends Subscribable<void> {
     if (!data) {
       api.v1.log("Attempted to set null/undefined story data. Initializing default.");
       this.currentStory = this.createDefaultData();
-    } else {
-      this.currentStory = this.validateAndMigrate(data);
-    }
-    this.notify();
-  }
-
-  private validateAndMigrate(data: StoryData): StoryData {
-    if (!data) return this.createDefaultData();
-    
-    // Ensure basic objects exist
-    data.dulfsCategoryIds = data.dulfsCategoryIds || {};
-    data.dulfsEntryIds = data.dulfsEntryIds || {};
-    data.dulfsEnabled = data.dulfsEnabled || {};
-    data.dulfsSummaries = data.dulfsSummaries || {};
-    data.textFieldEntryIds = data.textFieldEntryIds || {};
-    data.textFieldEnabled = data.textFieldEnabled || {};
-    
-    data.setting = data.setting || "Original";
-    data.attgEnabled = data.attgEnabled || false;
-    data.styleEnabled = data.styleEnabled || false;
-
-    // Ensure all fields are initialized
-    for (const config of FIELD_CONFIGS) {
-      const id = config.id;
-      if (config.layout === "list") {
-        if (isDulfsField(id)) {
-          data[id] = data[id] || [];
-        }
-      } else {
-        if (isTextField(id) && !data[id]) {
-          data[id] = {
-            id: id,
-            type: config.fieldType || "prompt",
-            content: "",
-            linkedEntities: [],
-          };
-          if (id === FieldID.Brainstorm) {
-            data[id].data = { messages: [] };
-          }
-        }
-      }
-    }
-
-    return data;
-  }
-
-  public getStoryField(id: string): StoryField | undefined {
-    if (!this.currentStory) return undefined;
-    if (isTextField(id)) {
-      return this.currentStory[id];
-    }
-    return undefined;
-  }
-
-  public setStoryField(id: string, field: StoryField): void {
-    if (!this.currentStory) return;
-    if (isTextField(id)) {
-      this.currentStory[id] = field;
     }
   }
 
-  public getDulfsList(id: string): DULFSField[] {
-    if (!this.currentStory) return [];
-    if (isDulfsField(id)) {
-      return this.currentStory[id];
-    }
-    return [];
-  }
-
-  public setDulfsList(id: string, list: DULFSField[]): void {
-    if (!this.currentStory) return;
-    if (isDulfsField(id)) {
-      this.currentStory[id] = list;
-    }
-  }
-
-  public getDulfsSummary(id: string): string {
-    if (!this.currentStory) return "";
-    return this.currentStory.dulfsSummaries[id] || "";
-  }
-
-  public setDulfsSummary(id: string, summary: string): void {
-    if (!this.currentStory) return;
-    this.currentStory.dulfsSummaries[id] = summary;
-  }
 
   public async save(): Promise<void> {
     if (!this.currentStory) return;

@@ -1,41 +1,41 @@
-import { StoryDataManager } from "./story-data-manager";
+import { StoryData } from "./story-data-manager";
+import { Store } from "./store";
 import { FieldID } from "../config/field-definitions";
 
 export class BrainstormDataManager {
-  constructor(private dataManager: StoryDataManager) {}
+  constructor(private store: Store<StoryData>) {}
 
   public getMessages(): { role: string; content: string }[] {
-    const data = this.dataManager.data;
-    if (!data) return [];
+    const data = this.store.get();
 
     const brainstorm = data[FieldID.Brainstorm];
-    if (!brainstorm.data) {
-      brainstorm.data = { messages: [] };
+    if (!brainstorm) return []; // Should exist by initialization
+
+    // Migration check (read-only)
+    if (brainstorm.data && !brainstorm.data.messages && brainstorm.data.cards) {
+       return []; // Or should we fix it? The old code fixed it by mutating. 
+       // We can just return empty and let next update fix it or fix it lazily.
+       // For safety, let's treat it as empty.
     }
-    // Migration check
-    if (!brainstorm.data.messages && brainstorm.data.cards) {
-      brainstorm.data = { messages: [] };
-    }
-    return brainstorm.data.messages || [];
+    
+    return brainstorm.data?.messages || [];
   }
 
   public addMessage(role: string, content: string): void {
-    const data = this.dataManager.data;
-    if (!data) return;
-    const brainstorm = data[FieldID.Brainstorm];
-
-    if (!brainstorm.data) brainstorm.data = { messages: [] };
-    if (!brainstorm.data.messages) brainstorm.data.messages = [];
-    brainstorm.data.messages.push({ role, content });
+    this.store.update(s => {
+        const brainstorm = s[FieldID.Brainstorm];
+        if (!brainstorm.data) brainstorm.data = { messages: [] };
+        if (!brainstorm.data.messages) brainstorm.data.messages = [];
+        brainstorm.data.messages.push({ role, content });
+    });
   }
 
   public setMessages(messages: { role: string; content: string }[]): void {
-    const data = this.dataManager.data;
-    if (!data) return;
-    const brainstorm = data[FieldID.Brainstorm];
-
-    if (!brainstorm.data) brainstorm.data = { messages: [] };
-    brainstorm.data.messages = messages;
+    this.store.update(s => {
+        const brainstorm = s[FieldID.Brainstorm];
+        if (!brainstorm.data) brainstorm.data = { messages: [] };
+        brainstorm.data.messages = messages;
+    });
   }
 
   public getConsolidated(): string {

@@ -1,17 +1,17 @@
-import { StoryDataManager } from "./story-data-manager";
+import { Store } from "./store";
+import { StoryData, StoryDataManager } from "./story-data-manager";
 import { FIELD_CONFIGS, FieldID } from "../config/field-definitions";
 import { hyperGenerate } from "../../lib/hyper-generator";
 
 export class LorebookSyncService {
-  constructor(private dataManager: StoryDataManager) {}
+  constructor(private store: Store<StoryData>) {}
 
   public async ensureDulfsCategory(
     fieldId: string,
     enabled: boolean = true,
     overrideName?: string,
   ): Promise<string> {
-    const data = this.dataManager.data;
-    if (!data) throw new Error("No story data");
+    const data = this.store.get();
 
     const categoryId = data.dulfsCategoryIds[fieldId];
     if (categoryId) {
@@ -40,8 +40,9 @@ export class LorebookSyncService {
         enabled: enabled,
         settings: { entryHeader: "----" },
       });
-      data.dulfsCategoryIds[fieldId] = catId;
-      await this.dataManager.save();
+      this.store.update((s) => {
+        s.dulfsCategoryIds[fieldId] = catId;
+      });
     } catch (e) {
       api.v1.log(`Error creating DULFS category for ${fieldId}:`, e);
     }
@@ -49,10 +50,12 @@ export class LorebookSyncService {
   }
 
   public async syncDulfsLorebook(fieldId: string): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
+    const data = this.store.get();
 
-    const list = this.dataManager.getDulfsList(fieldId);
+    // Use isDulfsField check or direct access safely
+    const list = data[fieldId as keyof StoryData] as any[];
+    if (!Array.isArray(list)) return; // Safety check
+
     const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
     const label = config ? config.label : fieldId;
     const isEnabled = data.dulfsEnabled[fieldId] !== false;
@@ -115,8 +118,6 @@ export class LorebookSyncService {
     categoryId: string,
     enabled: boolean,
   ): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
     try {
       const newId = api.v1.uuid();
       await api.v1.lorebook.createEntry({
@@ -128,8 +129,9 @@ export class LorebookSyncService {
         enabled: enabled,
         forceActivation: false,
       });
-      data.dulfsEntryIds[fieldId] = newId;
-      await this.dataManager.save();
+      this.store.update((s) => {
+        s.dulfsEntryIds[fieldId] = newId;
+      });
     } catch (e) {
       api.v1.log("Error creating DULFS entry:", e);
     }
@@ -139,11 +141,12 @@ export class LorebookSyncService {
     fieldId: string,
     itemId: string,
   ): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
+    const data = this.store.get();
 
-    const list = this.dataManager.getDulfsList(fieldId);
-    const item = list?.find((i) => i.id === itemId);
+    const list = data[fieldId as keyof StoryData] as any[];
+    if (!Array.isArray(list)) return;
+
+    const item = list.find((i) => i.id === itemId);
     if (!item) return;
 
     const isEnabled = data.dulfsEnabled[fieldId] !== false;
@@ -163,7 +166,6 @@ export class LorebookSyncService {
           };
 
           // Only update text if lorebookContent is explicitly set.
-          // This prevents overwriting manual user edits in NAI UI with the DULFS description.
           if (item.lorebookContent !== undefined) {
             update.text = item.lorebookContent;
           }
@@ -198,8 +200,6 @@ export class LorebookSyncService {
     categoryId: string,
     enabled: boolean,
   ): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
     try {
       const newId = api.v1.uuid();
       await api.v1.lorebook.createEntry({
@@ -210,12 +210,15 @@ export class LorebookSyncService {
         enabled: enabled,
       });
 
-      const list = this.dataManager.getDulfsList(fieldId);
-      const index = list?.findIndex((i) => i.id === itemId);
-      if (index !== -1 && list) {
-        list[index].linkedLorebooks = [newId];
-        await this.dataManager.save();
-      }
+      this.store.update((s) => {
+        const list = s[fieldId as keyof StoryData] as any[];
+        if (Array.isArray(list)) {
+          const index = list.findIndex((i) => i.id === itemId);
+          if (index !== -1) {
+            list[index].linkedLorebooks = [newId];
+          }
+        }
+      });
     } catch (e) {
       api.v1.log("Error creating individual lorebook entry:", e);
     }
@@ -265,21 +268,22 @@ export class LorebookSyncService {
   }
 
   public async removeDulfsLorebook(fieldId: string): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
-
-    // 1. Remove individual item entries
-    const list = this.dataManager.getDulfsList(fieldId);
-    for (const item of list) {
-      if (item.linkedLorebooks && item.linkedLorebooks.length > 0) {
-        for (const entryId of item.linkedLorebooks) {
-          try {
-            await api.v1.lorebook.removeEntry(entryId);
-          } catch (e) {
-            // Ignore if entry already gone
+    // 1. Remove individual item entries (Needs read before write)
+    const data = this.store.get();
+    const list = data[fieldId as keyof StoryData] as any[];
+    
+    if (Array.isArray(list)) {
+        for (const item of list) {
+          if (item.linkedLorebooks && item.linkedLorebooks.length > 0) {
+            for (const entryId of item.linkedLorebooks) {
+              try {
+                await api.v1.lorebook.removeEntry(entryId);
+              } catch (e) {
+                // Ignore if entry already gone
+              }
+            }
           }
         }
-      }
     }
 
     // 2. Remove summary entry
@@ -290,7 +294,6 @@ export class LorebookSyncService {
       } catch (e) {
         // Ignore
       }
-      delete data.dulfsEntryIds[fieldId];
     }
 
     // 3. Remove category
@@ -301,10 +304,12 @@ export class LorebookSyncService {
       } catch (e) {
         // Ignore
       }
-      delete data.dulfsCategoryIds[fieldId];
     }
 
-    await this.dataManager.save();
+    this.store.update(s => {
+        delete s.dulfsEntryIds[fieldId];
+        delete s.dulfsCategoryIds[fieldId];
+    });
   }
 
   private async syncToHeader(
@@ -345,17 +350,23 @@ export class LorebookSyncService {
   }
 
   public async syncTextField(fieldId: string): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
+    const data = this.store.get();
 
-    const field = this.dataManager.getStoryField(fieldId);
-    if (!field) return;
+    // Access field safely
+    // Note: getStoryField logic from DataManager needs to be replicated or simplified
+    const field = data[fieldId as keyof StoryData]; 
+    if (!field || typeof field !== 'object' || !('content' in field)) return;
 
-    if (!data.textFieldEnabled) data.textFieldEnabled = {};
-    if (!data.textFieldEntryIds) data.textFieldEntryIds = {};
+    // Type guard/cast
+    const textField = field as any; 
 
-    let isEnabled = data.textFieldEnabled[fieldId] === true;
-    const content = field.content;
+    if (!data.textFieldEnabled) {
+         // Should be initialized, but just in case
+         this.store.update(s => s.textFieldEnabled = {});
+    }
+
+    let isEnabled = data.textFieldEnabled?.[fieldId] === true;
+    const content = textField.content;
 
     // Determine Category Logic
     let categoryKey = fieldId;
@@ -365,15 +376,11 @@ export class LorebookSyncService {
       categoryKey = "se_basics";
       categoryName = "SE: Basics";
       // Category is enabled if EITHER is enabled
-      const promptEnabled = data.textFieldEnabled[FieldID.StoryPrompt] === true;
+      const promptEnabled = data.textFieldEnabled?.[FieldID.StoryPrompt] === true;
       const snapshotEnabled =
-        data.textFieldEnabled[FieldID.WorldSnapshot] === true;
+        data.textFieldEnabled?.[FieldID.WorldSnapshot] === true;
       const categoryEnabled = promptEnabled || snapshotEnabled;
 
-      // We ensure the category with the combined enabled state
-      // but passed isEnabled (param 2) is used for the entry logic if we didn't override it.
-      // Actually ensureDulfsCategory uses param 2 to set category.enabled.
-      // So we must pass the combined state.
       await this.ensureDulfsCategory(
         categoryKey,
         categoryEnabled,
@@ -383,10 +390,12 @@ export class LorebookSyncService {
       await this.ensureDulfsCategory(fieldId, isEnabled);
     }
 
-    // Retrieve the category ID (it might have been just created)
-    const categoryId = data.dulfsCategoryIds[categoryKey];
+    // Retrieve the category ID (it might have been just created/updated in store)
+    // We need to fetch fresh state because ensureDulfsCategory might have updated it
+    const freshData = this.store.get();
+    const categoryId = freshData.dulfsCategoryIds[categoryKey];
 
-    const entryId = data.textFieldEntryIds[fieldId];
+    const entryId = freshData.textFieldEntryIds[fieldId];
     let entryExists = false;
 
     if (entryId) {
@@ -432,8 +441,6 @@ export class LorebookSyncService {
     categoryId: string,
     enabled: boolean,
   ): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
     try {
       const newId = api.v1.uuid();
       await api.v1.lorebook.createEntry({
@@ -444,9 +451,11 @@ export class LorebookSyncService {
         enabled: enabled,
         forceActivation: enabled,
       });
-      if (!data.textFieldEntryIds) data.textFieldEntryIds = {};
-      data.textFieldEntryIds[fieldId] = newId;
-      await this.dataManager.save();
+      
+      this.store.update(s => {
+          if (!s.textFieldEntryIds) s.textFieldEntryIds = {};
+          s.textFieldEntryIds[fieldId] = newId;
+      });
     } catch (e) {
       api.v1.log("Error creating text field lorebook entry:", e);
     }

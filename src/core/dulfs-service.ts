@@ -1,26 +1,29 @@
 import { LIST_FIELD_IDS } from "../config/field-definitions";
-import { StoryDataManager, DULFSField } from "./story-data-manager";
+import { StoryDataManager, DULFSField, StoryData } from "./story-data-manager";
 import { LorebookSyncService } from "./lorebook-sync-service";
 import { ContentParsingService } from "./content-parsing-service";
 import { Debouncer } from "./debouncer";
 import { PersistenceMode } from "./story-manager";
+import { Store } from "./store";
 
 export class DulfsService {
   private debouncer: Debouncer = new Debouncer();
 
   constructor(
-    private dataManager: StoryDataManager,
+    private store: Store<StoryData>,
     private lorebookSyncService: LorebookSyncService,
     private parsingService: ContentParsingService,
   ) {}
 
   public getDulfsList(fieldId: string): DULFSField[] {
-    return this.dataManager.getDulfsList(fieldId);
+    const data = this.store.get();
+    const list = data[fieldId as keyof StoryData];
+    if (Array.isArray(list)) return list as DULFSField[];
+    return [];
   }
 
   public isDulfsEnabled(fieldId: string): boolean {
-    const data = this.dataManager.data;
-    if (!data) return false;
+    const data = this.store.get();
     return data.dulfsEnabled[fieldId] !== false;
   }
 
@@ -28,11 +31,11 @@ export class DulfsService {
     fieldId: string,
     enabled: boolean,
   ): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
-    data.dulfsEnabled[fieldId] = enabled;
-    await this.dataManager.save();
-    this.dataManager.notify();
+    this.store.update((s) => {
+      s.dulfsEnabled[fieldId] = enabled;
+    });
+    
+    // Trigger sync
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
 
     // Also sync all individual items to update their enabled status
@@ -43,13 +46,13 @@ export class DulfsService {
   }
 
   public async addDulfsItem(fieldId: string, item: DULFSField): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
-    const list = this.getDulfsList(fieldId);
-    list.push(item);
-    this.dataManager.setDulfsList(fieldId, list);
-    await this.dataManager.save();
-    this.dataManager.notify();
+    this.store.update((s) => {
+      const list = s[fieldId as keyof StoryData] as DULFSField[];
+      if (Array.isArray(list)) {
+        list.push(item);
+      }
+    });
+
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
     await this.lorebookSyncService.syncIndividualLorebook(fieldId, item.id);
   }
@@ -58,58 +61,38 @@ export class DulfsService {
     fieldId: string,
     itemId: string,
     updates: Partial<DULFSField>,
-    persistence: PersistenceMode = "debounce",
+    persistence: PersistenceMode = "debounce", // Kept for interface compatibility but largely ignored for save
     syncToLorebook: boolean = true,
   ): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
-    const list = this.getDulfsList(fieldId);
-    const index = list.findIndex((i) => i.id === itemId);
-    if (index !== -1) {
-      const oldItem = list[index];
-      let newItem = { ...oldItem, ...updates };
-
-      // Sync name into content if name changed - DEPRECATED/REMOVED
-      // We no longer maintain item.content as the primary source.
-      // Lorebook content is managed via linkedLorebooks.
-
-      list[index] = newItem;
-      this.dataManager.setDulfsList(fieldId, list);
-
-      if (persistence === "immediate") {
-        await this.dataManager.save();
-        this.dataManager.notify();
-      } else if (persistence === "debounce") {
-        await this.debouncer.debounceAction(
-          `save-${fieldId}`,
-          async () => {
-            await this.dataManager.save();
-            this.dataManager.notify();
-          },
-          250,
-        );
+    
+    this.store.update((s) => {
+      const list = s[fieldId as keyof StoryData] as DULFSField[];
+      if (Array.isArray(list)) {
+        const index = list.findIndex((i) => i.id === itemId);
+        if (index !== -1) {
+          list[index] = { ...list[index], ...updates };
+        }
       }
-      // If persistence === "none", skip save/debounce
+    });
 
-      if (syncToLorebook) {
-        await this.debouncer.debounceAction(
-          `sync-${fieldId}`,
-          async () => {
-            await this.lorebookSyncService.syncDulfsLorebook(fieldId);
-            if (
-              updates.lorebookContent !== undefined ||
-              updates.name !== undefined ||
-              updates.content !== undefined
-            ) {
-              await this.lorebookSyncService.syncIndividualLorebook(
-                fieldId,
-                itemId,
-              );
-            }
-          },
-          500,
-        );
-      }
+    if (syncToLorebook) {
+      await this.debouncer.debounceAction(
+        `sync-${fieldId}`,
+        async () => {
+          await this.lorebookSyncService.syncDulfsLorebook(fieldId);
+          if (
+            updates.lorebookContent !== undefined ||
+            updates.name !== undefined ||
+            updates.content !== undefined
+          ) {
+            await this.lorebookSyncService.syncIndividualLorebook(
+              fieldId,
+              itemId,
+            );
+          }
+        },
+        500,
+      );
     }
   }
 
@@ -158,9 +141,7 @@ export class DulfsService {
     fieldId: string,
     itemId: string,
   ): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
-
+    // Read state before mutation to get linked lorebooks
     const list = this.getDulfsList(fieldId);
     const item = list.find((i) => i.id === itemId);
     if (item && item.linkedLorebooks.length > 0) {
@@ -173,30 +154,35 @@ export class DulfsService {
       }
     }
 
-    const newList = list.filter((i) => i.id !== itemId);
-    this.dataManager.setDulfsList(fieldId, newList);
-    await this.dataManager.save();
-    this.dataManager.notify();
+    this.store.update((s) => {
+      const list = s[fieldId as keyof StoryData] as DULFSField[];
+      if (Array.isArray(list)) {
+        s[fieldId as keyof StoryData] = list.filter((i) => i.id !== itemId) as any;
+      }
+    });
+
     await this.lorebookSyncService.syncDulfsLorebook(fieldId);
   }
 
   public async clearDulfsList(fieldId: string): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
     await this.lorebookSyncService.removeDulfsLorebook(fieldId);
-    this.dataManager.setDulfsList(fieldId, []);
-    await this.dataManager.save();
-    this.dataManager.notify();
+    
+    this.store.update((s) => {
+      s[fieldId as keyof StoryData] = [] as any;
+    });
   }
 
   public findDulfsByLorebookId(
     entryId: string,
   ): { fieldId: string; item: DULFSField } | null {
+    const data = this.store.get();
     for (const fid of LIST_FIELD_IDS) {
-      const list = this.getDulfsList(fid);
-      const item = list.find((i) => i.linkedLorebooks.includes(entryId));
-      if (item) {
-        return { fieldId: fid, item };
+      const list = data[fid as keyof StoryData] as DULFSField[];
+      if (Array.isArray(list)) {
+        const item = list.find((i) => i.linkedLorebooks.includes(entryId));
+        if (item) {
+          return { fieldId: fid, item };
+        }
       }
     }
     return null;

@@ -3,18 +3,20 @@ import {
   LIST_FIELD_IDS,
   TEXT_FIELD_IDS,
 } from "../config/field-definitions";
-import { StoryDataManager, StoryField, DULFSField } from "./story-data-manager";
+import { StoryDataManager, StoryField, DULFSField, StoryData } from "./story-data-manager";
 import { LorebookSyncService } from "./lorebook-sync-service";
 import { BrainstormDataManager } from "./brainstorm-data-manager";
 import { ContentParsingService } from "./content-parsing-service";
 import { DulfsService } from "./dulfs-service";
 import { Debouncer } from "./debouncer";
+import { Store, Listener } from "./store";
 
 export { StoryField, DULFSField };
 
 export type PersistenceMode = "immediate" | "debounce" | "none";
 
 export class StoryManager {
+  public store: Store<StoryData>;
   private dataManager: StoryDataManager;
   private lorebookSyncService: LorebookSyncService;
   private brainstormDataManager: BrainstormDataManager;
@@ -24,15 +26,35 @@ export class StoryManager {
 
   constructor() {
     this.dataManager = new StoryDataManager();
-    this.lorebookSyncService = new LorebookSyncService(this.dataManager);
-    this.brainstormDataManager = new BrainstormDataManager(this.dataManager);
+    // Initialize with default data
+    this.store = new Store(this.dataManager.createDefaultData());
+    
+    this.lorebookSyncService = new LorebookSyncService(this.store);
+    this.brainstormDataManager = new BrainstormDataManager(this.store);
     this.parsingService = new ContentParsingService();
     this.debouncer = new Debouncer();
     this.dulfsService = new DulfsService(
-      this.dataManager,
+      this.store,
       this.lorebookSyncService,
       this.parsingService,
     );
+
+    // Persistence Reaction
+    this.store.subscribe((state, diff) => {
+        // Skip initial empty diff
+        if (diff.changed.length === 0) return;
+
+        // Debounce save
+        this.debouncer.debounceAction(
+            "global-save",
+            async () => {
+                this.dataManager.setData(state);
+                await this.dataManager.save();
+                api.v1.log("Auto-saved story data");
+            },
+            1000 
+        );
+    });
   }
 
   async initializeStory(): Promise<void> {
@@ -41,15 +63,30 @@ export class StoryManager {
     );
 
     if (savedData) {
-      this.dataManager.setData(savedData);
+      // Validate and migrate using DataManager logic
+      this.dataManager.setData(savedData); // Temporary set to use its validation logic if needed or just use validate method
+      // Actually DataManager.setData does validation.
+      // We can just grab the data back.
+      const validData = this.dataManager.data;
+      if (validData) {
+          this.store.update(s => {
+              Object.assign(s, validData);
+          });
+      }
     } else {
-      this.dataManager.setData(this.dataManager.createDefaultData());
-      await this.dataManager.save();
+      // Already initialized with default, just save it once
+      await this.saveStoryData(true);
     }
   }
 
   public subscribe(listener: () => void): () => void {
-    return this.dataManager.subscribe(listener);
+    // Adapter for legacy subscribers (UI)
+    return this.store.subscribe(() => listener());
+  }
+
+  // Exposed for advanced usage
+  public subscribeToStore(listener: Listener<StoryData>) {
+      return this.store.subscribe(listener);
   }
 
   private async debounceAction(
@@ -68,16 +105,12 @@ export class StoryManager {
   }
 
   public getSetting(): string {
-    return this.dataManager.data?.setting || "Original";
+    return this.store.get().setting || "Original";
   }
 
   public async setSetting(value: string): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
-    if (data.setting !== value) {
-      data.setting = value;
-      await this.dataManager.save();
-    }
+    this.store.update(s => s.setting = value);
+    // Persistence handled by store reaction
   }
 
   public getFieldContent(fieldId: string): string {
@@ -97,7 +130,9 @@ export class StoryManager {
       return item ? item.lorebookContent || "" : "";
     }
 
-    const field = this.dataManager.getStoryField(fieldId);
+    const data = this.store.get();
+    // Safety check
+    const field = data[fieldId as keyof StoryData] as StoryField;
     return field ? field.content : "";
   }
 
@@ -121,7 +156,7 @@ export class StoryManager {
   }
 
   public getDulfsSummary(fieldId: string): string {
-    return this.dataManager.getDulfsSummary(fieldId);
+    return this.store.get().dulfsSummaries[fieldId] || "";
   }
 
   public async setDulfsSummary(
@@ -129,24 +164,10 @@ export class StoryManager {
     summary: string,
     persistence: PersistenceMode = "debounce",
   ): Promise<void> {
-    const current = this.getDulfsSummary(fieldId);
-    if (current !== summary) {
-      this.dataManager.setDulfsSummary(fieldId, summary);
-      
-      if (persistence === "immediate") {
-        await this.dataManager.save();
-        this.dataManager.notify();
-      } else if (persistence === "debounce") {
-        await this.debounceAction(
-          `save-summary-${fieldId}`,
-          async () => {
-            await this.dataManager.save();
-            this.dataManager.notify();
-          },
-          1000,
-        );
-      }
-    }
+     this.store.update(s => s.dulfsSummaries[fieldId] = summary);
+     if (persistence === "immediate") {
+         await this.saveStoryData(true);
+     }
   }
 
   public async mergeDulfsNames(
@@ -171,13 +192,9 @@ export class StoryManager {
         attributes: {},
         linkedLorebooks: [],
       };
-      // Direct add without full save yet
+      // Direct add
       await this.dulfsService.addDulfsItem(fieldId, newItem);
       added = true;
-    }
-
-    if (added) {
-      await this.saveStoryData(true);
     }
   }
 
@@ -195,6 +212,9 @@ export class StoryManager {
       persistence,
       syncToLorebook,
     );
+    if (persistence === "immediate") {
+        await this.saveStoryData(true);
+    }
   }
 
   public async removeDulfsItem(fieldId: string, itemId: string): Promise<void> {
@@ -212,14 +232,11 @@ export class StoryManager {
   }
 
   public isAttgEnabled(): boolean {
-    return this.dataManager.data?.attgEnabled || false;
+    return this.store.get().attgEnabled || false;
   }
 
   public async setAttgEnabled(enabled: boolean): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
-    data.attgEnabled = enabled;
-    await this.dataManager.save();
+    this.store.update(s => s.attgEnabled = enabled);
     if (enabled) {
       await this.lorebookSyncService.syncAttgToMemory(
         this.getFieldContent(FieldID.ATTG),
@@ -228,14 +245,11 @@ export class StoryManager {
   }
 
   public isStyleEnabled(): boolean {
-    return this.dataManager.data?.styleEnabled || false;
+    return this.store.get().styleEnabled || false;
   }
 
   public async setStyleEnabled(enabled: boolean): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
-    data.styleEnabled = enabled;
-    await this.dataManager.save();
+    this.store.update(s => s.styleEnabled = enabled);
     if (enabled) {
       await this.lorebookSyncService.syncStyleToAN(
         this.getFieldContent(FieldID.Style),
@@ -244,8 +258,8 @@ export class StoryManager {
   }
 
   public isTextFieldLorebookEnabled(fieldId: string): boolean {
-    const data = this.dataManager.data;
-    if (!data || !data.textFieldEnabled) return false;
+    const data = this.store.get();
+    if (!data.textFieldEnabled) return false;
     return data.textFieldEnabled[fieldId] === true;
   }
 
@@ -253,15 +267,10 @@ export class StoryManager {
     fieldId: string,
     enabled: boolean,
   ): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
-
-    if (!data.textFieldEnabled) {
-      data.textFieldEnabled = {};
-    }
-
-    data.textFieldEnabled[fieldId] = enabled;
-    await this.dataManager.save();
+    this.store.update(s => {
+        if (!s.textFieldEnabled) s.textFieldEnabled = {};
+        s.textFieldEnabled[fieldId] = enabled;
+    });
     await this.lorebookSyncService.syncTextField(fieldId);
   }
 
@@ -271,8 +280,7 @@ export class StoryManager {
     persistence: PersistenceMode = "debounce",
     sync: boolean = true,
   ): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
+    const data = this.store.get();
 
     if (fieldId.includes(":")) {
       const [prefix, id] = fieldId.split(":");
@@ -297,18 +305,17 @@ export class StoryManager {
       return;
     }
 
-    const field = this.dataManager.getStoryField(fieldId);
+    // Direct field update
     let changed = false;
+    this.store.update(s => {
+        const field = s[fieldId as keyof StoryData] as StoryField;
+        if (field && field.content !== content) {
+            field.content = content;
+            changed = true;
+        }
+    });
 
-    if (field) {
-      if (field.content !== content) {
-        field.content = content;
-        changed = true;
-      }
-    }
-
-    // Force sync if explicitly requested with immediate persistence (end of generation),
-    // or if content changed and sync is requested.
+    // Sync logic (side effects)
     if ((changed || persistence === "immediate") && sync) {
       if (fieldId === FieldID.ATTG && data.attgEnabled) {
         await this.lorebookSyncService.syncAttgToMemory(content);
@@ -321,22 +328,8 @@ export class StoryManager {
       }
     }
 
-    if (changed || persistence === "immediate") {
-      if (persistence === "immediate") {
-        await this.dataManager.save();
-        this.dataManager.notify();
-      } else if (changed && persistence === "debounce") {
-        await this.debounceAction(
-          `save-global-${fieldId}`,
-          async () => {
-            await this.dataManager.save();
-            this.dataManager.notify();
-            api.v1.log(`Auto-saved global story data (${fieldId})`);
-          },
-          250,
-        );
-      }
-      // If persistence === "none", do nothing (content is updated in memory)
+    if (persistence === "immediate") {
+        await this.saveStoryData(true);
     }
   }
 
@@ -359,8 +352,7 @@ export class StoryManager {
   }
 
   public async clearAllStoryData(): Promise<void> {
-    const data = this.dataManager.data;
-    if (!data) return;
+    const data = this.store.get();
 
     // 1. Clear DULFS fields (Deletes all DULFS Lorebook content and categories)
     for (const fieldId of LIST_FIELD_IDS) {
@@ -375,15 +367,14 @@ export class StoryManager {
       await this.lorebookSyncService.syncStyleToAN("");
     }
 
-    // 3. Delete Text Field Lorebook Entries (Prevent orphans)
-    // We must manually delete them because we are about to lose their IDs by resetting the state.
+    // 3. Delete Text Field Lorebook Entries
     for (const fieldId of TEXT_FIELD_IDS) {
       const entryId = data.textFieldEntryIds[fieldId];
       if (entryId) {
         try {
           await api.v1.lorebook.removeEntry(entryId);
         } catch (e) {
-          // Ignore if already gone
+          // Ignore
         }
       }
     }
@@ -392,14 +383,16 @@ export class StoryManager {
     const defaultData = this.dataManager.createDefaultData();
 
     // 5. Preserve Brainstorm Data
-    // We want to keep the chat history even if we clear the structured data
-    const oldBrainstorm = this.dataManager.getStoryField(FieldID.Brainstorm);
+    const oldBrainstorm = data[FieldID.Brainstorm];
     if (oldBrainstorm) {
       defaultData[FieldID.Brainstorm] = oldBrainstorm;
     }
 
     // 6. Apply Fresh State
-    this.dataManager.setData(defaultData);
+    this.store.update(s => {
+        Object.assign(s, defaultData);
+    });
+    
     await this.saveStoryData(true);
   }
 
@@ -411,10 +404,9 @@ export class StoryManager {
   }
 
   public async saveStoryData(notify: boolean = true): Promise<void> {
+    this.dataManager.setData(this.store.get());
     await this.dataManager.save();
-    if (notify) {
-      this.dataManager.notify();
-    }
+    // Notification handled by store listeners
   }
 
   public async saveFieldDraft(fieldId: string, content: string): Promise<void> {

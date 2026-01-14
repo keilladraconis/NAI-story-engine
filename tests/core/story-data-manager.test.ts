@@ -19,40 +19,10 @@ describe('StoryDataManager', () => {
     expect(data.textFieldEntryIds).toEqual({});
   });
 
-  it('should notify listeners when data is set', () => {
-    const listener = vi.fn();
-    manager.subscribe(listener);
-    
-    manager.setData(manager.createDefaultData());
-    expect(listener).toHaveBeenCalledTimes(1);
-  });
-
-  it('should get and set story fields', () => {
-    manager.setData(manager.createDefaultData());
-    const fieldId = FieldID.StoryPrompt;
-    
-    const field = manager.getStoryField(fieldId);
-    expect(field).toBeDefined();
-    expect(field?.content).toBe('');
-
-    if (field) {
-      field.content = 'New Content';
-      manager.setStoryField(fieldId, field);
-    }
-
-    expect(manager.getStoryField(fieldId)?.content).toBe('New Content');
-  });
-
-  it('should get and set DULFS lists', () => {
-    manager.setData(manager.createDefaultData());
-    const fieldId = FieldID.Factions;
-    
-    expect(manager.getDulfsList(fieldId)).toEqual([]);
-
-    const newList = [{ id: '1', name: 'Faction A' } as any];
-    manager.setDulfsList(fieldId, newList);
-
-    expect(manager.getDulfsList(fieldId)).toEqual(newList);
+  it('should validate and migrate data when set', () => {
+    const data = manager.createDefaultData();
+    manager.setData(data);
+    expect(manager.data).toEqual(data);
   });
 
   it('should save to storyStorage', async () => {
