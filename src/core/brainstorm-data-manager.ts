@@ -1,9 +1,12 @@
 import { StoryData } from "./story-data-manager";
-import { Store } from "./store";
+import { Store, Action } from "./store";
 import { FieldID } from "../config/field-definitions";
 
 export class BrainstormDataManager {
-  constructor(private store: Store<StoryData>) {}
+  constructor(
+    private store: Store<StoryData>,
+    private dispatch: (action: Action<StoryData>) => void,
+  ) {}
 
   public getMessages(): { role: string; content: string }[] {
     const data = this.store.get();
@@ -22,27 +25,31 @@ export class BrainstormDataManager {
   }
 
   public addMessage(role: string, content: string): void {
-    this.store.update((s) => {
-      const brainstorm = s[FieldID.Brainstorm];
-      const messages = [
-        ...(brainstorm.data?.messages || []),
-        { role, content },
-      ];
-      s[FieldID.Brainstorm] = {
-        ...brainstorm,
-        data: { ...brainstorm.data, messages },
-      };
-    });
+    this.dispatch((store) =>
+      store.update((s) => {
+        const brainstorm = s[FieldID.Brainstorm];
+        const messages = [
+          ...(brainstorm.data?.messages || []),
+          { role, content },
+        ];
+        s[FieldID.Brainstorm] = {
+          ...brainstorm,
+          data: { ...brainstorm.data, messages },
+        };
+      }),
+    );
   }
 
   public setMessages(messages: { role: string; content: string }[]): void {
-    this.store.update((s) => {
-      const brainstorm = s[FieldID.Brainstorm];
-      s[FieldID.Brainstorm] = {
-        ...brainstorm,
-        data: { ...brainstorm.data, messages },
-      };
-    });
+    this.dispatch((store) =>
+      store.update((s) => {
+        const brainstorm = s[FieldID.Brainstorm];
+        s[FieldID.Brainstorm] = {
+          ...brainstorm,
+          data: { ...brainstorm.data, messages },
+        };
+      }),
+    );
   }
 
   public getConsolidated(): string {

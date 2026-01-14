@@ -1,10 +1,13 @@
-import { Store } from "./store";
-import { StoryData, StoryDataManager } from "./story-data-manager";
+import { Store, Action } from "./store";
+import { StoryData } from "./story-data-manager";
 import { FIELD_CONFIGS, FieldID } from "../config/field-definitions";
 import { hyperGenerate } from "../../lib/hyper-generator";
 
 export class LorebookSyncService {
-  constructor(private store: Store<StoryData>) {}
+  constructor(
+    private store: Store<StoryData>,
+    private dispatch: (action: Action<StoryData>) => void,
+  ) {}
 
   public async ensureDulfsCategory(
     fieldId: string,
@@ -29,8 +32,8 @@ export class LorebookSyncService {
     const categoryName = overrideName
       ? overrideName
       : config
-      ? `SE: ${config.label}`
-      : "SE: DULFS";
+        ? `SE: ${config.label}`
+        : "SE: DULFS";
 
     const catId = api.v1.uuid();
     try {
@@ -40,9 +43,11 @@ export class LorebookSyncService {
         enabled: enabled,
         settings: { entryHeader: "----" },
       });
-      this.store.update((s) => {
-        s.dulfsCategoryIds[fieldId] = catId;
-      });
+      this.dispatch((store) =>
+        store.update((s) => {
+          s.dulfsCategoryIds = { ...s.dulfsCategoryIds, [fieldId]: catId };
+        }),
+      );
     } catch (e) {
       api.v1.log(`Error creating DULFS category for ${fieldId}:`, e);
     }
@@ -129,9 +134,11 @@ export class LorebookSyncService {
         enabled: enabled,
         forceActivation: false,
       });
-      this.store.update((s) => {
-        s.dulfsEntryIds[fieldId] = newId;
-      });
+      this.dispatch((store) =>
+        store.update((s) => {
+          s.dulfsEntryIds = { ...s.dulfsEntryIds, [fieldId]: newId };
+        }),
+      );
     } catch (e) {
       api.v1.log("Error creating DULFS entry:", e);
     }
@@ -210,15 +217,19 @@ export class LorebookSyncService {
         enabled: enabled,
       });
 
-      this.store.update((s) => {
-        const list = s[fieldId as keyof StoryData] as any[];
-        if (Array.isArray(list)) {
-          const index = list.findIndex((i) => i.id === itemId);
-          if (index !== -1) {
-            list[index].linkedLorebooks = [newId];
+      this.dispatch((store) =>
+        store.update((s) => {
+          const list = s[fieldId as keyof StoryData] as any[];
+          if (Array.isArray(list)) {
+            const index = list.findIndex((i) => i.id === itemId);
+            if (index !== -1) {
+              const newList = [...list];
+              newList[index] = { ...list[index], linkedLorebooks: [newId] };
+              (s as any)[fieldId] = newList;
+            }
           }
-        }
-      });
+        }),
+      );
     } catch (e) {
       api.v1.log("Error creating individual lorebook entry:", e);
     }
@@ -271,19 +282,19 @@ export class LorebookSyncService {
     // 1. Remove individual item entries (Needs read before write)
     const data = this.store.get();
     const list = data[fieldId as keyof StoryData] as any[];
-    
+
     if (Array.isArray(list)) {
-        for (const item of list) {
-          if (item.linkedLorebooks && item.linkedLorebooks.length > 0) {
-            for (const entryId of item.linkedLorebooks) {
-              try {
-                await api.v1.lorebook.removeEntry(entryId);
-              } catch (e) {
-                // Ignore if entry already gone
-              }
+      for (const item of list) {
+        if (item.linkedLorebooks && item.linkedLorebooks.length > 0) {
+          for (const entryId of item.linkedLorebooks) {
+            try {
+              await api.v1.lorebook.removeEntry(entryId);
+            } catch (e) {
+              // Ignore if entry already gone
             }
           }
         }
+      }
     }
 
     // 2. Remove summary entry
@@ -306,10 +317,16 @@ export class LorebookSyncService {
       }
     }
 
-    this.store.update(s => {
-        delete s.dulfsEntryIds[fieldId];
-        delete s.dulfsCategoryIds[fieldId];
-    });
+    this.dispatch((store) =>
+      store.update((s) => {
+        // Remove keys immutably
+        const { [fieldId]: removedEntry, ...restEntries } = s.dulfsEntryIds;
+        s.dulfsEntryIds = restEntries;
+
+        const { [fieldId]: removedCat, ...restCats } = s.dulfsCategoryIds;
+        s.dulfsCategoryIds = restCats;
+      }),
+    );
   }
 
   private async syncToHeader(
@@ -330,7 +347,7 @@ export class LorebookSyncService {
   }
 
   public async syncAttgToMemory(content: string): Promise<void> {
-    const attgRegex = /\[\s*Author:[\s\S]*?\]/gi;
+    const attgRegex = /[\[\s*Author:[\s\S]*?\]/gi;
     await this.syncToHeader(
       content,
       attgRegex,
@@ -340,7 +357,7 @@ export class LorebookSyncService {
   }
 
   public async syncStyleToAN(content: string): Promise<void> {
-    const styleRegex = /\[\s*Style:[\s\S]*?\]/gi;
+    const styleRegex = /[\[\s*Style:[\s\S]*?\]/gi;
     await this.syncToHeader(
       content,
       styleRegex,
@@ -354,15 +371,15 @@ export class LorebookSyncService {
 
     // Access field safely
     // Note: getStoryField logic from DataManager needs to be replicated or simplified
-    const field = data[fieldId as keyof StoryData]; 
-    if (!field || typeof field !== 'object' || !('content' in field)) return;
+    const field = data[fieldId as keyof StoryData];
+    if (!field || typeof field !== "object" || !("content" in field)) return;
 
     // Type guard/cast
-    const textField = field as any; 
+    const textField = field as any;
 
     if (!data.textFieldEnabled) {
-         // Should be initialized, but just in case
-         this.store.update(s => s.textFieldEnabled = {});
+      // Should be initialized, but just in case
+      this.dispatch((store) => store.update((s) => (s.textFieldEnabled = {})));
     }
 
     let isEnabled = data.textFieldEnabled?.[fieldId] === true;
@@ -376,7 +393,8 @@ export class LorebookSyncService {
       categoryKey = "se_basics";
       categoryName = "SE: Basics";
       // Category is enabled if EITHER is enabled
-      const promptEnabled = data.textFieldEnabled?.[FieldID.StoryPrompt] === true;
+      const promptEnabled =
+        data.textFieldEnabled?.[FieldID.StoryPrompt] === true;
       const snapshotEnabled =
         data.textFieldEnabled?.[FieldID.WorldSnapshot] === true;
       const categoryEnabled = promptEnabled || snapshotEnabled;
@@ -451,11 +469,12 @@ export class LorebookSyncService {
         enabled: enabled,
         forceActivation: enabled,
       });
-      
-      this.store.update(s => {
-          if (!s.textFieldEntryIds) s.textFieldEntryIds = {};
-          s.textFieldEntryIds[fieldId] = newId;
-      });
+
+      this.dispatch((store) =>
+        store.update((s) => {
+          s.textFieldEntryIds = { ...s.textFieldEntryIds, [fieldId]: newId };
+        }),
+      );
     } catch (e) {
       api.v1.log("Error creating text field lorebook entry:", e);
     }

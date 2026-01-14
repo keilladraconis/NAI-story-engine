@@ -266,7 +266,7 @@ export class BrainstormStrategy implements GenerationStrategy {
   ): Promise<void> {
     session.outputBuffer = undefined; // Clear buffer on completion
     manager.addBrainstormMessage("assistant", finalText);
-    await manager.saveStoryData(true);
+    await manager.saveStoryData();
   }
 }
 
@@ -279,8 +279,8 @@ export class DulfsSummaryStrategy implements GenerationStrategy {
   }
 
   async onDelta(
-    session: GenerationSession,
-    buffer: string,
+    _session: GenerationSession,
+    _buffer: string,
     _manager: StoryManager,
   ): Promise<void> {
     // Could expose stream here if UI supports it

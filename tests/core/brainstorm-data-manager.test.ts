@@ -4,15 +4,16 @@ import { StoryDataManager, StoryData } from '../../src/core/story-data-manager';
 import { Store } from '../../src/core/store';
 import { FieldID } from '../../src/config/field-definitions';
 
+import { StoryDataManager } from '../../src/core/story-data-manager';
+
 describe('BrainstormDataManager', () => {
-  let manager: BrainstormDataManager;
   let store: Store<StoryData>;
-  let dataManager: StoryDataManager;
+  let manager: BrainstormDataManager;
 
   beforeEach(() => {
-    dataManager = new StoryDataManager();
+    const dataManager = new StoryDataManager();
     store = new Store<StoryData>(dataManager.createDefaultData());
-    manager = new BrainstormDataManager(store);
+    manager = new BrainstormDataManager(store, (action) => action(store));
   });
 
   it('should return empty array if no messages exist', () => {

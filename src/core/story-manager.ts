@@ -3,20 +3,24 @@ import {
   LIST_FIELD_IDS,
   TEXT_FIELD_IDS,
 } from "../config/field-definitions";
-import { StoryDataManager, StoryField, DULFSField, StoryData } from "./story-data-manager";
+import {
+  StoryDataManager,
+  StoryField,
+  DULFSField,
+  StoryData,
+} from "./story-data-manager";
 import { LorebookSyncService } from "./lorebook-sync-service";
 import { BrainstormDataManager } from "./brainstorm-data-manager";
 import { ContentParsingService } from "./content-parsing-service";
 import { DulfsService } from "./dulfs-service";
 import { Debouncer } from "./debouncer";
-import { Store, Listener } from "./store";
+import { Store, Listener, Action } from "./store";
 
 export { StoryField, DULFSField };
 
 export type PersistenceMode = "immediate" | "debounce" | "none";
 
 export class StoryManager {
-  public store: Store<StoryData>;
   private dataManager: StoryDataManager;
   private lorebookSyncService: LorebookSyncService;
   private brainstormDataManager: BrainstormDataManager;
@@ -24,36 +28,44 @@ export class StoryManager {
   private dulfsService: DulfsService;
   private debouncer: Debouncer;
 
-  constructor() {
+  constructor(
+    public store: Store<StoryData>,
+    private dispatch: (action: Action<StoryData>) => void,
+  ) {
     this.dataManager = new StoryDataManager();
-    // Initialize with default data
-    this.store = new Store(this.dataManager.createDefaultData());
-    
-    this.lorebookSyncService = new LorebookSyncService(this.store);
-    this.brainstormDataManager = new BrainstormDataManager(this.store);
+
+    this.lorebookSyncService = new LorebookSyncService(
+      this.store,
+      this.dispatch,
+    );
+    this.brainstormDataManager = new BrainstormDataManager(
+      this.store,
+      this.dispatch,
+    );
     this.parsingService = new ContentParsingService();
     this.debouncer = new Debouncer();
     this.dulfsService = new DulfsService(
       this.store,
+      this.dispatch,
       this.lorebookSyncService,
       this.parsingService,
     );
 
     // Persistence Reaction
     this.store.subscribe((state, diff) => {
-        // Skip initial empty diff
-        if (diff.changed.length === 0) return;
+      // Skip initial empty diff
+      if (diff.changed.length === 0) return;
 
-        // Debounce save
-        this.debouncer.debounceAction(
-            "global-save",
-            async () => {
-                this.dataManager.setData(state);
-                await this.dataManager.save();
-                api.v1.log("Auto-saved story data");
-            },
-            1000 
-        );
+      // Debounce save
+      this.debouncer.debounceAction(
+        "global-save",
+        async () => {
+          this.dataManager.setData(state);
+          await this.dataManager.save();
+          api.v1.log("Auto-saved story data");
+        },
+        1000,
+      );
     });
   }
 
@@ -64,18 +76,18 @@ export class StoryManager {
 
     if (savedData) {
       // Validate and migrate using DataManager logic
-      this.dataManager.setData(savedData); // Temporary set to use its validation logic if needed or just use validate method
-      // Actually DataManager.setData does validation.
-      // We can just grab the data back.
+      this.dataManager.setData(savedData);
       const validData = this.dataManager.data;
       if (validData) {
-          this.store.update(s => {
-              Object.assign(s, validData);
-          });
+        this.dispatch((store) =>
+          store.update((s) => {
+            Object.assign(s, validData);
+          }),
+        );
       }
     } else {
       // Already initialized with default, just save it once
-      await this.saveStoryData(true);
+      await this.saveStoryData();
     }
   }
 
@@ -86,15 +98,7 @@ export class StoryManager {
 
   // Exposed for advanced usage
   public subscribeToStore(listener: Listener<StoryData>) {
-      return this.store.subscribe(listener);
-  }
-
-  private async debounceAction(
-    key: string,
-    action: () => Promise<void>,
-    delay: number,
-  ): Promise<void> {
-    await this.debouncer.debounceAction(key, action, delay);
+    return this.store.subscribe(listener);
   }
 
   public async parseAndUpdateDulfsItem(
@@ -109,7 +113,7 @@ export class StoryManager {
   }
 
   public async setSetting(value: string): Promise<void> {
-    this.store.update(s => s.setting = value);
+    this.dispatch((store) => store.update((s) => (s.setting = value)));
     // Persistence handled by store reaction
   }
 
@@ -164,11 +168,13 @@ export class StoryManager {
     summary: string,
     persistence: PersistenceMode = "debounce",
   ): Promise<void> {
-    this.store.update(
-      (s) => (s.dulfsSummaries = { ...s.dulfsSummaries, [fieldId]: summary }),
+    this.dispatch((store) =>
+      store.update(
+        (s) => (s.dulfsSummaries = { ...s.dulfsSummaries, [fieldId]: summary }),
+      ),
     );
     if (persistence === "immediate") {
-      await this.saveStoryData(true);
+      await this.saveStoryData();
     }
   }
 
@@ -178,7 +184,6 @@ export class StoryManager {
   ): Promise<void> {
     const list = this.getDulfsList(fieldId);
     const existingNames = new Set(list.map((i) => i.name.toLowerCase().trim()));
-    let added = false;
 
     for (const rawName of names) {
       const name = rawName.trim();
@@ -196,7 +201,6 @@ export class StoryManager {
       };
       // Direct add
       await this.dulfsService.addDulfsItem(fieldId, newItem);
-      added = true;
     }
   }
 
@@ -211,11 +215,10 @@ export class StoryManager {
       fieldId,
       itemId,
       updates,
-      persistence,
       syncToLorebook,
     );
     if (persistence === "immediate") {
-        await this.saveStoryData(true);
+      await this.saveStoryData();
     }
   }
 
@@ -238,7 +241,7 @@ export class StoryManager {
   }
 
   public async setAttgEnabled(enabled: boolean): Promise<void> {
-    this.store.update(s => s.attgEnabled = enabled);
+    this.dispatch((store) => store.update((s) => (s.attgEnabled = enabled)));
     if (enabled) {
       await this.lorebookSyncService.syncAttgToMemory(
         this.getFieldContent(FieldID.ATTG),
@@ -251,7 +254,7 @@ export class StoryManager {
   }
 
   public async setStyleEnabled(enabled: boolean): Promise<void> {
-    this.store.update(s => s.styleEnabled = enabled);
+    this.dispatch((store) => store.update((s) => (s.styleEnabled = enabled)));
     if (enabled) {
       await this.lorebookSyncService.syncStyleToAN(
         this.getFieldContent(FieldID.Style),
@@ -269,9 +272,11 @@ export class StoryManager {
     fieldId: string,
     enabled: boolean,
   ): Promise<void> {
-    this.store.update((s) => {
-      s.textFieldEnabled = { ...s.textFieldEnabled, [fieldId]: enabled };
-    });
+    this.dispatch((store) =>
+      store.update((s) => {
+        s.textFieldEnabled = { ...s.textFieldEnabled, [fieldId]: enabled };
+      }),
+    );
     await this.lorebookSyncService.syncTextField(fieldId);
   }
 
@@ -308,14 +313,16 @@ export class StoryManager {
 
     // Direct field update
     let changed = false;
-    this.store.update((s) => {
-      const field = s[fieldId as keyof StoryData] as StoryField;
-      if (field && field.content !== content) {
-        // Replace object to trigger store change detection
-        (s as any)[fieldId] = { ...field, content };
-        changed = true;
-      }
-    });
+    this.dispatch((store) =>
+      store.update((s) => {
+        const field = s[fieldId as keyof StoryData] as StoryField;
+        if (field && field.content !== content) {
+          // Replace object to trigger store change detection
+          (s as any)[fieldId] = { ...field, content };
+          changed = true;
+        }
+      }),
+    );
 
     // Sync logic (side effects)
     if ((changed || persistence === "immediate") && sync) {
@@ -331,7 +338,7 @@ export class StoryManager {
     }
 
     if (persistence === "immediate") {
-        await this.saveStoryData(true);
+      await this.saveStoryData();
     }
   }
 
@@ -391,11 +398,13 @@ export class StoryManager {
     }
 
     // 6. Apply Fresh State
-    this.store.update(s => {
+    this.dispatch((store) =>
+      store.update((s) => {
         Object.assign(s, defaultData);
-    });
-    
-    await this.saveStoryData(true);
+      }),
+    );
+
+    await this.saveStoryData();
   }
 
   public async generateLorebookKeys(
@@ -405,7 +414,7 @@ export class StoryManager {
     await this.lorebookSyncService.generateAndSyncKeys(entryId, content);
   }
 
-  public async saveStoryData(notify: boolean = true): Promise<void> {
+  public async saveStoryData(): Promise<void> {
     this.dataManager.setData(this.store.get());
     await this.dataManager.save();
     // Notification handled by store listeners

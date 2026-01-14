@@ -10,7 +10,7 @@ export class BrainstormService {
   public async addUserMessage(content: string): Promise<void> {
     if (content.trim()) {
       this.storyManager.addBrainstormMessage("user", content);
-      await this.storyManager.saveStoryData(false);
+      await this.storyManager.saveStoryData();
     }
   }
 
@@ -19,7 +19,8 @@ export class BrainstormService {
     if (index >= 0 && index < history.length) {
       history[index].content = newContent;
       this.storyManager.setBrainstormMessages(history);
-      await this.storyManager.saveStoryData(true);
+            await this.storyManager.saveStoryData();
+
     }
   }
 
@@ -28,7 +29,8 @@ export class BrainstormService {
     if (index >= 0 && index < history.length) {
       history.splice(index, 1);
       this.storyManager.setBrainstormMessages(history);
-      await this.storyManager.saveStoryData(true);
+            await this.storyManager.saveStoryData();
+
     }
   }
 
@@ -48,11 +50,13 @@ export class BrainstormService {
     }
 
     this.storyManager.setBrainstormMessages(newHistory);
-    await this.storyManager.saveStoryData(true);
+          await this.storyManager.saveStoryData();
+
   }
 
   public async clearHistory(): Promise<void> {
     this.storyManager.setBrainstormMessages([]);
-    await this.storyManager.saveStoryData(true);
+          await this.storyManager.saveStoryData();
+
   }
 }

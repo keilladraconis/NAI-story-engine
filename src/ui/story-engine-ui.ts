@@ -368,9 +368,11 @@ export class StoryEngineUI {
                   initialValue: this.storyManager.getSetting(),
                   placeholder: "e.g., Original, Star Wars, Harry Potter...",
                   onChange: (val) => {
-                    this.dispatch(store => store.update(s => {
-                      s.setting = val;
-                    }));
+                    this.dispatch((store) =>
+                      store.update((s) => {
+                        s.setting = val;
+                      }),
+                    );
                   },
                   style: { flex: "1" },
                 }),

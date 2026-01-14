@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Store } from '../../src/core/store';
+import { Store, Dispatcher } from '../../src/core/store';
 import { StoryManager } from '../../src/core/story-manager';
 import { FieldID } from '../../src/config/field-definitions';
+import { StoryDataManager } from '../../src/core/story-data-manager';
 
 describe('Store<T>', () => {
   interface TestState {
@@ -80,7 +81,12 @@ describe('StoryManager Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    manager = new StoryManager();
+    const dataManager = new StoryDataManager();
+    const store = new Store(dataManager.createDefaultData());
+    const dispatcher = new Dispatcher(store);
+    // Use the real dispatcher
+    const dispatch = dispatcher.dispatch.bind(dispatcher);
+    manager = new StoryManager(store, dispatch);
   });
 
   it('should have a store initialized', () => {

@@ -1,8 +1,6 @@
 import {
   FieldID,
   FIELD_CONFIGS,
-  isDulfsField,
-  isTextField,
 } from "../config/field-definitions";
 
 export interface StoryField {

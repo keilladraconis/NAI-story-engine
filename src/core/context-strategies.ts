@@ -62,7 +62,6 @@ type StrategyFn = (
 
 export const buildDulfsContextString = (
   manager: StoryManager,
-  mode: "short" | "full",
   excludeFieldId?: string,
 ): string => {
   let context = "";
@@ -657,7 +656,6 @@ Output ONLY the names, separated by newlines, no other text.`,
     );
     const existingDulfs = buildDulfsContextString(
       this.storyManager,
-      "short",
       fieldId,
     );
 
