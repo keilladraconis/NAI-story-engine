@@ -87,7 +87,7 @@ export class UnifiedGenerationService extends Subscribable<string> {
       };
 
       await this.genX.generate(
-        messages as any,
+        messages,
         {
           max_tokens: 2048,
           model,
@@ -113,6 +113,7 @@ export class UnifiedGenerationService extends Subscribable<string> {
       notify();
     } catch (e: any) {
       if (!e.message?.includes("cancelled") && e !== "Cancelled") {
+        api.v1.log("Generation Error Stack:", e.stack || e);
         session.error = e.message || String(e);
         api.v1.ui.toast(`Generation failed: ${session.error}`, {
           type: "error",

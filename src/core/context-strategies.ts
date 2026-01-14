@@ -104,7 +104,7 @@ const Strategies: Record<string, StrategyFn> = {
   // Generate (Default / Brainstorm) - The Ideator
   // High creativity, divergent thinking
   "generate:default": async (_session, _manager, base) => {
-    const userPrompt = (await api.v1.config.get("brainstorm_prompt")) || "";
+    const userPrompt = String((await api.v1.config.get("brainstorm_prompt")) || "");
     const messages = contextBuilder(
       base.systemMsg,
       { role: "user", content: userPrompt },
@@ -141,7 +141,7 @@ const Strategies: Record<string, StrategyFn> = {
   // Takes brainstorm chat and turns it into a high-level premise
   "generate:storyPrompt": async (_session, manager, base) => {
     const userPrompt =
-      (await api.v1.config.get("story_prompt_generate_prompt")) || "";
+      String((await api.v1.config.get("story_prompt_generate_prompt")) || "");
     const brainstormContent = manager.getConsolidatedBrainstorm();
     const messages = contextBuilder(
       base.systemMsg,
@@ -177,7 +177,7 @@ const Strategies: Record<string, StrategyFn> = {
   // Generate (Dynamic World Snapshot) - The Architect
   // Balanced structure and creativity
   "generate:worldSnapshot": async (_session, manager, base) => {
-    const userPrompt = (await api.v1.config.get("world_snapshot_prompt")) || "";
+    const userPrompt = String((await api.v1.config.get("world_snapshot_prompt")) || "");
     const brainstormContent = manager.getConsolidatedBrainstorm();
     const messages = contextBuilder(
       base.systemMsg,
@@ -217,7 +217,7 @@ const Strategies: Record<string, StrategyFn> = {
 
   // Generate (ATTG)
   "generate:attg": async (_session, manager, base) => {
-    const userPrompt = (await api.v1.config.get("attg_generate_prompt")) || "";
+    const userPrompt = String((await api.v1.config.get("attg_generate_prompt")) || "");
     const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
     const brainstormContent = manager.getConsolidatedBrainstorm();
     const messages = contextBuilder(
@@ -258,14 +258,14 @@ const Strategies: Record<string, StrategyFn> = {
         presence_penalty: 0.0,
         max_tokens: 128,
         minTokens: 10,
-        stopSequences: ["]"],
+        stop: ["]"],
       },
     };
   },
 
   // Generate (Style)
   "generate:style": async (_session, manager, base) => {
-    const userPrompt = (await api.v1.config.get("style_generate_prompt")) || "";
+    const userPrompt = String((await api.v1.config.get("style_generate_prompt")) || "");
     const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
     const brainstormContent = manager.getConsolidatedBrainstorm();
     const messages = contextBuilder(
@@ -306,7 +306,7 @@ const Strategies: Record<string, StrategyFn> = {
         presence_penalty: 0.0,
         max_tokens: 128,
         minTokens: 10,
-        stopSequences: ["]"],
+        stop: ["]"],
       },
     };
   },
@@ -337,7 +337,7 @@ const Strategies: Record<string, StrategyFn> = {
     }
 
     const basePrompt =
-      (await api.v1.config.get("lorebook_generate_prompt")) || "";
+      String((await api.v1.config.get("lorebook_generate_prompt")) || "");
 
     // Select specific template based on category
     let templateKey;
@@ -361,7 +361,7 @@ const Strategies: Record<string, StrategyFn> = {
         templateKey = "lorebook_template_character";
     }
 
-    const templateContent = (await api.v1.config.get(templateKey)) || "";
+    const templateContent = String((await api.v1.config.get(templateKey)) || "");
     const worldSnapshot = manager.getFieldContent(FieldID.WorldSnapshot);
     const brainstormContent = manager.getConsolidatedBrainstorm();
     const dulfsContext = buildDulfsContextString(manager, "short");
@@ -436,7 +436,7 @@ export class ContextStrategyFactory {
   }
 
   async build(session: FieldSession): Promise<StrategyResult> {
-    const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
+    const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
     const setting = this.storyManager.getSetting();
 
@@ -478,9 +478,9 @@ export class ContextStrategyFactory {
     isInitialOrEmpty: boolean,
   ): Promise<StrategyResult> {
     const history = this.storyManager.getBrainstormMessages();
-    const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
+    const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
     const brainstormPrompt =
-      (await api.v1.config.get("brainstorm_prompt")) || "";
+      String((await api.v1.config.get("brainstorm_prompt")) || "");
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
     const setting = this.storyManager.getSetting();
     const worldSnapshot = this.storyManager.getFieldContent(
@@ -564,7 +564,7 @@ export class ContextStrategyFactory {
   }
 
   async buildDulfsListContext(fieldId: string): Promise<StrategyResult> {
-    const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
+    const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
     const setting = this.storyManager.getSetting();
     const worldSnapshot = this.storyManager.getFieldContent(
@@ -657,7 +657,7 @@ Output ONLY the names, separated by newlines, no other text.`,
     fieldId: string,
     itemId: string,
   ): Promise<StrategyResult> {
-    const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
+    const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
     const setting = this.storyManager.getSetting();
     const worldSnapshot = this.storyManager.getFieldContent(
@@ -749,7 +749,7 @@ Keep the description concise and focused on narrative potential.`,
   }
 
   async buildDulfsSummaryContext(fieldId: string): Promise<StrategyResult> {
-    const systemPrompt = (await api.v1.config.get("system_prompt")) || "";
+    const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
     const storyPrompt = this.storyManager.getFieldContent(FieldID.StoryPrompt);
     const setting = this.storyManager.getSetting();
 

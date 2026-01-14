@@ -23,12 +23,12 @@ export interface GenerationState {
 
 interface GenerationTask {
   id: string;
-  messages: any[];
-  params: any;
-  callback?: (chunk: any, final: boolean) => void;
+  messages: Message[];
+  params: GenerationParams & { minTokens?: number; maxRetries?: number };
+  callback?: (choices: GenerationChoice[], final: boolean) => void;
   behaviour?: "background" | "blocking";
-  signal?: any;
-  resolve: (value: any) => void;
+  signal?: CancellationSignal;
+  resolve: (value: GenerationResponse) => void;
   reject: (reason: any) => void;
 }
 
@@ -43,10 +43,6 @@ export class GenX {
   };
 
   private listeners: ((state: GenerationState) => void)[] = [];
-  // For budget timer
-
-  // --- Singleton-ish Access or just generic instantiation ---
-  // Depending on usage, might be a singleton. But class is fine.
   
   constructor() {
     this.initBudgetListener();
@@ -71,15 +67,15 @@ export class GenX {
    * Mirrors api.v1.generate parameters.
    */
   public generate(
-    messages: any[],
-    params: any,
-    callback?: (chunk: any, final: boolean) => void,
+    messages: Message[],
+    params: GenerationParams & { minTokens?: number; maxRetries?: number },
+    callback?: (choices: GenerationChoice[], final: boolean) => void,
     behaviour?: "background" | "blocking",
-    signal?: any
-  ): Promise<any> {
+    signal?: CancellationSignal
+  ): Promise<GenerationResponse> {
     return new Promise((resolve, reject) => {
       const task: GenerationTask = {
-        id: Math.random().toString(36).substring(2, 15),
+        id: api.v1.uuid(),
         messages,
         params,
         callback,
@@ -100,9 +96,8 @@ export class GenX {
   }
 
   public cancelCurrent() {
-    if (this.currentTask) {
-       // Logic to cancel current task specifically? 
-       // Usually handled by signal in generate, but we can force it here if needed.
+    if (this.currentTask && this.currentTask.signal) {
+       this.currentTask.signal.cancel();
     }
   }
 
@@ -215,13 +210,12 @@ export class GenX {
 
   private initBudgetListener() {
     // Listen for manual "Generate" clicks from user to unblock waiting
-    if ((api as any).v1?.events?.on) {
-      (api as any).v1.events.on("generationRequested", (data: any) => {
-        if (data && data.scriptInitiated === false) {
-           this.resolveBudgetWait();
-        }
-      });
-    }
+    api.v1.hooks.register("onGenerationRequested", (params) => {
+      if (!params.scriptInitiated) {
+        this.resolveBudgetWait();
+      }
+      // Passive listener, no return value needed
+    });
   }
 
   private resolveBudgetWait() {
@@ -235,7 +229,7 @@ export class GenX {
     }
   }
 
-  private async ensureBudget(requested: number, _min: number, signal?: any): Promise<void> {
+  private async ensureBudget(requested: number, _min: number, signal?: CancellationSignal): Promise<void> {
     let available = api.v1.script.getAllowedOutput();
 
     if (available < requested) {
@@ -256,9 +250,17 @@ export class GenX {
                 budgetRejecter: rejecter
             });
 
-            // If signal cancels while waiting
+            // Polling for cancellation if signal provided (since signal has no events)
             if (signal) {
-                signal.addEventListener("abort", () => rejecter("Cancelled"));
+                const check = () => {
+                    if (this._state.budgetState !== "waiting_for_user") return; // Stopped externally
+                    if (signal.cancelled) {
+                        rejecter("Cancelled");
+                        return;
+                    }
+                    api.v1.timers.setTimeout(check, 200);
+                };
+                check();
             }
         });
 
@@ -282,7 +284,7 @@ export class GenX {
     }
   }
 
-  private runBudgetTimer(durationMs: number, signal?: any): Promise<void> {
+  private runBudgetTimer(durationMs: number, signal?: CancellationSignal): Promise<void> {
     return new Promise((resolve, reject) => {
         const targetEnd = Date.now() + durationMs;
         
@@ -294,10 +296,6 @@ export class GenX {
             budgetResolver: () => resolve(),
             budgetRejecter: (reason) => reject(reason)
         });
-
-        if (signal) {
-             signal.addEventListener("abort", () => reject("Cancelled"));
-        }
 
         const tick = () => {
             if (this._state.budgetState !== "waiting_for_timer") return; // Stopped externally

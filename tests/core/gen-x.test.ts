@@ -71,10 +71,11 @@ describe('GenX', () => {
   });
 
   it('should handle budget wait (user)', async () => {
-    // Capture the event listener
-    let eventCallback: any;
-    (global as any).api.v1.events.on.mockImplementation((name: string, cb: any) => {
-        if (name === 'generationRequested') eventCallback = cb;
+    // Capture the hook listener
+    let hookCallback: any;
+    // We expect api.v1.hooks.register to be called
+    (global as any).api.v1.hooks.register.mockImplementation((name: string, cb: any) => {
+        if (name === 'onGenerationRequested') hookCallback = cb;
     });
 
     // Re-instantiate GenX to hook up the listener
@@ -91,12 +92,12 @@ describe('GenX', () => {
     expect(genX.state.status).toBe("waiting_for_user");
 
     // Trigger user action
-    if (eventCallback) {
+    if (hookCallback) {
         // Update budget to allow pass
         (global as any).api.v1.script.getAllowedOutput.mockReturnValue(1000);
         (global as any).api.v1.script.getTimeUntilAllowedOutput.mockReturnValue(0);
         
-        eventCallback({ scriptInitiated: false });
+        hookCallback({ scriptInitiated: false });
     }
 
     const result = await promise;
@@ -105,19 +106,30 @@ describe('GenX', () => {
   });
 
   it('should handle cancellation during generation', async () => {
-    let cancelCallback: any;
+    // Polling based cancellation doesn't need mock listeners
     const signal = {
         cancelled: false,
-        addEventListener: (evt: string, cb: any) => { if (evt === 'abort') cancelCallback = cb; },
         cancel: () => { 
             signal.cancelled = true; 
-            if (cancelCallback) cancelCallback(); 
-        }
+        },
+        dispose: () => {}
     };
 
     (global as any).api.v1.generate.mockImplementation(async (msgs: any, params: any, cb: any, behavior: any, sig: any) => {
-        await new Promise(r => setTimeout(r, 50)); // Wait a bit
-        if (sig?.cancelled) throw new Error("Cancelled"); // API throws on cancel
+        // Wait long enough for polling to catch it
+        // Polling interval is around 200ms or 1000ms
+        // But we want to test cancellation BEFORE generation? Or during?
+        // If during generation, api.v1.generate handles it (mock should throw)
+        
+        // This test simulates GenX handling cancellation IF api.v1.generate doesn't catch it immediately?
+        // Or rather, checking if GenX passes the signal and handles rejection.
+        
+        let checks = 0;
+        while(checks < 10) {
+            await new Promise(r => setTimeout(r, 50));
+            if (sig?.cancelled) throw new Error("Cancelled");
+            checks++;
+        }
         return { choices: [{ text: "success" }] };
     });
 

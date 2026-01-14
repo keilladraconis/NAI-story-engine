@@ -13,6 +13,9 @@ const apiMock = {
     events: {
         on: vi.fn()
     },
+    hooks: {
+        register: vi.fn()
+    },
     timers: {
       setTimeout: vi.fn((cb, delay) => setTimeout(cb, delay) as any),
       clearTimeout: vi.fn((id) => {
