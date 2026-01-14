@@ -23,7 +23,6 @@ export {
 interface Task {
   session: GenerationSession;
   strategy: GenerationStrategy;
-  updateFn: () => void;
 }
 
 export class AgentWorkflowService {
@@ -48,15 +47,16 @@ export class AgentWorkflowService {
     this.contextFactory = new ContextStrategyFactory(storyManager);
 
     this.generationService = new UnifiedGenerationService(storyManager);
+    this.generationService.subscribe((fieldId) => this.notify(fieldId));
     this.brainstormService = new BrainstormService(storyManager);
 
     this.queueManager = new GenX<Task>(async (item) => {
-      const { session, strategy, updateFn } = item.data;
+      const { session, strategy } = item.data;
+
       session.isQueued = false;
-      updateFn(); // Notify start
 
       try {
-        await this.generationService.run(session, strategy, updateFn);
+        await this.generationService.run(session, strategy);
       } finally {
         // Check if this was a list item (Phase 1), and if it was the last one
         if (session.type === "dulfs-item" && session.dulfsFieldId) {
@@ -167,7 +167,7 @@ export class AgentWorkflowService {
 
   private handleCancelledTasks(items: QueueItem<Task>[]) {
     for (const item of items) {
-      const { session, updateFn } = item.data;
+      const { session } = item.data;
       session.isQueued = false;
 
       // Stop timer/budget wait
@@ -185,63 +185,44 @@ export class AgentWorkflowService {
       // Force stop BudgetTimer loop if active
       session.isRunning = false;
 
-      updateFn();
+      this.notify(session.fieldId);
     }
   }
 
-  public requestBrainstormGeneration(
-    isInitial: boolean,
-    updateFn: () => void = () => {},
-  ) {
+  public requestBrainstormGeneration(isInitial: boolean) {
     const session = this.brainstormSession;
     session.error = undefined;
     session.isInitial = isInitial;
     session.outputBuffer = undefined; // Reset buffer
 
-    const wrappedUpdate = () => {
-      updateFn();
-      this.notify("brainstorm");
-    };
-
     const strategy = new BrainstormStrategy(this.contextFactory);
 
-    this.queueTask(session, strategy, wrappedUpdate);
+    this.queueTask(session, strategy);
   }
 
-  public requestListGeneration(fieldId: string, updateFn: () => void = () => {}) {
+  public requestListGeneration(fieldId: string) {
     // This is for Phase 1: Generating the list of NAMES
     const listState = this.getListGenerationState(fieldId);
     listState.error = undefined;
     listState.isRunning = true;
     this.listGenerationState.set(fieldId, listState);
 
-    const wrappedUpdate = () => {
-      // If the task is done (not in queue, not running), update state
-      // Logic handled in executeTask finally block
-      updateFn();
-      this.notify(fieldId);
-    };
+    // Initial notify to show loading state
+    this.notify(fieldId);
 
     const itemSession: GenerationSession = {
       id: api.v1.uuid(),
       fieldId: `${fieldId}:list-gen`, // Unique ID for the task
       dulfsFieldId: fieldId,
-      type: "dulfs-item", // Re-using type or should I change?
-      // Note: "dulfs-item" type triggers the finally block logic to clear listState.
-      // This is exactly what we want for the main list generation button.
+      type: "dulfs-item",
       isRunning: false,
     };
 
     const strategy = new DulfsListStrategy(this.contextFactory);
-    this.queueTask(itemSession, strategy, wrappedUpdate);
-
-    wrappedUpdate();
+    this.queueTask(itemSession, strategy);
   }
 
-  public requestDulfsSummaryGeneration(
-    fieldId: string,
-    updateFn: () => void = () => {},
-  ) {
+  public requestDulfsSummaryGeneration(fieldId: string) {
     const sessionKey = `summary:${fieldId}`;
     const session =
       this.getSession(sessionKey) || this.startSession(sessionKey);
@@ -249,20 +230,11 @@ export class AgentWorkflowService {
     session.dulfsFieldId = fieldId;
     session.type = "dulfs-summary";
 
-    const wrappedUpdate = () => {
-      updateFn();
-      this.notify(fieldId);
-    };
-
     const strategy = new DulfsSummaryStrategy(this.contextFactory);
-    this.queueTask(session, strategy, wrappedUpdate);
+    this.queueTask(session, strategy);
   }
 
-  public requestDulfsContentGeneration(
-    fieldId: string,
-    itemId: string,
-    updateFn: () => void = () => {},
-  ) {
+  public requestDulfsContentGeneration(fieldId: string, itemId: string) {
     // This is for Phase 2: Generating CONTENT for a specific item
     // We track this session individually so we can show a spinner on the item
     const sessionKey = `${fieldId}:${itemId}`;
@@ -273,38 +245,27 @@ export class AgentWorkflowService {
     session.dulfsItemId = itemId;
     session.type = "field"; // Treat as a field so it doesn't interfere with listState
 
-    const wrappedUpdate = () => {
-      updateFn();
-      this.notify(fieldId); // Notify the list field to re-render
-    };
-
     const strategy = new DulfsContentStrategy(this.contextFactory);
-    this.queueTask(session, strategy, wrappedUpdate);
+    this.queueTask(session, strategy);
   }
 
-  public requestFieldGeneration(fieldId: string, updateFn: () => void = () => {}) {
+  public requestFieldGeneration(fieldId: string) {
     const session = this.getSession(fieldId) || this.startSession(fieldId);
     session.error = undefined;
 
-    const wrappedUpdate = () => {
-      updateFn();
-      this.notify(fieldId);
-    };
-
     const strategy = new FieldGenerationStrategy(this.contextFactory);
-    this.queueTask(session, strategy, wrappedUpdate);
+    this.queueTask(session, strategy);
   }
 
   private queueTask(
     session: GenerationSession,
     strategy: GenerationStrategy,
-    updateFn: () => void,
   ) {
     session.isQueued = true;
     this.queueManager.enqueue({
       id: session.fieldId,
-      data: { session, strategy, updateFn },
+      data: { session, strategy },
     });
-    updateFn();
+    this.notify(session.fieldId);
   }
 }

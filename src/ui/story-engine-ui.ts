@@ -154,15 +154,7 @@ export class StoryEngineUI {
           },
           {
             onStart: () => {
-              this.agentWorkflowService.requestFieldGeneration(
-                sessionId,
-                () => {
-                  this.updateLorebookUI();
-                  // Also sync to NovelAI Lorebook on completion or chunk
-                  const content = this.storyManager.getFieldContent(sessionId);
-                  api.v1.lorebook.updateEntry(entryId, { text: content });
-                },
-              );
+              this.agentWorkflowService.requestFieldGeneration(sessionId);
             },
             onCancel: () => {
               this.agentWorkflowService.cancelFieldGeneration(sessionId);

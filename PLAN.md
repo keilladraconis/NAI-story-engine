@@ -110,8 +110,10 @@ The goal of this phase is to address outstanding nit-picks and sub-optimal UX an
 - [x] Github release workflow should append version to file name.
 - [x] Fix data update handling. All UI elements should simply be subscribers to the story manager or story data. Same for everything else that needs to know about data updates. No more update callbacks set all over the place. Story manager subscribes to generation-X. Fix the whole data flow and make it clean and straightforward.
 - [ ] Situational Dynamics tuning; Keep it from being "absolutely everyone"
+- [ ] Refactor generation around GenX, make hypergenerator obsolete. (Caller responsible for building context, seeking continuation, natural stop, GenX does queueing, manages calls to generate, pauses between calls, handles ephemeral errors and budget waits.)
 
 #### Bugs
+
 - [x] After discussing additional characters in brainstorm, DP generate doesn't add more characters.
 - [ ] SEGA doesn't continue after waiting for generation.
 - [ ] SEGA doesn't respect that list item contents must be filled before generating lorebook. (Maybe ditch contents and just include the story and other lorebooks into generation context?)
@@ -121,6 +123,7 @@ The goal of this phase is to address outstanding nit-picks and sub-optimal UX an
 The goal of this phase is to expand the viability of Story Engine to accommodate different "flavors" or "templates" of scenario. The default follows the "Three Sphere, Three Layer" world-building structure. However, this is not as well-suited to narrower-scope stories, fanfiction, episodes and vignettes, other casual kinds of scenarios. Speculative right now, design forthcoming...
 
 #### Features
+
 - [ ] Reconsider utility of DULFS "content"
 - [ ] Reconsider utility of Dynamic World Snapshot
 

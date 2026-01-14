@@ -3,6 +3,7 @@ import { ContextStrategyFactory, StrategyResult } from "./context-strategies";
 import { GenerationSession } from "./generation-types";
 import { hyperGenerate } from "../../lib/hyper-generator";
 import { BudgetTimer } from "../../lib/gen-x";
+import { Subscribable } from "./subscribable";
 
 export interface GenerationStrategy {
   buildContext(session: GenerationSession): Promise<StrategyResult>;
@@ -10,31 +11,31 @@ export interface GenerationStrategy {
     session: GenerationSession,
     buffer: string,
     manager: StoryManager,
-    updateFn: () => void,
   ): Promise<void>;
   onComplete(
     session: GenerationSession,
     manager: StoryManager,
     finalText: string,
-    updateFn: () => void,
   ): Promise<void>;
 }
 
-export class UnifiedGenerationService {
-  constructor(private storyManager: StoryManager) {}
+export class UnifiedGenerationService extends Subscribable<string> {
+  constructor(private storyManager: StoryManager) {
+    super();
+  }
 
   public async run(
     session: GenerationSession,
     strategy: GenerationStrategy,
-    updateFn: () => void,
   ): Promise<void> {
+    const notify = () => this.notify(session.fieldId);
     session.isRunning = true;
     session.cancellationSignal = await api.v1.createCancellationSignal();
     session.budgetWaitTime = undefined;
     session.budgetTimeRemaining = undefined;
     session.budgetWaitEndTime = undefined;
     session.error = undefined;
-    updateFn();
+    notify();
 
     try {
       const result = await strategy.buildContext(session);
@@ -71,26 +72,22 @@ export class UnifiedGenerationService {
           ...params,
           minTokens: params.minTokens || 50,
           onBudgetWait: (_1, _2, time) => {
-            return BudgetTimer.waitForBudget(session, time, updateFn);
+            return BudgetTimer.waitForBudget(session, time, notify);
           },
           onBudgetResume: () => {
             session.budgetState = "normal";
             session.budgetTimeRemaining = undefined;
             session.budgetResolver = undefined;
             session.budgetRejecter = undefined;
-            updateFn();
+            notify();
           },
         },
         async (text) => {
           if (text) {
             const filtered = applyFilters(text);
             buffer += filtered;
-            await strategy.onDelta(
-              session,
-              buffer,
-              this.storyManager,
-              updateFn,
-            );
+            await strategy.onDelta(session, buffer, this.storyManager);
+            notify();
           }
         },
         "background",
@@ -99,7 +96,8 @@ export class UnifiedGenerationService {
 
       if (session.cancellationSignal.cancelled) return;
 
-      await strategy.onComplete(session, this.storyManager, buffer, updateFn);
+      await strategy.onComplete(session, this.storyManager, buffer);
+      notify();
     } catch (e: any) {
       if (!e.message?.includes("cancelled") && e !== "Cancelled") {
         session.error = e.message || String(e);
@@ -115,7 +113,7 @@ export class UnifiedGenerationService {
       session.budgetWaitEndTime = undefined;
       session.budgetResolver = undefined;
       session.budgetRejecter = undefined;
-      updateFn();
+      notify();
     }
   }
 }
@@ -133,17 +131,14 @@ export class FieldGenerationStrategy implements GenerationStrategy {
     session: GenerationSession,
     buffer: string,
     manager: StoryManager,
-    updateFn: () => void,
   ): Promise<void> {
     await manager.saveFieldDraft(session.fieldId, buffer);
-    updateFn();
   }
 
   async onComplete(
     session: GenerationSession,
     manager: StoryManager,
     finalText: string,
-    updateFn: () => void,
   ): Promise<void> {
     await manager.setFieldContent(
       session.fieldId,
@@ -155,7 +150,6 @@ export class FieldGenerationStrategy implements GenerationStrategy {
       const entryId = session.fieldId.split(":")[1];
       await manager.generateLorebookKeys(entryId, finalText);
     }
-    updateFn();
   }
 }
 
@@ -171,17 +165,14 @@ export class DulfsListStrategy implements GenerationStrategy {
     session: GenerationSession,
     buffer: string,
     _manager: StoryManager,
-    updateFn: () => void,
   ): Promise<void> {
     session.outputBuffer = buffer;
-    updateFn();
   }
 
   async onComplete(
     session: GenerationSession,
     manager: StoryManager,
     finalText: string,
-    updateFn: () => void,
   ): Promise<void> {
     if (!session.dulfsFieldId) return;
 
@@ -199,7 +190,6 @@ export class DulfsListStrategy implements GenerationStrategy {
     } else {
       api.v1.ui.toast("No new items generated", { type: "warning" });
     }
-    updateFn();
   }
 }
 
@@ -220,7 +210,6 @@ export class DulfsContentStrategy implements GenerationStrategy {
     session: GenerationSession,
     buffer: string,
     manager: StoryManager,
-    updateFn: () => void,
   ): Promise<void> {
     if (session.dulfsFieldId && session.dulfsItemId) {
       await manager.updateDulfsItem(
@@ -231,14 +220,12 @@ export class DulfsContentStrategy implements GenerationStrategy {
         false, // No sync yet
       );
     }
-    updateFn();
   }
 
   async onComplete(
     session: GenerationSession,
     manager: StoryManager,
     finalText: string,
-    updateFn: () => void,
   ): Promise<void> {
     if (session.dulfsFieldId && session.dulfsItemId) {
       await manager.updateDulfsItem(
@@ -254,7 +241,6 @@ export class DulfsContentStrategy implements GenerationStrategy {
         session.dulfsItemId,
       );
     }
-    updateFn();
   }
 }
 
@@ -269,22 +255,18 @@ export class BrainstormStrategy implements GenerationStrategy {
     session: GenerationSession,
     buffer: string,
     _manager: StoryManager,
-    updateFn: () => void,
   ): Promise<void> {
     session.outputBuffer = buffer;
-    updateFn();
   }
 
   async onComplete(
     session: GenerationSession,
     manager: StoryManager,
     finalText: string,
-    updateFn: () => void,
   ): Promise<void> {
     session.outputBuffer = undefined; // Clear buffer on completion
     manager.addBrainstormMessage("assistant", finalText);
     await manager.saveStoryData(true);
-    updateFn();
   }
 }
 
@@ -300,20 +282,16 @@ export class DulfsSummaryStrategy implements GenerationStrategy {
     session: GenerationSession,
     buffer: string,
     _manager: StoryManager,
-    updateFn: () => void,
   ): Promise<void> {
     // Could expose stream here if UI supports it
-    updateFn();
   }
 
   async onComplete(
     session: GenerationSession,
     manager: StoryManager,
     finalText: string,
-    updateFn: () => void,
   ): Promise<void> {
     if (!session.dulfsFieldId) return;
     await manager.setDulfsSummary(session.dulfsFieldId, finalText, "immediate");
-    updateFn();
   }
 }

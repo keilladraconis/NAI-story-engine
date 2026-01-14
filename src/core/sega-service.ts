@@ -124,9 +124,9 @@ export class SegaService extends Subscribable<void> {
     this.bootstrapIds.add(FieldID.ATTG);
     this.bootstrapIds.add(FieldID.Style);
 
-    this.agentWorkflow.requestFieldGeneration(FieldID.StoryPrompt, () => {});
-    this.agentWorkflow.requestFieldGeneration(FieldID.ATTG, () => {});
-    this.agentWorkflow.requestFieldGeneration(FieldID.Style, () => {});
+    this.agentWorkflow.requestFieldGeneration(FieldID.StoryPrompt);
+    this.agentWorkflow.requestFieldGeneration(FieldID.ATTG);
+    this.agentWorkflow.requestFieldGeneration(FieldID.Style);
 
     // 3. Start SEGA in normal mode
     this._isRunning = true;
@@ -237,9 +237,9 @@ export class SegaService extends Subscribable<void> {
       (c) => c.id === nextId && c.layout === "list",
     );
     if (isList) {
-      this.agentWorkflow.requestListGeneration(nextId, () => {});
+      this.agentWorkflow.requestListGeneration(nextId);
     } else {
-      this.agentWorkflow.requestFieldGeneration(nextId, () => {});
+      this.agentWorkflow.requestFieldGeneration(nextId);
     }
   }
 
