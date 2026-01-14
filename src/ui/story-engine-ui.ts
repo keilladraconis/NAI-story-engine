@@ -4,6 +4,8 @@ import { StoryManager } from "../core/story-manager";
 import { AgentWorkflowService } from "../core/agent-workflow";
 import { BrainstormUI } from "./brainstorm-ui";
 import { SegaService } from "../core/sega-service";
+import { Action } from "../core/store";
+import { StoryData } from "../core/story-data-manager";
 
 import {
   createHeaderWithToggle,
@@ -26,6 +28,7 @@ export class StoryEngineUI {
   agentWorkflowService: AgentWorkflowService;
   brainstormUI: BrainstormUI;
   segaService: SegaService;
+  private dispatch: (action: Action<StoryData>) => void;
 
   // Selected state
   private selectedLorebookEntryId?: string;
@@ -33,8 +36,12 @@ export class StoryEngineUI {
   private lorebookEditMode: boolean = false;
   private showClearConfirm: boolean = false;
 
-  constructor() {
-    this.storyManager = new StoryManager();
+  constructor(
+    storyManager: StoryManager,
+    dispatch: (action: Action<StoryData>) => void,
+  ) {
+    this.dispatch = dispatch;
+    this.storyManager = storyManager;
     this.agentWorkflowService = new AgentWorkflowService(this.storyManager);
     this.segaService = new SegaService(
       this.storyManager,
@@ -45,12 +52,14 @@ export class StoryEngineUI {
     this.structuredEditor = new StructuredEditor(
       this.storyManager,
       this.agentWorkflowService,
+      this.dispatch
     );
     this.structuredEditor.subscribe(() => this.updateUI());
 
     this.brainstormUI = new BrainstormUI(
       this.storyManager,
       this.agentWorkflowService,
+      this.dispatch
     );
     this.sidebar = this.createSidebar();
     this.lorebookPanel = this.createLorebookPanel();
@@ -358,7 +367,11 @@ export class StoryEngineUI {
                 part.textInput({
                   initialValue: this.storyManager.getSetting(),
                   placeholder: "e.g., Original, Star Wars, Harry Potter...",
-                  onChange: (val) => this.storyManager.setSetting(val),
+                  onChange: (val) => {
+                    this.dispatch(store => store.update(s => {
+                      s.setting = val;
+                    }));
+                  },
                   style: { flex: "1" },
                 }),
               ],

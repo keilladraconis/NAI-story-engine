@@ -6,6 +6,8 @@ import {
   createToggleableContent,
   createResponsiveGenerateButton,
 } from "./ui-components";
+import { Action } from "../core/store";
+import { StoryData } from "../core/story-data-manager";
 
 const { row, column, text, button, checkboxInput, textInput } = api.v1.ui.part;
 
@@ -15,6 +17,7 @@ export interface BaseRenderContext {
   agentWorkflowService: AgentWorkflowService;
   editModeState: boolean; // The specific boolean for this field/mode
   toggleEditMode: () => void;
+  dispatch: (action: Action<StoryData>) => void;
 }
 
 export interface ListRenderContext extends BaseRenderContext {

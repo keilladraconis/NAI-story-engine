@@ -22,19 +22,26 @@ export class BrainstormDataManager {
   }
 
   public addMessage(role: string, content: string): void {
-    this.store.update(s => {
-        const brainstorm = s[FieldID.Brainstorm];
-        if (!brainstorm.data) brainstorm.data = { messages: [] };
-        if (!brainstorm.data.messages) brainstorm.data.messages = [];
-        brainstorm.data.messages.push({ role, content });
+    this.store.update((s) => {
+      const brainstorm = s[FieldID.Brainstorm];
+      const messages = [
+        ...(brainstorm.data?.messages || []),
+        { role, content },
+      ];
+      s[FieldID.Brainstorm] = {
+        ...brainstorm,
+        data: { ...brainstorm.data, messages },
+      };
     });
   }
 
   public setMessages(messages: { role: string; content: string }[]): void {
-    this.store.update(s => {
-        const brainstorm = s[FieldID.Brainstorm];
-        if (!brainstorm.data) brainstorm.data = { messages: [] };
-        brainstorm.data.messages = messages;
+    this.store.update((s) => {
+      const brainstorm = s[FieldID.Brainstorm];
+      s[FieldID.Brainstorm] = {
+        ...brainstorm,
+        data: { ...brainstorm.data, messages },
+      };
     });
   }
 

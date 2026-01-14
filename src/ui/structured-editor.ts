@@ -7,6 +7,8 @@ import {
 } from "../config/field-definitions";
 import { getFieldStrategy, RenderContext } from "./field-strategies";
 import { Subscribable } from "../core/subscribable";
+import { Action } from "../core/store";
+import { StoryData } from "../core/story-data-manager";
 
 const { column, collapsibleSection } = api.v1.ui.part;
 
@@ -21,6 +23,7 @@ export class StructuredEditor extends Subscribable<void> {
   constructor(
     storyManager: StoryManager,
     agentWorkflowService: AgentWorkflowService,
+    private dispatch: (action: Action<StoryData>) => void
   ) {
     super();
     this.storyManager = storyManager;
@@ -105,6 +108,7 @@ export class StructuredEditor extends Subscribable<void> {
       agentWorkflowService: this.agentWorkflowService,
       editModeState: isEditing,
       toggleEditMode: () => this.toggleEditMode(editModeKey),
+      dispatch: this.dispatch,
       handleFieldChange: (c) => this.handleFieldChange(config.id, c),
       currentContent: isEditing ? this.drafts.get(config.id) : undefined,
       // List specific

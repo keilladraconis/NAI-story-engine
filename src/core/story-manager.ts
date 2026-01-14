@@ -164,10 +164,12 @@ export class StoryManager {
     summary: string,
     persistence: PersistenceMode = "debounce",
   ): Promise<void> {
-     this.store.update(s => s.dulfsSummaries[fieldId] = summary);
-     if (persistence === "immediate") {
-         await this.saveStoryData(true);
-     }
+    this.store.update(
+      (s) => (s.dulfsSummaries = { ...s.dulfsSummaries, [fieldId]: summary }),
+    );
+    if (persistence === "immediate") {
+      await this.saveStoryData(true);
+    }
   }
 
   public async mergeDulfsNames(
@@ -267,9 +269,8 @@ export class StoryManager {
     fieldId: string,
     enabled: boolean,
   ): Promise<void> {
-    this.store.update(s => {
-        if (!s.textFieldEnabled) s.textFieldEnabled = {};
-        s.textFieldEnabled[fieldId] = enabled;
+    this.store.update((s) => {
+      s.textFieldEnabled = { ...s.textFieldEnabled, [fieldId]: enabled };
     });
     await this.lorebookSyncService.syncTextField(fieldId);
   }
@@ -307,12 +308,13 @@ export class StoryManager {
 
     // Direct field update
     let changed = false;
-    this.store.update(s => {
-        const field = s[fieldId as keyof StoryData] as StoryField;
-        if (field && field.content !== content) {
-            field.content = content;
-            changed = true;
-        }
+    this.store.update((s) => {
+      const field = s[fieldId as keyof StoryData] as StoryField;
+      if (field && field.content !== content) {
+        // Replace object to trigger store change detection
+        (s as any)[fieldId] = { ...field, content };
+        changed = true;
+      }
     });
 
     // Sync logic (side effects)

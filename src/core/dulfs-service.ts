@@ -32,7 +32,7 @@ export class DulfsService {
     enabled: boolean,
   ): Promise<void> {
     this.store.update((s) => {
-      s.dulfsEnabled[fieldId] = enabled;
+      s.dulfsEnabled = { ...s.dulfsEnabled, [fieldId]: enabled };
     });
     
     // Trigger sync
@@ -49,7 +49,7 @@ export class DulfsService {
     this.store.update((s) => {
       const list = s[fieldId as keyof StoryData] as DULFSField[];
       if (Array.isArray(list)) {
-        list.push(item);
+        (s as any)[fieldId] = [...list, item];
       }
     });
 
@@ -70,7 +70,9 @@ export class DulfsService {
       if (Array.isArray(list)) {
         const index = list.findIndex((i) => i.id === itemId);
         if (index !== -1) {
-          list[index] = { ...list[index], ...updates };
+          const newList = [...list];
+          newList[index] = { ...list[index], ...updates };
+          (s as any)[fieldId] = newList;
         }
       }
     });

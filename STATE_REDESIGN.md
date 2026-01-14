@@ -59,7 +59,7 @@ class Store<T extends object> {
   private listeners = new Set<Listener<T>>();
 
   constructor(initial: T) {
-    this.state = structuredClone(initial);
+    this.state = { ...initial };
   }
 
   get(): Readonly<T> {
@@ -67,7 +67,7 @@ class Store<T extends object> {
   }
 
   update(mutator: (draft: T) => void) {
-    const prev = structuredClone(this.state);
+    const prev = { ...this.state };
     mutator(this.state);
 
     const changed = Object.keys(this.state).filter(
@@ -293,11 +293,166 @@ Once you structure it this way, you no longer worry about:
 - “did this UI component mount too late?”
 - “did this backend system attach after the action fired?”
 
-If you want, next we can:
+----
 
-- tighten typing (field-level inference)
-- add async-safe effects
-- integrate undo/redo
-- make it framework-agnostic but React/Vue-friendly
+Excellent catch — this is exactly the right question to ask. What you noticed is a **notation shortcut**, and if left unexplained it *does* imply a singleton. You do **not** need a singleton dispatcher, but you *do* need to decide **where `dispatch` lives**.
 
-Just tell me where you want to push it.
+Let’s clear this up properly and give you clean, explicit options.
+
+---
+
+## The core clarification
+
+In the earlier snippet:
+
+```ts
+dispatch(setPrompt(textarea.value));
+```
+
+`dispatch` was being used as a **bound function**, not a global.
+
+In real code, it must come from **some owning context**.
+
+---
+
+## 1️⃣ The minimal, explicit form (no singleton)
+
+```ts
+const dispatcher = new Dispatcher(store);
+
+button.onclick = () => {
+  dispatcher.dispatch(setPrompt(textarea.value));
+};
+```
+
+This is the most honest version.
+No magic. No globals.
+
+---
+
+## 2️⃣ Passing a bound `dispatch` (recommended for UI code)
+
+Instead of passing the whole dispatcher around, you pass *just the function*:
+
+```ts
+const dispatch = dispatcher.dispatch.bind(dispatcher);
+```
+
+UI code:
+
+```ts
+button.onclick = () => {
+  dispatch(setPrompt(textarea.value));
+};
+```
+
+Here:
+
+* `dispatch` is a closure
+* it is tied to *one* dispatcher
+* no singleton involved
+
+This is the pattern used by React, Solid, Redux, etc.
+
+---
+
+## 3️⃣ Dependency injection (clean for larger systems)
+
+You inject dispatch where needed:
+
+```ts
+function createUI(dispatch: (a: Action<AppState>) => void) {
+  button.onclick = () => {
+    dispatch(setPrompt(textarea.value));
+  };
+}
+```
+
+Call site:
+
+```ts
+createUI(dispatcher.dispatch.bind(dispatcher));
+```
+
+This keeps UI:
+
+* testable
+* framework-agnostic
+* decoupled from store implementation
+
+---
+
+## 4️⃣ Context-based access (NOT a singleton, but scoped)
+
+If you want convenience without globals:
+
+```ts
+class AppContext<T extends object> {
+  constructor(
+    public store: Store<T>,
+    public dispatch: (a: Action<T>) => void
+  ) {}
+}
+```
+
+Usage:
+
+```ts
+const app = new AppContext(
+  store,
+  dispatcher.dispatch.bind(dispatcher)
+);
+```
+
+UI components receive `app`, not globals.
+
+---
+
+## 5️⃣ What *not* to do (actual singleton)
+
+❌ Don’t do this unless you really want one global app:
+
+```ts
+export const dispatch = dispatcher.dispatch.bind(dispatcher);
+```
+
+This:
+
+* makes tests harder
+* prevents multiple app instances
+* causes hidden coupling
+
+---
+
+## 6️⃣ Mental model (important)
+
+> **`dispatch` is an *API*, not a global.**
+
+It’s perfectly fine to *name* the API `dispatch`, but it must be:
+
+* bound to a specific store
+* passed explicitly or via context
+* not implicitly global
+
+The earlier example assumed this binding for brevity.
+
+---
+
+## 7️⃣ Do you *ever* want a singleton?
+
+Only if:
+
+* you truly have one app instance
+* no embedding (QuickJS, workers, tests)
+* no multiple backends
+
+Given what you’ve described (UI + backend + queue), **don’t do it**.
+
+---
+
+## TL;DR
+
+* The earlier snippet was shorthand
+* No singleton is required
+* Use a **bound dispatch function**
+* Pass it explicitly or via context

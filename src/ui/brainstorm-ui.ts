@@ -1,6 +1,9 @@
 import { StoryManager } from "../core/story-manager";
 import { AgentWorkflowService } from "../core/agent-workflow";
 import { calculateTextAreaHeight } from "./ui-components";
+import { Action } from "../core/store";
+import { StoryData } from "../core/story-data-manager";
+import { FieldID } from "../config/field-definitions";
 
 const { column, row, button, text, multilineTextInput } = api.v1.ui.part;
 const { sidebarPanel } = api.v1.ui.extension;
@@ -22,6 +25,7 @@ export class BrainstormUI {
   constructor(
     storyManager: StoryManager,
     agentWorkflowService: AgentWorkflowService,
+    private dispatch: (action: Action<StoryData>) => void
   ) {
     this.storyManager = storyManager;
     this.agentWorkflowService = agentWorkflowService;
@@ -444,9 +448,15 @@ export class BrainstormUI {
     );
   }
 
-  private async handleClear() {
-    await this.agentWorkflowService.brainstormService.clearHistory();
+  private handleClear() {
+    this.dispatch((store) =>
+      store.update((s) => {
+        const brainstorm = s[FieldID.Brainstorm];
+        if (brainstorm && brainstorm.data) {
+          brainstorm.data.messages = [];
+        }
+      }),
+    );
     api.v1.ui.toast("Brainstorm history cleared", { type: "info" });
-    this.updateUI();
   }
 }

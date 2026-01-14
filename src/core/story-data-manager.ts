@@ -78,9 +78,24 @@ export class StoryDataManager {
 
   public setData(data: StoryData): void {
     if (!data) {
-      api.v1.log("Attempted to set null/undefined story data. Initializing default.");
+      api.v1.log(
+        "Attempted to set null/undefined story data. Initializing default.",
+      );
       this.currentStory = this.createDefaultData();
+      return;
     }
+
+    // Basic migration/validation
+    const defaultData = this.createDefaultData();
+
+    // Ensure all top-level keys exist
+    for (const key of Object.keys(defaultData) as (keyof StoryData)[]) {
+      if (data[key] === undefined) {
+        (data as any)[key] = (defaultData as any)[key];
+      }
+    }
+
+    this.currentStory = data;
   }
 
 

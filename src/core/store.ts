@@ -5,7 +5,7 @@ export interface StateDiff<T> {
   previous: Partial<T>;
 }
 
-export type Action<T> = (store: Store<T>) => void;
+export type Action<T extends object> = (store: Store<T>) => void;
 
 export class Store<T extends object> {
   private state: T;
@@ -82,5 +82,24 @@ export class Store<T extends object> {
     // but Object.is (used implicitly by ===) is often enough for primitives.
     // For deep objects, we rely on the selector returning a new reference if it changed.
     return false;
+  }
+}
+
+export class Dispatcher<T extends object> {
+  private isDispatching = false;
+
+  constructor(private store: Store<T>) {}
+
+  dispatch(action: Action<T>) {
+    if (this.isDispatching) {
+      throw new Error("Dispatch cannot be called recursively");
+    }
+
+    try {
+      this.isDispatching = true;
+      action(this.store);
+    } finally {
+      this.isDispatching = false;
+    }
   }
 }
