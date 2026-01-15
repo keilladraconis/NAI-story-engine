@@ -105,18 +105,17 @@ describe('StoryManager Integration', () => {
     
     // Check listener was notified
     // 1: Initial subscription
-    // 2: Update
-    expect(listener).toHaveBeenCalledTimes(2);
+    // 2: Update content
+    // 3: Update entryId (immediate sync)
+    expect(listener).toHaveBeenCalledTimes(3);
   });
 
   it('should trigger persistence on store changes', async () => {
-    // Mock the debouncer to execute immediately or check if called
-    // Since we can't easily control the internal debouncer instance,
-    // we'll rely on calling setFieldContent with "immediate" which forces save via manager logic,
-    // BUT checking if the store reaction also works requires waiting for debounce.
-    // Instead, let's check explicit save path first.
+    // The store subscription now triggers immediate save.
+    // We use "none" persistence to ensure setFieldContent doesn't call save() directly,
+    // so we can verify the subscription (reaction) does it.
     
-    await manager.setFieldContent(FieldID.StoryPrompt, "Saved", "immediate");
+    await manager.setFieldContent(FieldID.StoryPrompt, "Saved", "none");
     
     expect(api.v1.storyStorage.set).toHaveBeenCalled();
   });

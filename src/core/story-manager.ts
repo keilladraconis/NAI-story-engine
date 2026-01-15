@@ -11,7 +11,6 @@ import { LorebookSyncService } from "./lorebook-sync-service";
 import { BrainstormDataManager } from "./brainstorm-data-manager";
 import { ContentParsingService } from "./content-parsing-service";
 import { DulfsService } from "./dulfs-service";
-import { Debouncer } from "./debouncer";
 import { Store, Listener, Action } from "./store";
 import { APP_CONFIG } from "../config/app-config";
 
@@ -25,7 +24,6 @@ export class StoryManager {
   private brainstormDataManager: BrainstormDataManager;
   private parsingService: ContentParsingService;
   private dulfsService: DulfsService;
-  private debouncer: Debouncer;
 
   constructor(
     public store: Store<StoryData>,
@@ -44,7 +42,6 @@ export class StoryManager {
       this.dispatch,
     );
     this.parsingService = new ContentParsingService();
-    this.debouncer = new Debouncer();
     this.dulfsService = new DulfsService(
       this.store,
       this.dispatch,
@@ -52,20 +49,14 @@ export class StoryManager {
     );
 
     // Persistence Reaction
-    this.store.subscribe((state, diff) => {
+    this.store.subscribe(async (state, diff) => {
       // Skip initial empty diff
       if (diff.changed.length === 0) return;
 
-      // Debounce save
-      this.debouncer.debounceAction(
-        "global-save",
-        async () => {
-          this.dataManager.setData(state);
-          await this.dataManager.save();
-          api.v1.log("Auto-saved story data");
-        },
-        APP_CONFIG.DEBOUNCE.SAVE,
-      );
+      // Immediate save
+      this.dataManager.setData(state);
+      await this.dataManager.save();
+      api.v1.log("Auto-saved story data");
     });
   }
 

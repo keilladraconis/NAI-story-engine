@@ -102,26 +102,27 @@ describe('LorebookSyncService Reactive', () => {
     expect(updateCall[1].text).toBe("New Content");
   });
 
-  it('should not sync if debounce is cancelled or not reached', async () => {
-    // This is hard to test with fake timers if we runAll, but we can advance time partially.
+  it('should sync immediately on every change', async () => {
+    // This test previously verified debouncing (skipping intermediate updates).
+    // Now it verifies immediate sync (all updates processed).
+
     await manager.setTextFieldLorebookEnabled(FieldID.StoryPrompt, true);
-    await vi.runAllTimersAsync(); // Ensure initial entry is created
+    
+    // Wait for entry creation (async side effect)
+    await vi.waitUntil(() => manager.store.get().textFieldEntryIds[FieldID.StoryPrompt] !== undefined);
+
     vi.clearAllMocks();
 
     await manager.setFieldContent(FieldID.StoryPrompt, "Draft 1", "none");
-    await vi.advanceTimersByTimeAsync(100);
+    // Wait for sync
+    await vi.waitUntil(() => (api.v1.lorebook.updateEntry as any).mock.calls.length === 1);
     
     await manager.setFieldContent(FieldID.StoryPrompt, "Draft 2", "none");
-    await vi.advanceTimersByTimeAsync(1100); // 1000ms debounce
+    // Wait for sync
+    await vi.waitUntil(() => (api.v1.lorebook.updateEntry as any).mock.calls.length === 2);
 
-    // Should only have synced Draft 2 effectively (or updated to Draft 2)
-    // Actually, debounce cancels previous timer. So we expect 1 call with Draft 2.
-    // However, createEntry vs updateEntry depends on ID presence.
-    // Since we mocked uuid, we assume ID is set.
-    
-    // Wait, createEntry was called in setup.
-    // So updateEntry should be called once.
-    expect(api.v1.lorebook.updateEntry).toHaveBeenCalledTimes(1);
-    expect((api.v1.lorebook.updateEntry as any).mock.calls[0][1].text).toBe("Draft 2");
+    expect(api.v1.lorebook.updateEntry).toHaveBeenCalledTimes(2);
+    expect((api.v1.lorebook.updateEntry as any).mock.calls[0][1].text).toBe("Draft 1");
+    expect((api.v1.lorebook.updateEntry as any).mock.calls[1][1].text).toBe("Draft 2");
   });
 });

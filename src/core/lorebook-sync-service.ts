@@ -8,10 +8,8 @@ import {
 } from "../config/field-definitions";
 import { APP_CONFIG } from "../config/app-config";
 import { GenX } from "../../lib/gen-x";
-import { Debouncer } from "./debouncer";
 
 export class LorebookSyncService {
-  private debouncer = new Debouncer();
   private isSubscribed = false;
   private genX = new GenX();
 
@@ -44,11 +42,7 @@ export class LorebookSyncService {
       diff.changed.includes("attgEnabled") ||
       (state.attgEnabled && diff.changed.includes(FieldID.ATTG))
     ) {
-      this.debouncer.debounceAction(
-        "sync-attg",
-        () => this.syncAttgToMemory(state.attg.content),
-        state.attgEnabled ? APP_CONFIG.DEBOUNCE.SYNC_TEXT : APP_CONFIG.DEBOUNCE.SYNC_GLOBAL
-      );
+      this.syncAttgToMemory(state.attg.content);
     }
 
     // Style
@@ -56,11 +50,7 @@ export class LorebookSyncService {
       diff.changed.includes("styleEnabled") ||
       (state.styleEnabled && diff.changed.includes(FieldID.Style))
     ) {
-      this.debouncer.debounceAction(
-        "sync-style",
-        () => this.syncStyleToAN(state.style.content),
-        state.styleEnabled ? APP_CONFIG.DEBOUNCE.SYNC_TEXT : APP_CONFIG.DEBOUNCE.SYNC_GLOBAL
-      );
+      this.syncStyleToAN(state.style.content);
     }
   }
 
@@ -71,15 +61,11 @@ export class LorebookSyncService {
     if (diff.changed.includes("textFieldEntryIds")) {
       const prevIds = diff.previous.textFieldEntryIds || {};
       const currIds = state.textFieldEntryIds;
-      
+
       for (const [fieldId, entryId] of Object.entries(prevIds)) {
         if (!currIds[fieldId as keyof typeof currIds]) {
           // Entry ID was removed from state -> Delete from Lorebook
-          this.debouncer.debounceAction(
-            `cleanup-text-${fieldId}`,
-            () => this.safeRemoveEntry(entryId),
-            APP_CONFIG.DEBOUNCE.SYNC_CLEANUP
-          );
+          this.safeRemoveEntry(entryId);
         }
       }
     }
@@ -91,14 +77,12 @@ export class LorebookSyncService {
         state.textFieldEnabled?.[fieldId] !==
           diff.previous.textFieldEnabled?.[fieldId];
 
-      const isContentChanged = diff.changed.includes(fieldId as keyof StoryData);
+      const isContentChanged = diff.changed.includes(
+        fieldId as keyof StoryData,
+      );
 
       if (isEnabledChanged || isContentChanged) {
-        this.debouncer.debounceAction(
-          `sync-text-${fieldId}`,
-          () => this.syncTextField(fieldId),
-          APP_CONFIG.DEBOUNCE.SYNC_TEXT
-        );
+        this.syncTextField(fieldId);
       }
     }
   }
@@ -113,11 +97,7 @@ export class LorebookSyncService {
       const currIds = state.dulfsEntryIds;
       for (const [fieldId, entryId] of Object.entries(prevIds)) {
         if (!currIds[fieldId]) {
-          this.debouncer.debounceAction(
-            `cleanup-dulfs-entry-${fieldId}`,
-            () => this.safeRemoveEntry(entryId),
-            APP_CONFIG.DEBOUNCE.SYNC_CLEANUP
-          );
+          this.safeRemoveEntry(entryId);
         }
       }
     }
@@ -126,11 +106,7 @@ export class LorebookSyncService {
       const currIds = state.dulfsCategoryIds;
       for (const [fieldId, catId] of Object.entries(prevIds)) {
         if (!currIds[fieldId]) {
-           this.debouncer.debounceAction(
-            `cleanup-dulfs-cat-${fieldId}`,
-            () => this.safeRemoveCategory(catId),
-            APP_CONFIG.DEBOUNCE.SYNC_CLEANUP
-          );
+          this.safeRemoveCategory(catId);
         }
       }
     }
@@ -148,11 +124,7 @@ export class LorebookSyncService {
 
       // Sync Summary/Category Entry
       if (isEnabledChanged || isListChanged || isSummaryChanged) {
-        this.debouncer.debounceAction(
-          `sync-list-${fieldId}`,
-          () => this.syncDulfsLorebook(fieldId),
-          APP_CONFIG.DEBOUNCE.SYNC_LIST
-        );
+        this.syncDulfsLorebook(fieldId);
       }
 
       // Sync Individual Items
@@ -162,7 +134,12 @@ export class LorebookSyncService {
         const currList = (state[fieldId as keyof StoryData] ||
           []) as DULFSField[];
 
-        this.diffAndSyncListItems(fieldId, prevList, currList, isEnabledChanged);
+        this.diffAndSyncListItems(
+          fieldId,
+          prevList,
+          currList,
+          isEnabledChanged,
+        );
       }
     }
   }
@@ -173,7 +150,7 @@ export class LorebookSyncService {
     fieldId: string,
     prev: DULFSField[],
     curr: DULFSField[],
-    forceSync: boolean
+    forceSync: boolean,
   ) {
     const prevMap = new Map(prev.map((i) => [i.id, i]));
     const currMap = new Map(curr.map((i) => [i.id, i]));
@@ -184,11 +161,7 @@ export class LorebookSyncService {
         // Removed
         if (oldItem.linkedLorebooks) {
           for (const entryId of oldItem.linkedLorebooks) {
-            this.debouncer.debounceAction(
-              `cleanup-item-${oldItem.id}-${entryId}`,
-              () => this.safeRemoveEntry(entryId),
-              APP_CONFIG.DEBOUNCE.SYNC_CLEANUP
-            );
+            this.safeRemoveEntry(entryId);
           }
         }
       }
@@ -197,20 +170,16 @@ export class LorebookSyncService {
     // 2. New or Updated Items
     for (const item of curr) {
       const oldItem = prevMap.get(item.id);
-      
+
       const isNew = !oldItem;
       const isChanged =
         oldItem &&
         (item.name !== oldItem.name ||
           item.content !== oldItem.content ||
           item.lorebookContent !== oldItem.lorebookContent);
-      
+
       if (isNew || isChanged || forceSync) {
-        this.debouncer.debounceAction(
-          `sync-item-${item.id}`,
-          () => this.syncIndividualLorebook(fieldId, item.id),
-          isNew ? APP_CONFIG.DEBOUNCE.SYNC_ITEM_NEW : APP_CONFIG.DEBOUNCE.SYNC_ITEM_UPDATE
-        );
+        this.syncIndividualLorebook(fieldId, item.id);
       }
     }
   }
@@ -252,7 +221,7 @@ export class LorebookSyncService {
   public async ensureDulfsCategory(
     fieldId: string,
     enabled: boolean = true,
-    overrideName?: string
+    overrideName?: string,
   ): Promise<string> {
     const data = this.store.get();
     const categoryId = data.dulfsCategoryIds[fieldId];
@@ -272,8 +241,8 @@ export class LorebookSyncService {
     const categoryName = overrideName
       ? overrideName
       : config
-      ? `${APP_CONFIG.LOREBOOK.CATEGORY_PREFIX}${config.label}`
-      : `${APP_CONFIG.LOREBOOK.CATEGORY_PREFIX}DULFS`;
+        ? `${APP_CONFIG.LOREBOOK.CATEGORY_PREFIX}${config.label}`
+        : `${APP_CONFIG.LOREBOOK.CATEGORY_PREFIX}DULFS`;
 
     const catId = api.v1.uuid();
     try {
@@ -286,7 +255,7 @@ export class LorebookSyncService {
       this.dispatch((store) =>
         store.update((s) => {
           s.dulfsCategoryIds = { ...s.dulfsCategoryIds, [fieldId]: catId };
-        })
+        }),
       );
     } catch (e) {
       api.v1.log(`Error creating DULFS category for ${fieldId}:`, e);
@@ -305,7 +274,7 @@ export class LorebookSyncService {
     const summary = data.dulfsSummaries[fieldId];
 
     let textContent = `${label}\n`;
-    
+
     if (summary) {
       textContent += `\n${summary}\n\n`;
     }
@@ -320,7 +289,7 @@ export class LorebookSyncService {
 
     const categoryId = await this.ensureDulfsCategory(fieldId, isEnabled);
     const entryId = data.dulfsEntryIds[fieldId];
-    
+
     if (entryId) {
       try {
         await api.v1.lorebook.updateEntry(entryId, {
@@ -339,14 +308,16 @@ export class LorebookSyncService {
         displayName: label,
         text: textContent,
         category: categoryId,
-        advancedConditions: [{ type: "random", chance: APP_CONFIG.LOREBOOK.RANDOM_CHANCE_SUMMARY }],
+        advancedConditions: [
+          { type: "random", chance: APP_CONFIG.LOREBOOK.RANDOM_CHANCE_SUMMARY },
+        ],
         enabled: isEnabled,
         forceActivation: false,
       });
       this.dispatch((store) =>
         store.update((s) => {
           s.dulfsEntryIds = { ...s.dulfsEntryIds, [fieldId]: newId };
-        })
+        }),
       );
     } catch (e) {
       api.v1.log("Error creating DULFS entry:", e);
@@ -355,7 +326,7 @@ export class LorebookSyncService {
 
   public async syncIndividualLorebook(
     fieldId: string,
-    itemId: string
+    itemId: string,
   ): Promise<void> {
     const data = this.store.get();
     const list = data[fieldId as keyof StoryData] as DULFSField[];
@@ -403,7 +374,7 @@ export class LorebookSyncService {
               (s as any)[fieldId] = newList;
             }
           }
-        })
+        }),
       );
     } catch (e) {
       api.v1.log("Error creating individual lorebook entry:", e);
@@ -424,18 +395,27 @@ export class LorebookSyncService {
     if (fieldId === FieldID.StoryPrompt || fieldId === FieldID.WorldSnapshot) {
       categoryKey = "se_basics";
       categoryName = `${APP_CONFIG.LOREBOOK.CATEGORY_PREFIX}Basics`;
-      const promptEnabled = data.textFieldEnabled?.[FieldID.StoryPrompt] === true;
-      const snapshotEnabled = data.textFieldEnabled?.[FieldID.WorldSnapshot] === true;
+      const promptEnabled =
+        data.textFieldEnabled?.[FieldID.StoryPrompt] === true;
+      const snapshotEnabled =
+        data.textFieldEnabled?.[FieldID.WorldSnapshot] === true;
       const categoryEnabled = promptEnabled || snapshotEnabled;
 
-      await this.ensureDulfsCategory(categoryKey, categoryEnabled, categoryName);
+      await this.ensureDulfsCategory(
+        categoryKey,
+        categoryEnabled,
+        categoryName,
+      );
     } else {
       await this.ensureDulfsCategory(fieldId, isEnabled);
     }
 
     const freshData = this.store.get();
     const categoryId = freshData.dulfsCategoryIds[categoryKey];
-    const entryId = freshData.textFieldEntryIds[fieldId as keyof typeof freshData.textFieldEntryIds];
+    const entryId =
+      freshData.textFieldEntryIds[
+        fieldId as keyof typeof freshData.textFieldEntryIds
+      ];
 
     if (entryId) {
       try {
@@ -452,7 +432,7 @@ export class LorebookSyncService {
     if (isEnabled) {
       const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
       const label = config ? config.label : fieldId;
-      
+
       try {
         const newId = api.v1.uuid();
         await api.v1.lorebook.createEntry({
@@ -466,7 +446,7 @@ export class LorebookSyncService {
         this.dispatch((store) =>
           store.update((s) => {
             s.textFieldEntryIds = { ...s.textFieldEntryIds, [fieldId]: newId };
-          })
+          }),
         );
       } catch (e) {
         api.v1.log("Error creating text field lorebook entry:", e);
@@ -476,13 +456,15 @@ export class LorebookSyncService {
 
   public async generateAndSyncKeys(
     entryId: string,
-    content: string
+    content: string,
   ): Promise<void> {
-    const promptTemplate = (await api.v1.config.get("lorebook_keys_prompt")) as string;
+    const promptTemplate = (await api.v1.config.get(
+      "lorebook_keys_prompt",
+    )) as string;
     if (!promptTemplate) return;
 
     const prompt = `${promptTemplate}\n\nENTRY:\n${content}`;
-    const model = (await api.v1.config.get("model")) || APP_CONFIG.MODELS.DEFAULT;
+    const model = await api.v1.config.get("model");
     const messages = [{ role: "user" as const, content: prompt }];
     let buffer = "";
 
@@ -494,10 +476,14 @@ export class LorebookSyncService {
           const text = choices[0]?.text;
           if (text) buffer += text;
         },
-        "background"
+        "background",
       );
 
-      const keys = buffer.trim().split(",").map((k) => k.trim()).filter((k) => k.length > 0);
+      const keys = buffer
+        .trim()
+        .split(",")
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0);
       if (keys.length > 0) {
         await api.v1.lorebook.updateEntry(entryId, { keys });
       }

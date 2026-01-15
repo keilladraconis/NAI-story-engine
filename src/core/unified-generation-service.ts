@@ -41,20 +41,23 @@ export class UnifiedGenerationService extends Subscribable<string> {
 
     // Sync GenX state to session
     const unsubscribe = this.genX.subscribe((state) => {
-      // Only update if this session is the one running? 
-      // Since GenX is single threaded, if we are in 'run', we are likely the active one 
+      // Only update if this session is the one running?
+      // Since GenX is single threaded, if we are in 'run', we are likely the active one
       // OR we are queued. GenX state reflects the *global* generation state.
       // We map relevant budget/status info to the session.
-      
-      if (state.status === "waiting_for_user" || state.status === "waiting_for_budget") {
-          session.budgetState = state.budgetState;
-          session.budgetTimeRemaining = state.budgetTimeRemaining;
-          session.budgetWaitEndTime = state.budgetWaitEndTime;
-          session.budgetResolver = state.budgetResolver;
-          session.budgetRejecter = state.budgetRejecter;
+
+      if (
+        state.status === "waiting_for_user" ||
+        state.status === "waiting_for_budget"
+      ) {
+        session.budgetState = state.budgetState;
+        session.budgetTimeRemaining = state.budgetTimeRemaining;
+        session.budgetWaitEndTime = state.budgetWaitEndTime;
+        session.budgetResolver = state.budgetResolver;
+        session.budgetRejecter = state.budgetRejecter;
       } else if (state.status === "generating") {
-          session.budgetState = "normal";
-          session.budgetTimeRemaining = undefined;
+        session.budgetState = "normal";
+        session.budgetTimeRemaining = undefined;
       }
       notify();
     });
@@ -74,7 +77,7 @@ export class UnifiedGenerationService extends Subscribable<string> {
         }
       }
 
-      const model = (await api.v1.config.get("model")) || APP_CONFIG.MODELS.DEFAULT;
+      const model = await api.v1.config.get("model");
 
       const applyFilters = (t: string) => {
         let out = t;
@@ -92,7 +95,7 @@ export class UnifiedGenerationService extends Subscribable<string> {
           max_tokens: 1024,
           model,
           ...params,
-          minTokens: params.minTokens || 50
+          minTokens: params.minTokens || 50,
         },
         async (choices) => {
           const text = choices[0]?.text;
@@ -155,11 +158,7 @@ export class FieldGenerationStrategy implements GenerationStrategy {
     manager: StoryManager,
     finalText: string,
   ): Promise<void> {
-    await manager.setFieldContent(
-      session.fieldId,
-      finalText,
-      "immediate",
-    );
+    await manager.setFieldContent(session.fieldId, finalText, "immediate");
     if (session.fieldId.startsWith("lorebook:")) {
       const entryId = session.fieldId.split(":")[1];
       await manager.generateLorebookKeys(entryId, finalText);
