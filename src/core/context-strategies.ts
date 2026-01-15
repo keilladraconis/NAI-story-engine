@@ -131,7 +131,7 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 1.35,
         min_p: 0.1,
         presence_penalty: 0.05,
-        max_tokens: 2048,
+        max_tokens: 1024,
       },
       prefixBehavior: "trim",
     };
@@ -209,7 +209,7 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 1.1,
         min_p: 0.05,
         presence_penalty: 0.1,
-        max_tokens: 2048,
+        max_tokens: 1024,
       },
       prefixBehavior: "trim",
     };
@@ -410,7 +410,7 @@ const Strategies: Record<string, StrategyFn> = {
         temperature: 0.8,
         min_p: 0.05,
         presence_penalty: 0.1,
-        max_tokens: 1536,
+        max_tokens: 1024,
       },
       filters: [Filters.scrubBrackets],
     };

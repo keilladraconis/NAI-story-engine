@@ -89,7 +89,7 @@ export class UnifiedGenerationService extends Subscribable<string> {
       await this.genX.generate(
         messages,
         {
-          max_tokens: 2048,
+          max_tokens: 1024,
           model,
           ...params,
           minTokens: params.minTokens || 50
