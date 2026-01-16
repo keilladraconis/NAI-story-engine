@@ -51,6 +51,9 @@
 
 ## Development Workflow
 
+### Plan
+Write a `PLAN.md` to lay out and prepare for larger development efforts. Include a list of tasks and update regularly as progress is made.
+
 ### Build
 Generates the `.naiscript` bundle in the `dist/` directory.
 ```bash

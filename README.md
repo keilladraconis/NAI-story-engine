@@ -69,7 +69,38 @@ Format all code with the `npm run format` script.
 
 ### Planning and Coordination
 
-A `PLAN.md` file is present, and it maintains an outline and implementation guide for the project. It should be updated frequently as development proceeds, and when the trajectory differs, update the file to match the latest development trajectory.
+### **Phase 7: Further usability improvements**
+
+The goal of this phase is to address outstanding nit-picks and sub-optimal UX and bugs related to the existing UI components and systems.
+
+#### Features
+
+- [x] Brainstorm UI shows queueing/waiting status of brainstorm chat.
+- [x] Optional binding of Story Prompt and/or World Snapshot to lorebooks.
+- [x] Fast S.E.G.A. mode. After brainstorming, if user activates SEGA while Story Prompt, ATTG and Style Guidelines are empty and unbound, open a modal confirmation to "Bootstrap Story from Brainstorm? (Generate Story Prompt, ATTG, Style Guidelines and bind to lorebook, Memory, AN)
+- [x] Evaluate factoring Queued Generation / Waiting from `agent-workflow.ts` as a stand-alone library or companion to `HyperGenerate`.
+- [x] Attempt to unify `FieldGenerationService` with `ListGenerationService`, the latter is just a consecutive execution of the former. Change "Generate/Add", to "Generate Batch" and "Generate One"
+- [x] Clean up ULFS lorebook templates. Allow for non-original settings.
+- [x] Allow inclusion of story context into brainstorm, other fields.
+- [x] Github release workflow should append version to file name.
+- [x] Fix data update handling. All UI elements should simply be subscribers to the story manager or story data. Same for everything else that needs to know about data updates. No more update callbacks set all over the place. Story manager subscribes to generation-X. Fix the whole data flow and make it clean and straightforward.
+- [ ] Situational Dynamics tuning; Keep it from being "absolutely everyone"
+- [ ] Refactor generation around GenX, make hypergenerator obsolete. (Caller responsible for building context, seeking continuation, natural stop, GenX does queueing, manages calls to generate, pauses between calls, handles ephemeral errors and budget waits.)
+
+#### Bugs
+
+- [x] After discussing additional characters in brainstorm, DP generate doesn't add more characters.
+- [ ] SEGA doesn't continue after waiting for generation.
+- [ ] SEGA doesn't respect that list item contents must be filled before generating lorebook. (Maybe ditch contents and just include the story and other lorebooks into generation context?)
+
+### **Phase 8: Scenario Modality**
+
+The goal of this phase is to expand the viability of Story Engine to accommodate different "flavors" or "templates" of scenario. The default follows the "Three Sphere, Three Layer" world-building structure. However, this is not as well-suited to narrower-scope stories, fanfiction, episodes and vignettes, other casual kinds of scenarios. Speculative right now, design forthcoming...
+
+#### Features
+
+- [x] Reconsider utility of DULFS "content"
+- [ ] Reconsider utility of Dynamic World Snapshot
 
 ### Code Review
 
