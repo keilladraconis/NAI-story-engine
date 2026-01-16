@@ -1,6 +1,5 @@
-import { RootState } from "../../core/store/types";
+import { RootState, Action } from "../../core/store/types";
 import { FIELD_CONFIGS } from "../../config/field-definitions";
-import { dispatch } from "../../core/store";
 import {
   segaToggled,
   settingUpdated,
@@ -14,6 +13,7 @@ const { sidebarPanel } = api.v1.ui.extension;
 
 export const renderMainSidebar = (
   state: RootState,
+  dispatch: (action: Action) => void,
 ): UIExtensionSidebarPanel => {
   const isSegaRunning = state.runtime.segaRunning;
   const showClearConfirm = state.ui.showClearConfirm;
@@ -85,7 +85,7 @@ export const renderMainSidebar = (
   });
 
   const fieldSections = FIELD_CONFIGS.filter((c) => !c.hidden).map((c) =>
-    renderField(c, state),
+    renderField(c, state, dispatch),
   );
 
   return sidebarPanel({

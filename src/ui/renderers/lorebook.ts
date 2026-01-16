@@ -1,5 +1,4 @@
-import { RootState } from "../../core/store/types";
-import { dispatch } from "../../core/store";
+import { RootState, Action } from "../../core/store/types";
 import {
   uiEditModeToggled,
   fieldUpdated,
@@ -20,6 +19,7 @@ const { lorebookPanel } = api.v1.ui.extension;
 
 export const renderLorebookPanel = (
   state: RootState,
+  dispatch: (action: Action) => void,
 ): UIExtensionLorebookPanel => {
   const entryId = state.ui.selectedLorebookEntryId;
   let content: UIPart[] = [];

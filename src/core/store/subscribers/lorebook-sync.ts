@@ -1,13 +1,13 @@
 import { Store } from "../store";
-import { RootState, Action } from "../types";
-import { ActionTypes, dulfsItemUpdated } from "../actions";
+import { RootState } from "../types";
+import { dulfsItemUpdated } from "../actions";
 import { FIELD_CONFIGS, DulfsFieldID } from "../../../config/field-definitions";
 
 export const lorebookSyncSubscriber = (store: Store<RootState>) => {
   let lastState = store.getState();
 
   store.subscribe(async (state, action) => {
-    if (action.type === ActionTypes.DULFS_ITEM_UPDATED) {
+    if (action.type === "story/dulfsItemUpdated") {
       const { fieldId, itemId, updates } = action.payload;
 
       // Avoid infinite loop: only sync if content or name changed, NOT if we just updated the ID
@@ -16,7 +16,7 @@ export const lorebookSyncSubscriber = (store: Store<RootState>) => {
       }
     }
 
-    if (action.type === ActionTypes.DULFS_ITEM_REMOVED) {
+    if (action.type === "story/dulfsItemRemoved") {
       const { fieldId, itemId } = action.payload;
       const prevList = lastState.story.dulfs[fieldId as DulfsFieldID] || [];
       const item = prevList.find((i) => i.id === itemId);

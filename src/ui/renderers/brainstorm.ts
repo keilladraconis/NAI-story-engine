@@ -1,5 +1,4 @@
-import { RootState } from "../../core/store/types";
-import { dispatch } from "../../core/store";
+import { RootState, Action } from "../../core/store/types";
 import { FieldID } from "../../config/field-definitions";
 import {
   fieldUpdated,
@@ -19,6 +18,7 @@ const { sidebarPanel } = api.v1.ui.extension;
 
 export const renderBrainstormSidebar = (
   state: RootState,
+  dispatch: (action: Action) => void,
 ): UIExtensionSidebarPanel => {
   // Brainstorm logic uses FieldID.Brainstorm content/data
   const field = state.story.fields[FieldID.Brainstorm];
@@ -36,14 +36,37 @@ export const renderBrainstormSidebar = (
 
   // Input state
   const inputKey = "brainstorm-input";
-  const inputValue = state.ui.inputs[inputKey] || "";
+
+  const handleSend = async (text?: string) => {
+    const finalContent =
+      (typeof text === "string" ? text : await api.v1.storage.get(inputKey)) ||
+      "";
+    if (!finalContent.trim()) return;
+
+    dispatch(brainstormMessageAdded({ role: "user", content: finalContent }));
+    dispatch(uiInputChanged({ id: inputKey, value: "" }));
+    await api.v1.storage.remove(inputKey);
+
+    // Force clear the UI input
+    api.v1.ui.updateParts([
+      { id: inputKey, type: "multilineTextInput", initialValue: "" },
+    ]);
+
+    dispatch(
+      generationRequested({
+        id: "gen-brainstorm",
+        type: "brainstorm",
+        targetId: FieldID.Brainstorm,
+      }),
+    );
+  };
 
   const messageParts: UIPart[] = [];
 
   // Streaming bubble (Active Generation)
   if (isGenerating && field?.content) {
     messageParts.push(
-      renderMessageBubble("assistant", field.content, -1, false, ""),
+      renderMessageBubble("assistant", field.content, -1, false, "", dispatch),
     );
   }
 
@@ -60,6 +83,7 @@ export const renderBrainstormSidebar = (
         originalIndex,
         isEditing,
         editValue,
+        dispatch,
       ),
     );
   });
@@ -67,11 +91,10 @@ export const renderBrainstormSidebar = (
   const inputArea = column({
     content: [
       multilineTextInput({
+        id: inputKey,
         placeholder: "Type an idea...",
-        initialValue: inputValue,
-        onChange: (val) =>
-          dispatch(uiInputChanged({ id: inputKey, value: val })),
-        onSubmit: () => handleSend(inputValue),
+        storageKey: inputKey,
+        onSubmit: (val) => handleSend(val),
         style: { "min-height": "60px", "max-height": "120px" },
         disabled: isGenerating,
       }),
@@ -99,11 +122,11 @@ export const renderBrainstormSidebar = (
               "font-weight": "bold",
               "background-color": isGenerating ? "#ffcccc" : undefined,
             },
-            callback: () => {
+            callback: async () => {
               if (isGenerating || isQueued) {
                 dispatch(generationCancelled({ requestId: genId }));
               } else {
-                handleSend(inputValue);
+                await handleSend();
               }
             },
           }),
@@ -144,26 +167,13 @@ export const renderBrainstormSidebar = (
   });
 };
 
-const handleSend = (text: string) => {
-  if (!text.trim()) return;
-
-  dispatch(brainstormMessageAdded({ role: "user", content: text }));
-  dispatch(uiInputChanged({ id: "brainstorm-input", value: "" }));
-  dispatch(
-    generationRequested({
-      id: "gen-brainstorm",
-      type: "brainstorm",
-      targetId: FieldID.Brainstorm,
-    }),
-  );
-};
-
 const renderMessageBubble = (
   role: string,
   content: string,
   index: number,
   isEditing: boolean,
   editValue: string,
+  dispatch: (action: Action) => void,
 ): UIPart => {
   const isUser = role === "user";
   const isStreaming = index === -1;

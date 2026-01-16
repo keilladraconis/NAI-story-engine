@@ -1,5 +1,4 @@
 import { UIState, Action } from "../types";
-import { ActionTypes } from "../actions";
 
 export const initialUIState: UIState = {
   activeTab: "editor",
@@ -13,9 +12,12 @@ export const initialUIState: UIState = {
   showClearConfirm: false,
 };
 
-export function uiReducer(state: UIState = initialUIState, action: Action): UIState {
+export function uiReducer(
+  state: UIState = initialUIState,
+  action: Action,
+): UIState {
   switch (action.type) {
-    case ActionTypes.UI_INPUT_CHANGED: {
+    case "ui/inputChanged": {
       const { id, value } = action.payload;
       return {
         ...state,
@@ -26,7 +28,7 @@ export function uiReducer(state: UIState = initialUIState, action: Action): UISt
       };
     }
 
-    case ActionTypes.UI_SECTION_TOGGLED: {
+    case "ui/sectionToggled": {
       const { id } = action.payload;
       return {
         ...state,
@@ -37,8 +39,9 @@ export function uiReducer(state: UIState = initialUIState, action: Action): UISt
       };
     }
 
-    case ActionTypes.UI_EDIT_MODE_TOGGLED: {
+    case "ui/editModeToggled": {
       const { id } = action.payload;
+      api.v1.log("editmodetoggled", state.editModes, id);
       return {
         ...state,
         editModes: {
@@ -48,7 +51,7 @@ export function uiReducer(state: UIState = initialUIState, action: Action): UISt
       };
     }
 
-    case ActionTypes.UI_LOREBOOK_SELECTED: {
+    case "ui/lorebookSelected": {
       const { entryId, categoryId } = action.payload;
       return {
         ...state,
@@ -58,13 +61,13 @@ export function uiReducer(state: UIState = initialUIState, action: Action): UISt
       };
     }
 
-    case ActionTypes.UI_LOREBOOK_EDIT_MODE_TOGGLED:
+    case "ui/lorebookEditModeToggled":
       return {
         ...state,
         lorebookEditMode: !state.lorebookEditMode,
       };
 
-    case ActionTypes.UI_CLEAR_CONFIRM_TOGGLED:
+    case "ui/clearConfirmToggled":
       return {
         ...state,
         showClearConfirm: !state.showClearConfirm,

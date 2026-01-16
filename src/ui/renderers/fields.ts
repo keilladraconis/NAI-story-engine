@@ -1,10 +1,9 @@
-import { RootState } from "../../core/store/types";
+import { RootState, Action } from "../../core/store/types";
 import {
   FieldConfig,
   FieldID,
   DulfsFieldID,
 } from "../../config/field-definitions";
-import { dispatch } from "../../core/store"; // Direct dispatch
 import {
   uiEditModeToggled,
   uiInputChanged,
@@ -15,6 +14,7 @@ import {
   dulfsItemUpdated,
   dulfsItemRemoved,
   uiSectionToggled,
+  dulfsSummaryUpdated,
 } from "../../core/store/actions";
 import {
   createHeaderWithToggle,
@@ -32,14 +32,22 @@ const {
   collapsibleSection,
 } = api.v1.ui.part;
 
-export const renderField = (config: FieldConfig, state: RootState): UIPart => {
+export const renderField = (
+  config: FieldConfig,
+  state: RootState,
+  dispatch: (action: Action) => void,
+): UIPart => {
   if (config.layout === "list") {
-    return renderListField(config, state);
+    return renderListField(config, state, dispatch);
   }
-  return renderTextField(config, state);
+  return renderTextField(config, state, dispatch);
 };
 
-const renderTextField = (config: FieldConfig, state: RootState): UIPart => {
+const renderTextField = (
+  config: FieldConfig,
+  state: RootState,
+  dispatch: (action: Action) => void,
+): UIPart => {
   const isEditing = state.ui.editModes[config.id] || false;
   const content = state.story.fields[config.id]?.content || "";
   const draftKey = `field-draft-${config.id}`;
@@ -124,13 +132,17 @@ const renderTextField = (config: FieldConfig, state: RootState): UIPart => {
         isEditing ? draft : content,
         config.placeholder,
         `input-${config.id}`,
-        (val) => dispatch(uiInputChanged(draftKey, val)),
+        (val) => dispatch(uiInputChanged({ id: draftKey, value: val })),
       ),
     ],
   });
 };
 
-const renderListField = (config: FieldConfig, state: RootState): UIPart => {
+const renderListField = (
+  config: FieldConfig,
+  state: RootState,
+  dispatch: (action: Action) => void,
+): UIPart => {
   const list = state.story.dulfs[config.id as DulfsFieldID] || [];
 
   // Summary logic
@@ -194,7 +206,7 @@ const renderListField = (config: FieldConfig, state: RootState): UIPart => {
         isSummaryEditing ? summaryDraft : summary,
         "Summary...",
         `summary-input-${config.id}`,
-        (val) => dispatch(uiInputChanged(summaryDraftKey, val)),
+        (val) => dispatch(uiInputChanged({ id: summaryDraftKey, value: val })),
       ),
     ],
   });

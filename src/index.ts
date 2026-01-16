@@ -1,4 +1,4 @@
-import { store, storyLoaded } from "./core/store";
+import { createStore, RootState, storyLoaded } from "./core/store";
 import {
   renderMainSidebar,
   renderBrainstormSidebar,
@@ -7,6 +7,10 @@ import {
 import { uiLorebookSelected } from "./core/store/actions";
 import { lorebookSyncSubscriber } from "./core/store/subscribers/lorebook-sync";
 import { initialStoryState } from "./core/store/reducers/storyReducer";
+import {
+  initialRootState,
+  rootReducer,
+} from "./core/store/reducers/rootReducer";
 
 (async () => {
   try {
@@ -15,23 +19,30 @@ import { initialStoryState } from "./core/store/reducers/storyReducer";
     // Request Permissions
     await api.v1.permissions.request(["lorebookEdit", "storyEdit"]);
 
-    // Start Subscribers
+    // Start store
+    const store = createStore<RootState>(
+      rootReducer,
+      initialRootState,
+    );
+    const { getState, dispatch, subscribe } = store;
+
+    // Initialize Subscribers
     lorebookSyncSubscriber(store);
 
     // Initial Render & Registration
-    const initialState = store.getState();
-    const sidebar = renderMainSidebar(initialState);
-    const brainstorm = renderBrainstormSidebar(initialState);
-    const lorebook = renderLorebookPanel(initialState);
+    const initialState = getState();
+    const sidebar = renderMainSidebar(initialState, dispatch);
+    const brainstorm = renderBrainstormSidebar(initialState, dispatch);
+    const lorebook = renderLorebookPanel(initialState, dispatch);
 
     await api.v1.ui.register([sidebar, brainstorm, lorebook]);
 
     // Render Loop
-    store.subscribe((state, _action) => {
+    subscribe((state, _action) => {
       try {
-        const updatedSidebar = renderMainSidebar(state);
-        const updatedBrainstorm = renderBrainstormSidebar(state);
-        const updatedLorebook = renderLorebookPanel(state);
+        const updatedSidebar = renderMainSidebar(state, dispatch);
+        const updatedBrainstorm = renderBrainstormSidebar(state, dispatch);
+        const updatedLorebook = renderLorebookPanel(state, dispatch);
 
         api.v1.ui.update([
           updatedSidebar,
@@ -48,12 +59,12 @@ import { initialStoryState } from "./core/store/reducers/storyReducer";
       "kse-story-data",
       initialStoryState,
     );
-    store.dispatch(storyLoaded({ story: data }));
+    dispatch(storyLoaded({ story: data }));
     api.v1.log("Story data loaded.");
 
     // Hooks
     api.v1.hooks.register("onLorebookEntrySelected", (params) => {
-      store.dispatch(
+      dispatch(
         uiLorebookSelected({
           entryId: params.entryId || null,
           categoryId: params.categoryId || null,

@@ -1,5 +1,4 @@
 import { RuntimeState, Action } from "../types";
-import { ActionTypes } from "../actions";
 
 export const initialRuntimeState: RuntimeState = {
   segaRunning: false,
@@ -11,13 +10,13 @@ export const initialRuntimeState: RuntimeState = {
 
 export function runtimeReducer(state: RuntimeState = initialRuntimeState, action: Action): RuntimeState {
   switch (action.type) {
-    case ActionTypes.SEGA_TOGGLED:
+    case "runtime/segaToggled":
       return {
         ...state,
         segaRunning: !state.segaRunning,
       };
 
-    case ActionTypes.GENERATION_REQUESTED: {
+    case "runtime/generationRequested": {
       const request = action.payload;
       return {
         ...state,
@@ -26,7 +25,7 @@ export function runtimeReducer(state: RuntimeState = initialRuntimeState, action
       };
     }
 
-    case ActionTypes.GENERATION_STARTED: {
+    case "runtime/generationStarted": {
       const { requestId } = action.payload; // Payload should ideally identify which request started
       // Logic: move specific request from queue to active
       const requestIndex = state.queue.findIndex(r => r.id === requestId);
@@ -42,21 +41,21 @@ export function runtimeReducer(state: RuntimeState = initialRuntimeState, action
       };
     }
 
-    case ActionTypes.GENERATION_COMPLETED:
+    case "runtime/generationCompleted":
       return {
         ...state,
         activeRequest: null,
         status: state.queue.length > 0 ? "queued" : "idle",
       };
 
-    case ActionTypes.GENERATION_FAILED:
+    case "runtime/generationFailed":
       return {
         ...state,
         activeRequest: null,
         status: "error", // Or return to idle/queued depending on retry logic
       };
       
-    case ActionTypes.GENERATION_CANCELLED: {
+    case "runtime/generationCancelled": {
        const { requestId } = action.payload;
        if (state.activeRequest && state.activeRequest.id === requestId) {
          return {
@@ -71,7 +70,7 @@ export function runtimeReducer(state: RuntimeState = initialRuntimeState, action
        };
     }
 
-    case ActionTypes.BUDGET_UPDATED:
+    case "runtime/budgetUpdated":
       return {
         ...state,
         budgetTimeRemaining: action.payload.timeRemaining,

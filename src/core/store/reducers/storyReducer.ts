@@ -1,5 +1,4 @@
 import { StoryState, Action, StoryField, DulfsItem } from "../types";
-import { ActionTypes } from "../actions";
 import { FIELD_CONFIGS, FieldID, DulfsFieldID } from "../../../config/field-definitions";
 
 export const initialStoryState: StoryState = {
@@ -30,17 +29,17 @@ FIELD_CONFIGS.forEach((config) => {
 
 export function storyReducer(state: StoryState = initialStoryState, action: Action): StoryState {
   switch (action.type) {
-    case ActionTypes.STORY_LOADED:
+    case "story/loaded":
       // Payload is { story: StoryState }
       return { ...initialStoryState, ...action.payload.story };
 
-    case ActionTypes.STORY_CLEARED:
+    case "story/cleared":
       return { ...initialStoryState };
 
-    case ActionTypes.SETTING_UPDATED:
+    case "story/settingUpdated":
       return { ...state, setting: action.payload.setting };
 
-    case ActionTypes.FIELD_UPDATED: {
+    case "story/fieldUpdated": {
       const { fieldId, content, data } = action.payload;
       const field = state.fields[fieldId];
       if (!field) return state; // Should not happen
@@ -58,7 +57,7 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       };
     }
 
-    case ActionTypes.DULFS_ITEM_ADDED: {
+    case "story/dulfsItemAdded": {
       const { fieldId, item } = action.payload;
       const list = state.dulfs[fieldId as DulfsFieldID] || [];
       return {
@@ -70,7 +69,7 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       };
     }
 
-    case ActionTypes.DULFS_ITEM_UPDATED: {
+    case "story/dulfsItemUpdated": {
       const { fieldId, itemId, updates } = action.payload;
       const list = state.dulfs[fieldId as DulfsFieldID] || [];
       return {
@@ -82,7 +81,7 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       };
     }
 
-    case ActionTypes.DULFS_ITEM_REMOVED: {
+    case "story/dulfsItemRemoved": {
       const { fieldId, itemId } = action.payload;
       const list = state.dulfs[fieldId as DulfsFieldID] || [];
       return {
@@ -94,7 +93,7 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       };
     }
 
-    case ActionTypes.DULFS_SUMMARY_UPDATED: {
+    case "story/dulfsSummaryUpdated": {
       const { fieldId, summary } = action.payload;
       return {
         ...state,
@@ -105,7 +104,7 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       };
     }
 
-    case ActionTypes.BRAINSTORM_MESSAGE_ADDED: {
+    case "story/brainstormMessageAdded": {
       const { role, content } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = field?.data?.messages || [];
@@ -124,7 +123,7 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       };
     }
 
-    case ActionTypes.BRAINSTORM_MESSAGE_EDITED: {
+    case "story/brainstormMessageEdited": {
       const { index, content } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = field?.data?.messages || [];
@@ -145,7 +144,7 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       };
     }
 
-    case ActionTypes.BRAINSTORM_MESSAGE_DELETED: {
+    case "story/brainstormMessageDeleted": {
       const { index } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = field?.data?.messages || [];
@@ -165,7 +164,7 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       };
     }
 
-    case ActionTypes.BRAINSTORM_RETRY: {
+    case "story/brainstormRetry": {
       const { index } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = field?.data?.messages || [];
@@ -194,10 +193,10 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       };
     }
 
-    case ActionTypes.TOGGLE_ATTG:
+    case "story/toggleAttg":
       return { ...state, attgEnabled: !state.attgEnabled };
 
-    case ActionTypes.TOGGLE_STYLE:
+    case "story/toggleStyle":
       return { ...state, styleEnabled: !state.styleEnabled };
 
     default:
