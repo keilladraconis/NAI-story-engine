@@ -126,6 +126,76 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       };
     }
 
+    case ActionTypes.BRAINSTORM_MESSAGE_EDITED: {
+      const { index, content } = action.payload;
+      const field = state.fields[FieldID.Brainstorm];
+      const messages = field?.data?.messages || [];
+      if (index < 0 || index >= messages.length || !messages[index]) return state;
+
+      const newMessages = [...messages];
+      newMessages[index] = { ...newMessages[index], content };
+
+      return {
+        ...state,
+        fields: {
+          ...state.fields,
+          [FieldID.Brainstorm]: {
+            ...field,
+            data: { ...field.data, messages: newMessages }
+          }
+        }
+      };
+    }
+
+    case ActionTypes.BRAINSTORM_MESSAGE_DELETED: {
+      const { index } = action.payload;
+      const field = state.fields[FieldID.Brainstorm];
+      const messages = field?.data?.messages || [];
+      if (index < 0 || index >= messages.length) return state;
+
+      const newMessages = messages.filter((_: any, i: number) => i !== index);
+
+      return {
+        ...state,
+        fields: {
+          ...state.fields,
+          [FieldID.Brainstorm]: {
+            ...field,
+            data: { ...field.data, messages: newMessages }
+          }
+        }
+      };
+    }
+
+    case ActionTypes.BRAINSTORM_RETRY: {
+      const { index } = action.payload;
+      const field = state.fields[FieldID.Brainstorm];
+      const messages = field?.data?.messages || [];
+      if (index < 0 || index >= messages.length) return state;
+
+      const targetMessage = messages[index];
+      let newMessages;
+
+      if (targetMessage.role === 'user') {
+        // Keep up to and including the user message
+        newMessages = messages.slice(0, index + 1);
+      } else {
+        // Assistant message: Remove it and everything after, keeping up to the previous message
+        newMessages = messages.slice(0, index);
+      }
+
+      return {
+        ...state,
+        fields: {
+          ...state.fields,
+          [FieldID.Brainstorm]: {
+            ...field,
+            data: { ...field.data, messages: newMessages }
+          }
+        }
+      };
+    }
+
     case ActionTypes.TOGGLE_ATTG:
       return { ...state, attgEnabled: !state.attgEnabled };
 

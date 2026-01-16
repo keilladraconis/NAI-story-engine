@@ -14,6 +14,9 @@ export const ActionTypes = {
   DULFS_ITEM_REMOVED: "story/dulfsItemRemoved",
   DULFS_SUMMARY_UPDATED: "story/dulfsSummaryUpdated",
   BRAINSTORM_MESSAGE_ADDED: "story/brainstormMessageAdded",
+  BRAINSTORM_MESSAGE_EDITED: "story/brainstormMessageEdited",
+  BRAINSTORM_MESSAGE_DELETED: "story/brainstormMessageDeleted",
+  BRAINSTORM_RETRY: "story/brainstormRetry",
   TOGGLE_ATTG: "story/toggleAttg",
   TOGGLE_STYLE: "story/toggleStyle",
 
@@ -105,4 +108,19 @@ export const generationRequested = (request: GenerationRequest): Action => ({
 export const generationCancelled = (requestId: string): Action => ({
   type: ActionTypes.GENERATION_CANCELLED,
   payload: { requestId },
+});
+
+export const brainstormMessageEdited = (index: number, content: string): Action => ({
+  type: ActionTypes.BRAINSTORM_MESSAGE_EDITED,
+  payload: { index, content },
+});
+
+export const brainstormMessageDeleted = (index: number): Action => ({
+  type: ActionTypes.BRAINSTORM_MESSAGE_DELETED,
+  payload: { index },
+});
+
+export const brainstormRetry = (index: number): Action => ({
+  type: ActionTypes.BRAINSTORM_RETRY,
+  payload: { index },
 });
