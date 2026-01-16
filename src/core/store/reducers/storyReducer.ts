@@ -31,10 +31,8 @@ FIELD_CONFIGS.forEach((config) => {
 export function storyReducer(state: StoryState = initialStoryState, action: Action): StoryState {
   switch (action.type) {
     case ActionTypes.STORY_LOADED:
-      // Assuming payload is a partial or full StoryState. 
-      // Need to be careful about merging deep structures if partial.
-      // For now, assume full replacement or strict structure.
-      return { ...initialStoryState, ...action.payload };
+      // Payload is { story: StoryState }
+      return { ...initialStoryState, ...action.payload.story };
 
     case ActionTypes.STORY_CLEARED:
       return { ...initialStoryState };

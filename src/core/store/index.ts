@@ -1,15 +1,21 @@
-import { createStore } from "./store";
-import { rootReducer, initialRootState } from "./reducers/rootReducer";
-import { persistenceMiddleware } from "./middleware/persistence";
-import { generationMiddleware } from "./middleware/generation";
-import { segaMiddleware } from "./middleware/sega";
+import { combineReducers, createStore } from "./store";
 import { RootState } from "./types";
+import { initialStoryState, storyReducer } from "./reducers/storyReducer";
+import { initialUIState, uiReducer } from "./reducers/uiReducer";
+import { initialRuntimeState, runtimeReducer } from "./reducers/runtimeReducer";
 
 // Create the store instance
 export const store = createStore<RootState>(
-  rootReducer,
-  initialRootState,
-  [persistenceMiddleware, generationMiddleware, segaMiddleware]
+  combineReducers({
+    story: storyReducer,
+    ui: uiReducer,
+    runtime: runtimeReducer,
+  }),
+  {
+    story: initialStoryState,
+    ui: initialUIState,
+    runtime: initialRuntimeState,
+  },
 );
 
 // Helper to access dispatch easily

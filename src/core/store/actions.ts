@@ -1,5 +1,5 @@
-import { Action, StoryField, DulfsItem, GenerationRequest } from "./types";
-import { FieldID, DulfsFieldID } from "../../config/field-definitions";
+import { Action, DulfsItem, GenerationRequest, StoryState } from "./types";
+import { DulfsFieldID } from "../../config/field-definitions";
 
 // --- Action Types ---
 
@@ -36,91 +36,105 @@ export const ActionTypes = {
   GENERATION_FAILED: "runtime/generationFailed",
   GENERATION_CANCELLED: "runtime/generationCancelled",
   BUDGET_UPDATED: "runtime/budgetUpdated",
-};
+} as const;
+
+export function action<T extends string>(type: T) {
+  return <P = void>() =>
+    (payload: P) =>
+      ({ type, payload } as Action<T, P>);
+}
 
 // --- Action Creators ---
 
-export const storyLoaded = (payload: any): Action => ({
-  type: ActionTypes.STORY_LOADED,
-  payload,
-});
+export const storyLoaded = action(ActionTypes.STORY_LOADED)<{ story: StoryState }>();
+export const storyCleared = action(ActionTypes.STORY_CLEARED)();
+export const settingUpdated = action(ActionTypes.SETTING_UPDATED)<{ setting: string }>();
+export const fieldUpdated = action(ActionTypes.FIELD_UPDATED)<{
+  fieldId: string;
+  content: string;
+  data?: any;
+}>();
+export const dulfsItemAdded = action(ActionTypes.DULFS_ITEM_ADDED)<{
+  fieldId: DulfsFieldID;
+  item: DulfsItem;
+}>();
+export const dulfsItemUpdated = action(ActionTypes.DULFS_ITEM_UPDATED)<{
+  fieldId: DulfsFieldID;
+  itemId: string;
+  updates: Partial<DulfsItem>;
+}>();
+export const dulfsItemRemoved = action(ActionTypes.DULFS_ITEM_REMOVED)<{
+  fieldId: DulfsFieldID;
+  itemId: string;
+}>();
+export const dulfsSummaryUpdated = action(ActionTypes.DULFS_SUMMARY_UPDATED)<{
+  fieldId: string;
+  summary: string;
+}>();
+export const brainstormMessageAdded = action(ActionTypes.BRAINSTORM_MESSAGE_ADDED)<{
+  role: string;
+  content: string;
+}>();
+export const brainstormMessageEdited = action(ActionTypes.BRAINSTORM_MESSAGE_EDITED)<{
+  index: number;
+  content: string;
+}>();
+export const brainstormMessageDeleted = action(ActionTypes.BRAINSTORM_MESSAGE_DELETED)<{
+  index: number;
+}>();
+export const brainstormRetry = action(ActionTypes.BRAINSTORM_RETRY)<{ index: number }>();
+export const toggleAttg = action(ActionTypes.TOGGLE_ATTG)();
+export const toggleStyle = action(ActionTypes.TOGGLE_STYLE)();
 
-export const storyCleared = (): Action => ({
-  type: ActionTypes.STORY_CLEARED,
-  payload: null,
-});
+export const uiInputChanged = action(ActionTypes.UI_INPUT_CHANGED)<{ id: string; value: string }>();
+export const uiSectionToggled = action(ActionTypes.UI_SECTION_TOGGLED)<{ id: string }>();
+export const uiEditModeToggled = action(ActionTypes.UI_EDIT_MODE_TOGGLED)<{ id: string }>();
+export const uiLorebookSelected = action(ActionTypes.UI_LOREBOOK_SELECTED)<{
+  entryId: string | null;
+  categoryId: string | null;
+}>();
+export const uiLorebookEditModeToggled = action(ActionTypes.UI_LOREBOOK_EDIT_MODE_TOGGLED)();
+export const uiClearConfirmToggled = action(ActionTypes.UI_CLEAR_CONFIRM_TOGGLED)();
 
-export const settingUpdated = (setting: string): Action => ({
-  type: ActionTypes.SETTING_UPDATED,
-  payload: { setting },
-});
+export const segaToggled = action(ActionTypes.SEGA_TOGGLED)();
+export const generationRequested = action(ActionTypes.GENERATION_REQUESTED)<GenerationRequest>();
+export const generationStarted = action(ActionTypes.GENERATION_STARTED)<{ requestId: string }>();
+export const generationCompleted = action(ActionTypes.GENERATION_COMPLETED)<{ requestId: string }>();
+export const generationFailed = action(ActionTypes.GENERATION_FAILED)<{
+  requestId: string;
+  error: string;
+}>();
+export const generationCancelled = action(ActionTypes.GENERATION_CANCELLED)<{ requestId: string }>();
+export const budgetUpdated = action(ActionTypes.BUDGET_UPDATED)<{ timeRemaining: number }>();
 
-export const fieldUpdated = (fieldId: string, content: string, data?: any): Action => ({
-  type: ActionTypes.FIELD_UPDATED,
-  payload: { fieldId, content, data },
-});
+export const actions = {
+  storyLoaded,
+  storyCleared,
+  settingUpdated,
+  fieldUpdated,
+  dulfsItemAdded,
+  dulfsItemUpdated,
+  dulfsItemRemoved,
+  dulfsSummaryUpdated,
+  brainstormMessageAdded,
+  brainstormMessageEdited,
+  brainstormMessageDeleted,
+  brainstormRetry,
+  toggleAttg,
+  toggleStyle,
 
-export const dulfsItemAdded = (fieldId: DulfsFieldID, item: DulfsItem): Action => ({
-  type: ActionTypes.DULFS_ITEM_ADDED,
-  payload: { fieldId, item },
-});
+  uiInputChanged,
+  uiSectionToggled,
+  uiEditModeToggled,
+  uiLorebookSelected,
+  uiLorebookEditModeToggled,
+  uiClearConfirmToggled,
 
-export const dulfsItemUpdated = (fieldId: DulfsFieldID, itemId: string, updates: Partial<DulfsItem>): Action => ({
-  type: ActionTypes.DULFS_ITEM_UPDATED,
-  payload: { fieldId, itemId, updates },
-});
-
-export const dulfsItemRemoved = (fieldId: DulfsFieldID, itemId: string): Action => ({
-  type: ActionTypes.DULFS_ITEM_REMOVED,
-  payload: { fieldId, itemId },
-});
-
-export const uiInputChanged = (id: string, value: string): Action => ({
-  type: ActionTypes.UI_INPUT_CHANGED,
-  payload: { id, value },
-});
-
-export const uiSectionToggled = (id: string): Action => ({
-  type: ActionTypes.UI_SECTION_TOGGLED,
-  payload: { id },
-});
-
-export const uiEditModeToggled = (id: string): Action => ({
-  type: ActionTypes.UI_EDIT_MODE_TOGGLED,
-  payload: { id },
-});
-
-export const uiLorebookSelected = (entryId: string | null, categoryId: string | null): Action => ({
-  type: ActionTypes.UI_LOREBOOK_SELECTED,
-  payload: { entryId, categoryId },
-});
-
-export const segaToggled = (): Action => ({
-  type: ActionTypes.SEGA_TOGGLED,
-  payload: null,
-});
-
-export const generationRequested = (request: GenerationRequest): Action => ({
-  type: ActionTypes.GENERATION_REQUESTED,
-  payload: request,
-});
-
-export const generationCancelled = (requestId: string): Action => ({
-  type: ActionTypes.GENERATION_CANCELLED,
-  payload: { requestId },
-});
-
-export const brainstormMessageEdited = (index: number, content: string): Action => ({
-  type: ActionTypes.BRAINSTORM_MESSAGE_EDITED,
-  payload: { index, content },
-});
-
-export const brainstormMessageDeleted = (index: number): Action => ({
-  type: ActionTypes.BRAINSTORM_MESSAGE_DELETED,
-  payload: { index },
-});
-
-export const brainstormRetry = (index: number): Action => ({
-  type: ActionTypes.BRAINSTORM_RETRY,
-  payload: { index },
-});
+  segaToggled,
+  generationRequested,
+  generationStarted,
+  generationCompleted,
+  generationFailed,
+  generationCancelled,
+  budgetUpdated,
+};

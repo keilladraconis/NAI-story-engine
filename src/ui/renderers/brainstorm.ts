@@ -10,6 +10,7 @@ import {
   brainstormMessageEdited,
   brainstormRetry,
   uiEditModeToggled,
+  brainstormMessageAdded,
 } from "../../core/store/actions";
 import { calculateTextAreaHeight } from "../ui-components";
 
@@ -68,7 +69,8 @@ export const renderBrainstormSidebar = (
       multilineTextInput({
         placeholder: "Type an idea...",
         initialValue: inputValue,
-        onChange: (val) => dispatch(uiInputChanged(inputKey, val)),
+        onChange: (val) =>
+          dispatch(uiInputChanged({ id: inputKey, value: val })),
         onSubmit: () => handleSend(inputValue),
         style: { "min-height": "60px", "max-height": "120px" },
         disabled: isGenerating,
@@ -80,7 +82,13 @@ export const renderBrainstormSidebar = (
             text: "Clear",
             style: { flex: 0.3 },
             callback: () => {
-              dispatch(fieldUpdated(FieldID.Brainstorm, "", { messages: [] }));
+              dispatch(
+                fieldUpdated({
+                  fieldId: FieldID.Brainstorm,
+                  content: "",
+                  data: { messages: [] },
+                }),
+              );
             },
           }),
           button({
@@ -93,7 +101,7 @@ export const renderBrainstormSidebar = (
             },
             callback: () => {
               if (isGenerating || isQueued) {
-                dispatch(generationCancelled(genId));
+                dispatch(generationCancelled({ requestId: genId }));
               } else {
                 handleSend(inputValue);
               }
@@ -139,11 +147,8 @@ export const renderBrainstormSidebar = (
 const handleSend = (text: string) => {
   if (!text.trim()) return;
 
-  dispatch({
-    type: "story/brainstormMessageAdded",
-    payload: { role: "user", content: text },
-  });
-  dispatch(uiInputChanged("brainstorm-input", ""));
+  dispatch(brainstormMessageAdded({ role: "user", content: text }));
+  dispatch(uiInputChanged({ id: "brainstorm-input", value: "" }));
   dispatch(
     generationRequested({
       id: "gen-brainstorm",
@@ -186,12 +191,16 @@ const renderMessageBubble = (
             style: { padding: "4px", height: "24px", width: "24px" },
             callback: () => {
               if (isEditing) {
-                dispatch(brainstormMessageEdited(index, editValue));
-                dispatch(uiEditModeToggled(editKey));
+                api.v1.log("bse", index);
+                dispatch(
+                  brainstormMessageEdited({ index, content: editValue }),
+                );
+                api.v1.log("bse2");
+                dispatch(uiEditModeToggled({ id: editKey }));
               } else {
                 // Initialize input with current content
-                dispatch(uiInputChanged(editKey, content || ""));
-                dispatch(uiEditModeToggled(editKey));
+                dispatch(uiInputChanged({ id: editKey, value: content || "" }));
+                dispatch(uiEditModeToggled({ id: editKey }));
               }
             },
           }),
@@ -201,7 +210,7 @@ const renderMessageBubble = (
                 iconId: "rotate-cw",
                 style: { padding: "4px", height: "24px", width: "24px" },
                 callback: () => {
-                  dispatch(brainstormRetry(index));
+                  dispatch(brainstormRetry({ index }));
                   dispatch(
                     generationRequested({
                       id: "gen-brainstorm",
@@ -217,7 +226,7 @@ const renderMessageBubble = (
             ? button({
                 iconId: "trash",
                 style: { padding: "4px", height: "24px", width: "24px" },
-                callback: () => dispatch(brainstormMessageDeleted(index)),
+                callback: () => dispatch(brainstormMessageDeleted({ index })),
               })
             : null,
         ].filter(Boolean) as UIPart[],
@@ -228,7 +237,8 @@ const renderMessageBubble = (
     ? multilineTextInput({
         id: editKey, // Stable ID for focus/state retention
         initialValue: String(editValue || ""),
-        onChange: (val) => dispatch(uiInputChanged(editKey, val)),
+        onChange: (val) =>
+          dispatch(uiInputChanged({ id: editKey, value: val })),
         style: {
           "min-height": "40px",
           width: "100%",

@@ -48,13 +48,16 @@ import { initialStoryState } from "./core/store/reducers/storyReducer";
       "kse-story-data",
       initialStoryState,
     );
-    store.dispatch(storyLoaded(data));
+    store.dispatch(storyLoaded({ story: data }));
     api.v1.log("Story data loaded.");
 
     // Hooks
     api.v1.hooks.register("onLorebookEntrySelected", (params) => {
       store.dispatch(
-        uiLorebookSelected(params.entryId || null, params.categoryId || null),
+        uiLorebookSelected({
+          entryId: params.entryId || null,
+          categoryId: params.categoryId || null,
+        }),
       );
     });
   } catch (e) {
