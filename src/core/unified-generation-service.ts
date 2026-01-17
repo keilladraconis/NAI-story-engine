@@ -63,6 +63,19 @@ export class UnifiedGenerationService {
         return out;
       };
 
+      let lastUpdateLength = 0;
+      const UPDATE_THRESHOLD = 50;
+      const callback = async (text) => {
+          if (text) {
+              const filtered = applyFilters(text);
+              buffer += filtered;
+              if (buffer.length - lastUpdateLength >= UPDATE_THRESHOLD) {
+                  await strategy.onDelta(session, buffer, this.storyManager, updateFn);
+                  lastUpdateLength = buffer.length;
+              }
+          }
+      };
+
       await hyperGenerate(
         messages,
         {
@@ -93,19 +106,7 @@ export class UnifiedGenerationService {
             session.budgetRejecter = undefined;
             updateFn();
           },
-        },
-        async (text) => {
-          if (text) {
-            const filtered = applyFilters(text);
-            buffer += filtered;
-            await strategy.onDelta(
-              session,
-              buffer,
-              this.storyManager,
-              updateFn,
-            );
-          }
-        },
+        }, callback,
         "background",
         session.cancellationSignal,
       );
