@@ -1,9 +1,6 @@
-import { RootState, Action } from "../../core/store/types";
-import {
-  FieldConfig,
-  FieldID,
-  DulfsFieldID,
-} from "../../config/field-definitions";
+import { RootState } from "../../core/store/types";
+import { Dispatch } from "../../core/store";
+import { FieldConfig, DulfsFieldID } from "../../config/field-definitions";
 import {
   uiEditModeToggled,
   uiInputChanged,
@@ -13,7 +10,6 @@ import {
   dulfsItemAdded,
   dulfsItemUpdated,
   dulfsItemRemoved,
-  uiSectionToggled,
   dulfsSummaryUpdated,
 } from "../../core/store/actions";
 import {
@@ -22,20 +18,13 @@ import {
   createResponsiveGenerateButton,
 } from "../ui-components";
 
-const {
-  row,
-  column,
-  text,
-  button,
-  checkboxInput,
-  textInput,
-  collapsibleSection,
-} = api.v1.ui.part;
+const { row, column, text, button, textInput, collapsibleSection } =
+  api.v1.ui.part;
 
 export const renderField = (
   config: FieldConfig,
   state: RootState,
-  dispatch: (action: Action) => void,
+  dispatch: Dispatch,
 ): UIPart => {
   if (config.layout === "list") {
     return renderListField(config, state, dispatch);
@@ -46,7 +35,7 @@ export const renderField = (
 const renderTextField = (
   config: FieldConfig,
   state: RootState,
-  dispatch: (action: Action) => void,
+  dispatch: Dispatch,
 ): UIPart => {
   const isEditing = state.ui.editModes[config.id] || false;
   const content = state.story.fields[config.id]?.content || "";
@@ -105,7 +94,6 @@ const renderTextField = (
   };
 
   const sectionId = `section-${config.id}`;
-  const isCollapsed = state.ui.collapsedSections[sectionId] || false;
 
   return collapsibleSection({
     id: sectionId,
@@ -141,7 +129,7 @@ const renderTextField = (
 const renderListField = (
   config: FieldConfig,
   state: RootState,
-  dispatch: (action: Action) => void,
+  dispatch: Dispatch,
 ): UIPart => {
   const list = state.story.dulfs[config.id as DulfsFieldID] || [];
 

@@ -1,4 +1,5 @@
-import { RuntimeState, Action } from "../types";
+import { RuntimeState } from "../types";
+import { Action } from "../store";
 
 export const initialRuntimeState: RuntimeState = {
   segaRunning: false,
@@ -8,7 +9,10 @@ export const initialRuntimeState: RuntimeState = {
   budgetTimeRemaining: 0,
 };
 
-export function runtimeReducer(state: RuntimeState = initialRuntimeState, action: Action): RuntimeState {
+export function runtimeReducer(
+  state: RuntimeState = initialRuntimeState,
+  action: Action,
+): RuntimeState {
   switch (action.type) {
     case "runtime/segaToggled":
       return {
@@ -28,14 +32,15 @@ export function runtimeReducer(state: RuntimeState = initialRuntimeState, action
     case "runtime/generationStarted": {
       const { requestId } = action.payload; // Payload should ideally identify which request started
       // Logic: move specific request from queue to active
-      const requestIndex = state.queue.findIndex(r => r.id === requestId);
-      if (requestIndex === -1 && !state.activeRequest) return state; 
-      
-      const request = requestIndex !== -1 ? state.queue[requestIndex] : state.activeRequest;
-      
+      const requestIndex = state.queue.findIndex((r) => r.id === requestId);
+      if (requestIndex === -1 && !state.activeRequest) return state;
+
+      const request =
+        requestIndex !== -1 ? state.queue[requestIndex] : state.activeRequest;
+
       return {
         ...state,
-        queue: state.queue.filter(r => r.id !== requestId),
+        queue: state.queue.filter((r) => r.id !== requestId),
         activeRequest: request,
         status: "generating",
       };
@@ -54,20 +59,20 @@ export function runtimeReducer(state: RuntimeState = initialRuntimeState, action
         activeRequest: null,
         status: "error", // Or return to idle/queued depending on retry logic
       };
-      
+
     case "runtime/generationCancelled": {
-       const { requestId } = action.payload;
-       if (state.activeRequest && state.activeRequest.id === requestId) {
-         return {
-           ...state,
-           activeRequest: null,
-           status: "idle"
-         };
-       }
-       return {
-         ...state,
-         queue: state.queue.filter(r => r.id !== requestId)
-       };
+      const { requestId } = action.payload;
+      if (state.activeRequest && state.activeRequest.id === requestId) {
+        return {
+          ...state,
+          activeRequest: null,
+          status: "idle",
+        };
+      }
+      return {
+        ...state,
+        queue: state.queue.filter((r) => r.id !== requestId),
+      };
     }
 
     case "runtime/budgetUpdated":

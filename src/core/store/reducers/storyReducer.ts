@@ -1,5 +1,10 @@
-import { StoryState, Action, StoryField, DulfsItem } from "../types";
-import { FIELD_CONFIGS, FieldID, DulfsFieldID } from "../../../config/field-definitions";
+import { StoryState, DulfsItem } from "../types";
+import { Action } from "../store";
+import {
+  FIELD_CONFIGS,
+  FieldID,
+  DulfsFieldID,
+} from "../../../config/field-definitions";
 
 export const initialStoryState: StoryState = {
   setting: "Original",
@@ -27,7 +32,10 @@ FIELD_CONFIGS.forEach((config) => {
   }
 });
 
-export function storyReducer(state: StoryState = initialStoryState, action: Action): StoryState {
+export function storyReducer(
+  state: StoryState = initialStoryState,
+  action: Action,
+): StoryState {
   switch (action.type) {
     case "story/loaded":
       // Payload is { story: StoryState }
@@ -76,7 +84,9 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
         ...state,
         dulfs: {
           ...state.dulfs,
-          [fieldId]: list.map((item) => (item.id === itemId ? { ...item, ...updates } : item)),
+          [fieldId]: list.map((item) =>
+            item.id === itemId ? { ...item, ...updates } : item,
+          ),
         },
       };
     }
@@ -104,7 +114,7 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       };
     }
 
-    case "story/brainstormMessageAdded": {
+    case "story/brainstormSubmitMessage": {
       const { role, content } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = field?.data?.messages || [];
@@ -116,10 +126,10 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
             ...field,
             data: {
               ...field.data,
-              messages: [...messages, { role, content }]
-            }
-          }
-        }
+              messages: [...messages, { role, content }],
+            },
+          },
+        },
       };
     }
 
@@ -127,7 +137,8 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       const { index, content } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = field?.data?.messages || [];
-      if (index < 0 || index >= messages.length || !messages[index]) return state;
+      if (index < 0 || index >= messages.length || !messages[index])
+        return state;
 
       const newMessages = [...messages];
       newMessages[index] = { ...newMessages[index], content };
@@ -138,9 +149,9 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
           ...state.fields,
           [FieldID.Brainstorm]: {
             ...field,
-            data: { ...field.data, messages: newMessages }
-          }
-        }
+            data: { ...field.data, messages: newMessages },
+          },
+        },
       };
     }
 
@@ -158,9 +169,9 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
           ...state.fields,
           [FieldID.Brainstorm]: {
             ...field,
-            data: { ...field.data, messages: newMessages }
-          }
-        }
+            data: { ...field.data, messages: newMessages },
+          },
+        },
       };
     }
 
@@ -173,7 +184,7 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
       const targetMessage = messages[index];
       let newMessages;
 
-      if (targetMessage.role === 'user') {
+      if (targetMessage.role === "user") {
         // Keep up to and including the user message
         newMessages = messages.slice(0, index + 1);
       } else {
@@ -187,9 +198,9 @@ export function storyReducer(state: StoryState = initialStoryState, action: Acti
           ...state.fields,
           [FieldID.Brainstorm]: {
             ...field,
-            data: { ...field.data, messages: newMessages }
-          }
-        }
+            data: { ...field.data, messages: newMessages },
+          },
+        },
       };
     }
 

@@ -10,7 +10,7 @@ import {
   brainstormMessageEdited,
   brainstormRetry,
   uiEditModeToggled,
-  brainstormMessageAdded,
+  brainstormSubmitMessage,
 } from "../../core/store/actions";
 import { calculateTextAreaHeight } from "../ui-components";
 
@@ -44,7 +44,7 @@ export const renderBrainstormSidebar = (
       "";
     if (!finalContent.trim()) return;
 
-    dispatch(brainstormMessageAdded({ role: "user", content: finalContent }));
+    dispatch(brainstormSubmitMessage({ role: "user", content: finalContent }));
     dispatch(uiInputChanged({ id: inputKey, value: "" }));
     await api.v1.storage.remove(inputKey);
 

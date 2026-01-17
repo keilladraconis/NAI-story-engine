@@ -1,7 +1,6 @@
-import { RootState, Action } from "../../core/store/types";
+import { RootState } from "../../core/store/types";
 import {
   uiEditModeToggled,
-  fieldUpdated,
   uiInputChanged,
   generationRequested,
   generationCancelled,
@@ -13,13 +12,14 @@ import {
   createResponsiveGenerateButton,
 } from "../ui-components";
 import { DulfsFieldID } from "../../config/field-definitions";
+import { Dispatch } from "../../core/store";
 
-const { row, column, text } = api.v1.ui.part;
+const { column, text } = api.v1.ui.part;
 const { lorebookPanel } = api.v1.ui.extension;
 
 export const renderLorebookPanel = (
   state: RootState,
-  dispatch: (action: Action) => void,
+  dispatch: Dispatch,
 ): UIExtensionLorebookPanel => {
   const entryId = state.ui.selectedLorebookEntryId;
   let content: UIPart[] = [];

@@ -2,7 +2,8 @@ import { combineReducers } from "../store";
 import { storyReducer, initialStoryState } from "./storyReducer";
 import { uiReducer, initialUIState } from "./uiReducer";
 import { runtimeReducer, initialRuntimeState } from "./runtimeReducer";
-import { Action, RootState } from "../types";
+import { RootState } from "../types";
+import { Action } from "../store";
 
 const appReducer = combineReducers({
   story: storyReducer,
@@ -16,7 +17,10 @@ export const initialRootState: RootState = {
   runtime: initialRuntimeState,
 };
 
-export const rootReducer = (state: RootState = initialRootState, action: Action): RootState => {
+export const rootReducer = (
+  state: RootState = initialRootState,
+  action: Action,
+): RootState => {
   if (action.type === "story/cleared") {
     return initialRootState;
   }

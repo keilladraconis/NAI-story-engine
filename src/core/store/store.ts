@@ -3,7 +3,7 @@ export type Action<Type extends string = string, Payload = any> = {
   payload: Payload;
 };
 
-type Reducer<S, A extends Action> = (state: S, action: A) => S;
+export type Reducer<S, A extends Action> = (state: S, action: A) => S;
 type SliceReducer<S> = (state: S, action: Action) => S;
 type Listener<S> = (state: S, action: Action) => void;
 

@@ -31,7 +31,7 @@ export const dulfsSummaryUpdated = action("story/dulfsSummaryUpdated")<{
   fieldId: string;
   summary: string;
 }>();
-export const brainstormMessageAdded = action("story/brainstormMessageAdded")<{
+export const brainstormSubmitMessage = action("story/brainstormSubmitMessage")<{
   role: string;
   content: string;
 }>();
