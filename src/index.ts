@@ -4,6 +4,7 @@ import {
   RootState,
   storyLoaded,
 } from "./core/store";
+import { registerEffects } from "./core/store/effects";
 import {
   renderMainSidebar,
   renderBrainstormSidebar,
@@ -15,6 +16,7 @@ import {
   initialRootState,
   rootReducer,
 } from "./core/store/reducers/rootReducer";
+import { GenX } from "../lib/gen-x";
 
 (async () => {
   try {
@@ -23,11 +25,18 @@ import {
     // Request Permissions
     await api.v1.permissions.request(["lorebookEdit", "storyEdit"]);
 
+    // Initialize GenX
+    const genX = new GenX();
+
     // Start store
     const store = createStore<RootState>(rootReducer, initialRootState);
     const { getState, dispatch, subscribe } = store;
     const effects = createEffectRunner(store);
-    store.subscribe((_state, action) => {
+
+    // Register Effects
+    registerEffects(effects, genX);
+
+    store.subscribeToActions((action) => {
       effects.run(action);
     });
 

@@ -1,4 +1,4 @@
-import { DulfsItem, GenerationRequest, StoryState } from "./types";
+import { DulfsItem, GenerationRequest, StoryState, BrainstormMessage } from "./types";
 import { DulfsFieldID } from "../../config/field-definitions";
 import { action } from "./store";
 
@@ -12,7 +12,7 @@ export const settingUpdated = action("story/settingUpdated")<{
 export const fieldUpdated = action("story/fieldUpdated")<{
   fieldId: string;
   content: string;
-  data?: any;
+  data?: unknown;
 }>();
 export const dulfsItemAdded = action("story/dulfsItemAdded")<{
   fieldId: DulfsFieldID;
@@ -31,25 +31,30 @@ export const dulfsSummaryUpdated = action("story/dulfsSummaryUpdated")<{
   fieldId: string;
   summary: string;
 }>();
-export const brainstormSubmitMessage = action("story/brainstormSubmitMessage")<{
-  role: string;
+
+// Domain: Brainstorm
+export const brainstormAddMessage = action("story/brainstormAddMessage")<{
+  message: BrainstormMessage;
+}>();
+export const brainstormUpdateMessage = action("story/brainstormUpdateMessage")<{
+  messageId: string;
   content: string;
 }>();
-export const brainstormMessageEdited = action("story/brainstormMessageEdited")<{
-  index: number;
-  content: string;
+export const brainstormRemoveMessage = action("story/brainstormRemoveMessage")<{
+  messageId: string;
 }>();
-export const brainstormMessageDeleted = action(
-  "story/brainstormMessageDeleted",
-)<{
-  index: number;
+export const brainstormAppendToMessage = action("story/brainstormAppendToMessage")<{
+  messageId: string;
+  content: string;
 }>();
 export const brainstormRetry = action("story/brainstormRetry")<{
-  index: number;
+  messageId: string;
 }>();
+
 export const toggleAttg = action("story/toggleAttg")();
 export const toggleStyle = action("story/toggleStyle")();
 
+// Intent: UI
 export const uiInputChanged = action("ui/inputChanged")<{
   id: string;
   value: string;
@@ -62,8 +67,15 @@ export const uiLorebookSelected = action("ui/lorebookSelected")<{
 }>();
 export const uiLorebookEditModeToggled = action("ui/lorebookEditModeToggled")();
 export const uiClearConfirmToggled = action("ui/clearConfirmToggled")();
+export const uiBrainstormSubmitUserMessage = action("ui/brainstormSubmitUserMessage")<{
+  content: string;
+}>();
+
 
 export const segaToggled = action("runtime/segaToggled")();
+// Deprecated/Legacy runtime actions? 
+// Keeping generationRequested/Started/Completed for compatibility if needed, 
+// but we are moving to genx/requestGeneration.
 export const generationRequested = action(
   "runtime/generationRequested",
 )<GenerationRequest>();
@@ -83,3 +95,12 @@ export const generationCancelled = action("runtime/generationCancelled")<{
 export const budgetUpdated = action("runtime/budgetUpdated")<{
   timeRemaining: number;
 }>();
+
+// Domain: GenX
+export const genxRequestGeneration = action("genx/requestGeneration")<{
+  requestId: string;
+  messages: Message[];
+  params: GenerationParams;
+  target: { type: "brainstorm"; messageId: string } | { type: "field"; fieldId: string };
+}>();
+

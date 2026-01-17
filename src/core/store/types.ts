@@ -2,6 +2,12 @@ import { DulfsFieldID } from "../../config/field-definitions";
 
 // --- Story Domain State ---
 
+export interface BrainstormMessage {
+  id: string;
+  role: string;
+  content: string;
+}
+
 export interface StoryField {
   id: string;
   content: string;

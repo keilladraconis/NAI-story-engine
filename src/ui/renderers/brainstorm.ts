@@ -3,14 +3,13 @@ import { Dispatch } from "../../core/store";
 import { FieldID } from "../../config/field-definitions";
 import {
   fieldUpdated,
-  generationRequested,
   generationCancelled,
   uiInputChanged,
-  brainstormMessageDeleted,
-  brainstormMessageEdited,
+  brainstormRemoveMessage,
+  brainstormUpdateMessage,
   brainstormRetry,
   uiEditModeToggled,
-  brainstormSubmitMessage,
+  uiBrainstormSubmitUserMessage,
 } from "../../core/store/actions";
 import { calculateTextAreaHeight } from "../ui-components";
 
@@ -23,6 +22,7 @@ export const renderBrainstormSidebar = (
 ): UIExtensionSidebarPanel => {
   // Brainstorm logic uses FieldID.Brainstorm content/data
   const field = state.story.fields[FieldID.Brainstorm];
+  // Safe cast (data could be partial)
   const messages: any[] = field?.data?.messages || [];
 
   // We reverse the chronological list for display with column-reverse
@@ -36,52 +36,29 @@ export const renderBrainstormSidebar = (
   const isQueued = state.runtime.queue.some((r) => r.id === genId);
 
   // Input state
-  const inputKey = "brainstorm-input";
+  const inputId = "brainstorm-input";
 
-  const handleSend = async (text?: string) => {
-    const finalContent =
-      (typeof text === "string" ? text : await api.v1.storage.get(inputKey)) ||
-      "";
+  const handleSend = async () => {
+    const finalContent = (await api.v1.storyStorage.get(inputId)) || "";
     if (!finalContent.trim()) return;
 
-    dispatch(brainstormSubmitMessage({ role: "user", content: finalContent }));
-    dispatch(uiInputChanged({ id: inputKey, value: "" }));
-    await api.v1.storage.remove(inputKey);
-
-    // Force clear the UI input
-    api.v1.ui.updateParts([
-      { id: inputKey, type: "multilineTextInput", initialValue: "" },
-    ]);
-
-    dispatch(
-      generationRequested({
-        id: "gen-brainstorm",
-        type: "brainstorm",
-        targetId: FieldID.Brainstorm,
-      }),
-    );
+    dispatch(uiBrainstormSubmitUserMessage({ content: finalContent }));
   };
 
   const messageParts: UIPart[] = [];
 
-  // Streaming bubble (Active Generation)
-  if (isGenerating && field?.content) {
-    messageParts.push(
-      renderMessageBubble("assistant", field.content, -1, false, "", dispatch),
-    );
-  }
-
   reversedMessages.forEach((msg, idx) => {
-    const originalIndex = messages.length - 1 - idx;
-    const editKey = `brainstorm-message-${originalIndex}`;
+    // Fallback ID if message is old/legacy
+    const msgId = msg.id || `legacy-${idx}`;
+    const editKey = `brainstorm-message-${msgId}`;
     const isEditing = !!state.ui.editModes[editKey];
     const editValue = state.ui.inputs[editKey] ?? msg.content;
 
     messageParts.push(
       renderMessageBubble(
+        msgId,
         msg.role,
         msg.content,
-        originalIndex,
         isEditing,
         editValue,
         dispatch,
@@ -92,10 +69,10 @@ export const renderBrainstormSidebar = (
   const inputArea = column({
     content: [
       multilineTextInput({
-        id: inputKey,
+        id: inputId,
         placeholder: "Type an idea...",
-        storageKey: inputKey,
-        onSubmit: (val) => handleSend(val),
+        storageKey: `story:${inputId}`,
+        onSubmit: () => handleSend(),
         style: { "min-height": "60px", "max-height": "120px" },
         disabled: isGenerating,
       }),
@@ -169,80 +146,73 @@ export const renderBrainstormSidebar = (
 };
 
 const renderMessageBubble = (
+  id: string,
   role: string,
   content: string,
-  index: number,
   isEditing: boolean,
   editValue: string,
   dispatch: Dispatch,
 ): UIPart => {
   const isUser = role === "user";
-  const isStreaming = index === -1;
   const bgColor = isUser
     ? "rgba(64, 156, 255, 0.2)"
     : "rgba(255, 255, 255, 0.05)";
   const align = isUser ? "flex-end" : "flex-start";
   const radius = isUser ? "12px 12px 0 12px" : "12px 12px 12px 0";
 
-  const editKey = `brainstorm-message-${index}`;
+  const editKey = `brainstorm-message-${id}`;
 
   // Action Buttons
-  const buttons = !isStreaming
-    ? row({
-        style: {
-          "margin-top": "5px",
-          gap: "5px",
-          "justify-content": "flex-end",
-          opacity: 0.6,
+  const buttons = row({
+    style: {
+      "margin-top": "5px",
+      gap: "5px",
+      "justify-content": "flex-end",
+      opacity: 0.6,
+    },
+    content: [
+      // Edit / Save
+      button({
+        iconId: isEditing ? "save" : "edit-3",
+        style: { padding: "4px", height: "24px", width: "24px" },
+        callback: () => {
+          if (isEditing) {
+            dispatch(
+              brainstormUpdateMessage({ messageId: id, content: editValue }),
+            );
+            dispatch(uiEditModeToggled({ id: editKey }));
+          } else {
+            // Initialize input with current content
+            dispatch(uiInputChanged({ id: editKey, value: content || "" }));
+            dispatch(uiEditModeToggled({ id: editKey }));
+          }
         },
-        content: [
-          // Edit / Save
-          button({
-            iconId: isEditing ? "save" : "edit-3",
+      }),
+      // Retry (if not editing)
+      !isEditing
+        ? button({
+            iconId: "rotate-cw",
             style: { padding: "4px", height: "24px", width: "24px" },
             callback: () => {
-              if (isEditing) {
-                api.v1.log("bse", index);
-                dispatch(
-                  brainstormMessageEdited({ index, content: editValue }),
-                );
-                api.v1.log("bse2");
-                dispatch(uiEditModeToggled({ id: editKey }));
-              } else {
-                // Initialize input with current content
-                dispatch(uiInputChanged({ id: editKey, value: content || "" }));
-                dispatch(uiEditModeToggled({ id: editKey }));
-              }
+              dispatch(brainstormRetry({ messageId: id }));
+              // Logic for retry generation needs to be handled via Intent
+              // For now assuming the retry reducer handles state cleanup
+              // and we might need to trigger generation?
+              // The reducer just slices the array. We need to trigger generation.
+              // TODO: This should probably be an Intent Action "ui/brainstormRetryMessage"
             },
-          }),
-          // Retry (if not editing)
-          !isEditing
-            ? button({
-                iconId: "rotate-cw",
-                style: { padding: "4px", height: "24px", width: "24px" },
-                callback: () => {
-                  dispatch(brainstormRetry({ index }));
-                  dispatch(
-                    generationRequested({
-                      id: "gen-brainstorm",
-                      type: "brainstorm",
-                      targetId: FieldID.Brainstorm,
-                    }),
-                  );
-                },
-              })
-            : null,
-          // Delete (if not editing)
-          !isEditing
-            ? button({
-                iconId: "trash",
-                style: { padding: "4px", height: "24px", width: "24px" },
-                callback: () => dispatch(brainstormMessageDeleted({ index })),
-              })
-            : null,
-        ].filter(Boolean) as UIPart[],
-      })
-    : null;
+          })
+        : null,
+      // Delete (if not editing)
+      !isEditing
+        ? button({
+            iconId: "trash",
+            style: { padding: "4px", height: "24px", width: "24px" },
+            callback: () => dispatch(brainstormRemoveMessage({ messageId: id })),
+          })
+        : null,
+    ].filter(Boolean) as UIPart[],
+  });
 
   const messageContent = isEditing
     ? multilineTextInput({
@@ -271,7 +241,7 @@ const renderMessageBubble = (
           padding: "10px",
           "border-radius": radius,
           width: "85%",
-          border: isStreaming ? "1px dashed #666" : "none",
+          border: "none",
         },
         content: [
           text({

@@ -5,14 +5,15 @@ export type Action<Type extends string = string, Payload = any> = {
 
 export type Reducer<S, A extends Action> = (state: S, action: A) => S;
 type SliceReducer<S> = (state: S, action: Action) => S;
-type Listener<S> = (state: S, action: Action) => void;
+type ActionListener = (action: Action) => void;
+type StateListener<S> = (state: S, action: Action) => void;
 
 type EffectContext<S> = {
   dispatch: Dispatch;
   getState: GetState<S>;
 };
 
-type Effect<S> = (action: Action, ctx: EffectContext<S>) => void;
+export type Effect<S> = (action: Action, ctx: EffectContext<S>) => void;
 
 export type Dispatch = (action: Action) => void;
 type GetState<S> = () => S;
@@ -20,7 +21,8 @@ type GetState<S> = () => S;
 interface Store<S> {
   getState: GetState<S>;
   dispatch: Dispatch;
-  subscribe: (listener: Listener<S>) => () => void;
+  subscribe: (listener: StateListener<S>) => () => void;
+  subscribeToActions: (listener: ActionListener) => () => void;
 }
 
 export function createStore<S>(
@@ -28,20 +30,37 @@ export function createStore<S>(
   initial: S,
 ): Store<S> {
   let state = initial;
-  const listeners = new Set<Listener<S>>();
+
+  const actionListeners = new Set<ActionListener>();
+  const stateListeners = new Set<StateListener<S>>();
 
   return {
     getState: () => state,
     dispatch(action: Action) {
+      // 1. Always notify action listeners
+      for (const l of actionListeners) {
+        l(action);
+      }
+
+      // 2. Reduce
       const next = reducer(state, action);
-      if (next !== state) {
-        state = next;
-        for (const l of listeners) l(state, action);
+      if (next === state) return;
+
+      state = next;
+
+      // 3. Notify state listeners only on change
+      for (const l of stateListeners) {
+        l(state, action);
       }
     },
-    subscribe(listener: Listener<S>) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
+    subscribe(listener: StateListener<S>) {
+      stateListeners.add(listener);
+      return () => stateListeners.delete(listener);
+    },
+
+    subscribeToActions(listener: ActionListener) {
+      actionListeners.add(listener);
+      return () => actionListeners.delete(listener);
     },
   };
 }

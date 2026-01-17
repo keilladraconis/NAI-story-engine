@@ -1,4 +1,4 @@
-import { StoryState, DulfsItem } from "../types";
+import { StoryState, DulfsItem, BrainstormMessage } from "../types";
 import { Action } from "../store";
 import {
   FIELD_CONFIGS,
@@ -114,8 +114,8 @@ export function storyReducer(
       };
     }
 
-    case "story/brainstormSubmitMessage": {
-      const { role, content } = action.payload;
+    case "story/brainstormAddMessage": {
+      const { message } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = field?.data?.messages || [];
       return {
@@ -126,22 +126,21 @@ export function storyReducer(
             ...field,
             data: {
               ...field.data,
-              messages: [...messages, { role, content }],
+              messages: [...messages, message],
             },
           },
         },
       };
     }
 
-    case "story/brainstormMessageEdited": {
-      const { index, content } = action.payload;
+    case "story/brainstormUpdateMessage": {
+      const { messageId, content } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
-      const messages = field?.data?.messages || [];
-      if (index < 0 || index >= messages.length || !messages[index])
-        return state;
-
-      const newMessages = [...messages];
-      newMessages[index] = { ...newMessages[index], content };
+      const messages = (field?.data?.messages || []) as BrainstormMessage[];
+      
+      const newMessages = messages.map(msg => 
+        msg.id === messageId ? { ...msg, content } : msg
+      );
 
       return {
         ...state,
@@ -155,13 +154,33 @@ export function storyReducer(
       };
     }
 
-    case "story/brainstormMessageDeleted": {
-      const { index } = action.payload;
+    case "story/brainstormRemoveMessage": {
+      const { messageId } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
-      const messages = field?.data?.messages || [];
-      if (index < 0 || index >= messages.length) return state;
+      const messages = (field?.data?.messages || []) as BrainstormMessage[];
 
-      const newMessages = messages.filter((_: any, i: number) => i !== index);
+      const newMessages = messages.filter(msg => msg.id !== messageId);
+
+      return {
+        ...state,
+        fields: {
+          ...state.fields,
+          [FieldID.Brainstorm]: {
+            ...field,
+            data: { ...field.data, messages: newMessages },
+          },
+        },
+      };
+    }
+
+    case "story/brainstormAppendToMessage": {
+      const { messageId, content } = action.payload;
+      const field = state.fields[FieldID.Brainstorm];
+      const messages = (field?.data?.messages || []) as BrainstormMessage[];
+
+      const newMessages = messages.map(msg => 
+        msg.id === messageId ? { ...msg, content: msg.content + content } : msg
+      );
 
       return {
         ...state,
@@ -176,10 +195,12 @@ export function storyReducer(
     }
 
     case "story/brainstormRetry": {
-      const { index } = action.payload;
+      const { messageId } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
-      const messages = field?.data?.messages || [];
-      if (index < 0 || index >= messages.length) return state;
+      const messages = (field?.data?.messages || []) as BrainstormMessage[];
+      
+      const index = messages.findIndex(msg => msg.id === messageId);
+      if (index === -1) return state;
 
       const targetMessage = messages[index];
       let newMessages;
