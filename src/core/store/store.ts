@@ -1,8 +1,25 @@
-import { Action, Listener, Reducer, SliceReducer } from "./types";
+export type Action<Type extends string = string, Payload = any> = {
+  type: Type;
+  payload: Payload;
+};
 
-export interface Store<S> {
-  getState: () => S;
-  dispatch: (action: Action) => void;
+type Reducer<S, A extends Action> = (state: S, action: A) => S;
+type SliceReducer<S> = (state: S, action: Action) => S;
+type Listener<S> = (state: S, action: Action) => void;
+
+type EffectContext<S> = {
+  dispatch: Dispatch;
+  getState: GetState<S>;
+};
+
+type Effect<S> = (action: Action, ctx: EffectContext<S>) => void;
+
+export type Dispatch = (action: Action) => void;
+type GetState<S> = () => S;
+
+interface Store<S> {
+  getState: GetState<S>;
+  dispatch: Dispatch;
   subscribe: (listener: Listener<S>) => () => void;
 }
 
@@ -27,6 +44,33 @@ export function createStore<S>(
       return () => listeners.delete(listener);
     },
   };
+}
+
+export function createEffectRunner<S>(store: {
+  dispatch: Dispatch;
+  getState: GetState<S>;
+}) {
+  const effects: Effect<S>[] = [];
+
+  return {
+    register(effect: Effect<S>) {
+      effects.push(effect);
+    },
+
+    run(action: Action) {
+      for (const e of effects) {
+        e(action, store);
+      }
+    },
+  };
+}
+
+// Helpers
+
+export function action<T extends string>(type: T) {
+  return <P = void>() =>
+    (payload: P) =>
+      ({ type, payload }) as Action<T, P>;
 }
 
 export function combineReducers<S extends Record<string, any>>(reducers: {

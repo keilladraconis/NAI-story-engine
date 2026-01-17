@@ -1,4 +1,9 @@
-import { createStore, RootState, storyLoaded } from "./core/store";
+import {
+  createEffectRunner,
+  createStore,
+  RootState,
+  storyLoaded,
+} from "./core/store";
 import {
   renderMainSidebar,
   renderBrainstormSidebar,
@@ -20,14 +25,16 @@ import {
     await api.v1.permissions.request(["lorebookEdit", "storyEdit"]);
 
     // Start store
-    const store = createStore<RootState>(
-      rootReducer,
-      initialRootState,
-    );
+    const store = createStore<RootState>(rootReducer, initialRootState);
     const { getState, dispatch, subscribe } = store;
+    const effects = createEffectRunner(store);
+    store.subscribe((_state, action) => {
+      effects.run(action);
+    });
 
     // Initialize Subscribers
     lorebookSyncSubscriber(store);
+    
 
     // Initial Render & Registration
     const initialState = getState();

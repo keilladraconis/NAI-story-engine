@@ -1,4 +1,5 @@
-import { RootState, Action } from "../../core/store/types";
+import { RootState } from "../../core/store/types";
+import { Dispatch } from "../../core/store";
 import { FieldID } from "../../config/field-definitions";
 import {
   fieldUpdated,
@@ -18,7 +19,7 @@ const { sidebarPanel } = api.v1.ui.extension;
 
 export const renderBrainstormSidebar = (
   state: RootState,
-  dispatch: (action: Action) => void,
+  dispatch: Dispatch,
 ): UIExtensionSidebarPanel => {
   // Brainstorm logic uses FieldID.Brainstorm content/data
   const field = state.story.fields[FieldID.Brainstorm];
@@ -173,7 +174,7 @@ const renderMessageBubble = (
   index: number,
   isEditing: boolean,
   editValue: string,
-  dispatch: (action: Action) => void,
+  dispatch: Dispatch,
 ): UIPart => {
   const isUser = role === "user";
   const isStreaming = index === -1;

@@ -1,4 +1,5 @@
-import { RootState, Action } from "../../core/store/types";
+import { RootState } from "../../core/store/types";
+import { Dispatch } from "../../core/store";
 import { FIELD_CONFIGS } from "../../config/field-definitions";
 import {
   segaToggled,
@@ -13,7 +14,7 @@ const { sidebarPanel } = api.v1.ui.extension;
 
 export const renderMainSidebar = (
   state: RootState,
-  dispatch: (action: Action) => void,
+  dispatch: Dispatch,
 ): UIExtensionSidebarPanel => {
   const isSegaRunning = state.runtime.segaRunning;
   const showClearConfirm = state.ui.showClearConfirm;

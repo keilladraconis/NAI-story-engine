@@ -1,14 +1,5 @@
 import { DulfsFieldID } from "../../config/field-definitions";
 
-export type Action<Type extends string = string, Payload = any> = {
-  type: Type;
-  payload: Payload;
-};
-
-export type Reducer<S, A extends Action> = (state: S, action: A) => S;
-export type SliceReducer<S> = (state: S, action: Action) => S;
-export type Listener<S> = (state: S, action: Action) => void;
-
 // --- Story Domain State ---
 
 export interface StoryField {

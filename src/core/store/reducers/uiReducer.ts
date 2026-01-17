@@ -1,4 +1,5 @@
-import { UIState, Action } from "../types";
+import { UIState } from "../types";
+import { Action } from "../store";
 
 export const initialUIState: UIState = {
   activeTab: "editor",
