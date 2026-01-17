@@ -9,7 +9,7 @@ import {
   generationFailed,
   genxRequestGeneration,
 } from "./actions";
-import { FieldID } from "../../config/field-definitions";
+import { buildBrainstormStrategy } from "./utils/context-builder";
 
 export function registerEffects(runner: { register: (effect: Effect<RootState>) => void }, genX: GenX) {
   runner.register(createBrainstormSubmitEffect(genX));
@@ -43,25 +43,20 @@ const createBrainstormSubmitEffect = (_genX: GenX): Effect<RootState> => async (
   dispatch(brainstormAddMessage({ message: assistantMsg }));
 
   // 4. Request Generation
-  // We need the messages context.
   const state = getState();
-  const field = state.story.fields[FieldID.Brainstorm];
-  const allMessages = (field?.data?.messages || []) as BrainstormMessage[];
   
-  // Exclude the last empty assistant message we just added from the prompt context
-  // but include the user message we just added.
-  const promptMessages = allMessages
-    .slice(0, -1) // remove last (assistant placeholder)
-    .map(m => ({ role: m.role as "user" | "assistant" | "system", content: m.content }));
+  // Use the Strategy Builder to construct the full context
+  // We mock a request object since the effect is creating the request
+  const strategy = await buildBrainstormStrategy(state.story, {
+    id: api.v1.uuid(),
+    type: "brainstorm",
+    targetId: assistantId
+  });
 
   dispatch(genxRequestGeneration({
     requestId: api.v1.uuid(),
-    messages: promptMessages,
-    params: {
-      model: "glm-4-6",
-      max_tokens: 300,
-      temperature: 0.7
-    },
+    messages: strategy.messages,
+    params: strategy.params,
     target: { type: "brainstorm", messageId: assistantId }
   }));
 };

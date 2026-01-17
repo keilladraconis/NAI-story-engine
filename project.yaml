@@ -6,34 +6,8 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1768663422
+updatedAt: 1768664749
 config:
-  - name: model
-    prettyName: LLM Model
-    description: Which model to use for generation
-    type: select
-    default: glm-4-6
-    options:
-      - label: GLM 4.6
-        value: glm-4-6
-      - label: Blue
-        value: blue
-      - label: Red
-        value: red
-      - label: Green
-        value: green
-      - label: Purple
-        value: purple
-      - label: Pink
-        value: pink
-      - label: Yellow
-        value: yellow
-      - label: White
-        value: white
-      - label: Black
-        value: black
-      - label: Violet
-        value: violet
   - name: system_prompt
     prettyName: System Prompt
     description: Configure the base system prompt used by all aspects of Story Engine
