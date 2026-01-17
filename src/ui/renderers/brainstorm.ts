@@ -4,12 +4,11 @@ import { FieldID } from "../../config/field-definitions";
 import {
   fieldUpdated,
   generationCancelled,
-  uiInputChanged,
   brainstormRemoveMessage,
-  brainstormUpdateMessage,
   brainstormRetry,
-  uiEditModeToggled,
   uiBrainstormSubmitUserMessage,
+  brainstormEditMessage,
+  brainstormSaveMessageEdit,
 } from "../../core/store/actions";
 import { calculateTextAreaHeight } from "../ui-components";
 
@@ -50,19 +49,10 @@ export const renderBrainstormSidebar = (
   reversedMessages.forEach((msg, idx) => {
     // Fallback ID if message is old/legacy
     const msgId = msg.id || `legacy-${idx}`;
-    const editKey = `brainstorm-message-${msgId}`;
-    const isEditing = !!state.ui.editModes[editKey];
-    const editValue = state.ui.inputs[editKey] ?? msg.content;
+    const isEditing = state.ui.brainstormEditingMessageId === msgId;
 
     messageParts.push(
-      renderMessageBubble(
-        msgId,
-        msg.role,
-        msg.content,
-        isEditing,
-        editValue,
-        dispatch,
-      ),
+      renderMessageBubble(msgId, msg.role, msg.content, isEditing, dispatch),
     );
   });
 
@@ -150,7 +140,6 @@ const renderMessageBubble = (
   role: string,
   content: string,
   isEditing: boolean,
-  editValue: string,
   dispatch: Dispatch,
 ): UIPart => {
   const isUser = role === "user";
@@ -159,8 +148,6 @@ const renderMessageBubble = (
     : "rgba(255, 255, 255, 0.05)";
   const align = isUser ? "flex-end" : "flex-start";
   const radius = isUser ? "12px 12px 0 12px" : "12px 12px 12px 0";
-
-  const editKey = `brainstorm-message-${id}`;
 
   // Action Buttons
   const buttons = row({
@@ -177,14 +164,10 @@ const renderMessageBubble = (
         style: { padding: "4px", height: "24px", width: "24px" },
         callback: () => {
           if (isEditing) {
-            dispatch(
-              brainstormUpdateMessage({ messageId: id, content: editValue }),
-            );
-            dispatch(uiEditModeToggled({ id: editKey }));
+            dispatch(brainstormSaveMessageEdit({ messageId: id }));
           } else {
-            // Initialize input with current content
-            dispatch(uiInputChanged({ id: editKey, value: content || "" }));
-            dispatch(uiEditModeToggled({ id: editKey }));
+            // Initiate edit mode -> will trigger effect to set storage and dispatch ui started
+            dispatch(brainstormEditMessage({ messageId: id, content }));
           }
         },
       }),
@@ -195,11 +178,6 @@ const renderMessageBubble = (
             style: { padding: "4px", height: "24px", width: "24px" },
             callback: () => {
               dispatch(brainstormRetry({ messageId: id }));
-              // Logic for retry generation needs to be handled via Intent
-              // For now assuming the retry reducer handles state cleanup
-              // and we might need to trigger generation?
-              // The reducer just slices the array. We need to trigger generation.
-              // TODO: This should probably be an Intent Action "ui/brainstormRetryMessage"
             },
           })
         : null,
@@ -216,14 +194,16 @@ const renderMessageBubble = (
 
   const messageContent = isEditing
     ? multilineTextInput({
-        id: editKey, // Stable ID for focus/state retention
-        initialValue: String(editValue || ""),
-        onChange: (val) =>
-          dispatch(uiInputChanged({ id: editKey, value: val })),
+        id: `brainstorm-edit-${id}`,
+        // Bind to storage key as requested.
+        // NOTE: The effect 'brainstormEditMessage' populates this key initially.
+        storageKey: `story:brainstorm-edit-${id}`,
+        // We do NOT use onChange here as per requirements.
         style: {
           "min-height": "40px",
           width: "100%",
-          height: calculateTextAreaHeight(String(editValue || "")),
+          // Calculate height based on initial content (best effort, as we don't track live value here)
+          height: calculateTextAreaHeight(content),
         },
       })
     : text({

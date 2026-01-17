@@ -9,6 +9,7 @@ export const initialUIState: UIState = {
   lorebookEditMode: false,
   collapsedSections: {},
   editModes: {},
+  brainstormEditingMessageId: null,
   inputs: {},
   showClearConfirm: false,
 };
@@ -28,6 +29,22 @@ export function uiReducer(
         },
       };
     }
+
+    case "ui/brainstormEditStarted":
+      return {
+        ...state,
+        brainstormEditingMessageId: action.payload.messageId,
+      };
+
+    case "ui/brainstormEditEnded":
+      // Only clear if the ending message is the one currently editing
+      if (state.brainstormEditingMessageId === action.payload.messageId) {
+        return {
+          ...state,
+          brainstormEditingMessageId: null,
+        };
+      }
+      return state;
 
     case "ui/sectionToggled": {
       const { id } = action.payload;

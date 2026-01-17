@@ -51,6 +51,13 @@ export const brainstormAppendToMessage = action("story/brainstormAppendToMessage
 export const brainstormRetry = action("story/brainstormRetry")<{
   messageId: string;
 }>();
+export const brainstormEditMessage = action("story/brainstormEditMessage")<{
+  messageId: string;
+  content: string;
+}>();
+export const brainstormSaveMessageEdit = action("story/brainstormSaveMessageEdit")<{
+  messageId: string;
+}>();
 
 export const toggleAttg = action("story/toggleAttg")();
 export const toggleStyle = action("story/toggleStyle")();
@@ -70,6 +77,12 @@ export const uiLorebookEditModeToggled = action("ui/lorebookEditModeToggled")();
 export const uiClearConfirmToggled = action("ui/clearConfirmToggled")();
 export const uiBrainstormSubmitUserMessage = action("ui/brainstormSubmitUserMessage")<{
   content: string;
+}>();
+export const uiBrainstormEditStarted = action("ui/brainstormEditStarted")<{
+  messageId: string;
+}>();
+export const uiBrainstormEditEnded = action("ui/brainstormEditEnded")<{
+  messageId: string;
 }>();
 
 

@@ -51,6 +51,7 @@ export interface UIState {
   // Editor
   collapsedSections: Record<string, boolean>; // FieldID -> boolean
   editModes: Record<string, boolean>; // FieldID -> boolean
+  brainstormEditingMessageId: string | null;
 
   // Transient Inputs (keyed by stable UI ID)
   inputs: Record<string, string>;
