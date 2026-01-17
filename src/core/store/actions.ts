@@ -83,35 +83,3 @@ export const generationCancelled = action("runtime/generationCancelled")<{
 export const budgetUpdated = action("runtime/budgetUpdated")<{
   timeRemaining: number;
 }>();
-
-export const actions = {
-  storyLoaded,
-  storyCleared,
-  settingUpdated,
-  fieldUpdated,
-  dulfsItemAdded,
-  dulfsItemUpdated,
-  dulfsItemRemoved,
-  dulfsSummaryUpdated,
-  brainstormMessageAdded,
-  brainstormMessageEdited,
-  brainstormMessageDeleted,
-  brainstormRetry,
-  toggleAttg,
-  toggleStyle,
-
-  uiInputChanged,
-  uiSectionToggled,
-  uiEditModeToggled,
-  uiLorebookSelected,
-  uiLorebookEditModeToggled,
-  uiClearConfirmToggled,
-
-  segaToggled,
-  generationRequested,
-  generationStarted,
-  generationCompleted,
-  generationFailed,
-  generationCancelled,
-  budgetUpdated,
-};

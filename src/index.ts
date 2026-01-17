@@ -10,7 +10,6 @@ import {
   renderLorebookPanel,
 } from "./ui/renderers";
 import { uiLorebookSelected } from "./core/store/actions";
-import { lorebookSyncSubscriber } from "./core/store/subscribers/lorebook-sync";
 import { initialStoryState } from "./core/store/reducers/storyReducer";
 import {
   initialRootState,
