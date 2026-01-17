@@ -32,10 +32,6 @@ import {
       effects.run(action);
     });
 
-    // Initialize Subscribers
-    lorebookSyncSubscriber(store);
-    
-
     // Initial Render & Registration
     const initialState = getState();
     const sidebar = renderMainSidebar(initialState, dispatch);
