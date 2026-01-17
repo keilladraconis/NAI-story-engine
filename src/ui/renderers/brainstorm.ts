@@ -5,10 +5,10 @@ import {
   fieldUpdated,
   generationCancelled,
   brainstormRemoveMessage,
-  brainstormRetry,
+  uiBrainstormRetry,
   uiBrainstormSubmitUserMessage,
-  brainstormEditMessage,
-  brainstormSaveMessageEdit,
+  uiBrainstormEditMessage,
+  uiBrainstormSaveMessageEdit,
 } from "../../core/store/actions";
 import { calculateTextAreaHeight } from "../ui-components";
 
@@ -164,10 +164,10 @@ const renderMessageBubble = (
         style: { padding: "4px", height: "24px", width: "24px" },
         callback: () => {
           if (isEditing) {
-            dispatch(brainstormSaveMessageEdit({ messageId: id }));
+            dispatch(uiBrainstormSaveMessageEdit({ messageId: id }));
           } else {
             // Initiate edit mode -> will trigger effect to set storage and dispatch ui started
-            dispatch(brainstormEditMessage({ messageId: id, content }));
+            dispatch(uiBrainstormEditMessage({ messageId: id, content }));
           }
         },
       }),
@@ -177,7 +177,7 @@ const renderMessageBubble = (
             iconId: "rotate-cw",
             style: { padding: "4px", height: "24px", width: "24px" },
             callback: () => {
-              dispatch(brainstormRetry({ messageId: id }));
+              dispatch(uiBrainstormRetry({ messageId: id }));
             },
           })
         : null,

@@ -5,9 +5,12 @@ import {
   brainstormAddMessage,
   brainstormAppendToMessage,
   brainstormUpdateMessage,
-  brainstormSaveMessageEdit,
+  uiBrainstormSaveMessageEdit,
+  uiBrainstormEditMessage,
   uiBrainstormEditStarted,
   uiBrainstormEditEnded,
+  uiBrainstormRetry,
+  brainstormHistoryPruned,
   generationStarted,
   generationCompleted,
   generationFailed,
@@ -16,33 +19,67 @@ import {
 } from "./actions";
 import { buildBrainstormStrategy } from "./utils/context-builder";
 import { initialStoryState } from "./reducers/storyReducer";
+import { FieldID } from "../../config/field-definitions";
 
 export function registerEffects(runner: { register: (effect: Effect<RootState>) => void }, genX: GenX) {
   runner.register(createBrainstormSubmitEffect(genX));
+  runner.register(createBrainstormRetryEffect(genX));
   runner.register(createGenXGenerationEffect(genX));
   runner.register(createStoryLoadEffect());
   runner.register(createStorySaveEffect());
   runner.register(createBrainstormEditEffects());
 }
 
+// Intent: Brainstorm Retry
+const createBrainstormRetryEffect = (_genX: GenX): Effect<RootState> => async (action, { dispatch, getState }) => {
+  if (action.type !== "ui/brainstormRetry") return;
+
+  const { messageId } = action.payload;
+
+  // 1. Prune history (Domain)
+  // This synchronously updates the state in the reducer
+  dispatch(brainstormHistoryPruned({ messageId }));
+
+  // 2. Check state to decide if we should regenerate
+  const state = getState();
+  const field = state.story.fields[FieldID.Brainstorm];
+  const messages = (field?.data?.messages || []) as BrainstormMessage[];
+  const lastMsg = messages[messages.length - 1];
+
+  // If the last message is now a user message, we assume the user wants the assistant to try again
+  if (lastMsg && lastMsg.role === "user") {
+      const assistantId = api.v1.uuid();
+      dispatch(brainstormAddMessage({ 
+        message: { id: assistantId, role: "assistant", content: "" } 
+      }));
+
+      // Generate
+      const strategy = await buildBrainstormStrategy(state.story, {
+        id: api.v1.uuid(),
+        type: "brainstorm",
+        targetId: assistantId
+      });
+
+      dispatch(genxRequestGeneration({
+        requestId: api.v1.uuid(),
+        messages: strategy.messages,
+        params: strategy.params,
+        target: { type: "brainstorm", messageId: assistantId }
+      }));
+  }
+};
+
 // Intent: Brainstorm Edit Workflow
 const createBrainstormEditEffects = (): Effect<RootState> => async (action, { dispatch, getState }) => {
   // Handle Start Edit
-  if (action.type === "story/brainstormEditMessage") {
+  if (action.type === "ui/brainstormEditMessage") {
     const { messageId, content } = action.payload;
     const state = getState();
     const currentEditId = state.ui.brainstormEditingMessageId;
 
     // 1. If we are already editing another message, save it first
     if (currentEditId && currentEditId !== messageId) {
-      // Dispatch the save intent synchronously (well, trigger it)
-      // Since effects are async, we can't await the *processing* of the other effect easily here
-      // unless we manually call the logic. 
-      // But we can dispatch the action and trust the order of operations if we await the storage call.
-      // Actually, we should probably manually run the save logic here to ensure sequentiality
-      // OR just dispatch and assume the storage write for the *new* one won't race the read of the *old* one.
-      // Let's dispatch the save action.
-      dispatch(brainstormSaveMessageEdit({ messageId: currentEditId }));
+      dispatch(uiBrainstormSaveMessageEdit({ messageId: currentEditId }));
     }
 
     // 2. Initialize the storage for the new draft
@@ -55,7 +92,7 @@ const createBrainstormEditEffects = (): Effect<RootState> => async (action, { di
   }
 
   // Handle Save Edit
-  if (action.type === "story/brainstormSaveMessageEdit") {
+  if (action.type === "ui/brainstormSaveMessageEdit") {
     const { messageId } = action.payload;
     const storageKey = `brainstorm-edit-${messageId}`;
 
@@ -66,8 +103,6 @@ const createBrainstormEditEffects = (): Effect<RootState> => async (action, { di
     await api.v1.storyStorage.set(storageKey, "");
 
     // 3. Update Domain State (if content exists)
-    // If draftContent is null/undefined, it means no change or error, fallback to empty string?
-    // Or maybe we should keep original? Ideally draftContent should be valid string.
     if (typeof draftContent === "string") {
         dispatch(brainstormUpdateMessage({ messageId, content: draftContent }));
     }
@@ -80,7 +115,13 @@ const createBrainstormEditEffects = (): Effect<RootState> => async (action, { di
 
 // Intent: Save Story
 const createStorySaveEffect = (): Effect<RootState> => async (action, { getState }) => {
-  if (action.type.startsWith("story/") && action.type !== "story/loadRequested") {
+  // Listen to any domain change in story, brainstorm, or dulfs
+  if (
+    (action.type.startsWith("story/") || 
+     action.type.startsWith("brainstorm/") || 
+     action.type.startsWith("dulfs/")) && 
+    action.type !== "story/loadRequested"
+  ) {
     try {
       const state = getState();
       // Fire and forget save

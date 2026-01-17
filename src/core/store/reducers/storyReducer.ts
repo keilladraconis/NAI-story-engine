@@ -65,7 +65,7 @@ export function storyReducer(
       };
     }
 
-    case "story/dulfsItemAdded": {
+    case "dulfs/itemAdded": {
       const { fieldId, item } = action.payload;
       const list = state.dulfs[fieldId as DulfsFieldID] || [];
       return {
@@ -77,7 +77,7 @@ export function storyReducer(
       };
     }
 
-    case "story/dulfsItemUpdated": {
+    case "dulfs/itemUpdated": {
       const { fieldId, itemId, updates } = action.payload;
       const list = state.dulfs[fieldId as DulfsFieldID] || [];
       return {
@@ -91,7 +91,7 @@ export function storyReducer(
       };
     }
 
-    case "story/dulfsItemRemoved": {
+    case "dulfs/itemRemoved": {
       const { fieldId, itemId } = action.payload;
       const list = state.dulfs[fieldId as DulfsFieldID] || [];
       return {
@@ -103,7 +103,7 @@ export function storyReducer(
       };
     }
 
-    case "story/dulfsSummaryUpdated": {
+    case "dulfs/summaryUpdated": {
       const { fieldId, summary } = action.payload;
       return {
         ...state,
@@ -114,7 +114,7 @@ export function storyReducer(
       };
     }
 
-    case "story/brainstormAddMessage": {
+    case "brainstorm/messageAdded": {
       const { message } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = field?.data?.messages || [];
@@ -133,7 +133,7 @@ export function storyReducer(
       };
     }
 
-    case "story/brainstormUpdateMessage": {
+    case "brainstorm/messageUpdated": {
       const { messageId, content } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = (field?.data?.messages || []) as BrainstormMessage[];
@@ -154,7 +154,7 @@ export function storyReducer(
       };
     }
 
-    case "story/brainstormRemoveMessage": {
+    case "brainstorm/messageRemoved": {
       const { messageId } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = (field?.data?.messages || []) as BrainstormMessage[];
@@ -173,7 +173,7 @@ export function storyReducer(
       };
     }
 
-    case "story/brainstormAppendToMessage": {
+    case "brainstorm/messageAppended": {
       const { messageId, content } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = (field?.data?.messages || []) as BrainstormMessage[];
@@ -194,7 +194,7 @@ export function storyReducer(
       };
     }
 
-    case "story/brainstormRetry": {
+    case "brainstorm/historyPruned": {
       const { messageId } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = (field?.data?.messages || []) as BrainstormMessage[];
@@ -225,10 +225,10 @@ export function storyReducer(
       };
     }
 
-    case "story/toggleAttg":
+    case "story/attgToggled":
       return { ...state, attgEnabled: !state.attgEnabled };
 
-    case "story/toggleStyle":
+    case "story/styleToggled":
       return { ...state, styleEnabled: !state.styleEnabled };
 
     default:

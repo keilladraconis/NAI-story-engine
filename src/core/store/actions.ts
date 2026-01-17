@@ -4,6 +4,7 @@ import { action } from "./store";
 
 // --- Action Creators ---
 
+// Domain: Story Lifecycle & Core
 export const storyLoadRequested = action("story/loadRequested")();
 export const storyLoaded = action("story/loaded")<{ story: StoryState }>();
 export const storyCleared = action("story/cleared")();
@@ -15,52 +16,47 @@ export const fieldUpdated = action("story/fieldUpdated")<{
   content: string;
   data?: unknown;
 }>();
-export const dulfsItemAdded = action("story/dulfsItemAdded")<{
+export const attgToggled = action("story/attgToggled")();
+export const styleToggled = action("story/styleToggled")();
+
+// Domain: DULFS
+export const dulfsItemAdded = action("dulfs/itemAdded")<{
   fieldId: DulfsFieldID;
   item: DulfsItem;
 }>();
-export const dulfsItemUpdated = action("story/dulfsItemUpdated")<{
+export const dulfsItemUpdated = action("dulfs/itemUpdated")<{
   fieldId: DulfsFieldID;
   itemId: string;
   updates: Partial<DulfsItem>;
 }>();
-export const dulfsItemRemoved = action("story/dulfsItemRemoved")<{
+export const dulfsItemRemoved = action("dulfs/itemRemoved")<{
   fieldId: DulfsFieldID;
   itemId: string;
 }>();
-export const dulfsSummaryUpdated = action("story/dulfsSummaryUpdated")<{
+export const dulfsSummaryUpdated = action("dulfs/summaryUpdated")<{
   fieldId: string;
   summary: string;
 }>();
 
 // Domain: Brainstorm
-export const brainstormAddMessage = action("story/brainstormAddMessage")<{
+export const brainstormAddMessage = action("brainstorm/messageAdded")<{
   message: BrainstormMessage;
 }>();
-export const brainstormUpdateMessage = action("story/brainstormUpdateMessage")<{
+export const brainstormUpdateMessage = action("brainstorm/messageUpdated")<{
   messageId: string;
   content: string;
 }>();
-export const brainstormRemoveMessage = action("story/brainstormRemoveMessage")<{
+export const brainstormRemoveMessage = action("brainstorm/messageRemoved")<{
   messageId: string;
 }>();
-export const brainstormAppendToMessage = action("story/brainstormAppendToMessage")<{
+export const brainstormAppendToMessage = action("brainstorm/messageAppended")<{
   messageId: string;
   content: string;
 }>();
-export const brainstormRetry = action("story/brainstormRetry")<{
-  messageId: string;
-}>();
-export const brainstormEditMessage = action("story/brainstormEditMessage")<{
-  messageId: string;
-  content: string;
-}>();
-export const brainstormSaveMessageEdit = action("story/brainstormSaveMessageEdit")<{
-  messageId: string;
+export const brainstormHistoryPruned = action("brainstorm/historyPruned")<{
+  messageId: string; // The message to prune from (inclusive/exclusive logic handled in reducer)
 }>();
 
-export const toggleAttg = action("story/toggleAttg")();
-export const toggleStyle = action("story/toggleStyle")();
 
 // Intent: UI
 export const uiInputChanged = action("ui/inputChanged")<{
@@ -75,6 +71,8 @@ export const uiLorebookSelected = action("ui/lorebookSelected")<{
 }>();
 export const uiLorebookEditModeToggled = action("ui/lorebookEditModeToggled")();
 export const uiClearConfirmToggled = action("ui/clearConfirmToggled")();
+
+// Intent: Brainstorm UI
 export const uiBrainstormSubmitUserMessage = action("ui/brainstormSubmitUserMessage")<{
   content: string;
 }>();
@@ -82,6 +80,17 @@ export const uiBrainstormEditStarted = action("ui/brainstormEditStarted")<{
   messageId: string;
 }>();
 export const uiBrainstormEditEnded = action("ui/brainstormEditEnded")<{
+  messageId: string;
+}>();
+// These are Intents because they involve storage side-effects before domain updates
+export const uiBrainstormEditMessage = action("ui/brainstormEditMessage")<{
+  messageId: string;
+  content: string;
+}>();
+export const uiBrainstormSaveMessageEdit = action("ui/brainstormSaveMessageEdit")<{
+  messageId: string;
+}>();
+export const uiBrainstormRetry = action("ui/brainstormRetry")<{
   messageId: string;
 }>();
 
