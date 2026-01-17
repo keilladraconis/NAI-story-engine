@@ -4,6 +4,7 @@ import { action } from "./store";
 
 // --- Action Creators ---
 
+export const storyLoadRequested = action("story/loadRequested")();
 export const storyLoaded = action("story/loaded")<{ story: StoryState }>();
 export const storyCleared = action("story/cleared")();
 export const settingUpdated = action("story/settingUpdated")<{

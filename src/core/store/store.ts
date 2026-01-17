@@ -37,20 +37,20 @@ export function createStore<S>(
   return {
     getState: () => state,
     dispatch(action: Action) {
-      // 1. Always notify action listeners
-      for (const l of actionListeners) {
-        l(action);
+      // 1. Reduce
+      const next = reducer(state, action);
+      if (next !== state) {
+        state = next;
+
+        // 2. Notify state listeners only on change
+        for (const l of stateListeners) {
+          l(state, action);
+        }
       }
 
-      // 2. Reduce
-      const next = reducer(state, action);
-      if (next === state) return;
-
-      state = next;
-
-      // 3. Notify state listeners only on change
-      for (const l of stateListeners) {
-        l(state, action);
+      // 3. Always notify action listeners
+      for (const l of actionListeners) {
+        l(action);
       }
     },
     subscribe(listener: StateListener<S>) {

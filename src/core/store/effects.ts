@@ -8,13 +8,46 @@ import {
   generationCompleted,
   generationFailed,
   genxRequestGeneration,
+  storyLoaded,
 } from "./actions";
 import { buildBrainstormStrategy } from "./utils/context-builder";
+import { initialStoryState } from "./reducers/storyReducer";
 
 export function registerEffects(runner: { register: (effect: Effect<RootState>) => void }, genX: GenX) {
   runner.register(createBrainstormSubmitEffect(genX));
   runner.register(createGenXGenerationEffect(genX));
+  runner.register(createStoryLoadEffect());
+  runner.register(createStorySaveEffect());
 }
+
+// Intent: Save Story
+const createStorySaveEffect = (): Effect<RootState> => async (action, { getState }) => {
+  if (action.type.startsWith("story/") && action.type !== "story/loadRequested") {
+    try {
+      const state = getState();
+      // Fire and forget save
+      api.v1.storyStorage.set("kse-story-data", state.story);
+    } catch (e) {
+      api.v1.log("Error saving story data:", e);
+    }
+  }
+};
+
+// Intent: Load Story
+const createStoryLoadEffect = (): Effect<RootState> => async (action, { dispatch }) => {
+  if (action.type !== "story/loadRequested") return;
+
+  try {
+    const data = await api.v1.storyStorage.getOrDefault(
+      "kse-story-data",
+      initialStoryState,
+    );
+    dispatch(storyLoaded({ story: data }));
+    api.v1.log("Story data loaded via effect.");
+  } catch (e) {
+    api.v1.log("Error loading story data:", e);
+  }
+};
 
 // Intent: User Submits Message
 const createBrainstormSubmitEffect = (_genX: GenX): Effect<RootState> => async (action, { dispatch, getState }) => {

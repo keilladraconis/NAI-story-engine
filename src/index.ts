@@ -2,7 +2,6 @@ import {
   createEffectRunner,
   createStore,
   RootState,
-  storyLoaded,
 } from "./core/store";
 import { registerEffects } from "./core/store/effects";
 import {
@@ -11,7 +10,6 @@ import {
   renderLorebookPanel,
 } from "./ui/renderers";
 import { uiLorebookSelected } from "./core/store/actions";
-import { initialStoryState } from "./core/store/reducers/storyReducer";
 import {
   initialRootState,
   rootReducer,
@@ -66,12 +64,8 @@ import { GenX } from "../lib/gen-x";
     });
 
     // Hydrate State
-    const data = await api.v1.storyStorage.getOrDefault(
-      "kse-story-data",
-      initialStoryState,
-    );
-    dispatch(storyLoaded({ story: data }));
-    api.v1.log("Story data loaded.");
+    dispatch({ type: "story/loadRequested", payload: undefined });
+    api.v1.log("Story load requested.");
 
     // Hooks
     api.v1.hooks.register("onLorebookEntrySelected", (params) => {
