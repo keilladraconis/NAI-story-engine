@@ -93,6 +93,17 @@ export interface RuntimeState {
   budgetTimeRemaining: number;
 }
 
+export interface GenerationStrategy {
+  requestId: string;
+  messages: Message[];
+  params: GenerationParams;
+  target:
+    | { type: "brainstorm"; messageId: string }
+    | { type: "field"; fieldId: string };
+  prefixBehavior: "keep" | "trim";
+  assistantPrefill?: string;
+}
+
 // --- Root State ---
 
 export interface RootState {

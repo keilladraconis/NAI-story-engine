@@ -1,4 +1,4 @@
-import { RootState } from "../../core/store/types";
+import { BrainstormMessage, RootState } from "../../core/store/types";
 import { Dispatch, Store } from "../../core/store"; // Import Store
 import { FieldID } from "../../config/field-definitions";
 import {
@@ -7,11 +7,14 @@ import {
   uiBrainstormRetry,
   uiBrainstormEditMessage,
   uiBrainstormSaveMessageEdit,
-  uiBrainstormSubmitRequest,
   uiRequestCancellation,
+  uiBrainstormSubmitUserMessage,
 } from "../../core/store/actions";
 import { calculateTextAreaHeight } from "../ui-components";
-import { createGenerationButton, mountGenerationButton } from "../components/generation-button"; // Import mount
+import {
+  createGenerationButton,
+  mountGenerationButton,
+} from "../components/generation-button"; // Import mount
 
 const { row, column, text, button, multilineTextInput } = api.v1.ui.part;
 const { sidebarPanel } = api.v1.ui.extension;
@@ -19,9 +22,9 @@ const { sidebarPanel } = api.v1.ui.extension;
 export const setupBrainstormButton = (store: Store<RootState>) => {
   return mountGenerationButton(store, "brainstorm-send-btn", {
     label: "Send",
-    onClick: () => store.dispatch(uiBrainstormSubmitRequest()),
-    onCancel: () => store.dispatch(uiRequestCancellation()), // Dispatch intent
-    onContinue: () => store.dispatch(uiBrainstormSubmitRequest()),
+    onClick: () => store.dispatch(uiBrainstormSubmitUserMessage()),
+    onCancel: () => store.dispatch(uiRequestCancellation()),
+    onContinue: () => {},
   });
 };
 
@@ -32,7 +35,7 @@ export const renderBrainstormSidebar = (
   // Brainstorm logic uses FieldID.Brainstorm content/data
   const field = state.story.fields[FieldID.Brainstorm];
   // Safe cast (data could be partial)
-  const messages: any[] = field?.data?.messages || [];
+  const messages: BrainstormMessage[] = field?.data?.messages || [];
 
   // We reverse the chronological list for display with column-reverse
   const reversedMessages = [...messages].reverse();
@@ -48,7 +51,7 @@ export const renderBrainstormSidebar = (
   const inputId = "brainstorm-input";
 
   const handleSend = () => {
-    dispatch(uiBrainstormSubmitRequest());
+    dispatch(uiBrainstormSubmitUserMessage());
   };
 
   const messageParts: UIPart[] = [];
@@ -83,7 +86,7 @@ export const renderBrainstormSidebar = (
         id: inputId,
         placeholder: "Type an idea...",
         storageKey: `story:${inputId}`,
-        onSubmit: () => handleSend(),
+        onSubmit: handleSend,
         style: { "min-height": "60px", "max-height": "120px" },
         disabled: isGenerating,
       }),
@@ -204,7 +207,8 @@ const renderMessageBubble = (
         ? button({
             iconId: "trash",
             style: { padding: "4px", height: "24px", width: "24px" },
-            callback: () => dispatch(brainstormRemoveMessage({ messageId: id })),
+            callback: () =>
+              dispatch(brainstormRemoveMessage({ messageId: id })),
           })
         : null,
     ].filter(Boolean) as UIPart[],

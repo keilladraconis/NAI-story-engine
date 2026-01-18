@@ -1,6 +1,18 @@
-import { StoryState, BrainstormMessage, GenerationRequest, DulfsItem } from "../types";
-import { FieldID, DulfsFieldID, FIELD_CONFIGS, LIST_FIELD_IDS } from "../../../config/field-definitions";
+import {
+  StoryState,
+  BrainstormMessage,
+  GenerationRequest,
+  DulfsItem,
+  GenerationStrategy,
+} from "../types";
+import {
+  FieldID,
+  DulfsFieldID,
+  FIELD_CONFIGS,
+  LIST_FIELD_IDS,
+} from "../../../config/field-definitions";
 
+// Maybe delete
 export type TextFilter = (text: string) => string;
 
 export interface StrategyResult {
@@ -11,6 +23,7 @@ export interface StrategyResult {
   filters?: TextFilter[];
 }
 
+// Maybe delete
 export const Filters = {
   scrubBrackets: (t: string) => t.replace(/[\[\]]/g, ""),
   scrubMarkdown: (t: string) => {
@@ -46,7 +59,9 @@ const getBrainstormHistory = (state: StoryState): BrainstormMessage[] => {
 const getConsolidatedBrainstorm = (state: StoryState): string => {
   const history = getBrainstormHistory(state);
   if (history.length > 0) {
-    return history.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
+    return history
+      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+      .join("\n");
   }
   return getFieldContent(state, FieldID.Brainstorm);
 };
@@ -95,7 +110,10 @@ const getStoryContextMessages = async (): Promise<Message[]> => {
   }
 };
 
-const getCommonContextBlocks = (state: StoryState, storyContext: Message[]): Message[] => {
+const getCommonContextBlocks = (
+  state: StoryState,
+  storyContext: Message[],
+): Message[] => {
   const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
   const setting = state.setting;
   const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
@@ -112,12 +130,14 @@ const getCommonContextBlocks = (state: StoryState, storyContext: Message[]): Mes
 
 export const buildBrainstormStrategy = async (
   state: StoryState,
-  _request: GenerationRequest
-): Promise<StrategyResult> => {
+  assistantId?: string,
+): Promise<GenerationStrategy> => {
   const model = "glm-4-6";
   const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  const brainstormInstruction = String((await api.v1.config.get("brainstorm_prompt")) || "");
-  
+  const brainstormInstruction = String(
+    (await api.v1.config.get("brainstorm_prompt")) || "",
+  );
+
   const systemMsg: Message = {
     role: "system",
     content: `${systemPrompt}\n\n[BRAINSTORMING MODE]\n${brainstormInstruction}`,
@@ -134,9 +154,18 @@ export const buildBrainstormStrategy = async (
   let contextBlock = "Here is the current state of the story:\n";
   let hasContext = false;
 
-  if (storyPrompt) { contextBlock += `STORY PROMPT:\n${storyPrompt}\n\n`; hasContext = true; }
-  if (setting) { contextBlock += `SETTING:\n${setting}\n\n`; hasContext = true; }
-  if (worldSnapshot) { contextBlock += `WORLD SNAPSHOT:\n${worldSnapshot}\n\n`; hasContext = true; }
+  if (storyPrompt) {
+    contextBlock += `STORY PROMPT:\n${storyPrompt}\n\n`;
+    hasContext = true;
+  }
+  if (setting) {
+    contextBlock += `SETTING:\n${setting}\n\n`;
+    hasContext = true;
+  }
+  if (worldSnapshot) {
+    contextBlock += `WORLD SNAPSHOT:\n${worldSnapshot}\n\n`;
+    hasContext = true;
+  }
 
   if (hasContext) {
     messages.push({
@@ -150,27 +179,38 @@ export const buildBrainstormStrategy = async (
   }
 
   const history = getBrainstormHistory(state);
-  const cleanHistory = history.filter(m => !(m.role === 'assistant' && !m.content.trim()));
-  const historyMessages: Message[] = cleanHistory.map(m => ({
+  const cleanHistory = history.filter(
+    (m) => !(m.role === "assistant" && !m.content.trim()),
+  );
+  const historyMessages: Message[] = cleanHistory.map((m) => ({
     role: m.role as "user" | "assistant",
-    content: m.content
+    content: m.content,
   }));
+  const messageId = assistantId ? assistantId : history.at(-1)!.id;
 
   messages.push(...historyMessages);
 
   return {
+    requestId: api.v1.uuid(),
     messages,
     params: { model, max_tokens: 300, temperature: 0.8, min_p: 0.05 },
-    prefixBehavior: "keep"
+    prefixBehavior: "keep",
+    target: {
+      type: "brainstorm",
+      messageId,
+    },
   };
 };
 
 export const buildStoryPromptStrategy = async (
-  state: StoryState
-): Promise<StrategyResult> => {
+  state: StoryState,
+  fieldId: FieldID,
+): Promise<GenerationStrategy> => {
   const model = "glm-4-6";
   const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  const prompt = String((await api.v1.config.get("story_prompt_generate_prompt")) || "");
+  const prompt = String(
+    (await api.v1.config.get("story_prompt_generate_prompt")) || "",
+  );
   const brainstormContent = getConsolidatedBrainstorm(state);
   const storyContext = await getStoryContextMessages();
   const commonBlocks = getCommonContextBlocks(state, storyContext);
@@ -178,26 +218,40 @@ export const buildStoryPromptStrategy = async (
   const messages = contextBuilder(
     { role: "system", content: systemPrompt },
     { role: "user", content: prompt },
-    { role: "assistant", content: "Here is the story prompt based on our brainstorming session:" },
+    {
+      role: "assistant",
+      content: "Here is the story prompt based on our brainstorming session:",
+    },
     [
       ...commonBlocks,
       { role: "user", content: `BRAINSTORM MATERIAL:\n${brainstormContent}` },
-    ]
+    ],
   );
 
   return {
+    requestId: api.v1.uuid(),
     messages,
-    params: { model, temperature: 1.1, min_p: 0.05, presence_penalty: 0.1, max_tokens: 1024 },
+    params: {
+      model,
+      temperature: 1.1,
+      min_p: 0.05,
+      presence_penalty: 0.1,
+      max_tokens: 1024,
+    },
+    target: { type: "field", fieldId },
     prefixBehavior: "trim",
   };
 };
 
 export const buildWorldSnapshotStrategy = async (
-  state: StoryState
-): Promise<StrategyResult> => {
+  state: StoryState,
+  fieldId: FieldID,
+): Promise<GenerationStrategy> => {
   const model = "glm-4-6";
   const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  const prompt = String((await api.v1.config.get("world_snapshot_prompt")) || "");
+  const prompt = String(
+    (await api.v1.config.get("world_snapshot_prompt")) || "",
+  );
   const brainstormContent = getConsolidatedBrainstorm(state);
   const storyContext = await getStoryContextMessages();
   const commonBlocks = getCommonContextBlocks(state, storyContext);
@@ -205,33 +259,45 @@ export const buildWorldSnapshotStrategy = async (
   const messages = contextBuilder(
     { role: "system", content: systemPrompt },
     { role: "user", content: prompt },
-    { role: "assistant", content: "Here is the dynamic world snapshot, focusing on drivers and tensions:" },
+    {
+      role: "assistant",
+      content:
+        "Here is the dynamic world snapshot, focusing on drivers and tensions:",
+    },
     [
       ...commonBlocks,
       { role: "user", content: `BRAINSTORM MATERIAL:\n${brainstormContent}` },
-    ]
+    ],
   );
 
   return {
+    requestId: api.v1.uuid(),
     messages,
-    params: { model, temperature: 1.1, min_p: 0.05, presence_penalty: 0.1, max_tokens: 1024 },
+    params: {
+      model,
+      temperature: 1.1,
+      min_p: 0.05,
+      presence_penalty: 0.1,
+      max_tokens: 1024,
+    },
     prefixBehavior: "trim",
+    target: { type: "field", fieldId },
   };
 };
 
 export const buildDulfsListStrategy = async (
   state: StoryState,
-  request: GenerationRequest
-): Promise<StrategyResult> => {
+  request: GenerationRequest,
+): Promise<GenerationStrategy> => {
   const model = "glm-4-6";
   const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
   const fieldId = request.targetId;
   const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
   const label = config ? config.label : fieldId;
-  
+
   const currentList = getDulfsList(state, fieldId as DulfsFieldID);
   const existingNames = currentList.map((i) => i.name).join(", ");
-  
+
   const attg = getFieldContent(state, FieldID.ATTG);
   const style = getFieldContent(state, FieldID.Style);
   const brainstormContent = getConsolidatedBrainstorm(state);
@@ -253,25 +319,36 @@ Output ONLY the names, separated by newlines, no other text.`,
       { role: "user", content: `STYLE:\n${style}` },
       { role: "user", content: `BRAINSTORM MATERIAL:\n${brainstormContent}` },
       existingNames
-        ? { role: "user", content: `EXISTING ${label.toUpperCase()} (Do not repeat):\n${existingNames}` }
+        ? {
+            role: "user",
+            content: `EXISTING ${label.toUpperCase()} (Do not repeat):\n${existingNames}`,
+          }
         : { role: "user", content: "" },
-    ]
+    ],
   );
 
   return {
+    requestId: api.v1.uuid(),
     messages,
-    params: { model, temperature: 1.2, min_p: 0.1, presence_penalty: 0.1, max_tokens: 512 },
+    params: {
+      model,
+      temperature: 1.2,
+      min_p: 0.1,
+      presence_penalty: 0.1,
+      max_tokens: 512,
+    },
     prefixBehavior: "trim",
+    target: { type: "field", fieldId },
   };
 };
 
 export const buildDulfsContentStrategy = async (
   state: StoryState,
-  request: GenerationRequest
-): Promise<StrategyResult> => {
+  request: GenerationRequest,
+): Promise<GenerationStrategy> => {
   const model = "glm-4-6";
   const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  
+
   // Target format: "FieldID:ItemID"
   const [fieldId, itemId] = request.targetId.split(":");
   const list = getDulfsList(state, fieldId as DulfsFieldID);
@@ -281,7 +358,8 @@ export const buildDulfsContentStrategy = async (
 
   const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
   const label = config ? config.label : fieldId;
-  const prefill = fieldId === FieldID.DramatisPersonae ? `${item.name} (` : `${item.name}: `;
+  const prefill =
+    fieldId === FieldID.DramatisPersonae ? `${item.name} (` : `${item.name}: `;
 
   const dulfsContext = buildDulfsContextString(state, fieldId);
   const brainstormContent = getConsolidatedBrainstorm(state);
@@ -302,47 +380,26 @@ Keep the description concise and focused on narrative potential.`,
       ...commonBlocks,
       { role: "user", content: `BRAINSTORM MATERIAL:\n${brainstormContent}` },
       dulfsContext
-        ? { role: "user", content: `OTHER ESTABLISHED WORLD ELEMENTS:\n${dulfsContext}` }
+        ? {
+            role: "user",
+            content: `OTHER ESTABLISHED WORLD ELEMENTS:\n${dulfsContext}`,
+          }
         : { role: "user", content: "" },
-    ]
+    ],
   );
 
-  const filters = config?.filters
-    ? config.filters.map((f) => Filters[f as keyof typeof Filters]).filter((f) => !!f)
-    : [];
-
   return {
+    requestId: api.v1.uuid(),
     messages,
-    params: { model, temperature: 0.85, min_p: 0.05, presence_penalty: 0.05, max_tokens: 1024 },
+    params: {
+      model,
+      temperature: 0.85,
+      min_p: 0.05,
+      presence_penalty: 0.05,
+      max_tokens: 1024,
+    },
     prefixBehavior: "keep",
     assistantPrefill: prefill,
-    filters,
+    target: { type: "field", fieldId },
   };
 };
-
-export const buildStrategy = async (
-  state: StoryState,
-  request: GenerationRequest
-): Promise<StrategyResult> => {
-  if (request.type === "brainstorm") {
-    return buildBrainstormStrategy(state, request);
-  }
-  
-  if (request.targetId === FieldID.StoryPrompt) {
-    return buildStoryPromptStrategy(state);
-  }
-  
-  if (request.targetId === FieldID.WorldSnapshot) {
-    return buildWorldSnapshotStrategy(state);
-  }
-  
-  if (request.type === "list") {
-    return buildDulfsListStrategy(state, request);
-  }
-  
-  if (request.type === "field" && request.targetId.includes(":")) {
-    return buildDulfsContentStrategy(state, request);
-  }
-  
-  throw new Error(`Unknown generation target or type: ${request.type} / ${request.targetId}`);
-}

@@ -1,4 +1,10 @@
-import { DulfsItem, GenerationRequest, StoryState, BrainstormMessage } from "./types";
+import {
+  DulfsItem,
+  GenerationRequest,
+  StoryState,
+  BrainstormMessage,
+  GenerationStrategy,
+} from "./types";
 import { DulfsFieldID } from "../../config/field-definitions";
 import { action } from "./store";
 
@@ -57,7 +63,6 @@ export const brainstormHistoryPruned = action("brainstorm/historyPruned")<{
   messageId: string; // The message to prune from (inclusive/exclusive logic handled in reducer)
 }>();
 
-
 // Intent: UI
 export const uiInputChanged = action("ui/inputChanged")<{
   id: string;
@@ -73,9 +78,9 @@ export const uiLorebookEditModeToggled = action("ui/lorebookEditModeToggled")();
 export const uiClearConfirmToggled = action("ui/clearConfirmToggled")();
 
 // Intent: Brainstorm UI
-export const uiBrainstormSubmitUserMessage = action("ui/brainstormSubmitUserMessage")<{
-  content: string;
-}>();
+export const uiBrainstormSubmitUserMessage = action(
+  "ui/brainstormSubmitUserMessage",
+)();
 export const uiBrainstormEditStarted = action("ui/brainstormEditStarted")<{
   messageId: string;
 }>();
@@ -83,14 +88,13 @@ export const uiBrainstormEditEnded = action("ui/brainstormEditEnded")<{
   messageId: string;
 }>();
 // These are Intents because they involve storage side-effects before domain updates
-export const uiBrainstormSubmitRequest = action(
-  "ui/brainstormSubmitRequest",
-)(); // No payload, reads from storage
 export const uiBrainstormEditMessage = action("ui/brainstormEditMessage")<{
   messageId: string;
   content: string;
 }>();
-export const uiBrainstormSaveMessageEdit = action("ui/brainstormSaveMessageEdit")<{
+export const uiBrainstormSaveMessageEdit = action(
+  "ui/brainstormSaveMessageEdit",
+)<{
   messageId: string;
 }>();
 export const uiBrainstormRetry = action("ui/brainstormRetry")<{
@@ -98,10 +102,9 @@ export const uiBrainstormRetry = action("ui/brainstormRetry")<{
 }>();
 export const uiRequestCancellation = action("ui/requestCancellation")(); // Intent to cancel current/queued generation
 
-
 export const segaToggled = action("runtime/segaToggled")();
-// Deprecated/Legacy runtime actions? 
-// Keeping generationRequested/Started/Completed for compatibility if needed, 
+// Deprecated/Legacy runtime actions?
+// Keeping generationRequested/Started/Completed for compatibility if needed,
 // but we are moving to genx/requestGeneration.
 export const generationRequested = action(
   "runtime/generationRequested",
@@ -127,10 +130,6 @@ export const runtimeStateUpdated = action("runtime/stateUpdated")<{
 }>();
 
 // Domain: GenX
-export const genxRequestGeneration = action("genx/requestGeneration")<{
-  requestId: string;
-  messages: Message[];
-  params: GenerationParams;
-  target: { type: "brainstorm"; messageId: string } | { type: "field"; fieldId: string };
-}>();
-
+export const genxRequestGeneration = action(
+  "genx/requestGeneration",
+)<GenerationStrategy>();
