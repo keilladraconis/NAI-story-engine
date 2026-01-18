@@ -1,6 +1,7 @@
 import { RootState } from "../../core/store";
 import { GenerationState } from "../../../lib/gen-x";
 import { Store } from "../../core/store/store";
+import { NAI_DARK_BACKGROUND, NAI_HEADER, NAI_WARNING } from "../colors";
 
 const { button } = api.v1.ui.part;
 
@@ -9,12 +10,13 @@ export interface GenerationButtonProps {
   onClick: () => void;
   onCancel: () => void;
   onContinue?: () => void; // For budget warnings
+  style: any;
 }
 
 export function createGenerationButton(
   id: string,
   genxState: GenerationState,
-  props: GenerationButtonProps
+  props: GenerationButtonProps,
 ): UIPart & { id: string } {
   const { status, budgetState, budgetTimeRemaining } = genxState;
   const label = props.label ?? "Generate";
@@ -22,30 +24,23 @@ export function createGenerationButton(
   // 1. Queued
   if (status === "queued") {
     return button({
-      id: `${id}`, // Main ID for the button to ensure replacement
-      text: label ? ` ${label} (Queued)` : " Queued",
+      id: id, // Main ID for the button to ensure replacement
+      text: label ? `Queued` : "",
       iconId: "clock",
-      style: {
-        "background-color": "#e2e3e5",
-        color: "#383d41",
-        cursor: "pointer",
-        padding: "4px 8px",
-      },
       callback: props.onCancel,
+      style: props.style,
     }) as UIPart & { id: string };
   }
 
   // 2. Waiting for User (Budget)
   if (status === "waiting_for_user" || budgetState === "waiting_for_user") {
     return button({
-      id: `${id}`,
-      text: label ? ` ${label} (Continue)` : " Continue",
-      iconId: "alertTriangle",
+      id: id,
+      text: label ? `Continue` : " Continue",
+      iconId: "fast-forward",
       style: {
-        "background-color": "#fff3cd",
-        color: "#856404",
-        "font-weight": "bold",
-        padding: "4px 8px",
+        background: NAI_HEADER,
+        ...props.style,
       },
       callback: () => {
         if (props.onContinue) props.onContinue();
@@ -61,29 +56,24 @@ export function createGenerationButton(
     const timeText = remaining > 0 ? ` ${remaining}s` : "...";
 
     return button({
-      id: `${id}`,
-      text: label ? ` Waiting...${timeText}` : timeText,
+      id: id,
+      text: label ? `Waiting...${timeText}` : timeText,
       iconId: "clock",
-      style: {
-        "background-color": "#e2e3e5",
-        color: "#383d41",
-        padding: "4px 8px",
-      },
       callback: props.onCancel, // Allow cancelling the wait
+      style: props.style,
     }) as UIPart & { id: string };
   }
 
   // 4. Generating / Running
   if (status === "generating") {
     return button({
-      id: `${id}`,
-      text: label ? ` Cancel` : " Cancel",
+      id: id,
+      text: label ? "Cancel" : "",
       iconId: "x",
       style: {
-        "font-weight": "bold",
-        "background-color": "#ffcccc",
-        color: "red",
-        padding: "4px 8px",
+        background: NAI_WARNING,
+        color: NAI_DARK_BACKGROUND,
+        ...props.style,
       },
       callback: props.onCancel,
     }) as UIPart & { id: string };
@@ -91,11 +81,11 @@ export function createGenerationButton(
 
   // 5. Idle / Default
   return button({
-    id: `${id}`,
-    text: ` ${label}`,
+    id: id,
+    text: label,
     iconId: "zap",
-    style: { "font-weight": "bold", padding: "4px 8px" },
     callback: props.onClick,
+    style: props.style,
   }) as UIPart & { id: string };
 }
 
@@ -106,7 +96,7 @@ export function createGenerationButton(
 export function mountGenerationButton(
   store: Store<RootState>,
   id: string,
-  props: GenerationButtonProps
+  props: GenerationButtonProps,
 ) {
   // Initial Render (Optional, usually handled by parent renderer, but good for mounting)
   // We assume the parent has already rendered the initial button.
@@ -116,11 +106,11 @@ export function mountGenerationButton(
     (genxState: GenerationState) => {
       // Create the updated part
       const part = createGenerationButton(id, genxState, props);
-      
+
       // Update via API
       if (part) {
         api.v1.ui.updateParts([part]);
       }
-    }
+    },
   );
 }

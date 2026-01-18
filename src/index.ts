@@ -1,8 +1,4 @@
-import {
-  createEffectRunner,
-  createStore,
-  RootState,
-} from "./core/store";
+import { createEffectRunner, createStore, RootState } from "./core/store";
 import { registerEffects } from "./core/store/effects";
 import {
   renderMainSidebar,
@@ -65,7 +61,7 @@ import { GenX } from "../lib/gen-x";
 
         api.v1.ui.update([
           updatedSidebar,
-          updatedBrainstorm,
+          // updatedBrainstorm,
           updatedLorebook,
         ] as (UIExtension & { id: string })[]);
       } catch (e) {

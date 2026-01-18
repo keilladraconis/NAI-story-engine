@@ -25,6 +25,7 @@ export const setupBrainstormButton = (store: Store<RootState>) => {
     onClick: () => store.dispatch(uiBrainstormSubmitUserMessage()),
     onCancel: () => store.dispatch(uiRequestCancellation()),
     onContinue: () => {},
+    style: { flex: "0.7" },
   });
 };
 
@@ -73,10 +74,8 @@ export const renderBrainstormSidebar = (
       label: "Send",
       onClick: handleSend,
       onCancel: () => dispatch(uiRequestCancellation()),
-      onContinue: () => {
-        // Trigger manual continue hook if needed, but GenX listens to onGenerationRequested
-        handleSend();
-      },
+      onContinue: () => {},
+      style: { flex: 0.7 },
     },
   );
 
@@ -106,27 +105,10 @@ export const renderBrainstormSidebar = (
               );
             },
           }),
-          // Wrap in a container to apply flex style if needed, or pass style to button
-          // createGenerationButton returns a button, but we might want to override style?
-          // The current impl has hardcoded styles. We might want to pass style props later.
-          // For now, let's just use it.
-          // Wait, createGenerationButton applies its own style.
-          // The previous button had `flex: 0.7`.
-          // We can wrap it in a column/row if we want specific layout or assume the component handles it.
-          // But UIPart doesn't support "className".
-          // I should add `style` to `GenerationButtonProps` or merged it.
-          // For now, I'll hack it by modifying the returned part if possible, or better, update the component.
-          // Let's just update the component to accept style overrides?
-          // I'll leave it as is for now, it has some padding. It won't flex 0.7 though.
           sendButton,
         ],
       }),
     ],
-    style: {
-      padding: "8px",
-      "border-top": "1px solid rgba(128,128,128, 0.2)",
-      "background-color": "rgba(0,0,0,0.2)",
-    },
   });
 
   return sidebarPanel({
@@ -182,7 +164,7 @@ const renderMessageBubble = (
       // Edit / Save
       button({
         iconId: isEditing ? "save" : "edit-3",
-        style: { padding: "4px", height: "24px", width: "24px" },
+        style: { padding: "4px", background: "none" },
         callback: () => {
           if (isEditing) {
             dispatch(uiBrainstormSaveMessageEdit({ messageId: id }));
@@ -196,7 +178,7 @@ const renderMessageBubble = (
       !isEditing
         ? button({
             iconId: "rotate-cw",
-            style: { padding: "4px", height: "24px", width: "24px" },
+            style: { padding: "4px", background: "none" },
             callback: () => {
               dispatch(uiBrainstormRetry({ messageId: id }));
             },
@@ -206,7 +188,7 @@ const renderMessageBubble = (
       !isEditing
         ? button({
             iconId: "trash",
-            style: { padding: "4px", height: "24px", width: "24px" },
+            style: { padding: "4px", background: "none" },
             callback: () =>
               dispatch(brainstormRemoveMessage({ messageId: id })),
           })
@@ -246,17 +228,22 @@ const renderMessageBubble = (
           border: "none",
         },
         content: [
-          text({
-            text: isUser ? "You" : "Brainstorm",
-            style: {
-              "font-size": "0.7em",
-              opacity: 0.7,
-              "margin-bottom": "2px",
-            },
+          row({
+            style: { "justify-content": "space-between" },
+            content: [
+              text({
+                text: isUser ? "You" : "Brainstorm",
+                style: {
+                  "font-size": "0.7em",
+                  opacity: 0.7,
+                  "margin-bottom": "2px",
+                },
+              }),
+              buttons,
+            ],
           }),
           messageContent,
-          buttons,
-        ].filter(Boolean) as UIPart[],
+        ],
       }),
     ],
   });
