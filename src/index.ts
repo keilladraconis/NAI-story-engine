@@ -1,11 +1,7 @@
 import { createEffectRunner, createStore, RootState } from "./core/store";
 import { registerEffects } from "./core/store/effects";
-import {
-  renderMainSidebar,
-  renderBrainstormSidebar,
-  renderLorebookPanel,
-  setupBrainstormButton,
-} from "./ui/renderers";
+import { renderMainSidebar, renderLorebookPanel } from "./ui/renderers";
+import { BrainstormManager } from "./ui/controllers/brainstorm/manager";
 import { uiLorebookSelected, runtimeStateUpdated } from "./core/store/actions";
 import {
   initialRootState,
@@ -15,7 +11,9 @@ import { GenX } from "../lib/gen-x";
 
 (async () => {
   try {
-    api.v1.log("Initializing Story Engine (Redux Architecture)...");
+    api.v1.log(
+      "Initializing Story Engine (Redux Architecture + Reactive Runtime)...",
+    );
 
     // Request Permissions
     await api.v1.permissions.request(["lorebookEdit", "storyEdit"]);
@@ -41,29 +39,31 @@ import { GenX } from "../lib/gen-x";
       effects.run(action);
     });
 
+    // Managers
+    const brainstormManager = new BrainstormManager(store);
+
     // Initial Render & Registration
     const initialState = getState();
     const sidebar = renderMainSidebar(initialState, dispatch);
-    const brainstorm = renderBrainstormSidebar(initialState, dispatch);
+    const brainstorm = brainstormManager.register();
     const lorebook = renderLorebookPanel(initialState, dispatch);
 
     await api.v1.ui.register([sidebar, brainstorm, lorebook]);
 
-    // Setup Reactive Components
-    setupBrainstormButton(store);
+    // Mount Managers (Start Subscriptions)
+    brainstormManager.mount();
 
     // Render Loop
     subscribe((state, _action) => {
       try {
         const updatedSidebar = renderMainSidebar(state, dispatch);
-        const updatedBrainstorm = renderBrainstormSidebar(state, dispatch);
         const updatedLorebook = renderLorebookPanel(state, dispatch);
 
-        api.v1.ui.update([
-          updatedSidebar,
-          // updatedBrainstorm,
-          updatedLorebook,
-        ] as (UIExtension & { id: string })[]);
+        // Brainstorm updates are handled by BrainstormManager internally
+
+        api.v1.ui.update([updatedSidebar, updatedLorebook] as (UIExtension & {
+          id: string;
+        })[]);
       } catch (e) {
         api.v1.log("Render error:", e);
       }

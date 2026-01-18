@@ -1,39 +1,39 @@
-import { vi } from 'vitest';
+import { vi } from "vitest";
 
 // Create a mock implementation of the api.v1 namespace
 const apiMock = {
   v1: {
     log: vi.fn(),
-    uuid: vi.fn(() => 'mock-uuid-' + Math.random().toString(36).substr(2, 9)),
+    uuid: vi.fn(() => "mock-uuid-" + Math.random().toString(36).substr(2, 9)),
     createCancellationSignal: vi.fn(() => ({
       cancelled: false,
       cancel: vi.fn(),
-      dispose: vi.fn()
+      dispose: vi.fn(),
     })),
     events: {
-        on: vi.fn()
+      on: vi.fn(),
     },
     hooks: {
-        register: vi.fn()
+      register: vi.fn(),
     },
     timers: {
       setTimeout: vi.fn((cb, delay) => setTimeout(cb, delay) as any),
       clearTimeout: vi.fn((id) => {
         clearTimeout(id);
       }),
-      sleep: vi.fn((ms) => new Promise(resolve => setTimeout(resolve, ms)))
+      sleep: vi.fn((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
     },
     script: {
-        getAllowedOutput: vi.fn(() => 10000),
-        getTimeUntilAllowedOutput: vi.fn(() => 0),
-        waitForAllowedOutput: vi.fn().mockResolvedValue(undefined)
+      getAllowedOutput: vi.fn(() => 10000),
+      getTimeUntilAllowedOutput: vi.fn(() => 0),
+      waitForAllowedOutput: vi.fn().mockResolvedValue(undefined),
     },
     config: {
-      get: vi.fn().mockResolvedValue(undefined)
+      get: vi.fn().mockResolvedValue(undefined),
     },
     storyStorage: {
       get: vi.fn().mockResolvedValue(null),
-      set: vi.fn().mockResolvedValue(undefined)
+      set: vi.fn().mockResolvedValue(undefined),
     },
     lorebook: {
       category: vi.fn(),
@@ -47,19 +47,19 @@ const apiMock = {
     },
     memory: {
       get: vi.fn().mockResolvedValue(""),
-      set: vi.fn().mockResolvedValue(undefined)
+      set: vi.fn().mockResolvedValue(undefined),
     },
     an: {
       get: vi.fn().mockResolvedValue(""),
-      set: vi.fn().mockResolvedValue(undefined)
+      set: vi.fn().mockResolvedValue(undefined),
     },
     ui: {
-      toast: vi.fn()
+      toast: vi.fn(),
     },
     generate: vi.fn(),
     buildContext: vi.fn().mockResolvedValue([]),
     maxTokens: vi.fn().mockResolvedValue(8192),
-  }
+  },
 };
 
 // Assign to global

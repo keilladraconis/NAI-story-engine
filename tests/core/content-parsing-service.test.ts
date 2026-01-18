@@ -74,12 +74,15 @@ describe("ContentParsingService", () => {
     });
 
     it("should parse multi-line content correctly", () => {
-      const text = "The Citadel: A massive fortress.\nIt spans three mountains.\nVery well guarded.";
+      const text =
+        "The Citadel: A massive fortress.\nIt spans three mountains.\nVery well guarded.";
       const result = service.parseDulfsItem(text, FieldID.Locations);
 
       expect(result).not.toBeNull();
       expect(result?.name).toBe("The Citadel");
-      expect(result?.description).toBe("A massive fortress.\nIt spans three mountains.\nVery well guarded.");
+      expect(result?.description).toBe(
+        "A massive fortress.\nIt spans three mountains.\nVery well guarded.",
+      );
     });
 
     it("should use specific field parsing if fieldId is provided", () => {

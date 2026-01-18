@@ -83,8 +83,17 @@ const createBrainstormEditEffects =
   async (action, { dispatch, getState }) => {
     // Handle Start Edit
     if (action.type === "ui/brainstormEditMessage") {
-      const { messageId, content } = action.payload;
+      let { messageId, content } = action.payload;
       const state = getState();
+
+      // If content is not provided, look it up from the store
+      if (content === undefined) {
+        const field = state.story.fields[FieldID.Brainstorm];
+        const messages = (field?.data?.messages || []) as BrainstormMessage[];
+        const msg = messages.find((m) => m.id === messageId);
+        content = msg?.content || "";
+      }
+
       const currentEditId = state.ui.brainstormEditingMessageId;
 
       // 1. If we are already editing another message, save it first

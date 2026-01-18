@@ -137,9 +137,9 @@ export function storyReducer(
       const { messageId, content } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = (field?.data?.messages || []) as BrainstormMessage[];
-      
-      const newMessages = messages.map(msg => 
-        msg.id === messageId ? { ...msg, content } : msg
+
+      const newMessages = messages.map((msg) =>
+        msg.id === messageId ? { ...msg, content } : msg,
       );
 
       return {
@@ -159,7 +159,7 @@ export function storyReducer(
       const field = state.fields[FieldID.Brainstorm];
       const messages = (field?.data?.messages || []) as BrainstormMessage[];
 
-      const newMessages = messages.filter(msg => msg.id !== messageId);
+      const newMessages = messages.filter((msg) => msg.id !== messageId);
 
       return {
         ...state,
@@ -178,8 +178,8 @@ export function storyReducer(
       const field = state.fields[FieldID.Brainstorm];
       const messages = (field?.data?.messages || []) as BrainstormMessage[];
 
-      const newMessages = messages.map(msg => 
-        msg.id === messageId ? { ...msg, content: msg.content + content } : msg
+      const newMessages = messages.map((msg) =>
+        msg.id === messageId ? { ...msg, content: msg.content + content } : msg,
       );
 
       return {
@@ -198,8 +198,8 @@ export function storyReducer(
       const { messageId } = action.payload;
       const field = state.fields[FieldID.Brainstorm];
       const messages = (field?.data?.messages || []) as BrainstormMessage[];
-      
-      const index = messages.findIndex(msg => msg.id === messageId);
+
+      const index = messages.findIndex((msg) => msg.id === messageId);
       if (index === -1) return state;
 
       const targetMessage = messages[index];

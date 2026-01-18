@@ -90,7 +90,7 @@ export const uiBrainstormEditEnded = action("ui/brainstormEditEnded")<{
 // These are Intents because they involve storage side-effects before domain updates
 export const uiBrainstormEditMessage = action("ui/brainstormEditMessage")<{
   messageId: string;
-  content: string;
+  content?: string;
 }>();
 export const uiBrainstormSaveMessageEdit = action(
   "ui/brainstormSaveMessageEdit",
