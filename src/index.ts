@@ -8,8 +8,9 @@ import {
   renderMainSidebar,
   renderBrainstormSidebar,
   renderLorebookPanel,
+  setupBrainstormButton,
 } from "./ui/renderers";
-import { uiLorebookSelected } from "./core/store/actions";
+import { uiLorebookSelected, runtimeStateUpdated } from "./core/store/actions";
 import {
   initialRootState,
   rootReducer,
@@ -29,6 +30,12 @@ import { GenX } from "../lib/gen-x";
     // Start store
     const store = createStore<RootState>(rootReducer, initialRootState);
     const { getState, dispatch, subscribe } = store;
+
+    // Link GenX to Store
+    genX.subscribe((genxState) => {
+      dispatch(runtimeStateUpdated({ genxState }));
+    });
+
     const effects = createEffectRunner(store);
 
     // Register Effects
@@ -45,6 +52,9 @@ import { GenX } from "../lib/gen-x";
     const lorebook = renderLorebookPanel(initialState, dispatch);
 
     await api.v1.ui.register([sidebar, brainstorm, lorebook]);
+
+    // Setup Reactive Components
+    setupBrainstormButton(store);
 
     // Render Loop
     subscribe((state, _action) => {

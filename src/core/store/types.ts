@@ -1,4 +1,5 @@
 import { DulfsFieldID } from "../../config/field-definitions";
+import { GenerationState } from "../../../lib/gen-x";
 
 // --- Story Domain State ---
 
@@ -84,6 +85,9 @@ export interface RuntimeState {
   queue: GenerationRequest[];
   activeRequest: GenerationRequest | null;
   status: GenerationStatus;
+
+  // GenX State Reflection
+  genx: GenerationState;
 
   // Budget
   budgetTimeRemaining: number;

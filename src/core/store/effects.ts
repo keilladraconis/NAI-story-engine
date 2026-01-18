@@ -6,10 +6,9 @@ import {
   brainstormAppendToMessage,
   brainstormUpdateMessage,
   uiBrainstormSaveMessageEdit,
-  uiBrainstormEditMessage,
+  uiBrainstormSubmitUserMessage,
   uiBrainstormEditStarted,
   uiBrainstormEditEnded,
-  uiBrainstormRetry,
   brainstormHistoryPruned,
   generationStarted,
   generationCompleted,
@@ -23,12 +22,21 @@ import { FieldID } from "../../config/field-definitions";
 
 export function registerEffects(runner: { register: (effect: Effect<RootState>) => void }, genX: GenX) {
   runner.register(createBrainstormSubmitEffect(genX));
+  runner.register(createBrainstormInputHandlerEffect());
   runner.register(createBrainstormRetryEffect(genX));
   runner.register(createGenXGenerationEffect(genX));
+  runner.register(createCancellationEffect(genX)); // Add this
   runner.register(createStoryLoadEffect());
   runner.register(createStorySaveEffect());
   runner.register(createBrainstormEditEffects());
 }
+
+// Intent: Cancellation
+const createCancellationEffect = (genX: GenX): Effect<RootState> => (action) => {
+  if (action.type === "ui/requestCancellation") {
+    genX.cancelCurrent();
+  }
+};
 
 // Intent: Brainstorm Retry
 const createBrainstormRetryEffect = (_genX: GenX): Effect<RootState> => async (action, { dispatch, getState }) => {
@@ -148,7 +156,19 @@ const createStoryLoadEffect = (): Effect<RootState> => async (action, { dispatch
   }
 };
 
-// Intent: User Submits Message
+// Intent: User Submits Message (Input Handler)
+const createBrainstormInputHandlerEffect = (): Effect<RootState> => async (action, { dispatch }) => {
+  if (action.type !== "ui/brainstormSubmitRequest") return;
+
+  const inputId = "brainstorm-input";
+  const finalContent = (await api.v1.storyStorage.get(inputId)) || "";
+  
+  if (!finalContent || !finalContent.trim()) return;
+
+  dispatch(uiBrainstormSubmitUserMessage({ content: finalContent }));
+};
+
+// Intent: User Submits Message (Logic)
 const createBrainstormSubmitEffect = (_genX: GenX): Effect<RootState> => async (action, { dispatch, getState }) => {
   if (action.type !== "ui/brainstormSubmitUserMessage") return;
 

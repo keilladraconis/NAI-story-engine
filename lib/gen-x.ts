@@ -96,8 +96,26 @@ export class GenX {
   }
 
   public cancelCurrent() {
+    // 1. Clear queue
+    this.queue = [];
+    
+    // 2. Cancel current task if running
     if (this.currentTask && this.currentTask.signal) {
        this.currentTask.signal.cancel();
+    }
+
+    // 3. Update state immediately (reactive UI will update)
+    // Note: If a task was running, it will reject with "Cancelled" and set status to failed/idle in processQueue loop.
+    // But if we just cleared queue and no task was running (e.g. queued state but not picked up?),
+    // we should ensure status reflects it.
+    
+    // If we are just queued (idle/queued status), we force idle.
+    if (!this.currentTask) {
+        this.updateState({ status: "idle", queueLength: 0 });
+    } else {
+        // If task is running, the signal cancellation will trigger the rejection flow which updates state.
+        // But we update queue length now.
+        this.updateState({ queueLength: 0 }); // Current + 0
     }
   }
 

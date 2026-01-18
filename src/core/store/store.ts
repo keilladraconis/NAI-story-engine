@@ -18,12 +18,23 @@ export type Effect<S> = (action: Action, ctx: EffectContext<S>) => void;
 export type Dispatch = (action: Action) => void;
 type GetState<S> = () => S;
 
-interface Store<S> {
+export interface Store<S> {
   getState: GetState<S>;
   dispatch: Dispatch;
   subscribe: (listener: StateListener<S>) => () => void;
   subscribeToActions: (listener: ActionListener) => () => void;
+  subscribeSelector: <T>(
+    selector: (state: S) => T,
+    listener: (value: T) => void,
+  ) => () => void;
 }
+
+// Selector Subscriptions
+type SelectorSub<S> = {
+  selector: (state: S) => any;
+  listener: (value: any) => void;
+  lastValue: any;
+};
 
 export function createStore<S>(
   reducer: Reducer<S, Action>,
@@ -33,6 +44,18 @@ export function createStore<S>(
 
   const actionListeners = new Set<ActionListener>();
   const stateListeners = new Set<StateListener<S>>();
+
+  const selectorSubs = new Set<SelectorSub<S>>();
+
+  function notifySelectors(next: S) {
+    for (const sub of selectorSubs) {
+      const nextValue = sub.selector(next);
+      if (nextValue !== sub.lastValue) {
+        sub.lastValue = nextValue;
+        sub.listener(nextValue);
+      }
+    }
+  }
 
   return {
     getState: () => state,
@@ -46,6 +69,9 @@ export function createStore<S>(
         for (const l of stateListeners) {
           l(state, action);
         }
+
+        // 3. Notify selectors
+        notifySelectors(next);
       }
 
       // 3. Always notify action listeners
@@ -61,6 +87,19 @@ export function createStore<S>(
     subscribeToActions(listener: ActionListener) {
       actionListeners.add(listener);
       return () => actionListeners.delete(listener);
+    },
+
+    subscribeSelector<T>(
+      selector: (state: S) => T,
+      listener: (value: T) => void,
+    ) {
+      const sub: SelectorSub<S> = {
+        selector,
+        listener,
+        lastValue: selector(state),
+      };
+      selectorSubs.add(sub);
+      return () => selectorSubs.delete(sub);
     },
   };
 }

@@ -7,6 +7,11 @@ export const initialRuntimeState: RuntimeState = {
   activeRequest: null,
   status: "idle",
   budgetTimeRemaining: 0,
+  genx: {
+    status: "idle",
+    queueLength: 0,
+    budgetState: "normal",
+  },
 };
 
 export function runtimeReducer(
@@ -14,6 +19,12 @@ export function runtimeReducer(
   action: Action,
 ): RuntimeState {
   switch (action.type) {
+    case "runtime/stateUpdated":
+      return {
+        ...state,
+        genx: action.payload.genxState,
+      };
+
     case "runtime/segaToggled":
       return {
         ...state,

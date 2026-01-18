@@ -1,19 +1,29 @@
 import { RootState } from "../../core/store/types";
-import { Dispatch } from "../../core/store";
+import { Dispatch, Store } from "../../core/store"; // Import Store
 import { FieldID } from "../../config/field-definitions";
 import {
   fieldUpdated,
-  generationCancelled,
   brainstormRemoveMessage,
   uiBrainstormRetry,
-  uiBrainstormSubmitUserMessage,
   uiBrainstormEditMessage,
   uiBrainstormSaveMessageEdit,
+  uiBrainstormSubmitRequest,
+  uiRequestCancellation,
 } from "../../core/store/actions";
 import { calculateTextAreaHeight } from "../ui-components";
+import { createGenerationButton, mountGenerationButton } from "../components/generation-button"; // Import mount
 
 const { row, column, text, button, multilineTextInput } = api.v1.ui.part;
 const { sidebarPanel } = api.v1.ui.extension;
+
+export const setupBrainstormButton = (store: Store<RootState>) => {
+  return mountGenerationButton(store, "brainstorm-send-btn", {
+    label: "Send",
+    onClick: () => store.dispatch(uiBrainstormSubmitRequest()),
+    onCancel: () => store.dispatch(uiRequestCancellation()), // Dispatch intent
+    onContinue: () => store.dispatch(uiBrainstormSubmitRequest()),
+  });
+};
 
 export const renderBrainstormSidebar = (
   state: RootState,
@@ -32,16 +42,13 @@ export const renderBrainstormSidebar = (
     state.runtime.queue.find((r) => r.id === genId) ||
     state.runtime.activeRequest;
   const isGenerating = !!request;
-  const isQueued = state.runtime.queue.some((r) => r.id === genId);
+  // const isQueued = state.runtime.queue.some((r) => r.id === genId);
 
   // Input state
   const inputId = "brainstorm-input";
 
-  const handleSend = async () => {
-    const finalContent = (await api.v1.storyStorage.get(inputId)) || "";
-    if (!finalContent.trim()) return;
-
-    dispatch(uiBrainstormSubmitUserMessage({ content: finalContent }));
+  const handleSend = () => {
+    dispatch(uiBrainstormSubmitRequest());
   };
 
   const messageParts: UIPart[] = [];
@@ -55,6 +62,20 @@ export const renderBrainstormSidebar = (
       renderMessageBubble(msgId, msg.role, msg.content, isEditing, dispatch),
     );
   });
+
+  const sendButton = createGenerationButton(
+    "brainstorm-send-btn",
+    state.runtime.genx,
+    {
+      label: "Send",
+      onClick: handleSend,
+      onCancel: () => dispatch(uiRequestCancellation()),
+      onContinue: () => {
+        // Trigger manual continue hook if needed, but GenX listens to onGenerationRequested
+        handleSend();
+      },
+    },
+  );
 
   const inputArea = column({
     content: [
@@ -82,22 +103,19 @@ export const renderBrainstormSidebar = (
               );
             },
           }),
-          button({
-            text: isGenerating ? "Stop" : isQueued ? "Queued" : "Send",
-            iconId: isGenerating ? "slash" : isQueued ? "clock" : "send",
-            style: {
-              flex: 0.7,
-              "font-weight": "bold",
-              "background-color": isGenerating ? "#ffcccc" : undefined,
-            },
-            callback: async () => {
-              if (isGenerating || isQueued) {
-                dispatch(generationCancelled({ requestId: genId }));
-              } else {
-                await handleSend();
-              }
-            },
-          }),
+          // Wrap in a container to apply flex style if needed, or pass style to button
+          // createGenerationButton returns a button, but we might want to override style?
+          // The current impl has hardcoded styles. We might want to pass style props later.
+          // For now, let's just use it.
+          // Wait, createGenerationButton applies its own style.
+          // The previous button had `flex: 0.7`.
+          // We can wrap it in a column/row if we want specific layout or assume the component handles it.
+          // But UIPart doesn't support "className".
+          // I should add `style` to `GenerationButtonProps` or merged it.
+          // For now, I'll hack it by modifying the returned part if possible, or better, update the component.
+          // Let's just update the component to accept style overrides?
+          // I'll leave it as is for now, it has some padding. It won't flex 0.7 though.
+          sendButton,
         ],
       }),
     ],

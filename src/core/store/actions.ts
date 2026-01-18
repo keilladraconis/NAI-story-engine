@@ -83,6 +83,9 @@ export const uiBrainstormEditEnded = action("ui/brainstormEditEnded")<{
   messageId: string;
 }>();
 // These are Intents because they involve storage side-effects before domain updates
+export const uiBrainstormSubmitRequest = action(
+  "ui/brainstormSubmitRequest",
+)(); // No payload, reads from storage
 export const uiBrainstormEditMessage = action("ui/brainstormEditMessage")<{
   messageId: string;
   content: string;
@@ -93,6 +96,7 @@ export const uiBrainstormSaveMessageEdit = action("ui/brainstormSaveMessageEdit"
 export const uiBrainstormRetry = action("ui/brainstormRetry")<{
   messageId: string;
 }>();
+export const uiRequestCancellation = action("ui/requestCancellation")(); // Intent to cancel current/queued generation
 
 
 export const segaToggled = action("runtime/segaToggled")();
@@ -117,6 +121,9 @@ export const generationCancelled = action("runtime/generationCancelled")<{
 }>();
 export const budgetUpdated = action("runtime/budgetUpdated")<{
   timeRemaining: number;
+}>();
+export const runtimeStateUpdated = action("runtime/stateUpdated")<{
+  genxState: any; // We'll refine the type later or import GenerationState
 }>();
 
 // Domain: GenX
