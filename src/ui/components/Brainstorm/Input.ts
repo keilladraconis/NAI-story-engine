@@ -2,7 +2,7 @@ import { Component, createEvents } from "../../../../lib/nai-act";
 import { BrainstormActions } from "./types";
 import { IDS } from "../../framework/ids";
 import { RootState } from "../../../core/store/types";
-import { createGenerationButton } from "../generation-button";
+import { GenerationButton } from "../GenerationButton";
 
 export interface InputProps {
   actions: BrainstormActions;
@@ -24,25 +24,18 @@ const events = createEvents({
 export const Input: Component<InputProps, RootState> = {
   id: () => `${IDS.BRAINSTORM.INPUT}-area`,
 
-  describe(props) {
+  describe(props, state) {
     const ids = IDS.BRAINSTORM;
 
-    // Default "Idle" button
-    const genButton = createGenerationButton(
-      ids.SEND_BTN,
-      {
-        status: "idle",
-        queueLength: 0,
-        budgetState: "normal",
-      },
-      {
-        label: "Send",
-        onClick: () => events.submit(props),
-        onCancel: () => events.cancel(props),
-        onContinue: () => events.continue(props),
-        style: STYLES.SEND_BTN,
-      },
-    );
+    // Default "Idle" button via component
+    const genButton = GenerationButton.describe({
+      id: ids.SEND_BTN,
+      label: "Send",
+      style: STYLES.SEND_BTN,
+      onClick: () => events.submit(props),
+      onCancel: () => events.cancel(props),
+      onContinue: () => events.continue(props),
+    }, state) as UIPart;
 
     return column({
       content: [
@@ -68,27 +61,29 @@ export const Input: Component<InputProps, RootState> = {
     });
   },
 
-  bind({ useSelector, updateParts }, props) {
+  bind(ctx, props) {
     const ids = IDS.BRAINSTORM;
+    const { useSelector, updateParts } = ctx;
 
-    // Watch Generation State
+    // Delegate Binding to GenerationButton
+    GenerationButton.bind(ctx, {
+      id: ids.SEND_BTN,
+      label: "Send",
+      style: STYLES.SEND_BTN,
+      onClick: () => events.submit(props),
+      onCancel: () => events.cancel(props),
+      onContinue: () => events.continue(props),
+    });
+
+    // Watch Generation State for Input Disabling
     useSelector(
-      (state) => state.runtime.genx,
-      (genxState) => {
-        const genButton = createGenerationButton(ids.SEND_BTN, genxState, {
-          label: "Send",
-          onClick: () => events.submit(props),
-          onCancel: () => events.cancel(props),
-          onContinue: () => events.continue(props),
-          style: STYLES.SEND_BTN,
-        });
-
+      (state) => state.runtime.genx.status,
+      (status) => {
         updateParts([
           {
             id: ids.INPUT,
-            disabled: genxState.status === "generating",
-          },
-          genButton,
+            disabled: status === "generating",
+          }
         ]);
       },
     );

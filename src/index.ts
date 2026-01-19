@@ -1,6 +1,7 @@
 import { createEffectRunner, createStore, RootState } from "./core/store";
 import { registerEffects } from "./core/store/effects";
-import { renderMainSidebar, renderLorebookPanel } from "./ui/renderers";
+import { Sidebar } from "./ui/components/Sidebar/Sidebar";
+import { LorebookPanel } from "./ui/components/Lorebook/LorebookPanel";
 import { BrainstormManager } from "./ui/controllers/brainstorm/manager";
 import { uiLorebookSelected, runtimeStateUpdated } from "./core/store/actions";
 import {
@@ -8,6 +9,7 @@ import {
   rootReducer,
 } from "./core/store/reducers/rootReducer";
 import { GenX } from "../lib/gen-x";
+import { mount } from "../lib/nai-act";
 
 (async () => {
   try {
@@ -23,7 +25,7 @@ import { GenX } from "../lib/gen-x";
 
     // Start store
     const store = createStore<RootState>(rootReducer, initialRootState);
-    const { getState, dispatch, subscribe } = store;
+    const { getState, dispatch } = store;
 
     // Link GenX to Store
     genX.subscribe((genxState) => {
@@ -39,35 +41,26 @@ import { GenX } from "../lib/gen-x";
       effects.run(action);
     });
 
-    // Managers
+    // Managers & Components
     const brainstormManager = new BrainstormManager(store);
 
     // Initial Render & Registration
     const initialState = getState();
-    const sidebar = renderMainSidebar(initialState, dispatch);
+    const sidebar = Sidebar.describe({}, initialState) as UIExtension;
     const brainstorm = brainstormManager.register();
-    const lorebook = renderLorebookPanel(initialState, dispatch);
+    const lorebook = LorebookPanel.describe({}, initialState) as UIExtension;
 
     await api.v1.ui.register([sidebar, brainstorm, lorebook]);
 
     // Mount Managers (Start Subscriptions)
     brainstormManager.mount();
-
-    // Render Loop
-    subscribe((state, _action) => {
-      try {
-        const updatedSidebar = renderMainSidebar(state, dispatch);
-        const updatedLorebook = renderLorebookPanel(state, dispatch);
-
-        // Brainstorm updates are handled by BrainstormManager internally
-
-        api.v1.ui.update([updatedSidebar, updatedLorebook] as (UIExtension & {
-          id: string;
-        })[]);
-      } catch (e) {
-        api.v1.log("Render error:", e);
-      }
-    });
+    
+    try {
+        mount(Sidebar, {}, store);
+        mount(LorebookPanel, {}, store);
+    } catch (err) {
+        api.v1.log("Mount error:", err);
+    }
 
     // Hydrate State
     dispatch({ type: "story/loadRequested", payload: undefined });

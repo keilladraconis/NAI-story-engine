@@ -87,13 +87,14 @@ export interface BindContext<State> {
     equalityFn?: (a: T, b: T) => boolean,
   ) => void;
   updateParts: (parts: (Partial<UIPart> & { id: string })[]) => void;
-  mount: <P>(comp: Component<P, State>, props: P) => UIPart;
+  dispatch: (action: any) => void;
+  mount: <P>(comp: Component<P, State>, props: P) => UIPart | UIExtension;
   unmount: <P>(comp: Component<P, State>, props: P) => void;
 }
 
 export interface Component<Props, State = any> {
   id(props: Props): string;
-  describe(props: Props): UIPart;
+  describe(props: Props, state: State): UIPart | UIExtension;
   bind(ctx: BindContext<State>, props: Props): void;
 }
 
@@ -111,7 +112,7 @@ export function mount<Props, State>(
   }
 
   // 1. Describe
-  const part = component.describe(props);
+  const part = component.describe(props, store.getState());
   if (!part?.id) {
     throw new Error(`describe() must return a UIPart with an id`);
   }
@@ -125,6 +126,7 @@ export function mount<Props, State>(
       unsubs.push(unsub);
     },
     updateParts: api.v1.ui.updateParts,
+    dispatch: store.dispatch,
     mount: (comp, p) => mount(comp, p, store),
     unmount: (comp, p) => unmount(comp, p),
   };

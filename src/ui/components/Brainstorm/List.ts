@@ -1,6 +1,6 @@
 import { BrainstormActions } from "./types";
 import { IDS } from "../../framework/ids";
-import { BrainstormMessage } from "../../../core/store/types";
+import { BrainstormMessage, RootState } from "../../../core/store/types";
 import { Message } from "./Message";
 
 export interface ListProps {
@@ -11,12 +11,12 @@ export interface ListProps {
 const { column } = api.v1.ui.part;
 
 export const List = {
-  describe(props: ListProps) {
+  describe(props: ListProps, state: RootState) {
     // Render initial list (reversed)
     const children = props.initialMessages
       .slice()
       .reverse()
-      .map((msg) => Message.describe({ message: msg, actions: props.actions }));
+      .map((msg) => Message.describe({ message: msg, actions: props.actions }, state) as UIPart);
 
     return column({
       id: IDS.BRAINSTORM.LIST,

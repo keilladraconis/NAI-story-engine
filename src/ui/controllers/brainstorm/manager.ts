@@ -107,11 +107,11 @@ export class BrainstormManager {
     const listPart = List.describe({
       initialMessages: messages,
       actions: this.actions,
-    });
+    }, state) as UIPart;
 
     const inputPart = Input.describe({
       actions: this.actions,
-    });
+    }, state) as UIPart;
 
     return sidebarPanel({
       id: "kse-brainstorm-sidebar",
