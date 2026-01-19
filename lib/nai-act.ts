@@ -10,6 +10,9 @@ import { Store } from "./nai-store";
 
 const mountedComponents = new Map<string, MountedComponent>();
 
+// Selector-Effect Mutex
+let inEffect = false;
+
 // ---------------------------------------------
 // Mounted component record
 // ---------------------------------------------
@@ -52,19 +55,24 @@ export function createUseSelector<State>(store: Store<State>) {
     effect: (value: T, prev: T | undefined) => void,
     equalityFn: (a: T, b: T) => boolean = (a, b) => a === b,
   ): () => void {
-    let last = selector(store.getState());
-    effect(last, undefined);
+    inEffect = true;
+    try {
+      let last = selector(store.getState());
+      effect(last, undefined);
 
-    const unsubscribe = store.subscribe((state) => {
-      const next = selector(state);
-      if (!equalityFn(next, last)) {
-        const prev = last;
-        last = next;
-        effect(next, prev);
-      }
-    });
+      const unsubscribe = store.subscribe((state) => {
+        const next = selector(state);
+        if (!equalityFn(next, last)) {
+          const prev = last;
+          last = next;
+          effect(next, prev);
+        }
+      });
 
-    return unsubscribe;
+      return unsubscribe;
+    } finally {
+      inEffect = false;
+    }
   };
 }
 
@@ -94,6 +102,8 @@ export function mount<Props, State>(
   props: Props,
   store: Store<State>,
 ) {
+  if (inEffect)
+    throw new Error("mount() is not allowed inside reactive effects");
   const id = component.id(props);
   if (mountedComponents.has(id)) {
     // Already mounted. In strict mode we might throw.

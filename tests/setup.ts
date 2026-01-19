@@ -55,6 +55,19 @@ const apiMock = {
     },
     ui: {
       toast: vi.fn(),
+      updateParts: vi.fn(),
+      part: {
+        button: vi.fn((props) => ({ ...props, type: "button" })),
+        text: vi.fn((props) => ({ ...props, type: "text" })),
+        column: vi.fn((props) => ({ ...props, type: "column" })),
+        row: vi.fn((props) => ({ ...props, type: "row" })),
+        multilineTextInput: vi.fn((props) => ({ ...props, type: "multilineTextInput" })),
+      },
+      update: vi.fn(),
+      register: vi.fn(),
+      extension: {
+        sidebarPanel: vi.fn((props) => ({ ...props, type: "sidebarPanel" })),
+      },
     },
     generate: vi.fn(),
     buildContext: vi.fn().mockResolvedValue([]),

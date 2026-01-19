@@ -16,6 +16,7 @@ import {
   uiBrainstormSaveMessageEdit,
   uiBrainstormRetry,
   brainstormRemoveMessage,
+  uiUserPresenceConfirmed,
 } from "../../../core/store/actions";
 
 const { column } = api.v1.ui.part;
@@ -54,10 +55,10 @@ export class BrainstormManager {
 
     // 3. Subscribe to Message List (Structure)
     this.unsubscribeMessages = this.store.subscribeSelector(
-      (state) => this.getMessages(state),
-      (messages) => {
+      (state) => this.getMessages(state).map((m) => m.id).join(","),
+      () => {
         // Full Refresh on Structural Change
-        this.refresh(messages);
+        this.refresh(this.getMessages(this.store.getState()));
       },
     );
   }
@@ -182,10 +183,11 @@ export class BrainstormManager {
         dispatch(uiBrainstormEditMessage({ messageId: msgId })),
       onSave: (msgId) =>
         dispatch(uiBrainstormSaveMessageEdit({ messageId: msgId })),
-      onRetry: (msgId) => dispatch(uiBrainstormRetry({ messageId: msgId })),
-      onDelete: (msgId) =>
+      onRetry: (msgId: string) => dispatch(uiBrainstormRetry({ messageId: msgId })),
+      onDelete: (msgId: string) =>
         dispatch(brainstormRemoveMessage({ messageId: msgId })),
       onCancelRequest: () => dispatch(uiRequestCancellation()),
+      onContinueRequest: () => dispatch(uiUserPresenceConfirmed()),
     };
   }
 }

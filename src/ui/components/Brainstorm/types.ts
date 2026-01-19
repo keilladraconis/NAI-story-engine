@@ -6,4 +6,5 @@ export type BrainstormActions = {
   onRetry: (msgId: string) => void;
   onDelete: (msgId: string) => void;
   onCancelRequest: () => void;
+  onContinueRequest: () => void;
 };

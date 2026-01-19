@@ -126,6 +126,20 @@ export class GenX {
     }
   }
 
+  public userInteraction() {
+    if (this._state.budgetState === "waiting_for_user") {
+      this.updateState({ budgetState: "waiting_for_timer" });
+
+      // If timer has already expired, resolve immediately
+      if (
+        this._state.budgetWaitEndTime &&
+        Date.now() >= this._state.budgetWaitEndTime
+      ) {
+        this.resolveBudgetWait();
+      }
+    }
+  }
+
   // --- Internal Logic ---
 
   private updateState(partial: Partial<GenerationState>) {
@@ -243,9 +257,8 @@ export class GenX {
     // Listen for manual "Generate" clicks from user to unblock waiting
     api.v1.hooks.register("onGenerationRequested", (params) => {
       if (!params.scriptInitiated) {
-        this.resolveBudgetWait();
+        this.userInteraction();
       }
-      // Passive listener, no return value needed
     });
   }
 
@@ -273,8 +286,9 @@ export class GenX {
         `Waiting for budget: Have ${available}, Need ${requested}, Time ${time}ms`,
       );
 
-      // 1. Wait for User (or timeout start)
       await new Promise<void>((resolve, reject) => {
+        const targetEnd = Date.now() + time;
+
         const resolver = () => {
           resolve();
         };
@@ -286,33 +300,42 @@ export class GenX {
           status: "waiting_for_user",
           budgetState: "waiting_for_user",
           budgetWaitTime: time,
-          budgetWaitEndTime: Date.now() + time,
+          budgetWaitEndTime: targetEnd,
+          budgetTimeRemaining: time,
           budgetResolver: resolver,
           budgetRejecter: rejecter,
         });
 
-        // Polling for cancellation if signal provided (since signal has no events)
-        if (signal) {
-          const check = () => {
-            if (this._state.budgetState !== "waiting_for_user") return; // Stopped externally
-            if (signal.cancelled) {
-              rejecter("Cancelled");
-              return;
-            }
-            api.v1.timers.setTimeout(check, 200);
-          };
-          check();
-        }
+        // Ticker for budget timer
+        const tick = () => {
+          // Check cancellation
+          if (signal?.cancelled) {
+            rejecter("Cancelled");
+            return;
+          }
+
+          // Check explicit resolver call (manual resolveBudgetWait)
+          if (!this._state.budgetResolver) {
+            // Already resolved externally
+            return;
+          }
+
+          const now = Date.now();
+          const remaining = Math.max(0, targetEnd - now);
+
+          this.updateState({ budgetTimeRemaining: remaining });
+
+          // Only resolve if in timer state AND time is up
+          if (this._state.budgetState === "waiting_for_timer" && remaining === 0) {
+            this.resolveBudgetWait();
+            return;
+          }
+
+          api.v1.timers.setTimeout(tick, 1000);
+        };
+
+        tick();
       });
-
-      // 2. Start Timer Countdown
-      // The user clicked continue (or logic proceeded). Now we wait for the actual time.
-      // Re-calculate time as it might have passed.
-      const freshTime = api.v1.script.getTimeUntilAllowedOutput(requested);
-
-      if (freshTime > 0) {
-        await this.runBudgetTimer(freshTime, signal);
-      }
 
       // 3. Final Wait (Platform enforcement)
       await api.v1.script.waitForAllowedOutput(requested);
@@ -323,43 +346,6 @@ export class GenX {
         budgetTimeRemaining: undefined,
       });
     }
-  }
-
-  private runBudgetTimer(
-    durationMs: number,
-    signal?: CancellationSignal,
-  ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const targetEnd = Date.now() + durationMs;
-
-      this.updateState({
-        status: "waiting_for_budget",
-        budgetState: "waiting_for_timer",
-        budgetWaitEndTime: targetEnd,
-        budgetTimeRemaining: durationMs,
-        budgetResolver: () => resolve(),
-        budgetRejecter: (reason) => reject(reason),
-      });
-
-      const tick = () => {
-        if (this._state.budgetState !== "waiting_for_timer") return; // Stopped externally
-        if (signal?.cancelled) {
-          reject("Cancelled");
-          return;
-        }
-
-        const now = Date.now();
-        if (now >= targetEnd) {
-          resolve();
-          return;
-        }
-
-        this.updateState({ budgetTimeRemaining: Math.max(0, targetEnd - now) });
-        api.v1.timers.setTimeout(tick, 1000);
-      };
-
-      tick();
-    });
   }
 
   private isTransientError(e: any): boolean {

@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1768761548
+updatedAt: 1768778610
 config:
   - name: system_prompt
     prettyName: System Prompt
@@ -82,8 +82,7 @@ config:
 
   - name: lorebook_generate_prompt
     prettyName: Lorebook Generate Prompt
-    description:
-      Smart prompt for generating diverse Lorebook entries (Characters,
+    description: Smart prompt for generating diverse Lorebook entries (Characters,
       Locations, Systems).
     type: string
     multiline: true

@@ -50,7 +50,6 @@ export const Message: Component<MessageProps, RootState> = {
     });
 
     const viewButtons = row({
-      id: `${ids.ROOT}-view-btns`,
       style: {
         "margin-top": "5px",
         gap: "5px",
@@ -113,7 +112,6 @@ export const Message: Component<MessageProps, RootState> = {
       content: [
         textInput,
         row({
-          id: `${ids.ROOT}-edit-btns`,
           style: { "justify-content": "flex-end", "margin-top": "4px" },
           content: [saveButton],
         }),
@@ -127,7 +125,6 @@ export const Message: Component<MessageProps, RootState> = {
       style: { "justify-content": align, width: "100%" },
       content: [
         column({
-          id: `${ids.ROOT}-bubble`,
           style: {
             "background-color": bgColor,
             padding: "10px",
@@ -137,7 +134,6 @@ export const Message: Component<MessageProps, RootState> = {
           },
           content: [
             text({
-              id: `${ids.ROOT}-label`,
               text: isUser ? "You" : "Brainstorm",
               style: {
                 "font-size": "0.7em",

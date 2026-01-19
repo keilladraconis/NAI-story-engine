@@ -101,6 +101,7 @@ export const uiBrainstormRetry = action("ui/brainstormRetry")<{
   messageId: string;
 }>();
 export const uiRequestCancellation = action("ui/requestCancellation")(); // Intent to cancel current/queued generation
+export const uiUserPresenceConfirmed = action("ui/userPresenceConfirmed")();
 
 export const segaToggled = action("runtime/segaToggled")();
 // Deprecated/Legacy runtime actions?

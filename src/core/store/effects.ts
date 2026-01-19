@@ -6,7 +6,6 @@ import {
   brainstormAppendToMessage,
   brainstormUpdateMessage,
   uiBrainstormSaveMessageEdit,
-  uiBrainstormSubmitUserMessage,
   uiBrainstormEditStarted,
   uiBrainstormEditEnded,
   brainstormHistoryPruned,
@@ -19,16 +18,17 @@ import {
 import { buildBrainstormStrategy } from "./utils/context-builder";
 import { initialStoryState } from "./reducers/storyReducer";
 import { FieldID } from "../../config/field-definitions";
+import { IDS } from "../../ui/framework/ids";
 
 export function registerEffects(
   runner: { register: (effect: Effect<RootState>) => void },
   genX: GenX,
 ) {
   runner.register(createBrainstormSubmitEffect(genX));
-  runner.register(createBrainstormInputHandlerEffect());
   runner.register(createBrainstormRetryEffect(genX));
   runner.register(createGenXGenerationEffect(genX));
   runner.register(createCancellationEffect(genX)); // Add this
+  runner.register(createUserPresenceEffect(genX));
   runner.register(createStoryLoadEffect());
   runner.register(createStorySaveEffect());
   runner.register(createBrainstormEditEffects());
@@ -43,11 +43,24 @@ const createCancellationEffect =
     }
   };
 
+// Intent: User Presence Confirmed
+const createUserPresenceEffect =
+  (genX: GenX): Effect<RootState> =>
+  (action) => {
+    if (action.type === "ui/userPresenceConfirmed") {
+      genX.userInteraction();
+    }
+  };
+
 // Intent: Brainstorm Retry
 const createBrainstormRetryEffect =
-  (_genX: GenX): Effect<RootState> =>
+  (genX: GenX): Effect<RootState> =>
   async (action, { dispatch, getState }) => {
     if (action.type !== "ui/brainstormRetry") return;
+
+    // Cancel any ongoing generation to prevent "zombie" streams from flooding the store
+    // and causing UI lag/crashes when retrying rapidly.
+    genX.cancelCurrent();
 
     const { messageId } = action.payload;
 
@@ -171,29 +184,14 @@ const createStoryLoadEffect =
     }
   };
 
-// Intent: User Submits Message (Input Handler)
-const createBrainstormInputHandlerEffect =
-  (): Effect<RootState> =>
-  async (action, { dispatch }) => {
-    if (action.type !== "ui/brainstormSubmitUserMessage") return;
-
-    const inputId = "brainstorm-input";
-    const finalContent = (await api.v1.storyStorage.get(inputId)) || "";
-
-    if (!finalContent || !finalContent.trim()) return;
-
-    dispatch(uiBrainstormSubmitUserMessage());
-  };
-
 // Intent: User Submits Message (Logic)
 const createBrainstormSubmitEffect =
   (_genX: GenX): Effect<RootState> =>
   async (action, { dispatch, getState }) => {
     if (action.type !== "ui/brainstormSubmitUserMessage") return;
 
-    const inputId = "brainstorm-input";
-    const content = (await api.v1.storyStorage.get(inputId)) || "";
-    await api.v1.storyStorage.set("brainstorm-input", "");
+    const content = (await api.v1.storyStorage.get(IDS.BRAINSTORM.INPUT)) || "";
+    await api.v1.storyStorage.set(IDS.BRAINSTORM.INPUT, "");
 
     let assistantId;
     // If the user sent a message, we add the message and an empty assistant placeholder.

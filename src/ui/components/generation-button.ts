@@ -2,6 +2,10 @@ import { RootState } from "../../core/store";
 import { GenerationState } from "../../../lib/gen-x";
 import { Store } from "../../core/store/store";
 import { NAI_DARK_BACKGROUND, NAI_HEADER, NAI_WARNING } from "../colors";
+import {
+  uiUserPresenceConfirmed,
+  uiRequestCancellation,
+} from "../../core/store/actions";
 
 const { button } = api.v1.ui.part;
 
@@ -9,7 +13,7 @@ export interface GenerationButtonProps {
   label?: string;
   onClick: () => void;
   onCancel: () => void;
-  onContinue?: () => void; // For budget warnings
+  onContinue: () => void; // For budget warnings
   style: any;
 }
 
@@ -36,15 +40,13 @@ export function createGenerationButton(
   if (status === "waiting_for_user" || budgetState === "waiting_for_user") {
     return button({
       id: id,
-      text: label ? `Continue` : " Continue",
+      text: label ? `Continue` : "",
       iconId: "fast-forward",
       style: {
         background: NAI_HEADER,
         ...props.style,
       },
-      callback: () => {
-        if (props.onContinue) props.onContinue();
-      },
+      callback: props.onContinue,
     }) as UIPart & { id: string };
   }
 
@@ -104,8 +106,21 @@ export function mountGenerationButton(
   return store.subscribeSelector(
     (state: RootState) => state.runtime.genx,
     (genxState: GenerationState) => {
+      // Augment props with store actions
+      const augmentedProps: GenerationButtonProps = {
+        ...props,
+        onCancel: () => {
+          store.dispatch(uiRequestCancellation());
+          props.onCancel();
+        },
+        onContinue: () => {
+          store.dispatch(uiUserPresenceConfirmed());
+          props.onContinue();
+        },
+      };
+
       // Create the updated part
-      const part = createGenerationButton(id, genxState, props);
+      const part = createGenerationButton(id, genxState, augmentedProps);
 
       // Update via API
       if (part) {
