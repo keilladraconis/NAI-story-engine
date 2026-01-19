@@ -55,7 +55,10 @@ export class BrainstormManager {
 
     // 3. Subscribe to Message List (Structure)
     this.unsubscribeMessages = this.store.subscribeSelector(
-      (state) => this.getMessages(state).map((m) => m.id).join(","),
+      (state) =>
+        this.getMessages(state)
+          .map((m) => m.id)
+          .join(","),
       () => {
         // Full Refresh on Structural Change
         this.refresh(this.getMessages(this.store.getState()));
@@ -183,7 +186,8 @@ export class BrainstormManager {
         dispatch(uiBrainstormEditMessage({ messageId: msgId })),
       onSave: (msgId) =>
         dispatch(uiBrainstormSaveMessageEdit({ messageId: msgId })),
-      onRetry: (msgId: string) => dispatch(uiBrainstormRetry({ messageId: msgId })),
+      onRetry: (msgId: string) =>
+        dispatch(uiBrainstormRetry({ messageId: msgId })),
       onDelete: (msgId: string) =>
         dispatch(brainstormRemoveMessage({ messageId: msgId })),
       onCancelRequest: () => dispatch(uiRequestCancellation()),

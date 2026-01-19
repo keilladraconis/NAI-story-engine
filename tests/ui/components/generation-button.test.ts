@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createStore } from "../../../src/core/store/store";
-import { rootReducer, initialRootState } from "../../../src/core/store/reducers/rootReducer";
+import {
+  rootReducer,
+  initialRootState,
+} from "../../../src/core/store/reducers/rootReducer";
 import { mountGenerationButton } from "../../../src/ui/components/generation-button";
 import { runtimeStateUpdated } from "../../../src/core/store/actions";
 import { GenerationState } from "../../../lib/gen-x";
@@ -30,13 +33,13 @@ describe("GenerationButton Component", () => {
           budgetState: "normal",
           ...partial,
         },
-      })
+      }),
     );
   };
 
   it("should render 'Send' (Idle) state", () => {
     mountGenerationButton(store, buttonId, props);
-    
+
     // Trigger update to queued then back to idle to verify idle rendering
     updateGenXState({ status: "queued", queueLength: 1 });
     updateGenXState({ status: "idle", queueLength: 0 });
@@ -50,7 +53,7 @@ describe("GenerationButton Component", () => {
 
   it("should render 'Queued' state and wire Cancel action", () => {
     mountGenerationButton(store, buttonId, props);
-    
+
     updateGenXState({ status: "queued", queueLength: 1 });
 
     const callArgs = (api.v1.ui.updateParts as any).mock.lastCall[0];
@@ -61,8 +64,8 @@ describe("GenerationButton Component", () => {
 
     // Simulate click
     buttonPart.callback();
-    
-    // Check if onCancel prop was called (and implicitly the action would be dispatched if we were checking store.dispatch, 
+
+    // Check if onCancel prop was called (and implicitly the action would be dispatched if we were checking store.dispatch,
     // but here we check if the wrapped callback calls our spy)
     expect(props.onCancel).toHaveBeenCalled();
     // We can also spy on store.dispatch if we wanted to verify the action type
@@ -70,7 +73,7 @@ describe("GenerationButton Component", () => {
 
   it("should render 'Cancel' (Generating) state", () => {
     mountGenerationButton(store, buttonId, props);
-    
+
     updateGenXState({ status: "generating" });
 
     const callArgs = (api.v1.ui.updateParts as any).mock.lastCall[0];
@@ -86,8 +89,11 @@ describe("GenerationButton Component", () => {
 
   it("should render 'Continue' (Waiting for User) state", () => {
     mountGenerationButton(store, buttonId, props);
-    
-    updateGenXState({ status: "waiting_for_user", budgetState: "waiting_for_user" });
+
+    updateGenXState({
+      status: "waiting_for_user",
+      budgetState: "waiting_for_user",
+    });
 
     const callArgs = (api.v1.ui.updateParts as any).mock.lastCall[0];
     const buttonPart = callArgs[0];
@@ -101,11 +107,11 @@ describe("GenerationButton Component", () => {
 
   it("should render Timer (Waiting for Budget) state", () => {
     mountGenerationButton(store, buttonId, props);
-    
-    updateGenXState({ 
-      status: "waiting_for_budget", 
+
+    updateGenXState({
+      status: "waiting_for_budget",
       budgetState: "waiting_for_timer",
-      budgetTimeRemaining: 5000 
+      budgetTimeRemaining: 5000,
     });
 
     const callArgs = (api.v1.ui.updateParts as any).mock.lastCall[0];

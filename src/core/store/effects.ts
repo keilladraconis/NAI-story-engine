@@ -3,7 +3,6 @@ import { RootState, BrainstormMessage } from "./types";
 import { GenX } from "../../../lib/gen-x";
 import {
   brainstormAddMessage,
-  brainstormAppendToMessage,
   brainstormUpdateMessage,
   uiBrainstormSaveMessageEdit,
   uiBrainstormEditStarted,
@@ -231,6 +230,8 @@ const createGenXGenerationEffect =
 
     dispatch(generationStarted({ requestId }));
 
+    let accumulatedText = "";
+
     try {
       await genX.generate(
         messages,
@@ -238,13 +239,14 @@ const createGenXGenerationEffect =
         (choices, _final) => {
           const text = choices[0]?.text || "";
           if (text) {
+            accumulatedText += text;
+
             if (target.type === "brainstorm") {
-              dispatch(
-                brainstormAppendToMessage({
-                  messageId: target.messageId,
-                  content: text,
-                }),
-              );
+              // Optimization: Stream directly to UI to avoid Redux overhead during high-frequency updates
+              const uiId = IDS.BRAINSTORM.message(
+                target.messageId,
+              ).TEXT_DISPLAY;
+              api.v1.ui.updateParts([{ id: uiId, text: accumulatedText }]);
             } else if (target.type === "field") {
               // Handle generic field streaming if needed
               // dispatch(fieldAppend({ fieldId: target.fieldId, content: text }));
@@ -254,11 +256,23 @@ const createGenXGenerationEffect =
         "background",
         await api.v1.createCancellationSignal(),
       );
+
       dispatch(generationCompleted({ requestId }));
     } catch (error: any) {
       api.v1.log("Generation failed:", error);
       dispatch(
         generationFailed({ requestId, error: error.message || String(error) }),
       );
+    } finally {
+      // Always sync whatever we managed to generate to the store
+      // This prevents "ghost text" where the UI shows streamed content but the store is empty
+      if (target.type === "brainstorm" && accumulatedText) {
+        dispatch(
+          brainstormUpdateMessage({
+            messageId: target.messageId,
+            content: accumulatedText,
+          }),
+        );
+      }
     }
   };

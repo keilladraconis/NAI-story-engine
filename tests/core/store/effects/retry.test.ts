@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { createStore } from "../../../../src/core/store/store";
-import { rootReducer, initialRootState } from "../../../../src/core/store/reducers/rootReducer";
+import {
+  rootReducer,
+  initialRootState,
+} from "../../../../src/core/store/reducers/rootReducer";
 import { registerEffects } from "../../../../src/core/store/effects";
 import { uiBrainstormRetry } from "../../../../src/core/store/actions";
 import { GenX } from "../../../../lib/gen-x";
@@ -16,8 +19,11 @@ const mockGenX = {
 describe("Brainstorm Effects", () => {
   it("should cancel current generation on retry", () => {
     const store = createStore(rootReducer, initialRootState);
-    const runner = { register: (effect: any) => store.subscribeToActions((action) => effect(action, store)) };
-    
+    const runner = {
+      register: (effect: any) =>
+        store.subscribeToActions((action) => effect(action, store)),
+    };
+
     registerEffects(runner as any, mockGenX);
 
     // Dispatch retry

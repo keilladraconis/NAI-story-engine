@@ -77,17 +77,13 @@ export const Input: Component<InputProps, RootState> = {
     useSelector(
       (state) => state.runtime.genx,
       (genxState) => {
-        const genButton = createGenerationButton(
-          ids.SEND_BTN,
-          genxState,
-          {
-            label: "Send",
-            onClick: () => events.submit(props),
-            onCancel: () => events.cancel(props),
-            onContinue: () => events.continue(props),
-            style: STYLES.SEND_BTN,
-          },
-        );
+        const genButton = createGenerationButton(ids.SEND_BTN, genxState, {
+          label: "Send",
+          onClick: () => events.submit(props),
+          onCancel: () => events.cancel(props),
+          onContinue: () => events.continue(props),
+          style: STYLES.SEND_BTN,
+        });
 
         updateParts([
           {

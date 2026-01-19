@@ -326,7 +326,10 @@ export class GenX {
           this.updateState({ budgetTimeRemaining: remaining });
 
           // Only resolve if in timer state AND time is up
-          if (this._state.budgetState === "waiting_for_timer" && remaining === 0) {
+          if (
+            this._state.budgetState === "waiting_for_timer" &&
+            remaining === 0
+          ) {
             this.resolveBudgetWait();
             return;
           }

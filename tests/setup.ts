@@ -17,11 +17,11 @@ const apiMock = {
       register: vi.fn(),
     },
     timers: {
-      setTimeout: vi.fn((cb, delay) => setTimeout(cb, delay) as any),
+      setTimeout: vi.fn((cb, delay) => globalThis.setTimeout(cb, delay) as any),
       clearTimeout: vi.fn((id) => {
-        clearTimeout(id);
+        globalThis.clearTimeout(id);
       }),
-      sleep: vi.fn((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+      sleep: vi.fn((ms) => new Promise((resolve) => globalThis.setTimeout(resolve, ms))),
     },
     script: {
       getAllowedOutput: vi.fn(() => 10000),
@@ -76,4 +76,4 @@ const apiMock = {
 };
 
 // Assign to global
-(global as any).api = apiMock;
+(globalThis as any).api = apiMock;

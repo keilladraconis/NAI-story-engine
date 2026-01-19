@@ -44,6 +44,7 @@ export function createGenerationButton(
       iconId: "fast-forward",
       style: {
         background: NAI_HEADER,
+        color: NAI_DARK_BACKGROUND,
         ...props.style,
       },
       callback: props.onContinue,
