@@ -45,7 +45,6 @@ export const Input: Component<InputProps, RootState> = {
     );
 
     return column({
-      id: `${ids.INPUT}-area`,
       content: [
         multilineTextInput({
           id: ids.INPUT,
@@ -58,7 +57,6 @@ export const Input: Component<InputProps, RootState> = {
           style: { gap: "8px", "margin-top": "8px" },
           content: [
             button({
-              id: ids.CLEAR_BTN,
               text: "Clear",
               style: { flex: 0.3 },
               callback: () => events.clear(props),

@@ -19,7 +19,6 @@ export const IDS = {
     INPUT: "kse-brainstorm-input",
     SEND_BTN: "kse-brainstorm-send-btn",
     CANCEL_BTN: "kse-brainstorm-cancel-btn",
-    CLEAR_BTN: "kse-brainstorm-clear-btn",
 
     // Message specific IDs
     message: (msgId: string) => ({
@@ -28,12 +27,6 @@ export const IDS = {
       EDIT_CONTAINER: `kse-bs-msg-${msgId}-edit`,
       TEXT_DISPLAY: `kse-bs-msg-${msgId}-text`,
       TEXT_INPUT: `kse-bs-msg-${msgId}-input`,
-      ACTIONS: {
-        EDIT: `kse-bs-msg-${msgId}-btn-edit`,
-        SAVE: `kse-bs-msg-${msgId}-btn-save`,
-        RETRY: `kse-bs-msg-${msgId}-btn-retry`,
-        DELETE: `kse-bs-msg-${msgId}-btn-delete`,
-      },
     }),
   },
 };

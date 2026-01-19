@@ -71,11 +71,65 @@ describe("Generation Effects", () => {
     expect(textUpdates[0][0][0].text).toBe("Hello ");
     expect(textUpdates[1][0][0].text).toBe("Hello World");
 
-    // 4. Verify Store Sync
-    const state = store.getState();
-    const field = state.story.fields[FieldID.Brainstorm];
-    const msg = field.data.messages.find((m: any) => m.id === messageId);
-
-    expect(msg.content).toBe("Hello World");
-  });
-});
+        // 4. Verify Store Sync
+        const state = store.getState();
+        const field = state.story.fields[FieldID.Brainstorm];
+        const msg = field.data.messages.find((m: any) => m.id === messageId);
+        
+        expect(msg.content).toBe("Hello World");
+      });
+    
+      it("should respect prefixBehavior: keep by appending to existing content", async () => {
+        // 1. Setup
+        const store = createStore(rootReducer, initialRootState);
+        const runner = { register: (effect: any) => store.subscribeToActions((action) => effect(action, store)) };
+        
+        const messageId = "msg-resume";
+        const initialContent = "Start";
+        
+        // Pre-populate message with EXISTING content (e.g. from previous run)
+        store.dispatch(brainstormAddMessage({ 
+            message: { id: messageId, role: "assistant", content: initialContent } 
+        }));
+    
+        const mockGenX = {
+            generate: vi.fn().mockImplementation(async (_msgs, _params, callback) => {
+                // Simulate continuation
+                callback([{ text: " Continued" }], false);
+            }),
+            cancelCurrent: vi.fn(),
+        } as any;
+    
+        registerEffects(runner as any, mockGenX);
+    
+        // 2. Action with Keep behavior
+        store.dispatch(genxRequestGeneration({
+            requestId: "req-resume",
+            messages: [],
+            params: { model: "test" } as any,
+            target: { type: "brainstorm", messageId },
+            prefixBehavior: "keep"
+        }));
+    
+        // Wait for async effect
+        await new Promise(resolve => globalThis.setTimeout(resolve, 10));
+    
+        // 3. Verify UI Streaming
+        // Expected: "Start Continued" (NOT just " Continued")
+        const calls = (api.v1.ui.updateParts as any).mock.calls;
+        const textUpdates = calls.filter((args: any[]) => 
+            args[0][0].id === `kse-bs-msg-${messageId}-text`
+        );
+    
+        expect(textUpdates.length).toBeGreaterThanOrEqual(1);
+        const lastUpdate = textUpdates[textUpdates.length - 1][0][0].text;
+        expect(lastUpdate).toBe("Start Continued");
+    
+        // 4. Verify Store Sync
+        const state = store.getState();
+        const field = state.story.fields[FieldID.Brainstorm];
+        const msg = field.data.messages.find((m: any) => m.id === messageId);
+        
+        expect(msg.content).toBe("Start Continued");
+      });
+    });

@@ -71,6 +71,7 @@ export const createToggleableContent = (
   inputId: string | undefined, // ID for the input element
   onChange: (val: string) => void,
   style: any = {},
+  textId?: string, // Add this
 ): UIPart => {
   if (isEditMode) {
     const autoHeight = calculateTextAreaHeight(content);
@@ -92,6 +93,7 @@ export const createToggleableContent = (
       .replace(/\[/g, "\\[");
 
     return text({
+      id: textId, // Set the ID here
       text: processedContent,
       markdown: true,
       style: {

@@ -121,6 +121,8 @@ const renderTextField = (
         config.placeholder,
         `input-${config.id}`,
         (val) => dispatch(uiInputChanged({ id: draftKey, value: val })),
+        {},
+        `text-display-${config.id}`,
       ),
     ],
   });
@@ -195,6 +197,8 @@ const renderListField = (
         "Summary...",
         `summary-input-${config.id}`,
         (val) => dispatch(uiInputChanged({ id: summaryDraftKey, value: val })),
+        {},
+        `summary-text-${config.id}`,
       ),
     ],
   });

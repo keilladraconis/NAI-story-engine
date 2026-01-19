@@ -125,6 +125,7 @@ export const renderLorebookPanel = (
               `lb-input-${entryId}`,
               (val) => dispatch(uiInputChanged({ id: draftKey, value: val })),
               { "min-height": "300px" },
+              `text-display-lore-${entryId}`,
             ),
           ],
         }),

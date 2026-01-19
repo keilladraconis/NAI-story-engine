@@ -13,10 +13,12 @@ import {
   generationFailed,
   genxRequestGeneration,
   storyLoaded,
+  fieldUpdated,
+  dulfsItemUpdated,
 } from "./actions";
 import { buildBrainstormStrategy } from "./utils/context-builder";
 import { initialStoryState } from "./reducers/storyReducer";
-import { FieldID } from "../../config/field-definitions";
+import { FieldID, DulfsFieldID } from "../../config/field-definitions";
 import { IDS } from "../../ui/framework/ids";
 
 export function registerEffects(
@@ -114,7 +116,7 @@ const createBrainstormEditEffects =
       }
 
       // 2. Initialize the storage for the new draft
-      const storageKey = `brainstorm-edit-${messageId}`;
+      const storageKey = IDS.BRAINSTORM.message(messageId).TEXT_INPUT;
       await api.v1.storyStorage.set(storageKey, content);
 
       // 3. Update UI state
@@ -125,7 +127,7 @@ const createBrainstormEditEffects =
     // Handle Save Edit
     if (action.type === "ui/brainstormSaveMessageEdit") {
       const { messageId } = action.payload;
-      const storageKey = `brainstorm-edit-${messageId}`;
+      const storageKey = IDS.BRAINSTORM.message(messageId).TEXT_INPUT;
 
       // 1. Retrieve drafted content
       const draftContent = await api.v1.storyStorage.get(storageKey);
@@ -223,14 +225,42 @@ const createBrainstormSubmitEffect =
 // Service: GenX Generation
 const createGenXGenerationEffect =
   (genX: GenX): Effect<RootState> =>
-  async (action, { dispatch }) => {
+  async (action, { dispatch, getState }) => {
     if (action.type !== "genx/requestGeneration") return;
 
-    const { requestId, messages, params, target } = action.payload;
+    const { requestId, messages, params, target, prefixBehavior } = action.payload;
 
     dispatch(generationStarted({ requestId }));
 
     let accumulatedText = "";
+
+    // If we are keeping the prefix (e.g. resumption), initialize accumulatedText with existing content
+    if (prefixBehavior === "keep") {
+      const state = getState();
+      if (target.type === "brainstorm") {
+        const field = state.story.fields[FieldID.Brainstorm];
+        const message = (field?.data?.messages || []).find(
+          (m: BrainstormMessage) => m.id === target.messageId,
+        );
+        if (message) {
+          accumulatedText = message.content;
+        }
+      } else if (target.type === "field") {
+        if (target.fieldId.includes(":")) {
+          const [fieldId, itemId] = target.fieldId.split(":");
+          const list = state.story.dulfs[fieldId as DulfsFieldID] || [];
+          const item = list.find((i) => i.id === itemId);
+          if (item) {
+            accumulatedText = item.content;
+          }
+        } else {
+          const field = state.story.fields[target.fieldId];
+          if (field) {
+            accumulatedText = field.content;
+          }
+        }
+      }
+    }
 
     try {
       await genX.generate(
@@ -243,13 +273,21 @@ const createGenXGenerationEffect =
 
             if (target.type === "brainstorm") {
               // Optimization: Stream directly to UI to avoid Redux overhead during high-frequency updates
-              const uiId = IDS.BRAINSTORM.message(
-                target.messageId,
-              ).TEXT_DISPLAY;
+              const uiId = IDS.BRAINSTORM.message(target.messageId).TEXT_DISPLAY;
               api.v1.ui.updateParts([{ id: uiId, text: accumulatedText }]);
             } else if (target.type === "field") {
-              // Handle generic field streaming if needed
-              // dispatch(fieldAppend({ fieldId: target.fieldId, content: text }));
+              // Optimization: Stream directly to field text display
+              const uiId = target.fieldId.includes(":")
+                ? `text-display-lore-${target.fieldId.split(":")[1]}`
+                : `text-display-${target.fieldId}`;
+
+              if (uiId) {
+                // Process content for NovelAI's markdown renderer (same as createToggleableContent)
+                const processed = accumulatedText
+                  .replace(/\n/g, "  \n")
+                  .replace(/\[/g, "\\[");
+                api.v1.ui.updateParts([{ id: uiId, text: processed }]);
+              }
             }
           }
         },
@@ -273,6 +311,21 @@ const createGenXGenerationEffect =
             content: accumulatedText,
           }),
         );
+      } else if (target.type === "field" && accumulatedText) {
+        if (target.fieldId.includes(":")) {
+          const [fieldId, itemId] = target.fieldId.split(":");
+          dispatch(
+            dulfsItemUpdated({
+              fieldId: fieldId as DulfsFieldID,
+              itemId,
+              updates: { content: accumulatedText },
+            }),
+          );
+        } else {
+          dispatch(
+            fieldUpdated({ fieldId: target.fieldId, content: accumulatedText }),
+          );
+        }
       }
     }
   };

@@ -58,21 +58,18 @@ export const Message: Component<MessageProps, RootState> = {
       },
       content: [
         button({
-          id: ids.ACTIONS.EDIT,
           iconId: "edit-3",
-          style: { padding: "4px", background: "none" },
+          style: { padding: "4px" },
           callback: () => events.edit(props),
         }),
         button({
-          id: ids.ACTIONS.RETRY,
           iconId: "rotate-cw",
-          style: { padding: "4px", background: "none" },
+          style: { padding: "4px" },
           callback: () => events.retry(props),
         }),
         button({
-          id: ids.ACTIONS.DELETE,
           iconId: "trash",
-          style: { padding: "4px", background: "none" },
+          style: { padding: "4px" },
           callback: () => events.delete(props),
         }),
       ].filter(Boolean) as UIPart[],
@@ -82,14 +79,28 @@ export const Message: Component<MessageProps, RootState> = {
       id: ids.VIEW_CONTAINER,
       // hidden: false -> default visible
       style: STYLES.VIEW_CONTAINER,
-      content: [textDisplay, viewButtons],
+      content: [
+        row({
+          spacing: "space-between",
+          content: [
+            text({
+              text: isUser ? "You" : "Brainstorm",
+              style: {
+                "font-size": "0.7em",
+                opacity: 0.7,
+                "margin-bottom": "2px",
+              },
+            }),
+            viewButtons,
+          ],
+        }),
+        textDisplay,
+      ],
     });
 
     // --- Edit Mode Components ---
 
     const textInput = multilineTextInput({
-      id: ids.TEXT_INPUT,
-      initialValue: msg.content,
       storageKey: `story:${ids.TEXT_INPUT}`,
       style: {
         "min-height": "40px",
@@ -99,7 +110,6 @@ export const Message: Component<MessageProps, RootState> = {
     });
 
     const saveButton = button({
-      id: ids.ACTIONS.SAVE,
       iconId: "save",
       style: { padding: "4px", background: "none" },
       callback: () => events.save(props),
@@ -110,11 +120,11 @@ export const Message: Component<MessageProps, RootState> = {
       // hidden: true -> display: none
       style: { ...STYLES.EDIT_CONTAINER, display: "none" },
       content: [
-        textInput,
         row({
           style: { "justify-content": "flex-end", "margin-top": "4px" },
           content: [saveButton],
         }),
+        textInput,
       ],
     });
 
@@ -132,18 +142,7 @@ export const Message: Component<MessageProps, RootState> = {
             width: "85%",
             border: "none",
           },
-          content: [
-            text({
-              text: isUser ? "You" : "Brainstorm",
-              style: {
-                "font-size": "0.7em",
-                opacity: 0.7,
-                "margin-bottom": "2px",
-              },
-            }),
-            viewContainer,
-            editContainer,
-          ],
+          content: [viewContainer, editContainer],
         }),
       ],
     });
@@ -168,17 +167,6 @@ export const Message: Component<MessageProps, RootState> = {
             style: isEditing
               ? STYLES.EDIT_CONTAINER
               : { ...STYLES.EDIT_CONTAINER, display: "none" },
-          },
-        ]);
-
-        updateParts([
-          {
-            id: ids.ACTIONS.RETRY,
-            style: {
-              padding: "4px",
-              background: "none",
-              display: isEditing ? "none" : "block",
-            },
           },
         ]);
       },
