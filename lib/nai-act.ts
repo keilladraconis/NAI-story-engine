@@ -11,7 +11,7 @@ interface StoreLike<S, A = any> {
   dispatch(action: A): void;
   subscribeSelector<T>(
     selector: (state: S) => T,
-    listener: (value: T, action: A) => void,
+    listener: (value: T) => void,
   ): () => void;
   subscribeEffect(
     when: (action: A) => boolean,
@@ -36,18 +36,32 @@ export interface BindContext<S, A = any> {
       ctx: { dispatch: (action: A) => void; getState: () => S },
     ) => void,
   ): () => boolean;
-  mount<P>(component: Component<P, S>, props: P): () => void;
+  mount<P>(component: Component<P, S, unknown>, props: P): () => void;
 }
 
 // --------------------------------------------------
 // Component Definition
 // --------------------------------------------------
 
-export interface Component<Props, State = any> {
+export interface Component<Props, State, Events> {
   id(props: Props): string;
-  events?: unknown;
+  events: Events;
   describe(props: Props): UIPart;
   bind(props: Props, ctx: BindContext<State>): void;
+}
+
+export function defineComponent<Props, State, Events>(
+  component: Component<Props, State, Events> &
+    ThisType<Component<Props, State, Events>>,
+): Component<Props, State, Events>;
+
+export function defineComponent<Props, State>(
+  component: Component<Props, State, any> &
+    ThisType<Component<Props, State, any>>,
+): Component<Props, State, any>;
+
+export function defineComponent(component: any): any {
+  return component;
 }
 
 // --------------------------------------------------
@@ -93,7 +107,7 @@ export function createEvents<
 // --------------------------------------------------
 
 export function mount<Props, State, Action>(
-  component: Component<Props, State>,
+  component: Component<Props, State, unknown>,
   props: Props,
   store: StoreLike<State, Action>,
 ): () => void {
@@ -104,7 +118,7 @@ export function mount<Props, State, Action>(
     dispatch: store.dispatch.bind(store),
     useSelector: store.subscribeSelector.bind(store),
     useEffect: store.subscribeEffect.bind(store),
-    mount<P>(child: Component<P, State>, childProps: P): () => void {
+    mount<P>(child: Component<P, State, unknown>, childProps: P): () => void {
       const unmount = mount(child, childProps, store);
       cleanups.push(unmount);
       return unmount;
