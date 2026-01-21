@@ -1,150 +1,129 @@
-export type Action<Type extends string = string, Payload = any> = {
-  type: Type;
-  payload: Payload;
+/*
+ NAIStore - [0.1.0]
+*/
+
+// ==================================================
+// Store Types
+// ==================================================
+
+export type Action = {
+  type: string;
+  [key: string]: any;
 };
 
-export type Reducer<S, A extends Action> = (state: S, action: A) => S;
-type SliceReducer<S> = (state: S, action: Action) => S;
-type ActionListener = (action: Action) => void;
-type StateListener<S> = (state: S, action: Action) => void;
+export type Reducer<S> = (state: S, action: Action) => S;
 
-type EffectContext<S> = {
-  dispatch: Dispatch;
-  getState: GetState<S>;
+export type Selector<S, T> = (state: S) => T;
+
+export type SelectorListener<T> = (value: T, action: Action) => void;
+
+export type EffectContext<S> = {
+  dispatch(action: Action): void;
+  getState(): S;
 };
 
 export type Effect<S> = (action: Action, ctx: EffectContext<S>) => void;
 
-export type Dispatch = (action: Action) => void;
-type GetState<S> = () => S;
+// ==================================================
+// Store Interface
+// ==================================================
 
 export interface Store<S> {
-  getState: GetState<S>;
-  dispatch: Dispatch;
-  subscribe: (listener: StateListener<S>) => () => void;
-  subscribeToActions: (listener: ActionListener) => () => void;
-  subscribeSelector: <T>(
-    selector: (state: S) => T,
-    listener: (value: T) => void,
-  ) => () => void;
+  getState(): S;
+  dispatch(action: Action): void;
+  subscribeSelector<T>(
+    selector: Selector<S, T>,
+    listener: SelectorListener<T>,
+  ): () => void;
 }
 
-// Selector Subscriptions
-type SelectorSub<S> = {
-  selector: (state: S) => any;
-  listener: (value: any) => void;
-  lastValue: any;
-};
+// ==================================================
+// createStore
+// ==================================================
 
-export function createStore<S>(
-  reducer: Reducer<S, Action>,
-  initial: S,
-): Store<S> {
-  let state = initial;
+export function createStore<S>(options: {
+  initialState: S;
+  reducer: Reducer<S>;
+  effects?: Effect<S>[];
+}): Store<S> {
+  let state = options.initialState;
 
-  const actionListeners = new Set<ActionListener>();
-  const stateListeners = new Set<StateListener<S>>();
+  const stateListeners = new Set<(state: S, action: Action) => void>();
+  const effects = options.effects ?? [];
 
-  const selectorSubs = new Set<SelectorSub<S>>();
+  function getState() {
+    return state;
+  }
 
-  function notifySelectors(next: S) {
-    for (const sub of selectorSubs) {
-      const nextValue = sub.selector(next);
-      if (nextValue !== sub.lastValue) {
-        sub.lastValue = nextValue;
-        sub.listener(nextValue);
+  function dispatch(action: Action) {
+    const prev = state;
+    const next = options.reducer(prev, action);
+
+    if (next !== prev) {
+      state = next;
+    }
+
+    // Notify state listeners (even if unchanged)
+    for (const l of stateListeners) {
+      l(state, action);
+    }
+
+    // Run effects after reducers
+    if (effects.length) {
+      const ctx: EffectContext<S> = { dispatch, getState };
+      for (const eff of effects) {
+        eff(action, ctx);
       }
     }
   }
 
+  function subscribe(listener: (state: S, action: Action) => void) {
+    stateListeners.add(listener);
+    return () => stateListeners.delete(listener);
+  }
+
+  function subscribeSelector<T>(
+    selector: Selector<S, T>,
+    listener: SelectorListener<T>,
+  ) {
+    let last = selector(state);
+
+    return subscribe((state, action) => {
+      const next = selector(state);
+      if (Object.is(next, last)) return;
+      last = next;
+      listener(next, action);
+    });
+  }
+
   return {
-    getState: () => state,
-    dispatch(action: Action) {
-      // 1. Reduce
-      const next = reducer(state, action);
-      if (next !== state) {
-        state = next;
-
-        // 2. Notify state listeners only on change
-        for (const l of stateListeners) {
-          l(state, action);
-        }
-
-        // 3. Notify selectors
-        notifySelectors(next);
-      }
-
-      // 3. Always notify action listeners
-      for (const l of actionListeners) {
-        l(action);
-      }
-    },
-    subscribe(listener: StateListener<S>) {
-      stateListeners.add(listener);
-      return () => stateListeners.delete(listener);
-    },
-
-    subscribeToActions(listener: ActionListener) {
-      actionListeners.add(listener);
-      return () => actionListeners.delete(listener);
-    },
-
-    subscribeSelector<T>(
-      selector: (state: S) => T,
-      listener: (value: T) => void,
-    ) {
-      const sub: SelectorSub<S> = {
-        selector,
-        listener,
-        lastValue: selector(state),
-      };
-      selectorSubs.add(sub);
-      return () => selectorSubs.delete(sub);
-    },
+    getState,
+    dispatch,
+    subscribeSelector,
   };
 }
 
-export function createEffectRunner<S>(store: {
-  dispatch: Dispatch;
-  getState: GetState<S>;
-}) {
-  const effects: Effect<S>[] = [];
-
-  return {
-    register(effect: Effect<S>) {
-      effects.push(effect);
-    },
-
-    run(action: Action) {
-      for (const e of effects) {
-        e(action, store);
-      }
-    },
-  };
-}
-
-// Helpers
-
-export function action<T extends string>(type: T) {
-  return <P = void>() =>
-    (payload: P) =>
-      ({ type, payload }) as Action<T, P>;
-}
-
+// ===============
+// combineReducers
+// ===============
 export function combineReducers<S extends Record<string, any>>(reducers: {
-  [K in keyof S]: SliceReducer<S[K]>;
-}) {
-  return (state: S, action: Action): S => {
+  [K in keyof S]: Reducer<S[K]>;
+}): Reducer<S> {
+  return function combinedReducer(state: S, action: Action): S {
     let changed = false;
-    const next = {} as S;
+    const nextState = {} as S;
 
     for (const key in reducers) {
       const prevSlice = state[key];
       const nextSlice = reducers[key](prevSlice, action);
-      next[key] = nextSlice;
+      nextState[key] = nextSlice;
       if (nextSlice !== prevSlice) changed = true;
     }
 
-    return changed ? next : state;
+    return changed ? nextState : state;
   };
 }
+
+/*
+ * END NAIStore
+ */

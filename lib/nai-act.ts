@@ -1,155 +1,132 @@
-import { Store } from "./nai-store";
+/*
+ NAIAct - [0.1.0]
+*/
 
-// ---------------------------------------------
-// Types
-// ---------------------------------------------
+// --------------------------------------------------
+// Core Types
+// --------------------------------------------------
 
-// ---------------------------------------------
-// Internal registries
-// ---------------------------------------------
-
-const mountedComponents = new Map<string, MountedComponent>();
-
-// Selector-Effect Mutex
-let inEffect = false;
-
-// ---------------------------------------------
-// Mounted component record
-// ---------------------------------------------
-
-interface MountedComponent {
-  id: string;
-  unsubs: (() => void)[];
+interface StoreLike<S, A = any> {
+  getState(): S;
+  dispatch(action: A): void;
+  subscribeSelector<T>(
+    selector: (state: S) => T,
+    listener: (value: T, action: A) => void,
+  ): () => void;
 }
 
-// ---------------------------------------------
-// createEvents
-// ---------------------------------------------
+export interface BindContext<S, A = any> {
+  getState(): S;
+  dispatch(action: A): void;
+  useSelector<T>(
+    selector: (state: S) => T,
+    listener: (value: T, action: A) => void,
+  ): () => void;
+  useEffect<T>(
+    selector: (state: S) => T,
+    effect: (value: T, action: A | undefined) => void | (() => void),
+  ): void;
+  mount<P>(component: Component<P, S>, props: P): () => void;
+}
 
-/**
- * Creates stable, non-closure-based event handlers.
- * Handlers receive props explicitly at call time.
- */
+// --------------------------------------------------
+// Component Definition
+// --------------------------------------------------
+
+export interface Component<Props, State = any> {
+  id(props: Props): string;
+  events?: unknown;
+  describe(props: Props): UIPart;
+  bind(props: Props, ctx: BindContext<State>): void;
+}
+
+// --------------------------------------------------
+// Helpers
+// --------------------------------------------------
+
 export function createEvents<
-  T extends Record<string, (props: any, ...args: any[]) => void>,
->(handlers: T): T {
-  const stable: any = {};
+  T extends Record<string, (...args: any[]) => any>,
+>() {
+  const handlers: Partial<T> = {};
+  const slots: Record<string, (...args: any[]) => any> = {};
 
-  for (const key in handlers) {
-    const fn = handlers[key];
-    stable[key] = (props: any, ...args: any[]) => {
-      fn(props, ...args);
-    };
+  const proxy = new Proxy({} as T, {
+    get(target, key: string, receiver) {
+      // 🔧 FIX: respect real properties on the target
+      if (key in target) {
+        return Reflect.get(target, key, receiver);
+      }
+
+      if (!slots[key]) {
+        slots[key] = (...args: any[]) => {
+          const fn = handlers[key];
+          if (fn) {
+            return fn(...args);
+          }
+        };
+      }
+      return slots[key] as T[keyof T];
+    },
+  });
+
+  function attach(next: T) {
+    for (const key in next) {
+      handlers[key] = next[key];
+    }
   }
 
-  return stable as T;
+  return Object.assign(proxy, { attach });
 }
 
-// ---------------------------------------------
-// useSelector
-// ---------------------------------------------
+// --------------------------------------------------
+// Mount / Unmount
+// --------------------------------------------------
 
-export function createUseSelector<State>(store: Store<State>) {
-  return function useSelector<T>(
-    selector: (state: State) => T,
-    effect: (value: T, prev: T | undefined) => void,
-    equalityFn: (a: T, b: T) => boolean = (a, b) => a === b,
-  ): () => void {
-    inEffect = true;
-    try {
-      let last = selector(store.getState());
-      effect(last, undefined);
+export function mount<Props, State, Action>(
+  component: Component<Props, State>,
+  props: Props,
+  store: StoreLike<State, Action>,
+): () => void {
+  const cleanups: (() => void)[] = [];
 
-      const unsubscribe = store.subscribe((state) => {
-        const next = selector(state);
-        if (!equalityFn(next, last)) {
-          const prev = last;
-          last = next;
-          effect(next, prev);
-        }
+  const ctx: BindContext<State, Action> = {
+    getState: store.getState.bind(store),
+    dispatch: store.dispatch.bind(store),
+    useSelector(selector, listener) {
+      return store.subscribeSelector(selector, listener);
+    },
+    useEffect(selector, effect) {
+      let cleanup: void | (() => void);
+
+      const unsubscribe = store.subscribeSelector(selector, (value, action) => {
+        if (cleanup) cleanup();
+        cleanup = effect(value, action);
       });
 
-      return unsubscribe;
-    } finally {
-      inEffect = false;
+      // run once immediately
+      cleanup = effect(selector(store.getState()), undefined);
+
+      cleanups.push(() => {
+        if (cleanup) cleanup();
+        unsubscribe();
+      });
+    },
+    mount<P>(child: Component<P, State>, childProps: P): () => void {
+      const unmount = mount(child, childProps, store);
+      cleanups.push(unmount);
+      return unmount;
+    },
+  };
+
+  component.bind(props, ctx);
+
+  return () => {
+    for (const fn of cleanups.splice(0)) {
+      fn();
     }
   };
 }
 
-// ---------------------------------------------
-// mount
-// ---------------------------------------------
-
-export interface BindContext<State> {
-  useSelector: <T>(
-    selector: (state: State) => T,
-    effect: (value: T, prev: T | undefined) => void,
-    equalityFn?: (a: T, b: T) => boolean,
-  ) => void;
-  updateParts: (parts: (Partial<UIPart> & { id: string })[]) => void;
-  dispatch: (action: any) => void;
-  mount: <P>(comp: Component<P, State>, props: P) => UIPart | UIExtension;
-  unmount: <P>(comp: Component<P, State>, props: P) => void;
-}
-
-export interface Component<Props, State = any> {
-  id(props: Props): string;
-  describe(props: Props, state: State): UIPart | UIExtension;
-  bind(ctx: BindContext<State>, props: Props): void;
-}
-
-export function mount<Props, State>(
-  component: Component<Props, State>,
-  props: Props,
-  store: Store<State>,
-) {
-  if (inEffect)
-    throw new Error("mount() is not allowed inside reactive effects");
-  const id = component.id(props);
-  if (mountedComponents.has(id)) {
-    // Already mounted. In strict mode we might throw.
-    throw new Error(`Component '${id}' is already mounted`);
-  }
-
-  // 1. Describe
-  const part = component.describe(props, store.getState());
-  if (!part?.id) {
-    throw new Error(`describe() must return a UIPart with an id`);
-  }
-
-  // 2. Bind
-  const unsubs: (() => void)[] = [];
-
-  const ctx: BindContext<State> = {
-    useSelector(selector, effect, equalityFn) {
-      const unsub = createUseSelector(store)(selector, effect, equalityFn);
-      unsubs.push(unsub);
-    },
-    updateParts: api.v1.ui.updateParts,
-    dispatch: store.dispatch,
-    mount: (comp, p) => mount(comp, p, store),
-    unmount: (comp, p) => unmount(comp, p),
-  };
-
-  component.bind(ctx, props);
-
-  mountedComponents.set(id, { id, unsubs });
-
-  return part;
-}
-
-// ---------------------------------------------
-// unmount
-// ---------------------------------------------
-
-export function unmount<Props, State>(
-  component: Component<Props, State>,
-  props: Props,
-) {
-  const id = component.id(props);
-  const record = mountedComponents.get(id);
-  if (!record) return;
-
-  for (const unsub of record.unsubs) unsub();
-  mountedComponents.delete(id);
-}
+/*
+ * END NAIAct
+ */
