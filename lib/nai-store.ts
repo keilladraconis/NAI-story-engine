@@ -6,23 +6,25 @@
 // Store Types
 // ==================================================
 
-export type Action = {
+type Action = {
   type: string;
   [key: string]: any;
 };
 
-export type Reducer<S> = (state: S, action: Action) => S;
+type Reducer<S> = (state: S, action: Action) => S;
 
-export type Selector<S, T> = (state: S) => T;
+type Selector<S, T> = (state: S) => T;
 
-export type SelectorListener<T> = (value: T, action: Action) => void;
+type SelectorListener<T> = (value: T) => void;
 
-export type EffectContext<S> = {
+type EffectPredicate = (action: Action) => boolean;
+
+type EffectContext<S> = {
   dispatch(action: Action): void;
   getState(): S;
 };
 
-export type Effect<S> = (action: Action, ctx: EffectContext<S>) => void;
+type Effect<S> = (action: Action, ctx: EffectContext<S>) => void;
 
 // ==================================================
 // Store Interface
@@ -35,6 +37,7 @@ export interface Store<S> {
     selector: Selector<S, T>,
     listener: SelectorListener<T>,
   ): () => void;
+  subscribeEffect(when: EffectPredicate, run: Effect<S>): () => boolean;
 }
 
 // ==================================================
@@ -44,62 +47,60 @@ export interface Store<S> {
 export function createStore<S>(options: {
   initialState: S;
   reducer: Reducer<S>;
-  effects?: Effect<S>[];
 }): Store<S> {
   let state = options.initialState;
 
-  const stateListeners = new Set<(state: S, action: Action) => void>();
-  const effects = options.effects ?? [];
+  const listeners = new Set<(state: S) => void>();
+  const effects = new Set<{ when: EffectPredicate; run: Effect<S> }>();
 
   function getState() {
     return state;
   }
 
   function dispatch(action: Action) {
-    const prev = state;
-    const next = options.reducer(prev, action);
+    state = options.reducer(state, action);
 
-    if (next !== prev) {
-      state = next;
+    for (const l of listeners) {
+      l(state);
     }
 
-    // Notify state listeners (even if unchanged)
-    for (const l of stateListeners) {
-      l(state, action);
-    }
-
-    // Run effects after reducers
-    if (effects.length) {
-      const ctx: EffectContext<S> = { dispatch, getState };
-      for (const eff of effects) {
-        eff(action, ctx);
-      }
+    const ctx: EffectContext<S> = { dispatch, getState };
+    for (const e of effects) {
+      if (e.when(action)) e.run(action, ctx);
     }
   }
 
-  function subscribe(listener: (state: S, action: Action) => void) {
-    stateListeners.add(listener);
-    return () => stateListeners.delete(listener);
+  function subscribe(listener: (state: S) => void) {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
   }
 
   function subscribeSelector<T>(
     selector: Selector<S, T>,
     listener: SelectorListener<T>,
   ) {
-    let last = selector(state);
+    let current = selector(state);
+    // Selector listeners follow at-least-once semantics.
+    listener(current);
 
-    return subscribe((state, action) => {
+    return subscribe((state) => {
       const next = selector(state);
-      if (Object.is(next, last)) return;
-      last = next;
-      listener(next, action);
+      if (Object.is(next, current)) return;
+      current = next;
+      listener(next);
     });
+  }
+
+  function subscribeEffect(when: EffectPredicate, run: Effect<S>) {
+    effects.add({ when, run });
+    return () => effects.delete({ when, run });
   }
 
   return {
     getState,
     dispatch,
     subscribeSelector,
+    subscribeEffect,
   };
 }
 

@@ -13,6 +13,13 @@ interface StoreLike<S, A = any> {
     selector: (state: S) => T,
     listener: (value: T, action: A) => void,
   ): () => void;
+  subscribeEffect(
+    when: (action: A) => boolean,
+    run: (
+      action: A,
+      ctx: { dispatch: (action: A) => void; getState: () => S },
+    ) => void,
+  ): () => boolean;
 }
 
 export interface BindContext<S, A = any> {
@@ -20,12 +27,15 @@ export interface BindContext<S, A = any> {
   dispatch(action: A): void;
   useSelector<T>(
     selector: (state: S) => T,
-    listener: (value: T, action: A) => void,
+    listener: (value: T) => void,
   ): () => void;
-  useEffect<T>(
-    selector: (state: S) => T,
-    effect: (value: T, action: A | undefined) => void | (() => void),
-  ): void;
+  useEffect(
+    when: (action: A) => boolean,
+    run: (
+      action: A,
+      ctx: { dispatch: (action: A) => void; getState: () => S },
+    ) => void,
+  ): () => boolean;
   mount<P>(component: Component<P, S>, props: P): () => void;
 }
 
@@ -92,25 +102,8 @@ export function mount<Props, State, Action>(
   const ctx: BindContext<State, Action> = {
     getState: store.getState.bind(store),
     dispatch: store.dispatch.bind(store),
-    useSelector(selector, listener) {
-      return store.subscribeSelector(selector, listener);
-    },
-    useEffect(selector, effect) {
-      let cleanup: void | (() => void);
-
-      const unsubscribe = store.subscribeSelector(selector, (value, action) => {
-        if (cleanup) cleanup();
-        cleanup = effect(value, action);
-      });
-
-      // run once immediately
-      cleanup = effect(selector(store.getState()), undefined);
-
-      cleanups.push(() => {
-        if (cleanup) cleanup();
-        unsubscribe();
-      });
-    },
+    useSelector: store.subscribeSelector.bind(store),
+    useEffect: store.subscribeEffect.bind(store),
     mount<P>(child: Component<P, State>, childProps: P): () => void {
       const unmount = mount(child, childProps, store);
       cleanups.push(unmount);
