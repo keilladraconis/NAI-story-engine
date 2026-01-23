@@ -1,67 +1,47 @@
-import { DulfsFieldID } from "../../config/field-definitions";
 import { GenerationState } from "../../../lib/gen-x";
 
-// --- Story Domain State ---
-
-export interface BrainstormMessage {
-  id: string;
-  role: string;
-  content: string;
-}
+import { DulfsFieldID } from "../../config/field-definitions";
 
 export interface StoryField {
   id: string;
   content: string;
-  data?: any; // For brainstorm messages, etc.
+  data?: any;
 }
 
 export interface DulfsItem {
   id: string; // UUID
   fieldId: DulfsFieldID;
   name: string;
-  content: string; // The generated description
-  text?: string; // The expanded content (Phase 2)
-  lorebookEntryId?: string; // Linked NAI lorebook entry
+  content: string;
+  text?: string;
+  lorebookEntryId?: string;
 }
 
 export interface StoryState {
   setting: string;
-  fields: Record<string, StoryField>; // Keyed by FieldID
-  dulfs: Record<DulfsFieldID, DulfsItem[]>; // Keyed by FieldID
-
-  // Metadata for integration
+  fields: Record<string, StoryField>;
+  dulfs: Record<DulfsFieldID, DulfsItem[]>;
   dulfsSummaries: Record<string, string>;
-
-  // Flags for sync/generation
   attgEnabled: boolean;
   styleEnabled: boolean;
 }
 
-// --- UI Domain State ---
-
-export interface UIState {
-  // Navigation
-  activeTab: string;
-  sidebarOpen: boolean;
-
-  // Lorebook Panel
-  selectedLorebookEntryId: string | null;
-  selectedLorebookCategoryId: string | null;
-  lorebookEditMode: boolean;
-
-  // Editor
-  collapsedSections: Record<string, boolean>; // FieldID -> boolean
-  editModes: Record<string, boolean>; // FieldID -> boolean
-  brainstormEditingMessageId: string | null;
-
-  // Transient Inputs (keyed by stable UI ID)
-  inputs: Record<string, string>;
-
-  // Modals/Confirms
-  showClearConfirm: boolean;
+export interface BrainstormMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
 }
 
-// --- Runtime/Workflow Domain State ---
+export interface BrainstormState {
+  messages: BrainstormMessage[];
+}
+
+export interface UIState {
+  brainstorm: {
+    editingMessageId: string | null;
+    input: string;
+  };
+}
 
 export type GenerationStatus =
   | "idle"
@@ -73,30 +53,14 @@ export type GenerationStatus =
 export interface GenerationRequest {
   id: string;
   type: "field" | "list" | "brainstorm";
-  targetId: string; // FieldID or DulfsItemID
+  targetId: string;
   prompt?: string;
-}
-
-export interface RuntimeState {
-  // SEGA Service State
-  segaRunning: boolean;
-
-  // Generation Queue
-  queue: GenerationRequest[];
-  activeRequest: GenerationRequest | null;
-  status: GenerationStatus;
-
-  // GenX State Reflection
-  genx: GenerationState;
-
-  // Budget
-  budgetTimeRemaining: number;
 }
 
 export interface GenerationStrategy {
   requestId: string;
-  messages: Message[];
-  params: GenerationParams;
+  messages: any[]; // TODO: Define Message type properly
+  params: any;     // TODO: Define Params
   target:
     | { type: "brainstorm"; messageId: string }
     | { type: "field"; fieldId: string };
@@ -104,10 +68,18 @@ export interface GenerationStrategy {
   assistantPrefill?: string;
 }
 
-// --- Root State ---
+export interface RuntimeState {
+  segaRunning: boolean;
+  queue: GenerationRequest[];
+  activeRequest: GenerationRequest | null;
+  status: GenerationStatus;
+  genx: GenerationState;
+  budgetTimeRemaining: number;
+}
 
 export interface RootState {
   story: StoryState;
+  brainstorm: BrainstormState;
   ui: UIState;
   runtime: RuntimeState;
 }

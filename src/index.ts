@@ -1,80 +1,50 @@
-import { createEffectRunner, createStore, RootState } from "./core/store";
+import { store, brainstormLoaded, storyLoaded } from "./core/store";
 import { registerEffects } from "./core/store/effects";
-import { Sidebar } from "./ui/components/Sidebar/Sidebar";
-import { LorebookPanel } from "./ui/components/Lorebook/LorebookPanel";
-import { BrainstormManager } from "./ui/controllers/brainstorm/manager";
-import { uiLorebookSelected, runtimeStateUpdated } from "./core/store/actions";
-import {
-  initialRootState,
-  rootReducer,
-} from "./core/store/reducers/rootReducer";
 import { GenX } from "../lib/gen-x";
+import { describeBrainstormPanel } from "./ui/components/brainstorm/Panel";
+import { List } from "./ui/components/brainstorm/List";
+import { Input } from "./ui/components/brainstorm/Input";
 import { mount } from "../lib/nai-act";
+import { stateUpdated } from "./core/store/slices/runtime";
 
 (async () => {
   try {
-    api.v1.log(
-      "Initializing Story Engine (Redux Architecture + Reactive Runtime)...",
-    );
+    api.v1.log("Initializing Story Engine (Refactored)...");
 
-    // Request Permissions
-    await api.v1.permissions.request(["lorebookEdit", "storyEdit"]);
-
-    // Initialize GenX
+    // 1. Initialize GenX
     const genX = new GenX();
-
-    // Start store
-    const store = createStore<RootState>(rootReducer, initialRootState);
-    const { getState, dispatch } = store;
-
-    // Link GenX to Store
     genX.subscribe((genxState) => {
-      dispatch(runtimeStateUpdated({ genxState }));
+        store.dispatch(stateUpdated({ genxState }));
     });
 
-    const effects = createEffectRunner(store);
+    // 2. Register Effects
+    registerEffects(store, genX);
 
-    // Register Effects
-    registerEffects(effects, genX);
-
-    store.subscribeToActions((action) => {
-      effects.run(action);
-    });
-
-    // Managers & Components
-    const brainstormManager = new BrainstormManager(store);
-
-    // Initial Render & Registration
-    const initialState = getState();
-    const sidebar = Sidebar.describe({}, initialState) as UIExtension;
-    const brainstorm = brainstormManager.register();
-    const lorebook = LorebookPanel.describe({}, initialState) as UIExtension;
-
-    await api.v1.ui.register([sidebar, brainstorm, lorebook]);
-
-    // Mount Managers (Start Subscriptions)
-    brainstormManager.mount();
-    
+    // 3. Load Data
     try {
-        mount(Sidebar, {}, store);
-        mount(LorebookPanel, {}, store);
-    } catch (err) {
-        api.v1.log("Mount error:", err);
+        const persisted = await api.v1.storyStorage.get("kse-persist");
+        if (persisted && typeof persisted === 'object') {
+            const { story, brainstorm } = persisted as any;
+            if (story) store.dispatch(storyLoaded({ story }));
+            if (brainstorm && brainstorm.messages) store.dispatch(brainstormLoaded({ messages: brainstorm.messages }));
+        }
+    } catch (e) {
+        api.v1.log("Error loading persisted data:", e);
     }
 
-    // Hydrate State
-    dispatch({ type: "story/loadRequested", payload: undefined });
-    api.v1.log("Story load requested.");
+    // 4. Register UI Extensions
+    // Pass initial state for hydration
+    const brainstormExt = describeBrainstormPanel(store.getState());
+    await api.v1.ui.register([brainstormExt]);
 
-    // Hooks
-    api.v1.hooks.register("onLorebookEntrySelected", (params) => {
-      dispatch(
-        uiLorebookSelected({
-          entryId: params.entryId || null,
-          categoryId: params.categoryId || null,
-        }),
-      );
-    });
+    // 5. Mount Components (Start Subscriptions)
+    // List component should receive initial state for consistency if it uses it in onMount
+    // but onMount typically starts useSelector which handles the first state read.
+    mount(List, { initialMessages: store.getState().brainstorm.messages }, store);
+    mount(Input, {}, store);
+
+    api.v1.log("Story Engine Initialized.");
+
   } catch (e) {
     api.v1.log("Startup error:", e);
   }

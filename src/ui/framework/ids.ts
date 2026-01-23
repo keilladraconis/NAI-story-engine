@@ -1,32 +1,16 @@
-// src/ui/framework/ids.ts
-
-/**
- * Deterministic ID generation for the UI.
- * Rules:
- * 1. IDs must be unique within the global scope.
- * 2. IDs must be derived from domain data (e.g. message IDs).
- * 3. IDs must be hierarchical.
- */
-
 export const IDS = {
-  // Global Sidebar
-  SIDEBAR: "kse-sidebar",
-
-  // Brainstorm Feature
   BRAINSTORM: {
-    ROOT: "kse-brainstorm-root",
-    LIST: "kse-brainstorm-list",
-    INPUT: "kse-brainstorm-input",
-    SEND_BTN: "kse-brainstorm-send-btn",
-    CANCEL_BTN: "kse-brainstorm-cancel-btn",
-
-    // Message specific IDs
-    message: (msgId: string) => ({
-      ROOT: `kse-bs-msg-${msgId}`,
-      VIEW_CONTAINER: `kse-bs-msg-${msgId}-view`,
-      EDIT_CONTAINER: `kse-bs-msg-${msgId}-edit`,
-      TEXT_DISPLAY: `kse-bs-msg-${msgId}-text`,
-      TEXT_INPUT: `kse-bs-msg-${msgId}-input`,
+    ROOT: "se-bs-root",
+    LIST: "se-bs-list",
+    INPUT: "se-bs-input",
+    SEND_BTN: "se-bs-send-btn",
+    
+    message: (id: string) => ({
+      ROOT: `se-bs-msg-${id}`,
+      VIEW: `se-bs-msg-${id}-view`,
+      EDIT: `se-bs-msg-${id}-edit`,
+      TEXT: `se-bs-msg-${id}-text`,
+      INPUT: `se-bs-msg-${id}-input`,
     }),
   },
 };
