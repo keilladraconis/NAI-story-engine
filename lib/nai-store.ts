@@ -1,17 +1,17 @@
 /*
- NAIStore - [0.1.0]
+ NAIStore - [0.1.1]
 */
 
 // ==================================================
 // Store Types
 // ==================================================
 
-type Action = {
-  type: string;
+export type Action<T = string> = {
+  type: T;
   [key: string]: any;
 };
 
-type Reducer<S> = (state: S, action: Action) => S;
+type Reducer<S> = (state: S | undefined, action: Action) => S;
 
 type Selector<S, T> = (state: S) => T;
 
@@ -37,31 +37,29 @@ export interface Store<S> {
     selector: Selector<S, T>,
     listener: SelectorListener<T>,
   ): () => void;
-  subscribeEffect(when: EffectPredicate, run: Effect<S>): () => boolean;
+  subscribeEffect(when: EffectPredicate, run: Effect<S>): () => void;
 }
 
 // ==================================================
 // createStore
 // ==================================================
 
-export function createStore<S>(options: {
-  initialState: S;
-  reducer: Reducer<S>;
-}): Store<S> {
-  let state = options.initialState;
+export function createStore<S>(reducer: Reducer<S>): Store<S> {
+  // Initialize state by dispatching the init action.
+  let currentState = reducer(undefined, { type: "@@NAISTORE/INIT" });
 
   const listeners = new Set<(state: S) => void>();
   const effects = new Set<{ when: EffectPredicate; run: Effect<S> }>();
 
   function getState() {
-    return state;
+    return currentState;
   }
 
   function dispatch(action: Action) {
-    state = options.reducer(state, action);
+    currentState = reducer(currentState, action);
 
     for (const l of listeners) {
-      l(state);
+      l(currentState);
     }
 
     const ctx: EffectContext<S> = { dispatch, getState };
@@ -72,14 +70,16 @@ export function createStore<S>(options: {
 
   function subscribe(listener: (state: S) => void) {
     listeners.add(listener);
-    return () => listeners.delete(listener);
+    return () => {
+      listeners.delete(listener);
+    };
   }
 
   function subscribeSelector<T>(
     selector: Selector<S, T>,
     listener: SelectorListener<T>,
   ) {
-    let current = selector(state);
+    let current = selector(currentState);
     // Selector listeners follow at-least-once semantics.
     listener(current);
 
@@ -92,8 +92,11 @@ export function createStore<S>(options: {
   }
 
   function subscribeEffect(when: EffectPredicate, run: Effect<S>) {
-    effects.add({ when, run });
-    return () => effects.delete({ when, run });
+    const effect = { when, run };
+    effects.add(effect);
+    return () => {
+      effects.delete(effect);
+    };
   }
 
   return {
@@ -104,21 +107,101 @@ export function createStore<S>(options: {
   };
 }
 
-// ===============
-// combineReducers
-// ===============
-export function combineReducers<S extends Record<string, any>>(reducers: {
-  [K in keyof S]: Reducer<S[K]>;
-}): Reducer<S> {
-  return function combinedReducer(state: S, action: Action): S {
+// ==================================================
+// Reducer Helpers
+// ==================================================
+
+type PayloadAction<P = void> = {
+  type: string;
+  payload: P;
+};
+
+type CaseReducer<S, P = any> = (state: S, payload: P) => S;
+
+type ActionCreator<P> = void extends P
+  ? (payload?: P) => PayloadAction<P>
+  : (payload: P) => PayloadAction<P>;
+
+type Slice<S, CR extends Record<string, CaseReducer<S, any>>> = {
+  reducer: Reducer<S>;
+  actions: {
+    [K in keyof CR]: CR[K] extends (
+      state: any,
+      payload: infer P,
+    ) => any
+      ? ActionCreator<P>
+      : () => PayloadAction<void>;
+  };
+};
+
+/**
+ * Creates a slice of state with auto-generated actions and reducer.
+ */
+export function createSlice<
+  S,
+  CR extends Record<string, CaseReducer<S, any>>
+>(options: {
+  name: string;
+  initialState: S;
+  reducers: CR;
+}): Slice<S, CR> {
+  const { name, initialState, reducers } = options;
+  const actions = {} as Slice<S, CR>["actions"];
+  const handlers: Record<string, CaseReducer<S, any>> = {};
+
+  for (const key of Object.keys(reducers)) {
+    const actionType = `${name}/${key}`;
+    handlers[actionType] = reducers[key];
+    // @ts-ignore: Dynamic action creator assignment
+    actions[key] = (payload: any) => ({ type: actionType, payload });
+  }
+
+  const reducer = (state: S | undefined, action: Action) => {
+    if (state === undefined) return initialState;
+    const handler = handlers[action.type];
+    if (handler) {
+      return handler(state, action.payload);
+    }
+    return state;
+  };
+
+  return { reducer, actions };
+}
+
+/**
+ * Creates a reducer from a map of action handlers.
+ */
+export function createReducer<S, A extends Action = Action>(
+  initialState: S,
+  handlers: {
+    [K in A["type"]]?: (state: S, action: Extract<A, { type: K }>) => S;
+  },
+): Reducer<S> {
+  return (state = initialState, action: Action) => {
+    // Cast action type to keyof handlers to safely index
+    const handler = handlers[action.type as keyof typeof handlers];
+    if (handler) {
+      return handler(state, action as any);
+    }
+    return state;
+  };
+}
+
+/**
+ * Combines multiple slice reducers into a single root reducer.
+ */
+export function combineReducers<R extends Record<string, Reducer<any>>>(
+  reducers: R,
+): Reducer<{ [K in keyof R]: ReturnType<R[K]> }> {
+  return function combinedReducer(state: any, action: Action) {
     let changed = false;
-    const nextState = {} as S;
+    const nextState: any = {};
 
     for (const key in reducers) {
-      const prevSlice = state[key];
+      const prevSlice = state ? state[key] : undefined;
       const nextSlice = reducers[key](prevSlice, action);
       nextState[key] = nextSlice;
-      if (nextSlice !== prevSlice) changed = true;
+      if (!state || nextSlice !== prevSlice) changed = true;
     }
 
     return changed ? nextState : state;

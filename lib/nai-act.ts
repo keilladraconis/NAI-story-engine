@@ -6,129 +6,146 @@
 // Core Types
 // --------------------------------------------------
 
-interface StoreLike<S, A = any> {
+type ActionLike = { type: string };
+
+export interface StoreLike<S> {
   getState(): S;
-  dispatch(action: A): void;
+  dispatch(action: ActionLike): void;
   subscribeSelector<T>(
     selector: (state: S) => T,
     listener: (value: T) => void,
   ): () => void;
   subscribeEffect(
-    when: (action: A) => boolean,
+    when: (action: ActionLike) => boolean,
     run: (
-      action: A,
-      ctx: { dispatch: (action: A) => void; getState: () => S },
+      action: ActionLike,
+      ctx: { dispatch: (action: ActionLike) => void; getState: () => S },
     ) => void,
-  ): () => boolean;
+  ): () => void;
 }
 
-export interface BindContext<S, A = any> {
+export interface BindContext<S> {
   getState(): S;
-  dispatch(action: A): void;
+  dispatch(action: ActionLike): void;
   useSelector<T>(
     selector: (state: S) => T,
     listener: (value: T) => void,
   ): () => void;
   useEffect(
-    when: (action: A) => boolean,
+    when: (action: ActionLike) => boolean,
     run: (
-      action: A,
-      ctx: { dispatch: (action: A) => void; getState: () => S },
+      action: ActionLike,
+      ctx: { dispatch: (action: ActionLike) => void; getState: () => S },
     ) => void,
-  ): () => boolean;
-  mount<P>(component: Component<P, S, unknown>, props: P): () => void;
+  ): () => void;
+  mount<P>(component: Component<P, S>, props: P): () => void;
 }
 
 // --------------------------------------------------
 // Component Definition
 // --------------------------------------------------
 
-export interface Component<Props, State, Events> {
-  id(props: Props): string;
-  events: Events;
-  describe(props: Props): UIPart;
-  bind(props: Props, ctx: BindContext<State>): void;
+type ComponentId<P> = [unknown] extends [P]
+  ? (props?: P) => string
+  : [P] extends [void]
+  ? () => string
+  : (props: P) => string;
+
+export interface Component<P, S = unknown, E = unknown> {
+  id: ComponentId<P>;
+  events: E;
+  describe(props: P): UIPart;
+  onMount(props: P, ctx: BindContext<S>): void;
 }
 
-export function defineComponent<Props, State, Events>(
-  component: Component<Props, State, Events> &
-    ThisType<Component<Props, State, Events>>,
-): Component<Props, State, Events>;
-
-export function defineComponent<Props, State>(
-  component: Component<Props, State, any> &
-    ThisType<Component<Props, State, any>>,
-): Component<Props, State, any>;
-
-export function defineComponent(component: any): any {
+export function defineComponent<P, S, E>(
+  component: Component<P, S, E> & ThisType<Component<P, S, E>>,
+): Component<P, S, E> {
   return component;
 }
 
 // --------------------------------------------------
-// Helpers
+// Events
 // --------------------------------------------------
 
-export function createEvents<
-  T extends Record<string, (...args: any[]) => any>,
->() {
-  const handlers: Partial<T> = {};
-  const slots: Record<string, (...args: any[]) => any> = {};
+type EventMap = Record<string, (...args: any[]) => any>;
 
-  const proxy = new Proxy({} as T, {
-    get(target, key: string, receiver) {
-      // 🔧 FIX: respect real properties on the target
-      if (key in target) {
-        return Reflect.get(target, key, receiver);
+type AugmentedEvents<P, Defs extends EventMap> = {
+  [K in keyof Defs]: P extends void
+    ? Defs[K]
+    : (props: P, ...args: Parameters<Defs[K]>) => ReturnType<Defs[K]>;
+};
+
+export function createEvents<P, Defs extends EventMap>() {
+  const handlers: Partial<AugmentedEvents<P, Defs>> = {};
+  const slots: Record<string, Function> = {};
+
+  return new Proxy({} as any, {
+    get(_target, key: string) {
+      if (key === "attach") {
+        return (next: Partial<AugmentedEvents<P, Defs>>) =>
+          Object.assign(handlers, next);
       }
-
+      
       if (!slots[key]) {
         slots[key] = (...args: any[]) => {
-          const fn = handlers[key];
-          if (fn) {
-            return fn(...args);
-          }
+          const fn = handlers[key as keyof typeof handlers];
+          // @ts-ignore: Dynamic dispatch based on key
+          return fn ? fn(...args) : undefined;
         };
       }
-      return slots[key] as T[keyof T];
+      return slots[key];
     },
-  });
-
-  function attach(next: T) {
-    for (const key in next) {
-      handlers[key] = next[key];
-    }
-  }
-
-  return Object.assign(proxy, { attach });
+  }) as AugmentedEvents<P, Defs> & {
+    attach(handlers: Partial<AugmentedEvents<P, Defs>>): void;
+  };
 }
 
 // --------------------------------------------------
-// Mount / Unmount
+// Mount
 // --------------------------------------------------
 
-export function mount<Props, State, Action>(
-  component: Component<Props, State, unknown>,
-  props: Props,
-  store: StoreLike<State, Action>,
+export function mount<P, S>(
+  component: Component<P, S>,
+  props: P,
+  store: StoreLike<S>,
 ): () => void {
   const cleanups: (() => void)[] = [];
 
-  const ctx: BindContext<State, Action> = {
+  const addCleanup = (fn: () => void) => {
+    cleanups.push(fn);
+    return () => {
+      fn();
+      const index = cleanups.indexOf(fn);
+      if (index !== -1) cleanups.splice(index, 1);
+    };
+  };
+
+  const ctx: BindContext<S> = {
     getState: store.getState.bind(store),
     dispatch: store.dispatch.bind(store),
-    useSelector: store.subscribeSelector.bind(store),
-    useEffect: store.subscribeEffect.bind(store),
-    mount<P>(child: Component<P, State, unknown>, childProps: P): () => void {
-      const unmount = mount(child, childProps, store);
-      cleanups.push(unmount);
-      return unmount;
+
+    useSelector(selector, listener) {
+      const unsub = store.subscribeSelector(selector, listener);
+      return addCleanup(unsub);
+    },
+
+    useEffect(when, run) {
+      const unsub = store.subscribeEffect(when, run);
+      return addCleanup(unsub);
+    },
+
+    mount(child, childProps) {
+      const unsub = mount(child, childProps, store);
+      return addCleanup(unsub);
     },
   };
 
-  component.bind(props, ctx);
+  component.onMount.call(component, props, ctx);
 
   return () => {
-    for (const fn of cleanups.splice(0)) {
+    const toRun = cleanups.splice(0);
+    for (const fn of toRun) {
       fn();
     }
   };
