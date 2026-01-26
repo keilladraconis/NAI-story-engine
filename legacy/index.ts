@@ -2,7 +2,7 @@ import { createEffectRunner, createStore, RootState } from "./core/store";
 import { registerEffects } from "./core/store/effects";
 import { Sidebar } from "./ui/components/Sidebar/Sidebar";
 import { LorebookPanel } from "./ui/components/Lorebook/LorebookPanel";
-import { BrainstormManager } from "./ui/controllers/brainstorm/manager";
+
 import { uiLorebookSelected, runtimeStateUpdated } from "./core/store/actions";
 import {
   initialRootState,
@@ -42,18 +42,15 @@ import { mount } from "../lib/nai-act";
     });
 
     // Managers & Components
-    const brainstormManager = new BrainstormManager(store);
 
     // Initial Render & Registration
     const initialState = getState();
     const sidebar = Sidebar.describe({}, initialState) as UIExtension;
-    const brainstorm = brainstormManager.register();
     const lorebook = LorebookPanel.describe({}, initialState) as UIExtension;
 
-    await api.v1.ui.register([sidebar, brainstorm, lorebook]);
+    await api.v1.ui.register([sidebar, lorebook]);
 
     // Mount Managers (Start Subscriptions)
-    brainstormManager.mount();
     
     try {
         mount(Sidebar, {}, store);
