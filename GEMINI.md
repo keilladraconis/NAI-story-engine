@@ -57,6 +57,21 @@
 - **Type Safety**: Strictly typed interfaces for `StoryData` and `StoryManager`. Avoid `any`.
 - **Testing**: Vitest for core logic (Parsing, Debouncing, Data Managers).
 
+## Coding Guidelines
+
+- **Strict Typing & APIs**:
+  - Read `.d.ts` files (e.g., `external/script-types.d.ts`) to adhere strictly to API signatures.
+  - Avoid `any` casts completely, especially with API interactions (e.g., never `api as any`).
+  - Rely on `api.v1.hooks` instead of the deprecated `api.v1.events`.
+  - Use API utilities like `api.v1.uuid()` instead of random ID generation.
+- **API Trust**: Trust provided `.d.ts` files implicitly. Do not wrap API calls in defensive existence checks or try-catch blocks unless handling a documented optional feature.
+- **Logging**: Use `api.v1.log` for all logging. `console.log` is not supported.
+- **Architecture**:
+  - **No Singletons/Globals**: Prefer dependency injection in `src/index.ts`.
+- **Project Management**:
+  - **Tool Usage**: Prefer using tools (like `read_file`, `glob`) over shell commands wherever possible.
+  - **Task Tracking**: Proactively check off and update tasks in `PLAN.md` as they are completed.
+
 ## Development Workflow
 
 ### Plan
@@ -88,10 +103,3 @@ npm run format
 ```
 
 ## Gemini Added Memories
-
-- The user prefers strict typing and expects me to read .d.ts files (like external/script-types.d.ts) to strictly adhere to API signatures, avoiding 'any' and random ID generation in favor of API-provided utilities like api.v1.uuid().
-- The user forbids 'any' casts, especially when interacting with the API (e.g. `api as any`). They expect me to rely on the types defined in .d.ts files. Also, api.v1.events is deprecated/non-existent; api.v1.hooks should be used instead.
-- The user expects me to trust the provided .d.ts files implicitly. I should not wrap API calls in defensive existence checks (e.g. `if (api.v1.hooks)`) or unnecessary try-catch blocks unless handling a documented optional feature or specific error case.
-- The project does not support 'console.log'. Use 'api.v1.log' for all logging purposes.
-- The user prefers using tools (like read_file, glob) over shell commands wherever possible.
-- The user strictly forbids singletons and global variables, preferring dependency injection in src/index.ts.

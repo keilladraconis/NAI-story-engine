@@ -34,8 +34,11 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       // 1. If currently editing another message, save it first
       if (currentEditingId && currentEditingId !== newId) {
         const prevInputId = IDS.BRAINSTORM.message(currentEditingId).INPUT;
-        const content = (await api.v1.storyStorage.get(`draft-${prevInputId}`)) || "";
-        dispatch(messageUpdated({ id: currentEditingId, content: String(content) }));
+        const content =
+          (await api.v1.storyStorage.get(`draft-${prevInputId}`)) || "";
+        dispatch(
+          messageUpdated({ id: currentEditingId, content: String(content) }),
+        );
       }
 
       // 2. Prepare the NEW message for editing
@@ -43,12 +46,15 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       if (newMessage) {
         // Seed the storage so the input shows the current content
         const newInputId = IDS.BRAINSTORM.message(newId).INPUT;
-        await api.v1.storyStorage.set(`draft-${newInputId}`, newMessage.content);
-        
+        await api.v1.storyStorage.set(
+          `draft-${newInputId}`,
+          newMessage.content,
+        );
+
         // 3. Set the editing ID
         dispatch(setBrainstormEditingMessageId(newId));
       }
-    }
+    },
   );
 
   // Intent: Brainstorm Edit End (Save)
@@ -60,12 +66,13 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       if (editingId) {
         const inputId = IDS.BRAINSTORM.message(editingId).INPUT;
-        const content = (await api.v1.storyStorage.get(`draft-${inputId}`)) || "";
-        
+        const content =
+          (await api.v1.storyStorage.get(`draft-${inputId}`)) || "";
+
         dispatch(messageUpdated({ id: editingId, content: String(content) }));
         dispatch(setBrainstormEditingMessageId(null));
       }
-    }
+    },
   );
 
   // Intent: Brainstorm Submit
@@ -74,35 +81,47 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     async (_action, { dispatch, getState }) => {
       const storageKey = IDS.BRAINSTORM.INPUT;
       const content = (await api.v1.storyStorage.get(storageKey)) || "";
-      
-      if (!content || !String(content).trim()) return;
 
       // Clear Input
       await api.v1.storyStorage.set(storageKey, "");
       api.v1.ui.updateParts([{ id: IDS.BRAINSTORM.INPUT, value: "" }]); // Reset UI
 
-      // Add User Message
-      const userMsg: BrainstormMessage = {
-        id: api.v1.uuid(),
-        role: "user",
-        content: String(content),
-      };
-      dispatch(messageAdded(userMsg));
+      let assistantId;
 
-      // Add Assistant Placeholder
-      const assistantId = api.v1.uuid();
-      const assistantMsg: BrainstormMessage = {
-        id: assistantId,
-        role: "assistant",
-        content: "",
-      };
-      dispatch(messageAdded(assistantMsg));
+      // Add User Message if user typed something
+      if (String(content).trim()) {
+        const userMsg: BrainstormMessage = {
+          id: api.v1.uuid(),
+          role: "user",
+          content: String(content),
+        };
+        dispatch(messageAdded(userMsg));
+      } else {
+        const lastMessage = getState().brainstorm.messages.at(-1);
+        if (lastMessage?.role == "user") {
+          // User sent a message
+          // Add Assistant Placeholder
+          assistantId = api.v1.uuid();
+          const assistantMsg: BrainstormMessage = {
+            id: assistantId,
+            role: "assistant",
+            content: "",
+          };
+          dispatch(messageAdded(assistantMsg));
+        } else if (lastMessage?.role == "assistant") {
+          // Continue the most recent assistant message.
+          assistantId = lastMessage.id;
+        } else {
+          // There are no messages
+          return;
+        }
+      }
 
       // Request Generation
       const state = getState();
       const strategy = await buildBrainstormStrategy(state, assistantId);
       dispatch(uiRequestGeneration(strategy));
-    }
+    },
   );
 
   // Intent: Brainstorm Retry
@@ -110,7 +129,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     (action) => action.type === uiBrainstormRetryGeneration({} as any).type,
     async (action, { dispatch, getState }) => {
       const { messageId } = action.payload;
-      
+
       // Prune history (keep up to user, remove assistant response if target is assistant)
       // Or if target is user, keep up to that user message.
       // The logic inside pruneHistory handles role-based pruning.
@@ -119,34 +138,37 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       // After pruning, we need to generate a response.
       // 1. If we retried a User message, we pruned everything after it. We need an Assistant response.
       // 2. If we retried an Assistant message, we pruned it. We need a new Assistant response.
-      
+
       const state = getState(); // Get updated state
-      const lastMessage = state.brainstorm.messages[state.brainstorm.messages.length - 1];
+      const lastMessage =
+        state.brainstorm.messages[state.brainstorm.messages.length - 1];
 
       let assistantId: string;
 
       if (lastMessage && lastMessage.role === "assistant") {
-          // Should not happen if we just pruned to generate?
-          // If we pruned an assistant message, the last one should be User.
-          // If we pruned a user message, the last one is that User message.
-          // So in both cases we need a new Assistant placeholder.
-          // Wait, if we are "retrying" a user message, do we want to edit it? No, that's Edit.
-          // Retry on User message usually means "Regenerate the response to this message".
-          // Retry on Assistant message means "Regenerate this response".
-          assistantId = api.v1.uuid();
+        // Should not happen if we just pruned to generate?
+        // If we pruned an assistant message, the last one should be User.
+        // If we pruned a user message, the last one is that User message.
+        // So in both cases we need a new Assistant placeholder.
+        // Wait, if we are "retrying" a user message, do we want to edit it? No, that's Edit.
+        // Retry on User message usually means "Regenerate the response to this message".
+        // Retry on Assistant message means "Regenerate this response".
+        assistantId = api.v1.uuid();
       } else {
-          // Last is user (or system), add assistant placeholder
-          assistantId = api.v1.uuid();
-          dispatch(messageAdded({
-              id: assistantId,
-              role: "assistant",
-              content: ""
-          }));
+        // Last is user (or system), add assistant placeholder
+        assistantId = api.v1.uuid();
+        dispatch(
+          messageAdded({
+            id: assistantId,
+            role: "assistant",
+            content: "",
+          }),
+        );
       }
 
       const strategy = await buildBrainstormStrategy(state, assistantId);
       dispatch(uiRequestGeneration(strategy));
-    }
+    },
   );
 
   // Intent: GenX Generation
@@ -165,10 +187,10 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         const state = getState();
         if (target.type === "brainstorm") {
           const message = state.brainstorm.messages.find(
-            (m) => m.id === target.messageId
+            (m) => m.id === target.messageId,
           );
           if (message) accumulatedText = message.content;
-        } 
+        }
         // Add other targets (field/list) if/when supported
       }
 
@@ -190,14 +212,17 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
             }
           },
           "background",
-          await api.v1.createCancellationSignal()
+          await api.v1.createCancellationSignal(),
         );
 
         dispatch(generationCompleted({ requestId }));
       } catch (error: any) {
         api.v1.log("Generation failed:", error);
         dispatch(
-          generationFailed({ requestId, error: error.message || String(error) })
+          generationFailed({
+            requestId,
+            error: error.message || String(error),
+          }),
         );
       } finally {
         // Sync to Store
@@ -206,11 +231,11 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
             messageUpdated({
               id: target.messageId,
               content: accumulatedText,
-            })
+            }),
           );
         }
       }
-    }
+    },
   );
 
   // Intent: Cancellation
@@ -218,7 +243,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     (action) => action.type === uiRequestCancellation().type,
     () => {
       genX.cancelCurrent();
-    }
+    },
   );
 
   // Intent: User Presence
@@ -226,31 +251,34 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     (action) => action.type === uiUserPresenceConfirmed().type,
     () => {
       genX.userInteraction();
-    }
+    },
   );
-  
+
   // Save Story Effect (Autosave)
   subscribeEffect(
-      (action) => action.type.startsWith("story/") || action.type.startsWith("brainstorm/"),
-      async (action, { getState }) => {
-          if (action.type === "story/loadRequested") return; // Don't save on load trigger
-          try {
-             // We save the 'story' slice. 
-             // Do we save 'brainstorm' slice?
-             // Legacy saved the whole story state which included brainstorm messages.
-             // Here they are separate. We should persist both.
-             // We can use 'kse-story-data' for story and 'kse-brainstorm-data' for brainstorm?
-             // Or combine them into one object for storage.
-             const state = getState();
-             const persistData = {
-                 story: state.story,
-                 brainstorm: state.brainstorm
-             };
-             // Debouncing? NAIStore doesn't debounce.
-             // Ideally we debounce. For now, fire and forget (NovelAI storage handles some key-based debounce? No)
-             // We'll just save. It's local storage usually.
-             api.v1.storyStorage.set("kse-persist", persistData);
-          } catch(e) { /* ignore */ }
+    (action) =>
+      action.type.startsWith("story/") || action.type.startsWith("brainstorm/"),
+    async (action, { getState }) => {
+      if (action.type === "story/loadRequested") return; // Don't save on load trigger
+      try {
+        // We save the 'story' slice.
+        // Do we save 'brainstorm' slice?
+        // Legacy saved the whole story state which included brainstorm messages.
+        // Here they are separate. We should persist both.
+        // We can use 'kse-story-data' for story and 'kse-brainstorm-data' for brainstorm?
+        // Or combine them into one object for storage.
+        const state = getState();
+        const persistData = {
+          story: state.story,
+          brainstorm: state.brainstorm,
+        };
+        // Debouncing? NAIStore doesn't debounce.
+        // Ideally we debounce. For now, fire and forget (NovelAI storage handles some key-based debounce? No)
+        // We'll just save. It's local storage usually.
+        api.v1.storyStorage.set("kse-persist", persistData);
+      } catch (e) {
+        /* ignore */
       }
+    },
   );
 }
