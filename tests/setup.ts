@@ -17,7 +17,7 @@ const apiMock = {
       register: vi.fn(),
     },
     timers: {
-      setTimeout: vi.fn((cb, delay) => globalThis.setTimeout(cb, delay) as any),
+      setTimeout: vi.fn((cb, delay) => Promise.resolve(globalThis.setTimeout(cb, delay)) as any),
       clearTimeout: vi.fn((id) => {
         globalThis.clearTimeout(id);
       }),

@@ -21,12 +21,15 @@ export interface GenerationButtonProps {
 
 const { button, row } = api.v1.ui.part;
 
-const events = createEvents<GenerationButtonProps, {
-  generate(): void;
-  cancel(): void;
-  cancelActive(): void;
-  continue(): void;
-}>();
+const events = createEvents<
+  GenerationButtonProps,
+  {
+    generate(): void;
+    cancel(): void;
+    cancelActive(): void;
+    continue(): void;
+  }
+>();
 
 export const GenerationButton: Component<GenerationButtonProps, RootState> = {
   id: (props) => props.id,
@@ -110,6 +113,8 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
 
   onMount(props, { dispatch, useSelector }) {
     const { id, requestId } = props;
+    let timerId: any = null;
+    let isTimerActive = false;
 
     // Attach Handlers
     events.attach({
@@ -143,27 +148,51 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       },
     });
 
+    const updateTimer = (endTime: number) => {
+      if (!isTimerActive) return;
+
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
+
+      api.v1.ui.updateParts([
+        {
+          id: `${id}-wait`,
+          text: `⏳ Wait (${remaining}s)`,
+        },
+      ]);
+
+      if (remaining > 0) {
+        api.v1.timers
+          .setTimeout(() => updateTimer(endTime), 2000)
+          .then((tid: any) => {
+            if (isTimerActive) {
+              timerId = tid;
+            } else {
+              api.v1.timers.clearTimeout(tid);
+            }
+          });
+      }
+    };
+
     // Reactive State
     useSelector(
       (state) => ({
         activeRequestId: state.runtime.activeRequest?.id,
         queueIds: state.runtime.queue.map((q) => q.id),
         genxStatus: state.runtime.genx.status,
-        genxBudgetState: state.runtime.genx.budgetState,
-        genxBudgetTime: state.runtime.genx.budgetTimeRemaining,
+        budgetWaitEndTime: state.runtime.genx.budgetWaitEndTime,
       }),
       (slice) => {
-        const { activeRequestId, queueIds, genxStatus, genxBudgetState } = slice;
+        const { activeRequestId, queueIds, genxStatus, budgetWaitEndTime } =
+          slice;
         let mode = "idle";
 
         if (requestId) {
           const isActive = activeRequestId === requestId;
           const isQueued = queueIds.includes(requestId);
           if (isActive) {
-            if (genxStatus === "waiting_for_user" || genxBudgetState === "waiting_for_user")
-              mode = "budget_user";
-            else if (genxStatus === "waiting_for_budget" || genxBudgetState === "waiting_for_timer")
-              mode = "budget_timer";
+            if (genxStatus === "waiting_for_budget") mode = "budget_timer";
+            else if (genxStatus === "waiting_for_user") mode = "budget_user";
             else mode = "generating";
           } else if (isQueued) {
             mode = "queued";
@@ -173,38 +202,54 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             genxStatus === "waiting_for_budget"
           ) {
             // Global busy state
-            mode = "idle"; 
+            mode = "idle";
           }
         } else {
           // Global button (Brainstorm Send)
           if (genxStatus === "queued") mode = "queued";
-          else if (genxStatus === "waiting_for_user" || genxBudgetState === "waiting_for_user")
-            mode = "budget_user";
-          else if (genxStatus === "waiting_for_budget" || genxBudgetState === "waiting_for_timer")
-            mode = "budget_timer";
+          else if (genxStatus === "waiting_for_budget") mode = "budget_timer";
+          else if (genxStatus === "waiting_for_user") mode = "budget_user";
           else if (genxStatus === "generating") mode = "generating";
         }
 
-        const updates: any[] = [
-          { id: `${id}-gen`, style: { display: mode === "idle" ? "block" : "none" } },
-          { id: `${id}-queue`, style: { display: mode === "queued" ? "block" : "none" } },
-          { id: `${id}-cancel`, style: { display: mode === "generating" ? "block" : "none" } },
-          { id: `${id}-continue`, style: { display: mode === "budget_user" ? "block" : "none" } },
+        const updates = [
+          {
+            id: `${id}-gen`,
+            style: { display: mode === "idle" ? "block" : "none" },
+          },
+          {
+            id: `${id}-queue`,
+            style: { display: mode === "queued" ? "block" : "none" },
+          },
+          {
+            id: `${id}-cancel`,
+            style: { display: mode === "generating" ? "block" : "none" },
+          },
+          {
+            id: `${id}-continue`,
+            style: { display: mode === "budget_user" ? "block" : "none" },
+          },
+          {
+            id: `${id}-wait`,
+            style: { display: mode === "budget_timer" ? "block" : "none" },
+          },
         ];
 
         if (mode === "budget_timer") {
-          const remaining = Math.ceil((slice.genxBudgetTime || 0) / 1000);
-          updates.push({
-            id: `${id}-wait`,
-            text: `⏳ Wait (${remaining}s)`,
-            style: { display: "block" },
-          });
+          if (!isTimerActive) {
+            isTimerActive = true;
+            updateTimer(budgetWaitEndTime || Date.now() + 240000);
+          }
         } else {
-          updates.push({ id: `${id}-wait`, style: { display: "none" } });
+          isTimerActive = false;
+          if (timerId) {
+            api.v1.timers.clearTimeout(timerId);
+            timerId = null;
+          }
         }
 
         api.v1.ui.updateParts(updates);
-      }
+      },
     );
   },
 };

@@ -19,13 +19,8 @@ export interface GenerationState {
   error?: string;
   queueLength: number;
 
-  // Budget/Timer info
-  budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
-  budgetTimeRemaining?: number;
+  // Budget Timer info
   budgetWaitEndTime?: number;
-  budgetWaitTime?: number;
-  budgetResolver?: () => void;
-  budgetRejecter?: (reason?: any) => void;
 }
 
 interface GenerationTask {
@@ -46,7 +41,6 @@ export class GenX {
   private _state: GenerationState = {
     status: "idle",
     queueLength: 0,
-    budgetState: "normal",
   };
 
   private listeners: ((state: GenerationState) => void)[] = [];
@@ -127,16 +121,8 @@ export class GenX {
   }
 
   public userInteraction() {
-    if (this._state.budgetState === "waiting_for_user") {
-      this.updateState({ budgetState: "waiting_for_timer" });
-
-      // If timer has already expired, resolve immediately
-      if (
-        this._state.budgetWaitEndTime &&
-        Date.now() >= this._state.budgetWaitEndTime
-      ) {
-        this.resolveBudgetWait();
-      }
+    if (this._state.status === "waiting_for_user") {
+      this.updateState({ status: "waiting_for_budget" });
     }
   }
 
@@ -262,17 +248,6 @@ export class GenX {
     });
   }
 
-  private resolveBudgetWait() {
-    if (this._state.budgetResolver) {
-      this._state.budgetResolver();
-      this.updateState({
-        budgetState: "normal",
-        budgetResolver: undefined,
-        budgetRejecter: undefined,
-      });
-    }
-  }
-
   private async ensureBudget(
     requested: number,
     _min: number,
@@ -282,71 +257,23 @@ export class GenX {
 
     if (available < requested) {
       const time = api.v1.script.getTimeUntilAllowedOutput(requested);
+      const targetEnd = Date.now() + time;
+
       api.v1.log(
         `Waiting for budget: Have ${available}, Need ${requested}, Time ${time}ms`,
       );
 
-      await new Promise<void>((resolve, reject) => {
-        const targetEnd = Date.now() + time;
-
-        const resolver = () => {
-          resolve();
-        };
-        const rejecter = (reason?: any) => {
-          reject(reason || "Cancelled");
-        };
-
-        this.updateState({
-          status: "waiting_for_user",
-          budgetState: "waiting_for_user",
-          budgetWaitTime: time,
-          budgetWaitEndTime: targetEnd,
-          budgetTimeRemaining: time,
-          budgetResolver: resolver,
-          budgetRejecter: rejecter,
-        });
-
-        // Ticker for budget timer
-        const tick = () => {
-          // Check cancellation
-          if (signal?.cancelled) {
-            rejecter("Cancelled");
-            return;
-          }
-
-          // Check explicit resolver call (manual resolveBudgetWait)
-          if (!this._state.budgetResolver) {
-            // Already resolved externally
-            return;
-          }
-
-          const now = Date.now();
-          const remaining = Math.max(0, targetEnd - now);
-
-          this.updateState({ budgetTimeRemaining: remaining });
-
-          // Only resolve if in timer state AND time is up
-          if (
-            this._state.budgetState === "waiting_for_timer" &&
-            remaining === 0
-          ) {
-            this.resolveBudgetWait();
-            return;
-          }
-
-          api.v1.timers.setTimeout(tick, 1000);
-        };
-
-        tick();
+      this.updateState({
+        status: "waiting_for_user",
+        budgetWaitEndTime: targetEnd,
       });
 
       // 3. Final Wait (Platform enforcement)
       await api.v1.script.waitForAllowedOutput(requested);
+      if (signal?.cancelled) return;
 
       this.updateState({
         status: "generating",
-        budgetState: "normal",
-        budgetTimeRemaining: undefined,
       });
     }
   }
