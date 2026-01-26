@@ -1,5 +1,5 @@
 import { createSlice } from "../../../../lib/nai-store";
-import { RuntimeState, GenerationRequest, GenerationStatus, GenerationStrategy } from "../types";
+import { RuntimeState, GenerationRequest } from "../types";
 import { GenerationState } from "../../../../lib/gen-x";
 
 export const initialRuntimeState: RuntimeState = {
@@ -29,7 +29,7 @@ export const runtimeSlice = createSlice({
     }),
     
     // Intent (handled by Effects)
-    intentRequestGeneration: (state, _strategy: GenerationStrategy) => state,
+    // intentRequestGeneration moved to uiSlice as uiRequestGeneration
 
     generationRequested: (state, request: GenerationRequest) => ({
         ...state,
@@ -55,18 +55,18 @@ export const runtimeSlice = createSlice({
             status: "generating"
         };
     },
-    generationCompleted: (state, payload: { requestId: string }) => ({
+    generationCompleted: (state, _payload: { requestId: string }) => ({
         ...state,
         activeRequest: null,
         status: state.queue.length > 0 ? "queued" : "idle"
     }),
-    generationFailed: (state, payload: { requestId: string; error: string }) => ({
+    generationFailed: (state, _payload: { requestId: string; error: string }) => ({
         ...state,
         activeRequest: null,
         status: "error"
     }),
-    generationCancelled: (state, payload: { requestId: string }) => {
-        const { requestId } = payload;
+    generationCancelled: (state, _payload: { requestId: string }) => {
+        const { requestId } = _payload;
         if (state.activeRequest && state.activeRequest.id === requestId) {
             return {
                 ...state,
@@ -89,7 +89,6 @@ export const runtimeSlice = createSlice({
 export const {
     stateUpdated,
     segaToggled,
-    intentRequestGeneration,
     generationRequested,
     generationStarted,
     generationCompleted,

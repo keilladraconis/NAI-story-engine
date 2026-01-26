@@ -1,10 +1,10 @@
 import { Component, createEvents } from "../../../../lib/nai-act";
 import { RootState, BrainstormMessage } from "../../../core/store/types";
 import {
-  setBrainstormEditingMessageId,
-  messageUpdated,
+  uiBrainstormMessageEditBegin,
+  uiBrainstormMessageEditEnd,
+  uiBrainstormRetryGeneration,
   messageRemoved,
-  historyPruned,
 } from "../../../core/store";
 import { IDS } from "../../framework/ids";
 import { calculateTextAreaHeight } from "../../utils";
@@ -148,21 +148,18 @@ export const Message: Component<MessageProps, RootState> = {
     });
   },
 
-  onMount(props, { dispatch, useSelector, mount }) {
+  onMount(props, { dispatch, useSelector }) {
     const ids = IDS.BRAINSTORM.message(props.message.id);
 
     events.attach({
       edit(p) {
-        dispatch(setBrainstormEditingMessageId(p.message.id));
+        dispatch(uiBrainstormMessageEditBegin({ id: p.message.id }));
       },
-      async save(p) {
-        const content = await api.v1.storyStorage.get(`draft-${ids.INPUT}`) || "";
-        dispatch(messageUpdated({ id: p.message.id, content: String(content) }));
-        dispatch(setBrainstormEditingMessageId(null));
+      save(_p) {
+        dispatch(uiBrainstormMessageEditEnd());
       },
       retry(p) {
-        dispatch(historyPruned(p.message.id));
-        // TODO: Trigger generation
+        dispatch(uiBrainstormRetryGeneration({ messageId: p.message.id }));
       },
       delete(p) {
         dispatch(messageRemoved(p.message.id));

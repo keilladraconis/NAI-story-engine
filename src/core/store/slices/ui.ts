@@ -24,6 +24,10 @@ export const uiSlice = createSlice({
     uiRequestCancellation: (state) => state,
     uiUserPresenceConfirmed: (state) => state,
     uiBrainstormSubmitUserMessage: (state) => state,
+    uiBrainstormMessageEditBegin: (state, _payload: { id: string }) => state,
+    uiBrainstormMessageEditEnd: (state) => state,
+    uiBrainstormRetryGeneration: (state, _payload: { messageId: string }) => state,
+    uiRequestGeneration: (state, _strategy: any) => state,
   },
 });
 
@@ -33,4 +37,8 @@ export const {
   uiRequestCancellation,
   uiUserPresenceConfirmed,
   uiBrainstormSubmitUserMessage,
+  uiBrainstormMessageEditBegin,
+  uiBrainstormMessageEditEnd,
+  uiBrainstormRetryGeneration,
+  uiRequestGeneration,
 } = uiSlice.actions;

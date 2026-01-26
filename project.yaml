@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1769437399
+updatedAt: 1769438820
 config:
   - name: system_prompt
     prettyName: System Prompt

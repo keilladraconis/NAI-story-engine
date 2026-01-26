@@ -39,7 +39,7 @@ export const brainstormSlice = createSlice({
         messages: state.messages.filter((msg) => msg.id !== id),
       };
     },
-    historyPruned: (state, id: string) => {
+    pruneHistory: (state, id: string) => {
       const index = state.messages.findIndex((msg) => msg.id === id);
       if (index === -1) return state;
 
@@ -79,7 +79,7 @@ export const {
   messageUpdated,
   messageAppended,
   messageRemoved,
-  historyPruned,
+  pruneHistory,
   messagesCleared,
   brainstormLoaded
 } = brainstormSlice.actions;

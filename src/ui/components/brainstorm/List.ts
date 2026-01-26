@@ -34,7 +34,7 @@ export const List: Component<ListProps, RootState> = {
     });
   },
 
-  onMount(props, ctx) {
+  onMount(_props, ctx) {
     const { useSelector, mount } = ctx;
     let messageCleanups: (() => void)[] = [];
 

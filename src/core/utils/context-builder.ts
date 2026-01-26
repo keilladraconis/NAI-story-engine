@@ -1,15 +1,10 @@
 import {
   RootState,
   BrainstormMessage,
-  GenerationRequest,
-  DulfsItem,
   GenerationStrategy,
 } from "../store/types";
 import {
   FieldID,
-  DulfsFieldID,
-  FIELD_CONFIGS,
-  LIST_FIELD_IDS,
 } from "../../config/field-definitions";
 
 export interface StrategyResult {
@@ -26,10 +21,6 @@ const getFieldContent = (state: RootState, id: string): string => {
   return state.story.fields[id]?.content || "";
 };
 
-const getDulfsList = (state: RootState, id: DulfsFieldID): DulfsItem[] => {
-  return state.story.dulfs[id] || [];
-};
-
 const getBrainstormHistory = (state: RootState): BrainstormMessage[] => {
   return state.brainstorm.messages || [];
 };
@@ -44,28 +35,6 @@ const getConsolidatedBrainstorm = (state: RootState): string => {
       .join("\n");
   }
   return "";
-};
-
-const buildDulfsContextString = (
-  state: RootState,
-  excludeFieldId?: string,
-): string => {
-  let context = "";
-  for (const fid of LIST_FIELD_IDS) {
-    const summary = state.story.dulfsSummaries[fid];
-    const config = FIELD_CONFIGS.find((c) => c.id === fid);
-    const label = config ? config.label.toUpperCase() : fid.toUpperCase();
-
-    if (summary && summary.trim().length > 0) {
-      context += `${label} OVERVIEW:\n${summary}\n\n`;
-    } else {
-      if (fid === excludeFieldId) continue;
-      const list = getDulfsList(state, fid as DulfsFieldID);
-      if (list.length === 0) continue;
-      context += `${label}: ${list.map((i) => i.name).join(", ")}\n\n`;
-    }
-  }
-  return context.trim();
 };
 
 const contextBuilder = (

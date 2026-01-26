@@ -5,7 +5,6 @@ export const calculateTextAreaHeight = (content: string): string => {
   
   if (!content) return `${MIN_HEIGHT}px`;
   
-  const lines = content.split("\n").length;
   // Simple heuristic: 60 chars per line wrap
   const wrappedLines = content.split("\n").reduce((acc, line) => {
       return acc + Math.max(1, Math.ceil(line.length / 60));

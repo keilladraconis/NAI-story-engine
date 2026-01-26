@@ -56,7 +56,7 @@ export const Input: Component<{}, RootState> = {
     });
   },
 
-  onMount(props, ctx) {
+  onMount(_props, ctx) {
     const { dispatch, useSelector, getState } = ctx;
     const ids = IDS.BRAINSTORM;
 

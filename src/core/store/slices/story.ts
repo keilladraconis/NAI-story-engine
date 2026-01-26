@@ -36,7 +36,7 @@ export const storySlice = createSlice({
   name: "story",
   initialState: initialStoryState,
   reducers: {
-    storyLoaded: (state, payload: { story: StoryState }) => ({
+    storyLoaded: (_state, payload: { story: StoryState }) => ({
         ...initialStoryState, // Reset then merge
         ...payload.story
     }),
