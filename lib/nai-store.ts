@@ -44,7 +44,10 @@ export interface Store<S> {
 // createStore
 // ==================================================
 
-export function createStore<S>(reducer: Reducer<S>): Store<S> {
+export function createStore<S>(
+  reducer: Reducer<S>,
+  debug: boolean = false,
+): Store<S> {
   // Initialize state by dispatching the init action.
   let currentState = reducer(undefined, { type: "@@NAISTORE/INIT" });
 
@@ -56,6 +59,7 @@ export function createStore<S>(reducer: Reducer<S>): Store<S> {
   }
 
   function dispatch(action: Action) {
+    if (debug) api.v1.log("NAIACT", action);
     currentState = reducer(currentState, action);
 
     for (const l of listeners) {
@@ -125,10 +129,7 @@ type ActionCreator<P> = void extends P
 type Slice<S, CR extends Record<string, CaseReducer<S, any>>> = {
   reducer: Reducer<S>;
   actions: {
-    [K in keyof CR]: CR[K] extends (
-      state: any,
-      payload: infer P,
-    ) => any
+    [K in keyof CR]: CR[K] extends (state: any, payload: infer P) => any
       ? ActionCreator<P>
       : () => PayloadAction<void>;
   };
@@ -139,12 +140,8 @@ type Slice<S, CR extends Record<string, CaseReducer<S, any>>> = {
  */
 export function createSlice<
   S,
-  CR extends Record<string, CaseReducer<S, any>>
->(options: {
-  name: string;
-  initialState: S;
-  reducers: CR;
-}): Slice<S, CR> {
+  CR extends Record<string, CaseReducer<S, any>>,
+>(options: { name: string; initialState: S; reducers: CR }): Slice<S, CR> {
   const { name, initialState, reducers } = options;
   const actions = {} as Slice<S, CR>["actions"];
   const handlers: Record<string, CaseReducer<S, any>> = {};

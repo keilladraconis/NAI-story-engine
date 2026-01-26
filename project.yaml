@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1769198765
+updatedAt: 1769437399
 config:
   - name: system_prompt
     prettyName: System Prompt
@@ -247,3 +247,8 @@ config:
       - Format the output strictly as: [ Write in a style that conveys the following: ... ]
       - DO NOT use any markdown bolding (**).
       - OUTPUT ONLY THE BLOCK.
+  - name: nai_store_debug
+    prettyName: NAIStore Debug
+    description: Enable debug logging of actions dispatched to NAIStore
+    type: boolean
+    default: false

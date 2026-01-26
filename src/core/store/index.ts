@@ -4,6 +4,7 @@ import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
 import { storySlice } from "./slices/story";
 import { RootState } from "./types";
+import { asyncWrapProviders } from "node:async_hooks";
 
 const rootReducer = combineReducers({
   story: storySlice.reducer,
@@ -12,7 +13,9 @@ const rootReducer = combineReducers({
   runtime: runtimeSlice.reducer,
 });
 
-export const store = createStore<RootState>(rootReducer);
+const debug = (await api.v1.config.get("nai_store_debug")) || false;
+
+export const store = createStore<RootState>(rootReducer, debug);
 
 // Export types
 export * from "./types";
