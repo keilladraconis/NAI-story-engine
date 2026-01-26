@@ -1,25 +1,54 @@
 import { Component, createEvents } from "../../../lib/nai-act";
-import { RootState, GenerationRequest } from "../../core/store/types";
+import { RootState } from "../../core/store/types";
 import {
-  generationRequested,
-  generationCancelled,
+  uiCancelRequest,
   uiRequestCancellation,
   uiUserPresenceConfirmed,
 } from "../../core/store";
-import { NAI_WARNING, NAI_HEADER, NAI_DARK_BACKGROUND } from "../colors";
+import { NAI_WARNING, NAI_HEADER, NAI_DARK_BACKGROUND, NAI_PARAGRAPH } from "../colors";
 
 export interface GenerationButtonProps {
   id: string;
   requestId?: string;
-  request?: GenerationRequest;
+  generateAction?: any;
   label: string;
   style?: any;
-  onClick?: () => void;
   onCancel?: () => void;
   onContinue?: () => void;
 }
 
 const { button, row } = api.v1.ui.part;
+
+const getButtonStyles = () => {
+  const base = {
+    width: "100%",
+    "font-weight": "bold",
+  };
+  return {
+    gen: { ...base },
+    queue: {
+      ...base,
+      "background-color": NAI_DARK_BACKGROUND,
+      color: NAI_PARAGRAPH,
+      cursor: "pointer",
+    },
+    cancel: {
+      ...base,
+      background: NAI_WARNING,
+      color: NAI_DARK_BACKGROUND,
+    },
+    continue: {
+      ...base,
+      background: NAI_HEADER,
+      color: NAI_DARK_BACKGROUND,
+    },
+    wait: {
+      ...base,
+      "background-color": NAI_DARK_BACKGROUND,
+      color: NAI_PARAGRAPH,
+    },
+  };
+};
 
 const events = createEvents<
   GenerationButtonProps,
@@ -37,97 +66,66 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
 
   describe(props) {
     const { id, label, style = {} } = props;
+    const styles = getButtonStyles();
 
     const btnGenerate = button({
       id: `${id}-gen`,
       text: `⚡ ${label}`,
-      style: {
-        "font-weight": "bold",
-        padding: "4px 8px",
-        ...style,
-      },
+      style: styles.gen,
       callback: () => events.generate(props),
     });
 
     const btnQueued = button({
       id: `${id}-queue`,
       text: `⏳ ${label} (Queued)`,
-      style: {
-        "background-color": "#e2e3e5",
-        color: "#383d41",
-        padding: "4px 8px",
-        cursor: "pointer",
-        ...style,
-        display: "none",
-      },
+      style: { ...styles.queue, display: "none" },
       callback: () => events.cancel(props),
     });
 
     const btnCancel = button({
       id: `${id}-cancel`,
       text: `🚫 Cancel`,
-      style: {
-        "font-weight": "bold",
-        background: NAI_WARNING,
-        color: NAI_DARK_BACKGROUND,
-        padding: "4px 8px",
-        ...style,
-        display: "none",
-      },
+      style: { ...styles.cancel, display: "none" },
       callback: () => events.cancelActive(props),
     });
 
     const btnContinue = button({
       id: `${id}-continue`,
       text: `⚠️ Continue`,
-      style: {
-        background: NAI_HEADER,
-        color: NAI_DARK_BACKGROUND,
-        "font-weight": "bold",
-        padding: "4px 8px",
-        ...style,
-        display: "none",
-      },
+      style: { ...styles.continue, display: "none" },
       callback: () => events.continue(props),
     });
 
     const btnWait = button({
       id: `${id}-wait`,
       text: `⏳ Wait`,
-      style: {
-        "background-color": "#e2e3e5",
-        color: "#383d41",
-        padding: "4px 8px",
-        ...style,
-        display: "none",
-      },
+      style: { ...styles.wait, display: "none" },
       callback: () => events.cancelActive(props),
     });
 
     return row({
       id,
-      style: { gap: "4px", alignItems: "center" },
+      style: { gap: "4px", alignItems: "center", ...style },
       content: [btnGenerate, btnQueued, btnCancel, btnContinue, btnWait],
     });
   },
 
   onMount(props, { dispatch, useSelector }) {
     const { id, requestId } = props;
+    const styles = getButtonStyles();
     let timerId: any = null;
     let isTimerActive = false;
 
     // Attach Handlers
     events.attach({
       generate(p) {
-        if (p.request) {
-          dispatch(generationRequested(p.request));
-        } else if (p.onClick) {
-          p.onClick();
+        if (p.generateAction) {
+          dispatch(p.generateAction);
         }
       },
       cancel(p) {
         if (p.requestId) {
-          dispatch(generationCancelled({ requestId: p.requestId }));
+          dispatch(uiCancelRequest({ requestId: p.requestId }));
         } else if (p.onCancel) {
           p.onCancel();
         }
@@ -163,7 +161,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
 
       if (remaining > 0) {
         api.v1.timers
-          .setTimeout(() => updateTimer(endTime), 2000)
+          .setTimeout(() => updateTimer(endTime), 1000)
           .then((tid: any) => {
             if (isTimerActive) {
               timerId = tid;
@@ -185,60 +183,80 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       (slice) => {
         const { activeRequestId, queueIds, genxStatus, budgetWaitEndTime } =
           slice;
-        let mode = "idle";
 
+        let mode: "gen" | "queue" | "cancel" | "continue" | "wait" = "gen";
+        let taskStatus: "queued" | "processing" | "not_found" = "not_found";
+
+        // Determine Task Status
         if (requestId) {
-          const isActive = activeRequestId === requestId;
-          const isQueued = queueIds.includes(requestId);
-          if (isActive) {
-            if (genxStatus === "waiting_for_budget") mode = "budget_timer";
-            else if (genxStatus === "waiting_for_user") mode = "budget_user";
-            else mode = "generating";
-          } else if (isQueued) {
-            mode = "queued";
-          } else if (
-            genxStatus === "generating" ||
-            genxStatus === "waiting_for_user" ||
-            genxStatus === "waiting_for_budget"
-          ) {
-            // Global busy state
-            mode = "idle";
+          if (activeRequestId === requestId) {
+            taskStatus = "processing";
+          } else if (queueIds.includes(requestId)) {
+            taskStatus = "queued";
           }
         } else {
-          // Global button (Brainstorm Send)
-          if (genxStatus === "queued") mode = "queued";
-          else if (genxStatus === "waiting_for_budget") mode = "budget_timer";
-          else if (genxStatus === "waiting_for_user") mode = "budget_user";
-          else if (genxStatus === "generating") mode = "generating";
+          // Global Button Fallback
+          if (genxStatus !== "idle") {
+            if (genxStatus === "queued") taskStatus = "queued";
+            else taskStatus = "processing";
+          }
         }
 
-        const updates = [
+        // Determine Button Mode based on Task Status & GenX Status
+        if (taskStatus === "queued") {
+          mode = "queue";
+        } else if (taskStatus === "processing") {
+          if (genxStatus === "waiting_for_user") {
+            mode = "continue";
+          } else if (genxStatus === "waiting_for_budget") {
+            mode = "wait";
+          } else {
+            // generating or other processing states
+            mode = "cancel";
+          }
+        } else {
+          mode = "gen";
+        }
+
+        api.v1.ui.updateParts([
           {
             id: `${id}-gen`,
-            style: { display: mode === "idle" ? "block" : "none" },
+            style: { ...styles.gen, display: mode === "gen" ? "block" : "none" },
           },
           {
             id: `${id}-queue`,
-            style: { display: mode === "queued" ? "block" : "none" },
+            style: {
+              ...styles.queue,
+              display: mode === "queue" ? "block" : "none",
+            },
           },
           {
             id: `${id}-cancel`,
-            style: { display: mode === "generating" ? "block" : "none" },
+            style: {
+              ...styles.cancel,
+              display: mode === "cancel" ? "block" : "none",
+            },
           },
           {
             id: `${id}-continue`,
-            style: { display: mode === "budget_user" ? "block" : "none" },
+            style: {
+              ...styles.continue,
+              display: mode === "continue" ? "block" : "none",
+            },
           },
           {
             id: `${id}-wait`,
-            style: { display: mode === "budget_timer" ? "block" : "none" },
+            style: {
+              ...styles.wait,
+              display: mode === "wait" ? "block" : "none",
+            },
           },
-        ];
+        ]);
 
-        if (mode === "budget_timer") {
+        if (mode === "wait") {
           if (!isTimerActive) {
             isTimerActive = true;
-            updateTimer(budgetWaitEndTime || Date.now() + 240000);
+            updateTimer(budgetWaitEndTime || Date.now() + 60000);
           }
         } else {
           isTimerActive = false;
@@ -247,8 +265,6 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             timerId = null;
           }
         }
-
-        api.v1.ui.updateParts(updates);
       },
     );
   },

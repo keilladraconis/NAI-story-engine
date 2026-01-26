@@ -26,7 +26,11 @@ export interface GenerationState {
 interface GenerationTask {
   id: string;
   messages: Message[];
-  params: GenerationParams & { minTokens?: number; maxRetries?: number };
+  params: GenerationParams & {
+    minTokens?: number;
+    maxRetries?: number;
+    taskId?: string;
+  };
   callback?: (choices: GenerationChoice[], final: boolean) => void;
   behaviour?: "background" | "blocking";
   signal?: CancellationSignal;
@@ -69,14 +73,18 @@ export class GenX {
    */
   public generate(
     messages: Message[],
-    params: GenerationParams & { minTokens?: number; maxRetries?: number },
+    params: GenerationParams & {
+      minTokens?: number;
+      maxRetries?: number;
+      taskId?: string;
+    },
     callback?: (choices: GenerationChoice[], final: boolean) => void,
     behaviour?: "background" | "blocking",
     signal?: CancellationSignal,
   ): Promise<GenerationResponse> {
     return new Promise((resolve, reject) => {
       const task: GenerationTask = {
-        id: api.v1.uuid(),
+        id: params.taskId || api.v1.uuid(),
         messages,
         params,
         callback,
@@ -94,6 +102,31 @@ export class GenX {
 
       this.processQueue();
     });
+  }
+
+  public getTaskStatus(taskId: string): "queued" | "processing" | "not_found" {
+    if (this.currentTask && this.currentTask.id === taskId) {
+      return "processing";
+    }
+    if (this.queue.some((t) => t.id === taskId)) {
+      return "queued";
+    }
+    return "not_found";
+  }
+
+  public cancelQueued(taskId: string): boolean {
+    const index = this.queue.findIndex((t) => t.id === taskId);
+    if (index === -1) return true;
+
+    const [task] = this.queue.splice(index, 1);
+    if (task.signal) {
+      task.signal.cancel();
+    }
+    task.reject("Cancelled");
+    this.updateState({
+      queueLength: this.queue.length + (this.currentTask ? 1 : 0),
+    });
+    return true;
   }
 
   public cancelCurrent() {
@@ -173,7 +206,7 @@ export class GenX {
   private async executeTask(task: GenerationTask): Promise<void> {
     const { messages, params, callback, behaviour, signal, resolve, reject } =
       task;
-    const { minTokens, maxRetries, ...apiParams } = params;
+    const { minTokens, maxRetries, taskId, ...apiParams } = params;
     const retryLimit = maxRetries ?? 5;
     let attempts = 0;
 

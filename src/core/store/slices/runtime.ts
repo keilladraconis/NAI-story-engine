@@ -35,52 +35,28 @@ export const runtimeSlice = createSlice({
       queue: [...state.queue, request],
       status: state.status === "idle" ? "queued" : state.status,
     }),
-    generationStarted: (state, payload: { requestId: string }) => {
-      const { requestId } = payload;
-      const requestIndex = state.queue.findIndex((r) => r.id === requestId);
-
-      let activeRequest = state.activeRequest;
-      let queue = state.queue;
-
-      if (requestIndex !== -1) {
-        activeRequest = state.queue[requestIndex];
-        queue = state.queue.filter((r) => r.id !== requestId);
-      }
-
-      return {
-        ...state,
-        activeRequest,
-        queue,
-        status: "generating",
-      };
-    },
-    generationCompleted: (state, _payload: { requestId: string }) => ({
-      ...state,
-      activeRequest: null,
-      status: state.queue.length > 0 ? "queued" : "idle",
-    }),
-    generationFailed: (
+    
+    requestsSynced: (
       state,
-      _payload: { requestId: string; error: string },
-    ) => ({
-      ...state,
-      activeRequest: null,
-      status: "error",
-    }),
-    generationCancelled: (state, _payload: { requestId: string }) => {
-      const { requestId } = _payload;
-      if (state.activeRequest && state.activeRequest.id === requestId) {
-        return {
-          ...state,
-          activeRequest: null,
-          status: "idle",
-        };
-      }
+      payload: {
+        queue: GenerationRequest[];
+        activeRequest: GenerationRequest | null;
+      },
+    ) => {
+      const { queue, activeRequest } = payload;
+      let status: any = "idle";
+      if (activeRequest) status = "generating";
+      else if (queue.length > 0) status = "queued";
+      else if (state.genx.status === "failed") status = "error";
+
       return {
         ...state,
-        queue: state.queue.filter((r) => r.id !== requestId),
+        queue,
+        activeRequest,
+        status,
       };
     },
+
     budgetUpdated: (state, payload: { timeRemaining: number }) => ({
       ...state,
       budgetTimeRemaining: payload.timeRemaining,
@@ -92,9 +68,6 @@ export const {
   stateUpdated,
   segaToggled,
   generationRequested,
-  generationStarted,
-  generationCompleted,
-  generationFailed,
-  generationCancelled,
+  requestsSynced,
   budgetUpdated,
 } = runtimeSlice.actions;

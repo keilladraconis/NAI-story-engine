@@ -28,6 +28,7 @@ export const uiSlice = createSlice({
     uiBrainstormMessageEditEnd: (state) => state,
     uiBrainstormRetryGeneration: (state, _payload: { messageId: string }) => state,
     uiRequestGeneration: (state, _strategy: any) => state,
+    uiCancelRequest: (state, _payload: { requestId: string }) => state,
   },
 });
 
@@ -41,4 +42,5 @@ export const {
   uiBrainstormMessageEditEnd,
   uiBrainstormRetryGeneration,
   uiRequestGeneration,
+  uiCancelRequest,
 } = uiSlice.actions;

@@ -8,9 +8,9 @@ import {
   messageAdded,
   messageUpdated,
   uiRequestGeneration,
-  generationStarted,
-  generationCompleted,
-  generationFailed,
+  uiCancelRequest,
+  requestsSynced,
+  stateUpdated,
   uiBrainstormMessageEditBegin,
   uiBrainstormMessageEditEnd,
   setBrainstormEditingMessageId,
@@ -89,32 +89,32 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       let assistantId;
 
       // Add User Message if user typed something
-      if (String(content).trim()) {
+      if (content.trim()) {
         const userMsg: BrainstormMessage = {
           id: api.v1.uuid(),
           role: "user",
           content: String(content),
         };
         dispatch(messageAdded(userMsg));
+      }
+
+      const lastMessage = getState().brainstorm.messages.at(-1);
+      if (lastMessage?.role == "user") {
+        // User sent a message
+        // Add Assistant Placeholder
+        assistantId = api.v1.uuid();
+        const assistantMsg: BrainstormMessage = {
+          id: assistantId,
+          role: "assistant",
+          content: "",
+        };
+        dispatch(messageAdded(assistantMsg));
+      } else if (lastMessage?.role == "assistant") {
+        // Continue the most recent assistant message.
+        assistantId = lastMessage.id;
       } else {
-        const lastMessage = getState().brainstorm.messages.at(-1);
-        if (lastMessage?.role == "user") {
-          // User sent a message
-          // Add Assistant Placeholder
-          assistantId = api.v1.uuid();
-          const assistantMsg: BrainstormMessage = {
-            id: assistantId,
-            role: "assistant",
-            content: "",
-          };
-          dispatch(messageAdded(assistantMsg));
-        } else if (lastMessage?.role == "assistant") {
-          // Continue the most recent assistant message.
-          assistantId = lastMessage.id;
-        } else {
-          // There are no messages
-          return;
-        }
+        // There are no messages
+        return;
       }
 
       // Request Generation
@@ -175,10 +175,8 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   subscribeEffect(
     (action) => action.type === uiRequestGeneration({} as any).type, // Match type only
     async (action, { dispatch, getState }) => {
-      const strategy = action.payload; // Type: GenerationStrategy
+      const strategy = action.payload;
       const { requestId, messages, params, target, prefixBehavior } = strategy;
-
-      dispatch(generationStarted({ requestId }));
 
       let accumulatedText = "";
 
@@ -197,7 +195,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       try {
         await genX.generate(
           messages,
-          params,
+          { ...params, taskId: requestId }, // Pass requestId to GenX
           (choices, _final) => {
             const text = choices[0]?.text || "";
             if (text) {
@@ -214,16 +212,8 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           "background",
           await api.v1.createCancellationSignal(),
         );
-
-        dispatch(generationCompleted({ requestId }));
       } catch (error: any) {
         api.v1.log("Generation failed:", error);
-        dispatch(
-          generationFailed({
-            requestId,
-            error: error.message || String(error),
-          }),
-        );
       } finally {
         // Sync to Store
         if (target.type === "brainstorm" && accumulatedText) {
@@ -234,6 +224,59 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
             }),
           );
         }
+      }
+    },
+  );
+
+  // Intent: Sync GenX State
+  subscribeEffect(
+    (action) => action.type === stateUpdated({} as any).type,
+    async (_action, { dispatch, getState }) => {
+      const state = getState();
+      const { queue, activeRequest } = state.runtime;
+      const allRequests = [...queue];
+      if (activeRequest) allRequests.push(activeRequest);
+
+      // If we have no requests tracking, nothing to sync (unless we want to clear ghosts?)
+      // If GenX has nothing, and we have requests, they might be done.
+      if (allRequests.length === 0) return;
+
+      const newQueue: typeof queue = [];
+      let newActive: typeof activeRequest = null;
+
+      for (const req of allRequests) {
+        const status = genX.getTaskStatus(req.id);
+        if (status === "queued") {
+          newQueue.push(req);
+        } else if (status === "processing") {
+          newActive = req;
+        }
+        // else 'not_found' -> drop
+      }
+
+      // Check if changed
+      const currentQueueIds = queue.map((r) => r.id).join(",");
+      const newQueueIds = newQueue.map((r) => r.id).join(",");
+      const currentActiveId = activeRequest?.id;
+      const newActiveId = newActive?.id;
+
+      if (currentQueueIds !== newQueueIds || currentActiveId !== newActiveId) {
+        dispatch(requestsSynced({ queue: newQueue, activeRequest: newActive }));
+      }
+    },
+  );
+
+  // Intent: Specific Cancellation
+  subscribeEffect(
+    (action) => action.type === uiCancelRequest({} as any).type,
+    (action) => {
+      const { requestId } = action.payload;
+      // Try to cancel if queued
+      genX.cancelQueued(requestId);
+      // If it's the current one?
+      const status = genX.getTaskStatus(requestId);
+      if (status === "processing") {
+        genX.cancelCurrent();
       }
     },
   );
