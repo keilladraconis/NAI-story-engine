@@ -37,6 +37,9 @@ export interface BrainstormState {
 }
 
 export interface UIState {
+  showClearConfirm: boolean;
+  editModes: Record<string, boolean>;
+  inputs: Record<string, string>;
   brainstorm: {
     editingMessageId: string | null;
     input: string;
@@ -60,7 +63,7 @@ export interface GenerationRequest {
 export interface GenerationStrategy {
   requestId: string;
   messages: any[]; // TODO: Define Message type properly
-  params: any;     // TODO: Define Params
+  params: any; // TODO: Define Params
   target:
     | { type: "brainstorm"; messageId: string }
     | { type: "field"; fieldId: string };

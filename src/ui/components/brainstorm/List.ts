@@ -59,7 +59,7 @@ export const List: Component<ListProps, RootState> = {
             content: children,
           },
         ]);
-      }
+      },
     );
   },
 };

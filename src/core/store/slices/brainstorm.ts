@@ -19,7 +19,7 @@ export const brainstormSlice = createSlice({
       return {
         ...state,
         messages: state.messages.map((msg) =>
-          msg.id === payload.id ? { ...msg, content: payload.content } : msg
+          msg.id === payload.id ? { ...msg, content: payload.content } : msg,
         ),
       };
     },
@@ -29,7 +29,7 @@ export const brainstormSlice = createSlice({
         messages: state.messages.map((msg) =>
           msg.id === payload.id
             ? { ...msg, content: msg.content + payload.content }
-            : msg
+            : msg,
         ),
       };
     },
@@ -60,17 +60,17 @@ export const brainstormSlice = createSlice({
       };
     },
     messagesCleared: (state) => {
-        return {
-            ...state,
-            messages: []
-        };
+      return {
+        ...state,
+        messages: [],
+      };
     },
     brainstormLoaded: (state, payload: { messages: BrainstormMessage[] }) => {
-        return {
-            ...state,
-            messages: payload.messages
-        };
-    }
+      return {
+        ...state,
+        messages: payload.messages,
+      };
+    },
   },
 });
 
@@ -81,5 +81,5 @@ export const {
   messageRemoved,
   pruneHistory,
   messagesCleared,
-  brainstormLoaded
+  brainstormLoaded,
 } = brainstormSlice.actions;

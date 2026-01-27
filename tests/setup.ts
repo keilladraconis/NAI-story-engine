@@ -17,11 +17,15 @@ const apiMock = {
       register: vi.fn(),
     },
     timers: {
-      setTimeout: vi.fn((cb, delay) => Promise.resolve(globalThis.setTimeout(cb, delay)) as any),
+      setTimeout: vi.fn(
+        (cb, delay) => Promise.resolve(globalThis.setTimeout(cb, delay)) as any,
+      ),
       clearTimeout: vi.fn((id) => {
         globalThis.clearTimeout(id);
       }),
-      sleep: vi.fn((ms) => new Promise((resolve) => globalThis.setTimeout(resolve, ms))),
+      sleep: vi.fn(
+        (ms) => new Promise((resolve) => globalThis.setTimeout(resolve, ms)),
+      ),
     },
     script: {
       getAllowedOutput: vi.fn(() => 10000),
@@ -61,7 +65,10 @@ const apiMock = {
         text: vi.fn((props) => ({ ...props, type: "text" })),
         column: vi.fn((props) => ({ ...props, type: "column" })),
         row: vi.fn((props) => ({ ...props, type: "row" })),
-        multilineTextInput: vi.fn((props) => ({ ...props, type: "multilineTextInput" })),
+        multilineTextInput: vi.fn((props) => ({
+          ...props,
+          type: "multilineTextInput",
+        })),
       },
       update: vi.fn(),
       register: vi.fn(),

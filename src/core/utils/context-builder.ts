@@ -3,9 +3,7 @@ import {
   BrainstormMessage,
   GenerationStrategy,
 } from "../store/types";
-import {
-  FieldID,
-} from "../../config/field-definitions";
+import { FieldID } from "../../config/field-definitions";
 
 export interface StrategyResult {
   messages: Message[];
@@ -27,7 +25,7 @@ const getBrainstormHistory = (state: RootState): BrainstormMessage[] => {
 
 const getConsolidatedBrainstorm = (state: RootState): string => {
   const history = getBrainstormHistory(state);
-  // Fallback to legacy field content if history is empty? 
+  // Fallback to legacy field content if history is empty?
   // No, new architecture uses slice.
   if (history.length > 0) {
     return history

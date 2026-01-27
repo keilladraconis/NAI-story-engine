@@ -4,7 +4,7 @@ export const IDS = {
     LIST: "se-bs-list",
     INPUT: "se-bs-input",
     SEND_BTN: "se-bs-send-btn",
-    
+
     message: (id: string) => ({
       ROOT: `se-bs-msg-${id}`,
       VIEW: `se-bs-msg-${id}-view`,

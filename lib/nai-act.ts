@@ -48,20 +48,52 @@ export interface BindContext<S> {
 type ComponentId<P> = [unknown] extends [P]
   ? (props?: P) => string
   : [P] extends [void]
-  ? () => string
-  : (props: P) => string;
+    ? () => string
+    : (props: P) => string;
 
-export interface Component<P, S = unknown, E = unknown> {
+// Define a broad Style type as the underlying API uses 'any'
+export type Style = Record<string, any>;
+
+export interface Component<
+  P,
+  S = unknown,
+  E = unknown,
+  St extends Record<string, Style> = Record<string, Style>,
+> {
   id: ComponentId<P>;
   events: E;
+  styles?: St;
   describe(props: P): UIPart;
   onMount(props: P, ctx: BindContext<S>): void;
 }
 
-export function defineComponent<P, S, E>(
-  component: Component<P, S, E> & ThisType<Component<P, S, E>>,
-): Component<P, S, E> {
+export function defineComponent<
+  P,
+  S,
+  E,
+  St extends Record<string, Style> = Record<string, Style>,
+>(
+  component: Component<P, S, E, St> & ThisType<Component<P, S, E, St>>,
+): Component<P, S, E, St> {
   return component;
+}
+
+// --------------------------------------------------
+// Styling Helpers
+// --------------------------------------------------
+
+/**
+ * Merges multiple style objects into one.
+ * Later styles override earlier ones.
+ */
+export function mergeStyles(...styles: (Style | undefined | null)[]): Style {
+  const result: Style = {};
+  for (const style of styles) {
+    if (style) {
+      Object.assign(result, style);
+    }
+  }
+  return result;
 }
 
 // --------------------------------------------------
@@ -86,7 +118,7 @@ export function createEvents<P, Defs extends EventMap>() {
         return (next: Partial<AugmentedEvents<P, Defs>>) =>
           Object.assign(handlers, next);
       }
-      
+
       if (!slots[key]) {
         slots[key] = (...args: any[]) => {
           const fn = handlers[key as keyof typeof handlers];

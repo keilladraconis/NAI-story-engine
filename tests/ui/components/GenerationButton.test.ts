@@ -52,9 +52,15 @@ describe("GenerationButton", () => {
 
     expect(api.v1.ui.updateParts).toHaveBeenCalledWith(
       expect.arrayContaining([
-        expect.objectContaining({ id: "test-btn-gen", style: { display: "block" } }),
-        expect.objectContaining({ id: "test-btn-wait", style: { display: "none" } }),
-      ])
+        expect.objectContaining({
+          id: "test-btn-gen",
+          style: expect.objectContaining({ display: "block" }),
+        }),
+        expect.objectContaining({
+          id: "test-btn-wait",
+          style: expect.objectContaining({ display: "none" }),
+        }),
+      ]),
     );
   });
 
@@ -77,9 +83,9 @@ describe("GenerationButton", () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: "test-btn-wait",
-          style: { display: "block" },
+          style: expect.objectContaining({ display: "block" }),
         }),
-      ])
+      ]),
     );
 
     // Verify updateTimer was called (it updates text)
@@ -89,7 +95,7 @@ describe("GenerationButton", () => {
           id: "test-btn-wait",
           text: expect.stringMatching(/Wait \(5s\)/),
         }),
-      ])
+      ]),
     );
 
     // Check timer set
@@ -99,16 +105,15 @@ describe("GenerationButton", () => {
     await vi.advanceTimersByTimeAsync(2000);
 
     // Verify third update
-    // 1. updateTimer (initial)
-    // 2. selector updates (initial)
-    // 3. updateTimer (after 2s)
-    // The previous failed test showed 1 call because we didn't advance timers or mocked them differently.
-    // Now we are in control.
     const calls = api.v1.ui.updateParts.mock.calls;
-    const waitUpdates = calls.map((args: any) => 
-        args[0].find((u: any) => u.id === 'test-btn-wait')?.text
-    ).filter(Boolean);
+    const waitUpdates = calls
+      .map(
+        (args: any) => args[0].find((u: any) => u.id === "test-btn-wait")?.text,
+      )
+      .filter(Boolean);
 
-    expect(waitUpdates.some((t: string) => t.includes("3s") || t.includes("2s"))).toBe(true);
+    expect(
+      waitUpdates.some((t: string) => t.includes("3s") || t.includes("2s")),
+    ).toBe(true);
   });
 });

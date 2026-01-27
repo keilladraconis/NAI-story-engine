@@ -5,7 +5,12 @@ import {
   uiRequestCancellation,
   uiUserPresenceConfirmed,
 } from "../../core/store";
-import { NAI_WARNING, NAI_HEADER, NAI_DARK_BACKGROUND, NAI_PARAGRAPH } from "../colors";
+import {
+  NAI_WARNING,
+  NAI_HEADER,
+  NAI_DARK_BACKGROUND,
+  NAI_PARAGRAPH,
+} from "../colors";
 
 export interface GenerationButtonProps {
   id: string;
@@ -221,7 +226,10 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
         api.v1.ui.updateParts([
           {
             id: `${id}-gen`,
-            style: { ...styles.gen, display: mode === "gen" ? "block" : "none" },
+            style: {
+              ...styles.gen,
+              display: mode === "gen" ? "block" : "none",
+            },
           },
           {
             id: `${id}-queue`,

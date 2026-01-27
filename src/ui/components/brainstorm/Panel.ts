@@ -6,8 +6,12 @@ import { List } from "./List";
 const { column } = api.v1.ui.part;
 const { sidebarPanel } = api.v1.ui.extension;
 
-export function describeBrainstormPanel(state: RootState): UIExtensionSidebarPanel {
-  const listPart = List.describe({ initialMessages: state.brainstorm.messages });
+export function describeBrainstormPanel(
+  state: RootState,
+): UIExtensionSidebarPanel {
+  const listPart = List.describe({
+    initialMessages: state.brainstorm.messages,
+  });
   const inputPart = Input.describe({});
 
   return sidebarPanel({

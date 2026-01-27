@@ -51,12 +51,12 @@ import { mount } from "../lib/nai-act";
     await api.v1.ui.register([sidebar, lorebook]);
 
     // Mount Managers (Start Subscriptions)
-    
+
     try {
-        mount(Sidebar, {}, store);
-        mount(LorebookPanel, {}, store);
+      mount(Sidebar, {}, store);
+      mount(LorebookPanel, {}, store);
     } catch (err) {
-        api.v1.log("Mount error:", err);
+      api.v1.log("Mount error:", err);
     }
 
     // Hydrate State

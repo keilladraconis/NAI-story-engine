@@ -35,7 +35,7 @@ export const runtimeSlice = createSlice({
       queue: [...state.queue, request],
       status: state.status === "idle" ? "queued" : state.status,
     }),
-    
+
     requestsSynced: (
       state,
       payload: {

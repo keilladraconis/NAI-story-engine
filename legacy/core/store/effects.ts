@@ -228,7 +228,8 @@ const createGenXGenerationEffect =
   async (action, { dispatch, getState }) => {
     if (action.type !== "genx/requestGeneration") return;
 
-    const { requestId, messages, params, target, prefixBehavior } = action.payload;
+    const { requestId, messages, params, target, prefixBehavior } =
+      action.payload;
 
     dispatch(generationStarted({ requestId }));
 
@@ -273,7 +274,9 @@ const createGenXGenerationEffect =
 
             if (target.type === "brainstorm") {
               // Optimization: Stream directly to UI to avoid Redux overhead during high-frequency updates
-              const uiId = IDS.BRAINSTORM.message(target.messageId).TEXT_DISPLAY;
+              const uiId = IDS.BRAINSTORM.message(
+                target.messageId,
+              ).TEXT_DISPLAY;
               api.v1.ui.updateParts([{ id: uiId, text: accumulatedText }]);
             } else if (target.type === "field") {
               // Optimization: Stream directly to field text display

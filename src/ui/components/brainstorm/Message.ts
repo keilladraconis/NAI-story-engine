@@ -15,12 +15,15 @@ export interface MessageProps {
 
 const { text, row, column, button, multilineTextInput } = api.v1.ui.part;
 
-const events = createEvents<MessageProps, {
-  edit(): void;
-  save(): void;
-  retry(): void;
-  delete(): void;
-}>();
+const events = createEvents<
+  MessageProps,
+  {
+    edit(): void;
+    save(): void;
+    retry(): void;
+    delete(): void;
+  }
+>();
 
 export const Message: Component<MessageProps, RootState> = {
   id: (props) => IDS.BRAINSTORM.message(props.message.id).ROOT,
@@ -180,7 +183,7 @@ export const Message: Component<MessageProps, RootState> = {
             style: { display: isEditing ? "block" : "none" },
           },
         ]);
-      }
+      },
     );
 
     // Bind: Content Updates (Streaming)
@@ -192,7 +195,7 @@ export const Message: Component<MessageProps, RootState> = {
         if (content !== undefined) {
           api.v1.ui.updateParts([{ id: ids.TEXT, text: content }]);
         }
-      }
+      },
     );
   },
 };
