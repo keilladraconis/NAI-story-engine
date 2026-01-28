@@ -1,4 +1,4 @@
-import { Component, createEvents } from "../../../../lib/nai-act";
+import { BindContext, createEvents, defineComponent } from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
 import { segaToggled } from "../../../core/store/slices/runtime";
 import { uiClearConfirmToggled } from "../../../core/store/slices/ui";
@@ -7,20 +7,17 @@ import { NAI_WARNING } from "../../../ui/colors";
 
 const { row, text, button } = api.v1.ui.part;
 
-// Define event signature
 type HeaderEvents = {
-  toggleSega(dispatch: any): void;
-  toggleClearConfirm(dispatch: any): void;
-  confirmClear(dispatch: any): void;
+  toggleSega(): void;
+  toggleClearConfirm(): void;
+  confirmClear(): void;
 };
 
-const events = createEvents<{}, HeaderEvents>();
-
-export const Header: Component<{}, RootState> = {
+export const Header = defineComponent({
   id: () => "kse-sidebar-header",
-  events: undefined,
+  events: createEvents<{}, HeaderEvents>(),
 
-  describe(props) {
+  describe(_props: {}) {
     return row({
       id: "kse-sidebar-header",
       style: {
@@ -38,7 +35,7 @@ export const Header: Component<{}, RootState> = {
               text: "S.E.G.A.",
               iconId: "play-circle",
               style: { padding: "4px 8px", "font-size": "0.8em" },
-              callback: () => events.toggleSega(props, null),
+              callback: () => this.events.toggleSega({}),
             }),
             button({
               id: "header-sega-stop-btn",
@@ -50,7 +47,7 @@ export const Header: Component<{}, RootState> = {
                 color: "#ff9800",
                 display: "none",
               },
-              callback: () => events.toggleSega(props, null),
+              callback: () => this.events.toggleSega({}),
             }),
           ],
         }),
@@ -62,7 +59,7 @@ export const Header: Component<{}, RootState> = {
               text: "Clear",
               iconId: "trash-2",
               style: { padding: "4px 8px", opacity: 0.7 },
-              callback: () => events.toggleClearConfirm(props, null),
+              callback: () => this.events.toggleClearConfirm({}),
             }),
             row({
               id: "header-clear-confirm",
@@ -76,13 +73,13 @@ export const Header: Component<{}, RootState> = {
                   id: "header-confirm-yes",
                   text: "Yes",
                   style: { color: NAI_WARNING, padding: "2px 8px" },
-                  callback: () => events.confirmClear(props, null),
+                  callback: () => this.events.confirmClear({}),
                 }),
                 button({
                   id: "header-confirm-no",
                   text: "No",
                   style: { padding: "2px 8px" },
-                  callback: () => events.toggleClearConfirm(props, null),
+                  callback: () => this.events.toggleClearConfirm({}),
                 }),
               ],
             }),
@@ -92,14 +89,15 @@ export const Header: Component<{}, RootState> = {
     });
   },
 
-  onMount(_, { useSelector }) {
-    // Attach event handlers
-    events.attach({
-      toggleSega: (_p, d) => d(segaToggled()),
-      toggleClearConfirm: (_p, d) => d(uiClearConfirmToggled()),
-      confirmClear: (_p, d) => {
-        d(storyCleared());
-        d(uiClearConfirmToggled());
+  onMount(_props: {}, ctx: BindContext<RootState>) {
+    const { useSelector, dispatch } = ctx;
+
+    this.events.attach({
+      toggleSega: () => dispatch(segaToggled()),
+      toggleClearConfirm: () => dispatch(uiClearConfirmToggled()),
+      confirmClear: () => {
+        dispatch(storyCleared());
+        dispatch(uiClearConfirmToggled());
       },
     });
 
@@ -130,4 +128,4 @@ export const Header: Component<{}, RootState> = {
       },
     );
   },
-};
+});

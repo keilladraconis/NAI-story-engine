@@ -34,6 +34,7 @@ export interface BrainstormMessage {
 
 export interface BrainstormState {
   messages: BrainstormMessage[];
+  editingMessageId: string | null;
 }
 
 export interface UIState {
@@ -41,7 +42,6 @@ export interface UIState {
   editModes: Record<string, boolean>;
   inputs: Record<string, string>;
   brainstorm: {
-    editingMessageId: string | null;
     input: string;
   };
 }

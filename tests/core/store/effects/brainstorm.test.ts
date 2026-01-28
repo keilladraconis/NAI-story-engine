@@ -17,7 +17,7 @@ describe("Brainstorm Effects", () => {
     // Reset store state (simplified for this test)
     // In a real app we might need a fresh store, but here we can just clear messages
     store.dispatch({ type: "brainstorm/messagesCleared" });
-    store.dispatch({ type: "ui/setBrainstormEditingMessageId", payload: null });
+    store.dispatch({ type: "brainstorm/editingMessageIdSet", payload: null });
 
     // Clear mocks
     vi.clearAllMocks();
@@ -56,7 +56,7 @@ describe("Brainstorm Effects", () => {
     );
 
     // Verify state updated
-    expect(store.getState().ui.brainstorm.editingMessageId).toBe(msgA.id);
+    expect(store.getState().brainstorm.editingMessageId).toBe(msgA.id);
 
     // 3. Begin editing Message B (implicitly saves A)
     // Mock storage return for A's edited content
@@ -80,7 +80,7 @@ describe("Brainstorm Effects", () => {
     );
 
     // Verify state updated
-    expect(store.getState().ui.brainstorm.editingMessageId).toBe(msgB.id);
+    expect(store.getState().brainstorm.editingMessageId).toBe(msgB.id);
 
     // 4. End editing (Save B)
     // Mock storage return for B's edited content
@@ -98,7 +98,7 @@ describe("Brainstorm Effects", () => {
     expect(updatedB?.content).toBe("Content B Modified");
 
     // Verify editing ID cleared
-    expect(store.getState().ui.brainstorm.editingMessageId).toBe(null);
+    expect(store.getState().brainstorm.editingMessageId).toBe(null);
   });
 
   it("should handle retry generation correctly", async () => {

@@ -6,7 +6,10 @@ import {
 import { RootState } from "../../../core/store/types";
 import { FieldConfig } from "../../../config/field-definitions";
 import { fieldUpdated } from "../../../core/store/slices/story";
-import { uiEditModeToggled } from "../../../core/store/slices/ui";
+import {
+  uiFieldEditBegin,
+  uiFieldEditEnd,
+} from "../../../core/store/slices/ui";
 import { generationRequested } from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
 import {
@@ -61,9 +64,8 @@ const createHeader = (
 };
 
 type TextFieldEvents = {
-  toggleMode(): void;
+  beginEdit(): void;
   save(): void;
-  handleInput(val: string): void;
 };
 
 export const TextField = defineComponent<
@@ -101,7 +103,7 @@ export const TextField = defineComponent<
       toggleEditId,
       toggleSaveId,
       genButton,
-      () => this.events.toggleMode(config),
+      () => this.events.beginEdit(config),
       () => this.events.save(config),
     );
 
@@ -117,7 +119,6 @@ export const TextField = defineComponent<
           placeholder: config.placeholder,
           initialValue: "",
           storageKey: `story:draft-${config.id}`,
-          onChange: (val) => this.events.handleInput(config, val),
           style: this.styles?.textArea,
         }),
         text({
@@ -131,26 +132,46 @@ export const TextField = defineComponent<
   },
 
   onMount(config, ctx) {
-    const { useSelector, dispatch } = ctx;
+    const { useSelector, useEffect, dispatch } = ctx;
     const toggleEditId = `btn-edit-${config.id}`;
     const toggleSaveId = `btn-save-${config.id}`;
     const inputId = `input-${config.id}`;
     const textId = `text-display-${config.id}`;
+    const storageKey = `draft-${config.id}`;
 
-    let currentDraft = "";
-
+    // Event handlers only dispatch actions
     this.events.attach({
-      toggleMode: (props) => {
-        dispatch(uiEditModeToggled({ id: props.id }));
+      beginEdit: (props) => {
+        dispatch(uiFieldEditBegin({ id: props.id }));
       },
       save: (props) => {
-        dispatch(fieldUpdated({ fieldId: props.id, content: currentDraft }));
-        dispatch(uiEditModeToggled({ id: props.id }));
-      },
-      handleInput: (_props, val) => {
-        currentDraft = val;
+        dispatch(uiFieldEditEnd({ id: props.id }));
       },
     });
+
+    type FieldAction = { type: string; payload: { id: string } };
+
+    // Effect: Handle edit begin - push current content to storage
+    useEffect(
+      (action) =>
+        action.type === uiFieldEditBegin({ id: "" }).type &&
+        (action as FieldAction).payload.id === config.id,
+      async (_action, { getState }) => {
+        const content = getState().story.fields[config.id]?.content || "";
+        await api.v1.storyStorage.set(storageKey, content);
+      },
+    );
+
+    // Effect: Handle edit end - read from storage and update state
+    useEffect(
+      (action) =>
+        action.type === uiFieldEditEnd({ id: "" }).type &&
+        (action as FieldAction).payload.id === config.id,
+      async (_action, { dispatch }) => {
+        const content = (await api.v1.storyStorage.get(storageKey)) || "";
+        dispatch(fieldUpdated({ fieldId: config.id, content: String(content) }));
+      },
+    );
 
     // Bind Generation Button
     ctx.mount(GenerationButton, {
@@ -200,25 +221,17 @@ export const TextField = defineComponent<
       },
     );
 
-    // Sync State
+    // Sync State -> Display
     useSelector(
       (state) => state.story.fields[config.id]?.content,
       (content) => {
         const safeContent = content || "";
-
-        // If we have no draft yet, initialize it with content
-        if (!currentDraft) currentDraft = safeContent;
-
         api.v1.ui.updateParts([
           {
             id: textId,
             text: (safeContent || "_No content._")
               .replace(/\n/g, "  \n")
               .replace(/\</g, "\\<"),
-          },
-          {
-            id: inputId,
-            initialValue: safeContent,
           },
         ]);
       },

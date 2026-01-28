@@ -1,4 +1,4 @@
-import { Component } from "../../../../lib/nai-act";
+import { defineComponent, BindContext } from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
 import { FIELD_CONFIGS, FieldID } from "../../../config/field-definitions";
 import { TextField } from "../Fields/TextField";
@@ -6,12 +6,11 @@ import { ListField } from "../Fields/ListField";
 
 const { column } = api.v1.ui.part;
 
-export const FieldList: Component<{}, RootState> = {
+export const FieldList = defineComponent({
   id: () => "kse-field-list",
   events: undefined,
 
-  describe() {
-    // Filter fields
+  describe(_props: {}) {
     const visibleFields = FIELD_CONFIGS.filter(
       (c) => !c.hidden && c.id !== FieldID.WorldSnapshot,
     );
@@ -28,7 +27,7 @@ export const FieldList: Component<{}, RootState> = {
     });
   },
 
-  onMount(_, ctx) {
+  onMount(_props: {}, ctx: BindContext<RootState>) {
     const visibleFields = FIELD_CONFIGS.filter(
       (c) => !c.hidden && c.id !== FieldID.WorldSnapshot,
     );
@@ -41,4 +40,4 @@ export const FieldList: Component<{}, RootState> = {
       }
     });
   },
-};
+});

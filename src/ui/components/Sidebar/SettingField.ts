@@ -1,22 +1,26 @@
-import { Component, createEvents } from "../../../../lib/nai-act";
+import { BindContext, createEvents, defineComponent } from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
 import { settingUpdated } from "../../../core/store/slices/story";
+import {
+  uiFieldEditBegin,
+  uiFieldEditEnd,
+} from "../../../core/store/slices/ui";
 
 const { row, text, button, textInput } = api.v1.ui.part;
 
+const FIELD_ID = "kse-setting";
+const STORAGE_KEY = "kse-setting-draft";
+
 type SettingEvents = {
-  toggleMode(isEditing: boolean, currentDraft: string, dispatch: any): void;
-  save(val: string, dispatch: any): void;
-  handleInput(val: string): void;
+  beginEdit(): void;
+  save(): void;
 };
 
-const events = createEvents<{}, SettingEvents>();
-
-export const SettingField: Component<{}, RootState> = {
+export const SettingField = defineComponent({
   id: () => "kse-sidebar-setting",
-  events: undefined,
+  events: createEvents<{}, SettingEvents>(),
 
-  describe(props) {
+  describe(_props: {}) {
     return row({
       id: "kse-sidebar-setting",
       style: { "align-items": "center", gap: "8px", "margin-bottom": "8px" },
@@ -29,8 +33,8 @@ export const SettingField: Component<{}, RootState> = {
           id: "kse-setting-input",
           initialValue: "",
           placeholder: "Original, Star Wars...",
+          storageKey: `story:${STORAGE_KEY}`,
           style: { flex: 1, display: "none" },
-          onChange: (val) => events.handleInput(props, val),
         }),
         text({
           id: "kse-setting-text",
@@ -41,62 +45,75 @@ export const SettingField: Component<{}, RootState> = {
           id: "kse-setting-edit-btn",
           iconId: "edit-3",
           style: { width: "24px", padding: "4px" },
-          callback: () => events.toggleMode(props, true, "", null),
+          callback: () => this.events.beginEdit({}),
         }),
         button({
           id: "kse-setting-save-btn",
           iconId: "save",
           style: { width: "24px", padding: "4px", display: "none" },
-          callback: () => events.toggleMode(props, false, "", null),
+          callback: () => this.events.save({}),
         }),
       ],
     });
   },
 
-  onMount(props, ctx) {
-    const { useSelector } = ctx;
-    let currentDraft = "";
+  onMount(_props: {}, ctx: BindContext<RootState>) {
+    const { useSelector, useEffect, dispatch } = ctx;
 
-    events.attach({
-      toggleMode: (_p, isEditing, _, d) => {
-        api.v1.ui.updateParts([
-          {
-            id: "kse-setting-input",
-            style: { display: isEditing ? "block" : "none" },
-          },
-          {
-            id: "kse-setting-text",
-            style: { display: isEditing ? "none" : "block" },
-          },
-          {
-            id: "kse-setting-edit-btn",
-            style: { display: isEditing ? "none" : "block" },
-          },
-          {
-            id: "kse-setting-save-btn",
-            style: { display: isEditing ? "block" : "none" },
-          },
-        ]);
-        if (!isEditing) {
-          events.save(props, currentDraft, d);
-        }
+    // Event handlers only dispatch intents
+    this.events.attach({
+      beginEdit: () => {
+        dispatch(uiFieldEditBegin({ id: FIELD_ID }));
       },
-      save: (_p, val, d) => d(settingUpdated(val)),
-      handleInput: (_p, val) => {
-        currentDraft = val;
+      save: () => {
+        dispatch(uiFieldEditEnd({ id: FIELD_ID }));
       },
     });
 
+    type FieldAction = { type: string; payload: { id: string } };
+
+    // Effect: Handle edit begin - push current content to storage
+    useEffect(
+      (action) =>
+        action.type === uiFieldEditBegin({ id: "" }).type &&
+        (action as FieldAction).payload.id === FIELD_ID,
+      async (_action, { getState }) => {
+        const setting = getState().story.setting || "Original";
+        await api.v1.storyStorage.set(STORAGE_KEY, setting);
+      },
+    );
+
+    // Effect: Handle save - read from storage and update state
+    useEffect(
+      (action) =>
+        action.type === uiFieldEditEnd({ id: "" }).type &&
+        (action as FieldAction).payload.id === FIELD_ID,
+      async (_action, { dispatch }) => {
+        const val = (await api.v1.storyStorage.get(STORAGE_KEY)) || "";
+        dispatch(settingUpdated(String(val)));
+      },
+    );
+
+    // React to Edit Mode
+    useSelector(
+      (state) => state.ui.editModes[FIELD_ID],
+      (isEditing) => {
+        api.v1.ui.updateParts([
+          { id: "kse-setting-input", style: { display: isEditing ? "block" : "none" } },
+          { id: "kse-setting-text", style: { display: isEditing ? "none" : "block" } },
+          { id: "kse-setting-edit-btn", style: { display: isEditing ? "none" : "block" } },
+          { id: "kse-setting-save-btn", style: { display: isEditing ? "block" : "none" } },
+        ]);
+      },
+    );
+
+    // Sync State -> Display
     useSelector(
       (state) => state.story.setting,
       (setting) => {
         const safeSetting = setting || "Original";
-        if (!currentDraft) currentDraft = safeSetting;
-        api.v1.ui.updateParts([
-          { id: "kse-setting-text", text: safeSetting },
-          { id: "kse-setting-input", initialValue: safeSetting },
-        ]);
+        api.v1.ui.updateParts([{ id: "kse-setting-text", text: safeSetting }]);
       },
     );
   },
-};
+});

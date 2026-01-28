@@ -9,7 +9,10 @@ import {
   dulfsSummaryUpdated,
   dulfsItemAdded,
 } from "../../../core/store/slices/story";
-import { uiEditModeToggled } from "../../../core/store/slices/ui";
+import {
+  uiFieldEditBegin,
+  uiFieldEditEnd,
+} from "../../../core/store/slices/ui";
 import { generationRequested } from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
 import { ListItem } from "./ListItem";
@@ -27,8 +30,7 @@ export type ListFieldProps = FieldConfig;
 const { row, text, column } = api.v1.ui.part;
 
 type ListFieldEvents = {
-  toggleSummaryEdit(): void;
-  handleSummaryInput(val: string): void;
+  beginSummaryEdit(): void;
   saveSummary(): void;
   addItem(): void;
 };
@@ -98,7 +100,7 @@ export const ListField = defineComponent<
                     IconButton({
                       id: summaryEditBtnId,
                       iconId: "edit-3",
-                      callback: () => this.events.toggleSummaryEdit(props),
+                      callback: () => this.events.beginSummaryEdit(props),
                     }),
                     IconButton({
                       id: summarySaveBtnId,
@@ -115,7 +117,6 @@ export const ListField = defineComponent<
               placeholder: "Summary...",
               initialValue: "",
               storageKey: `story:dulfs-summary-draft-${props.id}`,
-              onChange: (val) => this.events.handleSummaryInput(props, val),
               style: { display: "none" },
             }),
             text({
@@ -148,32 +149,24 @@ export const ListField = defineComponent<
   },
 
   onMount(props, ctx) {
-    const { useSelector, dispatch } = ctx;
+    const { useSelector, useEffect, dispatch } = ctx;
 
     const summaryEditBtnId = `summary-edit-btn-${props.id}`;
     const summarySaveBtnId = `summary-save-btn-${props.id}`;
     const summaryInputId = `summary-input-${props.id}`;
     const summaryTextId = `summary-text-${props.id}`;
     const itemsColId = `items-col-${props.id}`;
+    const summaryStorageKey = `dulfs-summary-draft-${props.id}`;
 
-    let currentSummaryDraft = "";
     const boundItems = new Set<string>();
 
+    // Event handlers only dispatch intents
     this.events.attach({
-      toggleSummaryEdit: (eventProps) => {
-        dispatch(uiEditModeToggled({ id: eventProps.id }));
+      beginSummaryEdit: (eventProps) => {
+        dispatch(uiFieldEditBegin({ id: eventProps.id }));
       },
       saveSummary: (eventProps) => {
-        dispatch(
-          dulfsSummaryUpdated({
-            fieldId: eventProps.id,
-            summary: currentSummaryDraft,
-          }),
-        );
-        dispatch(uiEditModeToggled({ id: eventProps.id }));
-      },
-      handleSummaryInput: (_eventProps, val) => {
-        currentSummaryDraft = val;
+        dispatch(uiFieldEditEnd({ id: eventProps.id }));
       },
       addItem: (eventProps) => {
         dispatch(
@@ -189,6 +182,35 @@ export const ListField = defineComponent<
         );
       },
     });
+
+    type FieldAction = { type: string; payload: { id: string } };
+
+    // Effect: Handle edit begin - push current content to storage
+    useEffect(
+      (action) =>
+        action.type === uiFieldEditBegin({ id: "" }).type &&
+        (action as FieldAction).payload.id === props.id,
+      async (_action, { getState }) => {
+        const summary = getState().story.dulfsSummaries[props.id] || "";
+        await api.v1.storyStorage.set(summaryStorageKey, summary);
+      },
+    );
+
+    // Effect: Handle save - read from storage and update state
+    useEffect(
+      (action) =>
+        action.type === uiFieldEditEnd({ id: "" }).type &&
+        (action as FieldAction).payload.id === props.id,
+      async (_action, { dispatch }) => {
+        const summary = (await api.v1.storyStorage.get(summaryStorageKey)) || "";
+        dispatch(
+          dulfsSummaryUpdated({
+            fieldId: props.id,
+            summary: String(summary),
+          }),
+        );
+      },
+    );
 
     // React to Edit Mode changes
     useSelector(
@@ -236,21 +258,12 @@ export const ListField = defineComponent<
       }),
     });
 
-    // Sync Summary
+    // Sync Summary -> Display
     useSelector(
       (state) => state.story.dulfsSummaries[props.id],
       (summary) => {
         const safeSummary = summary || "";
-        // Initialize draft if empty (first load)
-        if (!currentSummaryDraft) currentSummaryDraft = safeSummary;
-
-        api.v1.ui.updateParts([
-          { id: summaryTextId, text: safeSummary },
-          {
-            id: summaryInputId,
-            initialValue: safeSummary,
-          },
-        ]);
+        api.v1.ui.updateParts([{ id: summaryTextId, text: safeSummary }]);
       },
     );
 

@@ -13,7 +13,7 @@ import {
   stateUpdated,
   uiBrainstormMessageEditBegin,
   uiBrainstormMessageEditEnd,
-  setBrainstormEditingMessageId,
+  editingMessageIdSet,
   uiBrainstormRetryGeneration,
   pruneHistory,
 } from "./index";
@@ -29,7 +29,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     async (action, { dispatch, getState }) => {
       const { id: newId } = action.payload;
       const state = getState();
-      const currentEditingId = state.ui.brainstorm.editingMessageId;
+      const currentEditingId = state.brainstorm.editingMessageId;
 
       // 1. If currently editing another message, save it first
       if (currentEditingId && currentEditingId !== newId) {
@@ -52,7 +52,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         );
 
         // 3. Set the editing ID
-        dispatch(setBrainstormEditingMessageId(newId));
+        dispatch(editingMessageIdSet(newId));
       }
     },
   );
@@ -62,7 +62,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     (action) => action.type === uiBrainstormMessageEditEnd().type,
     async (_action, { dispatch, getState }) => {
       const state = getState();
-      const editingId = state.ui.brainstorm.editingMessageId;
+      const editingId = state.brainstorm.editingMessageId;
 
       if (editingId) {
         const inputId = IDS.BRAINSTORM.message(editingId).INPUT;
@@ -70,7 +70,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           (await api.v1.storyStorage.get(`draft-${inputId}`)) || "";
 
         dispatch(messageUpdated({ id: editingId, content: String(content) }));
-        dispatch(setBrainstormEditingMessageId(null));
+        dispatch(editingMessageIdSet(null));
       }
     },
   );

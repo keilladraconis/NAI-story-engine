@@ -1,10 +1,10 @@
-import { Component, createEvents } from "../../../../lib/nai-act";
-import { RootState, BrainstormMessage } from "../../../core/store/types";
+import { BindContext, createEvents, defineComponent } from "../../../../lib/nai-act";
+import { BrainstormMessage, RootState } from "../../../core/store/types";
 import {
+  messageRemoved,
   uiBrainstormMessageEditBegin,
   uiBrainstormMessageEditEnd,
   uiBrainstormRetryGeneration,
-  messageRemoved,
 } from "../../../core/store";
 import { IDS } from "../../framework/ids";
 import { calculateTextAreaHeight } from "../../utils";
@@ -15,21 +15,18 @@ export interface MessageProps {
 
 const { text, row, column, button, multilineTextInput } = api.v1.ui.part;
 
-const events = createEvents<
-  MessageProps,
-  {
-    edit(): void;
-    save(): void;
-    retry(): void;
-    delete(): void;
-  }
->();
+type MessageEvents = {
+  edit(): void;
+  save(): void;
+  retry(): void;
+  delete(): void;
+};
 
-export const Message: Component<MessageProps, RootState> = {
-  id: (props) => IDS.BRAINSTORM.message(props.message.id).ROOT,
-  events,
+export const Message = defineComponent({
+  id: (props: MessageProps) => `kse-bs-msg-${props.message.id}`,
+  events: createEvents<MessageProps, MessageEvents>(),
 
-  describe(props) {
+  describe(props: MessageProps) {
     const { message } = props;
     const ids = IDS.BRAINSTORM.message(message.id);
     const isUser = message.role === "user";
@@ -61,19 +58,19 @@ export const Message: Component<MessageProps, RootState> = {
         button({
           iconId: "edit-3",
           style: { padding: "4px" },
-          callback: () => events.edit(props),
+          callback: () => this.events.edit({ message }),
           id: `${ids.ROOT}-btn-edit`,
         }),
         button({
           iconId: "rotate-cw",
           style: { padding: "4px" },
-          callback: () => events.retry(props),
+          callback: () => this.events.retry({ message }),
           id: `${ids.ROOT}-btn-retry`,
         }),
         button({
           iconId: "trash",
           style: { padding: "4px" },
-          callback: () => events.delete(props),
+          callback: () => this.events.delete({ message }),
           id: `${ids.ROOT}-btn-delete`,
         }),
       ],
@@ -117,7 +114,7 @@ export const Message: Component<MessageProps, RootState> = {
     const saveButton = button({
       iconId: "save",
       style: { padding: "4px", background: "none" },
-      callback: () => events.save(props),
+      callback: () => this.events.save({ message }),
       id: `${ids.ROOT}-btn-save`,
     });
 
@@ -151,10 +148,11 @@ export const Message: Component<MessageProps, RootState> = {
     });
   },
 
-  onMount(props, { dispatch, useSelector }) {
+  onMount(props, ctx: BindContext<RootState>) {
+    const { dispatch, useSelector } = ctx;
     const ids = IDS.BRAINSTORM.message(props.message.id);
 
-    events.attach({
+    this.events.attach({
       edit(p) {
         dispatch(uiBrainstormMessageEditBegin({ id: p.message.id }));
       },
@@ -171,7 +169,7 @@ export const Message: Component<MessageProps, RootState> = {
 
     // Bind: Toggle View/Edit
     useSelector(
-      (state) => state.ui.brainstorm.editingMessageId === props.message.id,
+      (state) => state.brainstorm.editingMessageId === props.message.id,
       (isEditing) => {
         api.v1.ui.updateParts([
           {
@@ -198,4 +196,4 @@ export const Message: Component<MessageProps, RootState> = {
       },
     );
   },
-};
+});

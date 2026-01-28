@@ -6,7 +6,6 @@ export const initialUIState: UIState = {
   editModes: {},
   inputs: {},
   brainstorm: {
-    editingMessageId: null,
     input: "",
   },
 };
@@ -19,13 +18,6 @@ export const uiSlice = createSlice({
       ...state,
       showClearConfirm: !state.showClearConfirm,
     }),
-    uiEditModeToggled: (state, payload: { id: string }) => ({
-      ...state,
-      editModes: {
-        ...state.editModes,
-        [payload.id]: !state.editModes[payload.id],
-      },
-    }),
     uiInputChanged: (state, payload: { id: string; value: string }) => ({
       ...state,
       inputs: {
@@ -37,10 +29,6 @@ export const uiSlice = createSlice({
       ...state,
       brainstorm: { ...state.brainstorm, input },
     }),
-    setBrainstormEditingMessageId: (state, id: string | null) => ({
-      ...state,
-      brainstorm: { ...state.brainstorm, editingMessageId: id },
-    }),
     // Intents (handled by Effects)
     uiRequestCancellation: (state) => state,
     uiUserPresenceConfirmed: (state) => state,
@@ -51,15 +39,28 @@ export const uiSlice = createSlice({
       state,
     uiRequestGeneration: (state, _strategy: any) => state,
     uiCancelRequest: (state, _payload: { requestId: string }) => state,
+    // Field editing (state change + side effects in component useEffect)
+    uiFieldEditBegin: (state, payload: { id: string }) => ({
+      ...state,
+      editModes: {
+        ...state.editModes,
+        [payload.id]: true,
+      },
+    }),
+    uiFieldEditEnd: (state, payload: { id: string }) => ({
+      ...state,
+      editModes: {
+        ...state.editModes,
+        [payload.id]: false,
+      },
+    }),
   },
 });
 
 export const {
   uiClearConfirmToggled,
-  uiEditModeToggled,
   uiInputChanged,
   setBrainstormInput,
-  setBrainstormEditingMessageId,
   uiRequestCancellation,
   uiUserPresenceConfirmed,
   uiBrainstormSubmitUserMessage,
@@ -68,4 +69,6 @@ export const {
   uiBrainstormRetryGeneration,
   uiRequestGeneration,
   uiCancelRequest,
+  uiFieldEditBegin,
+  uiFieldEditEnd,
 } = uiSlice.actions;

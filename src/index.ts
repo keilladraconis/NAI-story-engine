@@ -1,12 +1,21 @@
 import { store, brainstormLoaded, storyLoaded } from "./core/store";
 import { registerEffects } from "./core/store/effects";
 import { GenX } from "../lib/gen-x";
-import { describeBrainstormPanel } from "./ui/components/brainstorm/Panel";
-import { Sidebar } from "./ui/components/Sidebar/Sidebar";
-import { List } from "./ui/components/brainstorm/List";
-import { Input } from "./ui/components/brainstorm/Input";
 import { mount } from "../lib/nai-act";
 import { stateUpdated } from "./core/store/slices/runtime";
+import { IDS } from "./ui/framework/ids";
+
+// Brainstorm components
+import { List } from "./ui/components/brainstorm/List";
+import { Input } from "./ui/components/brainstorm/Input";
+
+// Sidebar components
+import { Header } from "./ui/components/Sidebar/Header";
+import { SettingField } from "./ui/components/Sidebar/SettingField";
+import { FieldList } from "./ui/components/Sidebar/FieldList";
+
+const { column } = api.v1.ui.part;
+const { sidebarPanel } = api.v1.ui.extension;
 
 (async () => {
   try {
@@ -34,23 +43,43 @@ import { stateUpdated } from "./core/store/slices/runtime";
       api.v1.log("Error loading persisted data:", e);
     }
 
-    // 4. Register UI Extensions
-    // Pass initial state for hydration
-    const brainstormExt = describeBrainstormPanel(store.getState());
-    const sidebarExt = Sidebar.describe({}) as any; // Cast as any because types might mismatch with UI extension expectation if strict
+    // 4. Register UI Extensions (static declarations, not components)
+    const brainstormPanel = sidebarPanel({
+      id: "kse-brainstorm-sidebar",
+      name: "Brainstorm",
+      iconId: "cloud-lightning",
+      content: [
+        column({
+          id: IDS.BRAINSTORM.ROOT,
+          style: { height: "100%", "justify-content": "space-between" },
+          content: [List.describe(), Input.describe({})],
+        }),
+      ],
+    });
 
-    await api.v1.ui.register([brainstormExt, sidebarExt]);
+    const storyEnginePanel = sidebarPanel({
+      id: "kse-sidebar",
+      name: "Story Engine",
+      iconId: "lightning",
+      content: [
+        column({
+          content: [
+            Header.describe({}),
+            SettingField.describe({}),
+            FieldList.describe({}),
+          ],
+        }),
+      ],
+    });
 
-    // 5. Mount Components (Start Subscriptions)
-    // List component should receive initial state for consistency if it uses it in onMount
-    // but onMount typically starts useSelector which handles the first state read.
-    mount(
-      List,
-      { initialMessages: store.getState().brainstorm.messages },
-      store,
-    );
+    await api.v1.ui.register([brainstormPanel, storyEnginePanel]);
+
+    // 5. Mount Components (start reactive subscriptions)
+    mount(List, undefined, store);
     mount(Input, {}, store);
-    mount(Sidebar, {}, store);
+    mount(Header, {}, store);
+    mount(SettingField, {}, store);
+    mount(FieldList, {}, store);
 
     api.v1.log("Story Engine Initialized.");
   } catch (e) {

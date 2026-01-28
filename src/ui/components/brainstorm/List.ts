@@ -1,27 +1,18 @@
-import { Component } from "../../../../lib/nai-act";
-import { RootState, BrainstormMessage } from "../../../core/store/types";
+import { BindContext, defineComponent } from "../../../../lib/nai-act";
+import { RootState } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
 import { Message } from "./Message";
 
 const { column } = api.v1.ui.part;
 
-export interface ListProps {
-  initialMessages?: BrainstormMessage[];
-}
-
-export const List: Component<ListProps, RootState> = {
+export const List = defineComponent({
   id: () => IDS.BRAINSTORM.LIST,
-  events: {},
+  events: undefined,
 
-  describe(props) {
-    const children = (props.initialMessages || [])
-      .slice()
-      .reverse()
-      .map((msg) => Message.describe({ message: msg }));
-
+  describe(_props: void) {
     return column({
       id: IDS.BRAINSTORM.LIST,
-      content: children,
+      content: [],
       style: {
         flex: 1,
         overflow: "auto",
@@ -34,7 +25,7 @@ export const List: Component<ListProps, RootState> = {
     });
   },
 
-  onMount(_props, ctx) {
+  onMount(_props, ctx: BindContext<RootState>) {
     const { useSelector, mount } = ctx;
     let messageCleanups: (() => void)[] = [];
 
@@ -62,4 +53,4 @@ export const List: Component<ListProps, RootState> = {
       },
     );
   },
-};
+});

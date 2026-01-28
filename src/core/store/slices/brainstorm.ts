@@ -3,6 +3,7 @@ import { BrainstormState, BrainstormMessage } from "../types";
 
 export const initialBrainstormState: BrainstormState = {
   messages: [],
+  editingMessageId: null,
 };
 
 export const brainstormSlice = createSlice({
@@ -71,6 +72,12 @@ export const brainstormSlice = createSlice({
         messages: payload.messages,
       };
     },
+    editingMessageIdSet: (state, id: string | null) => {
+      return {
+        ...state,
+        editingMessageId: id,
+      };
+    },
   },
 });
 
@@ -82,4 +89,5 @@ export const {
   pruneHistory,
   messagesCleared,
   brainstormLoaded,
+  editingMessageIdSet,
 } = brainstormSlice.actions;
