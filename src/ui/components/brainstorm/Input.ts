@@ -6,18 +6,19 @@ import {
   uiBrainstormSubmitUserMessage,
 } from "../../../core/store";
 import { GenerationButton } from "../GenerationButton";
+import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 
-const { column, row, button, multilineTextInput } = api.v1.ui.part;
+const { column, row, multilineTextInput } = api.v1.ui.part;
 
 const STYLES = {
   SEND_BTN: { flex: 0.7 },
+  CLEAR_BTN: { flex: 0.3 },
 };
 
 const events = createEvents<
   {},
   {
     submit(): void;
-    clear(): void;
   }
 >();
 
@@ -28,7 +29,14 @@ export const Input: Component<{}, RootState> = {
   describe(props) {
     const ids = IDS.BRAINSTORM;
 
-    // Use GenerationButton describe
+    const btnClear = ButtonWithConfirmation.describe({
+      id: `${ids.INPUT}-btn-clear`,
+      label: "Clear",
+      confirmLabel: "Clear?",
+      style: STYLES.CLEAR_BTN,
+      onConfirm: () => {},
+    });
+
     const btnSend = GenerationButton.describe({
       id: ids.SEND_BTN,
       label: "Send",
@@ -47,15 +55,7 @@ export const Input: Component<{}, RootState> = {
         }),
         row({
           style: { gap: "8px", "margin-top": "8px" },
-          content: [
-            button({
-              id: `${ids.INPUT}-btn-clear`,
-              text: "Clear",
-              style: { flex: 0.3 },
-              callback: () => events.clear(props),
-            }),
-            btnSend,
-          ],
+          content: [btnClear, btnSend],
         }),
       ],
     });
@@ -64,6 +64,15 @@ export const Input: Component<{}, RootState> = {
   onMount(_props, ctx) {
     const { dispatch, useSelector, mount } = ctx;
     const ids = IDS.BRAINSTORM;
+
+    // Mount ButtonWithConfirmation for Clear button
+    mount(ButtonWithConfirmation, {
+      id: `${ids.INPUT}-btn-clear`,
+      label: "Clear",
+      confirmLabel: "Clear?",
+      style: STYLES.CLEAR_BTN,
+      onConfirm: () => dispatch(messagesCleared()),
+    });
 
     // Mount GenerationButton logic
     mount(GenerationButton, {
@@ -76,9 +85,6 @@ export const Input: Component<{}, RootState> = {
     events.attach({
       submit() {
         dispatch(uiBrainstormSubmitUserMessage());
-      },
-      clear() {
-        dispatch(messagesCleared());
       },
     });
 

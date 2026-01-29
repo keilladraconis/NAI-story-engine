@@ -2,7 +2,6 @@ import { createSlice } from "../../../../lib/nai-store";
 import { UIState } from "../types";
 
 export const initialUIState: UIState = {
-  showClearConfirm: false,
   editModes: {},
   inputs: {},
   brainstorm: {
@@ -14,10 +13,6 @@ export const uiSlice = createSlice({
   name: "ui",
   initialState: initialUIState,
   reducers: {
-    uiClearConfirmToggled: (state) => ({
-      ...state,
-      showClearConfirm: !state.showClearConfirm,
-    }),
     uiInputChanged: (state, payload: { id: string; value: string }) => ({
       ...state,
       inputs: {
@@ -58,7 +53,6 @@ export const uiSlice = createSlice({
 });
 
 export const {
-  uiClearConfirmToggled,
   uiInputChanged,
   setBrainstormInput,
   uiRequestCancellation,

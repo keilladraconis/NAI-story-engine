@@ -5,16 +5,13 @@ import {
 } from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
 import { segaToggled } from "../../../core/store/slices/runtime";
-import { uiClearConfirmToggled } from "../../../core/store/slices/ui";
 import { storyCleared } from "../../../core/store/slices/story";
-import { NAI_WARNING } from "../../../ui/colors";
+import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 
 const { row, text, button } = api.v1.ui.part;
 
 type HeaderEvents = {
   toggleSega(): void;
-  toggleClearConfirm(): void;
-  confirmClear(): void;
 };
 
 export const Header = defineComponent({
@@ -55,62 +52,38 @@ export const Header = defineComponent({
             }),
           ],
         }),
-        row({
-          style: { gap: "4px", "align-items": "center" },
-          content: [
-            button({
-              id: "header-clear-btn",
-              text: "Clear",
-              iconId: "trash-2",
-              style: { padding: "4px 8px", opacity: 0.7 },
-              callback: () => this.events.toggleClearConfirm({}),
-            }),
-            row({
-              id: "header-clear-confirm",
-              style: { gap: "4px", "align-items": "center", display: "none" },
-              content: [
-                text({
-                  text: "Clear?",
-                  style: { color: NAI_WARNING, "font-weight": "bold" },
-                }),
-                button({
-                  id: "header-confirm-yes",
-                  text: "Yes",
-                  style: { color: NAI_WARNING, padding: "2px 8px" },
-                  callback: () => this.events.confirmClear({}),
-                }),
-                button({
-                  id: "header-confirm-no",
-                  text: "No",
-                  style: { padding: "2px 8px" },
-                  callback: () => this.events.toggleClearConfirm({}),
-                }),
-              ],
-            }),
-          ],
+        ButtonWithConfirmation.describe({
+          id: "header-clear",
+          label: "Clear",
+          confirmLabel: "Clear?",
+          buttonStyle: { padding: "4px 8px", opacity: 0.7 },
+          onConfirm: () => {},
         }),
       ],
     });
   },
 
   onMount(_props: {}, ctx: BindContext<RootState>) {
-    const { useSelector, dispatch } = ctx;
+    const { useSelector, dispatch, mount } = ctx;
 
     this.events.attach({
       toggleSega: () => dispatch(segaToggled()),
-      toggleClearConfirm: () => dispatch(uiClearConfirmToggled()),
-      confirmClear: () => {
-        dispatch(storyCleared());
-        dispatch(uiClearConfirmToggled());
-      },
+    });
+
+    // Mount ButtonWithConfirmation for Clear button
+    mount(ButtonWithConfirmation, {
+      id: "header-clear",
+      label: "Clear",
+      confirmLabel: "Clear?",
+      buttonStyle: { padding: "4px 8px", opacity: 0.7 },
+      onConfirm: () => dispatch(storyCleared()),
     });
 
     useSelector(
       (state) => ({
         segaRunning: state.runtime.segaRunning,
-        showClearConfirm: state.ui.showClearConfirm,
       }),
-      ({ segaRunning, showClearConfirm }) => {
+      ({ segaRunning }) => {
         api.v1.ui.updateParts([
           {
             id: "header-sega-start-btn",
@@ -119,14 +92,6 @@ export const Header = defineComponent({
           {
             id: "header-sega-stop-btn",
             style: { display: segaRunning ? "block" : "none" },
-          },
-          {
-            id: "header-clear-btn",
-            style: { display: showClearConfirm ? "none" : "block" },
-          },
-          {
-            id: "header-clear-confirm",
-            style: { display: showClearConfirm ? "flex" : "none" },
           },
         ]);
       },

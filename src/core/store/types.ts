@@ -34,7 +34,6 @@ export interface BrainstormState {
 }
 
 export interface UIState {
-  showClearConfirm: boolean;
   editModes: Record<string, boolean>;
   inputs: Record<string, string>;
   brainstorm: {

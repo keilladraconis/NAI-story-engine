@@ -82,28 +82,28 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
 
     const btnQueued = button({
       id: `${id}-queue`,
-      text: `⏳ ${label} (Queued)`,
+      text: label ? `⏳ Queued` : "⏳",
       style: { ...styles.queue, display: "none" },
       callback: () => events.cancel(props),
     });
 
     const btnCancel = button({
       id: `${id}-cancel`,
-      text: `🚫 Cancel`,
+      text: label ? `🚫 Cancel` : "🚫",
       style: { ...styles.cancel, display: "none" },
       callback: () => events.cancelActive(props),
     });
 
     const btnContinue = button({
       id: `${id}-continue`,
-      text: `⚠️ Continue`,
+      text: label ? `⚠️ Continue` : "⚠️",
       style: { ...styles.continue, display: "none" },
       callback: () => events.continue(props),
     });
 
     const btnWait = button({
       id: `${id}-wait`,
-      text: `⏳ Wait`,
+      text: label ? `⏳ Wait` : "⏳",
       style: { ...styles.wait, display: "none" },
       callback: () => events.cancelActive(props),
     });
@@ -160,7 +160,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       api.v1.ui.updateParts([
         {
           id: `${id}-wait`,
-          text: `⏳ Wait (${remaining}s)`,
+          text: props.label ? `⏳ Wait (${remaining}s)` : `⏳ (${remaining}s)`,
         },
       ]);
 
