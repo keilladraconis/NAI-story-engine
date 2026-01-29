@@ -7,7 +7,6 @@ import {
 } from "../../../config/field-definitions";
 
 export const initialStoryState: StoryState = {
-  setting: "Original",
   fields: {},
   dulfs: {
     [FieldID.DramatisPersonae]: [],
@@ -41,10 +40,6 @@ export const storySlice = createSlice({
       ...payload.story,
     }),
     storyCleared: () => initialStoryState,
-    settingUpdated: (state, setting: string) => ({
-      ...state,
-      setting,
-    }),
     fieldUpdated: (
       state,
       payload: { fieldId: string; content: string; data?: any },
@@ -76,26 +71,6 @@ export const storySlice = createSlice({
         dulfs: {
           ...state.dulfs,
           [fieldId]: [...list, item],
-        },
-      };
-    },
-    dulfsItemUpdated: (
-      state,
-      payload: {
-        fieldId: DulfsFieldID;
-        itemId: string;
-        updates: Partial<DulfsItem>;
-      },
-    ) => {
-      const { fieldId, itemId, updates } = payload;
-      const list = state.dulfs[fieldId] || [];
-      return {
-        ...state,
-        dulfs: {
-          ...state.dulfs,
-          [fieldId]: list.map((item) =>
-            item.id === itemId ? { ...item, ...updates } : item,
-          ),
         },
       };
     },
@@ -137,10 +112,8 @@ export const storySlice = createSlice({
 export const {
   storyLoaded,
   storyCleared,
-  settingUpdated,
   fieldUpdated,
   dulfsItemAdded,
-  dulfsItemUpdated,
   dulfsItemRemoved,
   dulfsSummaryUpdated,
   attgToggled,

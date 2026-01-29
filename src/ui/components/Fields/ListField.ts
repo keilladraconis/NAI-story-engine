@@ -173,15 +173,15 @@ export const ListField = defineComponent<
       saveSummary: (eventProps) => {
         dispatch(uiFieldEditEnd({ id: eventProps.id }));
       },
-      addItem: (eventProps) => {
+      addItem: async (eventProps) => {
+        const itemId = api.v1.uuid();
+        await api.v1.storyStorage.set(`dulfs-item-${itemId}`, "New Item");
         dispatch(
           dulfsItemAdded({
             fieldId: eventProps.id as DulfsFieldID,
             item: {
-              id: api.v1.uuid(),
+              id: itemId,
               fieldId: eventProps.id as DulfsFieldID,
-              name: "New Item",
-              content: "",
             },
           }),
         );

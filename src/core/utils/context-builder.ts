@@ -57,12 +57,12 @@ const getStoryContextMessages = async (): Promise<Message[]> => {
   }
 };
 
-const getCommonContextBlocks = (
+const getCommonContextBlocks = async (
   state: RootState,
   storyContext: Message[],
-): Message[] => {
+): Promise<Message[]> => {
   const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
-  const setting = state.story.setting;
+  const setting = String((await api.v1.storyStorage.get("kse-setting")) || "");
   const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
 
   return [
@@ -95,7 +95,7 @@ export const buildBrainstormStrategy = async (
   messages.push(...storyContext);
 
   const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
-  const setting = state.story.setting;
+  const setting = String((await api.v1.storyStorage.get("kse-setting")) || "");
   const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
 
   let contextBlock = "Here is the current state of the story:\n";
@@ -160,7 +160,7 @@ export const buildStoryPromptStrategy = async (
   );
   const brainstormContent = getConsolidatedBrainstorm(state);
   const storyContext = await getStoryContextMessages();
-  const commonBlocks = getCommonContextBlocks(state, storyContext);
+  const commonBlocks = await getCommonContextBlocks(state, storyContext);
 
   const messages = contextBuilder(
     { role: "system", content: systemPrompt },

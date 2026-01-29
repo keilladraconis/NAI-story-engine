@@ -269,24 +269,30 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         } else if (target.type === "list" && accumulatedText) {
           // Parse generated list and create DULFS items
           const lines = accumulatedText.split("\n").filter((l) => l.trim());
-          lines.forEach((line) => {
+          for (const line of lines) {
             // Parse "Name: Description" or just "Name"
             const match = line.match(/^[-*+\d.]*\s*(.+?)(?::\s*(.+))?$/);
             if (match) {
               const name = match[1].trim();
+              const content = match[2]?.trim() || "";
+              const itemId = api.v1.uuid();
+
+              // Store content in storyStorage
+              const fullContent = content ? `${name}: ${content}` : name;
+              await api.v1.storyStorage.set(`dulfs-item-${itemId}`, fullContent);
+
+              // Dispatch minimal item
               dispatch(
                 dulfsItemAdded({
                   fieldId: target.fieldId as DulfsFieldID,
                   item: {
-                    id: api.v1.uuid(),
+                    id: itemId,
                     fieldId: target.fieldId as DulfsFieldID,
-                    name,
-                    content: match[2]?.trim() || "",
                   },
                 }),
               );
             }
-          });
+          }
         }
       }
     },

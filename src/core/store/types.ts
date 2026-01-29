@@ -9,16 +9,12 @@ export interface StoryField {
 }
 
 export interface DulfsItem {
-  id: string; // UUID
+  id: string;
   fieldId: DulfsFieldID;
-  name: string;
-  content: string;
-  text?: string;
   lorebookEntryId?: string;
 }
 
 export interface StoryState {
-  setting: string;
   fields: Record<string, StoryField>;
   dulfs: Record<DulfsFieldID, DulfsItem[]>;
   dulfsSummaries: Record<string, string>;
