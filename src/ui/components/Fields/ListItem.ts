@@ -13,19 +13,9 @@ import {
   uiFieldEditBegin,
   uiFieldEditEnd,
 } from "../../../core/store/slices/ui";
-import { generationRequested } from "../../../core/store/slices/runtime";
-import { GenerationButton } from "../GenerationButton";
-import {
-  ItemColumn,
-  IconButton,
-  StyledTextInput,
-  StyledTextArea,
-  ContentText,
-  StyledCollapsibleSection,
-  Styles,
-} from "../../styles";
+import { IconButton, StyledTextInput, Styles } from "../../styles";
 
-const { row } = api.v1.ui.part;
+const { row, text } = api.v1.ui.part;
 
 export interface ListItemProps {
   config: FieldConfig;
@@ -47,87 +37,79 @@ export const ListItem = defineComponent<
   events: createEvents<ListItemProps, ListItemEvents>(),
 
   styles: {
-    headerRow: {
+    itemRow: {
+      gap: "8px",
       "align-items": "center",
-      gap: "4px",
-      "justify-content": "flex-end",
-      "margin-bottom": "8px",
+      padding: "4px 0",
     },
-    nameInput: { "margin-bottom": "8px" },
-    genButton: { padding: "4px" },
+    bookIcon: {
+      opacity: "0.3",
+      cursor: "default",
+    },
+    nameText: {
+      flex: "1",
+      "min-width": "0",
+    },
+    nameInput: {
+      flex: "1",
+      display: "none",
+    },
     hidden: { display: "none" },
     block: { display: "block" },
   },
 
   describe(props) {
-    const { item, config } = props;
-    const requestId = `gen-item-${item.id}`;
+    const { item } = props;
 
+    const bookBtnId = `book-${item.id}`;
+    const nameTextId = `name-text-${item.id}`;
+    const nameInputId = `name-input-${item.id}`;
     const editBtnId = `btn-edit-${item.id}`;
     const saveBtnId = `btn-save-${item.id}`;
     const deleteBtnId = `btn-del-${item.id}`;
-    const nameInputId = `name-input-${item.id}`;
-    const contentInputId = `content-input-${item.id}`;
-    const contentTextId = `content-text-${item.id}`;
-    const collapseId = `collapse-${item.id}`;
 
-    const genButton = GenerationButton.describe({
-      id: `gen-btn-${item.id}`,
-      requestId,
-      label: "", // Icon only
-      style: this.styles?.genButton,
-    }) as UIPart;
-
-    return ItemColumn({
+    return row({
       id: `item-${item.id}`,
+      style: this.styles?.itemRow,
       content: [
-        StyledCollapsibleSection({
-          id: collapseId,
-          title: item.name,
-          storageKey: `story:dulfs-item-expanded-${item.id}`,
-          content: [
-            row({
-              style: this.styles?.headerRow,
-              content: [
-                genButton,
-                IconButton({
-                  id: editBtnId,
-                  iconId: "edit-3",
-                  callback: () => this.events.beginEdit(props),
-                }),
-                IconButton({
-                  id: saveBtnId,
-                  iconId: "save",
-                  style: { display: "none" },
-                  callback: () => this.events.save(props),
-                }),
-                IconButton({
-                  id: deleteBtnId,
-                  iconId: "trash",
-                  callback: () => this.events.delete(props),
-                }),
-              ],
-            }),
-            StyledTextInput({
-              id: nameInputId,
-              initialValue: item.name,
-              placeholder: "Item Name",
-              storageKey: `story:dulfs-item-name-${item.id}`,
-              style: mergeStyles(this.styles?.nameInput, this.styles?.hidden),
-            }),
-            StyledTextArea({
-              id: contentInputId,
-              initialValue: item.content,
-              placeholder: config.placeholder,
-              storageKey: `story:dulfs-item-content-${item.id}`,
-              style: { display: "none" },
-            }),
-            ContentText({
-              id: contentTextId,
-              text: item.content || "_No description._",
-              markdown: true,
-            }),
-          ],
+        // Book icon (dummy, indicates lorebook status)
+        IconButton({
+          id: bookBtnId,
+          iconId: "book",
+          style: this.styles?.bookIcon,
+          callback: () => {},
+        }),
+        // Name display
+        text({
+          id: nameTextId,
+          text: item.name,
+          style: this.styles?.nameText,
+        }),
+        // Name input (hidden by default)
+        StyledTextInput({
+          id: nameInputId,
+          initialValue: item.name,
+          storageKey: `story:dulfs-item-name-${item.id}`,
+          style: this.styles?.nameInput,
+        }),
+        // Edit button
+        IconButton({
+          id: editBtnId,
+          iconId: "edit-3",
+          callback: () => this.events.beginEdit(props),
+        }),
+        // Save button (hidden by default)
+        IconButton({
+          id: saveBtnId,
+          iconId: "save",
+          style: { display: "none" },
+          callback: () => this.events.save(props),
+        }),
+        // Delete button
+        IconButton({
+          id: deleteBtnId,
+          iconId: "trash",
+          callback: () => this.events.delete(props),
         }),
       ],
     });
@@ -137,15 +119,12 @@ export const ListItem = defineComponent<
     const { useSelector, useEffect, dispatch } = ctx;
     const { item, config } = props;
 
+    const nameTextId = `name-text-${item.id}`;
+    const nameInputId = `name-input-${item.id}`;
     const editBtnId = `btn-edit-${item.id}`;
     const saveBtnId = `btn-save-${item.id}`;
-    const nameInputId = `name-input-${item.id}`;
-    const contentInputId = `content-input-${item.id}`;
-    const contentTextId = `content-text-${item.id}`;
-    const collapseId = `collapse-${item.id}`;
 
     const nameStorageKey = `dulfs-item-name-${item.id}`;
-    const contentStorageKey = `dulfs-item-content-${item.id}`;
 
     // Event handlers only dispatch actions
     this.events.attach({
@@ -167,18 +146,16 @@ export const ListItem = defineComponent<
 
     type FieldAction = { type: string; payload: { id: string } };
 
-    // Effect: Handle edit begin - push current content to storage
+    // Effect: Handle edit begin - push current name to storage
     useEffect(
       (action) =>
         action.type === uiFieldEditBegin({ id: "" }).type &&
         (action as FieldAction).payload.id === item.id,
       async (_action, { getState }) => {
-        const items =
-          getState().story.dulfs[config.id as DulfsFieldID] || [];
+        const items = getState().story.dulfs[config.id as DulfsFieldID] || [];
         const currentItem = items.find((i) => i.id === item.id);
         if (currentItem) {
           await api.v1.storyStorage.set(nameStorageKey, currentItem.name);
-          await api.v1.storyStorage.set(contentStorageKey, currentItem.content);
         }
       },
     );
@@ -189,31 +166,18 @@ export const ListItem = defineComponent<
         action.type === uiFieldEditEnd({ id: "" }).type &&
         (action as FieldAction).payload.id === item.id,
       async (_action, { dispatch }) => {
-        const name = (await api.v1.storyStorage.get(nameStorageKey)) || item.name;
-        const content =
-          (await api.v1.storyStorage.get(contentStorageKey)) || item.content;
+        const name =
+          (await api.v1.storyStorage.get(nameStorageKey)) || item.name;
 
         dispatch(
           dulfsItemUpdated({
             fieldId: config.id as DulfsFieldID,
             itemId: item.id,
-            updates: { name: String(name), content: String(content) },
+            updates: { name: String(name) },
           }),
         );
       },
     );
-
-    // Bind Generation Button
-    ctx.mount(GenerationButton, {
-      id: `gen-btn-${item.id}`,
-      requestId: `gen-item-${item.id}`,
-      label: "",
-      generateAction: generationRequested({
-        id: `gen-item-${item.id}`,
-        type: "field",
-        targetId: `${config.id}:${item.id}`,
-      }),
-    });
 
     // React to Edit Mode
     useSelector(
@@ -233,25 +197,16 @@ export const ListItem = defineComponent<
             }),
           },
           {
-            id: nameInputId,
-            style: mergeStyles(
-              Styles.textInput,
-              mergeStyles(
-                this.styles?.nameInput,
-                isEditing ? this.styles?.block : this.styles?.hidden,
-              ),
-            ),
-          },
-          {
-            id: contentInputId,
-            style: mergeStyles(Styles.textArea, {
-              display: isEditing ? "block" : "none",
+            id: nameTextId,
+            style: mergeStyles(this.styles?.nameText, {
+              display: isEditing ? "none" : "block",
             }),
           },
           {
-            id: contentTextId,
-            style: mergeStyles(Styles.contentText, {
-              display: isEditing ? "none" : "block",
+            id: nameInputId,
+            style: mergeStyles(Styles.textInput, {
+              flex: "1",
+              display: isEditing ? "block" : "none",
             }),
           },
         ]);
@@ -266,10 +221,7 @@ export const ListItem = defineComponent<
         ),
       (updatedItem) => {
         if (!updatedItem) return;
-        api.v1.ui.updateParts([
-          { id: collapseId, title: updatedItem.name },
-          { id: contentTextId, text: updatedItem.content || "_No description._" },
-        ]);
+        api.v1.ui.updateParts([{ id: nameTextId, text: updatedItem.name }]);
       },
     );
   },

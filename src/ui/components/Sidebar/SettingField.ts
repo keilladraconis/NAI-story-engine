@@ -1,4 +1,8 @@
-import { BindContext, createEvents, defineComponent } from "../../../../lib/nai-act";
+import {
+  BindContext,
+  createEvents,
+  defineComponent,
+} from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
 import { settingUpdated } from "../../../core/store/slices/story";
 import {
@@ -99,10 +103,22 @@ export const SettingField = defineComponent({
       (state) => state.ui.editModes[FIELD_ID],
       (isEditing) => {
         api.v1.ui.updateParts([
-          { id: "kse-setting-input", style: { display: isEditing ? "block" : "none" } },
-          { id: "kse-setting-text", style: { display: isEditing ? "none" : "block" } },
-          { id: "kse-setting-edit-btn", style: { display: isEditing ? "none" : "block" } },
-          { id: "kse-setting-save-btn", style: { display: isEditing ? "block" : "none" } },
+          {
+            id: "kse-setting-input",
+            style: { display: isEditing ? "block" : "none" },
+          },
+          {
+            id: "kse-setting-text",
+            style: { display: isEditing ? "none" : "block" },
+          },
+          {
+            id: "kse-setting-edit-btn",
+            style: { display: isEditing ? "none" : "block" },
+          },
+          {
+            id: "kse-setting-save-btn",
+            style: { display: isEditing ? "block" : "none" },
+          },
         ]);
       },
     );

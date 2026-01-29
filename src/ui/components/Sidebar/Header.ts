@@ -1,4 +1,8 @@
-import { BindContext, createEvents, defineComponent } from "../../../../lib/nai-act";
+import {
+  BindContext,
+  createEvents,
+  defineComponent,
+} from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
 import { segaToggled } from "../../../core/store/slices/runtime";
 import { uiClearConfirmToggled } from "../../../core/store/slices/ui";

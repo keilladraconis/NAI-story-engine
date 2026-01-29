@@ -1,4 +1,8 @@
-import { BindContext, createEvents, defineComponent } from "../../../../lib/nai-act";
+import {
+  BindContext,
+  createEvents,
+  defineComponent,
+} from "../../../../lib/nai-act";
 import { BrainstormMessage, RootState } from "../../../core/store/types";
 import {
   messageRemoved,

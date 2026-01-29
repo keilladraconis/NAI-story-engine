@@ -66,7 +66,8 @@ export interface GenerationStrategy {
   params: any; // TODO: Define Params
   target:
     | { type: "brainstorm"; messageId: string }
-    | { type: "field"; fieldId: string };
+    | { type: "field"; fieldId: string }
+    | { type: "list"; fieldId: string };
   prefixBehavior: "keep" | "trim";
   assistantPrefill?: string;
 }

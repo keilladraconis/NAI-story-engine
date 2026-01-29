@@ -16,9 +16,17 @@ import {
   editingMessageIdSet,
   uiBrainstormRetryGeneration,
   pruneHistory,
+  generationRequested,
+  fieldUpdated,
+  dulfsItemAdded,
 } from "./index";
-import { buildBrainstormStrategy } from "../utils/context-builder";
+import {
+  buildBrainstormStrategy,
+  buildStoryPromptStrategy,
+  buildDulfsListStrategy,
+} from "../utils/context-builder";
 import { IDS } from "../../ui/framework/ids";
+import { DulfsFieldID } from "../../config/field-definitions";
 
 export function registerEffects(store: Store<RootState>, genX: GenX) {
   const { subscribeEffect } = store;
@@ -171,6 +179,30 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
+  // Intent: Field/List Generation
+  subscribeEffect(
+    (action) => action.type === generationRequested({} as any).type,
+    async (action, { dispatch, getState }) => {
+      const { type, targetId } = action.payload;
+      const state = getState();
+
+      if (type === "field") {
+        // Single field (e.g., StoryPrompt) or DULFS item (format: "fieldId:itemId")
+        if (targetId.includes(":")) {
+          // DULFS item content generation (skip for now per requirements)
+          return;
+        }
+        const strategy = await buildStoryPromptStrategy(state, targetId);
+        dispatch(uiRequestGeneration(strategy));
+      } else if (type === "list") {
+        // DULFS list generation (generate names)
+        const strategy = await buildDulfsListStrategy(state, targetId);
+        dispatch(uiRequestGeneration(strategy));
+      }
+      // "brainstorm" type is handled via separate submit/retry effects
+    },
+  );
+
   // Intent: GenX Generation
   subscribeEffect(
     (action) => action.type === uiRequestGeneration({} as any).type, // Match type only
@@ -205,8 +237,12 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
                 // Stream to UI
                 const uiId = IDS.BRAINSTORM.message(target.messageId).TEXT;
                 api.v1.ui.updateParts([{ id: uiId, text: accumulatedText }]);
+              } else if (target.type === "field") {
+                // Stream to field display
+                const uiId = `text-display-${target.fieldId}`;
+                api.v1.ui.updateParts([{ id: uiId, text: accumulatedText }]);
               }
-              // Add other targets
+              // List streaming is not displayed (parsed at the end)
             }
           },
           "background",
@@ -223,6 +259,34 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
               content: accumulatedText,
             }),
           );
+        } else if (target.type === "field" && accumulatedText) {
+          dispatch(
+            fieldUpdated({
+              fieldId: target.fieldId,
+              content: accumulatedText,
+            }),
+          );
+        } else if (target.type === "list" && accumulatedText) {
+          // Parse generated list and create DULFS items
+          const lines = accumulatedText.split("\n").filter((l) => l.trim());
+          lines.forEach((line) => {
+            // Parse "Name: Description" or just "Name"
+            const match = line.match(/^[-*+\d.]*\s*(.+?)(?::\s*(.+))?$/);
+            if (match) {
+              const name = match[1].trim();
+              dispatch(
+                dulfsItemAdded({
+                  fieldId: target.fieldId as DulfsFieldID,
+                  item: {
+                    id: api.v1.uuid(),
+                    fieldId: target.fieldId as DulfsFieldID,
+                    name,
+                    content: match[2]?.trim() || "",
+                  },
+                }),
+              );
+            }
+          });
         }
       }
     },

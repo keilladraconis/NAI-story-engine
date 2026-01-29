@@ -72,6 +72,11 @@ export const ListField = defineComponent<
       id: `gen-btn-${listGenId}`,
       requestId: listGenId,
       label: "Generate Items",
+      generateAction: generationRequested({
+        id: listGenId,
+        type: "list",
+        targetId: props.id,
+      }),
     }) as UIPart;
 
     return StyledCollapsibleSection({
@@ -202,7 +207,8 @@ export const ListField = defineComponent<
         action.type === uiFieldEditEnd({ id: "" }).type &&
         (action as FieldAction).payload.id === props.id,
       async (_action, { dispatch }) => {
-        const summary = (await api.v1.storyStorage.get(summaryStorageKey)) || "";
+        const summary =
+          (await api.v1.storyStorage.get(summaryStorageKey)) || "";
         dispatch(
           dulfsSummaryUpdated({
             fieldId: props.id,

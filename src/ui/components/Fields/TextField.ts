@@ -96,6 +96,11 @@ export const TextField = defineComponent<
       id: `gen-btn-${config.id}`,
       requestId,
       label: "Generate",
+      generateAction: generationRequested({
+        id: requestId,
+        type: "field",
+        targetId: config.id,
+      }),
     }) as UIPart;
 
     const header = createHeader(
@@ -169,7 +174,9 @@ export const TextField = defineComponent<
         (action as FieldAction).payload.id === config.id,
       async (_action, { dispatch }) => {
         const content = (await api.v1.storyStorage.get(storageKey)) || "";
-        dispatch(fieldUpdated({ fieldId: config.id, content: String(content) }));
+        dispatch(
+          fieldUpdated({ fieldId: config.id, content: String(content) }),
+        );
       },
     );
 

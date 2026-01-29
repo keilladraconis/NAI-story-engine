@@ -3,7 +3,7 @@ import {
   BrainstormMessage,
   GenerationStrategy,
 } from "../store/types";
-import { FieldID } from "../../config/field-definitions";
+import { FieldID, FIELD_CONFIGS } from "../../config/field-definitions";
 
 export interface StrategyResult {
   messages: Message[];
@@ -190,4 +190,40 @@ export const buildStoryPromptStrategy = async (
   };
 };
 
-// ... (Other strategies ommitted for brevity as we focus on Brainstorm, but should add them if needed)
+export const buildDulfsListStrategy = async (
+  state: RootState,
+  fieldId: string,
+): Promise<GenerationStrategy> => {
+  const model = "glm-4-6";
+  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
+  const fieldConfig = FIELD_CONFIGS.find((f) => f.id === fieldId);
+
+  // Use listGenerationInstruction if available, otherwise generationInstruction
+  const instruction =
+    fieldConfig?.listGenerationInstruction ||
+    fieldConfig?.generationInstruction ||
+    "";
+  const exampleFormat = fieldConfig?.exampleFormat || "";
+  const brainstormContent = getConsolidatedBrainstorm(state);
+  const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+
+  const messages: Message[] = [
+    {
+      role: "system",
+      content: `${systemPrompt}\n\n[LIST GENERATION MODE]\n${instruction}\n\nExample format:\n${exampleFormat}`,
+    },
+    {
+      role: "user",
+      content: `STORY PROMPT:\n${storyPrompt}\n\nBRAINSTORM:\n${brainstormContent}`,
+    },
+    { role: "assistant", content: "Here are the items:" },
+  ];
+
+  return {
+    requestId: api.v1.uuid(),
+    messages,
+    params: { model, max_tokens: 512, temperature: 0.9, min_p: 0.05 },
+    target: { type: "list", fieldId },
+    prefixBehavior: "trim",
+  };
+};
