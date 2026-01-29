@@ -1,8 +1,4 @@
-import {
-  createEvents,
-  mergeStyles,
-  defineComponent,
-} from "../../../../lib/nai-act";
+import { createEvents, defineComponent } from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
 import {
@@ -16,18 +12,11 @@ import {
 import { generationRequested } from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
 import { ListItem } from "./ListItem";
-import {
-  StyledCollapsibleSection,
-  SummaryBox,
-  SummaryInput,
-  IconButton,
-  StandardButton,
-  Styles,
-} from "../../styles";
 
 export type ListFieldProps = FieldConfig;
 
-const { row, text, column } = api.v1.ui.part;
+const { row, text, column, button, collapsibleSection, multilineTextInput } =
+  api.v1.ui.part;
 
 type ListFieldEvents = {
   beginSummaryEdit(): void;
@@ -49,6 +38,13 @@ export const ListField = defineComponent<
       opacity: 0.8,
       "margin-bottom": "8px",
     },
+    summaryBox: {
+      "margin-bottom": "12px",
+      "background-color": "rgba(128, 128, 128, 0.05)",
+      padding: "8px",
+      "border-radius": "4px",
+      gap: "4px",
+    },
     summaryHeader: {
       "justify-content": "space-between",
       "align-items": "center",
@@ -56,8 +52,13 @@ export const ListField = defineComponent<
     summaryLabel: { "font-weight": "bold", opacity: "0.7" },
     buttonGroup: { gap: "4px" },
     summaryText: { opacity: 0.8 },
+    summaryInput: { "min-height": "60px" },
     itemsColumn: { gap: "4px" },
     actionsRow: { "margin-top": "8px", gap: "8px", "flex-wrap": "wrap" },
+    iconButton: { width: "24px", padding: "4px" },
+    standardButton: { padding: "4px 8px" },
+    hidden: { display: "none" },
+    visible: { display: "block" },
   },
 
   describe(props) {
@@ -79,7 +80,7 @@ export const ListField = defineComponent<
       }),
     }) as UIPart;
 
-    return StyledCollapsibleSection({
+    return collapsibleSection({
       id: `section-${props.id}`,
       title: props.label,
       iconId: props.icon,
@@ -87,64 +88,67 @@ export const ListField = defineComponent<
       content: [
         text({
           text: props.description,
-          style: this.styles?.description,
+          style: this.style?.("description"),
         }),
         // Summary Section
-        SummaryBox({
+        column({
+          style: this.style?.("summaryBox"),
           content: [
             row({
-              style: this.styles?.summaryHeader,
+              style: this.style?.("summaryHeader"),
               content: [
                 text({
                   text: "Category Summary",
-                  style: this.styles?.summaryLabel,
+                  style: this.style?.("summaryLabel"),
                 }),
                 row({
-                  style: this.styles?.buttonGroup,
+                  style: this.style?.("buttonGroup"),
                   content: [
-                    IconButton({
+                    button({
                       id: summaryEditBtnId,
                       iconId: "edit-3",
+                      style: this.style?.("iconButton"),
                       callback: () => this.events.beginSummaryEdit(props),
                     }),
-                    IconButton({
+                    button({
                       id: summarySaveBtnId,
                       iconId: "save",
-                      style: { display: "none" },
+                      style: this.style?.("iconButton", "hidden"),
                       callback: () => this.events.saveSummary(props),
                     }),
                   ],
                 }),
               ],
             }),
-            SummaryInput({
+            multilineTextInput({
               id: summaryInputId,
               placeholder: "Summary...",
               initialValue: "",
               storageKey: `story:dulfs-summary-draft-${props.id}`,
-              style: { display: "none" },
+              style: this.style?.("summaryInput", "hidden"),
             }),
             text({
               id: summaryTextId,
               text: "_No summary._",
-              style: this.styles?.summaryText,
+              style: this.style?.("summaryText"),
             }),
           ],
         }),
         // Items List
         column({
           id: `items-col-${props.id}`,
-          style: this.styles?.itemsColumn,
+          style: this.style?.("itemsColumn"),
           content: [], // Populated in onMount
         }),
         // Actions
         row({
-          style: this.styles?.actionsRow,
+          style: this.style?.("actionsRow"),
           content: [
             genButton,
-            StandardButton({
+            button({
               text: "Add Item",
               iconId: "plus",
+              style: this.style?.("standardButton"),
               callback: () => this.events.addItem(props),
             }),
           ],
@@ -225,27 +229,19 @@ export const ListField = defineComponent<
         api.v1.ui.updateParts([
           {
             id: summaryEditBtnId,
-            style: mergeStyles(Styles.iconButton, {
-              display: isEditing ? "none" : "block",
-            }),
+            style: this.style?.("iconButton", isEditing ? "hidden" : "visible"),
           },
           {
             id: summarySaveBtnId,
-            style: mergeStyles(Styles.iconButton, {
-              display: isEditing ? "block" : "none",
-            }),
+            style: this.style?.("iconButton", isEditing ? "visible" : "hidden"),
           },
           {
             id: summaryInputId,
-            style: mergeStyles(Styles.textArea, {
-              display: isEditing ? "block" : "none",
-            }),
+            style: this.style?.("summaryInput", isEditing ? "visible" : "hidden"),
           },
           {
             id: summaryTextId,
-            style: mergeStyles(this.styles?.summaryText, {
-              display: isEditing ? "none" : "block",
-            }),
+            style: this.style?.("summaryText", isEditing ? "hidden" : "visible"),
           },
         ]);
       },

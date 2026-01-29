@@ -18,36 +18,41 @@ export const Header = defineComponent({
   id: () => "kse-sidebar-header",
   events: createEvents<{}, HeaderEvents>(),
 
+  styles: {
+    mainRow: {
+      "justify-content": "space-between",
+      "margin-bottom": "8px",
+      "align-items": "center",
+    },
+    buttonGroup: { gap: "8px", "align-items": "center" },
+    titleText: { "font-weight": "bold" },
+    actionButton: { padding: "4px 8px", "font-size": "0.8em" },
+    stopButton: { padding: "4px 8px", "font-size": "0.8em", color: "#ff9800" },
+    hidden: { display: "none" },
+    visible: { display: "block" },
+  },
+
   describe(_props: {}) {
     return row({
       id: "kse-sidebar-header",
-      style: {
-        "justify-content": "space-between",
-        "margin-bottom": "8px",
-        "align-items": "center",
-      },
+      style: this.style?.("mainRow"),
       content: [
         row({
-          style: { gap: "8px", "align-items": "center" },
+          style: this.style?.("buttonGroup"),
           content: [
-            text({ text: "🎭 Story Engine", style: { "font-weight": "bold" } }),
+            text({ text: "🎭 Story Engine", style: this.style?.("titleText") }),
             button({
               id: "header-sega-start-btn",
               text: "S.E.G.A.",
               iconId: "play-circle",
-              style: { padding: "4px 8px", "font-size": "0.8em" },
+              style: this.style?.("actionButton"),
               callback: () => this.events.toggleSega({}),
             }),
             button({
               id: "header-sega-stop-btn",
               text: "S.E.G.A.",
               iconId: "fast-forward",
-              style: {
-                padding: "4px 8px",
-                "font-size": "0.8em",
-                color: "#ff9800",
-                display: "none",
-              },
+              style: this.style?.("stopButton", "hidden"),
               callback: () => this.events.toggleSega({}),
             }),
           ],
@@ -87,11 +92,11 @@ export const Header = defineComponent({
         api.v1.ui.updateParts([
           {
             id: "header-sega-start-btn",
-            style: { display: segaRunning ? "none" : "block" },
+            style: this.style?.("actionButton", segaRunning ? "hidden" : "visible"),
           },
           {
             id: "header-sega-stop-btn",
-            style: { display: segaRunning ? "block" : "none" },
+            style: this.style?.("stopButton", segaRunning ? "visible" : "hidden"),
           },
         ]);
       },

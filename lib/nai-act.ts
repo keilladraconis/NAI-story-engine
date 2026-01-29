@@ -48,11 +48,15 @@ export interface BindContext<S> {
 type ComponentId<P> = [unknown] extends [P]
   ? (props?: P) => string
   : [P] extends [void]
-    ? () => string
-    : (props: P) => string;
+  ? () => string
+  : (props: P) => string;
 
 // Define a broad Style type as the underlying API uses 'any'
 export type Style = Record<string, any>;
+
+type StyleResolver<St extends Record<string, Style>> = (
+  ...keys: (keyof St | undefined | false | null)[]
+) => Style;
 
 export interface Component<
   P,
@@ -63,6 +67,7 @@ export interface Component<
   id: ComponentId<P>;
   events: E;
   styles?: St;
+  style?: StyleResolver<St>;
   describe(props: P): UIPart;
   onMount(props: P, ctx: BindContext<S>): void;
 }
@@ -75,6 +80,13 @@ export function defineComponent<
 >(
   component: Component<P, S, E, St> & ThisType<Component<P, S, E, St>>,
 ): Component<P, S, E, St> {
+  if (component.styles) {
+    component.style = function (
+      ...keys: (keyof St | undefined | false | null)[]
+    ): Style {
+      return mergeStyles(...keys.map((k) => (k ? this.styles?.[k] : undefined)));
+    };
+  }
   return component;
 }
 

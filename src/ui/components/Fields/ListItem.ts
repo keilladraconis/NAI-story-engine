@@ -2,9 +2,8 @@ import { createEvents, defineComponent } from "../../../../lib/nai-act";
 import { RootState, DulfsItem } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
 import { dulfsItemRemoved } from "../../../core/store/slices/story";
-import { IconButton, StyledTextInput } from "../../styles";
 
-const { row } = api.v1.ui.part;
+const { row, button, textInput } = api.v1.ui.part;
 
 export interface ListItemProps {
   config: FieldConfig;
@@ -23,18 +22,6 @@ export const ListItem = defineComponent<
   id: (props) => `item-${props.item.id}`,
   events: createEvents<ListItemProps, ListItemEvents>(),
 
-  styles: {
-    itemRow: {
-      gap: "8px",
-      "align-items": "center",
-      padding: "4px 0",
-    },
-    bookIcon: {
-      opacity: "0.3",
-      cursor: "default",
-    },
-  },
-
   describe(props) {
     const { item } = props;
 
@@ -44,26 +31,24 @@ export const ListItem = defineComponent<
 
     return row({
       id: `item-${item.id}`,
-      style: this.styles?.itemRow,
+      style: { gap: "8px", "align-items": "center", padding: "4px 0" },
       content: [
-        // Book icon (indicates lorebook status)
-        IconButton({
+        button({
           id: bookBtnId,
           iconId: "book",
-          style: this.styles?.bookIcon,
+          style: { width: "24px", padding: "4px", opacity: "0.3", cursor: "default" },
           callback: () => {},
         }),
-        // Always-editable input synced via storageKey
-        StyledTextInput({
+        textInput({
           id: nameInputId,
           initialValue: "",
           storageKey: `story:dulfs-item-${item.id}`,
-          style: { flex: "1" },
+          style: { padding: "4px", flex: "1" },
         }),
-        // Delete button
-        IconButton({
+        button({
           id: deleteBtnId,
           iconId: "trash",
+          style: { width: "24px", padding: "4px" },
           callback: () => this.events.delete(props),
         }),
       ],

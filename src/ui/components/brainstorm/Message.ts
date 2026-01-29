@@ -30,17 +30,42 @@ export const Message = defineComponent({
   id: (props: MessageProps) => `kse-bs-msg-${props.message.id}`,
   events: createEvents<MessageProps, MessageEvents>(),
 
+  styles: {
+    textDisplay: { "word-break": "break-word", "user-select": "text" },
+    viewButtonsRow: {
+      "margin-top": "5px",
+      gap: "5px",
+      "justify-content": "flex-end",
+      opacity: 0.6,
+    },
+    buttonIcon: { padding: "4px" },
+    labelText: { "font-size": "0.7em", opacity: 0.7, "margin-bottom": "2px" },
+    editContainer: { width: "100%" },
+    saveRow: { "justify-content": "flex-end", "margin-top": "4px" },
+    viewContainer: { width: "100%" },
+    buttonRow: { "justify-content": "space-between" },
+    textInput: { "min-height": "40px", width: "100%" },
+    saveButton: { padding: "4px", background: "none" },
+    rootRow: { width: "100%" },
+    rootRowUser: { "justify-content": "flex-end" },
+    rootRowAssistant: { "justify-content": "flex-start" },
+    bubble: { padding: "10px", width: "85%", border: "none" },
+    bubbleUser: {
+      "background-color": "rgba(64, 156, 255, 0.2)",
+      "border-radius": "12px 12px 0 12px",
+    },
+    bubbleAssistant: {
+      "background-color": "rgba(255, 255, 255, 0.05)",
+      "border-radius": "12px 12px 12px 0",
+    },
+    hidden: { display: "none" },
+    visible: { display: "block" },
+  },
+
   describe(props: MessageProps) {
     const { message } = props;
     const ids = IDS.BRAINSTORM.message(message.id);
     const isUser = message.role === "user";
-
-    // Styles
-    const bgColor = isUser
-      ? "rgba(64, 156, 255, 0.2)"
-      : "rgba(255, 255, 255, 0.05)";
-    const align = isUser ? "flex-end" : "flex-start";
-    const radius = isUser ? "12px 12px 0 12px" : "12px 12px 12px 0";
 
     // --- View Mode ---
 
@@ -48,32 +73,27 @@ export const Message = defineComponent({
       id: ids.TEXT,
       text: message.content,
       markdown: true,
-      style: { "word-break": "break-word", "user-select": "text" },
+      style: this.style?.("textDisplay"),
     });
 
     const viewButtons = row({
-      style: {
-        "margin-top": "5px",
-        gap: "5px",
-        "justify-content": "flex-end",
-        opacity: 0.6,
-      },
+      style: this.style?.("viewButtonsRow"),
       content: [
         button({
           iconId: "edit-3",
-          style: { padding: "4px" },
+          style: this.style?.("buttonIcon"),
           callback: () => this.events.edit({ message }),
           id: `${ids.ROOT}-btn-edit`,
         }),
         button({
           iconId: "rotate-cw",
-          style: { padding: "4px" },
+          style: this.style?.("buttonIcon"),
           callback: () => this.events.retry({ message }),
           id: `${ids.ROOT}-btn-retry`,
         }),
         button({
           iconId: "trash",
-          style: { padding: "4px" },
+          style: this.style?.("buttonIcon"),
           callback: () => this.events.delete({ message }),
           id: `${ids.ROOT}-btn-delete`,
         }),
@@ -82,18 +102,14 @@ export const Message = defineComponent({
 
     const viewContainer = column({
       id: ids.VIEW,
-      style: { width: "100%" },
+      style: this.style?.("viewContainer"),
       content: [
         row({
-          style: { "justify-content": "space-between" },
+          style: this.style?.("buttonRow"),
           content: [
             text({
               text: isUser ? "You" : "Brainstorm",
-              style: {
-                "font-size": "0.7em",
-                opacity: 0.7,
-                "margin-bottom": "2px",
-              },
+              style: this.style?.("labelText"),
             }),
             viewButtons,
           ],
@@ -108,8 +124,7 @@ export const Message = defineComponent({
       id: ids.INPUT,
       storageKey: `story:draft-${ids.INPUT}`,
       style: {
-        "min-height": "40px",
-        width: "100%",
+        ...this.style?.("textInput"),
         height: calculateTextAreaHeight(message.content),
       },
       initialValue: message.content,
@@ -117,17 +132,17 @@ export const Message = defineComponent({
 
     const saveButton = button({
       iconId: "save",
-      style: { padding: "4px", background: "none" },
+      style: this.style?.("saveButton"),
       callback: () => this.events.save({ message }),
       id: `${ids.ROOT}-btn-save`,
     });
 
     const editContainer = column({
       id: ids.EDIT,
-      style: { width: "100%", display: "none" },
+      style: this.style?.("editContainer", "hidden"),
       content: [
         row({
-          style: { "justify-content": "flex-end", "margin-top": "4px" },
+          style: this.style?.("saveRow"),
           content: [saveButton],
         }),
         textInput,
@@ -136,16 +151,10 @@ export const Message = defineComponent({
 
     return row({
       id: ids.ROOT,
-      style: { "justify-content": align, width: "100%" },
+      style: this.style?.("rootRow", isUser ? "rootRowUser" : "rootRowAssistant"),
       content: [
         column({
-          style: {
-            "background-color": bgColor,
-            padding: "10px",
-            "border-radius": radius,
-            width: "85%",
-            border: "none",
-          },
+          style: this.style?.("bubble", isUser ? "bubbleUser" : "bubbleAssistant"),
           content: [viewContainer, editContainer],
         }),
       ],
@@ -178,11 +187,11 @@ export const Message = defineComponent({
         api.v1.ui.updateParts([
           {
             id: ids.VIEW,
-            style: { display: isEditing ? "none" : "block" },
+            style: this.style?.("viewContainer", isEditing ? "hidden" : "visible"),
           },
           {
             id: ids.EDIT,
-            style: { display: isEditing ? "block" : "none" },
+            style: this.style?.("editContainer", isEditing ? "visible" : "hidden"),
           },
         ]);
       },

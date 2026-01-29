@@ -1,10 +1,10 @@
-import { createEvents, defineComponent } from "../../../../lib/nai-act";
+import { defineComponent } from "../../../../lib/nai-act";
 
 const { row, text, textInput } = api.v1.ui.part;
 
 export const SettingField = defineComponent({
   id: () => "kse-sidebar-setting",
-  events: createEvents<{}, {}>(),
+  events: undefined,
 
   describe(_props: {}) {
     return row({
@@ -26,7 +26,5 @@ export const SettingField = defineComponent({
     });
   },
 
-  onMount() {
-    // No event handlers needed - input syncs directly via storageKey
-  },
+  onMount() {},
 });
