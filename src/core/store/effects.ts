@@ -183,7 +183,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   subscribeEffect(
     (action) => action.type === generationRequested({} as any).type,
     async (action, { dispatch, getState }) => {
-      const { type, targetId } = action.payload;
+      const { id: requestId, type, targetId } = action.payload;
       const state = getState();
 
       if (type === "field") {
@@ -193,10 +193,12 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           return;
         }
         const strategy = await buildStoryPromptStrategy(state, targetId);
+        strategy.requestId = requestId; // Use store's ID for queue tracking
         dispatch(uiRequestGeneration(strategy));
       } else if (type === "list") {
         // DULFS list generation (generate names)
         const strategy = await buildDulfsListStrategy(state, targetId);
+        strategy.requestId = requestId; // Use store's ID for queue tracking
         dispatch(uiRequestGeneration(strategy));
       }
       // "brainstorm" type is handled via separate submit/retry effects
