@@ -58,6 +58,11 @@ npm run format     # prettier -w .
 - Use `api.v1.hooks` (not deprecated `api.v1.events`). Use `api.v1.uuid()` for ID generation.
 - No singletons/globals — prefer dependency injection wired in `src/index.ts`.
 
+**UI Input Patterns:**
+
+- Prefer `storageKey` on inputs for automatic persistence — avoid manual onChange handlers for simple state sync.
+- Exception: Use `onChange` callbacks alongside `storageKey` when syncing to non-UIPart targets (e.g., `api.v1.an.set()`, `api.v1.memory.set()`). See ATTG/Style fields in `TextField.ts` for example.
+
 ## Key Constraints
 
 - **No DOM:** Runs in QuickJS web worker. No `setTimeout` (use `api.v1.timers`), no `console.log` (use `api.v1.log()`).

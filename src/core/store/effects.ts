@@ -259,9 +259,20 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
                 const uiId = IDS.BRAINSTORM.message(target.messageId).TEXT;
                 api.v1.ui.updateParts([{ id: uiId, text: accumulatedText }]);
               } else if (target.type === "field") {
-                // Stream to field display
-                const uiId = `text-display-${target.fieldId}`;
-                api.v1.ui.updateParts([{ id: uiId, text: accumulatedText }]);
+                // Plain text fields (ATTG, Style) stream to input value and storyStorage
+                if (
+                  target.fieldId === FieldID.ATTG ||
+                  target.fieldId === FieldID.Style
+                ) {
+                  const inputId = `input-${target.fieldId}`;
+                  const storageKey = `kse-field-${target.fieldId}`;
+                  api.v1.ui.updateParts([{ id: inputId, value: accumulatedText }]);
+                  api.v1.storyStorage.set(storageKey, accumulatedText);
+                } else {
+                  // Standard fields stream to text display
+                  const uiId = `text-display-${target.fieldId}`;
+                  api.v1.ui.updateParts([{ id: uiId, text: accumulatedText }]);
+                }
               }
               // List streaming is not displayed (parsed at the end)
             }
@@ -281,12 +292,35 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
             }),
           );
         } else if (target.type === "field" && accumulatedText) {
-          dispatch(
-            fieldUpdated({
-              fieldId: target.fieldId,
-              content: accumulatedText,
-            }),
-          );
+          // Plain text fields (ATTG, Style) save to storyStorage
+          if (
+            target.fieldId === FieldID.ATTG ||
+            target.fieldId === FieldID.Style
+          ) {
+            const storageKey = `kse-field-${target.fieldId}`;
+            await api.v1.storyStorage.set(storageKey, accumulatedText);
+
+            // Trigger sync to Memory / Author's Note if enabled
+            if (target.fieldId === FieldID.ATTG) {
+              const syncEnabled = await api.v1.storyStorage.get("kse-sync-attg-memory");
+              if (syncEnabled) {
+                await api.v1.memory.set(accumulatedText);
+              }
+            } else if (target.fieldId === FieldID.Style) {
+              const syncEnabled = await api.v1.storyStorage.get("kse-sync-style-an");
+              if (syncEnabled) {
+                await api.v1.an.set(accumulatedText);
+              }
+            }
+          } else {
+            // Standard fields dispatch to state
+            dispatch(
+              fieldUpdated({
+                fieldId: target.fieldId,
+                content: accumulatedText,
+              }),
+            );
+          }
         } else if (target.type === "list" && accumulatedText) {
           // Parse generated list and create DULFS items (names only)
           const lines = accumulatedText.split("\n").filter((l) => l.trim());
