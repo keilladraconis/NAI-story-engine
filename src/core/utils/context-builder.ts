@@ -203,27 +203,92 @@ export const buildDulfsListStrategy = async (
     fieldConfig?.listGenerationInstruction ||
     fieldConfig?.generationInstruction ||
     "";
-  const exampleFormat = fieldConfig?.exampleFormat || "";
+  const listExampleFormat = fieldConfig?.listExampleFormat || "";
   const brainstormContent = getConsolidatedBrainstorm(state);
   const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
 
   const messages: Message[] = [
     {
       role: "system",
-      content: `${systemPrompt}\n\n[LIST GENERATION MODE]\n${instruction}\n\nExample format:\n${exampleFormat}`,
+      content: `${systemPrompt}\n\n[LIST GENERATION MODE]\n${instruction}\n\nOutput ONLY a bulleted list of names, nothing else.\n\nExample:\n${listExampleFormat}`,
     },
     {
       role: "user",
       content: `STORY PROMPT:\n${storyPrompt}\n\nBRAINSTORM:\n${brainstormContent}`,
     },
-    { role: "assistant", content: "Here are the items:" },
+    { role: "assistant", content: "-" },
   ];
 
   return {
     requestId: api.v1.uuid(),
     messages,
-    params: { model, max_tokens: 512, temperature: 0.9, min_p: 0.05 },
+    params: { model, max_tokens: 72, temperature: 0.9, min_p: 0.05 },
     target: { type: "list", fieldId },
     prefixBehavior: "trim",
+  };
+};
+
+export const buildATTGStrategy = async (
+  state: RootState,
+): Promise<GenerationStrategy> => {
+  const model = "glm-4-6";
+  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
+  const prompt = String((await api.v1.config.get("attg_generate_prompt")) || "");
+  const brainstormContent = getConsolidatedBrainstorm(state);
+  const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+  const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
+
+  const messages: Message[] = [
+    {
+      role: "system",
+      content: `${systemPrompt}\n\n[ATTG GENERATION MODE]\n${prompt}`,
+    },
+    {
+      role: "user",
+      content: `STORY PROMPT:\n${storyPrompt}\n\nWORLD SNAPSHOT:\n${worldSnapshot}\n\nBRAINSTORM:\n${brainstormContent}`,
+    },
+    { role: "assistant", content: "[" },
+  ];
+
+  return {
+    requestId: api.v1.uuid(),
+    messages,
+    params: { model, max_tokens: 128, temperature: 0.7, min_p: 0.05 },
+    target: { type: "field", fieldId: FieldID.ATTG },
+    prefixBehavior: "keep",
+  };
+};
+
+export const buildStyleStrategy = async (
+  state: RootState,
+): Promise<GenerationStrategy> => {
+  const model = "glm-4-6";
+  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
+  const prompt = String(
+    (await api.v1.config.get("style_generate_prompt")) || "",
+  );
+  const brainstormContent = getConsolidatedBrainstorm(state);
+  const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+  const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
+  const attg = getFieldContent(state, FieldID.ATTG);
+
+  const messages: Message[] = [
+    {
+      role: "system",
+      content: `${systemPrompt}\n\n[STYLE GENERATION MODE]\n${prompt}`,
+    },
+    {
+      role: "user",
+      content: `STORY PROMPT:\n${storyPrompt}\n\nWORLD SNAPSHOT:\n${worldSnapshot}\n\nATTG:\n${attg}\n\nBRAINSTORM:\n${brainstormContent}`,
+    },
+    { role: "assistant", content: "[" },
+  ];
+
+  return {
+    requestId: api.v1.uuid(),
+    messages,
+    params: { model, max_tokens: 128, temperature: 0.8, min_p: 0.05 },
+    target: { type: "field", fieldId: FieldID.Style },
+    prefixBehavior: "keep",
   };
 };

@@ -24,9 +24,11 @@ import {
   buildBrainstormStrategy,
   buildStoryPromptStrategy,
   buildDulfsListStrategy,
+  buildATTGStrategy,
+  buildStyleStrategy,
 } from "../utils/context-builder";
 import { IDS } from "../../ui/framework/ids";
-import { DulfsFieldID } from "../../config/field-definitions";
+import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 
 export function registerEffects(store: Store<RootState>, genX: GenX) {
   const { subscribeEffect } = store;
@@ -192,7 +194,19 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           // DULFS item content generation (skip for now per requirements)
           return;
         }
-        const strategy = await buildStoryPromptStrategy(state, targetId);
+
+        let strategy;
+        if (targetId === FieldID.StoryPrompt) {
+          strategy = await buildStoryPromptStrategy(state, targetId);
+        } else if (targetId === FieldID.ATTG) {
+          strategy = await buildATTGStrategy(state);
+        } else if (targetId === FieldID.Style) {
+          strategy = await buildStyleStrategy(state);
+        } else {
+          api.v1.log(`[effects] No generation strategy found for field: ${targetId}`);
+          return;
+        }
+
         strategy.requestId = requestId; // Use store's ID for queue tracking
         dispatch(uiRequestGeneration(strategy));
       } else if (type === "list") {
@@ -222,8 +236,13 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
             (m) => m.id === target.messageId,
           );
           if (message) accumulatedText = message.content;
+        } else if (target.type === "field") {
+          // Use assistant prefill from messages
+          const lastMsg = messages[messages.length - 1];
+          if (lastMsg?.role === "assistant" && lastMsg.content) {
+            accumulatedText = lastMsg.content;
+          }
         }
-        // Add other targets (field/list) if/when supported
       }
 
       try {
@@ -269,30 +288,35 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
             }),
           );
         } else if (target.type === "list" && accumulatedText) {
-          // Parse generated list and create DULFS items
+          // Parse generated list and create DULFS items (names only)
           const lines = accumulatedText.split("\n").filter((l) => l.trim());
           for (const line of lines) {
-            // Parse "Name: Description" or just "Name"
-            const match = line.match(/^[-*+\d.]*\s*(.+?)(?::\s*(.+))?$/);
+            // Strip bullets, numbers, dashes, and extract clean name
+            const match = line.match(/^[\s\-*+•\d.)\]]*(.+)$/);
             if (match) {
-              const name = match[1].trim();
-              const content = match[2]?.trim() || "";
-              const itemId = api.v1.uuid();
+              const name = match[1]
+                .trim()
+                .replace(/^[:\-–—]\s*/, "") // Strip leading colons/dashes
+                .replace(/[:\-–—].*$/, "") // Strip trailing descriptions
+                .trim();
 
-              // Store content in storyStorage
-              const fullContent = content ? `${name}: ${content}` : name;
-              await api.v1.storyStorage.set(`dulfs-item-${itemId}`, fullContent);
+              if (name) {
+                const itemId = api.v1.uuid();
 
-              // Dispatch minimal item
-              dispatch(
-                dulfsItemAdded({
-                  fieldId: target.fieldId as DulfsFieldID,
-                  item: {
-                    id: itemId,
+                // Store only the name in storyStorage
+                await api.v1.storyStorage.set(`dulfs-item-${itemId}`, name);
+
+                // Dispatch minimal item
+                dispatch(
+                  dulfsItemAdded({
                     fieldId: target.fieldId as DulfsFieldID,
-                  },
-                }),
-              );
+                    item: {
+                      id: itemId,
+                      fieldId: target.fieldId as DulfsFieldID,
+                    },
+                  }),
+                );
+              }
             }
           }
         }
