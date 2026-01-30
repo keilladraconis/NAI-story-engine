@@ -92,11 +92,17 @@ export const Header = defineComponent({
         api.v1.ui.updateParts([
           {
             id: "header-sega-start-btn",
-            style: this.style?.("actionButton", segaRunning ? "hidden" : "visible"),
+            style: this.style?.(
+              "actionButton",
+              segaRunning ? "hidden" : "visible",
+            ),
           },
           {
             id: "header-sega-stop-btn",
-            style: this.style?.("stopButton", segaRunning ? "visible" : "hidden"),
+            style: this.style?.(
+              "stopButton",
+              segaRunning ? "visible" : "hidden",
+            ),
           },
         ]);
       },

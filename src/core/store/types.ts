@@ -11,7 +11,6 @@ export interface StoryField {
 export interface DulfsItem {
   id: string;
   fieldId: DulfsFieldID;
-  lorebookEntryId?: string;
 }
 
 export interface StoryState {

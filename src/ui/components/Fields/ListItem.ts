@@ -36,7 +36,12 @@ export const ListItem = defineComponent<
         button({
           id: bookBtnId,
           iconId: "book",
-          style: { width: "24px", padding: "4px", opacity: "0.3", cursor: "default" },
+          style: {
+            width: "24px",
+            padding: "4px",
+            opacity: "0.3",
+            cursor: "default",
+          },
           callback: () => {},
         }),
         textInput({
@@ -44,6 +49,12 @@ export const ListItem = defineComponent<
           initialValue: "",
           storageKey: `story:dulfs-item-${item.id}`,
           style: { padding: "4px", flex: "1" },
+          onChange: async (value: string) => {
+            await api.v1.lorebook.updateEntry(item.id, {
+              displayName: value,
+              keys: [value],
+            });
+          },
         }),
         button({
           id: deleteBtnId,

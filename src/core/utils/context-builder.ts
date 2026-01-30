@@ -233,7 +233,9 @@ export const buildATTGStrategy = async (
 ): Promise<GenerationStrategy> => {
   const model = "glm-4-6";
   const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  const prompt = String((await api.v1.config.get("attg_generate_prompt")) || "");
+  const prompt = String(
+    (await api.v1.config.get("attg_generate_prompt")) || "",
+  );
   const brainstormContent = getConsolidatedBrainstorm(state);
   const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
   const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);

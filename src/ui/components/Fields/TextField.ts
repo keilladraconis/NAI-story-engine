@@ -111,7 +111,9 @@ export const TextField = defineComponent<
           storageKey: `story:kse-field-${config.id}`,
           style: this.style?.("textArea"),
           onChange: async (value: string) => {
-            const syncEnabled = await api.v1.storyStorage.get("kse-sync-attg-memory");
+            const syncEnabled = await api.v1.storyStorage.get(
+              "kse-sync-attg-memory",
+            );
             if (syncEnabled) {
               await api.v1.memory.set(value);
             }
@@ -126,7 +128,8 @@ export const TextField = defineComponent<
           storageKey: `story:kse-field-${config.id}`,
           style: this.style?.("textArea"),
           onChange: async (value: string) => {
-            const syncEnabled = await api.v1.storyStorage.get("kse-sync-style-an");
+            const syncEnabled =
+              await api.v1.storyStorage.get("kse-sync-style-an");
             if (syncEnabled) {
               await api.v1.an.set(value);
             }
@@ -339,11 +342,17 @@ export const TextField = defineComponent<
         api.v1.ui.updateParts([
           {
             id: toggleEditId,
-            style: this.style?.("standardButton", isEditing ? "hidden" : "visible"),
+            style: this.style?.(
+              "standardButton",
+              isEditing ? "hidden" : "visible",
+            ),
           },
           {
             id: toggleSaveId,
-            style: this.style?.("standardButton", isEditing ? "visible" : "hidden"),
+            style: this.style?.(
+              "standardButton",
+              isEditing ? "visible" : "hidden",
+            ),
           },
           {
             id: inputId,
@@ -351,7 +360,10 @@ export const TextField = defineComponent<
           },
           {
             id: textId,
-            style: this.style?.("textDisplay", isEditing ? "hidden" : "visible"),
+            style: this.style?.(
+              "textDisplay",
+              isEditing ? "hidden" : "visible",
+            ),
           },
         ]);
       },

@@ -19,6 +19,8 @@ import {
   generationRequested,
   fieldUpdated,
   dulfsItemAdded,
+  dulfsItemRemoved,
+  storyCleared,
 } from "./index";
 import {
   buildBrainstormStrategy,
@@ -28,7 +30,38 @@ import {
   buildStyleStrategy,
 } from "../utils/context-builder";
 import { IDS } from "../../ui/framework/ids";
-import { DulfsFieldID, FieldID } from "../../config/field-definitions";
+import {
+  DulfsFieldID,
+  FieldID,
+  FIELD_CONFIGS,
+} from "../../config/field-definitions";
+
+// Lorebook sync constants
+const SE_CATEGORY_PREFIX = "SE: ";
+
+// Helper: Find or create a category for a DULFS field
+async function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
+  const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
+  const name = `${SE_CATEGORY_PREFIX}${config?.label || fieldId}`;
+
+  const categories = await api.v1.lorebook.categories();
+  const existing = categories.find((c) => c.name === name);
+  if (existing) return existing.id;
+
+  return api.v1.lorebook.createCategory({
+    id: api.v1.uuid(),
+    name,
+    enabled: true,
+  });
+}
+
+// Helper: Find a category for a DULFS field (returns null if not found)
+async function findCategory(fieldId: DulfsFieldID): Promise<string | null> {
+  const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
+  const name = `${SE_CATEGORY_PREFIX}${config?.label || fieldId}`;
+  const categories = await api.v1.lorebook.categories();
+  return categories.find((c) => c.name === name)?.id || null;
+}
 
 export function registerEffects(store: Store<RootState>, genX: GenX) {
   const { subscribeEffect } = store;
@@ -203,7 +236,9 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         } else if (targetId === FieldID.Style) {
           strategy = await buildStyleStrategy(state);
         } else {
-          api.v1.log(`[effects] No generation strategy found for field: ${targetId}`);
+          api.v1.log(
+            `[effects] No generation strategy found for field: ${targetId}`,
+          );
           return;
         }
 
@@ -266,7 +301,9 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
                 ) {
                   const inputId = `input-${target.fieldId}`;
                   const storageKey = `kse-field-${target.fieldId}`;
-                  api.v1.ui.updateParts([{ id: inputId, value: accumulatedText }]);
+                  api.v1.ui.updateParts([
+                    { id: inputId, value: accumulatedText },
+                  ]);
                   api.v1.storyStorage.set(storageKey, accumulatedText);
                 } else {
                   // Standard fields stream to text display
@@ -302,12 +339,15 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
             // Trigger sync to Memory / Author's Note if enabled
             if (target.fieldId === FieldID.ATTG) {
-              const syncEnabled = await api.v1.storyStorage.get("kse-sync-attg-memory");
+              const syncEnabled = await api.v1.storyStorage.get(
+                "kse-sync-attg-memory",
+              );
               if (syncEnabled) {
                 await api.v1.memory.set(accumulatedText);
               }
             } else if (target.fieldId === FieldID.Style) {
-              const syncEnabled = await api.v1.storyStorage.get("kse-sync-style-an");
+              const syncEnabled =
+                await api.v1.storyStorage.get("kse-sync-style-an");
               if (syncEnabled) {
                 await api.v1.an.set(accumulatedText);
               }
@@ -451,6 +491,86 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         api.v1.storyStorage.set("kse-persist", persistData);
       } catch (e) {
         /* ignore */
+      }
+    },
+  );
+
+  // Lorebook Sync: Item Added
+  subscribeEffect(
+    (action) => action.type === dulfsItemAdded({} as any).type,
+    async (action) => {
+      const { fieldId, item } = action.payload;
+      const name = (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "";
+
+      const categoryId = await ensureCategory(fieldId);
+      await api.v1.lorebook.createEntry({
+        id: item.id,
+        category: categoryId,
+        displayName: String(name),
+        keys: String(name) ? [String(name)] : [],
+        enabled: true,
+      });
+    },
+  );
+
+  // Lorebook Sync: Item Removed
+  subscribeEffect(
+    (action) => action.type === dulfsItemRemoved({} as any).type,
+    async (action) => {
+      const { fieldId, itemId } = action.payload;
+
+      // Remove lorebook entry (same ID as item)
+      await api.v1.lorebook.removeEntry(itemId);
+
+      // Clean up storage
+      await api.v1.storyStorage.set(`dulfs-item-${itemId}`, null);
+
+      // Remove empty category
+      const categoryId = await findCategory(fieldId);
+      if (categoryId) {
+        const entries = await api.v1.lorebook.entries(categoryId);
+        if (entries.length === 0) {
+          await api.v1.lorebook.removeCategory(categoryId);
+        }
+      }
+    },
+  );
+
+  // Lorebook Sync & Storage Cleanup: Story Cleared
+  subscribeEffect(
+    (action) => action.type === storyCleared().type,
+    async () => {
+      // Clear lorebook entries and categories
+      const categories = await api.v1.lorebook.categories();
+      const seCategories = categories.filter((c) =>
+        c.name?.startsWith(SE_CATEGORY_PREFIX),
+      );
+
+      for (const category of seCategories) {
+        const entries = await api.v1.lorebook.entries(category.id);
+        for (const entry of entries) {
+          await api.v1.lorebook.removeEntry(entry.id);
+        }
+        await api.v1.lorebook.removeCategory(category.id);
+      }
+
+      // Clear storage keys used by storageKey-based UI components
+      // This prevents orphaned keys from polluting the user's story storage
+      const allKeys = await api.v1.storyStorage.list();
+      const patternsToRemove = [
+        /^kse-field-/, // ATTG, Style field content
+        /^kse-sync-/, // Sync checkbox states
+        /^kse-section-/, // Collapsible section states
+        /^draft-/, // Draft content (text fields, brainstorm messages)
+        /^dulfs-item-/, // DULFS item content
+        /^dulfs-summary-draft-/, // DULFS summary drafts
+        /^se-bs-input$/, // Brainstorm input
+      ];
+
+      for (const key of allKeys) {
+        if (patternsToRemove.some((pattern) => pattern.test(key))) {
+          await api.v1.storyStorage.remove(key);
+        }
       }
     },
   );

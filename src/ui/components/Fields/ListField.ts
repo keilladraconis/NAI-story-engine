@@ -237,11 +237,17 @@ export const ListField = defineComponent<
           },
           {
             id: summaryInputId,
-            style: this.style?.("summaryInput", isEditing ? "visible" : "hidden"),
+            style: this.style?.(
+              "summaryInput",
+              isEditing ? "visible" : "hidden",
+            ),
           },
           {
             id: summaryTextId,
-            style: this.style?.("summaryText", isEditing ? "hidden" : "visible"),
+            style: this.style?.(
+              "summaryText",
+              isEditing ? "hidden" : "visible",
+            ),
           },
         ]);
       },

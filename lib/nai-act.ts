@@ -48,8 +48,8 @@ export interface BindContext<S> {
 type ComponentId<P> = [unknown] extends [P]
   ? (props?: P) => string
   : [P] extends [void]
-  ? () => string
-  : (props: P) => string;
+    ? () => string
+    : (props: P) => string;
 
 // Define a broad Style type as the underlying API uses 'any'
 export type Style = Record<string, any>;
@@ -84,7 +84,9 @@ export function defineComponent<
     component.style = function (
       ...keys: (keyof St | undefined | false | null)[]
     ): Style {
-      return mergeStyles(...keys.map((k) => (k ? this.styles?.[k] : undefined)));
+      return mergeStyles(
+        ...keys.map((k) => (k ? this.styles?.[k] : undefined)),
+      );
     };
   }
   return component;

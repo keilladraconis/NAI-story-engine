@@ -109,7 +109,8 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     fieldType: "dulfs",
     listGenerationInstruction:
       "List only system/mechanic names. Focus on fundamental world rules.",
-    listExampleFormat: "- Aetheric Resonance\n- The Binding Laws\n- Chrono-Drift",
+    listExampleFormat:
+      "- Aetheric Resonance\n- The Binding Laws\n- Chrono-Drift",
     generationInstruction:
       "Describe the key universe system, law, or technological principle, its mechanics/terms, and its broader impact on the world.",
     exampleFormat:
@@ -126,8 +127,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     layout: "list",
     fieldType: "dulfs",
     listGenerationInstruction: "List only faction/organization names.",
-    listExampleFormat:
-      "- The Iron Pact\n- House Meridian\n- The Unbound",
+    listExampleFormat: "- The Iron Pact\n- House Meridian\n- The Unbound",
     generationInstruction:
       "Describe the faction's core ideology, history, and its role in the world's power dynamics.",
     exampleFormat:

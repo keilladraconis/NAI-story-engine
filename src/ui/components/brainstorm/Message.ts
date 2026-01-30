@@ -151,10 +151,16 @@ export const Message = defineComponent({
 
     return row({
       id: ids.ROOT,
-      style: this.style?.("rootRow", isUser ? "rootRowUser" : "rootRowAssistant"),
+      style: this.style?.(
+        "rootRow",
+        isUser ? "rootRowUser" : "rootRowAssistant",
+      ),
       content: [
         column({
-          style: this.style?.("bubble", isUser ? "bubbleUser" : "bubbleAssistant"),
+          style: this.style?.(
+            "bubble",
+            isUser ? "bubbleUser" : "bubbleAssistant",
+          ),
           content: [viewContainer, editContainer],
         }),
       ],
@@ -187,11 +193,17 @@ export const Message = defineComponent({
         api.v1.ui.updateParts([
           {
             id: ids.VIEW,
-            style: this.style?.("viewContainer", isEditing ? "hidden" : "visible"),
+            style: this.style?.(
+              "viewContainer",
+              isEditing ? "hidden" : "visible",
+            ),
           },
           {
             id: ids.EDIT,
-            style: this.style?.("editContainer", isEditing ? "visible" : "hidden"),
+            style: this.style?.(
+              "editContainer",
+              isEditing ? "visible" : "hidden",
+            ),
           },
         ]);
       },
