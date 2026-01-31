@@ -138,7 +138,17 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
         const now = Date.now();
         const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
 
-        // Could update a tooltip or similar, but for icon we just maintain wait state
+        // Update button to show countdown number (no icon)
+        api.v1.ui.updateParts([
+          {
+            id,
+            text: `${remaining}`,
+            iconId: undefined,
+            style: STYLES.wait,
+            callback: () => events.cancelActive(props),
+          },
+        ]);
+
         if (remaining > 0) {
           api.v1.timers
             .setTimeout(() => updateTimer(endTime), 1000)
@@ -214,6 +224,7 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
                   {
                     id,
                     iconId: "book",
+                    text: undefined, // Clear text when showing icon
                     style: hasContent ? STYLES.idleWithContent : STYLES.idle,
                     callback: () => events.generate(props),
                   },
@@ -257,27 +268,48 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
               callback = () => events.continue(props);
               break;
             case "wait":
-              iconId = "clock";
+              // Wait mode is handled by updateTimer - it shows countdown number
+              // Just set callback here, timer will update the visual
               style = STYLES.wait;
               callback = () => events.cancelActive(props);
               break;
           }
 
           // Update the button immediately (no async before this!)
-          api.v1.ui.updateParts([
-            {
-              id,
-              iconId,
-              style,
-              callback,
-            },
-          ]);
+          // For wait mode, skip this - the timer will handle the update
+          if (mode !== "wait") {
+            api.v1.ui.updateParts([
+              {
+                id,
+                iconId,
+                text: undefined, // Clear text when showing icon (exiting wait mode)
+                style,
+                callback,
+              },
+            ]);
+          }
 
           // Handle timer for wait state
           if (mode === "wait") {
             if (!isTimerActive) {
               isTimerActive = true;
-              updateTimer(budgetWaitEndTime || Date.now() + 60000);
+              const endTime = budgetWaitEndTime || Date.now() + 60000;
+              // Immediate update with initial countdown value
+              const initialRemaining = Math.max(
+                0,
+                Math.ceil((endTime - Date.now()) / 1000),
+              );
+              api.v1.ui.updateParts([
+                {
+                  id,
+                  text: `${initialRemaining}`,
+                  iconId: undefined,
+                  style: STYLES.wait,
+                  callback: () => events.cancelActive(props),
+                },
+              ]);
+              // Start the countdown timer
+              updateTimer(endTime);
             }
           } else {
             isTimerActive = false;

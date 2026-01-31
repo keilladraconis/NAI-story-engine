@@ -25,6 +25,8 @@ import {
   lorebookContentGenerationRequested,
   lorebookKeysGenerationRequested,
   lorebookItemGenerationRequested,
+  requestCancelled,
+  cancelledRequestCleared,
 } from "./index";
 import {
   createLorebookContentFactory,
@@ -313,6 +315,19 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         );
       }
 
+      // For lorebook generation, capture original content for rollback on cancellation
+      let originalLorebookContent = "";
+      let originalLorebookKeys = "";
+      if (target.type === "lorebookContent" || target.type === "lorebookKeys") {
+        const entry = await api.v1.lorebook.entry(target.entryId);
+        if (entry) {
+          originalLorebookContent = entry.text || "";
+          originalLorebookKeys = entry.keys?.join(", ") || "";
+        }
+      }
+
+      let generationSucceeded = false;
+
       try {
         await genX.generate(
           messagesOrFactory,
@@ -344,15 +359,23 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
                   api.v1.ui.updateParts([{ id: uiId, text: accumulatedText }]);
                 }
               } else if (target.type === "lorebookContent") {
-                // Stream directly to content area
-                api.v1.ui.updateParts([
-                  { id: IDS.LOREBOOK.CONTENT_TEXT, text: accumulatedText },
-                ]);
+                // Stream to storageKey - UI auto-updates via binding
+                const currentSelected = getState().ui.lorebook.selectedEntryId;
+                if (target.entryId === currentSelected) {
+                  api.v1.storyStorage.set(
+                    IDS.LOREBOOK.CONTENT_DRAFT_RAW,
+                    accumulatedText,
+                  );
+                }
               } else if (target.type === "lorebookKeys") {
-                // Stream directly to keys area
-                api.v1.ui.updateParts([
-                  { id: IDS.LOREBOOK.KEYS_TEXT, text: accumulatedText },
-                ]);
+                // Stream to storageKey - UI auto-updates via binding
+                const currentSelected = getState().ui.lorebook.selectedEntryId;
+                if (target.entryId === currentSelected) {
+                  api.v1.storyStorage.set(
+                    IDS.LOREBOOK.KEYS_DRAFT_RAW,
+                    accumulatedText,
+                  );
+                }
               }
               // List streaming is not displayed (parsed at the end)
             }
@@ -360,83 +383,105 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           "background",
           await api.v1.createCancellationSignal(),
         );
+
+        // Generation finished (but may have been cancelled)
+        generationSucceeded = true;
       } catch (error: any) {
-        api.v1.log("Generation failed:", error);
-      } finally {
-        // Sync to Store
-        if (target.type === "brainstorm" && accumulatedText) {
+        api.v1.log(`[effects] Generation error for ${requestId}:`, error);
+        generationSucceeded = false;
+      }
+
+      // Check if this request was cancelled (user clicked cancel button)
+      const wasCancelled =
+        getState().runtime.cancelledRequestIds.includes(requestId);
+      if (wasCancelled) {
+        api.v1.log(`[effects] Generation was cancelled for ${requestId}`);
+        generationSucceeded = false;
+        // Clear the cancelled flag
+        dispatch(cancelledRequestCleared({ requestId }));
+      } else if (generationSucceeded) {
+        api.v1.log(
+          `[effects] Generation completed successfully for ${requestId}`,
+        );
+      }
+
+      // Handle completion based on success/failure
+      if (target.type === "brainstorm" && accumulatedText) {
+        dispatch(
+          messageUpdated({
+            id: target.messageId,
+            content: accumulatedText,
+          }),
+        );
+      } else if (target.type === "field" && accumulatedText) {
+        // Plain text fields (ATTG, Style) save to storyStorage
+        if (
+          target.fieldId === FieldID.ATTG ||
+          target.fieldId === FieldID.Style
+        ) {
+          const storageKey = `kse-field-${target.fieldId}`;
+          await api.v1.storyStorage.set(storageKey, accumulatedText);
+
+          // Trigger sync to Memory / Author's Note if enabled
+          if (target.fieldId === FieldID.ATTG) {
+            const syncEnabled = await api.v1.storyStorage.get(
+              "kse-sync-attg-memory",
+            );
+            if (syncEnabled) {
+              await api.v1.memory.set(accumulatedText);
+            }
+          } else if (target.fieldId === FieldID.Style) {
+            const syncEnabled =
+              await api.v1.storyStorage.get("kse-sync-style-an");
+            if (syncEnabled) {
+              await api.v1.an.set(accumulatedText);
+            }
+          }
+        } else {
+          // Standard fields dispatch to state
           dispatch(
-            messageUpdated({
-              id: target.messageId,
+            fieldUpdated({
+              fieldId: target.fieldId,
               content: accumulatedText,
             }),
           );
-        } else if (target.type === "field" && accumulatedText) {
-          // Plain text fields (ATTG, Style) save to storyStorage
-          if (
-            target.fieldId === FieldID.ATTG ||
-            target.fieldId === FieldID.Style
-          ) {
-            const storageKey = `kse-field-${target.fieldId}`;
-            await api.v1.storyStorage.set(storageKey, accumulatedText);
+        }
+      } else if (target.type === "list" && accumulatedText) {
+        // Parse generated list and create DULFS items (names only)
+        const lines = accumulatedText.split("\n").filter((l) => l.trim());
+        for (const line of lines) {
+          // Strip bullets, numbers, dashes, and extract clean name
+          const match = line.match(/^[\s\-*+•\d.)\]]*(.+)$/);
+          if (match) {
+            const name = match[1]
+              .trim()
+              .replace(/^[:\-–—]\s*/, "") // Strip leading colons/dashes
+              .replace(/[:\-–—].*$/, "") // Strip trailing descriptions
+              .trim();
 
-            // Trigger sync to Memory / Author's Note if enabled
-            if (target.fieldId === FieldID.ATTG) {
-              const syncEnabled = await api.v1.storyStorage.get(
-                "kse-sync-attg-memory",
-              );
-              if (syncEnabled) {
-                await api.v1.memory.set(accumulatedText);
-              }
-            } else if (target.fieldId === FieldID.Style) {
-              const syncEnabled =
-                await api.v1.storyStorage.get("kse-sync-style-an");
-              if (syncEnabled) {
-                await api.v1.an.set(accumulatedText);
-              }
-            }
-          } else {
-            // Standard fields dispatch to state
-            dispatch(
-              fieldUpdated({
-                fieldId: target.fieldId,
-                content: accumulatedText,
-              }),
-            );
-          }
-        } else if (target.type === "list" && accumulatedText) {
-          // Parse generated list and create DULFS items (names only)
-          const lines = accumulatedText.split("\n").filter((l) => l.trim());
-          for (const line of lines) {
-            // Strip bullets, numbers, dashes, and extract clean name
-            const match = line.match(/^[\s\-*+•\d.)\]]*(.+)$/);
-            if (match) {
-              const name = match[1]
-                .trim()
-                .replace(/^[:\-–—]\s*/, "") // Strip leading colons/dashes
-                .replace(/[:\-–—].*$/, "") // Strip trailing descriptions
-                .trim();
+            if (name) {
+              const itemId = api.v1.uuid();
 
-              if (name) {
-                const itemId = api.v1.uuid();
+              // Store only the name in storyStorage
+              await api.v1.storyStorage.set(`dulfs-item-${itemId}`, name);
 
-                // Store only the name in storyStorage
-                await api.v1.storyStorage.set(`dulfs-item-${itemId}`, name);
-
-                // Dispatch minimal item
-                dispatch(
-                  dulfsItemAdded({
+              // Dispatch minimal item
+              dispatch(
+                dulfsItemAdded({
+                  fieldId: target.fieldId as DulfsFieldID,
+                  item: {
+                    id: itemId,
                     fieldId: target.fieldId as DulfsFieldID,
-                    item: {
-                      id: itemId,
-                      fieldId: target.fieldId as DulfsFieldID,
-                    },
-                  }),
-                );
-              }
+                  },
+                }),
+              );
             }
           }
-        } else if (target.type === "lorebookContent" && accumulatedText) {
+        }
+      } else if (target.type === "lorebookContent") {
+        const currentSelected = getState().ui.lorebook.selectedEntryId;
+
+        if (generationSucceeded && accumulatedText) {
           // Clean output: strip leading delimiter if present
           let cleanedContent = accumulatedText;
           if (cleanedContent.startsWith("----")) {
@@ -448,11 +493,28 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
             text: cleanedContent,
           });
 
-          // Update UI with cleaned content
-          api.v1.ui.updateParts([
-            { id: IDS.LOREBOOK.CONTENT_TEXT, text: cleanedContent },
-          ]);
-        } else if (target.type === "lorebookKeys" && accumulatedText) {
+          // Update draft with cleaned content if viewing this entry
+          // (storageKey binding auto-updates UI)
+          if (target.entryId === currentSelected) {
+            await api.v1.storyStorage.set(
+              IDS.LOREBOOK.CONTENT_DRAFT_RAW,
+              cleanedContent,
+            );
+          }
+        } else {
+          // Cancelled or failed: restore draft to original content if viewing this entry
+          // (storageKey binding auto-updates UI)
+          if (target.entryId === currentSelected) {
+            await api.v1.storyStorage.set(
+              IDS.LOREBOOK.CONTENT_DRAFT_RAW,
+              originalLorebookContent,
+            );
+          }
+        }
+      } else if (target.type === "lorebookKeys") {
+        const currentSelected = getState().ui.lorebook.selectedEntryId;
+
+        if (generationSucceeded && accumulatedText) {
           // Parse comma-separated keys
           const keys = accumulatedText
             .split(",")
@@ -462,10 +524,21 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           // Update lorebook entry with generated keys
           await api.v1.lorebook.updateEntry(target.entryId, { keys });
 
-          // Update UI with parsed keys
-          api.v1.ui.updateParts([
-            { id: IDS.LOREBOOK.KEYS_TEXT, text: keys.join(", ") },
-          ]);
+          // Update draft with parsed keys if viewing this entry
+          // (storageKey binding auto-updates UI)
+          if (target.entryId === currentSelected) {
+            const keysStr = keys.join(", ");
+            await api.v1.storyStorage.set(IDS.LOREBOOK.KEYS_DRAFT_RAW, keysStr);
+          }
+        } else {
+          // Cancelled or failed: restore draft to original keys if viewing this entry
+          // (storageKey binding auto-updates UI)
+          if (target.entryId === currentSelected) {
+            await api.v1.storyStorage.set(
+              IDS.LOREBOOK.KEYS_DRAFT_RAW,
+              originalLorebookKeys,
+            );
+          }
         }
       }
     },
@@ -512,8 +585,12 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   // Intent: Specific Cancellation
   subscribeEffect(
     (action) => action.type === uiCancelRequest({} as any).type,
-    (action) => {
+    (action, { dispatch }) => {
       const { requestId } = action.payload;
+
+      // Mark as cancelled in state (for detection after generation completes)
+      dispatch(requestCancelled({ requestId }));
+
       // Try to cancel if queued
       genX.cancelQueued(requestId);
       // If it's the current one?
@@ -524,10 +601,16 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Cancellation
+  // Intent: Cancellation (global - cancels current task)
   subscribeEffect(
     (action) => action.type === uiRequestCancellation().type,
-    () => {
+    (_action, { dispatch, getState }) => {
+      // Mark the active request as cancelled
+      const activeRequest = getState().runtime.activeRequest;
+      if (activeRequest) {
+        dispatch(requestCancelled({ requestId: activeRequest.id }));
+      }
+
       genX.cancelCurrent();
     },
   );

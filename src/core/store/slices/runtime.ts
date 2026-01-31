@@ -12,6 +12,7 @@ export const initialRuntimeState: RuntimeState = {
     status: "idle",
     queueLength: 0,
   },
+  cancelledRequestIds: [],
 };
 
 export const runtimeSlice = createSlice({
@@ -69,6 +70,20 @@ export const runtimeSlice = createSlice({
       ...state,
       budgetTimeRemaining: payload.timeRemaining,
     }),
+
+    // Mark a request as cancelled (for detection after generation completes)
+    requestCancelled: (state, payload: { requestId: string }) => ({
+      ...state,
+      cancelledRequestIds: [...state.cancelledRequestIds, payload.requestId],
+    }),
+
+    // Clear a cancelled request ID (after handling)
+    cancelledRequestCleared: (state, payload: { requestId: string }) => ({
+      ...state,
+      cancelledRequestIds: state.cancelledRequestIds.filter(
+        (id) => id !== payload.requestId,
+      ),
+    }),
   },
 });
 
@@ -79,4 +94,6 @@ export const {
   requestQueued,
   requestsSynced,
   budgetUpdated,
+  requestCancelled,
+  cancelledRequestCleared,
 } = runtimeSlice.actions;

@@ -82,6 +82,7 @@ export interface RuntimeState {
   status: GenerationStatus;
   genx: GenerationState;
   budgetTimeRemaining: number;
+  cancelledRequestIds: string[];
 }
 
 export interface RootState {

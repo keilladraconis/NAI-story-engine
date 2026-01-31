@@ -1,11 +1,6 @@
 import { BindContext, defineComponent } from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
-import { GenerationButton } from "../GenerationButton";
-import {
-  lorebookContentGenerationRequested,
-  lorebookKeysGenerationRequested,
-} from "../../../core/store";
 
 const SE_CATEGORY_PREFIX = "SE: ";
 
@@ -20,26 +15,9 @@ export const LorebookPanelContent = defineComponent({
   },
 
   onMount(_props: void, ctx: BindContext<RootState>) {
-    const { useSelector, mount } = ctx;
+    const { useSelector } = ctx;
 
-    // Mount generation buttons with requestIds for independent state tracking
-    mount(GenerationButton, {
-      id: IDS.LOREBOOK.GEN_CONTENT_BTN,
-      requestId: "lb-content-req",
-      label: "Generate Lorebook",
-      generateAction: lorebookContentGenerationRequested({
-        requestId: "lb-content-req",
-      }),
-    });
-
-    mount(GenerationButton, {
-      id: IDS.LOREBOOK.GEN_KEYS_BTN,
-      requestId: "lb-keys-req",
-      label: "Generate Keys",
-      generateAction: lorebookKeysGenerationRequested({
-        requestId: "lb-keys-req",
-      }),
-    });
+    let currentEntryId: string | null = null;
 
     // Subscribe to lorebook state changes
     useSelector(
@@ -51,6 +29,8 @@ export const LorebookPanelContent = defineComponent({
           { id: IDS.LOREBOOK.NOT_MANAGED, style: { display: "none" } },
           { id: IDS.LOREBOOK.MAIN_CONTENT, style: { display: "none" } },
         ]);
+
+        currentEntryId = selectedEntryId;
 
         // Nothing selected
         if (!selectedEntryId) {
@@ -87,16 +67,52 @@ export const LorebookPanelContent = defineComponent({
           return;
         }
 
-        // Show main content
+        // Show main content with current values
         const displayName = entry.displayName || "Unnamed Entry";
-        const currentContent = entry.text || "(No content yet)";
-        const currentKeys = entry.keys?.join(", ") || "(No keys)";
+        const currentContent = entry.text || "";
+        const currentKeys = entry.keys?.join(", ") || "";
 
+        // Set draft storage keys to current entry content
+        // This populates the storageKey-bound inputs and enables streaming
+        await api.v1.storyStorage.set(
+          IDS.LOREBOOK.CONTENT_DRAFT_RAW,
+          currentContent,
+        );
+        await api.v1.storyStorage.set(IDS.LOREBOOK.KEYS_DRAFT_RAW, currentKeys);
+
+        // Show main content
+        // Note: Generation buttons are managed by LorebookGenerationButton components
+        // which self-update based on selectedEntryId changes
         api.v1.ui.updateParts([
           { id: IDS.LOREBOOK.MAIN_CONTENT, style: { display: "flex" } },
           { id: IDS.LOREBOOK.ENTRY_NAME, text: displayName },
-          { id: IDS.LOREBOOK.CONTENT_TEXT, text: currentContent },
-          { id: IDS.LOREBOOK.KEYS_TEXT, text: currentKeys },
+        ]);
+
+        // Set up onChange handlers for direct lorebook updates
+        // When user edits, save to lorebook immediately
+        api.v1.ui.updateParts([
+          {
+            id: IDS.LOREBOOK.CONTENT_INPUT,
+            onChange: async (value: string) => {
+              if (currentEntryId) {
+                await api.v1.lorebook.updateEntry(currentEntryId, {
+                  text: value,
+                });
+              }
+            },
+          },
+          {
+            id: IDS.LOREBOOK.KEYS_INPUT,
+            onChange: async (value: string) => {
+              if (currentEntryId) {
+                const keys = value
+                  .split(",")
+                  .map((k) => k.trim())
+                  .filter((k) => k.length > 0);
+                await api.v1.lorebook.updateEntry(currentEntryId, { keys });
+              }
+            },
+          },
         ]);
       },
     );

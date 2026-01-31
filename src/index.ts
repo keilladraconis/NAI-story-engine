@@ -3,8 +3,6 @@ import {
   brainstormLoaded,
   storyLoaded,
   lorebookEntrySelected,
-  lorebookContentGenerationRequested,
-  lorebookKeysGenerationRequested,
 } from "./core/store";
 import { registerEffects } from "./core/store/effects";
 import { GenX } from "../lib/gen-x";
@@ -23,9 +21,9 @@ import { FieldList } from "./ui/components/Sidebar/FieldList";
 
 // Lorebook components
 import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelContent";
-import { GenerationButton } from "./ui/components/GenerationButton";
+import { LorebookGenerationButton } from "./ui/components/Lorebook/LorebookGenerationButton";
 
-const { column, text, row } = api.v1.ui.part;
+const { column, text, row, textInput, multilineTextInput } = api.v1.ui.part;
 const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
 
 (async () => {
@@ -137,55 +135,54 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
                     "font-size": "16px",
                   },
                 }),
-                // Generation buttons with requestIds for independent state tracking
+                // Generation buttons - managed by LorebookGenerationButton components
+                // which derive requestIds dynamically from selectedEntryId
                 row({
                   style: { gap: "8px", "margin-top": "4px" },
                   content: [
-                    GenerationButton.describe({
+                    LorebookGenerationButton.describe({
                       id: IDS.LOREBOOK.GEN_CONTENT_BTN,
-                      requestId: "lb-content-req",
-                      label: "Generate Lorebook",
-                      generateAction: lorebookContentGenerationRequested({
-                        requestId: "lb-content-req",
-                      }),
+                      type: "content",
+                      label: "Generate Content",
                     }),
-                    GenerationButton.describe({
+                    LorebookGenerationButton.describe({
                       id: IDS.LOREBOOK.GEN_KEYS_BTN,
-                      requestId: "lb-keys-req",
+                      type: "keys",
                       label: "Generate Keys",
-                      generateAction: lorebookKeysGenerationRequested({
-                        requestId: "lb-keys-req",
-                      }),
                     }),
                   ],
                 }),
-                // Content area (shows current content, replaced during streaming)
-                text({
-                  id: IDS.LOREBOOK.CONTENT_TEXT,
-                  text: "",
+                // Content area (editable - multiline textarea, storageKey for streaming)
+                multilineTextInput({
+                  id: IDS.LOREBOOK.CONTENT_INPUT,
+                  initialValue: "",
+                  placeholder: "Lorebook content...",
+                  storageKey: IDS.LOREBOOK.CONTENT_DRAFT_KEY,
                   style: {
                     "font-size": "13px",
-                    "white-space": "pre-wrap",
-                    "line-height": "1.4",
+                    "min-height": "120px",
                   },
                 }),
-                // Keys row
+                // Keys input (editable)
                 row({
-                  style: { gap: "4px", "flex-wrap": "wrap" },
+                  style: { gap: "8px", "align-items": "center" },
                   content: [
                     text({
                       text: "Keys:",
                       style: {
                         "font-size": "12px",
                         color: "rgba(255,255,255,0.6)",
+                        "white-space": "nowrap",
                       },
                     }),
-                    text({
-                      id: IDS.LOREBOOK.KEYS_TEXT,
-                      text: "",
+                    textInput({
+                      id: IDS.LOREBOOK.KEYS_INPUT,
+                      initialValue: "",
+                      placeholder: "comma, separated, keys",
+                      storageKey: IDS.LOREBOOK.KEYS_DRAFT_KEY,
                       style: {
                         "font-size": "12px",
-                        color: "rgba(255,255,255,0.8)",
+                        flex: "1",
                       },
                     }),
                   ],
@@ -220,6 +217,26 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
     mount(SettingField, {}, store);
     mount(FieldList, {}, store);
     mount(LorebookPanelContent, undefined, store);
+
+    // Mount Lorebook generation buttons (they self-manage based on selectedEntryId)
+    mount(
+      LorebookGenerationButton,
+      {
+        id: IDS.LOREBOOK.GEN_CONTENT_BTN,
+        type: "content" as const,
+        label: "Generate Content",
+      },
+      store,
+    );
+    mount(
+      LorebookGenerationButton,
+      {
+        id: IDS.LOREBOOK.GEN_KEYS_BTN,
+        type: "keys" as const,
+        label: "Generate Keys",
+      },
+      store,
+    );
 
     api.v1.log("Story Engine Initialized.");
   } catch (e) {
