@@ -77,7 +77,11 @@ export const uiSlice = createSlice({
     // Item-level lorebook generation (queues both content + keys)
     lorebookItemGenerationRequested: (
       state,
-      _payload: { entryId: string; contentRequestId: string; keysRequestId: string },
+      _payload: {
+        entryId: string;
+        contentRequestId: string;
+        keysRequestId: string;
+      },
     ) => state,
   },
 });

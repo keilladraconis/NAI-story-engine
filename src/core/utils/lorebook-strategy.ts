@@ -162,9 +162,7 @@ export const createLorebookContentFactory = (
  * CRITICAL: This fetches entry.text at execution time, so it gets fresh content
  * from any preceding content generation.
  */
-export const createLorebookKeysFactory = (
-  entryId: string,
-): MessageFactory => {
+export const createLorebookKeysFactory = (entryId: string): MessageFactory => {
   return async () => {
     // Fetch FRESH entry.text at execution time
     const entry = await api.v1.lorebook.entry(entryId);

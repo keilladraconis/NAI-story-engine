@@ -684,8 +684,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: Lorebook Keys Generation (CRITICAL: uses factory to get fresh entry.text)
   subscribeEffect(
-    (action) =>
-      action.type === lorebookKeysGenerationRequested({} as any).type,
+    (action) => action.type === lorebookKeysGenerationRequested({} as any).type,
     async (action, { dispatch, getState }) => {
       const { requestId } = action.payload;
       const { selectedEntryId } = getState().ui.lorebook;
@@ -712,8 +711,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: Lorebook Item Generation (queues both content + keys from DULFS list)
   subscribeEffect(
-    (action) =>
-      action.type === lorebookItemGenerationRequested({} as any).type,
+    (action) => action.type === lorebookItemGenerationRequested({} as any).type,
     async (action, { dispatch, getState }) => {
       const { entryId, contentRequestId, keysRequestId } = action.payload;
 

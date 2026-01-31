@@ -97,29 +97,32 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
     onMount(props, { dispatch, useSelector }) {
       const { id, entryId } = props;
 
-      // Request IDs for this item's generations
-      const contentRequestId = `lb-item-${entryId}-content`;
-      const keysRequestId = `lb-item-${entryId}-keys`;
-
       let hasContent = false;
       let timerId: any = null;
       let isTimerActive = false;
+      let lastMode: "idle" | "queued" | "cancel" | "continue" | "wait" | null =
+        null;
 
       // Attach event handlers
       events.attach({
         generate(p) {
+          // Derive request IDs from props
+          const contentReqId = `lb-item-${p.entryId}-content`;
+          const keysReqId = `lb-item-${p.entryId}-keys`;
           dispatch(
             lorebookItemGenerationRequested({
               entryId: p.entryId,
-              contentRequestId,
-              keysRequestId,
+              contentRequestId: contentReqId,
+              keysRequestId: keysReqId,
             }),
           );
         },
-        cancel(_p) {
-          // Cancel queued request
-          dispatch(uiCancelRequest({ requestId: contentRequestId }));
-          dispatch(uiCancelRequest({ requestId: keysRequestId }));
+        cancel(p) {
+          // Cancel queued request - derive IDs from props
+          const contentReqId = `lb-item-${p.entryId}-content`;
+          const keysReqId = `lb-item-${p.entryId}-keys`;
+          dispatch(uiCancelRequest({ requestId: contentReqId }));
+          dispatch(uiCancelRequest({ requestId: keysReqId }));
         },
         cancelActive(_p) {
           dispatch(uiRequestCancellation());
@@ -163,6 +166,7 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
       checkContent();
 
       // Reactive state tracking
+      // Return raw state values from selector, do instance-specific comparison in callback
       useSelector(
         (state) => ({
           activeRequestId: state.runtime.activeRequest?.id,
@@ -170,32 +174,28 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
           genxStatus: state.runtime.genx.status,
           budgetWaitEndTime: state.runtime.genx.budgetWaitEndTime,
         }),
-        async (slice) => {
+        (slice) => {
           const { activeRequestId, queueIds, genxStatus, budgetWaitEndTime } =
             slice;
 
-          // Determine task status for this item's requests
-          // We track the content request primarily, but also check keys
-          let taskStatus: "queued" | "processing" | "not_found" = "not_found";
+          // Derive request IDs from props (not closure variables)
+          const contentRequestId = `lb-item-${entryId}-content`;
+          const keysRequestId = `lb-item-${entryId}-keys`;
 
-          if (
+          // Instance-specific comparison in callback (like GenerationButton)
+          const isProcessing =
             activeRequestId === contentRequestId ||
-            activeRequestId === keysRequestId
-          ) {
-            taskStatus = "processing";
-          } else if (
+            activeRequestId === keysRequestId;
+          const isQueued =
             queueIds.includes(contentRequestId) ||
-            queueIds.includes(keysRequestId)
-          ) {
-            taskStatus = "queued";
-          }
+            queueIds.includes(keysRequestId);
 
           // Determine button mode based on task status & GenX status
           let mode: "idle" | "queued" | "cancel" | "continue" | "wait" = "idle";
 
-          if (taskStatus === "queued") {
+          if (isQueued) {
             mode = "queued";
-          } else if (taskStatus === "processing") {
+          } else if (isProcessing) {
             if (genxStatus === "waiting_for_user") {
               mode = "continue";
             } else if (genxStatus === "waiting_for_budget") {
@@ -203,11 +203,32 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
             } else {
               mode = "cancel";
             }
-          } else {
-            mode = "idle";
-            // Refresh content check when returning to idle
-            await checkContent();
           }
+
+          // For idle mode, always verify content state (handles list re-renders)
+          if (mode === "idle") {
+            checkContent().then(() => {
+              // Only update if we're still in idle mode
+              if (lastMode === "idle") {
+                api.v1.ui.updateParts([
+                  {
+                    id,
+                    iconId: "book",
+                    style: hasContent ? STYLES.idleWithContent : STYLES.idle,
+                    callback: () => events.generate(props),
+                  },
+                ]);
+              }
+            });
+
+            // For idle specifically, skip immediate update if mode unchanged
+            // (the async checkContent will handle the update)
+            if (mode === lastMode) {
+              return;
+            }
+          }
+
+          lastMode = mode;
 
           // Determine icon and style based on mode
           let iconId = "book";
@@ -242,7 +263,7 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
               break;
           }
 
-          // Update the button
+          // Update the button immediately (no async before this!)
           api.v1.ui.updateParts([
             {
               id,
