@@ -1,4 +1,4 @@
-import { GenerationState } from "../../../lib/gen-x";
+import { GenerationState, MessageFactory } from "../../../lib/gen-x";
 
 import { DulfsFieldID } from "../../config/field-definitions";
 
@@ -32,12 +32,18 @@ export interface BrainstormState {
   editingMessageId: string | null;
 }
 
+export interface LorebookUIState {
+  selectedEntryId: string | null;
+  selectedCategoryId: string | null;
+}
+
 export interface UIState {
   editModes: Record<string, boolean>;
   inputs: Record<string, string>;
   brainstorm: {
     input: string;
   };
+  lorebook: LorebookUIState;
 }
 
 export type GenerationStatus =
@@ -49,19 +55,22 @@ export type GenerationStatus =
 
 export interface GenerationRequest {
   id: string;
-  type: "field" | "list" | "brainstorm";
+  type: "field" | "list" | "brainstorm" | "lorebookContent" | "lorebookKeys";
   targetId: string;
   prompt?: string;
 }
 
 export interface GenerationStrategy {
   requestId: string;
-  messages: any[]; // TODO: Define Message type properly
-  params: any; // TODO: Define Params
+  messages?: any[]; // Optional if using messageFactory
+  messageFactory?: MessageFactory; // JIT strategy builder
+  params?: any; // Optional if provided by factory
   target:
     | { type: "brainstorm"; messageId: string }
     | { type: "field"; fieldId: string }
-    | { type: "list"; fieldId: string };
+    | { type: "list"; fieldId: string }
+    | { type: "lorebookContent"; entryId: string }
+    | { type: "lorebookKeys"; entryId: string };
   prefixBehavior: "keep" | "trim";
   assistantPrefill?: string;
 }

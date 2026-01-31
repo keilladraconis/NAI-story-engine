@@ -30,7 +30,15 @@ export const runtimeSlice = createSlice({
     // Intent (handled by Effects)
     // intentRequestGeneration moved to uiSlice as uiRequestGeneration
 
+    // Intent (triggers effect to build strategy)
     generationRequested: (state, request: GenerationRequest) => ({
+      ...state,
+      queue: [...state.queue, request],
+      status: state.status === "idle" ? "queued" : state.status,
+    }),
+
+    // Just adds to queue (no effect, for when strategy is already built)
+    requestQueued: (state, request: GenerationRequest) => ({
       ...state,
       queue: [...state.queue, request],
       status: state.status === "idle" ? "queued" : state.status,
@@ -68,6 +76,7 @@ export const {
   stateUpdated,
   segaToggled,
   generationRequested,
+  requestQueued,
   requestsSynced,
   budgetUpdated,
 } = runtimeSlice.actions;

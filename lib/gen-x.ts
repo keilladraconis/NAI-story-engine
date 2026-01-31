@@ -23,9 +23,16 @@ export interface GenerationState {
   budgetWaitEndTime?: number;
 }
 
+// Message factory for JIT (just-in-time) strategy building
+export type MessageFactory = () => Promise<{
+  messages: Message[];
+  params?: Partial<GenerationParams>;
+}>;
+
 interface GenerationTask {
   id: string;
-  messages: Message[];
+  messages: Message[] | null; // null if using factory
+  messageFactory?: MessageFactory;
   params: GenerationParams & {
     minTokens?: number;
     maxRetries?: number;
@@ -70,9 +77,12 @@ export class GenX {
   /**
    * Queue a generation request.
    * Mirrors api.v1.generate parameters.
+   *
+   * When `messages` is a MessageFactory function, it will be called at execution
+   * time (when the job is picked off the queue), enabling JIT strategy building.
    */
   public generate(
-    messages: Message[],
+    messages: Message[] | MessageFactory,
     params: GenerationParams & {
       minTokens?: number;
       maxRetries?: number;
@@ -83,9 +93,12 @@ export class GenX {
     signal?: CancellationSignal,
   ): Promise<GenerationResponse> {
     return new Promise((resolve, reject) => {
+      const isFactory = typeof messages === "function";
+
       const task: GenerationTask = {
         id: params.taskId || api.v1.uuid(),
-        messages,
+        messages: isFactory ? null : (messages as Message[]),
+        messageFactory: isFactory ? (messages as MessageFactory) : undefined,
         params,
         callback,
         behaviour,
@@ -204,8 +217,31 @@ export class GenX {
   }
 
   private async executeTask(task: GenerationTask): Promise<void> {
-    const { messages, params, callback, behaviour, signal, resolve, reject } =
-      task;
+    let { messages, params } = task;
+    const { callback, behaviour, signal, resolve, reject } = task;
+
+    // JIT: Resolve factory at execution time (when job is picked off queue)
+    if (!messages && task.messageFactory) {
+      try {
+        const resolved = await task.messageFactory();
+        messages = resolved.messages;
+        if (resolved.params) {
+          params = { ...params, ...resolved.params };
+        }
+      } catch (e: any) {
+        this.updateState({ status: "failed", error: e.message || String(e) });
+        reject(e);
+        return;
+      }
+    }
+
+    if (!messages) {
+      const err = "No messages provided for generation";
+      this.updateState({ status: "failed", error: err });
+      reject(err);
+      return;
+    }
+
     const { minTokens, maxRetries, taskId, ...apiParams } = params;
     const retryLimit = maxRetries ?? 5;
     let attempts = 0;

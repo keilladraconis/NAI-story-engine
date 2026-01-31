@@ -1,0 +1,203 @@
+import { RootState, GenerationStrategy } from "../store/types";
+import { MessageFactory } from "../../../lib/gen-x";
+import { FieldID } from "../../config/field-definitions";
+
+// Category-to-template mapping
+const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
+  "SE: Dramatis Personae": "lorebook_template_character",
+  "SE: Universe Systems": "lorebook_template_system",
+  "SE: Locations": "lorebook_template_location",
+  "SE: Factions": "lorebook_template_faction",
+  "SE: Situational Dynamics": "lorebook_template_dynamic",
+};
+
+const getFieldContent = (state: RootState, id: string): string => {
+  return state.story.fields[id]?.content || "";
+};
+
+export const buildLorebookContentStrategy = async (
+  state: RootState,
+  entryId: string,
+  categoryName: string,
+  displayName: string,
+): Promise<GenerationStrategy> => {
+  const model = "glm-4-6";
+  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
+  const basePrompt = String(
+    (await api.v1.config.get("lorebook_generate_prompt")) || "",
+  );
+
+  // Get template based on category
+  const templateKey = CATEGORY_TEMPLATE_MAP[categoryName];
+  const template = templateKey
+    ? String((await api.v1.config.get(templateKey)) || "")
+    : "";
+
+  // Replace placeholder in base prompt
+  const prompt = basePrompt.replace("[itemName]", displayName);
+
+  const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+  const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
+
+  const messages: Message[] = [
+    {
+      role: "system",
+      content: `${systemPrompt}\n\n[LOREBOOK ENTRY GENERATION]\n${prompt}${template ? `\n\nTEMPLATE:\n${template}` : ""}`,
+    },
+    {
+      role: "user",
+      content: `Generate a lorebook entry for: ${displayName}\n\nSTORY PROMPT:\n${storyPrompt}\n\nWORLD SNAPSHOT:\n${worldSnapshot}`,
+    },
+    { role: "assistant", content: "----\n" },
+  ];
+
+  return {
+    requestId: api.v1.uuid(),
+    messages,
+    params: { model, max_tokens: 512, temperature: 0.85, min_p: 0.05 },
+    target: { type: "lorebookContent", entryId },
+    prefixBehavior: "trim",
+  };
+};
+
+export const buildLorebookKeysStrategy = async (
+  entryId: string,
+  displayName: string,
+  entryText: string,
+): Promise<GenerationStrategy> => {
+  const model = "glm-4-6";
+  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
+  const prompt = String(
+    (await api.v1.config.get("lorebook_keys_prompt")) || "",
+  );
+
+  const messages: Message[] = [
+    {
+      role: "system",
+      content: `${systemPrompt}\n\n[LOREBOOK KEY GENERATION]\n${prompt}`,
+    },
+    {
+      role: "user",
+      content: `Entry Name: ${displayName}\n\nEntry Content:\n${entryText}`,
+    },
+    { role: "assistant", content: "" },
+  ];
+
+  return {
+    requestId: api.v1.uuid(),
+    messages,
+    params: { model, max_tokens: 64, temperature: 0.3, min_p: 0.05 },
+    target: { type: "lorebookKeys", entryId },
+    prefixBehavior: "trim",
+  };
+};
+
+// --- Factory Builders for JIT Strategy Building ---
+
+/**
+ * Creates a message factory for lorebook content generation.
+ * The factory captures context but defers data fetching until execution time.
+ */
+export const createLorebookContentFactory = (
+  getState: () => RootState,
+  entryId: string,
+): MessageFactory => {
+  return async () => {
+    const state = getState();
+    const entry = await api.v1.lorebook.entry(entryId);
+    if (!entry) {
+      throw new Error(`Lorebook entry not found: ${entryId}`);
+    }
+
+    // Get category name
+    let categoryName = "";
+    if (entry.category) {
+      const categories = await api.v1.lorebook.categories();
+      const category = categories.find((c) => c.id === entry.category);
+      categoryName = category?.name || "";
+    }
+
+    const displayName = entry.displayName || "Unnamed Entry";
+    const model = "glm-4-6";
+    const systemPrompt = String(
+      (await api.v1.config.get("system_prompt")) || "",
+    );
+    const basePrompt = String(
+      (await api.v1.config.get("lorebook_generate_prompt")) || "",
+    );
+
+    // Get template based on category
+    const templateKey = CATEGORY_TEMPLATE_MAP[categoryName];
+    const template = templateKey
+      ? String((await api.v1.config.get(templateKey)) || "")
+      : "";
+
+    // Replace placeholder in base prompt
+    const prompt = basePrompt.replace("[itemName]", displayName);
+
+    const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+    const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
+
+    const messages: Message[] = [
+      {
+        role: "system",
+        content: `${systemPrompt}\n\n[LOREBOOK ENTRY GENERATION]\n${prompt}${template ? `\n\nTEMPLATE:\n${template}` : ""}`,
+      },
+      {
+        role: "user",
+        content: `Generate a lorebook entry for: ${displayName}\n\nSTORY PROMPT:\n${storyPrompt}\n\nWORLD SNAPSHOT:\n${worldSnapshot}`,
+      },
+      { role: "assistant", content: "----\n" },
+    ];
+
+    return {
+      messages,
+      params: { model, max_tokens: 512, temperature: 0.85, min_p: 0.05 },
+    };
+  };
+};
+
+/**
+ * Creates a message factory for lorebook keys generation.
+ * CRITICAL: This fetches entry.text at execution time, so it gets fresh content
+ * from any preceding content generation.
+ */
+export const createLorebookKeysFactory = (
+  entryId: string,
+): MessageFactory => {
+  return async () => {
+    // Fetch FRESH entry.text at execution time
+    const entry = await api.v1.lorebook.entry(entryId);
+    if (!entry) {
+      throw new Error(`Lorebook entry not found: ${entryId}`);
+    }
+
+    const displayName = entry.displayName || "Unnamed Entry";
+    const entryText = entry.text || ""; // Now has content from previous generation
+
+    const model = "glm-4-6";
+    const systemPrompt = String(
+      (await api.v1.config.get("system_prompt")) || "",
+    );
+    const prompt = String(
+      (await api.v1.config.get("lorebook_keys_prompt")) || "",
+    );
+
+    const messages: Message[] = [
+      {
+        role: "system",
+        content: `${systemPrompt}\n\n[LOREBOOK KEY GENERATION]\n${prompt}`,
+      },
+      {
+        role: "user",
+        content: `Entry Name: ${displayName}\n\nEntry Content:\n${entryText}`,
+      },
+      { role: "assistant", content: "" },
+    ];
+
+    return {
+      messages,
+      params: { model, max_tokens: 64, temperature: 0.3, min_p: 0.05 },
+    };
+  };
+};

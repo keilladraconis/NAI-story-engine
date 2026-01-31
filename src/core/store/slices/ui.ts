@@ -1,5 +1,10 @@
 import { createSlice } from "../../../../lib/nai-store";
-import { UIState } from "../types";
+import { UIState, LorebookUIState } from "../types";
+
+const initialLorebookState: LorebookUIState = {
+  selectedEntryId: null,
+  selectedCategoryId: null,
+};
 
 export const initialUIState: UIState = {
   editModes: {},
@@ -7,6 +12,7 @@ export const initialUIState: UIState = {
   brainstorm: {
     input: "",
   },
+  lorebook: initialLorebookState,
 };
 
 export const uiSlice = createSlice({
@@ -49,6 +55,30 @@ export const uiSlice = createSlice({
         [payload.id]: false,
       },
     }),
+    // Lorebook actions
+    lorebookEntrySelected: (
+      state,
+      payload: { entryId: string | null; categoryId: string | null },
+    ) => ({
+      ...state,
+      lorebook: {
+        ...state.lorebook,
+        selectedEntryId: payload.entryId,
+        selectedCategoryId: payload.categoryId,
+      },
+    }),
+    // Lorebook generation intents (handled by effects)
+    lorebookContentGenerationRequested: (
+      state,
+      _payload: { requestId: string },
+    ) => state,
+    lorebookKeysGenerationRequested: (state, _payload: { requestId: string }) =>
+      state,
+    // Item-level lorebook generation (queues both content + keys)
+    lorebookItemGenerationRequested: (
+      state,
+      _payload: { entryId: string; contentRequestId: string; keysRequestId: string },
+    ) => state,
   },
 });
 
@@ -65,4 +95,8 @@ export const {
   uiCancelRequest,
   uiFieldEditBegin,
   uiFieldEditEnd,
+  lorebookEntrySelected,
+  lorebookContentGenerationRequested,
+  lorebookKeysGenerationRequested,
+  lorebookItemGenerationRequested,
 } = uiSlice.actions;

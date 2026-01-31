@@ -10,6 +10,7 @@ import {
   uiRequestGeneration,
   uiCancelRequest,
   requestsSynced,
+  requestQueued,
   stateUpdated,
   uiBrainstormMessageEditBegin,
   uiBrainstormMessageEditEnd,
@@ -21,7 +22,14 @@ import {
   dulfsItemAdded,
   dulfsItemRemoved,
   storyCleared,
+  lorebookContentGenerationRequested,
+  lorebookKeysGenerationRequested,
+  lorebookItemGenerationRequested,
 } from "./index";
+import {
+  createLorebookContentFactory,
+  createLorebookKeysFactory,
+} from "../utils/lorebook-strategy";
 import {
   buildBrainstormStrategy,
   buildStoryPromptStrategy,
@@ -259,12 +267,19 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     (action) => action.type === uiRequestGeneration({} as any).type, // Match type only
     async (action, { dispatch, getState }) => {
       const strategy = action.payload;
-      const { requestId, messages, params, target, prefixBehavior } = strategy;
+      const {
+        requestId,
+        messages,
+        messageFactory,
+        params,
+        target,
+        prefixBehavior,
+      } = strategy;
 
       let accumulatedText = "";
 
       // Handle Prefix (Resumption)
-      if (prefixBehavior === "keep") {
+      if (prefixBehavior === "keep" && messages) {
         const state = getState();
         if (target.type === "brainstorm") {
           const message = state.brainstorm.messages.find(
@@ -280,9 +295,27 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         }
       }
 
+      // Determine what to pass to GenX: factory or messages
+      const messagesOrFactory = messageFactory || messages;
+      if (!messagesOrFactory) {
+        api.v1.log("Generation failed: no messages or factory provided");
+        return;
+      }
+
+      // Add lorebook requests to queue for button state tracking
+      if (target.type === "lorebookContent" || target.type === "lorebookKeys") {
+        dispatch(
+          requestQueued({
+            id: requestId,
+            type: target.type,
+            targetId: target.entryId,
+          }),
+        );
+      }
+
       try {
         await genX.generate(
-          messages,
+          messagesOrFactory,
           { ...params, taskId: requestId }, // Pass requestId to GenX
           (choices, _final) => {
             const text = choices[0]?.text || "";
@@ -310,6 +343,16 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
                   const uiId = `text-display-${target.fieldId}`;
                   api.v1.ui.updateParts([{ id: uiId, text: accumulatedText }]);
                 }
+              } else if (target.type === "lorebookContent") {
+                // Stream directly to content area
+                api.v1.ui.updateParts([
+                  { id: IDS.LOREBOOK.CONTENT_TEXT, text: accumulatedText },
+                ]);
+              } else if (target.type === "lorebookKeys") {
+                // Stream directly to keys area
+                api.v1.ui.updateParts([
+                  { id: IDS.LOREBOOK.KEYS_TEXT, text: accumulatedText },
+                ]);
               }
               // List streaming is not displayed (parsed at the end)
             }
@@ -393,6 +436,36 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
               }
             }
           }
+        } else if (target.type === "lorebookContent" && accumulatedText) {
+          // Clean output: strip leading delimiter if present
+          let cleanedContent = accumulatedText;
+          if (cleanedContent.startsWith("----")) {
+            cleanedContent = cleanedContent.slice(4).trimStart();
+          }
+
+          // Update lorebook entry with generated content
+          await api.v1.lorebook.updateEntry(target.entryId, {
+            text: cleanedContent,
+          });
+
+          // Update UI with cleaned content
+          api.v1.ui.updateParts([
+            { id: IDS.LOREBOOK.CONTENT_TEXT, text: cleanedContent },
+          ]);
+        } else if (target.type === "lorebookKeys" && accumulatedText) {
+          // Parse comma-separated keys
+          const keys = accumulatedText
+            .split(",")
+            .map((k) => k.trim())
+            .filter((k) => k.length > 0 && k.length < 50); // Filter invalid keys
+
+          // Update lorebook entry with generated keys
+          await api.v1.lorebook.updateEntry(target.entryId, { keys });
+
+          // Update UI with parsed keys
+          api.v1.ui.updateParts([
+            { id: IDS.LOREBOOK.KEYS_TEXT, text: keys.join(", ") },
+          ]);
         }
       }
     },
@@ -500,7 +573,8 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     (action) => action.type === dulfsItemAdded({} as any).type,
     async (action) => {
       const { fieldId, item } = action.payload;
-      const name = (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "";
+      const name =
+        (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "";
 
       const categoryId = await ensureCategory(fieldId);
       await api.v1.lorebook.createEntry({
@@ -572,6 +646,100 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           await api.v1.storyStorage.remove(key);
         }
       }
+    },
+  );
+
+  // Intent: Lorebook Content Generation (uses factory for JIT building)
+  subscribeEffect(
+    (action) =>
+      action.type === lorebookContentGenerationRequested({} as any).type,
+    async (action, { dispatch, getState }) => {
+      const { requestId } = action.payload;
+      const { selectedEntryId } = getState().ui.lorebook;
+
+      if (!selectedEntryId) {
+        api.v1.log(
+          "[effects] No lorebook entry selected for content generation",
+        );
+        return;
+      }
+
+      // Create factory that builds strategy at execution time
+      const messageFactory = createLorebookContentFactory(
+        getState,
+        selectedEntryId,
+      );
+
+      dispatch(
+        uiRequestGeneration({
+          requestId,
+          messageFactory,
+          params: { model: "glm-4-6", max_tokens: 512 }, // Base params, factory can override
+          target: { type: "lorebookContent", entryId: selectedEntryId },
+          prefixBehavior: "trim",
+        }),
+      );
+    },
+  );
+
+  // Intent: Lorebook Keys Generation (CRITICAL: uses factory to get fresh entry.text)
+  subscribeEffect(
+    (action) =>
+      action.type === lorebookKeysGenerationRequested({} as any).type,
+    async (action, { dispatch, getState }) => {
+      const { requestId } = action.payload;
+      const { selectedEntryId } = getState().ui.lorebook;
+
+      if (!selectedEntryId) {
+        api.v1.log("[effects] No lorebook entry selected for keys generation");
+        return;
+      }
+
+      // Factory fetches entry.text at execution time, not now
+      const messageFactory = createLorebookKeysFactory(selectedEntryId);
+
+      dispatch(
+        uiRequestGeneration({
+          requestId,
+          messageFactory,
+          params: { model: "glm-4-6", max_tokens: 64 }, // Base params, factory can override
+          target: { type: "lorebookKeys", entryId: selectedEntryId },
+          prefixBehavior: "trim",
+        }),
+      );
+    },
+  );
+
+  // Intent: Lorebook Item Generation (queues both content + keys from DULFS list)
+  subscribeEffect(
+    (action) =>
+      action.type === lorebookItemGenerationRequested({} as any).type,
+    async (action, { dispatch, getState }) => {
+      const { entryId, contentRequestId, keysRequestId } = action.payload;
+
+      // Queue content generation
+      const contentFactory = createLorebookContentFactory(getState, entryId);
+      dispatch(
+        uiRequestGeneration({
+          requestId: contentRequestId,
+          messageFactory: contentFactory,
+          params: { model: "glm-4-6", max_tokens: 512 },
+          target: { type: "lorebookContent", entryId },
+          prefixBehavior: "trim",
+        }),
+      );
+
+      // Queue keys generation (will execute after content due to JIT factory)
+      const keysFactory = createLorebookKeysFactory(entryId);
+      dispatch(
+        uiRequestGeneration({
+          requestId: keysRequestId,
+          messageFactory: keysFactory,
+          params: { model: "glm-4-6", max_tokens: 64 },
+          target: { type: "lorebookKeys", entryId },
+          prefixBehavior: "trim",
+        }),
+      );
     },
   );
 }

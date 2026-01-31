@@ -2,6 +2,7 @@ import { createEvents, defineComponent } from "../../../../lib/nai-act";
 import { RootState, DulfsItem } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
 import { dulfsItemRemoved } from "../../../core/store/slices/story";
+import { LorebookIconButton } from "../LorebookIconButton";
 
 const { row, button, textInput } = api.v1.ui.part;
 
@@ -33,16 +34,10 @@ export const ListItem = defineComponent<
       id: `item-${item.id}`,
       style: { gap: "8px", "align-items": "center", padding: "4px 0" },
       content: [
-        button({
+        // Lorebook generation icon button
+        LorebookIconButton.describe({
           id: bookBtnId,
-          iconId: "book",
-          style: {
-            width: "24px",
-            padding: "4px",
-            opacity: "0.3",
-            cursor: "default",
-          },
-          callback: () => {},
+          entryId: item.id,
         }),
         textInput({
           id: nameInputId,
@@ -66,10 +61,16 @@ export const ListItem = defineComponent<
     });
   },
 
-  onMount(_props, ctx) {
-    const { dispatch } = ctx;
+  onMount(props, ctx) {
+    const { dispatch, mount } = ctx;
 
-    // Only delete handler needed
+    // Mount the lorebook icon button for reactivity
+    mount(LorebookIconButton, {
+      id: `book-${props.item.id}`,
+      entryId: props.item.id,
+    });
+
+    // Delete handler
     this.events.attach({
       delete: (eventProps) => {
         dispatch(

@@ -1,4 +1,11 @@
-import { store, brainstormLoaded, storyLoaded } from "./core/store";
+import {
+  store,
+  brainstormLoaded,
+  storyLoaded,
+  lorebookEntrySelected,
+  lorebookContentGenerationRequested,
+  lorebookKeysGenerationRequested,
+} from "./core/store";
 import { registerEffects } from "./core/store/effects";
 import { GenX } from "../lib/gen-x";
 import { mount } from "../lib/nai-act";
@@ -14,8 +21,12 @@ import { Header } from "./ui/components/Sidebar/Header";
 import { SettingField } from "./ui/components/Sidebar/SettingField";
 import { FieldList } from "./ui/components/Sidebar/FieldList";
 
-const { column } = api.v1.ui.part;
-const { sidebarPanel } = api.v1.ui.extension;
+// Lorebook components
+import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelContent";
+import { GenerationButton } from "./ui/components/GenerationButton";
+
+const { column, text, row } = api.v1.ui.part;
+const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
 
 (async () => {
   try {
@@ -72,7 +83,135 @@ const { sidebarPanel } = api.v1.ui.extension;
       ],
     });
 
-    await api.v1.ui.register([brainstormPanel, storyEnginePanel]);
+    // Lorebook Panel (appears in Lorebook when entry is selected)
+    const lorebookGenPanel = lorebookPanel({
+      id: IDS.LOREBOOK.PANEL,
+      name: "Story Engine",
+      iconId: "zap",
+      content: [
+        column({
+          id: IDS.LOREBOOK.CONTAINER,
+          style: { padding: "12px", gap: "12px" },
+          content: [
+            // Empty state
+            column({
+              id: IDS.LOREBOOK.EMPTY_STATE,
+              style: {
+                display: "flex",
+                "align-items": "center",
+                "justify-content": "center",
+                padding: "20px",
+                color: "rgba(255,255,255,0.5)",
+              },
+              content: [
+                text({ text: "Select a Lorebook entry to generate content." }),
+              ],
+            }),
+            // Not managed state
+            column({
+              id: IDS.LOREBOOK.NOT_MANAGED,
+              style: {
+                display: "none",
+                "align-items": "center",
+                "justify-content": "center",
+                padding: "20px",
+                color: "rgba(255,255,255,0.5)",
+              },
+              content: [
+                text({
+                  text: "This entry is not managed by Story Engine.\nOnly entries in SE: categories can be generated.",
+                }),
+              ],
+            }),
+            // Main content
+            column({
+              id: IDS.LOREBOOK.MAIN_CONTENT,
+              style: { display: "none", gap: "12px" },
+              content: [
+                // Entry name header
+                text({
+                  id: IDS.LOREBOOK.ENTRY_NAME,
+                  text: "",
+                  style: {
+                    "font-weight": "bold",
+                    "font-size": "16px",
+                  },
+                }),
+                // Generation buttons with requestIds for independent state tracking
+                row({
+                  style: { gap: "8px", "margin-top": "4px" },
+                  content: [
+                    GenerationButton.describe({
+                      id: IDS.LOREBOOK.GEN_CONTENT_BTN,
+                      requestId: "lb-content-req",
+                      label: "Generate Lorebook",
+                      generateAction: lorebookContentGenerationRequested({
+                        requestId: "lb-content-req",
+                      }),
+                    }),
+                    GenerationButton.describe({
+                      id: IDS.LOREBOOK.GEN_KEYS_BTN,
+                      requestId: "lb-keys-req",
+                      label: "Generate Keys",
+                      generateAction: lorebookKeysGenerationRequested({
+                        requestId: "lb-keys-req",
+                      }),
+                    }),
+                  ],
+                }),
+                // Content area (shows current content, replaced during streaming)
+                text({
+                  id: IDS.LOREBOOK.CONTENT_TEXT,
+                  text: "",
+                  style: {
+                    "font-size": "13px",
+                    "white-space": "pre-wrap",
+                    "line-height": "1.4",
+                  },
+                }),
+                // Keys row
+                row({
+                  style: { gap: "4px", "flex-wrap": "wrap" },
+                  content: [
+                    text({
+                      text: "Keys:",
+                      style: {
+                        "font-size": "12px",
+                        color: "rgba(255,255,255,0.6)",
+                      },
+                    }),
+                    text({
+                      id: IDS.LOREBOOK.KEYS_TEXT,
+                      text: "",
+                      style: {
+                        "font-size": "12px",
+                        color: "rgba(255,255,255,0.8)",
+                      },
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    });
+
+    await api.v1.ui.register([
+      brainstormPanel,
+      storyEnginePanel,
+      lorebookGenPanel,
+    ]);
+
+    // Register lorebook entry selection hook
+    api.v1.hooks.register("onLorebookEntrySelected", (params) => {
+      store.dispatch(
+        lorebookEntrySelected({
+          entryId: params.entryId || null,
+          categoryId: params.categoryId || null,
+        }),
+      );
+    });
 
     // 5. Mount Components (start reactive subscriptions)
     mount(List, undefined, store);
@@ -80,6 +219,7 @@ const { sidebarPanel } = api.v1.ui.extension;
     mount(Header, {}, store);
     mount(SettingField, {}, store);
     mount(FieldList, {}, store);
+    mount(LorebookPanelContent, undefined, store);
 
     api.v1.log("Story Engine Initialized.");
   } catch (e) {
