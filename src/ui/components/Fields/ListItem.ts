@@ -2,7 +2,8 @@ import { createEvents, defineComponent } from "../../../../lib/nai-act";
 import { RootState, DulfsItem } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
 import { dulfsItemRemoved } from "../../../core/store/slices/story";
-import { LorebookIconButton } from "../LorebookIconButton";
+import { lorebookItemGenerationRequested } from "../../../core/store/slices/ui";
+import { GenerationButton } from "../GenerationButton";
 
 const { row, button, textInput } = api.v1.ui.part;
 
@@ -35,9 +36,11 @@ export const ListItem = defineComponent<
       style: { gap: "8px", "align-items": "center", padding: "4px 0" },
       content: [
         // Lorebook generation icon button
-        LorebookIconButton.describe({
+        GenerationButton.describe({
           id: bookBtnId,
-          entryId: item.id,
+          variant: "icon",
+          iconId: "book",
+          requestIds: [`lb-item-${item.id}-content`, `lb-item-${item.id}-keys`],
         }),
         textInput({
           id: nameInputId,
@@ -64,11 +67,31 @@ export const ListItem = defineComponent<
 
   onMount(props, ctx) {
     const { dispatch, mount } = ctx;
+    const entryId = props.item.id;
 
     // Mount the lorebook icon button for reactivity
-    mount(LorebookIconButton, {
-      id: `book-${props.item.id}`,
-      entryId: props.item.id,
+    mount(GenerationButton, {
+      id: `book-${entryId}`,
+      variant: "icon",
+      iconId: "book",
+      requestIds: [`lb-item-${entryId}-content`, `lb-item-${entryId}-keys`],
+      onGenerate: () => {
+        dispatch(
+          lorebookItemGenerationRequested({
+            entryId,
+            contentRequestId: `lb-item-${entryId}-content`,
+            keysRequestId: `lb-item-${entryId}-keys`,
+          }),
+        );
+      },
+      contentChecker: async () => {
+        try {
+          const entry = await api.v1.lorebook.entry(entryId);
+          return !!(entry?.text?.trim());
+        } catch {
+          return false;
+        }
+      },
     });
 
     // Delete handler

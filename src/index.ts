@@ -3,6 +3,8 @@ import {
   brainstormLoaded,
   storyLoaded,
   lorebookEntrySelected,
+  lorebookContentGenerationRequested,
+  lorebookKeysGenerationRequested,
 } from "./core/store";
 import { registerEffects } from "./core/store/effects";
 import { GenX } from "../lib/gen-x";
@@ -21,7 +23,7 @@ import { FieldList } from "./ui/components/Sidebar/FieldList";
 
 // Lorebook components
 import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelContent";
-import { LorebookGenerationButton } from "./ui/components/Lorebook/LorebookGenerationButton";
+import { GenerationButton } from "./ui/components/GenerationButton";
 
 const { column, text, row, textInput, multilineTextInput } = api.v1.ui.part;
 const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
@@ -135,19 +137,16 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
                     "font-size": "16px",
                   },
                 }),
-                // Generation buttons - managed by LorebookGenerationButton components
-                // which derive requestIds dynamically from selectedEntryId
+                // Generation buttons - use stateProjection for dynamic requestId
                 row({
                   style: { gap: "8px", "margin-top": "4px" },
                   content: [
-                    LorebookGenerationButton.describe({
+                    GenerationButton.describe({
                       id: IDS.LOREBOOK.GEN_CONTENT_BTN,
-                      type: "content",
                       label: "Generate Content",
                     }),
-                    LorebookGenerationButton.describe({
+                    GenerationButton.describe({
                       id: IDS.LOREBOOK.GEN_KEYS_BTN,
-                      type: "keys",
                       label: "Generate Keys",
                     }),
                   ],
@@ -218,22 +217,48 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
     mount(FieldList, {}, store);
     mount(LorebookPanelContent, undefined, store);
 
-    // Mount Lorebook generation buttons (they self-manage based on selectedEntryId)
+    // Mount Lorebook generation buttons (they self-manage based on selectedEntryId via stateProjection)
     mount(
-      LorebookGenerationButton,
+      GenerationButton,
       {
         id: IDS.LOREBOOK.GEN_CONTENT_BTN,
-        type: "content" as const,
         label: "Generate Content",
+        stateProjection: (state) => state.ui.lorebook.selectedEntryId,
+        requestIdFromProjection: (entryId: string | null) =>
+          entryId ? IDS.LOREBOOK.entry(entryId).CONTENT_REQ : undefined,
+        isDisabledFromProjection: (entryId: string | null) => !entryId,
+        onGenerate: () => {
+          const entryId = store.getState().ui.lorebook.selectedEntryId;
+          if (entryId) {
+            store.dispatch(
+              lorebookContentGenerationRequested({
+                requestId: IDS.LOREBOOK.entry(entryId).CONTENT_REQ,
+              }),
+            );
+          }
+        },
       },
       store,
     );
     mount(
-      LorebookGenerationButton,
+      GenerationButton,
       {
         id: IDS.LOREBOOK.GEN_KEYS_BTN,
-        type: "keys" as const,
         label: "Generate Keys",
+        stateProjection: (state) => state.ui.lorebook.selectedEntryId,
+        requestIdFromProjection: (entryId: string | null) =>
+          entryId ? IDS.LOREBOOK.entry(entryId).KEYS_REQ : undefined,
+        isDisabledFromProjection: (entryId: string | null) => !entryId,
+        onGenerate: () => {
+          const entryId = store.getState().ui.lorebook.selectedEntryId;
+          if (entryId) {
+            store.dispatch(
+              lorebookKeysGenerationRequested({
+                requestId: IDS.LOREBOOK.entry(entryId).KEYS_REQ,
+              }),
+            );
+          }
+        },
       },
       store,
     );

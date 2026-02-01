@@ -572,12 +572,19 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       for (const req of allRequests) {
         const status = genX.getTaskStatus(req.id);
-        if (status === "queued") {
-          newQueue.push(req);
-        } else if (status === "processing") {
+        if (status === "processing") {
           newActive = req;
+        } else if (status === "queued") {
+          newQueue.push(req);
+        } else {
+          // 'not_found' in GenX - keep in queue if it was queued in store
+          // This handles items pending submission (not yet in GenX) and
+          // prevents race conditions when multiple items are queued together
+          if (req.status === "queued") {
+            newQueue.push(req);
+          }
+          // If it was processing (activeRequest) and is now not_found, it completed - drop it
         }
-        // else 'not_found' -> drop
       }
 
       // Check if changed
