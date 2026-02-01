@@ -1,4 +1,4 @@
-import { Store } from "../../../lib/nai-store";
+import { Store, matchesAction } from "../../../lib/nai-store";
 import { RootState, BrainstormMessage } from "./types";
 import { GenX } from "../../../lib/gen-x";
 import {
@@ -26,7 +26,7 @@ import {
   lorebookKeysGenerationRequested,
   lorebookItemGenerationRequested,
   requestCancelled,
-  cancelledRequestCleared,
+  requestCompleted,
 } from "./index";
 import {
   createLorebookContentFactory,
@@ -78,7 +78,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: Brainstorm Edit Begin
   subscribeEffect(
-    (action) => action.type === uiBrainstormMessageEditBegin({} as any).type,
+    matchesAction(uiBrainstormMessageEditBegin),
     async (action, { dispatch, getState }) => {
       const { id: newId } = action.payload;
       const state = getState();
@@ -170,16 +170,15 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
-      // Request Generation
-      const state = getState();
-      const strategy = await buildBrainstormStrategy(state, assistantId);
+      // Request Generation - use factory pattern for JIT message building
+      const strategy = buildBrainstormStrategy(getState, assistantId);
       dispatch(uiRequestGeneration(strategy));
     },
   );
 
   // Intent: Brainstorm Retry
   subscribeEffect(
-    (action) => action.type === uiBrainstormRetryGeneration({} as any).type,
+    matchesAction(uiBrainstormRetryGeneration),
     async (action, { dispatch, getState }) => {
       const { messageId } = action.payload;
 
@@ -219,17 +218,17 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         );
       }
 
-      const strategy = await buildBrainstormStrategy(state, assistantId);
+      // Request Generation - use factory pattern for JIT message building
+      const strategy = buildBrainstormStrategy(getState, assistantId);
       dispatch(uiRequestGeneration(strategy));
     },
   );
 
   // Intent: Field/List Generation
   subscribeEffect(
-    (action) => action.type === generationRequested({} as any).type,
+    matchesAction(generationRequested),
     async (action, { dispatch, getState }) => {
       const { id: requestId, type, targetId } = action.payload;
-      const state = getState();
 
       if (type === "field") {
         // Single field (e.g., StoryPrompt) or DULFS item (format: "fieldId:itemId")
@@ -240,11 +239,11 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
         let strategy;
         if (targetId === FieldID.StoryPrompt) {
-          strategy = await buildStoryPromptStrategy(state, targetId);
+          strategy = buildStoryPromptStrategy(getState, targetId);
         } else if (targetId === FieldID.ATTG) {
-          strategy = await buildATTGStrategy(state);
+          strategy = buildATTGStrategy(getState);
         } else if (targetId === FieldID.Style) {
-          strategy = await buildStyleStrategy(state);
+          strategy = buildStyleStrategy(getState);
         } else {
           api.v1.log(
             `[effects] No generation strategy found for field: ${targetId}`,
@@ -256,7 +255,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         dispatch(uiRequestGeneration(strategy));
       } else if (type === "list") {
         // DULFS list generation (generate names)
-        const strategy = await buildDulfsListStrategy(state, targetId);
+        const strategy = buildDulfsListStrategy(getState, targetId);
         strategy.requestId = requestId; // Use store's ID for queue tracking
         dispatch(uiRequestGeneration(strategy));
       }
@@ -266,7 +265,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: GenX Generation
   subscribeEffect(
-    (action) => action.type === uiRequestGeneration({} as any).type, // Match type only
+    matchesAction(uiRequestGeneration),
     async (action, { dispatch, getState }) => {
       const strategy = action.payload;
       const {
@@ -276,12 +275,13 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         params,
         target,
         prefixBehavior,
+        assistantPrefill,
       } = strategy;
 
       let accumulatedText = "";
 
       // Handle Prefix (Resumption)
-      if (prefixBehavior === "keep" && messages) {
+      if (prefixBehavior === "keep") {
         const state = getState();
         if (target.type === "brainstorm") {
           const message = state.brainstorm.messages.find(
@@ -289,10 +289,15 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           );
           if (message) accumulatedText = message.content;
         } else if (target.type === "field") {
-          // Use assistant prefill from messages
-          const lastMsg = messages[messages.length - 1];
-          if (lastMsg?.role === "assistant" && lastMsg.content) {
-            accumulatedText = lastMsg.content;
+          // Use explicit assistantPrefill if provided (for factory-based strategies)
+          if (assistantPrefill) {
+            accumulatedText = assistantPrefill;
+          } else if (messages) {
+            // Fallback: extract from messages array
+            const lastMsg = messages[messages.length - 1];
+            if (lastMsg?.role === "assistant" && lastMsg.content) {
+              accumulatedText = lastMsg.content;
+            }
           }
         }
       }
@@ -304,15 +309,19 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
-      // Add lorebook requests to queue for button state tracking
+      // Add lorebook requests to queue for button state tracking (skip if already queued)
       if (target.type === "lorebookContent" || target.type === "lorebookKeys") {
-        dispatch(
-          requestQueued({
-            id: requestId,
-            type: target.type,
-            targetId: target.entryId,
-          }),
-        );
+        const currentQueue = getState().runtime.queue;
+        const alreadyQueued = currentQueue.some((r) => r.id === requestId);
+        if (!alreadyQueued) {
+          dispatch(
+            requestQueued({
+              id: requestId,
+              type: target.type,
+              targetId: target.entryId,
+            }),
+          );
+        }
       }
 
       // For lorebook generation, capture original content for rollback on cancellation
@@ -392,17 +401,18 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       }
 
       // Check if this request was cancelled (user clicked cancel button)
+      const activeRequest = getState().runtime.activeRequest;
       const wasCancelled =
-        getState().runtime.cancelledRequestIds.includes(requestId);
+        activeRequest?.id === requestId &&
+        activeRequest?.status === "cancelled";
       if (wasCancelled) {
         api.v1.log(`[effects] Generation was cancelled for ${requestId}`);
         generationSucceeded = false;
-        // Clear the cancelled flag
-        dispatch(cancelledRequestCleared({ requestId }));
       } else if (generationSucceeded) {
         api.v1.log(
           `[effects] Generation completed successfully for ${requestId}`,
         );
+        dispatch(requestCompleted({ requestId }));
       }
 
       // Handle completion based on success/failure
@@ -546,7 +556,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: Sync GenX State
   subscribeEffect(
-    (action) => action.type === stateUpdated({} as any).type,
+    matchesAction(stateUpdated),
     async (_action, { dispatch, getState }) => {
       const state = getState();
       const { queue, activeRequest } = state.runtime;
@@ -583,23 +593,20 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   );
 
   // Intent: Specific Cancellation
-  subscribeEffect(
-    (action) => action.type === uiCancelRequest({} as any).type,
-    (action, { dispatch }) => {
-      const { requestId } = action.payload;
+  subscribeEffect(matchesAction(uiCancelRequest), (action, { dispatch }) => {
+    const { requestId } = action.payload;
 
-      // Mark as cancelled in state (for detection after generation completes)
-      dispatch(requestCancelled({ requestId }));
+    // Mark as cancelled in state (for detection after generation completes)
+    dispatch(requestCancelled({ requestId }));
 
-      // Try to cancel if queued
-      genX.cancelQueued(requestId);
-      // If it's the current one?
-      const status = genX.getTaskStatus(requestId);
-      if (status === "processing") {
-        genX.cancelCurrent();
-      }
-    },
-  );
+    // Try to cancel if queued
+    genX.cancelQueued(requestId);
+    // If it's the current one?
+    const status = genX.getTaskStatus(requestId);
+    if (status === "processing") {
+      genX.cancelCurrent();
+    }
+  });
 
   // Intent: Cancellation (global - cancels current task)
   subscribeEffect(
@@ -652,46 +659,39 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   );
 
   // Lorebook Sync: Item Added
-  subscribeEffect(
-    (action) => action.type === dulfsItemAdded({} as any).type,
-    async (action) => {
-      const { fieldId, item } = action.payload;
-      const name =
-        (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "";
+  subscribeEffect(matchesAction(dulfsItemAdded), async (action) => {
+    const { fieldId, item } = action.payload;
+    const name = (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "";
 
-      const categoryId = await ensureCategory(fieldId);
-      await api.v1.lorebook.createEntry({
-        id: item.id,
-        category: categoryId,
-        displayName: String(name),
-        keys: String(name) ? [String(name)] : [],
-        enabled: true,
-      });
-    },
-  );
+    const categoryId = await ensureCategory(fieldId);
+    await api.v1.lorebook.createEntry({
+      id: item.id,
+      category: categoryId,
+      displayName: String(name),
+      keys: String(name) ? [String(name)] : [],
+      enabled: true,
+    });
+  });
 
   // Lorebook Sync: Item Removed
-  subscribeEffect(
-    (action) => action.type === dulfsItemRemoved({} as any).type,
-    async (action) => {
-      const { fieldId, itemId } = action.payload;
+  subscribeEffect(matchesAction(dulfsItemRemoved), async (action) => {
+    const { fieldId, itemId } = action.payload;
 
-      // Remove lorebook entry (same ID as item)
-      await api.v1.lorebook.removeEntry(itemId);
+    // Remove lorebook entry (same ID as item)
+    await api.v1.lorebook.removeEntry(itemId);
 
-      // Clean up storage
-      await api.v1.storyStorage.set(`dulfs-item-${itemId}`, null);
+    // Clean up storage
+    await api.v1.storyStorage.set(`dulfs-item-${itemId}`, null);
 
-      // Remove empty category
-      const categoryId = await findCategory(fieldId);
-      if (categoryId) {
-        const entries = await api.v1.lorebook.entries(categoryId);
-        if (entries.length === 0) {
-          await api.v1.lorebook.removeCategory(categoryId);
-        }
+    // Remove empty category
+    const categoryId = await findCategory(fieldId);
+    if (categoryId) {
+      const entries = await api.v1.lorebook.entries(categoryId);
+      if (entries.length === 0) {
+        await api.v1.lorebook.removeCategory(categoryId);
       }
-    },
-  );
+    }
+  });
 
   // Lorebook Sync & Storage Cleanup: Story Cleared
   subscribeEffect(
@@ -734,8 +734,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: Lorebook Content Generation (uses factory for JIT building)
   subscribeEffect(
-    (action) =>
-      action.type === lorebookContentGenerationRequested({} as any).type,
+    matchesAction(lorebookContentGenerationRequested),
     async (action, { dispatch, getState }) => {
       const { requestId } = action.payload;
       const { selectedEntryId } = getState().ui.lorebook;
@@ -767,7 +766,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: Lorebook Keys Generation (CRITICAL: uses factory to get fresh entry.text)
   subscribeEffect(
-    (action) => action.type === lorebookKeysGenerationRequested({} as any).type,
+    matchesAction(lorebookKeysGenerationRequested),
     async (action, { dispatch, getState }) => {
       const { requestId } = action.payload;
       const { selectedEntryId } = getState().ui.lorebook;
@@ -794,11 +793,27 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: Lorebook Item Generation (queues both content + keys from DULFS list)
   subscribeEffect(
-    (action) => action.type === lorebookItemGenerationRequested({} as any).type,
+    matchesAction(lorebookItemGenerationRequested),
     async (action, { dispatch, getState }) => {
       const { entryId, contentRequestId, keysRequestId } = action.payload;
 
-      // Queue content generation
+      // Queue BOTH items in store first for immediate visibility
+      dispatch(
+        requestQueued({
+          id: contentRequestId,
+          type: "lorebookContent",
+          targetId: entryId,
+        }),
+      );
+      dispatch(
+        requestQueued({
+          id: keysRequestId,
+          type: "lorebookKeys",
+          targetId: entryId,
+        }),
+      );
+
+      // Now dispatch generation requests (they'll skip re-queuing since already in queue)
       const contentFactory = createLorebookContentFactory(getState, entryId);
       dispatch(
         uiRequestGeneration({
@@ -810,7 +825,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         }),
       );
 
-      // Queue keys generation (will execute after content due to JIT factory)
+      // Queue keys generation (JIT factory ensures fresh content is used)
       const keysFactory = createLorebookKeysFactory(entryId);
       dispatch(
         uiRequestGeneration({

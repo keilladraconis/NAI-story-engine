@@ -3,15 +3,8 @@ import {
   BrainstormMessage,
   GenerationStrategy,
 } from "../store/types";
+import { MessageFactory } from "../../../lib/gen-x";
 import { FieldID, FIELD_CONFIGS } from "../../config/field-definitions";
-
-export interface StrategyResult {
-  messages: Message[];
-  params: GenerationParams;
-  prefixBehavior?: "trim" | "keep";
-  assistantPrefill?: string;
-  filters?: any[];
-}
 
 // --- Helpers ---
 
@@ -25,8 +18,6 @@ const getBrainstormHistory = (state: RootState): BrainstormMessage[] => {
 
 const getConsolidatedBrainstorm = (state: RootState): string => {
   const history = getBrainstormHistory(state);
-  // Fallback to legacy field content if history is empty?
-  // No, new architecture uses slice.
   if (history.length > 0) {
     return history
       .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
@@ -73,224 +64,325 @@ const getCommonContextBlocks = async (
   ];
 };
 
-// --- Strategies ---
+// --- Strategy Factories ---
 
-export const buildBrainstormStrategy = async (
-  state: RootState,
-  assistantId?: string,
-): Promise<GenerationStrategy> => {
-  const model = "glm-4-6";
-  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  const brainstormInstruction = String(
-    (await api.v1.config.get("brainstorm_prompt")) || "",
-  );
+/**
+ * Creates a message factory for brainstorm generation.
+ * The factory defers data fetching until execution time.
+ */
+export const createBrainstormFactory = (
+  getState: () => RootState,
+): MessageFactory => {
+  return async () => {
+    const state = getState();
+    const model = "glm-4-6";
+    const systemPrompt = String(
+      (await api.v1.config.get("system_prompt")) || "",
+    );
+    const brainstormInstruction = String(
+      (await api.v1.config.get("brainstorm_prompt")) || "",
+    );
 
-  const systemMsg: Message = {
-    role: "system",
-    content: `${systemPrompt}\n\n[BRAINSTORMING MODE]\n${brainstormInstruction}`,
+    const systemMsg: Message = {
+      role: "system",
+      content: `${systemPrompt}\n\n[BRAINSTORMING MODE]\n${brainstormInstruction}`,
+    };
+
+    const messages: Message[] = [systemMsg];
+    const storyContext = await getStoryContextMessages();
+    messages.push(...storyContext);
+
+    const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+    const setting = String(
+      (await api.v1.storyStorage.get("kse-setting")) || "",
+    );
+    const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
+
+    let contextBlock = "Here is the current state of the story:\n";
+    let hasContext = false;
+
+    if (storyPrompt) {
+      contextBlock += `STORY PROMPT:\n${storyPrompt}\n\n`;
+      hasContext = true;
+    }
+    if (setting) {
+      contextBlock += `SETTING:\n${setting}\n\n`;
+      hasContext = true;
+    }
+    if (worldSnapshot) {
+      contextBlock += `WORLD SNAPSHOT:\n${worldSnapshot}\n\n`;
+      hasContext = true;
+    }
+
+    if (hasContext) {
+      messages.push({
+        role: "user",
+        content: `${contextBlock}Let's brainstorm based on this context.`,
+      });
+      messages.push({
+        role: "assistant",
+        content:
+          "Understood. I have the full story context in mind. Let's jam.",
+      });
+    }
+
+    const history = getBrainstormHistory(state);
+    const cleanHistory = history.filter(
+      (m) => !(m.role === "assistant" && !m.content.trim()),
+    );
+    const historyMessages: Message[] = cleanHistory.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }));
+
+    messages.push(...historyMessages);
+
+    return {
+      messages,
+      params: { model, max_tokens: 300, temperature: 0.8, min_p: 0.05 },
+    };
   };
+};
 
-  const messages: Message[] = [systemMsg];
-  const storyContext = await getStoryContextMessages();
-  messages.push(...storyContext);
-
-  const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
-  const setting = String((await api.v1.storyStorage.get("kse-setting")) || "");
-  const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
-
-  let contextBlock = "Here is the current state of the story:\n";
-  let hasContext = false;
-
-  if (storyPrompt) {
-    contextBlock += `STORY PROMPT:\n${storyPrompt}\n\n`;
-    hasContext = true;
-  }
-  if (setting) {
-    contextBlock += `SETTING:\n${setting}\n\n`;
-    hasContext = true;
-  }
-  if (worldSnapshot) {
-    contextBlock += `WORLD SNAPSHOT:\n${worldSnapshot}\n\n`;
-    hasContext = true;
-  }
-
-  if (hasContext) {
-    messages.push({
-      role: "user",
-      content: `${contextBlock}Let's brainstorm based on this context.`,
-    });
-    messages.push({
-      role: "assistant",
-      content: "Understood. I have the full story context in mind. Let's jam.",
-    });
-  }
-
-  const history = getBrainstormHistory(state);
-  const cleanHistory = history.filter(
-    (m) => !(m.role === "assistant" && !m.content.trim()),
-  );
-  const historyMessages: Message[] = cleanHistory.map((m) => ({
-    role: m.role as "user" | "assistant",
-    content: m.content,
-  }));
-  const messageId = assistantId ? assistantId : history.at(-1)!.id;
-
-  messages.push(...historyMessages);
-
+/**
+ * Builds a brainstorm generation strategy using JIT factory pattern.
+ */
+export const buildBrainstormStrategy = (
+  getState: () => RootState,
+  messageId: string,
+): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messages,
-    params: { model, max_tokens: 300, temperature: 0.8, min_p: 0.05 },
-    prefixBehavior: "keep",
+    messageFactory: createBrainstormFactory(getState),
     target: {
       type: "brainstorm",
       messageId,
     },
+    prefixBehavior: "keep",
   };
 };
 
-export const buildStoryPromptStrategy = async (
-  state: RootState,
+/**
+ * Creates a message factory for story prompt generation.
+ */
+export const createStoryPromptFactory = (
+  getState: () => RootState,
+): MessageFactory => {
+  return async () => {
+    const state = getState();
+    const model = "glm-4-6";
+    const systemPrompt = String(
+      (await api.v1.config.get("system_prompt")) || "",
+    );
+    const prompt = String(
+      (await api.v1.config.get("story_prompt_generate_prompt")) || "",
+    );
+    const brainstormContent = getConsolidatedBrainstorm(state);
+    const storyContext = await getStoryContextMessages();
+    const commonBlocks = await getCommonContextBlocks(state, storyContext);
+
+    const messages = contextBuilder(
+      { role: "system", content: systemPrompt },
+      { role: "user", content: prompt },
+      {
+        role: "assistant",
+        content: "Here is the story prompt based on our brainstorming session:",
+      },
+      [
+        ...commonBlocks,
+        { role: "user", content: `BRAINSTORM MATERIAL:\n${brainstormContent}` },
+      ],
+    );
+
+    return {
+      messages,
+      params: {
+        model,
+        temperature: 1.1,
+        min_p: 0.05,
+        presence_penalty: 0.1,
+        max_tokens: 1024,
+      },
+    };
+  };
+};
+
+/**
+ * Builds a story prompt generation strategy using JIT factory pattern.
+ */
+export const buildStoryPromptStrategy = (
+  getState: () => RootState,
   fieldId: FieldID,
-): Promise<GenerationStrategy> => {
-  const model = "glm-4-6";
-  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  const prompt = String(
-    (await api.v1.config.get("story_prompt_generate_prompt")) || "",
-  );
-  const brainstormContent = getConsolidatedBrainstorm(state);
-  const storyContext = await getStoryContextMessages();
-  const commonBlocks = await getCommonContextBlocks(state, storyContext);
-
-  const messages = contextBuilder(
-    { role: "system", content: systemPrompt },
-    { role: "user", content: prompt },
-    {
-      role: "assistant",
-      content: "Here is the story prompt based on our brainstorming session:",
-    },
-    [
-      ...commonBlocks,
-      { role: "user", content: `BRAINSTORM MATERIAL:\n${brainstormContent}` },
-    ],
-  );
-
+): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messages,
-    params: {
-      model,
-      temperature: 1.1,
-      min_p: 0.05,
-      presence_penalty: 0.1,
-      max_tokens: 1024,
-    },
+    messageFactory: createStoryPromptFactory(getState),
     target: { type: "field", fieldId },
     prefixBehavior: "trim",
   };
 };
 
-export const buildDulfsListStrategy = async (
-  state: RootState,
+/**
+ * Creates a message factory for DULFS list generation.
+ */
+export const createDulfsListFactory = (
+  getState: () => RootState,
   fieldId: string,
-): Promise<GenerationStrategy> => {
-  const model = "glm-4-6";
-  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  const fieldConfig = FIELD_CONFIGS.find((f) => f.id === fieldId);
+): MessageFactory => {
+  return async () => {
+    const state = getState();
+    const model = "glm-4-6";
+    const systemPrompt = String(
+      (await api.v1.config.get("system_prompt")) || "",
+    );
+    const fieldConfig = FIELD_CONFIGS.find((f) => f.id === fieldId);
 
-  // Use listGenerationInstruction if available, otherwise generationInstruction
-  const instruction =
-    fieldConfig?.listGenerationInstruction ||
-    fieldConfig?.generationInstruction ||
-    "";
-  const listExampleFormat = fieldConfig?.listExampleFormat || "";
-  const brainstormContent = getConsolidatedBrainstorm(state);
-  const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+    // Use listGenerationInstruction if available, otherwise generationInstruction
+    const instruction =
+      fieldConfig?.listGenerationInstruction ||
+      fieldConfig?.generationInstruction ||
+      "";
+    const listExampleFormat = fieldConfig?.listExampleFormat || "";
+    const brainstormContent = getConsolidatedBrainstorm(state);
+    const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
 
-  const messages: Message[] = [
-    {
-      role: "system",
-      content: `${systemPrompt}\n\n[LIST GENERATION MODE]\n${instruction}\n\nOutput ONLY a bulleted list of names, nothing else.\n\nExample:\n${listExampleFormat}`,
-    },
-    {
-      role: "user",
-      content: `STORY PROMPT:\n${storyPrompt}\n\nBRAINSTORM:\n${brainstormContent}`,
-    },
-    { role: "assistant", content: "-" },
-  ];
+    const messages: Message[] = [
+      {
+        role: "system",
+        content: `${systemPrompt}\n\n[LIST GENERATION MODE]\n${instruction}\n\nOutput ONLY a bulleted list of names, nothing else.\n\nExample:\n${listExampleFormat}`,
+      },
+      {
+        role: "user",
+        content: `STORY PROMPT:\n${storyPrompt}\n\nBRAINSTORM:\n${brainstormContent}`,
+      },
+      { role: "assistant", content: "-" },
+    ];
 
+    return {
+      messages,
+      params: { model, max_tokens: 72, temperature: 0.9, min_p: 0.05 },
+    };
+  };
+};
+
+/**
+ * Builds a DULFS list generation strategy using JIT factory pattern.
+ */
+export const buildDulfsListStrategy = (
+  getState: () => RootState,
+  fieldId: string,
+): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messages,
-    params: { model, max_tokens: 72, temperature: 0.9, min_p: 0.05 },
+    messageFactory: createDulfsListFactory(getState, fieldId),
     target: { type: "list", fieldId },
     prefixBehavior: "trim",
   };
 };
 
-export const buildATTGStrategy = async (
-  state: RootState,
-): Promise<GenerationStrategy> => {
-  const model = "glm-4-6";
-  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  const prompt = String(
-    (await api.v1.config.get("attg_generate_prompt")) || "",
-  );
-  const brainstormContent = getConsolidatedBrainstorm(state);
-  const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
-  const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
+/**
+ * Creates a message factory for ATTG generation.
+ */
+export const createATTGFactory = (
+  getState: () => RootState,
+): MessageFactory => {
+  return async () => {
+    const state = getState();
+    const model = "glm-4-6";
+    const systemPrompt = String(
+      (await api.v1.config.get("system_prompt")) || "",
+    );
+    const prompt = String(
+      (await api.v1.config.get("attg_generate_prompt")) || "",
+    );
+    const brainstormContent = getConsolidatedBrainstorm(state);
+    const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+    const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
 
-  const messages: Message[] = [
-    {
-      role: "system",
-      content: `${systemPrompt}\n\n[ATTG GENERATION MODE]\n${prompt}`,
-    },
-    {
-      role: "user",
-      content: `STORY PROMPT:\n${storyPrompt}\n\nWORLD SNAPSHOT:\n${worldSnapshot}\n\nBRAINSTORM:\n${brainstormContent}`,
-    },
-    { role: "assistant", content: "[" },
-  ];
+    const messages: Message[] = [
+      {
+        role: "system",
+        content: `${systemPrompt}\n\n[ATTG GENERATION MODE]\n${prompt}`,
+      },
+      {
+        role: "user",
+        content: `STORY PROMPT:\n${storyPrompt}\n\nWORLD SNAPSHOT:\n${worldSnapshot}\n\nBRAINSTORM:\n${brainstormContent}`,
+      },
+      { role: "assistant", content: "[" },
+    ];
 
-  return {
-    requestId: api.v1.uuid(),
-    messages,
-    params: { model, max_tokens: 128, temperature: 0.7, min_p: 0.05 },
-    target: { type: "field", fieldId: FieldID.ATTG },
-    prefixBehavior: "keep",
+    return {
+      messages,
+      params: { model, max_tokens: 128, temperature: 0.7, min_p: 0.05 },
+    };
   };
 };
 
-export const buildStyleStrategy = async (
-  state: RootState,
-): Promise<GenerationStrategy> => {
-  const model = "glm-4-6";
-  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  const prompt = String(
-    (await api.v1.config.get("style_generate_prompt")) || "",
-  );
-  const brainstormContent = getConsolidatedBrainstorm(state);
-  const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
-  const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
-  const attg = getFieldContent(state, FieldID.ATTG);
-
-  const messages: Message[] = [
-    {
-      role: "system",
-      content: `${systemPrompt}\n\n[STYLE GENERATION MODE]\n${prompt}`,
-    },
-    {
-      role: "user",
-      content: `STORY PROMPT:\n${storyPrompt}\n\nWORLD SNAPSHOT:\n${worldSnapshot}\n\nATTG:\n${attg}\n\nBRAINSTORM:\n${brainstormContent}`,
-    },
-    { role: "assistant", content: "[" },
-  ];
-
+/**
+ * Builds an ATTG generation strategy using JIT factory pattern.
+ */
+export const buildATTGStrategy = (
+  getState: () => RootState,
+): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messages,
-    params: { model, max_tokens: 128, temperature: 0.8, min_p: 0.05 },
+    messageFactory: createATTGFactory(getState),
+    target: { type: "field", fieldId: FieldID.ATTG },
+    prefixBehavior: "keep",
+    assistantPrefill: "[",
+  };
+};
+
+/**
+ * Creates a message factory for Style generation.
+ */
+export const createStyleFactory = (
+  getState: () => RootState,
+): MessageFactory => {
+  return async () => {
+    const state = getState();
+    const model = "glm-4-6";
+    const systemPrompt = String(
+      (await api.v1.config.get("system_prompt")) || "",
+    );
+    const prompt = String(
+      (await api.v1.config.get("style_generate_prompt")) || "",
+    );
+    const brainstormContent = getConsolidatedBrainstorm(state);
+    const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+    const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
+    const attg = getFieldContent(state, FieldID.ATTG);
+
+    const messages: Message[] = [
+      {
+        role: "system",
+        content: `${systemPrompt}\n\n[STYLE GENERATION MODE]\n${prompt}`,
+      },
+      {
+        role: "user",
+        content: `STORY PROMPT:\n${storyPrompt}\n\nWORLD SNAPSHOT:\n${worldSnapshot}\n\nATTG:\n${attg}\n\nBRAINSTORM:\n${brainstormContent}`,
+      },
+      { role: "assistant", content: "[" },
+    ];
+
+    return {
+      messages,
+      params: { model, max_tokens: 128, temperature: 0.8, min_p: 0.05 },
+    };
+  };
+};
+
+/**
+ * Builds a Style generation strategy using JIT factory pattern.
+ */
+export const buildStyleStrategy = (
+  getState: () => RootState,
+): GenerationStrategy => {
+  return {
+    requestId: api.v1.uuid(),
+    messageFactory: createStyleFactory(getState),
     target: { type: "field", fieldId: FieldID.Style },
     prefixBehavior: "keep",
+    assistantPrefill: "[",
   };
 };

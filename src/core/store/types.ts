@@ -53,10 +53,17 @@ export type GenerationStatus =
   | "paused"
   | "error";
 
+export type GenerationRequestStatus =
+  | "queued"
+  | "processing"
+  | "completed"
+  | "cancelled";
+
 export interface GenerationRequest {
   id: string;
   type: "field" | "list" | "brainstorm" | "lorebookContent" | "lorebookKeys";
   targetId: string;
+  status: GenerationRequestStatus;
   prompt?: string;
 }
 
@@ -82,7 +89,6 @@ export interface RuntimeState {
   status: GenerationStatus;
   genx: GenerationState;
   budgetTimeRemaining: number;
-  cancelledRequestIds: string[];
 }
 
 export interface RootState {

@@ -62,6 +62,7 @@ npm run format     # prettier -w .
 
 - Prefer `storageKey` on inputs for automatic persistence — avoid manual onChange handlers for simple state sync.
 - Exception: Use `onChange` callbacks alongside `storageKey` when syncing to non-UIPart targets (e.g., `api.v1.an.set()`, `api.v1.memory.set()`). See ATTG/Style fields in `TextField.ts` for example.
+- **Never dispatch actions in `onChange` callbacks.** The reducer overhead is too high for keystroke-frequency events. Direct API calls are acceptable in `onChange` when syncing to external APIs (e.g., `api.v1.lorebook.updateEntry()`). See `ListItem.ts` for example.
 
 ## Key Constraints
 

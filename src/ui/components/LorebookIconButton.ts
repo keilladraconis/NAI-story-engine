@@ -8,6 +8,11 @@ import {
 } from "../../core/store";
 import { NAI_WARNING, NAI_HEADER } from "../colors";
 
+/**
+ * Icon-based generation button for DULFS list items.
+ * Derives requestIds from the entryId prop and tracks lorebook content state.
+ */
+
 export interface LorebookIconButtonProps {
   id: string;
   entryId: string;
@@ -15,16 +20,16 @@ export interface LorebookIconButtonProps {
 
 const { button } = api.v1.ui.part;
 
+type ButtonMode = "idle" | "queued" | "cancel" | "continue" | "wait";
+
 // Icon-based visual states
 const STYLES = {
-  // Idle - no content (grey, low opacity)
   idle: {
     width: "24px",
     padding: "4px",
     opacity: "0.3",
     cursor: "pointer",
   },
-  // Idle - has content (green tint)
   idleWithContent: {
     width: "24px",
     padding: "4px",
@@ -32,7 +37,6 @@ const STYLES = {
     cursor: "pointer",
     color: "rgb(144, 238, 144)", // Light green
   },
-  // Queued (yellow/amber tint)
   queued: {
     width: "24px",
     padding: "4px",
@@ -40,7 +44,6 @@ const STYLES = {
     cursor: "pointer",
     color: NAI_HEADER,
   },
-  // Generating - cancel available (red tint)
   cancel: {
     width: "24px",
     padding: "4px",
@@ -48,7 +51,6 @@ const STYLES = {
     cursor: "pointer",
     color: NAI_WARNING,
   },
-  // Waiting for user interaction (amber/warning)
   continue: {
     width: "24px",
     padding: "4px",
@@ -57,7 +59,6 @@ const STYLES = {
     color: NAI_HEADER,
     animation: "pulse 1s infinite",
   },
-  // Waiting for budget
   wait: {
     width: "24px",
     padding: "4px",
@@ -85,7 +86,6 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
     describe(props) {
       const { id } = props;
 
-      // Single button that changes appearance based on state
       return button({
         id,
         iconId: "book",
@@ -100,34 +100,33 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
       let hasContent = false;
       let timerId: any = null;
       let isTimerActive = false;
-      let lastMode: "idle" | "queued" | "cancel" | "continue" | "wait" | null =
-        null;
+      let lastMode: ButtonMode | null = null;
+
+      // Derive request IDs from entryId
+      const contentRequestId = `lb-item-${entryId}-content`;
+      const keysRequestId = `lb-item-${entryId}-keys`;
 
       // Attach event handlers
       events.attach({
         generate(p) {
-          // Derive request IDs from props
-          const contentReqId = `lb-item-${p.entryId}-content`;
-          const keysReqId = `lb-item-${p.entryId}-keys`;
           dispatch(
             lorebookItemGenerationRequested({
               entryId: p.entryId,
-              contentRequestId: contentReqId,
-              keysRequestId: keysReqId,
+              contentRequestId: `lb-item-${p.entryId}-content`,
+              keysRequestId: `lb-item-${p.entryId}-keys`,
             }),
           );
         },
         cancel(p) {
-          // Cancel queued request - derive IDs from props
-          const contentReqId = `lb-item-${p.entryId}-content`;
-          const keysReqId = `lb-item-${p.entryId}-keys`;
-          dispatch(uiCancelRequest({ requestId: contentReqId }));
-          dispatch(uiCancelRequest({ requestId: keysReqId }));
+          dispatch(
+            uiCancelRequest({ requestId: `lb-item-${p.entryId}-content` }),
+          );
+          dispatch(uiCancelRequest({ requestId: `lb-item-${p.entryId}-keys` }));
         },
-        cancelActive(_p) {
+        cancelActive() {
           dispatch(uiRequestCancellation());
         },
-        continue(_p) {
+        continue() {
           dispatch(uiUserPresenceConfirmed());
         },
       });
@@ -138,7 +137,6 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
         const now = Date.now();
         const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
 
-        // Update button to show countdown number (no icon)
         api.v1.ui.updateParts([
           {
             id,
@@ -162,7 +160,7 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
         }
       };
 
-      // Check lorebook entry for content on mount and periodically
+      // Check lorebook entry for content
       const checkContent = async () => {
         try {
           const entry = await api.v1.lorebook.entry(entryId);
@@ -176,7 +174,6 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
       checkContent();
 
       // Reactive state tracking
-      // Return raw state values from selector, do instance-specific comparison in callback
       useSelector(
         (state) => ({
           activeRequestId: state.runtime.activeRequest?.id,
@@ -188,11 +185,7 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
           const { activeRequestId, queueIds, genxStatus, budgetWaitEndTime } =
             slice;
 
-          // Derive request IDs from props (not closure variables)
-          const contentRequestId = `lb-item-${entryId}-content`;
-          const keysRequestId = `lb-item-${entryId}-keys`;
-
-          // Instance-specific comparison in callback (like GenerationButton)
+          // Check if any of our requests are active/queued
           const isProcessing =
             activeRequestId === contentRequestId ||
             activeRequestId === keysRequestId;
@@ -200,8 +193,8 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
             queueIds.includes(contentRequestId) ||
             queueIds.includes(keysRequestId);
 
-          // Determine button mode based on task status & GenX status
-          let mode: "idle" | "queued" | "cancel" | "continue" | "wait" = "idle";
+          // Determine button mode
+          let mode: ButtonMode = "idle";
 
           if (isQueued) {
             mode = "queued";
@@ -215,16 +208,15 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
             }
           }
 
-          // For idle mode, always verify content state (handles list re-renders)
+          // For idle mode, always verify content state
           if (mode === "idle") {
             checkContent().then(() => {
-              // Only update if we're still in idle mode
               if (lastMode === "idle") {
                 api.v1.ui.updateParts([
                   {
                     id,
                     iconId: "book",
-                    text: undefined, // Clear text when showing icon
+                    text: undefined,
                     style: hasContent ? STYLES.idleWithContent : STYLES.idle,
                     callback: () => events.generate(props),
                   },
@@ -232,8 +224,6 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
               }
             });
 
-            // For idle specifically, skip immediate update if mode unchanged
-            // (the async checkContent will handle the update)
             if (mode === lastMode) {
               return;
             }
@@ -268,21 +258,18 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
               callback = () => events.continue(props);
               break;
             case "wait":
-              // Wait mode is handled by updateTimer - it shows countdown number
-              // Just set callback here, timer will update the visual
               style = STYLES.wait;
               callback = () => events.cancelActive(props);
               break;
           }
 
-          // Update the button immediately (no async before this!)
-          // For wait mode, skip this - the timer will handle the update
+          // Update button (skip for wait mode - timer handles it)
           if (mode !== "wait") {
             api.v1.ui.updateParts([
               {
                 id,
                 iconId,
-                text: undefined, // Clear text when showing icon (exiting wait mode)
+                text: undefined,
                 style,
                 callback,
               },
@@ -294,7 +281,6 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
             if (!isTimerActive) {
               isTimerActive = true;
               const endTime = budgetWaitEndTime || Date.now() + 60000;
-              // Immediate update with initial countdown value
               const initialRemaining = Math.max(
                 0,
                 Math.ceil((endTime - Date.now()) / 1000),
@@ -308,7 +294,6 @@ export const LorebookIconButton: Component<LorebookIconButtonProps, RootState> =
                   callback: () => events.cancelActive(props),
                 },
               ]);
-              // Start the countdown timer
               updateTimer(endTime);
             }
           } else {

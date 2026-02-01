@@ -205,6 +205,30 @@ export function combineReducers<R extends Record<string, Reducer<any>>>(
   };
 }
 
+// ==================================================
+// Effect Helpers
+// ==================================================
+
+/**
+ * Type-safe action matcher for use with subscribeEffect.
+ * Extracts the action type string from an action creator.
+ *
+ * @example
+ * subscribeEffect(
+ *   matchesAction(myAction),
+ *   (action, ctx) => {
+ *     // action.payload is properly typed
+ *   }
+ * );
+ */
+export function matchesAction<P>(
+  actionCreator: (payload: P) => PayloadAction<P>,
+): (action: Action) => action is PayloadAction<P> {
+  // Get the action type by calling the creator with a placeholder
+  const actionType = actionCreator(undefined as P).type;
+  return (action): action is PayloadAction<P> => action.type === actionType;
+}
+
 /*
  * END NAIStore
  */

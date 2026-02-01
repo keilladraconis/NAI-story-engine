@@ -15,6 +15,12 @@ import {
   NAI_PARAGRAPH,
 } from "../../colors";
 
+/**
+ * Lorebook-specific generation button that derives requestId from selected entry.
+ * This is a thin wrapper that handles the dynamic requestId resolution that the
+ * unified GenerationButton cannot do (since it needs access to full state in selector).
+ */
+
 export interface LorebookGenerationButtonProps {
   id: string;
   type: "content" | "keys";
@@ -59,6 +65,8 @@ const getButtonStyles = () => {
   };
 };
 
+type ButtonMode = "gen" | "queue" | "cancel" | "continue" | "wait" | "disabled";
+
 const events = createEvents<
   LorebookGenerationButtonProps,
   {
@@ -82,35 +90,35 @@ export const LorebookGenerationButton: Component<
 
     const btnGenerate = button({
       id: `${id}-gen`,
-      text: `\u26A1 ${label}`,
+      text: `⚡ ${label}`,
       style: styles.gen,
       callback: () => events.generate(props),
     });
 
     const btnQueued = button({
       id: `${id}-queue`,
-      text: label ? `\u23F3 Queued` : "\u23F3",
+      text: label ? `⏳ Queued` : "⏳",
       style: { ...styles.queue, display: "none" },
       callback: () => events.cancel(props),
     });
 
     const btnCancel = button({
       id: `${id}-cancel`,
-      text: label ? `\uD83D\uDEAB Cancel` : "\uD83D\uDEAB",
+      text: label ? `🚫 Cancel` : "🚫",
       style: { ...styles.cancel, display: "none" },
       callback: () => events.cancelActive(props),
     });
 
     const btnContinue = button({
       id: `${id}-continue`,
-      text: label ? `\u26A0\uFE0F Continue` : "\u26A0\uFE0F",
+      text: label ? `⚠️ Continue` : "⚠️",
       style: { ...styles.continue, display: "none" },
       callback: () => events.continue(props),
     });
 
     const btnWait = button({
       id: `${id}-wait`,
-      text: label ? `\u23F3 Wait` : "\u23F3",
+      text: label ? `⏳ Wait` : "⏳",
       style: { ...styles.wait, display: "none" },
       callback: () => events.cancelActive(props),
     });
@@ -123,32 +131,20 @@ export const LorebookGenerationButton: Component<
   },
 
   onMount(props, { dispatch, useSelector }) {
-    const { id, type } = props;
+    const { id, type, label } = props;
     const styles = getButtonStyles();
     let timerId: any = null;
     let isTimerActive = false;
 
-    // Attach Handlers
+    // Attach Handlers - these don't do anything directly,
+    // actual dispatch happens in selector callback with derived requestId
     events.attach({
-      generate(p) {
-        // This will be called via the callback, but we need to get current selectedEntryId
-        // Since we can't access state directly here, we dispatch without entryId
-        // and let the effect handle it using getState()
-        if (p.type === "content") {
-          // Get requestId dynamically - the selector callback will have updated
-          // but we need the current entry. Use a separate mechanism.
-        }
-        if (p.type === "keys") {
-          // Same as above
-        }
-      },
-      cancel(_p) {
-        // Cancel is handled via requestId derived in the callback
-      },
-      cancelActive(_p) {
+      generate() {},
+      cancel() {},
+      cancelActive() {
         dispatch(uiRequestCancellation());
       },
-      continue(_p) {
+      continue() {
         dispatch(uiUserPresenceConfirmed());
       },
     });
@@ -162,9 +158,7 @@ export const LorebookGenerationButton: Component<
       api.v1.ui.updateParts([
         {
           id: `${id}-wait`,
-          text: props.label
-            ? `\u23F3 Wait (${remaining}s)`
-            : `\u23F3 (${remaining}s)`,
+          text: label ? `⏳ Wait (${remaining}s)` : `⏳ (${remaining}s)`,
         },
       ]);
 
@@ -219,7 +213,7 @@ export const LorebookGenerationButton: Component<
         const requestId =
           type === "content" ? entryIds.CONTENT_REQ : entryIds.KEYS_REQ;
 
-        let mode: "gen" | "queue" | "cancel" | "continue" | "wait" = "gen";
+        let mode: ButtonMode = "gen";
         let taskStatus: "queued" | "processing" | "not_found" = "not_found";
 
         // Determine Task Status based on derived requestId

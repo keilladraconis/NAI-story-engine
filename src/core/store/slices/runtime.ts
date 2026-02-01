@@ -12,7 +12,6 @@ export const initialRuntimeState: RuntimeState = {
     status: "idle",
     queueLength: 0,
   },
-  cancelledRequestIds: [],
 };
 
 export const runtimeSlice = createSlice({
@@ -32,16 +31,19 @@ export const runtimeSlice = createSlice({
     // intentRequestGeneration moved to uiSlice as uiRequestGeneration
 
     // Intent (triggers effect to build strategy)
-    generationRequested: (state, request: GenerationRequest) => ({
+    generationRequested: (
+      state,
+      request: Omit<GenerationRequest, "status">,
+    ) => ({
       ...state,
-      queue: [...state.queue, request],
+      queue: [...state.queue, { ...request, status: "queued" as const }],
       status: state.status === "idle" ? "queued" : state.status,
     }),
 
     // Just adds to queue (no effect, for when strategy is already built)
-    requestQueued: (state, request: GenerationRequest) => ({
+    requestQueued: (state, request: Omit<GenerationRequest, "status">) => ({
       ...state,
-      queue: [...state.queue, request],
+      queue: [...state.queue, { ...request, status: "queued" as const }],
       status: state.status === "idle" ? "queued" : state.status,
     }),
 
@@ -71,19 +73,39 @@ export const runtimeSlice = createSlice({
       budgetTimeRemaining: payload.timeRemaining,
     }),
 
-    // Mark a request as cancelled (for detection after generation completes)
-    requestCancelled: (state, payload: { requestId: string }) => ({
-      ...state,
-      cancelledRequestIds: [...state.cancelledRequestIds, payload.requestId],
-    }),
+    // Mark a request as cancelled (status change on the request itself)
+    requestCancelled: (state, payload: { requestId: string }) => {
+      // Check if in queue
+      const queueIndex = state.queue.findIndex(
+        (r) => r.id === payload.requestId,
+      );
+      if (queueIndex >= 0) {
+        const newQueue = [...state.queue];
+        newQueue[queueIndex] = { ...newQueue[queueIndex], status: "cancelled" };
+        return { ...state, queue: newQueue };
+      }
 
-    // Clear a cancelled request ID (after handling)
-    cancelledRequestCleared: (state, payload: { requestId: string }) => ({
-      ...state,
-      cancelledRequestIds: state.cancelledRequestIds.filter(
-        (id) => id !== payload.requestId,
-      ),
-    }),
+      // Check if active request
+      if (state.activeRequest?.id === payload.requestId) {
+        return {
+          ...state,
+          activeRequest: { ...state.activeRequest, status: "cancelled" },
+        };
+      }
+
+      return state;
+    },
+
+    // Mark a request as completed
+    requestCompleted: (state, payload: { requestId: string }) => {
+      if (state.activeRequest?.id === payload.requestId) {
+        return {
+          ...state,
+          activeRequest: { ...state.activeRequest, status: "completed" },
+        };
+      }
+      return state;
+    },
   },
 });
 
@@ -95,5 +117,5 @@ export const {
   requestsSynced,
   budgetUpdated,
   requestCancelled,
-  cancelledRequestCleared,
+  requestCompleted,
 } = runtimeSlice.actions;

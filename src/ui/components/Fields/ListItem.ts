@@ -45,6 +45,7 @@ export const ListItem = defineComponent<
           storageKey: `story:dulfs-item-${item.id}`,
           style: { padding: "4px", flex: "1" },
           onChange: async (value: string) => {
+            // Direct API call for lorebook sync (acceptable for onChange - no store overhead)
             await api.v1.lorebook.updateEntry(item.id, {
               displayName: value,
               keys: [value],
