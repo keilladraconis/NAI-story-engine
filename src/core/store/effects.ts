@@ -447,6 +447,23 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         originalContent: rollbackState.content,
         originalKeys: rollbackState.keys,
       });
+
+      // 8. Show toast notification for Story Engine generations
+      if (generationSucceeded) {
+        if (target.type === "list") {
+          const fieldConfig = FIELD_CONFIGS.find((c) => c.id === target.fieldId);
+          const label = fieldConfig?.label || "Items";
+          api.v1.ui.toast(`${label} generated`, { type: "success" });
+        } else if (target.type === "lorebookContent") {
+          const entry = await api.v1.lorebook.entry(target.entryId);
+          const name = entry?.displayName || "Entry";
+          api.v1.ui.toast(`Lorebook: ${name}`, { type: "success" });
+        } else if (target.type === "lorebookKeys") {
+          const entry = await api.v1.lorebook.entry(target.entryId);
+          const name = entry?.displayName || "Entry";
+          api.v1.ui.toast(`Keys: ${name}`, { type: "success" });
+        }
+      }
     },
   );
 

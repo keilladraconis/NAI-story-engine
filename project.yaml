@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1769987834
+updatedAt: 1769989294
 config:
   - name: system_prompt
     prettyName: System Prompt
@@ -197,20 +197,19 @@ config:
     type: string
     multiline: true
     default: |-
-      Generate a list of activation keys (triggers) for this Lorebook entry.
-      The keys should include the character/place name, aliases, titles, and unique identifiers.
-      CRITICAL: Output ONLY the comma-separated list of keys. No other text.
+      List proper nouns that would appear in story prose when this entry is relevant.
+      Focus on NAMES: the entry's name, related people, places, events, organizations.
+      Output ONLY a comma-separated list. No descriptions.
 
-      EXAMPLE:
-      Entry: [Gandalf] ...
-      Output: Gandalf, Gandalf the Grey, Mithrandir, The Grey Pilgrim
+      FOR CHARACTERS: their name, family/ally/enemy names, faction names, home location
+      FOR LOCATIONS: place name, notable people there, connected places
+      FOR FACTIONS: faction name, leader name, member titles, rival names
+      FOR EVENTS: event name, participant names, location names
 
-      INSTRUCTION:
-      - Read the provided Lorebook Entry.
-      - Extract all names, titles, aliases, and unique terms that should trigger this entry.
-      - Output them as a simple comma-separated list.
-      - DO NOT include common words that would trigger false positives (e.g. "The", "Man").
-      - LIMIT to the most important 5-10 keys.
+      DO NOT INCLUDE: descriptions, adjectives, skills, traits, species, body parts
+      These describe the entry but won't appear as searchable names in prose.
+
+      5-8 names maximum.
 
   - name: attg_generate_prompt
     prettyName: ATTG Generate Prompt

@@ -202,7 +202,14 @@ export const createLorebookKeysFactory = (entryId: string): MessageFactory => {
 
     return {
       messages,
-      params: { model, max_tokens: 64, temperature: 0.3, min_p: 0.05 },
+      params: {
+        model,
+        max_tokens: 64,
+        temperature: 0.5,
+        min_p: 0.05,
+        frequency_penalty: 0.3,
+        stop: ["\n"],
+      },
     };
   };
 };
