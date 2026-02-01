@@ -15,7 +15,6 @@ export const initialStoryState: StoryState = {
     [FieldID.Factions]: [],
     [FieldID.SituationalDynamics]: [],
   } as Record<DulfsFieldID, DulfsItem[]>,
-  dulfsSummaries: {},
   attgEnabled: false,
   styleEnabled: false,
 };
@@ -88,16 +87,6 @@ export const storySlice = createSlice({
         },
       };
     },
-    dulfsSummaryUpdated: (
-      state,
-      payload: { fieldId: string; summary: string },
-    ) => ({
-      ...state,
-      dulfsSummaries: {
-        ...state.dulfsSummaries,
-        [payload.fieldId]: payload.summary,
-      },
-    }),
     attgToggled: (state) => ({
       ...state,
       attgEnabled: !state.attgEnabled,
@@ -115,7 +104,6 @@ export const {
   fieldUpdated,
   dulfsItemAdded,
   dulfsItemRemoved,
-  dulfsSummaryUpdated,
   attgToggled,
   styleToggled,
 } = storySlice.actions;

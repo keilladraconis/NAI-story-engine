@@ -36,6 +36,7 @@ import {
   buildDulfsListStrategy,
   buildATTGStrategy,
   buildStyleStrategy,
+  extractDulfsItemName,
 } from "../utils/context-builder";
 import { IDS } from "../../ui/framework/ids";
 import {
@@ -566,15 +567,18 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     (action) => action.type === "story/dulfsItemAdded",
     async (action: any) => {
       const { fieldId, item } = action.payload;
-      const name =
+      const content =
         (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "";
+
+      // Extract name from full content using field-specific parser
+      const name = extractDulfsItemName(String(content), fieldId);
 
       const categoryId = await ensureCategory(fieldId);
       await api.v1.lorebook.createEntry({
         id: item.id,
         category: categoryId,
-        displayName: String(name),
-        keys: String(name) ? [String(name)] : [],
+        displayName: name,
+        keys: [], // Keys are generated separately via lorebook generation
         enabled: true,
       });
     },
@@ -627,7 +631,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         /^kse-section-/, // Collapsible section states
         /^draft-/, // Draft content (text fields, brainstorm messages)
         /^dulfs-item-/, // DULFS item content
-        /^dulfs-summary-draft-/, // DULFS summary drafts
         /^se-bs-input$/, // Brainstorm input
       ];
 

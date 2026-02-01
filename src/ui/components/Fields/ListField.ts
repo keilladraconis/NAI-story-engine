@@ -1,26 +1,16 @@
 import { createEvents, defineComponent } from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
-import {
-  dulfsSummaryUpdated,
-  dulfsItemAdded,
-} from "../../../core/store/slices/story";
-import {
-  uiFieldEditBegin,
-  uiFieldEditEnd,
-} from "../../../core/store/slices/ui";
+import { dulfsItemAdded } from "../../../core/store/slices/story";
 import { uiGenerationRequested } from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
 import { ListItem } from "./ListItem";
 
 export type ListFieldProps = FieldConfig;
 
-const { row, text, column, button, collapsibleSection, multilineTextInput } =
-  api.v1.ui.part;
+const { row, text, column, button, collapsibleSection } = api.v1.ui.part;
 
 type ListFieldEvents = {
-  beginSummaryEdit(): void;
-  saveSummary(): void;
   addItem(): void;
 };
 
@@ -38,36 +28,13 @@ export const ListField = defineComponent<
       opacity: 0.8,
       "margin-bottom": "8px",
     },
-    summaryBox: {
-      "margin-bottom": "12px",
-      "background-color": "rgba(128, 128, 128, 0.05)",
-      padding: "8px",
-      "border-radius": "4px",
-      gap: "4px",
-    },
-    summaryHeader: {
-      "justify-content": "space-between",
-      "align-items": "center",
-    },
-    summaryLabel: { "font-weight": "bold", opacity: "0.7" },
-    buttonGroup: { gap: "4px" },
-    summaryText: { opacity: 0.8 },
-    summaryInput: { "min-height": "60px" },
     itemsColumn: { gap: "4px" },
     actionsRow: { "margin-top": "8px", gap: "8px", "flex-wrap": "wrap" },
-    iconButton: { width: "24px", padding: "4px" },
     standardButton: { padding: "4px 8px" },
-    hidden: { display: "none" },
-    visible: { display: "block" },
   },
 
   describe(props) {
     const listGenId = `gen-list-${props.id}`;
-
-    const summaryEditBtnId = `summary-edit-btn-${props.id}`;
-    const summarySaveBtnId = `summary-save-btn-${props.id}`;
-    const summaryInputId = `summary-input-${props.id}`;
-    const summaryTextId = `summary-text-${props.id}`;
 
     const genButton = GenerationButton.describe({
       id: `gen-btn-${listGenId}`,
@@ -89,50 +56,6 @@ export const ListField = defineComponent<
         text({
           text: props.description,
           style: this.style?.("description"),
-        }),
-        // Summary Section
-        column({
-          style: this.style?.("summaryBox"),
-          content: [
-            row({
-              style: this.style?.("summaryHeader"),
-              content: [
-                text({
-                  text: "Category Summary",
-                  style: this.style?.("summaryLabel"),
-                }),
-                row({
-                  style: this.style?.("buttonGroup"),
-                  content: [
-                    button({
-                      id: summaryEditBtnId,
-                      iconId: "edit-3",
-                      style: this.style?.("iconButton"),
-                      callback: () => this.events.beginSummaryEdit(props),
-                    }),
-                    button({
-                      id: summarySaveBtnId,
-                      iconId: "save",
-                      style: this.style?.("iconButton", "hidden"),
-                      callback: () => this.events.saveSummary(props),
-                    }),
-                  ],
-                }),
-              ],
-            }),
-            multilineTextInput({
-              id: summaryInputId,
-              placeholder: "Summary...",
-              initialValue: "",
-              storageKey: `story:dulfs-summary-draft-${props.id}`,
-              style: this.style?.("summaryInput", "hidden"),
-            }),
-            text({
-              id: summaryTextId,
-              text: "_No summary._",
-              style: this.style?.("summaryText"),
-            }),
-          ],
         }),
         // Items List
         column({
@@ -158,25 +81,13 @@ export const ListField = defineComponent<
   },
 
   onMount(props, ctx) {
-    const { useSelector, useEffect, dispatch } = ctx;
+    const { useSelector, dispatch } = ctx;
 
-    const summaryEditBtnId = `summary-edit-btn-${props.id}`;
-    const summarySaveBtnId = `summary-save-btn-${props.id}`;
-    const summaryInputId = `summary-input-${props.id}`;
-    const summaryTextId = `summary-text-${props.id}`;
     const itemsColId = `items-col-${props.id}`;
-    const summaryStorageKey = `dulfs-summary-draft-${props.id}`;
-
     const boundItems = new Set<string>();
 
-    // Event handlers only dispatch intents
+    // Event handlers
     this.events.attach({
-      beginSummaryEdit: (eventProps) => {
-        dispatch(uiFieldEditBegin({ id: eventProps.id }));
-      },
-      saveSummary: (eventProps) => {
-        dispatch(uiFieldEditEnd({ id: eventProps.id }));
-      },
       addItem: async (eventProps) => {
         const itemId = api.v1.uuid();
         await api.v1.storyStorage.set(`dulfs-item-${itemId}`, "");
@@ -192,67 +103,6 @@ export const ListField = defineComponent<
       },
     });
 
-    type FieldAction = { type: string; payload: { id: string } };
-
-    // Effect: Handle edit begin - push current content to storage
-    useEffect(
-      (action) =>
-        action.type === uiFieldEditBegin({ id: "" }).type &&
-        (action as FieldAction).payload.id === props.id,
-      async (_action, { getState }) => {
-        const summary = getState().story.dulfsSummaries[props.id] || "";
-        await api.v1.storyStorage.set(summaryStorageKey, summary);
-      },
-    );
-
-    // Effect: Handle save - read from storage and update state
-    useEffect(
-      (action) =>
-        action.type === uiFieldEditEnd({ id: "" }).type &&
-        (action as FieldAction).payload.id === props.id,
-      async (_action, { dispatch }) => {
-        const summary =
-          (await api.v1.storyStorage.get(summaryStorageKey)) || "";
-        dispatch(
-          dulfsSummaryUpdated({
-            fieldId: props.id,
-            summary: String(summary),
-          }),
-        );
-      },
-    );
-
-    // React to Edit Mode changes
-    useSelector(
-      (state) => state.ui.editModes[props.id],
-      (isEditing) => {
-        api.v1.ui.updateParts([
-          {
-            id: summaryEditBtnId,
-            style: this.style?.("iconButton", isEditing ? "hidden" : "visible"),
-          },
-          {
-            id: summarySaveBtnId,
-            style: this.style?.("iconButton", isEditing ? "visible" : "hidden"),
-          },
-          {
-            id: summaryInputId,
-            style: this.style?.(
-              "summaryInput",
-              isEditing ? "visible" : "hidden",
-            ),
-          },
-          {
-            id: summaryTextId,
-            style: this.style?.(
-              "summaryText",
-              isEditing ? "hidden" : "visible",
-            ),
-          },
-        ]);
-      },
-    );
-
     // Bind Category Gen Button
     const listGenId = `gen-list-${props.id}`;
     ctx.mount(GenerationButton, {
@@ -265,15 +115,6 @@ export const ListField = defineComponent<
         targetId: props.id,
       }),
     });
-
-    // Sync Summary -> Display
-    useSelector(
-      (state) => state.story.dulfsSummaries[props.id],
-      (summary) => {
-        const safeSummary = summary || "";
-        api.v1.ui.updateParts([{ id: summaryTextId, text: safeSummary }]);
-      },
-    );
 
     // Sync Items
     useSelector(

@@ -1,6 +1,7 @@
 import { RootState, GenerationStrategy } from "../store/types";
 import { MessageFactory } from "../../../lib/gen-x";
 import { FieldID } from "../../config/field-definitions";
+import { getAllDulfsContext } from "./context-builder";
 
 // Category-to-template mapping
 const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
@@ -37,7 +38,10 @@ export const buildLorebookContentStrategy = async (
   const prompt = basePrompt.replace("[itemName]", displayName);
 
   const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
-  const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
+
+  // Get DULFS context and the specific item's short description
+  const dulfsContext = await getAllDulfsContext(state);
+  const itemContent = String((await api.v1.storyStorage.get(`dulfs-item-${entryId}`)) || "");
 
   const messages: Message[] = [
     {
@@ -46,7 +50,7 @@ export const buildLorebookContentStrategy = async (
     },
     {
       role: "user",
-      content: `Generate a lorebook entry for: ${displayName}\n\nSTORY PROMPT:\n${storyPrompt}\n\nWORLD SNAPSHOT:\n${worldSnapshot}`,
+      content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}\n\nSTORY PROMPT:\n${storyPrompt}\n\nSTORY ELEMENTS:\n${dulfsContext}`,
     },
     { role: "assistant", content: "----\n" },
   ];
@@ -136,7 +140,10 @@ export const createLorebookContentFactory = (
     const prompt = basePrompt.replace("[itemName]", displayName);
 
     const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
-    const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
+
+    // Get DULFS context and the specific item's short description
+    const dulfsContext = await getAllDulfsContext(state);
+    const itemContent = String((await api.v1.storyStorage.get(`dulfs-item-${entryId}`)) || "");
 
     const messages: Message[] = [
       {
@@ -145,14 +152,14 @@ export const createLorebookContentFactory = (
       },
       {
         role: "user",
-        content: `Generate a lorebook entry for: ${displayName}\n\nSTORY PROMPT:\n${storyPrompt}\n\nWORLD SNAPSHOT:\n${worldSnapshot}`,
+        content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}\n\nSTORY PROMPT:\n${storyPrompt}\n\nSTORY ELEMENTS:\n${dulfsContext}`,
       },
       { role: "assistant", content: "----\n" },
     ];
 
     return {
       messages,
-      params: { model, max_tokens: 512, temperature: 0.85, min_p: 0.05 },
+      params: { model, max_tokens: 700, temperature: 0.85, min_p: 0.05 },
     };
   };
 };

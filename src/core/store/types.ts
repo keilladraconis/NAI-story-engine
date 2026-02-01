@@ -16,7 +16,6 @@ export interface DulfsItem {
 export interface StoryState {
   fields: Record<string, StoryField>;
   dulfs: Record<DulfsFieldID, DulfsItem[]>;
-  dulfsSummaries: Record<string, string>;
   attgEnabled: boolean;
   styleEnabled: boolean;
 }

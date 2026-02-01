@@ -4,8 +4,9 @@ import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
 import { dulfsItemRemoved } from "../../../core/store/slices/story";
 import { uiLorebookItemGenerationRequested } from "../../../core/store/slices/ui";
 import { GenerationButton } from "../GenerationButton";
+import { extractDulfsItemName } from "../../../core/utils/context-builder";
 
-const { row, button, textInput } = api.v1.ui.part;
+const { row, button, multilineTextInput } = api.v1.ui.part;
 
 export interface ListItemProps {
   config: FieldConfig;
@@ -25,15 +26,15 @@ export const ListItem = defineComponent<
   events: createEvents<ListItemProps, ListItemEvents>(),
 
   describe(props) {
-    const { item } = props;
+    const { item, config } = props;
 
     const bookBtnId = `book-${item.id}`;
-    const nameInputId = `name-input-${item.id}`;
+    const contentInputId = `content-input-${item.id}`;
     const deleteBtnId = `btn-del-${item.id}`;
 
     return row({
       id: `item-${item.id}`,
-      style: { gap: "8px", "align-items": "center", padding: "4px 0" },
+      style: { gap: "8px", "align-items": "flex-start", padding: "4px 0" },
       content: [
         // Lorebook generation icon button
         GenerationButton.describe({
@@ -42,16 +43,16 @@ export const ListItem = defineComponent<
           iconId: "book",
           requestIds: [`lb-item-${item.id}-content`, `lb-item-${item.id}-keys`],
         }),
-        textInput({
-          id: nameInputId,
+        multilineTextInput({
+          id: contentInputId,
           initialValue: "",
           storageKey: `story:dulfs-item-${item.id}`,
-          style: { padding: "4px", flex: "1" },
+          style: { padding: "4px", flex: "1", "min-height": "48px" },
           onChange: async (value: string) => {
-            // Direct API call for lorebook sync (acceptable for onChange - no store overhead)
+            // Extract name using field-specific parser and sync to lorebook displayName only
+            const name = extractDulfsItemName(value, config.id);
             await api.v1.lorebook.updateEntry(item.id, {
-              displayName: value,
-              keys: [value],
+              displayName: name,
             });
           },
         }),

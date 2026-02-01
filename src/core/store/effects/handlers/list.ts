@@ -16,25 +16,23 @@ export const listHandler: GenerationHandlers<ListTarget> = {
   async completion(ctx: CompletionContext<ListTarget>): Promise<void> {
     if (!ctx.accumulatedText) return;
 
-    // Parse generated list and create DULFS items (names only)
+    // Parse generated list and create DULFS items with full content
     const lines = ctx.accumulatedText.split("\n").filter((l) => l.trim());
     for (const line of lines) {
-      // Strip bullets, numbers, dashes, and extract clean name
+      // Strip bullets, numbers, dashes, and extract full content
       const match = line.match(/^[\s\-*+•\d.)\]]*(.+)$/);
       if (match) {
-        const name = match[1]
+        const content = match[1]
           .trim()
-          .replace(/^[:\-–—]\s*/, "") // Strip leading colons/dashes
-          .replace(/[:\-–—].*$/, "") // Strip trailing descriptions
-          .trim();
+          .replace(/^[:\-–—]\s*/, ""); // Strip leading colons/dashes only
 
-        if (name) {
+        if (content) {
           const itemId = api.v1.uuid();
 
-          // Store only the name in storyStorage
-          await api.v1.storyStorage.set(`dulfs-item-${itemId}`, name);
+          // Store full content in storyStorage (name extraction happens in effects.ts)
+          await api.v1.storyStorage.set(`dulfs-item-${itemId}`, content);
 
-          // Dispatch minimal item
+          // Dispatch item - lorebook sync (with parsed name) happens in effects.ts
           ctx.dispatch(
             dulfsItemAdded({
               fieldId: ctx.target.fieldId as DulfsFieldID,

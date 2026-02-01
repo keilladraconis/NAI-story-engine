@@ -4,7 +4,7 @@ import {
   GenerationStrategy,
 } from "../store/types";
 import { MessageFactory } from "../../../lib/gen-x";
-import { FieldID, FIELD_CONFIGS } from "../../config/field-definitions";
+import { FieldID, FIELD_CONFIGS, DulfsFieldID } from "../../config/field-definitions";
 
 // --- Helpers ---
 
@@ -14,6 +14,81 @@ const getFieldContent = (state: RootState, id: string): string => {
 
 const getBrainstormHistory = (state: RootState): BrainstormMessage[] => {
   return state.brainstorm.messages || [];
+};
+
+/**
+ * Extracts the name portion from a DULFS item content using field-specific parsing.
+ * Falls back to raw content if no regex match.
+ */
+export const extractDulfsItemName = (
+  content: string,
+  fieldId: string,
+): string => {
+  const fieldConfig = FIELD_CONFIGS.find((f) => f.id === fieldId);
+  const regex = fieldConfig?.parsingRegex;
+
+  if (regex) {
+    const match = content.match(regex);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+
+  // Fallback: return content up to first colon or full content
+  const colonIndex = content.indexOf(":");
+  if (colonIndex > 0) {
+    return content.substring(0, colonIndex).trim();
+  }
+  return content.trim();
+};
+
+/**
+ * Gets existing DULFS item content for a field, joined with newlines.
+ * Returns empty string if no items exist.
+ */
+export const getExistingDulfsItems = async (
+  state: RootState,
+  fieldId: DulfsFieldID,
+): Promise<string> => {
+  const items = state.story.dulfs[fieldId] || [];
+  if (items.length === 0) return "";
+
+  const contents: string[] = [];
+  for (const item of items) {
+    const content = String((await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "");
+    if (content) contents.push(content);
+  }
+  return contents.join("\n");
+};
+
+/**
+ * All DULFS field IDs for iteration.
+ */
+const ALL_DULFS_FIELDS: DulfsFieldID[] = [
+  FieldID.DramatisPersonae,
+  FieldID.UniverseSystems,
+  FieldID.Locations,
+  FieldID.Factions,
+  FieldID.SituationalDynamics,
+];
+
+/**
+ * Gets all DULFS items across all fields, grouped by category label.
+ * Returns formatted string for context injection.
+ */
+export const getAllDulfsContext = async (state: RootState): Promise<string> => {
+  const sections: string[] = [];
+
+  for (const fieldId of ALL_DULFS_FIELDS) {
+    const items = await getExistingDulfsItems(state, fieldId);
+    if (items) {
+      const config = FIELD_CONFIGS.find((f) => f.id === fieldId);
+      const label = config?.label || fieldId;
+      sections.push(`[${label.toUpperCase()}]\n${items}`);
+    }
+  }
+
+  return sections.join("\n\n");
 };
 
 const getConsolidatedBrainstorm = (state: RootState): string => {
@@ -54,13 +129,11 @@ const getCommonContextBlocks = async (
 ): Promise<Message[]> => {
   const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
   const setting = String((await api.v1.storyStorage.get("kse-setting")) || "");
-  const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
 
   return [
     ...storyContext,
     { role: "user", content: `STORY PROMPT:\n${storyPrompt}` },
     { role: "user", content: `SETTING:\n${setting}` },
-    { role: "user", content: `WORLD SNAPSHOT:\n${worldSnapshot}` },
   ];
 };
 
@@ -96,7 +169,6 @@ export const createBrainstormFactory = (
     const setting = String(
       (await api.v1.storyStorage.get("kse-setting")) || "",
     );
-    const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
 
     let contextBlock = "Here is the current state of the story:\n";
     let hasContext = false;
@@ -107,10 +179,6 @@ export const createBrainstormFactory = (
     }
     if (setting) {
       contextBlock += `SETTING:\n${setting}\n\n`;
-      hasContext = true;
-    }
-    if (worldSnapshot) {
-      contextBlock += `WORLD SNAPSHOT:\n${worldSnapshot}\n\n`;
       hasContext = true;
     }
 
@@ -237,30 +305,39 @@ export const createDulfsListFactory = (
     );
     const fieldConfig = FIELD_CONFIGS.find((f) => f.id === fieldId);
 
-    // Use listGenerationInstruction if available, otherwise generationInstruction
+    // Use generationInstruction for rich format, listGenerationInstruction for context
     const instruction =
       fieldConfig?.listGenerationInstruction ||
       fieldConfig?.generationInstruction ||
       "";
-    const listExampleFormat = fieldConfig?.listExampleFormat || "";
+    const exampleFormat = fieldConfig?.exampleFormat || "";
     const brainstormContent = getConsolidatedBrainstorm(state);
     const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+
+    // Get existing items in full format to avoid duplicates
+    const existingItems = await getExistingDulfsItems(
+      state,
+      fieldId as DulfsFieldID,
+    );
+    const existingContext = existingItems
+      ? `\n\n[EXISTING ${fieldConfig?.label?.toUpperCase() || "ITEMS"}]\n${existingItems}\n\nDo not repeat any of the above characters/items.`
+      : "";
 
     const messages: Message[] = [
       {
         role: "system",
-        content: `${systemPrompt}\n\n[LIST GENERATION MODE]\n${instruction}\n\nOutput ONLY a bulleted list of names, nothing else.\n\nExample:\n${listExampleFormat}`,
+        content: `${systemPrompt}\n\n[LIST GENERATION MODE]\n${instruction}\n\nOutput a bulleted list. Each item should follow this format:\n${exampleFormat}`,
       },
       {
         role: "user",
-        content: `STORY PROMPT:\n${storyPrompt}\n\nBRAINSTORM:\n${brainstormContent}`,
+        content: `STORY PROMPT:\n${storyPrompt}\n\nBRAINSTORM:\n${brainstormContent}${existingContext}`,
       },
       { role: "assistant", content: "-" },
     ];
 
     return {
       messages,
-      params: { model, max_tokens: 72, temperature: 0.9, min_p: 0.05 },
+      params: { model, max_tokens: 350, temperature: 0.9, min_p: 0.05 },
     };
   };
 };
@@ -297,7 +374,6 @@ export const createATTGFactory = (
     );
     const brainstormContent = getConsolidatedBrainstorm(state);
     const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
-    const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
 
     const messages: Message[] = [
       {
@@ -306,7 +382,7 @@ export const createATTGFactory = (
       },
       {
         role: "user",
-        content: `STORY PROMPT:\n${storyPrompt}\n\nWORLD SNAPSHOT:\n${worldSnapshot}\n\nBRAINSTORM:\n${brainstormContent}`,
+        content: `STORY PROMPT:\n${storyPrompt}\n\nBRAINSTORM:\n${brainstormContent}`,
       },
       { role: "assistant", content: "[" },
     ];
@@ -350,7 +426,6 @@ export const createStyleFactory = (
     );
     const brainstormContent = getConsolidatedBrainstorm(state);
     const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
-    const worldSnapshot = getFieldContent(state, FieldID.WorldSnapshot);
     const attg = getFieldContent(state, FieldID.ATTG);
 
     const messages: Message[] = [
@@ -360,7 +435,7 @@ export const createStyleFactory = (
       },
       {
         role: "user",
-        content: `STORY PROMPT:\n${storyPrompt}\n\nWORLD SNAPSHOT:\n${worldSnapshot}\n\nATTG:\n${attg}\n\nBRAINSTORM:\n${brainstormContent}`,
+        content: `STORY PROMPT:\n${storyPrompt}\n\nATTG:\n${attg}\n\nBRAINSTORM:\n${brainstormContent}`,
       },
       { role: "assistant", content: "[" },
     ];
