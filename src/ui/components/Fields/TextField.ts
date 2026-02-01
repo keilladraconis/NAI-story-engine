@@ -6,7 +6,7 @@ import {
   uiFieldEditBegin,
   uiFieldEditEnd,
 } from "../../../core/store/slices/ui";
-import { generationRequested } from "../../../core/store/slices/runtime";
+import { uiGenerationRequested } from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
 
 export type TextFieldProps = FieldConfig;
@@ -76,7 +76,7 @@ export const TextField = defineComponent<
       id: `gen-btn-${config.id}`,
       requestId,
       label: "Generate",
-      generateAction: generationRequested({
+      generateAction: uiGenerationRequested({
         id: requestId,
         type: "field",
         targetId: config.id,
@@ -280,7 +280,7 @@ export const TextField = defineComponent<
       id: `gen-btn-${config.id}`,
       requestId: `gen-${config.id}`,
       label: "Generate",
-      generateAction: generationRequested({
+      generateAction: uiGenerationRequested({
         id: `gen-${config.id}`,
         type: "field",
         targetId: config.id,

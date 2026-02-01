@@ -38,7 +38,8 @@ export const uiSlice = createSlice({
     uiBrainstormMessageEditEnd: (state) => state,
     uiBrainstormRetryGeneration: (state, _payload: { messageId: string }) =>
       state,
-    uiRequestGeneration: (state, _strategy: any) => state,
+    // Internal: Submit generation to GenX (not a user intent)
+    generationSubmitted: (state, _strategy: any) => state,
     uiCancelRequest: (state, _payload: { requestId: string }) => state,
     // Field editing (state change + side effects in component useEffect)
     uiFieldEditBegin: (state, payload: { id: string }) => ({
@@ -55,8 +56,8 @@ export const uiSlice = createSlice({
         [payload.id]: false,
       },
     }),
-    // Lorebook actions
-    lorebookEntrySelected: (
+    // Lorebook user intents (handled by effects)
+    uiLorebookEntrySelected: (
       state,
       payload: { entryId: string | null; categoryId: string | null },
     ) => ({
@@ -67,15 +68,16 @@ export const uiSlice = createSlice({
         selectedCategoryId: payload.categoryId,
       },
     }),
-    // Lorebook generation intents (handled by effects)
-    lorebookContentGenerationRequested: (
+    uiLorebookContentGenerationRequested: (
       state,
       _payload: { requestId: string },
     ) => state,
-    lorebookKeysGenerationRequested: (state, _payload: { requestId: string }) =>
+    uiLorebookKeysGenerationRequested: (
       state,
+      _payload: { requestId: string },
+    ) => state,
     // Item-level lorebook generation (queues both content + keys)
-    lorebookItemGenerationRequested: (
+    uiLorebookItemGenerationRequested: (
       state,
       _payload: {
         entryId: string;
@@ -95,12 +97,12 @@ export const {
   uiBrainstormMessageEditBegin,
   uiBrainstormMessageEditEnd,
   uiBrainstormRetryGeneration,
-  uiRequestGeneration,
+  generationSubmitted,
   uiCancelRequest,
   uiFieldEditBegin,
   uiFieldEditEnd,
-  lorebookEntrySelected,
-  lorebookContentGenerationRequested,
-  lorebookKeysGenerationRequested,
-  lorebookItemGenerationRequested,
+  uiLorebookEntrySelected,
+  uiLorebookContentGenerationRequested,
+  uiLorebookKeysGenerationRequested,
+  uiLorebookItemGenerationRequested,
 } = uiSlice.actions;

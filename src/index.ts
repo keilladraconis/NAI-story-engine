@@ -2,9 +2,9 @@ import {
   store,
   brainstormLoaded,
   storyLoaded,
-  lorebookEntrySelected,
-  lorebookContentGenerationRequested,
-  lorebookKeysGenerationRequested,
+  uiLorebookEntrySelected,
+  uiLorebookContentGenerationRequested,
+  uiLorebookKeysGenerationRequested,
 } from "./core/store";
 import { registerEffects } from "./core/store/effects";
 import { GenX } from "../lib/gen-x";
@@ -202,7 +202,7 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
     // Register lorebook entry selection hook
     api.v1.hooks.register("onLorebookEntrySelected", (params) => {
       store.dispatch(
-        lorebookEntrySelected({
+        uiLorebookEntrySelected({
           entryId: params.entryId || null,
           categoryId: params.categoryId || null,
         }),
@@ -231,7 +231,7 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
           const entryId = store.getState().ui.lorebook.selectedEntryId;
           if (entryId) {
             store.dispatch(
-              lorebookContentGenerationRequested({
+              uiLorebookContentGenerationRequested({
                 requestId: IDS.LOREBOOK.entry(entryId).CONTENT_REQ,
               }),
             );
@@ -253,7 +253,7 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
           const entryId = store.getState().ui.lorebook.selectedEntryId;
           if (entryId) {
             store.dispatch(
-              lorebookKeysGenerationRequested({
+              uiLorebookKeysGenerationRequested({
                 requestId: IDS.LOREBOOK.entry(entryId).KEYS_REQ,
               }),
             );

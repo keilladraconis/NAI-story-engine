@@ -27,11 +27,8 @@ export const runtimeSlice = createSlice({
       segaRunning: !state.segaRunning,
     }),
 
-    // Intent (handled by Effects)
-    // intentRequestGeneration moved to uiSlice as uiRequestGeneration
-
-    // Intent (triggers effect to build strategy)
-    generationRequested: (
+    // User intent: Request generation (triggers effect to build strategy)
+    uiGenerationRequested: (
       state,
       request: Omit<GenerationRequest, "status">,
     ) => ({
@@ -112,7 +109,7 @@ export const runtimeSlice = createSlice({
 export const {
   stateUpdated,
   segaToggled,
-  generationRequested,
+  uiGenerationRequested,
   requestQueued,
   requestsSynced,
   budgetUpdated,

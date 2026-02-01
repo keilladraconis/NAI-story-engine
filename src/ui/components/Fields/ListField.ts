@@ -9,7 +9,7 @@ import {
   uiFieldEditBegin,
   uiFieldEditEnd,
 } from "../../../core/store/slices/ui";
-import { generationRequested } from "../../../core/store/slices/runtime";
+import { uiGenerationRequested } from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
 import { ListItem } from "./ListItem";
 
@@ -73,7 +73,7 @@ export const ListField = defineComponent<
       id: `gen-btn-${listGenId}`,
       requestId: listGenId,
       label: "Generate Items",
-      generateAction: generationRequested({
+      generateAction: uiGenerationRequested({
         id: listGenId,
         type: "list",
         targetId: props.id,
@@ -259,7 +259,7 @@ export const ListField = defineComponent<
       id: `gen-btn-${listGenId}`,
       requestId: listGenId,
       label: "Generate Items",
-      generateAction: generationRequested({
+      generateAction: uiGenerationRequested({
         id: listGenId,
         type: "list",
         targetId: props.id,

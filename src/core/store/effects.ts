@@ -7,7 +7,7 @@ import {
   uiUserPresenceConfirmed,
   messageAdded,
   messageUpdated,
-  uiRequestGeneration,
+  generationSubmitted,
   uiCancelRequest,
   requestsSynced,
   requestQueued,
@@ -17,14 +17,14 @@ import {
   editingMessageIdSet,
   uiBrainstormRetryGeneration,
   pruneHistory,
-  generationRequested,
+  uiGenerationRequested,
   fieldUpdated,
   dulfsItemAdded,
   dulfsItemRemoved,
   storyCleared,
-  lorebookContentGenerationRequested,
-  lorebookKeysGenerationRequested,
-  lorebookItemGenerationRequested,
+  uiLorebookContentGenerationRequested,
+  uiLorebookKeysGenerationRequested,
+  uiLorebookItemGenerationRequested,
   requestCancelled,
   requestCompleted,
 } from "./index";
@@ -172,7 +172,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       // Request Generation - use factory pattern for JIT message building
       const strategy = buildBrainstormStrategy(getState, assistantId);
-      dispatch(uiRequestGeneration(strategy));
+      dispatch(generationSubmitted(strategy));
     },
   );
 
@@ -220,13 +220,13 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       // Request Generation - use factory pattern for JIT message building
       const strategy = buildBrainstormStrategy(getState, assistantId);
-      dispatch(uiRequestGeneration(strategy));
+      dispatch(generationSubmitted(strategy));
     },
   );
 
   // Intent: Field/List Generation
   subscribeEffect(
-    matchesAction(generationRequested),
+    matchesAction(uiGenerationRequested),
     async (action, { dispatch, getState }) => {
       const { id: requestId, type, targetId } = action.payload;
 
@@ -252,12 +252,12 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         }
 
         strategy.requestId = requestId; // Use store's ID for queue tracking
-        dispatch(uiRequestGeneration(strategy));
+        dispatch(generationSubmitted(strategy));
       } else if (type === "list") {
         // DULFS list generation (generate names)
         const strategy = buildDulfsListStrategy(getState, targetId);
         strategy.requestId = requestId; // Use store's ID for queue tracking
-        dispatch(uiRequestGeneration(strategy));
+        dispatch(generationSubmitted(strategy));
       }
       // "brainstorm" type is handled via separate submit/retry effects
     },
@@ -265,7 +265,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: GenX Generation
   subscribeEffect(
-    matchesAction(uiRequestGeneration),
+    matchesAction(generationSubmitted),
     async (action, { dispatch, getState }) => {
       const strategy = action.payload;
       const {
@@ -741,7 +741,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: Lorebook Content Generation (uses factory for JIT building)
   subscribeEffect(
-    matchesAction(lorebookContentGenerationRequested),
+    matchesAction(uiLorebookContentGenerationRequested),
     async (action, { dispatch, getState }) => {
       const { requestId } = action.payload;
       const { selectedEntryId } = getState().ui.lorebook;
@@ -760,7 +760,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       );
 
       dispatch(
-        uiRequestGeneration({
+        generationSubmitted({
           requestId,
           messageFactory,
           params: { model: "glm-4-6", max_tokens: 512 }, // Base params, factory can override
@@ -773,7 +773,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: Lorebook Keys Generation (CRITICAL: uses factory to get fresh entry.text)
   subscribeEffect(
-    matchesAction(lorebookKeysGenerationRequested),
+    matchesAction(uiLorebookKeysGenerationRequested),
     async (action, { dispatch, getState }) => {
       const { requestId } = action.payload;
       const { selectedEntryId } = getState().ui.lorebook;
@@ -787,7 +787,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       const messageFactory = createLorebookKeysFactory(selectedEntryId);
 
       dispatch(
-        uiRequestGeneration({
+        generationSubmitted({
           requestId,
           messageFactory,
           params: { model: "glm-4-6", max_tokens: 64 }, // Base params, factory can override
@@ -800,7 +800,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: Lorebook Item Generation (queues both content + keys from DULFS list)
   subscribeEffect(
-    matchesAction(lorebookItemGenerationRequested),
+    matchesAction(uiLorebookItemGenerationRequested),
     async (action, { dispatch, getState }) => {
       const { entryId, contentRequestId, keysRequestId } = action.payload;
 
@@ -823,7 +823,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       // Now dispatch generation requests (they'll skip re-queuing since already in queue)
       const contentFactory = createLorebookContentFactory(getState, entryId);
       dispatch(
-        uiRequestGeneration({
+        generationSubmitted({
           requestId: contentRequestId,
           messageFactory: contentFactory,
           params: { model: "glm-4-6", max_tokens: 512 },
@@ -835,7 +835,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       // Queue keys generation (JIT factory ensures fresh content is used)
       const keysFactory = createLorebookKeysFactory(entryId);
       dispatch(
-        uiRequestGeneration({
+        generationSubmitted({
           requestId: keysRequestId,
           messageFactory: keysFactory,
           params: { model: "glm-4-6", max_tokens: 64 },

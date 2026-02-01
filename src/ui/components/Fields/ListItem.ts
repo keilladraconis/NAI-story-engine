@@ -2,7 +2,7 @@ import { createEvents, defineComponent } from "../../../../lib/nai-act";
 import { RootState, DulfsItem } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
 import { dulfsItemRemoved } from "../../../core/store/slices/story";
-import { lorebookItemGenerationRequested } from "../../../core/store/slices/ui";
+import { uiLorebookItemGenerationRequested } from "../../../core/store/slices/ui";
 import { GenerationButton } from "../GenerationButton";
 
 const { row, button, textInput } = api.v1.ui.part;
@@ -77,7 +77,7 @@ export const ListItem = defineComponent<
       requestIds: [`lb-item-${entryId}-content`, `lb-item-${entryId}-keys`],
       onGenerate: () => {
         dispatch(
-          lorebookItemGenerationRequested({
+          uiLorebookItemGenerationRequested({
             entryId,
             contentRequestId: `lb-item-${entryId}-content`,
             keysRequestId: `lb-item-${entryId}-keys`,
