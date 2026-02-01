@@ -469,7 +469,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
           break;
         case "continue":
           style = iconStyles.continue;
-          icon = "alert-triangle";
+          icon = "fast-forward";
           callback = () => events.continue(props);
           break;
         case "wait":
