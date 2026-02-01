@@ -87,7 +87,7 @@ export const ListItem = defineComponent<
       contentChecker: async () => {
         try {
           const entry = await api.v1.lorebook.entry(entryId);
-          return !!(entry?.text?.trim());
+          return !!entry?.text?.trim();
         } catch {
           return false;
         }

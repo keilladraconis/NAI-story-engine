@@ -1,5 +1,5 @@
 import { Store, matchesAction } from "../../../lib/nai-store";
-import { RootState, BrainstormMessage } from "./types";
+import { RootState, BrainstormMessage, GenerationStrategy } from "./types";
 import { GenX } from "../../../lib/gen-x";
 import {
   uiBrainstormSubmitUserMessage,
@@ -18,8 +18,6 @@ import {
   uiBrainstormRetryGeneration,
   pruneHistory,
   uiGenerationRequested,
-  fieldUpdated,
-  dulfsItemAdded,
   dulfsItemRemoved,
   storyCleared,
   uiLorebookContentGenerationRequested,
@@ -45,6 +43,7 @@ import {
   FieldID,
   FIELD_CONFIGS,
 } from "../../config/field-definitions";
+import { getHandler } from "./effects/generation-handlers";
 
 // Lorebook sync constants
 const SE_CATEGORY_PREFIX = "SE: ";
@@ -73,13 +72,116 @@ async function findCategory(fieldId: DulfsFieldID): Promise<string | null> {
   return categories.find((c) => c.name === name)?.id || null;
 }
 
-export function registerEffects(store: Store<RootState>, genX: GenX) {
-  const { subscribeEffect } = store;
+// ─────────────────────────────────────────────────────────────────────────────
+// Generation Effect Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Resolve the prefix text for resumption scenarios
+ */
+function resolvePrefix(
+  strategy: GenerationStrategy,
+  getState: () => RootState,
+): string {
+  const { prefixBehavior, assistantPrefill, target, messages } = strategy;
+
+  if (prefixBehavior !== "keep") return "";
+
+  const state = getState();
+
+  if (target.type === "brainstorm") {
+    const message = state.brainstorm.messages.find(
+      (m) => m.id === target.messageId,
+    );
+    return message?.content || "";
+  }
+
+  if (target.type === "field") {
+    // Use explicit assistantPrefill if provided (for factory-based strategies)
+    if (assistantPrefill) return assistantPrefill;
+
+    // Fallback: extract from messages array
+    if (messages) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg?.role === "assistant" && lastMsg.content) {
+        return lastMsg.content;
+      }
+    }
+  }
+
+  return "";
+}
+
+/**
+ * Queue lorebook request if not already in queue (for button state tracking)
+ */
+function queueLorebookRequestIfNeeded(
+  target: GenerationStrategy["target"],
+  requestId: string,
+  getState: () => RootState,
+  dispatch: (action: any) => void,
+): void {
+  if (target.type !== "lorebookContent" && target.type !== "lorebookKeys") {
+    return;
+  }
+
+  const currentQueue = getState().runtime.queue;
+  const alreadyQueued = currentQueue.some((r) => r.id === requestId);
+
+  if (!alreadyQueued) {
+    dispatch(
+      requestQueued({
+        id: requestId,
+        type: target.type,
+        targetId: target.entryId,
+      }),
+    );
+  }
+}
+
+/**
+ * Capture original lorebook content for rollback on cancellation
+ */
+async function captureRollbackState(
+  target: GenerationStrategy["target"],
+): Promise<{ content: string; keys: string }> {
+  if (target.type !== "lorebookContent" && target.type !== "lorebookKeys") {
+    return { content: "", keys: "" };
+  }
+
+  const entry = await api.v1.lorebook.entry(target.entryId);
+  return {
+    content: entry?.text || "",
+    keys: entry?.keys?.join(", ") || "",
+  };
+}
+
+/**
+ * Check if a request was cancelled by the user
+ */
+function checkCancellation(
+  requestId: string,
+  getState: () => RootState,
+): boolean {
+  const activeRequest = getState().runtime.activeRequest;
+  return (
+    activeRequest?.id === requestId && activeRequest?.status === "cancelled"
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Brainstorm Edit Effects
+// ─────────────────────────────────────────────────────────────────────────────
+
+function registerBrainstormEditEffects(
+  subscribeEffect: Store<RootState>["subscribeEffect"],
+  dispatch: (action: any) => void,
+  getState: () => RootState,
+): void {
   // Intent: Brainstorm Edit Begin
   subscribeEffect(
     matchesAction(uiBrainstormMessageEditBegin),
-    async (action, { dispatch, getState }) => {
+    async (action) => {
       const { id: newId } = action.payload;
       const state = getState();
       const currentEditingId = state.brainstorm.editingMessageId;
@@ -113,7 +215,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   // Intent: Brainstorm Edit End (Save)
   subscribeEffect(
     (action) => action.type === uiBrainstormMessageEditEnd().type,
-    async (_action, { dispatch, getState }) => {
+    async () => {
       const state = getState();
       const editingId = state.brainstorm.editingMessageId;
 
@@ -127,6 +229,17 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       }
     },
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Effects Registration
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function registerEffects(store: Store<RootState>, genX: GenX) {
+  const { subscribeEffect, dispatch, getState } = store;
+
+  // Register brainstorm edit effects
+  registerBrainstormEditEffects(subscribeEffect, dispatch, getState);
 
   // Intent: Brainstorm Submit
   subscribeEffect(
@@ -263,148 +376,56 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: GenX Generation
+  // Intent: GenX Generation (using handler map pattern)
   subscribeEffect(
     matchesAction(generationSubmitted),
     async (action, { dispatch, getState }) => {
       const strategy = action.payload;
-      const {
-        requestId,
-        messages,
-        messageFactory,
-        params,
-        target,
-        prefixBehavior,
-        assistantPrefill,
-      } = strategy;
+      const { requestId, messages, messageFactory, params, target } = strategy;
 
-      let accumulatedText = "";
+      // 1. Resolve prefix for resumption
+      let accumulatedText = resolvePrefix(strategy, getState);
 
-      // Handle Prefix (Resumption)
-      if (prefixBehavior === "keep") {
-        const state = getState();
-        if (target.type === "brainstorm") {
-          const message = state.brainstorm.messages.find(
-            (m) => m.id === target.messageId,
-          );
-          if (message) accumulatedText = message.content;
-        } else if (target.type === "field") {
-          // Use explicit assistantPrefill if provided (for factory-based strategies)
-          if (assistantPrefill) {
-            accumulatedText = assistantPrefill;
-          } else if (messages) {
-            // Fallback: extract from messages array
-            const lastMsg = messages[messages.length - 1];
-            if (lastMsg?.role === "assistant" && lastMsg.content) {
-              accumulatedText = lastMsg.content;
-            }
-          }
-        }
-      }
-
-      // Determine what to pass to GenX: factory or messages
+      // 2. Determine what to pass to GenX: factory or messages
       const messagesOrFactory = messageFactory || messages;
       if (!messagesOrFactory) {
         api.v1.log("Generation failed: no messages or factory provided");
         return;
       }
 
-      // Add lorebook requests to queue for button state tracking (skip if already queued)
-      if (target.type === "lorebookContent" || target.type === "lorebookKeys") {
-        const currentQueue = getState().runtime.queue;
-        const alreadyQueued = currentQueue.some((r) => r.id === requestId);
-        if (!alreadyQueued) {
-          dispatch(
-            requestQueued({
-              id: requestId,
-              type: target.type,
-              targetId: target.entryId,
-            }),
-          );
-        }
-      }
+      // 3. Queue lorebook requests if needed (for button state tracking)
+      queueLorebookRequestIfNeeded(target, requestId, getState, dispatch);
 
-      // For lorebook generation, capture original content for rollback on cancellation
-      let originalLorebookContent = "";
-      let originalLorebookKeys = "";
-      if (target.type === "lorebookContent" || target.type === "lorebookKeys") {
-        const entry = await api.v1.lorebook.entry(target.entryId);
-        if (entry) {
-          originalLorebookContent = entry.text || "";
-          originalLorebookKeys = entry.keys?.join(", ") || "";
-        }
-      }
+      // 4. Capture rollback state for lorebook
+      const rollbackState = await captureRollbackState(target);
 
+      // 5. Get handler for this target type
+      const handler = getHandler(target.type);
       let generationSucceeded = false;
 
       try {
         await genX.generate(
           messagesOrFactory,
-          { ...params, taskId: requestId }, // Pass requestId to GenX
+          { ...params, taskId: requestId },
           (choices, _final) => {
             const text = choices[0]?.text || "";
             if (text) {
               accumulatedText += text;
-
-              if (target.type === "brainstorm") {
-                // Stream to UI
-                const uiId = IDS.BRAINSTORM.message(target.messageId).TEXT;
-                api.v1.ui.updateParts([{ id: uiId, text: accumulatedText }]);
-              } else if (target.type === "field") {
-                // Plain text fields (ATTG, Style) stream to input value and storyStorage
-                if (
-                  target.fieldId === FieldID.ATTG ||
-                  target.fieldId === FieldID.Style
-                ) {
-                  const inputId = `input-${target.fieldId}`;
-                  const storageKey = `kse-field-${target.fieldId}`;
-                  api.v1.ui.updateParts([
-                    { id: inputId, value: accumulatedText },
-                  ]);
-                  api.v1.storyStorage.set(storageKey, accumulatedText);
-                } else {
-                  // Standard fields stream to text display
-                  const uiId = `text-display-${target.fieldId}`;
-                  api.v1.ui.updateParts([{ id: uiId, text: accumulatedText }]);
-                }
-              } else if (target.type === "lorebookContent") {
-                // Stream to storageKey - UI auto-updates via binding
-                const currentSelected = getState().ui.lorebook.selectedEntryId;
-                if (target.entryId === currentSelected) {
-                  api.v1.storyStorage.set(
-                    IDS.LOREBOOK.CONTENT_DRAFT_RAW,
-                    accumulatedText,
-                  );
-                }
-              } else if (target.type === "lorebookKeys") {
-                // Stream to storageKey - UI auto-updates via binding
-                const currentSelected = getState().ui.lorebook.selectedEntryId;
-                if (target.entryId === currentSelected) {
-                  api.v1.storyStorage.set(
-                    IDS.LOREBOOK.KEYS_DRAFT_RAW,
-                    accumulatedText,
-                  );
-                }
-              }
-              // List streaming is not displayed (parsed at the end)
+              handler.streaming({ target, getState, accumulatedText }, text);
             }
           },
           "background",
           await api.v1.createCancellationSignal(),
         );
 
-        // Generation finished (but may have been cancelled)
         generationSucceeded = true;
       } catch (error: any) {
         api.v1.log(`[effects] Generation error for ${requestId}:`, error);
         generationSucceeded = false;
       }
 
-      // Check if this request was cancelled (user clicked cancel button)
-      const activeRequest = getState().runtime.activeRequest;
-      const wasCancelled =
-        activeRequest?.id === requestId &&
-        activeRequest?.status === "cancelled";
+      // 6. Check cancellation and dispatch completion
+      const wasCancelled = checkCancellation(requestId, getState);
       if (wasCancelled) {
         api.v1.log(`[effects] Generation was cancelled for ${requestId}`);
         generationSucceeded = false;
@@ -415,142 +436,16 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         dispatch(requestCompleted({ requestId }));
       }
 
-      // Handle completion based on success/failure
-      if (target.type === "brainstorm" && accumulatedText) {
-        dispatch(
-          messageUpdated({
-            id: target.messageId,
-            content: accumulatedText,
-          }),
-        );
-      } else if (target.type === "field" && accumulatedText) {
-        // Plain text fields (ATTG, Style) save to storyStorage
-        if (
-          target.fieldId === FieldID.ATTG ||
-          target.fieldId === FieldID.Style
-        ) {
-          const storageKey = `kse-field-${target.fieldId}`;
-          await api.v1.storyStorage.set(storageKey, accumulatedText);
-
-          // Trigger sync to Memory / Author's Note if enabled
-          if (target.fieldId === FieldID.ATTG) {
-            const syncEnabled = await api.v1.storyStorage.get(
-              "kse-sync-attg-memory",
-            );
-            if (syncEnabled) {
-              await api.v1.memory.set(accumulatedText);
-            }
-          } else if (target.fieldId === FieldID.Style) {
-            const syncEnabled =
-              await api.v1.storyStorage.get("kse-sync-style-an");
-            if (syncEnabled) {
-              await api.v1.an.set(accumulatedText);
-            }
-          }
-        } else {
-          // Standard fields dispatch to state
-          dispatch(
-            fieldUpdated({
-              fieldId: target.fieldId,
-              content: accumulatedText,
-            }),
-          );
-        }
-      } else if (target.type === "list" && accumulatedText) {
-        // Parse generated list and create DULFS items (names only)
-        const lines = accumulatedText.split("\n").filter((l) => l.trim());
-        for (const line of lines) {
-          // Strip bullets, numbers, dashes, and extract clean name
-          const match = line.match(/^[\s\-*+•\d.)\]]*(.+)$/);
-          if (match) {
-            const name = match[1]
-              .trim()
-              .replace(/^[:\-–—]\s*/, "") // Strip leading colons/dashes
-              .replace(/[:\-–—].*$/, "") // Strip trailing descriptions
-              .trim();
-
-            if (name) {
-              const itemId = api.v1.uuid();
-
-              // Store only the name in storyStorage
-              await api.v1.storyStorage.set(`dulfs-item-${itemId}`, name);
-
-              // Dispatch minimal item
-              dispatch(
-                dulfsItemAdded({
-                  fieldId: target.fieldId as DulfsFieldID,
-                  item: {
-                    id: itemId,
-                    fieldId: target.fieldId as DulfsFieldID,
-                  },
-                }),
-              );
-            }
-          }
-        }
-      } else if (target.type === "lorebookContent") {
-        const currentSelected = getState().ui.lorebook.selectedEntryId;
-
-        if (generationSucceeded && accumulatedText) {
-          // Clean output: strip leading delimiter if present
-          let cleanedContent = accumulatedText;
-          if (cleanedContent.startsWith("----")) {
-            cleanedContent = cleanedContent.slice(4).trimStart();
-          }
-
-          // Update lorebook entry with generated content
-          await api.v1.lorebook.updateEntry(target.entryId, {
-            text: cleanedContent,
-          });
-
-          // Update draft with cleaned content if viewing this entry
-          // (storageKey binding auto-updates UI)
-          if (target.entryId === currentSelected) {
-            await api.v1.storyStorage.set(
-              IDS.LOREBOOK.CONTENT_DRAFT_RAW,
-              cleanedContent,
-            );
-          }
-        } else {
-          // Cancelled or failed: restore draft to original content if viewing this entry
-          // (storageKey binding auto-updates UI)
-          if (target.entryId === currentSelected) {
-            await api.v1.storyStorage.set(
-              IDS.LOREBOOK.CONTENT_DRAFT_RAW,
-              originalLorebookContent,
-            );
-          }
-        }
-      } else if (target.type === "lorebookKeys") {
-        const currentSelected = getState().ui.lorebook.selectedEntryId;
-
-        if (generationSucceeded && accumulatedText) {
-          // Parse comma-separated keys
-          const keys = accumulatedText
-            .split(",")
-            .map((k) => k.trim())
-            .filter((k) => k.length > 0 && k.length < 50); // Filter invalid keys
-
-          // Update lorebook entry with generated keys
-          await api.v1.lorebook.updateEntry(target.entryId, { keys });
-
-          // Update draft with parsed keys if viewing this entry
-          // (storageKey binding auto-updates UI)
-          if (target.entryId === currentSelected) {
-            const keysStr = keys.join(", ");
-            await api.v1.storyStorage.set(IDS.LOREBOOK.KEYS_DRAFT_RAW, keysStr);
-          }
-        } else {
-          // Cancelled or failed: restore draft to original keys if viewing this entry
-          // (storageKey binding auto-updates UI)
-          if (target.entryId === currentSelected) {
-            await api.v1.storyStorage.set(
-              IDS.LOREBOOK.KEYS_DRAFT_RAW,
-              originalLorebookKeys,
-            );
-          }
-        }
-      }
+      // 7. Run completion handler
+      await handler.completion({
+        target,
+        getState,
+        accumulatedText,
+        generationSucceeded,
+        dispatch,
+        originalContent: rollbackState.content,
+        originalKeys: rollbackState.keys,
+      });
     },
   );
 
@@ -665,20 +560,25 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Lorebook Sync: Item Added
-  subscribeEffect(matchesAction(dulfsItemAdded), async (action) => {
-    const { fieldId, item } = action.payload;
-    const name = (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "";
+  // Lorebook Sync: Item Added - imported from dulfsItemAdded action
+  // Note: dulfsItemAdded is now dispatched from list.ts handler
+  subscribeEffect(
+    (action) => action.type === "story/dulfsItemAdded",
+    async (action: any) => {
+      const { fieldId, item } = action.payload;
+      const name =
+        (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "";
 
-    const categoryId = await ensureCategory(fieldId);
-    await api.v1.lorebook.createEntry({
-      id: item.id,
-      category: categoryId,
-      displayName: String(name),
-      keys: String(name) ? [String(name)] : [],
-      enabled: true,
-    });
-  });
+      const categoryId = await ensureCategory(fieldId);
+      await api.v1.lorebook.createEntry({
+        id: item.id,
+        category: categoryId,
+        displayName: String(name),
+        keys: String(name) ? [String(name)] : [],
+        enabled: true,
+      });
+    },
+  );
 
   // Lorebook Sync: Item Removed
   subscribeEffect(matchesAction(dulfsItemRemoved), async (action) => {

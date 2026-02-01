@@ -441,7 +441,9 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
                 id,
                 iconId,
                 text: undefined,
-                style: hasContent ? iconStyles.idleWithContent : iconStyles.idle,
+                style: hasContent
+                  ? iconStyles.idleWithContent
+                  : iconStyles.idle,
                 callback: () => events.generate(props),
               },
             ]);
