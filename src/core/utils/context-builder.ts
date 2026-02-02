@@ -343,7 +343,7 @@ export const createDulfsListFactory = (
 
     return {
       messages,
-      params: { model, max_tokens: 350, temperature: 0.9, min_p: 0.05 },
+      params: { model, max_tokens: 500, temperature: 0.9, min_p: 0.05 },
     };
   };
 };

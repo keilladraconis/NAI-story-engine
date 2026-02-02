@@ -7,6 +7,19 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 
+/**
+ * Strip markdown formatting from text.
+ * Handles: **bold**, *italic*, __bold__, _italic_, ~~strikethrough~~
+ */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1") // **bold**
+    .replace(/__(.+?)__/g, "$1") // __bold__
+    .replace(/\*(.+?)\*/g, "$1") // *italic*
+    .replace(/_(.+?)_/g, "$1") // _italic_
+    .replace(/~~(.+?)~~/g, "$1"); // ~~strikethrough~~
+}
+
 export const listHandler: GenerationHandlers<ListTarget> = {
   // List streaming is not displayed (parsed at the end)
   streaming(_ctx: StreamingContext<ListTarget>, _newText: string): void {
@@ -22,7 +35,8 @@ export const listHandler: GenerationHandlers<ListTarget> = {
       // Strip bullets, numbers, dashes, and extract full content
       const match = line.match(/^[\s\-*+•\d.)\]]*(.+)$/);
       if (match) {
-        const content = match[1].trim().replace(/^[:\-–—]\s*/, ""); // Strip leading colons/dashes only
+        let content = match[1].trim().replace(/^[:\-–—]\s*/, ""); // Strip leading colons/dashes only
+        content = stripMarkdown(content); // Remove markdown formatting
 
         if (content) {
           const itemId = api.v1.uuid();

@@ -40,7 +40,6 @@ export const Header = defineComponent({
         row({
           style: this.style?.("buttonGroup"),
           content: [
-            text({ text: "🎭 Story Engine", style: this.style?.("titleText") }),
             button({
               id: "header-sega-start-btn",
               text: "S.E.G.A.",
@@ -62,7 +61,7 @@ export const Header = defineComponent({
           label: "Clear",
           confirmLabel: "Clear?",
           buttonStyle: { padding: "4px 8px", opacity: 0.7 },
-          onConfirm: () => {},
+          onConfirm: () => { },
         }),
       ],
     });

@@ -114,14 +114,33 @@ async function findEntryNeedingContent(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Enable sync toggle for ATTG/Style fields and update checkbox UI.
+ * This ensures SEGA-generated content is synced to Memory/Author's Note.
+ */
+async function enableSyncForField(fieldId: string): Promise<void> {
+  if (fieldId === FieldID.ATTG) {
+    await api.v1.storyStorage.set("kse-sync-attg-memory", true);
+    api.v1.ui.updateParts([{ id: "checkbox-sync-attg", value: true }]);
+  } else if (fieldId === FieldID.Style) {
+    await api.v1.storyStorage.set("kse-sync-style-an", true);
+    api.v1.ui.updateParts([{ id: "checkbox-sync-style", value: true }]);
+  }
+}
+
+/**
  * Queue a SEGA-initiated generation and track the request ID.
  */
-function queueSegaGeneration(
+async function queueSegaGeneration(
   dispatch: (action: any) => void,
   type: "field" | "list",
   targetId: string,
-): string {
+): Promise<string> {
   const requestId = api.v1.uuid();
+
+  // Enable sync for ATTG/Style before generation
+  if (type === "field") {
+    await enableSyncForField(targetId);
+  }
 
   // Track this request as SEGA-initiated
   dispatch(segaRequestTracked({ requestId }));
@@ -223,19 +242,19 @@ async function scheduleNextSegaTask(
   // Stage 1: Story Prompt
   if (await needsStoryPrompt(state)) {
     dispatch(segaStageSet({ stage: "storyPrompt" }));
-    queueSegaGeneration(dispatch, "field", FieldID.StoryPrompt);
+    await queueSegaGeneration(dispatch, "field", FieldID.StoryPrompt);
     return;
   }
 
   // Stage 2: ATTG & Style
   if (await needsATTG()) {
     dispatch(segaStageSet({ stage: "attgStyle" }));
-    queueSegaGeneration(dispatch, "field", FieldID.ATTG);
+    await queueSegaGeneration(dispatch, "field", FieldID.ATTG);
     return;
   }
   if (await needsStyle()) {
     dispatch(segaStageSet({ stage: "attgStyle" }));
-    queueSegaGeneration(dispatch, "field", FieldID.Style);
+    await queueSegaGeneration(dispatch, "field", FieldID.Style);
     return;
   }
 
@@ -243,7 +262,7 @@ async function scheduleNextSegaTask(
   const nextCategory = getNextDulfsCategory(state);
   if (nextCategory) {
     dispatch(segaStageSet({ stage: "dulfsLists" }));
-    queueSegaGeneration(dispatch, "list", nextCategory);
+    await queueSegaGeneration(dispatch, "list", nextCategory);
     dispatch(segaRoundRobinAdvanced());
     return;
   }
