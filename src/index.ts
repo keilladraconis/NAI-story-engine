@@ -25,7 +25,7 @@ import { FieldList } from "./ui/components/Sidebar/FieldList";
 import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelContent";
 import { GenerationButton } from "./ui/components/GenerationButton";
 
-const { column, text, row, textInput, multilineTextInput } = api.v1.ui.part;
+const { column } = api.v1.ui.part;
 const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
 
 (async () => {
@@ -88,109 +88,7 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
       id: IDS.LOREBOOK.PANEL,
       name: "Story Engine",
       iconId: "zap",
-      content: [
-        column({
-          id: IDS.LOREBOOK.CONTAINER,
-          style: { padding: "12px", gap: "12px" },
-          content: [
-            // Empty state
-            column({
-              id: IDS.LOREBOOK.EMPTY_STATE,
-              style: {
-                display: "flex",
-                "align-items": "center",
-                "justify-content": "center",
-                padding: "20px",
-                color: "rgba(255,255,255,0.5)",
-              },
-              content: [
-                text({ text: "Select a Lorebook entry to generate content." }),
-              ],
-            }),
-            // Not managed state
-            column({
-              id: IDS.LOREBOOK.NOT_MANAGED,
-              style: {
-                display: "none",
-                "align-items": "center",
-                "justify-content": "center",
-                padding: "20px",
-                color: "rgba(255,255,255,0.5)",
-              },
-              content: [
-                text({
-                  text: "This entry is not managed by Story Engine.\nOnly entries in SE: categories can be generated.",
-                }),
-              ],
-            }),
-            // Main content
-            column({
-              id: IDS.LOREBOOK.MAIN_CONTENT,
-              style: { display: "none", gap: "12px" },
-              content: [
-                // Entry name header
-                text({
-                  id: IDS.LOREBOOK.ENTRY_NAME,
-                  text: "",
-                  style: {
-                    "font-weight": "bold",
-                    "font-size": "16px",
-                  },
-                }),
-                // Generation buttons - use stateProjection for dynamic requestId
-                row({
-                  style: { gap: "8px", "margin-top": "4px" },
-                  content: [
-                    GenerationButton.describe({
-                      id: IDS.LOREBOOK.GEN_CONTENT_BTN,
-                      label: "Generate Content",
-                    }),
-                    GenerationButton.describe({
-                      id: IDS.LOREBOOK.GEN_KEYS_BTN,
-                      label: "Generate Keys",
-                    }),
-                  ],
-                }),
-                // Content area (editable - multiline textarea, storageKey for streaming)
-                multilineTextInput({
-                  id: IDS.LOREBOOK.CONTENT_INPUT,
-                  initialValue: "",
-                  placeholder: "Lorebook content...",
-                  storageKey: IDS.LOREBOOK.CONTENT_DRAFT_KEY,
-                  style: {
-                    "font-size": "13px",
-                    "min-height": "120px",
-                  },
-                }),
-                // Keys input (editable)
-                row({
-                  style: { gap: "8px", "align-items": "center" },
-                  content: [
-                    text({
-                      text: "Keys:",
-                      style: {
-                        "font-size": "12px",
-                        color: "rgba(255,255,255,0.6)",
-                        "white-space": "nowrap",
-                      },
-                    }),
-                    textInput({
-                      id: IDS.LOREBOOK.KEYS_INPUT,
-                      initialValue: "",
-                      placeholder: "comma, separated, keys",
-                      storageKey: IDS.LOREBOOK.KEYS_DRAFT_KEY,
-                      style: {
-                        "font-size": "12px",
-                        flex: "1",
-                      },
-                    }),
-                  ],
-                }),
-              ],
-            }),
-          ],
-        }),
-      ],
+      content: [LorebookPanelContent.describe()],
     });
 
     await api.v1.ui.register([
