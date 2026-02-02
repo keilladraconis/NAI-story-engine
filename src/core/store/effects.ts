@@ -1,6 +1,7 @@
 import { Store, matchesAction } from "../../../lib/nai-store";
 import { RootState, BrainstormMessage, GenerationStrategy } from "./types";
 import { GenX } from "../../../lib/gen-x";
+import { registerSegaEffects } from "./effects/sega";
 import {
   uiBrainstormSubmitUserMessage,
   uiRequestCancellation,
@@ -242,6 +243,9 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   // Register brainstorm edit effects
   registerBrainstormEditEffects(subscribeEffect, dispatch, getState);
 
+  // Register SEGA effects
+  registerSegaEffects(subscribeEffect, dispatch, getState, genX);
+
   // Intent: Brainstorm Submit
   subscribeEffect(
     (action) => action.type === uiBrainstormSubmitUserMessage().type,
@@ -451,7 +455,9 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       // 8. Show toast notification for Story Engine generations
       if (generationSucceeded) {
         if (target.type === "list") {
-          const fieldConfig = FIELD_CONFIGS.find((c) => c.id === target.fieldId);
+          const fieldConfig = FIELD_CONFIGS.find(
+            (c) => c.id === target.fieldId,
+          );
           const label = fieldConfig?.label || "Items";
           api.v1.ui.toast(`${label} generated`, { type: "success" });
         } else if (target.type === "lorebookContent") {

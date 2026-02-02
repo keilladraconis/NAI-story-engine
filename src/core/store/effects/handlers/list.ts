@@ -22,9 +22,7 @@ export const listHandler: GenerationHandlers<ListTarget> = {
       // Strip bullets, numbers, dashes, and extract full content
       const match = line.match(/^[\s\-*+•\d.)\]]*(.+)$/);
       if (match) {
-        const content = match[1]
-          .trim()
-          .replace(/^[:\-–—]\s*/, ""); // Strip leading colons/dashes only
+        const content = match[1].trim().replace(/^[:\-–—]\s*/, ""); // Strip leading colons/dashes only
 
         if (content) {
           const itemId = api.v1.uuid();

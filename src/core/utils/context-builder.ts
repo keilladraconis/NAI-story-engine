@@ -4,7 +4,11 @@ import {
   GenerationStrategy,
 } from "../store/types";
 import { MessageFactory } from "../../../lib/gen-x";
-import { FieldID, FIELD_CONFIGS, DulfsFieldID } from "../../config/field-definitions";
+import {
+  FieldID,
+  FIELD_CONFIGS,
+  DulfsFieldID,
+} from "../../config/field-definitions";
 
 // --- Helpers ---
 
@@ -55,7 +59,9 @@ export const getExistingDulfsItems = async (
 
   const contents: string[] = [];
   for (const item of items) {
-    const content = String((await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "");
+    const content = String(
+      (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "",
+    );
     if (content) contents.push(content);
   }
   return contents.join("\n");

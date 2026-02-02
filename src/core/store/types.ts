@@ -1,6 +1,34 @@
 import { GenerationState, MessageFactory } from "../../../lib/gen-x";
 
-import { DulfsFieldID } from "../../config/field-definitions";
+import { DulfsFieldID, FieldID } from "../../config/field-definitions";
+
+// SEGA Types
+export type SegaStage =
+  | "idle"
+  | "storyPrompt"
+  | "attgStyle"
+  | "dulfsLists"
+  | "lorebookContent"
+  | "completed";
+
+export interface SegaState {
+  stage: SegaStage;
+  activeRequestIds: string[]; // Track SEGA-initiated requests for cancellation
+  dulfsRoundRobin: {
+    currentIndex: number;
+    passes: number; // Track complete cycles to ensure all categories have items
+  };
+}
+
+export const DULFS_CATEGORIES: DulfsFieldID[] = [
+  FieldID.DramatisPersonae,
+  FieldID.UniverseSystems,
+  FieldID.Locations,
+  FieldID.Factions,
+  FieldID.SituationalDynamics,
+];
+
+export const MIN_ITEMS_PER_CATEGORY = 2;
 
 export interface StoryField {
   id: string;
@@ -83,6 +111,7 @@ export interface GenerationStrategy {
 
 export interface RuntimeState {
   segaRunning: boolean;
+  sega: SegaState;
   queue: GenerationRequest[];
   activeRequest: GenerationRequest | null;
   status: GenerationStatus;

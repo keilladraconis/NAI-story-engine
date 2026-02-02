@@ -41,7 +41,9 @@ export const buildLorebookContentStrategy = async (
 
   // Get DULFS context and the specific item's short description
   const dulfsContext = await getAllDulfsContext(state);
-  const itemContent = String((await api.v1.storyStorage.get(`dulfs-item-${entryId}`)) || "");
+  const itemContent = String(
+    (await api.v1.storyStorage.get(`dulfs-item-${entryId}`)) || "",
+  );
 
   const messages: Message[] = [
     {
@@ -143,7 +145,9 @@ export const createLorebookContentFactory = (
 
     // Get DULFS context and the specific item's short description
     const dulfsContext = await getAllDulfsContext(state);
-    const itemContent = String((await api.v1.storyStorage.get(`dulfs-item-${entryId}`)) || "");
+    const itemContent = String(
+      (await api.v1.storyStorage.get(`dulfs-item-${entryId}`)) || "",
+    );
 
     const messages: Message[] = [
       {

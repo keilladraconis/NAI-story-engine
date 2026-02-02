@@ -1,9 +1,21 @@
 import { createSlice } from "../../../../lib/nai-store";
-import { RuntimeState, GenerationRequest } from "../types";
+import {
+  RuntimeState,
+  GenerationRequest,
+  SegaStage,
+  SegaState,
+} from "../types";
 import { GenerationState } from "../../../../lib/gen-x";
+
+const initialSegaState: SegaState = {
+  stage: "idle",
+  activeRequestIds: [],
+  dulfsRoundRobin: { currentIndex: 0, passes: 0 },
+};
 
 export const initialRuntimeState: RuntimeState = {
   segaRunning: false,
+  sega: initialSegaState,
   queue: [],
   activeRequest: null,
   status: "idle",
@@ -103,6 +115,51 @@ export const runtimeSlice = createSlice({
       }
       return state;
     },
+
+    // SEGA Reducers
+    segaStageSet: (state, payload: { stage: SegaStage }) => ({
+      ...state,
+      sega: { ...state.sega, stage: payload.stage },
+    }),
+
+    segaRequestTracked: (state, payload: { requestId: string }) => ({
+      ...state,
+      sega: {
+        ...state.sega,
+        activeRequestIds: [...state.sega.activeRequestIds, payload.requestId],
+      },
+    }),
+
+    segaRequestUntracked: (state, payload: { requestId: string }) => ({
+      ...state,
+      sega: {
+        ...state.sega,
+        activeRequestIds: state.sega.activeRequestIds.filter(
+          (id) => id !== payload.requestId,
+        ),
+      },
+    }),
+
+    segaRoundRobinAdvanced: (state) => {
+      const { currentIndex } = state.sega.dulfsRoundRobin;
+      const nextIndex = (currentIndex + 1) % 5; // 5 DULFS categories
+      const newPasses =
+        nextIndex === 0
+          ? state.sega.dulfsRoundRobin.passes + 1
+          : state.sega.dulfsRoundRobin.passes;
+      return {
+        ...state,
+        sega: {
+          ...state.sega,
+          dulfsRoundRobin: { currentIndex: nextIndex, passes: newPasses },
+        },
+      };
+    },
+
+    segaReset: (state) => ({
+      ...state,
+      sega: initialSegaState,
+    }),
   },
 });
 
@@ -115,4 +172,9 @@ export const {
   budgetUpdated,
   requestCancelled,
   requestCompleted,
+  segaStageSet,
+  segaRequestTracked,
+  segaRequestUntracked,
+  segaRoundRobinAdvanced,
+  segaReset,
 } = runtimeSlice.actions;
