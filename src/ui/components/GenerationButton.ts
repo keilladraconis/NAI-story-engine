@@ -272,10 +272,17 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
         }
       },
       cancelActive(p) {
+        // Cancel the active request
         if (p.onCancel) {
           p.onCancel();
         } else {
           dispatch(uiRequestCancellation());
+        }
+        // Also cancel any other queued requests from the same requestIds group
+        if (p.requestIds && p.requestIds.length > 0) {
+          for (const reqId of p.requestIds) {
+            dispatch(uiCancelRequest({ requestId: reqId }));
+          }
         }
       },
       continue(p) {

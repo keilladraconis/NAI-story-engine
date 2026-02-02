@@ -12,7 +12,7 @@ const rootReducer = combineReducers({
   runtime: runtimeSlice.reducer,
 });
 
-const debug = (await api.v1.config.get("nai_store_debug")) || false;
+const debug = (await api.v1.config.get("story_engine_debug")) || false;
 
 export const store = createStore<RootState>(rootReducer, debug);
 

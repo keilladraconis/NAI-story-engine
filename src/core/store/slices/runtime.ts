@@ -9,6 +9,7 @@ import { GenerationState } from "../../../../lib/gen-x";
 
 const initialSegaState: SegaState = {
   stage: "idle",
+  statusText: "",
   activeRequestIds: [],
   dulfsRoundRobin: { currentIndex: 0, passes: 0 },
 };
@@ -160,6 +161,11 @@ export const runtimeSlice = createSlice({
       ...state,
       sega: initialSegaState,
     }),
+
+    segaStatusUpdated: (state, payload: { statusText: string }) => ({
+      ...state,
+      sega: { ...state.sega, statusText: payload.statusText },
+    }),
   },
 });
 
@@ -177,4 +183,5 @@ export const {
   segaRequestUntracked,
   segaRoundRobinAdvanced,
   segaReset,
+  segaStatusUpdated,
 } = runtimeSlice.actions;

@@ -13,6 +13,7 @@ export type SegaStage =
 
 export interface SegaState {
   stage: SegaStage;
+  statusText: string; // Current status for UI display
   activeRequestIds: string[]; // Track SEGA-initiated requests for cancellation
   dulfsRoundRobin: {
     currentIndex: number;

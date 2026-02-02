@@ -23,11 +23,17 @@ export const Header = defineComponent({
       "justify-content": "space-between",
       "margin-bottom": "8px",
       "align-items": "center",
+      gap: "8px",
     },
-    buttonGroup: { gap: "8px", "align-items": "center" },
-    titleText: { "font-weight": "bold" },
     actionButton: { padding: "4px 8px", "font-size": "0.8em" },
     stopButton: { padding: "4px 8px", "font-size": "0.8em", color: "#ff9800" },
+    statusText: {
+      flex: "1",
+      "font-size": "0.8em",
+      opacity: "0.8",
+      overflow: "hidden",
+      "white-space": "nowrap",
+    },
     hidden: { display: "none" },
     visible: { display: "block" },
   },
@@ -37,8 +43,8 @@ export const Header = defineComponent({
       id: "kse-sidebar-header",
       style: this.style?.("mainRow"),
       content: [
+        // SEGA buttons (left)
         row({
-          style: this.style?.("buttonGroup"),
           content: [
             button({
               id: "header-sega-start-btn",
@@ -56,12 +62,19 @@ export const Header = defineComponent({
             }),
           ],
         }),
+        // Status text (center)
+        text({
+          id: "header-sega-status",
+          text: "",
+          style: this.style?.("statusText"),
+        }),
+        // Clear button (right)
         ButtonWithConfirmation.describe({
           id: "header-clear",
           label: "Clear",
           confirmLabel: "Clear?",
           buttonStyle: { padding: "4px 8px", opacity: 0.7 },
-          onConfirm: () => { },
+          onConfirm: () => {},
         }),
       ],
     });
@@ -83,11 +96,52 @@ export const Header = defineComponent({
       onConfirm: () => dispatch(storyCleared()),
     });
 
+    // Marquee state
+    const marquee = {
+      running: false,
+      text: "",
+      position: 0,
+    };
+
+    const runMarquee = async () => {
+      const SPEED = 180;
+      const PAUSE = 3000;
+
+      // Initial pause before scrolling starts
+      await api.v1.timers.sleep(PAUSE);
+
+      while (marquee.running && marquee.text) {
+        // Gap is 1/3 of text length, minimum 5 spaces
+        const gapSize = Math.max(5, Math.ceil(marquee.text.length / 3));
+        const gap = " ".repeat(gapSize);
+        const unit = marquee.text + gap;
+
+        api.v1.ui.updateParts([
+          {
+            id: "header-sega-status",
+            text: unit.substring(marquee.position) + unit.substring(0, marquee.position),
+          },
+        ]);
+
+        const nextPosition = (marquee.position + 1) % unit.length;
+
+        // Pause at the start of each cycle
+        if (nextPosition === 0) {
+          await api.v1.timers.sleep(PAUSE);
+        } else {
+          await api.v1.timers.sleep(SPEED);
+        }
+
+        marquee.position = nextPosition;
+      }
+    };
+
     useSelector(
       (state) => ({
         segaRunning: state.runtime.segaRunning,
+        statusText: state.runtime.sega.statusText,
       }),
-      ({ segaRunning }) => {
+      ({ segaRunning, statusText }) => {
         api.v1.ui.updateParts([
           {
             id: "header-sega-start-btn",
@@ -104,6 +158,27 @@ export const Header = defineComponent({
             ),
           },
         ]);
+
+        // Marquee control
+        if (statusText) {
+          if (statusText !== marquee.text) {
+            marquee.text = statusText;
+            marquee.position = 0;
+          }
+          if (!marquee.running) {
+            marquee.running = true;
+            runMarquee();
+          }
+        } else {
+          marquee.running = false;
+          marquee.text = "";
+          api.v1.ui.updateParts([
+            {
+              id: "header-sega-status",
+              text: "",
+            },
+          ]);
+        }
       },
     );
   },

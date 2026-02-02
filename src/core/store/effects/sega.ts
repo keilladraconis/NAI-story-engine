@@ -24,10 +24,13 @@ import {
   segaRequestUntracked,
   segaRoundRobinAdvanced,
   segaReset,
+  segaStatusUpdated,
   uiGenerationRequested,
   requestCompleted,
+  requestCancelled,
 } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
+import { attgToggled, styleToggled } from "../slices/story";
 import {
   createLorebookContentFactory,
   createLorebookKeysFactory,
@@ -114,32 +117,55 @@ async function findEntryNeedingContent(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Enable sync toggle for ATTG/Style fields and update checkbox UI.
+ * Enable sync toggle for ATTG/Style fields.
+ * - Sets storage key for sync checkbox (checkbox UI auto-syncs via storageKey binding)
+ * - Dispatches state toggle if not already enabled
  * This ensures SEGA-generated content is synced to Memory/Author's Note.
  */
-async function enableSyncForField(fieldId: string): Promise<void> {
+async function enableSyncForField(
+  fieldId: string,
+  dispatch: (action: any) => void,
+  getState: () => RootState,
+): Promise<void> {
   if (fieldId === FieldID.ATTG) {
+    // Enable the sync storage key
     await api.v1.storyStorage.set("kse-sync-attg-memory", true);
-    api.v1.ui.updateParts([{ id: "checkbox-sync-attg", value: true }]);
+    // Enable ATTG in state if not already enabled
+    if (!getState().story.attgEnabled) {
+      dispatch(attgToggled());
+    }
   } else if (fieldId === FieldID.Style) {
+    // Enable the sync storage key
     await api.v1.storyStorage.set("kse-sync-style-an", true);
-    api.v1.ui.updateParts([{ id: "checkbox-sync-style", value: true }]);
+    // Enable Style in state if not already enabled
+    if (!getState().story.styleEnabled) {
+      dispatch(styleToggled());
+    }
   }
 }
 
 /**
  * Queue a SEGA-initiated generation and track the request ID.
+ * Uses the same request ID pattern as the UI buttons for proper tracking.
  */
 async function queueSegaGeneration(
   dispatch: (action: any) => void,
+  getState: () => RootState,
   type: "field" | "list",
   targetId: string,
 ): Promise<string> {
-  const requestId = api.v1.uuid();
+  // Use the same request ID pattern as GenerationButton for proper UI tracking
+  // Fields: gen-{fieldId}, Lists: gen-list-{fieldId}
+  const requestId = type === "field" ? `gen-${targetId}` : `gen-list-${targetId}`;
+
+  // Update status text
+  const fieldName = targetId.replace("dulfs-", "");
+  const label = type === "list" ? `List: ${fieldName}` : `Field: ${fieldName}`;
+  dispatch(segaStatusUpdated({ statusText: label }));
 
   // Enable sync for ATTG/Style before generation
   if (type === "field") {
-    await enableSyncForField(targetId);
+    await enableSyncForField(targetId, dispatch, getState);
   }
 
   // Track this request as SEGA-initiated
@@ -159,14 +185,22 @@ async function queueSegaGeneration(
 
 /**
  * Queue lorebook content and keys generation for a DULFS item.
+ * Uses the same request ID pattern as the UI buttons for proper tracking.
  */
 async function queueSegaLorebookGeneration(
   dispatch: (action: any) => void,
   getState: () => RootState,
   item: DulfsItem,
 ): Promise<void> {
-  const contentRequestId = api.v1.uuid();
-  const keysRequestId = api.v1.uuid();
+  // Use the same request ID pattern as lorebook buttons: lb-item-{entryId}-{type}
+  const contentRequestId = `lb-item-${item.id}-content`;
+  const keysRequestId = `lb-item-${item.id}-keys`;
+
+  // Update status text with category and entry name
+  const entry = await api.v1.lorebook.entry(item.id);
+  const name = entry?.displayName || item.id;
+  const category = item.fieldId.replace("dulfs-", "");
+  dispatch(segaStatusUpdated({ statusText: `Lorebook: ${category} - ${name}` }));
 
   // Track as SEGA-initiated
   dispatch(segaRequestTracked({ requestId: contentRequestId }));
@@ -242,19 +276,19 @@ async function scheduleNextSegaTask(
   // Stage 1: Story Prompt
   if (await needsStoryPrompt(state)) {
     dispatch(segaStageSet({ stage: "storyPrompt" }));
-    await queueSegaGeneration(dispatch, "field", FieldID.StoryPrompt);
+    await queueSegaGeneration(dispatch, getState, "field", FieldID.StoryPrompt);
     return;
   }
 
   // Stage 2: ATTG & Style
   if (await needsATTG()) {
     dispatch(segaStageSet({ stage: "attgStyle" }));
-    await queueSegaGeneration(dispatch, "field", FieldID.ATTG);
+    await queueSegaGeneration(dispatch, getState, "field", FieldID.ATTG);
     return;
   }
   if (await needsStyle()) {
     dispatch(segaStageSet({ stage: "attgStyle" }));
-    await queueSegaGeneration(dispatch, "field", FieldID.Style);
+    await queueSegaGeneration(dispatch, getState, "field", FieldID.Style);
     return;
   }
 
@@ -262,7 +296,7 @@ async function scheduleNextSegaTask(
   const nextCategory = getNextDulfsCategory(state);
   if (nextCategory) {
     dispatch(segaStageSet({ stage: "dulfsLists" }));
-    await queueSegaGeneration(dispatch, "list", nextCategory);
+    await queueSegaGeneration(dispatch, getState, "list", nextCategory);
     dispatch(segaRoundRobinAdvanced());
     return;
   }
@@ -320,6 +354,27 @@ export function registerSegaEffects(
     dispatch(segaRequestUntracked({ requestId }));
 
     // Schedule next task if SEGA still running
+    if (state.runtime.segaRunning) {
+      // Small delay to allow state to settle
+      await api.v1.timers.sleep(100);
+      await scheduleNextSegaTask(dispatch, getState);
+    }
+  });
+
+  // Effect 3: Continuation on Request Cancellation
+  subscribeEffect(matchesAction(requestCancelled), async (action) => {
+    const { requestId } = action.payload;
+    const state = getState();
+
+    // Check if this was a SEGA-initiated request
+    if (!state.runtime.sega.activeRequestIds.includes(requestId)) {
+      return;
+    }
+
+    // Untrack the cancelled request
+    dispatch(segaRequestUntracked({ requestId }));
+
+    // Schedule next task if SEGA still running (skip cancelled item, move on)
     if (state.runtime.segaRunning) {
       // Small delay to allow state to settle
       await api.v1.timers.sleep(100);

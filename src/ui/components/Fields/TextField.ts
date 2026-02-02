@@ -1,7 +1,12 @@
 import { createEvents, defineComponent } from "../../../../lib/nai-act";
+import { matchesAction } from "../../../../lib/nai-store";
 import { RootState } from "../../../core/store/types";
 import { FieldConfig, FieldID } from "../../../config/field-definitions";
-import { fieldUpdated } from "../../../core/store/slices/story";
+import {
+  fieldUpdated,
+  attgToggled,
+  styleToggled,
+} from "../../../core/store/slices/story";
 import {
   uiFieldEditBegin,
   uiFieldEditEnd,
@@ -23,6 +28,8 @@ const {
 type TextFieldEvents = {
   beginEdit(): void;
   save(): void;
+  attgSyncToggled(checked: boolean): void;
+  styleSyncToggled(checked: boolean): void;
 };
 
 // Fields that use plain textarea mode (no edit/save modality)
@@ -158,16 +165,8 @@ export const TextField = defineComponent<
                 initialValue: false,
                 storageKey: "story:kse-sync-attg-memory",
                 label: "Copy to Memory",
-                onChange: async (checked: boolean) => {
-                  if (checked) {
-                    const content = await api.v1.storyStorage.get(
-                      `kse-field-${config.id}`,
-                    );
-                    if (content) {
-                      await api.v1.memory.set(String(content));
-                    }
-                  }
-                },
+                onChange: (checked: boolean) =>
+                  this.events.attgSyncToggled(config, checked),
               }),
             ],
           }),
@@ -185,16 +184,8 @@ export const TextField = defineComponent<
                 initialValue: false,
                 storageKey: "story:kse-sync-style-an",
                 label: "Copy to Author's Note",
-                onChange: async (checked: boolean) => {
-                  if (checked) {
-                    const content = await api.v1.storyStorage.get(
-                      `kse-field-${config.id}`,
-                    );
-                    if (content) {
-                      await api.v1.an.set(String(content));
-                    }
-                  }
-                },
+                onChange: (checked: boolean) =>
+                  this.events.styleSyncToggled(config, checked),
               }),
             ],
           }),
@@ -287,8 +278,46 @@ export const TextField = defineComponent<
       }),
     });
 
-    // Plain text fields don't need edit/save modality
+    // Plain text fields (ATTG, Style) - handle sync checkbox events
     if (isPlainTextField) {
+      // Attach sync checkbox event handlers
+      this.events.attach({
+        attgSyncToggled: (_props, checked: boolean) => {
+          if (checked) {
+            dispatch(attgToggled());
+          }
+        },
+        styleSyncToggled: (_props, checked: boolean) => {
+          if (checked) {
+            dispatch(styleToggled());
+          }
+        },
+      });
+
+      // Effect: Sync ATTG to Memory when toggled on
+      useEffect(matchesAction(attgToggled), async (_action, { getState }) => {
+        if (config.id !== FieldID.ATTG) return;
+        // Only sync if just enabled (not when toggling off)
+        if (getState().story.attgEnabled) {
+          const content = await api.v1.storyStorage.get(`kse-field-${config.id}`);
+          if (content) {
+            await api.v1.memory.set(String(content));
+          }
+        }
+      });
+
+      // Effect: Sync Style to Author's Note when toggled on
+      useEffect(matchesAction(styleToggled), async (_action, { getState }) => {
+        if (config.id !== FieldID.Style) return;
+        // Only sync if just enabled (not when toggling off)
+        if (getState().story.styleEnabled) {
+          const content = await api.v1.storyStorage.get(`kse-field-${config.id}`);
+          if (content) {
+            await api.v1.an.set(String(content));
+          }
+        }
+      });
+
       return;
     }
 

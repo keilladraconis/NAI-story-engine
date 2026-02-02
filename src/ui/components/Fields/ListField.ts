@@ -1,14 +1,34 @@
 import { createEvents, defineComponent } from "../../../../lib/nai-act";
-import { RootState } from "../../../core/store/types";
+import { matchesAction } from "../../../../lib/nai-store";
+import { RootState, DulfsItem } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
 import { dulfsItemAdded } from "../../../core/store/slices/story";
-import { uiGenerationRequested } from "../../../core/store/slices/runtime";
+import {
+  uiGenerationRequested,
+  requestCompleted,
+} from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
 import { ListItem } from "./ListItem";
 
 export type ListFieldProps = FieldConfig;
 
 const { row, text, column, button, collapsibleSection } = api.v1.ui.part;
+
+/**
+ * Count how many items have lorebook content.
+ */
+async function countLorebookEntries(
+  items: DulfsItem[],
+): Promise<{ withContent: number; total: number }> {
+  let withContent = 0;
+  for (const item of items) {
+    const entry = await api.v1.lorebook.entry(item.id);
+    if (entry?.text?.trim()) {
+      withContent++;
+    }
+  }
+  return { withContent, total: items.length };
+}
 
 type ListFieldEvents = {
   addItem(): void;
@@ -83,8 +103,20 @@ export const ListField = defineComponent<
   onMount(props, ctx) {
     const { useSelector, dispatch } = ctx;
 
+    const sectionId = `section-${props.id}`;
     const itemsColId = `items-col-${props.id}`;
     const boundItems = new Set<string>();
+
+    // Helper to update section title with lorebook count
+    const updateTitleWithCount = async (list: DulfsItem[]) => {
+      if (list.length === 0) {
+        api.v1.ui.updateParts([{ id: sectionId, title: props.label }]);
+        return;
+      }
+      const { withContent, total } = await countLorebookEntries(list);
+      const title = `${props.label} (${withContent}/${total})`;
+      api.v1.ui.updateParts([{ id: sectionId, title }]);
+    };
 
     // Event handlers
     this.events.attach({
@@ -119,7 +151,7 @@ export const ListField = defineComponent<
     // Sync Items
     useSelector(
       (state) => state.story.dulfs[props.id as DulfsFieldID] || [],
-      (list) => {
+      async (list) => {
         // 1. Mount new items
         list.forEach((item) => {
           if (!boundItems.has(item.id)) {
@@ -137,7 +169,16 @@ export const ListField = defineComponent<
             ),
           },
         ]);
+
+        // 3. Update title with lorebook count
+        await updateTitleWithCount(list);
       },
     );
+
+    // Refresh count when lorebook content is generated for items in this category
+    ctx.useEffect(matchesAction(requestCompleted), async (_action, { getState }) => {
+      const list = getState().story.dulfs[props.id as DulfsFieldID] || [];
+      await updateTitleWithCount(list);
+    });
   },
 });
