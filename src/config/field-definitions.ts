@@ -54,12 +54,12 @@ export interface FieldConfig {
   linkedEntities?: string[];
   layout?: "default" | "list";
   fieldType?:
-    | "prompt"
-    | "brainstorm"
-    | "worldSnapshot"
-    | "dulfs"
-    | "attg"
-    | "style";
+  | "prompt"
+  | "brainstorm"
+  | "worldSnapshot"
+  | "dulfs"
+  | "attg"
+  | "style";
   generationInstruction?: string;
   listGenerationInstruction?: string;
   exampleFormat?: string;
@@ -196,7 +196,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     id: FieldID.ATTG,
     label: "ATTG",
     description: "Author, Title, Tags, Genre block",
-    placeholder: "[ Author: ...; Tags: ...; Title: ...; Genre: ... ]",
+    placeholder: "[ Author: ...; Title: ...; Tags: ...; Genre: ... ]",
     icon: "tag",
     fieldType: "attg",
   },

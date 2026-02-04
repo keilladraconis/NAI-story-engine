@@ -1,7 +1,7 @@
 compatibilityVersion: naiscript-1.0
 id: e6c35faa-e4f2-4c3b-af4a-d56e4c992d87
 name: Story Engine
-version: 0.4.0
+version: 0.4.1
 createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
@@ -221,10 +221,10 @@ config:
       CRITICAL: Output ONLY the block. No Markdown, no headers, no conversational filler, no extra text.
 
       EXAMPLE:
-      [ Author: Stephen King; Tags: horror, supernatural, small town; Title: The Mist; Genre: Horror ]
+      [ Author: Stephen King; Title: The Mist; Tags: horror, supernatural, small town; Genre: Horror ]
 
       INSTRUCTION:
-      - Complete the ATTG block: [ Author: [author]; Tags: [comma-separated-tags]; Title: [title]; Genre: [genre] ]
+      - Complete the ATTG block: [ Author: [author]; Title: [title]; Tags: [comma-separated-tags]; Genre: [genre] ]
       - Pick a well-known author that fits the story
       - DO NOT use any markdown bolding (**).
       - OUTPUT ONLY THE BLOCK.
