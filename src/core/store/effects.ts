@@ -29,12 +29,14 @@ import {
   uiLorebookContentGenerationRequested,
   uiLorebookKeysGenerationRequested,
   uiLorebookItemGenerationRequested,
+  uiLorebookRefineRequested,
   requestCancelled,
   requestCompleted,
 } from "./index";
 import {
   createLorebookContentFactory,
   createLorebookKeysFactory,
+  createLorebookRefineFactory,
 } from "../utils/lorebook-strategy";
 import {
   buildBrainstormStrategy,
@@ -128,7 +130,11 @@ function queueLorebookRequestIfNeeded(
   getState: () => RootState,
   dispatch: AppDispatch,
 ): void {
-  if (target.type !== "lorebookContent" && target.type !== "lorebookKeys") {
+  if (
+    target.type !== "lorebookContent" &&
+    target.type !== "lorebookKeys" &&
+    target.type !== "lorebookRefine"
+  ) {
     return;
   }
 
@@ -152,7 +158,11 @@ function queueLorebookRequestIfNeeded(
 async function captureRollbackState(
   target: GenerationStrategy["target"],
 ): Promise<{ content: string; keys: string }> {
-  if (target.type !== "lorebookContent" && target.type !== "lorebookKeys") {
+  if (
+    target.type !== "lorebookContent" &&
+    target.type !== "lorebookKeys" &&
+    target.type !== "lorebookRefine"
+  ) {
     return { content: "", keys: "" };
   }
 
@@ -473,6 +483,10 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           const entry = await api.v1.lorebook.entry(target.entryId);
           const name = entry?.displayName || "Entry";
           api.v1.ui.toast(`Keys: ${name}`, { type: "success" });
+        } else if (target.type === "lorebookRefine") {
+          const entry = await api.v1.lorebook.entry(target.entryId);
+          const name = entry?.displayName || "Entry";
+          api.v1.ui.toast(`Refined: ${name}`, { type: "success" });
         }
       }
     },
@@ -771,6 +785,41 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           messageFactory: keysFactory,
           params: { model: "glm-4-6", max_tokens: 64 },
           target: { type: "lorebookKeys", entryId },
+          prefixBehavior: "trim",
+        }),
+      );
+    },
+  );
+
+  // Intent: Lorebook Refine (modify existing entry with natural language instructions)
+  subscribeEffect(
+    matchesAction(uiLorebookRefineRequested),
+    async (action, { dispatch, getState }) => {
+      const { requestId } = action.payload;
+      const { selectedEntryId } = getState().ui.lorebook;
+
+      if (!selectedEntryId) {
+        api.v1.log("[effects] No lorebook entry selected for refinement");
+        return;
+      }
+
+      // Create factory that fetches instructions at execution time
+      const getInstructions = async () =>
+        String(
+          (await api.v1.storyStorage.get(IDS.LOREBOOK.REFINE_INSTRUCTIONS_RAW)) ||
+            "",
+        );
+      const messageFactory = createLorebookRefineFactory(
+        selectedEntryId,
+        getInstructions,
+      );
+
+      dispatch(
+        generationSubmitted({
+          requestId,
+          messageFactory,
+          params: { model: "glm-4-6", max_tokens: 700 },
+          target: { type: "lorebookRefine", entryId: selectedEntryId },
           prefixBehavior: "trim",
         }),
       );

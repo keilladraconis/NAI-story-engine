@@ -93,7 +93,13 @@ export type GenerationRequestStatus =
 
 export interface GenerationRequest {
   id: string;
-  type: "field" | "list" | "brainstorm" | "lorebookContent" | "lorebookKeys";
+  type:
+    | "field"
+    | "list"
+    | "brainstorm"
+    | "lorebookContent"
+    | "lorebookKeys"
+    | "lorebookRefine";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -109,7 +115,8 @@ export interface GenerationStrategy {
     | { type: "field"; fieldId: string }
     | { type: "list"; fieldId: string }
     | { type: "lorebookContent"; entryId: string }
-    | { type: "lorebookKeys"; entryId: string };
+    | { type: "lorebookKeys"; entryId: string }
+    | { type: "lorebookRefine"; entryId: string };
   prefixBehavior: "keep" | "trim";
   assistantPrefill?: string;
 }

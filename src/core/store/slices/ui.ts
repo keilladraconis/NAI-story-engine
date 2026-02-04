@@ -85,6 +85,9 @@ export const uiSlice = createSlice({
         keysRequestId: string;
       },
     ) => state,
+    // Lorebook refinement (modify existing entry with instructions)
+    uiLorebookRefineRequested: (state, _payload: { requestId: string }) =>
+      state,
   },
 });
 
@@ -105,4 +108,5 @@ export const {
   uiLorebookContentGenerationRequested,
   uiLorebookKeysGenerationRequested,
   uiLorebookItemGenerationRequested,
+  uiLorebookRefineRequested,
 } = uiSlice.actions;

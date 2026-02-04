@@ -12,6 +12,19 @@ const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
   "SE: Situational Dynamics": "lorebook_template_dynamic",
 };
 
+// Category-to-type mapping for anchored prefills
+const CATEGORY_TO_TYPE: Record<string, string> = {
+  "SE: Dramatis Personae": "Character",
+  "SE: Universe Systems": "System",
+  "SE: Locations": "Location",
+  "SE: Factions": "Faction",
+  "SE: Situational Dynamics": "Dynamic",
+};
+
+const getEntryType = (categoryName: string): string => {
+  return CATEGORY_TO_TYPE[categoryName] || "Entry";
+};
+
 const getFieldContent = (state: RootState, id: string): string => {
   return state.story.fields[id]?.content || "";
 };
@@ -149,6 +162,17 @@ export const createLorebookContentFactory = (
       (await api.v1.storyStorage.get(`dulfs-item-${entryId}`)) || "",
     );
 
+    // Build anchored assistant prefill to prevent veering to other entries
+    const entryType = getEntryType(categoryName);
+    const setting = String(
+      (await api.v1.storyStorage.get("kse-setting")) || "",
+    );
+    const assistantPrefill = `----
+Name: ${displayName}
+Type: ${entryType}
+Setting: ${setting}
+`;
+
     const messages: Message[] = [
       {
         role: "system",
@@ -158,7 +182,7 @@ export const createLorebookContentFactory = (
         role: "user",
         content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}\n\nSTORY PROMPT:\n${storyPrompt}\n\nSTORY ELEMENTS:\n${dulfsContext}`,
       },
-      { role: "assistant", content: "----\n" },
+      { role: "assistant", content: assistantPrefill },
     ];
 
     return {
@@ -216,4 +240,105 @@ export const createLorebookKeysFactory = (entryId: string): MessageFactory => {
       },
     };
   };
+};
+
+/**
+ * Creates a message factory for lorebook entry refinement.
+ * Allows users to modify existing lorebook entries with natural language instructions.
+ */
+export const createLorebookRefineFactory = (
+  entryId: string,
+  getInstructions: () => Promise<string>,
+): MessageFactory => {
+  return async () => {
+    const entry = await api.v1.lorebook.entry(entryId);
+    if (!entry) {
+      throw new Error(`Lorebook entry not found: ${entryId}`);
+    }
+
+    const displayName = entry.displayName || "Unnamed Entry";
+    const currentContent = entry.text || "";
+    const instructions = await getInstructions();
+
+    // Get category name for type and template
+    let categoryName = "";
+    if (entry.category) {
+      const categories = await api.v1.lorebook.categories();
+      const category = categories.find((c) => c.id === entry.category);
+      categoryName = category?.name || "";
+    }
+
+    const entryType = getEntryType(categoryName);
+    const setting = String(
+      (await api.v1.storyStorage.get("kse-setting")) || "",
+    );
+
+    // Get template based on category (same as content generation)
+    const templateKey = CATEGORY_TEMPLATE_MAP[categoryName];
+    const template = templateKey
+      ? String((await api.v1.config.get(templateKey)) || "")
+      : "";
+
+    // Build anchored assistant prefill (without ---- marker, will be added separately)
+    const prefillContent = `Name: ${displayName}
+Type: ${entryType}
+Setting: ${setting}
+`;
+
+    const model = "glm-4-6";
+    const systemPrompt = String(
+      (await api.v1.config.get("system_prompt")) || "",
+    );
+    const refinePrompt = String(
+      (await api.v1.config.get("lorebook_refine_prompt")) || "",
+    );
+
+    const messages: Message[] = [
+      {
+        role: "system",
+        content: `${systemPrompt}\n\n[LOREBOOK ENTRY REFINEMENT]\n${refinePrompt}${template ? `\n\nTEMPLATE:\n${template}` : ""}`,
+      },
+      {
+        role: "user",
+        content: `CURRENT ENTRY:\n${currentContent}\n\nMODIFICATION INSTRUCTIONS:\n${instructions}`,
+      },
+      { role: "assistant", content: `----\n${prefillContent}` },
+    ];
+
+    return {
+      messages,
+      params: { model, max_tokens: 700, temperature: 0.7, min_p: 0.05 },
+    };
+  };
+};
+
+/**
+ * Helper to build the lorebook prefill content (Name/Type/Setting header).
+ * Used by handlers to prepend to generated content.
+ */
+export const buildLorebookPrefill = async (
+  entryId: string,
+): Promise<string> => {
+  const entry = await api.v1.lorebook.entry(entryId);
+  if (!entry) return "";
+
+  const displayName = entry.displayName || "Unnamed Entry";
+
+  // Get category name for type
+  let categoryName = "";
+  if (entry.category) {
+    const categories = await api.v1.lorebook.categories();
+    const category = categories.find((c) => c.id === entry.category);
+    categoryName = category?.name || "";
+  }
+
+  const entryType = getEntryType(categoryName);
+  const setting = String(
+    (await api.v1.storyStorage.get("kse-setting")) || "",
+  );
+
+  return `Name: ${displayName}
+Type: ${entryType}
+Setting: ${setting}
+`;
 };
