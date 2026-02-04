@@ -133,12 +133,12 @@ const getCommonContextBlocks = async (
   state: RootState,
   storyContext: Message[],
 ): Promise<Message[]> => {
-  const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+  const canon = getFieldContent(state, FieldID.Canon);
   const setting = String((await api.v1.storyStorage.get("kse-setting")) || "");
 
   return [
     ...storyContext,
-    { role: "user", content: `STORY PROMPT:\n${storyPrompt}` },
+    { role: "user", content: `CANON:\n${canon}` },
     { role: "user", content: `SETTING:\n${setting}` },
   ];
 };
@@ -171,7 +171,7 @@ export const createBrainstormFactory = (
     const storyContext = await getStoryContextMessages();
     messages.push(...storyContext);
 
-    const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+    const canon = getFieldContent(state, FieldID.Canon);
     const setting = String(
       (await api.v1.storyStorage.get("kse-setting")) || "",
     );
@@ -179,8 +179,8 @@ export const createBrainstormFactory = (
     let contextBlock = "Here is the current state of the story:\n";
     let hasContext = false;
 
-    if (storyPrompt) {
-      contextBlock += `STORY PROMPT:\n${storyPrompt}\n\n`;
+    if (canon) {
+      contextBlock += `CANON:\n${canon}\n\n`;
       hasContext = true;
     }
     if (setting) {
@@ -237,9 +237,9 @@ export const buildBrainstormStrategy = (
 };
 
 /**
- * Creates a message factory for story prompt generation.
+ * Creates a message factory for Canon generation.
  */
-export const createStoryPromptFactory = (
+export const createCanonFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
@@ -249,7 +249,7 @@ export const createStoryPromptFactory = (
       (await api.v1.config.get("system_prompt")) || "",
     );
     const prompt = String(
-      (await api.v1.config.get("story_prompt_generate_prompt")) || "",
+      (await api.v1.config.get("canon_generate_prompt")) || "",
     );
     const brainstormContent = getConsolidatedBrainstorm(state);
     const storyContext = await getStoryContextMessages();
@@ -260,7 +260,7 @@ export const createStoryPromptFactory = (
       { role: "user", content: prompt },
       {
         role: "assistant",
-        content: "Here is the story prompt based on our brainstorming session:",
+        content: "Here is the canon extracted from our brainstorming session:",
       },
       [
         ...commonBlocks,
@@ -282,15 +282,15 @@ export const createStoryPromptFactory = (
 };
 
 /**
- * Builds a story prompt generation strategy using JIT factory pattern.
+ * Builds a Canon generation strategy using JIT factory pattern.
  */
-export const buildStoryPromptStrategy = (
+export const buildCanonStrategy = (
   getState: () => RootState,
   fieldId: FieldID,
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createStoryPromptFactory(getState),
+    messageFactory: createCanonFactory(getState),
     target: { type: "field", fieldId },
     prefixBehavior: "trim",
   };
@@ -318,7 +318,7 @@ export const createDulfsListFactory = (
       "";
     const exampleFormat = fieldConfig?.exampleFormat || "";
     const brainstormContent = getConsolidatedBrainstorm(state);
-    const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+    const canon = getFieldContent(state, FieldID.Canon);
 
     // Get existing items in full format to avoid duplicates
     const existingItems = await getExistingDulfsItems(
@@ -336,7 +336,7 @@ export const createDulfsListFactory = (
       },
       {
         role: "user",
-        content: `STORY PROMPT:\n${storyPrompt}\n\nBRAINSTORM:\n${brainstormContent}${existingContext}`,
+        content: `CANON:\n${canon}\n\nBRAINSTORM:\n${brainstormContent}${existingContext}`,
       },
       { role: "assistant", content: "-" },
     ];
@@ -379,7 +379,7 @@ export const createATTGFactory = (
       (await api.v1.config.get("attg_generate_prompt")) || "",
     );
     const brainstormContent = getConsolidatedBrainstorm(state);
-    const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+    const canon = getFieldContent(state, FieldID.Canon);
 
     const messages: Message[] = [
       {
@@ -388,7 +388,7 @@ export const createATTGFactory = (
       },
       {
         role: "user",
-        content: `STORY PROMPT:\n${storyPrompt}\n\nBRAINSTORM:\n${brainstormContent}`,
+        content: `CANON:\n${canon}\n\nBRAINSTORM:\n${brainstormContent}`,
       },
       { role: "assistant", content: "[" },
     ];
@@ -431,7 +431,7 @@ export const createStyleFactory = (
       (await api.v1.config.get("style_generate_prompt")) || "",
     );
     const brainstormContent = getConsolidatedBrainstorm(state);
-    const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+    const canon = getFieldContent(state, FieldID.Canon);
     const attg = getFieldContent(state, FieldID.ATTG);
 
     const messages: Message[] = [
@@ -441,7 +441,7 @@ export const createStyleFactory = (
       },
       {
         role: "user",
-        content: `STORY PROMPT:\n${storyPrompt}\n\nATTG:\n${attg}\n\nBRAINSTORM:\n${brainstormContent}`,
+        content: `CANON:\n${canon}\n\nATTG:\n${attg}\n\nBRAINSTORM:\n${brainstormContent}`,
       },
       { role: "assistant", content: "[" },
     ];

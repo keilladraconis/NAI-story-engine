@@ -1,7 +1,6 @@
 export enum FieldID {
-  StoryPrompt = "storyPrompt",
+  Canon = "canon",
   Brainstorm = "brainstorm",
-  WorldSnapshot = "worldSnapshot",
   DramatisPersonae = "dramatisPersonae",
   UniverseSystems = "universeSystems",
   Locations = "locations",
@@ -19,9 +18,8 @@ export type DulfsFieldID =
   | FieldID.SituationalDynamics;
 
 export type TextFieldID =
-  | FieldID.StoryPrompt
+  | FieldID.Canon
   | FieldID.Brainstorm
-  | FieldID.WorldSnapshot
   | FieldID.ATTG
   | FieldID.Style;
 
@@ -37,9 +35,8 @@ export function isDulfsField(id: string): id is DulfsFieldID {
 
 export function isTextField(id: string): id is TextFieldID {
   return [
-    FieldID.StoryPrompt,
+    FieldID.Canon,
     FieldID.Brainstorm,
-    FieldID.WorldSnapshot,
     FieldID.ATTG,
     FieldID.Style,
   ].includes(id as FieldID);
@@ -54,9 +51,8 @@ export interface FieldConfig {
   linkedEntities?: string[];
   layout?: "default" | "list";
   fieldType?:
-  | "prompt"
+  | "canon"
   | "brainstorm"
-  | "worldSnapshot"
   | "dulfs"
   | "attg"
   | "style";
@@ -71,15 +67,15 @@ export interface FieldConfig {
 
 export const FIELD_CONFIGS: FieldConfig[] = [
   {
-    id: FieldID.StoryPrompt,
-    label: "Story Prompt",
-    description: "The initial creative spark for your story",
-    placeholder: "Once upon a time in a world where...",
+    id: FieldID.Canon,
+    label: "Canon",
+    description: "Authoritative facts: inciting incident, setting, established backstory",
+    placeholder: "The facts of your story world...",
     icon: "bookOpen",
-    fieldType: "prompt",
+    fieldType: "canon",
     generationInstruction:
-      "Synthesize the brainstorming session into a high-level thematic starting point, including protagonist, key themes, and genre.",
-    filters: ["scrubBrackets"],
+      "Extract canonical facts from the brainstorming session: inciting incident, setting details, established character origins, and fixed world elements.",
+    filters: ["scrubBrackets", "scrubMarkdown"],
   },
   {
     id: FieldID.Brainstorm,
@@ -89,15 +85,6 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     icon: "cloud-lightning" as IconId,
     hidden: true,
     fieldType: "brainstorm",
-  },
-  {
-    id: FieldID.WorldSnapshot,
-    label: "Dynamic World Snapshot",
-    description: "A snapshot of the world full of dynamic potential",
-    placeholder: "The state of the world, its drivers, and tensions...",
-    icon: "package",
-    fieldType: "worldSnapshot",
-    filters: ["scrubBrackets"],
   },
   {
     id: FieldID.UniverseSystems,
@@ -115,7 +102,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
       "Describe the key universe system, law, or technological principle, its mechanics/terms, and its broader impact on the world.",
     exampleFormat:
       "System Name: Description of mechanic, societal impact, and rules. Example: Aetheric Resonance: High-frequency crystals can levitate heavy objects when sung to at specific pitches. This system forms the backbone of the empire's sky-fleets but causes 'harmonic sickness' in long-term pilots.",
-    filters: ["scrubBrackets"],
+    filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
   {
@@ -132,7 +119,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
       "Describe the faction's core ideology, history, and its role in the world's power dynamics.",
     exampleFormat:
       "Faction Name: Goal, history, and public face vs. private reality. Example: The Iron Pact: A militaristic group dedicated to border protection. Publicly they are heroes, but privately they are hoarding ancient artifacts to trigger a pre-emptive strike against their rivals.",
-    filters: ["scrubBrackets"],
+    filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
   {
@@ -150,7 +137,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
       "Focus on the core motivation and unique behavioral tell of the character.",
     exampleFormat:
       "Name (Gender, Age, Role): Core motivation, Unique behavioral tell. Example: Kael (Male, 34, Smuggler): To pay off his life debt, Rubs a coin when calculating odds",
-    filters: ["scrubBrackets"],
+    filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*([\s\S]+)$/,
   },
 
@@ -170,26 +157,26 @@ export const FIELD_CONFIGS: FieldConfig[] = [
       "Include atmospheric anchors, sensory details, and inherent tensions of the location.",
     exampleFormat:
       "Location Name: Atmosphere, history, and landmarks. Example: The Sunken Market: A damp, claustrophobic bazaar built into the ruins of an old dam. The air smells of salt and rotting wood, and the constant groaning of the rusted supports reminds everyone of the impending flood.",
-    filters: ["scrubBrackets"],
+    filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
   {
     id: FieldID.SituationalDynamics,
     label: "Situational Dynamics",
-    description: "Current conflicts, tensions, and events",
-    placeholder: "Active conflicts, pending events...",
+    description: "Narrative vectors: tensions, pressures, and volatile situations",
+    placeholder: "Directions of pressure, not predetermined outcomes...",
     icon: "activity",
     layout: "list",
     fieldType: "dulfs",
     listGenerationInstruction:
-      "List only situation/conflict names as short titles.",
+      "List only narrative vector titles—tensions, pressures, or volatile situations (NOT plot events or outcomes).",
     listExampleFormat:
       "- The Succession Crisis\n- Border Tensions\n- The Missing Heir",
     generationInstruction:
-      "Describe a current conflict, pending event, or tension that involve multiple characters with no suggested resolution.",
+      "Describe a narrative vector: a direction of pressure or volatile situation. Focus on the FACTORS that create tension, not what WILL happen. Include multiple actors and their competing interests.",
     exampleFormat:
-      "Dynamic Name: The nature of the conflict, the stakes, and the primary actors. Example: The Succession Crisis: Three heirs are vying for the throne after the Emperor's sudden death. The city is on the brink of civil war as the military and the merchant guilds begin taking sides.",
-    filters: ["scrubBrackets"],
+      "Vector Name: The nature of the tension, the competing pressures, and the actors involved. Example: The Succession Crisis: Three heirs each have legitimate claims. The military favors strength, the merchants favor stability, the clergy favor tradition. No resolution is predetermined—the outcome emerges from play.",
+    filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
   {

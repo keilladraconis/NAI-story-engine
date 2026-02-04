@@ -42,10 +42,10 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Check if Story Prompt needs generation.
+ * Check if Canon needs generation.
  */
-async function needsStoryPrompt(state: RootState): Promise<boolean> {
-  const content = state.story.fields[FieldID.StoryPrompt]?.content?.trim();
+async function needsCanon(state: RootState): Promise<boolean> {
+  const content = state.story.fields[FieldID.Canon]?.content?.trim();
   return !content;
 }
 
@@ -277,10 +277,10 @@ async function scheduleNextSegaTask(
   // Check if SEGA is still running
   if (!state.runtime.segaRunning) return;
 
-  // Stage 1: Story Prompt
-  if (await needsStoryPrompt(state)) {
-    dispatch(segaStageSet({ stage: "storyPrompt" }));
-    await queueSegaGeneration(dispatch, getState, "field", FieldID.StoryPrompt);
+  // Stage 1: Canon
+  if (await needsCanon(state)) {
+    dispatch(segaStageSet({ stage: "canon" }));
+    await queueSegaGeneration(dispatch, getState, "field", FieldID.Canon);
     return;
   }
 

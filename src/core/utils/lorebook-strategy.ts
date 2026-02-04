@@ -50,7 +50,7 @@ export const buildLorebookContentStrategy = async (
   // Replace placeholder in base prompt
   const prompt = basePrompt.replace("[itemName]", displayName);
 
-  const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+  const canon = getFieldContent(state, FieldID.Canon);
 
   // Get DULFS context and the specific item's short description
   const dulfsContext = await getAllDulfsContext(state);
@@ -65,9 +65,9 @@ export const buildLorebookContentStrategy = async (
     },
     {
       role: "user",
-      content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}\n\nSTORY PROMPT:\n${storyPrompt}\n\nSTORY ELEMENTS:\n${dulfsContext}`,
+      content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}\n\nCANON:\n${canon}\n\nSTORY ELEMENTS:\n${dulfsContext}`,
     },
-    { role: "assistant", content: "----\n" },
+    { role: "assistant", content: "" },
   ];
 
   return {
@@ -154,7 +154,7 @@ export const createLorebookContentFactory = (
     // Replace placeholder in base prompt
     const prompt = basePrompt.replace("[itemName]", displayName);
 
-    const storyPrompt = getFieldContent(state, FieldID.StoryPrompt);
+    const canon = getFieldContent(state, FieldID.Canon);
 
     // Get DULFS context and the specific item's short description
     const dulfsContext = await getAllDulfsContext(state);
@@ -167,8 +167,7 @@ export const createLorebookContentFactory = (
     const setting = String(
       (await api.v1.storyStorage.get("kse-setting")) || "",
     );
-    const assistantPrefill = `----
-Name: ${displayName}
+    const assistantPrefill = `Name: ${displayName}
 Type: ${entryType}
 Setting: ${setting}
 `;
@@ -180,7 +179,7 @@ Setting: ${setting}
       },
       {
         role: "user",
-        content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}\n\nSTORY PROMPT:\n${storyPrompt}\n\nSTORY ELEMENTS:\n${dulfsContext}`,
+        content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}\n\nCANON:\n${canon}\n\nSTORY ELEMENTS:\n${dulfsContext}`,
       },
       { role: "assistant", content: assistantPrefill },
     ];
@@ -279,7 +278,7 @@ export const createLorebookRefineFactory = (
       ? String((await api.v1.config.get(templateKey)) || "")
       : "";
 
-    // Build anchored assistant prefill (without ---- marker, will be added separately)
+    // Build anchored assistant prefill (---- header handled by NAI category defaults)
     const prefillContent = `Name: ${displayName}
 Type: ${entryType}
 Setting: ${setting}
@@ -302,7 +301,7 @@ Setting: ${setting}
         role: "user",
         content: `CURRENT ENTRY:\n${currentContent}\n\nMODIFICATION INSTRUCTIONS:\n${instructions}`,
       },
-      { role: "assistant", content: `----\n${prefillContent}` },
+      { role: "assistant", content: prefillContent },
     ];
 
     return {

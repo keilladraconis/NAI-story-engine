@@ -40,7 +40,7 @@ import {
 } from "../utils/lorebook-strategy";
 import {
   buildBrainstormStrategy,
-  buildStoryPromptStrategy,
+  buildCanonStrategy,
   buildDulfsListStrategy,
   buildATTGStrategy,
   buildStyleStrategy,
@@ -364,15 +364,15 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       const { id: requestId, type, targetId } = action.payload;
 
       if (type === "field") {
-        // Single field (e.g., StoryPrompt) or DULFS item (format: "fieldId:itemId")
+        // Single field (e.g., Canon) or DULFS item (format: "fieldId:itemId")
         if (targetId.includes(":")) {
           // DULFS item content generation (skip for now per requirements)
           return;
         }
 
         let strategy;
-        if (targetId === FieldID.StoryPrompt) {
-          strategy = buildStoryPromptStrategy(getState, targetId);
+        if (targetId === FieldID.Canon) {
+          strategy = buildCanonStrategy(getState, targetId);
         } else if (targetId === FieldID.ATTG) {
           strategy = buildATTGStrategy(getState);
         } else if (targetId === FieldID.Style) {

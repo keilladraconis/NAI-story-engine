@@ -9,7 +9,7 @@ export type AppDispatch = (action: Action) => void;
 // SEGA Types
 export type SegaStage =
   | "idle"
-  | "storyPrompt"
+  | "canon"
   | "attgStyle"
   | "dulfsLists"
   | "lorebookContent"
