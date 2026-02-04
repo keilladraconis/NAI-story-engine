@@ -11,8 +11,8 @@ import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 const { column, row, multilineTextInput } = api.v1.ui.part;
 
 const STYLES = {
-  SEND_BTN: { flex: 0.7 },
-  CLEAR_BTN: { flex: 0.3 },
+  SEND_BTN: { flex: "0.7" },
+  CLEAR_BTN: { flex: "0.3" },
 };
 
 const events = createEvents<
@@ -34,7 +34,7 @@ export const Input: Component<{}, RootState> = {
       label: "Clear",
       confirmLabel: "Clear?",
       style: STYLES.CLEAR_BTN,
-      onConfirm: () => {},
+      onConfirm: () => { },
     });
 
     const btnSend = GenerationButton.describe({
