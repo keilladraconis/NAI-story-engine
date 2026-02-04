@@ -1,6 +1,10 @@
 import { GenerationState, MessageFactory } from "../../../lib/gen-x";
+import { Action } from "../../../lib/nai-store";
 
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
+
+// App-wide dispatch type for effects
+export type AppDispatch = (action: Action) => void;
 
 // SEGA Types
 export type SegaStage =
@@ -34,7 +38,7 @@ export const MIN_ITEMS_PER_CATEGORY = 2;
 export interface StoryField {
   id: string;
   content: string;
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 export interface DulfsItem {
@@ -97,9 +101,9 @@ export interface GenerationRequest {
 
 export interface GenerationStrategy {
   requestId: string;
-  messages?: any[]; // Optional if using messageFactory
+  messages?: Message[]; // Optional if using messageFactory
   messageFactory?: MessageFactory; // JIT strategy builder
-  params?: any; // Optional if provided by factory
+  params?: GenerationParams; // Optional if provided by factory
   target:
     | { type: "brainstorm"; messageId: string }
     | { type: "field"; fieldId: string }

@@ -6,6 +6,7 @@ import {
   uiLorebookContentGenerationRequested,
   uiLorebookKeysGenerationRequested,
 } from "./core/store";
+import { StoryState, BrainstormMessage } from "./core/store/types";
 import { registerEffects } from "./core/store/effects";
 import { GenX } from "../lib/gen-x";
 import { mount } from "../lib/nai-act";
@@ -42,10 +43,14 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
     registerEffects(store, genX);
 
     // 3. Load Data
+    interface PersistedState {
+      story?: StoryState;
+      brainstorm?: { messages: BrainstormMessage[] };
+    }
     try {
       const persisted = await api.v1.storyStorage.get("kse-persist");
       if (persisted && typeof persisted === "object") {
-        const { story, brainstorm } = persisted as any;
+        const { story, brainstorm } = persisted as PersistedState;
         if (story) store.dispatch(storyLoaded({ story }));
         if (brainstorm && brainstorm.messages)
           store.dispatch(brainstormLoaded({ messages: brainstorm.messages }));

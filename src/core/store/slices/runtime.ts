@@ -2,6 +2,7 @@ import { createSlice } from "../../../../lib/nai-store";
 import {
   RuntimeState,
   GenerationRequest,
+  GenerationStatus,
   SegaStage,
   SegaState,
 } from "../types";
@@ -65,7 +66,7 @@ export const runtimeSlice = createSlice({
       },
     ) => {
       const { queue, activeRequest } = payload;
-      let status: any = "idle";
+      let status: GenerationStatus = "idle";
       if (activeRequest) status = "generating";
       else if (queue.length > 0) status = "queued";
       else if (state.genx.status === "failed") status = "error";

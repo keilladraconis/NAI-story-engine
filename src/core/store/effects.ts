@@ -1,5 +1,10 @@
 import { Store, matchesAction } from "../../../lib/nai-store";
-import { RootState, BrainstormMessage, GenerationStrategy } from "./types";
+import {
+  RootState,
+  BrainstormMessage,
+  GenerationStrategy,
+  AppDispatch,
+} from "./types";
 import { GenX } from "../../../lib/gen-x";
 import { registerSegaEffects } from "./effects/sega";
 import {
@@ -121,7 +126,7 @@ function queueLorebookRequestIfNeeded(
   target: GenerationStrategy["target"],
   requestId: string,
   getState: () => RootState,
-  dispatch: (action: any) => void,
+  dispatch: AppDispatch,
 ): void {
   if (target.type !== "lorebookContent" && target.type !== "lorebookKeys") {
     return;
@@ -177,7 +182,7 @@ function checkCancellation(
 
 function registerBrainstormEditEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
-  dispatch: (action: any) => void,
+  dispatch: AppDispatch,
   getState: () => RootState,
 ): void {
   // Intent: Brainstorm Edit Begin

@@ -41,7 +41,11 @@ export const storySlice = createSlice({
     storyCleared: () => initialStoryState,
     fieldUpdated: (
       state,
-      payload: { fieldId: string; content: string; data?: any },
+      payload: {
+        fieldId: string;
+        content: string;
+        data?: Record<string, unknown>;
+      },
     ) => {
       const { fieldId, content, data } = payload;
       const field = state.fields[fieldId];

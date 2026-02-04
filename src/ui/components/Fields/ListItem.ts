@@ -89,7 +89,8 @@ export const ListItem = defineComponent<
         try {
           const entry = await api.v1.lorebook.entry(entryId);
           return !!entry?.text?.trim();
-        } catch {
+        } catch (e) {
+          api.v1.log(`[ListItem] Error checking lorebook entry ${entryId}:`, e);
           return false;
         }
       },

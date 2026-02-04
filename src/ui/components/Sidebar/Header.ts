@@ -119,7 +119,9 @@ export const Header = defineComponent({
         api.v1.ui.updateParts([
           {
             id: "header-sega-status",
-            text: unit.substring(marquee.position) + unit.substring(0, marquee.position),
+            text:
+              unit.substring(marquee.position) +
+              unit.substring(0, marquee.position),
           },
         ]);
 

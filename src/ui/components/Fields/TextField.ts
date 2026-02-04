@@ -299,7 +299,9 @@ export const TextField = defineComponent<
         if (config.id !== FieldID.ATTG) return;
         // Only sync if just enabled (not when toggling off)
         if (getState().story.attgEnabled) {
-          const content = await api.v1.storyStorage.get(`kse-field-${config.id}`);
+          const content = await api.v1.storyStorage.get(
+            `kse-field-${config.id}`,
+          );
           if (content) {
             await api.v1.memory.set(String(content));
           }
@@ -311,7 +313,9 @@ export const TextField = defineComponent<
         if (config.id !== FieldID.Style) return;
         // Only sync if just enabled (not when toggling off)
         if (getState().story.styleEnabled) {
-          const content = await api.v1.storyStorage.get(`kse-field-${config.id}`);
+          const content = await api.v1.storyStorage.get(
+            `kse-field-${config.id}`,
+          );
           if (content) {
             await api.v1.an.set(String(content));
           }

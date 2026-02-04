@@ -1,4 +1,4 @@
-import { RootState, GenerationStrategy } from "../types";
+import { RootState, GenerationStrategy, AppDispatch } from "../types";
 import { brainstormHandler } from "./handlers/brainstorm";
 import { fieldHandler } from "./handlers/field";
 import { listHandler } from "./handlers/list";
@@ -42,7 +42,7 @@ export interface CompletionContext<
   T = GenerationStrategy["target"],
 > extends StreamingContext<T> {
   generationSucceeded: boolean;
-  dispatch: (action: any) => void;
+  dispatch: AppDispatch;
   originalContent?: string; // For lorebook rollback
   originalKeys?: string; // For lorebook rollback
 }

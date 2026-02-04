@@ -15,6 +15,7 @@ import {
   DULFS_CATEGORIES,
   MIN_ITEMS_PER_CATEGORY,
   DulfsItem,
+  AppDispatch,
 } from "../types";
 import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
 import {
@@ -124,7 +125,7 @@ async function findEntryNeedingContent(
  */
 async function enableSyncForField(
   fieldId: string,
-  dispatch: (action: any) => void,
+  dispatch: AppDispatch,
   getState: () => RootState,
 ): Promise<void> {
   if (fieldId === FieldID.ATTG) {
@@ -149,14 +150,15 @@ async function enableSyncForField(
  * Uses the same request ID pattern as the UI buttons for proper tracking.
  */
 async function queueSegaGeneration(
-  dispatch: (action: any) => void,
+  dispatch: AppDispatch,
   getState: () => RootState,
   type: "field" | "list",
   targetId: string,
 ): Promise<string> {
   // Use the same request ID pattern as GenerationButton for proper UI tracking
   // Fields: gen-{fieldId}, Lists: gen-list-{fieldId}
-  const requestId = type === "field" ? `gen-${targetId}` : `gen-list-${targetId}`;
+  const requestId =
+    type === "field" ? `gen-${targetId}` : `gen-list-${targetId}`;
 
   // Update status text
   const fieldName = targetId.replace("dulfs-", "");
@@ -188,7 +190,7 @@ async function queueSegaGeneration(
  * Uses the same request ID pattern as the UI buttons for proper tracking.
  */
 async function queueSegaLorebookGeneration(
-  dispatch: (action: any) => void,
+  dispatch: AppDispatch,
   getState: () => RootState,
   item: DulfsItem,
 ): Promise<void> {
@@ -200,7 +202,9 @@ async function queueSegaLorebookGeneration(
   const entry = await api.v1.lorebook.entry(item.id);
   const name = entry?.displayName || item.id;
   const category = item.fieldId.replace("dulfs-", "");
-  dispatch(segaStatusUpdated({ statusText: `Lorebook: ${category} - ${name}` }));
+  dispatch(
+    segaStatusUpdated({ statusText: `Lorebook: ${category} - ${name}` }),
+  );
 
   // Track as SEGA-initiated
   dispatch(segaRequestTracked({ requestId: contentRequestId }));
@@ -239,7 +243,7 @@ async function queueSegaLorebookGeneration(
 function cancelAllSegaTasks(
   getState: () => RootState,
   genX: GenX,
-  dispatch: (action: any) => void,
+  dispatch: AppDispatch,
 ): void {
   const { activeRequestIds } = getState().runtime.sega;
 
@@ -265,7 +269,7 @@ function cancelAllSegaTasks(
  * Determines and schedules the next task in the pipeline.
  */
 async function scheduleNextSegaTask(
-  dispatch: (action: any) => void,
+  dispatch: AppDispatch,
   getState: () => RootState,
 ): Promise<void> {
   const state = getState();
@@ -321,7 +325,7 @@ async function scheduleNextSegaTask(
 
 export function registerSegaEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
-  dispatch: (action: any) => void,
+  dispatch: AppDispatch,
   getState: () => RootState,
   genX: GenX,
 ): void {

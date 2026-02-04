@@ -176,9 +176,12 @@ export const ListField = defineComponent<
     );
 
     // Refresh count when lorebook content is generated for items in this category
-    ctx.useEffect(matchesAction(requestCompleted), async (_action, { getState }) => {
-      const list = getState().story.dulfs[props.id as DulfsFieldID] || [];
-      await updateTitleWithCount(list);
-    });
+    ctx.useEffect(
+      matchesAction(requestCompleted),
+      async (_action, { getState }) => {
+        const list = getState().story.dulfs[props.id as DulfsFieldID] || [];
+        await updateTitleWithCount(list);
+      },
+    );
   },
 });
