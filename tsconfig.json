@@ -14,9 +14,11 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noEmit": true,
-    "typeRoots": ["./external", "./node_modules/@types"],
-    "rewriteRelativeImportExtensions": true
+    "typeRoots": ["./external", "./node_modules/@types", "./node_modules"],
+    "rewriteRelativeImportExtensions": true,
+    "noImplicitAny": true,
+    "types": ["node", "vitest/globals"]
   },
-  "include": ["src/**/*", "external/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "include": ["src/**/*", "external/**/*", "lib/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

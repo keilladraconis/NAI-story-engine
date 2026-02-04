@@ -63,6 +63,7 @@ export interface FieldConfig {
   generationInstruction?: string;
   listGenerationInstruction?: string;
   exampleFormat?: string;
+  listExampleFormat?: string;
   filters?: ("scrubBrackets" | "scrubMarkdown" | "normalizeQuotes")[];
   hidden?: boolean;
   parsingRegex?: RegExp;
@@ -106,6 +107,10 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     icon: "settings" as IconId,
     layout: "list",
     fieldType: "dulfs",
+    listGenerationInstruction:
+      "List only system/mechanic names. Focus on fundamental world rules.",
+    listExampleFormat:
+      "- Aetheric Resonance\n- The Binding Laws\n- Chrono-Drift",
     generationInstruction:
       "Describe the key universe system, law, or technological principle, its mechanics/terms, and its broader impact on the world.",
     exampleFormat:
@@ -121,6 +126,8 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     icon: "users",
     layout: "list",
     fieldType: "dulfs",
+    listGenerationInstruction: "List only faction/organization names.",
+    listExampleFormat: "- The Iron Pact\n- House Meridian\n- The Unbound",
     generationInstruction:
       "Describe the faction's core ideology, history, and its role in the world's power dynamics.",
     exampleFormat:
@@ -137,7 +144,8 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     layout: "list",
     fieldType: "dulfs",
     listGenerationInstruction:
-      "Start with the protagonist and expand outward to other key figures.",
+      "List only character names. Start with the protagonist, then supporting characters.",
+    listExampleFormat: "- Kael\n- Elena\n- The Iron Warden",
     generationInstruction:
       "Focus on the core motivation and unique behavioral tell of the character.",
     exampleFormat:
@@ -154,6 +162,10 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     icon: "map-pin" as IconId,
     layout: "list",
     fieldType: "dulfs",
+    listGenerationInstruction:
+      "List only location names. Include places relevant to the story.",
+    listExampleFormat:
+      "- The Sunken Market\n- Thornveil Keep\n- The Shattered Coast",
     generationInstruction:
       "Include atmospheric anchors, sensory details, and inherent tensions of the location.",
     exampleFormat:
@@ -169,6 +181,10 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     icon: "activity",
     layout: "list",
     fieldType: "dulfs",
+    listGenerationInstruction:
+      "List only situation/conflict names as short titles.",
+    listExampleFormat:
+      "- The Succession Crisis\n- Border Tensions\n- The Missing Heir",
     generationInstruction:
       "Describe a current conflict, pending event, or tension that involve multiple characters with no suggested resolution.",
     exampleFormat:

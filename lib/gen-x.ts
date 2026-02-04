@@ -1,301 +1,360 @@
 /**
  * gen-x.ts
- * v0.1.0
- * 
- * A reusable library for managing generation queues, status notifications,
- * and timing logic for budget countdowns.
- * 
- * Dependencies:
- * - Requires 'api' global object for timers (setTimeout).
- * 
- * Design Goals?
- * - Maybe this can replace hyperGenerator. Be a clean wrapper around generate API, but handle transient errors.
+ * v1.0.0
+ *
+ * The Generation eXchange.
+ * A single-threaded, queued generation engine with built-in budget management,
+ * transient error handling, and reactive state.
  */
 
-// --- Budget / Timer Logic ---
+export interface GenerationState {
+  status:
+    | "idle"
+    | "queued"
+    | "generating"
+    | "waiting_for_budget"
+    | "waiting_for_user"
+    | "completed"
+    | "failed";
+  error?: string;
+  queueLength: number;
 
-/**
- * Interface for objects that track budget/timer state.
- * Compatible with Story Engine's GenerationSession.
- */
-export interface BudgetTracked {
-  budgetState?: "normal" | "waiting_for_user" | "waiting_for_timer";
-  budgetTimeRemaining?: number;
+  // Budget Timer info
   budgetWaitEndTime?: number;
-  budgetWaitTime?: number;
-  budgetResolver?: () => void;
-  budgetRejecter?: (reason?: any) => void;
-  isRunning?: boolean; // Used to stop timer if task stops
 }
 
-export class BudgetTimer {
-  private static activeWait: { resolve: () => void; state: BudgetTracked } | null = null;
-  private static initialized = false;
+// Message factory for JIT (just-in-time) strategy building
+export type MessageFactory = () => Promise<{
+  messages: Message[];
+  params?: Partial<GenerationParams>;
+}>;
 
-  private static init() {
-    if (this.initialized) return;
-    this.initialized = true;
-    
-    const listener = (data: any) => {
-       if (BudgetTimer.activeWait && data && data.scriptInitiated === false) {
-          // User manually triggered generation. Unblock the wait.
-          BudgetTimer.activeWait.resolve();
-          BudgetTimer.activeWait = null;
-       }
-    };
-
-    if ((api as any).v1?.events?.on) {
-      (api as any).v1.events.on("generationRequested", listener);
-    }
-  }
-
-  /**
-   * Manages the "Waiting for User" phase of a budget wait.
-   * Sets state to "waiting_for_user" and waits for either:
-   * 1. Manual resolution via state.budgetResolver() (e.g. user clicked "Continue")
-   * 2. "generationRequested" event with scriptInitiated=false (user clicked Generate or triggered via keybind)
-   * 
-   * Once triggered, it automatically calls BudgetTimer.start() to begin the countdown.
-   * 
-   * @param state The state object to track
-   * @param durationMs The duration of the budget wait
-   * @param updateFn Callback to notify UI
-   */
-  static waitForBudget(
-    state: BudgetTracked,
-    durationMs: number,
-    updateFn: () => void
-  ): Promise<void> {
-    BudgetTimer.init();
-
-    return new Promise((resolve, reject) => {
-      
-      const proceed = () => {
-        if (BudgetTimer.activeWait?.state === state) {
-            BudgetTimer.activeWait = null;
-        }
-        
-        BudgetTimer.start(state, durationMs, updateFn)
-          .then(resolve)
-          .catch(reject);
-      };
-
-      // Register this session as the active waiter
-      BudgetTimer.activeWait = { resolve: proceed, state };
-
-      state.budgetResolver = () => proceed();
-      state.budgetRejecter = (reason) => {
-        if (BudgetTimer.activeWait?.state === state) {
-            BudgetTimer.activeWait = null;
-        }
-        reject(reason || "Cancelled");
-      };
-      
-      state.budgetState = "waiting_for_user";
-      state.budgetWaitTime = durationMs;
-      state.budgetWaitEndTime = Date.now() + durationMs;
-      updateFn();
-    });
-  }
-
-  /**
-   * Starts a countdown timer for a budget wait.
-   * Updates the state object and calls updateFn on each tick.
-   * 
-   * @param state The state object to track (must be mutable)
-   * @param durationMs Duration to wait in milliseconds
-   * @param updateFn Callback to notify UI/listeners of changes
-   */
-  static start(
-    state: BudgetTracked,
-    durationMs: number,
-    updateFn: () => void
-  ): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      state.budgetState = "waiting_for_timer";
-      const targetEnd = Date.now() + durationMs;
-      state.budgetWaitEndTime = targetEnd;
-      state.budgetTimeRemaining = durationMs;
-
-      // Store resolvers so they can be triggered externally
-      state.budgetResolver = () => {
-         resolve(); 
-      };
-      
-      state.budgetRejecter = (reason) => {
-          reject(reason || "Cancelled");
-      };
-
-      const tick = () => {
-        // Stop if no longer running (cancelled/finished externally)
-        if (state.isRunning === false) return; 
-        
-        // Stop if state changed externally (e.g. user clicked "Continue Now")
-        if (state.budgetState !== "waiting_for_timer") return;
-
-        const now = Date.now();
-        if (now >= targetEnd) {
-          resolve();
-          return;
-        }
-        
-        state.budgetTimeRemaining = Math.max(0, targetEnd - now);
-        updateFn();
-        
-        // Recursively schedule next tick
-        api.v1.timers.setTimeout(tick, 1000);
-      };
-
-      // Start loop
-      tick();
-      updateFn();
-    });
-  }
+interface GenerationTask {
+  id: string;
+  messages: Message[] | null; // null if using factory
+  messageFactory?: MessageFactory;
+  params: GenerationParams & {
+    minTokens?: number;
+    maxRetries?: number;
+    taskId?: string;
+  };
+  callback?: (choices: GenerationChoice[], final: boolean) => void;
+  behaviour?: "background" | "blocking";
+  signal?: CancellationSignal;
+  resolve: (value: GenerationResponse) => void;
+  reject: (reason: any) => void;
 }
 
-// --- Queue Management ---
+export class GenX {
+  private queue: GenerationTask[] = [];
+  private currentTask: GenerationTask | null = null;
 
-/**
- * Interface for an item in the queue.
- * @template TPayload The data payload needed to execute the task.
- */
-export interface QueueItem<TPayload> {
-  id: string; // Unique ID for identification
-  data: TPayload;
-}
+  private _state: GenerationState = {
+    status: "idle",
+    queueLength: 0,
+  };
 
-/**
- * Generic class to manage a serial queue of tasks.
- * "GenX" stands for Generation eXchange.
- */
-export class GenX<TPayload> {
-  private queue: QueueItem<TPayload>[] = [];
-  private currentItem: QueueItem<TPayload> | null = null;
-  private isProcessing: boolean = false;
-  
-  // Listeners for queue events
-  private listeners: Array<(itemId: string, item?: QueueItem<TPayload>) => void> = [];
+  private listeners: ((state: GenerationState) => void)[] = [];
 
-  /**
-   * @param executor Function that executes a task. Should return a Promise that resolves when task is done.
-   */
-  constructor(
-    private executor: (item: QueueItem<TPayload>) => Promise<void>
-  ) {}
+  constructor() {
+    this.initBudgetListener();
+  }
 
-  /**
-   * Subscribe to queue events (enqueue, start, complete, cancel).
-   */
-  public subscribe(listener: (itemId: string, item?: QueueItem<TPayload>) => void): () => void {
+  // --- Public API ---
+
+  public get state(): GenerationState {
+    return { ...this._state };
+  }
+
+  public subscribe(listener: (state: GenerationState) => void): () => void {
     this.listeners.push(listener);
+    listener(this.state); // Immediate update
     return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
+      this.listeners = this.listeners.filter((l) => l !== listener);
     };
   }
 
-  private notify(itemId: string, item?: QueueItem<TPayload>) {
-    for (const listener of this.listeners) {
-      try {
-        listener(itemId, item);
-      } catch (e) {
-        // Ignore listener errors
-        api.v1.log(`Queue listener error: ${e}`);
-      }
+  /**
+   * Queue a generation request.
+   * Mirrors api.v1.generate parameters.
+   *
+   * When `messages` is a MessageFactory function, it will be called at execution
+   * time (when the job is picked off the queue), enabling JIT strategy building.
+   */
+  public generate(
+    messages: Message[] | MessageFactory,
+    params: GenerationParams & {
+      minTokens?: number;
+      maxRetries?: number;
+      taskId?: string;
+    },
+    callback?: (choices: GenerationChoice[], final: boolean) => void,
+    behaviour?: "background" | "blocking",
+    signal?: CancellationSignal,
+  ): Promise<GenerationResponse> {
+    return new Promise((resolve, reject) => {
+      const isFactory = typeof messages === "function";
+
+      const task: GenerationTask = {
+        id: params.taskId || api.v1.uuid(),
+        messages: isFactory ? null : (messages as Message[]),
+        messageFactory: isFactory ? (messages as MessageFactory) : undefined,
+        params,
+        callback,
+        behaviour,
+        signal,
+        resolve,
+        reject,
+      };
+
+      this.queue.push(task);
+      this.updateState({
+        status: this._state.status === "idle" ? "queued" : this._state.status,
+        queueLength: this.queue.length + (this.currentTask ? 1 : 0),
+      });
+
+      this.processQueue();
+    });
+  }
+
+  public getTaskStatus(taskId: string): "queued" | "processing" | "not_found" {
+    if (this.currentTask && this.currentTask.id === taskId) {
+      return "processing";
+    }
+    if (this.queue.some((t) => t.id === taskId)) {
+      return "queued";
+    }
+    return "not_found";
+  }
+
+  public cancelQueued(taskId: string): boolean {
+    const index = this.queue.findIndex((t) => t.id === taskId);
+    if (index === -1) return true;
+
+    const [task] = this.queue.splice(index, 1);
+    if (task.signal) {
+      task.signal.cancel();
+    }
+    task.reject("Cancelled");
+    this.updateState({
+      queueLength: this.queue.length + (this.currentTask ? 1 : 0),
+    });
+    return true;
+  }
+
+  public cancelCurrent() {
+    // 1. Clear queue
+    this.queue = [];
+
+    // 2. Cancel current task if running
+    if (this.currentTask && this.currentTask.signal) {
+      this.currentTask.signal.cancel();
+    }
+
+    // 3. Update state immediately (reactive UI will update)
+    // Note: If a task was running, it will reject with "Cancelled" and set status to failed/idle in processQueue loop.
+    // But if we just cleared queue and no task was running (e.g. queued state but not picked up?),
+    // we should ensure status reflects it.
+
+    // If we are just queued (idle/queued status), we force idle.
+    if (!this.currentTask) {
+      this.updateState({ status: "idle", queueLength: 0 });
+    } else {
+      // If task is running, the signal cancellation will trigger the rejection flow which updates state.
+      // But we update queue length now.
+      this.updateState({ queueLength: 0 }); // Current + 0
     }
   }
 
-  /**
-   * Check if a task with the given ID is currently running.
-   */
-  public isRunning(itemId: string): boolean {
-    return this.currentItem?.id === itemId;
+  public userInteraction() {
+    if (this._state.status === "waiting_for_user") {
+      this.updateState({ status: "waiting_for_budget" });
+    }
   }
 
-  /**
-   * Check if the queue is currently processing tasks.
-   */
-  public get isActive(): boolean {
-    return this.isProcessing;
+  // --- Internal Logic ---
+
+  private updateState(partial: Partial<GenerationState>) {
+    Object.assign(this._state, partial);
+    const snapshot = { ...this._state };
+    this.listeners.forEach((l) => {
+      try {
+        l(snapshot);
+      } catch (e) {
+        api.v1.log("GenX Listener Error:", e);
+      }
+    });
   }
 
-  /**
-   * Add an item to the queue.
-   * Triggers processing if idle.
-   */
-  public enqueue(item: QueueItem<TPayload>) {
-    this.queue.push(item);
-    this.notify(item.id, item);
+  private async processQueue() {
+    if (this.currentTask) return; // Already processing
+    if (this.queue.length === 0) {
+      this.updateState({ status: "idle", queueLength: 0 });
+      return;
+    }
 
-    if (!this.isProcessing) {
+    const task = this.queue.shift();
+    if (!task) return;
+
+    this.currentTask = task;
+    this.updateState({
+      status: "generating",
+      queueLength: this.queue.length + 1,
+      error: undefined,
+    });
+
+    try {
+      await this.executeTask(task);
+    } catch (e: any) {
+      // Task failed (and retries exhausted or fatal)
+      // The task.reject() has already been called in executeTask if needed,
+      // or we do it here if it wasn't caught.
+    } finally {
+      this.currentTask = null;
+      // Process next
       this.processQueue();
     }
   }
 
-  /**
-   * Get a snapshot of the current queue.
-   */
-  public getQueue(): QueueItem<TPayload>[] {
-    return [...this.queue];
-  }
+  private async executeTask(task: GenerationTask): Promise<void> {
+    let { messages, params } = task;
+    const { callback, behaviour, signal, resolve, reject } = task;
 
-  /**
-   * Cancel items matching a predicate.
-   * Removes from queue.
-   * Returns the list of cancelled items (including the running one if matched).
-   * Note: This does NOT stop the running task's promise; the caller must handle 
-   * signalling the running task (e.g. via AbortController in TPayload).
-   */
-  public cancel(matcher: (item: QueueItem<TPayload>) => boolean): QueueItem<TPayload>[] {
-    const cancelledItems: QueueItem<TPayload>[] = [];
-
-    // 1. Remove from queue
-    const originalQueue = [...this.queue];
-    this.queue = [];
-    for (const item of originalQueue) {
-      if (matcher(item)) {
-        cancelledItems.push(item);
-      } else {
-        this.queue.push(item);
+    // JIT: Resolve factory at execution time (when job is picked off queue)
+    if (!messages && task.messageFactory) {
+      try {
+        const resolved = await task.messageFactory();
+        messages = resolved.messages;
+        if (resolved.params) {
+          params = { ...params, ...resolved.params };
+        }
+      } catch (e: any) {
+        this.updateState({ status: "failed", error: e.message || String(e) });
+        reject(e);
+        return;
       }
     }
 
-    // 2. Check running item
-    if (this.currentItem && matcher(this.currentItem)) {
-      cancelledItems.push(this.currentItem);
-    }
-    
-    // Notify about cancellations
-    for (const item of cancelledItems) {
-      this.notify(item.id, item);
+    if (!messages) {
+      const err = "No messages provided for generation";
+      this.updateState({ status: "failed", error: err });
+      reject(err);
+      return;
     }
 
-    return cancelledItems;
-  }
+    const { minTokens, maxRetries, taskId, ...apiParams } = params;
+    const retryLimit = maxRetries ?? 5;
+    let attempts = 0;
 
-  private async processQueue() {
-    if (this.isProcessing) return;
-    this.isProcessing = true;
-
-    while (this.queue.length > 0) {
-      const item = this.queue.shift();
-      if (!item) break;
-
-      this.currentItem = item;
-      
-      // Notify start
-      this.notify(item.id, item);
+    while (true) {
+      if (signal?.cancelled) {
+        reject("Cancelled");
+        return;
+      }
 
       try {
-        await this.executor(item);
-      } catch (e) {
-        api.v1.log(`Task execution failed for ${item.id}: ${e}`);
-      } finally {
-        this.currentItem = null;
-        // Notify end
-        this.notify(item.id, item);
+        const requestedTokens = apiParams.max_tokens || 1024;
+        const minimumTokens = minTokens || 1;
+
+        // Budget Check
+        await this.ensureBudget(requestedTokens, minimumTokens, signal);
+
+        if (signal?.cancelled) {
+          reject("Cancelled");
+          return;
+        }
+
+        this.updateState({ status: "generating" });
+
+        const result = await api.v1.generate(
+          messages,
+          apiParams,
+          callback,
+          behaviour,
+          signal,
+        );
+
+        resolve(result);
+        this.updateState({ status: "completed" });
+        return;
+      } catch (e: any) {
+        if (signal?.cancelled) {
+          reject("Cancelled");
+          return;
+        }
+
+        if (this.isTransientError(e)) {
+          attempts++;
+          if (attempts > retryLimit) {
+            const err = `Transient error retries exhausted: ${e.message}`;
+            this.updateState({ status: "failed", error: err });
+            reject(err);
+            return;
+          }
+
+          const delay = Math.pow(2, attempts) * 1000;
+          api.v1.log(
+            `Transient error: ${e.message}. Retrying in ${delay}ms...`,
+          );
+          await api.v1.timers.sleep(delay);
+        } else {
+          this.updateState({ status: "failed", error: e.message || String(e) });
+          reject(e);
+          return;
+        }
       }
     }
+  }
 
-    this.isProcessing = false;
+  // --- Budget Management ---
+
+  private initBudgetListener() {
+    // Listen for manual "Generate" clicks from user to unblock waiting
+    api.v1.hooks.register("onGenerationRequested", (params) => {
+      if (!params.scriptInitiated) {
+        this.userInteraction();
+      }
+    });
+  }
+
+  private async ensureBudget(
+    requested: number,
+    _min: number,
+    signal?: CancellationSignal,
+  ): Promise<void> {
+    let available = api.v1.script.getAllowedOutput();
+
+    if (available < requested) {
+      const time = api.v1.script.getTimeUntilAllowedOutput(requested);
+      const targetEnd = Date.now() + time;
+
+      api.v1.log(
+        `Waiting for budget: Have ${available}, Need ${requested}, Time ${time}ms`,
+      );
+
+      this.updateState({
+        status: "waiting_for_user",
+        budgetWaitEndTime: targetEnd,
+      });
+
+      // 3. Final Wait (Platform enforcement)
+      await api.v1.script.waitForAllowedOutput(requested);
+      if (signal?.cancelled) return;
+
+      this.updateState({
+        status: "generating",
+      });
+    }
+  }
+
+  private isTransientError(e: any): boolean {
+    const msg = (e?.message || String(e)).toLowerCase();
+    return (
+      msg.includes("aborted") ||
+      msg.includes("fetch") ||
+      msg.includes("network") ||
+      msg.includes("timeout") ||
+      msg.includes("in progress")
+    );
   }
 }

@@ -1,0 +1,388 @@
+/**
+ * S.E.G.A. (Story Engine Generate All) Effects
+ *
+ * Orchestrates automatic generation of story components in sequence:
+ * 1. Story Prompt
+ * 2. ATTG & Style
+ * 3. DULFS Lists (round-robin until each has MIN_ITEMS_PER_CATEGORY items)
+ * 4. Lorebook Content (random selection until all filled)
+ */
+
+import { Store, matchesAction } from "../../../../lib/nai-store";
+import { GenX } from "../../../../lib/gen-x";
+import {
+  RootState,
+  DULFS_CATEGORIES,
+  MIN_ITEMS_PER_CATEGORY,
+  DulfsItem,
+  AppDispatch,
+} from "../types";
+import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
+import {
+  segaToggled,
+  segaStageSet,
+  segaRequestTracked,
+  segaRequestUntracked,
+  segaRoundRobinAdvanced,
+  segaReset,
+  segaStatusUpdated,
+  uiGenerationRequested,
+  requestCompleted,
+  requestCancelled,
+} from "../slices/runtime";
+import { generationSubmitted } from "../slices/ui";
+import { attgToggled, styleToggled } from "../slices/story";
+import {
+  createLorebookContentFactory,
+  createLorebookKeysFactory,
+} from "../../utils/lorebook-strategy";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper Functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Check if Story Prompt needs generation.
+ */
+async function needsStoryPrompt(state: RootState): Promise<boolean> {
+  const content = state.story.fields[FieldID.StoryPrompt]?.content?.trim();
+  return !content;
+}
+
+/**
+ * Check if ATTG field needs generation.
+ */
+async function needsATTG(): Promise<boolean> {
+  const content = await api.v1.storyStorage.get("kse-field-attg");
+  return !content || !String(content).trim();
+}
+
+/**
+ * Check if Style field needs generation.
+ */
+async function needsStyle(): Promise<boolean> {
+  const content = await api.v1.storyStorage.get("kse-field-style");
+  return !content || !String(content).trim();
+}
+
+/**
+ * Get the next DULFS category that needs items, using round-robin.
+ * Returns null if all categories have sufficient items.
+ */
+function getNextDulfsCategory(state: RootState): DulfsFieldID | null {
+  const { currentIndex } = state.runtime.sega.dulfsRoundRobin;
+
+  // Scan from current index looking for a category that needs items
+  for (let i = 0; i < DULFS_CATEGORIES.length; i++) {
+    const idx = (currentIndex + i) % DULFS_CATEGORIES.length;
+    const category = DULFS_CATEGORIES[idx];
+    const items = state.story.dulfs[category] || [];
+
+    if (items.length < MIN_ITEMS_PER_CATEGORY) {
+      return category;
+    }
+  }
+
+  return null; // All categories have enough items
+}
+
+/**
+ * Find a DULFS item that needs lorebook content.
+ * Randomly selects from items without content for variety.
+ */
+async function findEntryNeedingContent(
+  state: RootState,
+): Promise<DulfsItem | null> {
+  const entriesNeedingContent: DulfsItem[] = [];
+
+  for (const category of DULFS_CATEGORIES) {
+    const items = state.story.dulfs[category] || [];
+    for (const item of items) {
+      const entry = await api.v1.lorebook.entry(item.id);
+      // Entry needs content if it exists but has no text
+      if (entry && (!entry.text || !entry.text.trim())) {
+        entriesNeedingContent.push(item);
+      }
+    }
+  }
+
+  if (entriesNeedingContent.length === 0) return null;
+
+  // Random selection for variety
+  const randomIndex = Math.floor(Math.random() * entriesNeedingContent.length);
+  return entriesNeedingContent[randomIndex];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEGA Orchestration
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Enable sync toggle for ATTG/Style fields.
+ * - Sets storage key for sync checkbox (checkbox UI auto-syncs via storageKey binding)
+ * - Dispatches state toggle if not already enabled
+ * This ensures SEGA-generated content is synced to Memory/Author's Note.
+ */
+async function enableSyncForField(
+  fieldId: string,
+  dispatch: AppDispatch,
+  getState: () => RootState,
+): Promise<void> {
+  if (fieldId === FieldID.ATTG) {
+    // Enable the sync storage key
+    await api.v1.storyStorage.set("kse-sync-attg-memory", true);
+    // Enable ATTG in state if not already enabled
+    if (!getState().story.attgEnabled) {
+      dispatch(attgToggled());
+    }
+  } else if (fieldId === FieldID.Style) {
+    // Enable the sync storage key
+    await api.v1.storyStorage.set("kse-sync-style-an", true);
+    // Enable Style in state if not already enabled
+    if (!getState().story.styleEnabled) {
+      dispatch(styleToggled());
+    }
+  }
+}
+
+/**
+ * Queue a SEGA-initiated generation and track the request ID.
+ * Uses the same request ID pattern as the UI buttons for proper tracking.
+ */
+async function queueSegaGeneration(
+  dispatch: AppDispatch,
+  getState: () => RootState,
+  type: "field" | "list",
+  targetId: string,
+): Promise<string> {
+  // Use the same request ID pattern as GenerationButton for proper UI tracking
+  // Fields: gen-{fieldId}, Lists: gen-list-{fieldId}
+  const requestId =
+    type === "field" ? `gen-${targetId}` : `gen-list-${targetId}`;
+
+  // Update status text
+  const fieldName = targetId.replace("dulfs-", "");
+  const label = type === "list" ? `List: ${fieldName}` : `Field: ${fieldName}`;
+  dispatch(segaStatusUpdated({ statusText: label }));
+
+  // Enable sync for ATTG/Style before generation
+  if (type === "field") {
+    await enableSyncForField(targetId, dispatch, getState);
+  }
+
+  // Track this request as SEGA-initiated
+  dispatch(segaRequestTracked({ requestId }));
+
+  // Queue the generation request
+  dispatch(
+    uiGenerationRequested({
+      id: requestId,
+      type,
+      targetId,
+    }),
+  );
+
+  return requestId;
+}
+
+/**
+ * Queue lorebook content and keys generation for a DULFS item.
+ * Uses the same request ID pattern as the UI buttons for proper tracking.
+ */
+async function queueSegaLorebookGeneration(
+  dispatch: AppDispatch,
+  getState: () => RootState,
+  item: DulfsItem,
+): Promise<void> {
+  // Use the same request ID pattern as lorebook buttons: lb-item-{entryId}-{type}
+  const contentRequestId = `lb-item-${item.id}-content`;
+  const keysRequestId = `lb-item-${item.id}-keys`;
+
+  // Update status text with category and entry name
+  const entry = await api.v1.lorebook.entry(item.id);
+  const name = entry?.displayName || item.id;
+  const category = item.fieldId.replace("dulfs-", "");
+  dispatch(
+    segaStatusUpdated({ statusText: `Lorebook: ${category} - ${name}` }),
+  );
+
+  // Track as SEGA-initiated
+  dispatch(segaRequestTracked({ requestId: contentRequestId }));
+  dispatch(segaRequestTracked({ requestId: keysRequestId }));
+
+  // Create factories for JIT strategy building
+  const contentFactory = createLorebookContentFactory(getState, item.id);
+  const keysFactory = createLorebookKeysFactory(item.id);
+
+  // Queue content generation
+  dispatch(
+    generationSubmitted({
+      requestId: contentRequestId,
+      messageFactory: contentFactory,
+      params: { model: "glm-4-6", max_tokens: 700 },
+      target: { type: "lorebookContent", entryId: item.id },
+      prefixBehavior: "trim",
+    }),
+  );
+
+  // Queue keys generation (will execute after content due to queue)
+  dispatch(
+    generationSubmitted({
+      requestId: keysRequestId,
+      messageFactory: keysFactory,
+      params: { model: "glm-4-6", max_tokens: 64 },
+      target: { type: "lorebookKeys", entryId: item.id },
+      prefixBehavior: "trim",
+    }),
+  );
+}
+
+/**
+ * Cancel all SEGA-tracked requests.
+ */
+function cancelAllSegaTasks(
+  getState: () => RootState,
+  genX: GenX,
+  dispatch: AppDispatch,
+): void {
+  const { activeRequestIds } = getState().runtime.sega;
+
+  // Cancel queued requests
+  for (const requestId of activeRequestIds) {
+    genX.cancelQueued(requestId);
+  }
+
+  // Cancel current if SEGA-initiated
+  const activeRequest = getState().runtime.activeRequest;
+  if (activeRequest && activeRequestIds.includes(activeRequest.id)) {
+    genX.cancelCurrent();
+  }
+
+  // Clear tracking
+  for (const requestId of activeRequestIds) {
+    dispatch(segaRequestUntracked({ requestId }));
+  }
+}
+
+/**
+ * Main SEGA orchestration function.
+ * Determines and schedules the next task in the pipeline.
+ */
+async function scheduleNextSegaTask(
+  dispatch: AppDispatch,
+  getState: () => RootState,
+): Promise<void> {
+  const state = getState();
+
+  // Check if SEGA is still running
+  if (!state.runtime.segaRunning) return;
+
+  // Stage 1: Story Prompt
+  if (await needsStoryPrompt(state)) {
+    dispatch(segaStageSet({ stage: "storyPrompt" }));
+    await queueSegaGeneration(dispatch, getState, "field", FieldID.StoryPrompt);
+    return;
+  }
+
+  // Stage 2: ATTG & Style
+  if (await needsATTG()) {
+    dispatch(segaStageSet({ stage: "attgStyle" }));
+    await queueSegaGeneration(dispatch, getState, "field", FieldID.ATTG);
+    return;
+  }
+  if (await needsStyle()) {
+    dispatch(segaStageSet({ stage: "attgStyle" }));
+    await queueSegaGeneration(dispatch, getState, "field", FieldID.Style);
+    return;
+  }
+
+  // Stage 3: DULFS Lists (round-robin)
+  const nextCategory = getNextDulfsCategory(state);
+  if (nextCategory) {
+    dispatch(segaStageSet({ stage: "dulfsLists" }));
+    await queueSegaGeneration(dispatch, getState, "list", nextCategory);
+    dispatch(segaRoundRobinAdvanced());
+    return;
+  }
+
+  // Stage 4: Lorebook Content
+  const entryNeedingContent = await findEntryNeedingContent(state);
+  if (entryNeedingContent) {
+    dispatch(segaStageSet({ stage: "lorebookContent" }));
+    await queueSegaLorebookGeneration(dispatch, getState, entryNeedingContent);
+    return;
+  }
+
+  // All done!
+  dispatch(segaStageSet({ stage: "completed" }));
+  dispatch(segaToggled()); // Turn off SEGA
+  api.v1.ui.toast("S.E.G.A. Complete!", { type: "success" });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Effect Registration
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function registerSegaEffects(
+  subscribeEffect: Store<RootState>["subscribeEffect"],
+  dispatch: AppDispatch,
+  getState: () => RootState,
+  genX: GenX,
+): void {
+  // Effect 1: SEGA Toggle Handler
+  subscribeEffect(matchesAction(segaToggled), async (_action) => {
+    const state = getState();
+
+    if (state.runtime.segaRunning) {
+      // SEGA was just turned ON (state already updated by reducer)
+      dispatch(segaReset());
+      await scheduleNextSegaTask(dispatch, getState);
+    } else {
+      // SEGA was just turned OFF
+      cancelAllSegaTasks(getState, genX, dispatch);
+      dispatch(segaReset());
+    }
+  });
+
+  // Effect 2: Continuation on Request Completion
+  subscribeEffect(matchesAction(requestCompleted), async (action) => {
+    const { requestId } = action.payload;
+    const state = getState();
+
+    // Check if this was a SEGA-initiated request
+    if (!state.runtime.sega.activeRequestIds.includes(requestId)) {
+      return;
+    }
+
+    // Untrack the completed request
+    dispatch(segaRequestUntracked({ requestId }));
+
+    // Schedule next task if SEGA still running
+    if (state.runtime.segaRunning) {
+      // Small delay to allow state to settle
+      await api.v1.timers.sleep(100);
+      await scheduleNextSegaTask(dispatch, getState);
+    }
+  });
+
+  // Effect 3: Continuation on Request Cancellation
+  subscribeEffect(matchesAction(requestCancelled), async (action) => {
+    const { requestId } = action.payload;
+    const state = getState();
+
+    // Check if this was a SEGA-initiated request
+    if (!state.runtime.sega.activeRequestIds.includes(requestId)) {
+      return;
+    }
+
+    // Untrack the cancelled request
+    dispatch(segaRequestUntracked({ requestId }));
+
+    // Schedule next task if SEGA still running (skip cancelled item, move on)
+    if (state.runtime.segaRunning) {
+      // Small delay to allow state to settle
+      await api.v1.timers.sleep(100);
+      await scheduleNextSegaTask(dispatch, getState);
+    }
+  });
+}
