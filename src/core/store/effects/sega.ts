@@ -232,7 +232,8 @@ async function queueSegaLorebookGeneration(
       messageFactory: keysFactory,
       params: { model: "glm-4-6", max_tokens: 64 },
       target: { type: "lorebookKeys", entryId: item.id },
-      prefixBehavior: "trim",
+      prefixBehavior: "keep", // Keep prefill (entry name) as first key
+      assistantPrefill: `${name}, `,
     }),
   );
 }

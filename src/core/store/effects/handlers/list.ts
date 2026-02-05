@@ -35,11 +35,13 @@ export const listHandler: GenerationHandlers<ListTarget> = {
     // Parse generated list and create DULFS items with full content
     const lines = ctx.accumulatedText.split("\n").filter((l) => l.trim());
     for (const line of lines) {
+      // Strip markdown FIRST (before bullet stripping eats markdown asterisks)
+      const cleanLine = stripMarkdown(line);
       // Strip bullets, numbers, dashes, and extract full content
-      const match = line.match(/^[\s\-*+•\d.)\]]*(.+)$/);
+      // Note: * removed from character class since markdown is already stripped
+      const match = cleanLine.match(/^[\s\-+•\d.)\]]*(.+)$/);
       if (match) {
-        let content = match[1].trim().replace(/^[:\-–—]\s*/, ""); // Strip leading colons/dashes only
-        content = stripMarkdown(content); // Remove markdown formatting
+        const content = match[1].trim().replace(/^[:\-–—]\s*/, ""); // Strip leading colons/dashes only
 
         if (content) {
           const itemId = api.v1.uuid();

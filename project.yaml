@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1770314227
+updatedAt: 1770320866
 config:
   - name: system_prompt
     prettyName: System Prompt
@@ -242,6 +242,35 @@ config:
       - Format the output strictly as: [ Write in a style that conveys the following: ... ]
       - DO NOT use any markdown bolding (**).
       - OUTPUT ONLY THE BLOCK.
+  - name: lorebook_context_budget
+    prettyName: Lorebook Context Budget
+    description: Max tokens for lorebook cross-references during entry generation (0
+      to disable)
+    type: number
+    default: 12000
+  - name: lorebook_story_context_budget
+    prettyName: Story Context Budget
+    description: Max tokens for story narrative context during entry generation (0
+      to disable)
+    type: number
+    default: 3000
+  - name: lorebook_keys_context_budget
+    prettyName: Keys Context Budget
+    description: Max tokens for cross-references in keys generation (0 to disable)
+    type: number
+    default: 2000
+  - name: lorebook_weaving_prompt
+    prettyName: Lorebook Weaving Prompt
+    description: Instruction for weaving cross-references into lorebook entries
+    type: string
+    multiline: true
+    default: |-
+      When generating this entry, actively reference existing world elements where narratively appropriate:
+      - Characters may belong to factions, frequent locations, or have relationships with other characters
+      - Locations may be controlled by factions, inhabited by characters, or connected to other places
+      - Factions may have notable members, headquarters, rivals, or territorial interests
+      - Systems may be practiced by factions, studied at locations, or mastered by characters
+      Weave these connections naturally into the entry to create a cohesive world.
   - name: story_engine_debug
     prettyName: Story Engine Debug
     description: Enable debug logging for Story Engine

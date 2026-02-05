@@ -367,6 +367,10 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
         const allRequestIds: string[] =
           props.requestIds ?? (resolvedRequestId ? [resolvedRequestId] : []);
 
+        // When stateProjection is provided, the button opts into custom tracking
+        // and should NOT fall back to global state even if projection returns nothing
+        const hasCustomProjection = !!props.stateProjection;
+
         let mode: ButtonMode = "gen";
         let taskStatus: "queued" | "processing" | "not_found" = "not_found";
 
@@ -402,8 +406,9 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
           } else {
             mode = "gen";
           }
-        } else {
-          // Global Button Fallback (no specific requestId)
+        } else if (!hasCustomProjection) {
+          // Global Button Fallback - only for buttons WITHOUT custom projection
+          // Buttons with stateProjection explicitly opt into tracking only their own requests
           if (genxStatus !== "idle") {
             if (genxStatus === "queued") taskStatus = "queued";
             else taskStatus = "processing";

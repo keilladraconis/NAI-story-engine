@@ -121,6 +121,12 @@ function resolvePrefix(
     }
   }
 
+  // For lorebookKeys, use explicit assistantPrefill (entry name as first key)
+  if (target.type === "lorebookKeys") {
+    api.v1.log(`[resolvePrefix] lorebookKeys: prefixBehavior=${prefixBehavior}, assistantPrefill="${assistantPrefill}"`);
+    if (assistantPrefill) return assistantPrefill;
+  }
+
   return "";
 }
 
@@ -731,6 +737,10 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
+      // Get entry displayName for prefill (entry name should be first key)
+      const entry = await api.v1.lorebook.entry(selectedEntryId);
+      const displayName = entry?.displayName || "Unnamed Entry";
+
       // Factory fetches entry.text at execution time, not now
       const messageFactory = createLorebookKeysFactory(selectedEntryId);
 
@@ -740,7 +750,8 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           messageFactory,
           params: { model: "glm-4-6", max_tokens: 64 }, // Base params, factory can override
           target: { type: "lorebookKeys", entryId: selectedEntryId },
-          prefixBehavior: "trim",
+          prefixBehavior: "keep", // Keep prefill (entry name) as first key
+          assistantPrefill: `${displayName}, `,
         }),
       );
     },
@@ -751,6 +762,10 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     matchesAction(uiLorebookItemGenerationRequested),
     async (action, { dispatch, getState }) => {
       const { entryId, contentRequestId, keysRequestId } = action.payload;
+
+      // Get entry displayName for keys prefill
+      const entry = await api.v1.lorebook.entry(entryId);
+      const displayName = entry?.displayName || "Unnamed Entry";
 
       // Queue BOTH items in store first for immediate visibility
       dispatch(
@@ -788,7 +803,8 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           messageFactory: keysFactory,
           params: { model: "glm-4-6", max_tokens: 64 },
           target: { type: "lorebookKeys", entryId },
-          prefixBehavior: "trim",
+          prefixBehavior: "keep", // Keep prefill (entry name) as first key
+          assistantPrefill: `${displayName}, `,
         }),
       );
     },

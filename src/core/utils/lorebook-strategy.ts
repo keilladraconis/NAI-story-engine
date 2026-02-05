@@ -1,7 +1,8 @@
 import { RootState, GenerationStrategy } from "../store/types";
 import { MessageFactory } from "../../../lib/gen-x";
 import { FieldID } from "../../config/field-definitions";
-import { getAllDulfsContext } from "./context-builder";
+import { getAllDulfsContext, getStoryContextMessages } from "./context-builder";
+import { buildLorebookReferenceContext } from "./lorebook-context";
 
 // Category-to-template mapping
 const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
@@ -99,7 +100,8 @@ export const buildLorebookKeysStrategy = async (
       role: "user",
       content: `Entry Name: ${displayName}\n\nEntry Content:\n${entryText}`,
     },
-    { role: "assistant", content: "" },
+    // Prefill with entry name to prevent instruction echoing and anchor response format
+    { role: "assistant", content: `${displayName}, ` },
   ];
 
   return {
@@ -107,7 +109,7 @@ export const buildLorebookKeysStrategy = async (
     messages,
     params: { model, max_tokens: 64, temperature: 0.5, min_p: 0.05, frequency_penalty: 0.3 },
     target: { type: "lorebookKeys", entryId },
-    prefixBehavior: "trim",
+    prefixBehavior: "keep", // Keep prefill (entry name) as first key
   };
 };
 
@@ -116,6 +118,7 @@ export const buildLorebookKeysStrategy = async (
 /**
  * Creates a message factory for lorebook content generation.
  * The factory captures context but defers data fetching until execution time.
+ * Includes cross-reference context from other lorebook entries for weaving.
  */
 export const createLorebookContentFactory = (
   getState: () => RootState,
@@ -172,17 +175,73 @@ Type: ${entryType}
 Setting: ${setting}
 `;
 
+    // Get weaving instruction from config
+    const weavingPrompt = String(
+      (await api.v1.config.get("lorebook_weaving_prompt")) || "",
+    );
+
+    // Get lorebook cross-reference context (shuffled for variety)
+    const lorebookBudget = Number(
+      (await api.v1.config.get("lorebook_context_budget")) ?? 12000,
+    );
+    const lorebookContext = await buildLorebookReferenceContext(
+      entryId,
+      lorebookBudget,
+      { shuffle: true },
+    );
+
+    // Get story context WITHOUT lorebook entries (we're adding our own shuffled selection)
+    const storyBudget = Number(
+      (await api.v1.config.get("lorebook_story_context_budget")) ?? 3000,
+    );
+    let storyContextContent = "";
+    if (storyBudget > 0) {
+      const storyMessages = await getStoryContextMessages({
+        includeLorebookEntries: false,
+      });
+      // Join assistant messages (the actual story content)
+      storyContextContent = storyMessages
+        .filter((m) => m.role === "assistant")
+        .map((m) => m.content)
+        .join("\n\n");
+    }
+
+    // Build messages with context structure:
+    // 1. System: Base prompt + weaving instruction + template
+    // 2. System: Existing world entries (shuffled lorebook content)
+    // 3. System: Story context (assistant messages)
+    // 4. User: Generation instruction + item details + canon + DULFS
+    // 5. Assistant: Anchored prefill
     const messages: Message[] = [
       {
         role: "system",
-        content: `${systemPrompt}\n\n[LOREBOOK ENTRY GENERATION]\n${prompt}${template ? `\n\nTEMPLATE:\n${template}` : ""}`,
+        content: `${systemPrompt}\n\n[LOREBOOK ENTRY GENERATION]\n${prompt}${weavingPrompt ? `\n\n${weavingPrompt}` : ""}${template ? `\n\nTEMPLATE:\n${template}` : ""}`,
       },
-      {
-        role: "user",
-        content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}\n\nCANON:\n${canon}\n\nSTORY ELEMENTS:\n${dulfsContext}`,
-      },
-      { role: "assistant", content: assistantPrefill },
     ];
+
+    // Add lorebook cross-reference context if available
+    if (lorebookContext.content) {
+      messages.push({
+        role: "system",
+        content: `[EXISTING WORLD ENTRIES - Reference for consistency and cross-referencing]\n${lorebookContext.content}`,
+      });
+    }
+
+    // Add story context if available
+    if (storyContextContent) {
+      messages.push({
+        role: "system",
+        content: `[STORY CONTEXT]\n${storyContextContent}`,
+      });
+    }
+
+    // User instruction comes AFTER context so the LLM knows to generate new content
+    messages.push({
+      role: "user",
+      content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}\n\nCANON:\n${canon}\n\nSTORY ELEMENTS:\n${dulfsContext}`,
+    });
+
+    messages.push({ role: "assistant", content: assistantPrefill });
 
     return {
       messages,
@@ -195,6 +254,7 @@ Setting: ${setting}
  * Creates a message factory for lorebook keys generation.
  * CRITICAL: This fetches entry.text at execution time, so it gets fresh content
  * from any preceding content generation.
+ * Includes minimal cross-reference context so keys can include names of related entries.
  */
 export const createLorebookKeysFactory = (entryId: string): MessageFactory => {
   return async () => {
@@ -215,17 +275,39 @@ export const createLorebookKeysFactory = (entryId: string): MessageFactory => {
       (await api.v1.config.get("lorebook_keys_prompt")) || "",
     );
 
+    // Get minimal cross-reference context for keys
+    const keysBudget = Number(
+      (await api.v1.config.get("lorebook_keys_context_budget")) ?? 2000,
+    );
+    const lorebookContext = await buildLorebookReferenceContext(
+      entryId,
+      keysBudget,
+      { shuffle: true },
+    );
+
     const messages: Message[] = [
       {
         role: "system",
         content: `${systemPrompt}\n\n[LOREBOOK KEY GENERATION]\n${prompt}`,
       },
+    ];
+
+    // Include world entries so keys can reference cross-linked names
+    if (lorebookContext.content) {
+      messages.push({
+        role: "system",
+        content: `[WORLD REFERENCE]\n${lorebookContext.content}`,
+      });
+    }
+
+    messages.push(
       {
         role: "user",
         content: `Entry Name: ${displayName}\n\nEntry Content:\n${entryText}`,
       },
-      { role: "assistant", content: "" },
-    ];
+      // Prefill with entry name to prevent instruction echoing and anchor response format
+      { role: "assistant", content: `${displayName}, ` },
+    );
 
     return {
       messages,

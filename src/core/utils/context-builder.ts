@@ -120,9 +120,28 @@ const contextBuilder = (
   return [clean(system), ...rest.map(clean), clean(user), clean(assistant)];
 };
 
-const getStoryContextMessages = async (): Promise<Message[]> => {
+/**
+ * Options for getStoryContextMessages.
+ */
+export interface StoryContextOptions {
+  /** Include lorebook entries (system messages). Default: true */
+  includeLorebookEntries?: boolean;
+  /** Context limit reduction for buildContext. Default: 4000 */
+  contextLimitReduction?: number;
+}
+
+/**
+ * Gets story context messages from the current story state.
+ * Filters out user messages, Author's Note, and optionally lorebook entries.
+ * Cleans prefill from assistant messages.
+ */
+export const getStoryContextMessages = async (
+  options: StoryContextOptions = {},
+): Promise<Message[]> => {
+  const { includeLorebookEntries = true, contextLimitReduction = 4000 } = options;
+
   try {
-    const messages = await api.v1.buildContext({ contextLimitReduction: 4000 });
+    const messages = await api.v1.buildContext({ contextLimitReduction });
     const prefill = await api.v1.prefill.get();
     const authorsNote = await api.v1.an.get();
 
@@ -144,6 +163,10 @@ const getStoryContextMessages = async (): Promise<Message[]> => {
         // Filter out Author's Note from system messages
         const content = msg.content || "";
         if (authorsNote && content === authorsNote) {
+          continue;
+        }
+        // Optionally filter out lorebook entries (system messages)
+        if (!includeLorebookEntries) {
           continue;
         }
         // Keep other system messages (lorebook entries)
@@ -187,7 +210,7 @@ const getStoryContextMessages = async (): Promise<Message[]> => {
     }
 
     return filtered;
-  } catch (e) {
+  } catch {
     return [];
   }
 };

@@ -111,12 +111,16 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
   async completion(ctx: CompletionContext<LorebookKeysTarget>): Promise<void> {
     const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
 
+    api.v1.log(`[lorebookKeysHandler] completion: accumulatedText="${ctx.accumulatedText}"`);
+
     if (ctx.generationSucceeded && ctx.accumulatedText) {
       // Parse comma-separated keys
       const keys = ctx.accumulatedText
         .split(",")
         .map((k) => k.trim())
         .filter((k) => k.length > 0 && k.length < 50); // Filter invalid keys
+
+      api.v1.log(`[lorebookKeysHandler] parsed keys: ${JSON.stringify(keys)}`);
 
       // Update lorebook entry with generated keys
       await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys });
