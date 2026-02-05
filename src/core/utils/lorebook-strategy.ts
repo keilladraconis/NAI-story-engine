@@ -186,7 +186,7 @@ Setting: ${setting}
 
     return {
       messages,
-      params: { model, max_tokens: 700, temperature: 0.85, min_p: 0.05 },
+      params: { model, max_tokens: 1024, temperature: 0.85, min_p: 0.05 },
     };
   };
 };
@@ -306,7 +306,7 @@ Setting: ${setting}
 
     return {
       messages,
-      params: { model, max_tokens: 700, temperature: 0.7, min_p: 0.05 },
+      params: { model, max_tokens: 1024, temperature: 0.7, min_p: 0.05 },
     };
   };
 };
