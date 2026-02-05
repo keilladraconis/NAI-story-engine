@@ -73,7 +73,7 @@ export const buildLorebookContentStrategy = async (
   return {
     requestId: api.v1.uuid(),
     messages,
-    params: { model, max_tokens: 512, temperature: 0.85, min_p: 0.05 },
+    params: { model, max_tokens: 512, temperature: 0.85, min_p: 0.05, frequency_penalty: 0.1 },
     target: { type: "lorebookContent", entryId },
     prefixBehavior: "trim",
   };
@@ -105,7 +105,7 @@ export const buildLorebookKeysStrategy = async (
   return {
     requestId: api.v1.uuid(),
     messages,
-    params: { model, max_tokens: 64, temperature: 0.3, min_p: 0.05 },
+    params: { model, max_tokens: 64, temperature: 0.5, min_p: 0.05, frequency_penalty: 0.3 },
     target: { type: "lorebookKeys", entryId },
     prefixBehavior: "trim",
   };
@@ -186,7 +186,7 @@ Setting: ${setting}
 
     return {
       messages,
-      params: { model, max_tokens: 1024, temperature: 0.85, min_p: 0.05 },
+      params: { model, max_tokens: 1024, temperature: 0.85, min_p: 0.05, frequency_penalty: 0.1 },
     };
   };
 };
@@ -306,7 +306,7 @@ Setting: ${setting}
 
     return {
       messages,
-      params: { model, max_tokens: 1024, temperature: 0.7, min_p: 0.05 },
+      params: { model, max_tokens: 1024, temperature: 0.7, min_p: 0.05, frequency_penalty: 0.1 },
     };
   };
 };

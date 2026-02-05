@@ -199,7 +199,7 @@ export const createBrainstormFactory = (
 
     return {
       messages,
-      params: { model, max_tokens: 300, temperature: 0.8, min_p: 0.05 },
+      params: { model, max_tokens: 300, temperature: 0.95, min_p: 0.05, presence_penalty: 0.05 },
     };
   };
 };
@@ -336,7 +336,7 @@ export const createDulfsListFactory = (
 
     return {
       messages,
-      params: { model, max_tokens: 500, temperature: 0.9, min_p: 0.05 },
+      params: { model, max_tokens: 500, temperature: 0.9, min_p: 0.05, frequency_penalty: 0.15 },
     };
   };
 };
