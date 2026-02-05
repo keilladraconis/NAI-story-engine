@@ -123,7 +123,70 @@ const contextBuilder = (
 const getStoryContextMessages = async (): Promise<Message[]> => {
   try {
     const messages = await api.v1.buildContext({ contextLimitReduction: 4000 });
-    return messages.filter((m) => m.role !== "system");
+    const prefill = await api.v1.prefill.get();
+    const authorsNote = await api.v1.an.get();
+
+    // First message is always systemPrompt - skip it
+    // Keep system messages (lorebook entries) but filter out Author's Note
+    // Filter out user messages (user-written instructions)
+    // Clean prefill from the last assistant message
+    const filtered: Message[] = [];
+
+    for (let i = 1; i < messages.length; i++) {
+      const msg = messages[i];
+
+      if (msg.role === "user") {
+        // Skip user-written instructions
+        continue;
+      }
+
+      if (msg.role === "system") {
+        // Filter out Author's Note from system messages
+        const content = msg.content || "";
+        if (authorsNote && content === authorsNote) {
+          continue;
+        }
+        // Keep other system messages (lorebook entries)
+        filtered.push(msg);
+        continue;
+      }
+
+      if (msg.role === "assistant") {
+        // Strip prefill from assistant message content
+        let content = msg.content || "";
+
+        if (prefill) {
+          // Normalize whitespace for comparison (collapse multiple newlines)
+          const normalizeWs = (s: string) => s.replace(/\n{2,}/g, "\n");
+          const normalizedPrefill = normalizeWs(prefill);
+          const normalizedContent = normalizeWs(content);
+
+          if (normalizedContent.startsWith(normalizedPrefill)) {
+            // Find where to cut in original content by matching normalized positions
+            // Walk through original content, tracking normalized position
+            let normalizedPos = 0;
+            let cutIndex = 0;
+            for (let j = 0; j < content.length && normalizedPos < normalizedPrefill.length; j++) {
+              const char = content[j];
+              // Skip extra newlines (those that get collapsed in normalization)
+              if (char === "\n" && j > 0 && content[j - 1] === "\n") {
+                cutIndex = j + 1;
+                continue;
+              }
+              normalizedPos++;
+              cutIndex = j + 1;
+            }
+            content = content.slice(cutIndex).trim();
+          }
+        }
+
+        if (content) {
+          filtered.push({ ...msg, content });
+        }
+      }
+    }
+
+    return filtered;
   } catch (e) {
     return [];
   }
@@ -150,7 +213,7 @@ export const createBrainstormFactory = (
 
     const systemMsg: Message = {
       role: "system",
-      content: `${systemPrompt}\n\n[BRAINSTORMING MODE]\n${brainstormInstruction}`,
+      content: `${systemPrompt}\n\nYou are now in brainstorming mode. ${brainstormInstruction}\n\nRespond naturally without echoing mode indicators or tags.`,
     };
 
     const messages: Message[] = [systemMsg];

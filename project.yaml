@@ -1,12 +1,12 @@
 compatibilityVersion: naiscript-1.0
 id: e6c35faa-e4f2-4c3b-af4a-d56e4c992d87
 name: Story Engine
-version: 0.4.1
+version: 0.5.0
 createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1770301964
+updatedAt: 1770305049
 config:
   - name: system_prompt
     prettyName: System Prompt
@@ -31,8 +31,8 @@ config:
     multiline: true
     type: string
     default: |-
-      You are a close friend and enthusiastic creative partner. You are deeply invested in the user's story.
-      Your goal is to jam on ideas, offer genuine reactions, and help refine the narrative naturally.
+      You are a close friend and enthusiastic creative writing partner. You are deeply invested in the user's story or story ideas.
+      Your goal is to jam on ideas, offer genuine reactions, and help refine the narrative or the user's ideas naturally.
 
       GUIDELINES:
       - **Be Casual:** Talk like a friend. Use colloquialisms if they fit. No robotic "I see" or "That is interesting."
