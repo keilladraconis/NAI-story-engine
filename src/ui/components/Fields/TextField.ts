@@ -13,6 +13,7 @@ import {
 } from "../../../core/store/slices/ui";
 import { uiGenerationRequested } from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
+import { bootstrapFromCanon } from "../../../core/utils/bootstrap";
 
 export type TextFieldProps = FieldConfig;
 
@@ -28,6 +29,7 @@ const {
 type TextFieldEvents = {
   beginEdit(): void;
   save(): void;
+  bootstrap(): void;
   attgSyncToggled(checked: boolean): void;
   styleSyncToggled(checked: boolean): void;
 };
@@ -204,6 +206,40 @@ export const TextField = defineComponent<
     // Standard fields with edit/save modality
     const toggleEditId = `btn-edit-${config.id}`;
     const toggleSaveId = `btn-save-${config.id}`;
+    const bootstrapId = `btn-bootstrap-${config.id}`;
+    const isCanonField = config.id === FieldID.Canon;
+
+    const buttonGroupContent: UIPart[] = [
+      button({
+        id: toggleEditId,
+        text: "Edit",
+        iconId: "edit-3",
+        style: this.style?.("standardButton"),
+        callback: () => this.events.beginEdit(config),
+      }),
+      button({
+        id: toggleSaveId,
+        text: "Save",
+        iconId: "save",
+        style: this.style?.("standardButton", "hidden"),
+        callback: () => this.events.save(config),
+      }),
+      genButton,
+    ];
+
+    // Add Bootstrap button for Canon field
+    if (isCanonField) {
+      buttonGroupContent.push(
+        button({
+          id: bootstrapId,
+          text: "Bootstrap",
+          iconId: "play",
+          style: this.style?.("standardButton"),
+          disabled: true, // Initially disabled until we know Canon has content
+          callback: () => this.events.bootstrap(config),
+        }),
+      );
+    }
 
     const header = row({
       id: `header-row-${config.id}`,
@@ -215,23 +251,7 @@ export const TextField = defineComponent<
         }),
         row({
           style: this.style?.("buttonGroup"),
-          content: [
-            button({
-              id: toggleEditId,
-              text: "Edit",
-              iconId: "edit-3",
-              style: this.style?.("standardButton"),
-              callback: () => this.events.beginEdit(config),
-            }),
-            button({
-              id: toggleSaveId,
-              text: "Save",
-              iconId: "save",
-              style: this.style?.("standardButton", "hidden"),
-              callback: () => this.events.save(config),
-            }),
-            genButton,
-          ],
+          content: buttonGroupContent,
         }),
       ],
     });
@@ -328,9 +348,11 @@ export const TextField = defineComponent<
     // Standard field logic below
     const toggleEditId = `btn-edit-${config.id}`;
     const toggleSaveId = `btn-save-${config.id}`;
+    const bootstrapId = `btn-bootstrap-${config.id}`;
     const inputId = `input-${config.id}`;
     const textId = `text-display-${config.id}`;
     const storageKey = `draft-${config.id}`;
+    const isCanonField = config.id === FieldID.Canon;
 
     // Event handlers only dispatch actions
     this.events.attach({
@@ -340,7 +362,26 @@ export const TextField = defineComponent<
       save: (props) => {
         dispatch(uiFieldEditEnd({ id: props.id }));
       },
+      bootstrap: async () => {
+        await bootstrapFromCanon(ctx.getState());
+      },
     });
+
+    // Canon field: track content to enable/disable Bootstrap button
+    if (isCanonField) {
+      useSelector(
+        (state) => state.story.fields[FieldID.Canon]?.content,
+        (content) => {
+          const hasContent = !!content?.trim();
+          api.v1.ui.updateParts([
+            {
+              id: bootstrapId,
+              disabled: !hasContent,
+            },
+          ]);
+        },
+      );
+    }
 
     type FieldAction = { type: string; payload: { id: string } };
 

@@ -33,7 +33,7 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
   try {
     api.v1.log("Initializing Story Engine (Refactored)...");
 
-    api.v1.permissions.request(["storyEdit", "lorebookEdit"]);
+    api.v1.permissions.request(["storyEdit", "lorebookEdit", "documentEdit"]);
 
     // 1. Initialize GenX
     const genX = new GenX();
