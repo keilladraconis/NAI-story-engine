@@ -129,20 +129,6 @@ const getStoryContextMessages = async (): Promise<Message[]> => {
   }
 };
 
-const getCommonContextBlocks = async (
-  state: RootState,
-  storyContext: Message[],
-): Promise<Message[]> => {
-  const canon = getFieldContent(state, FieldID.Canon);
-  const setting = String((await api.v1.storyStorage.get("kse-setting")) || "");
-
-  return [
-    ...storyContext,
-    { role: "user", content: `CANON:\n${canon}` },
-    { role: "user", content: `SETTING:\n${setting}` },
-  ];
-};
-
 // --- Strategy Factories ---
 
 /**
@@ -238,6 +224,7 @@ export const buildBrainstormStrategy = (
 
 /**
  * Creates a message factory for Canon generation.
+ * Note: Canon generation excludes existing Canon from context (can't reference itself).
  */
 export const createCanonFactory = (
   getState: () => RootState,
@@ -253,7 +240,13 @@ export const createCanonFactory = (
     );
     const brainstormContent = getConsolidatedBrainstorm(state);
     const storyContext = await getStoryContextMessages();
-    const commonBlocks = await getCommonContextBlocks(state, storyContext);
+    const setting = String((await api.v1.storyStorage.get("kse-setting")) || "");
+
+    // Build context without Canon (we're generating it)
+    const contextBlocks: Message[] = [
+      ...storyContext,
+      ...(setting ? [{ role: "user" as const, content: `SETTING:\n${setting}` }] : []),
+    ];
 
     const messages = contextBuilder(
       { role: "system", content: systemPrompt },
@@ -263,7 +256,7 @@ export const createCanonFactory = (
         content: "Here is the canon extracted from our brainstorming session:",
       },
       [
-        ...commonBlocks,
+        ...contextBlocks,
         { role: "user", content: `BRAINSTORM MATERIAL:\n${brainstormContent}` },
       ],
     );
