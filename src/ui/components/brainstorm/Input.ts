@@ -42,6 +42,18 @@ export const Input: Component<{}, RootState> = {
       label: "Send",
       style: STYLES.SEND_BTN,
       generateAction: uiBrainstormSubmitUserMessage(),
+      // Track only brainstorm-type requests, not global generation status
+      stateProjection: (state) => {
+        // Find any brainstorm request (active or queued)
+        if (state.runtime.activeRequest?.type === "brainstorm") {
+          return state.runtime.activeRequest.id;
+        }
+        const queuedBrainstorm = state.runtime.queue.find(
+          (r) => r.type === "brainstorm"
+        );
+        return queuedBrainstorm?.id;
+      },
+      requestIdFromProjection: (projection) => projection,
     });
 
     return column({
@@ -80,6 +92,18 @@ export const Input: Component<{}, RootState> = {
       label: "Send",
       style: STYLES.SEND_BTN,
       generateAction: uiBrainstormSubmitUserMessage(),
+      // Track only brainstorm-type requests, not global generation status
+      stateProjection: (state) => {
+        // Find any brainstorm request (active or queued)
+        if (state.runtime.activeRequest?.type === "brainstorm") {
+          return state.runtime.activeRequest.id;
+        }
+        const queuedBrainstorm = state.runtime.queue.find(
+          (r) => r.type === "brainstorm"
+        );
+        return queuedBrainstorm?.id;
+      },
+      requestIdFromProjection: (projection) => projection,
     });
 
     events.attach({
@@ -89,17 +113,20 @@ export const Input: Component<{}, RootState> = {
     });
 
     // Reactive State: Only handle Input disabled state
+    // Only disable when brainstorm is actively generating, not other generation types
     useSelector(
       (state) => ({
-        status: state.runtime.genx.status,
+        activeRequest: state.runtime.activeRequest,
+        genxStatus: state.runtime.genx.status,
       }),
-      ({ status }) => {
-        const isGenerating = status === "generating";
+      ({ activeRequest, genxStatus }) => {
+        const isBrainstormGenerating =
+          activeRequest?.type === "brainstorm" && genxStatus === "generating";
 
         api.v1.ui.updateParts([
           {
             id: ids.INPUT,
-            disabled: isGenerating,
+            disabled: isBrainstormGenerating,
           },
         ]);
       },

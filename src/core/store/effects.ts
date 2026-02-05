@@ -70,6 +70,9 @@ async function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
     id: api.v1.uuid(),
     name,
     enabled: true,
+    settings: {
+      entryHeader: "----"
+    }
   });
 }
 
@@ -807,7 +810,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       const getInstructions = async () =>
         String(
           (await api.v1.storyStorage.get(IDS.LOREBOOK.REFINE_INSTRUCTIONS_RAW)) ||
-            "",
+          "",
         );
       const messageFactory = createLorebookRefineFactory(
         selectedEntryId,

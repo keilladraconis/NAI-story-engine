@@ -75,7 +75,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     fieldType: "canon",
     generationInstruction:
       "Extract canonical facts from the brainstorming session: inciting incident, setting details, established character origins, and fixed world elements.",
-    filters: ["scrubBrackets", "scrubMarkdown"],
+    filters: ["scrubBrackets"],
   },
   {
     id: FieldID.Brainstorm,
