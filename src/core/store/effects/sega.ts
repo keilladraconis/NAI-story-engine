@@ -34,7 +34,7 @@ import { generationSubmitted } from "../slices/ui";
 import { attgToggled, styleToggled } from "../slices/story";
 import {
   createLorebookContentFactory,
-  createLorebookKeysFactory,
+  buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -210,32 +210,21 @@ async function queueSegaLorebookGeneration(
   dispatch(segaRequestTracked({ requestId: contentRequestId }));
   dispatch(segaRequestTracked({ requestId: keysRequestId }));
 
-  // Create factories for JIT strategy building
-  const contentFactory = createLorebookContentFactory(getState, item.id);
-  const keysFactory = createLorebookKeysFactory(item.id);
-
   // Queue content generation
+  const contentFactory = createLorebookContentFactory(getState, item.id);
   dispatch(
     generationSubmitted({
       requestId: contentRequestId,
       messageFactory: contentFactory,
       params: { model: "glm-4-6", max_tokens: 700 },
       target: { type: "lorebookContent", entryId: item.id },
-      prefixBehavior: "trim",
+      prefillBehavior: "trim",
     }),
   );
 
   // Queue keys generation (will execute after content due to queue)
-  dispatch(
-    generationSubmitted({
-      requestId: keysRequestId,
-      messageFactory: keysFactory,
-      params: { model: "glm-4-6", max_tokens: 64 },
-      target: { type: "lorebookKeys", entryId: item.id },
-      prefixBehavior: "keep", // Keep prefill (entry name) as first key
-      assistantPrefill: `${name}, `,
-    }),
-  );
+  const keysPayload = await buildLorebookKeysPayload(item.id, keysRequestId);
+  dispatch(generationSubmitted(keysPayload));
 }
 
 /**

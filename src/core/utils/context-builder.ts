@@ -304,7 +304,7 @@ export const buildBrainstormStrategy = (
       type: "brainstorm",
       messageId,
     },
-    prefixBehavior: "keep",
+    prefillBehavior: "keep",
   };
 };
 
@@ -371,7 +371,7 @@ export const buildCanonStrategy = (
     requestId: api.v1.uuid(),
     messageFactory: createCanonFactory(getState),
     target: { type: "field", fieldId },
-    prefixBehavior: "trim",
+    prefillBehavior: "trim",
   };
 };
 
@@ -438,7 +438,7 @@ export const buildDulfsListStrategy = (
     requestId: api.v1.uuid(),
     messageFactory: createDulfsListFactory(getState, fieldId),
     target: { type: "list", fieldId },
-    prefixBehavior: "trim",
+    prefillBehavior: "trim",
   };
 };
 
@@ -489,7 +489,7 @@ export const buildATTGStrategy = (
     requestId: api.v1.uuid(),
     messageFactory: createATTGFactory(getState),
     target: { type: "field", fieldId: FieldID.ATTG },
-    prefixBehavior: "keep",
+    prefillBehavior: "keep",
     assistantPrefill: "[",
   };
 };
@@ -542,7 +542,7 @@ export const buildStyleStrategy = (
     requestId: api.v1.uuid(),
     messageFactory: createStyleFactory(getState),
     target: { type: "field", fieldId: FieldID.Style },
-    prefixBehavior: "keep",
+    prefillBehavior: "keep",
     assistantPrefill: "[",
   };
 };

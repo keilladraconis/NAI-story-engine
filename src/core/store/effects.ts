@@ -35,8 +35,8 @@ import {
 } from "./index";
 import {
   createLorebookContentFactory,
-  createLorebookKeysFactory,
   createLorebookRefineFactory,
+  buildLorebookKeysPayload,
 } from "../utils/lorebook-strategy";
 import {
   buildBrainstormStrategy,
@@ -91,13 +91,13 @@ async function findCategory(fieldId: DulfsFieldID): Promise<string | null> {
 /**
  * Resolve the prefix text for resumption scenarios
  */
-function resolvePrefix(
+function resolvePrefill(
   strategy: GenerationStrategy,
   getState: () => RootState,
 ): string {
-  const { prefixBehavior, assistantPrefill, target, messages } = strategy;
+  const { prefillBehavior, assistantPrefill, target, messages } = strategy;
 
-  if (prefixBehavior !== "keep") return "";
+  if (prefillBehavior !== "keep") return "";
 
   const state = getState();
 
@@ -123,7 +123,6 @@ function resolvePrefix(
 
   // For lorebookKeys, use explicit assistantPrefill (entry name as first key)
   if (target.type === "lorebookKeys") {
-    api.v1.log(`[resolvePrefix] lorebookKeys: prefixBehavior=${prefixBehavior}, assistantPrefill="${assistantPrefill}"`);
     if (assistantPrefill) return assistantPrefill;
   }
 
@@ -413,7 +412,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       const { requestId, messages, messageFactory, params, target } = strategy;
 
       // 1. Resolve prefix for resumption
-      let accumulatedText = resolvePrefix(strategy, getState);
+      let accumulatedText = resolvePrefill(strategy, getState);
 
       // 2. Determine what to pass to GenX: factory or messages
       const messagesOrFactory = messageFactory || messages;
@@ -719,7 +718,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           messageFactory,
           params: { model: "glm-4-6", max_tokens: 512 }, // Base params, factory can override
           target: { type: "lorebookContent", entryId: selectedEntryId },
-          prefixBehavior: "trim",
+          prefillBehavior: "trim",
         }),
       );
     },
@@ -737,23 +736,8 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
-      // Get entry displayName for prefill (entry name should be first key)
-      const entry = await api.v1.lorebook.entry(selectedEntryId);
-      const displayName = entry?.displayName || "Unnamed Entry";
-
-      // Factory fetches entry.text at execution time, not now
-      const messageFactory = createLorebookKeysFactory(selectedEntryId);
-
-      dispatch(
-        generationSubmitted({
-          requestId,
-          messageFactory,
-          params: { model: "glm-4-6", max_tokens: 64 }, // Base params, factory can override
-          target: { type: "lorebookKeys", entryId: selectedEntryId },
-          prefixBehavior: "keep", // Keep prefill (entry name) as first key
-          assistantPrefill: `${displayName}, `,
-        }),
-      );
+      const keysPayload = await buildLorebookKeysPayload(selectedEntryId, requestId);
+      dispatch(generationSubmitted(keysPayload));
     },
   );
 
@@ -762,10 +746,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     matchesAction(uiLorebookItemGenerationRequested),
     async (action, { dispatch, getState }) => {
       const { entryId, contentRequestId, keysRequestId } = action.payload;
-
-      // Get entry displayName for keys prefill
-      const entry = await api.v1.lorebook.entry(entryId);
-      const displayName = entry?.displayName || "Unnamed Entry";
 
       // Queue BOTH items in store first for immediate visibility
       dispatch(
@@ -791,22 +771,13 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           messageFactory: contentFactory,
           params: { model: "glm-4-6", max_tokens: 512 },
           target: { type: "lorebookContent", entryId },
-          prefixBehavior: "trim",
+          prefillBehavior: "trim",
         }),
       );
 
       // Queue keys generation (JIT factory ensures fresh content is used)
-      const keysFactory = createLorebookKeysFactory(entryId);
-      dispatch(
-        generationSubmitted({
-          requestId: keysRequestId,
-          messageFactory: keysFactory,
-          params: { model: "glm-4-6", max_tokens: 64 },
-          target: { type: "lorebookKeys", entryId },
-          prefixBehavior: "keep", // Keep prefill (entry name) as first key
-          assistantPrefill: `${displayName}, `,
-        }),
-      );
+      const keysPayload = await buildLorebookKeysPayload(entryId, keysRequestId);
+      dispatch(generationSubmitted(keysPayload));
     },
   );
 
@@ -839,7 +810,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           messageFactory,
           params: { model: "glm-4-6", max_tokens: 700 },
           target: { type: "lorebookRefine", entryId: selectedEntryId },
-          prefixBehavior: "trim",
+          prefillBehavior: "trim",
         }),
       );
     },

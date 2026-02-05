@@ -117,7 +117,7 @@ export interface GenerationStrategy {
     | { type: "lorebookContent"; entryId: string }
     | { type: "lorebookKeys"; entryId: string }
     | { type: "lorebookRefine"; entryId: string };
-  prefixBehavior: "keep" | "trim";
+  prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
 }
 

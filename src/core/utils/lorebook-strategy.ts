@@ -1,4 +1,4 @@
-import { RootState, GenerationStrategy } from "../store/types";
+import { RootState } from "../store/types";
 import { MessageFactory } from "../../../lib/gen-x";
 import { FieldID } from "../../config/field-definitions";
 import { getAllDulfsContext, getStoryContextMessages } from "./context-builder";
@@ -28,89 +28,6 @@ const getEntryType = (categoryName: string): string => {
 
 const getFieldContent = (state: RootState, id: string): string => {
   return state.story.fields[id]?.content || "";
-};
-
-export const buildLorebookContentStrategy = async (
-  state: RootState,
-  entryId: string,
-  categoryName: string,
-  displayName: string,
-): Promise<GenerationStrategy> => {
-  const model = "glm-4-6";
-  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  const basePrompt = String(
-    (await api.v1.config.get("lorebook_generate_prompt")) || "",
-  );
-
-  // Get template based on category
-  const templateKey = CATEGORY_TEMPLATE_MAP[categoryName];
-  const template = templateKey
-    ? String((await api.v1.config.get(templateKey)) || "")
-    : "";
-
-  // Replace placeholder in base prompt
-  const prompt = basePrompt.replace("[itemName]", displayName);
-
-  const canon = getFieldContent(state, FieldID.Canon);
-
-  // Get DULFS context and the specific item's short description
-  const dulfsContext = await getAllDulfsContext(state);
-  const itemContent = String(
-    (await api.v1.storyStorage.get(`dulfs-item-${entryId}`)) || "",
-  );
-
-  const messages: Message[] = [
-    {
-      role: "system",
-      content: `${systemPrompt}\n\n[LOREBOOK ENTRY GENERATION]\n${prompt}${template ? `\n\nTEMPLATE:\n${template}` : ""}`,
-    },
-    {
-      role: "user",
-      content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}\n\nCANON:\n${canon}\n\nSTORY ELEMENTS:\n${dulfsContext}`,
-    },
-    { role: "assistant", content: "" },
-  ];
-
-  return {
-    requestId: api.v1.uuid(),
-    messages,
-    params: { model, max_tokens: 512, temperature: 0.85, min_p: 0.05, frequency_penalty: 0.1 },
-    target: { type: "lorebookContent", entryId },
-    prefixBehavior: "trim",
-  };
-};
-
-export const buildLorebookKeysStrategy = async (
-  entryId: string,
-  displayName: string,
-  entryText: string,
-): Promise<GenerationStrategy> => {
-  const model = "glm-4-6";
-  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  const prompt = String(
-    (await api.v1.config.get("lorebook_keys_prompt")) || "",
-  );
-
-  const messages: Message[] = [
-    {
-      role: "system",
-      content: `${systemPrompt}\n\n[LOREBOOK KEY GENERATION]\n${prompt}`,
-    },
-    {
-      role: "user",
-      content: `Entry Name: ${displayName}\n\nEntry Content:\n${entryText}`,
-    },
-    // Prefill with entry name to prevent instruction echoing and anchor response format
-    { role: "assistant", content: `${displayName}, ` },
-  ];
-
-  return {
-    requestId: api.v1.uuid(),
-    messages,
-    params: { model, max_tokens: 64, temperature: 0.5, min_p: 0.05, frequency_penalty: 0.3 },
-    target: { type: "lorebookKeys", entryId },
-    prefixBehavior: "keep", // Keep prefill (entry name) as first key
-  };
 };
 
 // --- Factory Builders for JIT Strategy Building ---
@@ -390,6 +307,35 @@ Setting: ${setting}
       messages,
       params: { model, max_tokens: 1024, temperature: 0.7, min_p: 0.05, frequency_penalty: 0.1 },
     };
+  };
+};
+
+/**
+ * Builds the complete generation payload for lorebook keys.
+ * Consolidates factory creation, prefill setup, and params in one place.
+ */
+export const buildLorebookKeysPayload = async (
+  entryId: string,
+  requestId: string,
+): Promise<{
+  requestId: string;
+  messageFactory: MessageFactory;
+  params: { model: string; max_tokens: number };
+  target: { type: "lorebookKeys"; entryId: string };
+  prefillBehavior: "keep";
+  assistantPrefill: string;
+}> => {
+  // Fetch entry to get displayName for prefill
+  const entry = await api.v1.lorebook.entry(entryId);
+  const displayName = entry?.displayName || "Unnamed Entry";
+
+  return {
+    requestId,
+    messageFactory: createLorebookKeysFactory(entryId),
+    params: { model: "glm-4-6", max_tokens: 64 },
+    target: { type: "lorebookKeys", entryId },
+    prefillBehavior: "keep",
+    assistantPrefill: `${displayName}, `,
   };
 };
 
