@@ -9,15 +9,18 @@ import {
 
 /**
  * Strip markdown formatting from text.
- * Handles: **bold**, *italic*, __bold__, _italic_, ~~strikethrough~~
+ * Handles: ***bold+italic***, **bold**, *italic*, ___bold+italic___, __bold__, _italic_, ~~strikethrough~~
+ * Uses [^X]+ instead of .+? to prevent matching across multiple format sections.
  */
 function stripMarkdown(text: string): string {
   return text
-    .replace(/\*\*(.+?)\*\*/g, "$1") // **bold**
-    .replace(/__(.+?)__/g, "$1") // __bold__
-    .replace(/\*(.+?)\*/g, "$1") // *italic*
-    .replace(/_(.+?)_/g, "$1") // _italic_
-    .replace(/~~(.+?)~~/g, "$1"); // ~~strikethrough~~
+    .replace(/\*\*\*(.+?)\*\*\*/g, "$1") // ***bold+italic***
+    .replace(/\*\*([^*]+)\*\*/g, "$1") // **bold**
+    .replace(/\*([^*]+)\*/g, "$1") // *italic*
+    .replace(/___(.+?)___/g, "$1") // ___bold+italic___
+    .replace(/__([^_]+)__/g, "$1") // __bold__
+    .replace(/_([^_]+)_/g, "$1") // _italic_
+    .replace(/~~([^~]+)~~/g, "$1"); // ~~strikethrough~~
 }
 
 export const listHandler: GenerationHandlers<ListTarget> = {
