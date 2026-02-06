@@ -50,7 +50,7 @@ export interface GenerationButtonProps {
   /** For icon variant: whether the target has content (affects idle style) */
   hasContent?: boolean;
   /** For icon variant: icon ID to show in idle state */
-  iconId?: string;
+  iconId?: IconId;
   /** For icon variant: async function to check if target has content */
   contentChecker?: () => Promise<boolean>;
 }
@@ -162,14 +162,14 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       variant = "button",
       label = "",
       style = {},
-      iconId = "book",
+      iconId,
     } = props;
 
     if (variant === "icon") {
       // Icon variant - single button that changes appearance
       return button({
         id,
-        iconId: iconId as IconId,
+        iconId,
         style: { ...getIconStyles().idle, ...style },
         callback: () => events.generate(props),
       });
@@ -180,7 +180,8 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
 
     const btnGenerate = button({
       id: `${id}-gen`,
-      text: `⚡ ${label}`,
+      iconId,
+      text: `${iconId ? "" : "⚡"} ${label}`,
       style: { ...styles.gen, ...style },
       callback: () => events.generate(props),
     });

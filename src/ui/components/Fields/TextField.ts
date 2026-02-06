@@ -13,7 +13,6 @@ import {
 } from "../../../core/store/slices/ui";
 import { uiGenerationRequested } from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
-import { bootstrapFromCanon } from "../../../core/utils/bootstrap";
 
 export type TextFieldProps = FieldConfig;
 
@@ -29,7 +28,6 @@ const {
 type TextFieldEvents = {
   beginEdit(): void;
   save(): void;
-  bootstrap(): void;
   attgSyncToggled(checked: boolean): void;
   styleSyncToggled(checked: boolean): void;
 };
@@ -227,18 +225,21 @@ export const TextField = defineComponent<
       genButton,
     ];
 
-    // Add Bootstrap button for Canon field
+    // Add Bootstrap button for Canon field (uses GenerationButton for GLM generation)
     if (isCanonField) {
-      buttonGroupContent.push(
-        button({
-          id: bootstrapId,
-          text: "Bootstrap",
-          iconId: "play",
-          style: this.style?.("standardButton"),
-          disabled: true, // Initially disabled until we know Canon has content
-          callback: () => this.events.bootstrap(config),
+      const bootstrapRequestId = "gen-bootstrap";
+      const bootstrapButton = GenerationButton.describe({
+        id: bootstrapId,
+        iconId: "play",
+        requestId: bootstrapRequestId,
+        label: "Bootstrap",
+        generateAction: uiGenerationRequested({
+          id: bootstrapRequestId,
+          type: "bootstrap",
+          targetId: FieldID.Canon,
         }),
-      );
+      }) as UIPart;
+      buttonGroupContent.push(bootstrapButton);
     }
 
     const header = row({
@@ -362,25 +363,23 @@ export const TextField = defineComponent<
       save: (props) => {
         dispatch(uiFieldEditEnd({ id: props.id }));
       },
-      bootstrap: async () => {
-        await bootstrapFromCanon(ctx.getState());
-      },
     });
 
-    // Canon field: track content to enable/disable Bootstrap button
+    // Canon field: mount Bootstrap GenerationButton with disabled state tracking
     if (isCanonField) {
-      useSelector(
-        (state) => state.story.fields[FieldID.Canon]?.content,
-        (content) => {
-          const hasContent = !!content?.trim();
-          api.v1.ui.updateParts([
-            {
-              id: bootstrapId,
-              disabled: !hasContent,
-            },
-          ]);
-        },
-      );
+      const bootstrapRequestId = "gen-bootstrap";
+      ctx.mount(GenerationButton, {
+        id: bootstrapId,
+        requestId: bootstrapRequestId,
+        label: "Bootstrap",
+        generateAction: uiGenerationRequested({
+          id: bootstrapRequestId,
+          type: "bootstrap",
+          targetId: FieldID.Canon,
+        }),
+        stateProjection: (state) => state.story.fields[FieldID.Canon]?.content,
+        isDisabledFromProjection: (content) => !content?.trim(),
+      });
     }
 
     type FieldAction = { type: string; payload: { id: string } };

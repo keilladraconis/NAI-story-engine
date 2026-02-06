@@ -40,6 +40,7 @@ import {
 } from "../utils/lorebook-strategy";
 import {
   buildBrainstormStrategy,
+  buildBootstrapStrategy,
   buildCanonStrategy,
   buildDulfsListStrategy,
   buildATTGStrategy,
@@ -398,6 +399,10 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         // DULFS list generation (generate names)
         const strategy = buildDulfsListStrategy(getState, targetId);
         strategy.requestId = requestId; // Use store's ID for queue tracking
+        dispatch(generationSubmitted(strategy));
+      } else if (type === "bootstrap") {
+        // Bootstrap generation - scene opening instruction
+        const strategy = buildBootstrapStrategy(getState, requestId);
         dispatch(generationSubmitted(strategy));
       }
       // "brainstorm" type is handled via separate submit/retry effects

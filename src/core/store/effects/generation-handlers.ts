@@ -1,5 +1,6 @@
 import { RootState, GenerationStrategy, AppDispatch } from "../types";
 import { brainstormHandler } from "./handlers/brainstorm";
+import { bootstrapHandler } from "./handlers/bootstrap";
 import { fieldHandler } from "./handlers/field";
 import { listHandler } from "./handlers/list";
 import {
@@ -36,6 +37,10 @@ export type LorebookRefineTarget = Extract<
   GenerationStrategy["target"],
   { type: "lorebookRefine" }
 >;
+export type BootstrapTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "bootstrap" }
+>;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
   target: T;
@@ -69,6 +74,7 @@ export interface GenerationHandlers<T = GenerationStrategy["target"]> {
 // Handler registry mapping target types to their handlers
 export const GENERATION_HANDLERS: {
   brainstorm: GenerationHandlers<BrainstormTarget>;
+  bootstrap: GenerationHandlers<BootstrapTarget>;
   field: GenerationHandlers<FieldTarget>;
   list: GenerationHandlers<ListTarget>;
   lorebookContent: GenerationHandlers<LorebookContentTarget>;
@@ -76,6 +82,7 @@ export const GENERATION_HANDLERS: {
   lorebookRefine: GenerationHandlers<LorebookRefineTarget>;
 } = {
   brainstorm: brainstormHandler,
+  bootstrap: bootstrapHandler,
   field: fieldHandler,
   list: listHandler,
   lorebookContent: lorebookContentHandler,

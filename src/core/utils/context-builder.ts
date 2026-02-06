@@ -546,3 +546,115 @@ export const buildStyleStrategy = (
     assistantPrefill: "[",
   };
 };
+
+/**
+ * Story opening techniques for GLM to select from.
+ */
+const STORY_OPENING_TECHNIQUES = `[STORY OPENING TECHNIQUES]
+- In Media Res: Begin mid-action, context revealed through unfolding events
+- Inciting Incident: The catalyst that disrupts the status quo
+- Character-Driven: Open with character revealing personality through action
+- Atmospheric/Tone: Establish mood, voice, and setting atmosphere first
+- Mystery Hook: Open with an intriguing question or anomaly
+- Dramatic Irony: Reader knows something the characters don't
+- Sensory Immersion: World-building through vivid sensory detail
+- Dialogue Hook: Open with compelling conversation that reveals stakes
+- Thematic Statement: Encapsulate the core theme in the opening
+- Frame Narrative: Narrator reflecting on events to come`;
+
+/**
+ * Creates a message factory for Bootstrap generation.
+ * Generates a self-contained scene opening instruction for the NAI story LLM.
+ */
+export const createBootstrapFactory = (
+  getState: () => RootState,
+): MessageFactory => {
+  return async () => {
+    const state = getState();
+    const model = "glm-4-6";
+    const systemPrompt = String(
+      (await api.v1.config.get("system_prompt")) || "",
+    );
+
+    const canon = getFieldContent(state, FieldID.Canon);
+    const dulfsContext = await getAllDulfsContext(state);
+    const brainstormContent = getConsolidatedBrainstorm(state);
+
+    // Build context section with available world details
+    let worldDetailsSection = "";
+    if (dulfsContext) {
+      worldDetailsSection = `\n\n[AVAILABLE WORLD DETAILS - may be incomplete]\n${dulfsContext}`;
+    }
+    if (brainstormContent) {
+      worldDetailsSection += `\n\n[BRAINSTORM NOTES]\n${brainstormContent}`;
+    }
+
+    const systemMessage = `${systemPrompt}
+
+You are a creative writing assistant specializing in story openings.
+
+${STORY_OPENING_TECHNIQUES}
+
+[TASK]
+Analyze the provided canon and any available world details.
+Select 1-2 appropriate opening techniques based on the story's nature.
+
+Generate a SELF-CONTAINED instruction block that includes:
+
+1. [BACKGROUND] (inline context the story LLM needs):
+   - World/setting essentials (era, tone, key rules)
+   - POV character with key traits, motivation, and appearance
+   - Any factions, locations, or world systems relevant to the opening scene
+
+2. [SCENE INSTRUCTION] (imperative voice directives):
+   - Where and when the scene begins
+   - What tension or narrative vector to pursue
+   - Concrete sensory details or action beats to open with
+   - What the POV character is doing/feeling
+
+The instruction must work STANDALONE. The story LLM may not have detailed lorebook entries yet - include all necessary context within the instruction itself.
+
+IMPORTANT: Do NOT use hash/pound signs in your output. Use bracketed labels like [SECTION] instead of markdown headers.`;
+
+    const userMessage = `[CANON - Story Foundation]
+${canon}${worldDetailsSection}
+
+Generate a self-contained opening scene instruction.`;
+
+    const messages: Message[] = [
+      { role: "system", content: systemMessage },
+      { role: "user", content: userMessage },
+      {
+        role: "assistant",
+        content: "[SCENE OPENING]\nTechnique:",
+      },
+    ];
+
+    return {
+      messages,
+      params: {
+        model,
+        max_tokens: 1024,
+        temperature: 0.85,
+        min_p: 0.05,
+        presence_penalty: 0.1,
+      },
+    };
+  };
+};
+
+/**
+ * Builds a Bootstrap generation strategy using JIT factory pattern.
+ */
+export const buildBootstrapStrategy = (
+  getState: () => RootState,
+  requestId: string,
+): GenerationStrategy => {
+  return {
+    requestId,
+    messageFactory: createBootstrapFactory(getState),
+    target: { type: "bootstrap" },
+    prefillBehavior: "keep",
+    assistantPrefill: "[SCENE OPENING]\nTechnique:",
+  };
+};

@@ -99,7 +99,8 @@ export interface GenerationRequest {
     | "brainstorm"
     | "lorebookContent"
     | "lorebookKeys"
-    | "lorebookRefine";
+    | "lorebookRefine"
+    | "bootstrap";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -116,7 +117,8 @@ export interface GenerationStrategy {
     | { type: "list"; fieldId: string }
     | { type: "lorebookContent"; entryId: string }
     | { type: "lorebookKeys"; entryId: string }
-    | { type: "lorebookRefine"; entryId: string };
+    | { type: "lorebookRefine"; entryId: string }
+    | { type: "bootstrap" };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
 }
