@@ -1,14 +1,23 @@
 /**
  * Utilities for building lorebook cross-reference context.
  * Enables rich context injection from existing lorebook entries during generation.
+ *
+ * CONTEXT ORDERING STRATEGY:
+ * Uses seeded pseudo-random shuffling based on story ID for stable ordering.
+ * This maximizes token cache efficiency while maintaining variety across stories.
+ * New entries naturally appear at the end of the context.
  */
+
+import { seededShuffle, getStoryIdSeed } from "./seeded-random";
 
 /**
  * Options for building lorebook reference context.
  */
 export interface LorebookReferenceOptions {
-  /** Randomize entry selection order (default: true) */
+  /** Use seeded shuffle for stable ordering (default: true) */
   shuffle?: boolean;
+  /** Optional seed override (defaults to story ID) */
+  seed?: number;
 }
 
 /**
@@ -21,17 +30,6 @@ export interface LorebookReferenceResult {
   tokenCount: number;
 }
 
-/**
- * Shuffles an array in place using Fisher-Yates algorithm.
- */
-const shuffleArray = <T>(array: T[]): T[] => {
-  const result = [...array];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-};
 
 /**
  * Fetches all lorebook entries with full text content.
@@ -75,7 +73,7 @@ export const buildLorebookReferenceContext = async (
   tokenBudget: number,
   options: LorebookReferenceOptions = {},
 ): Promise<LorebookReferenceResult> => {
-  const { shuffle = true } = options;
+  const { shuffle = true, seed } = options;
 
   if (tokenBudget <= 0) {
     return { content: "", tokenCount: 0 };
@@ -87,8 +85,13 @@ export const buildLorebookReferenceContext = async (
     return { content: "", tokenCount: 0 };
   }
 
-  // Optionally shuffle for variety
-  const orderedEntries = shuffle ? shuffleArray(entries) : entries;
+  // Use seeded shuffle for stable ordering (maximizes token cache efficiency)
+  // Seed defaults to story ID for consistency within the same story
+  let orderedEntries = entries;
+  if (shuffle) {
+    const effectiveSeed = seed ?? (await getStoryIdSeed());
+    orderedEntries = seededShuffle(entries, effectiveSeed);
+  }
 
   // Use RolloverHelper for token budget management
   const helper = api.v1.createRolloverHelper<{ content: string }>({

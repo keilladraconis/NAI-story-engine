@@ -1,3 +1,22 @@
+/**
+ * Context Builder - Strategy factories for GLM generation.
+ *
+ * CANONICAL CONTEXT ORDERING (for token cache efficiency):
+ * All generation strategies should follow this ordering to maximize cache hits:
+ *
+ * 1. System Prompt (stable - from project config)
+ * 2. Canon / Setting (stable after initial generation)
+ * 3. DULFS items (by creation order - new items append at end)
+ * 4. Lorebook entries (seeded shuffle by story ID - stable within story)
+ * 5. Brainstorm history (if applicable)
+ * 6. Story context (volatile - moving window, always at end)
+ *
+ * This ordering ensures:
+ * - Stable content stays at the beginning (high cache hit rate)
+ * - New/volatile content appears at the end (expected cache misses)
+ * - Same story ID produces same ordering (deterministic)
+ */
+
 import {
   RootState,
   BrainstormMessage,
@@ -48,6 +67,7 @@ export const extractDulfsItemName = (
 
 /**
  * Gets existing DULFS item content for a field, joined with newlines.
+ * Items are returned in creation order (array index order) for stable context.
  * Returns empty string if no items exist.
  */
 export const getExistingDulfsItems = async (
@@ -80,6 +100,8 @@ const ALL_DULFS_FIELDS: DulfsFieldID[] = [
 
 /**
  * Gets all DULFS items across all fields, grouped by category label.
+ * Categories are in fixed order (DP → US → Loc → Fac → SD).
+ * Items within each category are in creation order (stable).
  * Returns formatted string for context injection.
  */
 export const getAllDulfsContext = async (state: RootState): Promise<string> => {
