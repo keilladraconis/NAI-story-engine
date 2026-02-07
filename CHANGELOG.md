@@ -2,6 +2,68 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-02-07
+
+### Breaking Changes
+
+- **Story Prompt → Canon** — The "Story Prompt" field has been replaced by "Canon," a denser authoritative-facts format (world, characters, structure, tone). Existing Story Prompt content will not migrate automatically.
+- **World Snapshot removed** — The Dynamic World Snapshot field and its generation prompt have been removed. Canon absorbs its purpose.
+- `prefixBehavior` renamed to `prefillBehavior` across all generation strategies.
+
+### Added
+
+#### Unified Prefix & Token Cache Strategy
+
+- **`buildStoryEnginePrefix()`** — All Story Engine strategies now share a common 4-message prefix (system prompt + weaving, cross-reference entries, story state snapshot, DULFS items). This maximizes token cache hits across sequential generations.
+- **Cache instrumentation** — Every generation logs `[cache] label: N uncached tokens` for monitoring cache efficiency.
+- **Lorebook cross-reference context** (`lorebook-context.ts`) — Injects existing lorebook entries into generation context with configurable token budget, enabling richer and more consistent worldbuilding.
+- **Hash-sorted entry ordering** (`seeded-random.ts`) — Lorebook entries are sorted by `hash(storyId + entryId)` so new entries slot into position without shifting others, producing append-only cache growth during S.E.G.A.
+
+#### Canon & Bootstrap
+
+- **Canon field** — Replaces Story Prompt with a structured authoritative-facts format: World, Characters, Structure (with named narrative architectures like Three-Sphere, Powder Keg, Intimate Power, etc.), and Tone.
+- **Bootstrap** — New "Bootstrap" button generates a self-contained opening scene instruction from Canon + world state, then streams it into the document as an instruct block. Requires new `documentEdit` permission.
+
+#### Lorebook Improvements
+
+- **Lorebook Refinement** — New "Refine" button in the Lorebook panel lets you modify an existing entry with natural language instructions (e.g., "make her taller," "add a rivalry with X").
+- **Anchored prefills** — Lorebook content generation now prefills `Name/Type/Setting` header lines, and keys generation prefills the entry name as the first key. Produces more consistent formatting.
+- **Configurable budgets** — New config fields: `lorebook_context_budget`, `lorebook_story_context_budget`, `lorebook_keys_context_budget`, `lorebook_weaving_prompt`.
+- **`entryHeader` on categories** — Lorebook categories now set `entryHeader: "----"` for proper entry formatting.
+
+#### UI Enhancements
+
+- **Status border indicators** — DULFS list sections show colored left borders: gray (empty), yellow (queued), orange (generating), white (complete).
+- **Brainstorm tracking button** — New button in brainstorm input to track ongoing brainstorm generations.
+- **Dynamic textarea heights** — DULFS item textareas auto-resize based on stored content length.
+
+### Changed
+
+- **Prompt rewrites** — Canon, lorebook content, lorebook keys, ATTG, brainstorm, and situational dynamic prompts have all been substantially rewritten for higher quality output.
+  - Characters now require full physical stats (height, weight, BWH, etc.) and emphasize susceptibilities over predetermined roles.
+  - Keys prompt rewritten to focus on activation prediction ("If a scene mentions [key], should this entry be in context?").
+  - Situational Dynamics renamed to Narrative Vectors with competing-pressures framing.
+- **S.E.G.A. overhaul** — Completion handler now runs before `requestCompleted` dispatch (fixes stale-state scheduling bugs). Paired content+keys requests must both finish before the next entry is scheduled. Added extensive logging throughout.
+- **Story context filtering** — `getStoryContextMessages()` now filters out user messages, Author's Note, and strips prefill from assistant messages for cleaner context injection.
+- **Generation parameters tuned** — Brainstorm temperature raised to 0.95 with presence penalty. Lorebook content gets `frequency_penalty: 0.1`. Keys get `frequency_penalty: 0.3` with higher max tokens (96). List generation gets `frequency_penalty: 0.15`.
+- **`requestCompleted` reducer** — Now also removes the request from the queue (handles race where GenX finishes before state sync).
+- **Story clear** — Now flushes runtime queue so border selectors re-evaluate immediately.
+- Brainstorm system prompt softened ("creative writing partner" / "story ideas").
+
+### Fixed
+
+- S.E.G.A. double-generation bug — scheduling next entry before keys finished caused duplicate lorebook entries.
+- S.E.G.A. getting stuck — failed generations now always signal `requestCompleted` so the scheduler advances.
+- Completion handler errors no longer prevent `requestCompleted` dispatch (wrapped in try/catch).
+- Story context messages correctly filter out the first system prompt message.
+- Markdown stripping in output filters.
+
+### Developer Notes
+
+- New test suite: `tests/core/utils/cache-ordering.test.ts` — validates unified prefix structure, hash-sort stability, and cache efficiency invariants.
+- `seededShuffle` and `stableOrderWithNewAtEnd` utilities available in `seeded-random.ts`.
+- `applyFieldFilters` / `applyFilter` in `filters.ts` for post-generation text cleanup.
+
 ## [0.4.0] - 2026-02-04
 
 ### Breaking Changes
