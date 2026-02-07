@@ -31,6 +31,7 @@ const apiMock = {
       getAllowedOutput: vi.fn(() => 10000),
       getTimeUntilAllowedOutput: vi.fn(() => 0),
       waitForAllowedOutput: vi.fn().mockResolvedValue(undefined),
+      countUncachedInputTokens: vi.fn(() => 0),
     },
     config: {
       get: vi.fn().mockResolvedValue(undefined),

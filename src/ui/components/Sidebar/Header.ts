@@ -5,13 +5,16 @@ import {
 } from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
 import { segaToggled } from "../../../core/store/slices/runtime";
+import { uiUserPresenceConfirmed } from "../../../core/store/slices/ui";
 import { storyCleared } from "../../../core/store/slices/story";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
+import { NAI_HEADER, NAI_FOREGROUND } from "../../colors";
 
 const { row, text, button } = api.v1.ui.part;
 
 type HeaderEvents = {
   toggleSega(): void;
+  continueGeneration(): void;
 };
 
 export const Header = defineComponent({
@@ -36,6 +39,17 @@ export const Header = defineComponent({
     },
     hidden: { display: "none" },
     visible: { display: "block" },
+    continueButton: {
+      padding: "4px 8px",
+      "font-size": "0.8em",
+      background: NAI_HEADER,
+      color: NAI_FOREGROUND,
+    },
+    waitText: {
+      flex: "1",
+      "font-size": "0.8em",
+      opacity: "0.8",
+    },
   },
 
   describe(_props: {}) {
@@ -68,6 +82,20 @@ export const Header = defineComponent({
           text: "",
           style: this.style?.("statusText"),
         }),
+        // Continue button (center, hidden by default)
+        button({
+          id: "header-continue-btn",
+          text: "Continue",
+          iconId: "fast-forward",
+          style: this.style?.("continueButton", "hidden"),
+          callback: () => this.events.continueGeneration({}),
+        }),
+        // Wait countdown (center, hidden by default)
+        text({
+          id: "header-wait-text",
+          text: "",
+          style: this.style?.("waitText", "hidden"),
+        }),
         // Clear button (right)
         ButtonWithConfirmation.describe({
           id: "header-clear",
@@ -85,6 +113,7 @@ export const Header = defineComponent({
 
     this.events.attach({
       toggleSega: () => dispatch(segaToggled()),
+      continueGeneration: () => dispatch(uiUserPresenceConfirmed()),
     });
 
     // Mount ButtonWithConfirmation for Clear button
@@ -138,12 +167,41 @@ export const Header = defineComponent({
       }
     };
 
+    // Continue/Wait timer state
+    let waitTimerId: any = null;
+    let isWaitTimerActive = false;
+
+    const updateWaitTimer = (endTime: number) => {
+      if (!isWaitTimerActive) return;
+
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
+
+      api.v1.ui.updateParts([
+        { id: "header-wait-text", text: `Wait (${remaining}s)` },
+      ]);
+
+      if (remaining > 0) {
+        api.v1.timers
+          .setTimeout(() => updateWaitTimer(endTime), 1000)
+          .then((tid: any) => {
+            if (isWaitTimerActive) {
+              waitTimerId = tid;
+            } else {
+              api.v1.timers.clearTimeout(tid);
+            }
+          });
+      }
+    };
+
     useSelector(
       (state) => ({
         segaRunning: state.runtime.segaRunning,
         statusText: state.runtime.sega.statusText,
+        genxStatus: state.runtime.genx.status,
+        budgetWaitEndTime: state.runtime.genx.budgetWaitEndTime,
       }),
-      ({ segaRunning, statusText }) => {
+      ({ segaRunning, statusText, genxStatus, budgetWaitEndTime }) => {
         api.v1.ui.updateParts([
           {
             id: "header-sega-start-btn",
@@ -161,8 +219,59 @@ export const Header = defineComponent({
           },
         ]);
 
+        // Continue/Wait widget control
+        const showContinue = genxStatus === "waiting_for_user";
+        const showWait = genxStatus === "waiting_for_budget";
+        const showMarquee = !showContinue && !showWait;
+
+        api.v1.ui.updateParts([
+          {
+            id: "header-continue-btn",
+            style: this.style?.(
+              "continueButton",
+              showContinue ? "visible" : "hidden",
+            ),
+          },
+          {
+            id: "header-wait-text",
+            style: this.style?.(
+              "waitText",
+              showWait ? "visible" : "hidden",
+            ),
+          },
+          {
+            id: "header-sega-status",
+            style: this.style?.(
+              "statusText",
+              showMarquee ? "visible" : "hidden",
+            ),
+          },
+        ]);
+
+        // Wait countdown timer
+        if (showWait) {
+          if (!isWaitTimerActive) {
+            isWaitTimerActive = true;
+            const endTime = budgetWaitEndTime || Date.now() + 60000;
+            const initialRemaining = Math.max(
+              0,
+              Math.ceil((endTime - Date.now()) / 1000),
+            );
+            api.v1.ui.updateParts([
+              { id: "header-wait-text", text: `Wait (${initialRemaining}s)` },
+            ]);
+            updateWaitTimer(endTime);
+          }
+        } else {
+          isWaitTimerActive = false;
+          if (waitTimerId) {
+            api.v1.timers.clearTimeout(waitTimerId);
+            waitTimerId = null;
+          }
+        }
+
         // Marquee control
-        if (statusText) {
+        if (showMarquee && statusText) {
           if (statusText !== marquee.text) {
             marquee.text = statusText;
             marquee.position = 0;
@@ -171,15 +280,17 @@ export const Header = defineComponent({
             marquee.running = true;
             runMarquee();
           }
-        } else {
+        } else if (!statusText || !showMarquee) {
           marquee.running = false;
           marquee.text = "";
-          api.v1.ui.updateParts([
-            {
-              id: "header-sega-status",
-              text: "",
-            },
-          ]);
+          if (showMarquee) {
+            api.v1.ui.updateParts([
+              {
+                id: "header-sega-status",
+                text: "",
+              },
+            ]);
+          }
         }
       },
     );

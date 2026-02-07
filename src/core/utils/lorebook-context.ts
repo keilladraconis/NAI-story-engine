@@ -3,18 +3,18 @@
  * Enables rich context injection from existing lorebook entries during generation.
  *
  * CONTEXT ORDERING STRATEGY:
- * Uses seeded pseudo-random shuffling based on story ID for stable ordering.
- * This maximizes token cache efficiency while maintaining variety across stories.
- * New entries naturally appear at the end of the context.
+ * Uses hash-based sorting (hash(storyId + entryId)) for stable ordering.
+ * Each entry has a fixed position regardless of array size, so new entries
+ * slot in without shifting others — enabling append-only token cache behavior.
  */
 
-import { seededShuffle, getStoryIdSeed } from "./seeded-random";
+import { hashEntryPosition, getStoryIdSeed } from "./seeded-random";
 
 /**
  * Options for building lorebook reference context.
  */
 export interface LorebookReferenceOptions {
-  /** Use seeded shuffle for stable ordering (default: true) */
+  /** Use hash-based sort for stable ordering (default: true) */
   shuffle?: boolean;
   /** Optional seed override (defaults to story ID) */
   seed?: number;
@@ -69,7 +69,7 @@ const formatEntryForContext = (entry: LorebookEntry): string => {
  * @returns Formatted context and token count
  */
 export const buildLorebookReferenceContext = async (
-  excludeId: string,
+  excludeId: string | undefined,
   tokenBudget: number,
   options: LorebookReferenceOptions = {},
 ): Promise<LorebookReferenceResult> => {
@@ -85,12 +85,15 @@ export const buildLorebookReferenceContext = async (
     return { content: "", tokenCount: 0 };
   }
 
-  // Use seeded shuffle for stable ordering (maximizes token cache efficiency)
-  // Seed defaults to story ID for consistency within the same story
+  // Hash-sort for stable ordering: each entry has a fixed position regardless
+  // of array size. New entries slot into position without shifting others,
+  // enabling append-only token cache behavior during SEGA.
   let orderedEntries = entries;
   if (shuffle) {
     const effectiveSeed = seed ?? (await getStoryIdSeed());
-    orderedEntries = seededShuffle(entries, effectiveSeed);
+    orderedEntries = [...entries].sort(
+      (a, b) => hashEntryPosition(effectiveSeed, a.id) - hashEntryPosition(effectiveSeed, b.id),
+    );
   }
 
   // Use RolloverHelper for token budget management

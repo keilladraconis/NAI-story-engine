@@ -9,6 +9,12 @@ import {
 } from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
 import { ListItem } from "./ListItem";
+import {
+  STATUS_EMPTY,
+  STATUS_GENERATING,
+  STATUS_QUEUED,
+  STATUS_COMPLETE,
+} from "../../colors";
 
 export type ListFieldProps = FieldConfig;
 
@@ -51,6 +57,10 @@ export const ListField = defineComponent<
     itemsColumn: { gap: "4px" },
     actionsRow: { "margin-top": "8px", gap: "8px", "flex-wrap": "wrap" },
     standardButton: { padding: "4px 8px" },
+    borderEmpty: { "border-left": `3px solid ${STATUS_EMPTY}` },
+    borderQueued: { "border-left": `3px solid ${STATUS_QUEUED}` },
+    borderGenerating: { "border-left": `3px solid ${STATUS_GENERATING}` },
+    borderComplete: { "border-left": `3px solid ${STATUS_COMPLETE}` },
   },
 
   describe(props) {
@@ -147,6 +157,52 @@ export const ListField = defineComponent<
         targetId: props.id,
       }),
     });
+
+    // Section border status tracking
+    type SectionStatus = "empty" | "queued" | "generating" | "complete";
+    const borderStyleMap: Record<SectionStatus, string> = {
+      empty: "borderEmpty",
+      queued: "borderQueued",
+      generating: "borderGenerating",
+      complete: "borderComplete",
+    };
+
+    useSelector(
+      (state) => ({
+        activeRequest: state.runtime.activeRequest,
+        queueIds: state.runtime.queue
+          .filter((q) => q.status === "queued")
+          .map((q) => q.id),
+        items: state.story.dulfs[props.id as DulfsFieldID] || [],
+      }),
+      ({ activeRequest, queueIds, items }) => {
+        // Collect all request IDs for this category
+        const allRequestIds = [listGenId];
+        for (const item of items) {
+          allRequestIds.push(`lb-item-${item.id}-content`);
+          allRequestIds.push(`lb-item-${item.id}-keys`);
+        }
+
+        const activeId =
+          activeRequest &&
+          activeRequest.status !== "completed" &&
+          activeRequest.status !== "cancelled"
+            ? activeRequest.id
+            : undefined;
+
+        let status: SectionStatus;
+        if (allRequestIds.some((id) => id === activeId))
+          status = "generating";
+        else if (allRequestIds.some((id) => queueIds.includes(id)))
+          status = "queued";
+        else if (items.length > 0) status = "complete";
+        else status = "empty";
+
+        api.v1.ui.updateParts([
+          { id: sectionId, style: this.style?.(borderStyleMap[status]) },
+        ]);
+      },
+    );
 
     // Sync Items
     useSelector(

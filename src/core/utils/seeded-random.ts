@@ -55,6 +55,20 @@ export const seededShuffle = <T>(array: T[], seed: number): T[] => {
 };
 
 /**
+ * Computes a stable hash position for a lorebook entry.
+ * Each entry gets a fixed position regardless of how many other entries exist.
+ * Used for cache-optimal ordering: new entries slot into position without
+ * shifting existing entries.
+ *
+ * @param storyIdSeed - Numeric seed from story ID
+ * @param entryId - Lorebook entry ID
+ * @returns Unsigned 32-bit hash for sorting
+ */
+export const hashEntryPosition = (storyIdSeed: number, entryId: string): number => {
+  return hashString(`${storyIdSeed}:${entryId}`);
+};
+
+/**
  * Gets the current story ID for use as a seed.
  * Falls back to a constant if story ID is unavailable.
  */

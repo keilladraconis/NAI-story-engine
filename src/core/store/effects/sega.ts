@@ -5,7 +5,12 @@
  * 1. Story Prompt
  * 2. ATTG & Style
  * 3. DULFS Lists (round-robin until each has MIN_ITEMS_PER_CATEGORY items)
- * 4. Lorebook Content (random selection until all filled)
+ * 4. Lorebook (content + keys per entry)
+ *
+ * CACHE STRATEGY: All Story Engine strategies share a unified message prefix
+ * (system prompt + weaving, cross-refs, story state). Content and keys for the
+ * same entry have identical prefixes, so keys generation has near-zero uncached
+ * tokens. Entries are generated in hash order for append-only cross-ref growth.
  */
 
 import { Store, matchesAction } from "../../../../lib/nai-store";
@@ -36,6 +41,7 @@ import {
   createLorebookContentFactory,
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
+import { hashEntryPosition, getStoryIdSeed } from "../../utils/seeded-random";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper Functions
@@ -87,30 +93,53 @@ function getNextDulfsCategory(state: RootState): DulfsFieldID | null {
 }
 
 /**
- * Find a DULFS item that needs lorebook content.
- * Randomly selects from items without content for variety.
+ * Find the next DULFS entry that needs content generation.
+ * Entries are sorted by hash position (matching cross-reference order)
+ * so SEGA generates them in an order that produces append-only cache growth.
+ * Returns null if all entries have content.
  */
-async function findEntryNeedingContent(
-  state: RootState,
-): Promise<DulfsItem | null> {
-  const entriesNeedingContent: DulfsItem[] = [];
+async function findEntryNeedingContent(state: RootState): Promise<DulfsItem | null> {
+  const needsContent: DulfsItem[] = [];
+  let totalEntries = 0;
+  let withContent = 0;
+  let noEntry = 0;
 
   for (const category of DULFS_CATEGORIES) {
     const items = state.story.dulfs[category] || [];
     for (const item of items) {
+      totalEntries++;
       const entry = await api.v1.lorebook.entry(item.id);
-      // Entry needs content if it exists but has no text
-      if (entry && (!entry.text || !entry.text.trim())) {
-        entriesNeedingContent.push(item);
+      if (!entry) {
+        noEntry++;
+        continue;
+      }
+
+      if (!entry.text || !entry.text.trim()) {
+        needsContent.push(item);
+      } else {
+        withContent++;
       }
     }
   }
 
-  if (entriesNeedingContent.length === 0) return null;
+  api.v1.log(
+    `[sega] findEntryNeedingContent: ${totalEntries} total, ${withContent} with content, ${needsContent.length} need content, ${noEntry} no entry`,
+  );
 
-  // Random selection for variety
-  const randomIndex = Math.floor(Math.random() * entriesNeedingContent.length);
-  return entriesNeedingContent[randomIndex];
+  if (needsContent.length === 0) return null;
+
+  // Sort by hash position for cache-optimal ordering
+  const seed = await getStoryIdSeed();
+  needsContent.sort(
+    (a, b) => hashEntryPosition(seed, a.id) - hashEntryPosition(seed, b.id),
+  );
+
+  const nextEntry = await api.v1.lorebook.entry(needsContent[0].id);
+  api.v1.log(
+    `[sega] next entry: ${nextEntry?.displayName || needsContent[0].id.slice(0, 8)} (${needsContent[0].fieldId})`,
+  );
+
+  return needsContent[0];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -186,15 +215,15 @@ async function queueSegaGeneration(
 }
 
 /**
- * Queue lorebook content and keys generation for a DULFS item.
- * Uses the same request ID pattern as the UI buttons for proper tracking.
+ * Queue lorebook content + keys generation for a DULFS item.
+ * With the unified prefix, content and keys share the same message prefix,
+ * so keys generation immediately after content has near-zero uncached tokens.
  */
 async function queueSegaLorebookGeneration(
   dispatch: AppDispatch,
   getState: () => RootState,
   item: DulfsItem,
 ): Promise<void> {
-  // Use the same request ID pattern as lorebook buttons: lb-item-{entryId}-{type}
   const contentRequestId = `lb-item-${item.id}-content`;
   const keysRequestId = `lb-item-${item.id}-keys`;
 
@@ -206,7 +235,7 @@ async function queueSegaLorebookGeneration(
     segaStatusUpdated({ statusText: `Lorebook: ${category} - ${name}` }),
   );
 
-  // Track as SEGA-initiated
+  // Track both as SEGA-initiated
   dispatch(segaRequestTracked({ requestId: contentRequestId }));
   dispatch(segaRequestTracked({ requestId: keysRequestId }));
 
@@ -222,8 +251,8 @@ async function queueSegaLorebookGeneration(
     }),
   );
 
-  // Queue keys generation (will execute after content due to queue)
-  const keysPayload = await buildLorebookKeysPayload(item.id, keysRequestId);
+  // Queue keys generation (runs after content; factory fetches fresh entry.text)
+  const keysPayload = await buildLorebookKeysPayload(getState, item.id, keysRequestId);
   dispatch(generationSubmitted(keysPayload));
 }
 
@@ -269,6 +298,7 @@ async function scheduleNextSegaTask(
 
   // Stage 1: Canon
   if (await needsCanon(state)) {
+    api.v1.log("[sega] scheduling: canon");
     dispatch(segaStageSet({ stage: "canon" }));
     await queueSegaGeneration(dispatch, getState, "field", FieldID.Canon);
     return;
@@ -276,11 +306,13 @@ async function scheduleNextSegaTask(
 
   // Stage 2: ATTG & Style
   if (await needsATTG()) {
+    api.v1.log("[sega] scheduling: attg");
     dispatch(segaStageSet({ stage: "attgStyle" }));
     await queueSegaGeneration(dispatch, getState, "field", FieldID.ATTG);
     return;
   }
   if (await needsStyle()) {
+    api.v1.log("[sega] scheduling: style");
     dispatch(segaStageSet({ stage: "attgStyle" }));
     await queueSegaGeneration(dispatch, getState, "field", FieldID.Style);
     return;
@@ -289,21 +321,24 @@ async function scheduleNextSegaTask(
   // Stage 3: DULFS Lists (round-robin)
   const nextCategory = getNextDulfsCategory(state);
   if (nextCategory) {
+    api.v1.log(`[sega] scheduling: list ${nextCategory}`);
     dispatch(segaStageSet({ stage: "dulfsLists" }));
     await queueSegaGeneration(dispatch, getState, "list", nextCategory);
     dispatch(segaRoundRobinAdvanced());
     return;
   }
 
-  // Stage 4: Lorebook Content
-  const entryNeedingContent = await findEntryNeedingContent(state);
-  if (entryNeedingContent) {
+  // Stage 4: Lorebook (content + keys per entry, unified prefix)
+  const nextEntry = await findEntryNeedingContent(state);
+  if (nextEntry) {
+    api.v1.log(`[sega] scheduling: lorebook ${nextEntry.id.slice(0, 8)}`);
     dispatch(segaStageSet({ stage: "lorebookContent" }));
-    await queueSegaLorebookGeneration(dispatch, getState, entryNeedingContent);
+    await queueSegaLorebookGeneration(dispatch, getState, nextEntry);
     return;
   }
 
   // All done!
+  api.v1.log("[sega] all stages complete");
   dispatch(segaStageSet({ stage: "completed" }));
   dispatch(segaToggled()); // Turn off SEGA
   api.v1.ui.toast("S.E.G.A. Complete!", { type: "success" });
@@ -347,11 +382,22 @@ export function registerSegaEffects(
     // Untrack the completed request
     dispatch(segaRequestUntracked({ requestId }));
 
-    // Schedule next task if SEGA still running
-    if (state.runtime.segaRunning) {
-      // Small delay to allow state to settle
+    // Wait for ALL paired requests to finish before scheduling next task.
+    // content+keys are queued together — scheduling on content completion
+    // would queue the NEXT entry before keys runs, causing double-generation.
+    const updated = getState();
+    const remaining = updated.runtime.sega.activeRequestIds;
+    if (remaining.length > 0) {
+      api.v1.log(`[sega] ${requestId} done, waiting for ${remaining.length} paired: ${remaining.join(", ")}`);
+      return;
+    }
+
+    if (updated.runtime.segaRunning) {
+      api.v1.log(`[sega] ${requestId} done, all paired complete — scheduling next`);
       await api.v1.timers.sleep(100);
       await scheduleNextSegaTask(dispatch, getState);
+    } else {
+      api.v1.log(`[sega] ${requestId} done, but SEGA no longer running`);
     }
   });
 
@@ -365,12 +411,21 @@ export function registerSegaEffects(
       return;
     }
 
+    api.v1.log(`[sega] ${requestId} cancelled`);
+
     // Untrack the cancelled request
     dispatch(segaRequestUntracked({ requestId }));
 
-    // Schedule next task if SEGA still running (skip cancelled item, move on)
-    if (state.runtime.segaRunning) {
-      // Small delay to allow state to settle
+    // Wait for ALL paired requests to finish before scheduling next
+    const updated = getState();
+    const remaining = updated.runtime.sega.activeRequestIds;
+    if (remaining.length > 0) {
+      api.v1.log(`[sega] waiting for ${remaining.length} paired: ${remaining.join(", ")}`);
+      return;
+    }
+
+    if (updated.runtime.segaRunning) {
+      api.v1.log(`[sega] all paired complete after cancellation — scheduling next`);
       await api.v1.timers.sleep(100);
       await scheduleNextSegaTask(dispatch, getState);
     }

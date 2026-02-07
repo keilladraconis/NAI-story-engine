@@ -1,8 +1,6 @@
 import { RootState } from "../store/types";
 import { MessageFactory } from "../../../lib/gen-x";
-import { FieldID } from "../../config/field-definitions";
-import { getAllDulfsContext, getStoryContextMessages } from "./context-builder";
-import { buildLorebookReferenceContext } from "./lorebook-context";
+import { buildStoryEnginePrefix } from "./context-builder";
 
 // Category-to-template mapping
 const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
@@ -26,23 +24,17 @@ const getEntryType = (categoryName: string): string => {
   return CATEGORY_TO_TYPE[categoryName] || "Entry";
 };
 
-const getFieldContent = (state: RootState, id: string): string => {
-  return state.story.fields[id]?.content || "";
-};
-
 // --- Factory Builders for JIT Strategy Building ---
 
 /**
  * Creates a message factory for lorebook content generation.
- * The factory captures context but defers data fetching until execution time.
- * Includes cross-reference context from other lorebook entries for weaving.
+ * Uses unified prefix (excludes self) + volatile tail with content-specific instruction.
  */
 export const createLorebookContentFactory = (
   getState: () => RootState,
   entryId: string,
 ): MessageFactory => {
   return async () => {
-    const state = getState();
     const entry = await api.v1.lorebook.entry(entryId);
     if (!entry) {
       throw new Error(`Lorebook entry not found: ${entryId}`);
@@ -58,12 +50,10 @@ export const createLorebookContentFactory = (
 
     const displayName = entry.displayName || "Unnamed Entry";
     const model = "glm-4-6";
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
     const basePrompt = String(
       (await api.v1.config.get("lorebook_generate_prompt")) || "",
     );
+    const prompt = basePrompt.replace("[itemName]", displayName);
 
     // Get template based on category
     const templateKey = CATEGORY_TEMPLATE_MAP[categoryName];
@@ -71,18 +61,12 @@ export const createLorebookContentFactory = (
       ? String((await api.v1.config.get(templateKey)) || "")
       : "";
 
-    // Replace placeholder in base prompt
-    const prompt = basePrompt.replace("[itemName]", displayName);
-
-    const canon = getFieldContent(state, FieldID.Canon);
-
-    // Get DULFS context and the specific item's short description
-    const dulfsContext = await getAllDulfsContext(state);
+    // Item's short description from DULFS
     const itemContent = String(
       (await api.v1.storyStorage.get(`dulfs-item-${entryId}`)) || "",
     );
 
-    // Build anchored assistant prefill to prevent veering to other entries
+    // Anchored assistant prefill
     const entryType = getEntryType(categoryName);
     const setting = String(
       (await api.v1.storyStorage.get("kse-setting")) || "",
@@ -92,73 +76,34 @@ Type: ${entryType}
 Setting: ${setting}
 `;
 
-    // Get weaving instruction from config
-    const weavingPrompt = String(
-      (await api.v1.config.get("lorebook_weaving_prompt")) || "",
-    );
+    // Unified prefix (excludes this entry from cross-refs)
+    const prefix = await buildStoryEnginePrefix(getState, {
+      excludeEntryId: entryId,
+    });
 
-    // Get lorebook cross-reference context (shuffled for variety)
-    const lorebookBudget = Number(
-      (await api.v1.config.get("lorebook_context_budget")) ?? 12000,
-    );
-    const lorebookContext = await buildLorebookReferenceContext(
-      entryId,
-      lorebookBudget,
-      { shuffle: true },
-    );
-
-    // Get story context WITHOUT lorebook entries (we're adding our own shuffled selection)
-    const storyBudget = Number(
-      (await api.v1.config.get("lorebook_story_context_budget")) ?? 3000,
-    );
-    let storyContextContent = "";
-    if (storyBudget > 0) {
-      const storyMessages = await getStoryContextMessages({
-        includeLorebookEntries: false,
-      });
-      // Join assistant messages (the actual story content)
-      storyContextContent = storyMessages
-        .filter((m) => m.role === "assistant")
-        .map((m) => m.content)
-        .join("\n\n");
-    }
-
-    // Build messages with context structure:
-    // 1. System: Base prompt + weaving instruction + template
-    // 2. System: Existing world entries (shuffled lorebook content)
-    // 3. System: Story context (assistant messages)
-    // 4. User: Generation instruction + item details + canon + DULFS
-    // 5. Assistant: Anchored prefill
     const messages: Message[] = [
+      ...prefix,
       {
         role: "system",
-        content: `${systemPrompt}\n\n[LOREBOOK ENTRY GENERATION]\n${prompt}${weavingPrompt ? `\n\n${weavingPrompt}` : ""}${template ? `\n\nTEMPLATE:\n${template}` : ""}`,
+        content: `[LOREBOOK ENTRY GENERATION]\n${prompt}`,
       },
     ];
 
-    // Add lorebook cross-reference context if available
-    if (lorebookContext.content) {
+    // Template after stable prefix (varies per category)
+    if (template) {
       messages.push({
         role: "system",
-        content: `[EXISTING WORLD ENTRIES - Reference for consistency and cross-referencing]\n${lorebookContext.content}`,
+        content: `TEMPLATE:\n${template}`,
       });
     }
 
-    // Add story context if available
-    if (storyContextContent) {
-      messages.push({
-        role: "system",
-        content: `[STORY CONTEXT]\n${storyContextContent}`,
-      });
-    }
-
-    // User instruction comes AFTER context so the LLM knows to generate new content
-    messages.push({
-      role: "user",
-      content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}\n\nCANON:\n${canon}\n\nSTORY ELEMENTS:\n${dulfsContext}`,
-    });
-
-    messages.push({ role: "assistant", content: assistantPrefill });
+    messages.push(
+      {
+        role: "user",
+        content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}`,
+      },
+      { role: "assistant", content: assistantPrefill },
+    );
 
     return {
       messages,
@@ -169,62 +114,44 @@ Setting: ${setting}
 
 /**
  * Creates a message factory for lorebook keys generation.
- * CRITICAL: This fetches entry.text at execution time, so it gets fresh content
- * from any preceding content generation.
- * Includes minimal cross-reference context so keys can include names of related entries.
+ * Uses unified prefix (excludes self) + volatile tail with keys-specific instruction.
+ * CRITICAL: Fetches entry.text at execution time for fresh content from preceding generation.
  */
-export const createLorebookKeysFactory = (entryId: string): MessageFactory => {
+export const createLorebookKeysFactory = (
+  getState: () => RootState,
+  entryId: string,
+): MessageFactory => {
   return async () => {
-    // Fetch FRESH entry.text at execution time
     const entry = await api.v1.lorebook.entry(entryId);
     if (!entry) {
       throw new Error(`Lorebook entry not found: ${entryId}`);
     }
 
     const displayName = entry.displayName || "Unnamed Entry";
-    const entryText = entry.text || ""; // Now has content from previous generation
+    const entryText = entry.text || "";
 
     const model = "glm-4-6";
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
     const prompt = String(
       (await api.v1.config.get("lorebook_keys_prompt")) || "",
     );
 
-    // Get minimal cross-reference context for keys
-    const keysBudget = Number(
-      (await api.v1.config.get("lorebook_keys_context_budget")) ?? 2000,
-    );
-    const lorebookContext = await buildLorebookReferenceContext(
-      entryId,
-      keysBudget,
-      { shuffle: true },
-    );
+    // Unified prefix (excludes this entry from cross-refs)
+    const prefix = await buildStoryEnginePrefix(getState, {
+      excludeEntryId: entryId,
+    });
 
     const messages: Message[] = [
+      ...prefix,
       {
         role: "system",
-        content: `${systemPrompt}\n\n[LOREBOOK KEY GENERATION]\n${prompt}`,
+        content: `[LOREBOOK KEY GENERATION]\n${prompt}`,
       },
-    ];
-
-    // Include world entries so keys can reference cross-linked names
-    if (lorebookContext.content) {
-      messages.push({
-        role: "system",
-        content: `[WORLD REFERENCE]\n${lorebookContext.content}`,
-      });
-    }
-
-    messages.push(
       {
         role: "user",
         content: `Entry Name: ${displayName}\n\nEntry Content:\n${entryText}`,
       },
-      // Prefill with entry name to prevent instruction echoing and anchor response format
       { role: "assistant", content: `${displayName}, ` },
-    );
+    ];
 
     return {
       messages,
@@ -242,9 +169,10 @@ export const createLorebookKeysFactory = (entryId: string): MessageFactory => {
 
 /**
  * Creates a message factory for lorebook entry refinement.
- * Allows users to modify existing lorebook entries with natural language instructions.
+ * Uses unified prefix (excludes self) + volatile tail with refine-specific instruction.
  */
 export const createLorebookRefineFactory = (
+  getState: () => RootState,
   entryId: string,
   getInstructions: () => Promise<string>,
 ): MessageFactory => {
@@ -271,30 +199,33 @@ export const createLorebookRefineFactory = (
       (await api.v1.storyStorage.get("kse-setting")) || "",
     );
 
-    // Get template based on category (same as content generation)
+    // Get template based on category
     const templateKey = CATEGORY_TEMPLATE_MAP[categoryName];
     const template = templateKey
       ? String((await api.v1.config.get(templateKey)) || "")
       : "";
 
-    // Build anchored assistant prefill (---- header handled by NAI category defaults)
+    // Anchored assistant prefill
     const prefillContent = `Name: ${displayName}
 Type: ${entryType}
 Setting: ${setting}
 `;
 
     const model = "glm-4-6";
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
     const refinePrompt = String(
       (await api.v1.config.get("lorebook_refine_prompt")) || "",
     );
 
+    // Unified prefix (excludes this entry from cross-refs)
+    const prefix = await buildStoryEnginePrefix(getState, {
+      excludeEntryId: entryId,
+    });
+
     const messages: Message[] = [
+      ...prefix,
       {
         role: "system",
-        content: `${systemPrompt}\n\n[LOREBOOK ENTRY REFINEMENT]\n${refinePrompt}${template ? `\n\nTEMPLATE:\n${template}` : ""}`,
+        content: `[LOREBOOK ENTRY REFINEMENT]\n${refinePrompt}${template ? `\n\nTEMPLATE:\n${template}` : ""}`,
       },
       {
         role: "user",
@@ -315,6 +246,7 @@ Setting: ${setting}
  * Consolidates factory creation, prefill setup, and params in one place.
  */
 export const buildLorebookKeysPayload = async (
+  getState: () => RootState,
   entryId: string,
   requestId: string,
 ): Promise<{
@@ -331,7 +263,7 @@ export const buildLorebookKeysPayload = async (
 
   return {
     requestId,
-    messageFactory: createLorebookKeysFactory(entryId),
+    messageFactory: createLorebookKeysFactory(getState, entryId),
     params: { model: "glm-4-6", max_tokens: 64 },
     target: { type: "lorebookKeys", entryId },
     prefillBehavior: "keep",

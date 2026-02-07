@@ -11,3 +11,9 @@ export const NAI_PROMPT = "rgb(245, 243, 194)";
 export const NAI_AITEXT = "rgb(255, 255, 255)";
 export const NAI_EDITTEXT = "rgb(244, 199, 255)";
 export const NAI_USERTEXT = "rgb(156, 220, 255)";
+
+// Section status indicator colors
+export const STATUS_EMPTY = "rgba(128,128,128,0.3)";
+export const STATUS_GENERATING = "#ff9800";
+export const STATUS_QUEUED = "rgb(245,243,194)";
+export const STATUS_COMPLETE = "rgba(255,255,255,0.8)";

@@ -5,7 +5,7 @@ import {
   GenerationStrategy,
   AppDispatch,
 } from "./types";
-import { GenX } from "../../../lib/gen-x";
+import { GenX, MessageFactory } from "../../../lib/gen-x";
 import { registerSegaEffects } from "./effects/sega";
 import {
   uiBrainstormSubmitUserMessage,
@@ -180,6 +180,28 @@ async function captureRollbackState(
     content: entry?.text || "",
     keys: entry?.keys?.join(", ") || "",
   };
+}
+
+/**
+ * Descriptive label for cache instrumentation logs.
+ */
+function cacheLabel(target: GenerationStrategy["target"]): string {
+  switch (target.type) {
+    case "field":
+      return `field:${target.fieldId}`;
+    case "list":
+      return `list:${target.fieldId}`;
+    case "brainstorm":
+      return `brainstorm:${target.messageId}`;
+    case "lorebookContent":
+      return `lb-content:${target.entryId.slice(0, 8)}`;
+    case "lorebookKeys":
+      return `lb-keys:${target.entryId.slice(0, 8)}`;
+    case "lorebookRefine":
+      return `lb-refine:${target.entryId.slice(0, 8)}`;
+    case "bootstrap":
+      return "bootstrap";
+  }
 }
 
 /**
@@ -420,7 +442,22 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       let accumulatedText = resolvePrefill(strategy, getState);
 
       // 2. Determine what to pass to GenX: factory or messages
-      const messagesOrFactory = messageFactory || messages;
+      // Wrap with instrumentation to log uncached token counts
+      let messagesOrFactory: Message[] | MessageFactory | undefined;
+      if (messageFactory) {
+        // Wrap factory to instrument after resolution
+        messagesOrFactory = async () => {
+          const result = await messageFactory();
+          const uncached = await api.v1.script.countUncachedInputTokens(result.messages, "glm-4-6");
+          api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);
+          return result;
+        };
+      } else if (messages) {
+        // Instrument static messages inline
+        const uncached = await api.v1.script.countUncachedInputTokens(messages, "glm-4-6");
+        api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);
+        messagesOrFactory = messages;
+      }
       if (!messagesOrFactory) {
         api.v1.log("Generation failed: no messages or factory provided");
         return;
@@ -457,30 +494,47 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         generationSucceeded = false;
       }
 
-      // 6. Check cancellation and dispatch completion
+      // 6. Check cancellation
       const wasCancelled = checkCancellation(requestId, getState);
       if (wasCancelled) {
         api.v1.log(`[effects] Generation was cancelled for ${requestId}`);
         generationSucceeded = false;
-      } else if (generationSucceeded) {
-        api.v1.log(
-          `[effects] Generation completed successfully for ${requestId}`,
-        );
+      }
+
+      // 7. Run completion handler BEFORE signaling completion.
+      // SEGA schedules the next task on requestCompleted — the handler must
+      // finish updating state (e.g. adding DULFS items) first, otherwise the
+      // scheduler sees stale counts and re-schedules the same category.
+      try {
+        await handler.completion({
+          target,
+          getState,
+          accumulatedText,
+          generationSucceeded,
+          dispatch,
+          originalContent: rollbackState.content,
+          originalKeys: rollbackState.keys,
+        });
+      } catch (e) {
+        api.v1.log(`[effects] Completion handler error for ${requestId}:`, e);
+      }
+
+      // 8. Signal completion (after handler has updated state).
+      // SEGA relies on this signal to advance — without it, SEGA gets stuck.
+      if (!wasCancelled) {
+        if (generationSucceeded) {
+          api.v1.log(
+            `[effects] Generation completed successfully for ${requestId}`,
+          );
+        } else {
+          api.v1.log(
+            `[effects] Generation failed for ${requestId}, signaling completion`,
+          );
+        }
         dispatch(requestCompleted({ requestId }));
       }
 
-      // 7. Run completion handler
-      await handler.completion({
-        target,
-        getState,
-        accumulatedText,
-        generationSucceeded,
-        dispatch,
-        originalContent: rollbackState.content,
-        originalKeys: rollbackState.keys,
-      });
-
-      // 8. Show toast notification for Story Engine generations
+      // 9. Show toast notification for Story Engine generations
       if (generationSucceeded) {
         if (target.type === "list") {
           const fieldConfig = FIELD_CONFIGS.find(
@@ -741,7 +795,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
-      const keysPayload = await buildLorebookKeysPayload(selectedEntryId, requestId);
+      const keysPayload = await buildLorebookKeysPayload(getState, selectedEntryId, requestId);
       dispatch(generationSubmitted(keysPayload));
     },
   );
@@ -781,7 +835,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       );
 
       // Queue keys generation (JIT factory ensures fresh content is used)
-      const keysPayload = await buildLorebookKeysPayload(entryId, keysRequestId);
+      const keysPayload = await buildLorebookKeysPayload(getState, entryId, keysRequestId);
       dispatch(generationSubmitted(keysPayload));
     },
   );
@@ -805,6 +859,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           "",
         );
       const messageFactory = createLorebookRefineFactory(
+        getState,
         selectedEntryId,
         getInstructions,
       );

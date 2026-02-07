@@ -1,20 +1,19 @@
 /**
  * Context Builder - Strategy factories for GLM generation.
  *
- * CANONICAL CONTEXT ORDERING (for token cache efficiency):
- * All generation strategies should follow this ordering to maximize cache hits:
+ * UNIFIED PREFIX STRATEGY (for token cache efficiency):
+ * All Story Engine strategies share a common prefix via buildStoryEnginePrefix():
  *
- * 1. System Prompt (stable - from project config)
- * 2. Canon / Setting (stable after initial generation)
- * 3. DULFS items (by creation order - new items append at end)
- * 4. Lorebook entries (seeded shuffle by story ID - stable within story)
- * 5. Brainstorm history (if applicable)
- * 6. Story context (volatile - moving window, always at end)
+ *   MSG 1 (SYSTEM): systemPrompt + weaving prompt             [STABLE]
+ *   MSG 2 (SYSTEM): cross-reference entries (hash-sorted)     [GROWS append-only]
+ *   MSG 3 (SYSTEM): story state snapshot (canon, setting,     [STABLE during SEGA]
+ *                    ATTG, style, brainstorm, story text)
+ *   MSG 4 (SYSTEM): DULFS items                               [GROWS during list stage]
+ *   ─── cache boundary ───
+ *   MSG 5+ : strategy-specific instructions                   [VOLATILE]
+ *   LAST   : assistant prefill                                [VOLATILE]
  *
- * This ordering ensures:
- * - Stable content stays at the beginning (high cache hit rate)
- * - New/volatile content appears at the end (expected cache misses)
- * - Same story ID produces same ordering (deterministic)
+ * Brainstorm mode is excluded — it uses chat-based context (createBrainstormFactory).
  */
 
 import {
@@ -28,6 +27,7 @@ import {
   FIELD_CONFIGS,
   DulfsFieldID,
 } from "../../config/field-definitions";
+import { buildLorebookReferenceContext } from "./lorebook-context";
 
 // --- Helpers ---
 
@@ -119,7 +119,7 @@ export const getAllDulfsContext = async (state: RootState): Promise<string> => {
   return sections.join("\n\n");
 };
 
-const getConsolidatedBrainstorm = (state: RootState): string => {
+export const getConsolidatedBrainstorm = (state: RootState): string => {
   const history = getBrainstormHistory(state);
   if (history.length > 0) {
     return history
@@ -127,19 +127,6 @@ const getConsolidatedBrainstorm = (state: RootState): string => {
       .join("\n");
   }
   return "";
-};
-
-const contextBuilder = (
-  system: Message,
-  user: Message,
-  assistant: Message,
-  rest: Message[],
-): Message[] => {
-  const clean = (m: Message): Message => ({
-    ...m,
-    content: m.content ? m.content.trim() : m.content,
-  });
-  return [clean(system), ...rest.map(clean), clean(user), clean(assistant)];
 };
 
 /**
@@ -237,6 +224,144 @@ export const getStoryContextMessages = async (
   }
 };
 
+// --- Unified Story Engine Prefix ---
+
+/**
+ * Builds the shared message prefix for all Story Engine generation strategies.
+ * Brainstorm mode is excluded — it uses its own chat-based context.
+ *
+ * Prefix structure:
+ *   MSG 1 (SYSTEM): systemPrompt + weaving prompt             [STABLE]
+ *   MSG 2 (SYSTEM): cross-reference entries (hash-sorted)     [GROWS append-only]
+ *   MSG 3 (SYSTEM): story state snapshot (stable fields)      [STABLE during SEGA]
+ *   MSG 4 (SYSTEM): DULFS items                               [GROWS during list stage]
+ *
+ * After the prefix, each factory appends its own volatile tail
+ * (strategy-specific instructions, prefill, etc.).
+ */
+export interface StoryEnginePrefixOptions {
+  /** Lorebook entry ID to exclude from cross-references */
+  excludeEntryId?: string;
+  /** Snapshot sections to exclude (e.g., "canon" when generating canon) */
+  excludeSections?: Array<"canon" | "setting" | "attg" | "style" | "brainstorm" | "dulfs" | "storyText">;
+}
+
+export const buildStoryEnginePrefix = async (
+  getState: () => RootState,
+  options: StoryEnginePrefixOptions = {},
+): Promise<Message[]> => {
+  const state = getState();
+  const excluded = new Set(options.excludeSections || []);
+
+  // --- MSG 1: System prompt + weaving ---
+  const systemPrompt = String(
+    (await api.v1.config.get("system_prompt")) || "",
+  );
+  const weavingPrompt = String(
+    (await api.v1.config.get("lorebook_weaving_prompt")) || "",
+  );
+  const msg1Content = weavingPrompt
+    ? `${systemPrompt}\n\n${weavingPrompt}`
+    : systemPrompt;
+
+  // --- MSG 2: Cross-reference entries ---
+  const lorebookBudget = Number(
+    (await api.v1.config.get("lorebook_context_budget")) ?? 12000,
+  );
+  const lorebookContext = await buildLorebookReferenceContext(
+    options.excludeEntryId,
+    lorebookBudget,
+    { shuffle: true },
+  );
+
+  // --- MSG 3: Story state snapshot (STABLE sections) ---
+  const stableSections: string[] = [];
+
+  // Canon
+  if (!excluded.has("canon")) {
+    const canon = getFieldContent(state, FieldID.Canon);
+    if (canon) stableSections.push(`[CANON]\n${canon}`);
+  }
+
+  // Setting
+  if (!excluded.has("setting")) {
+    const setting = String(
+      (await api.v1.storyStorage.get("kse-setting")) || "",
+    );
+    if (setting) stableSections.push(`[SETTING]\n${setting}`);
+  }
+
+  // ATTG
+  if (!excluded.has("attg")) {
+    const attg = String(
+      (await api.v1.storyStorage.get("kse-field-attg")) || "",
+    );
+    if (attg) stableSections.push(`[ATTG]\n${attg}`);
+  }
+
+  // Style
+  if (!excluded.has("style")) {
+    const style = String(
+      (await api.v1.storyStorage.get("kse-field-style")) || "",
+    );
+    if (style) stableSections.push(`[STYLE]\n${style}`);
+  }
+
+  // Brainstorm (consolidated)
+  if (!excluded.has("brainstorm")) {
+    const brainstorm = getConsolidatedBrainstorm(state);
+    if (brainstorm) stableSections.push(`[BRAINSTORM]\n${brainstorm}`);
+  }
+
+  // Story text (stable during SEGA — user's story doesn't change)
+  if (!excluded.has("storyText")) {
+    const storyMessages = await getStoryContextMessages({
+      includeLorebookEntries: false,
+    });
+    const storyText = storyMessages
+      .filter((m) => m.role === "assistant")
+      .map((m) => m.content)
+      .join("\n\n");
+    if (storyText) stableSections.push(`[STORY TEXT]\n${storyText}`);
+  }
+
+  // --- MSG 4: DULFS items (GROWS during list stage, stable during lorebook) ---
+  // Separate message so growth doesn't invalidate MSG 3's cached tokens.
+  let dulfsContent = "";
+  if (!excluded.has("dulfs")) {
+    const dulfsContext = await getAllDulfsContext(state);
+    if (dulfsContext) dulfsContent = `[WORLD ENTRIES]\n${dulfsContext}`;
+  }
+
+  // --- Assemble prefix ---
+  const messages: Message[] = [
+    { role: "system", content: msg1Content },
+  ];
+
+  if (lorebookContext.content) {
+    messages.push({
+      role: "system",
+      content: `[EXISTING WORLD ENTRIES - Reference for consistency and cross-referencing]\n${lorebookContext.content}`,
+    });
+  }
+
+  if (stableSections.length > 0) {
+    messages.push({
+      role: "system",
+      content: stableSections.join("\n\n"),
+    });
+  }
+
+  if (dulfsContent) {
+    messages.push({
+      role: "system",
+      content: dulfsContent,
+    });
+  }
+
+  return messages;
+};
+
 // --- Strategy Factories ---
 
 /**
@@ -332,42 +457,33 @@ export const buildBrainstormStrategy = (
 
 /**
  * Creates a message factory for Canon generation.
- * Note: Canon generation excludes existing Canon from context (can't reference itself).
+ * Uses unified prefix + volatile tail with canon-specific instruction.
  */
 export const createCanonFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const state = getState();
     const model = "glm-4-6";
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
     const prompt = String(
       (await api.v1.config.get("canon_generate_prompt")) || "",
     );
-    const brainstormContent = getConsolidatedBrainstorm(state);
-    const storyContext = await getStoryContextMessages();
-    const setting = String((await api.v1.storyStorage.get("kse-setting")) || "");
 
-    // Build context without Canon (we're generating it)
-    const contextBlocks: Message[] = [
-      ...storyContext,
-      ...(setting ? [{ role: "user" as const, content: `SETTING:\n${setting}` }] : []),
-    ];
+    // Exclude canon (generating it — prevents self-reference)
+    const prefix = await buildStoryEnginePrefix(getState, {
+      excludeSections: ["canon"],
+    });
 
-    const messages = contextBuilder(
-      { role: "system", content: systemPrompt },
-      { role: "user", content: prompt },
+    const messages: Message[] = [
+      ...prefix,
+      {
+        role: "system",
+        content: `[CANON GENERATION]\n${prompt}`,
+      },
       {
         role: "assistant",
         content: "Here is the canon extracted from our brainstorming session:",
       },
-      [
-        ...contextBlocks,
-        { role: "user", content: `BRAINSTORM MATERIAL:\n${brainstormContent}` },
-      ],
-    );
+    ];
 
     return {
       messages,
@@ -399,6 +515,7 @@ export const buildCanonStrategy = (
 
 /**
  * Creates a message factory for DULFS list generation.
+ * Uses unified prefix + volatile tail with list-specific instruction.
  */
 export const createDulfsListFactory = (
   getState: () => RootState,
@@ -407,19 +524,13 @@ export const createDulfsListFactory = (
   return async () => {
     const state = getState();
     const model = "glm-4-6";
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
     const fieldConfig = FIELD_CONFIGS.find((f) => f.id === fieldId);
 
-    // Use generationInstruction for rich format, listGenerationInstruction for context
     const instruction =
       fieldConfig?.listGenerationInstruction ||
       fieldConfig?.generationInstruction ||
       "";
     const exampleFormat = fieldConfig?.exampleFormat || "";
-    const brainstormContent = getConsolidatedBrainstorm(state);
-    const canon = getFieldContent(state, FieldID.Canon);
 
     // Get existing items in full format to avoid duplicates
     const existingItems = await getExistingDulfsItems(
@@ -430,14 +541,17 @@ export const createDulfsListFactory = (
       ? `\n\n[EXISTING ${fieldConfig?.label?.toUpperCase() || "ITEMS"}]\n${existingItems}\n\nDo not repeat any of the above characters/items.`
       : "";
 
+    const prefix = await buildStoryEnginePrefix(getState);
+
     const messages: Message[] = [
+      ...prefix,
       {
         role: "system",
-        content: `${systemPrompt}\n\n[LIST GENERATION MODE]\n${instruction}\n\nOutput a bulleted list. Each item should follow this format:\n${exampleFormat}`,
+        content: `[LIST GENERATION]\n${instruction}\n\nOutput a bulleted list. Each item should follow this format:\n${exampleFormat}`,
       },
       {
         role: "user",
-        content: `CANON:\n${canon}\n\nBRAINSTORM:\n${brainstormContent}${existingContext}`,
+        content: existingContext.trim() || "Generate items.",
       },
       { role: "assistant", content: "-" },
     ];
@@ -466,30 +580,27 @@ export const buildDulfsListStrategy = (
 
 /**
  * Creates a message factory for ATTG generation.
+ * Uses unified prefix + volatile tail with ATTG-specific instruction.
  */
 export const createATTGFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const state = getState();
     const model = "glm-4-6";
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
     const prompt = String(
       (await api.v1.config.get("attg_generate_prompt")) || "",
     );
-    const brainstormContent = getConsolidatedBrainstorm(state);
-    const canon = getFieldContent(state, FieldID.Canon);
+
+    // Exclude ATTG (generating it)
+    const prefix = await buildStoryEnginePrefix(getState, {
+      excludeSections: ["attg"],
+    });
 
     const messages: Message[] = [
+      ...prefix,
       {
         role: "system",
-        content: `${systemPrompt}\n\n[ATTG GENERATION MODE]\n${prompt}`,
-      },
-      {
-        role: "user",
-        content: `CANON:\n${canon}\n\nBRAINSTORM:\n${brainstormContent}`,
+        content: `[ATTG GENERATION]\n${prompt}`,
       },
       { role: "assistant", content: "[" },
     ];
@@ -518,31 +629,27 @@ export const buildATTGStrategy = (
 
 /**
  * Creates a message factory for Style generation.
+ * Uses unified prefix + volatile tail with style-specific instruction.
  */
 export const createStyleFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const state = getState();
     const model = "glm-4-6";
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
     const prompt = String(
       (await api.v1.config.get("style_generate_prompt")) || "",
     );
-    const brainstormContent = getConsolidatedBrainstorm(state);
-    const canon = getFieldContent(state, FieldID.Canon);
-    const attg = getFieldContent(state, FieldID.ATTG);
+
+    // Exclude style (generating it)
+    const prefix = await buildStoryEnginePrefix(getState, {
+      excludeSections: ["style"],
+    });
 
     const messages: Message[] = [
+      ...prefix,
       {
         role: "system",
-        content: `${systemPrompt}\n\n[STYLE GENERATION MODE]\n${prompt}`,
-      },
-      {
-        role: "user",
-        content: `CANON:\n${canon}\n\nATTG:\n${attg}\n\nBRAINSTORM:\n${brainstormContent}`,
+        content: `[STYLE GENERATION]\n${prompt}`,
       },
       { role: "assistant", content: "[" },
     ];
@@ -586,39 +693,22 @@ const STORY_OPENING_TECHNIQUES = `[STORY OPENING TECHNIQUES]
 
 /**
  * Creates a message factory for Bootstrap generation.
- * Generates a self-contained scene opening instruction for the NAI story LLM.
+ * Uses unified prefix + volatile tail with bootstrap-specific task instruction.
  */
 export const createBootstrapFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const state = getState();
     const model = "glm-4-6";
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
 
-    const canon = getFieldContent(state, FieldID.Canon);
-    const dulfsContext = await getAllDulfsContext(state);
-    const brainstormContent = getConsolidatedBrainstorm(state);
+    const prefix = await buildStoryEnginePrefix(getState);
 
-    // Build context section with available world details
-    let worldDetailsSection = "";
-    if (dulfsContext) {
-      worldDetailsSection = `\n\n[AVAILABLE WORLD DETAILS - may be incomplete]\n${dulfsContext}`;
-    }
-    if (brainstormContent) {
-      worldDetailsSection += `\n\n[BRAINSTORM NOTES]\n${brainstormContent}`;
-    }
-
-    const systemMessage = `${systemPrompt}
-
-You are a creative writing assistant specializing in story openings.
+    const bootstrapTask = `You are a creative writing assistant specializing in story openings.
 
 ${STORY_OPENING_TECHNIQUES}
 
 [TASK]
-Analyze the provided canon and any available world details.
+Analyze the story state provided above.
 Select 1-2 appropriate opening techniques based on the story's nature.
 
 Generate a SELF-CONTAINED instruction block that includes:
@@ -638,14 +728,16 @@ The instruction must work STANDALONE. The story LLM may not have detailed lorebo
 
 IMPORTANT: Do NOT use hash/pound signs in your output. Use bracketed labels like [SECTION] instead of markdown headers.`;
 
-    const userMessage = `[CANON - Story Foundation]
-${canon}${worldDetailsSection}
-
-Generate a self-contained opening scene instruction.`;
-
     const messages: Message[] = [
-      { role: "system", content: systemMessage },
-      { role: "user", content: userMessage },
+      ...prefix,
+      {
+        role: "system",
+        content: bootstrapTask,
+      },
+      {
+        role: "user",
+        content: "Generate a self-contained opening scene instruction.",
+      },
       {
         role: "assistant",
         content: "[SCENE OPENING]\nTechnique:",

@@ -13,6 +13,12 @@ import {
 } from "../../../core/store/slices/ui";
 import { uiGenerationRequested } from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
+import {
+  STATUS_EMPTY,
+  STATUS_GENERATING,
+  STATUS_QUEUED,
+  STATUS_COMPLETE,
+} from "../../colors";
 
 export type TextFieldProps = FieldConfig;
 
@@ -68,6 +74,10 @@ export const TextField = defineComponent<
     standardButton: { padding: "4px 8px" },
     hidden: { display: "none" },
     visible: { display: "block" },
+    borderEmpty: { "border-left": `3px solid ${STATUS_EMPTY}` },
+    borderQueued: { "border-left": `3px solid ${STATUS_QUEUED}` },
+    borderGenerating: { "border-left": `3px solid ${STATUS_GENERATING}` },
+    borderComplete: { "border-left": `3px solid ${STATUS_COMPLETE}` },
     checkboxRow: {
       "margin-top": "8px",
       "padding-top": "8px",
@@ -286,6 +296,54 @@ export const TextField = defineComponent<
   onMount(config, ctx) {
     const { useSelector, useEffect, dispatch } = ctx;
     const isPlainTextField = PLAIN_TEXT_FIELDS.includes(config.id as FieldID);
+    const sectionId = `section-${config.id}`;
+    const requestId = `gen-${config.id}`;
+
+    type SectionStatus = "empty" | "queued" | "generating" | "complete";
+    const borderStyleMap: Record<SectionStatus, string> = {
+      empty: "borderEmpty",
+      queued: "borderQueued",
+      generating: "borderGenerating",
+      complete: "borderComplete",
+    };
+
+    // Section border status tracking
+    useSelector(
+      (state) => ({
+        activeRequest: state.runtime.activeRequest,
+        queueIds: state.runtime.queue
+          .filter((q) => q.status === "queued")
+          .map((q) => q.id),
+        content: state.story.fields[config.id]?.content,
+      }),
+      async ({ activeRequest, queueIds, content }) => {
+        let hasContent: boolean;
+        if (isPlainTextField) {
+          // ATTG/Style use storyStorage
+          const stored = await api.v1.storyStorage.get(
+            `kse-field-${config.id}`,
+          );
+          hasContent = !!stored && String(stored).trim().length > 0;
+        } else {
+          hasContent = !!content?.trim();
+        }
+
+        const isActive =
+          activeRequest?.id === requestId &&
+          activeRequest.status !== "completed" &&
+          activeRequest.status !== "cancelled";
+
+        let status: SectionStatus;
+        if (isActive) status = "generating";
+        else if (queueIds.includes(requestId)) status = "queued";
+        else if (hasContent) status = "complete";
+        else status = "empty";
+
+        api.v1.ui.updateParts([
+          { id: sectionId, style: this.style?.(borderStyleMap[status]) },
+        ]);
+      },
+    );
 
     // Bind Generation Button
     ctx.mount(GenerationButton, {
