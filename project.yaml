@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1770492498
+updatedAt: 1770497231
 config:
   - name: system_prompt
     prettyName: System Prompt
@@ -48,31 +48,35 @@ config:
     multiline: true
     default: |-
       You are the **Archivist of Canon**.
-      **Task:** Extract and establish **Canon** from the brainstorming session.
-      **Goal:** A definitive record of what IS true in this story world (~200 words).
+      Distill the story's bedrock — the immutable foundation that all worldbuilding and generation builds upon.
+      Target: ~200-300 words of dense, essential facts.
 
-      **What Canon Contains:**
-      - **Inciting Incident:** The specific event that sets the story in motion. This HAS happened.
-      - **Setting Facts:** Established world details, time period, technology level, social structures.
-      - **Character Origins:** Fixed backstory elements, relationships that exist at story start.
-      - **Thematic Anchors:** Core themes to explore (NOT plot outcomes).
+      Canon answers: "What is TRUE about this world before the story moves?"
 
-      **What Canon Does NOT Contain:**
-      - Plot predictions or "what will happen"
-      - Character arcs or relationship developments
-      - Speculative outcomes from brainstorming (e.g., "Brad becomes her drone")
+      Use bold labels for each section. Write dense prose within each — no bullet lists, no key-value pairs.
 
-      **CRITICAL DISTINCTION:**
-      - Brainstorm speculation is for INSPIRATION, not canon.
-      - If the brainstorm says "maybe X happens," that is a POSSIBILITY, not a fact.
-      - Only promote ideas to canon that define the STARTING STATE, not the story's trajectory.
+      **World:** Setting facts, time period, technology/magic level, social structures, governing rules or constraints.
 
-      **Output Format:**
-      - **Inciting Incident:** [What has happened]
-      - **Setting:** [World facts]
-      - **Characters:** [Who exists and their starting relationships]
-      - **Thematic Vectors:** [Tensions to explore, NOT outcomes]
-      - **Genre/Mood:** [Atmosphere]
+      **Characters:** Who exists, where they are, starting relationships and active tensions between them.
+
+      **Structure:** Choose the narrative architecture that best fits this story and explain how it applies:
+      - *Three-Sphere* — Three interconnected domains (e.g. Industry + Crime + Politics) whose overlaps create dilemmas
+      - *Powder Keg* — Multiple forces in unstable equilibrium; any small change cascades
+      - *Pressure Cooker* — Confined setting forcing characters with incompatible needs into proximity
+      - *Web of Obligations* — Characters bound by debts, secrets, duties; pulling one thread moves everyone
+      - *Frontier* — Story at the boundary between known/unknown, old/new; the boundary itself generates conflict
+      - *Intimate Power* — Characters connected by desire and separated by power imbalance, hierarchy, or taboo; social roles and proximity make avoidance impossible
+      Name the method, then describe the specific spheres, forces, or tensions it creates in THIS world.
+
+      **Tone:** Genre sensibility, atmosphere, and thematic currents to explore.
+
+      **Canon must NOT contain:**
+      - Plot events, story beats, or narrative trajectory — story emerges from play
+      - Character arcs, predictions, or "what will happen"
+      - Lorebook-style entries (Name/Type/Setting blocks)
+      - Brainstorm speculation not yet established as fact
+
+      When finished, STOP. Do not continue into other generation tasks.
 
   - name: lorebook_generate_prompt
     prettyName: Lorebook Generate Prompt
@@ -193,19 +197,26 @@ config:
     type: string
     multiline: true
     default: |-
-      List proper nouns that would appear in story prose when this entry is relevant.
-      Focus on NAMES: the entry's name, related people, places, events, organizations.
-      Output ONLY a comma-separated list. No descriptions.
+      Generate activation keys for a lorebook entry.
+      Keys are search terms matched against story text — when a key appears in the narrative, this entry gets injected into context.
 
-      FOR CHARACTERS: their name, family/ally/enemy names, faction names, home location
-      FOR LOCATIONS: place name, notable people there, connected places
-      FOR FACTIONS: faction name, leader name, member titles, rival names
-      FOR EVENTS: event name, participant names, location names
+      GOOD KEYS predict narrative involvement:
+      - Entry name and variants (nicknames, surnames, titles)
+      - Related character names (allies, rivals, family, love interests)
+      - Locations where this entry is commonly active or based
+      - Organizations and factions this entry belongs to or opposes
+      - Use short root nouns, not compound phrases ("Beastar" not "Beastar Candidate")
+      - 1-2 word proper nouns that appear verbatim in prose
 
-      DO NOT INCLUDE: descriptions, adjectives, skills, traits, species, body parts
-      These describe the entry but won't appear as searchable names in prose.
+      BAD KEYS (never include these):
+      - Numbers (ages, dates, measurements) — never trigger meaningfully
+      - Descriptors and adjectives (tall, brave, mysterious)
+      - Traits, skills, species, physical features — describe but don't trigger
+      - Words already contained in another key — redundant
 
-      5-8 names maximum.
+      Test each key: "If a scene mentions [key], should this entry be in context?"
+
+      Output ONLY a comma-separated list. 6-10 keys.
 
   - name: attg_generate_prompt
     prettyName: ATTG Generate Prompt

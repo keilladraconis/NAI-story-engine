@@ -157,8 +157,8 @@ export const createLorebookKeysFactory = (
       messages,
       params: {
         model,
-        max_tokens: 64,
-        temperature: 0.5,
+        max_tokens: 96,
+        temperature: 0.6,
         min_p: 0.05,
         frequency_penalty: 0.3,
         stop: ["\n"],
@@ -264,7 +264,7 @@ export const buildLorebookKeysPayload = async (
   return {
     requestId,
     messageFactory: createLorebookKeysFactory(getState, entryId),
-    params: { model: "glm-4-6", max_tokens: 64 },
+    params: { model: "glm-4-6", max_tokens: 96 },
     target: { type: "lorebookKeys", entryId },
     prefillBehavior: "keep",
     assistantPrefill: `${displayName}, `,

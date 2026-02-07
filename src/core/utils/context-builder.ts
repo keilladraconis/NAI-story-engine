@@ -481,7 +481,7 @@ export const createCanonFactory = (
       },
       {
         role: "assistant",
-        content: "Here is the canon extracted from our brainstorming session:",
+        content: "**World:**",
       },
     ];
 
@@ -489,10 +489,10 @@ export const createCanonFactory = (
       messages,
       params: {
         model,
-        temperature: 1.1,
+        temperature: 0.9,
         min_p: 0.05,
         presence_penalty: 0.1,
-        max_tokens: 1024,
+        max_tokens: 600,
       },
     };
   };

@@ -716,7 +716,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   // Lorebook Sync & Storage Cleanup: Story Cleared
   subscribeEffect(
     (action) => action.type === storyCleared().type,
-    async () => {
+    async (_action, { dispatch }) => {
       // Clear lorebook entries and categories
       const categories = await api.v1.lorebook.categories();
       const seCategories = categories.filter((c) =>
@@ -748,6 +748,10 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           await api.v1.storyStorage.remove(key);
         }
       }
+
+      // Flush runtime queue so border selectors re-evaluate
+      // (ATTG/Style check storyStorage which is now clean)
+      dispatch(requestsSynced({ queue: [], activeRequest: null }));
     },
   );
 

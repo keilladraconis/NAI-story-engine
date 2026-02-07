@@ -69,12 +69,12 @@ export const FIELD_CONFIGS: FieldConfig[] = [
   {
     id: FieldID.Canon,
     label: "Canon",
-    description: "Authoritative facts: inciting incident, setting, established backstory",
+    description: "Bedrock facts: world, characters, themes, tone — the foundation for all generation",
     placeholder: "The facts of your story world...",
     icon: "bookOpen",
     fieldType: "canon",
     generationInstruction:
-      "Extract canonical facts from the brainstorming session: inciting incident, setting details, established character origins, and fixed world elements.",
+      "Distill the story's bedrock: world facts, character starting states, thematic tensions, and tonal identity.",
     filters: ["scrubBrackets"],
   },
   {

@@ -8,7 +8,7 @@ import {
   requestCompleted,
 } from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
-import { ListItem } from "./ListItem";
+import { ListItem, contentMinHeight, inputStyle } from "./ListItem";
 import {
   STATUS_EMPTY,
   STATUS_GENERATING,
@@ -116,6 +116,24 @@ export const ListField = defineComponent<
     const sectionId = `section-${props.id}`;
     const itemsColId = `items-col-${props.id}`;
     const boundItems = new Set<string>();
+
+    // Helper to resize all item textareas based on stored content
+    const updateItemHeights = async (list: DulfsItem[]) => {
+      const updates = await Promise.all(
+        list.map(async (item) => {
+          const content = String(
+            (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "",
+          );
+          return {
+            id: `content-input-${item.id}`,
+            style: inputStyle(contentMinHeight(content)),
+          };
+        }),
+      );
+      if (updates.length > 0) {
+        api.v1.ui.updateParts(updates);
+      }
+    };
 
     // Helper to update section title with lorebook count
     const updateTitleWithCount = async (list: DulfsItem[]) => {
@@ -226,16 +244,20 @@ export const ListField = defineComponent<
           },
         ]);
 
-        // 3. Update title with lorebook count
+        // 3. Resize textareas after re-render replaces the subtree
+        await updateItemHeights(list);
+
+        // 4. Update title with lorebook count
         await updateTitleWithCount(list);
       },
     );
 
-    // Refresh count when lorebook content is generated for items in this category
+    // Refresh count + heights when lorebook content is generated for items in this category
     ctx.useEffect(
       matchesAction(requestCompleted),
       async (_action, { getState }) => {
         const list = getState().story.dulfs[props.id as DulfsFieldID] || [];
+        await updateItemHeights(list);
         await updateTitleWithCount(list);
       },
     );

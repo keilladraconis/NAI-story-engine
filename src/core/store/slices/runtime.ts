@@ -107,15 +107,25 @@ export const runtimeSlice = createSlice({
       return state;
     },
 
-    // Mark a request as completed
+    // Mark a request as completed and remove from queue
+    // (handles race where GenX finishes before stateUpdated moves it to activeRequest)
     requestCompleted: (state, payload: { requestId: string }) => {
-      if (state.activeRequest?.id === payload.requestId) {
-        return {
-          ...state,
-          activeRequest: { ...state.activeRequest, status: "completed" },
-        };
+      const newActive =
+        state.activeRequest?.id === payload.requestId
+          ? { ...state.activeRequest, status: "completed" as const }
+          : state.activeRequest;
+      const newQueue = state.queue.filter(
+        (r) => r.id !== payload.requestId,
+      );
+
+      if (
+        newActive === state.activeRequest &&
+        newQueue.length === state.queue.length
+      ) {
+        return state;
       }
-      return state;
+
+      return { ...state, activeRequest: newActive, queue: newQueue };
     },
 
     // SEGA Reducers
