@@ -39,6 +39,7 @@ export interface BindContext<S> {
     ) => void,
   ): () => void;
   mount<P>(component: Component<P, S>, props: P): () => void;
+  render<P>(component: Component<P, S>, props: P): { part: UIPart; unmount: () => void };
 }
 
 // --------------------------------------------------
@@ -184,6 +185,13 @@ export function mount<P, S>(
     mount(child, childProps) {
       const unsub = mount(child, childProps, store);
       return addCleanup(unsub);
+    },
+
+    render(child, childProps) {
+      const part = child.describe.call(child, childProps);
+      const unsub = mount(child, childProps, store);
+      const unmount = addCleanup(unsub);
+      return { part, unmount };
     },
   };
 

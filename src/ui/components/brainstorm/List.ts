@@ -26,7 +26,7 @@ export const List = defineComponent({
   },
 
   onMount(_props, ctx: BindContext<RootState>) {
-    const { useSelector, mount } = ctx;
+    const { useSelector } = ctx;
     let messageCleanups: (() => void)[] = [];
 
     useSelector(
@@ -39,9 +39,9 @@ export const List = defineComponent({
         const reversed = messages.slice().reverse();
 
         const children = reversed.map((msg) => {
-          const cleanup = mount(Message, { message: msg });
-          messageCleanups.push(cleanup);
-          return Message.describe({ message: msg });
+          const { part, unmount } = ctx.render(Message, { message: msg });
+          messageCleanups.push(unmount);
+          return part;
         });
 
         api.v1.ui.updateParts([

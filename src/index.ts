@@ -3,8 +3,6 @@ import {
   brainstormLoaded,
   storyLoaded,
   uiLorebookEntrySelected,
-  uiLorebookContentGenerationRequested,
-  uiLorebookKeysGenerationRequested,
 } from "./core/store";
 import { StoryState, BrainstormMessage } from "./core/store/types";
 import { registerEffects } from "./core/store/effects";
@@ -24,7 +22,6 @@ import { FieldList } from "./ui/components/Sidebar/FieldList";
 
 // Lorebook components
 import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelContent";
-import { GenerationButton } from "./ui/components/GenerationButton";
 
 const { column } = api.v1.ui.part;
 const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
@@ -121,52 +118,6 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
     mount(SettingField, {}, store);
     mount(FieldList, {}, store);
     mount(LorebookPanelContent, undefined, store);
-
-    // Mount Lorebook generation buttons (they self-manage based on selectedEntryId via stateProjection)
-    mount(
-      GenerationButton,
-      {
-        id: IDS.LOREBOOK.GEN_CONTENT_BTN,
-        label: "Generate Content",
-        stateProjection: (state) => state.ui.lorebook.selectedEntryId,
-        requestIdFromProjection: (entryId: string | null) =>
-          entryId ? IDS.LOREBOOK.entry(entryId).CONTENT_REQ : undefined,
-        isDisabledFromProjection: (entryId: string | null) => !entryId,
-        onGenerate: () => {
-          const entryId = store.getState().ui.lorebook.selectedEntryId;
-          if (entryId) {
-            store.dispatch(
-              uiLorebookContentGenerationRequested({
-                requestId: IDS.LOREBOOK.entry(entryId).CONTENT_REQ,
-              }),
-            );
-          }
-        },
-      },
-      store,
-    );
-    mount(
-      GenerationButton,
-      {
-        id: IDS.LOREBOOK.GEN_KEYS_BTN,
-        label: "Generate Keys",
-        stateProjection: (state) => state.ui.lorebook.selectedEntryId,
-        requestIdFromProjection: (entryId: string | null) =>
-          entryId ? IDS.LOREBOOK.entry(entryId).KEYS_REQ : undefined,
-        isDisabledFromProjection: (entryId: string | null) => !entryId,
-        onGenerate: () => {
-          const entryId = store.getState().ui.lorebook.selectedEntryId;
-          if (entryId) {
-            store.dispatch(
-              uiLorebookKeysGenerationRequested({
-                requestId: IDS.LOREBOOK.entry(entryId).KEYS_REQ,
-              }),
-            );
-          }
-        },
-      },
-      store,
-    );
 
     api.v1.log("Story Engine Initialized.");
   } catch (e) {

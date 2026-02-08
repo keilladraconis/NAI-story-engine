@@ -64,19 +64,6 @@ export const ListField = defineComponent<
   },
 
   describe(props) {
-    const listGenId = `gen-list-${props.id}`;
-
-    const genButton = GenerationButton.describe({
-      id: `gen-btn-${listGenId}`,
-      requestId: listGenId,
-      label: "Generate Items",
-      generateAction: uiGenerationRequested({
-        id: listGenId,
-        type: "list",
-        targetId: props.id,
-      }),
-    }) as UIPart;
-
     return collapsibleSection({
       id: `section-${props.id}`,
       title: props.label,
@@ -97,7 +84,10 @@ export const ListField = defineComponent<
         row({
           style: this.style?.("actionsRow"),
           content: [
-            genButton,
+            row({
+              id: `gen-btn-wrap-${props.id}`,
+              content: [],
+            }),
             button({
               text: "Add Item",
               iconId: "plus",
@@ -163,9 +153,9 @@ export const ListField = defineComponent<
       },
     });
 
-    // Bind Category Gen Button
+    // Render Category Gen Button
     const listGenId = `gen-list-${props.id}`;
-    ctx.mount(GenerationButton, {
+    const { part: genBtnPart } = ctx.render(GenerationButton, {
       id: `gen-btn-${listGenId}`,
       requestId: listGenId,
       label: "Generate Items",
@@ -175,6 +165,12 @@ export const ListField = defineComponent<
         targetId: props.id,
       }),
     });
+    api.v1.ui.updateParts([
+      {
+        id: `gen-btn-wrap-${props.id}`,
+        content: [genBtnPart],
+      },
+    ]);
 
     // Section border status tracking
     type SectionStatus = "empty" | "queued" | "generating" | "complete";

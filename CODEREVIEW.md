@@ -35,15 +35,15 @@ String matching on `"aborted"`, `"fetch"`, `"network"` etc. is fragile — any e
 
 ## nai-act.ts — Component Framework
 
-### `TODO` Unify describe/mount into single lifecycle
+### `DONE` Unify describe/mount into single lifecycle
 **Priority: High**
 
-Every container must call `ChildComponent.describe(props)` in `describe()` AND `ctx.mount(ChildComponent, props)` in `onMount()`. Forgetting either half causes silent failures — UI renders but isn't reactive, or subscriptions fire with no UI element. A single `ctx.render(Component, props)` that returns the UIPart *and* registers the mount would collapse this. Affected files: `TextField.ts`, `ListField.ts`, `LorebookPanelContent.ts`, `List.ts`, `Header.ts`.
+Added `ctx.render(Component, props)` to `BindContext` — calls `describe()` + `mount()` in one shot, returning `{ part: UIPart; unmount: () => void }`. Props are specified once in `onMount()`, and the returned `part` is injected into a placeholder container via `updateParts`. Migrated consumers: `TextField.ts`, `ListField.ts`, `LorebookPanelContent.ts`, `List.ts`, `Header.ts`, `Input.ts`. Not migrated: `FieldList.ts` (children depend on initial `useSelector` for visual state), `ListItem.ts` (needs different props in describe vs mount).
 
-### `TODO` Give `describe()` access to state
+### `DONE` Give `describe()` access to state
 **Priority: High**
 
-`describe()` only receives `props`, but sometimes the initial UIPart tree depends on current state. This forces `LorebookPanelContent` to import the store singleton directly — violating the DI principle the framework otherwise promotes. Consider passing a read-only `getState` into `describe()`, or merging into a single lifecycle (see above).
+Resolved by `ctx.render()`. Components that needed state-dependent callbacks (e.g. `LorebookPanelContent`'s `onGenerate`) now specify them in `onMount()` where `ctx.getState()` and `ctx.dispatch()` are available. The `store` singleton import was removed from `LorebookPanelContent` — no UI components import the store directly.
 
 ### `TODO` Make `createEvents` per-instance
 **Priority: Medium**
@@ -60,10 +60,10 @@ The `List` component (brainstorm messages) manually tracks cleanup functions and
 
 `SettingField` declares an empty `onMount(_props: {}, _ctx: BindContext<RootState>) {}`. Making `onMount` optional in the `Component` interface (with a default no-op in `mount()`) would clean this up.
 
-### `DEFER` Fix `describe()` return type friction
+### `DONE` Fix `describe()` return type friction
 **Priority: Low**
 
-Multiple places cast `ChildComponent.describe(...) as UIPart` because the inferred return type doesn't unify with the parent layout's type expectations (`TextField.ts:101`, `ListField.ts:78`). This suggests a gap in the `UIPart` type hierarchy. Deferred — likely resolves naturally if describe/mount are unified.
+Resolved by `ctx.render()`. Child components are no longer called directly in `describe()` parent layout arrays, so the `as UIPart` casts are eliminated. `ctx.render()` returns `{ part: UIPart }` with the correct type, injected via `updateParts`.
 
 ---
 

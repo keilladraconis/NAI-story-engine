@@ -29,33 +29,6 @@ export const Input: Component<{}, RootState> = {
   describe(props) {
     const ids = IDS.BRAINSTORM;
 
-    const btnClear = ButtonWithConfirmation.describe({
-      id: `${ids.INPUT}-btn-clear`,
-      label: "Clear",
-      confirmLabel: "Clear?",
-      style: STYLES.CLEAR_BTN,
-      onConfirm: () => { },
-    });
-
-    const btnSend = GenerationButton.describe({
-      id: ids.SEND_BTN,
-      label: "Send",
-      style: STYLES.SEND_BTN,
-      generateAction: uiBrainstormSubmitUserMessage(),
-      // Track only brainstorm-type requests, not global generation status
-      stateProjection: (state) => {
-        // Find any brainstorm request (active or queued)
-        if (state.runtime.activeRequest?.type === "brainstorm") {
-          return state.runtime.activeRequest.id;
-        }
-        const queuedBrainstorm = state.runtime.queue.find(
-          (r) => r.type === "brainstorm"
-        );
-        return queuedBrainstorm?.id;
-      },
-      requestIdFromProjection: (projection) => projection,
-    });
-
     return column({
       content: [
         multilineTextInput({
@@ -66,19 +39,20 @@ export const Input: Component<{}, RootState> = {
           onSubmit: () => events.submit(props),
         }),
         row({
+          id: `${ids.INPUT}-btn-row`,
           style: { gap: "8px", "margin-top": "8px" },
-          content: [btnClear, btnSend],
+          content: [],
         }),
       ],
     });
   },
 
   onMount(_props, ctx) {
-    const { dispatch, useSelector, mount } = ctx;
+    const { dispatch, useSelector } = ctx;
     const ids = IDS.BRAINSTORM;
 
-    // Mount ButtonWithConfirmation for Clear button
-    mount(ButtonWithConfirmation, {
+    // Render ButtonWithConfirmation for Clear button
+    const { part: clearBtn } = ctx.render(ButtonWithConfirmation, {
       id: `${ids.INPUT}-btn-clear`,
       label: "Clear",
       confirmLabel: "Clear?",
@@ -86,15 +60,13 @@ export const Input: Component<{}, RootState> = {
       onConfirm: () => dispatch(messagesCleared()),
     });
 
-    // Mount GenerationButton logic
-    mount(GenerationButton, {
+    // Render GenerationButton for Send
+    const { part: sendBtn } = ctx.render(GenerationButton, {
       id: ids.SEND_BTN,
       label: "Send",
       style: STYLES.SEND_BTN,
       generateAction: uiBrainstormSubmitUserMessage(),
-      // Track only brainstorm-type requests, not global generation status
       stateProjection: (state) => {
-        // Find any brainstorm request (active or queued)
         if (state.runtime.activeRequest?.type === "brainstorm") {
           return state.runtime.activeRequest.id;
         }
@@ -105,6 +77,14 @@ export const Input: Component<{}, RootState> = {
       },
       requestIdFromProjection: (projection) => projection,
     });
+
+    // Inject buttons into placeholder
+    api.v1.ui.updateParts([
+      {
+        id: `${ids.INPUT}-btn-row`,
+        content: [clearBtn, sendBtn],
+      },
+    ]);
 
     events.attach({
       submit() {

@@ -2,7 +2,6 @@ import { BindContext, defineComponent } from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
-import { store } from "../../../core/store";
 import {
   uiLorebookContentGenerationRequested,
   uiLorebookKeysGenerationRequested,
@@ -77,49 +76,11 @@ export const LorebookPanelContent = defineComponent({
               text: "",
               style: this.style?.("entryName"),
             }),
-            // Generation buttons
+            // Generation buttons (rendered in onMount)
             row({
+              id: IDS.LOREBOOK.GEN_CONTENT_BTN + "-wrap",
               style: this.style?.("buttonRow"),
-              content: [
-                GenerationButton.describe({
-                  id: IDS.LOREBOOK.GEN_CONTENT_BTN,
-                  label: "Generate Content",
-                  stateProjection: (state) => state.ui.lorebook.selectedEntryId,
-                  requestIdFromProjection: (entryId) =>
-                    entryId
-                      ? IDS.LOREBOOK.entry(entryId).CONTENT_REQ
-                      : undefined,
-                  onGenerate: () => {
-                    const selectedEntryId =
-                      store.getState().ui.lorebook.selectedEntryId;
-                    if (selectedEntryId) {
-                      const requestId =
-                        IDS.LOREBOOK.entry(selectedEntryId).CONTENT_REQ;
-                      store.dispatch(
-                        uiLorebookContentGenerationRequested({ requestId }),
-                      );
-                    }
-                  },
-                }),
-                GenerationButton.describe({
-                  id: IDS.LOREBOOK.GEN_KEYS_BTN,
-                  label: "Generate Keys",
-                  stateProjection: (state) => state.ui.lorebook.selectedEntryId,
-                  requestIdFromProjection: (entryId) =>
-                    entryId ? IDS.LOREBOOK.entry(entryId).KEYS_REQ : undefined,
-                  onGenerate: () => {
-                    const selectedEntryId =
-                      store.getState().ui.lorebook.selectedEntryId;
-                    if (selectedEntryId) {
-                      const requestId =
-                        IDS.LOREBOOK.entry(selectedEntryId).KEYS_REQ;
-                      store.dispatch(
-                        uiLorebookKeysGenerationRequested({ requestId }),
-                      );
-                    }
-                  },
-                }),
-              ],
+              content: [],
             }),
             // Content area (editable - multiline textarea, storageKey for streaming)
             multilineTextInput({
@@ -146,7 +107,7 @@ export const LorebookPanelContent = defineComponent({
                 }),
               ],
             }),
-            // Refine row (instructions input + button)
+            // Refine row (instructions input + button rendered in onMount)
             row({
               style: this.style?.("refineRow"),
               content: [
@@ -157,21 +118,9 @@ export const LorebookPanelContent = defineComponent({
                   storageKey: IDS.LOREBOOK.REFINE_INSTRUCTIONS_KEY,
                   style: this.style?.("refineInput"),
                 }),
-                GenerationButton.describe({
-                  id: IDS.LOREBOOK.REFINE_BTN,
-                  label: "Refine",
-                  stateProjection: (state) => state.ui.lorebook.selectedEntryId,
-                  requestIdFromProjection: (entryId) =>
-                    entryId ? IDS.LOREBOOK.entry(entryId).REFINE_REQ : undefined,
-                  onGenerate: () => {
-                    const selectedEntryId =
-                      store.getState().ui.lorebook.selectedEntryId;
-                    if (selectedEntryId) {
-                      const requestId =
-                        IDS.LOREBOOK.entry(selectedEntryId).REFINE_REQ;
-                      store.dispatch(uiLorebookRefineRequested({ requestId }));
-                    }
-                  },
+                row({
+                  id: IDS.LOREBOOK.REFINE_BTN + "-wrap",
+                  content: [],
                 }),
               ],
             }),
@@ -182,55 +131,69 @@ export const LorebookPanelContent = defineComponent({
   },
 
   onMount(_props: void, ctx: BindContext<RootState>) {
-    const { useSelector, mount } = ctx;
+    const { useSelector, getState, dispatch } = ctx;
 
     let currentEntryId: string | null = null;
 
-    // Mount GenerationButton components for reactive state tracking
-    mount(GenerationButton, {
+    // Render GenerationButton components (describe + mount in one shot)
+    const { part: contentBtn } = ctx.render(GenerationButton, {
       id: IDS.LOREBOOK.GEN_CONTENT_BTN,
       label: "Generate Content",
       stateProjection: (state: RootState) => state.ui.lorebook.selectedEntryId,
       requestIdFromProjection: (entryId: string | null) =>
         entryId ? IDS.LOREBOOK.entry(entryId).CONTENT_REQ : undefined,
+      isDisabledFromProjection: (entryId: string | null) => !entryId,
       onGenerate: () => {
-        const selectedEntryId = store.getState().ui.lorebook.selectedEntryId;
+        const selectedEntryId = getState().ui.lorebook.selectedEntryId;
         if (selectedEntryId) {
           const requestId = IDS.LOREBOOK.entry(selectedEntryId).CONTENT_REQ;
-          store.dispatch(uiLorebookContentGenerationRequested({ requestId }));
+          dispatch(uiLorebookContentGenerationRequested({ requestId }));
         }
       },
     });
 
-    mount(GenerationButton, {
+    const { part: keysBtn } = ctx.render(GenerationButton, {
       id: IDS.LOREBOOK.GEN_KEYS_BTN,
       label: "Generate Keys",
       stateProjection: (state: RootState) => state.ui.lorebook.selectedEntryId,
       requestIdFromProjection: (entryId: string | null) =>
         entryId ? IDS.LOREBOOK.entry(entryId).KEYS_REQ : undefined,
+      isDisabledFromProjection: (entryId: string | null) => !entryId,
       onGenerate: () => {
-        const selectedEntryId = store.getState().ui.lorebook.selectedEntryId;
+        const selectedEntryId = getState().ui.lorebook.selectedEntryId;
         if (selectedEntryId) {
           const requestId = IDS.LOREBOOK.entry(selectedEntryId).KEYS_REQ;
-          store.dispatch(uiLorebookKeysGenerationRequested({ requestId }));
+          dispatch(uiLorebookKeysGenerationRequested({ requestId }));
         }
       },
     });
 
-    mount(GenerationButton, {
+    const { part: refineBtn } = ctx.render(GenerationButton, {
       id: IDS.LOREBOOK.REFINE_BTN,
       label: "Refine",
       stateProjection: (state: RootState) => state.ui.lorebook.selectedEntryId,
       requestIdFromProjection: (entryId: string | null) =>
         entryId ? IDS.LOREBOOK.entry(entryId).REFINE_REQ : undefined,
       onGenerate: () => {
-        const selectedEntryId = store.getState().ui.lorebook.selectedEntryId;
+        const selectedEntryId = getState().ui.lorebook.selectedEntryId;
         if (selectedEntryId) {
           const requestId = IDS.LOREBOOK.entry(selectedEntryId).REFINE_REQ;
-          store.dispatch(uiLorebookRefineRequested({ requestId }));
+          dispatch(uiLorebookRefineRequested({ requestId }));
         }
       },
     });
+
+    // Inject rendered buttons into their placeholder containers
+    api.v1.ui.updateParts([
+      {
+        id: IDS.LOREBOOK.GEN_CONTENT_BTN + "-wrap",
+        content: [contentBtn, keysBtn],
+      },
+      {
+        id: IDS.LOREBOOK.REFINE_BTN + "-wrap",
+        content: [refineBtn],
+      },
+    ]);
 
     // Subscribe to lorebook state changes
     useSelector(

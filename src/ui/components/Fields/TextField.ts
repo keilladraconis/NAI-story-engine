@@ -86,19 +86,7 @@ export const TextField = defineComponent<
   },
 
   describe(config) {
-    const requestId = `gen-${config.id}`;
     const isPlainTextField = PLAIN_TEXT_FIELDS.includes(config.id as FieldID);
-
-    const genButton = GenerationButton.describe({
-      id: `gen-btn-${config.id}`,
-      requestId,
-      label: "Generate",
-      generateAction: uiGenerationRequested({
-        id: requestId,
-        type: "field",
-        targetId: config.id,
-      }),
-    }) as UIPart;
 
     // Plain text fields (ATTG, Style) - always editable textarea
     if (isPlainTextField) {
@@ -111,8 +99,9 @@ export const TextField = defineComponent<
             style: this.style?.("descriptionText"),
           }),
           row({
+            id: `gen-btn-wrap-${config.id}`,
             style: this.style?.("buttonGroup"),
-            content: [genButton],
+            content: [],
           }),
         ],
       });
@@ -214,43 +203,6 @@ export const TextField = defineComponent<
     // Standard fields with edit/save modality
     const toggleEditId = `btn-edit-${config.id}`;
     const toggleSaveId = `btn-save-${config.id}`;
-    const bootstrapId = `btn-bootstrap-${config.id}`;
-    const isCanonField = config.id === FieldID.Canon;
-
-    const buttonGroupContent: UIPart[] = [
-      button({
-        id: toggleEditId,
-        text: "Edit",
-        iconId: "edit-3",
-        style: this.style?.("standardButton"),
-        callback: () => this.events.beginEdit(config),
-      }),
-      button({
-        id: toggleSaveId,
-        text: "Save",
-        iconId: "save",
-        style: this.style?.("standardButton", "hidden"),
-        callback: () => this.events.save(config),
-      }),
-      genButton,
-    ];
-
-    // Add Bootstrap button for Canon field (uses GenerationButton for GLM generation)
-    if (isCanonField) {
-      const bootstrapRequestId = "gen-bootstrap";
-      const bootstrapButton = GenerationButton.describe({
-        id: bootstrapId,
-        iconId: "play",
-        requestId: bootstrapRequestId,
-        label: "Bootstrap",
-        generateAction: uiGenerationRequested({
-          id: bootstrapRequestId,
-          type: "bootstrap",
-          targetId: FieldID.Canon,
-        }),
-      }) as UIPart;
-      buttonGroupContent.push(bootstrapButton);
-    }
 
     const header = row({
       id: `header-row-${config.id}`,
@@ -262,7 +214,27 @@ export const TextField = defineComponent<
         }),
         row({
           style: this.style?.("buttonGroup"),
-          content: buttonGroupContent,
+          content: [
+            button({
+              id: toggleEditId,
+              text: "Edit",
+              iconId: "edit-3",
+              style: this.style?.("standardButton"),
+              callback: () => this.events.beginEdit(config),
+            }),
+            button({
+              id: toggleSaveId,
+              text: "Save",
+              iconId: "save",
+              style: this.style?.("standardButton", "hidden"),
+              callback: () => this.events.save(config),
+            }),
+            row({
+              id: `gen-btn-wrap-${config.id}`,
+              style: { gap: "4px" },
+              content: [],
+            }),
+          ],
         }),
       ],
     });
@@ -345,8 +317,8 @@ export const TextField = defineComponent<
       },
     );
 
-    // Bind Generation Button
-    ctx.mount(GenerationButton, {
+    // Render Generation Button (describe + mount in one shot)
+    const { part: genBtnPart } = ctx.render(GenerationButton, {
       id: `gen-btn-${config.id}`,
       requestId: `gen-${config.id}`,
       label: "Generate",
@@ -357,8 +329,15 @@ export const TextField = defineComponent<
       }),
     });
 
-    // Plain text fields (ATTG, Style) - handle sync checkbox events
+    // Inject gen button into placeholder
     if (isPlainTextField) {
+      api.v1.ui.updateParts([
+        {
+          id: `gen-btn-wrap-${config.id}`,
+          content: [genBtnPart],
+        },
+      ]);
+
       // Attach sync checkbox event handlers
       this.events.attach({
         attgSyncToggled: (_props, checked: boolean) => {
@@ -407,7 +386,6 @@ export const TextField = defineComponent<
     // Standard field logic below
     const toggleEditId = `btn-edit-${config.id}`;
     const toggleSaveId = `btn-save-${config.id}`;
-    const bootstrapId = `btn-bootstrap-${config.id}`;
     const inputId = `input-${config.id}`;
     const textId = `text-display-${config.id}`;
     const storageKey = `draft-${config.id}`;
@@ -423,11 +401,13 @@ export const TextField = defineComponent<
       },
     });
 
-    // Canon field: mount Bootstrap GenerationButton with disabled state tracking
+    // Inject gen button (and bootstrap for Canon) into placeholder
+    const genBtnContent: UIPart[] = [genBtnPart];
     if (isCanonField) {
       const bootstrapRequestId = "gen-bootstrap";
-      ctx.mount(GenerationButton, {
-        id: bootstrapId,
+      const { part: bootstrapPart } = ctx.render(GenerationButton, {
+        id: `btn-bootstrap-${config.id}`,
+        iconId: "play",
         requestId: bootstrapRequestId,
         label: "Bootstrap",
         generateAction: uiGenerationRequested({
@@ -438,7 +418,14 @@ export const TextField = defineComponent<
         stateProjection: (state) => state.story.fields[FieldID.Canon]?.content,
         isDisabledFromProjection: (content) => !content?.trim(),
       });
+      genBtnContent.push(bootstrapPart);
     }
+    api.v1.ui.updateParts([
+      {
+        id: `gen-btn-wrap-${config.id}`,
+        content: genBtnContent,
+      },
+    ]);
 
     // Effect: Handle edit begin - push current content to storage
     useEffect(

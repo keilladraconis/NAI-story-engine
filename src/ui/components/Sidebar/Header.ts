@@ -10,6 +10,8 @@ import { storyCleared } from "../../../core/store/slices/story";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 import { NAI_HEADER, NAI_FOREGROUND } from "../../colors";
 
+const CLEAR_BTN_WRAP_ID = "header-clear-wrap";
+
 const { row, text, button } = api.v1.ui.part;
 
 type HeaderEvents = {
@@ -96,34 +98,34 @@ export const Header = defineComponent({
           text: "",
           style: this.style?.("waitText", "hidden"),
         }),
-        // Clear button (right)
-        ButtonWithConfirmation.describe({
-          id: "header-clear",
-          label: "Clear",
-          confirmLabel: "Clear?",
-          buttonStyle: { padding: "4px 8px", opacity: 0.7 },
-          onConfirm: () => {},
+        // Clear button (rendered in onMount)
+        row({
+          id: CLEAR_BTN_WRAP_ID,
+          content: [],
         }),
       ],
     });
   },
 
   onMount(_props: {}, ctx: BindContext<RootState>) {
-    const { useSelector, dispatch, mount } = ctx;
+    const { useSelector, dispatch } = ctx;
 
     this.events.attach({
       toggleSega: () => dispatch(segaToggled()),
       continueGeneration: () => dispatch(uiUserPresenceConfirmed()),
     });
 
-    // Mount ButtonWithConfirmation for Clear button
-    mount(ButtonWithConfirmation, {
+    // Render ButtonWithConfirmation for Clear button
+    const { part: clearBtn } = ctx.render(ButtonWithConfirmation, {
       id: "header-clear",
       label: "Clear",
       confirmLabel: "Clear?",
       buttonStyle: { padding: "4px 8px", opacity: 0.7 },
       onConfirm: () => dispatch(storyCleared()),
     });
+    api.v1.ui.updateParts([
+      { id: CLEAR_BTN_WRAP_ID, content: [clearBtn] },
+    ]);
 
     // Marquee state
     const marquee = {
