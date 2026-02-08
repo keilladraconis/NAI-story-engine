@@ -69,3 +69,4 @@ npm run test       # vitest run
 - **NovelAI API:** Generation via `api.v1.generate()`, storage via `api.v1.storyStorage`, UI via `api.v1.ui`, config via `api.v1.config`.
 - **Strict TypeScript:** `noImplicitAny`, `noUnusedLocals`, `noUnusedParameters` enabled.
 - Existing docs: `external/` (framework READMEs).
+- Code reviews: `CODEREVIEW.md`.

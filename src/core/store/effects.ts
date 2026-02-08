@@ -25,7 +25,9 @@ import {
   pruneHistory,
   uiGenerationRequested,
   dulfsItemRemoved,
+  dulfsItemAdded,
   storyCleared,
+  storyLoaded,
   uiLorebookContentGenerationRequested,
   uiLorebookKeysGenerationRequested,
   uiLorebookItemGenerationRequested,
@@ -262,7 +264,7 @@ function registerBrainstormEditEffects(
 
   // Intent: Brainstorm Edit End (Save)
   subscribeEffect(
-    (action) => action.type === uiBrainstormMessageEditEnd().type,
+    (action) => action.type === uiBrainstormMessageEditEnd.type,
     async () => {
       const state = getState();
       const editingId = state.brainstorm.editingMessageId;
@@ -294,7 +296,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: Brainstorm Submit
   subscribeEffect(
-    (action) => action.type === uiBrainstormSubmitUserMessage().type,
+    (action) => action.type === uiBrainstormSubmitUserMessage.type,
     async (_action, { dispatch, getState }) => {
       const storageKey = IDS.BRAINSTORM.INPUT;
       const content = (await api.v1.storyStorage.get(storageKey)) || "";
@@ -622,7 +624,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: Cancellation (global - cancels current task)
   subscribeEffect(
-    (action) => action.type === uiRequestCancellation().type,
+    (action) => action.type === uiRequestCancellation.type,
     (_action, { dispatch, getState }) => {
       // Mark the active request as cancelled
       const activeRequest = getState().runtime.activeRequest;
@@ -636,7 +638,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Intent: User Presence
   subscribeEffect(
-    (action) => action.type === uiUserPresenceConfirmed().type,
+    (action) => action.type === uiUserPresenceConfirmed.type,
     () => {
       genX.userInteraction();
     },
@@ -647,7 +649,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     (action) =>
       action.type.startsWith("story/") || action.type.startsWith("brainstorm/"),
     async (action, { getState }) => {
-      if (action.type === "story/loadRequested") return; // Don't save on load trigger
+      if (action.type === storyLoaded.type) return; // Don't save on load trigger
       try {
         // We save the 'story' slice.
         // Do we save 'brainstorm' slice?
@@ -673,8 +675,8 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   // Lorebook Sync: Item Added - imported from dulfsItemAdded action
   // Note: dulfsItemAdded is now dispatched from list.ts handler
   subscribeEffect(
-    (action) => action.type === "story/dulfsItemAdded",
-    async (action: any) => {
+    matchesAction(dulfsItemAdded),
+    async (action) => {
       const { fieldId, item } = action.payload;
       const content =
         (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "";
@@ -715,7 +717,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
   // Lorebook Sync & Storage Cleanup: Story Cleared
   subscribeEffect(
-    (action) => action.type === storyCleared().type,
+    (action) => action.type === storyCleared.type,
     async (_action, { dispatch }) => {
       // Clear lorebook entries and categories
       const categories = await api.v1.lorebook.categories();

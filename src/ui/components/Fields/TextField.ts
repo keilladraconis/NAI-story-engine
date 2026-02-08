@@ -440,13 +440,9 @@ export const TextField = defineComponent<
       });
     }
 
-    type FieldAction = { type: string; payload: { id: string } };
-
     // Effect: Handle edit begin - push current content to storage
     useEffect(
-      (action) =>
-        action.type === uiFieldEditBegin({ id: "" }).type &&
-        (action as FieldAction).payload.id === config.id,
+      matchesAction(uiFieldEditBegin, (p) => p.id === config.id),
       async (_action, { getState }) => {
         const content = getState().story.fields[config.id]?.content || "";
         await api.v1.storyStorage.set(storageKey, content);
@@ -455,9 +451,7 @@ export const TextField = defineComponent<
 
     // Effect: Handle edit end - read from storage and update state
     useEffect(
-      (action) =>
-        action.type === uiFieldEditEnd({ id: "" }).type &&
-        (action as FieldAction).payload.id === config.id,
+      matchesAction(uiFieldEditEnd, (p) => p.id === config.id),
       async (_action, { dispatch }) => {
         const content = (await api.v1.storyStorage.get(storageKey)) || "";
         dispatch(

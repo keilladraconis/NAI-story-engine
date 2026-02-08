@@ -122,16 +122,16 @@ type PayloadAction<P = void> = {
 
 type CaseReducer<S, P = any> = (state: S, payload: P) => S;
 
-type ActionCreator<P> = void extends P
+type ActionCreator<P> = (void extends P
   ? (payload?: P) => PayloadAction<P>
-  : (payload: P) => PayloadAction<P>;
+  : (payload: P) => PayloadAction<P>) & { type: string };
 
 type Slice<S, CR extends Record<string, CaseReducer<S, any>>> = {
   reducer: Reducer<S>;
   actions: {
     [K in keyof CR]: CR[K] extends (state: any, payload: infer P) => any
       ? ActionCreator<P>
-      : () => PayloadAction<void>;
+      : (() => PayloadAction<void>) & { type: string };
   };
 };
 
@@ -149,8 +149,10 @@ export function createSlice<
   for (const key of Object.keys(reducers)) {
     const actionType = `${name}/${key}`;
     handlers[actionType] = reducers[key];
+    const creator = (payload: any) => ({ type: actionType, payload });
+    creator.type = actionType;
     // @ts-ignore: Dynamic action creator assignment
-    actions[key] = (payload: any) => ({ type: actionType, payload });
+    actions[key] = creator;
   }
 
   const reducer = (state: S | undefined, action: Action) => {
@@ -222,11 +224,13 @@ export function combineReducers<R extends Record<string, Reducer<any>>>(
  * );
  */
 export function matchesAction<P>(
-  actionCreator: (payload: P) => PayloadAction<P>,
+  actionCreator: ActionCreator<P>,
+  payloadPredicate?: (payload: P) => boolean,
 ): (action: Action) => action is PayloadAction<P> {
-  // Get the action type by calling the creator with a placeholder
-  const actionType = actionCreator(undefined as P).type;
-  return (action): action is PayloadAction<P> => action.type === actionType;
+  const actionType = actionCreator.type;
+  return (action): action is PayloadAction<P> =>
+    action.type === actionType &&
+    (!payloadPredicate || payloadPredicate((action as PayloadAction<P>).payload));
 }
 
 /*
