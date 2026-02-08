@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1770498063
+updatedAt: 1770562769
 config:
   - name: system_prompt
     prettyName: System Prompt
@@ -22,7 +22,7 @@ config:
       2.  **Show, Don't Tell:** Focus on behavior and actions that reveal inner states.
       3.  **Depth:** Ensure every entity has a Surface (public), Shadow (hidden), and Personal (history) layer.
       4.  **No Fluff:** Every detail must be a hook for potential interaction.
-      5.  **Three-Sphere Architecture:** Design interconnected social/professional spheres (e.g., Industry + Crime + Politics) that create natural friction. Intersection points create dilemmas.
+      5.  **Interconnection:** Every entity should connect to at least two others — through allegiance, opposition, geography, or history. Isolated elements are dead weight.
 
       Where indicated by `[placeholder]`, replace placeholders.
   - name: brainstorm_prompt
