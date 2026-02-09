@@ -1,5 +1,5 @@
 /*
- NAIAct - [0.1.0]
+ NAIAct - [0.2.0]
 */
 
 // --------------------------------------------------
@@ -38,7 +38,6 @@ export interface BindContext<S> {
       ctx: { dispatch: (action: ActionLike) => void; getState: () => S },
     ) => void,
   ): () => void;
-  mount<P>(component: Component<P, S>, props: P): () => void;
   render<P>(component: Component<P, S>, props: P): { part: UIPart; unmount: () => void };
 }
 
@@ -69,8 +68,7 @@ export interface Component<
   events: E;
   styles?: St;
   style?: StyleResolver<St>;
-  describe(props: P): UIPart;
-  onMount(props: P, ctx: BindContext<S>): void;
+  build(props: P, ctx: BindContext<S>): UIPart;
 }
 
 export function defineComponent<
@@ -156,7 +154,7 @@ export function mount<P, S>(
   component: Component<P, S>,
   props: P,
   store: StoreLike<S>,
-): () => void {
+): { part: UIPart; unmount: () => void } {
   const cleanups: (() => void)[] = [];
 
   const addCleanup = (fn: () => void) => {
@@ -182,26 +180,23 @@ export function mount<P, S>(
       return addCleanup(unsub);
     },
 
-    mount(child, childProps) {
-      const unsub = mount(child, childProps, store);
-      return addCleanup(unsub);
-    },
-
     render(child, childProps) {
-      const part = child.describe.call(child, childProps);
-      const unsub = mount(child, childProps, store);
-      const unmount = addCleanup(unsub);
-      return { part, unmount };
+      const result = mount(child, childProps, store);
+      const unmount = addCleanup(result.unmount);
+      return { part: result.part, unmount };
     },
   };
 
-  component.onMount.call(component, props, ctx);
+  const part = component.build.call(component, props, ctx);
 
-  return () => {
-    const toRun = cleanups.splice(0);
-    for (const fn of toRun) {
-      fn();
-    }
+  return {
+    part,
+    unmount() {
+      const toRun = cleanups.splice(0);
+      for (const fn of toRun) {
+        fn();
+      }
+    },
   };
 }
 

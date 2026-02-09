@@ -25,7 +25,7 @@ describe("GenerationButton", () => {
   });
 
   const mountButton = (props: any = { id: "test-btn", label: "Test" }) => {
-    GenerationButton.onMount(props, { dispatch, useSelector } as any);
+    GenerationButton.build(props, { dispatch, useSelector } as any);
   };
 
   const triggerState = (runtimeState: any) => {

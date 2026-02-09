@@ -85,11 +85,112 @@ export const TextField = defineComponent<
     },
   },
 
-  describe(config) {
+  build(config, ctx) {
+    const { useSelector, useEffect, dispatch } = ctx;
     const isPlainTextField = PLAIN_TEXT_FIELDS.includes(config.id as FieldID);
+    const sectionId = `section-${config.id}`;
+    const requestId = `gen-${config.id}`;
+
+    type SectionStatus = "empty" | "queued" | "generating" | "complete";
+    const borderStyleMap: Record<SectionStatus, string> = {
+      empty: "borderEmpty",
+      queued: "borderQueued",
+      generating: "borderGenerating",
+      complete: "borderComplete",
+    };
+
+    // Section border status tracking
+    useSelector(
+      (state) => ({
+        activeRequest: state.runtime.activeRequest,
+        queueIds: state.runtime.queue
+          .filter((q) => q.status === "queued")
+          .map((q) => q.id),
+        content: state.story.fields[config.id]?.content,
+      }),
+      async ({ activeRequest, queueIds, content }) => {
+        let hasContent: boolean;
+        if (isPlainTextField) {
+          // ATTG/Style use storyStorage
+          const stored = await api.v1.storyStorage.get(
+            `kse-field-${config.id}`,
+          );
+          hasContent = !!stored && String(stored).trim().length > 0;
+        } else {
+          hasContent = !!content?.trim();
+        }
+
+        const isActive =
+          activeRequest?.id === requestId &&
+          activeRequest.status !== "completed" &&
+          activeRequest.status !== "cancelled";
+
+        let status: SectionStatus;
+        if (isActive) status = "generating";
+        else if (queueIds.includes(requestId)) status = "queued";
+        else if (hasContent) status = "complete";
+        else status = "empty";
+
+        api.v1.ui.updateParts([
+          { id: sectionId, style: this.style?.(borderStyleMap[status]) },
+        ]);
+      },
+    );
+
+    // Render Generation Button
+    const { part: genBtnPart } = ctx.render(GenerationButton, {
+      id: `gen-btn-${config.id}`,
+      requestId: `gen-${config.id}`,
+      label: "Generate",
+      generateAction: uiGenerationRequested({
+        id: `gen-${config.id}`,
+        type: "field",
+        targetId: config.id,
+      }),
+    });
 
     // Plain text fields (ATTG, Style) - always editable textarea
     if (isPlainTextField) {
+      // Attach sync checkbox event handlers
+      this.events.attach({
+        attgSyncToggled: (_props, checked: boolean) => {
+          if (checked) {
+            dispatch(attgToggled());
+          }
+        },
+        styleSyncToggled: (_props, checked: boolean) => {
+          if (checked) {
+            dispatch(styleToggled());
+          }
+        },
+      });
+
+      // Effect: Sync ATTG to Memory when toggled on
+      useEffect(matchesAction(attgToggled), async (_action, { getState }) => {
+        if (config.id !== FieldID.ATTG) return;
+        if (getState().story.attgEnabled) {
+          const content = await api.v1.storyStorage.get(
+            `kse-field-${config.id}`,
+          );
+          if (content) {
+            await api.v1.memory.set(String(content));
+          }
+        }
+      });
+
+      // Effect: Sync Style to Author's Note when toggled on
+      useEffect(matchesAction(styleToggled), async (_action, { getState }) => {
+        if (config.id !== FieldID.Style) return;
+        if (getState().story.styleEnabled) {
+          const content = await api.v1.storyStorage.get(
+            `kse-field-${config.id}`,
+          );
+          if (content) {
+            await api.v1.an.set(String(content));
+          }
+        }
+      });
+
       const header = row({
         id: `header-row-${config.id}`,
         style: this.style?.("headerRow"),
@@ -99,9 +200,8 @@ export const TextField = defineComponent<
             style: this.style?.("descriptionText"),
           }),
           row({
-            id: `gen-btn-wrap-${config.id}`,
             style: this.style?.("buttonGroup"),
-            content: [],
+            content: [genBtnPart],
           }),
         ],
       });
@@ -109,7 +209,6 @@ export const TextField = defineComponent<
       // Build input with onChange for sync
       let inputPart: UIPart;
       if (config.id === FieldID.ATTG) {
-        // ATTG syncs to Memory
         inputPart = multilineTextInput({
           id: `input-${config.id}`,
           placeholder: config.placeholder,
@@ -126,7 +225,6 @@ export const TextField = defineComponent<
           },
         });
       } else if (config.id === FieldID.Style) {
-        // Style syncs to Author's Note
         inputPart = multilineTextInput({
           id: `input-${config.id}`,
           placeholder: config.placeholder,
@@ -192,7 +290,7 @@ export const TextField = defineComponent<
       }
 
       return collapsibleSection({
-        id: `section-${config.id}`,
+        id: sectionId,
         title: config.label,
         iconId: config.icon,
         storageKey: `story:kse-section-${config.id}`,
@@ -201,189 +299,6 @@ export const TextField = defineComponent<
     }
 
     // Standard fields with edit/save modality
-    const toggleEditId = `btn-edit-${config.id}`;
-    const toggleSaveId = `btn-save-${config.id}`;
-
-    const header = row({
-      id: `header-row-${config.id}`,
-      style: this.style?.("headerRow"),
-      content: [
-        text({
-          text: config.description,
-          style: this.style?.("descriptionText"),
-        }),
-        row({
-          style: this.style?.("buttonGroup"),
-          content: [
-            button({
-              id: toggleEditId,
-              text: "Edit",
-              iconId: "edit-3",
-              style: this.style?.("standardButton"),
-              callback: () => this.events.beginEdit(config),
-            }),
-            button({
-              id: toggleSaveId,
-              text: "Save",
-              iconId: "save",
-              style: this.style?.("standardButton", "hidden"),
-              callback: () => this.events.save(config),
-            }),
-            row({
-              id: `gen-btn-wrap-${config.id}`,
-              style: { gap: "4px" },
-              content: [],
-            }),
-          ],
-        }),
-      ],
-    });
-
-    const content: UIPart[] = [
-      header,
-      multilineTextInput({
-        id: `input-${config.id}`,
-        placeholder: config.placeholder,
-        initialValue: "",
-        storageKey: `story:draft-${config.id}`,
-        style: this.style?.("textArea", "hidden"),
-      }),
-      text({
-        id: `text-display-${config.id}`,
-        text: "_No content._",
-        markdown: true,
-        style: this.style?.("textDisplay"),
-      }),
-    ];
-
-    return collapsibleSection({
-      id: `section-${config.id}`,
-      title: config.label,
-      iconId: config.icon,
-      storageKey: `story:kse-section-${config.id}`,
-      content,
-    });
-  },
-
-  onMount(config, ctx) {
-    const { useSelector, useEffect, dispatch } = ctx;
-    const isPlainTextField = PLAIN_TEXT_FIELDS.includes(config.id as FieldID);
-    const sectionId = `section-${config.id}`;
-    const requestId = `gen-${config.id}`;
-
-    type SectionStatus = "empty" | "queued" | "generating" | "complete";
-    const borderStyleMap: Record<SectionStatus, string> = {
-      empty: "borderEmpty",
-      queued: "borderQueued",
-      generating: "borderGenerating",
-      complete: "borderComplete",
-    };
-
-    // Section border status tracking
-    useSelector(
-      (state) => ({
-        activeRequest: state.runtime.activeRequest,
-        queueIds: state.runtime.queue
-          .filter((q) => q.status === "queued")
-          .map((q) => q.id),
-        content: state.story.fields[config.id]?.content,
-      }),
-      async ({ activeRequest, queueIds, content }) => {
-        let hasContent: boolean;
-        if (isPlainTextField) {
-          // ATTG/Style use storyStorage
-          const stored = await api.v1.storyStorage.get(
-            `kse-field-${config.id}`,
-          );
-          hasContent = !!stored && String(stored).trim().length > 0;
-        } else {
-          hasContent = !!content?.trim();
-        }
-
-        const isActive =
-          activeRequest?.id === requestId &&
-          activeRequest.status !== "completed" &&
-          activeRequest.status !== "cancelled";
-
-        let status: SectionStatus;
-        if (isActive) status = "generating";
-        else if (queueIds.includes(requestId)) status = "queued";
-        else if (hasContent) status = "complete";
-        else status = "empty";
-
-        api.v1.ui.updateParts([
-          { id: sectionId, style: this.style?.(borderStyleMap[status]) },
-        ]);
-      },
-    );
-
-    // Render Generation Button (describe + mount in one shot)
-    const { part: genBtnPart } = ctx.render(GenerationButton, {
-      id: `gen-btn-${config.id}`,
-      requestId: `gen-${config.id}`,
-      label: "Generate",
-      generateAction: uiGenerationRequested({
-        id: `gen-${config.id}`,
-        type: "field",
-        targetId: config.id,
-      }),
-    });
-
-    // Inject gen button into placeholder
-    if (isPlainTextField) {
-      api.v1.ui.updateParts([
-        {
-          id: `gen-btn-wrap-${config.id}`,
-          content: [genBtnPart],
-        },
-      ]);
-
-      // Attach sync checkbox event handlers
-      this.events.attach({
-        attgSyncToggled: (_props, checked: boolean) => {
-          if (checked) {
-            dispatch(attgToggled());
-          }
-        },
-        styleSyncToggled: (_props, checked: boolean) => {
-          if (checked) {
-            dispatch(styleToggled());
-          }
-        },
-      });
-
-      // Effect: Sync ATTG to Memory when toggled on
-      useEffect(matchesAction(attgToggled), async (_action, { getState }) => {
-        if (config.id !== FieldID.ATTG) return;
-        // Only sync if just enabled (not when toggling off)
-        if (getState().story.attgEnabled) {
-          const content = await api.v1.storyStorage.get(
-            `kse-field-${config.id}`,
-          );
-          if (content) {
-            await api.v1.memory.set(String(content));
-          }
-        }
-      });
-
-      // Effect: Sync Style to Author's Note when toggled on
-      useEffect(matchesAction(styleToggled), async (_action, { getState }) => {
-        if (config.id !== FieldID.Style) return;
-        // Only sync if just enabled (not when toggling off)
-        if (getState().story.styleEnabled) {
-          const content = await api.v1.storyStorage.get(
-            `kse-field-${config.id}`,
-          );
-          if (content) {
-            await api.v1.an.set(String(content));
-          }
-        }
-      });
-
-      return;
-    }
-
-    // Standard field logic below
     const toggleEditId = `btn-edit-${config.id}`;
     const toggleSaveId = `btn-save-${config.id}`;
     const inputId = `input-${config.id}`;
@@ -401,7 +316,7 @@ export const TextField = defineComponent<
       },
     });
 
-    // Inject gen button (and bootstrap for Canon) into placeholder
+    // Build gen button content (and bootstrap for Canon)
     const genBtnContent: UIPart[] = [genBtnPart];
     if (isCanonField) {
       const bootstrapRequestId = "gen-bootstrap";
@@ -420,12 +335,6 @@ export const TextField = defineComponent<
       });
       genBtnContent.push(bootstrapPart);
     }
-    api.v1.ui.updateParts([
-      {
-        id: `gen-btn-wrap-${config.id}`,
-        content: genBtnContent,
-      },
-    ]);
 
     // Effect: Handle edit begin - push current content to storage
     useEffect(
@@ -496,5 +405,61 @@ export const TextField = defineComponent<
         ]);
       },
     );
+
+    const header = row({
+      id: `header-row-${config.id}`,
+      style: this.style?.("headerRow"),
+      content: [
+        text({
+          text: config.description,
+          style: this.style?.("descriptionText"),
+        }),
+        row({
+          style: this.style?.("buttonGroup"),
+          content: [
+            button({
+              id: toggleEditId,
+              text: "Edit",
+              iconId: "edit-3",
+              style: this.style?.("standardButton"),
+              callback: () => this.events.beginEdit(config),
+            }),
+            button({
+              id: toggleSaveId,
+              text: "Save",
+              iconId: "save",
+              style: this.style?.("standardButton", "hidden"),
+              callback: () => this.events.save(config),
+            }),
+            ...genBtnContent,
+          ],
+        }),
+      ],
+    });
+
+    const sectionContent: UIPart[] = [
+      header,
+      multilineTextInput({
+        id: inputId,
+        placeholder: config.placeholder,
+        initialValue: "",
+        storageKey: `story:draft-${config.id}`,
+        style: this.style?.("textArea", "hidden"),
+      }),
+      text({
+        id: textId,
+        text: "_No content._",
+        markdown: true,
+        style: this.style?.("textDisplay"),
+      }),
+    ];
+
+    return collapsibleSection({
+      id: sectionId,
+      title: config.label,
+      iconId: config.icon,
+      storageKey: `story:kse-section-${config.id}`,
+      content: sectionContent,
+    });
   },
 });

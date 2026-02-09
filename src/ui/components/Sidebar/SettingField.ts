@@ -6,7 +6,7 @@ export const SettingField = defineComponent({
   id: () => "kse-sidebar-setting",
   events: undefined,
 
-  describe(_props: {}) {
+  build(_props: {}) {
     return row({
       id: "kse-sidebar-setting",
       style: { "align-items": "center", gap: "8px", "margin-bottom": "8px" },
@@ -25,6 +25,4 @@ export const SettingField = defineComponent({
       ],
     });
   },
-
-  onMount() {},
 });

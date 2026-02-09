@@ -42,100 +42,12 @@ export const LorebookPanelContent = defineComponent({
     visible: { display: "flex" },
   },
 
-  describe(_props: void) {
-    return column({
-      id: IDS.LOREBOOK.CONTAINER,
-      style: this.style?.("container"),
-      content: [
-        // Empty state
-        column({
-          id: IDS.LOREBOOK.EMPTY_STATE,
-          style: this.style?.("stateContainer", "visible"),
-          content: [
-            text({ text: "Select a Lorebook entry to generate content." }),
-          ],
-        }),
-        // Not managed state
-        column({
-          id: IDS.LOREBOOK.NOT_MANAGED,
-          style: this.style?.("stateContainer", "hidden"),
-          content: [
-            text({
-              text: "This entry is not managed by Story Engine.\nOnly entries in SE: categories can be generated.",
-            }),
-          ],
-        }),
-        // Main content
-        column({
-          id: IDS.LOREBOOK.MAIN_CONTENT,
-          style: this.style?.("mainContent", "hidden"),
-          content: [
-            // Entry name header
-            text({
-              id: IDS.LOREBOOK.ENTRY_NAME,
-              text: "",
-              style: this.style?.("entryName"),
-            }),
-            // Generation buttons (rendered in onMount)
-            row({
-              id: IDS.LOREBOOK.GEN_CONTENT_BTN + "-wrap",
-              style: this.style?.("buttonRow"),
-              content: [],
-            }),
-            // Content area (editable - multiline textarea, storageKey for streaming)
-            multilineTextInput({
-              id: IDS.LOREBOOK.CONTENT_INPUT,
-              initialValue: "",
-              placeholder: "Lorebook content...",
-              storageKey: IDS.LOREBOOK.CONTENT_DRAFT_KEY,
-              style: this.style?.("contentInput"),
-            }),
-            // Keys input (editable)
-            row({
-              style: this.style?.("keysRow"),
-              content: [
-                text({
-                  text: "Keys:",
-                  style: this.style?.("keysLabel"),
-                }),
-                textInput({
-                  id: IDS.LOREBOOK.KEYS_INPUT,
-                  initialValue: "",
-                  placeholder: "comma, separated, keys",
-                  storageKey: IDS.LOREBOOK.KEYS_DRAFT_KEY,
-                  style: this.style?.("keysInput"),
-                }),
-              ],
-            }),
-            // Refine row (instructions input + button rendered in onMount)
-            row({
-              style: this.style?.("refineRow"),
-              content: [
-                textInput({
-                  id: IDS.LOREBOOK.REFINE_INSTRUCTIONS_INPUT,
-                  initialValue: "",
-                  placeholder: "Describe changes (e.g., 'Make them shorter, change race to halfling')",
-                  storageKey: IDS.LOREBOOK.REFINE_INSTRUCTIONS_KEY,
-                  style: this.style?.("refineInput"),
-                }),
-                row({
-                  id: IDS.LOREBOOK.REFINE_BTN + "-wrap",
-                  content: [],
-                }),
-              ],
-            }),
-          ],
-        }),
-      ],
-    });
-  },
-
-  onMount(_props: void, ctx: BindContext<RootState>) {
+  build(_props: void, ctx: BindContext<RootState>) {
     const { useSelector, getState, dispatch } = ctx;
 
     let currentEntryId: string | null = null;
 
-    // Render GenerationButton components (describe + mount in one shot)
+    // Render GenerationButton components
     const { part: contentBtn } = ctx.render(GenerationButton, {
       id: IDS.LOREBOOK.GEN_CONTENT_BTN,
       label: "Generate Content",
@@ -182,18 +94,6 @@ export const LorebookPanelContent = defineComponent({
         }
       },
     });
-
-    // Inject rendered buttons into their placeholder containers
-    api.v1.ui.updateParts([
-      {
-        id: IDS.LOREBOOK.GEN_CONTENT_BTN + "-wrap",
-        content: [contentBtn, keysBtn],
-      },
-      {
-        id: IDS.LOREBOOK.REFINE_BTN + "-wrap",
-        content: [refineBtn],
-      },
-    ]);
 
     // Subscribe to lorebook state changes
     useSelector(
@@ -275,8 +175,6 @@ export const LorebookPanelContent = defineComponent({
         await api.v1.storyStorage.set(IDS.LOREBOOK.KEYS_DRAFT_RAW, currentKeys);
 
         // Show main content
-        // Note: Generation buttons are managed by LorebookGenerationButton components
-        // which self-update based on selectedEntryId changes
         api.v1.ui.updateParts([
           {
             id: IDS.LOREBOOK.MAIN_CONTENT,
@@ -286,7 +184,6 @@ export const LorebookPanelContent = defineComponent({
         ]);
 
         // Set up onChange handlers for direct lorebook updates
-        // When user edits, save to lorebook immediately
         api.v1.ui.updateParts([
           {
             id: IDS.LOREBOOK.CONTENT_INPUT,
@@ -313,5 +210,87 @@ export const LorebookPanelContent = defineComponent({
         ]);
       },
     );
+
+    return column({
+      id: IDS.LOREBOOK.CONTAINER,
+      style: this.style?.("container"),
+      content: [
+        // Empty state
+        column({
+          id: IDS.LOREBOOK.EMPTY_STATE,
+          style: this.style?.("stateContainer", "visible"),
+          content: [
+            text({ text: "Select a Lorebook entry to generate content." }),
+          ],
+        }),
+        // Not managed state
+        column({
+          id: IDS.LOREBOOK.NOT_MANAGED,
+          style: this.style?.("stateContainer", "hidden"),
+          content: [
+            text({
+              text: "This entry is not managed by Story Engine.\nOnly entries in SE: categories can be generated.",
+            }),
+          ],
+        }),
+        // Main content
+        column({
+          id: IDS.LOREBOOK.MAIN_CONTENT,
+          style: this.style?.("mainContent", "hidden"),
+          content: [
+            // Entry name header
+            text({
+              id: IDS.LOREBOOK.ENTRY_NAME,
+              text: "",
+              style: this.style?.("entryName"),
+            }),
+            // Generation buttons (directly composed)
+            row({
+              style: this.style?.("buttonRow"),
+              content: [contentBtn, keysBtn],
+            }),
+            // Content area (editable - multiline textarea, storageKey for streaming)
+            multilineTextInput({
+              id: IDS.LOREBOOK.CONTENT_INPUT,
+              initialValue: "",
+              placeholder: "Lorebook content...",
+              storageKey: IDS.LOREBOOK.CONTENT_DRAFT_KEY,
+              style: this.style?.("contentInput"),
+            }),
+            // Keys input (editable)
+            row({
+              style: this.style?.("keysRow"),
+              content: [
+                text({
+                  text: "Keys:",
+                  style: this.style?.("keysLabel"),
+                }),
+                textInput({
+                  id: IDS.LOREBOOK.KEYS_INPUT,
+                  initialValue: "",
+                  placeholder: "comma, separated, keys",
+                  storageKey: IDS.LOREBOOK.KEYS_DRAFT_KEY,
+                  style: this.style?.("keysInput"),
+                }),
+              ],
+            }),
+            // Refine row (instructions input + button)
+            row({
+              style: this.style?.("refineRow"),
+              content: [
+                textInput({
+                  id: IDS.LOREBOOK.REFINE_INSTRUCTIONS_INPUT,
+                  initialValue: "",
+                  placeholder: "Describe changes (e.g., 'Make them shorter, change race to halfling')",
+                  storageKey: IDS.LOREBOOK.REFINE_INSTRUCTIONS_KEY,
+                  style: this.style?.("refineInput"),
+                }),
+                refineBtn,
+              ],
+            }),
+          ],
+        }),
+      ],
+    });
   },
 });

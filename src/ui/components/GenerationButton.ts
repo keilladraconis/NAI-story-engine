@@ -156,73 +156,8 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
   id: (props) => props.id,
   events,
 
-  describe(props) {
-    const {
-      id,
-      variant = "button",
-      label = "",
-      style = {},
-      iconId,
-    } = props;
-
-    if (variant === "icon") {
-      // Icon variant - single button that changes appearance
-      return button({
-        id,
-        iconId,
-        style: { ...getIconStyles().idle, ...style },
-        callback: () => events.generate(props),
-      });
-    }
-
-    // Button variant - row with multiple button states
-    const styles = getButtonStyles();
-
-    const btnGenerate = button({
-      id: `${id}-gen`,
-      iconId,
-      text: `${iconId ? "" : "⚡"} ${label}`,
-      style: { ...styles.gen, ...style },
-      callback: () => events.generate(props),
-    });
-
-    const btnQueued = button({
-      id: `${id}-queue`,
-      text: label ? `⏳ Queued` : "⏳",
-      style: { ...styles.queue, display: "none", ...style },
-      callback: () => events.cancel(props, props.requestId),
-    });
-
-    const btnCancel = button({
-      id: `${id}-cancel`,
-      text: label ? `🚫 Cancel` : "🚫",
-      style: { ...styles.cancel, display: "none", ...style },
-      callback: () => events.cancelActive(props),
-    });
-
-    const btnContinue = button({
-      id: `${id}-continue`,
-      text: label ? `⚠️ Continue` : "⚠️",
-      style: { ...styles.continue, display: "none", ...style },
-      callback: () => events.continue(props),
-    });
-
-    const btnWait = button({
-      id: `${id}-wait`,
-      text: label ? `⏳ Wait` : "⏳",
-      style: { ...styles.wait, display: "none", ...style },
-      callback: () => events.cancelActive(props),
-    });
-
-    return row({
-      id,
-      style: { gap: "4px", alignItems: "center", ...style },
-      content: [btnGenerate, btnQueued, btnCancel, btnContinue, btnWait],
-    });
-  },
-
-  onMount(props, { dispatch, useSelector }) {
-    const { id, variant = "button", label = "", iconId = "book" } = props;
+  build(props, { dispatch, useSelector }) {
+    const { id, variant = "button", label = "", style = {}, iconId } = props;
     const buttonStyles = getButtonStyles();
     const iconStyles = getIconStyles();
     let timerId: any = null;
@@ -595,5 +530,61 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
         }
       }
     }
+
+    // Build the UI tree
+    if (variant === "icon") {
+      // Icon variant - single button that changes appearance
+      return button({
+        id,
+        iconId,
+        style: iconStyles.idle,
+        callback: () => events.generate(props),
+      });
+    }
+
+    // Button variant - row with multiple button states
+    const styles = getButtonStyles();
+
+    const btnGenerate = button({
+      id: `${id}-gen`,
+      iconId,
+      text: `${iconId ? "" : "⚡"} ${label}`,
+      style: { ...styles.gen, display: "block" },
+      callback: () => events.generate(props),
+    });
+
+    const btnQueued = button({
+      id: `${id}-queue`,
+      text: label ? `⏳ Queued` : "⏳",
+      style: { ...styles.queue, display: "none" },
+      callback: () => events.cancel(props, props.requestId),
+    });
+
+    const btnCancel = button({
+      id: `${id}-cancel`,
+      text: label ? `🚫 Cancel` : "🚫",
+      style: { ...styles.cancel, display: "none" },
+      callback: () => events.cancelActive(props),
+    });
+
+    const btnContinue = button({
+      id: `${id}-continue`,
+      text: label ? `⚠️ Continue` : "⚠️",
+      style: { ...styles.continue, display: "none" },
+      callback: () => events.continue(props),
+    });
+
+    const btnWait = button({
+      id: `${id}-wait`,
+      text: label ? `⏳ Wait` : "⏳",
+      style: { ...styles.wait, display: "none" },
+      callback: () => events.cancelActive(props),
+    });
+
+    return row({
+      id,
+      style: { gap: "4px", alignItems: "center", ...style },
+      content: [btnGenerate, btnQueued, btnCancel, btnContinue, btnWait],
+    });
   },
 };

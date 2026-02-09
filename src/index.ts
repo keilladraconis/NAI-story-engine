@@ -58,7 +58,15 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
       api.v1.log("Error loading persisted data:", e);
     }
 
-    // 4. Register UI Extensions (static declarations, not components)
+    // 4. Mount all components (returns UIPart + sets up subscriptions)
+    const { part: listPart } = mount(List, undefined, store);
+    const { part: inputPart } = mount(Input, {}, store);
+    const { part: headerPart } = mount(Header, {}, store);
+    const { part: settingPart } = mount(SettingField, {}, store);
+    const { part: fieldListPart } = mount(FieldList, {}, store);
+    const { part: lorebookPart } = mount(LorebookPanelContent, undefined, store);
+
+    // 5. Compose panels from returned parts
     const brainstormPanel = sidebarPanel({
       id: "kse-brainstorm-sidebar",
       name: "Brainstorm",
@@ -67,7 +75,7 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
         column({
           id: IDS.BRAINSTORM.ROOT,
           style: { height: "100%", "justify-content": "space-between" },
-          content: [List.describe(), Input.describe({})],
+          content: [listPart, inputPart],
         }),
       ],
     });
@@ -78,21 +86,16 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
       iconId: "lightning",
       content: [
         column({
-          content: [
-            Header.describe({}),
-            SettingField.describe({}),
-            FieldList.describe({}),
-          ],
+          content: [headerPart, settingPart, fieldListPart],
         }),
       ],
     });
 
-    // Lorebook Panel (appears in Lorebook when entry is selected)
     const lorebookGenPanel = lorebookPanel({
       id: IDS.LOREBOOK.PANEL,
       name: "Story Engine",
       iconId: "zap",
-      content: [LorebookPanelContent.describe()],
+      content: [lorebookPart],
     });
 
     await api.v1.ui.register([
@@ -110,14 +113,6 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
         }),
       );
     });
-
-    // 5. Mount Components (start reactive subscriptions)
-    mount(List, undefined, store);
-    mount(Input, {}, store);
-    mount(Header, {}, store);
-    mount(SettingField, {}, store);
-    mount(FieldList, {}, store);
-    mount(LorebookPanelContent, undefined, store);
 
     api.v1.log("Story Engine Initialized.");
   } catch (e) {

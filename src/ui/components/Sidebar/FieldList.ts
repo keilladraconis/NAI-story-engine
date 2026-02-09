@@ -10,30 +10,22 @@ export const FieldList = defineComponent({
   id: () => "kse-field-list",
   events: undefined,
 
-  describe(_props: {}) {
+  build(_props: {}, ctx: BindContext<RootState>) {
     const visibleFields = FIELD_CONFIGS.filter((c) => !c.hidden);
+
+    const children = visibleFields.map((config) => {
+      if (config.layout === "list") {
+        const { part } = ctx.render(ListField, config);
+        return part;
+      }
+      const { part } = ctx.render(TextField, config);
+      return part;
+    });
 
     return column({
       id: "kse-field-list",
       style: { gap: "8px" },
-      content: visibleFields.map((config) => {
-        if (config.layout === "list") {
-          return ListField.describe(config);
-        }
-        return TextField.describe(config);
-      }),
-    });
-  },
-
-  onMount(_props: {}, ctx: BindContext<RootState>) {
-    const visibleFields = FIELD_CONFIGS.filter((c) => !c.hidden);
-
-    visibleFields.forEach((config) => {
-      if (config.layout === "list") {
-        ctx.mount(ListField, config);
-      } else {
-        ctx.mount(TextField, config);
-      }
+      content: children,
     });
   },
 });

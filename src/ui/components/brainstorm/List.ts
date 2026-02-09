@@ -9,26 +9,20 @@ export const List = defineComponent({
   id: () => IDS.BRAINSTORM.LIST,
   events: undefined,
 
-  describe(_props: void) {
-    return column({
-      id: IDS.BRAINSTORM.LIST,
-      content: [],
-      style: {
-        flex: 1,
-        overflow: "auto",
-        gap: "10px",
-        padding: "8px",
-        "padding-bottom": "20px",
-        "flex-direction": "column-reverse",
-        "justify-content": "flex-start",
-      },
-    });
-  },
-
-  onMount(_props, ctx: BindContext<RootState>) {
+  build(_props: void, ctx: BindContext<RootState>) {
     const { useSelector } = ctx;
     let messageCleanups: (() => void)[] = [];
 
+    // Read initial messages
+    const initialMessages = ctx.getState().brainstorm.messages;
+    const initialReversed = initialMessages.slice().reverse();
+    const initialChildren = initialReversed.map((msg) => {
+      const { part, unmount } = ctx.render(Message, { message: msg });
+      messageCleanups.push(unmount);
+      return part;
+    });
+
+    // Subscribe for future changes
     useSelector(
       (state) => state.brainstorm.messages,
       (messages) => {
@@ -52,5 +46,19 @@ export const List = defineComponent({
         ]);
       },
     );
+
+    return column({
+      id: IDS.BRAINSTORM.LIST,
+      content: initialChildren,
+      style: {
+        flex: 1,
+        overflow: "auto",
+        gap: "10px",
+        padding: "8px",
+        "padding-bottom": "20px",
+        "flex-direction": "column-reverse",
+        "justify-content": "flex-start",
+      },
+    });
   },
 });

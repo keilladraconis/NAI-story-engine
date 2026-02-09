@@ -44,58 +44,18 @@ export const ListItem = defineComponent<
   id: (props) => `item-${props.item.id}`,
   events: createEvents<ListItemProps, ListItemEvents>(),
 
-  describe(props) {
+  build(props, ctx) {
+    const { dispatch } = ctx;
     const { item, config } = props;
+    const entryId = item.id;
 
-    const bookBtnId = `book-${item.id}`;
-    const contentInputId = `content-input-${item.id}`;
-    const deleteBtnId = `btn-del-${item.id}`;
+    const bookBtnId = `book-${entryId}`;
+    const contentInputId = `content-input-${entryId}`;
+    const deleteBtnId = `btn-del-${entryId}`;
 
-    return row({
-      id: `item-${item.id}`,
-      style: { gap: "8px", "align-items": "flex-start", padding: "4px 0" },
-      content: [
-        // Lorebook generation icon button
-        GenerationButton.describe({
-          id: bookBtnId,
-          variant: "icon",
-          iconId: "book",
-          requestIds: [`lb-item-${item.id}-content`, `lb-item-${item.id}-keys`],
-        }),
-        multilineTextInput({
-          id: contentInputId,
-          initialValue: "",
-          storageKey: `story:dulfs-item-${item.id}`,
-          style: inputStyle("3rem"),
-          onChange: async (value: string) => {
-            // Extract name using field-specific parser and sync to lorebook displayName only
-            const name = extractDulfsItemName(value, config.id);
-            await api.v1.lorebook.updateEntry(item.id, {
-              displayName: name,
-            });
-            // Resize textarea to fit content
-            api.v1.ui.updateParts([
-              { id: contentInputId, style: inputStyle(contentMinHeight(value)) },
-            ]);
-          },
-        }),
-        button({
-          id: deleteBtnId,
-          iconId: "trash",
-          style: { width: "24px", padding: "4px" },
-          callback: () => this.events.delete(props),
-        }),
-      ],
-    });
-  },
-
-  onMount(props, ctx) {
-    const { dispatch, mount } = ctx;
-    const entryId = props.item.id;
-
-    // Mount the lorebook icon button for reactivity
-    mount(GenerationButton, {
-      id: `book-${entryId}`,
+    // Render the lorebook icon button with full props
+    const { part: bookBtnPart } = ctx.render(GenerationButton, {
+      id: bookBtnId,
       variant: "icon",
       iconId: "book",
       requestIds: [`lb-item-${entryId}-content`, `lb-item-${entryId}-keys`],
@@ -129,6 +89,37 @@ export const ListItem = defineComponent<
           }),
         );
       },
+    });
+
+    return row({
+      id: `item-${entryId}`,
+      style: { gap: "8px", "align-items": "flex-start", padding: "4px 0" },
+      content: [
+        bookBtnPart,
+        multilineTextInput({
+          id: contentInputId,
+          initialValue: "",
+          storageKey: `story:dulfs-item-${entryId}`,
+          style: inputStyle("3rem"),
+          onChange: async (value: string) => {
+            // Extract name using field-specific parser and sync to lorebook displayName only
+            const name = extractDulfsItemName(value, config.id);
+            await api.v1.lorebook.updateEntry(entryId, {
+              displayName: name,
+            });
+            // Resize textarea to fit content
+            api.v1.ui.updateParts([
+              { id: contentInputId, style: inputStyle(contentMinHeight(value)) },
+            ]);
+          },
+        }),
+        button({
+          id: deleteBtnId,
+          iconId: "trash",
+          style: { width: "24px", padding: "4px" },
+          callback: () => this.events.delete(props),
+        }),
+      ],
     });
   },
 });

@@ -62,10 +62,62 @@ export const Message = defineComponent({
     visible: { display: "block" },
   },
 
-  describe(props: MessageProps) {
+  build(props: MessageProps, ctx: BindContext<RootState>) {
+    const { dispatch, useSelector } = ctx;
     const { message } = props;
     const ids = IDS.BRAINSTORM.message(message.id);
     const isUser = message.role === "user";
+
+    // Attach event handlers
+    this.events.attach({
+      edit(p) {
+        dispatch(uiBrainstormMessageEditBegin({ id: p.message.id }));
+      },
+      save(_p) {
+        dispatch(uiBrainstormMessageEditEnd());
+      },
+      retry(p) {
+        dispatch(uiBrainstormRetryGeneration({ messageId: p.message.id }));
+      },
+      delete(p) {
+        dispatch(messageRemoved(p.message.id));
+      },
+    });
+
+    // Bind: Toggle View/Edit
+    useSelector(
+      (state) => state.brainstorm.editingMessageId === props.message.id,
+      (isEditing) => {
+        api.v1.ui.updateParts([
+          {
+            id: ids.VIEW,
+            style: this.style?.(
+              "viewContainer",
+              isEditing ? "hidden" : "visible",
+            ),
+          },
+          {
+            id: ids.EDIT,
+            style: this.style?.(
+              "editContainer",
+              isEditing ? "visible" : "hidden",
+            ),
+          },
+        ]);
+      },
+    );
+
+    // Bind: Content Updates (Streaming)
+    useSelector(
+      (state) =>
+        state.brainstorm.messages.find((m) => m.id === props.message.id)
+          ?.content,
+      (content) => {
+        if (content !== undefined) {
+          api.v1.ui.updateParts([{ id: ids.TEXT, text: content }]);
+        }
+      },
+    );
 
     // --- View Mode ---
 
@@ -165,60 +217,5 @@ export const Message = defineComponent({
         }),
       ],
     });
-  },
-
-  onMount(props, ctx: BindContext<RootState>) {
-    const { dispatch, useSelector } = ctx;
-    const ids = IDS.BRAINSTORM.message(props.message.id);
-
-    this.events.attach({
-      edit(p) {
-        dispatch(uiBrainstormMessageEditBegin({ id: p.message.id }));
-      },
-      save(_p) {
-        dispatch(uiBrainstormMessageEditEnd());
-      },
-      retry(p) {
-        dispatch(uiBrainstormRetryGeneration({ messageId: p.message.id }));
-      },
-      delete(p) {
-        dispatch(messageRemoved(p.message.id));
-      },
-    });
-
-    // Bind: Toggle View/Edit
-    useSelector(
-      (state) => state.brainstorm.editingMessageId === props.message.id,
-      (isEditing) => {
-        api.v1.ui.updateParts([
-          {
-            id: ids.VIEW,
-            style: this.style?.(
-              "viewContainer",
-              isEditing ? "hidden" : "visible",
-            ),
-          },
-          {
-            id: ids.EDIT,
-            style: this.style?.(
-              "editContainer",
-              isEditing ? "visible" : "hidden",
-            ),
-          },
-        ]);
-      },
-    );
-
-    // Bind: Content Updates (Streaming)
-    useSelector(
-      (state) =>
-        state.brainstorm.messages.find((m) => m.id === props.message.id)
-          ?.content,
-      (content) => {
-        if (content !== undefined) {
-          api.v1.ui.updateParts([{ id: ids.TEXT, text: content }]);
-        }
-      },
-    );
   },
 });

@@ -84,8 +84,6 @@ export function createStore<S>(
     listener: SelectorListener<T>,
   ) {
     let current = selector(currentState);
-    // Selector listeners follow at-least-once semantics.
-    listener(current);
 
     return subscribe((state) => {
       const next = selector(state);

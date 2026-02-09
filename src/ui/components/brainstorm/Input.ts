@@ -26,32 +26,11 @@ export const Input: Component<{}, RootState> = {
   id: () => `${IDS.BRAINSTORM.INPUT}-area`,
   events,
 
-  describe(props) {
-    const ids = IDS.BRAINSTORM;
-
-    return column({
-      content: [
-        multilineTextInput({
-          id: ids.INPUT,
-          placeholder: "Type an idea...",
-          storageKey: `story:${ids.INPUT}`,
-          style: { "min-height": "60px", "max-height": "120px" },
-          onSubmit: () => events.submit(props),
-        }),
-        row({
-          id: `${ids.INPUT}-btn-row`,
-          style: { gap: "8px", "margin-top": "8px" },
-          content: [],
-        }),
-      ],
-    });
-  },
-
-  onMount(_props, ctx) {
+  build(_props, ctx) {
     const { dispatch, useSelector } = ctx;
     const ids = IDS.BRAINSTORM;
 
-    // Render ButtonWithConfirmation for Clear button
+    // Render child components
     const { part: clearBtn } = ctx.render(ButtonWithConfirmation, {
       id: `${ids.INPUT}-btn-clear`,
       label: "Clear",
@@ -60,7 +39,6 @@ export const Input: Component<{}, RootState> = {
       onConfirm: () => dispatch(messagesCleared()),
     });
 
-    // Render GenerationButton for Send
     const { part: sendBtn } = ctx.render(GenerationButton, {
       id: ids.SEND_BTN,
       label: "Send",
@@ -78,14 +56,6 @@ export const Input: Component<{}, RootState> = {
       requestIdFromProjection: (projection) => projection,
     });
 
-    // Inject buttons into placeholder
-    api.v1.ui.updateParts([
-      {
-        id: `${ids.INPUT}-btn-row`,
-        content: [clearBtn, sendBtn],
-      },
-    ]);
-
     events.attach({
       submit() {
         dispatch(uiBrainstormSubmitUserMessage());
@@ -93,7 +63,6 @@ export const Input: Component<{}, RootState> = {
     });
 
     // Reactive State: Only handle Input disabled state
-    // Only disable when brainstorm is actively generating, not other generation types
     useSelector(
       (state) => ({
         activeRequest: state.runtime.activeRequest,
@@ -111,5 +80,22 @@ export const Input: Component<{}, RootState> = {
         ]);
       },
     );
+
+    return column({
+      content: [
+        multilineTextInput({
+          id: ids.INPUT,
+          placeholder: "Type an idea...",
+          storageKey: `story:${ids.INPUT}`,
+          style: { "min-height": "60px", "max-height": "120px" },
+          onSubmit: () => events.submit({}),
+        }),
+        row({
+          id: `${ids.INPUT}-btn-row`,
+          style: { gap: "8px", "margin-top": "8px" },
+          content: [clearBtn, sendBtn],
+        }),
+      ],
+    });
   },
 };

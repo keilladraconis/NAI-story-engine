@@ -63,49 +63,13 @@ export const ListField = defineComponent<
     borderComplete: { "border-left": `3px solid ${STATUS_COMPLETE}` },
   },
 
-  describe(props) {
-    return collapsibleSection({
-      id: `section-${props.id}`,
-      title: props.label,
-      iconId: props.icon,
-      storageKey: `story:kse-section-${props.id}`,
-      content: [
-        text({
-          text: props.description,
-          style: this.style?.("description"),
-        }),
-        // Items List
-        column({
-          id: `items-col-${props.id}`,
-          style: this.style?.("itemsColumn"),
-          content: [], // Populated in onMount
-        }),
-        // Actions
-        row({
-          style: this.style?.("actionsRow"),
-          content: [
-            row({
-              id: `gen-btn-wrap-${props.id}`,
-              content: [],
-            }),
-            button({
-              text: "Add Item",
-              iconId: "plus",
-              style: this.style?.("standardButton"),
-              callback: () => this.events.addItem(props),
-            }),
-          ],
-        }),
-      ],
-    });
-  },
-
-  onMount(props, ctx) {
+  build(props, ctx) {
     const { useSelector, dispatch } = ctx;
 
     const sectionId = `section-${props.id}`;
     const itemsColId = `items-col-${props.id}`;
-    const boundItems = new Set<string>();
+    const listGenId = `gen-list-${props.id}`;
+    const itemParts = new Map<string, { part: UIPart; unmount: () => void }>();
 
     // Helper to resize all item textareas based on stored content
     const updateItemHeights = async (list: DulfsItem[]) => {
@@ -154,7 +118,6 @@ export const ListField = defineComponent<
     });
 
     // Render Category Gen Button
-    const listGenId = `gen-list-${props.id}`;
     const { part: genBtnPart } = ctx.render(GenerationButton, {
       id: `gen-btn-${listGenId}`,
       requestId: listGenId,
@@ -165,12 +128,6 @@ export const ListField = defineComponent<
         targetId: props.id,
       }),
     });
-    api.v1.ui.updateParts([
-      {
-        id: `gen-btn-wrap-${props.id}`,
-        content: [genBtnPart],
-      },
-    ]);
 
     // Section border status tracking
     type SectionStatus = "empty" | "queued" | "generating" | "complete";
@@ -218,32 +175,49 @@ export const ListField = defineComponent<
       },
     );
 
-    // Sync Items
+    // Read initial items
+    const initialItems =
+      ctx.getState().story.dulfs[props.id as DulfsFieldID] || [];
+
+    // Mount initial items
+    for (const item of initialItems) {
+      itemParts.set(item.id, ctx.render(ListItem, { config: props, item }));
+    }
+
+    // Sync Items on future changes
     useSelector(
       (state) => state.story.dulfs[props.id as DulfsFieldID] || [],
       async (list) => {
-        // 1. Mount new items
-        list.forEach((item) => {
-          if (!boundItems.has(item.id)) {
-            ctx.mount(ListItem, { config: props, item });
-            boundItems.add(item.id);
+        // Mount new items
+        for (const item of list) {
+          if (!itemParts.has(item.id)) {
+            itemParts.set(
+              item.id,
+              ctx.render(ListItem, { config: props, item }),
+            );
           }
-        });
+        }
 
-        // 2. Re-render list structure
+        // Unmount removed items
+        for (const [id] of itemParts) {
+          if (!list.some((item) => item.id === id)) {
+            itemParts.get(id)!.unmount();
+            itemParts.delete(id);
+          }
+        }
+
+        // Update container content
         api.v1.ui.updateParts([
           {
             id: itemsColId,
-            content: list.map((item) =>
-              ListItem.describe({ config: props, item }),
-            ),
+            content: list.map((item) => itemParts.get(item.id)!.part),
           },
         ]);
 
-        // 3. Resize textareas after re-render replaces the subtree
+        // Resize textareas after re-render replaces the subtree
         await updateItemHeights(list);
 
-        // 4. Update title with lorebook count
+        // Update title with lorebook count
         await updateTitleWithCount(list);
       },
     );
@@ -257,5 +231,37 @@ export const ListField = defineComponent<
         await updateTitleWithCount(list);
       },
     );
+
+    return collapsibleSection({
+      id: sectionId,
+      title: props.label,
+      iconId: props.icon,
+      storageKey: `story:kse-section-${props.id}`,
+      content: [
+        text({
+          text: props.description,
+          style: this.style?.("description"),
+        }),
+        // Items List
+        column({
+          id: itemsColId,
+          style: this.style?.("itemsColumn"),
+          content: initialItems.map((item) => itemParts.get(item.id)!.part),
+        }),
+        // Actions
+        row({
+          style: this.style?.("actionsRow"),
+          content: [
+            genBtnPart,
+            button({
+              text: "Add Item",
+              iconId: "plus",
+              style: this.style?.("standardButton"),
+              callback: () => this.events.addItem(props),
+            }),
+          ],
+        }),
+      ],
+    });
   },
 });

@@ -10,8 +10,6 @@ import { storyCleared } from "../../../core/store/slices/story";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 import { NAI_HEADER, NAI_FOREGROUND } from "../../colors";
 
-const CLEAR_BTN_WRAP_ID = "header-clear-wrap";
-
 const { row, text, button } = api.v1.ui.part;
 
 type HeaderEvents = {
@@ -54,60 +52,7 @@ export const Header = defineComponent({
     },
   },
 
-  describe(_props: {}) {
-    return row({
-      id: "kse-sidebar-header",
-      style: this.style?.("mainRow"),
-      content: [
-        // SEGA buttons (left)
-        row({
-          content: [
-            button({
-              id: "header-sega-start-btn",
-              text: "S.E.G.A.",
-              iconId: "play-circle",
-              style: this.style?.("actionButton"),
-              callback: () => this.events.toggleSega({}),
-            }),
-            button({
-              id: "header-sega-stop-btn",
-              text: "S.E.G.A.",
-              iconId: "fast-forward",
-              style: this.style?.("stopButton", "hidden"),
-              callback: () => this.events.toggleSega({}),
-            }),
-          ],
-        }),
-        // Status text (center)
-        text({
-          id: "header-sega-status",
-          text: "",
-          style: this.style?.("statusText"),
-        }),
-        // Continue button (center, hidden by default)
-        button({
-          id: "header-continue-btn",
-          text: "Continue",
-          iconId: "fast-forward",
-          style: this.style?.("continueButton", "hidden"),
-          callback: () => this.events.continueGeneration({}),
-        }),
-        // Wait countdown (center, hidden by default)
-        text({
-          id: "header-wait-text",
-          text: "",
-          style: this.style?.("waitText", "hidden"),
-        }),
-        // Clear button (rendered in onMount)
-        row({
-          id: CLEAR_BTN_WRAP_ID,
-          content: [],
-        }),
-      ],
-    });
-  },
-
-  onMount(_props: {}, ctx: BindContext<RootState>) {
+  build(_props: {}, ctx: BindContext<RootState>) {
     const { useSelector, dispatch } = ctx;
 
     this.events.attach({
@@ -123,9 +68,6 @@ export const Header = defineComponent({
       buttonStyle: { padding: "4px 8px", opacity: 0.7 },
       onConfirm: () => dispatch(storyCleared()),
     });
-    api.v1.ui.updateParts([
-      { id: CLEAR_BTN_WRAP_ID, content: [clearBtn] },
-    ]);
 
     // Marquee state
     const marquee = {
@@ -296,5 +238,53 @@ export const Header = defineComponent({
         }
       },
     );
+
+    return row({
+      id: "kse-sidebar-header",
+      style: this.style?.("mainRow"),
+      content: [
+        // SEGA buttons (left)
+        row({
+          content: [
+            button({
+              id: "header-sega-start-btn",
+              text: "S.E.G.A.",
+              iconId: "play-circle",
+              style: this.style?.("actionButton"),
+              callback: () => this.events.toggleSega({}),
+            }),
+            button({
+              id: "header-sega-stop-btn",
+              text: "S.E.G.A.",
+              iconId: "fast-forward",
+              style: this.style?.("stopButton", "hidden"),
+              callback: () => this.events.toggleSega({}),
+            }),
+          ],
+        }),
+        // Status text (center)
+        text({
+          id: "header-sega-status",
+          text: "",
+          style: this.style?.("statusText"),
+        }),
+        // Continue button (center, hidden by default)
+        button({
+          id: "header-continue-btn",
+          text: "Continue",
+          iconId: "fast-forward",
+          style: this.style?.("continueButton", "hidden"),
+          callback: () => this.events.continueGeneration({}),
+        }),
+        // Wait countdown (center, hidden by default)
+        text({
+          id: "header-wait-text",
+          text: "",
+          style: this.style?.("waitText", "hidden"),
+        }),
+        // Clear button (directly composed)
+        clearBtn,
+      ],
+    });
   },
 });

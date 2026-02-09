@@ -338,6 +338,13 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       // Request Generation - use factory pattern for JIT message building
       const strategy = buildBrainstormStrategy(getState, assistantId);
+      dispatch(
+        requestQueued({
+          id: strategy.requestId,
+          type: "brainstorm",
+          targetId: assistantId,
+        }),
+      );
       dispatch(generationSubmitted(strategy));
     },
   );
@@ -386,6 +393,13 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       // Request Generation - use factory pattern for JIT message building
       const strategy = buildBrainstormStrategy(getState, assistantId);
+      dispatch(
+        requestQueued({
+          id: strategy.requestId,
+          type: "brainstorm",
+          targetId: assistantId,
+        }),
+      );
       dispatch(generationSubmitted(strategy));
     },
   );

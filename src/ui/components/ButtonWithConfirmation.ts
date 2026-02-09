@@ -59,7 +59,7 @@ events.attach({
     updateVisibility(p.id, true);
   },
   confirm(p) {
-    // Use registered props (from onMount) to get the real onConfirm callback
+    // Use registered props (from build) to get the real onConfirm callback
     const registeredProps = buttonRegistry[p.id];
     registeredProps?.onConfirm();
     updateVisibility(p.id, false);
@@ -76,7 +76,7 @@ export const ButtonWithConfirmation: Component<
   id: (props) => props.id,
   events,
 
-  describe(props) {
+  build(props) {
     const {
       id,
       label,
@@ -85,6 +85,9 @@ export const ButtonWithConfirmation: Component<
       style = {},
       buttonStyle = {},
     } = props;
+
+    // Register props so updateVisibility can access buttonStyle
+    buttonRegistry[id] = props;
 
     const mainButton = button({
       id: `${id}-btn`,
@@ -122,10 +125,5 @@ export const ButtonWithConfirmation: Component<
       style: { gap: "4px", alignItems: "center", ...style },
       content: [mainButton, confirmRow],
     });
-  },
-
-  onMount(props) {
-    // Register props so updateVisibility can access buttonStyle
-    buttonRegistry[props.id] = props;
   },
 };
