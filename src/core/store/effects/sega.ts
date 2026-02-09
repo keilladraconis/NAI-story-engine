@@ -274,7 +274,7 @@ function cancelAllSegaTasks(
   // Cancel current if SEGA-initiated
   const activeRequest = getState().runtime.activeRequest;
   if (activeRequest && activeRequestIds.includes(activeRequest.id)) {
-    genX.cancelCurrent();
+    genX.cancelAll();
   }
 
   // Clear tracking

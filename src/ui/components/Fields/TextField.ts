@@ -41,13 +41,8 @@ type TextFieldEvents = {
 // Fields that use plain textarea mode (no edit/save modality)
 const PLAIN_TEXT_FIELDS = [FieldID.ATTG, FieldID.Style];
 
-export const TextField = defineComponent<
-  TextFieldProps,
-  RootState,
-  ReturnType<typeof createEvents<TextFieldProps, TextFieldEvents>>
->({
+export const TextField = defineComponent<TextFieldProps, RootState>({
   id: (config) => `section-${config.id}`,
-  events: createEvents<TextFieldProps, TextFieldEvents>(),
 
   styles: {
     textArea: { "min-height": "100px" },
@@ -87,6 +82,7 @@ export const TextField = defineComponent<
 
   build(config, ctx) {
     const { useSelector, useEffect, dispatch, getState } = ctx;
+    const events = createEvents<TextFieldEvents>();
     const isPlainTextField = PLAIN_TEXT_FIELDS.includes(config.id as FieldID);
     const sectionId = `section-${config.id}`;
     const requestId = `gen-${config.id}`;
@@ -152,13 +148,13 @@ export const TextField = defineComponent<
     // Plain text fields (ATTG, Style) - always editable textarea
     if (isPlainTextField) {
       // Attach sync checkbox event handlers
-      this.events.attach({
-        attgSyncToggled: (_props, checked: boolean) => {
+      events.attach({
+        attgSyncToggled: (checked: boolean) => {
           if (checked) {
             dispatch(attgToggled());
           }
         },
-        styleSyncToggled: (_props, checked: boolean) => {
+        styleSyncToggled: (checked: boolean) => {
           if (checked) {
             dispatch(styleToggled());
           }
@@ -263,7 +259,7 @@ export const TextField = defineComponent<
                 storageKey: "story:kse-sync-attg-memory",
                 label: "Copy to Memory",
                 onChange: (checked: boolean) =>
-                  this.events.attgSyncToggled(config, checked),
+                  events.attgSyncToggled(checked),
               }),
             ],
           }),
@@ -282,7 +278,7 @@ export const TextField = defineComponent<
                 storageKey: "story:kse-sync-style-an",
                 label: "Copy to Author's Note",
                 onChange: (checked: boolean) =>
-                  this.events.styleSyncToggled(config, checked),
+                  events.styleSyncToggled(checked),
               }),
             ],
           }),
@@ -307,12 +303,12 @@ export const TextField = defineComponent<
     const isCanonField = config.id === FieldID.Canon;
 
     // Event handlers only dispatch actions
-    this.events.attach({
-      beginEdit: (props) => {
-        dispatch(uiFieldEditBegin({ id: props.id }));
+    events.attach({
+      beginEdit: () => {
+        dispatch(uiFieldEditBegin({ id: config.id }));
       },
-      save: (props) => {
-        dispatch(uiFieldEditEnd({ id: props.id }));
+      save: () => {
+        dispatch(uiFieldEditEnd({ id: config.id }));
       },
     });
 
@@ -422,14 +418,14 @@ export const TextField = defineComponent<
               text: "Edit",
               iconId: "edit-3",
               style: this.style?.("standardButton"),
-              callback: () => this.events.beginEdit(config),
+              callback: () => events.beginEdit(),
             }),
             button({
               id: toggleSaveId,
               text: "Save",
               iconId: "save",
               style: this.style?.("standardButton", "hidden"),
-              callback: () => this.events.save(config),
+              callback: () => events.save(),
             }),
             ...genBtnContent,
           ],

@@ -14,7 +14,6 @@ const SE_CATEGORY_PREFIX = "SE: ";
 
 export const LorebookPanelContent = defineComponent({
   id: () => IDS.LOREBOOK.CONTAINER,
-  events: undefined,
 
   styles: {
     container: { height: "100%" },

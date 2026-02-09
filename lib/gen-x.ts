@@ -9,13 +9,13 @@
 
 export interface GenerationState {
   status:
-    | "idle"
-    | "queued"
-    | "generating"
-    | "waiting_for_budget"
-    | "waiting_for_user"
-    | "completed"
-    | "failed";
+  | "idle"
+  | "queued"
+  | "generating"
+  | "waiting_for_budget"
+  | "waiting_for_user"
+  | "completed"
+  | "failed";
   error?: string;
   queueLength: number;
 
@@ -153,7 +153,7 @@ export class GenX {
     return true;
   }
 
-  public cancelCurrent() {
+  public cancelAll() {
     // 1. Clear queue
     this.queue = [];
 

@@ -40,13 +40,8 @@ type ListFieldEvents = {
   addItem(): void;
 };
 
-export const ListField = defineComponent<
-  ListFieldProps,
-  RootState,
-  ReturnType<typeof createEvents<ListFieldProps, ListFieldEvents>>
->({
+export const ListField = defineComponent<ListFieldProps, RootState>({
   id: (props) => `section-${props.id}`,
-  events: createEvents<ListFieldProps, ListFieldEvents>(),
 
   styles: {
     description: {
@@ -65,6 +60,7 @@ export const ListField = defineComponent<
 
   build(props, ctx) {
     const { useSelector, dispatch } = ctx;
+    const events = createEvents<ListFieldEvents>();
 
     const sectionId = `section-${props.id}`;
     const itemsColId = `items-col-${props.id}`;
@@ -101,16 +97,16 @@ export const ListField = defineComponent<
     };
 
     // Event handlers
-    this.events.attach({
-      addItem: async (eventProps) => {
+    events.attach({
+      addItem: async () => {
         const itemId = api.v1.uuid();
         await api.v1.storyStorage.set(`dulfs-item-${itemId}`, "");
         dispatch(
           dulfsItemAdded({
-            fieldId: eventProps.id as DulfsFieldID,
+            fieldId: props.id as DulfsFieldID,
             item: {
               id: itemId,
-              fieldId: eventProps.id as DulfsFieldID,
+              fieldId: props.id as DulfsFieldID,
             },
           }),
         );
@@ -257,7 +253,7 @@ export const ListField = defineComponent<
               text: "Add Item",
               iconId: "plus",
               style: this.style?.("standardButton"),
-              callback: () => this.events.addItem(props),
+              callback: () => events.addItem(),
             }),
           ],
         }),

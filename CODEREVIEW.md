@@ -16,7 +16,7 @@ Added `GenXHooks` interface (`onStateChange`, `onTaskStarted`, `beforeGenerate`)
 
 `beforeGenerate(taskId, messages)` fires after factory resolution, before the API call. Effects retain the factory-wrapping pattern for label-rich `[cache]` logging since `cacheLabel(target)` needs strategy context GenX doesn't have — but the hook is available for future middleware-style consumers.
 
-### `TODO` Rename `cancelCurrent` → `cancelAll`
+### `DONE` Rename `cancelCurrent` → `cancelAll`
 **Priority: Low**
 
 `cancelCurrent()` clears the entire queue (`this.queue = []` at line 147) — the name implies it only cancels the running task. This is a naming/contract mismatch that will surprise consumers.
@@ -45,10 +45,10 @@ Added `ctx.render(Component, props)` to `BindContext` — calls `describe()` + `
 
 Resolved by `ctx.render()`. Components that needed state-dependent callbacks (e.g. `LorebookPanelContent`'s `onGenerate`) now specify them in `onMount()` where `ctx.getState()` and `ctx.dispatch()` are available. The `store` singleton import was removed from `LorebookPanelContent` — no UI components import the store directly.
 
-### `TODO` Make `createEvents` per-instance
+### `DONE` Make `createEvents` per-instance
 **Priority: Medium**
 
-`createEvents` returns a module-level singleton Proxy. All instances of a component share one event bus. `ButtonWithConfirmation` works around this with a `buttonRegistry` keyed by ID — a pattern needed by *every* reusable multi-instance component. Fix: `createEvents` should return a factory, or events should be scoped per-component-instance in `onMount`.
+Removed `P` type parameter and `AugmentedEvents` wrapper — `createEvents<Defs>()` is now a simple typed dispatch helper. Removed `E` type parameter and `events` property from `Component`/`defineComponent`. All consumers call `createEvents()` inside `build()`, so each instance gets its own handlers map. Handlers close over props from their build scope instead of receiving them as a first argument. `ButtonWithConfirmation` rewritten to `defineComponent` — `buttonRegistry` and module-level workaround removed.
 
 ### `TODO` Add `ctx.mountList()` helper
 **Priority: Medium**

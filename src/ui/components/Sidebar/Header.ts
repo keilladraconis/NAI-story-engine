@@ -19,7 +19,6 @@ type HeaderEvents = {
 
 export const Header = defineComponent({
   id: () => "kse-sidebar-header",
-  events: createEvents<{}, HeaderEvents>(),
 
   styles: {
     mainRow: {
@@ -54,8 +53,9 @@ export const Header = defineComponent({
 
   build(_props: {}, ctx: BindContext<RootState>) {
     const { useSelector, dispatch } = ctx;
+    const events = createEvents<HeaderEvents>();
 
-    this.events.attach({
+    events.attach({
       toggleSega: () => dispatch(segaToggled()),
       continueGeneration: () => dispatch(uiUserPresenceConfirmed()),
     });
@@ -251,14 +251,14 @@ export const Header = defineComponent({
               text: "S.E.G.A.",
               iconId: "play-circle",
               style: this.style?.("actionButton"),
-              callback: () => this.events.toggleSega({}),
+              callback: () => events.toggleSega(),
             }),
             button({
               id: "header-sega-stop-btn",
               text: "S.E.G.A.",
               iconId: "fast-forward",
               style: this.style?.("stopButton", "hidden"),
-              callback: () => this.events.toggleSega({}),
+              callback: () => events.toggleSega(),
             }),
           ],
         }),
@@ -274,7 +274,7 @@ export const Header = defineComponent({
           text: "Continue",
           iconId: "fast-forward",
           style: this.style?.("continueButton", "hidden"),
-          callback: () => this.events.continueGeneration({}),
+          callback: () => events.continueGeneration(),
         }),
         // Wait countdown (center, hidden by default)
         text({

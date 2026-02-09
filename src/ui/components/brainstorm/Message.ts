@@ -28,7 +28,6 @@ type MessageEvents = {
 
 export const Message = defineComponent({
   id: (props: MessageProps) => `kse-bs-msg-${props.message.id}`,
-  events: createEvents<MessageProps, MessageEvents>(),
 
   styles: {
     textDisplay: { "word-break": "break-word", "user-select": "text" },
@@ -65,22 +64,23 @@ export const Message = defineComponent({
   build(props: MessageProps, ctx: BindContext<RootState>) {
     const { dispatch, useSelector } = ctx;
     const { message } = props;
+    const events = createEvents<MessageEvents>();
     const ids = IDS.BRAINSTORM.message(message.id);
     const isUser = message.role === "user";
 
     // Attach event handlers
-    this.events.attach({
-      edit(p) {
-        dispatch(uiBrainstormMessageEditBegin({ id: p.message.id }));
+    events.attach({
+      edit() {
+        dispatch(uiBrainstormMessageEditBegin({ id: message.id }));
       },
-      save(_p) {
+      save() {
         dispatch(uiBrainstormMessageEditEnd());
       },
-      retry(p) {
-        dispatch(uiBrainstormRetryGeneration({ messageId: p.message.id }));
+      retry() {
+        dispatch(uiBrainstormRetryGeneration({ messageId: message.id }));
       },
-      delete(p) {
-        dispatch(messageRemoved(p.message.id));
+      delete() {
+        dispatch(messageRemoved(message.id));
       },
     });
 
@@ -134,19 +134,19 @@ export const Message = defineComponent({
         button({
           iconId: "edit-3",
           style: this.style?.("buttonIcon"),
-          callback: () => this.events.edit({ message }),
+          callback: () => events.edit(),
           id: `${ids.ROOT}-btn-edit`,
         }),
         button({
           iconId: "rotate-cw",
           style: this.style?.("buttonIcon"),
-          callback: () => this.events.retry({ message }),
+          callback: () => events.retry(),
           id: `${ids.ROOT}-btn-retry`,
         }),
         button({
           iconId: "trash",
           style: this.style?.("buttonIcon"),
-          callback: () => this.events.delete({ message }),
+          callback: () => events.delete(),
           id: `${ids.ROOT}-btn-delete`,
         }),
       ],
@@ -185,7 +185,7 @@ export const Message = defineComponent({
     const saveButton = button({
       iconId: "save",
       style: this.style?.("saveButton"),
-      callback: () => this.events.save({ message }),
+      callback: () => events.save(),
       id: `${ids.ROOT}-btn-save`,
     });
 

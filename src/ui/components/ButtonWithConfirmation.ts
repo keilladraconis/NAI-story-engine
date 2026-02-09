@@ -1,5 +1,4 @@
-import { Component, createEvents, mergeStyles } from "../../../lib/nai-act";
-import { RootState } from "../../core/store/types";
+import { createEvents, defineComponent, mergeStyles } from "../../../lib/nai-act";
 import { NAI_WARNING } from "../colors";
 
 const { row, text, button } = api.v1.ui.part;
@@ -14,17 +13,11 @@ export interface ButtonWithConfirmationProps {
   onConfirm: () => void;
 }
 
-const events = createEvents<
-  ButtonWithConfirmationProps,
-  {
-    showConfirm(): void;
-    confirm(): void;
-    cancel(): void;
-  }
->();
-
-// Store registered props per button id (includes styles)
-const buttonRegistry: Record<string, ButtonWithConfirmationProps> = {};
+type ButtonWithConfirmationEvents = {
+  showConfirm(): void;
+  confirm(): void;
+  cancel(): void;
+};
 
 const CONFIRM_ROW_BASE_STYLE = {
   gap: "4px",
@@ -33,48 +26,8 @@ const CONFIRM_ROW_BASE_STYLE = {
   width: "100%",
 };
 
-const updateVisibility = (id: string, isConfirming: boolean) => {
-  const props = buttonRegistry[id];
-  const buttonStyle = props?.buttonStyle ?? {};
-
-  api.v1.ui.updateParts([
-    {
-      id: `${id}-btn`,
-      style: mergeStyles({ width: "100%" }, buttonStyle, {
-        display: isConfirming ? "none" : "flex",
-      }),
-    },
-    {
-      id: `${id}-confirm`,
-      style: mergeStyles(CONFIRM_ROW_BASE_STYLE, {
-        display: isConfirming ? "flex" : "none",
-      }),
-    },
-  ]);
-};
-
-// Attach handlers once at module level
-events.attach({
-  showConfirm(p) {
-    updateVisibility(p.id, true);
-  },
-  confirm(p) {
-    // Use registered props (from build) to get the real onConfirm callback
-    const registeredProps = buttonRegistry[p.id];
-    registeredProps?.onConfirm();
-    updateVisibility(p.id, false);
-  },
-  cancel(p) {
-    updateVisibility(p.id, false);
-  },
-});
-
-export const ButtonWithConfirmation: Component<
-  ButtonWithConfirmationProps,
-  RootState
-> = {
+export const ButtonWithConfirmation = defineComponent<ButtonWithConfirmationProps>({
   id: (props) => props.id,
-  events,
 
   build(props) {
     const {
@@ -86,15 +39,44 @@ export const ButtonWithConfirmation: Component<
       buttonStyle = {},
     } = props;
 
-    // Register props so updateVisibility can access buttonStyle
-    buttonRegistry[id] = props;
+    const events = createEvents<ButtonWithConfirmationEvents>();
+
+    const updateVisibility = (isConfirming: boolean) => {
+      api.v1.ui.updateParts([
+        {
+          id: `${id}-btn`,
+          style: mergeStyles({ width: "100%" }, buttonStyle, {
+            display: isConfirming ? "none" : "flex",
+          }),
+        },
+        {
+          id: `${id}-confirm`,
+          style: mergeStyles(CONFIRM_ROW_BASE_STYLE, {
+            display: isConfirming ? "flex" : "none",
+          }),
+        },
+      ]);
+    };
+
+    events.attach({
+      showConfirm() {
+        updateVisibility(true);
+      },
+      confirm() {
+        props.onConfirm();
+        updateVisibility(false);
+      },
+      cancel() {
+        updateVisibility(false);
+      },
+    });
 
     const mainButton = button({
       id: `${id}-btn`,
       text: label,
       iconId,
       style: { width: "100%", ...buttonStyle },
-      callback: () => events.showConfirm(props),
+      callback: () => events.showConfirm(),
     });
 
     const confirmRow = row({
@@ -109,13 +91,13 @@ export const ButtonWithConfirmation: Component<
           id: `${id}-yes`,
           text: "Yes",
           style: { color: NAI_WARNING, padding: "2px 8px" },
-          callback: () => events.confirm(props),
+          callback: () => events.confirm(),
         }),
         button({
           id: `${id}-no`,
           text: "No",
           style: { padding: "2px 8px" },
-          callback: () => events.cancel(props),
+          callback: () => events.cancel(),
         }),
       ],
     });
@@ -126,4 +108,4 @@ export const ButtonWithConfirmation: Component<
       content: [mainButton, confirmRow],
     });
   },
-};
+});

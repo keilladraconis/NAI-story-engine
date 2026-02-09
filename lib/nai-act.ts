@@ -61,11 +61,9 @@ type StyleResolver<St extends Record<string, Style>> = (
 export interface Component<
   P,
   S = unknown,
-  E = unknown,
   St extends Record<string, Style> = Record<string, Style>,
 > {
   id: ComponentId<P>;
-  events: E;
   styles?: St;
   style?: StyleResolver<St>;
   build(props: P, ctx: BindContext<S>): UIPart;
@@ -73,12 +71,11 @@ export interface Component<
 
 export function defineComponent<
   P,
-  S,
-  E,
+  S = unknown,
   St extends Record<string, Style> = Record<string, Style>,
 >(
-  component: Component<P, S, E, St> & ThisType<Component<P, S, E, St>>,
-): Component<P, S, E, St> {
+  component: Component<P, S, St> & ThisType<Component<P, S, St>>,
+): Component<P, S, St> {
   if (component.styles) {
     component.style = function (
       ...keys: (keyof St | undefined | false | null)[]
@@ -115,21 +112,14 @@ export function mergeStyles(...styles: (Style | undefined | null)[]): Style {
 
 type EventMap = Record<string, (...args: any[]) => any>;
 
-type AugmentedEvents<P, Defs extends EventMap> = {
-  [K in keyof Defs]: P extends void
-    ? Defs[K]
-    : (props: P, ...args: Parameters<Defs[K]>) => ReturnType<Defs[K]>;
-};
-
-export function createEvents<P, Defs extends EventMap>() {
-  const handlers: Partial<AugmentedEvents<P, Defs>> = {};
+export function createEvents<Defs extends EventMap>() {
+  const handlers: Partial<Defs> = {};
   const slots: Record<string, Function> = {};
 
   return new Proxy({} as any, {
     get(_target, key: string) {
       if (key === "attach") {
-        return (next: Partial<AugmentedEvents<P, Defs>>) =>
-          Object.assign(handlers, next);
+        return (next: Partial<Defs>) => Object.assign(handlers, next);
       }
 
       if (!slots[key]) {
@@ -141,8 +131,8 @@ export function createEvents<P, Defs extends EventMap>() {
       }
       return slots[key];
     },
-  }) as AugmentedEvents<P, Defs> & {
-    attach(handlers: Partial<AugmentedEvents<P, Defs>>): void;
+  }) as Defs & {
+    attach(handlers: Partial<Defs>): void;
   };
 }
 

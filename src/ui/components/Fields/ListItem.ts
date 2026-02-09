@@ -36,16 +36,12 @@ type ListItemEvents = {
   delete(): void;
 };
 
-export const ListItem = defineComponent<
-  ListItemProps,
-  RootState,
-  ReturnType<typeof createEvents<ListItemProps, ListItemEvents>>
->({
+export const ListItem = defineComponent<ListItemProps, RootState>({
   id: (props) => `item-${props.item.id}`,
-  events: createEvents<ListItemProps, ListItemEvents>(),
 
   build(props, ctx) {
     const { dispatch } = ctx;
+    const events = createEvents<ListItemEvents>();
     const { item, config } = props;
     const entryId = item.id;
 
@@ -80,12 +76,12 @@ export const ListItem = defineComponent<
     });
 
     // Delete handler
-    this.events.attach({
-      delete: (eventProps) => {
+    events.attach({
+      delete: () => {
         dispatch(
           dulfsItemRemoved({
-            fieldId: eventProps.config.id as DulfsFieldID,
-            itemId: eventProps.item.id,
+            fieldId: config.id as DulfsFieldID,
+            itemId: item.id,
           }),
         );
       },
@@ -117,7 +113,7 @@ export const ListItem = defineComponent<
           id: deleteBtnId,
           iconId: "trash",
           style: { width: "24px", padding: "4px" },
-          callback: () => this.events.delete(props),
+          callback: () => events.delete(),
         }),
       ],
     });

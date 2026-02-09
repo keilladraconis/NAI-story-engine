@@ -7,7 +7,6 @@ const { column } = api.v1.ui.part;
 
 export const List = defineComponent({
   id: () => IDS.BRAINSTORM.LIST,
-  events: undefined,
 
   build(_props: void, ctx: BindContext<RootState>) {
     const { useSelector } = ctx;

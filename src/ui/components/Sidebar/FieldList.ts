@@ -8,7 +8,6 @@ const { column } = api.v1.ui.part;
 
 export const FieldList = defineComponent({
   id: () => "kse-field-list",
-  events: undefined,
 
   build(_props: {}, ctx: BindContext<RootState>) {
     const visibleFields = FIELD_CONFIGS.filter((c) => !c.hidden);

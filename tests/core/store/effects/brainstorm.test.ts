@@ -24,7 +24,7 @@ describe("Brainstorm Effects", () => {
 
     genXMock = {
       generate: vi.fn(),
-      cancelCurrent: vi.fn(),
+      cancelAll: vi.fn(),
       userInteraction: vi.fn(),
     } as any;
     registerEffects(store, genXMock);

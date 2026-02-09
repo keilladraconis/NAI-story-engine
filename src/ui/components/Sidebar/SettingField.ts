@@ -4,7 +4,6 @@ const { row, text, textInput } = api.v1.ui.part;
 
 export const SettingField = defineComponent({
   id: () => "kse-sidebar-setting",
-  events: undefined,
 
   build(_props: {}) {
     return row({

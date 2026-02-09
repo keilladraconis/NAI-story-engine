@@ -589,7 +589,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     // If it's the current one?
     const status = genX.getTaskStatus(requestId);
     if (status === "processing") {
-      genX.cancelCurrent();
+      genX.cancelAll();
     }
   });
 
@@ -603,7 +603,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         dispatch(requestCancelled({ requestId: activeRequest.id }));
       }
 
-      genX.cancelCurrent();
+      genX.cancelAll();
     },
   );
 

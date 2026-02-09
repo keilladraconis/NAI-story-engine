@@ -142,22 +142,19 @@ const getIconStyles = () => ({
 
 type ButtonMode = "gen" | "queue" | "cancel" | "continue" | "wait" | "disabled";
 
-const events = createEvents<
-  GenerationButtonProps,
-  {
-    generate(): void;
-    cancel(resolvedRequestId?: string): void;
-    cancelActive(): void;
-    continue(): void;
-  }
->();
+type GenerationButtonEvents = {
+  generate(): void;
+  cancel(resolvedRequestId?: string): void;
+  cancelActive(): void;
+  continue(): void;
+};
 
 export const GenerationButton: Component<GenerationButtonProps, RootState> = {
   id: (props) => props.id,
-  events,
 
   build(props, { dispatch, useSelector }) {
     const { id, variant = "button", label = "", style = {}, iconId } = props;
+    const events = createEvents<GenerationButtonEvents>();
     const buttonStyles = getButtonStyles();
     const iconStyles = getIconStyles();
     let timerId: any = null;
@@ -182,48 +179,48 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       checkContent();
     }
 
-    // Attach handlers - these receive props passed via events.X(props)
+    // Attach handlers - close over props and dispatch from build scope
     events.attach({
-      generate(p) {
-        if (p.generateAction) {
-          dispatch(p.generateAction);
+      generate() {
+        if (props.generateAction) {
+          dispatch(props.generateAction);
         }
-        if (p.onGenerate) {
-          p.onGenerate();
+        if (props.onGenerate) {
+          props.onGenerate();
         }
       },
-      cancel(p, resolvedRequestId) {
+      cancel(resolvedRequestId) {
         // Cancel queued request(s)
-        if (p.requestIds && p.requestIds.length > 0) {
-          for (const reqId of p.requestIds) {
+        if (props.requestIds && props.requestIds.length > 0) {
+          for (const reqId of props.requestIds) {
             dispatch(uiCancelRequest({ requestId: reqId }));
           }
         } else {
-          const reqId = resolvedRequestId ?? p.requestId;
+          const reqId = resolvedRequestId ?? props.requestId;
           if (reqId) {
             dispatch(uiCancelRequest({ requestId: reqId }));
-          } else if (p.onCancel) {
-            p.onCancel();
+          } else if (props.onCancel) {
+            props.onCancel();
           }
         }
       },
-      cancelActive(p) {
+      cancelActive() {
         // Cancel the active request
-        if (p.onCancel) {
-          p.onCancel();
+        if (props.onCancel) {
+          props.onCancel();
         } else {
           dispatch(uiRequestCancellation());
         }
         // Also cancel any other queued requests from the same requestIds group
-        if (p.requestIds && p.requestIds.length > 0) {
-          for (const reqId of p.requestIds) {
+        if (props.requestIds && props.requestIds.length > 0) {
+          for (const reqId of props.requestIds) {
             dispatch(uiCancelRequest({ requestId: reqId }));
           }
         }
       },
-      continue(p) {
-        if (p.onContinue) {
-          p.onContinue();
+      continue() {
+        if (props.onContinue) {
+          props.onContinue();
         } else {
           dispatch(uiUserPresenceConfirmed());
         }
@@ -243,7 +240,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             text: `${remaining}`,
             iconId: undefined,
             style: iconStyles.wait,
-            callback: () => events.cancelActive(props),
+            callback: () => events.cancelActive(),
           },
         ]);
       } else {
@@ -378,7 +375,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       let style = iconStyles.idle;
       let icon = iconId;
       // Use closures over mount props - events.X(props) passes mount props to handler
-      let callback = () => events.generate(props);
+      let callback = () => events.generate();
 
       // For idle mode, re-check content state (async) and update accordingly
       if (mode === "gen" && props.contentChecker) {
@@ -392,7 +389,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
                 style: hasContent
                   ? iconStyles.idleWithContent
                   : iconStyles.idle,
-                callback: () => events.generate(props),
+                callback: () => events.generate(),
               },
             ]);
           }
@@ -403,26 +400,26 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
         case "gen":
           style = hasContent ? iconStyles.idleWithContent : iconStyles.idle;
           icon = iconId;
-          callback = () => events.generate(props);
+          callback = () => events.generate();
           break;
         case "queue":
           style = iconStyles.queued;
           icon = "clock";
-          callback = () => events.cancel(props, currentResolvedRequestId);
+          callback = () => events.cancel(currentResolvedRequestId);
           break;
         case "cancel":
           style = iconStyles.cancel;
           icon = "x";
-          callback = () => events.cancelActive(props);
+          callback = () => events.cancelActive();
           break;
         case "continue":
           style = iconStyles.continue;
           icon = "fast-forward";
-          callback = () => events.continue(props);
+          callback = () => events.continue();
           break;
         case "wait":
           style = iconStyles.wait;
-          callback = () => events.cancelActive(props);
+          callback = () => events.cancelActive();
           break;
       }
 
@@ -454,7 +451,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
               text: `${initialRemaining}`,
               iconId: undefined,
               style: iconStyles.wait,
-              callback: () => events.cancelActive(props),
+              callback: () => events.cancelActive(),
             },
           ]);
           updateTimer(endTime);
@@ -481,7 +478,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
         {
           id: `${id}-gen`,
           style: genStyle,
-          callback: () => events.generate(props),
+          callback: () => events.generate(),
         },
         {
           id: `${id}-queue`,
@@ -489,7 +486,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             ...buttonStyles.queue,
             display: mode === "queue" ? "block" : "none",
           },
-          callback: () => events.cancel(props, currentResolvedRequestId),
+          callback: () => events.cancel(currentResolvedRequestId),
         },
         {
           id: `${id}-cancel`,
@@ -497,7 +494,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             ...buttonStyles.cancel,
             display: mode === "cancel" ? "block" : "none",
           },
-          callback: () => events.cancelActive(props),
+          callback: () => events.cancelActive(),
         },
         {
           id: `${id}-continue`,
@@ -505,7 +502,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             ...buttonStyles.continue,
             display: mode === "continue" ? "block" : "none",
           },
-          callback: () => events.continue(props),
+          callback: () => events.continue(),
         },
         {
           id: `${id}-wait`,
@@ -513,7 +510,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             ...buttonStyles.wait,
             display: mode === "wait" ? "block" : "none",
           },
-          callback: () => events.cancelActive(props),
+          callback: () => events.cancelActive(),
         },
       ]);
 
@@ -538,7 +535,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
         id,
         iconId,
         style: iconStyles.idle,
-        callback: () => events.generate(props),
+        callback: () => events.generate(),
       });
     }
 
@@ -550,35 +547,35 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       iconId,
       text: `${iconId ? "" : "⚡"} ${label}`,
       style: { ...styles.gen, display: "block" },
-      callback: () => events.generate(props),
+      callback: () => events.generate(),
     });
 
     const btnQueued = button({
       id: `${id}-queue`,
       text: label ? `⏳ Queued` : "⏳",
       style: { ...styles.queue, display: "none" },
-      callback: () => events.cancel(props, props.requestId),
+      callback: () => events.cancel(props.requestId),
     });
 
     const btnCancel = button({
       id: `${id}-cancel`,
       text: label ? `🚫 Cancel` : "🚫",
       style: { ...styles.cancel, display: "none" },
-      callback: () => events.cancelActive(props),
+      callback: () => events.cancelActive(),
     });
 
     const btnContinue = button({
       id: `${id}-continue`,
       text: label ? `⚠️ Continue` : "⚠️",
       style: { ...styles.continue, display: "none" },
-      callback: () => events.continue(props),
+      callback: () => events.continue(),
     });
 
     const btnWait = button({
       id: `${id}-wait`,
       text: label ? `⏳ Wait` : "⏳",
       style: { ...styles.wait, display: "none" },
-      callback: () => events.cancelActive(props),
+      callback: () => events.cancelActive(),
     });
 
     return row({

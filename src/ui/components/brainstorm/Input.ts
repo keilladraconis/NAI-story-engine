@@ -15,19 +15,12 @@ const STYLES = {
   CLEAR_BTN: { flex: "0.3" },
 };
 
-const events = createEvents<
-  {},
-  {
-    submit(): void;
-  }
->();
-
 export const Input: Component<{}, RootState> = {
   id: () => `${IDS.BRAINSTORM.INPUT}-area`,
-  events,
 
   build(_props, ctx) {
     const { dispatch, useSelector } = ctx;
+    const events = createEvents<{ submit(): void }>();
     const ids = IDS.BRAINSTORM;
 
     // Render child components
@@ -88,7 +81,7 @@ export const Input: Component<{}, RootState> = {
           placeholder: "Type an idea...",
           storageKey: `story:${ids.INPUT}`,
           style: { "min-height": "60px", "max-height": "120px" },
-          onSubmit: () => events.submit({}),
+          onSubmit: () => events.submit(),
         }),
         row({
           id: `${ids.INPUT}-btn-row`,
