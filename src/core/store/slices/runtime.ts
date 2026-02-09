@@ -2,7 +2,6 @@ import { createSlice } from "../../../../lib/nai-store";
 import {
   RuntimeState,
   GenerationRequest,
-  GenerationStatus,
   SegaStage,
   SegaState,
 } from "../types";
@@ -58,26 +57,24 @@ export const runtimeSlice = createSlice({
       status: state.status === "idle" ? "queued" : state.status,
     }),
 
-    requestsSynced: (
-      state,
-      payload: {
-        queue: GenerationRequest[];
-        activeRequest: GenerationRequest | null;
-      },
-    ) => {
-      const { queue, activeRequest } = payload;
-      let status: GenerationStatus = "idle";
-      if (activeRequest) status = "generating";
-      else if (queue.length > 0) status = "queued";
-      else if (state.genx.status === "failed") status = "error";
-
+    requestActivated: (state, payload: { requestId: string }) => {
+      const idx = state.queue.findIndex((r) => r.id === payload.requestId);
+      if (idx === -1) return state;
+      const activated = state.queue[idx];
       return {
         ...state,
-        queue,
-        activeRequest,
-        status,
+        queue: state.queue.filter((r) => r.id !== payload.requestId),
+        activeRequest: { ...activated, status: "processing" as const },
+        status: "generating" as const,
       };
     },
+
+    queueCleared: (state) => ({
+      ...state,
+      queue: [],
+      activeRequest: null,
+      status: "idle" as const,
+    }),
 
     budgetUpdated: (state, payload: { timeRemaining: number }) => ({
       ...state,
@@ -107,25 +104,22 @@ export const runtimeSlice = createSlice({
       return state;
     },
 
-    // Mark a request as completed and remove from queue
-    // (handles race where GenX finishes before stateUpdated moves it to activeRequest)
+    // Mark a request as completed and clear from active/queue
     requestCompleted: (state, payload: { requestId: string }) => {
-      const newActive =
-        state.activeRequest?.id === payload.requestId
-          ? { ...state.activeRequest, status: "completed" as const }
-          : state.activeRequest;
+      const isActive = state.activeRequest?.id === payload.requestId;
       const newQueue = state.queue.filter(
         (r) => r.id !== payload.requestId,
       );
 
-      if (
-        newActive === state.activeRequest &&
-        newQueue.length === state.queue.length
-      ) {
+      if (!isActive && newQueue.length === state.queue.length) {
         return state;
       }
 
-      return { ...state, activeRequest: newActive, queue: newQueue };
+      return {
+        ...state,
+        activeRequest: isActive ? null : state.activeRequest,
+        queue: newQueue,
+      };
     },
 
     // SEGA Reducers
@@ -185,7 +179,8 @@ export const {
   segaToggled,
   uiGenerationRequested,
   requestQueued,
-  requestsSynced,
+  requestActivated,
+  queueCleared,
   budgetUpdated,
   requestCancelled,
   requestCompleted,

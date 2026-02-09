@@ -6,15 +6,15 @@ Architectural review of `lib/gen-x.ts`, `lib/nai-act.ts`, `lib/nai-store.ts` —
 
 ## gen-x.ts — Generation eXchange
 
-### `TODO` Collapse dual-state into the store
+### `DONE` Collapse dual-state via constructor hooks
 **Priority: High**
 
-GenX maintains its own `status`, `queueLength`, `error` — then Story Engine bridges these into the store via `genX.subscribe()` → `dispatch(stateUpdated())`. A reconciliation effect (`effects.ts:562-605`) manually syncs GenX's internal task status with the store's `runtime.queue`, papering over race conditions with comments. GenX should either be a store slice (pure functions driven by dispatch) or delegate all observable state to the store entirely, acting as a headless executor.
+Added `GenXHooks` interface (`onStateChange`, `onTaskStarted`, `beforeGenerate`) as an optional constructor parameter. `onTaskStarted` fires when a task is picked off the queue, letting the store move requests from `queue` → `activeRequest` directly via the new `requestActivated` reducer — eliminating the 43-line reconciliation effect that polled `genX.getTaskStatus()`. `requestCompleted` now nulls `activeRequest` and fires unconditionally (including cancellation), since no reconciliation effect exists to clean up stale state. `subscribe()` / `state` getter / `listeners[]` remain for standalone use.
 
-### `TODO` Add instrumentation hook
+### `DONE` Add instrumentation hook
 **Priority: Medium**
 
-No `beforeExecute` or `onResolveFactory` hook exists. Callers wrap the `MessageFactory` in another async function just to log cache hit rates (`effects.ts:447-460`). A hook would eliminate this boilerplate and open the door to middleware-style composition.
+`beforeGenerate(taskId, messages)` fires after factory resolution, before the API call. Effects retain the factory-wrapping pattern for label-rich `[cache]` logging since `cacheLabel(target)` needs strategy context GenX doesn't have — but the hook is available for future middleware-style consumers.
 
 ### `TODO` Rename `cancelCurrent` → `cancelAll`
 **Priority: Low**
@@ -118,10 +118,10 @@ Exported but never imported anywhere in the codebase. All slices use `createSlic
 
 ## Cross-Cutting: Testability
 
-### `TODO` GenX: Accept hooks/timers as constructor options
+### `TODO` GenX: Inject budget listener dependency
 **Priority: Medium**
 
-GenX can't be instantiated in tests without mocking `api.v1.hooks` globally. Constructor injection with defaults would allow clean test setup.
+GenX constructor now accepts `GenXHooks` for lifecycle events, but `initBudgetListener()` still calls `api.v1.hooks.register` directly — GenX can't be instantiated in tests without mocking `api.v1.hooks` globally. Injecting the budget listener (or its registration function) via constructor options would complete testability.
 
 ### `TODO` nai-act: Export a `createTestContext()` helper
 **Priority: Medium**

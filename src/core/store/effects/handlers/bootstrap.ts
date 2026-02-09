@@ -29,6 +29,11 @@ function scheduleLiveUpdate(): void {
       await api.v1.document.appendParagraph({
         text,
         source: "instruction",
+        origin: [{
+          position: 0,
+          length: text.length,
+          data: "prompt",
+        }],
       });
       const ids = await api.v1.document.sectionIds();
       activeSectionId = ids[ids.length - 1];
@@ -36,6 +41,11 @@ function scheduleLiveUpdate(): void {
       await api.v1.document.updateParagraph(activeSectionId, {
         text,
         source: "instruction",
+        origin: [{
+          position: 0,
+          length: text.length,
+          data: "prompt"
+        }]
       });
     }
   });
@@ -48,11 +58,21 @@ function finalizeParagraph(text: string): void {
       await api.v1.document.updateParagraph(activeSectionId, {
         text,
         source: "instruction",
+        origin: [{
+          position: 0,
+          length: text.length,
+          data: "prompt",
+        }],
       });
     } else {
       await api.v1.document.appendParagraph({
         text,
         source: "instruction",
+        origin: [{
+          position: 0,
+          length: text.length,
+          data: "prompt",
+        }],
       });
     }
     activeSectionId = null;
@@ -108,11 +128,21 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
         await api.v1.document.updateParagraph(activeSectionId, {
           text: remaining,
           source: "instruction",
+          origin: [{
+            position: 0,
+            length: remaining.length,
+            data: "prompt",
+          }],
         });
       } else {
         await api.v1.document.appendParagraph({
           text: remaining,
           source: "instruction",
+          origin: [{
+            position: 0,
+            length: remaining.length,
+            data: "prompt",
+          }],
         });
       }
     }

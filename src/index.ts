@@ -8,7 +8,7 @@ import { StoryState, BrainstormMessage } from "./core/store/types";
 import { registerEffects } from "./core/store/effects";
 import { GenX } from "../lib/gen-x";
 import { mount } from "../lib/nai-act";
-import { stateUpdated } from "./core/store/slices/runtime";
+import { stateUpdated, requestActivated } from "./core/store/slices/runtime";
 import { IDS } from "./ui/framework/ids";
 
 // Brainstorm components
@@ -32,10 +32,14 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
 
     api.v1.permissions.request(["storyEdit", "lorebookEdit", "documentEdit"]);
 
-    // 1. Initialize GenX
-    const genX = new GenX();
-    genX.subscribe((genxState) => {
-      store.dispatch(stateUpdated({ genxState }));
+    // 1. Initialize GenX with lifecycle hooks
+    const genX = new GenX({
+      onStateChange(genxState) {
+        store.dispatch(stateUpdated({ genxState }));
+      },
+      onTaskStarted(taskId) {
+        store.dispatch(requestActivated({ requestId: taskId }));
+      },
     });
 
     // 2. Register Effects

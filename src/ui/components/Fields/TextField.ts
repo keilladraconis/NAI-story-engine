@@ -86,7 +86,7 @@ export const TextField = defineComponent<
   },
 
   build(config, ctx) {
-    const { useSelector, useEffect, dispatch } = ctx;
+    const { useSelector, useEffect, dispatch, getState } = ctx;
     const isPlainTextField = PLAIN_TEXT_FIELDS.includes(config.id as FieldID);
     const sectionId = `section-${config.id}`;
     const requestId = `gen-${config.id}`;
@@ -437,6 +437,8 @@ export const TextField = defineComponent<
       ],
     });
 
+    const fieldContent = getState().story.fields[config.id]?.content
+
     const sectionContent: UIPart[] = [
       header,
       multilineTextInput({
@@ -448,7 +450,7 @@ export const TextField = defineComponent<
       }),
       text({
         id: textId,
-        text: "_No content._",
+        text: fieldContent || "_No content._",
         markdown: true,
         style: this.style?.("textDisplay"),
       }),

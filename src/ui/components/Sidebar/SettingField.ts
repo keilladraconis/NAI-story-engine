@@ -17,7 +17,7 @@ export const SettingField = defineComponent({
         }),
         textInput({
           id: "kse-setting-input",
-          initialValue: "",
+          initialValue: "original",
           placeholder: "Original, Star Wars...",
           storageKey: "story:kse-setting",
           style: { flex: 1 },

@@ -15,9 +15,8 @@ import {
   messageUpdated,
   generationSubmitted,
   uiCancelRequest,
-  requestsSynced,
+  queueCleared,
   requestQueued,
-  stateUpdated,
   uiBrainstormMessageEditBegin,
   uiBrainstormMessageEditEnd,
   editingMessageIdSet,
@@ -536,19 +535,22 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       }
 
       // 8. Signal completion (after handler has updated state).
+      // Always dispatch — this clears activeRequest so UI buttons reset.
       // SEGA relies on this signal to advance — without it, SEGA gets stuck.
-      if (!wasCancelled) {
-        if (generationSucceeded) {
-          api.v1.log(
-            `[effects] Generation completed successfully for ${requestId}`,
-          );
-        } else {
-          api.v1.log(
-            `[effects] Generation failed for ${requestId}, signaling completion`,
-          );
-        }
-        dispatch(requestCompleted({ requestId }));
+      if (generationSucceeded) {
+        api.v1.log(
+          `[effects] Generation completed successfully for ${requestId}`,
+        );
+      } else if (wasCancelled) {
+        api.v1.log(
+          `[effects] Generation cancelled for ${requestId}, signaling completion`,
+        );
+      } else {
+        api.v1.log(
+          `[effects] Generation failed for ${requestId}, signaling completion`,
+        );
       }
+      dispatch(requestCompleted({ requestId }));
 
       // 9. Show toast notification for Story Engine generations
       if (generationSucceeded) {
@@ -571,51 +573,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           const name = entry?.displayName || "Entry";
           api.v1.ui.toast(`Refined: ${name}`, { type: "success" });
         }
-      }
-    },
-  );
-
-  // Intent: Sync GenX State
-  subscribeEffect(
-    matchesAction(stateUpdated),
-    async (_action, { dispatch, getState }) => {
-      const state = getState();
-      const { queue, activeRequest } = state.runtime;
-      const allRequests = [...queue];
-      if (activeRequest) allRequests.push(activeRequest);
-
-      // If we have no requests tracking, nothing to sync (unless we want to clear ghosts?)
-      // If GenX has nothing, and we have requests, they might be done.
-      if (allRequests.length === 0) return;
-
-      const newQueue: typeof queue = [];
-      let newActive: typeof activeRequest = null;
-
-      for (const req of allRequests) {
-        const status = genX.getTaskStatus(req.id);
-        if (status === "processing") {
-          newActive = req;
-        } else if (status === "queued") {
-          newQueue.push(req);
-        } else {
-          // 'not_found' in GenX - keep in queue if it was queued in store
-          // This handles items pending submission (not yet in GenX) and
-          // prevents race conditions when multiple items are queued together
-          if (req.status === "queued") {
-            newQueue.push(req);
-          }
-          // If it was processing (activeRequest) and is now not_found, it completed - drop it
-        }
-      }
-
-      // Check if changed
-      const currentQueueIds = queue.map((r) => r.id).join(",");
-      const newQueueIds = newQueue.map((r) => r.id).join(",");
-      const currentActiveId = activeRequest?.id;
-      const newActiveId = newActive?.id;
-
-      if (currentQueueIds !== newQueueIds || currentActiveId !== newActiveId) {
-        dispatch(requestsSynced({ queue: newQueue, activeRequest: newActive }));
       }
     },
   );
@@ -767,7 +724,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       // Flush runtime queue so border selectors re-evaluate
       // (ATTG/Style check storyStorage which is now clean)
-      dispatch(requestsSynced({ queue: [], activeRequest: null }));
+      dispatch(queueCleared());
     },
   );
 

@@ -45,6 +45,15 @@ interface GenerationTask {
   reject: (reason: any) => void;
 }
 
+export interface GenXHooks {
+  /** Fires on every internal state change (replaces subscribe for store use) */
+  onStateChange?(state: GenerationState): void;
+  /** Fires when a queued task begins execution (picked off queue) */
+  onTaskStarted?(taskId: string): void;
+  /** Fires just before API call, after factory resolution */
+  beforeGenerate?(taskId: string, messages: Message[]): void;
+}
+
 export class GenX {
   private queue: GenerationTask[] = [];
   private currentTask: GenerationTask | null = null;
@@ -55,8 +64,10 @@ export class GenX {
   };
 
   private listeners: ((state: GenerationState) => void)[] = [];
+  private hooks?: GenXHooks;
 
-  constructor() {
+  constructor(hooks?: GenXHooks) {
+    this.hooks = hooks;
     this.initBudgetListener();
   }
 
@@ -184,6 +195,7 @@ export class GenX {
         api.v1.log("GenX Listener Error:", e);
       }
     });
+    this.hooks?.onStateChange?.(snapshot);
   }
 
   private async processQueue() {
@@ -202,6 +214,7 @@ export class GenX {
       queueLength: this.queue.length + 1,
       error: undefined,
     });
+    this.hooks?.onTaskStarted?.(task.id);
 
     try {
       await this.executeTask(task);
@@ -241,6 +254,8 @@ export class GenX {
       reject(err);
       return;
     }
+
+    this.hooks?.beforeGenerate?.(task.id, messages);
 
     const { minTokens, maxRetries, taskId, ...apiParams } = params;
     const retryLimit = maxRetries ?? 5;
