@@ -2,9 +2,9 @@
  * S.E.G.A. (Story Engine Generate All) Effects
  *
  * Orchestrates automatic generation of story components in sequence:
- * 1. Story Prompt
- * 2. ATTG & Style
- * 3. DULFS Lists (round-robin until each has MIN_ITEMS_PER_CATEGORY items)
+ * 1. ATTG & Style (anchor tone/genre first)
+ * 2. DULFS Lists (round-robin until each has MIN_ITEMS_PER_CATEGORY items)
+ * 3. Canon (synthesize from world entries)
  * 4. Lorebook (content + keys per entry)
  *
  * CACHE STRATEGY: All Story Engine strategies share a unified message prefix
@@ -296,15 +296,7 @@ async function scheduleNextSegaTask(
   // Check if SEGA is still running
   if (!state.runtime.segaRunning) return;
 
-  // Stage 1: Canon
-  if (await needsCanon(state)) {
-    api.v1.log("[sega] scheduling: canon");
-    dispatch(segaStageSet({ stage: "canon" }));
-    await queueSegaGeneration(dispatch, getState, "field", FieldID.Canon);
-    return;
-  }
-
-  // Stage 2: ATTG & Style
+  // Stage 1: ATTG & Style (anchor tone/genre first)
   if (await needsATTG()) {
     api.v1.log("[sega] scheduling: attg");
     dispatch(segaStageSet({ stage: "attgStyle" }));
@@ -318,13 +310,21 @@ async function scheduleNextSegaTask(
     return;
   }
 
-  // Stage 3: DULFS Lists (round-robin)
+  // Stage 2: DULFS Lists (round-robin)
   const nextCategory = getNextDulfsCategory(state);
   if (nextCategory) {
     api.v1.log(`[sega] scheduling: list ${nextCategory}`);
     dispatch(segaStageSet({ stage: "dulfsLists" }));
     await queueSegaGeneration(dispatch, getState, "list", nextCategory);
     dispatch(segaRoundRobinAdvanced());
+    return;
+  }
+
+  // Stage 3: Canon (synthesize from world entries)
+  if (await needsCanon(state)) {
+    api.v1.log("[sega] scheduling: canon");
+    dispatch(segaStageSet({ stage: "canon" }));
+    await queueSegaGeneration(dispatch, getState, "field", FieldID.Canon);
     return;
   }
 
