@@ -1,7 +1,7 @@
 compatibilityVersion: naiscript-1.0
 id: e6c35faa-e4f2-4c3b-af4a-d56e4c992d87
 name: Story Engine
-version: 0.6.1
+version: 0.6.2
 createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
