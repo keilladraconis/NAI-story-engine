@@ -98,9 +98,9 @@ export const FIELD_CONFIGS: FieldConfig[] = [
       "List only character names. Start with the protagonist, then supporting characters.",
     listExampleFormat: "- Kael\n- Elena\n- The Iron Warden",
     generationInstruction:
-      "Focus on the core motivation and unique behavioral tell of the character.",
+      "One line per character: name, demographics, core motivation, and one behavioral tell. Be terse.",
     exampleFormat:
-      "Name (Gender, Age, Role): Core motivation, Unique behavioral tell. Example: Kael (Male, 34, Smuggler): To pay off his life debt, Rubs a coin when calculating odds",
+      "Name (Gender, Age, Role): Motivation. Behavioral tell.\nExample: Kael (Male, 34, Smuggler): Paying off a life debt. Rubs a coin when calculating odds.",
     filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*([\s\S]+)$/,
   },
@@ -117,9 +117,9 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     listExampleFormat:
       "- Aetheric Resonance\n- The Binding Laws\n- Chrono-Drift",
     generationInstruction:
-      "Describe the key universe system, law, or technological principle, its mechanics/terms, and its broader impact on the world.",
+      "One line per system: name, core mechanic, and key cost or constraint. No worldbuilding prose.",
     exampleFormat:
-      "System Name: Description of mechanic, societal impact, and rules. Example: Aetheric Resonance: High-frequency crystals can levitate heavy objects when sung to at specific pitches. This system forms the backbone of the empire's sky-fleets but causes 'harmonic sickness' in long-term pilots.",
+      "System Name: Core mechanic; cost/constraint.\nExample: Aetheric Resonance: Sung crystals levitate mass; causes harmonic sickness in long-term pilots.",
     filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
@@ -136,9 +136,9 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     listExampleFormat:
       "- The Sunken Market\n- Thornveil Keep\n- The Shattered Coast",
     generationInstruction:
-      "Include atmospheric anchors, sensory details, and inherent tensions of the location.",
+      "One line per location: name, function, and one sensory anchor. No history or prose.",
     exampleFormat:
-      "Location Name: Atmosphere, history, and landmarks. Example: The Sunken Market: A damp, claustrophobic bazaar built into the ruins of an old dam. The air smells of salt and rotting wood, and the constant groaning of the rusted supports reminds everyone of the impending flood.",
+      "Location Name: Function; sensory anchor.\nExample: The Sunken Market: Black-market bazaar in old dam ruins; damp, groaning supports.",
     filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
@@ -153,9 +153,9 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     listGenerationInstruction: "List only faction/organization names.",
     listExampleFormat: "- The Iron Pact\n- House Meridian\n- The Unbound",
     generationInstruction:
-      "Describe the faction's core ideology, history, and its role in the world's power dynamics.",
+      "One line per faction: name, stated goal, and hidden reality or key tension. No history.",
     exampleFormat:
-      "Faction Name: Goal, history, and public face vs. private reality. Example: The Iron Pact: A militaristic group dedicated to border protection. Publicly they are heroes, but privately they are hoarding ancient artifacts to trigger a pre-emptive strike against their rivals.",
+      "Faction Name: Public goal; private reality.\nExample: The Iron Pact: Border protectors publicly; secretly hoarding artifacts for a pre-emptive strike.",
     filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
@@ -172,9 +172,9 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     listExampleFormat:
       "- The Succession Crisis\n- Border Tensions\n- The Missing Heir",
     generationInstruction:
-      "Describe a narrative vector: a direction of pressure or volatile situation. Focus on the FACTORS that create tension, not what WILL happen. Include multiple actors and their competing interests.",
+      "One line per vector: name and competing pressures. Actors and stakes only, no outcomes.",
     exampleFormat:
-      "Vector Name: The nature of the tension, the competing pressures, and the actors involved. Example: The Succession Crisis: Three heirs each have legitimate claims. The military favors strength, the merchants favor stability, the clergy favor tradition. No resolution is predetermined—the outcome emerges from play.",
+      "Vector Name: Competing pressures and actors.\nExample: The Succession Crisis: Three legitimate heirs; military, merchants, and clergy each back different candidates.",
     filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },

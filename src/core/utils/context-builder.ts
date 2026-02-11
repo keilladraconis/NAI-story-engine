@@ -539,7 +539,7 @@ export const createDulfsListFactory = (
       ...prefix,
       {
         role: "system",
-        content: `[LIST GENERATION]\n${instruction}\n\nOutput a bulleted list. Each item should follow this format:\n${exampleFormat}`,
+        content: `[LIST GENERATION]\n${instruction}\n\nOutput a bulleted list. Each item is ONE LINE — name and a terse summary clause. No prose, no atmosphere, no history.\nFormat:\n${exampleFormat}`,
       },
       {
         role: "user",
@@ -550,7 +550,7 @@ export const createDulfsListFactory = (
 
     return {
       messages,
-      params: { model, max_tokens: 500, temperature: 0.9, min_p: 0.05, frequency_penalty: 0.15 },
+      params: { model, max_tokens: 350, temperature: 0.8, min_p: 0.1 },
     };
   };
 };
