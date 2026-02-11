@@ -87,6 +87,24 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     fieldType: "brainstorm",
   },
   {
+    id: FieldID.DramatisPersonae,
+    label: "Dramatis Personae",
+    description: "Characters by name, age, description, tell",
+    placeholder: "Character names, descriptions, motivations...",
+    icon: "user",
+    layout: "list",
+    fieldType: "dulfs",
+    listGenerationInstruction:
+      "List only character names. Start with the protagonist, then supporting characters.",
+    listExampleFormat: "- Kael\n- Elena\n- The Iron Warden",
+    generationInstruction:
+      "Focus on the core motivation and unique behavioral tell of the character.",
+    exampleFormat:
+      "Name (Gender, Age, Role): Core motivation, Unique behavioral tell. Example: Kael (Male, 34, Smuggler): To pay off his life debt, Rubs a coin when calculating odds",
+    filters: ["scrubBrackets", "scrubMarkdown"],
+    parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*([\s\S]+)$/,
+  },
+  {
     id: FieldID.UniverseSystems,
     label: "Universe Systems",
     description: "Rules, magic, technology, laws, and world mechanics",
@@ -106,42 +124,6 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
   {
-    id: FieldID.Factions,
-    label: "Factions",
-    description: "Groups, organizations, and their agendas",
-    placeholder: "Factions, guilds, political parties...",
-    icon: "users",
-    layout: "list",
-    fieldType: "dulfs",
-    listGenerationInstruction: "List only faction/organization names.",
-    listExampleFormat: "- The Iron Pact\n- House Meridian\n- The Unbound",
-    generationInstruction:
-      "Describe the faction's core ideology, history, and its role in the world's power dynamics.",
-    exampleFormat:
-      "Faction Name: Goal, history, and public face vs. private reality. Example: The Iron Pact: A militaristic group dedicated to border protection. Publicly they are heroes, but privately they are hoarding ancient artifacts to trigger a pre-emptive strike against their rivals.",
-    filters: ["scrubBrackets", "scrubMarkdown"],
-    parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
-  },
-  {
-    id: FieldID.DramatisPersonae,
-    label: "Dramatis Personae",
-    description: "Characters by name, age, description, tell",
-    placeholder: "Character names, descriptions, motivations...",
-    icon: "user",
-    layout: "list",
-    fieldType: "dulfs",
-    listGenerationInstruction:
-      "List only character names. Start with the protagonist, then supporting characters.",
-    listExampleFormat: "- Kael\n- Elena\n- The Iron Warden",
-    generationInstruction:
-      "Focus on the core motivation and unique behavioral tell of the character.",
-    exampleFormat:
-      "Name (Gender, Age, Role): Core motivation, Unique behavioral tell. Example: Kael (Male, 34, Smuggler): To pay off his life debt, Rubs a coin when calculating odds",
-    filters: ["scrubBrackets", "scrubMarkdown"],
-    parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*([\s\S]+)$/,
-  },
-
-  {
     id: FieldID.Locations,
     label: "Locations",
     description: "Places where the story takes place",
@@ -157,6 +139,23 @@ export const FIELD_CONFIGS: FieldConfig[] = [
       "Include atmospheric anchors, sensory details, and inherent tensions of the location.",
     exampleFormat:
       "Location Name: Atmosphere, history, and landmarks. Example: The Sunken Market: A damp, claustrophobic bazaar built into the ruins of an old dam. The air smells of salt and rotting wood, and the constant groaning of the rusted supports reminds everyone of the impending flood.",
+    filters: ["scrubBrackets", "scrubMarkdown"],
+    parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
+  },
+  {
+    id: FieldID.Factions,
+    label: "Factions",
+    description: "Groups, organizations, and their agendas",
+    placeholder: "Factions, guilds, political parties...",
+    icon: "users",
+    layout: "list",
+    fieldType: "dulfs",
+    listGenerationInstruction: "List only faction/organization names.",
+    listExampleFormat: "- The Iron Pact\n- House Meridian\n- The Unbound",
+    generationInstruction:
+      "Describe the faction's core ideology, history, and its role in the world's power dynamics.",
+    exampleFormat:
+      "Faction Name: Goal, history, and public face vs. private reality. Example: The Iron Pact: A militaristic group dedicated to border protection. Publicly they are heroes, but privately they are hoarding ancient artifacts to trigger a pre-emptive strike against their rivals.",
     filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },

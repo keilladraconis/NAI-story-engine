@@ -5,10 +5,10 @@
  * All Story Engine strategies share a common prefix via buildStoryEnginePrefix():
  *
  *   MSG 1 (SYSTEM): systemPrompt + weaving prompt             [STABLE]
- *   MSG 2 (SYSTEM): cross-reference entries (hash-sorted)     [GROWS append-only]
- *   MSG 3 (SYSTEM): story state snapshot (canon, setting,     [STABLE during SEGA]
- *                    ATTG, style, brainstorm, story text)
- *   MSG 4 (SYSTEM): DULFS items                               [GROWS during list stage]
+ *   MSG 2 (SYSTEM): story state snapshot (ATTG, style,        [STABLE during SEGA]
+ *                    setting, brainstorm, canon)
+ *   MSG 3 (SYSTEM): DULFS items                               [GROWS during list stage]
+ *   MSG 4 (SYSTEM): story text (rolling window)               [VOLATILE — at end]
  *   ─── cache boundary ───
  *   MSG 5+ : strategy-specific instructions                   [VOLATILE]
  *   LAST   : assistant prefill                                [VOLATILE]
@@ -27,8 +27,6 @@ import {
   FIELD_CONFIGS,
   DulfsFieldID,
 } from "../../config/field-definitions";
-import { buildLorebookReferenceContext } from "./lorebook-context";
-
 // --- Helpers ---
 
 const getFieldContent = (state: RootState, id: string): string => {
@@ -232,16 +230,15 @@ export const getStoryContextMessages = async (
  *
  * Prefix structure:
  *   MSG 1 (SYSTEM): systemPrompt + weaving prompt             [STABLE]
- *   MSG 2 (SYSTEM): cross-reference entries (hash-sorted)     [GROWS append-only]
- *   MSG 3 (SYSTEM): story state snapshot (stable fields)      [STABLE during SEGA]
- *   MSG 4 (SYSTEM): DULFS items                               [GROWS during list stage]
+ *   MSG 2 (SYSTEM): story state snapshot (ATTG, style,        [STABLE during SEGA]
+ *                    setting, brainstorm, canon)
+ *   MSG 3 (SYSTEM): DULFS items                               [GROWS during list stage]
+ *   MSG 4 (SYSTEM): story text (rolling window)               [VOLATILE — at end]
  *
  * After the prefix, each factory appends its own volatile tail
  * (strategy-specific instructions, prefill, etc.).
  */
 export interface StoryEnginePrefixOptions {
-  /** Lorebook entry ID to exclude from cross-references */
-  excludeEntryId?: string;
   /** Snapshot sections to exclude (e.g., "canon" when generating canon) */
   excludeSections?: Array<"canon" | "setting" | "attg" | "style" | "brainstorm" | "dulfs" | "storyText">;
 }
@@ -264,32 +261,10 @@ export const buildStoryEnginePrefix = async (
     ? `${systemPrompt}\n\n${weavingPrompt}`
     : systemPrompt;
 
-  // --- MSG 2: Cross-reference entries ---
-  const lorebookBudget = Number(
-    (await api.v1.config.get("lorebook_context_budget")) ?? 12000,
-  );
-  const lorebookContext = await buildLorebookReferenceContext(
-    options.excludeEntryId,
-    lorebookBudget,
-    { shuffle: true },
-  );
-
-  // --- MSG 3: Story state snapshot (STABLE sections) ---
+  // --- MSG 2: Story state snapshot (STABLE sections) ---
+  // Order matches generation pipeline: ATTG/Style first (tone anchors),
+  // then setting/brainstorm (foundational), then canon last (synthesis).
   const stableSections: string[] = [];
-
-  // Canon
-  if (!excluded.has("canon")) {
-    const canon = getFieldContent(state, FieldID.Canon);
-    if (canon) stableSections.push(`[CANON]\n${canon}`);
-  }
-
-  // Setting
-  if (!excluded.has("setting")) {
-    const setting = String(
-      (await api.v1.storyStorage.get("kse-setting")) || "",
-    );
-    if (setting) stableSections.push(`[SETTING]\n${setting}`);
-  }
 
   // ATTG
   if (!excluded.has("attg")) {
@@ -307,43 +282,53 @@ export const buildStoryEnginePrefix = async (
     if (style) stableSections.push(`[STYLE]\n${style}`);
   }
 
+  // Setting
+  if (!excluded.has("setting")) {
+    const setting = String(
+      (await api.v1.storyStorage.get("kse-setting")) || "",
+    );
+    if (setting) stableSections.push(`[SETTING]\n${setting}`);
+  }
+
   // Brainstorm (consolidated)
   if (!excluded.has("brainstorm")) {
     const brainstorm = getConsolidatedBrainstorm(state);
     if (brainstorm) stableSections.push(`[BRAINSTORM]\n${brainstorm}`);
   }
 
-  // Story text (stable during SEGA — user's story doesn't change)
-  if (!excluded.has("storyText")) {
-    const storyMessages = await getStoryContextMessages({
-      includeLorebookEntries: false,
-    });
-    const storyText = storyMessages
-      .filter((m) => m.role === "assistant")
-      .map((m) => m.content)
-      .join("\n\n");
-    if (storyText) stableSections.push(`[STORY TEXT]\n${storyText}`);
+  // Canon (synthesis — last so it can reference all above sections)
+  if (!excluded.has("canon")) {
+    const canon = getFieldContent(state, FieldID.Canon);
+    if (canon) stableSections.push(`[CANON]\n${canon}`);
   }
 
-  // --- MSG 4: DULFS items (GROWS during list stage, stable during lorebook) ---
-  // Separate message so growth doesn't invalidate MSG 3's cached tokens.
+  // --- MSG 3: DULFS items (GROWS during list stage, stable during lorebook) ---
+  // Separate message so growth doesn't invalidate MSG 2's cached tokens.
   let dulfsContent = "";
   if (!excluded.has("dulfs")) {
     const dulfsContext = await getAllDulfsContext(state);
     if (dulfsContext) dulfsContent = `[WORLD ENTRIES]\n${dulfsContext}`;
   }
 
+  // --- MSG 4: Story text (VOLATILE — at end of prefix) ---
+  // Placed last so frequent changes don't bust cache for stable sections above.
+  let storyTextContent = "";
+  if (!excluded.has("storyText")) {
+    const storyMessages = await getStoryContextMessages({
+      includeLorebookEntries: false,
+      contextLimitReduction: 8000,
+    });
+    const storyText = storyMessages
+      .filter((m) => m.role === "assistant")
+      .map((m) => m.content)
+      .join("\n\n");
+    if (storyText) storyTextContent = `[STORY TEXT]\n${storyText}`;
+  }
+
   // --- Assemble prefix ---
   const messages: Message[] = [
     { role: "system", content: msg1Content },
   ];
-
-  if (lorebookContext.content) {
-    messages.push({
-      role: "system",
-      content: `[EXISTING WORLD ENTRIES - Reference for consistency and cross-referencing]\n${lorebookContext.content}`,
-    });
-  }
 
   if (stableSections.length > 0) {
     messages.push({
@@ -356,6 +341,13 @@ export const buildStoryEnginePrefix = async (
     messages.push({
       role: "system",
       content: dulfsContent,
+    });
+  }
+
+  if (storyTextContent) {
+    messages.push({
+      role: "system",
+      content: storyTextContent,
     });
   }
 

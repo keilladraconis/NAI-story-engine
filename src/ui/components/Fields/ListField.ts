@@ -172,6 +172,13 @@ export const ListField = defineComponent<ListFieldProps, RootState>({
       itemParts.set(item.id, ctx.render(ListItem, { config: props, item }));
     }
 
+    // Initialize display state (selectors only fire on future changes)
+    api.v1.ui.updateParts([{
+      id: sectionId,
+      style: this.style?.(borderStyleMap[initialItems.length > 0 ? "complete" : "empty"]),
+    }]);
+    updateTitleWithCount(initialItems);
+
     // Sync Items on future changes
     useSelector(
       (state) => state.story.dulfs[props.id as DulfsFieldID] || [],

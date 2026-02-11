@@ -76,10 +76,7 @@ Type: ${entryType}
 Setting: ${setting}
 `;
 
-    // Unified prefix (excludes this entry from cross-refs)
-    const prefix = await buildStoryEnginePrefix(getState, {
-      excludeEntryId: entryId,
-    });
+    const prefix = await buildStoryEnginePrefix(getState);
 
     const messages: Message[] = [
       ...prefix,
@@ -135,10 +132,7 @@ export const createLorebookKeysFactory = (
       (await api.v1.config.get("lorebook_keys_prompt")) || "",
     );
 
-    // Unified prefix (excludes this entry from cross-refs)
-    const prefix = await buildStoryEnginePrefix(getState, {
-      excludeEntryId: entryId,
-    });
+    const prefix = await buildStoryEnginePrefix(getState);
 
     const messages: Message[] = [
       ...prefix,
@@ -216,10 +210,7 @@ Setting: ${setting}
       (await api.v1.config.get("lorebook_refine_prompt")) || "",
     );
 
-    // Unified prefix (excludes this entry from cross-refs)
-    const prefix = await buildStoryEnginePrefix(getState, {
-      excludeEntryId: entryId,
-    });
+    const prefix = await buildStoryEnginePrefix(getState);
 
     const messages: Message[] = [
       ...prefix,
