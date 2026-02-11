@@ -1,6 +1,5 @@
 import {
   BindContext,
-  createEvents,
   defineComponent,
 } from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
@@ -11,11 +10,6 @@ import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 import { NAI_HEADER, NAI_FOREGROUND } from "../../colors";
 
 const { row, text, button } = api.v1.ui.part;
-
-type HeaderEvents = {
-  toggleSega(): void;
-  continueGeneration(): void;
-};
 
 export const Header = defineComponent({
   id: () => "kse-sidebar-header",
@@ -53,12 +47,9 @@ export const Header = defineComponent({
 
   build(_props: {}, ctx: BindContext<RootState>) {
     const { useSelector, dispatch } = ctx;
-    const events = createEvents<HeaderEvents>();
 
-    events.attach({
-      toggleSega: () => dispatch(segaToggled()),
-      continueGeneration: () => dispatch(uiUserPresenceConfirmed()),
-    });
+    const toggleSega = () => dispatch(segaToggled());
+    const continueGeneration = () => dispatch(uiUserPresenceConfirmed());
 
     // Render ButtonWithConfirmation for Clear button
     const { part: clearBtn } = ctx.render(ButtonWithConfirmation, {
@@ -251,14 +242,14 @@ export const Header = defineComponent({
               text: "S.E.G.A.",
               iconId: "play-circle",
               style: this.style?.("actionButton"),
-              callback: () => events.toggleSega(),
+              callback: toggleSega,
             }),
             button({
               id: "header-sega-stop-btn",
               text: "S.E.G.A.",
               iconId: "fast-forward",
               style: this.style?.("stopButton", "hidden"),
-              callback: () => events.toggleSega(),
+              callback: toggleSega,
             }),
           ],
         }),
@@ -274,7 +265,7 @@ export const Header = defineComponent({
           text: "Continue",
           iconId: "fast-forward",
           style: this.style?.("continueButton", "hidden"),
-          callback: () => events.continueGeneration(),
+          callback: continueGeneration,
         }),
         // Wait countdown (center, hidden by default)
         text({

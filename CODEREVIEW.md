@@ -45,10 +45,10 @@ Added `ctx.render(Component, props)` to `BindContext` — calls `describe()` + `
 
 Resolved by `ctx.render()`. Components that needed state-dependent callbacks (e.g. `LorebookPanelContent`'s `onGenerate`) now specify them in `onMount()` where `ctx.getState()` and `ctx.dispatch()` are available. The `store` singleton import was removed from `LorebookPanelContent` — no UI components import the store directly.
 
-### `DONE` Make `createEvents` per-instance
+### `DONE` Remove `createEvents` — use plain functions
 **Priority: Medium**
 
-Removed `P` type parameter and `AugmentedEvents` wrapper — `createEvents<Defs>()` is now a simple typed dispatch helper. Removed `E` type parameter and `events` property from `Component`/`defineComponent`. All consumers call `createEvents()` inside `build()`, so each instance gets its own handlers map. Handlers close over props from their build scope instead of receiving them as a first argument. `ButtonWithConfirmation` rewritten to `defineComponent` — `buttonRegistry` and module-level workaround removed.
+`createEvents` and its Proxy machinery existed to bridge describe/mount phases — buttons needed callback references at describe-time before handlers were wired in mount. Now that `build()` does both in one phase, the indirection is unnecessary. Removed `createEvents`, `EventMap`, `AugmentedEvents`, and the `events`/`E` properties from `Component`/`defineComponent`. All event handlers are now plain functions declared in `build()`, closing over props from their scope. `ButtonWithConfirmation` rewritten to `defineComponent` — `buttonRegistry` removed.
 
 ### `TODO` Add `ctx.mountList()` helper
 **Priority: Medium**

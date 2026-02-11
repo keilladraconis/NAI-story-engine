@@ -1,4 +1,4 @@
-import { createEvents, defineComponent, mergeStyles } from "../../../lib/nai-act";
+import { defineComponent, mergeStyles } from "../../../lib/nai-act";
 import { NAI_WARNING } from "../colors";
 
 const { row, text, button } = api.v1.ui.part;
@@ -12,12 +12,6 @@ export interface ButtonWithConfirmationProps {
   buttonStyle?: any; // Applied to button element (for appearance)
   onConfirm: () => void;
 }
-
-type ButtonWithConfirmationEvents = {
-  showConfirm(): void;
-  confirm(): void;
-  cancel(): void;
-};
 
 const CONFIRM_ROW_BASE_STYLE = {
   gap: "4px",
@@ -39,8 +33,6 @@ export const ButtonWithConfirmation = defineComponent<ButtonWithConfirmationProp
       buttonStyle = {},
     } = props;
 
-    const events = createEvents<ButtonWithConfirmationEvents>();
-
     const updateVisibility = (isConfirming: boolean) => {
       api.v1.ui.updateParts([
         {
@@ -58,25 +50,19 @@ export const ButtonWithConfirmation = defineComponent<ButtonWithConfirmationProp
       ]);
     };
 
-    events.attach({
-      showConfirm() {
-        updateVisibility(true);
-      },
-      confirm() {
-        props.onConfirm();
-        updateVisibility(false);
-      },
-      cancel() {
-        updateVisibility(false);
-      },
-    });
+    const showConfirm = () => updateVisibility(true);
+    const confirm = () => {
+      props.onConfirm();
+      updateVisibility(false);
+    };
+    const cancelConfirm = () => updateVisibility(false);
 
     const mainButton = button({
       id: `${id}-btn`,
       text: label,
       iconId,
       style: { width: "100%", ...buttonStyle },
-      callback: () => events.showConfirm(),
+      callback: showConfirm,
     });
 
     const confirmRow = row({
@@ -91,13 +77,13 @@ export const ButtonWithConfirmation = defineComponent<ButtonWithConfirmationProp
           id: `${id}-yes`,
           text: "Yes",
           style: { color: NAI_WARNING, padding: "2px 8px" },
-          callback: () => events.confirm(),
+          callback: confirm,
         }),
         button({
           id: `${id}-no`,
           text: "No",
           style: { padding: "2px 8px" },
-          callback: () => events.cancel(),
+          callback: cancelConfirm,
         }),
       ],
     });

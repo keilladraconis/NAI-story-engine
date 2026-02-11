@@ -1,4 +1,4 @@
-import { createEvents, defineComponent } from "../../../../lib/nai-act";
+import { defineComponent } from "../../../../lib/nai-act";
 import { matchesAction } from "../../../../lib/nai-store";
 import { RootState } from "../../../core/store/types";
 import { FieldConfig, FieldID } from "../../../config/field-definitions";
@@ -30,13 +30,6 @@ const {
   multilineTextInput,
   checkboxInput,
 } = api.v1.ui.part;
-
-type TextFieldEvents = {
-  beginEdit(): void;
-  save(): void;
-  attgSyncToggled(checked: boolean): void;
-  styleSyncToggled(checked: boolean): void;
-};
 
 // Fields that use plain textarea mode (no edit/save modality)
 const PLAIN_TEXT_FIELDS = [FieldID.ATTG, FieldID.Style];
@@ -82,7 +75,6 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
 
   build(config, ctx) {
     const { useSelector, useEffect, dispatch, getState } = ctx;
-    const events = createEvents<TextFieldEvents>();
     const isPlainTextField = PLAIN_TEXT_FIELDS.includes(config.id as FieldID);
     const sectionId = `section-${config.id}`;
     const requestId = `gen-${config.id}`;
@@ -147,19 +139,16 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
 
     // Plain text fields (ATTG, Style) - always editable textarea
     if (isPlainTextField) {
-      // Attach sync checkbox event handlers
-      events.attach({
-        attgSyncToggled: (checked: boolean) => {
-          if (checked) {
-            dispatch(attgToggled());
-          }
-        },
-        styleSyncToggled: (checked: boolean) => {
-          if (checked) {
-            dispatch(styleToggled());
-          }
-        },
-      });
+      const attgSyncToggled = (checked: boolean) => {
+        if (checked) {
+          dispatch(attgToggled());
+        }
+      };
+      const styleSyncToggled = (checked: boolean) => {
+        if (checked) {
+          dispatch(styleToggled());
+        }
+      };
 
       // Effect: Sync ATTG to Memory when toggled on
       useEffect(matchesAction(attgToggled), async (_action, { getState }) => {
@@ -258,8 +247,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
                 initialValue: false,
                 storageKey: "story:kse-sync-attg-memory",
                 label: "Copy to Memory",
-                onChange: (checked: boolean) =>
-                  events.attgSyncToggled(checked),
+                onChange: attgSyncToggled,
               }),
             ],
           }),
@@ -277,8 +265,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
                 initialValue: false,
                 storageKey: "story:kse-sync-style-an",
                 label: "Copy to Author's Note",
-                onChange: (checked: boolean) =>
-                  events.styleSyncToggled(checked),
+                onChange: styleSyncToggled,
               }),
             ],
           }),
@@ -302,15 +289,8 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
     const storageKey = `draft-${config.id}`;
     const isCanonField = config.id === FieldID.Canon;
 
-    // Event handlers only dispatch actions
-    events.attach({
-      beginEdit: () => {
-        dispatch(uiFieldEditBegin({ id: config.id }));
-      },
-      save: () => {
-        dispatch(uiFieldEditEnd({ id: config.id }));
-      },
-    });
+    const beginEdit = () => dispatch(uiFieldEditBegin({ id: config.id }));
+    const save = () => dispatch(uiFieldEditEnd({ id: config.id }));
 
     // Build gen button content (and bootstrap for Canon)
     const genBtnContent: UIPart[] = [genBtnPart];
@@ -418,14 +398,14 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
               text: "Edit",
               iconId: "edit-3",
               style: this.style?.("standardButton"),
-              callback: () => events.beginEdit(),
+              callback: beginEdit,
             }),
             button({
               id: toggleSaveId,
               text: "Save",
               iconId: "save",
               style: this.style?.("standardButton", "hidden"),
-              callback: () => events.save(),
+              callback: save,
             }),
             ...genBtnContent,
           ],

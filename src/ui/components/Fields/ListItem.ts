@@ -1,4 +1,4 @@
-import { createEvents, defineComponent } from "../../../../lib/nai-act";
+import { defineComponent } from "../../../../lib/nai-act";
 import { RootState, DulfsItem } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
 import { dulfsItemRemoved } from "../../../core/store/slices/story";
@@ -32,16 +32,11 @@ export interface ListItemProps {
   item: DulfsItem;
 }
 
-type ListItemEvents = {
-  delete(): void;
-};
-
 export const ListItem = defineComponent<ListItemProps, RootState>({
   id: (props) => `item-${props.item.id}`,
 
   build(props, ctx) {
     const { dispatch } = ctx;
-    const events = createEvents<ListItemEvents>();
     const { item, config } = props;
     const entryId = item.id;
 
@@ -75,17 +70,14 @@ export const ListItem = defineComponent<ListItemProps, RootState>({
       },
     });
 
-    // Delete handler
-    events.attach({
-      delete: () => {
-        dispatch(
-          dulfsItemRemoved({
-            fieldId: config.id as DulfsFieldID,
-            itemId: item.id,
-          }),
-        );
-      },
-    });
+    const deleteItem = () => {
+      dispatch(
+        dulfsItemRemoved({
+          fieldId: config.id as DulfsFieldID,
+          itemId: item.id,
+        }),
+      );
+    };
 
     return row({
       id: `item-${entryId}`,
@@ -113,7 +105,7 @@ export const ListItem = defineComponent<ListItemProps, RootState>({
           id: deleteBtnId,
           iconId: "trash",
           style: { width: "24px", padding: "4px" },
-          callback: () => events.delete(),
+          callback: deleteItem,
         }),
       ],
     });

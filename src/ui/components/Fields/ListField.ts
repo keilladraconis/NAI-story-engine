@@ -1,4 +1,4 @@
-import { createEvents, defineComponent } from "../../../../lib/nai-act";
+import { defineComponent } from "../../../../lib/nai-act";
 import { matchesAction } from "../../../../lib/nai-store";
 import { RootState, DulfsItem } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
@@ -36,10 +36,6 @@ async function countLorebookEntries(
   return { withContent, total: items.length };
 }
 
-type ListFieldEvents = {
-  addItem(): void;
-};
-
 export const ListField = defineComponent<ListFieldProps, RootState>({
   id: (props) => `section-${props.id}`,
 
@@ -60,7 +56,6 @@ export const ListField = defineComponent<ListFieldProps, RootState>({
 
   build(props, ctx) {
     const { useSelector, dispatch } = ctx;
-    const events = createEvents<ListFieldEvents>();
 
     const sectionId = `section-${props.id}`;
     const itemsColId = `items-col-${props.id}`;
@@ -96,22 +91,19 @@ export const ListField = defineComponent<ListFieldProps, RootState>({
       api.v1.ui.updateParts([{ id: sectionId, title }]);
     };
 
-    // Event handlers
-    events.attach({
-      addItem: async () => {
-        const itemId = api.v1.uuid();
-        await api.v1.storyStorage.set(`dulfs-item-${itemId}`, "");
-        dispatch(
-          dulfsItemAdded({
+    const addItem = async () => {
+      const itemId = api.v1.uuid();
+      await api.v1.storyStorage.set(`dulfs-item-${itemId}`, "");
+      dispatch(
+        dulfsItemAdded({
+          fieldId: props.id as DulfsFieldID,
+          item: {
+            id: itemId,
             fieldId: props.id as DulfsFieldID,
-            item: {
-              id: itemId,
-              fieldId: props.id as DulfsFieldID,
-            },
-          }),
-        );
-      },
-    });
+          },
+        }),
+      );
+    };
 
     // Render Category Gen Button
     const { part: genBtnPart } = ctx.render(GenerationButton, {
@@ -253,7 +245,7 @@ export const ListField = defineComponent<ListFieldProps, RootState>({
               text: "Add Item",
               iconId: "plus",
               style: this.style?.("standardButton"),
-              callback: () => events.addItem(),
+              callback: addItem,
             }),
           ],
         }),

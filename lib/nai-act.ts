@@ -107,36 +107,6 @@ export function mergeStyles(...styles: (Style | undefined | null)[]): Style {
 }
 
 // --------------------------------------------------
-// Events
-// --------------------------------------------------
-
-type EventMap = Record<string, (...args: any[]) => any>;
-
-export function createEvents<Defs extends EventMap>() {
-  const handlers: Partial<Defs> = {};
-  const slots: Record<string, Function> = {};
-
-  return new Proxy({} as any, {
-    get(_target, key: string) {
-      if (key === "attach") {
-        return (next: Partial<Defs>) => Object.assign(handlers, next);
-      }
-
-      if (!slots[key]) {
-        slots[key] = (...args: any[]) => {
-          const fn = handlers[key as keyof typeof handlers];
-          // @ts-ignore: Dynamic dispatch based on key
-          return fn ? fn(...args) : undefined;
-        };
-      }
-      return slots[key];
-    },
-  }) as Defs & {
-    attach(handlers: Partial<Defs>): void;
-  };
-}
-
-// --------------------------------------------------
 // Mount
 // --------------------------------------------------
 

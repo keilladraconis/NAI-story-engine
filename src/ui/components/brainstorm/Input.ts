@@ -1,4 +1,4 @@
-import { Component, createEvents } from "../../../../lib/nai-act";
+import { Component } from "../../../../lib/nai-act";
 import { RootState } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
 import {
@@ -20,7 +20,6 @@ export const Input: Component<{}, RootState> = {
 
   build(_props, ctx) {
     const { dispatch, useSelector } = ctx;
-    const events = createEvents<{ submit(): void }>();
     const ids = IDS.BRAINSTORM;
 
     // Render child components
@@ -49,11 +48,7 @@ export const Input: Component<{}, RootState> = {
       requestIdFromProjection: (projection) => projection,
     });
 
-    events.attach({
-      submit() {
-        dispatch(uiBrainstormSubmitUserMessage());
-      },
-    });
+    const submit = () => dispatch(uiBrainstormSubmitUserMessage());
 
     // Reactive State: Only handle Input disabled state
     useSelector(
@@ -81,7 +76,7 @@ export const Input: Component<{}, RootState> = {
           placeholder: "Type an idea...",
           storageKey: `story:${ids.INPUT}`,
           style: { "min-height": "60px", "max-height": "120px" },
-          onSubmit: () => events.submit(),
+          onSubmit: submit,
         }),
         row({
           id: `${ids.INPUT}-btn-row`,

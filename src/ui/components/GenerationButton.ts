@@ -1,4 +1,4 @@
-import { Component, createEvents } from "../../../lib/nai-act";
+import { Component } from "../../../lib/nai-act";
 import { RootState } from "../../core/store/types";
 import {
   uiCancelRequest,
@@ -142,19 +142,11 @@ const getIconStyles = () => ({
 
 type ButtonMode = "gen" | "queue" | "cancel" | "continue" | "wait" | "disabled";
 
-type GenerationButtonEvents = {
-  generate(): void;
-  cancel(resolvedRequestId?: string): void;
-  cancelActive(): void;
-  continue(): void;
-};
-
 export const GenerationButton: Component<GenerationButtonProps, RootState> = {
   id: (props) => props.id,
 
   build(props, { dispatch, useSelector }) {
     const { id, variant = "button", label = "", style = {}, iconId } = props;
-    const events = createEvents<GenerationButtonEvents>();
     const buttonStyles = getButtonStyles();
     const iconStyles = getIconStyles();
     let timerId: any = null;
@@ -179,53 +171,53 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       checkContent();
     }
 
-    // Attach handlers - close over props and dispatch from build scope
-    events.attach({
-      generate() {
-        if (props.generateAction) {
-          dispatch(props.generateAction);
+    const generate = () => {
+      if (props.generateAction) {
+        dispatch(props.generateAction);
+      }
+      if (props.onGenerate) {
+        props.onGenerate();
+      }
+    };
+
+    const cancel = (resolvedRequestId?: string) => {
+      // Cancel queued request(s)
+      if (props.requestIds && props.requestIds.length > 0) {
+        for (const reqId of props.requestIds) {
+          dispatch(uiCancelRequest({ requestId: reqId }));
         }
-        if (props.onGenerate) {
-          props.onGenerate();
-        }
-      },
-      cancel(resolvedRequestId) {
-        // Cancel queued request(s)
-        if (props.requestIds && props.requestIds.length > 0) {
-          for (const reqId of props.requestIds) {
-            dispatch(uiCancelRequest({ requestId: reqId }));
-          }
-        } else {
-          const reqId = resolvedRequestId ?? props.requestId;
-          if (reqId) {
-            dispatch(uiCancelRequest({ requestId: reqId }));
-          } else if (props.onCancel) {
-            props.onCancel();
-          }
-        }
-      },
-      cancelActive() {
-        // Cancel the active request
-        if (props.onCancel) {
+      } else {
+        const reqId = resolvedRequestId ?? props.requestId;
+        if (reqId) {
+          dispatch(uiCancelRequest({ requestId: reqId }));
+        } else if (props.onCancel) {
           props.onCancel();
-        } else {
-          dispatch(uiRequestCancellation());
         }
-        // Also cancel any other queued requests from the same requestIds group
-        if (props.requestIds && props.requestIds.length > 0) {
-          for (const reqId of props.requestIds) {
-            dispatch(uiCancelRequest({ requestId: reqId }));
-          }
+      }
+    };
+
+    const cancelActive = () => {
+      // Cancel the active request
+      if (props.onCancel) {
+        props.onCancel();
+      } else {
+        dispatch(uiRequestCancellation());
+      }
+      // Also cancel any other queued requests from the same requestIds group
+      if (props.requestIds && props.requestIds.length > 0) {
+        for (const reqId of props.requestIds) {
+          dispatch(uiCancelRequest({ requestId: reqId }));
         }
-      },
-      continue() {
-        if (props.onContinue) {
-          props.onContinue();
-        } else {
-          dispatch(uiUserPresenceConfirmed());
-        }
-      },
-    });
+      }
+    };
+
+    const handleContinue = () => {
+      if (props.onContinue) {
+        props.onContinue();
+      } else {
+        dispatch(uiUserPresenceConfirmed());
+      }
+    };
 
     const updateTimer = (endTime: number) => {
       if (!isTimerActive) return;
@@ -240,7 +232,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             text: `${remaining}`,
             iconId: undefined,
             style: iconStyles.wait,
-            callback: () => events.cancelActive(),
+            callback: () => cancelActive(),
           },
         ]);
       } else {
@@ -374,8 +366,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
     function updateIconVariant(mode: ButtonMode, budgetWaitEndTime?: number) {
       let style = iconStyles.idle;
       let icon = iconId;
-      // Use closures over mount props - events.X(props) passes mount props to handler
-      let callback = () => events.generate();
+      let callback = () => generate();
 
       // For idle mode, re-check content state (async) and update accordingly
       if (mode === "gen" && props.contentChecker) {
@@ -389,7 +380,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
                 style: hasContent
                   ? iconStyles.idleWithContent
                   : iconStyles.idle,
-                callback: () => events.generate(),
+                callback: () => generate(),
               },
             ]);
           }
@@ -400,26 +391,26 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
         case "gen":
           style = hasContent ? iconStyles.idleWithContent : iconStyles.idle;
           icon = iconId;
-          callback = () => events.generate();
+          callback = () => generate();
           break;
         case "queue":
           style = iconStyles.queued;
           icon = "clock";
-          callback = () => events.cancel(currentResolvedRequestId);
+          callback = () => cancel(currentResolvedRequestId);
           break;
         case "cancel":
           style = iconStyles.cancel;
           icon = "x";
-          callback = () => events.cancelActive();
+          callback = () => cancelActive();
           break;
         case "continue":
           style = iconStyles.continue;
           icon = "fast-forward";
-          callback = () => events.continue();
+          callback = () => handleContinue();
           break;
         case "wait":
           style = iconStyles.wait;
-          callback = () => events.cancelActive();
+          callback = () => cancelActive();
           break;
       }
 
@@ -451,7 +442,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
               text: `${initialRemaining}`,
               iconId: undefined,
               style: iconStyles.wait,
-              callback: () => events.cancelActive(),
+              callback: () => cancelActive(),
             },
           ]);
           updateTimer(endTime);
@@ -473,12 +464,11 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
           ? { ...buttonStyles.disabled, display: "block" }
           : { ...buttonStyles.gen, display: showGen ? "block" : "none" };
 
-      // Use closures over mount props - events.X(props) passes mount props to handler
       api.v1.ui.updateParts([
         {
           id: `${id}-gen`,
           style: genStyle,
-          callback: () => events.generate(),
+          callback: () => generate(),
         },
         {
           id: `${id}-queue`,
@@ -486,7 +476,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             ...buttonStyles.queue,
             display: mode === "queue" ? "block" : "none",
           },
-          callback: () => events.cancel(currentResolvedRequestId),
+          callback: () => cancel(currentResolvedRequestId),
         },
         {
           id: `${id}-cancel`,
@@ -494,7 +484,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             ...buttonStyles.cancel,
             display: mode === "cancel" ? "block" : "none",
           },
-          callback: () => events.cancelActive(),
+          callback: () => cancelActive(),
         },
         {
           id: `${id}-continue`,
@@ -502,7 +492,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             ...buttonStyles.continue,
             display: mode === "continue" ? "block" : "none",
           },
-          callback: () => events.continue(),
+          callback: () => handleContinue(),
         },
         {
           id: `${id}-wait`,
@@ -510,7 +500,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             ...buttonStyles.wait,
             display: mode === "wait" ? "block" : "none",
           },
-          callback: () => events.cancelActive(),
+          callback: () => cancelActive(),
         },
       ]);
 
@@ -535,7 +525,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
         id,
         iconId,
         style: iconStyles.idle,
-        callback: () => events.generate(),
+        callback: () => generate(),
       });
     }
 
@@ -547,35 +537,35 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       iconId,
       text: `${iconId ? "" : "⚡"} ${label}`,
       style: { ...styles.gen, display: "block" },
-      callback: () => events.generate(),
+      callback: () => generate(),
     });
 
     const btnQueued = button({
       id: `${id}-queue`,
       text: label ? `⏳ Queued` : "⏳",
       style: { ...styles.queue, display: "none" },
-      callback: () => events.cancel(props.requestId),
+      callback: () => cancel(props.requestId),
     });
 
     const btnCancel = button({
       id: `${id}-cancel`,
       text: label ? `🚫 Cancel` : "🚫",
       style: { ...styles.cancel, display: "none" },
-      callback: () => events.cancelActive(),
+      callback: () => cancelActive(),
     });
 
     const btnContinue = button({
       id: `${id}-continue`,
       text: label ? `⚠️ Continue` : "⚠️",
       style: { ...styles.continue, display: "none" },
-      callback: () => events.continue(),
+      callback: () => handleContinue(),
     });
 
     const btnWait = button({
       id: `${id}-wait`,
       text: label ? `⏳ Wait` : "⏳",
       style: { ...styles.wait, display: "none" },
-      callback: () => events.cancelActive(),
+      callback: () => cancelActive(),
     });
 
     return row({
