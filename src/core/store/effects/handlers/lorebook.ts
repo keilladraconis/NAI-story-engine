@@ -115,8 +115,8 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
       // Parse comma-separated keys
       const keys = ctx.accumulatedText
         .split(",")
-        .map((k) => k.trim())
-        .filter((k) => k.length > 0 && k.length < 50); // Filter invalid keys
+        .map((k) => k.trim().toLowerCase())
+        .filter((k) => k.length > 0 && k.length < 50);
 
       // Update lorebook entry with generated keys
       await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys });

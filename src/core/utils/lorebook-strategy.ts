@@ -144,7 +144,7 @@ export const createLorebookKeysFactory = (
         role: "user",
         content: `Entry Name: ${displayName}\n\nEntry Content:\n${entryText}`,
       },
-      { role: "assistant", content: `${displayName}, ` },
+      { role: "assistant", content: `${displayName.toLowerCase()}, ` },
     ];
 
     return {
@@ -152,9 +152,8 @@ export const createLorebookKeysFactory = (
       params: {
         model,
         max_tokens: 96,
-        temperature: 0.6,
-        min_p: 0.05,
-        frequency_penalty: 0.3,
+        temperature: 0.3,
+        min_p: 0.1,
         stop: ["\n"],
       },
     };
@@ -258,7 +257,7 @@ export const buildLorebookKeysPayload = async (
     params: { model: "glm-4-6", max_tokens: 96 },
     target: { type: "lorebookKeys", entryId },
     prefillBehavior: "keep",
-    assistantPrefill: `${displayName}, `,
+    assistantPrefill: `${displayName.toLowerCase()}, `,
   };
 };
 

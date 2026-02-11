@@ -1,12 +1,12 @@
 compatibilityVersion: naiscript-1.0
 id: e6c35faa-e4f2-4c3b-af4a-d56e4c992d87
 name: Story Engine
-version: 0.6.0
+version: 0.6.1
 createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1770823348
+updatedAt: 1770825682
 config:
   - name: system_prompt
     prettyName: System Prompt
@@ -198,25 +198,29 @@ config:
     multiline: true
     default: |-
       Generate activation keys for a lorebook entry.
-      Keys are search terms matched against story text — when a key appears in the narrative, this entry gets injected into context.
+      Keys trigger entry injection when matched in story text. Think of them as database index terms — precise, lowercase, topical.
+      ALL keys MUST be lowercase. Output ONLY a comma-separated list of 6-12 keys.
 
-      GOOD KEYS predict narrative involvement:
-      - Entry name and variants (nicknames, surnames, titles)
-      - Related character names (allies, rivals, family, love interests)
-      - Locations where this entry is commonly active or based
-      - Organizations and factions this entry belongs to or opposes
-      - Use short root nouns, not compound phrases ("Beastar" not "Beastar Candidate")
-      - 1-2 word proper nouns that appear verbatim in prose
+      GOOD KEYS — proper nouns that predict narrative involvement:
+      - Name variants: first name, surname, nickname, title ("elena", "voss", "the magistrate")
+      - Related characters by name: allies, rivals, family, lovers
+      - Locations where this entity operates or resides
+      - Factions or organizations this entity belongs to or opposes
+      - For name/term variants, use regex: /kath(erine|y|leen)?/, /grey|gray/
+      - Root forms only: "forge" not "the ancient forge"
 
-      BAD KEYS (never include these):
-      - Numbers (ages, dates, measurements) — never trigger meaningfully
-      - Descriptors and adjectives (tall, brave, mysterious)
-      - Traits, skills, species, physical features — describe but don't trigger
-      - Words already contained in another key — redundant
+      NEVER generate these — they are the most common failure mode:
+      - Ages, numbers, dates, measurements, dimensions
+      - Adjectives or descriptors (tall, brave, mysterious, ancient, simmering)
+      - Physical traits (hair, eyes, posture, build, height, weight)
+      - Personality words (resentful, kind, ambitious)
+      - Generic nouns usable in any scene (woman, city, war, sword, breaks)
+      - Habits, routines, schedules, activities
+      - Sentence fragments or phrases copied from the entry
 
-      Test each key: "If a scene mentions [key], should this entry be in context?"
+      Test each key: "Does this word UNIQUELY signal this entry? Would it appear naturally in prose referring to this entity?"
 
-      Output ONLY a comma-separated list. 6-10 keys.
+      ONLY output the comma-separated key list. Nothing else.
 
   - name: attg_generate_prompt
     prettyName: ATTG Generate Prompt
