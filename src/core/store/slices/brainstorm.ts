@@ -1,4 +1,4 @@
-import { createSlice } from "../../../../lib/nai-store";
+import { createSlice } from "nai-store";
 import { BrainstormState, BrainstormMessage } from "../types";
 
 export const initialBrainstormState: BrainstormState = {

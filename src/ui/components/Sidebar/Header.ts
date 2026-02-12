@@ -1,7 +1,7 @@
 import {
   BindContext,
   defineComponent,
-} from "../../../../lib/nai-act";
+} from "nai-act";
 import { RootState } from "../../../core/store/types";
 import { segaToggled } from "../../../core/store/slices/runtime";
 import { uiUserPresenceConfirmed } from "../../../core/store/slices/ui";

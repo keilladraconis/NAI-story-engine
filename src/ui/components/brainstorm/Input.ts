@@ -1,4 +1,4 @@
-import { Component } from "../../../../lib/nai-act";
+import { Component } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
 import {

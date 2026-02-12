@@ -1,5 +1,5 @@
-import { GenerationState, MessageFactory } from "../../../lib/gen-x";
-import { Action } from "../../../lib/nai-store";
+import { GenerationState, MessageFactory } from "nai-gen-x";
+import { Action } from "nai-store";
 
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 
@@ -94,13 +94,13 @@ export type GenerationRequestStatus =
 export interface GenerationRequest {
   id: string;
   type:
-    | "field"
-    | "list"
-    | "brainstorm"
-    | "lorebookContent"
-    | "lorebookKeys"
-    | "lorebookRefine"
-    | "bootstrap";
+  | "field"
+  | "list"
+  | "brainstorm"
+  | "lorebookContent"
+  | "lorebookKeys"
+  | "lorebookRefine"
+  | "bootstrap";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -112,13 +112,13 @@ export interface GenerationStrategy {
   messageFactory?: MessageFactory; // JIT strategy builder
   params?: GenerationParams; // Optional if provided by factory
   target:
-    | { type: "brainstorm"; messageId: string }
-    | { type: "field"; fieldId: string }
-    | { type: "list"; fieldId: string }
-    | { type: "lorebookContent"; entryId: string }
-    | { type: "lorebookKeys"; entryId: string }
-    | { type: "lorebookRefine"; entryId: string }
-    | { type: "bootstrap" };
+  | { type: "brainstorm"; messageId: string }
+  | { type: "field"; fieldId: string }
+  | { type: "list"; fieldId: string }
+  | { type: "lorebookContent"; entryId: string }
+  | { type: "lorebookKeys"; entryId: string }
+  | { type: "lorebookRefine"; entryId: string }
+  | { type: "bootstrap" };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
 }

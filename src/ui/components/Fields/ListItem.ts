@@ -1,4 +1,4 @@
-import { defineComponent } from "../../../../lib/nai-act";
+import { defineComponent } from "nai-act";
 import { RootState, DulfsItem } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
 import { dulfsItemRemoved } from "../../../core/store/slices/story";

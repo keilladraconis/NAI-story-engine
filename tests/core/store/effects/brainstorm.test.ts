@@ -8,7 +8,7 @@ import {
 } from "../../../../src/core/store";
 import { registerEffects } from "../../../../src/core/store/effects";
 import { IDS } from "../../../../src/ui/framework/ids";
-import { GenX } from "../../../../lib/gen-x";
+import { GenX } from "nai-gen-x";
 
 describe("Brainstorm Effects", () => {
   let genXMock: GenX;

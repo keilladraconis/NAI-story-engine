@@ -1,4 +1,4 @@
-import { defineComponent, mergeStyles } from "../../../lib/nai-act";
+import { defineComponent, mergeStyles } from "nai-act";
 import { NAI_WARNING } from "../colors";
 
 const { row, text, button } = api.v1.ui.part;

@@ -1,7 +1,7 @@
 import {
   BindContext,
   defineComponent,
-} from "../../../../lib/nai-act";
+} from "nai-act";
 import { BrainstormMessage, RootState } from "../../../core/store/types";
 import {
   messageRemoved,

@@ -6,8 +6,8 @@ import {
 } from "./core/store";
 import { StoryState, BrainstormMessage } from "./core/store/types";
 import { registerEffects } from "./core/store/effects";
-import { GenX } from "../lib/gen-x";
-import { mount } from "../lib/nai-act";
+import { GenX } from "nai-gen-x";
+import { mount } from "nai-act";
 import { stateUpdated, requestActivated } from "./core/store/slices/runtime";
 import { IDS } from "./ui/framework/ids";
 

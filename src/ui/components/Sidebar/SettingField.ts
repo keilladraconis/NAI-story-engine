@@ -1,4 +1,4 @@
-import { defineComponent } from "../../../../lib/nai-act";
+import { defineComponent } from "nai-act";
 
 const { row, text, textInput } = api.v1.ui.part;
 

@@ -1,11 +1,11 @@
-import { Store, matchesAction } from "../../../lib/nai-store";
+import { Store, matchesAction } from "nai-store";
 import {
   RootState,
   BrainstormMessage,
   GenerationStrategy,
   AppDispatch,
 } from "./types";
-import { GenX, MessageFactory } from "../../../lib/gen-x";
+import { GenX, MessageFactory } from "nai-gen-x";
 import { registerSegaEffects } from "./effects/sega";
 import {
   uiBrainstormSubmitUserMessage,

@@ -21,7 +21,7 @@ import {
   BrainstormMessage,
   GenerationStrategy,
 } from "../store/types";
-import { MessageFactory } from "../../../lib/gen-x";
+import { MessageFactory } from "nai-gen-x";
 import {
   FieldID,
   FIELD_CONFIGS,

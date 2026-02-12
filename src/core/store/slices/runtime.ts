@@ -1,11 +1,11 @@
-import { createSlice } from "../../../../lib/nai-store";
+import { createSlice } from "nai-store";
 import {
   RuntimeState,
   GenerationRequest,
   SegaStage,
   SegaState,
 } from "../types";
-import { GenerationState } from "../../../../lib/gen-x";
+import { GenerationState } from "nai-gen-x";
 
 const initialSegaState: SegaState = {
   stage: "idle",

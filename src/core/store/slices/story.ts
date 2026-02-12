@@ -1,4 +1,4 @@
-import { createSlice } from "../../../../lib/nai-store";
+import { createSlice } from "nai-store";
 import { StoryState, DulfsItem } from "../types";
 import {
   FIELD_CONFIGS,

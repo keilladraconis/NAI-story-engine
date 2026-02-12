@@ -13,8 +13,8 @@
  * tokens. Entries are generated in hash order for append-only cross-ref growth.
  */
 
-import { Store, matchesAction } from "../../../../lib/nai-store";
-import { GenX } from "../../../../lib/gen-x";
+import { Store, matchesAction } from "nai-store";
+import { GenX } from "nai-gen-x";
 import {
   RootState,
   DULFS_CATEGORIES,

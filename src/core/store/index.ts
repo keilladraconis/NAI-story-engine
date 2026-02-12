@@ -1,4 +1,4 @@
-import { createStore, combineReducers } from "../../../lib/nai-store";
+import { createStore, combineReducers } from "nai-store";
 import { brainstormSlice } from "./slices/brainstorm";
 import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";

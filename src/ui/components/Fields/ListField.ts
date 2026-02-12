@@ -1,5 +1,5 @@
-import { defineComponent } from "../../../../lib/nai-act";
-import { matchesAction } from "../../../../lib/nai-store";
+import { defineComponent } from "nai-act";
+import { matchesAction } from "nai-store";
 import { RootState, DulfsItem } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
 import { dulfsItemAdded } from "../../../core/store/slices/story";
@@ -144,8 +144,8 @@ export const ListField = defineComponent<ListFieldProps, RootState>({
 
         const activeId =
           activeRequest &&
-          activeRequest.status !== "completed" &&
-          activeRequest.status !== "cancelled"
+            activeRequest.status !== "completed" &&
+            activeRequest.status !== "cancelled"
             ? activeRequest.id
             : undefined;
 

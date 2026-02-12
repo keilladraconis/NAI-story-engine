@@ -1,4 +1,4 @@
-import { BindContext, defineComponent } from "../../../../lib/nai-act";
+import { BindContext, defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";

@@ -1,4 +1,4 @@
-import { defineComponent, BindContext } from "../../../../lib/nai-act";
+import { defineComponent, BindContext } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import { FIELD_CONFIGS } from "../../../config/field-definitions";
 import { TextField } from "../Fields/TextField";

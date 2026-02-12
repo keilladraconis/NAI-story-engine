@@ -1,5 +1,5 @@
-import { defineComponent } from "../../../../lib/nai-act";
-import { matchesAction } from "../../../../lib/nai-store";
+import { defineComponent } from "nai-act";
+import { matchesAction } from "nai-store";
 import { RootState } from "../../../core/store/types";
 import { FieldConfig, FieldID } from "../../../config/field-definitions";
 import {

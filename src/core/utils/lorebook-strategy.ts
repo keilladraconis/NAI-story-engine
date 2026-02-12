@@ -1,5 +1,5 @@
 import { RootState } from "../store/types";
-import { MessageFactory } from "../../../lib/gen-x";
+import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "./context-builder";
 
 // Category-to-template mapping
