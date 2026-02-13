@@ -34,6 +34,9 @@ import {
   requestCancelled,
   requestCompleted,
   crucibleLoaded,
+  crucibleStarted,
+  uiCrucibleDeepenRequested,
+  roundAdvanced,
 } from "./index";
 import {
   createLorebookContentFactory,
@@ -49,6 +52,10 @@ import {
   buildStyleStrategy,
   extractDulfsItemName,
 } from "../utils/context-builder";
+import {
+  buildCrucibleSeedStrategy,
+  buildCrucibleExpandStrategy,
+} from "../utils/crucible-strategy";
 import { IDS } from "../../ui/framework/ids";
 import {
   DulfsFieldID,
@@ -215,6 +222,11 @@ function resolvePrefill(
     if (assistantPrefill) return assistantPrefill;
   }
 
+  // Crucible targets use explicit assistantPrefill (JSON anchors)
+  if (target.type === "crucibleSeed" || target.type === "crucibleExpand") {
+    if (assistantPrefill) return assistantPrefill;
+  }
+
   return "";
 }
 
@@ -289,6 +301,10 @@ function cacheLabel(target: GenerationStrategy["target"]): string {
       return `lb-refine:${target.entryId.slice(0, 8)}`;
     case "bootstrap":
       return "bootstrap";
+    case "crucibleSeed":
+      return "crucible-seed";
+    case "crucibleExpand":
+      return `crucible-expand:r${target.round}`;
   }
 }
 
@@ -699,6 +715,39 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     (action) => action.type === uiUserPresenceConfirmed.type,
     () => {
       genX.userInteraction();
+    },
+  );
+
+  // Intent: Crucible Seed (triggered when user starts Crucible)
+  subscribeEffect(
+    matchesAction(crucibleStarted),
+    (_action, { dispatch, getState }) => {
+      const strategy = buildCrucibleSeedStrategy(getState);
+      dispatch(
+        requestQueued({
+          id: strategy.requestId,
+          type: "crucibleSeed",
+          targetId: "crucible",
+        }),
+      );
+      dispatch(generationSubmitted(strategy));
+    },
+  );
+
+  // Intent: Crucible Expand (user clicks "Deepen" for another round)
+  subscribeEffect(
+    matchesAction(uiCrucibleDeepenRequested),
+    (_action, { dispatch, getState }) => {
+      dispatch(roundAdvanced());
+      const strategy = buildCrucibleExpandStrategy(getState);
+      dispatch(
+        requestQueued({
+          id: strategy.requestId,
+          type: "crucibleExpand",
+          targetId: "crucible",
+        }),
+      );
+      dispatch(generationSubmitted(strategy));
     },
   );
 

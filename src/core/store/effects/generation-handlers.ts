@@ -8,6 +8,10 @@ import {
   lorebookKeysHandler,
   lorebookRefineHandler,
 } from "./handlers/lorebook";
+import {
+  crucibleSeedHandler,
+  crucibleExpandHandler,
+} from "./handlers/crucible";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -40,6 +44,14 @@ export type LorebookRefineTarget = Extract<
 export type BootstrapTarget = Extract<
   GenerationStrategy["target"],
   { type: "bootstrap" }
+>;
+export type CrucibleSeedTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "crucibleSeed" }
+>;
+export type CrucibleExpandTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "crucibleExpand" }
 >;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
@@ -80,6 +92,8 @@ export const GENERATION_HANDLERS: {
   lorebookContent: GenerationHandlers<LorebookContentTarget>;
   lorebookKeys: GenerationHandlers<LorebookKeysTarget>;
   lorebookRefine: GenerationHandlers<LorebookRefineTarget>;
+  crucibleSeed: GenerationHandlers<CrucibleSeedTarget>;
+  crucibleExpand: GenerationHandlers<CrucibleExpandTarget>;
 } = {
   brainstorm: brainstormHandler,
   bootstrap: bootstrapHandler,
@@ -88,6 +102,8 @@ export const GENERATION_HANDLERS: {
   lorebookContent: lorebookContentHandler,
   lorebookKeys: lorebookKeysHandler,
   lorebookRefine: lorebookRefineHandler,
+  crucibleSeed: crucibleSeedHandler,
+  crucibleExpand: crucibleExpandHandler,
 };
 
 export function getHandler(

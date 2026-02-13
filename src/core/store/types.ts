@@ -100,7 +100,9 @@ export interface GenerationRequest {
   | "lorebookContent"
   | "lorebookKeys"
   | "lorebookRefine"
-  | "bootstrap";
+  | "bootstrap"
+  | "crucibleSeed"
+  | "crucibleExpand";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -118,7 +120,9 @@ export interface GenerationStrategy {
   | { type: "lorebookContent"; entryId: string }
   | { type: "lorebookKeys"; entryId: string }
   | { type: "lorebookRefine"; entryId: string }
-  | { type: "bootstrap" };
+  | { type: "bootstrap" }
+  | { type: "crucibleSeed" }
+  | { type: "crucibleExpand"; round: number };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
 }

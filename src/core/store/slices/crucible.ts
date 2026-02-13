@@ -97,6 +97,9 @@ export const crucibleSlice = createSlice({
     windowToggled: (state) => {
       return { ...state, windowOpen: !state.windowOpen };
     },
+    uiCrucibleDeepenRequested: (state) => {
+      return state; // Intent action — effects handle generation
+    },
   },
 });
 
@@ -113,4 +116,5 @@ export const {
   crucibleReset,
   crucibleLoaded,
   windowToggled,
+  uiCrucibleDeepenRequested,
 } = crucibleSlice.actions;

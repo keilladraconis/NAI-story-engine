@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771001227
+updatedAt: 1771002715
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -280,6 +280,49 @@ config:
       - Factions may have notable members, headquarters, rivals, or territorial interests
       - Systems may be practiced by factions, studied at locations, or mastered by characters
       Weave these connections naturally into the entry to create a cohesive world.
+  - name: crucible_seed_prompt
+    prettyName: Crucible Seed Prompt
+    description: Prompt for extracting the core story intent from brainstorm conversation
+    type: string
+    multiline: true
+    default: |-
+      [CRUCIBLE — SEED EXTRACTION]
+      Analyze the brainstorm conversation and extract the core story intent.
+
+      Output a JSON object:
+      {
+        "content": "Full description of the story intent (~100-150 words). What is this story ABOUT — not plot, but the central tension, world premise, and emotional core.",
+        "summary": "One-line summary (max 80 chars)"
+      }
+
+      Output ONLY the JSON object. No markdown, no explanation.
+  - name: crucible_expand_prompt
+    prettyName: Crucible Expand Prompt
+    description: Prompt template for Crucible expansion rounds proposing new world nodes
+    type: string
+    multiline: true
+    default: |-
+      [CRUCIBLE — EXPANSION ROUND]
+      You are expanding a story world. The intent and accepted elements are below.
+
+      Propose 3-5 new world elements. Each must SERVE at least one existing node.
+      Prioritize gaps: if no locations exist, propose locations. If characters lack
+      factions, propose factions. Follow the interconnection principle — no isolates.
+
+      Additionally, propose ONE "nudge" — a surprising element that makes the world
+      more interesting. Mark it with "nudge": true. The user can always reject it.
+
+      Output a JSON array:
+      [
+        {
+          "kind": "character|faction|location|system|situation|beat|opener",
+          "content": "Detailed description (~80-120 words)",
+          "summary": "One-line summary (max 80 chars)",
+          "serves": ["id-of-node-this-supports", ...]
+        }
+      ]
+
+      Output ONLY the JSON array. No markdown, no explanation.
   - name: story_engine_debug
     prettyName: Story Engine Debug
     description: Enable debug logging for Story Engine
