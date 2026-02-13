@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771015353
+updatedAt: 1771016359
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility

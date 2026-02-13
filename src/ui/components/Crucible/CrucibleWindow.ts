@@ -81,46 +81,6 @@ function buildPhaseText(state: RootState): string {
   }
 }
 
-/**
- * Build grouped content UIParts from node ID list.
- * Intent nodes are rendered first outside kind groups.
- */
-function buildGroupedContent(
-  nodes: CrucibleNode[],
-  nodeParts: Map<string, { part: UIPart; unmount: () => void }>,
-  styleRef: (((...names: string[]) => Record<string, string> | undefined) | undefined),
-): UIPart[] {
-  const content: UIPart[] = [];
-
-  // Intent first (no group header)
-  const intentNodes = nodes.filter((n) => n.kind === "intent");
-  for (const node of intentNodes) {
-    const entry = nodeParts.get(node.id);
-    if (entry) content.push(entry.part);
-  }
-
-  // Remaining kinds in order
-  for (const kind of KIND_ORDER) {
-    const kindNodes = nodes.filter((n) => n.kind === kind);
-    if (kindNodes.length === 0) continue;
-
-    content.push(
-      text({
-        id: IDS.CRUCIBLE.kindGroup(kind),
-        text: `◆ ${KIND_LABELS[kind]}`,
-        style: styleRef?.("kindHeader"),
-      }),
-    );
-
-    for (const node of kindNodes) {
-      const entry = nodeParts.get(node.id);
-      if (entry) content.push(entry.part);
-    }
-  }
-
-  return content;
-}
-
 export const CrucibleWindow = defineComponent<void, RootState>({
   id: () => IDS.CRUCIBLE.WINDOW_ROOT,
 
@@ -209,6 +169,39 @@ export const CrucibleWindow = defineComponent<void, RootState>({
       { part: UIPart; unmount: () => void }
     >();
 
+    // Local helper — captures `this` via arrow in build() scope
+    const buildGroupedContent = (nodes: CrucibleNode[]): UIPart[] => {
+      const content: UIPart[] = [];
+
+      // Intent first (no group header)
+      for (const node of nodes) {
+        if (node.kind !== "intent") continue;
+        const entry = nodeParts.get(node.id);
+        if (entry) content.push(entry.part);
+      }
+
+      // Remaining kinds in order
+      for (const kind of KIND_ORDER) {
+        const kindNodes = nodes.filter((n) => n.kind === kind);
+        if (kindNodes.length === 0) continue;
+
+        content.push(
+          text({
+            id: IDS.CRUCIBLE.kindGroup(kind),
+            text: `◆ ${KIND_LABELS[kind]}`,
+            style: this.style?.("kindHeader"),
+          }),
+        );
+
+        for (const node of kindNodes) {
+          const entry = nodeParts.get(node.id);
+          if (entry) content.push(entry.part);
+        }
+      }
+
+      return content;
+    };
+
     // --- Read initial state for window reopen (#15) ---
     const initial = ctx.getState();
     const initialPhaseText = buildPhaseText(initial);
@@ -218,11 +211,7 @@ export const CrucibleWindow = defineComponent<void, RootState>({
       nodeParts.set(node.id, ctx.render(NodeCard, { node }));
     }
 
-    const initialGroupedContent = buildGroupedContent(
-      initial.crucible.nodes,
-      nodeParts,
-      this.style,
-    );
+    const initialGroupedContent = buildGroupedContent(initial.crucible.nodes);
     const hasInitialNodes = initial.crucible.nodes.length > 0;
 
     // -- Header --
@@ -446,7 +435,7 @@ export const CrucibleWindow = defineComponent<void, RootState>({
 
         // Rebuild grouped content
         const hasNodes = nodes.length > 0;
-        const content = buildGroupedContent(nodes, nodeParts, this.style);
+        const content = buildGroupedContent(nodes);
 
         api.v1.ui.updateParts([
           {
