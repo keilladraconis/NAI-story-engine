@@ -158,7 +158,6 @@ export interface CrucibleNode {
   status: CrucibleNodeStatus;
   round: number;
   content: string;
-  summary: string;
   serves: string[];
   stale: boolean;
 }

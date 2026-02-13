@@ -86,7 +86,7 @@ function formatAcceptedNodes(nodes: CrucibleNode[]): string {
 
     const label = KIND_LABELS[kind];
     const items = group
-      .map((n) => `- [${n.id}] ${n.summary}\n  ${n.content}`)
+      .map((n) => `- [${n.id}] ${n.content}`)
       .join("\n");
     sections.push(`[${label}]\n${items}`);
   }
@@ -167,15 +167,11 @@ export const createCrucibleExpandFactory = (
       ? `[STRATEGY: ${state.crucible.strategy}]\n${bias}`
       : "";
 
-    const nudgeInstruction =
-      "Additionally, propose ONE \"nudge\" — a surprising element that makes the world more interesting. Mark it with \"nudge\": true. The user can always reject it.";
-
     // Assemble the crucible-specific context
     const contextParts: string[] = [];
     if (intentSection) contextParts.push(intentSection);
     if (acceptedSection) contextParts.push(`[ACCEPTED NODES]\n${acceptedSection}`);
     if (strategyInstruction) contextParts.push(strategyInstruction);
-    contextParts.push(nudgeInstruction);
 
     const prefix = await buildStoryEnginePrefix(getState);
 
@@ -192,7 +188,7 @@ export const createCrucibleExpandFactory = (
       messages,
       params: {
         model: "glm-4-6",
-        max_tokens: 1024,
+        max_tokens: 2048,
         temperature: 0.85,
         min_p: 0.05,
       },

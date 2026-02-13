@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771002715
+updatedAt: 1771015353
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -291,11 +291,10 @@ config:
 
       Output a JSON object:
       {
-        "content": "Full description of the story intent (~100-150 words). What is this story ABOUT — not plot, but the central tension, world premise, and emotional core.",
-        "summary": "One-line summary (max 80 chars)"
+        "content": "Intent Name: 2-3 sentence description of the story intent. What is this story ABOUT — not plot, but the central tension, world premise, and emotional core."
       }
 
-      Output ONLY the JSON object. No markdown, no explanation.
+      Be concise. Output ONLY the JSON object. No markdown, no explanation.
   - name: crucible_expand_prompt
     prettyName: Crucible Expand Prompt
     description: Prompt template for Crucible expansion rounds proposing new world nodes
@@ -312,13 +311,13 @@ config:
       Additionally, propose ONE "nudge" — a surprising element that makes the world
       more interesting. Mark it with "nudge": true. The user can always reject it.
 
-      Output a JSON array:
+      Be concise — 1-3 sentences per element. Output a JSON array:
       [
         {
           "kind": "character|faction|location|system|situation|beat|opener",
-          "content": "Detailed description (~80-120 words)",
-          "summary": "One-line summary (max 80 chars)",
-          "serves": ["id-of-node-this-supports", ...]
+          "content": "Element Name: 1-3 sentence description",
+          "serves": ["id-of-node-this-supports", ...],
+          "nudge": false
         }
       ]
 

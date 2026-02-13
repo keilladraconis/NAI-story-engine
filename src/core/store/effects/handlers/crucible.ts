@@ -25,6 +25,7 @@ const ALLOWED_KINDS: Set<string> = new Set<CrucibleNodeKind>([
 /**
  * Strip markdown fencing and find the outermost JSON structure.
  * Returns cleaned string ready for JSON.parse.
+ * Handles truncated output by attempting to close the structure.
  */
 function repairJSON(text: string, anchor: "{" | "["): string {
   // Strip markdown code fences
@@ -35,7 +36,22 @@ function repairJSON(text: string, anchor: "{" | "["): string {
   const start = cleaned.indexOf(anchor);
   const end = cleaned.lastIndexOf(close);
 
-  if (start === -1 || end === -1 || end <= start) {
+  if (start === -1) return cleaned.trim();
+
+  if (end === -1 || end <= start) {
+    // Truncated output — attempt salvage
+    let truncated = cleaned.slice(start);
+    if (anchor === "[") {
+      // Find last complete object in the array
+      const lastObj = truncated.lastIndexOf("}");
+      if (lastObj > 0) return truncated.slice(0, lastObj + 1) + "]";
+    } else {
+      // Strip trailing incomplete key-value, close the object
+      const lastQuote = truncated.lastIndexOf('"');
+      const lastColon = truncated.lastIndexOf(":");
+      if (lastColon > lastQuote) truncated = truncated.slice(0, lastQuote + 1);
+      return truncated + "}";
+    }
     return cleaned.trim();
   }
 
@@ -56,11 +72,10 @@ export const crucibleSeedHandler: GenerationHandlers<CrucibleSeedTarget> = {
       const json = repairJSON(ctx.accumulatedText, "{");
       const parsed = JSON.parse(json) as {
         content?: string;
-        summary?: string;
       };
 
-      if (!parsed.content || !parsed.summary) {
-        api.v1.log("[crucible] Seed parse: missing content or summary");
+      if (!parsed.content) {
+        api.v1.log("[crucible] Seed parse: missing content");
         return;
       }
 
@@ -71,7 +86,6 @@ export const crucibleSeedHandler: GenerationHandlers<CrucibleSeedTarget> = {
         status: "pending",
         round: 0,
         content: String(parsed.content),
-        summary: String(parsed.summary),
         serves: [],
         stale: false,
       };
@@ -100,7 +114,6 @@ export const crucibleExpandHandler: GenerationHandlers<CrucibleExpandTarget> = {
       const parsed = JSON.parse(json) as Array<{
         kind?: string;
         content?: string;
-        summary?: string;
         serves?: string[];
         nudge?: boolean;
       }>;
@@ -116,15 +129,21 @@ export const crucibleExpandHandler: GenerationHandlers<CrucibleExpandTarget> = {
 
       const nodes: CrucibleNode[] = [];
       for (const element of parsed) {
-        // Validate kind
-        const kind = String(element.kind || "");
-        if (!ALLOWED_KINDS.has(kind)) {
-          api.v1.log(`[crucible] Expand: skipping invalid kind "${kind}"`);
+        // Resolve kind — map "nudge" to "situation" with nudge origin
+        let resolvedKind = String(element.kind || "");
+        let origin: CrucibleNode["origin"] = element.nudge ? "nudge" : "solver";
+        if (resolvedKind === "nudge") {
+          origin = "nudge";
+          resolvedKind = "situation";
+        }
+
+        if (!ALLOWED_KINDS.has(resolvedKind)) {
+          api.v1.log(`[crucible] Expand: skipping invalid kind "${resolvedKind}"`);
           continue;
         }
 
-        if (!element.content || !element.summary) {
-          api.v1.log("[crucible] Expand: skipping node missing content/summary");
+        if (!element.content) {
+          api.v1.log("[crucible] Expand: skipping node missing content");
           continue;
         }
 
@@ -135,12 +154,11 @@ export const crucibleExpandHandler: GenerationHandlers<CrucibleExpandTarget> = {
 
         nodes.push({
           id: api.v1.uuid(),
-          kind: kind as CrucibleNodeKind,
-          origin: element.nudge ? "nudge" : "solver",
+          kind: resolvedKind as CrucibleNodeKind,
+          origin,
           status: "pending",
           round,
           content: String(element.content),
-          summary: String(element.summary),
           serves,
           stale: false,
         });

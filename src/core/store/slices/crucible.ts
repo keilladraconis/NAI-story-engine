@@ -57,14 +57,13 @@ export const crucibleSlice = createSlice({
     },
     nodeEdited: (
       state,
-      payload: { id: string; content: string; summary: string },
+      payload: { id: string; content: string },
     ) => {
       let nodes = state.nodes.map((node) =>
         node.id === payload.id
           ? {
               ...node,
               content: payload.content,
-              summary: payload.summary,
               status: "edited" as const,
             }
           : node,

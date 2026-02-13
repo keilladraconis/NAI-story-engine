@@ -6,6 +6,7 @@ import { RootState } from "../../../core/store/types";
 import { segaToggled } from "../../../core/store/slices/runtime";
 import { uiUserPresenceConfirmed } from "../../../core/store/slices/ui";
 import { storyCleared } from "../../../core/store/slices/story";
+import { windowToggled } from "../../../core/store/slices/crucible";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 import { NAI_HEADER, NAI_FOREGROUND } from "../../colors";
 
@@ -234,6 +235,13 @@ export const Header = defineComponent({
       id: "kse-sidebar-header",
       style: this.style?.("mainRow"),
       content: [
+        // Crucible button
+        button({
+          id: "header-crucible-btn",
+          iconId: "hexagon",
+          style: this.style?.("actionButton"),
+          callback: () => dispatch(windowToggled()),
+        }),
         // SEGA buttons (left)
         row({
           content: [

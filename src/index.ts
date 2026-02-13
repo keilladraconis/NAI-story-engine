@@ -24,6 +24,9 @@ import { FieldList } from "./ui/components/Sidebar/FieldList";
 // Lorebook components
 import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelContent";
 
+// Crucible
+import { registerCrucibleWindow } from "./ui/components/Crucible/openCrucibleWindow";
+
 const { column } = api.v1.ui.part;
 const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
 
@@ -45,6 +48,7 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
 
     // 2. Register Effects
     registerEffects(store, genX);
+    registerCrucibleWindow(store);
 
     // 3. Load Data
     interface PersistedState {
