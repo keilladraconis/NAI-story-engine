@@ -188,9 +188,13 @@ export const LorebookPanelContent = defineComponent({
             id: IDS.LOREBOOK.CONTENT_INPUT,
             onChange: async (value: string) => {
               if (currentEntryId) {
-                await api.v1.lorebook.updateEntry(currentEntryId, {
-                  text: value,
-                });
+                const erato =
+                  (await api.v1.config.get("erato_compatibility")) || false;
+                const text =
+                  erato && !value.startsWith("----\n")
+                    ? "----\n" + value
+                    : value;
+                await api.v1.lorebook.updateEntry(currentEntryId, { text });
               }
             },
           },

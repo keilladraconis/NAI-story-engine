@@ -5,7 +5,7 @@ import {
   uiLorebookEntrySelected,
 } from "./core/store";
 import { StoryState, BrainstormMessage } from "./core/store/types";
-import { registerEffects } from "./core/store/effects";
+import { registerEffects, syncEratoCompatibility } from "./core/store/effects";
 import { GenX } from "nai-gen-x";
 import { mount } from "nai-act";
 import { stateUpdated, requestActivated } from "./core/store/slices/runtime";
@@ -61,6 +61,9 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
     } catch (e) {
       api.v1.log("Error loading persisted data:", e);
     }
+
+    // 3b. Sync Erato compatibility (migrate entries/categories if toggled)
+    await syncEratoCompatibility(store.getState);
 
     // 4. Mount all components (returns UIPart + sets up subscriptions)
     const { part: listPart } = mount(List, undefined, store);

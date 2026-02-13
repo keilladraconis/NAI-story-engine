@@ -58,6 +58,7 @@ import { getHandler } from "./effects/generation-handlers";
 
 // Lorebook sync constants
 const SE_CATEGORY_PREFIX = "SE: ";
+const SE_ERATO_MARKER_NAME = "SE: End of Lorebook";
 
 // Helper: Find or create a category for a DULFS field
 async function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
@@ -68,13 +69,13 @@ async function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
   const existing = categories.find((c) => c.name === name);
   if (existing) return existing.id;
 
+  const erato = (await api.v1.config.get("erato_compatibility")) || false;
+
   return api.v1.lorebook.createCategory({
     id: api.v1.uuid(),
     name,
     enabled: true,
-    settings: {
-      entryHeader: "----"
-    }
+    settings: erato ? {} : { entryHeader: "----" },
   });
 }
 
@@ -84,6 +85,91 @@ async function findCategory(fieldId: DulfsFieldID): Promise<string | null> {
   const name = `${SE_CATEGORY_PREFIX}${config?.label || fieldId}`;
   const categories = await api.v1.lorebook.categories();
   return categories.find((c) => c.name === name)?.id || null;
+}
+
+/**
+ * Sync lorebook entries and categories when erato_compatibility is toggled.
+ * - Erato ON: clear entryHeader from categories, prepend "----\n" to entry text
+ * - Erato OFF: set entryHeader on categories, strip "----\n" from entry text
+ */
+export async function syncEratoCompatibility(
+  getState: () => RootState,
+): Promise<void> {
+  const erato = (await api.v1.config.get("erato_compatibility")) || false;
+  const dulfs = getState().story.dulfs;
+
+  // Collect managed entry IDs from DULFS state
+  const entryIds: string[] = [];
+  for (const fieldId in dulfs) {
+    const items = dulfs[fieldId as DulfsFieldID];
+    if (items) {
+      for (const item of items) {
+        entryIds.push(item.id);
+      }
+    }
+  }
+
+  // Gather unique category IDs from managed entries
+  const categoryIds = new Set<string>();
+  for (const entryId of entryIds) {
+    const entry = await api.v1.lorebook.entry(entryId);
+    if (entry?.category) {
+      categoryIds.add(entry.category);
+    }
+  }
+
+  // Update categories
+  for (const categoryId of categoryIds) {
+    if (erato) {
+      await api.v1.lorebook.updateCategory(categoryId, { settings: { entryHeader: "" } });
+    } else {
+      await api.v1.lorebook.updateCategory(categoryId, {
+        settings: { entryHeader: "----" },
+      });
+    }
+  }
+
+  // Update entry text
+  for (const entryId of entryIds) {
+    const entry = await api.v1.lorebook.entry(entryId);
+    if (!entry?.text) continue;
+
+    if (erato && !entry.text.startsWith("----\n")) {
+      await api.v1.lorebook.updateEntry(entryId, {
+        text: "----\n" + entry.text,
+      });
+    } else if (!erato && entry.text.startsWith("----\n")) {
+      await api.v1.lorebook.updateEntry(entryId, {
+        text: entry.text.slice(5),
+      });
+    }
+  }
+
+  // Manage "End of Lorebook" marker entry
+  // Erato has no clean boundary between lorebook (pos 400) and story text (pos 0).
+  // A forced-activation entry with "***\n" acts as a visual separator.
+  // The user must manually set its insertion position to 1.
+  const allEntries = await api.v1.lorebook.entries();
+  const existingMarker = allEntries.find(
+    (e) => e.displayName === SE_ERATO_MARKER_NAME,
+  );
+
+  if (erato && !existingMarker) {
+    await api.v1.lorebook.createEntry({
+      id: api.v1.uuid(),
+      displayName: SE_ERATO_MARKER_NAME,
+      text: "***\n",
+      keys: [],
+      enabled: true,
+      forceActivation: true,
+    });
+    api.v1.ui.toast(
+      'Created "SE: End of Lorebook" entry. Set its insertion position to 1.',
+      { type: "info" },
+    );
+  } else if (!erato && existingMarker) {
+    await api.v1.lorebook.removeEntry(existingMarker.id);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -702,6 +788,15 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           await api.v1.lorebook.removeEntry(entry.id);
         }
         await api.v1.lorebook.removeCategory(category.id);
+      }
+
+      // Remove Erato marker entry (uncategorized, so not caught above)
+      const allEntries = await api.v1.lorebook.entries();
+      const marker = allEntries.find(
+        (e) => e.displayName === SE_ERATO_MARKER_NAME,
+      );
+      if (marker) {
+        await api.v1.lorebook.removeEntry(marker.id);
       }
 
       // Clear storage keys used by storageKey-based UI components

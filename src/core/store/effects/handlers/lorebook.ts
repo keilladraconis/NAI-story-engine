@@ -72,16 +72,24 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
         // Combine prefill + accumulated text for the full entry
         const fullContent = prefill + ctx.accumulatedText;
 
+        // Erato compatibility: prepend separator if needed
+        const erato =
+          (await api.v1.config.get("erato_compatibility")) || false;
+        const finalContent =
+          erato && !fullContent.startsWith("----\n")
+            ? "----\n" + fullContent
+            : fullContent;
+
         // Update lorebook entry with generated content
         await api.v1.lorebook.updateEntry(entryId, {
-          text: fullContent,
+          text: finalContent,
         });
 
         // Update draft with full content if viewing this entry
         if (entryId === currentSelected) {
           await api.v1.storyStorage.set(
             IDS.LOREBOOK.CONTENT_DRAFT_RAW,
-            fullContent,
+            finalContent,
           );
         }
       } else {
@@ -174,16 +182,24 @@ export const lorebookRefineHandler: GenerationHandlers<LorebookRefineTarget> = {
       // Combine prefill + accumulated text for the full entry
       const fullContent = prefill + ctx.accumulatedText;
 
+      // Erato compatibility: prepend separator if needed
+      const erato =
+        (await api.v1.config.get("erato_compatibility")) || false;
+      const finalContent =
+        erato && !fullContent.startsWith("----\n")
+          ? "----\n" + fullContent
+          : fullContent;
+
       // Update lorebook entry with refined content
       await api.v1.lorebook.updateEntry(entryId, {
-        text: fullContent,
+        text: finalContent,
       });
 
       // Update draft with full content if viewing this entry
       if (entryId === currentSelected) {
         await api.v1.storyStorage.set(
           IDS.LOREBOOK.CONTENT_DRAFT_RAW,
-          fullContent,
+          finalContent,
         );
       }
 

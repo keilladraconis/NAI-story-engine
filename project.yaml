@@ -6,8 +6,19 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1770914791
+updatedAt: 1770998393
 config:
+  - name: erato_compatibility
+    prettyName: Erato Compatibility
+    description: >-
+      For use with Erato. Moves the lorebook entry separator (----) from the
+      category header (unsupported by Erato) into each entry's text content.
+      Also creates a forced-activation "SE: End of Lorebook" marker entry
+      containing *** to separate lorebook from story text. You MUST manually set
+      that entry's insertion order to 1 (the API cannot set this). On toggle,
+      all managed lorebook entries are automatically migrated.
+    type: boolean
+    default: false
   - name: system_prompt
     prettyName: System Prompt
     description: Configure the base system prompt used by all aspects of Story Engine
