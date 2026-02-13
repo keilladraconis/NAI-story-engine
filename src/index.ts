@@ -2,9 +2,10 @@ import {
   store,
   brainstormLoaded,
   storyLoaded,
+  crucibleLoaded,
   uiLorebookEntrySelected,
 } from "./core/store";
-import { StoryState, BrainstormMessage } from "./core/store/types";
+import { StoryState, BrainstormMessage, CrucibleState } from "./core/store/types";
 import { registerEffects, syncEratoCompatibility } from "./core/store/effects";
 import { GenX } from "nai-gen-x";
 import { mount } from "nai-act";
@@ -49,14 +50,16 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
     interface PersistedState {
       story?: StoryState;
       brainstorm?: { messages: BrainstormMessage[] };
+      crucible?: CrucibleState;
     }
     try {
       const persisted = await api.v1.storyStorage.get("kse-persist");
       if (persisted && typeof persisted === "object") {
-        const { story, brainstorm } = persisted as PersistedState;
+        const { story, brainstorm, crucible } = persisted as PersistedState;
         if (story) store.dispatch(storyLoaded({ story }));
         if (brainstorm && brainstorm.messages)
           store.dispatch(brainstormLoaded({ messages: brainstorm.messages }));
+        if (crucible) store.dispatch(crucibleLoaded({ crucible }));
       }
     } catch (e) {
       api.v1.log("Error loading persisted data:", e);

@@ -3,6 +3,7 @@ import { brainstormSlice } from "./slices/brainstorm";
 import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
 import { storySlice } from "./slices/story";
+import { crucibleSlice } from "./slices/crucible";
 import { RootState } from "./types";
 
 const rootReducer = combineReducers({
@@ -10,6 +11,7 @@ const rootReducer = combineReducers({
   brainstorm: brainstormSlice.reducer,
   ui: uiSlice.reducer,
   runtime: runtimeSlice.reducer,
+  crucible: crucibleSlice.reducer,
 });
 
 const debug = (await api.v1.config.get("story_engine_debug")) || false;
@@ -23,3 +25,4 @@ export * from "./slices/brainstorm";
 export * from "./slices/ui";
 export * from "./slices/runtime";
 export * from "./slices/story";
+export * from "./slices/crucible";

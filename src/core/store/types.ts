@@ -133,9 +133,44 @@ export interface RuntimeState {
   budgetTimeRemaining: number;
 }
 
+// Crucible Types
+export type CrucibleNodeKind =
+  | "intent" | "beat" | "character" | "faction"
+  | "location" | "system" | "situation" | "opener";
+
+export type CrucibleNodeStatus = "pending" | "accepted" | "edited" | "rejected";
+export type CrucibleNodeOrigin = "solver" | "nudge" | "user";
+
+export type CrucibleStrategy =
+  | "character-driven" | "faction-conflict" | "mystery-revelation"
+  | "exploration" | "slice-of-life" | "custom";
+
+export type CruciblePhase = "idle" | "seeding" | "expanding" | "committed";
+
+export interface CrucibleNode {
+  id: string;
+  kind: CrucibleNodeKind;
+  origin: CrucibleNodeOrigin;
+  status: CrucibleNodeStatus;
+  round: number;
+  content: string;
+  summary: string;
+  serves: string[];
+  stale: boolean;
+}
+
+export interface CrucibleState {
+  phase: CruciblePhase;
+  strategy: CrucibleStrategy | null;
+  nodes: CrucibleNode[];
+  currentRound: number;
+  windowOpen: boolean;
+}
+
 export interface RootState {
   story: StoryState;
   brainstorm: BrainstormState;
   ui: UIState;
   runtime: RuntimeState;
+  crucible: CrucibleState;
 }

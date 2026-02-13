@@ -33,6 +33,7 @@ import {
   uiLorebookRefineRequested,
   requestCancelled,
   requestCompleted,
+  crucibleLoaded,
 } from "./index";
 import {
   createLorebookContentFactory,
@@ -704,24 +705,19 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   // Save Story Effect (Autosave)
   subscribeEffect(
     (action) =>
-      action.type.startsWith("story/") || action.type.startsWith("brainstorm/"),
+      action.type.startsWith("story/") ||
+      action.type.startsWith("brainstorm/") ||
+      action.type.startsWith("crucible/"),
     async (action, { getState }) => {
       if (action.type === storyLoaded.type) return; // Don't save on load trigger
+      if (action.type === crucibleLoaded.type) return; // Don't save on load trigger
       try {
-        // We save the 'story' slice.
-        // Do we save 'brainstorm' slice?
-        // Legacy saved the whole story state which included brainstorm messages.
-        // Here they are separate. We should persist both.
-        // We can use 'kse-story-data' for story and 'kse-brainstorm-data' for brainstorm?
-        // Or combine them into one object for storage.
         const state = getState();
         const persistData = {
           story: state.story,
           brainstorm: state.brainstorm,
+          crucible: state.crucible,
         };
-        // Debouncing? NAIStore doesn't debounce.
-        // Ideally we debounce. For now, fire and forget (NovelAI storage handles some key-based debounce? No)
-        // We'll just save. It's local storage usually.
         api.v1.storyStorage.set("kse-persist", persistData);
       } catch (e) {
         /* ignore */
