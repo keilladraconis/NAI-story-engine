@@ -102,6 +102,7 @@ export interface GenerationRequest {
   | "lorebookRefine"
   | "bootstrap"
   | "crucibleGoals"
+  | "crucibleIntent"
   | "crucibleSolve";
   targetId: string;
   status: GenerationRequestStatus;
@@ -122,6 +123,7 @@ export interface GenerationStrategy {
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }
   | { type: "crucibleGoals" }
+  | { type: "crucibleIntent" }
   | { type: "crucibleSolve" };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
@@ -172,6 +174,7 @@ export interface CrucibleState {
   edges: CrucibleEdge[];
   autoSolving: boolean;
   solverFeedback: string | null;
+  solverStalls: number;
   windowOpen: boolean;
 }
 

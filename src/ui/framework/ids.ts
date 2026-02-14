@@ -8,6 +8,7 @@ export const IDS = {
     START_BTN: "cr-start-btn",
     STOP_BTN: "cr-stop-btn",
     GOALS_BTN: "cr-goals-btn",
+    INTENT_BTN: "cr-intent-btn",
     SOLVE_BTN: "cr-solve-btn",
     STATUS_TEXT: "cr-status",
     PRUNE_BTN: "cr-prune-btn",

@@ -8,12 +8,13 @@ import {
   CrucibleNodeKind,
   CrucibleEdgeType,
 } from "../../types";
-import { intentSet, nodesAdded, nodeUpdated, edgeAdded, solverFeedbackSet } from "../../index";
-import { formatWeb } from "../../../utils/crucible-strategy";
+import { intentSet, nodesAdded, nodeUpdated, edgeAdded, solverFeedbackSet, strategyEdited, crucibleAutoSolveStopped } from "../../index";
+import { formatWeb, ARC_KINDS } from "../../../utils/crucible-strategy";
 
 // --- Types for crucible targets ---
 
 type CrucibleGoalsTarget = { type: "crucibleGoals" };
+type CrucibleIntentTarget = { type: "crucibleIntent" };
 type CrucibleSolveTarget = { type: "crucibleSolve" };
 
 // --- Allowed node kinds for validation ---
@@ -26,6 +27,57 @@ const ALLOWED_KINDS = new Set<string>([
 const ALLOWED_EDGE_TYPES = new Set<string>([
   "requires", "involves", "opposes", "located_at",
 ]);
+
+/** Max edges per node — prevents nexus nodes that connect to everything */
+const MAX_EDGES_PER_NODE = 4;
+
+/**
+ * Check if adding an edge source→target would create a cycle among arc nodes.
+ * Uses BFS: if target can already reach source via existing arc edges, adding
+ * source→target closes a loop.
+ */
+function wouldCreateArcCycle(
+  sourceUuid: string,
+  targetUuid: string,
+  nodes: CrucibleNode[],
+  edges: CrucibleEdge[],
+): boolean {
+  const arcNodeIds = new Set(nodes.filter((n) => ARC_KINDS.has(n.kind)).map((n) => n.id));
+  if (!arcNodeIds.has(sourceUuid) || !arcNodeIds.has(targetUuid)) return false;
+
+  // BFS from target — can it reach source via existing arc-only edges?
+  const visited = new Set<string>();
+  const queue = [targetUuid];
+  visited.add(targetUuid);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current === sourceUuid) return true;
+    for (const edge of edges) {
+      // Follow edges in both directions (undirected for reachability)
+      const neighbor =
+        edge.source === current ? edge.target :
+        edge.target === current ? edge.source : null;
+      if (neighbor && arcNodeIds.has(neighbor) && !visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Count existing edges for a node (as source or target).
+ */
+function edgeCount(nodeId: string, edges: CrucibleEdge[]): number {
+  let count = 0;
+  for (const edge of edges) {
+    if (edge.source === nodeId || edge.target === nodeId) count++;
+  }
+  return count;
+}
 
 // --- JSON Repair ---
 
@@ -107,10 +159,14 @@ export const crucibleGoalsHandler: GenerationHandlers<CrucibleGoalsTarget> = {
 
       // Extract intent if present — only set if no manual intent exists
       if (parsed.intent && !ctx.getState().crucible.intent) {
+        const strategyLabel = parsed.strategy ? String(parsed.strategy) : undefined;
         ctx.dispatch(intentSet({
           intent: String(parsed.intent),
-          strategyLabel: parsed.strategy ? String(parsed.strategy) : undefined,
+          strategyLabel,
         }));
+        if (strategyLabel) {
+          api.v1.storyStorage.set("cr-strategy-value", strategyLabel);
+        }
       }
 
       const goalsArray = parsed.goals;
@@ -138,6 +194,48 @@ export const crucibleGoalsHandler: GenerationHandlers<CrucibleGoalsTarget> = {
       }
     } catch (e) {
       api.v1.log("[crucible] Goals JSON parse failed:", e);
+      api.v1.log("[crucible] Raw text:", ctx.accumulatedText.slice(0, 500));
+    }
+  },
+};
+
+// --- Intent Handler ---
+
+export const crucibleIntentHandler: GenerationHandlers<CrucibleIntentTarget> = {
+  streaming(): void {
+    // No-op — JSON accumulates silently
+  },
+
+  async completion(ctx: CompletionContext<CrucibleIntentTarget>): Promise<void> {
+    if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
+
+    try {
+      const json = repairJSON(ctx.accumulatedText);
+      const parsed = JSON.parse(json) as {
+        intent?: string;
+        strategy?: string;
+        tags?: string[];
+      };
+
+      if (parsed.intent) {
+        // Build intent text with tags if present
+        let intentText = String(parsed.intent);
+        if (Array.isArray(parsed.tags) && parsed.tags.length > 0) {
+          const tagLine = parsed.tags.map((t) => String(t)).join(", ");
+          intentText += `\nTags: ${tagLine}`;
+        }
+
+        // Always overwrite — user explicitly requested (re)generation
+        ctx.dispatch(intentSet({ intent: intentText }));
+      }
+
+      if (parsed.strategy) {
+        const strategyValue = String(parsed.strategy);
+        ctx.dispatch(strategyEdited({ strategy: strategyValue }));
+        api.v1.storyStorage.set("cr-strategy-value", strategyValue);
+      }
+    } catch (e) {
+      api.v1.log("[crucible] Intent JSON parse failed:", e);
       api.v1.log("[crucible] Raw text:", ctx.accumulatedText.slice(0, 500));
     }
   },
@@ -197,12 +295,35 @@ export const crucibleSolveHandler: GenerationHandlers<CrucibleSolveTarget> = {
 
         // Parse connections
         const edges: CrucibleEdge[] = [];
+        let goalConnectionsRejected = 0;
         if (Array.isArray(parsed.connect)) {
           for (const conn of parsed.connect) {
             if (!conn.id || !conn.type) continue;
             const targetUuid = idMap.get(String(conn.id));
             if (!targetUuid) continue;
             if (!ALLOWED_EDGE_TYPES.has(String(conn.type))) continue;
+
+            // Reject opener → goal connections (openers are inciting incidents, not endpoints)
+            if (kind === "opener" && state.crucible.nodes.some(
+              (n) => n.id === targetUuid && n.kind === "goal",
+            )) {
+              api.v1.log(`[crucible] Solve: rejected opener→goal connection`);
+              goalConnectionsRejected++;
+              continue;
+            }
+
+            // Skip if target node already has too many connections
+            if (edgeCount(targetUuid, state.crucible.edges) >= MAX_EDGES_PER_NODE) {
+              api.v1.log(`[crucible] Solve: skipped edge to saturated node`);
+              continue;
+            }
+
+            // Skip if this arc edge would create a cycle
+            if (wouldCreateArcCycle(nodeId, targetUuid, state.crucible.nodes, state.crucible.edges)) {
+              api.v1.log(`[crucible] Solve: skipped arc cycle edge`);
+              continue;
+            }
+
             edges.push({
               source: nodeId,
               target: targetUuid,
@@ -214,15 +335,42 @@ export const crucibleSolveHandler: GenerationHandlers<CrucibleSolveTarget> = {
         // Reject orphan non-goal nodes — only goals may float
         if (kind !== "goal" && edges.length === 0) {
           api.v1.log(`[crucible] Solve add: rejected orphan ${kind} "${String(parsed.content).slice(0, 40)}"`);
-          ctx.dispatch(solverFeedbackSet({
-            feedback: `Rejected: ${kind} add had no valid connections. Every non-goal node MUST include a "connect" array linking to at least one existing node.`,
-          }));
+          const feedback = goalConnectionsRejected > 0
+            ? `Rejected: openers cannot connect to goals. Goals are endpoints. ` +
+              `Connect to beats or world nodes instead.`
+            : `Rejected: ${kind} add had no valid connections. Every non-goal node MUST include a "connect" array linking to at least one existing node.`;
+          ctx.dispatch(solverFeedbackSet({ feedback }));
           return;
+        }
+
+        // Arc nodes must connect to at least one other arc node.
+        // A situation connected only to characters/locations is disconnected from
+        // the narrative chain — it needs a link to a goal, beat, or opener.
+        const arcKind = kind as CrucibleNodeKind;
+        if (ARC_KINDS.has(arcKind) && kind !== "goal") {
+          const hasArcConnection = edges.some((e) => {
+            const targetNode = state.crucible.nodes.find((n) => n.id === e.target);
+            return targetNode && ARC_KINDS.has(targetNode.kind);
+          });
+          if (!hasArcConnection) {
+            api.v1.log(`[crucible] Solve add: rejected arc-disconnected ${kind} "${String(parsed.content).slice(0, 40)}"`);
+            ctx.dispatch(solverFeedbackSet({
+              feedback: `Rejected: ${kind} has no connection to another arc node (goal, beat, opener). ` +
+                `Arc nodes must connect to the narrative chain, not just to world nodes. ` +
+                `Add a connection to a beat or (for beats) a goal.`,
+            }));
+            return;
+          }
         }
 
         // Clear feedback on success
         ctx.dispatch(solverFeedbackSet({ feedback: null }));
         ctx.dispatch(nodesAdded({ nodes: [node], edges: edges.length > 0 ? edges : undefined }));
+
+        // Stop auto-solve when an opener is generated (narrative is complete enough)
+        if (kind === "opener") {
+          ctx.dispatch(crucibleAutoSolveStopped());
+        }
       } else if (op === "update") {
         const shortId = String(parsed.id || "");
         const uuid = idMap.get(shortId);
@@ -250,6 +398,40 @@ export const crucibleSolveHandler: GenerationHandlers<CrucibleSolveTarget> = {
           api.v1.log(`[crucible] Solve connect: invalid edge type "${edgeType}"`);
           return;
         }
+
+        // Reject opener ↔ goal connections (openers start the story, goals end it)
+        const sourceNode = state.crucible.nodes.find((n) => n.id === sourceUuid);
+        const targetNode = state.crucible.nodes.find((n) => n.id === targetUuid);
+        if (
+          sourceNode?.kind === "opener" && targetNode?.kind === "goal" ||
+          targetNode?.kind === "opener" && sourceNode?.kind === "goal"
+        ) {
+          api.v1.log(`[crucible] Solve connect: rejected opener↔goal edge`);
+          ctx.dispatch(solverFeedbackSet({
+            feedback: "Rejected: openers cannot connect directly to goals. Goals are endpoints.",
+          }));
+          return;
+        }
+
+        // Reject if either node is saturated
+        if (edgeCount(sourceUuid, state.crucible.edges) >= MAX_EDGES_PER_NODE ||
+            edgeCount(targetUuid, state.crucible.edges) >= MAX_EDGES_PER_NODE) {
+          api.v1.log(`[crucible] Solve connect: rejected — node at max connections (${MAX_EDGES_PER_NODE})`);
+          ctx.dispatch(solverFeedbackSet({
+            feedback: `Rejected: one of the nodes already has ${MAX_EDGES_PER_NODE} connections. Connect to a less-connected node instead.`,
+          }));
+          return;
+        }
+
+        // Reject arc cycles
+        if (wouldCreateArcCycle(sourceUuid, targetUuid, state.crucible.nodes, state.crucible.edges)) {
+          api.v1.log(`[crucible] Solve connect: rejected — would create arc cycle`);
+          ctx.dispatch(solverFeedbackSet({
+            feedback: "Rejected: this connection would create a cycle in the arc chain. Arc nodes must form a directed chain toward goals, not loops.",
+          }));
+          return;
+        }
+
         ctx.dispatch(solverFeedbackSet({ feedback: null }));
         ctx.dispatch(edgeAdded({
           edge: { source: sourceUuid, target: targetUuid, type: edgeType as CrucibleEdgeType },

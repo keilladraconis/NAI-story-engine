@@ -14,6 +14,7 @@ export const initialCrucibleState: CrucibleState = {
   edges: [],
   autoSolving: false,
   solverFeedback: null,
+  solverStalls: 0,
   windowOpen: false,
 };
 
@@ -33,6 +34,12 @@ export const crucibleSlice = createSlice({
     },
     intentEdited: (state, payload: { intent: string }) => {
       return { ...state, intent: payload.intent };
+    },
+    strategyEdited: (state, payload: { strategy: string }) => {
+      return { ...state, strategyLabel: payload.strategy };
+    },
+    crucibleIntentRequested: (state) => {
+      return state; // Intent action — effects queue intent generation
     },
     nodesAdded: (state, payload: { nodes: CrucibleNode[]; edges?: CrucibleEdge[] }) => {
       return {
@@ -161,7 +168,11 @@ export const crucibleSlice = createSlice({
       return state; // Intent action — effects cancel active request + stop auto-solve
     },
     solverFeedbackSet: (state, payload: { feedback: string | null }) => {
-      return { ...state, solverFeedback: payload.feedback };
+      return {
+        ...state,
+        solverFeedback: payload.feedback,
+        solverStalls: payload.feedback ? state.solverStalls + 1 : 0,
+      };
     },
     uiCrucibleSolveNextRequested: (state) => {
       return { ...state, autoSolving: true };
@@ -176,7 +187,7 @@ export const crucibleSlice = createSlice({
       return { ...initialCrucibleState };
     },
     crucibleLoaded: (_state, payload: { crucible: CrucibleState }) => {
-      return payload.crucible;
+      return { ...payload.crucible, autoSolving: false };
     },
     windowToggled: (state) => {
       return { ...state, windowOpen: !state.windowOpen };
@@ -188,6 +199,8 @@ export const {
   crucibleStarted,
   intentSet,
   intentEdited,
+  strategyEdited,
+  crucibleIntentRequested,
   nodesAdded,
   nodeUpdated,
   edgeAdded,

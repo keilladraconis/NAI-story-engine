@@ -34,12 +34,14 @@ import {
   requestCancelled,
   requestCompleted,
   crucibleLoaded,
-  crucibleStarted,
   crucibleCommitted,
   uiCrucibleSolveNextRequested,
   crucibleAutoSolveStopped,
   crucibleGoalsRequested,
+  crucibleIntentRequested,
   crucibleStopRequested,
+  strategyEdited,
+  solverFeedbackSet,
 } from "./index";
 import {
   createLorebookContentFactory,
@@ -57,6 +59,7 @@ import {
 } from "../utils/context-builder";
 import {
   buildCrucibleGoalsStrategy,
+  buildCrucibleIntentStrategy,
   buildCrucibleSolveStrategy,
 } from "../utils/crucible-strategy";
 import { IDS } from "../../ui/framework/ids";
@@ -226,7 +229,7 @@ function resolvePrefill(
   }
 
   // Crucible targets use explicit assistantPrefill (JSON anchors)
-  if (target.type === "crucibleGoals" || target.type === "crucibleSolve") {
+  if (target.type === "crucibleGoals" || target.type === "crucibleIntent" || target.type === "crucibleSolve") {
     if (assistantPrefill) return assistantPrefill;
   }
 
@@ -306,6 +309,8 @@ function cacheLabel(target: GenerationStrategy["target"]): string {
       return "bootstrap";
     case "crucibleGoals":
       return "crucible-goals";
+    case "crucibleIntent":
+      return "crucible-intent";
     case "crucibleSolve":
       return "crucible-solve";
   }
@@ -721,10 +726,11 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Start → queue goals generation
+  // Intent: Crucible Goals Requested → queue goals generation
   subscribeEffect(
-    matchesAction(crucibleStarted),
-    (_action, { dispatch }) => {
+    matchesAction(crucibleGoalsRequested),
+    async (_action, { dispatch }) => {
+      await syncStrategyFromStorage();
       const strategy = buildCrucibleGoalsStrategy(getState);
       dispatch(
         requestQueued({
@@ -737,15 +743,16 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Goals Requested → queue goals generation (no phase gate)
+  // Intent: Crucible Intent Requested → queue intent generation
   subscribeEffect(
-    matchesAction(crucibleGoalsRequested),
-    (_action, { dispatch }) => {
-      const strategy = buildCrucibleGoalsStrategy(getState);
+    matchesAction(crucibleIntentRequested),
+    async (_action, { dispatch }) => {
+      await syncStrategyFromStorage();
+      const strategy = buildCrucibleIntentStrategy(getState);
       dispatch(
         requestQueued({
           id: strategy.requestId,
-          type: "crucibleGoals",
+          type: "crucibleIntent",
           targetId: "crucible",
         }),
       );
@@ -762,7 +769,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         dispatch(crucibleAutoSolveStopped());
       }
       const activeRequest = state.runtime.activeRequest;
-      if (activeRequest && (activeRequest.type === "crucibleGoals" || activeRequest.type === "crucibleSolve")) {
+      if (activeRequest && (activeRequest.type === "crucibleGoals" || activeRequest.type === "crucibleIntent" || activeRequest.type === "crucibleSolve")) {
         dispatch(requestCancelled({ requestId: activeRequest.id }));
         genX.cancelAll();
       }
@@ -770,6 +777,15 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   );
 
   // --- Crucible solve helpers ---
+
+  /** Sync strategy from storageKey input back to state before generation */
+  async function syncStrategyFromStorage(): Promise<void> {
+    const storedStrategy = String(await api.v1.storyStorage.get("cr-strategy-value") || "");
+    const state = getState();
+    if (storedStrategy !== (state.crucible.strategyLabel || "")) {
+      dispatch(strategyEdited({ strategy: storedStrategy }));
+    }
+  }
 
   function dispatchSolve(): void {
     // Check ≥1 goal exists
@@ -792,25 +808,75 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     dispatch(generationSubmitted(strategy));
   }
 
+  // Smart start: generate preconditions (intent, goals) before solving
+  async function smartSolve(): Promise<void> {
+    await syncStrategyFromStorage();
+    const state = getState();
+
+    // If no intent, generate intent first
+    if (state.crucible.intent === null) {
+      dispatch(crucibleIntentRequested());
+      return;
+    }
+
+    // If no goal nodes, generate goals first
+    const hasGoals = state.crucible.nodes.some((n) => n.kind === "goal");
+    if (!hasGoals) {
+      dispatch(crucibleGoalsRequested());
+      return;
+    }
+
+    dispatchSolve();
+  }
+
+  // Local stall counter — tracks consecutive solve rejections.
+  // Using a closure variable instead of state to avoid dispatch timing issues.
+  let solveStalls = 0;
+  const MAX_STALLS = 3;
+
   // Intent: Crucible Solve Next (start auto-solve loop)
   subscribeEffect(
     matchesAction(uiCrucibleSolveNextRequested),
     () => {
-      dispatchSolve();
+      solveStalls = 0; // Reset on fresh user-initiated solve
+      smartSolve();
+    },
+  );
+
+  // Track stalls via solverFeedback changes
+  subscribeEffect(
+    matchesAction(solverFeedbackSet),
+    (action) => {
+      const { feedback } = action.payload as { feedback: string | null };
+      if (feedback) {
+        solveStalls++;
+        api.v1.log(`[crucible] Solve stall ${solveStalls}/${MAX_STALLS}`);
+      } else {
+        solveStalls = 0;
+      }
     },
   );
 
   // Auto-solve continuation: requeue on completion while autoSolving
+  // Allows both "idle" and "active" phases — smart start generates
+  // intent/goals during "idle", only "committed" should block.
   subscribeEffect(
     matchesAction(requestCompleted),
     async () => {
       await api.v1.timers.sleep(150);
 
       const state = getState();
-      if (!state.crucible.autoSolving || state.crucible.phase !== "active") return;
+      if (!state.crucible.autoSolving || state.crucible.phase === "committed") return;
       if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
 
-      dispatchSolve();
+      // Stop after consecutive rejections to prevent infinite loops
+      if (solveStalls >= MAX_STALLS) {
+        api.v1.log(`[crucible] Auto-solve stopped: ${solveStalls} consecutive rejections`);
+        dispatch(crucibleAutoSolveStopped());
+        return;
+      }
+
+      smartSolve();
     },
   );
 

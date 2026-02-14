@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771083671
+updatedAt: 1771098303
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -280,6 +280,29 @@ config:
       - Factions may have notable members, headquarters, rivals, or territorial interests
       - Systems may be practiced by factions, studied at locations, or mastered by characters
       Weave these connections naturally into the entry to create a cohesive world.
+  - name: crucible_intent_prompt
+    prettyName: Crucible Intent Prompt
+    description: Prompt for generating or regenerating the story intent from brainstorm
+    type: string
+    multiline: true
+    default: |-
+      [CRUCIBLE — INTENT EXTRACTION]
+      Analyze the brainstorm conversation and story state to extract a clear
+      story intent — the core tension, world premise, and narrative direction.
+
+      If the brainstorm implies a PROGRESSION (e.g. "what if X leads to Y",
+      "then Z happens"), capture that trajectory as guidance for the solver.
+
+      Also derive a set of thematic/genre/mood TAGS from the brainstorm.
+      Tags are single words or short phrases that anchor the story's identity.
+
+      You MUST output this EXACT JSON structure:
+      {
+        "intent": "2-4 sentence core tension, world premise, and narrative direction. If a progression is implied, describe the arc.",
+        "strategy": "character-driven|faction-conflict|mystery-revelation|exploration|slice-of-life|pressure-cooker|web-of-obligations",
+        "tags": ["tag1", "tag2", "tag3", "..."]
+      }
+      Output ONLY the JSON object. No other text.
   - name: crucible_goals_prompt
     prettyName: Crucible Goals Prompt
     description: Prompt for extracting intent and generating epic story goals
@@ -301,6 +324,7 @@ config:
       - If a goal could appear on a to-do list, it is TOO BORING. Escalate.
 
       Every goal uses DULFS format: "Name: 1-2 sentence description."
+      Keep each goal TERSE — name + one punchy sentence.
 
       You MUST output this EXACT JSON structure:
       {
@@ -324,6 +348,30 @@ config:
       Does this connection represent a real narrative dependency?"
       If the answer is no, pick a different operation.
 
+      NODE CATEGORIES:
+      - ARC NODES form the narrative chain: opener → beat → goal
+        These are plot events — the inciting incident, escalations, and climax.
+      - WORLD NODES provide context: character, faction, location, system, situation
+        These are the cast, setting, tensions, and mechanics that arc events
+        draw upon. They CONNECT TO arc nodes but don't form the chain.
+
+      BUILD ORDER — what to add when:
+      - When only goals exist: add CHARACTERS and SITUATIONS first. These
+        create the cast and tensions the story needs before any events.
+      - When the world has depth: add BEATS connected to goals (escalation
+        toward the climax) and to world nodes that participate in those events.
+      - Add OPENERS LAST — only when world nodes exist for the opener to
+        draw upon. An opener with nothing to connect to is useless.
+      NEVER add an opener when the web has only goals.
+
+      NARRATIVE POSITION — nodes exist at different points in time:
+      - Openers happen FIRST (inciting incident, catalyst, disruption of status quo)
+      - Situations and characters exist throughout
+      - Beats happen in the MIDDLE (escalation, complications, revelations)
+      - Goals happen at the END (climax, resolution, consequences)
+      Do NOT create an opener that describes a mid-story or climactic event.
+      An opener that sounds like it could be a goal is WRONG.
+
       Operations:
       - "add": Create a node that is REQUIRED by an existing goal or node.
         Do not invent nodes the story doesn't need. A character should exist
@@ -342,20 +390,39 @@ config:
       - "opposes": A and B are in active tension or conflict
       - "located_at": A physically takes place at or resides in B
 
+      CONNECTION RULES:
+      - Arc-to-arc (REQUIRED for arc nodes): every beat and opener MUST
+        connect to at least one other arc node. This forms the narrative chain.
+        Valid: opener→beat, beat→goal, beat→beat (escalation).
+        Arc connections must NOT create cycles — the chain is directional.
+      - World-to-arc: characters/factions/locations/situations connect to
+        arc nodes they participate in (via involves, located_at, requires).
+      - World-to-world: allowed sparingly — but don't over-connect. Each
+        node should have at most 3-4 connections total.
+      - Beat→goal: ALLOWED. Beats are escalation steps toward the climax.
+        This is the primary way the narrative chain reaches goals.
+      - FORBIDDEN: opener → goal directly. Openers are inciting incidents —
+        they connect to beats or world nodes, never to the endpoint.
+      - NO NEXUS NODES: If a node already has 4 connections, connect to
+        something else. A web where everything connects to one node is dull.
+
       BAD connections (will be rejected on review):
+      - An opener "involves" or "requires" a goal (impossible — goals are endpoints)
+      - A beat connected ONLY to goals with no world node involvement
       - A barista "involves" a domestic situation they have nothing to do with
       - A character "located_at" a place they have no reason to visit
       - Any link where removing it changes nothing about either node
 
-      DULFS format (MANDATORY — name + 1-2 sentences, no more):
-      - character: "Name (Gender, Age, Role): Motivations and core conflict."
-      - faction: "Name: Leader, goal, modus operandi."
-      - location: "Name: Region, atmosphere, how it drives conflict."
-      - system: "Name: Domain, mechanics/cost, current instability."
-      - situation: "Name: Scope, competing pressures, volatility."
-      - beat: "Name: Specific plot event or turning point."
-      - opener: "Name: Opening scene that launches a specific goal thread."
-      - goal: "Name: Extreme dramatic endpoint or consequence."
+      DULFS format (MANDATORY — name + ONE terse sentence, ≤15 words):
+      - character: "Name (Gender, Age, Role): Core motivation."
+      - faction: "Name: Goal and method."
+      - location: "Name: Atmosphere and narrative function."
+      - system: "Name: Mechanic and current instability."
+      - situation: "Name: Competing pressures."
+      - beat: "Name: Specific event or turning point."
+      - opener: "Name: The inciting incident — the FIRST thing that happens
+          to set events in motion. NOT a mid-story event or climax."
+      - goal: "Name: Extreme dramatic endpoint."
 
       Status markers in [CURRENT WEB]:
       ★ = user-favored — build toward this.

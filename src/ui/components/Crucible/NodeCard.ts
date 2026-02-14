@@ -27,9 +27,14 @@ const KIND_COLORS: Record<CrucibleNodeKind, string> = {
 };
 
 /**
- * Extract the display name from DULFS-formatted content ("Name: description").
+ * Extract the display name from DULFS-formatted content.
+ * Handles "Name (Gender, Age, Role): desc" and "Name: desc".
  */
 function extractName(content: string): string {
+  // "Name (Gender, Age, Role): desc" → "Name"
+  const parenMatch = content.match(/^([^(:]+)\s*\(/);
+  if (parenMatch) return parenMatch[1].trim();
+  // "Name: desc" → "Name"
   const colonIdx = content.indexOf(":");
   if (colonIdx > 0 && colonIdx < 60) return content.slice(0, colonIdx).trim();
   return content.slice(0, 30).trim();
