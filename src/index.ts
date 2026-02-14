@@ -63,7 +63,15 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
         if (story) store.dispatch(storyLoaded({ story }));
         if (brainstorm && brainstorm.messages)
           store.dispatch(brainstormLoaded({ messages: brainstorm.messages }));
-        if (crucible) store.dispatch(crucibleLoaded({ crucible }));
+        if (crucible) {
+          // Migration: v1 had currentRound, v2 had parentId/no edges — reset if old format
+          const c = crucible as any;
+          if ("currentRound" in c || !Array.isArray(c.edges) || c.nodes?.[0]?.parentId !== undefined) {
+            api.v1.log("[migration] Resetting pre-v3 Crucible state");
+          } else {
+            store.dispatch(crucibleLoaded({ crucible }));
+          }
+        }
       }
     } catch (e) {
       api.v1.log("Error loading persisted data:", e);

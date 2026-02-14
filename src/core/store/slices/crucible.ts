@@ -2,90 +2,175 @@ import { createSlice } from "nai-store";
 import {
   CrucibleState,
   CrucibleNode,
-  CrucibleNodeStatus,
-  CrucibleStrategy,
+  CrucibleEdge,
+  CrucibleNodeKind,
 } from "../types";
 
 export const initialCrucibleState: CrucibleState = {
   phase: "idle",
-  strategy: null,
+  intent: null,
+  strategyLabel: null,
   nodes: [],
-  currentRound: 0,
+  edges: [],
+  autoSolving: false,
+  solverFeedback: null,
   windowOpen: false,
 };
-
-/**
- * Mark nodes whose `serves` array includes the given ID as stale.
- */
-function markDependentsStale(nodes: CrucibleNode[], id: string): CrucibleNode[] {
-  return nodes.map((node) =>
-    node.serves.includes(id) ? { ...node, stale: true } : node,
-  );
-}
 
 export const crucibleSlice = createSlice({
   name: "crucible",
   initialState: initialCrucibleState,
   reducers: {
     crucibleStarted: (state) => {
-      return { ...state, phase: "seeding" as const };
+      return state; // Intent action — effects handle generation, phase changes on nodesAdded
     },
-    crucibleSeeded: (state, payload: { node: CrucibleNode }) => {
+    intentSet: (state, payload: { intent: string; strategyLabel?: string }) => {
       return {
         ...state,
-        phase: "expanding" as const,
-        nodes: [...state.nodes, payload.node],
+        intent: payload.intent,
+        strategyLabel: payload.strategyLabel || state.strategyLabel,
       };
     },
-    nodesAdded: (state, payload: { nodes: CrucibleNode[] }) => {
+    intentEdited: (state, payload: { intent: string }) => {
+      return { ...state, intent: payload.intent };
+    },
+    nodesAdded: (state, payload: { nodes: CrucibleNode[]; edges?: CrucibleEdge[] }) => {
       return {
         ...state,
+        phase: "active" as const,
         nodes: [...state.nodes, ...payload.nodes],
+        edges: payload.edges ? [...state.edges, ...payload.edges] : state.edges,
       };
     },
-    nodeStatusChanged: (
-      state,
-      payload: { id: string; status: CrucibleNodeStatus },
-    ) => {
-      let nodes = state.nodes.map((node) =>
-        node.id === payload.id ? { ...node, status: payload.status } : node,
-      );
-      if (payload.status === "edited" || payload.status === "rejected") {
-        nodes = markDependentsStale(nodes, payload.id);
-      }
-      return { ...state, nodes };
-    },
-    nodeEdited: (
-      state,
-      payload: { id: string; content: string },
-    ) => {
-      let nodes = state.nodes.map((node) =>
-        node.id === payload.id
-          ? {
-              ...node,
-              content: payload.content,
-              status: "edited" as const,
-            }
-          : node,
-      );
-      nodes = markDependentsStale(nodes, payload.id);
-      return { ...state, nodes };
-    },
-    nodeRemoved: (state, payload: { id: string }) => {
-      const staleMarked = markDependentsStale(state.nodes, payload.id);
+    nodeUpdated: (state, payload: { id: string; content: string }) => {
       return {
         ...state,
-        nodes: staleMarked.filter((node) => node.id !== payload.id),
+        nodes: state.nodes.map((node) =>
+          node.id === payload.id
+            ? { ...node, content: payload.content }
+            : node,
+        ),
       };
     },
-    strategySelected: (state, payload: { strategy: CrucibleStrategy }) => {
-      return { ...state, strategy: payload.strategy };
+    edgeAdded: (state, payload: { edge: CrucibleEdge }) => {
+      return {
+        ...state,
+        edges: [...state.edges, payload.edge],
+      };
     },
-    roundAdvanced: (state) => {
-      return { ...state, currentRound: state.currentRound + 1 };
+    nodeFavorited: (state, payload: { id: string }) => {
+      return {
+        ...state,
+        nodes: state.nodes.map((node) =>
+          node.id === payload.id
+            ? { ...node, status: node.status === "favorited" ? "pending" as const : "favorited" as const }
+            : node,
+        ),
+      };
+    },
+    nodeEdited: (state, payload: { id: string; content: string }) => {
+      return {
+        ...state,
+        nodes: state.nodes.map((node) =>
+          node.id === payload.id
+            ? { ...node, content: payload.content, status: "edited" as const }
+            : node,
+        ),
+      };
+    },
+    nodeDisfavored: (state, payload: { id: string }) => {
+      return {
+        ...state,
+        nodes: state.nodes.map((node) =>
+          node.id === payload.id
+            ? { ...node, status: node.status === "disfavored" ? "pending" as const : "disfavored" as const }
+            : node,
+        ),
+      };
+    },
+    nodesPruned: (state) => {
+      // 1. Remove disfavored nodes
+      const afterDisfavor = state.nodes.filter((n) => n.status !== "disfavored");
+
+      // 2. Find anchor nodes (favorited, edited, or goal)
+      const anchorIds = new Set(
+        afterDisfavor
+          .filter((n) => n.status === "favorited" || n.status === "edited" || n.kind === "goal")
+          .map((n) => n.id),
+      );
+
+      // 3. BFS from anchors via edges to find reachable nodes
+      const nodeIds = new Set(afterDisfavor.map((n) => n.id));
+      const reachable = new Set(anchorIds);
+      const queue = [...anchorIds];
+      while (queue.length > 0) {
+        const current = queue.pop()!;
+        for (const edge of state.edges) {
+          const neighbor =
+            edge.source === current ? edge.target :
+            edge.target === current ? edge.source : null;
+          if (neighbor && nodeIds.has(neighbor) && !reachable.has(neighbor)) {
+            reachable.add(neighbor);
+            queue.push(neighbor);
+          }
+        }
+      }
+
+      return {
+        ...state,
+        nodes: afterDisfavor.filter((n) => reachable.has(n.id)),
+        edges: state.edges.filter(
+          (e) => reachable.has(e.source) && reachable.has(e.target),
+        ),
+      };
+    },
+    userGoalAdded: (state) => {
+      const node: CrucibleNode = {
+        id: api.v1.uuid(),
+        kind: "goal",
+        origin: "user",
+        status: "pending",
+        content: "",
+        stale: false,
+      };
+      return {
+        ...state,
+        phase: state.phase === "idle" ? "active" as const : state.phase,
+        nodes: [...state.nodes, node],
+      };
+    },
+    userNodeAdded: (state, payload: { kind: CrucibleNodeKind }) => {
+      const node: CrucibleNode = {
+        id: api.v1.uuid(),
+        kind: payload.kind,
+        origin: "user",
+        status: "pending",
+        content: "",
+        stale: false,
+      };
+      return {
+        ...state,
+        phase: state.phase === "idle" ? "active" as const : state.phase,
+        nodes: [...state.nodes, node],
+      };
+    },
+    crucibleGoalsRequested: (state) => {
+      return state; // Intent action — effects queue goals generation
+    },
+    crucibleStopRequested: (state) => {
+      return state; // Intent action — effects cancel active request + stop auto-solve
+    },
+    solverFeedbackSet: (state, payload: { feedback: string | null }) => {
+      return { ...state, solverFeedback: payload.feedback };
+    },
+    uiCrucibleSolveNextRequested: (state) => {
+      return { ...state, autoSolving: true };
+    },
+    crucibleAutoSolveStopped: (state) => {
+      return { ...state, autoSolving: false };
     },
     crucibleCommitted: (state) => {
-      return { ...state, phase: "committed" as const };
+      return { ...state, phase: "committed" as const, autoSolving: false };
     },
     crucibleReset: () => {
       return { ...initialCrucibleState };
@@ -96,24 +181,29 @@ export const crucibleSlice = createSlice({
     windowToggled: (state) => {
       return { ...state, windowOpen: !state.windowOpen };
     },
-    uiCrucibleDeepenRequested: (state) => {
-      return state; // Intent action — effects handle generation
-    },
   },
 });
 
 export const {
   crucibleStarted,
-  crucibleSeeded,
+  intentSet,
+  intentEdited,
   nodesAdded,
-  nodeStatusChanged,
+  nodeUpdated,
+  edgeAdded,
+  nodeFavorited,
+  nodesPruned,
   nodeEdited,
-  nodeRemoved,
-  strategySelected,
-  roundAdvanced,
+  nodeDisfavored,
+  userGoalAdded,
+  userNodeAdded,
+  crucibleGoalsRequested,
+  crucibleStopRequested,
+  solverFeedbackSet,
+  uiCrucibleSolveNextRequested,
+  crucibleAutoSolveStopped,
   crucibleCommitted,
   crucibleReset,
   crucibleLoaded,
   windowToggled,
-  uiCrucibleDeepenRequested,
 } = crucibleSlice.actions;

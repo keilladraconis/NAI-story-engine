@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771016359
+updatedAt: 1771083671
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -280,48 +280,94 @@ config:
       - Factions may have notable members, headquarters, rivals, or territorial interests
       - Systems may be practiced by factions, studied at locations, or mastered by characters
       Weave these connections naturally into the entry to create a cohesive world.
-  - name: crucible_seed_prompt
-    prettyName: Crucible Seed Prompt
-    description: Prompt for extracting the core story intent from brainstorm conversation
+  - name: crucible_goals_prompt
+    prettyName: Crucible Goals Prompt
+    description: Prompt for extracting intent and generating epic story goals
     type: string
     multiline: true
     default: |-
-      [CRUCIBLE — SEED EXTRACTION]
-      Analyze the brainstorm conversation and extract the core story intent.
+      [CRUCIBLE — IGNITION]
+      Extract the story's core intent from the brainstorm, then generate 3-5 EXTREME
+      story goals that push the premise to its most dramatic possible conclusion.
 
-      Output a JSON object:
+      RULES FOR GOALS:
+      - Goals are CATACLYSMIC ENDPOINTS, not mundane tasks or mild objectives.
+      - WRONG: "Finds a better apartment." RIGHT: "Destroys the housing cartel that
+        enslaved an entire city district."
+      - WRONG: "Wins a local race." RIGHT: "Shatters the world speed record while
+        fleeing a government supersoldier program."
+      - Each goal should make the reader think "holy shit, how does THAT happen?"
+      - Every goal must be specific, visceral, and irreversible.
+      - If a goal could appear on a to-do list, it is TOO BORING. Escalate.
+
+      Every goal uses DULFS format: "Name: 1-2 sentence description."
+
+      You MUST output this EXACT JSON structure:
       {
-        "content": "Intent Name: 2-3 sentence description of the story intent. What is this story ABOUT — not plot, but the central tension, world premise, and emotional core."
+        "intent": "2-3 sentence core tension and world premise",
+        "strategy": "character-driven|faction-conflict|mystery-revelation|exploration|slice-of-life|pressure-cooker|web-of-obligations",
+        "goals": [{ "content": "Name: description" }, ...]
       }
-
-      Be concise. Output ONLY the JSON object. No markdown, no explanation.
-  - name: crucible_expand_prompt
-    prettyName: Crucible Expand Prompt
-    description: Prompt template for Crucible expansion rounds proposing new world nodes
+      Output ONLY the JSON object. No other text.
+  - name: crucible_solve_prompt
+    prettyName: Crucible Solve Prompt
+    description: Prompt for the web solver — GLM picks its own operation
     type: string
     multiline: true
     default: |-
-      [CRUCIBLE — EXPANSION ROUND]
-      You are expanding a story world. The intent and accepted elements are below.
+      [CRUCIBLE — WEB SOLVER]
+      You are a constraint solver building a narrative web. Every node must
+      serve the story's goals. [CURRENT WEB] shows all nodes and edges.
+      Choose ONE operation.
 
-      Propose 3-5 new world elements. Each must SERVE at least one existing node.
-      Prioritize gaps: if no locations exist, propose locations. If characters lack
-      factions, propose factions. Follow the interconnection principle — no isolates.
+      BEFORE choosing, ask: "Does this node NEED to exist for a goal to work?
+      Does this connection represent a real narrative dependency?"
+      If the answer is no, pick a different operation.
 
-      Additionally, propose ONE "nudge" — a surprising element that makes the world
-      more interesting. Mark it with "nudge": true. The user can always reject it.
+      Operations:
+      - "add": Create a node that is REQUIRED by an existing goal or node.
+        Do not invent nodes the story doesn't need. A character should exist
+        because a goal demands someone in that role. A location should exist
+        because events need to happen there. Never add a node just to fill
+        an under-represented category.
+        MANDATORY: Every non-goal node MUST include "connect" with at least
+        one valid link. Orphan nodes are rejected.
+      - "update": Improve an existing node's content — make it more specific,
+        raise the stakes, or sharpen the conflict.
+      - "connect": Link two nodes that have a genuine narrative dependency.
 
-      Be concise — 1-3 sentences per element. Output a JSON array:
-      [
-        {
-          "kind": "character|faction|location|system|situation|beat|opener",
-          "content": "Element Name: 1-3 sentence description",
-          "serves": ["id-of-node-this-supports", ...],
-          "nudge": false
-        }
-      ]
+      Edge types — use precisely:
+      - "requires": A CANNOT happen without B (causal dependency)
+      - "involves": A directly features B as a participant or setting
+      - "opposes": A and B are in active tension or conflict
+      - "located_at": A physically takes place at or resides in B
 
-      Output ONLY the JSON array. No markdown, no explanation.
+      BAD connections (will be rejected on review):
+      - A barista "involves" a domestic situation they have nothing to do with
+      - A character "located_at" a place they have no reason to visit
+      - Any link where removing it changes nothing about either node
+
+      DULFS format (MANDATORY — name + 1-2 sentences, no more):
+      - character: "Name (Gender, Age, Role): Motivations and core conflict."
+      - faction: "Name: Leader, goal, modus operandi."
+      - location: "Name: Region, atmosphere, how it drives conflict."
+      - system: "Name: Domain, mechanics/cost, current instability."
+      - situation: "Name: Scope, competing pressures, volatility."
+      - beat: "Name: Specific plot event or turning point."
+      - opener: "Name: Opening scene that launches a specific goal thread."
+      - goal: "Name: Extreme dramatic endpoint or consequence."
+
+      Status markers in [CURRENT WEB]:
+      ★ = user-favored — build toward this.
+      ✗ = user-disfavored — avoid entirely.
+
+      JSON formats:
+      "add": { "op":"add", "kind":"...", "content":"Name: desc",
+               "connect":[{"id":"G1","type":"requires"}] }
+      "update": { "op":"update", "id":"C1", "content":"Name: new desc" }
+      "connect": { "op":"connect", "source":"C1", "target":"G1", "type":"involves" }
+
+      Output ONLY the JSON object.
   - name: story_engine_debug
     prettyName: Story Engine Debug
     description: Enable debug logging for Story Engine

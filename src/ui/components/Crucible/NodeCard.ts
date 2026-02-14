@@ -1,32 +1,38 @@
 import { defineComponent } from "nai-act";
-import { RootState, CrucibleNode, CrucibleNodeStatus } from "../../../core/store/types";
-import { nodeStatusChanged, nodeEdited } from "../../../core/store/slices/crucible";
+import { RootState, CrucibleNode, CrucibleNodeKind } from "../../../core/store/types";
+import {
+  nodeFavorited,
+  nodeEdited,
+  nodeDisfavored,
+} from "../../../core/store/slices/crucible";
 import { IDS } from "../../framework/ids";
 import { calculateTextAreaHeight } from "../../utils";
 
 export interface NodeCardProps {
   node: CrucibleNode;
+  startInEditMode?: boolean;
 }
 
 const { text, row, column, button, multilineTextInput } = api.v1.ui.part;
 
-const STATUS_COLORS: Record<CrucibleNodeStatus, string> = {
-  pending: "rgba(255,255,255,0.15)",
-  accepted: "rgba(76,175,80,0.5)",
-  edited: "rgba(33,150,243,0.5)",
-  rejected: "rgba(244,67,54,0.3)",
+const KIND_COLORS: Record<CrucibleNodeKind, string> = {
+  goal: "#f5f3c2",
+  character: "#81d4fa",
+  faction: "#ef5350",
+  location: "#66bb6a",
+  system: "#ab47bc",
+  situation: "#ffa726",
+  beat: "#78909c",
+  opener: "#fff176",
 };
 
 /**
- * Extract a short name from "Name: description..." content format.
- * Falls back to first line or first 40 chars.
+ * Extract the display name from DULFS-formatted content ("Name: description").
  */
-function extractNodeName(content: string): string {
-  const colon = content.indexOf(":");
-  if (colon > 0 && colon < 60) return content.slice(0, colon).trim();
-  const nl = content.indexOf("\n");
-  if (nl > 0) return content.slice(0, nl).trim().slice(0, 40);
-  return content.trim().slice(0, 40);
+function extractName(content: string): string {
+  const colonIdx = content.indexOf(":");
+  if (colonIdx > 0 && colonIdx < 60) return content.slice(0, colonIdx).trim();
+  return content.slice(0, 30).trim();
 }
 
 export const NodeCard = defineComponent<NodeCardProps, RootState>({
@@ -39,19 +45,20 @@ export const NodeCard = defineComponent<NodeCardProps, RootState>({
       "background-color": "rgba(255,255,255,0.03)",
       "border-left": "3px solid rgba(255,255,255,0.15)",
       gap: "2px",
+      width: "220px",
+      "min-width": "180px",
+      "max-width": "260px",
+      flex: "1 1 220px",
     },
-    cardNudge: {
-      "border-left": "3px solid #ff9800",
-    },
-    cardAccepted: {
-      "border-left": "3px solid rgba(76,175,80,0.7)",
+    cardFavorited: {
+      "border-left": "3px solid rgba(233,30,99,0.7)",
     },
     cardEdited: {
       "border-left": "3px solid rgba(33,150,243,0.7)",
     },
-    cardRejected: {
-      opacity: "0.5",
-      "border-left": "3px solid rgba(244,67,54,0.4)",
+    cardDisfavored: {
+      opacity: "0.4",
+      "border-left": "3px dashed rgba(244,67,54,0.5)",
     },
     headerRow: {
       "align-items": "center",
@@ -59,19 +66,9 @@ export const NodeCard = defineComponent<NodeCardProps, RootState>({
     },
     kindBadge: {
       "font-size": "0.65em",
-      opacity: "0.5",
+      opacity: "0.9",
       "text-transform": "uppercase",
       "letter-spacing": "0.5px",
-    },
-    nameText: {
-      flex: "1",
-      "font-size": "0.85em",
-      "font-weight": "bold",
-      "word-break": "break-word",
-    },
-    nameTextRejected: {
-      "text-decoration": "line-through",
-      opacity: "0.7",
     },
     staleBadge: {
       "font-size": "0.75em",
@@ -82,29 +79,26 @@ export const NodeCard = defineComponent<NodeCardProps, RootState>({
     },
     contentText: {
       "font-size": "0.8em",
-      opacity: "0.7",
+      opacity: "0.85",
       "word-break": "break-word",
     },
-    servesRow: {
-      gap: "4px",
-      "flex-wrap": "wrap",
-    },
-    servesTag: {
+    connectionsRow: {
       "font-size": "0.7em",
       opacity: "0.6",
-      padding: "1px 4px",
-      "border-radius": "4px",
-      "background-color": "rgba(255,255,255,0.06)",
+      "flex-wrap": "wrap",
+      gap: "4px",
     },
-    servesRowHidden: {
+    connectionsHidden: {
       display: "none",
     },
     actionBtn: {
       padding: "1px 5px",
       "font-size": "0.75em",
     },
+    spacer: { flex: "1" },
     viewContainer: { width: "100%" },
     editContainer: { width: "100%", display: "none" },
+    editContainerVisible: { width: "100%", display: "block" },
     visible: { display: "block" },
     hidden: { display: "none" },
     inputStyle: { width: "100%", "min-height": "60px" },
@@ -114,26 +108,28 @@ export const NodeCard = defineComponent<NodeCardProps, RootState>({
 
   build(props, ctx) {
     const { dispatch, useSelector } = ctx;
-    const { node } = props;
+    const { node, startInEditMode } = props;
     const ids = IDS.CRUCIBLE.node(node.id);
 
-    const acceptNode = () =>
-      dispatch(nodeStatusChanged({ id: node.id, status: "accepted" }));
-    const rejectNode = () =>
-      dispatch(nodeStatusChanged({ id: node.id, status: "rejected" }));
+    const favoriteNode = () =>
+      dispatch(nodeFavorited({ id: node.id }));
+    const disfavorNode = () =>
+      dispatch(nodeDisfavored({ id: node.id }));
 
     const enterEdit = () => {
-      api.v1.storyStorage.set(`cr-draft-content-${node.id}`, node.content);
+      const currentNode = ctx.getState().crucible.nodes.find((n) => n.id === node.id);
+      const content = currentNode?.content || node.content;
+      api.v1.storyStorage.set(`cr-draft-content-${node.id}`, content);
       api.v1.ui.updateParts([
         { id: ids.VIEW, style: this.style?.("viewContainer", "hidden") },
-        { id: ids.EDIT, style: this.style?.("editContainer", "visible") },
+        { id: ids.EDIT, style: this.style?.("editContainerVisible") },
       ]);
     };
 
     const cancelEdit = () => {
       api.v1.ui.updateParts([
         { id: ids.VIEW, style: this.style?.("viewContainer", "visible") },
-        { id: ids.EDIT, style: this.style?.("editContainer", "hidden") },
+        { id: ids.EDIT, style: this.style?.("editContainer") },
       ]);
     };
 
@@ -141,34 +137,47 @@ export const NodeCard = defineComponent<NodeCardProps, RootState>({
       const content = String(
         (await api.v1.storyStorage.get(`cr-draft-content-${node.id}`)) || "",
       );
-      dispatch(nodeEdited({ id: node.id, content }));
+      if (content.trim()) {
+        dispatch(nodeEdited({ id: node.id, content }));
+      }
       api.v1.ui.updateParts([
         { id: ids.VIEW, style: this.style?.("viewContainer", "visible") },
-        { id: ids.EDIT, style: this.style?.("editContainer", "hidden") },
+        { id: ids.EDIT, style: this.style?.("editContainer") },
       ]);
     };
 
-    // Resolve served node names
-    const resolveServedNames = (state: RootState, serves: string[]): string[] => {
-      if (serves.length === 0) return [];
-      return serves.map((sid) => {
-        const served = state.crucible.nodes.find((n) => n.id === sid);
-        return served ? extractNodeName(served.content) : sid.slice(0, 8);
-      });
+    // Build connection tags from edges
+    const buildConnectionText = (state: RootState): string => {
+      const edges = state.crucible.edges.filter(
+        (e) => e.source === node.id || e.target === node.id,
+      );
+      if (edges.length === 0) return "";
+
+      const parts: string[] = [];
+      for (const edge of edges) {
+        const otherId = edge.source === node.id ? edge.target : edge.source;
+        const otherNode = state.crucible.nodes.find((n) => n.id === otherId);
+        if (!otherNode) continue;
+        const name = extractName(otherNode.content);
+        const direction = edge.source === node.id ? "\u2192" : "\u2190";
+        parts.push(`${direction} ${edge.type}: ${name}`);
+      }
+      return parts.join(" | ");
     };
 
     // Reactive: update node display when state changes
     useSelector(
-      (state) => state.crucible.nodes.find((n) => n.id === node.id),
-      (current) => {
+      (state) => ({
+        node: state.crucible.nodes.find((n) => n.id === node.id),
+        edges: state.crucible.edges.filter(
+          (e) => e.source === node.id || e.target === node.id,
+        ),
+      }),
+      (slice) => {
+        const current = slice.node;
         if (!current) return;
 
-        const name = extractNodeName(current.content);
-        const state = ctx.getState();
-        const servedNames = resolveServedNames(state, current.serves);
-
         api.v1.ui.updateParts([
-          { id: ids.NAME, text: name },
           { id: ids.CONTENT, text: current.content },
         ]);
 
@@ -182,79 +191,66 @@ export const NodeCard = defineComponent<NodeCardProps, RootState>({
           },
         ]);
 
-        // Update serves tags
-        if (servedNames.length > 0) {
-          api.v1.ui.updateParts([
-            {
-              id: ids.SERVES,
-              style: this.style?.("servesRow"),
-              content: servedNames.map((sn) =>
-                text({ text: `→ ${sn}`, style: this.style?.("servesTag") }),
-              ),
-            },
-          ]);
-        } else {
-          api.v1.ui.updateParts([
-            { id: ids.SERVES, style: this.style?.("servesRowHidden") },
-          ]);
-        }
-
-        // Update card border based on status + origin
+        // Update card border based on status
         let borderStyle: string;
-        if (current.origin === "nudge" && current.status === "pending") {
-          borderStyle = "cardNudge";
-        } else {
-          switch (current.status) {
-            case "accepted":
-              borderStyle = "cardAccepted";
-              break;
-            case "edited":
-              borderStyle = "cardEdited";
-              break;
-            case "rejected":
-              borderStyle = "cardRejected";
-              break;
-            default:
-              borderStyle = "cardRoot";
-          }
+        switch (current.status) {
+          case "favorited":
+            borderStyle = "cardFavorited";
+            break;
+          case "edited":
+            borderStyle = "cardEdited";
+            break;
+          case "disfavored":
+            borderStyle = "cardDisfavored";
+            break;
+          default:
+            borderStyle = "cardRoot";
         }
         api.v1.ui.updateParts([
           { id: ids.ROOT, style: this.style?.("cardRoot", borderStyle) },
         ]);
 
-        // Update name strikethrough for rejected
+        // Update connection tags
+        const state = ctx.getState();
+        const connText = buildConnectionText(state);
         api.v1.ui.updateParts([
           {
-            id: ids.NAME,
-            style:
-              current.status === "rejected"
-                ? this.style?.("nameText", "nameTextRejected")
-                : this.style?.("nameText"),
+            id: ids.CONNECTIONS,
+            text: connText,
+            style: connText
+              ? this.style?.("connectionsRow")
+              : this.style?.("connectionsHidden"),
           },
         ]);
       },
     );
 
-    // Initial computed values
-    const initialName = extractNodeName(node.content);
-    const initialState = ctx.getState();
-    const initialServedNames = resolveServedNames(initialState, node.serves);
-
     const initialBorderStyle =
-      node.origin === "nudge" && node.status === "pending"
-        ? "cardNudge"
-        : node.status === "accepted"
-          ? "cardAccepted"
-          : node.status === "edited"
-            ? "cardEdited"
-            : node.status === "rejected"
-              ? "cardRejected"
-              : "cardRoot";
+      node.status === "favorited"
+        ? "cardFavorited"
+        : node.status === "edited"
+          ? "cardEdited"
+          : node.status === "disfavored"
+            ? "cardDisfavored"
+            : "cardRoot";
+
+    // If starting in edit mode, seed storage for the empty content
+    if (startInEditMode) {
+      api.v1.storyStorage.set(`cr-draft-content-${node.id}`, node.content);
+    }
+
+    // Initial connection text
+    const initialState = ctx.getState();
+    const initialConnText = buildConnectionText(initialState);
+    const kindColor = KIND_COLORS[node.kind] || "#ffffff";
 
     // -- View Mode --
     const viewContainer = column({
       id: ids.VIEW,
-      style: this.style?.("viewContainer"),
+      style: this.style?.(
+        "viewContainer",
+        startInEditMode ? "hidden" : undefined,
+      ),
       content: [
         row({
           style: this.style?.("headerRow"),
@@ -263,41 +259,34 @@ export const NodeCard = defineComponent<NodeCardProps, RootState>({
               text: node.kind,
               style: {
                 ...this.style?.("kindBadge"),
-                color: STATUS_COLORS[node.status],
+                color: kindColor,
               },
             }),
             text({
-              id: ids.NAME,
-              text: initialName,
-              style:
-                node.status === "rejected"
-                  ? this.style?.("nameText", "nameTextRejected")
-                  : this.style?.("nameText"),
-            }),
-            text({
               id: ids.STALE,
-              text: "⚠",
+              text: "\u26A0",
               style: node.stale
                 ? this.style?.("staleBadge")
                 : this.style?.("staleBadgeHidden"),
             }),
+            text({ text: "", style: this.style?.("spacer") }),
             button({
-              text: "✓",
+              text: "\u2764",
               style: this.style?.("actionBtn"),
-              callback: acceptNode,
-              id: `${ids.ROOT}-accept`,
+              callback: favoriteNode,
+              id: `${ids.ROOT}-fav`,
             }),
             button({
-              text: "✎",
+              text: "\u270E",
               style: this.style?.("actionBtn"),
               callback: enterEdit,
               id: `${ids.ROOT}-edit`,
             }),
             button({
-              text: "✗",
+              text: "\u2717",
               style: this.style?.("actionBtn"),
-              callback: rejectNode,
-              id: `${ids.ROOT}-reject`,
+              callback: disfavorNode,
+              id: `${ids.ROOT}-disfavor`,
             }),
           ],
         }),
@@ -307,14 +296,12 @@ export const NodeCard = defineComponent<NodeCardProps, RootState>({
           style: this.style?.("contentText"),
           markdown: true,
         }),
-        row({
-          id: ids.SERVES,
-          style: initialServedNames.length > 0
-            ? this.style?.("servesRow")
-            : this.style?.("servesRowHidden"),
-          content: initialServedNames.map((sn) =>
-            text({ text: `→ ${sn}`, style: this.style?.("servesTag") }),
-          ),
+        text({
+          id: ids.CONNECTIONS,
+          text: initialConnText,
+          style: initialConnText
+            ? this.style?.("connectionsRow")
+            : this.style?.("connectionsHidden"),
         }),
       ],
     });
@@ -322,14 +309,16 @@ export const NodeCard = defineComponent<NodeCardProps, RootState>({
     // -- Edit Mode --
     const editContainer = column({
       id: ids.EDIT,
-      style: this.style?.("editContainer"),
+      style: startInEditMode
+        ? this.style?.("editContainerVisible")
+        : this.style?.("editContainer"),
       content: [
         multilineTextInput({
           id: ids.CONTENT_INPUT,
           storageKey: `story:cr-draft-content-${node.id}`,
           style: {
             ...this.style?.("inputStyle"),
-            height: calculateTextAreaHeight(node.content),
+            height: calculateTextAreaHeight(node.content || ""),
           },
           initialValue: node.content,
         }),

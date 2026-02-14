@@ -101,8 +101,8 @@ export interface GenerationRequest {
   | "lorebookKeys"
   | "lorebookRefine"
   | "bootstrap"
-  | "crucibleSeed"
-  | "crucibleExpand";
+  | "crucibleGoals"
+  | "crucibleSolve";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -121,8 +121,8 @@ export interface GenerationStrategy {
   | { type: "lorebookKeys"; entryId: string }
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }
-  | { type: "crucibleSeed" }
-  | { type: "crucibleExpand"; round: number };
+  | { type: "crucibleGoals" }
+  | { type: "crucibleSolve" };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
 }
@@ -139,34 +139,39 @@ export interface RuntimeState {
 
 // Crucible Types
 export type CrucibleNodeKind =
-  | "intent" | "beat" | "character" | "faction"
+  | "goal" | "beat" | "character" | "faction"
   | "location" | "system" | "situation" | "opener";
 
-export type CrucibleNodeStatus = "pending" | "accepted" | "edited" | "rejected";
-export type CrucibleNodeOrigin = "solver" | "nudge" | "user";
+export type CrucibleNodeStatus = "pending" | "favorited" | "edited" | "disfavored";
+export type CrucibleNodeOrigin = "solver" | "user";
 
-export type CrucibleStrategy =
-  | "character-driven" | "faction-conflict" | "mystery-revelation"
-  | "exploration" | "slice-of-life" | "custom";
+export type CrucibleEdgeType = "requires" | "involves" | "opposes" | "located_at";
 
-export type CruciblePhase = "idle" | "seeding" | "expanding" | "committed";
+export interface CrucibleEdge {
+  source: string;
+  target: string;
+  type: CrucibleEdgeType;
+}
+
+export type CruciblePhase = "idle" | "active" | "committed";
 
 export interface CrucibleNode {
   id: string;
   kind: CrucibleNodeKind;
   origin: CrucibleNodeOrigin;
   status: CrucibleNodeStatus;
-  round: number;
   content: string;
-  serves: string[];
   stale: boolean;
 }
 
 export interface CrucibleState {
   phase: CruciblePhase;
-  strategy: CrucibleStrategy | null;
+  intent: string | null;
+  strategyLabel: string | null;
   nodes: CrucibleNode[];
-  currentRound: number;
+  edges: CrucibleEdge[];
+  autoSolving: boolean;
+  solverFeedback: string | null;
   windowOpen: boolean;
 }
 

@@ -1,119 +1,120 @@
 /**
- * Crucible Strategy — Factory functions for Crucible seed and expand generations.
+ * Crucible Strategy — Factory functions for Crucible goals and web-solver generations.
  *
- * Follows the same unified-prefix pattern as lorebook-strategy.ts and context-builder.ts.
- * Both strategies share buildStoryEnginePrefix() for cache efficiency.
+ * v3: Web-based narrative solver. GLM sees the entire web and picks its own operations.
  */
 
 import {
   RootState,
   GenerationStrategy,
   CrucibleNode,
-  CrucibleStrategy,
+  CrucibleEdge,
   CrucibleNodeKind,
 } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "./context-builder";
 
-// --- Strategy Bias Instructions ---
+// --- Short ID prefixes per kind ---
 
-const STRATEGY_BIAS: Record<Exclude<CrucibleStrategy, "custom">, string> = {
-  "character-driven":
-    "Prioritize characters with conflicting motivations. Every proposed character should have a relationship tension with at least one existing character. Propose situations that force character choices.",
-  "faction-conflict":
-    "Prioritize factions and power structures. Characters should be members or opponents of factions. Locations should be contested or strategic. Situations should involve faction interests colliding.",
-  "mystery-revelation":
-    "Prioritize secrets, hidden information, and asymmetric knowledge. Characters should have something to hide. Locations should contain clues. Situations should involve information being revealed or suppressed.",
-  exploration:
-    "Prioritize locations, world systems, and frontiers. Characters should be discoverers or gatekeepers. Situations should involve the unknown or the boundary between known and unknown.",
-  "slice-of-life":
-    "Prioritize mundane but meaningful details — daily routines, community bonds, small personal stakes. Characters should have domestic concerns alongside larger tensions. Locations should feel lived-in.",
+const KIND_PREFIX: Record<CrucibleNodeKind, string> = {
+  goal: "G",
+  character: "C",
+  faction: "F",
+  location: "L",
+  system: "S",
+  situation: "D",
+  beat: "B",
+  opener: "O",
 };
 
-/**
- * Returns the strategy-specific bias paragraph for the given strategy.
- * For "custom", fetches the user's free-text instruction from storyStorage.
- */
-async function getStrategyBias(
-  strategy: CrucibleStrategy | null,
-): Promise<string> {
-  if (!strategy) return "";
-
-  if (strategy === "custom") {
-    const custom = String(
-      (await api.v1.storyStorage.get("kse-crucible-custom-strategy")) || "",
-    );
-    return custom || "";
-  }
-
-  return STRATEGY_BIAS[strategy] || "";
-}
-
-// --- Node Kind labels for grouping ---
+const KIND_ORDER: CrucibleNodeKind[] = [
+  "goal", "character", "faction", "location", "system", "situation", "beat", "opener",
+];
 
 const KIND_LABELS: Record<CrucibleNodeKind, string> = {
-  intent: "INTENT",
-  beat: "BEATS",
+  goal: "GOALS",
   character: "CHARACTERS",
   faction: "FACTIONS",
   location: "LOCATIONS",
   system: "SYSTEMS",
   situation: "SITUATIONS",
+  beat: "BEATS",
   opener: "OPENERS",
 };
 
 /**
- * Groups accepted/edited nodes by kind and formats as labeled sections.
- * Only includes nodes with status "accepted" or "edited".
+ * Format the narrative web for the solve prompt.
+ * Groups nodes by kind, assigns short IDs (G1, C1, etc.), formats edges.
+ * Returns the formatted string and a mapping of shortId → UUID.
  */
-function formatAcceptedNodes(nodes: CrucibleNode[]): string {
-  const accepted = nodes.filter(
-    (n) => n.status === "accepted" || n.status === "edited",
+export function formatWeb(
+  nodes: CrucibleNode[],
+  edges: CrucibleEdge[],
+): { formatted: string; idMap: Map<string, string> } {
+  const idMap = new Map<string, string>(); // shortId → uuid
+  const reverseMap = new Map<string, string>(); // uuid → shortId
+  const lines: string[] = [];
+
+  // Assign short IDs and group by kind
+  const kindCounters: Record<string, number> = {};
+  for (const kind of KIND_ORDER) {
+    const kindNodes = nodes.filter((n) => n.kind === kind);
+    if (kindNodes.length === 0) continue;
+
+    lines.push(`${KIND_LABELS[kind]}:`);
+    for (const node of kindNodes) {
+      const prefix = KIND_PREFIX[kind];
+      const count = (kindCounters[prefix] || 0) + 1;
+      kindCounters[prefix] = count;
+      const shortId = `${prefix}${count}`;
+      idMap.set(shortId, node.id);
+      reverseMap.set(node.id, shortId);
+      const marker =
+        node.status === "favorited" || node.status === "edited" ? " \u2605" :
+        node.status === "disfavored" ? " \u2717" : "";
+      lines.push(`  [${shortId}]${marker} ${node.content}`);
+    }
+  }
+
+  // Format edges
+  if (edges.length > 0) {
+    lines.push("EDGES:");
+    const edgeStrs: string[] = [];
+    for (const edge of edges) {
+      const sourceShort = reverseMap.get(edge.source);
+      const targetShort = reverseMap.get(edge.target);
+      if (sourceShort && targetShort) {
+        edgeStrs.push(`  ${sourceShort} --${edge.type}--> ${targetShort}`);
+      }
+    }
+    lines.push(...edgeStrs);
+  }
+
+  // Diversity report
+  const presentKinds = new Set(nodes.map((n) => n.kind));
+  const underRepresented = KIND_ORDER.filter(
+    (k) => k !== "goal" && !presentKinds.has(k),
   );
-
-  if (accepted.length === 0) return "";
-
-  const grouped: Partial<Record<CrucibleNodeKind, CrucibleNode[]>> = {};
-  for (const node of accepted) {
-    if (!grouped[node.kind]) grouped[node.kind] = [];
-    grouped[node.kind]!.push(node);
+  if (underRepresented.length > 0) {
+    lines.push(`UNDER-REPRESENTED: ${underRepresented.join(", ")}`);
   }
 
-  const sections: string[] = [];
-  for (const kind of Object.keys(KIND_LABELS) as CrucibleNodeKind[]) {
-    const group = grouped[kind];
-    if (!group || group.length === 0) continue;
-
-    const label = KIND_LABELS[kind];
-    const items = group
-      .map((n) => `- [${n.id}] ${n.content}`)
-      .join("\n");
-    sections.push(`[${label}]\n${items}`);
-  }
-
-  return sections.join("\n\n");
+  return { formatted: lines.join("\n"), idMap };
 }
 
 // --- Factory Functions ---
 
 /**
- * Creates a message factory for Crucible seed extraction.
- * Extracts the core intent from brainstorm as a JSON { content, summary } object.
+ * Creates a message factory for Crucible goal generation.
+ * GLM extracts intent + strategy + generates epic goals in one call.
  */
-export const createCrucibleSeedFactory = (
+export const createCrucibleGoalsFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const state = getState();
-
-    const seedPrompt = String(
-      (await api.v1.config.get("crucible_seed_prompt")) || "",
+    const goalsPrompt = String(
+      (await api.v1.config.get("crucible_goals_prompt")) || "",
     );
-
-    const bias = await getStrategyBias(state.crucible.strategy);
-    const strategyInstruction = bias
-      ? `\n\n[STRATEGY: ${state.crucible.strategy}]\n${bias}`
-      : "";
 
     const prefix = await buildStoryEnginePrefix(getState);
 
@@ -121,7 +122,57 @@ export const createCrucibleSeedFactory = (
       ...prefix,
       {
         role: "system",
-        content: `${seedPrompt}${strategyInstruction}`,
+        content: goalsPrompt,
+      },
+      { role: "assistant", content: '{"intent":"' },
+    ];
+
+    return {
+      messages,
+      params: {
+        model: "glm-4-6",
+        max_tokens: 1024,
+        temperature: 0.9,
+        min_p: 0.05,
+      },
+    };
+  };
+};
+
+/**
+ * Creates a message factory for Crucible web-solver.
+ * GLM sees the full web and chooses an operation (add/update/connect).
+ */
+export const createCrucibleSolveFactory = (
+  getState: () => RootState,
+): MessageFactory => {
+  return async () => {
+    const state = getState();
+
+    const solvePrompt = String(
+      (await api.v1.config.get("crucible_solve_prompt")) || "",
+    );
+
+    const { formatted } = formatWeb(state.crucible.nodes, state.crucible.edges);
+
+    const contextParts: string[] = [];
+    if (state.crucible.intent) {
+      contextParts.push(`[INTENT]\n${state.crucible.intent}`);
+    }
+    contextParts.push(`[CURRENT WEB]\n${formatted}`);
+
+    // Append solver feedback if the last operation was rejected
+    if (state.crucible.solverFeedback) {
+      contextParts.push(`[SOLVER FEEDBACK]\n${state.crucible.solverFeedback}`);
+    }
+
+    const prefix = await buildStoryEnginePrefix(getState);
+
+    const messages: Message[] = [
+      ...prefix,
+      {
+        role: "system",
+        content: `${solvePrompt}\n\n${contextParts.join("\n\n")}`,
       },
       { role: "assistant", content: "{" },
     ];
@@ -130,66 +181,8 @@ export const createCrucibleSeedFactory = (
       messages,
       params: {
         model: "glm-4-6",
-        max_tokens: 512,
-        temperature: 0.8,
-        min_p: 0.05,
-      },
-    };
-  };
-};
-
-/**
- * Creates a message factory for Crucible expansion rounds.
- * Proposes 3-5 new nodes that serve existing accepted nodes.
- */
-export const createCrucibleExpandFactory = (
-  getState: () => RootState,
-): MessageFactory => {
-  return async () => {
-    const state = getState();
-
-    const expandPrompt = String(
-      (await api.v1.config.get("crucible_expand_prompt")) || "",
-    );
-
-    // Build node context
-    const intentNode = state.crucible.nodes.find((n) => n.kind === "intent");
-    const intentSection = intentNode
-      ? `[INTENT]\n${intentNode.content}`
-      : "";
-
-    const acceptedSection = formatAcceptedNodes(
-      state.crucible.nodes.filter((n) => n.kind !== "intent"),
-    );
-
-    const bias = await getStrategyBias(state.crucible.strategy);
-    const strategyInstruction = bias
-      ? `[STRATEGY: ${state.crucible.strategy}]\n${bias}`
-      : "";
-
-    // Assemble the crucible-specific context
-    const contextParts: string[] = [];
-    if (intentSection) contextParts.push(intentSection);
-    if (acceptedSection) contextParts.push(`[ACCEPTED NODES]\n${acceptedSection}`);
-    if (strategyInstruction) contextParts.push(strategyInstruction);
-
-    const prefix = await buildStoryEnginePrefix(getState);
-
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: `${expandPrompt}\n\n${contextParts.join("\n\n")}`,
-      },
-      { role: "assistant", content: "[" },
-    ];
-
-    return {
-      messages,
-      params: {
-        model: "glm-4-6",
-        max_tokens: 1024,
-        temperature: 0.85,
+        max_tokens: 384,
+        temperature: 0.75,
         min_p: 0.05,
       },
     };
@@ -199,32 +192,31 @@ export const createCrucibleExpandFactory = (
 // --- Strategy Builders ---
 
 /**
- * Builds a Crucible seed generation strategy.
+ * Builds a Crucible goals generation strategy.
  */
-export const buildCrucibleSeedStrategy = (
+export const buildCrucibleGoalsStrategy = (
   getState: () => RootState,
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createCrucibleSeedFactory(getState),
-    target: { type: "crucibleSeed" },
+    messageFactory: createCrucibleGoalsFactory(getState),
+    target: { type: "crucibleGoals" },
     prefillBehavior: "keep",
-    assistantPrefill: "{",
+    assistantPrefill: '{"intent":"',
   };
 };
 
 /**
- * Builds a Crucible expand generation strategy.
+ * Builds a Crucible solve generation strategy.
  */
-export const buildCrucibleExpandStrategy = (
+export const buildCrucibleSolveStrategy = (
   getState: () => RootState,
 ): GenerationStrategy => {
-  const state = getState();
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createCrucibleExpandFactory(getState),
-    target: { type: "crucibleExpand", round: state.crucible.currentRound },
+    messageFactory: createCrucibleSolveFactory(getState),
+    target: { type: "crucibleSolve" },
     prefillBehavior: "keep",
-    assistantPrefill: "[",
+    assistantPrefill: "{",
   };
 };

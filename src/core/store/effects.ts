@@ -35,8 +35,11 @@ import {
   requestCompleted,
   crucibleLoaded,
   crucibleStarted,
-  uiCrucibleDeepenRequested,
-  roundAdvanced,
+  crucibleCommitted,
+  uiCrucibleSolveNextRequested,
+  crucibleAutoSolveStopped,
+  crucibleGoalsRequested,
+  crucibleStopRequested,
 } from "./index";
 import {
   createLorebookContentFactory,
@@ -53,8 +56,8 @@ import {
   extractDulfsItemName,
 } from "../utils/context-builder";
 import {
-  buildCrucibleSeedStrategy,
-  buildCrucibleExpandStrategy,
+  buildCrucibleGoalsStrategy,
+  buildCrucibleSolveStrategy,
 } from "../utils/crucible-strategy";
 import { IDS } from "../../ui/framework/ids";
 import {
@@ -223,7 +226,7 @@ function resolvePrefill(
   }
 
   // Crucible targets use explicit assistantPrefill (JSON anchors)
-  if (target.type === "crucibleSeed" || target.type === "crucibleExpand") {
+  if (target.type === "crucibleGoals" || target.type === "crucibleSolve") {
     if (assistantPrefill) return assistantPrefill;
   }
 
@@ -301,10 +304,10 @@ function cacheLabel(target: GenerationStrategy["target"]): string {
       return `lb-refine:${target.entryId.slice(0, 8)}`;
     case "bootstrap":
       return "bootstrap";
-    case "crucibleSeed":
-      return "crucible-seed";
-    case "crucibleExpand":
-      return `crucible-expand:r${target.round}`;
+    case "crucibleGoals":
+      return "crucible-goals";
+    case "crucibleSolve":
+      return "crucible-solve";
   }
 }
 
@@ -718,15 +721,15 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Seed (triggered when user starts Crucible)
+  // Intent: Crucible Start → queue goals generation
   subscribeEffect(
     matchesAction(crucibleStarted),
-    (_action, { dispatch, getState }) => {
-      const strategy = buildCrucibleSeedStrategy(getState);
+    (_action, { dispatch }) => {
+      const strategy = buildCrucibleGoalsStrategy(getState);
       dispatch(
         requestQueued({
           id: strategy.requestId,
-          type: "crucibleSeed",
+          type: "crucibleGoals",
           targetId: "crucible",
         }),
       );
@@ -734,20 +737,132 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Expand (user clicks "Deepen" for another round)
+  // Intent: Crucible Goals Requested → queue goals generation (no phase gate)
   subscribeEffect(
-    matchesAction(uiCrucibleDeepenRequested),
-    (_action, { dispatch, getState }) => {
-      dispatch(roundAdvanced());
-      const strategy = buildCrucibleExpandStrategy(getState);
+    matchesAction(crucibleGoalsRequested),
+    (_action, { dispatch }) => {
+      const strategy = buildCrucibleGoalsStrategy(getState);
       dispatch(
         requestQueued({
           id: strategy.requestId,
-          type: "crucibleExpand",
+          type: "crucibleGoals",
           targetId: "crucible",
         }),
       );
       dispatch(generationSubmitted(strategy));
+    },
+  );
+
+  // Intent: Crucible Stop → cancel active request + stop auto-solve
+  subscribeEffect(
+    matchesAction(crucibleStopRequested),
+    (_action, { dispatch, getState: getLatest }) => {
+      const state = getLatest();
+      if (state.crucible.autoSolving) {
+        dispatch(crucibleAutoSolveStopped());
+      }
+      const activeRequest = state.runtime.activeRequest;
+      if (activeRequest && (activeRequest.type === "crucibleGoals" || activeRequest.type === "crucibleSolve")) {
+        dispatch(requestCancelled({ requestId: activeRequest.id }));
+        genX.cancelAll();
+      }
+    },
+  );
+
+  // --- Crucible solve helpers ---
+
+  function dispatchSolve(): void {
+    // Check ≥1 goal exists
+    const state = getState();
+    const goals = state.crucible.nodes.filter((n) => n.kind === "goal");
+    if (goals.length === 0) {
+      api.v1.log("[crucible] Solve: no goals exist");
+      dispatch(crucibleAutoSolveStopped());
+      return;
+    }
+
+    const strategy = buildCrucibleSolveStrategy(getState);
+    dispatch(
+      requestQueued({
+        id: strategy.requestId,
+        type: "crucibleSolve",
+        targetId: "crucible",
+      }),
+    );
+    dispatch(generationSubmitted(strategy));
+  }
+
+  // Intent: Crucible Solve Next (start auto-solve loop)
+  subscribeEffect(
+    matchesAction(uiCrucibleSolveNextRequested),
+    () => {
+      dispatchSolve();
+    },
+  );
+
+  // Auto-solve continuation: requeue on completion while autoSolving
+  subscribeEffect(
+    matchesAction(requestCompleted),
+    async () => {
+      await api.v1.timers.sleep(150);
+
+      const state = getState();
+      if (!state.crucible.autoSolving || state.crucible.phase !== "active") return;
+      if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
+
+      dispatchSolve();
+    },
+  );
+
+  // Stop auto-solve on cancellation
+  subscribeEffect(
+    matchesAction(requestCancelled),
+    (action) => {
+      const state = getState();
+      if (!state.crucible.autoSolving) return;
+
+      const { requestId } = action.payload;
+      if (
+        state.runtime.activeRequest?.id === requestId &&
+        state.runtime.activeRequest?.type === "crucibleSolve"
+      ) {
+        dispatch(crucibleAutoSolveStopped());
+      }
+    },
+  );
+
+  // Intent: Crucible Export on Commit
+  subscribeEffect(
+    matchesAction(crucibleCommitted),
+    async (_action, { dispatch, getState }) => {
+      const state = getState();
+      const favorited = state.crucible.nodes.filter(
+        (n) => n.status === "favorited" || n.status === "edited",
+      );
+
+      // Map node kinds to DULFS field IDs
+      const kindToField: Record<string, DulfsFieldID | undefined> = {
+        character: FieldID.DramatisPersonae,
+        faction: FieldID.Factions,
+        location: FieldID.Locations,
+        system: FieldID.UniverseSystems,
+        situation: FieldID.SituationalDynamics,
+      };
+
+      let exported = 0;
+      for (const node of favorited) {
+        const fieldId = kindToField[node.kind];
+        if (!fieldId) continue; // Skip goals, beats, openers, intents
+
+        const itemId = api.v1.uuid();
+        await api.v1.storyStorage.set(`dulfs-item-${itemId}`, node.content);
+        dispatch(dulfsItemAdded({ fieldId, item: { id: itemId, fieldId } }));
+        exported++;
+      }
+
+      if (exported > 0) {
+        api.v1.ui.toast(`Exported ${exported} items to Story Engine`, { type: "success" });
+      }
     },
   );
 
