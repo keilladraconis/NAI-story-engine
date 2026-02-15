@@ -1,939 +1,718 @@
 import { defineComponent } from "nai-act";
 import {
   RootState,
-  CrucibleNode,
-  CrucibleEdge,
   CruciblePhase,
-  CrucibleNodeKind,
 } from "../../../core/store/types";
 import {
   crucibleCommitted,
   crucibleReset,
-  nodesPruned,
-  uiCrucibleSolveNextRequested,
   crucibleGoalsRequested,
   crucibleStopRequested,
-  userGoalAdded,
-  userNodeAdded,
-  intentEdited,
-  nodeFavorited,
-  nodeDisfavored,
+  goalsConfirmed,
+  goalToggled,
+  checkpointCleared,
+  crucibleChainRequested,
+  crucibleMergeRequested,
+  autoChainStarted,
+  beatRejected,
 } from "../../../core/store/slices/crucible";
-import { ARC_KINDS, WORLD_KINDS } from "../../../core/utils/crucible-strategy";
 import { IDS } from "../../framework/ids";
-import { NodeCard } from "./NodeCard";
 import { GenerationButton } from "../GenerationButton";
 import { BudgetFeedback } from "../BudgetFeedback";
-import { calculateTextAreaHeight } from "../../utils";
+import {
+  NAI_HEADER,
+  NAI_WARNING,
+  NAI_DARK_BACKGROUND,
+  NAI_PARAGRAPH,
+  STATUS_COMPLETE,
+  STATUS_GENERATING,
+} from "../../colors";
 
-const { text, row, column, button, textInput, multilineTextInput } = api.v1.ui.part;
+const { text, row, column, button } = api.v1.ui.part;
 
-const KIND_COLORS: Record<CrucibleNodeKind, string> = {
-  goal: "#f5f3c2",
-  character: "#81d4fa",
-  faction: "#ef5350",
-  location: "#66bb6a",
-  system: "#ab47bc",
-  situation: "#ffa726",
-  beat: "#78909c",
-  opener: "#fff176",
+const CR = IDS.CRUCIBLE;
+
+// --- Phase labels ---
+const PHASE_LABELS: Record<CruciblePhase, string> = {
+  idle: "Ready",
+  goals: "Goal Selection",
+  chaining: "Backward Chaining",
+  merging: "World Merge",
+  reviewing: "Review World",
+  populating: "Populating DULFS",
 };
 
-// Kinds available for "+ Node" picker (goals have their own button)
-const ADDABLE_KINDS: CrucibleNodeKind[] = [
-  "character", "faction", "location", "system", "situation", "beat", "opener",
-];
-
-// (World nodes rendered in insertion order, no grouping)
-
-/**
- * Decompose arc nodes into per-path columns. Each distinct chain leading to a
- * goal becomes one arc (vertical column). Goals at the bottom, openers at top.
- * If two beats both point to the same goal, that's two separate arcs.
- */
-function decomposeArcs(
-  nodes: CrucibleNode[],
-  edges: CrucibleEdge[],
-): { arcs: string[][]; loose: string[] } {
-  const arcNodes = new Map(
-    nodes.filter((n) => ARC_KINDS.has(n.kind)).map((n) => [n.id, n]),
-  );
-  const goals = nodes.filter((n) => n.kind === "goal");
-
-  // Build directed predecessors: for each arc node, who points TO it?
-  const predecessors = new Map<string, string[]>();
-  for (const [id] of arcNodes) predecessors.set(id, []);
-  for (const edge of edges) {
-    if (arcNodes.has(edge.source) && arcNodes.has(edge.target)) {
-      predecessors.get(edge.target)!.push(edge.source);
-    }
-  }
-
-  const arcs: string[][] = [];
-  const inArc = new Set<string>();
-
-  for (const goal of goals) {
-    // Walk backwards from goal, splitting at each fork
-    const walkBack = (nodeId: string, chain: string[]): void => {
-      const preds = predecessors.get(nodeId) || [];
-      if (preds.length === 0) {
-        // End of chain — emit arc (chain is in reverse order: goal first)
-        arcs.push([...chain].reverse()); // top-to-bottom: opener...beats...goal
-        chain.forEach((id) => inArc.add(id));
-        return;
-      }
-      for (const pred of preds) {
-        if (chain.includes(pred)) continue; // prevent loops
-        walkBack(pred, [...chain, pred]);
-      }
-    };
-    walkBack(goal.id, [goal.id]);
-  }
-
-  const loose = [...arcNodes.keys()].filter((id) => !inArc.has(id));
-  return { arcs, loose };
-}
-
-/**
- * Build the status text from runtime + crucible state.
- */
-function buildStatusText(state: RootState): string {
-  const { phase, nodes, edges, autoSolving } = state.crucible;
-  const activeReq = state.runtime.activeRequest;
-
-  if (activeReq?.type === "crucibleGoals") return "Generating goals\u2026";
-  if (activeReq?.type === "crucibleIntent") return "Generating intent\u2026";
-  if (activeReq?.type === "crucibleSolve" && autoSolving) return "\u26A1 Auto-solving\u2026";
-  if (activeReq?.type === "crucibleSolve") return "Solving\u2026";
-
-  switch (phase) {
-    case "idle":
-      return "Ready";
-    case "active":
-      return `${nodes.length} nodes \u00B7 ${edges.length} edges`;
-    case "committed":
-      return "Exported";
-  }
-}
-
-export const CrucibleWindow = defineComponent<void, RootState>({
-  id: () => IDS.CRUCIBLE.WINDOW_ROOT,
+export const CrucibleWindow = defineComponent<undefined, RootState>({
+  id: () => CR.WINDOW_ROOT,
 
   styles: {
     root: {
-      height: "100%",
-      gap: "4px",
-      padding: "6px 12px 6px 6px",
+      padding: "10px",
+      gap: "8px",
     },
     headerRow: {
-      "align-items": "center",
       "justify-content": "space-between",
+      "align-items": "center",
       gap: "6px",
+    },
+    title: {
+      "font-size": "1.1em",
+      "font-weight": "bold",
+      color: NAI_HEADER,
+    },
+    phaseTag: {
+      "font-size": "0.75em",
+      padding: "2px 8px",
+      "border-radius": "10px",
+      "background-color": "rgba(255,255,255,0.08)",
+      color: NAI_PARAGRAPH,
     },
     statusText: {
       "font-size": "0.8em",
-      opacity: "0.8",
-      flex: "1",
+      opacity: "0.7",
+      "min-height": "1.2em",
     },
-    intentContainer: {
-      gap: "2px",
-    },
-    intentViewRow: {
-      "align-items": "flex-start",
+    section: {
       gap: "4px",
     },
-    intentText: {
-      flex: "1",
-      "font-size": "0.8em",
-      opacity: "0.7",
-      "font-style": "italic",
+    sectionTitle: {
+      "font-size": "0.85em",
+      "font-weight": "bold",
+      opacity: "0.9",
+    },
+    goalCard: {
+      padding: "6px 8px",
+      "border-radius": "4px",
+      "background-color": "rgba(255,255,255,0.04)",
+      "border-left": "3px solid rgba(245,243,194,0.5)",
+      gap: "2px",
       cursor: "pointer",
     },
-    intentEditBtn: {
-      padding: "1px 5px",
-      "font-size": "0.7em",
-      opacity: "0.5",
-    },
-    intentEditContainer: {
-      display: "none",
-    },
-    intentEditContainerVisible: {
-      display: "block",
-    },
-    intentEditInput: {
-      width: "100%",
-      "min-height": "40px",
-    },
-    intentSaveRow: {
-      "justify-content": "flex-end",
-      "margin-top": "2px",
-      gap: "4px",
-    },
-    intentSaveBtn: {
-      padding: "3px 8px",
-      "font-size": "0.8em",
-    },
-    strategyInputRow: {
-      "align-items": "center",
-      gap: "4px",
-    },
-    strategyLabel: {
-      "font-size": "0.7em",
-      opacity: "0.5",
-    },
-    nodesCol: {
-      flex: "1",
-      overflow: "auto",
-      gap: "4px",
-      padding: "2px 0",
-    },
-    emptyState: {
-      "font-size": "0.8em",
-      opacity: "0.5",
-      "text-align": "center",
-      padding: "16px 0",
-    },
-    levelDivider: {
-      "border-top": "1px solid rgba(255,255,255,0.1)",
-      "margin-top": "4px",
-      "padding-top": "4px",
-    },
-    arcGroup: {
+    goalCardDeselected: {
+      padding: "6px 8px",
+      "border-radius": "4px",
+      "background-color": "rgba(255,255,255,0.02)",
+      "border-left": "3px solid rgba(128,128,128,0.3)",
       gap: "2px",
-      "border-left": "2px solid rgba(255,255,255,0.08)",
-      "padding-left": "6px",
-      "margin-bottom": "4px",
-      "padding-right": "8px",
+      cursor: "pointer",
+      opacity: "0.5",
     },
-    arcLine: {
-      "align-items": "center",
-      gap: "4px",
-    },
-    arcLineFavorited: {
-      "align-items": "center",
-      gap: "4px",
-      "border-left": "3px solid rgba(233,30,99,0.7)",
-      "padding-left": "4px",
-    },
-    arcLineDisfavored: {
-      "align-items": "center",
-      gap: "4px",
-      opacity: "0.35",
-      "text-decoration": "line-through",
-    },
-    arcLineEdited: {
-      "align-items": "center",
-      gap: "4px",
-      "border-left": "3px solid rgba(33,150,243,0.7)",
-      "padding-left": "4px",
-    },
-    arcKindBadge: {
-      "font-size": "0.65em",
-      opacity: "0.9",
-      "text-transform": "uppercase",
-      "letter-spacing": "0.5px",
-      "flex-shrink": "0",
-    },
-    arcInput: {
-      flex: "1",
-      "min-height": "1.4em",
+    goalText: {
       "font-size": "0.85em",
     },
-    levelRow: {
-      "flex-wrap": "wrap",
-      gap: "4px",
-    },
-    footerRow: {
-      gap: "4px",
-      "flex-wrap": "wrap",
-      "align-items": "center",
-    },
-    primaryBtn: {
-      padding: "4px 10px",
-      "font-weight": "bold",
-      "border-radius": "4px",
-    },
-    secondaryBtn: {
-      padding: "4px 10px",
-      "border-radius": "4px",
-    },
-    addGoalBtn: {
-      padding: "4px 10px",
-      "border-radius": "4px",
-      "font-size": "0.85em",
-    },
-    addNodeBtn: {
-      padding: "4px 10px",
-      "border-radius": "4px",
-      "font-size": "0.85em",
-    },
-    kindRow: {
-      gap: "4px",
-      "flex-wrap": "wrap",
-      "align-items": "center",
-      display: "none",
-    },
-    kindRowVisible: {
-      gap: "4px",
-      "flex-wrap": "wrap",
-      "align-items": "center",
-      display: "flex",
-    },
-    kindPickerBtn: {
-      padding: "2px 6px",
+    goalStakes: {
       "font-size": "0.75em",
-      "border-radius": "3px",
-    },
-    resetBtn: {
-      padding: "4px 8px",
       opacity: "0.6",
+    },
+    goalTerminal: {
+      "font-size": "0.75em",
+      opacity: "0.7",
+      "font-style": "italic",
+    },
+    buttonRow: {
+      gap: "6px",
+      "flex-wrap": "wrap",
+    },
+    btn: {
+      padding: "5px 10px",
+      "font-size": "0.8em",
+    },
+    btnPrimary: {
+      padding: "5px 10px",
+      "font-size": "0.8em",
+      "background-color": NAI_HEADER,
+      color: NAI_DARK_BACKGROUND,
+      "font-weight": "bold",
+    },
+    btnDanger: {
+      padding: "5px 10px",
+      "font-size": "0.8em",
+      color: NAI_WARNING,
+    },
+    checkpointBox: {
+      padding: "8px",
       "border-radius": "4px",
+      "background-color": "rgba(255,147,147,0.1)",
+      "border-left": "3px solid " + NAI_WARNING,
+      gap: "4px",
     },
-    genBtnRow: {
-      "font-size": "0.85em",
-    },
-    sectionLabel: {
-      "font-size": "0.7em",
-      opacity: "0.4",
-      "text-align": "center",
-      "border-top": "1px solid rgba(255,255,255,0.08)",
-      "margin-top": "4px",
-      "padding-top": "4px",
+    checkpointText: {
+      "font-size": "0.8em",
+      color: NAI_WARNING,
     },
     hidden: { display: "none" },
-    visible: { display: "flex" },
+    beatCard: {
+      padding: "4px 8px",
+      "border-radius": "3px",
+      "background-color": "rgba(255,255,255,0.03)",
+      "border-left": "2px solid rgba(120,144,156,0.5)",
+      gap: "2px",
+    },
+    beatScene: {
+      "font-size": "0.8em",
+    },
+    beatMeta: {
+      "font-size": "0.7em",
+      opacity: "0.6",
+    },
+    constraintOpen: {
+      "font-size": "0.75em",
+      color: STATUS_GENERATING,
+    },
+    constraintResolved: {
+      "font-size": "0.75em",
+      color: STATUS_COMPLETE,
+      opacity: "0.5",
+    },
+    elementItem: {
+      "font-size": "0.8em",
+      "padding-left": "8px",
+      "border-left": "2px solid rgba(255,255,255,0.1)",
+    },
+    mergedCard: {
+      padding: "6px 8px",
+      "border-radius": "4px",
+      "background-color": "rgba(255,255,255,0.04)",
+      "border-left": "3px solid rgba(129,212,250,0.5)",
+      gap: "2px",
+    },
+    mergedName: {
+      "font-size": "0.85em",
+      "font-weight": "bold",
+    },
+    mergedType: {
+      "font-size": "0.7em",
+      opacity: "0.6",
+      "text-transform": "uppercase",
+    },
+    mergedDesc: {
+      "font-size": "0.8em",
+      opacity: "0.85",
+    },
+    mergedPurpose: {
+      "font-size": "0.75em",
+      opacity: "0.6",
+      "font-style": "italic",
+    },
+    chainLabel: {
+      "font-size": "0.8em",
+      opacity: "0.8",
+    },
+    activeGoalTag: {
+      "font-size": "0.7em",
+      padding: "1px 6px",
+      "border-radius": "8px",
+      "background-color": STATUS_GENERATING,
+      color: NAI_DARK_BACKGROUND,
+    },
+    emptyState: {
+      "font-size": "0.85em",
+      opacity: "0.4",
+      "font-style": "italic",
+      "text-align": "center",
+      padding: "16px",
+    },
   },
 
   build(_props, ctx) {
     const { dispatch, useSelector } = ctx;
+    const state = ctx.getState();
 
-    // Track mounted node cards and which ones start in edit mode
-    const nodeParts = new Map<
-      string,
-      { part: UIPart; unmount: () => void }
-    >();
-    const newNodeIds = new Set<string>();
-    let kindRowVisible = false;
-
-    // Build a compact inline line for an arc node
-    const buildArcLine = (node: CrucibleNode): UIPart => {
-      const kindColor = KIND_COLORS[node.kind] || "#ffffff";
-      const storageKey = `cr-arc-content-${node.id}`;
-
-      const lineStyle = node.status === "favorited"
-        ? "arcLineFavorited"
-        : node.status === "disfavored"
-          ? "arcLineDisfavored"
-          : node.status === "edited"
-            ? "arcLineEdited"
-            : "arcLine";
-
-      // Seed storage with current store content
-      api.v1.storyStorage.set(storageKey, node.content);
-
-      return row({
-        id: `cr-arcnode-${node.id}`,
-        style: this.style?.(lineStyle),
-        content: [
-          text({
-            text: node.kind,
-            style: { ...this.style?.("arcKindBadge"), color: kindColor },
-          }),
-          multilineTextInput({
-            id: `cr-arcnode-${node.id}-input`,
-            storageKey: `story:${storageKey}`,
-            initialValue: node.content,
-            style: this.style?.("arcInput"),
-          }),
-          button({
-            iconId: "heart",
-            callback: () => dispatch(nodeFavorited({ id: node.id })),
-            id: `cr-arcnode-${node.id}-fav`,
-          }),
-          button({
-            iconId: "x",
-            callback: () => dispatch(nodeDisfavored({ id: node.id })),
-            id: `cr-arcnode-${node.id}-dis`,
-          }),
-        ],
-      });
-    };
-
-    // Build arc section — each arc is a horizontal group of compact lines
-    const buildArcLevels = (nodes: CrucibleNode[], edges: CrucibleEdge[]): UIPart[] => {
-      const { arcs, loose } = decomposeArcs(nodes, edges);
-      const content: UIPart[] = [];
-
-      if (arcs.length > 0) {
-        for (let i = 0; i < arcs.length; i++) {
-          const lines: UIPart[] = [];
-          for (const id of arcs[i]) {
-            const node = nodes.find((n) => n.id === id);
-            if (!node) continue;
-            lines.push(buildArcLine(node));
-          }
-          if (lines.length === 0) continue;
-
-          content.push(column({
-            id: `cr-arc-${i}`,
-            style: this.style?.("arcGroup"),
-            content: [
-              text({
-                id: `cr-arc-label-${i}`,
-                text: `\u2014 Arc ${i + 1} \u2014`,
-                style: this.style?.("sectionLabel"),
-              }),
-              ...lines,
-            ],
-          }));
-        }
-      }
-
-      // Loose arc nodes — render as NodeCard tiles
-      if (loose.length > 0) {
-        const looseCards: UIPart[] = [];
-        for (const id of loose) {
-          const entry = nodeParts.get(id);
-          if (entry) looseCards.push(entry.part);
-        }
-        if (looseCards.length > 0) {
-          content.push(text({
-            id: "cr-loose-label",
-            text: "\u2014 Loose \u2014",
-            style: this.style?.("sectionLabel"),
-          }));
-          content.push(row({
-            id: "cr-level-loose",
-            style: this.style?.("levelRow"),
-            content: looseCards,
-          }));
-        }
-      }
-
-      return content;
-    };
-
-    // Build world section — insertion order, no grouping
-    const buildWorldSection = (nodes: CrucibleNode[]): UIPart[] => {
-      const worldNodes = nodes.filter((n) => WORLD_KINDS.has(n.kind));
-      if (worldNodes.length === 0) return [];
-
-      const cards: UIPart[] = [];
-      for (const node of worldNodes) {
-        const entry = nodeParts.get(node.id);
-        if (entry) cards.push(entry.part);
-      }
-      if (cards.length === 0) return [];
-
-      return [
-        text({
-          id: "cr-world-label",
-          text: "\u2014 World \u2014",
-          style: this.style?.("sectionLabel"),
-        }),
-        row({
-          id: "cr-world-row",
-          style: this.style?.("levelRow"),
-          content: cards,
-        }),
-      ];
-    };
-
-    // Build full content: arc levels + world section
-    const buildLevelContent = (nodes: CrucibleNode[], edges: CrucibleEdge[]): UIPart[] => {
-      return [...buildArcLevels(nodes, edges), ...buildWorldSection(nodes)];
-    };
-
-    // Rebuild the nodes container from current state
-    const rebuildContent = () => {
-      const state = ctx.getState();
-      const nodes = state.crucible.nodes;
-      const hasNodes = nodes.length > 0;
-      const content = buildLevelContent(nodes, state.crucible.edges);
-
-      api.v1.ui.updateParts([
-        {
-          id: IDS.CRUCIBLE.EMPTY_STATE,
-          style: this.style?.(
-            "emptyState",
-            hasNodes ? "hidden" : undefined,
-          ),
-        },
-        {
-          id: IDS.CRUCIBLE.NODES_COL,
-          content: [emptyState, ...content],
-        },
-      ]);
-    };
-
-    // Mount NodeCards only for nodes that need tile rendering (world + loose arc)
-    const ensureNodeCards = (nodes: CrucibleNode[], edges: CrucibleEdge[]) => {
-      const { loose } = decomposeArcs(nodes, edges);
-      const looseSet = new Set(loose);
-      const nodeIds = new Set(nodes.map((n) => n.id));
-
-      for (const node of nodes) {
-        // Mount NodeCards for world nodes and loose arc nodes
-        const needsCard = WORLD_KINDS.has(node.kind) || looseSet.has(node.id);
-        if (needsCard && !nodeParts.has(node.id)) {
-          const isNew = newNodeIds.has(node.id);
-          if (isNew) newNodeIds.delete(node.id);
-          nodeParts.set(
-            node.id,
-            ctx.render(NodeCard, { node, startInEditMode: isNew }),
-          );
-        }
-      }
-
-      // Unmount removed nodes
-      for (const [id] of nodeParts) {
-        if (!nodeIds.has(id)) {
-          nodeParts.get(id)!.unmount();
-          nodeParts.delete(id);
-        }
-      }
-    };
-
-    // --- Read initial state ---
-    const initial = ctx.getState();
-    const initialStatusText = buildStatusText(initial);
-
-    // Mount initial node cards (world + loose arc only)
-    ensureNodeCards(initial.crucible.nodes, initial.crucible.edges);
-
-    const initialLevelContent = buildLevelContent(initial.crucible.nodes, initial.crucible.edges);
-    const hasInitialNodes = initial.crucible.nodes.length > 0;
-    const isActive = initial.crucible.phase === "active";
-    const isSolving = initial.crucible.autoSolving;
-    const activeSolve = initial.runtime.activeRequest?.type === "crucibleSolve";
-
-    // -- Header with status + BudgetFeedback --
-    const statusTextPart = text({
-      id: IDS.CRUCIBLE.STATUS_TEXT,
-      text: initialStatusText,
-      style: this.style?.("statusText"),
-    });
-
-    const { part: budgetFeedbackPart } = ctx.render(BudgetFeedback, { id: "cr-budget" });
-
-    // -- Intent display (editable) --
-    const intentViewId = "cr-intent-view";
-    const intentEditId = "cr-intent-edit";
-
-    const enterIntentEdit = () => {
-      const state = ctx.getState();
-      const content = state.crucible.intent || "";
-      api.v1.storyStorage.set("cr-intent-draft", content);
-      api.v1.ui.updateParts([
-        { id: intentViewId, style: this.style?.("intentViewRow", "hidden") },
-        { id: intentEditId, style: this.style?.("intentEditContainerVisible") },
-        { id: "cr-intent-input", style: {
-          ...this.style?.("intentEditInput"),
-          height: calculateTextAreaHeight(content),
-        }},
-      ]);
-    };
-
-    const cancelIntentEdit = () => {
-      api.v1.ui.updateParts([
-        { id: intentViewId, style: this.style?.("intentViewRow") },
-        { id: intentEditId, style: this.style?.("intentEditContainer") },
-      ]);
-    };
-
-    const saveIntentEdit = async () => {
-      const content = String(
-        (await api.v1.storyStorage.get("cr-intent-draft")) || "",
-      );
-      if (content.trim()) {
-        dispatch(intentEdited({ intent: content.trim() }));
-      }
-      api.v1.ui.updateParts([
-        { id: intentViewId, style: this.style?.("intentViewRow") },
-        { id: intentEditId, style: this.style?.("intentEditContainer") },
-      ]);
-    };
-
-    // -- Intent GenerationButton (icon variant) --
-    const { part: intentGenIconPart } = ctx.render(GenerationButton, {
-      id: IDS.CRUCIBLE.INTENT_BTN,
-      variant: "icon",
-      iconId: "zap",
-      stateProjection: (state: RootState) => ({
-        activeReqId: state.runtime.activeRequest?.type === "crucibleIntent"
-          ? state.runtime.activeRequest.id
-          : undefined,
-        queuedIds: state.runtime.queue
-          .filter((q) => q.type === "crucibleIntent")
-          .map((q) => q.id),
+    // --- Generation Buttons (with full budget/cancel/continue support) ---
+    const { part: goalsBtnPart } = ctx.render(GenerationButton, {
+      id: CR.GOALS_BTN,
+      label: "Generate Goals",
+      variant: "button",
+      generateAction: crucibleGoalsRequested(),
+      stateProjection: (s: RootState) => ({
+        activeType: s.runtime.activeRequest?.type,
+        queueTypes: s.runtime.queue.map((q) => q.type),
       }),
-      requestIdFromProjection: (proj: { activeReqId?: string; queuedIds: string[] }) =>
-        proj.activeReqId || proj.queuedIds[0],
-      onGenerate: () => dispatch(crucibleGoalsRequested()),
-      onCancel: () => dispatch(crucibleStopRequested()),
+      requestIdFromProjection: () => {
+        // Track goals by matching active request type
+        const s = ctx.getState();
+        if (s.runtime.activeRequest?.type === "crucibleGoals") return s.runtime.activeRequest.id;
+        const queued = s.runtime.queue.find((q) => q.type === "crucibleGoals");
+        return queued?.id;
+      },
+      isDisabledFromProjection: (proj: any) =>
+        proj.activeType === "crucibleChain" || proj.activeType === "crucibleMerge",
     });
 
-    const intentContainer = column({
-      id: IDS.CRUCIBLE.INTENT_TEXT,
-      style: this.style?.("intentContainer"),
-      content: [
-        row({
-          id: intentViewId,
-          style: this.style?.("intentViewRow"),
-          content: [
-            text({
-              id: "cr-intent-content",
-              text: initial.crucible.intent || "No intent \u2014 press Solve to generate",
-              style: this.style?.("intentText"),
-              markdown: true,
-            }),
-            intentGenIconPart,
-            button({
-              iconId: "edit",
-              style: this.style?.("intentEditBtn"),
-              callback: enterIntentEdit,
-              id: "cr-intent-edit-btn",
-            }),
-          ],
-        }),
-        column({
-          id: intentEditId,
-          style: this.style?.("intentEditContainer"),
-          content: [
-            multilineTextInput({
-              id: "cr-intent-input",
-              storageKey: "story:cr-intent-draft",
-              style: this.style?.("intentEditInput"),
-              initialValue: initial.crucible.intent || "",
-            }),
-            row({
-              style: this.style?.("intentSaveRow"),
+    const { part: budgetPart } = ctx.render(BudgetFeedback, { id: "cr-budget" });
+
+    // --- Reactive UI updates ---
+
+    // Phase display
+    useSelector(
+      (s) => s.crucible.phase,
+      (phase) => {
+        api.v1.ui.updateParts([
+          { id: CR.PHASE_TEXT, text: PHASE_LABELS[phase] || phase },
+        ]);
+      },
+    );
+
+    // Status text (active goal, chain progress, etc.)
+    useSelector(
+      (s) => ({
+        phase: s.crucible.phase,
+        activeGoalId: s.crucible.activeGoalId,
+        goals: s.crucible.goals,
+        chains: s.crucible.chains,
+        autoChaining: s.crucible.autoChaining,
+        activeType: s.runtime.activeRequest?.type,
+      }),
+      (slice) => {
+        let statusText = "";
+        if (slice.phase === "idle") {
+          statusText = "Generate goals from your brainstorm to begin.";
+        } else if (slice.phase === "goals") {
+          const selected = slice.goals.filter((g) => g.selected).length;
+          statusText = `${selected}/${slice.goals.length} goals selected. Confirm to begin chaining.`;
+        } else if (slice.phase === "chaining") {
+          const goal = slice.goals.find((g) => g.id === slice.activeGoalId);
+          const chain = slice.activeGoalId ? slice.chains[slice.activeGoalId] : null;
+          const beats = chain?.beats.length || 0;
+          const open = chain?.openConstraints.length || 0;
+          const goalName = goal?.goal?.slice(0, 40) || "...";
+          const auto = slice.autoChaining ? " (auto)" : "";
+          statusText = `Chaining: "${goalName}" — ${beats} beats, ${open} open constraints${auto}`;
+        } else if (slice.phase === "merging") {
+          statusText = "Merging world elements across goals...";
+        } else if (slice.phase === "reviewing") {
+          statusText = "Review the merged world. Commit to populate DULFS.";
+        } else if (slice.phase === "populating") {
+          statusText = "Elements exported to Story Engine.";
+        }
+        api.v1.ui.updateParts([{ id: CR.STATUS_TEXT, text: statusText }]);
+      },
+    );
+
+    // Goals list
+    useSelector(
+      (s) => s.crucible.goals,
+      (goals) => {
+        if (goals.length === 0) {
+          api.v1.ui.updateParts([
+            { id: CR.GOALS_LIST, style: this.style?.("hidden") },
+          ]);
+          return;
+        }
+
+        const goalParts = goals.map((goal) => {
+          const ids = CR.goal(goal.id);
+          return column({
+            id: ids.ROOT,
+            style: goal.selected
+              ? this.style?.("goalCard")
+              : this.style?.("goalCardDeselected"),
+            content: [
+              row({
+                style: { "justify-content": "space-between", "align-items": "center" },
+                content: [
+                  text({ id: ids.TEXT, text: goal.goal, style: this.style?.("goalText") }),
+                  button({
+                    id: ids.TOGGLE,
+                    text: goal.selected ? "✓" : "○",
+                    style: { "font-size": "0.8em", padding: "2px 6px" },
+                    callback: () => dispatch(goalToggled({ goalId: goal.id })),
+                  }),
+                ],
+              }),
+              text({
+                text: `Stakes: ${goal.stakes}`,
+                style: this.style?.("goalStakes"),
+              }),
+              text({
+                text: `Terminal: ${goal.terminalCondition}`,
+                style: this.style?.("goalTerminal"),
+              }),
+            ],
+          });
+        });
+
+        api.v1.ui.updateParts([
+          { id: CR.GOALS_LIST, style: { display: "flex" }, content: goalParts },
+        ]);
+      },
+    );
+
+    // Checkpoint display
+    useSelector(
+      (s) => s.crucible.checkpointReason,
+      (reason) => {
+        if (reason) {
+          api.v1.ui.updateParts([
+            { id: CR.CHECKPOINT_ROW, style: this.style?.("checkpointBox") },
+            { id: CR.CHECKPOINT_TEXT, text: reason },
+          ]);
+        } else {
+          api.v1.ui.updateParts([
+            { id: CR.CHECKPOINT_ROW, style: this.style?.("hidden") },
+          ]);
+        }
+      },
+    );
+
+    // Beats display (for active chain)
+    useSelector(
+      (s) => {
+        const { activeGoalId, chains } = s.crucible;
+        const chain = activeGoalId ? chains[activeGoalId] : null;
+        return {
+          beats: chain?.beats || [],
+          open: chain?.openConstraints || [],
+          resolved: chain?.resolvedConstraints || [],
+          elements: chain?.worldElements,
+          complete: chain?.complete || false,
+          activeGoalId,
+        };
+      },
+      (slice) => {
+        // Beats
+        if (slice.beats.length === 0) {
+          api.v1.ui.updateParts([
+            { id: CR.BEATS_LIST, style: this.style?.("hidden") },
+          ]);
+        } else {
+          // Show beats newest-first (closest to goal)
+          const beatParts = slice.beats.map((beat, i) =>
+            column({
+              style: this.style?.("beatCard"),
               content: [
-                button({
-                  text: "Cancel",
-                  style: this.style?.("intentSaveBtn"),
-                  callback: cancelIntentEdit,
-                  id: "cr-intent-cancel",
+                text({
+                  text: `Beat ${i + 1}: ${beat.scene}`,
+                  style: this.style?.("beatScene"),
                 }),
-                button({
-                  text: "Save",
-                  iconId: "save",
-                  style: this.style?.("intentSaveBtn"),
-                  callback: saveIntentEdit,
-                  id: "cr-intent-save",
-                }),
+                beat.location ? text({
+                  text: `📍 ${beat.location}`,
+                  style: this.style?.("beatMeta"),
+                }) : text({ text: "" }),
+                beat.conflictTension ? text({
+                  text: `⚔️ ${beat.conflictTension}`,
+                  style: this.style?.("beatMeta"),
+                }) : text({ text: "" }),
               ],
             }),
-          ],
-        }),
-      ],
-    });
+          ).reverse();
 
-    // -- Strategy: simple text input with storageKey --
-    // Seed storage on mount
-    api.v1.storyStorage.set("cr-strategy-value", initial.crucible.strategyLabel || "");
+          api.v1.ui.updateParts([
+            { id: CR.BEATS_LIST, style: { display: "flex" }, content: beatParts },
+          ]);
+        }
 
-    const strategyRow = row({
-      id: "cr-strategy-row",
-      style: this.style?.("strategyInputRow"),
-      content: [
-        text({ text: "Strategy:", style: this.style?.("strategyLabel") }),
-        textInput({
-          id: "cr-strategy-input",
-          initialValue: initial.crucible.strategyLabel || "",
-          placeholder: "e.g. character-driven",
-          storageKey: "story:cr-strategy-value",
-          style: { flex: "1", "font-size": "0.7em", opacity: "0.7" },
-        }),
-      ],
-    });
-
-    // -- Nodes container --
-    const emptyState = text({
-      id: IDS.CRUCIBLE.EMPTY_STATE,
-      text: "Generate or add goals to get started.",
-      style: this.style?.(
-        "emptyState",
-        hasInitialNodes ? "hidden" : undefined,
-      ),
-    });
-
-    // -- Goals GenerationButton (button variant in footer) --
-    const { part: goalsBtnPart } = ctx.render(GenerationButton, {
-      id: IDS.CRUCIBLE.GOALS_BTN,
-      variant: "button",
-      label: "Goals",
-      iconId: "zap",
-      style: this.style?.("genBtnRow"),
-      stateProjection: (state: RootState) => ({
-        activeReqId: state.runtime.activeRequest?.type === "crucibleGoals"
-          ? state.runtime.activeRequest.id
-          : undefined,
-        queuedIds: state.runtime.queue
-          .filter((q) => q.type === "crucibleGoals")
-          .map((q) => q.id),
-      }),
-      requestIdFromProjection: (proj: { activeReqId?: string; queuedIds: string[] }) =>
-        proj.activeReqId || proj.queuedIds[0],
-      onGenerate: () => dispatch(crucibleGoalsRequested()),
-      onCancel: () => dispatch(crucibleStopRequested()),
-    });
-
-    // -- Solve/Stop swap — only react to crucibleSolve --
-    const solveBtn = button({
-      id: IDS.CRUCIBLE.SOLVE_BTN,
-      text: "Solve \u25B6",
-      style: {
-        ...this.style?.("primaryBtn"),
-        display: isSolving || activeSolve ? "none" : "flex",
-      },
-      callback: () => dispatch(uiCrucibleSolveNextRequested()),
-    });
-
-    const stopBtn = button({
-      id: IDS.CRUCIBLE.STOP_BTN,
-      text: "Stop \u25A0",
-      style: {
-        ...this.style?.("primaryBtn"),
-        display: isSolving || activeSolve ? "flex" : "none",
-      },
-      callback: () => dispatch(crucibleStopRequested()),
-    });
-
-    // -- Other footer buttons --
-    const addGoalBtn = button({
-      id: IDS.CRUCIBLE.ADD_GOAL_BTN,
-      text: "+ Goal",
-      style: this.style?.("addGoalBtn"),
-      callback: () => dispatch(userGoalAdded()),
-    });
-
-    // Kind picker row (hidden by default)
-    const kindPickerButtons = ADDABLE_KINDS.map((kind) =>
-      button({
-        id: `cr-kind-pick-${kind}`,
-        text: kind,
-        style: {
-          ...this.style?.("kindPickerBtn"),
-          color: KIND_COLORS[kind],
-        },
-        callback: () => {
-          dispatch(userNodeAdded({ kind }));
-          const updated = ctx.getState();
-          const newNode = updated.crucible.nodes[updated.crucible.nodes.length - 1];
-          if (newNode && !nodeParts.has(newNode.id)) {
-            newNodeIds.add(newNode.id);
-          }
-        },
-      }),
-    );
-
-    const kindRow = row({
-      id: IDS.CRUCIBLE.KIND_ROW,
-      style: this.style?.("kindRow"),
-      content: kindPickerButtons,
-    });
-
-    const addNodeBtn = button({
-      id: IDS.CRUCIBLE.ADD_NODE_BTN,
-      text: "+ Node",
-      style: this.style?.("addNodeBtn"),
-      callback: () => {
-        kindRowVisible = !kindRowVisible;
-        api.v1.ui.updateParts([{
-          id: IDS.CRUCIBLE.KIND_ROW,
-          style: kindRowVisible
-            ? this.style?.("kindRowVisible")
-            : this.style?.("kindRow"),
-        }]);
-      },
-    });
-
-    const pruneBtn = button({
-      id: IDS.CRUCIBLE.PRUNE_BTN,
-      text: "Prune",
-      iconId: "scissors",
-      style: this.style?.(
-        "secondaryBtn",
-        isActive ? "visible" : "hidden",
-      ),
-      callback: () => dispatch(nodesPruned()),
-    });
-
-    const commitBtn = button({
-      id: IDS.CRUCIBLE.COMMIT_BTN,
-      text: "Commit",
-      iconId: "check-circle",
-      style: this.style?.(
-        "secondaryBtn",
-        isActive ? "visible" : "hidden",
-      ),
-      callback: () => dispatch(crucibleCommitted()),
-    });
-
-    const resetBtn = button({
-      id: IDS.CRUCIBLE.RESET_BTN,
-      text: "Reset",
-      iconId: "rotate-cw",
-      style: this.style?.(
-        "resetBtn",
-        initial.crucible.nodes.length > 0 || initial.crucible.intent ? "visible" : "hidden",
-      ),
-      callback: () => dispatch(crucibleReset()),
-    });
-
-    // -- Reactive: Update Solve/Stop swap + status on runtime changes --
-    const updateControls = () => {
-      const state = ctx.getState();
-      const phase = state.crucible.phase;
-      const phaseIsActive = phase === "active";
-      const activeReq = state.runtime.activeRequest;
-      const isActiveSolve = activeReq?.type === "crucibleSolve";
-      const solving = state.crucible.autoSolving;
-      const showStop = !!isActiveSolve || solving;
-
-      api.v1.ui.updateParts([
-        { id: IDS.CRUCIBLE.STATUS_TEXT, text: buildStatusText(state) },
-        // Solve/Stop swap — only for solve ops
-        {
-          id: IDS.CRUCIBLE.SOLVE_BTN,
-          style: {
-            ...this.style?.("primaryBtn"),
-            display: showStop ? "none" : "flex",
-          },
-        },
-        {
-          id: IDS.CRUCIBLE.STOP_BTN,
-          style: {
-            ...this.style?.("primaryBtn"),
-            display: showStop ? "flex" : "none",
-          },
-        },
-        {
-          id: IDS.CRUCIBLE.PRUNE_BTN,
-          style: this.style?.(
-            "secondaryBtn",
-            phaseIsActive ? "visible" : "hidden",
+        // Constraints
+        const constraintParts = [
+          ...slice.open.map((c) =>
+            text({
+              text: `○ ${c.description}`,
+              style: this.style?.("constraintOpen"),
+            }),
           ),
-        },
-        {
-          id: IDS.CRUCIBLE.COMMIT_BTN,
-          style: this.style?.(
-            "secondaryBtn",
-            phaseIsActive ? "visible" : "hidden",
+          ...slice.resolved.slice(-5).map((c) =>
+            text({
+              text: `● ${c.description} (${c.status === "groundState" ? "ground state" : "resolved"})`,
+              style: this.style?.("constraintResolved"),
+            }),
           ),
-        },
-        {
-          id: IDS.CRUCIBLE.RESET_BTN,
-          style: this.style?.(
-            "resetBtn",
-            state.crucible.nodes.length > 0 || state.crucible.intent ? "visible" : "hidden",
-          ),
-        },
-      ]);
-    };
+        ];
+        if (constraintParts.length > 0) {
+          api.v1.ui.updateParts([
+            { id: CR.CONSTRAINTS_LIST, style: { display: "flex" }, content: constraintParts },
+          ]);
+        } else {
+          api.v1.ui.updateParts([
+            { id: CR.CONSTRAINTS_LIST, style: this.style?.("hidden") },
+          ]);
+        }
 
-    // -- Reactive: Phase changes --
-    useSelector(
-      (state) => state.crucible.phase,
-      (_phase: CruciblePhase) => updateControls(),
+        // World elements summary
+        if (slice.elements) {
+          const counts: string[] = [];
+          if (slice.elements.characters.length) counts.push(`${slice.elements.characters.length} chars`);
+          if (slice.elements.locations.length) counts.push(`${slice.elements.locations.length} locs`);
+          if (slice.elements.factions.length) counts.push(`${slice.elements.factions.length} factions`);
+          if (slice.elements.systems.length) counts.push(`${slice.elements.systems.length} systems`);
+          if (slice.elements.situations.length) counts.push(`${slice.elements.situations.length} situations`);
+          const summary = counts.length > 0 ? `Elements: ${counts.join(", ")}` : "";
+          api.v1.ui.updateParts([
+            {
+              id: CR.ELEMENTS_LIST,
+              text: summary,
+              style: summary ? this.style?.("chainLabel") : this.style?.("hidden"),
+            },
+          ]);
+        }
+      },
     );
 
-    // -- Reactive: Runtime changes (activeRequest) --
+    // Merged world display
     useSelector(
-      (state) => ({
-        activeType: state.runtime.activeRequest?.type,
-        activeId: state.runtime.activeRequest?.id,
+      (s) => s.crucible.mergedWorld,
+      (mergedWorld) => {
+        if (!mergedWorld || mergedWorld.elements.length === 0) {
+          api.v1.ui.updateParts([
+            { id: CR.MERGED_LIST, style: this.style?.("hidden") },
+          ]);
+          return;
+        }
+
+        const elementParts = mergedWorld.elements.map((el) =>
+          column({
+            style: this.style?.("mergedCard"),
+            content: [
+              row({
+                style: { gap: "6px", "align-items": "center" },
+                content: [
+                  text({ text: el.name, style: this.style?.("mergedName") }),
+                  text({ text: el.type, style: this.style?.("mergedType") }),
+                ],
+              }),
+              text({ text: el.description, style: this.style?.("mergedDesc") }),
+              ...Object.entries(el.goalPurposes).map(([goal, purpose]) =>
+                text({
+                  text: `→ ${goal.slice(0, 30)}: ${purpose}`,
+                  style: this.style?.("mergedPurpose"),
+                }),
+              ),
+            ],
+          }),
+        );
+
+        api.v1.ui.updateParts([
+          { id: CR.MERGED_LIST, style: { display: "flex" }, content: elementParts },
+        ]);
+      },
+    );
+
+    // Action buttons visibility by phase
+    useSelector(
+      (s) => ({
+        phase: s.crucible.phase,
+        hasGoals: s.crucible.goals.length > 0,
+        hasSelectedGoals: s.crucible.goals.some((g) => g.selected),
+        activeGoalId: s.crucible.activeGoalId,
+        autoChaining: s.crucible.autoChaining,
+        hasMergedWorld: s.crucible.mergedWorld !== null,
       }),
-      () => updateControls(),
-    );
+      (slice) => {
+        const { phase } = slice;
 
-    // -- Reactive: autoSolving status --
-    useSelector(
-      (state) => state.crucible.autoSolving,
-      () => updateControls(),
-    );
-
-    // -- Reactive: Intent text updates --
-    useSelector(
-      (state) => state.crucible.intent,
-      (intent) => {
+        // Goals button: visible in idle
         api.v1.ui.updateParts([
           {
-            id: "cr-intent-content",
-            text: intent || "No intent \u2014 press Solve to generate",
+            id: `${CR.GOALS_BTN}`,
+            style: phase === "idle" ? { display: "flex" } : { display: "none" },
+          },
+        ]);
+
+        // Confirm Goals button
+        api.v1.ui.updateParts([
+          {
+            id: "cr-confirm-goals-btn",
+            style: phase === "goals" && slice.hasSelectedGoals
+              ? this.style?.("btnPrimary")
+              : this.style?.("hidden"),
+          },
+        ]);
+
+        // Chain controls
+        api.v1.ui.updateParts([
+          {
+            id: "cr-chain-row",
+            style: phase === "chaining" ? { display: "flex" } : { display: "none" },
+          },
+        ]);
+
+        // Commit button: visible in reviewing
+        api.v1.ui.updateParts([
+          {
+            id: CR.COMMIT_BTN,
+            style: phase === "reviewing" && slice.hasMergedWorld
+              ? this.style?.("btnPrimary")
+              : this.style?.("hidden"),
+          },
+        ]);
+
+        // Stop button: visible during chaining/merging/goals generation
+        api.v1.ui.updateParts([
+          {
+            id: CR.STOP_BTN,
+            style: (phase === "chaining" || phase === "merging")
+              ? this.style?.("btnDanger")
+              : this.style?.("hidden"),
           },
         ]);
       },
     );
 
-    // -- Reactive: Strategy label sync to storyStorage + UI input --
-    useSelector(
-      (state) => state.crucible.strategyLabel,
-      (strategy) => {
-        const val = strategy || "";
-        api.v1.storyStorage.set("cr-strategy-value", val);
-        api.v1.ui.updateParts([{ id: "cr-strategy-input", value: val }]);
-      },
-    );
-
-    // -- Reactive: Node/edge changes → reconcile cards + rebuild layout --
-    // Broader selector: triggers on node IDs, content, status, and edges
-    useSelector(
-      (state) => ({
-        sig: state.crucible.nodes.map((n) => `${n.id}:${n.content.length}:${n.status}`).join(","),
-        edgeSig: state.crucible.edges.length,
-      }),
-      () => {
-        const state = ctx.getState();
-        ensureNodeCards(state.crucible.nodes, state.crucible.edges);
-        rebuildContent();
-        updateControls();
-      },
-    );
-
-    // Intercept userGoalAdded to track new goal IDs for edit mode
-    const addGoalWithEditMode = () => {
-      dispatch(userGoalAdded());
-      const updated = ctx.getState();
-      const newNode = updated.crucible.nodes[updated.crucible.nodes.length - 1];
-      if (newNode && newNode.kind === "goal" && !nodeParts.has(newNode.id)) {
-        newNodeIds.add(newNode.id);
-      }
-    };
-
-    // Override the callback after creation
-    api.v1.ui.updateParts([{
-      id: IDS.CRUCIBLE.ADD_GOAL_BTN,
-      callback: addGoalWithEditMode,
-    }]);
-
-    // Build window
+    // --- Build initial UI tree ---
     return column({
-      id: IDS.CRUCIBLE.WINDOW_ROOT,
+      id: CR.WINDOW_ROOT,
       style: this.style?.("root"),
       content: [
-        // Header with status + budget feedback
+        // Header
         row({
           style: this.style?.("headerRow"),
-          content: [statusTextPart, budgetFeedbackPart],
+          content: [
+            text({ text: "Crucible", style: this.style?.("title") }),
+            text({
+              id: CR.PHASE_TEXT,
+              text: PHASE_LABELS[state.crucible.phase],
+              style: this.style?.("phaseTag"),
+            }),
+            button({
+              id: CR.RESET_BTN,
+              text: "Reset",
+              style: this.style?.("btn"),
+              callback: () => dispatch(crucibleReset()),
+            }),
+          ],
         }),
-        // Intent
-        intentContainer,
-        // Strategy (simple text input)
-        strategyRow,
-        // Nodes container (BFS grid)
+
+        // Status
+        text({
+          id: CR.STATUS_TEXT,
+          text: state.crucible.phase === "idle"
+            ? "Generate goals from your brainstorm to begin."
+            : "",
+          style: this.style?.("statusText"),
+        }),
+
+        // Budget feedback
+        budgetPart,
+
+        // Checkpoint alert
         column({
-          id: IDS.CRUCIBLE.NODES_COL,
-          style: this.style?.("nodesCol"),
-          content: [emptyState, ...initialLevelContent],
+          id: CR.CHECKPOINT_ROW,
+          style: state.crucible.checkpointReason
+            ? this.style?.("checkpointBox")
+            : this.style?.("hidden"),
+          content: [
+            text({
+              id: CR.CHECKPOINT_TEXT,
+              text: state.crucible.checkpointReason || "",
+              style: this.style?.("checkpointText"),
+            }),
+            row({
+              style: { gap: "6px" },
+              content: [
+                button({
+                  text: "Continue",
+                  style: this.style?.("btnPrimary"),
+                  callback: () => dispatch(checkpointCleared()),
+                }),
+                button({
+                  text: "Reject Beat",
+                  style: this.style?.("btnDanger"),
+                  callback: () => {
+                    const s = ctx.getState();
+                    if (s.crucible.activeGoalId) {
+                      dispatch(beatRejected({ goalId: s.crucible.activeGoalId }));
+                      dispatch(checkpointCleared());
+                    }
+                  },
+                }),
+              ],
+            }),
+          ],
         }),
-        // Kind picker row
-        kindRow,
-        // Single footer row: Goals, Solve/Stop, + Goal, + Node, Prune, Commit, Reset
+
+        row({ style: { "border-top": "1px solid rgba(255,255,255,0.08)", "margin": "4px 0" }, content: [] }),
+
+        // Goals Generation Button (with full state tracking)
+        goalsBtnPart,
+
+        // Confirm Goals button
+        button({
+          id: "cr-confirm-goals-btn",
+          text: "Confirm Goals & Start Chaining",
+          style: state.crucible.phase === "goals"
+            ? this.style?.("btnPrimary")
+            : this.style?.("hidden"),
+          callback: () => dispatch(goalsConfirmed()),
+        }),
+
+        // Goals list (populated reactively)
+        column({
+          id: CR.GOALS_LIST,
+          style: state.crucible.goals.length > 0
+            ? this.style?.("section")
+            : this.style?.("hidden"),
+          content: [],
+        }),
+
+        // Chain controls row
         row({
-          style: this.style?.("footerRow"),
-          content: [goalsBtnPart, solveBtn, stopBtn, addGoalBtn, addNodeBtn, pruneBtn, commitBtn, resetBtn],
+          id: "cr-chain-row",
+          style: state.crucible.phase === "chaining"
+            ? this.style?.("buttonRow")
+            : this.style?.("hidden"),
+          content: [
+            button({
+              text: "Step",
+              style: this.style?.("btn"),
+              callback: () => dispatch(crucibleChainRequested()),
+            }),
+            button({
+              text: "Auto-Chain",
+              style: this.style?.("btnPrimary"),
+              callback: () => {
+                dispatch(autoChainStarted());
+                dispatch(crucibleChainRequested());
+              },
+            }),
+            button({
+              text: "Merge World",
+              style: this.style?.("btn"),
+              callback: () => dispatch(crucibleMergeRequested()),
+            }),
+          ],
+        }),
+
+        // Stop button
+        button({
+          id: CR.STOP_BTN,
+          text: "Stop",
+          style: this.style?.("hidden"),
+          callback: () => dispatch(crucibleStopRequested()),
+        }),
+
+        // Beats list (populated reactively)
+        column({
+          id: CR.BEATS_LIST,
+          style: this.style?.("hidden"),
+          content: [],
+        }),
+
+        // Constraints list
+        column({
+          id: CR.CONSTRAINTS_LIST,
+          style: this.style?.("hidden"),
+          content: [],
+        }),
+
+        // Elements summary
+        text({
+          id: CR.ELEMENTS_LIST,
+          text: "",
+          style: this.style?.("hidden"),
+        }),
+
+        // Merged world list (populated reactively)
+        column({
+          id: CR.MERGED_LIST,
+          style: this.style?.("hidden"),
+          content: [],
+        }),
+
+        // Commit button
+        button({
+          id: CR.COMMIT_BTN,
+          text: "Commit to Story Engine",
+          style: this.style?.("hidden"),
+          callback: () => dispatch(crucibleCommitted()),
         }),
       ],
     });

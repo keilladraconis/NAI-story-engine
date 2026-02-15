@@ -3,68 +3,27 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import {
-  CrucibleNode,
-  CrucibleEdge,
-  CrucibleNodeKind,
-  CrucibleEdgeType,
+  CrucibleGoal,
+  CrucibleBeat,
+  Constraint,
+  WorldElements,
+  NamedElement,
+  MergedElement,
+  MergedElementType,
 } from "../../types";
-import { intentSet, nodesAdded, nodeUpdated, edgeAdded, solverFeedbackSet, strategyEdited, crucibleAutoSolveStopped } from "../../index";
-import { formatWeb, ARC_KINDS } from "../../../utils/crucible-strategy";
+import {
+  goalsSet,
+  beatAdded,
+  chainCompleted,
+  checkpointSet,
+  mergedWorldSet,
+} from "../../index";
 
 // --- Types for crucible targets ---
 
 type CrucibleGoalsTarget = { type: "crucibleGoals" };
-type CrucibleIntentTarget = { type: "crucibleIntent" };
-type CrucibleSolveTarget = { type: "crucibleSolve" };
-
-// --- Allowed node kinds for validation ---
-
-const ALLOWED_KINDS = new Set<string>([
-  "goal", "beat", "character", "faction",
-  "location", "system", "situation", "opener",
-]);
-
-const ALLOWED_EDGE_TYPES = new Set<string>([
-  "requires", "involves", "opposes", "located_at",
-]);
-
-// Connection caps enforced in slice reducers (WORLD_NODE_SOFT_CAP).
-// Arc nodes have no connection cap.
-
-/**
- * Check if adding an edge source→target would create a cycle among arc nodes.
- * Uses BFS: if target can already reach source via existing arc edges, adding
- * source→target closes a loop.
- */
-function wouldCreateArcCycle(
-  sourceUuid: string,
-  targetUuid: string,
-  nodes: CrucibleNode[],
-  edges: CrucibleEdge[],
-): boolean {
-  const arcNodeIds = new Set(nodes.filter((n) => ARC_KINDS.has(n.kind)).map((n) => n.id));
-  if (!arcNodeIds.has(sourceUuid) || !arcNodeIds.has(targetUuid)) return false;
-
-  // Directed BFS from target following source→target direction.
-  // If target can reach source via directed edges, adding source→target closes a cycle.
-  const visited = new Set<string>();
-  const queue = [targetUuid];
-  visited.add(targetUuid);
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    if (current === sourceUuid) return true;
-    for (const edge of edges) {
-      // Follow directed: edge.source === current → neighbor is edge.target
-      if (edge.source === current && arcNodeIds.has(edge.target) && !visited.has(edge.target)) {
-        visited.add(edge.target);
-        queue.push(edge.target);
-      }
-    }
-  }
-
-  return false;
-}
+type CrucibleChainTarget = { type: "crucibleChain"; goalId: string };
+type CrucibleMergeTarget = { type: "crucibleMerge" };
 
 // --- JSON Repair ---
 
@@ -126,6 +85,34 @@ function repairJSON(text: string): string {
   return cleaned;
 }
 
+/** Parse an array of NamedElement from raw JSON array. */
+function parseNamedElements(arr: unknown): NamedElement[] {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .filter((item): item is { name: string; description: string } =>
+      typeof item === "object" && item !== null && typeof (item as any).name === "string",
+    )
+    .map((item) => ({
+      name: String(item.name),
+      description: String((item as any).description || ""),
+    }));
+}
+
+/** Parse WorldElements from a raw JSON object. */
+function parseWorldElements(obj: unknown): WorldElements {
+  if (typeof obj !== "object" || obj === null) {
+    return { characters: [], locations: [], factions: [], systems: [], situations: [] };
+  }
+  const o = obj as Record<string, unknown>;
+  return {
+    characters: parseNamedElements(o.characters),
+    locations: parseNamedElements(o.locations),
+    factions: parseNamedElements(o.factions),
+    systems: parseNamedElements(o.systems),
+    situations: parseNamedElements(o.situations),
+  };
+}
+
 // --- Goals Handler ---
 
 export const crucibleGoalsHandler: GenerationHandlers<CrucibleGoalsTarget> = {
@@ -139,22 +126,16 @@ export const crucibleGoalsHandler: GenerationHandlers<CrucibleGoalsTarget> = {
     try {
       const json = repairJSON(ctx.accumulatedText);
       const parsed = JSON.parse(json) as {
-        intent?: string;
-        strategy?: string;
-        goals?: Array<{ content?: string }>;
+        goals?: Array<{
+          goal?: string;
+          stakes?: string;
+          theme?: string;
+          emotionalArc?: string;
+          emotional_arc?: string;
+          terminalCondition?: string;
+          terminal_condition?: string;
+        }>;
       };
-
-      // Extract intent if present — only set if no manual intent exists
-      if (parsed.intent && !ctx.getState().crucible.intent) {
-        const strategyLabel = parsed.strategy ? String(parsed.strategy) : undefined;
-        ctx.dispatch(intentSet({
-          intent: String(parsed.intent),
-          strategyLabel,
-        }));
-        if (strategyLabel) {
-          api.v1.storyStorage.set("cr-strategy-value", strategyLabel);
-        }
-      }
 
       const goalsArray = parsed.goals;
       if (!Array.isArray(goalsArray) || goalsArray.length === 0) {
@@ -162,22 +143,23 @@ export const crucibleGoalsHandler: GenerationHandlers<CrucibleGoalsTarget> = {
         return;
       }
 
-      const goals: CrucibleNode[] = [];
+      const goals: CrucibleGoal[] = [];
       for (const element of goalsArray) {
-        if (!element.content) continue;
+        if (!element.goal) continue;
 
         goals.push({
           id: api.v1.uuid(),
-          kind: "goal",
-          origin: "solver",
-          status: "pending",
-          content: String(element.content),
-          stale: false,
+          goal: String(element.goal),
+          stakes: String(element.stakes || ""),
+          theme: String(element.theme || ""),
+          emotionalArc: String(element.emotionalArc || element.emotional_arc || ""),
+          terminalCondition: String(element.terminalCondition || element.terminal_condition || ""),
+          selected: true,
         });
       }
 
       if (goals.length > 0) {
-        ctx.dispatch(nodesAdded({ nodes: goals }));
+        ctx.dispatch(goalsSet({ goals }));
       }
     } catch (e) {
       api.v1.log("[crucible] Goals JSON parse failed:", e);
@@ -186,256 +168,169 @@ export const crucibleGoalsHandler: GenerationHandlers<CrucibleGoalsTarget> = {
   },
 };
 
-// --- Intent Handler ---
+// --- Chain Handler ---
 
-export const crucibleIntentHandler: GenerationHandlers<CrucibleIntentTarget> = {
+export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
   streaming(): void {
     // No-op — JSON accumulates silently
   },
 
-  async completion(ctx: CompletionContext<CrucibleIntentTarget>): Promise<void> {
+  async completion(ctx: CompletionContext<CrucibleChainTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
+
+    const { goalId } = ctx.target;
+    const state = ctx.getState();
+    const chain = state.crucible.chains[goalId];
+    if (!chain) return;
 
     try {
       const json = repairJSON(ctx.accumulatedText);
       const parsed = JSON.parse(json) as {
-        intent?: string;
-        strategy?: string;
-        tags?: string[];
+        scene?: string;
+        charactersPresent?: string[];
+        characters_present?: string[];
+        location?: string;
+        conflictTension?: string;
+        conflict_tension?: string;
+        conflict?: string;
+        worldElementsIntroduced?: unknown;
+        world_elements_introduced?: unknown;
+        world_elements?: unknown;
+        constraintsResolved?: string[];
+        constraints_resolved?: string[];
+        newOpenConstraints?: string[];
+        new_open_constraints?: string[];
+        groundStateConstraints?: string[];
+        ground_state_constraints?: string[];
       };
 
-      if (parsed.intent) {
-        // Build intent text with tags if present
-        let intentText = String(parsed.intent);
-        if (Array.isArray(parsed.tags) && parsed.tags.length > 0) {
-          const tagLine = parsed.tags.map((t) => String(t)).join(", ");
-          intentText += `\nTags: ${tagLine}`;
-        }
-
-        // Always overwrite — user explicitly requested (re)generation
-        ctx.dispatch(intentSet({ intent: intentText }));
+      if (!parsed.scene) {
+        api.v1.log("[crucible] Chain parse: missing scene");
+        return;
       }
 
-      if (parsed.strategy) {
-        const strategyValue = String(parsed.strategy);
-        ctx.dispatch(strategyEdited({ strategy: strategyValue }));
-        api.v1.storyStorage.set("cr-strategy-value", strategyValue);
+      const beat: CrucibleBeat = {
+        scene: String(parsed.scene),
+        charactersPresent: (parsed.charactersPresent || parsed.characters_present || []).map(String),
+        location: String(parsed.location || ""),
+        conflictTension: String(parsed.conflictTension || parsed.conflict_tension || parsed.conflict || ""),
+        worldElementsIntroduced: parseWorldElements(
+          parsed.worldElementsIntroduced || parsed.world_elements_introduced || parsed.world_elements,
+        ),
+        constraintsResolved: (parsed.constraintsResolved || parsed.constraints_resolved || []).map(String),
+        newOpenConstraints: (parsed.newOpenConstraints || parsed.new_open_constraints || []).map(String),
+        groundStateConstraints: (parsed.groundStateConstraints || parsed.ground_state_constraints || []).map(String),
+      };
+
+      const beatIndex = chain.beats.length; // index of the new beat
+
+      // Build constraint update objects
+      const opened: Constraint[] = beat.newOpenConstraints.map((desc) => ({
+        id: api.v1.uuid(),
+        description: desc,
+        sourceBeatIndex: beatIndex,
+        status: "open" as const,
+      }));
+
+      ctx.dispatch(beatAdded({
+        goalId,
+        beat,
+        constraints: {
+          resolved: beat.constraintsResolved,
+          opened,
+          grounded: beat.groundStateConstraints,
+        },
+      }));
+
+      // --- Checkpoint detection ---
+      const updatedState = ctx.getState();
+      const updatedChain = updatedState.crucible.chains[goalId];
+      if (!updatedChain) return;
+
+      // (a) Major character introduction (1st or 2nd character across beats)
+      const totalChars = updatedChain.worldElements.characters.length;
+      const newChars = beat.worldElementsIntroduced.characters.length;
+      if (newChars > 0 && totalChars <= 2) {
+        ctx.dispatch(checkpointSet({ reason: `Major character introduced: ${beat.worldElementsIntroduced.characters.map((c) => c.name).join(", ")}` }));
+      }
+
+      // (b) Constraint explosion: net growth >2 for 3 consecutive beats
+      if (updatedChain.beats.length >= 3) {
+        const lastThree = updatedChain.beats.slice(-3);
+        const explosionCount = lastThree.filter(
+          (b) => b.newOpenConstraints.length - b.constraintsResolved.length > 2,
+        ).length;
+        if (explosionCount >= 3) {
+          ctx.dispatch(checkpointSet({ reason: "Constraint explosion — open constraints growing faster than resolving" }));
+        }
+      }
+
+      // (c) Beat count threshold
+      if (updatedChain.beats.length >= 15) {
+        ctx.dispatch(checkpointSet({ reason: "Chain reached 15 beats — consider consolidating" }));
+      }
+
+      // Chain completion: all open constraints resolved
+      if (updatedChain.openConstraints.length === 0 && updatedChain.beats.length > 0) {
+        ctx.dispatch(chainCompleted({ goalId }));
       }
     } catch (e) {
-      api.v1.log("[crucible] Intent JSON parse failed:", e);
+      api.v1.log("[crucible] Chain JSON parse failed:", e);
       api.v1.log("[crucible] Raw text:", ctx.accumulatedText.slice(0, 500));
     }
   },
 };
 
-// --- Solve Handler ---
+// --- Merge Handler ---
 
-export const crucibleSolveHandler: GenerationHandlers<CrucibleSolveTarget> = {
+const VALID_ELEMENT_TYPES = new Set<string>(["character", "location", "faction", "system", "situation"]);
+
+export const crucibleMergeHandler: GenerationHandlers<CrucibleMergeTarget> = {
   streaming(): void {
     // No-op — JSON accumulates silently
   },
 
-  async completion(ctx: CompletionContext<CrucibleSolveTarget>): Promise<void> {
+  async completion(ctx: CompletionContext<CrucibleMergeTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
     try {
       const json = repairJSON(ctx.accumulatedText);
       const parsed = JSON.parse(json) as {
-        op?: string;
-        kind?: string;
-        content?: string;
-        connect?: Array<{ id?: string; type?: string }>;
-        id?: string;
-        source?: string;
-        target?: string;
-        type?: string;
+        elements?: Array<{
+          name?: string;
+          type?: string;
+          description?: string;
+          goalPurposes?: Record<string, string>;
+          goal_purposes?: Record<string, string>;
+          relationships?: string[];
+        }>;
       };
 
-      const op = String(parsed.op || "add");
-      const state = ctx.getState();
-      const { idMap } = formatWeb(state.crucible.nodes, state.crucible.edges);
+      if (!Array.isArray(parsed.elements) || parsed.elements.length === 0) {
+        api.v1.log("[crucible] Merge parse: missing elements array");
+        return;
+      }
 
-      if (op === "add") {
-        const kind = String(parsed.kind || "");
-        if (!ALLOWED_KINDS.has(kind)) {
-          api.v1.log(`[crucible] Solve add: invalid kind "${kind}"`);
-          ctx.dispatch(solverFeedbackSet({
-            feedback: `Rejected: invalid kind "${kind}". Use: ${[...ALLOWED_KINDS].join(", ")}`,
-          }));
-          return;
-        }
-        if (!parsed.content) {
-          api.v1.log("[crucible] Solve add: missing content");
-          ctx.dispatch(solverFeedbackSet({ feedback: "Rejected: add op missing content." }));
-          return;
-        }
+      const elements: MergedElement[] = [];
+      for (const el of parsed.elements) {
+        if (!el.name || !el.type) continue;
+        if (!VALID_ELEMENT_TYPES.has(el.type)) continue;
 
-        const nodeId = api.v1.uuid();
-        const node: CrucibleNode = {
-          id: nodeId,
-          kind: kind as CrucibleNodeKind,
-          origin: "solver",
-          status: "pending",
-          content: String(parsed.content),
-          stale: false,
-        };
+        elements.push({
+          name: String(el.name),
+          type: String(el.type) as MergedElementType,
+          description: String(el.description || ""),
+          goalPurposes: el.goalPurposes || el.goal_purposes || {},
+          relationships: Array.isArray(el.relationships) ? el.relationships.map(String) : [],
+        });
+      }
 
-        // Parse connections
-        const edges: CrucibleEdge[] = [];
-        let goalConnectionsRejected = 0;
-        if (Array.isArray(parsed.connect)) {
-          for (const conn of parsed.connect) {
-            if (!conn.id || !conn.type) continue;
-            const targetUuid = idMap.get(String(conn.id));
-            if (!targetUuid) continue;
-            if (!ALLOWED_EDGE_TYPES.has(String(conn.type))) continue;
-
-            // Reject opener → goal connections (openers are inciting incidents, not endpoints)
-            if (kind === "opener" && state.crucible.nodes.some(
-              (n) => n.id === targetUuid && n.kind === "goal",
-            )) {
-              api.v1.log(`[crucible] Solve: rejected opener→goal connection`);
-              goalConnectionsRejected++;
-              continue;
-            }
-
-            // Reject connections TO openers (openers are terminal start nodes)
-            if (state.crucible.nodes.some(
-              (n) => n.id === targetUuid && n.kind === "opener",
-            )) {
-              api.v1.log(`[crucible] Solve: rejected connection to opener (terminal)`);
-              continue;
-            }
-
-            // Skip if this arc edge would create a cycle
-            if (wouldCreateArcCycle(nodeId, targetUuid, state.crucible.nodes, state.crucible.edges)) {
-              api.v1.log(`[crucible] Solve: skipped arc cycle edge`);
-              continue;
-            }
-
-            edges.push({
-              source: nodeId,
-              target: targetUuid,
-              type: String(conn.type) as CrucibleEdgeType,
-            });
-          }
-        }
-
-        // Arc nodes on add get exactly ONE connection — prevents a single beat
-        // from claiming every goal. Additional links use the "connect" op.
-        if (ARC_KINDS.has(kind as CrucibleNodeKind) && kind !== "goal" && edges.length > 1) {
-          api.v1.log(`[crucible] Solve add: trimmed ${kind} from ${edges.length} edges to 1`);
-          edges.length = 1;
-        }
-
-        // Reject orphan non-goal nodes — only goals may float
-        if (kind !== "goal" && edges.length === 0) {
-          api.v1.log(`[crucible] Solve add: rejected orphan ${kind} "${String(parsed.content).slice(0, 40)}"`);
-          const feedback = goalConnectionsRejected > 0
-            ? `Rejected: openers cannot connect to goals. Goals are endpoints. ` +
-              `Connect to beats or world nodes instead.`
-            : `Rejected: ${kind} add had no valid connections. Every non-goal node MUST include a "connect" array linking to at least one existing node.`;
-          ctx.dispatch(solverFeedbackSet({ feedback }));
-          return;
-        }
-
-        // Arc nodes must connect to at least one other arc node.
-        // A situation connected only to characters/locations is disconnected from
-        // the narrative chain — it needs a link to a goal, beat, or opener.
-        const arcKind = kind as CrucibleNodeKind;
-        if (ARC_KINDS.has(arcKind) && kind !== "goal") {
-          const hasArcConnection = edges.some((e) => {
-            const targetNode = state.crucible.nodes.find((n) => n.id === e.target);
-            return targetNode && ARC_KINDS.has(targetNode.kind);
-          });
-          if (!hasArcConnection) {
-            api.v1.log(`[crucible] Solve add: rejected arc-disconnected ${kind} "${String(parsed.content).slice(0, 40)}"`);
-            ctx.dispatch(solverFeedbackSet({
-              feedback: `Rejected: ${kind} has no connection to another arc node (goal, beat, opener). ` +
-                `Arc nodes must connect to the narrative chain, not just to world nodes. ` +
-                `Add a connection to a beat or (for beats) a goal.`,
-            }));
-            return;
-          }
-        }
-
-        // Clear feedback on success
-        ctx.dispatch(solverFeedbackSet({ feedback: null }));
-        ctx.dispatch(nodesAdded({ nodes: [node], edges: edges.length > 0 ? edges : undefined }));
-
-        // Stop auto-solve when an opener is generated (narrative is complete enough)
-        if (kind === "opener") {
-          ctx.dispatch(crucibleAutoSolveStopped());
-        }
-      } else if (op === "update") {
-        const shortId = String(parsed.id || "");
-        const uuid = idMap.get(shortId);
-        if (!uuid) {
-          api.v1.log(`[crucible] Solve update: unknown ID "${shortId}"`);
-          return;
-        }
-        if (!parsed.content) {
-          api.v1.log("[crucible] Solve update: missing content");
-          return;
-        }
-        ctx.dispatch(solverFeedbackSet({ feedback: null }));
-        ctx.dispatch(nodeUpdated({ id: uuid, content: String(parsed.content) }));
-      } else if (op === "connect") {
-        const sourceId = String(parsed.source || "");
-        const targetId = String(parsed.target || "");
-        const edgeType = String(parsed.type || "");
-        const sourceUuid = idMap.get(sourceId);
-        const targetUuid = idMap.get(targetId);
-        if (!sourceUuid || !targetUuid) {
-          api.v1.log(`[crucible] Solve connect: unknown IDs "${sourceId}" or "${targetId}"`);
-          return;
-        }
-        if (!ALLOWED_EDGE_TYPES.has(edgeType)) {
-          api.v1.log(`[crucible] Solve connect: invalid edge type "${edgeType}"`);
-          return;
-        }
-
-        // Reject opener ↔ goal connections (openers start the story, goals end it)
-        const sourceNode = state.crucible.nodes.find((n) => n.id === sourceUuid);
-        const targetNode = state.crucible.nodes.find((n) => n.id === targetUuid);
-        if (
-          sourceNode?.kind === "opener" && targetNode?.kind === "goal" ||
-          targetNode?.kind === "opener" && sourceNode?.kind === "goal"
-        ) {
-          api.v1.log(`[crucible] Solve connect: rejected opener↔goal edge`);
-          ctx.dispatch(solverFeedbackSet({
-            feedback: "Rejected: openers cannot connect directly to goals. Goals are endpoints.",
-          }));
-          return;
-        }
-
-        // Reject connections TO openers (openers are terminal start nodes)
-        if (targetNode?.kind === "opener" && sourceNode && ARC_KINDS.has(sourceNode.kind)) {
-          api.v1.log(`[crucible] Solve connect: rejected — openers are start-of-chain terminals`);
-          ctx.dispatch(solverFeedbackSet({
-            feedback: "Rejected: openers are chain start nodes. Connect FROM openers, not TO them.",
-          }));
-          return;
-        }
-
-        // Reject arc cycles
-        if (wouldCreateArcCycle(sourceUuid, targetUuid, state.crucible.nodes, state.crucible.edges)) {
-          api.v1.log(`[crucible] Solve connect: rejected — would create arc cycle`);
-          ctx.dispatch(solverFeedbackSet({
-            feedback: "Rejected: this connection would create a cycle in the arc chain. Arc nodes must form a directed chain toward goals, not loops.",
-          }));
-          return;
-        }
-
-        ctx.dispatch(solverFeedbackSet({ feedback: null }));
-        ctx.dispatch(edgeAdded({
-          edge: { source: sourceUuid, target: targetUuid, type: edgeType as CrucibleEdgeType },
-        }));
-      } else {
-        api.v1.log(`[crucible] Solve: unknown op "${op}"`);
+      if (elements.length > 0) {
+        ctx.dispatch(mergedWorldSet({ mergedWorld: { elements } }));
       }
     } catch (e) {
-      api.v1.log("[crucible] Solve JSON parse failed:", e);
+      api.v1.log("[crucible] Merge JSON parse failed:", e);
+      api.v1.log("[crucible] Raw text:", ctx.accumulatedText.slice(0, 500));
     }
   },
 };

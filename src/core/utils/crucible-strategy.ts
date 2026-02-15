@@ -1,157 +1,132 @@
 /**
- * Crucible Strategy — Factory functions for Crucible goals and web-solver generations.
+ * Crucible Strategy — Factory functions for Crucible v4 backward-chain world generator.
  *
- * v3: Web-based narrative solver. GLM sees the entire web and picks its own operations.
+ * Three strategies: goals extraction, per-goal chain, world element merge.
  */
 
 import {
   RootState,
   GenerationStrategy,
-  CrucibleNode,
-  CrucibleEdge,
-  CrucibleNodeKind,
+  CrucibleChain,
+  CrucibleGoal,
 } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "./context-builder";
 
-// --- Short ID prefixes per kind ---
-
-const KIND_PREFIX: Record<CrucibleNodeKind, string> = {
-  goal: "G",
-  character: "C",
-  faction: "F",
-  location: "L",
-  system: "S",
-  situation: "D",
-  beat: "B",
-  opener: "O",
-};
-
-export const ARC_KINDS = new Set<CrucibleNodeKind>(["goal", "opener", "beat"]);
-export const WORLD_KINDS = new Set<CrucibleNodeKind>(["character", "faction", "location", "system", "situation"]);
-
-const ARC_ORDER: CrucibleNodeKind[] = ["goal", "beat", "opener"];
-const WORLD_ORDER: CrucibleNodeKind[] = ["character", "faction", "location", "system", "situation"];
-
-const KIND_ORDER: CrucibleNodeKind[] = [...ARC_ORDER, ...WORLD_ORDER];
-
-const KIND_LABELS: Record<CrucibleNodeKind, string> = {
-  goal: "GOALS",
-  character: "CHARACTERS",
-  faction: "FACTIONS",
-  location: "LOCATIONS",
-  system: "SYSTEMS",
-  situation: "SITUATIONS",
-  beat: "BEATS",
-  opener: "OPENERS",
-};
+// --- Chain Context Formatter ---
 
 /**
- * Format the narrative web for the solve prompt.
- * Partitions nodes into arc (narrative chain) and world (supporting artifacts),
- * assigns short IDs (G1, C1, etc.), formats edges by category.
- * Returns the formatted string and a mapping of shortId → UUID.
+ * Format chain context for the backward-chaining prompt.
+ * Shows goal, beats (newest-first), open/resolved constraints, and accumulated world elements.
  */
-export function formatWeb(
-  nodes: CrucibleNode[],
-  edges: CrucibleEdge[],
-): { formatted: string; idMap: Map<string, string> } {
-  const idMap = new Map<string, string>(); // shortId → uuid
-  const reverseMap = new Map<string, string>(); // uuid → shortId
-  const lines: string[] = [];
+function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal): string {
+  const sections: string[] = [];
 
-  // Assign short IDs across all nodes (consistent ordering)
-  const kindCounters: Record<string, number> = {};
-  for (const kind of KIND_ORDER) {
-    for (const node of nodes.filter((n) => n.kind === kind)) {
-      const prefix = KIND_PREFIX[kind];
-      const count = (kindCounters[prefix] || 0) + 1;
-      kindCounters[prefix] = count;
-      const shortId = `${prefix}${count}`;
-      idMap.set(shortId, node.id);
-      reverseMap.set(node.id, shortId);
-    }
-  }
+  // Goal statement
+  sections.push(`GOAL: ${goal.goal}`);
+  sections.push(`TERMINAL CONDITION: ${goal.terminalCondition}`);
+  sections.push(`STAKES: ${goal.stakes}`);
+  sections.push(`THEME: ${goal.theme}`);
 
-  const formatNode = (node: CrucibleNode): string => {
-    const shortId = reverseMap.get(node.id)!;
-    const marker =
-      node.status === "favorited" || node.status === "edited" ? " \u2605" :
-      node.status === "disfavored" ? " \u2717" : "";
-    return `  [${shortId}]${marker} ${node.content}`;
-  };
-
-  // Arc nodes section
-  lines.push("ARC NODES (narrative chain \u2014 opener \u2192 beat \u2192 goal):");
-  for (const kind of ARC_ORDER) {
-    const kindNodes = nodes.filter((n) => n.kind === kind);
-    if (kindNodes.length === 0) continue;
-    lines.push(`  ${KIND_LABELS[kind]}:`);
-    for (const node of kindNodes) {
-      lines.push(`  ${formatNode(node)}`);
-    }
-  }
-
-  // World nodes section
-  const hasWorld = nodes.some((n) => WORLD_KINDS.has(n.kind));
-  if (hasWorld) {
-    lines.push("WORLD NODES (supporting cast & setting):");
-    for (const kind of WORLD_ORDER) {
-      const kindNodes = nodes.filter((n) => n.kind === kind);
-      if (kindNodes.length === 0) continue;
-      lines.push(`  ${KIND_LABELS[kind]}:`);
-      for (const node of kindNodes) {
-        lines.push(`  ${formatNode(node)}`);
+  // Beats (newest-first — closest to goal first)
+  if (chain.beats.length > 0) {
+    sections.push("\nESTABLISHED BEATS (newest-first, closest to goal first):");
+    for (let i = chain.beats.length - 1; i >= 0; i--) {
+      const beat = chain.beats[i];
+      sections.push(`  Beat ${i + 1}: ${beat.scene}`);
+      if (beat.charactersPresent.length > 0) {
+        sections.push(`    Characters: ${beat.charactersPresent.join(", ")}`);
+      }
+      if (beat.location) {
+        sections.push(`    Location: ${beat.location}`);
+      }
+      if (beat.conflictTension) {
+        sections.push(`    Conflict: ${beat.conflictTension}`);
       }
     }
   }
 
-  // Partition edges
-  const arcEdges: string[] = [];
-  const supportEdges: string[] = [];
-
-  for (const edge of edges) {
-    const sourceShort = reverseMap.get(edge.source);
-    const targetShort = reverseMap.get(edge.target);
-    if (!sourceShort || !targetShort) continue;
-
-    const sourceNode = nodes.find((n) => n.id === edge.source);
-    const targetNode = nodes.find((n) => n.id === edge.target);
-    const edgeStr = `  ${sourceShort} --${edge.type}--> ${targetShort}`;
-
-    if (sourceNode && targetNode && ARC_KINDS.has(sourceNode.kind) && ARC_KINDS.has(targetNode.kind)) {
-      arcEdges.push(edgeStr);
-    } else {
-      supportEdges.push(edgeStr);
+  // Open constraints
+  if (chain.openConstraints.length > 0) {
+    sections.push("\nOPEN CONSTRAINTS (must still be established):");
+    for (const c of chain.openConstraints) {
+      sections.push(`  - ${c.description} (from Beat ${c.sourceBeatIndex + 1})`);
     }
   }
 
-  if (arcEdges.length > 0) {
-    lines.push("ARC EDGES:");
-    lines.push(...arcEdges);
-  }
-  if (supportEdges.length > 0) {
-    lines.push("SUPPORT EDGES (world \u2194 arc):");
-    lines.push(...supportEdges);
-  }
-
-  // Diversity report
-  const presentKinds = new Set(nodes.map((n) => n.kind));
-  const underRepresented = KIND_ORDER.filter(
-    (k) => k !== "goal" && !presentKinds.has(k),
-  );
-  if (underRepresented.length > 0) {
-    lines.push(`UNDER-REPRESENTED: ${underRepresented.join(", ")}`);
+  // Resolved constraints
+  if (chain.resolvedConstraints.length > 0) {
+    sections.push("\nRESOLVED CONSTRAINTS:");
+    for (const c of chain.resolvedConstraints) {
+      const label = c.status === "groundState" ? "ground state" : `Beat ${c.sourceBeatIndex + 1}`;
+      sections.push(`  - ${c.description} → ${label}`);
+    }
   }
 
-  return { formatted: lines.join("\n"), idMap };
+  // Accumulated world elements
+  const we = chain.worldElements;
+  const hasElements =
+    we.characters.length + we.locations.length + we.factions.length +
+    we.systems.length + we.situations.length > 0;
+  if (hasElements) {
+    sections.push("\nWORLD ELEMENTS DERIVED SO FAR:");
+    if (we.characters.length > 0) {
+      sections.push(`  Characters: ${we.characters.map((e) => `${e.name} (${e.description})`).join("; ")}`);
+    }
+    if (we.locations.length > 0) {
+      sections.push(`  Locations: ${we.locations.map((e) => `${e.name} (${e.description})`).join("; ")}`);
+    }
+    if (we.factions.length > 0) {
+      sections.push(`  Factions: ${we.factions.map((e) => `${e.name} (${e.description})`).join("; ")}`);
+    }
+    if (we.systems.length > 0) {
+      sections.push(`  Systems: ${we.systems.map((e) => `${e.name} (${e.description})`).join("; ")}`);
+    }
+    if (we.situations.length > 0) {
+      sections.push(`  Situations: ${we.situations.map((e) => `${e.name} (${e.description})`).join("; ")}`);
+    }
+  }
+
+  return sections.join("\n");
+}
+
+/**
+ * Format all chains' world elements for the merge prompt.
+ */
+function formatAllChainsElements(state: RootState): string {
+  const sections: string[] = [];
+
+  for (const goal of state.crucible.goals.filter((g) => g.selected)) {
+    const chain = state.crucible.chains[goal.id];
+    if (!chain) continue;
+
+    sections.push(`\n--- GOAL: ${goal.goal} ---`);
+
+    const we = chain.worldElements;
+    const formatList = (label: string, items: { name: string; description: string }[]): void => {
+      if (items.length > 0) {
+        sections.push(`  ${label}:`);
+        for (const item of items) {
+          sections.push(`    - ${item.name}: ${item.description}`);
+        }
+      }
+    };
+
+    formatList("Characters", we.characters);
+    formatList("Locations", we.locations);
+    formatList("Factions", we.factions);
+    formatList("Systems", we.systems);
+    formatList("Situations", we.situations);
+  }
+
+  return sections.join("\n");
 }
 
 // --- Factory Functions ---
 
 /**
- * Creates a message factory for Crucible goal generation.
- * GLM extracts intent + strategy + generates epic goals in one call.
+ * Creates a message factory for Crucible goal extraction.
+ * GLM reads brainstorm + story state and derives 3-5 goals with terminal conditions.
  */
 export const createCrucibleGoalsFactory = (
   getState: () => RootState,
@@ -169,7 +144,7 @@ export const createCrucibleGoalsFactory = (
         role: "system",
         content: goalsPrompt,
       },
-      { role: "assistant", content: '{"intent":"' },
+      { role: "assistant", content: '{"goals":[{"goal":"' },
     ];
 
     return {
@@ -177,7 +152,7 @@ export const createCrucibleGoalsFactory = (
       params: {
         model: "glm-4-6",
         max_tokens: 1024,
-        temperature: 0.9,
+        temperature: 1.0,
         min_p: 0.05,
       },
     };
@@ -185,83 +160,89 @@ export const createCrucibleGoalsFactory = (
 };
 
 /**
- * Creates a message factory for Crucible web-solver.
- * GLM sees the full web and chooses an operation (add/update/connect).
+ * Creates a message factory for backward-chaining beat generation.
+ * GLM sees the goal, existing beats, constraints, and world elements, then generates the next beat.
  */
-export const createCrucibleSolveFactory = (
+export const createCrucibleChainFactory = (
+  getState: () => RootState,
+  goalId: string,
+): MessageFactory => {
+  return async () => {
+    const state = getState();
+    const chain = state.crucible.chains[goalId];
+    const goal = state.crucible.goals.find((g) => g.id === goalId);
+
+    if (!chain || !goal) {
+      throw new Error(`[crucible] Chain or goal not found for ${goalId}`);
+    }
+
+    const chainPrompt = String(
+      (await api.v1.config.get("crucible_chain_prompt")) || "",
+    );
+
+    const context = formatChainContext(chain, goal);
+    const prefix = await buildStoryEnginePrefix(getState);
+
+    const messages: Message[] = [
+      ...prefix,
+      {
+        role: "system",
+        content: chainPrompt,
+      },
+      {
+        role: "user",
+        content: context + "\n\nDesign the next beat backward.",
+      },
+      { role: "assistant", content: '{"scene":"' },
+    ];
+
+    return {
+      messages,
+      params: {
+        model: "glm-4-6",
+        max_tokens: 1024,
+        temperature: 1.0,
+        min_p: 0.05,
+      },
+    };
+  };
+};
+
+/**
+ * Creates a message factory for world element merge.
+ * GLM sees all chains' world elements and produces a unified inventory.
+ */
+export const createCrucibleMergeFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
     const state = getState();
 
-    const solvePrompt = String(
-      (await api.v1.config.get("crucible_solve_prompt")) || "",
+    const mergePrompt = String(
+      (await api.v1.config.get("crucible_merge_prompt")) || "",
     );
 
-    const { formatted } = formatWeb(state.crucible.nodes, state.crucible.edges);
-
-    const contextParts: string[] = [];
-    if (state.crucible.intent) {
-      contextParts.push(`[INTENT]\n${state.crucible.intent}`);
-    }
-    contextParts.push(`[CURRENT WEB]\n${formatted}`);
-
-    // Append solver feedback if the last operation was rejected
-    if (state.crucible.solverFeedback) {
-      contextParts.push(`[SOLVER FEEDBACK]\n${state.crucible.solverFeedback}`);
-    }
-
+    const elementsContext = formatAllChainsElements(state);
     const prefix = await buildStoryEnginePrefix(getState);
 
     const messages: Message[] = [
       ...prefix,
       {
         role: "system",
-        content: `${solvePrompt}\n\n${contextParts.join("\n\n")}`,
+        content: mergePrompt,
       },
-      { role: "assistant", content: "{" },
-    ];
-
-    return {
-      messages,
-      params: {
-        model: "glm-4-6",
-        max_tokens: 384,
-        temperature: 0.75,
-        min_p: 0.05,
-      },
-    };
-  };
-};
-
-/**
- * Creates a message factory for Crucible intent (re)generation.
- * GLM derives intent, strategy, and tags from brainstorm + story state.
- */
-export const createCrucibleIntentFactory = (
-  getState: () => RootState,
-): MessageFactory => {
-  return async () => {
-    const intentPrompt = String(
-      (await api.v1.config.get("crucible_intent_prompt")) || "",
-    );
-
-    const prefix = await buildStoryEnginePrefix(getState);
-
-    const messages: Message[] = [
-      ...prefix,
       {
-        role: "system",
-        content: intentPrompt,
+        role: "user",
+        content: `Merge these per-goal world elements into a unified inventory:\n${elementsContext}`,
       },
-      { role: "assistant", content: '{"intent":"' },
+      { role: "assistant", content: '{"elements":[{"name":"' },
     ];
 
     return {
       messages,
       params: {
         model: "glm-4-6",
-        max_tokens: 512,
+        max_tokens: 1024,
         temperature: 0.8,
         min_p: 0.05,
       },
@@ -273,6 +254,7 @@ export const createCrucibleIntentFactory = (
 
 /**
  * Builds a Crucible goals generation strategy.
+ * Uses continuation (maxCalls: 3) since 3-5 goals may exceed 1024 tokens.
  */
 export const buildCrucibleGoalsStrategy = (
   getState: () => RootState,
@@ -282,36 +264,41 @@ export const buildCrucibleGoalsStrategy = (
     messageFactory: createCrucibleGoalsFactory(getState),
     target: { type: "crucibleGoals" },
     prefillBehavior: "keep",
-    assistantPrefill: '{"intent":"',
+    assistantPrefill: '{"goals":[{"goal":"',
+    continuation: { maxCalls: 3 },
   };
 };
 
 /**
- * Builds a Crucible intent generation strategy.
+ * Builds a Crucible chain generation strategy.
+ * No continuation — single beat fits in 1024 tokens.
  */
-export const buildCrucibleIntentStrategy = (
+export const buildCrucibleChainStrategy = (
   getState: () => RootState,
+  goalId: string,
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createCrucibleIntentFactory(getState),
-    target: { type: "crucibleIntent" },
+    messageFactory: createCrucibleChainFactory(getState, goalId),
+    target: { type: "crucibleChain", goalId },
     prefillBehavior: "keep",
-    assistantPrefill: '{"intent":"',
+    assistantPrefill: '{"scene":"',
   };
 };
 
 /**
- * Builds a Crucible solve generation strategy.
+ * Builds a Crucible merge generation strategy.
+ * Uses continuation (maxCalls: 5) since merged elements can be extensive.
  */
-export const buildCrucibleSolveStrategy = (
+export const buildCrucibleMergeStrategy = (
   getState: () => RootState,
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createCrucibleSolveFactory(getState),
-    target: { type: "crucibleSolve" },
+    messageFactory: createCrucibleMergeFactory(getState),
+    target: { type: "crucibleMerge" },
     prefillBehavior: "keep",
-    assistantPrefill: "{",
+    assistantPrefill: '{"elements":[{"name":"',
+    continuation: { maxCalls: 5 },
   };
 };

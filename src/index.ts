@@ -25,7 +25,7 @@ import { FieldList } from "./ui/components/Sidebar/FieldList";
 import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelContent";
 
 // Crucible
-import { registerCrucibleWindow } from "./ui/components/Crucible/openCrucibleWindow";
+import { CrucibleWindow } from "./ui/components/Crucible/CrucibleWindow";
 
 const { column } = api.v1.ui.part;
 const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
@@ -48,7 +48,6 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
 
     // 2. Register Effects
     registerEffects(store, genX);
-    registerCrucibleWindow(store);
 
     // 3. Load Data
     interface PersistedState {
@@ -64,10 +63,10 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
         if (brainstorm && brainstorm.messages)
           store.dispatch(brainstormLoaded({ messages: brainstorm.messages }));
         if (crucible) {
-          // Migration: v1 had currentRound, v2 had parentId/no edges — reset if old format
+          // Migration: v1-v3 had nodes/edges/currentRound — reset if old format
           const c = crucible as any;
-          if ("currentRound" in c || !Array.isArray(c.edges) || c.nodes?.[0]?.parentId !== undefined) {
-            api.v1.log("[migration] Resetting pre-v3 Crucible state");
+          if (Array.isArray(c.nodes) || Array.isArray(c.edges) || "currentRound" in c) {
+            api.v1.log("[migration] Resetting pre-v4 Crucible state");
           } else {
             store.dispatch(crucibleLoaded({ crucible }));
           }
@@ -87,6 +86,7 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
     const { part: settingPart } = mount(SettingField, {}, store);
     const { part: fieldListPart } = mount(FieldList, {}, store);
     const { part: lorebookPart } = mount(LorebookPanelContent, undefined, store);
+    const { part: cruciblePart } = mount(CrucibleWindow, undefined, store);
 
     // 5. Compose panels from returned parts
     const brainstormPanel = sidebarPanel({
@@ -120,9 +120,17 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
       content: [lorebookPart],
     });
 
+    const cruciblePanel = sidebarPanel({
+      id: "kse-crucible-sidebar",
+      name: "Crucible",
+      iconId: "hexagon",
+      content: [cruciblePart],
+    });
+
     await api.v1.ui.register([
       brainstormPanel,
       storyEnginePanel,
+      cruciblePanel,
       lorebookGenPanel,
     ]);
 

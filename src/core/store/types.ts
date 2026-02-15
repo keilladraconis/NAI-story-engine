@@ -102,8 +102,8 @@ export interface GenerationRequest {
   | "lorebookRefine"
   | "bootstrap"
   | "crucibleGoals"
-  | "crucibleIntent"
-  | "crucibleSolve";
+  | "crucibleChain"
+  | "crucibleMerge";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -123,10 +123,11 @@ export interface GenerationStrategy {
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }
   | { type: "crucibleGoals" }
-  | { type: "crucibleIntent" }
-  | { type: "crucibleSolve" };
+  | { type: "crucibleChain"; goalId: string }
+  | { type: "crucibleMerge" };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
+  continuation?: { maxCalls: number };
 }
 
 export interface RuntimeState {
@@ -140,42 +141,83 @@ export interface RuntimeState {
 }
 
 // Crucible Types
-export type CrucibleNodeKind =
-  | "goal" | "beat" | "character" | "faction"
-  | "location" | "system" | "situation" | "opener";
+export type CruciblePhase = "idle" | "goals" | "chaining" | "merging" | "reviewing" | "populating";
 
-export type CrucibleNodeStatus = "pending" | "favorited" | "edited" | "disfavored";
-export type CrucibleNodeOrigin = "solver" | "user";
-
-export type CrucibleEdgeType = "requires" | "involves" | "opposes" | "located_at";
-
-export interface CrucibleEdge {
-  source: string;
-  target: string;
-  type: CrucibleEdgeType;
+export interface CrucibleGoal {
+  id: string;
+  goal: string;
+  stakes: string;
+  theme: string;
+  emotionalArc: string;
+  terminalCondition: string;
+  selected: boolean;
 }
 
-export type CruciblePhase = "idle" | "active" | "committed";
+export interface NamedElement {
+  name: string;
+  description: string;
+}
 
-export interface CrucibleNode {
+export interface WorldElements {
+  characters: NamedElement[];
+  locations: NamedElement[];
+  factions: NamedElement[];
+  systems: NamedElement[];
+  situations: NamedElement[];
+}
+
+export interface CrucibleBeat {
+  scene: string;
+  charactersPresent: string[];
+  location: string;
+  conflictTension: string;
+  worldElementsIntroduced: WorldElements;
+  constraintsResolved: string[];
+  newOpenConstraints: string[];
+  groundStateConstraints: string[];
+}
+
+export type ConstraintStatus = "open" | "resolved" | "groundState";
+
+export interface Constraint {
   id: string;
-  kind: CrucibleNodeKind;
-  origin: CrucibleNodeOrigin;
-  status: CrucibleNodeStatus;
-  content: string;
-  stale: boolean;
+  description: string;
+  sourceBeatIndex: number;
+  status: ConstraintStatus;
+}
+
+export interface CrucibleChain {
+  goalId: string;
+  beats: CrucibleBeat[];
+  openConstraints: Constraint[];
+  resolvedConstraints: Constraint[];
+  worldElements: WorldElements;
+  complete: boolean;
+}
+
+export type MergedElementType = "character" | "location" | "faction" | "system" | "situation";
+
+export interface MergedElement {
+  name: string;
+  type: MergedElementType;
+  description: string;
+  goalPurposes: Record<string, string>;
+  relationships: string[];
+}
+
+export interface MergedWorldInventory {
+  elements: MergedElement[];
 }
 
 export interface CrucibleState {
   phase: CruciblePhase;
-  intent: string | null;
-  strategyLabel: string | null;
-  nodes: CrucibleNode[];
-  edges: CrucibleEdge[];
-  autoSolving: boolean;
-  solverFeedback: string | null;
+  goals: CrucibleGoal[];
+  chains: Record<string, CrucibleChain>;
+  activeGoalId: string | null;
+  mergedWorld: MergedWorldInventory | null;
+  checkpointReason: string | null;
+  autoChaining: boolean;
   solverStalls: number;
-  windowOpen: boolean;
 }
 
 export interface RootState {

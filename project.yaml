@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771103446
+updatedAt: 1771164649
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -280,172 +280,135 @@ config:
       - Factions may have notable members, headquarters, rivals, or territorial interests
       - Systems may be practiced by factions, studied at locations, or mastered by characters
       Weave these connections naturally into the entry to create a cohesive world.
-  - name: crucible_intent_prompt
-    prettyName: Crucible Intent Prompt
-    description: Prompt for generating or regenerating the story intent from brainstorm
-    type: string
-    multiline: true
-    default: |-
-      [CRUCIBLE — INTENT EXTRACTION]
-      Analyze the brainstorm conversation and story state to extract a clear
-      story intent — the core tension, world premise, and narrative direction.
-
-      If the brainstorm implies a PROGRESSION (e.g. "what if X leads to Y",
-      "then Z happens"), capture that trajectory as guidance for the solver.
-
-      Also derive a set of thematic/genre/mood TAGS from the brainstorm.
-      Tags are single words or short phrases that anchor the story's identity.
-
-      You MUST output this EXACT JSON structure:
-      {
-        "intent": "2-4 sentence core tension, world premise, and narrative direction. If a progression is implied, describe the arc.",
-        "strategy": "character-driven|faction-conflict|mystery-revelation|exploration|slice-of-life|pressure-cooker|web-of-obligations",
-        "tags": ["tag1", "tag2", "tag3", "..."]
-      }
-      Output ONLY the JSON object. No other text.
   - name: crucible_goals_prompt
     prettyName: Crucible Goals Prompt
-    description: Prompt for extracting intent and generating epic story goals
+    description: Prompt for extracting 3-5 story goals with terminal conditions
     type: string
     multiline: true
     default: |-
-      [CRUCIBLE — IGNITION]
-      Extract the story's core intent from the brainstorm, then generate 3-5 EXTREME
-      story goals that push the premise to its most dramatic possible conclusion.
+      [CRUCIBLE — GOAL EXTRACTION]
+      Read the brainstorm conversation and story state. Identify the user's
+      UNSTATED intent — what the story should accomplish, not just what was discussed.
+      Derive 3-5 Goal scenarios that push the premise toward its most dramatic
+      possible conclusions.
+
+      Each goal anchors a backward-chaining world generation pass.
+      Multiple goals ensure every world element serves competing trajectories —
+      anti-destination, not predestination.
 
       RULES FOR GOALS:
-      - Goals are CATACLYSMIC ENDPOINTS, not mundane tasks or mild objectives.
-      - WRONG: "Finds a better apartment." RIGHT: "Destroys the housing cartel that
-        enslaved an entire city district."
-      - WRONG: "Wins a local race." RIGHT: "Shatters the world speed record while
-        fleeing a government supersoldier program."
-      - Each goal should make the reader think "holy shit, how does THAT happen?"
-      - Every goal must be specific, visceral, and irreversible.
+      - Goals are CATACLYSMIC ENDPOINTS, not mundane tasks.
+      - WRONG: "Finds a better apartment." RIGHT: "Destroys the housing cartel
+        that enslaved an entire city district."
+      - Each goal must be specific, visceral, and irreversible.
       - If a goal could appear on a to-do list, it is TOO BORING. Escalate.
 
-      Every goal uses DULFS format: "Name: 1-2 sentence description."
-      Keep each goal TERSE — name + one punchy sentence.
+      The TERMINAL CONDITION is the concrete, observable story state when
+      the goal is achieved. It must be decomposable — the backward chainer
+      needs something specific to work backward from.
+      GOOD: "The colony ship arrives but the crew discovers it's already inhabited"
+      BAD: "Everything changes" (too vague to decompose)
 
       You MUST output this EXACT JSON structure:
       {
-        "intent": "2-3 sentence core tension and world premise",
-        "strategy": "character-driven|faction-conflict|mystery-revelation|exploration|slice-of-life|pressure-cooker|web-of-obligations",
-        "goals": [{ "content": "Name: description" }, ...]
+        "goals": [
+          {
+            "goal": "One-line goal statement",
+            "stakes": "What's at risk if this goal fails",
+            "theme": "The thematic question this goal explores",
+            "emotionalArc": "What the reader should feel at resolution",
+            "terminalCondition": "Concrete observable story state at achievement"
+          }
+        ]
       }
       Output ONLY the JSON object. No other text.
-  - name: crucible_solve_prompt
-    prettyName: Crucible Solve Prompt
-    description: Prompt for the web solver — GLM picks its own operation
+  - name: crucible_chain_prompt
+    prettyName: Crucible Chain Prompt
+    description: Prompt for backward-chaining beat generation
     type: string
     multiline: true
     default: |-
-      [CRUCIBLE — WEB SOLVER]
-      You are a constraint solver building a narrative web BACKWARDS from
-      goals. Goals are the climax — you work backward to discover what
-      must happen for them to occur. Every node must serve the story's
-      goals. [CURRENT WEB] shows all nodes and edges. Choose ONE operation.
+      [CRUCIBLE — BACKWARD CHAINING]
+      You are working BACKWARDS from a story's climax toward its opening.
+      You are given established beats and a list of OPEN CONSTRAINTS —
+      things that must be true but haven't been established yet.
 
-      BEFORE choosing, ask: "What does this goal REQUIRE to happen first?
-      What cause produces this effect?" If you can't answer, don't add it.
+      Design the NEXT beat backward — the LATEST-POSSIBLE scene that
+      establishes one or more open constraints.
 
-      NODE CATEGORIES:
-      - ARC NODES form a directed chain: opener → beat(s) → goal
-        Edges are DIRECTIONAL. The "source" flows toward the "target".
-        opener is the start; goal is the end. No backlinks.
-        These are plot events — the inciting incident, escalations, and climax.
-      - WORLD NODES provide context: character, faction, location, system, situation
-        These are the cast, setting, tensions, and mechanics that arc events
-        draw upon. They CONNECT TO arc nodes but don't form the chain.
+      RULES:
+      - Each beat must RESOLVE ≥1 open constraint (establish it as true)
+      - Each beat must declare its own PRECONDITIONS (new open constraints)
+      - Preconditions needing no prior setup → mark as GROUND STATE
+      - World elements emerge from narrative necessity — never decorative
+      - "Latest-possible" — stay close to the goal before stepping further back
+      - Every beat must contain conflict, tension, or revelation — never pure exposition
+      - World elements use brief descriptions: "Name: role/function"
+      - If this is the FIRST beat, its scene IS the terminal condition itself
 
-      BUILD ORDER — always work BACKWARDS from goals:
-      1. GOAL exists → ask "What event DIRECTLY causes this goal?"
-         Add that beat, connected to the goal. This is the immediate cause.
-      2. BEAT exists → ask "What must happen before THIS beat can occur?"
-         Add another beat as its predecessor, OR add WORLD NODES the beat
-         requires — the character who acts, the location where it happens,
-         the situation that creates the pressure.
-      3. When the causal chain is deep enough: add an OPENER connected to
-         the earliest beat. The opener is the inciting incident that sets
-         the whole chain in motion.
-      NEVER add an opener when the web has only goals.
-      NEVER skip steps — each beat must be a direct cause of the next.
+      TERMINATE when all constraints are resolved or ground state.
 
-      CAUSE → EFFECT — the arc chain is a causal sequence:
-      - Each beat answers "WHY does the next thing happen?"
-        Beat A causes Beat B causes the Goal. Not vibes — causation.
-      - A beat's content should describe a specific, concrete event with
-        a clear consequence. "Tensions rise" is NOT a beat. "The dam breaks
-        and floods the lower district" IS a beat — it has a cause and effect.
-      - Openers happen FIRST (inciting incident, catalyst, disruption)
-      - Goals happen LAST (climax, resolution, consequences)
-      Do NOT create an opener that describes a mid-story or climactic event.
-      An opener that sounds like it could be a goal is WRONG.
+      You MUST output this EXACT JSON structure:
+      {
+        "scene": "What happens — 2-3 sentences describing the concrete event",
+        "charactersPresent": ["Character name + why they must be here"],
+        "location": "Where + why it matters",
+        "conflictTension": "What's at stake in this moment",
+        "worldElementsIntroduced": {
+          "characters": [{"name": "Name", "description": "Role/motivation"}],
+          "locations": [{"name": "Name", "description": "Significance"}],
+          "factions": [{"name": "Name", "description": "Goal/method"}],
+          "systems": [{"name": "Name", "description": "Mechanic/rule"}],
+          "situations": [{"name": "Name", "description": "Tension/dynamic"}]
+        },
+        "constraintsResolved": ["Description of constraint this beat establishes"],
+        "newOpenConstraints": ["Preconditions this beat requires"],
+        "groundStateConstraints": ["Preconditions true at story start"]
+      }
+      Output ONLY the JSON object. No other text.
+  - name: crucible_merge_prompt
+    prettyName: Crucible Merge Prompt
+    description: Prompt for merging per-goal world elements into a unified inventory
+    type: string
+    multiline: true
+    default: |-
+      [CRUCIBLE — WORLD ELEMENT MERGE]
+      You are given world elements derived from multiple backward-chaining
+      goal analyses. Your task: merge them into a UNIFIED world inventory.
 
-      Operations:
-      - "add": Create a node that is REQUIRED by an existing goal or node.
-        Do not invent nodes the story doesn't need. A character should exist
-        because a goal demands someone in that role. A location should exist
-        because events need to happen there. Never add a node just to fill
-        an under-represented category.
-        MANDATORY: Every non-goal node MUST include "connect" with at least
-        one valid link. Orphan nodes are rejected.
-        ARC NODE LIMIT: beats and openers may declare exactly ONE connection
-        on add. Pick the single most important narrative link. Use "connect"
-        ops later to add more links if needed.
-      - "update": Improve an existing node's content — make it more specific,
-        raise the stakes, or sharpen the conflict.
-      - "connect": Link two nodes that have a genuine narrative dependency.
+      MERGE RULES:
+      - If Character X in Goal A = Character Y in Goal B, merge them.
+        The merged character has COMPETING MOTIVATIONS from different goals.
+        This creates open-ended agency — the character can pursue either goal.
+      - Same for locations, factions, systems, situations.
+      - If elements are DISTINCT, keep them separate.
+      - Flag and resolve contradictions (same element, incompatible properties).
+      - Every merged element must include its PURPOSE from EACH goal chain
+        (in goalPurposes).
 
-      Edge types — use precisely:
-      - "requires": A CANNOT happen without B (causal dependency)
-      - "involves": A directly features B as a participant or setting
-      - "opposes": A and B are in active tension or conflict
-      - "located_at": A physically takes place at or resides in B
+      ANTI-DESTINATION PRINCIPLE:
+      Characters with single-goal purposes are puppets. Characters with
+      multi-goal purposes have genuine agency. Prefer merging over keeping
+      separate when narratively justified.
 
-      CONNECTION RULES:
-      - DIRECTED ARC CHAIN: arc edges flow source→target toward the goal.
-        Valid directions: opener→beat, beat→beat, beat→goal.
-        The chain must be acyclic (a DAG).
-      - TERMINAL NODES: goals and openers are terminals.
-        - Goals: no outgoing arc edges (they are endpoints).
-        - Openers: no incoming arc edges (they are start points).
-        FORBIDDEN: opener→goal, beat→opener, opener→opener.
-      - World-to-arc: characters/factions/locations/situations connect to
-        arc nodes they participate in (via involves, located_at, requires).
-        World connections are undirected and don't affect the arc DAG.
-      - World-to-world: allowed sparingly.
-      - NO NEXUS NODES on world nodes: prefer 3-4 connections max.
-        Arc nodes may have more connections as narratives converge/diverge.
+      Element types: character, location, faction, system, situation
 
-      BAD connections (will be rejected on review):
-      - An opener "involves" or "requires" a goal (impossible — both are terminals)
-      - A beat→opener connection (openers are start terminals)
-      - A beat connected ONLY to goals with no world node involvement
-      - A barista "involves" a domestic situation they have nothing to do with
-      - Any link where removing it changes nothing about either node
-
-      DULFS format (MANDATORY — name + ONE terse sentence, ≤15 words):
-      - character: "Name (Gender, Age, Role): Core motivation."
-      - faction: "Name: Goal and method."
-      - location: "Name: Atmosphere and narrative function."
-      - system: "Name: Mechanic and current instability."
-      - situation: "Name: Competing pressures."
-      - beat: "Name: Concrete event → its consequence."
-      - opener: "Name: The inciting incident — the FIRST thing that happens
-          to set events in motion. NOT a mid-story event or climax."
-      - goal: "Name: Extreme dramatic endpoint."
-
-      Status markers in [CURRENT WEB]:
-      ★ = user-favored — build toward this.
-      ✗ = user-disfavored — avoid entirely.
-
-      JSON formats:
-      "add": { "op":"add", "kind":"...", "content":"Name: desc",
-               "connect":[{"id":"G1","type":"requires"}] }
-      "update": { "op":"update", "id":"C1", "content":"Name: new desc" }
-      "connect": { "op":"connect", "source":"C1", "target":"G1", "type":"involves" }
-
-      Output ONLY the JSON object.
+      You MUST output this EXACT JSON structure:
+      {
+        "elements": [
+          {
+            "name": "Element name",
+            "type": "character|location|faction|system|situation",
+            "description": "Unified description",
+            "goalPurposes": {
+              "Goal statement 1": "Why this element matters to goal 1",
+              "Goal statement 2": "Why this element matters to goal 2"
+            },
+            "relationships": ["Related element names"]
+          }
+        ]
+      }
+      Output ONLY the JSON object. No other text.
   - name: story_engine_debug
     prettyName: Story Engine Debug
     description: Enable debug logging for Story Engine

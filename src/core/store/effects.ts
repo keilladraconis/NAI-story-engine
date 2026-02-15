@@ -35,13 +35,17 @@ import {
   requestCompleted,
   crucibleLoaded,
   crucibleCommitted,
-  uiCrucibleSolveNextRequested,
-  crucibleAutoSolveStopped,
   crucibleGoalsRequested,
-  crucibleIntentRequested,
   crucibleStopRequested,
-  strategyEdited,
-  solverFeedbackSet,
+  goalsConfirmed,
+  crucibleChainRequested,
+  crucibleMergeRequested,
+  chainStarted,
+  beatAdded,
+  activeGoalAdvanced,
+  autoChainStarted,
+  autoChainStopped,
+  checkpointCleared,
 } from "./index";
 import {
   createLorebookContentFactory,
@@ -59,8 +63,8 @@ import {
 } from "../utils/context-builder";
 import {
   buildCrucibleGoalsStrategy,
-  buildCrucibleIntentStrategy,
-  buildCrucibleSolveStrategy,
+  buildCrucibleChainStrategy,
+  buildCrucibleMergeStrategy,
 } from "../utils/crucible-strategy";
 import { IDS } from "../../ui/framework/ids";
 import {
@@ -229,7 +233,7 @@ function resolvePrefill(
   }
 
   // Crucible targets use explicit assistantPrefill (JSON anchors)
-  if (target.type === "crucibleGoals" || target.type === "crucibleIntent" || target.type === "crucibleSolve") {
+  if (target.type === "crucibleGoals" || target.type === "crucibleChain" || target.type === "crucibleMerge") {
     if (assistantPrefill) return assistantPrefill;
   }
 
@@ -309,10 +313,10 @@ function cacheLabel(target: GenerationStrategy["target"]): string {
       return "bootstrap";
     case "crucibleGoals":
       return "crucible-goals";
-    case "crucibleIntent":
-      return "crucible-intent";
-    case "crucibleSolve":
-      return "crucible-solve";
+    case "crucibleChain":
+      return `crucible-chain:${target.goalId.slice(0, 8)}`;
+    case "crucibleMerge":
+      return "crucible-merge";
   }
 }
 
@@ -570,7 +574,18 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       // 2. Determine what to pass to GenX: factory or messages
       // Wrap with instrumentation to log uncached token counts
       let messagesOrFactory: Message[] | MessageFactory | undefined;
-      if (messageFactory) {
+      let resolvedMessages: Message[] | undefined;
+      const apiParams = { ...params };
+
+      if (messageFactory && strategy.continuation) {
+        // Continuation strategies: resolve eagerly — need messages for continuation rebuilds
+        const result = await messageFactory();
+        resolvedMessages = result.messages;
+        if (result.params) Object.assign(apiParams, result.params);
+        const uncached = await api.v1.script.countUncachedInputTokens(result.messages, "glm-4-6");
+        api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);
+        messagesOrFactory = resolvedMessages;
+      } else if (messageFactory) {
         // Wrap factory to instrument after resolution
         messagesOrFactory = async () => {
           const result = await messageFactory();
@@ -600,9 +615,9 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       let generationSucceeded = false;
 
       try {
-        await genX.generate(
+        const result = await genX.generate(
           messagesOrFactory,
-          { ...params, taskId: requestId },
+          { ...apiParams, taskId: requestId },
           (choices, _final) => {
             const text = choices[0]?.text || "";
             if (text) {
@@ -615,6 +630,44 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         );
 
         generationSucceeded = true;
+
+        // Continuation: extend output beyond single max_tokens call
+        if (strategy.continuation && resolvedMessages && result) {
+          let calls = 1;
+          const maxCalls = strategy.continuation.maxCalls;
+          let finishReason = result.choices?.[0]?.finish_reason;
+
+          while (calls < maxCalls && finishReason === "length") {
+            api.v1.log(`[continuation] Call ${calls + 1}/${maxCalls}, extending output...`);
+
+            // Rebuild messages with accumulated text as assistant message
+            const continuationMessages: Message[] = [
+              ...resolvedMessages.slice(0, -1), // everything except original prefill
+              { role: "assistant", content: accumulatedText },
+            ];
+
+            try {
+              const contResult = await api.v1.generate(
+                continuationMessages,
+                { ...apiParams, max_tokens: 1024 },
+                (choices) => {
+                  const text = choices[0]?.text || "";
+                  if (text) {
+                    accumulatedText += text;
+                    handler.streaming({ target, getState, accumulatedText }, text);
+                  }
+                },
+                "background",
+                await api.v1.createCancellationSignal(),
+              );
+              finishReason = contResult.choices?.[0]?.finish_reason;
+            } catch (e) {
+              api.v1.log("[continuation] Error:", e);
+              break;
+            }
+            calls++;
+          }
+        }
       } catch (error: any) {
         api.v1.log(`[effects] Generation error for ${requestId}:`, error);
         generationSucceeded = false;
@@ -730,7 +783,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   subscribeEffect(
     matchesAction(crucibleGoalsRequested),
     async (_action, { dispatch }) => {
-      await syncStrategyFromStorage();
       const strategy = buildCrucibleGoalsStrategy(getState);
       dispatch(
         requestQueued({
@@ -743,16 +795,60 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Intent Requested → queue intent generation
+  // Intent: Goals Confirmed → init chains for selected goals, start auto-chaining
   subscribeEffect(
-    matchesAction(crucibleIntentRequested),
-    async (_action, { dispatch }) => {
-      await syncStrategyFromStorage();
-      const strategy = buildCrucibleIntentStrategy(getState);
+    matchesAction(goalsConfirmed),
+    (_action, { dispatch, getState: getLatest }) => {
+      const state = getLatest();
+      const selectedGoals = state.crucible.goals.filter((g) => g.selected);
+      if (selectedGoals.length === 0) {
+        api.v1.log("[crucible] No goals selected");
+        return;
+      }
+
+      // Init chains for all selected goals
+      for (const goal of selectedGoals) {
+        dispatch(chainStarted({ goalId: goal.id }));
+      }
+
+      // Start auto-chaining with the first goal
+      dispatch(autoChainStarted());
+      dispatch(crucibleChainRequested());
+    },
+  );
+
+  // Intent: Crucible Chain Requested → queue chain generation for activeGoalId
+  subscribeEffect(
+    matchesAction(crucibleChainRequested),
+    async (_action, { dispatch, getState: getLatest }) => {
+      const state = getLatest();
+      const { activeGoalId } = state.crucible;
+      if (!activeGoalId) {
+        api.v1.log("[crucible] Chain requested but no active goal");
+        return;
+      }
+
+      const strategy = buildCrucibleChainStrategy(getState, activeGoalId);
       dispatch(
         requestQueued({
           id: strategy.requestId,
-          type: "crucibleIntent",
+          type: "crucibleChain",
+          targetId: activeGoalId,
+        }),
+      );
+      dispatch(generationSubmitted(strategy));
+    },
+  );
+
+  // Intent: Crucible Merge Requested → queue merge generation
+  subscribeEffect(
+    matchesAction(crucibleMergeRequested),
+    async (_action, { dispatch }) => {
+      const strategy = buildCrucibleMergeStrategy(getState);
+      dispatch(
+        requestQueued({
+          id: strategy.requestId,
+          type: "crucibleMerge",
           targetId: "crucible",
         }),
       );
@@ -760,154 +856,119 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Stop → cancel active request + stop auto-solve
+  // Intent: Crucible Stop → cancel active request + stop auto-chain
   subscribeEffect(
     matchesAction(crucibleStopRequested),
     (_action, { dispatch, getState: getLatest }) => {
       const state = getLatest();
-      if (state.crucible.autoSolving) {
-        dispatch(crucibleAutoSolveStopped());
+      if (state.crucible.autoChaining) {
+        dispatch(autoChainStopped());
       }
       const activeRequest = state.runtime.activeRequest;
-      if (activeRequest && (activeRequest.type === "crucibleGoals" || activeRequest.type === "crucibleIntent" || activeRequest.type === "crucibleSolve")) {
+      if (activeRequest && (activeRequest.type === "crucibleGoals" || activeRequest.type === "crucibleChain" || activeRequest.type === "crucibleMerge")) {
         dispatch(requestCancelled({ requestId: activeRequest.id }));
         genX.cancelAll();
       }
     },
   );
 
-  // --- Crucible solve helpers ---
+  // Local stall counter for auto-chaining
+  let chainStalls = 0;
+  const MAX_CHAIN_STALLS = 3;
 
-  /** Sync strategy from storageKey input back to state before generation */
-  async function syncStrategyFromStorage(): Promise<void> {
-    const storedStrategy = String(await api.v1.storyStorage.get("cr-strategy-value") || "");
-    const state = getState();
-    if (storedStrategy !== (state.crucible.strategyLabel || "")) {
-      dispatch(strategyEdited({ strategy: storedStrategy }));
-    }
-  }
-
-  function dispatchSolve(): void {
-    // Check ≥1 goal exists
-    const state = getState();
-    const goals = state.crucible.nodes.filter((n) => n.kind === "goal");
-    if (goals.length === 0) {
-      api.v1.log("[crucible] Solve: no goals exist");
-      dispatch(crucibleAutoSolveStopped());
-      return;
-    }
-
-    const strategy = buildCrucibleSolveStrategy(getState);
-    dispatch(
-      requestQueued({
-        id: strategy.requestId,
-        type: "crucibleSolve",
-        targetId: "crucible",
-      }),
-    );
-    dispatch(generationSubmitted(strategy));
-  }
-
-  // Smart start: generate preconditions (intent, goals) before solving
-  async function smartSolve(): Promise<void> {
-    await syncStrategyFromStorage();
-    const state = getState();
-
-    // If no intent, generate intent first
-    if (state.crucible.intent === null) {
-      dispatch(crucibleIntentRequested());
-      return;
-    }
-
-    // If no goal nodes, generate goals first
-    const hasGoals = state.crucible.nodes.some((n) => n.kind === "goal");
-    if (!hasGoals) {
-      dispatch(crucibleGoalsRequested());
-      return;
-    }
-
-    dispatchSolve();
-  }
-
-  // Local stall counter — tracks consecutive solve rejections.
-  // Using a closure variable instead of state to avoid dispatch timing issues.
-  let solveStalls = 0;
-  const MAX_STALLS = 3;
-
-  // Intent: Crucible Solve Next (start auto-solve loop)
-  subscribeEffect(
-    matchesAction(uiCrucibleSolveNextRequested),
-    () => {
-      solveStalls = 0; // Reset on fresh user-initiated solve
-      smartSolve();
-    },
-  );
-
-  // Track stalls via solverFeedback changes
-  subscribeEffect(
-    matchesAction(solverFeedbackSet),
-    (action) => {
-      const { feedback } = action.payload as { feedback: string | null };
-      if (feedback) {
-        solveStalls++;
-        api.v1.log(`[crucible] Solve stall ${solveStalls}/${MAX_STALLS}`);
-      } else {
-        solveStalls = 0;
-      }
-    },
-  );
-
-  // Auto-solve continuation: requeue on completion while autoSolving
-  // Allows both "idle" and "active" phases — smart start generates
-  // intent/goals during "idle", only "committed" should block.
+  // Auto-chain continuation: on requestCompleted, advance chaining
   subscribeEffect(
     matchesAction(requestCompleted),
     async () => {
       await api.v1.timers.sleep(150);
 
       const state = getState();
-      if (!state.crucible.autoSolving || state.crucible.phase === "committed") return;
+      if (!state.crucible.autoChaining) return;
+      if (state.crucible.phase !== "chaining") return;
+      if (state.crucible.checkpointReason) return; // Paused at checkpoint
       if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
 
-      // Stop after consecutive rejections to prevent infinite loops
-      if (solveStalls >= MAX_STALLS) {
-        api.v1.log(`[crucible] Auto-solve stopped: ${solveStalls} consecutive rejections`);
-        dispatch(crucibleAutoSolveStopped());
+      const { activeGoalId } = state.crucible;
+      if (!activeGoalId) return;
+
+      const chain = state.crucible.chains[activeGoalId];
+      if (!chain) return;
+
+      if (chain.complete) {
+        // Advance to next unfinished goal
+        dispatch(activeGoalAdvanced());
+        const updated = getState();
+        if (updated.crucible.activeGoalId) {
+          // More goals to chain
+          chainStalls = 0;
+          dispatch(crucibleChainRequested());
+        } else {
+          // All goals complete → trigger merge
+          dispatch(autoChainStopped());
+          dispatch(crucibleMergeRequested());
+        }
         return;
       }
 
-      smartSolve();
+      // Stall detection: if beat wasn't added (handler failed), increment stall
+      // The handler dispatches beatAdded on success, so check if chain grew
+      chainStalls++;
+      if (chainStalls >= MAX_CHAIN_STALLS) {
+        api.v1.log(`[crucible] Auto-chain stopped: ${chainStalls} consecutive stalls`);
+        dispatch(autoChainStopped());
+        return;
+      }
+
+      // Continue chaining
+      dispatch(crucibleChainRequested());
     },
   );
 
-  // Stop auto-solve on cancellation
+  // Reset stall counter when a beat is successfully added
+  subscribeEffect(
+    matchesAction(beatAdded),
+    () => {
+      chainStalls = 0;
+    },
+  );
+
+  // Checkpoint cleared → resume auto-chaining
+  subscribeEffect(
+    matchesAction(checkpointCleared),
+    (_action, { dispatch, getState: getLatest }) => {
+      const state = getLatest();
+      if (state.crucible.autoChaining && state.crucible.phase === "chaining") {
+        dispatch(crucibleChainRequested());
+      }
+    },
+  );
+
+  // Stop auto-chain on cancellation
   subscribeEffect(
     matchesAction(requestCancelled),
     (action) => {
       const state = getState();
-      if (!state.crucible.autoSolving) return;
+      if (!state.crucible.autoChaining) return;
 
       const { requestId } = action.payload;
       if (
         state.runtime.activeRequest?.id === requestId &&
-        state.runtime.activeRequest?.type === "crucibleSolve"
+        (state.runtime.activeRequest?.type === "crucibleChain" || state.runtime.activeRequest?.type === "crucibleGoals")
       ) {
-        dispatch(crucibleAutoSolveStopped());
+        dispatch(autoChainStopped());
       }
     },
   );
 
-  // Intent: Crucible Export on Commit
+  // Intent: Crucible Export on Commit — map merged world elements to DULFS
   subscribeEffect(
     matchesAction(crucibleCommitted),
     async (_action, { dispatch, getState }) => {
       const state = getState();
-      const favorited = state.crucible.nodes.filter(
-        (n) => n.status === "favorited" || n.status === "edited",
-      );
+      const mergedWorld = state.crucible.mergedWorld;
+      if (!mergedWorld) return;
 
-      // Map node kinds to DULFS field IDs
-      const kindToField: Record<string, DulfsFieldID | undefined> = {
+      const typeToField: Record<string, DulfsFieldID | undefined> = {
         character: FieldID.DramatisPersonae,
         faction: FieldID.Factions,
         location: FieldID.Locations,
@@ -916,18 +977,28 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       };
 
       let exported = 0;
-      for (const node of favorited) {
-        const fieldId = kindToField[node.kind];
-        if (!fieldId) continue; // Skip goals, beats, openers, intents
+      for (const element of mergedWorld.elements) {
+        const fieldId = typeToField[element.type];
+        if (!fieldId) continue;
+
+        // Format element content with name, description, and purposes
+        const parts = [`${element.name}: ${element.description}`];
+        const purposes = Object.values(element.goalPurposes);
+        if (purposes.length > 0) {
+          parts.push(`Narrative Purpose: ${purposes.join("; ")}`);
+        }
+        if (element.relationships.length > 0) {
+          parts.push(`Relationships: ${element.relationships.join(", ")}`);
+        }
 
         const itemId = api.v1.uuid();
-        await api.v1.storyStorage.set(`dulfs-item-${itemId}`, node.content);
+        await api.v1.storyStorage.set(`dulfs-item-${itemId}`, parts.join("\n"));
         dispatch(dulfsItemAdded({ fieldId, item: { id: itemId, fieldId } }));
         exported++;
       }
 
       if (exported > 0) {
-        api.v1.ui.toast(`Exported ${exported} items to Story Engine`, { type: "success" });
+        api.v1.ui.toast(`Exported ${exported} elements to Story Engine`, { type: "success" });
       }
     },
   );
