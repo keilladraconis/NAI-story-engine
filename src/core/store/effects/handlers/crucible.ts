@@ -28,8 +28,8 @@ const ALLOWED_EDGE_TYPES = new Set<string>([
   "requires", "involves", "opposes", "located_at",
 ]);
 
-/** Max edges per node — prevents nexus nodes that connect to everything */
-const MAX_EDGES_PER_NODE = 4;
+// Connection caps enforced in slice reducers (WORLD_NODE_SOFT_CAP).
+// Arc nodes have no connection cap.
 
 /**
  * Check if adding an edge source→target would create a cycle among arc nodes.
@@ -45,7 +45,8 @@ function wouldCreateArcCycle(
   const arcNodeIds = new Set(nodes.filter((n) => ARC_KINDS.has(n.kind)).map((n) => n.id));
   if (!arcNodeIds.has(sourceUuid) || !arcNodeIds.has(targetUuid)) return false;
 
-  // BFS from target — can it reach source via existing arc-only edges?
+  // Directed BFS from target following source→target direction.
+  // If target can reach source via directed edges, adding source→target closes a cycle.
   const visited = new Set<string>();
   const queue = [targetUuid];
   visited.add(targetUuid);
@@ -54,29 +55,15 @@ function wouldCreateArcCycle(
     const current = queue.shift()!;
     if (current === sourceUuid) return true;
     for (const edge of edges) {
-      // Follow edges in both directions (undirected for reachability)
-      const neighbor =
-        edge.source === current ? edge.target :
-        edge.target === current ? edge.source : null;
-      if (neighbor && arcNodeIds.has(neighbor) && !visited.has(neighbor)) {
-        visited.add(neighbor);
-        queue.push(neighbor);
+      // Follow directed: edge.source === current → neighbor is edge.target
+      if (edge.source === current && arcNodeIds.has(edge.target) && !visited.has(edge.target)) {
+        visited.add(edge.target);
+        queue.push(edge.target);
       }
     }
   }
 
   return false;
-}
-
-/**
- * Count existing edges for a node (as source or target).
- */
-function edgeCount(nodeId: string, edges: CrucibleEdge[]): number {
-  let count = 0;
-  for (const edge of edges) {
-    if (edge.source === nodeId || edge.target === nodeId) count++;
-  }
-  return count;
 }
 
 // --- JSON Repair ---
@@ -312,9 +299,11 @@ export const crucibleSolveHandler: GenerationHandlers<CrucibleSolveTarget> = {
               continue;
             }
 
-            // Skip if target node already has too many connections
-            if (edgeCount(targetUuid, state.crucible.edges) >= MAX_EDGES_PER_NODE) {
-              api.v1.log(`[crucible] Solve: skipped edge to saturated node`);
+            // Reject connections TO openers (openers are terminal start nodes)
+            if (state.crucible.nodes.some(
+              (n) => n.id === targetUuid && n.kind === "opener",
+            )) {
+              api.v1.log(`[crucible] Solve: rejected connection to opener (terminal)`);
               continue;
             }
 
@@ -330,6 +319,13 @@ export const crucibleSolveHandler: GenerationHandlers<CrucibleSolveTarget> = {
               type: String(conn.type) as CrucibleEdgeType,
             });
           }
+        }
+
+        // Arc nodes on add get exactly ONE connection — prevents a single beat
+        // from claiming every goal. Additional links use the "connect" op.
+        if (ARC_KINDS.has(kind as CrucibleNodeKind) && kind !== "goal" && edges.length > 1) {
+          api.v1.log(`[crucible] Solve add: trimmed ${kind} from ${edges.length} edges to 1`);
+          edges.length = 1;
         }
 
         // Reject orphan non-goal nodes — only goals may float
@@ -413,12 +409,11 @@ export const crucibleSolveHandler: GenerationHandlers<CrucibleSolveTarget> = {
           return;
         }
 
-        // Reject if either node is saturated
-        if (edgeCount(sourceUuid, state.crucible.edges) >= MAX_EDGES_PER_NODE ||
-            edgeCount(targetUuid, state.crucible.edges) >= MAX_EDGES_PER_NODE) {
-          api.v1.log(`[crucible] Solve connect: rejected — node at max connections (${MAX_EDGES_PER_NODE})`);
+        // Reject connections TO openers (openers are terminal start nodes)
+        if (targetNode?.kind === "opener" && sourceNode && ARC_KINDS.has(sourceNode.kind)) {
+          api.v1.log(`[crucible] Solve connect: rejected — openers are start-of-chain terminals`);
           ctx.dispatch(solverFeedbackSet({
-            feedback: `Rejected: one of the nodes already has ${MAX_EDGES_PER_NODE} connections. Connect to a less-connected node instead.`,
+            feedback: "Rejected: openers are chain start nodes. Connect FROM openers, not TO them.",
           }));
           return;
         }

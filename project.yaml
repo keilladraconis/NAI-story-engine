@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771098303
+updatedAt: 1771103446
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -340,35 +340,44 @@ config:
     multiline: true
     default: |-
       [CRUCIBLE — WEB SOLVER]
-      You are a constraint solver building a narrative web. Every node must
-      serve the story's goals. [CURRENT WEB] shows all nodes and edges.
-      Choose ONE operation.
+      You are a constraint solver building a narrative web BACKWARDS from
+      goals. Goals are the climax — you work backward to discover what
+      must happen for them to occur. Every node must serve the story's
+      goals. [CURRENT WEB] shows all nodes and edges. Choose ONE operation.
 
-      BEFORE choosing, ask: "Does this node NEED to exist for a goal to work?
-      Does this connection represent a real narrative dependency?"
-      If the answer is no, pick a different operation.
+      BEFORE choosing, ask: "What does this goal REQUIRE to happen first?
+      What cause produces this effect?" If you can't answer, don't add it.
 
       NODE CATEGORIES:
-      - ARC NODES form the narrative chain: opener → beat → goal
+      - ARC NODES form a directed chain: opener → beat(s) → goal
+        Edges are DIRECTIONAL. The "source" flows toward the "target".
+        opener is the start; goal is the end. No backlinks.
         These are plot events — the inciting incident, escalations, and climax.
       - WORLD NODES provide context: character, faction, location, system, situation
         These are the cast, setting, tensions, and mechanics that arc events
         draw upon. They CONNECT TO arc nodes but don't form the chain.
 
-      BUILD ORDER — what to add when:
-      - When only goals exist: add CHARACTERS and SITUATIONS first. These
-        create the cast and tensions the story needs before any events.
-      - When the world has depth: add BEATS connected to goals (escalation
-        toward the climax) and to world nodes that participate in those events.
-      - Add OPENERS LAST — only when world nodes exist for the opener to
-        draw upon. An opener with nothing to connect to is useless.
+      BUILD ORDER — always work BACKWARDS from goals:
+      1. GOAL exists → ask "What event DIRECTLY causes this goal?"
+         Add that beat, connected to the goal. This is the immediate cause.
+      2. BEAT exists → ask "What must happen before THIS beat can occur?"
+         Add another beat as its predecessor, OR add WORLD NODES the beat
+         requires — the character who acts, the location where it happens,
+         the situation that creates the pressure.
+      3. When the causal chain is deep enough: add an OPENER connected to
+         the earliest beat. The opener is the inciting incident that sets
+         the whole chain in motion.
       NEVER add an opener when the web has only goals.
+      NEVER skip steps — each beat must be a direct cause of the next.
 
-      NARRATIVE POSITION — nodes exist at different points in time:
-      - Openers happen FIRST (inciting incident, catalyst, disruption of status quo)
-      - Situations and characters exist throughout
-      - Beats happen in the MIDDLE (escalation, complications, revelations)
-      - Goals happen at the END (climax, resolution, consequences)
+      CAUSE → EFFECT — the arc chain is a causal sequence:
+      - Each beat answers "WHY does the next thing happen?"
+        Beat A causes Beat B causes the Goal. Not vibes — causation.
+      - A beat's content should describe a specific, concrete event with
+        a clear consequence. "Tensions rise" is NOT a beat. "The dam breaks
+        and floods the lower district" IS a beat — it has a cause and effect.
+      - Openers happen FIRST (inciting incident, catalyst, disruption)
+      - Goals happen LAST (climax, resolution, consequences)
       Do NOT create an opener that describes a mid-story or climactic event.
       An opener that sounds like it could be a goal is WRONG.
 
@@ -380,6 +389,9 @@ config:
         an under-represented category.
         MANDATORY: Every non-goal node MUST include "connect" with at least
         one valid link. Orphan nodes are rejected.
+        ARC NODE LIMIT: beats and openers may declare exactly ONE connection
+        on add. Pick the single most important narrative link. Use "connect"
+        ops later to add more links if needed.
       - "update": Improve an existing node's content — make it more specific,
         raise the stakes, or sharpen the conflict.
       - "connect": Link two nodes that have a genuine narrative dependency.
@@ -391,26 +403,25 @@ config:
       - "located_at": A physically takes place at or resides in B
 
       CONNECTION RULES:
-      - Arc-to-arc (REQUIRED for arc nodes): every beat and opener MUST
-        connect to at least one other arc node. This forms the narrative chain.
-        Valid: opener→beat, beat→goal, beat→beat (escalation).
-        Arc connections must NOT create cycles — the chain is directional.
+      - DIRECTED ARC CHAIN: arc edges flow source→target toward the goal.
+        Valid directions: opener→beat, beat→beat, beat→goal.
+        The chain must be acyclic (a DAG).
+      - TERMINAL NODES: goals and openers are terminals.
+        - Goals: no outgoing arc edges (they are endpoints).
+        - Openers: no incoming arc edges (they are start points).
+        FORBIDDEN: opener→goal, beat→opener, opener→opener.
       - World-to-arc: characters/factions/locations/situations connect to
         arc nodes they participate in (via involves, located_at, requires).
-      - World-to-world: allowed sparingly — but don't over-connect. Each
-        node should have at most 3-4 connections total.
-      - Beat→goal: ALLOWED. Beats are escalation steps toward the climax.
-        This is the primary way the narrative chain reaches goals.
-      - FORBIDDEN: opener → goal directly. Openers are inciting incidents —
-        they connect to beats or world nodes, never to the endpoint.
-      - NO NEXUS NODES: If a node already has 4 connections, connect to
-        something else. A web where everything connects to one node is dull.
+        World connections are undirected and don't affect the arc DAG.
+      - World-to-world: allowed sparingly.
+      - NO NEXUS NODES on world nodes: prefer 3-4 connections max.
+        Arc nodes may have more connections as narratives converge/diverge.
 
       BAD connections (will be rejected on review):
-      - An opener "involves" or "requires" a goal (impossible — goals are endpoints)
+      - An opener "involves" or "requires" a goal (impossible — both are terminals)
+      - A beat→opener connection (openers are start terminals)
       - A beat connected ONLY to goals with no world node involvement
       - A barista "involves" a domestic situation they have nothing to do with
-      - A character "located_at" a place they have no reason to visit
       - Any link where removing it changes nothing about either node
 
       DULFS format (MANDATORY — name + ONE terse sentence, ≤15 words):
@@ -419,7 +430,7 @@ config:
       - location: "Name: Atmosphere and narrative function."
       - system: "Name: Mechanic and current instability."
       - situation: "Name: Competing pressures."
-      - beat: "Name: Specific event or turning point."
+      - beat: "Name: Concrete event → its consequence."
       - opener: "Name: The inciting incident — the FIRST thing that happens
           to set events in motion. NOT a mid-story event or climax."
       - goal: "Name: Extreme dramatic endpoint."

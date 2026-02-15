@@ -16,6 +16,8 @@ import {
   userGoalAdded,
   userNodeAdded,
   intentEdited,
+  nodeFavorited,
+  nodeDisfavored,
 } from "../../../core/store/slices/crucible";
 import { ARC_KINDS, WORLD_KINDS } from "../../../core/utils/crucible-strategy";
 import { IDS } from "../../framework/ids";
@@ -45,73 +47,51 @@ const ADDABLE_KINDS: CrucibleNodeKind[] = [
 // (World nodes rendered in insertion order, no grouping)
 
 /**
- * BFS-level layout: assign each node a "level" based on distance from goals.
- * Goals are level 0. Nodes connected to goals are level 1, etc.
- * Unconnected nodes go into a "loose" group.
- * Optional kindFilter limits which nodes and edges participate in BFS.
+ * Decompose arc nodes into per-path columns. Each distinct chain leading to a
+ * goal becomes one arc (vertical column). Goals at the bottom, openers at top.
+ * If two beats both point to the same goal, that's two separate arcs.
  */
-function buildLevelLayout(
+function decomposeArcs(
   nodes: CrucibleNode[],
   edges: CrucibleEdge[],
-  kindFilter?: Set<CrucibleNodeKind>,
-): { levels: string[][]; loose: string[] } {
-  const filteredNodes = kindFilter ? nodes.filter((n) => kindFilter.has(n.kind)) : nodes;
-  const filteredEdges = kindFilter
-    ? edges.filter((e) => {
-        const sNode = nodes.find((n) => n.id === e.source);
-        const tNode = nodes.find((n) => n.id === e.target);
-        return sNode && tNode && kindFilter.has(sNode.kind) && kindFilter.has(tNode.kind);
-      })
-    : edges;
+): { arcs: string[][]; loose: string[] } {
+  const arcNodes = new Map(
+    nodes.filter((n) => ARC_KINDS.has(n.kind)).map((n) => [n.id, n]),
+  );
+  const goals = nodes.filter((n) => n.kind === "goal");
 
-  const nodeIds = new Set(filteredNodes.map((n) => n.id));
-  const visited = new Map<string, number>(); // id → level
-  const queue: string[] = [];
-
-  // Level 0: all goal nodes
-  for (const node of filteredNodes) {
-    if (node.kind === "goal") {
-      visited.set(node.id, 0);
-      queue.push(node.id);
+  // Build directed predecessors: for each arc node, who points TO it?
+  const predecessors = new Map<string, string[]>();
+  for (const [id] of arcNodes) predecessors.set(id, []);
+  for (const edge of edges) {
+    if (arcNodes.has(edge.source) && arcNodes.has(edge.target)) {
+      predecessors.get(edge.target)!.push(edge.source);
     }
   }
 
-  // BFS outward via edges (undirected)
-  let head = 0;
-  while (head < queue.length) {
-    const current = queue[head++];
-    const currentLevel = visited.get(current)!;
-    for (const edge of filteredEdges) {
-      const neighbor =
-        edge.source === current ? edge.target :
-        edge.target === current ? edge.source : null;
-      if (neighbor && nodeIds.has(neighbor) && !visited.has(neighbor)) {
-        visited.set(neighbor, currentLevel + 1);
-        queue.push(neighbor);
+  const arcs: string[][] = [];
+  const inArc = new Set<string>();
+
+  for (const goal of goals) {
+    // Walk backwards from goal, splitting at each fork
+    const walkBack = (nodeId: string, chain: string[]): void => {
+      const preds = predecessors.get(nodeId) || [];
+      if (preds.length === 0) {
+        // End of chain — emit arc (chain is in reverse order: goal first)
+        arcs.push([...chain].reverse()); // top-to-bottom: opener...beats...goal
+        chain.forEach((id) => inArc.add(id));
+        return;
       }
-    }
+      for (const pred of preds) {
+        if (chain.includes(pred)) continue; // prevent loops
+        walkBack(pred, [...chain, pred]);
+      }
+    };
+    walkBack(goal.id, [goal.id]);
   }
 
-  // Group by level
-  const levelMap = new Map<number, string[]>();
-  const loose: string[] = [];
-
-  for (const node of filteredNodes) {
-    const level = visited.get(node.id);
-    if (level !== undefined) {
-      const arr = levelMap.get(level) || [];
-      arr.push(node.id);
-      levelMap.set(level, arr);
-    } else {
-      loose.push(node.id);
-    }
-  }
-
-  // Sort levels
-  const sortedKeys = [...levelMap.keys()].sort((a, b) => a - b);
-  const levels = sortedKeys.map((k) => levelMap.get(k)!);
-
-  return { levels, loose };
+  const loose = [...arcNodes.keys()].filter((id) => !inArc.has(id));
+  return { arcs, loose };
 }
 
 /**
@@ -218,6 +198,47 @@ export const CrucibleWindow = defineComponent<void, RootState>({
       "margin-top": "4px",
       "padding-top": "4px",
     },
+    arcGroup: {
+      gap: "2px",
+      "border-left": "2px solid rgba(255,255,255,0.08)",
+      "padding-left": "6px",
+      "margin-bottom": "4px",
+      "padding-right": "8px",
+    },
+    arcLine: {
+      "align-items": "center",
+      gap: "4px",
+    },
+    arcLineFavorited: {
+      "align-items": "center",
+      gap: "4px",
+      "border-left": "3px solid rgba(233,30,99,0.7)",
+      "padding-left": "4px",
+    },
+    arcLineDisfavored: {
+      "align-items": "center",
+      gap: "4px",
+      opacity: "0.35",
+      "text-decoration": "line-through",
+    },
+    arcLineEdited: {
+      "align-items": "center",
+      gap: "4px",
+      "border-left": "3px solid rgba(33,150,243,0.7)",
+      "padding-left": "4px",
+    },
+    arcKindBadge: {
+      "font-size": "0.65em",
+      opacity: "0.9",
+      "text-transform": "uppercase",
+      "letter-spacing": "0.5px",
+      "flex-shrink": "0",
+    },
+    arcInput: {
+      flex: "1",
+      "min-height": "1.4em",
+      "font-size": "0.85em",
+    },
     levelRow: {
       "flex-wrap": "wrap",
       gap: "4px",
@@ -294,29 +315,81 @@ export const CrucibleWindow = defineComponent<void, RootState>({
     const newNodeIds = new Set<string>();
     let kindRowVisible = false;
 
-    // Build arc BFS levels from node parts
+    // Build a compact inline line for an arc node
+    const buildArcLine = (node: CrucibleNode): UIPart => {
+      const kindColor = KIND_COLORS[node.kind] || "#ffffff";
+      const storageKey = `cr-arc-content-${node.id}`;
+
+      const lineStyle = node.status === "favorited"
+        ? "arcLineFavorited"
+        : node.status === "disfavored"
+          ? "arcLineDisfavored"
+          : node.status === "edited"
+            ? "arcLineEdited"
+            : "arcLine";
+
+      // Seed storage with current store content
+      api.v1.storyStorage.set(storageKey, node.content);
+
+      return row({
+        id: `cr-arcnode-${node.id}`,
+        style: this.style?.(lineStyle),
+        content: [
+          text({
+            text: node.kind,
+            style: { ...this.style?.("arcKindBadge"), color: kindColor },
+          }),
+          multilineTextInput({
+            id: `cr-arcnode-${node.id}-input`,
+            storageKey: `story:${storageKey}`,
+            initialValue: node.content,
+            style: this.style?.("arcInput"),
+          }),
+          button({
+            iconId: "heart",
+            callback: () => dispatch(nodeFavorited({ id: node.id })),
+            id: `cr-arcnode-${node.id}-fav`,
+          }),
+          button({
+            iconId: "x",
+            callback: () => dispatch(nodeDisfavored({ id: node.id })),
+            id: `cr-arcnode-${node.id}-dis`,
+          }),
+        ],
+      });
+    };
+
+    // Build arc section — each arc is a horizontal group of compact lines
     const buildArcLevels = (nodes: CrucibleNode[], edges: CrucibleEdge[]): UIPart[] => {
-      const { levels, loose } = buildLevelLayout(nodes, edges, ARC_KINDS);
+      const { arcs, loose } = decomposeArcs(nodes, edges);
       const content: UIPart[] = [];
 
-      for (let i = 0; i < levels.length; i++) {
-        const cards: UIPart[] = [];
-        for (const id of levels[i]) {
-          const entry = nodeParts.get(id);
-          if (entry) cards.push(entry.part);
-        }
-        if (cards.length === 0) continue;
+      if (arcs.length > 0) {
+        for (let i = 0; i < arcs.length; i++) {
+          const lines: UIPart[] = [];
+          for (const id of arcs[i]) {
+            const node = nodes.find((n) => n.id === id);
+            if (!node) continue;
+            lines.push(buildArcLine(node));
+          }
+          if (lines.length === 0) continue;
 
-        content.push(row({
-          id: `cr-level-${i}`,
-          style: i > 0
-            ? { ...this.style?.("levelRow"), ...this.style?.("levelDivider") }
-            : this.style?.("levelRow"),
-          content: cards,
-        }));
+          content.push(column({
+            id: `cr-arc-${i}`,
+            style: this.style?.("arcGroup"),
+            content: [
+              text({
+                id: `cr-arc-label-${i}`,
+                text: `\u2014 Arc ${i + 1} \u2014`,
+                style: this.style?.("sectionLabel"),
+              }),
+              ...lines,
+            ],
+          }));
+        }
       }
 
-      // Loose arc nodes
+      // Loose arc nodes — render as NodeCard tiles
       if (loose.length > 0) {
         const looseCards: UIPart[] = [];
         for (const id of loose) {
@@ -324,9 +397,14 @@ export const CrucibleWindow = defineComponent<void, RootState>({
           if (entry) looseCards.push(entry.part);
         }
         if (looseCards.length > 0) {
+          content.push(text({
+            id: "cr-loose-label",
+            text: "\u2014 Loose \u2014",
+            style: this.style?.("sectionLabel"),
+          }));
           content.push(row({
             id: "cr-level-loose",
-            style: { ...this.style?.("levelRow"), ...this.style?.("levelDivider") },
+            style: this.style?.("levelRow"),
             content: looseCards,
           }));
         }
@@ -366,14 +444,62 @@ export const CrucibleWindow = defineComponent<void, RootState>({
       return [...buildArcLevels(nodes, edges), ...buildWorldSection(nodes)];
     };
 
+    // Rebuild the nodes container from current state
+    const rebuildContent = () => {
+      const state = ctx.getState();
+      const nodes = state.crucible.nodes;
+      const hasNodes = nodes.length > 0;
+      const content = buildLevelContent(nodes, state.crucible.edges);
+
+      api.v1.ui.updateParts([
+        {
+          id: IDS.CRUCIBLE.EMPTY_STATE,
+          style: this.style?.(
+            "emptyState",
+            hasNodes ? "hidden" : undefined,
+          ),
+        },
+        {
+          id: IDS.CRUCIBLE.NODES_COL,
+          content: [emptyState, ...content],
+        },
+      ]);
+    };
+
+    // Mount NodeCards only for nodes that need tile rendering (world + loose arc)
+    const ensureNodeCards = (nodes: CrucibleNode[], edges: CrucibleEdge[]) => {
+      const { loose } = decomposeArcs(nodes, edges);
+      const looseSet = new Set(loose);
+      const nodeIds = new Set(nodes.map((n) => n.id));
+
+      for (const node of nodes) {
+        // Mount NodeCards for world nodes and loose arc nodes
+        const needsCard = WORLD_KINDS.has(node.kind) || looseSet.has(node.id);
+        if (needsCard && !nodeParts.has(node.id)) {
+          const isNew = newNodeIds.has(node.id);
+          if (isNew) newNodeIds.delete(node.id);
+          nodeParts.set(
+            node.id,
+            ctx.render(NodeCard, { node, startInEditMode: isNew }),
+          );
+        }
+      }
+
+      // Unmount removed nodes
+      for (const [id] of nodeParts) {
+        if (!nodeIds.has(id)) {
+          nodeParts.get(id)!.unmount();
+          nodeParts.delete(id);
+        }
+      }
+    };
+
     // --- Read initial state ---
     const initial = ctx.getState();
     const initialStatusText = buildStatusText(initial);
 
-    // Mount initial nodes
-    for (const node of initial.crucible.nodes) {
-      nodeParts.set(node.id, ctx.render(NodeCard, { node }));
-    }
+    // Mount initial node cards (world + loose arc only)
+    ensureNodeCards(initial.crucible.nodes, initial.crucible.edges);
 
     const initialLevelContent = buildLevelContent(initial.crucible.nodes, initial.crucible.edges);
     const hasInitialNodes = initial.crucible.nodes.length > 0;
@@ -751,52 +877,17 @@ export const CrucibleWindow = defineComponent<void, RootState>({
       },
     );
 
-    // -- Reactive: Node list changes → reconcile cards --
+    // -- Reactive: Node/edge changes → reconcile cards + rebuild layout --
+    // Broader selector: triggers on node IDs, content, status, and edges
     useSelector(
-      (state) => state.crucible.nodes.map((n) => n.id).join(","),
+      (state) => ({
+        sig: state.crucible.nodes.map((n) => `${n.id}:${n.content.length}:${n.status}`).join(","),
+        edgeSig: state.crucible.edges.length,
+      }),
       () => {
         const state = ctx.getState();
-        const nodes = state.crucible.nodes;
-        const nodeIds = new Set(nodes.map((n) => n.id));
-
-        // Mount new nodes — check if any should start in edit mode
-        for (const node of nodes) {
-          if (!nodeParts.has(node.id)) {
-            const isNew = newNodeIds.has(node.id);
-            if (isNew) newNodeIds.delete(node.id);
-            nodeParts.set(
-              node.id,
-              ctx.render(NodeCard, { node, startInEditMode: isNew }),
-            );
-          }
-        }
-
-        // Unmount removed nodes
-        for (const [id] of nodeParts) {
-          if (!nodeIds.has(id)) {
-            nodeParts.get(id)!.unmount();
-            nodeParts.delete(id);
-          }
-        }
-
-        // Rebuild BFS-level content
-        const hasNodes = nodes.length > 0;
-        const content = buildLevelContent(nodes, state.crucible.edges);
-
-        api.v1.ui.updateParts([
-          {
-            id: IDS.CRUCIBLE.EMPTY_STATE,
-            style: this.style?.(
-              "emptyState",
-              hasNodes ? "hidden" : undefined,
-            ),
-          },
-          {
-            id: IDS.CRUCIBLE.NODES_COL,
-            content: [emptyState, ...content],
-          },
-        ]);
-
+        ensureNodeCards(state.crucible.nodes, state.crucible.edges);
+        rebuildContent();
         updateControls();
       },
     );

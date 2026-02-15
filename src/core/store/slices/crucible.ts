@@ -5,6 +5,35 @@ import {
   CrucibleEdge,
   CrucibleNodeKind,
 } from "../types";
+import { WORLD_KINDS } from "../../utils/crucible-strategy";
+
+/** Soft cap for world nodes — 5th connection evicts the oldest */
+export const WORLD_NODE_SOFT_CAP = 4;
+
+/**
+ * Enforce soft cap on world nodes: if a world node has more than WORLD_NODE_SOFT_CAP
+ * edges, evict the oldest (earliest by array position) to make room.
+ */
+function enforceWorldSoftCap(
+  nodes: CrucibleNode[],
+  edges: CrucibleEdge[],
+): CrucibleEdge[] {
+  const worldIds = new Set(
+    nodes.filter((n) => WORLD_KINDS.has(n.kind)).map((n) => n.id),
+  );
+  let result = edges;
+  for (const id of worldIds) {
+    const nodeEdges = result
+      .map((e, i) => ({ edge: e, index: i }))
+      .filter(({ edge }) => edge.source === id || edge.target === id);
+    if (nodeEdges.length > WORLD_NODE_SOFT_CAP) {
+      const toRemove = nodeEdges.length - WORLD_NODE_SOFT_CAP;
+      const removeIndices = new Set(nodeEdges.slice(0, toRemove).map(({ index }) => index));
+      result = result.filter((_, i) => !removeIndices.has(i));
+    }
+  }
+  return result;
+}
 
 export const initialCrucibleState: CrucibleState = {
   phase: "idle",
@@ -42,11 +71,13 @@ export const crucibleSlice = createSlice({
       return state; // Intent action — effects queue intent generation
     },
     nodesAdded: (state, payload: { nodes: CrucibleNode[]; edges?: CrucibleEdge[] }) => {
+      const allNodes = [...state.nodes, ...payload.nodes];
+      const mergedEdges = payload.edges ? [...state.edges, ...payload.edges] : state.edges;
       return {
         ...state,
         phase: "active" as const,
-        nodes: [...state.nodes, ...payload.nodes],
-        edges: payload.edges ? [...state.edges, ...payload.edges] : state.edges,
+        nodes: allNodes,
+        edges: enforceWorldSoftCap(allNodes, mergedEdges),
       };
     },
     nodeUpdated: (state, payload: { id: string; content: string }) => {
@@ -62,7 +93,7 @@ export const crucibleSlice = createSlice({
     edgeAdded: (state, payload: { edge: CrucibleEdge }) => {
       return {
         ...state,
-        edges: [...state.edges, payload.edge],
+        edges: enforceWorldSoftCap(state.nodes, [...state.edges, payload.edge]),
       };
     },
     nodeFavorited: (state, payload: { id: string }) => {
