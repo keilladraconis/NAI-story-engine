@@ -21,6 +21,8 @@ export interface EditableTextProps {
   id: string;
   storageKey: string;
   placeholder?: string;
+  /** Called after save with the new content string. */
+  onSave?: (content: string) => void;
 }
 
 export const EditableText = defineComponent<EditableTextProps, RootState>({
@@ -63,7 +65,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
 
   build(props, ctx) {
     const { dispatch, useSelector } = ctx;
-    const { id, storageKey, placeholder } = props;
+    const { id, storageKey, placeholder, onSave } = props;
 
     const viewId = `${id}-view`;
     const editId = `${id}-edit`;
@@ -101,6 +103,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
         { id: viewId, text: content.replace(/\n/g, "  \n").replace(/</g, "\\<") || "_No content._" },
       ]);
       dispatch(uiFieldEditEnd({ id }));
+      if (onSave) onSave(content);
     };
 
     // React to edit mode changes

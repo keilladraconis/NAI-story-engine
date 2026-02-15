@@ -27,9 +27,6 @@ export const IDS = {
     goal: (id: string) => ({
       ROOT: `cr-goal-${id}`,
       TEXT: `cr-goal-${id}-text`,
-      INPUT: `cr-goal-${id}-input`,
-      EDIT_BTN: `cr-goal-${id}-edit`,
-      SAVE_BTN: `cr-goal-${id}-save`,
       FAV_BTN: `cr-goal-${id}-fav`,
       DEL_BTN: `cr-goal-${id}-del`,
     }),

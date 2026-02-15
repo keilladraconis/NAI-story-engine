@@ -36,7 +36,7 @@ import {
   STATUS_GENERATING,
 } from "../../colors";
 
-const { text, row, column, button, multilineTextInput } = api.v1.ui.part;
+const { text, row, column, button } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
@@ -117,32 +117,9 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
       "white-space": "pre-wrap",
       "word-break": "break-word",
     },
-    goalTextHidden: {
-      display: "none",
-    },
-    goalInput: {
-      "min-height": "80px",
-      width: "100%",
-      "font-size": "0.85em",
-    },
-    goalInputHidden: {
-      "min-height": "80px",
-      width: "100%",
-      "font-size": "0.85em",
-      display: "none",
-    },
-    goalBtnRow: {
-      gap: "2px",
-      "align-items": "center",
-    },
     goalBtn: {
       padding: "2px 6px",
       "font-size": "0.8em",
-    },
-    goalBtnHidden: {
-      padding: "2px 6px",
-      "font-size": "0.8em",
-      display: "none",
     },
     buttonRow: {
       gap: "6px",
@@ -241,7 +218,7 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
     // --- Generation Buttons ---
     const { part: intentBtnPart } = ctx.render(GenerationButton, {
       id: CR.INTENT_BTN,
-      label: "\u26A1",
+      label: "",
       variant: "button",
       generateAction: crucibleIntentRequested(),
       stateProjection: (s: RootState) => ({
@@ -260,7 +237,7 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
 
     const { part: goalsBtnPart } = ctx.render(GenerationButton, {
       id: CR.GOALS_BTN,
-      label: "\u26A1",
+      label: "Goals",
       variant: "button",
       generateAction: crucibleGoalsRequested(),
       stateProjection: (s: RootState) => ({
@@ -343,64 +320,58 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
       },
     );
 
-    // Track which goals are in edit mode (persists across selector rebuilds)
-    const editingGoals = new Set<string>();
+    // Cache rendered EditableText parts per goal (persists across selector rebuilds)
+    const goalEditables = new Map<string, UIPart>();
 
     // Goals list
     useSelector(
       (s) => s.crucible.goals,
       async (goals) => {
-
         if (goals.length === 0) {
+          goalEditables.clear();
           api.v1.ui.updateParts([
             { id: CR.GOALS_LIST, style: this.style?.("hidden") },
           ]);
           return;
         }
 
-        // Seed storyStorage for editable goals
+        // Render EditableText for new goals, clean up removed ones
+        const currentIds = new Set(goals.map((g) => g.id));
+        for (const [id] of goalEditables) {
+          if (!currentIds.has(id)) goalEditables.delete(id);
+        }
+        for (const goal of goals) {
+          if (!goalEditables.has(goal.id)) {
+            const { part } = ctx.render(EditableText, {
+              id: CR.goal(goal.id).TEXT,
+              storageKey: `cr-goal-${goal.id}`,
+              placeholder: "[GOAL] ...\n[STAKES] ...\n[THEME] ...",
+              onSave: (content: string) =>
+                dispatch(goalTextUpdated({ goalId: goal.id, text: content })),
+            });
+            goalEditables.set(goal.id, part);
+          }
+        }
+
+        // Seed storyStorage and update view text for each goal
         for (const goal of goals) {
           if (goal.text) {
             await api.v1.storyStorage.set(`cr-goal-${goal.id}`, goal.text);
+            const display = formatTagsWithEmoji(goal.text)
+              .replace(/\n/g, "  \n").replace(/</g, "\\<");
+            api.v1.ui.updateParts([
+              { id: `${CR.goal(goal.id).TEXT}-view`, text: display },
+            ]);
+          } else {
+            api.v1.ui.updateParts([
+              { id: `${CR.goal(goal.id).TEXT}-view`, text: "_Generating..._" },
+            ]);
           }
         }
 
         const goalParts = goals.map((goal) => {
           const ids = CR.goal(goal.id);
-          const isEmpty = !goal.text.trim();
-          const isEditing = editingGoals.has(goal.id);
-          const displayText = isEmpty
-            ? "_Generating..._"
-            : formatTagsWithEmoji(goal.text).replace(/\n/g, "  \n").replace(/</g, "\\<");
-
-          const beginEdit = async (): Promise<void> => {
-            editingGoals.add(goal.id);
-            const currentText = String(
-              (await api.v1.storyStorage.get(`cr-goal-${goal.id}`)) || "",
-            );
-            const lines = Math.max((currentText.match(/\n/g) || []).length + 1, 4);
-            const height = `${Math.min(lines * 18, 300)}px`;
-            api.v1.ui.updateParts([
-              { id: ids.TEXT, style: this.style?.("goalTextHidden") },
-              { id: ids.INPUT, style: { ...this.style?.("goalInput"), "min-height": height } },
-              { id: ids.EDIT_BTN, style: this.style?.("goalBtnHidden") },
-              { id: ids.SAVE_BTN, style: this.style?.("goalBtn") },
-            ]);
-          };
-
-          const saveEdit = async (): Promise<void> => {
-            editingGoals.delete(goal.id);
-            const content = String(
-              (await api.v1.storyStorage.get(`cr-goal-${goal.id}`)) || "",
-            );
-            dispatch(goalTextUpdated({ goalId: goal.id, text: content }));
-            api.v1.ui.updateParts([
-              { id: ids.TEXT, style: this.style?.("goalText") },
-              { id: ids.INPUT, style: this.style?.("goalInputHidden") },
-              { id: ids.EDIT_BTN, style: this.style?.("goalBtn") },
-              { id: ids.SAVE_BTN, style: this.style?.("goalBtnHidden") },
-            ]);
-          };
+          const editable = goalEditables.get(goal.id)!;
 
           return column({
             id: ids.ROOT,
@@ -411,20 +382,6 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
               row({
                 style: { "justify-content": "flex-end", gap: "2px" },
                 content: [
-                  ...(!isEmpty ? [
-                    button({
-                      id: ids.EDIT_BTN,
-                      text: "\u270F\uFE0F",
-                      style: isEditing ? this.style?.("goalBtnHidden") : this.style?.("goalBtn"),
-                      callback: beginEdit,
-                    }),
-                    button({
-                      id: ids.SAVE_BTN,
-                      text: "\uD83D\uDCBE",
-                      style: isEditing ? this.style?.("goalBtn") : this.style?.("goalBtnHidden"),
-                      callback: saveEdit,
-                    }),
-                  ] : []),
                   button({
                     id: ids.FAV_BTN,
                     text: goal.selected ? "\u2764\uFE0F" : "\uD83E\uDD0D",
@@ -439,19 +396,7 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
                   }),
                 ],
               }),
-              text({
-                id: ids.TEXT,
-                text: displayText,
-                markdown: true,
-                style: isEditing ? this.style?.("goalTextHidden") : this.style?.("goalText"),
-              }),
-              multilineTextInput({
-                id: ids.INPUT,
-                initialValue: "",
-                placeholder: "[GOAL] ...\n[STAKES] ...\n[THEME] ...",
-                storageKey: `story:cr-goal-${goal.id}`,
-                style: isEditing ? this.style?.("goalInput") : this.style?.("goalInputHidden"),
-              }),
+              editable,
             ],
           });
         });

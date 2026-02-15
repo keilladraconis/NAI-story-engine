@@ -62,7 +62,8 @@ export const crucibleGoalHandler: GenerationHandlers<CrucibleGoalTarget> = {
   streaming(ctx: StreamingContext<CrucibleGoalTarget>): void {
     const { goalId } = ctx.target;
     const display = formatTagsWithEmoji(ctx.accumulatedText);
-    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.goal(goalId).TEXT, text: display }]);
+    // Write to EditableText's view element (${id}-view)
+    api.v1.ui.updateParts([{ id: `${IDS.CRUCIBLE.goal(goalId).TEXT}-view`, text: display }]);
   },
 
   async completion(ctx: CompletionContext<CrucibleGoalTarget>): Promise<void> {
