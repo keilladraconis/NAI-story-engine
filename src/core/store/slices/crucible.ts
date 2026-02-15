@@ -36,6 +36,7 @@ function mergeWorldElements(existing: WorldElements, introduced: WorldElements):
 
 export const initialCrucibleState: CrucibleState = {
   phase: "idle",
+  intent: null,
   goals: [],
   chains: {},
   activeGoalId: null,
@@ -55,8 +56,31 @@ export const crucibleSlice = createSlice({
     crucibleMergeRequested: (state) => state,
     crucibleStopRequested: (state) => state,
 
-    goalsSet: (state, payload: { goals: CrucibleGoal[] }) => {
-      return { ...state, phase: "goals" as const, goals: payload.goals };
+    // Intent phase reducers
+    crucibleIntentRequested: (state) => state, // Intent action — effect queues generation
+    intentSet: (state, payload: { intent: string }) => {
+      return { ...state, intent: payload.intent };
+    },
+
+    goalTextUpdated: (state, payload: { goalId: string; text: string }) => {
+      return {
+        ...state,
+        goals: state.goals.map((g) =>
+          g.id === payload.goalId ? { ...g, text: payload.text } : g,
+        ),
+      };
+    },
+
+    goalAdded: (state, payload: { goal: CrucibleGoal }) => {
+      return { ...state, phase: "goals" as const, goals: [...state.goals, payload.goal] };
+    },
+
+    goalRemoved: (state, payload: { goalId: string }) => {
+      return { ...state, goals: state.goals.filter((g) => g.id !== payload.goalId) };
+    },
+
+    goalsCleared: (state) => {
+      return { ...state, goals: [] };
     },
 
     goalToggled: (state, payload: { goalId: string }) => {
@@ -274,7 +298,12 @@ export const {
   crucibleChainRequested,
   crucibleMergeRequested,
   crucibleStopRequested,
-  goalsSet,
+  crucibleIntentRequested,
+  intentSet,
+  goalTextUpdated,
+  goalAdded,
+  goalRemoved,
+  goalsCleared,
   goalToggled,
   goalsConfirmed,
   chainStarted,

@@ -6,10 +6,15 @@ import {
 import {
   crucibleCommitted,
   crucibleReset,
-  crucibleGoalsRequested,
   crucibleStopRequested,
+  crucibleIntentRequested,
+  crucibleGoalsRequested,
+  goalAdded,
+  goalRemoved,
+  goalsCleared,
   goalsConfirmed,
   goalToggled,
+  goalTextUpdated,
   checkpointCleared,
   crucibleChainRequested,
   crucibleMergeRequested,
@@ -19,6 +24,9 @@ import {
 import { IDS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
 import { BudgetFeedback } from "../BudgetFeedback";
+import { EditableText } from "../EditableText";
+import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
+import { parseTag, formatTagsWithEmoji } from "../../../core/utils/tag-parser";
 import {
   NAI_HEADER,
   NAI_WARNING,
@@ -28,7 +36,7 @@ import {
   STATUS_GENERATING,
 } from "../../colors";
 
-const { text, row, column, button } = api.v1.ui.part;
+const { text, row, column, button, multilineTextInput } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
@@ -42,7 +50,14 @@ const PHASE_LABELS: Record<CruciblePhase, string> = {
   populating: "Populating DULFS",
 };
 
-export const CrucibleWindow = defineComponent<undefined, RootState>({
+/** Format intent prose for display: only apply emoji to [TAGS], rest is natural prose. */
+function formatForDisplay(raw: string): string {
+  // Only transform [TAGS] — rest is prose, not tagged
+  const display = raw.replace(/\[TAGS\]/g, "\uD83C\uDFF7\uFE0F");
+  return display.replace(/\n/g, "  \n").replace(/</g, "\\<");
+}
+
+export const CruciblePanel = defineComponent<undefined, RootState>({
   id: () => CR.WINDOW_ROOT,
 
   styles: {
@@ -99,15 +114,35 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
     },
     goalText: {
       "font-size": "0.85em",
+      "white-space": "pre-wrap",
+      "word-break": "break-word",
     },
-    goalStakes: {
-      "font-size": "0.75em",
-      opacity: "0.6",
+    goalTextHidden: {
+      display: "none",
     },
-    goalTerminal: {
-      "font-size": "0.75em",
-      opacity: "0.7",
-      "font-style": "italic",
+    goalInput: {
+      "min-height": "80px",
+      width: "100%",
+      "font-size": "0.85em",
+    },
+    goalInputHidden: {
+      "min-height": "80px",
+      width: "100%",
+      "font-size": "0.85em",
+      display: "none",
+    },
+    goalBtnRow: {
+      gap: "2px",
+      "align-items": "center",
+    },
+    goalBtn: {
+      padding: "2px 6px",
+      "font-size": "0.8em",
+    },
+    goalBtnHidden: {
+      padding: "2px 6px",
+      "font-size": "0.8em",
+      display: "none",
     },
     buttonRow: {
       gap: "6px",
@@ -141,6 +176,13 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
       color: NAI_WARNING,
     },
     hidden: { display: "none" },
+    streamText: {
+      "font-size": "0.85em",
+      "white-space": "pre-wrap",
+      "word-break": "break-word",
+      opacity: "0.8",
+      "min-height": "1.2em",
+    },
     beatCard: {
       padding: "4px 8px",
       "border-radius": "3px",
@@ -148,12 +190,9 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
       "border-left": "2px solid rgba(120,144,156,0.5)",
       gap: "2px",
     },
-    beatScene: {
+    beatText: {
       "font-size": "0.8em",
-    },
-    beatMeta: {
-      "font-size": "0.7em",
-      opacity: "0.6",
+      "white-space": "pre-wrap",
     },
     constraintOpen: {
       "font-size": "0.75em",
@@ -164,10 +203,9 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
       color: STATUS_COMPLETE,
       opacity: "0.5",
     },
-    elementItem: {
+    chainLabel: {
       "font-size": "0.8em",
-      "padding-left": "8px",
-      "border-left": "2px solid rgba(255,255,255,0.1)",
+      opacity: "0.8",
     },
     mergedCard: {
       padding: "6px 8px",
@@ -185,32 +223,14 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
       opacity: "0.6",
       "text-transform": "uppercase",
     },
-    mergedDesc: {
+    mergedText: {
       "font-size": "0.8em",
+      "white-space": "pre-wrap",
       opacity: "0.85",
     },
-    mergedPurpose: {
-      "font-size": "0.75em",
-      opacity: "0.6",
-      "font-style": "italic",
-    },
-    chainLabel: {
-      "font-size": "0.8em",
-      opacity: "0.8",
-    },
-    activeGoalTag: {
-      "font-size": "0.7em",
-      padding: "1px 6px",
-      "border-radius": "8px",
-      "background-color": STATUS_GENERATING,
-      color: NAI_DARK_BACKGROUND,
-    },
-    emptyState: {
-      "font-size": "0.85em",
-      opacity: "0.4",
-      "font-style": "italic",
-      "text-align": "center",
-      padding: "16px",
+    divider: {
+      "border-top": "1px solid rgba(255,255,255,0.08)",
+      margin: "4px 0",
     },
   },
 
@@ -218,10 +238,29 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
     const { dispatch, useSelector } = ctx;
     const state = ctx.getState();
 
-    // --- Generation Buttons (with full budget/cancel/continue support) ---
+    // --- Generation Buttons ---
+    const { part: intentBtnPart } = ctx.render(GenerationButton, {
+      id: CR.INTENT_BTN,
+      label: "\u26A1",
+      variant: "button",
+      generateAction: crucibleIntentRequested(),
+      stateProjection: (s: RootState) => ({
+        activeType: s.runtime.activeRequest?.type,
+        queueTypes: s.runtime.queue.map((q) => q.type),
+      }),
+      requestIdFromProjection: () => {
+        const s = ctx.getState();
+        if (s.runtime.activeRequest?.type === "crucibleIntent") return s.runtime.activeRequest.id;
+        const queued = s.runtime.queue.find((q) => q.type === "crucibleIntent");
+        return queued?.id;
+      },
+      isDisabledFromProjection: (proj: any) =>
+        proj.activeType === "crucibleChain" || proj.activeType === "crucibleMerge" || proj.activeType === "crucibleGoal",
+    });
+
     const { part: goalsBtnPart } = ctx.render(GenerationButton, {
       id: CR.GOALS_BTN,
-      label: "Generate Goals",
+      label: "\u26A1",
       variant: "button",
       generateAction: crucibleGoalsRequested(),
       stateProjection: (s: RootState) => ({
@@ -229,17 +268,33 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
         queueTypes: s.runtime.queue.map((q) => q.type),
       }),
       requestIdFromProjection: () => {
-        // Track goals by matching active request type
         const s = ctx.getState();
-        if (s.runtime.activeRequest?.type === "crucibleGoals") return s.runtime.activeRequest.id;
-        const queued = s.runtime.queue.find((q) => q.type === "crucibleGoals");
+        if (s.runtime.activeRequest?.type === "crucibleGoal") return s.runtime.activeRequest.id;
+        const queued = s.runtime.queue.find((q) => q.type === "crucibleGoal");
         return queued?.id;
       },
       isDisabledFromProjection: (proj: any) =>
-        proj.activeType === "crucibleChain" || proj.activeType === "crucibleMerge",
+        proj.activeType === "crucibleChain" || proj.activeType === "crucibleMerge" || proj.activeType === "crucibleIntent",
     });
 
     const { part: budgetPart } = ctx.render(BudgetFeedback, { id: "cr-budget" });
+
+    // --- EditableText for Intent ---
+    const { part: intentEditablePart } = ctx.render(EditableText, {
+      id: CR.INTENT_TEXT,
+      storageKey: "cr-intent",
+      placeholder: "The story explores... [TAGS] tag1, tag2, tag3",
+    });
+
+    // --- ButtonWithConfirmation for Clear Goals (icon-only) ---
+    const { part: clearGoalsPart } = ctx.render(ButtonWithConfirmation, {
+      id: CR.CLEAR_GOALS_BTN,
+      label: "",
+      iconId: "trash",
+      confirmLabel: "Clear all goals?",
+      buttonStyle: this.style?.("btnDanger"),
+      onConfirm: () => dispatch(goalsCleared()),
+    });
 
     // --- Reactive UI updates ---
 
@@ -253,7 +308,7 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
       },
     );
 
-    // Status text (active goal, chain progress, etc.)
+    // Status text
     useSelector(
       (s) => ({
         phase: s.crucible.phase,
@@ -261,23 +316,22 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
         goals: s.crucible.goals,
         chains: s.crucible.chains,
         autoChaining: s.crucible.autoChaining,
-        activeType: s.runtime.activeRequest?.type,
       }),
       (slice) => {
         let statusText = "";
         if (slice.phase === "idle") {
-          statusText = "Generate goals from your brainstorm to begin.";
+          statusText = "Write or derive intent, then generate goals.";
         } else if (slice.phase === "goals") {
           const selected = slice.goals.filter((g) => g.selected).length;
-          statusText = `${selected}/${slice.goals.length} goals selected. Confirm to begin chaining.`;
+          statusText = `${selected}/${slice.goals.length} goals selected.`;
         } else if (slice.phase === "chaining") {
           const goal = slice.goals.find((g) => g.id === slice.activeGoalId);
           const chain = slice.activeGoalId ? slice.chains[slice.activeGoalId] : null;
           const beats = chain?.beats.length || 0;
           const open = chain?.openConstraints.length || 0;
-          const goalName = goal?.goal?.slice(0, 40) || "...";
+          const goalText = goal ? (parseTag(goal.text, "GOAL") || goal.text.slice(0, 40)) : "...";
           const auto = slice.autoChaining ? " (auto)" : "";
-          statusText = `Chaining: "${goalName}" — ${beats} beats, ${open} open constraints${auto}`;
+          statusText = `Chaining: "${goalText.slice(0, 40)}" \u2014 ${beats} beats, ${open} open${auto}`;
         } else if (slice.phase === "merging") {
           statusText = "Merging world elements across goals...";
         } else if (slice.phase === "reviewing") {
@@ -289,10 +343,14 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
       },
     );
 
+    // Track which goals are in edit mode (persists across selector rebuilds)
+    const editingGoals = new Set<string>();
+
     // Goals list
     useSelector(
       (s) => s.crucible.goals,
-      (goals) => {
+      async (goals) => {
+
         if (goals.length === 0) {
           api.v1.ui.updateParts([
             { id: CR.GOALS_LIST, style: this.style?.("hidden") },
@@ -300,8 +358,50 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
           return;
         }
 
+        // Seed storyStorage for editable goals
+        for (const goal of goals) {
+          if (goal.text) {
+            await api.v1.storyStorage.set(`cr-goal-${goal.id}`, goal.text);
+          }
+        }
+
         const goalParts = goals.map((goal) => {
           const ids = CR.goal(goal.id);
+          const isEmpty = !goal.text.trim();
+          const isEditing = editingGoals.has(goal.id);
+          const displayText = isEmpty
+            ? "_Generating..._"
+            : formatTagsWithEmoji(goal.text).replace(/\n/g, "  \n").replace(/</g, "\\<");
+
+          const beginEdit = async (): Promise<void> => {
+            editingGoals.add(goal.id);
+            const currentText = String(
+              (await api.v1.storyStorage.get(`cr-goal-${goal.id}`)) || "",
+            );
+            const lines = Math.max((currentText.match(/\n/g) || []).length + 1, 4);
+            const height = `${Math.min(lines * 18, 300)}px`;
+            api.v1.ui.updateParts([
+              { id: ids.TEXT, style: this.style?.("goalTextHidden") },
+              { id: ids.INPUT, style: { ...this.style?.("goalInput"), "min-height": height } },
+              { id: ids.EDIT_BTN, style: this.style?.("goalBtnHidden") },
+              { id: ids.SAVE_BTN, style: this.style?.("goalBtn") },
+            ]);
+          };
+
+          const saveEdit = async (): Promise<void> => {
+            editingGoals.delete(goal.id);
+            const content = String(
+              (await api.v1.storyStorage.get(`cr-goal-${goal.id}`)) || "",
+            );
+            dispatch(goalTextUpdated({ goalId: goal.id, text: content }));
+            api.v1.ui.updateParts([
+              { id: ids.TEXT, style: this.style?.("goalText") },
+              { id: ids.INPUT, style: this.style?.("goalInputHidden") },
+              { id: ids.EDIT_BTN, style: this.style?.("goalBtn") },
+              { id: ids.SAVE_BTN, style: this.style?.("goalBtnHidden") },
+            ]);
+          };
+
           return column({
             id: ids.ROOT,
             style: goal.selected
@@ -309,24 +409,48 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
               : this.style?.("goalCardDeselected"),
             content: [
               row({
-                style: { "justify-content": "space-between", "align-items": "center" },
+                style: { "justify-content": "flex-end", gap: "2px" },
                 content: [
-                  text({ id: ids.TEXT, text: goal.goal, style: this.style?.("goalText") }),
+                  ...(!isEmpty ? [
+                    button({
+                      id: ids.EDIT_BTN,
+                      text: "\u270F\uFE0F",
+                      style: isEditing ? this.style?.("goalBtnHidden") : this.style?.("goalBtn"),
+                      callback: beginEdit,
+                    }),
+                    button({
+                      id: ids.SAVE_BTN,
+                      text: "\uD83D\uDCBE",
+                      style: isEditing ? this.style?.("goalBtn") : this.style?.("goalBtnHidden"),
+                      callback: saveEdit,
+                    }),
+                  ] : []),
                   button({
-                    id: ids.TOGGLE,
-                    text: goal.selected ? "✓" : "○",
-                    style: { "font-size": "0.8em", padding: "2px 6px" },
+                    id: ids.FAV_BTN,
+                    text: goal.selected ? "\u2764\uFE0F" : "\uD83E\uDD0D",
+                    style: this.style?.("goalBtn"),
                     callback: () => dispatch(goalToggled({ goalId: goal.id })),
+                  }),
+                  button({
+                    id: ids.DEL_BTN,
+                    text: "\uD83D\uDDD1\uFE0F",
+                    style: this.style?.("goalBtn"),
+                    callback: () => dispatch(goalRemoved({ goalId: goal.id })),
                   }),
                 ],
               }),
               text({
-                text: `Stakes: ${goal.stakes}`,
-                style: this.style?.("goalStakes"),
+                id: ids.TEXT,
+                text: displayText,
+                markdown: true,
+                style: isEditing ? this.style?.("goalTextHidden") : this.style?.("goalText"),
               }),
-              text({
-                text: `Terminal: ${goal.terminalCondition}`,
-                style: this.style?.("goalTerminal"),
+              multilineTextInput({
+                id: ids.INPUT,
+                initialValue: "",
+                placeholder: "[GOAL] ...\n[STAKES] ...\n[THEME] ...",
+                storageKey: `story:cr-goal-${goal.id}`,
+                style: isEditing ? this.style?.("goalInput") : this.style?.("goalInputHidden"),
               }),
             ],
           });
@@ -334,6 +458,22 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
 
         api.v1.ui.updateParts([
           { id: CR.GOALS_LIST, style: { display: "flex" }, content: goalParts },
+        ]);
+      },
+    );
+
+    // Intent display — seed storyStorage for EditableText, always visible
+    useSelector(
+      (s) => s.crucible.intent,
+      async (intent) => {
+        if (!intent) return;
+
+        // Seed storyStorage for EditableText
+        await api.v1.storyStorage.set("cr-intent", intent);
+
+        // Update the EditableText view with emoji-formatted display
+        api.v1.ui.updateParts([
+          { id: `${CR.INTENT_TEXT}-view`, text: formatForDisplay(intent) },
         ]);
       },
     );
@@ -376,26 +516,18 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
             { id: CR.BEATS_LIST, style: this.style?.("hidden") },
           ]);
         } else {
-          // Show beats newest-first (closest to goal)
-          const beatParts = slice.beats.map((beat, i) =>
-            column({
+          const beatParts = slice.beats.map((beat, i) => {
+            const scene = parseTag(beat.text, "SCENE") || beat.text.split("\n")[0] || "Beat";
+            return column({
               style: this.style?.("beatCard"),
               content: [
                 text({
-                  text: `Beat ${i + 1}: ${beat.scene}`,
-                  style: this.style?.("beatScene"),
+                  text: `Beat ${i + 1}: ${scene}`,
+                  style: this.style?.("beatText"),
                 }),
-                beat.location ? text({
-                  text: `📍 ${beat.location}`,
-                  style: this.style?.("beatMeta"),
-                }) : text({ text: "" }),
-                beat.conflictTension ? text({
-                  text: `⚔️ ${beat.conflictTension}`,
-                  style: this.style?.("beatMeta"),
-                }) : text({ text: "" }),
               ],
-            }),
-          ).reverse();
+            });
+          }).reverse();
 
           api.v1.ui.updateParts([
             { id: CR.BEATS_LIST, style: { display: "flex" }, content: beatParts },
@@ -406,13 +538,13 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
         const constraintParts = [
           ...slice.open.map((c) =>
             text({
-              text: `○ ${c.description}`,
+              text: `\u25CB ${c.description}`,
               style: this.style?.("constraintOpen"),
             }),
           ),
           ...slice.resolved.slice(-5).map((c) =>
             text({
-              text: `● ${c.description} (${c.status === "groundState" ? "ground state" : "resolved"})`,
+              text: `\u25CF ${c.description} (${c.status === "groundState" ? "ground state" : "resolved"})`,
               style: this.style?.("constraintResolved"),
             }),
           ),
@@ -458,8 +590,11 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
           return;
         }
 
-        const elementParts = mergedWorld.elements.map((el) =>
-          column({
+        const elementParts = mergedWorld.elements.map((el) => {
+          const description = parseTag(el.text, "DESCRIPTION") || "";
+          const purpose = parseTag(el.text, "PURPOSE") || "";
+
+          return column({
             style: this.style?.("mergedCard"),
             content: [
               row({
@@ -469,16 +604,14 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
                   text({ text: el.type, style: this.style?.("mergedType") }),
                 ],
               }),
-              text({ text: el.description, style: this.style?.("mergedDesc") }),
-              ...Object.entries(el.goalPurposes).map(([goal, purpose]) =>
-                text({
-                  text: `→ ${goal.slice(0, 30)}: ${purpose}`,
-                  style: this.style?.("mergedPurpose"),
-                }),
-              ),
+              text({ text: description, style: this.style?.("mergedText") }),
+              purpose ? text({
+                text: `Purpose: ${purpose}`,
+                style: { ...this.style?.("mergedText"), opacity: "0.6", "font-style": "italic" },
+              }) : text({ text: "" }),
             ],
-          }),
-        );
+          });
+        });
 
         api.v1.ui.updateParts([
           { id: CR.MERGED_LIST, style: { display: "flex" }, content: elementParts },
@@ -492,26 +625,36 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
         phase: s.crucible.phase,
         hasGoals: s.crucible.goals.length > 0,
         hasSelectedGoals: s.crucible.goals.some((g) => g.selected),
-        activeGoalId: s.crucible.activeGoalId,
         autoChaining: s.crucible.autoChaining,
         hasMergedWorld: s.crucible.mergedWorld !== null,
+        isGenerating: s.runtime.activeRequest !== null,
       }),
       (slice) => {
         const { phase } = slice;
+        const canAct = !slice.isGenerating;
+        const preChaining = phase === "idle" || phase === "goals";
 
-        // Goals button: visible in idle
+        // Intent derive button: visible when not generating and not in chaining+
         api.v1.ui.updateParts([
           {
-            id: `${CR.GOALS_BTN}`,
-            style: phase === "idle" ? { display: "flex" } : { display: "none" },
+            id: `${CR.INTENT_BTN}`,
+            style: preChaining ? { display: "flex" } : { display: "none" },
           },
         ]);
 
-        // Confirm Goals button
+        // Goal management header: visible in idle and goals phases
+        api.v1.ui.updateParts([
+          {
+            id: "cr-goal-controls",
+            style: preChaining ? { display: "flex" } : { display: "none" },
+          },
+        ]);
+
+        // Confirm Goals button: visible in goals phase with selected goals
         api.v1.ui.updateParts([
           {
             id: "cr-confirm-goals-btn",
-            style: phase === "goals" && slice.hasSelectedGoals
+            style: phase === "goals" && slice.hasSelectedGoals && canAct
               ? this.style?.("btnPrimary")
               : this.style?.("hidden"),
           },
@@ -535,12 +678,22 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
           },
         ]);
 
-        // Stop button: visible during chaining/merging/goals generation
+        // Stop button: visible during active generation
         api.v1.ui.updateParts([
           {
             id: CR.STOP_BTN,
-            style: (phase === "chaining" || phase === "merging")
+            style: slice.isGenerating
               ? this.style?.("btnDanger")
+              : this.style?.("hidden"),
+          },
+        ]);
+
+        // Stream text: visible only for chain/merge (not goals — they stream into cards)
+        api.v1.ui.updateParts([
+          {
+            id: CR.STREAM_TEXT,
+            style: (phase === "chaining" || phase === "merging")
+              ? this.style?.("streamText")
               : this.style?.("hidden"),
           },
         ]);
@@ -574,9 +727,7 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
         // Status
         text({
           id: CR.STATUS_TEXT,
-          text: state.crucible.phase === "idle"
-            ? "Generate goals from your brainstorm to begin."
-            : "",
+          text: "Write or generate intent, then generate goals.",
           style: this.style?.("statusText"),
         }),
 
@@ -619,19 +770,27 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
           ],
         }),
 
-        row({ style: { "border-top": "1px solid rgba(255,255,255,0.08)", "margin": "4px 0" }, content: [] }),
+        // --- Intent Section (always visible) ---
+        row({ style: this.style?.("divider"), content: [] }),
+        row({
+          style: { ...this.style?.("headerRow"), gap: "6px" },
+          content: [
+            text({ text: "**Intent**", style: this.style?.("sectionTitle"), markdown: true }),
+            intentBtnPart,
+          ],
+        }),
+        intentEditablePart,
 
-        // Goals Generation Button (with full state tracking)
-        goalsBtnPart,
-
-        // Confirm Goals button
-        button({
-          id: "cr-confirm-goals-btn",
-          text: "Confirm Goals & Start Chaining",
-          style: state.crucible.phase === "goals"
-            ? this.style?.("btnPrimary")
-            : this.style?.("hidden"),
-          callback: () => dispatch(goalsConfirmed()),
+        // --- Goals Section ---
+        row({ style: this.style?.("divider"), content: [] }),
+        row({
+          id: "cr-goal-controls",
+          style: { ...this.style?.("headerRow"), gap: "6px" },
+          content: [
+            text({ text: "**Goals**", style: this.style?.("sectionTitle"), markdown: true }),
+            goalsBtnPart,
+            clearGoalsPart,
+          ],
         }),
 
         // Goals list (populated reactively)
@@ -643,7 +802,37 @@ export const CrucibleWindow = defineComponent<undefined, RootState>({
           content: [],
         }),
 
-        // Chain controls row
+        // + Goal button (at bottom, always accessible)
+        button({
+          id: CR.ADD_GOAL_BTN,
+          text: "+ Goal",
+          style: this.style?.("btn"),
+          callback: () => {
+            dispatch(goalAdded({
+              goal: { id: api.v1.uuid(), text: "[GOAL] New goal\n[STAKES] \n[THEME] \n[EMOTIONAL ARC] \n[TERMINAL CONDITION] ", selected: true },
+            }));
+          },
+        }),
+
+        // Confirm Goals & Start Chaining
+        button({
+          id: "cr-confirm-goals-btn",
+          text: "Confirm Goals & Start Chaining",
+          style: state.crucible.phase === "goals"
+            ? this.style?.("btnPrimary")
+            : this.style?.("hidden"),
+          callback: () => dispatch(goalsConfirmed()),
+        }),
+
+        // Streaming text (for chain/merge generation output only)
+        text({
+          id: CR.STREAM_TEXT,
+          text: "",
+          markdown: true,
+          style: this.style?.("hidden"),
+        }),
+
+        // --- Chaining Section ---
         row({
           id: "cr-chain-row",
           style: state.crucible.phase === "chaining"

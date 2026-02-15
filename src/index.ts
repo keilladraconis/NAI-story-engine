@@ -25,7 +25,7 @@ import { FieldList } from "./ui/components/Sidebar/FieldList";
 import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelContent";
 
 // Crucible
-import { CrucibleWindow } from "./ui/components/Crucible/CrucibleWindow";
+import { CruciblePanel } from "./ui/components/Crucible/CruciblePanel";
 
 const { column } = api.v1.ui.part;
 const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
@@ -86,7 +86,7 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
     const { part: settingPart } = mount(SettingField, {}, store);
     const { part: fieldListPart } = mount(FieldList, {}, store);
     const { part: lorebookPart } = mount(LorebookPanelContent, undefined, store);
-    const { part: cruciblePart } = mount(CrucibleWindow, undefined, store);
+    const { part: cruciblePart } = mount(CruciblePanel, undefined, store);
 
     // 5. Compose panels from returned parts
     const brainstormPanel = sidebarPanel({

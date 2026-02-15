@@ -1,169 +1,81 @@
 import {
   GenerationHandlers,
+  StreamingContext,
   CompletionContext,
 } from "../generation-handlers";
 import {
-  CrucibleGoal,
   CrucibleBeat,
   Constraint,
-  WorldElements,
-  NamedElement,
   MergedElement,
   MergedElementType,
 } from "../../types";
 import {
-  goalsSet,
+  goalTextUpdated,
   beatAdded,
   chainCompleted,
   checkpointSet,
   mergedWorldSet,
+  intentSet,
 } from "../../index";
+import { IDS } from "../../../../ui/framework/ids";
+import {
+  parseTag,
+  parseTagList,
+  splitSections,
+  parseWorldElementLines,
+  formatTagsWithEmoji,
+} from "../../../utils/tag-parser";
 
 // --- Types for crucible targets ---
 
-type CrucibleGoalsTarget = { type: "crucibleGoals" };
+type CrucibleIntentTarget = { type: "crucibleIntent" };
+type CrucibleGoalTarget = { type: "crucibleGoal"; goalId: string };
 type CrucibleChainTarget = { type: "crucibleChain"; goalId: string };
 type CrucibleMergeTarget = { type: "crucibleMerge" };
 
-// --- JSON Repair ---
+const VALID_ELEMENT_TYPES = new Set<string>(["character", "location", "faction", "system", "situation"]);
 
-/**
- * Find the balanced closing brace for a `{` at position `start`.
- * Respects string quoting (skips braces inside JSON strings).
- * Returns -1 if no balanced close found.
- */
-function findBalancedClose(text: string, start: number): number {
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (escape) { escape = false; continue; }
-    if (ch === "\\") { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === "{" || ch === "[") depth++;
-    else if (ch === "}" || ch === "]") {
-      depth--;
-      if (depth === 0) return i;
-    }
-  }
-  return -1;
-}
+// --- Intent Handler ---
 
-/**
- * Strip markdown fencing, find balanced JSON object, fix trailing commas.
- */
-function repairJSON(text: string): string {
-  let cleaned = text.replace(/^```(?:json)?\s*/gm, "").replace(/```\s*$/gm, "");
-
-  const start = cleaned.indexOf("{");
-  if (start === -1) return cleaned.trim();
-
-  // Try balanced extraction first
-  const balancedEnd = findBalancedClose(cleaned, start);
-  if (balancedEnd !== -1) {
-    cleaned = cleaned.slice(start, balancedEnd + 1);
-  } else {
-    // Truncated — take from start to last } and hope for the best
-    const end = cleaned.lastIndexOf("}");
-    if (end > start) {
-      cleaned = cleaned.slice(start, end + 1);
-    } else {
-      // No closing brace at all — try to close it
-      let truncated = cleaned.slice(start);
-      const lastBracket = truncated.lastIndexOf("]");
-      if (lastBracket > 0) truncated = truncated.slice(0, lastBracket + 1) + "}";
-      else truncated += "}";
-      cleaned = truncated;
-    }
-  }
-
-  // Fix trailing commas before } or ] (common GLM output issue)
-  cleaned = cleaned.replace(/,\s*([}\]])/g, "$1");
-
-  return cleaned;
-}
-
-/** Parse an array of NamedElement from raw JSON array. */
-function parseNamedElements(arr: unknown): NamedElement[] {
-  if (!Array.isArray(arr)) return [];
-  return arr
-    .filter((item): item is { name: string; description: string } =>
-      typeof item === "object" && item !== null && typeof (item as any).name === "string",
-    )
-    .map((item) => ({
-      name: String(item.name),
-      description: String((item as any).description || ""),
-    }));
-}
-
-/** Parse WorldElements from a raw JSON object. */
-function parseWorldElements(obj: unknown): WorldElements {
-  if (typeof obj !== "object" || obj === null) {
-    return { characters: [], locations: [], factions: [], systems: [], situations: [] };
-  }
-  const o = obj as Record<string, unknown>;
-  return {
-    characters: parseNamedElements(o.characters),
-    locations: parseNamedElements(o.locations),
-    factions: parseNamedElements(o.factions),
-    systems: parseNamedElements(o.systems),
-    situations: parseNamedElements(o.situations),
-  };
-}
-
-// --- Goals Handler ---
-
-export const crucibleGoalsHandler: GenerationHandlers<CrucibleGoalsTarget> = {
-  streaming(): void {
-    // No-op — JSON accumulates silently
+export const crucibleIntentHandler: GenerationHandlers<CrucibleIntentTarget> = {
+  streaming(ctx: StreamingContext<CrucibleIntentTarget>): void {
+    // Stream raw prose — only escape line breaks and angle brackets for markdown
+    const display = ctx.accumulatedText.replace(/\n/g, "  \n").replace(/</g, "\\<");
+    api.v1.ui.updateParts([{ id: `${IDS.CRUCIBLE.INTENT_TEXT}-view`, text: display }]);
   },
 
-  async completion(ctx: CompletionContext<CrucibleGoalsTarget>): Promise<void> {
+  async completion(ctx: CompletionContext<CrucibleIntentTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
-    try {
-      const json = repairJSON(ctx.accumulatedText);
-      const parsed = JSON.parse(json) as {
-        goals?: Array<{
-          goal?: string;
-          stakes?: string;
-          theme?: string;
-          emotionalArc?: string;
-          emotional_arc?: string;
-          terminalCondition?: string;
-          terminal_condition?: string;
-        }>;
-      };
+    const text = ctx.accumulatedText.trim();
+    if (text.length > 0) {
+      ctx.dispatch(intentSet({ intent: text }));
+    } else {
+      api.v1.log("[crucible] Intent generation produced empty text");
+    }
+  },
+};
 
-      const goalsArray = parsed.goals;
-      if (!Array.isArray(goalsArray) || goalsArray.length === 0) {
-        api.v1.log("[crucible] Goals parse: missing goals array. Raw:", ctx.accumulatedText.slice(0, 500));
-        return;
-      }
+// --- Per-Goal Handler ---
 
-      const goals: CrucibleGoal[] = [];
-      for (const element of goalsArray) {
-        if (!element.goal) continue;
+export const crucibleGoalHandler: GenerationHandlers<CrucibleGoalTarget> = {
+  streaming(ctx: StreamingContext<CrucibleGoalTarget>): void {
+    const { goalId } = ctx.target;
+    const display = formatTagsWithEmoji(ctx.accumulatedText);
+    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.goal(goalId).TEXT, text: display }]);
+  },
 
-        goals.push({
-          id: api.v1.uuid(),
-          goal: String(element.goal),
-          stakes: String(element.stakes || ""),
-          theme: String(element.theme || ""),
-          emotionalArc: String(element.emotionalArc || element.emotional_arc || ""),
-          terminalCondition: String(element.terminalCondition || element.terminal_condition || ""),
-          selected: true,
-        });
-      }
+  async completion(ctx: CompletionContext<CrucibleGoalTarget>): Promise<void> {
+    if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
-      if (goals.length > 0) {
-        ctx.dispatch(goalsSet({ goals }));
-      }
-    } catch (e) {
-      api.v1.log("[crucible] Goals JSON parse failed:", e);
-      api.v1.log("[crucible] Raw text:", ctx.accumulatedText.slice(0, 500));
+    const { goalId } = ctx.target;
+    const text = ctx.accumulatedText.trim();
+
+    if (parseTag(text, "GOAL")) {
+      ctx.dispatch(goalTextUpdated({ goalId, text }));
+    } else {
+      api.v1.log("[crucible] Goal parse: missing [GOAL]");
+      api.v1.log("[crucible] Raw text:", text.slice(0, 500));
     }
   },
 };
@@ -171,8 +83,9 @@ export const crucibleGoalsHandler: GenerationHandlers<CrucibleGoalsTarget> = {
 // --- Chain Handler ---
 
 export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
-  streaming(): void {
-    // No-op — JSON accumulates silently
+  streaming(ctx: StreamingContext<CrucibleChainTarget>): void {
+    const display = formatTagsWithEmoji(ctx.accumulatedText);
+    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.STREAM_TEXT, text: display }]);
   },
 
   async completion(ctx: CompletionContext<CrucibleChainTarget>): Promise<void> {
@@ -184,48 +97,31 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
     if (!chain) return;
 
     try {
-      const json = repairJSON(ctx.accumulatedText);
-      const parsed = JSON.parse(json) as {
-        scene?: string;
-        charactersPresent?: string[];
-        characters_present?: string[];
-        location?: string;
-        conflictTension?: string;
-        conflict_tension?: string;
-        conflict?: string;
-        worldElementsIntroduced?: unknown;
-        world_elements_introduced?: unknown;
-        world_elements?: unknown;
-        constraintsResolved?: string[];
-        constraints_resolved?: string[];
-        newOpenConstraints?: string[];
-        new_open_constraints?: string[];
-        groundStateConstraints?: string[];
-        ground_state_constraints?: string[];
-      };
+      const text = ctx.accumulatedText.trim();
 
-      if (!parsed.scene) {
-        api.v1.log("[crucible] Chain parse: missing scene");
+      // Validate: must have [SCENE]
+      if (!parseTag(text, "SCENE")) {
+        api.v1.log("[crucible] Chain parse: missing [SCENE]");
         return;
       }
 
+      const worldElements = parseWorldElementLines(text);
+      const constraintsResolved = parseTagList(text, "RESOLVED");
+      const newOpenConstraints = parseTagList(text, "OPEN");
+      const groundStateConstraints = parseTagList(text, "GROUND");
+
       const beat: CrucibleBeat = {
-        scene: String(parsed.scene),
-        charactersPresent: (parsed.charactersPresent || parsed.characters_present || []).map(String),
-        location: String(parsed.location || ""),
-        conflictTension: String(parsed.conflictTension || parsed.conflict_tension || parsed.conflict || ""),
-        worldElementsIntroduced: parseWorldElements(
-          parsed.worldElementsIntroduced || parsed.world_elements_introduced || parsed.world_elements,
-        ),
-        constraintsResolved: (parsed.constraintsResolved || parsed.constraints_resolved || []).map(String),
-        newOpenConstraints: (parsed.newOpenConstraints || parsed.new_open_constraints || []).map(String),
-        groundStateConstraints: (parsed.groundStateConstraints || parsed.ground_state_constraints || []).map(String),
+        text,
+        worldElementsIntroduced: worldElements,
+        constraintsResolved,
+        newOpenConstraints,
+        groundStateConstraints,
       };
 
       const beatIndex = chain.beats.length; // index of the new beat
 
       // Build constraint update objects
-      const opened: Constraint[] = beat.newOpenConstraints.map((desc) => ({
+      const opened: Constraint[] = newOpenConstraints.map((desc) => ({
         id: api.v1.uuid(),
         description: desc,
         sourceBeatIndex: beatIndex,
@@ -236,9 +132,9 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
         goalId,
         beat,
         constraints: {
-          resolved: beat.constraintsResolved,
+          resolved: constraintsResolved,
           opened,
-          grounded: beat.groundStateConstraints,
+          grounded: groundStateConstraints,
         },
       }));
 
@@ -275,7 +171,7 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
         ctx.dispatch(chainCompleted({ goalId }));
       }
     } catch (e) {
-      api.v1.log("[crucible] Chain JSON parse failed:", e);
+      api.v1.log("[crucible] Chain parse failed:", e);
       api.v1.log("[crucible] Raw text:", ctx.accumulatedText.slice(0, 500));
     }
   },
@@ -283,45 +179,33 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
 
 // --- Merge Handler ---
 
-const VALID_ELEMENT_TYPES = new Set<string>(["character", "location", "faction", "system", "situation"]);
-
 export const crucibleMergeHandler: GenerationHandlers<CrucibleMergeTarget> = {
-  streaming(): void {
-    // No-op — JSON accumulates silently
+  streaming(ctx: StreamingContext<CrucibleMergeTarget>): void {
+    const display = formatTagsWithEmoji(ctx.accumulatedText);
+    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.STREAM_TEXT, text: display }]);
   },
 
   async completion(ctx: CompletionContext<CrucibleMergeTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
     try {
-      const json = repairJSON(ctx.accumulatedText);
-      const parsed = JSON.parse(json) as {
-        elements?: Array<{
-          name?: string;
-          type?: string;
-          description?: string;
-          goalPurposes?: Record<string, string>;
-          goal_purposes?: Record<string, string>;
-          relationships?: string[];
-        }>;
-      };
-
-      if (!Array.isArray(parsed.elements) || parsed.elements.length === 0) {
-        api.v1.log("[crucible] Merge parse: missing elements array");
+      const sections = splitSections(ctx.accumulatedText);
+      if (sections.length === 0) {
+        api.v1.log("[crucible] Merge parse: no sections found");
         return;
       }
 
       const elements: MergedElement[] = [];
-      for (const el of parsed.elements) {
-        if (!el.name || !el.type) continue;
-        if (!VALID_ELEMENT_TYPES.has(el.type)) continue;
+      for (const section of sections) {
+        const name = parseTag(section, "NAME");
+        const type = parseTag(section, "TYPE");
+        if (!name || !type) continue;
+        if (!VALID_ELEMENT_TYPES.has(type.toLowerCase())) continue;
 
         elements.push({
-          name: String(el.name),
-          type: String(el.type) as MergedElementType,
-          description: String(el.description || ""),
-          goalPurposes: el.goalPurposes || el.goal_purposes || {},
-          relationships: Array.isArray(el.relationships) ? el.relationships.map(String) : [],
+          text: section,
+          type: type.toLowerCase() as MergedElementType,
+          name,
         });
       }
 
@@ -329,7 +213,7 @@ export const crucibleMergeHandler: GenerationHandlers<CrucibleMergeTarget> = {
         ctx.dispatch(mergedWorldSet({ mergedWorld: { elements } }));
       }
     } catch (e) {
-      api.v1.log("[crucible] Merge JSON parse failed:", e);
+      api.v1.log("[crucible] Merge parse failed:", e);
       api.v1.log("[crucible] Raw text:", ctx.accumulatedText.slice(0, 500));
     }
   },

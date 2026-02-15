@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771164649
+updatedAt: 1771172083
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -280,28 +280,65 @@ config:
       - Factions may have notable members, headquarters, rivals, or territorial interests
       - Systems may be practiced by factions, studied at locations, or mastered by characters
       Weave these connections naturally into the entry to create a cohesive world.
-  - name: crucible_goals_prompt
-    prettyName: Crucible Goals Prompt
-    description: Prompt for extracting 3-5 story goals with terminal conditions
+  - name: crucible_intent_prompt
+    prettyName: Crucible Intent Prompt
+    description: Prompt for distilling brainstorm into a derived intent framework
     type: string
     multiline: true
     default: |-
-      [CRUCIBLE — GOAL EXTRACTION]
-      Read the brainstorm conversation and story state. Identify the user's
-      UNSTATED intent — what the story should accomplish, not just what was discussed.
-      Derive 3-5 Goal scenarios that push the premise toward its most dramatic
-      possible conclusions.
+      [CRUCIBLE — DERIVE INTENT]
+      Analyze the brainstorm conversation and story state. Write a dense,
+      natural prose paragraph that captures the story's full creative
+      direction. Look beyond what was explicitly discussed — identify the
+      UNSTATED intent, the story's soul.
 
-      Each goal anchors a backward-chaining world generation pass.
-      Multiple goals ensure every world element serves competing trajectories —
-      anti-destination, not predestination.
+      Your paragraph must weave together ALL of these elements into
+      connected prose — not as separate sections, but as a living whole:
+      - Characters: names, physical descriptions, personality, relationships,
+        the tensions between them
+      - World: setting, atmosphere, sensory details, what makes this place
+        distinct and alive
+      - Tone: genre sensibility, emotional register, the feeling the story
+        should evoke
+      - Core tension: the irreducible dramatic opposition that drives everything
+      - Narrative momentum: the direction the story wants to move (not an
+        ending — a trajectory)
 
-      RULES FOR GOALS:
+      Suggest a story architecture that fits naturally:
+      hero's journey, pressure cooker, spiral descent, slice of life,
+      character study, powder keg, web of obligations, three-sphere,
+      frontier, intimate power — or invent one. Name it and explain
+      briefly how it applies.
+
+      End with a single [TAGS] line: 3-8 short labels capturing genre,
+      tone, motifs, or thematic markers.
+
+      Write ONLY natural prose. No structured tags, no bullet points,
+      no section headers — except the final [TAGS] line.
+  - name: crucible_goals_prompt
+    prettyName: Crucible Goals Prompt
+    description: Prompt for generating a single story goal with terminal condition
+    type: string
+    multiline: true
+    default: |-
+      [CRUCIBLE — GOAL GENERATION]
+      Using the DERIVED INTENT provided above, generate ONE Goal scenario
+      that pushes the core tension toward a dramatic possible conclusion.
+
+      The intent gives you the story's soul — find a cataclysmic endpoint
+      that would test it to destruction. This goal should approach the core
+      tension from a unique angle, ensuring the world elements generated
+      serve a distinct trajectory — anti-destination, not predestination.
+
+      This goal will anchor a backward-chaining world generation pass.
+
+      RULES:
       - Goals are CATACLYSMIC ENDPOINTS, not mundane tasks.
       - WRONG: "Finds a better apartment." RIGHT: "Destroys the housing cartel
         that enslaved an entire city district."
-      - Each goal must be specific, visceral, and irreversible.
+      - The goal must be specific, visceral, and irreversible.
       - If a goal could appear on a to-do list, it is TOO BORING. Escalate.
+      - The goal must align with the narrative direction and tags from the intent.
 
       The TERMINAL CONDITION is the concrete, observable story state when
       the goal is achieved. It must be decomposable — the backward chainer
@@ -309,19 +346,12 @@ config:
       GOOD: "The colony ship arrives but the crew discovers it's already inhabited"
       BAD: "Everything changes" (too vague to decompose)
 
-      You MUST output this EXACT JSON structure:
-      {
-        "goals": [
-          {
-            "goal": "One-line goal statement",
-            "stakes": "What's at risk if this goal fails",
-            "theme": "The thematic question this goal explores",
-            "emotionalArc": "What the reader should feel at resolution",
-            "terminalCondition": "Concrete observable story state at achievement"
-          }
-        ]
-      }
-      Output ONLY the JSON object. No other text.
+      Output using this tagged format (no +++ separators):
+      [GOAL] One-line goal statement
+      [STAKES] What's at risk if this goal fails
+      [THEME] The thematic question this goal explores
+      [EMOTIONAL ARC] What the reader should feel at resolution
+      [TERMINAL CONDITION] Concrete observable story state at achievement
   - name: crucible_chain_prompt
     prettyName: Crucible Chain Prompt
     description: Prompt for backward-chaining beat generation
@@ -343,29 +373,25 @@ config:
       - World elements emerge from narrative necessity — never decorative
       - "Latest-possible" — stay close to the goal before stepping further back
       - Every beat must contain conflict, tension, or revelation — never pure exposition
-      - World elements use brief descriptions: "Name: role/function"
+      - World elements use brief descriptions: "Name — role/function"
       - If this is the FIRST beat, its scene IS the terminal condition itself
 
       TERMINATE when all constraints are resolved or ground state.
 
-      You MUST output this EXACT JSON structure:
-      {
-        "scene": "What happens — 2-3 sentences describing the concrete event",
-        "charactersPresent": ["Character name + why they must be here"],
-        "location": "Where + why it matters",
-        "conflictTension": "What's at stake in this moment",
-        "worldElementsIntroduced": {
-          "characters": [{"name": "Name", "description": "Role/motivation"}],
-          "locations": [{"name": "Name", "description": "Significance"}],
-          "factions": [{"name": "Name", "description": "Goal/method"}],
-          "systems": [{"name": "Name", "description": "Mechanic/rule"}],
-          "situations": [{"name": "Name", "description": "Tension/dynamic"}]
-        },
-        "constraintsResolved": ["Description of constraint this beat establishes"],
-        "newOpenConstraints": ["Preconditions this beat requires"],
-        "groundStateConstraints": ["Preconditions true at story start"]
-      }
-      Output ONLY the JSON object. No other text.
+      Output using EXACTLY this tagged format:
+      [SCENE] What happens — 2-3 sentences describing the concrete event
+      [CHARACTERS] Name — reason they must be here; Name — reason
+      [LOCATION] Where — why it matters
+      [CONFLICT] What's at stake in this moment
+      [WORLD ELEMENTS]
+      - Character: Name — role/motivation
+      - Location: Name — significance
+      - Faction: Name — goal/method
+      - System: Name — mechanic/rule
+      - Situation: Name — tension/dynamic
+      [RESOLVED] constraint1; constraint2
+      [OPEN] constraint1; constraint2
+      [GROUND] constraint1; constraint2
   - name: crucible_merge_prompt
     prettyName: Crucible Merge Prompt
     description: Prompt for merging per-goal world elements into a unified inventory
@@ -383,8 +409,7 @@ config:
       - Same for locations, factions, systems, situations.
       - If elements are DISTINCT, keep them separate.
       - Flag and resolve contradictions (same element, incompatible properties).
-      - Every merged element must include its PURPOSE from EACH goal chain
-        (in goalPurposes).
+      - Every merged element must include its PURPOSE from EACH goal chain.
 
       ANTI-DESTINATION PRINCIPLE:
       Characters with single-goal purposes are puppets. Characters with
@@ -393,22 +418,14 @@ config:
 
       Element types: character, location, faction, system, situation
 
-      You MUST output this EXACT JSON structure:
-      {
-        "elements": [
-          {
-            "name": "Element name",
-            "type": "character|location|faction|system|situation",
-            "description": "Unified description",
-            "goalPurposes": {
-              "Goal statement 1": "Why this element matters to goal 1",
-              "Goal statement 2": "Why this element matters to goal 2"
-            },
-            "relationships": ["Related element names"]
-          }
-        ]
-      }
-      Output ONLY the JSON object. No other text.
+      Output elements separated by +++ using this tagged format:
+      +++
+      [NAME] Element name
+      [TYPE] character|location|faction|system|situation
+      [DESCRIPTION] Unified description
+      [PURPOSE] Goal1: why this element matters; Goal2: why it matters
+      [RELATIONSHIPS] name1, name2
+      +++
   - name: story_engine_debug
     prettyName: Story Engine Debug
     description: Enable debug logging for Story Engine

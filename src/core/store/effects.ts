@@ -37,6 +37,9 @@ import {
   crucibleCommitted,
   crucibleGoalsRequested,
   crucibleStopRequested,
+  crucibleIntentRequested,
+  intentSet,
+  goalAdded,
   goalsConfirmed,
   crucibleChainRequested,
   crucibleMergeRequested,
@@ -62,10 +65,12 @@ import {
   extractDulfsItemName,
 } from "../utils/context-builder";
 import {
-  buildCrucibleGoalsStrategy,
+  buildCrucibleIntentStrategy,
+  buildCrucibleGoalStrategy,
   buildCrucibleChainStrategy,
   buildCrucibleMergeStrategy,
 } from "../utils/crucible-strategy";
+import { parseTag } from "../utils/tag-parser";
 import { IDS } from "../../ui/framework/ids";
 import {
   DulfsFieldID,
@@ -233,7 +238,7 @@ function resolvePrefill(
   }
 
   // Crucible targets use explicit assistantPrefill (JSON anchors)
-  if (target.type === "crucibleGoals" || target.type === "crucibleChain" || target.type === "crucibleMerge") {
+  if (target.type === "crucibleIntent" || target.type === "crucibleGoal" || target.type === "crucibleChain" || target.type === "crucibleMerge") {
     if (assistantPrefill) return assistantPrefill;
   }
 
@@ -311,8 +316,10 @@ function cacheLabel(target: GenerationStrategy["target"]): string {
       return `lb-refine:${target.entryId.slice(0, 8)}`;
     case "bootstrap":
       return "bootstrap";
-    case "crucibleGoals":
-      return "crucible-goals";
+    case "crucibleIntent":
+      return "crucible-intent";
+    case "crucibleGoal":
+      return `crucible-goal:${target.goalId.slice(0, 8)}`;
     case "crucibleChain":
       return `crucible-chain:${target.goalId.slice(0, 8)}`;
     case "crucibleMerge":
@@ -779,19 +786,49 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Goals Requested → queue goals generation
+  // Intent: Crucible Intent Requested → queue intent generation
   subscribeEffect(
-    matchesAction(crucibleGoalsRequested),
+    matchesAction(crucibleIntentRequested),
     async (_action, { dispatch }) => {
-      const strategy = buildCrucibleGoalsStrategy(getState);
+      const strategy = buildCrucibleIntentStrategy(getState);
       dispatch(
         requestQueued({
           id: strategy.requestId,
-          type: "crucibleGoals",
+          type: "crucibleIntent",
           targetId: "crucible",
         }),
       );
       dispatch(generationSubmitted(strategy));
+    },
+  );
+
+  // Intent: Crucible Goals Requested → sync intent, create 3 empty goals, queue per-goal generation
+  subscribeEffect(
+    matchesAction(crucibleGoalsRequested),
+    async (_action, { dispatch }) => {
+      // Sync intent from storyStorage (user may have edited it)
+      const editedIntent = String(
+        (await api.v1.storyStorage.get("cr-intent")) || "",
+      );
+      if (editedIntent) {
+        dispatch(intentSet({ intent: editedIntent }));
+      }
+
+      // Create 3 empty goals and queue generation for each
+      for (let i = 0; i < 3; i++) {
+        const goalId = api.v1.uuid();
+        dispatch(goalAdded({ goal: { id: goalId, text: "", selected: true } }));
+
+        const strategy = buildCrucibleGoalStrategy(getState, goalId);
+        dispatch(
+          requestQueued({
+            id: strategy.requestId,
+            type: "crucibleGoal",
+            targetId: goalId,
+          }),
+        );
+        dispatch(generationSubmitted(strategy));
+      }
     },
   );
 
@@ -865,7 +902,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         dispatch(autoChainStopped());
       }
       const activeRequest = state.runtime.activeRequest;
-      if (activeRequest && (activeRequest.type === "crucibleGoals" || activeRequest.type === "crucibleChain" || activeRequest.type === "crucibleMerge")) {
+      if (activeRequest && (activeRequest.type === "crucibleIntent" || activeRequest.type === "crucibleGoal" || activeRequest.type === "crucibleChain" || activeRequest.type === "crucibleMerge")) {
         dispatch(requestCancelled({ requestId: activeRequest.id }));
         genX.cancelAll();
       }
@@ -953,7 +990,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       const { requestId } = action.payload;
       if (
         state.runtime.activeRequest?.id === requestId &&
-        (state.runtime.activeRequest?.type === "crucibleChain" || state.runtime.activeRequest?.type === "crucibleGoals")
+        (state.runtime.activeRequest?.type === "crucibleIntent" || state.runtime.activeRequest?.type === "crucibleChain" || state.runtime.activeRequest?.type === "crucibleGoal")
       ) {
         dispatch(autoChainStopped());
       }
@@ -981,14 +1018,17 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         const fieldId = typeToField[element.type];
         if (!fieldId) continue;
 
-        // Format element content with name, description, and purposes
-        const parts = [`${element.name}: ${element.description}`];
-        const purposes = Object.values(element.goalPurposes);
-        if (purposes.length > 0) {
-          parts.push(`Narrative Purpose: ${purposes.join("; ")}`);
+        // Extract description and purpose from tagged text
+        const description = parseTag(element.text, "DESCRIPTION") || "";
+        const purpose = parseTag(element.text, "PURPOSE") || "";
+        const relationships = parseTag(element.text, "RELATIONSHIPS") || "";
+
+        const parts = [`${element.name}: ${description}`];
+        if (purpose) {
+          parts.push(`Narrative Purpose: ${purpose}`);
         }
-        if (element.relationships.length > 0) {
-          parts.push(`Relationships: ${element.relationships.join(", ")}`);
+        if (relationships) {
+          parts.push(`Relationships: ${relationships}`);
         }
 
         const itemId = api.v1.uuid();

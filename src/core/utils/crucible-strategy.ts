@@ -1,7 +1,8 @@
 /**
  * Crucible Strategy — Factory functions for Crucible v4 backward-chain world generator.
  *
- * Three strategies: goals extraction, per-goal chain, world element merge.
+ * Four strategies: intent derivation, goals extraction, per-goal chain, world element merge.
+ * All use tagged plaintext output format for streaming-first design.
  */
 
 import {
@@ -17,31 +18,24 @@ import { buildStoryEnginePrefix } from "./context-builder";
 
 /**
  * Format chain context for the backward-chaining prompt.
- * Shows goal, beats (newest-first), open/resolved constraints, and accumulated world elements.
+ * Shows goal text, beats (newest-first), open/resolved constraints, and accumulated world elements.
  */
 function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal): string {
   const sections: string[] = [];
 
-  // Goal statement
-  sections.push(`GOAL: ${goal.goal}`);
-  sections.push(`TERMINAL CONDITION: ${goal.terminalCondition}`);
-  sections.push(`STAKES: ${goal.stakes}`);
-  sections.push(`THEME: ${goal.theme}`);
+  // Goal — include full tagged text
+  sections.push("ACTIVE GOAL:");
+  sections.push(goal.text);
 
   // Beats (newest-first — closest to goal first)
   if (chain.beats.length > 0) {
     sections.push("\nESTABLISHED BEATS (newest-first, closest to goal first):");
     for (let i = chain.beats.length - 1; i >= 0; i--) {
       const beat = chain.beats[i];
-      sections.push(`  Beat ${i + 1}: ${beat.scene}`);
-      if (beat.charactersPresent.length > 0) {
-        sections.push(`    Characters: ${beat.charactersPresent.join(", ")}`);
-      }
-      if (beat.location) {
-        sections.push(`    Location: ${beat.location}`);
-      }
-      if (beat.conflictTension) {
-        sections.push(`    Conflict: ${beat.conflictTension}`);
+      sections.push(`  Beat ${i + 1}:`);
+      // Include raw beat text indented
+      for (const line of beat.text.split("\n")) {
+        sections.push(`    ${line}`);
       }
     }
   }
@@ -100,7 +94,8 @@ function formatAllChainsElements(state: RootState): string {
     const chain = state.crucible.chains[goal.id];
     if (!chain) continue;
 
-    sections.push(`\n--- GOAL: ${goal.goal} ---`);
+    const goalLine = goal.text.split("\n")[0] || "Goal";
+    sections.push(`\n--- ${goalLine} ---`);
 
     const we = chain.worldElements;
     const formatList = (label: string, items: { name: string; description: string }[]): void => {
@@ -125,15 +120,15 @@ function formatAllChainsElements(state: RootState): string {
 // --- Factory Functions ---
 
 /**
- * Creates a message factory for Crucible goal extraction.
- * GLM reads brainstorm + story state and derives 3-5 goals with terminal conditions.
+ * Creates a message factory for Crucible intent derivation.
+ * GLM reads brainstorm + story state and distills core tension, world premise, narrative direction, and tags.
  */
-export const createCrucibleGoalsFactory = (
+export const createCrucibleIntentFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const goalsPrompt = String(
-      (await api.v1.config.get("crucible_goals_prompt")) || "",
+    const intentPrompt = String(
+      (await api.v1.config.get("crucible_intent_prompt")) || "",
     );
 
     const prefix = await buildStoryEnginePrefix(getState);
@@ -142,10 +137,71 @@ export const createCrucibleGoalsFactory = (
       ...prefix,
       {
         role: "system",
+        content: intentPrompt,
+      },
+      { role: "assistant", content: "The story " },
+    ];
+
+    return {
+      messages,
+      params: {
+        model: "glm-4-6",
+        max_tokens: 1024,
+        temperature: 1.0,
+        min_p: 0.05,
+      },
+    };
+  };
+};
+
+/**
+ * Creates a message factory for a single Crucible goal generation.
+ * Injects existing goals as "do NOT repeat" context for diversity.
+ */
+export const createCrucibleGoalFactory = (
+  getState: () => RootState,
+  goalId: string,
+): MessageFactory => {
+  return async () => {
+    const state = getState();
+    const goalsPrompt = String(
+      (await api.v1.config.get("crucible_goals_prompt")) || "",
+    );
+
+    // If intent exists, exclude brainstorm from prefix (intent captures its essence)
+    const prefix = state.crucible.intent
+      ? await buildStoryEnginePrefix(getState, { excludeSections: ["brainstorm"] })
+      : await buildStoryEnginePrefix(getState);
+
+    const messages: Message[] = [...prefix];
+
+    // Inject intent context if available
+    if (state.crucible.intent) {
+      messages.push({
+        role: "system",
+        content: `DERIVED INTENT (user-reviewed):\n${state.crucible.intent}`,
+      });
+    }
+
+    // Inject existing goals for diversity
+    const existingGoals = state.crucible.goals.filter(
+      (g) => g.id !== goalId && g.text.trim(),
+    );
+    if (existingGoals.length > 0) {
+      const existingText = existingGoals.map((g) => g.text.trim()).join("\n+++\n");
+      messages.push({
+        role: "system",
+        content: `EXISTING GOALS (do NOT repeat these — approach the core tension from a DIFFERENT angle):\n${existingText}`,
+      });
+    }
+
+    messages.push(
+      {
+        role: "system",
         content: goalsPrompt,
       },
-      { role: "assistant", content: '{"goals":[{"goal":"' },
-    ];
+      { role: "assistant", content: "[GOAL] " },
+    );
 
     return {
       messages,
@@ -193,7 +249,7 @@ export const createCrucibleChainFactory = (
         role: "user",
         content: context + "\n\nDesign the next beat backward.",
       },
-      { role: "assistant", content: '{"scene":"' },
+      { role: "assistant", content: "[SCENE] " },
     ];
 
     return {
@@ -235,7 +291,7 @@ export const createCrucibleMergeFactory = (
         role: "user",
         content: `Merge these per-goal world elements into a unified inventory:\n${elementsContext}`,
       },
-      { role: "assistant", content: '{"elements":[{"name":"' },
+      { role: "assistant", content: "+++\n[NAME] " },
     ];
 
     return {
@@ -253,19 +309,35 @@ export const createCrucibleMergeFactory = (
 // --- Strategy Builders ---
 
 /**
- * Builds a Crucible goals generation strategy.
- * Uses continuation (maxCalls: 3) since 3-5 goals may exceed 1024 tokens.
+ * Builds a Crucible intent derivation strategy.
+ * No continuation — intent fits in one call.
  */
-export const buildCrucibleGoalsStrategy = (
+export const buildCrucibleIntentStrategy = (
   getState: () => RootState,
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createCrucibleGoalsFactory(getState),
-    target: { type: "crucibleGoals" },
+    messageFactory: createCrucibleIntentFactory(getState),
+    target: { type: "crucibleIntent" },
     prefillBehavior: "keep",
-    assistantPrefill: '{"goals":[{"goal":"',
-    continuation: { maxCalls: 3 },
+    assistantPrefill: "The story ",
+  };
+};
+
+/**
+ * Builds a Crucible single goal generation strategy.
+ * No continuation — single goal fits in one call.
+ */
+export const buildCrucibleGoalStrategy = (
+  getState: () => RootState,
+  goalId: string,
+): GenerationStrategy => {
+  return {
+    requestId: api.v1.uuid(),
+    messageFactory: createCrucibleGoalFactory(getState, goalId),
+    target: { type: "crucibleGoal", goalId },
+    prefillBehavior: "keep",
+    assistantPrefill: "[GOAL] ",
   };
 };
 
@@ -282,7 +354,7 @@ export const buildCrucibleChainStrategy = (
     messageFactory: createCrucibleChainFactory(getState, goalId),
     target: { type: "crucibleChain", goalId },
     prefillBehavior: "keep",
-    assistantPrefill: '{"scene":"',
+    assistantPrefill: "[SCENE] ",
   };
 };
 
@@ -298,7 +370,7 @@ export const buildCrucibleMergeStrategy = (
     messageFactory: createCrucibleMergeFactory(getState),
     target: { type: "crucibleMerge" },
     prefillBehavior: "keep",
-    assistantPrefill: '{"elements":[{"name":"',
+    assistantPrefill: "+++\n[NAME] ",
     continuation: { maxCalls: 5 },
   };
 };

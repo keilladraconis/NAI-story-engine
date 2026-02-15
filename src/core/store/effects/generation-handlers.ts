@@ -9,7 +9,8 @@ import {
   lorebookRefineHandler,
 } from "./handlers/lorebook";
 import {
-  crucibleGoalsHandler,
+  crucibleIntentHandler,
+  crucibleGoalHandler,
   crucibleChainHandler,
   crucibleMergeHandler,
 } from "./handlers/crucible";
@@ -46,9 +47,13 @@ export type BootstrapTarget = Extract<
   GenerationStrategy["target"],
   { type: "bootstrap" }
 >;
-export type CrucibleGoalsTarget = Extract<
+export type CrucibleIntentTarget = Extract<
   GenerationStrategy["target"],
-  { type: "crucibleGoals" }
+  { type: "crucibleIntent" }
+>;
+export type CrucibleGoalTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "crucibleGoal" }
 >;
 export type CrucibleChainTarget = Extract<
   GenerationStrategy["target"],
@@ -97,7 +102,8 @@ export const GENERATION_HANDLERS: {
   lorebookContent: GenerationHandlers<LorebookContentTarget>;
   lorebookKeys: GenerationHandlers<LorebookKeysTarget>;
   lorebookRefine: GenerationHandlers<LorebookRefineTarget>;
-  crucibleGoals: GenerationHandlers<CrucibleGoalsTarget>;
+  crucibleIntent: GenerationHandlers<CrucibleIntentTarget>;
+  crucibleGoal: GenerationHandlers<CrucibleGoalTarget>;
   crucibleChain: GenerationHandlers<CrucibleChainTarget>;
   crucibleMerge: GenerationHandlers<CrucibleMergeTarget>;
 } = {
@@ -108,7 +114,8 @@ export const GENERATION_HANDLERS: {
   lorebookContent: lorebookContentHandler,
   lorebookKeys: lorebookKeysHandler,
   lorebookRefine: lorebookRefineHandler,
-  crucibleGoals: crucibleGoalsHandler,
+  crucibleIntent: crucibleIntentHandler,
+  crucibleGoal: crucibleGoalHandler,
   crucibleChain: crucibleChainHandler,
   crucibleMerge: crucibleMergeHandler,
 };

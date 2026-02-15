@@ -101,7 +101,8 @@ export interface GenerationRequest {
   | "lorebookKeys"
   | "lorebookRefine"
   | "bootstrap"
-  | "crucibleGoals"
+  | "crucibleIntent"
+  | "crucibleGoal"
   | "crucibleChain"
   | "crucibleMerge";
   targetId: string;
@@ -122,7 +123,8 @@ export interface GenerationStrategy {
   | { type: "lorebookKeys"; entryId: string }
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }
-  | { type: "crucibleGoals" }
+  | { type: "crucibleIntent" }
+  | { type: "crucibleGoal"; goalId: string }
   | { type: "crucibleChain"; goalId: string }
   | { type: "crucibleMerge" };
   prefillBehavior: "keep" | "trim";
@@ -141,15 +143,12 @@ export interface RuntimeState {
 }
 
 // Crucible Types
+
 export type CruciblePhase = "idle" | "goals" | "chaining" | "merging" | "reviewing" | "populating";
 
 export interface CrucibleGoal {
   id: string;
-  goal: string;
-  stakes: string;
-  theme: string;
-  emotionalArc: string;
-  terminalCondition: string;
+  text: string;
   selected: boolean;
 }
 
@@ -167,10 +166,7 @@ export interface WorldElements {
 }
 
 export interface CrucibleBeat {
-  scene: string;
-  charactersPresent: string[];
-  location: string;
-  conflictTension: string;
+  text: string;
   worldElementsIntroduced: WorldElements;
   constraintsResolved: string[];
   newOpenConstraints: string[];
@@ -198,11 +194,9 @@ export interface CrucibleChain {
 export type MergedElementType = "character" | "location" | "faction" | "system" | "situation";
 
 export interface MergedElement {
-  name: string;
+  text: string;
   type: MergedElementType;
-  description: string;
-  goalPurposes: Record<string, string>;
-  relationships: string[];
+  name: string;
 }
 
 export interface MergedWorldInventory {
@@ -211,6 +205,7 @@ export interface MergedWorldInventory {
 
 export interface CrucibleState {
   phase: CruciblePhase;
+  intent: string | null;
   goals: CrucibleGoal[];
   chains: Record<string, CrucibleChain>;
   activeGoalId: string | null;
