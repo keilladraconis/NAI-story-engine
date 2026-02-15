@@ -1,277 +1,320 @@
-# Crucible — Design Document (v7)
+# Crucible v4 — Backward-Chain World Generator
 
 ## Overview
 
-The Crucible is a constraint-solver that sits between Brainstorm and Story Engine. It takes raw brainstorm material and transforms it into structured, validated world-building nodes before committing them to DULFS and Canon.
+The Crucible bridges Brainstorm → Story Engine. It uses **backward chaining from narrative goals** to derive world elements (characters, factions, locations, systems, situations). The backward chain is a world generation technique, not a plot planner — beats are scaffolding; the real outputs are the world elements that emerge as *requirements* of the narrative logic. Multiple goals ensure every element has multiple possible trajectories: anti-destination, not predestination.
 
-**Problem:** Currently, brainstorm ideas go directly into SEGA which generates everything from scratch. The user has no structured intermediary to review, curate, or shape *what* gets generated before the pipeline runs.
+**Problem:** Brainstorm produces raw conversation. Story Engine needs structured world elements. The gap between them requires a system that can extract narrative intent, derive what the world *must* contain to support that intent, and populate DULFS categories with purposeful elements.
 
-**Solution:** The Crucible extracts structured nodes from brainstorm, lets the user accept/edit/reject them, deepens accepted nodes through iterative solver passes, and commits the result into Story Engine fields.
+**Solution:** Extract goals from brainstorm → backward-chain from each goal to derive world elements → merge elements across goals into a unified world inventory → populate DULFS.
 
-## Metaphor
+## Pipeline
 
-A crucible refines raw ore (brainstorm chat) into shaped metal (structured world state). Three phases:
-1. **Seeding** — Extract the core intent from brainstorm
-2. **Expanding** — Solver proposes nodes; user curates; repeat
-3. **Committed** — Accepted nodes map to DULFS items / Canon / fields
+```
+Brainstorm Chat Log
+        │
+        ▼
+┌─────────────────┐
+│  Goal Extraction │  → 3-5 Goal scenarios with Terminal Conditions
+└────────┬────────┘
+         │ User selects goals
+         ▼
+┌─────────────────────┐
+│  Backward Chaining   │  Per goal: chain of beats → emergent world elements
+│  (per goal, auto)    │  Pauses at structural checkpoints for user review
+└────────┬────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  World Element Merge │  Unify elements across goals → multi-purpose inventory
+└────────┬────────────┘
+         │ User reviews merged world
+         ▼
+┌─────────────────────┐
+│  DULFS Population    │  Feed merged elements into Story Engine fields
+└─────────────────────┘
+```
 
 ## Design Principles
-- **Visible causality** — each node shows why it exists via `serves` tags
-- **Incremental commitment** — only re-solve from edited nodes downward
-- **Edit = ownership** — edited nodes are constraints, never overwritten
-- **Gentle challenge** — nudge nodes suggest "most interesting version of what user wants", not redirections
-- **No slot machine** — user always adding information and narrowing, never starting over
 
-## Data Model (Implemented)
+- **Anti-destination** — Goals define possible futures, not predetermined endings. The world elements that emerge serve multiple trajectories. When the user "presses play," actors move toward open-ended outcomes.
+- **Narrative necessity** — Every world element exists because the backward chain required it. No decorative invention. If a character exists, it's because a beat needed them.
+- **Scaffolding vs. product** — Beats are the reasoning scaffold. World elements are the product. The user cares about the world, not the beat sequence.
+- **One step at a time** — The solver exposes beats incrementally, auto-running but pausing at structural checkpoints (major character introductions, act boundaries, constraint explosion).
 
-See `src/core/store/slices/crucible.ts` and types in `src/core/store/types.ts`.
+## Phase 1: Goal Extraction
 
-### Node
+**Input:** Full brainstorm chat log.
 
+**Task:** GLM reads the chat and identifies the user's *unstated* intent — what the story should accomplish, not just what was discussed. Derives 3-5 Goal scenarios.
+
+**Output format per goal:**
 ```
-CrucibleNode {
-  id: string
-  kind: intent | beat | character | faction | location | system | situation | opener
-  origin: solver | nudge | user          // who created it
-  status: pending | accepted | edited | rejected
-  round: number                          // which expansion pass created it
-  content: string                        // full text
-  summary: string                        // one-line for UI cards
-  serves: string[]                       // IDs of nodes this depends on
-  stale: boolean                         // invalidated by upstream edit/reject
-}
+Goal: [one-line statement]
+Stakes: [what's at risk if this goal fails]
+Theme: [the thematic question this goal explores]
+Emotional Arc: [what the reader should feel at resolution]
+Terminal Condition: [concrete, observable story state when goal is achieved]
 ```
 
-### State
+The **Terminal Condition** anchors backward chaining. Without something concrete to decompose, the solver has no starting point. Examples:
+- "The colony ship arrives at its destination, but the crew discovers it's already inhabited"
+- "The detective solves the case but realizes the true criminal is their mentor"
+- "The kingdom fractures into three successor states, each claiming legitimacy"
+
+**Context layout:**
+```
+MSG 1 (system): Narrative architect role + output format spec
+MSG 2 (user): [full chat log]
+MSG 3 (user): Derive 3-5 goals with terminal conditions
+```
+
+**User checkpoint:** User selects which goals to pursue (1 or more). Unselected goals are discarded.
+
+## Phase 2: Backward Chaining
+
+For each selected goal, run an autonomous backward-chaining loop. Goals are processed as separate chains (not interleaved).
+
+### The Solver Loop
+
+**Iteration 0 — Terminal Beat:**
+The first beat is the scene where the Terminal Condition becomes true.
+
+**Iteration N — Backward step:**
+1. Review OPEN CONSTRAINTS (preconditions that haven't been established yet)
+2. Design the **latest-possible** beat that establishes ≥1 open constraint
+3. The new beat may introduce new open constraints (its own preconditions)
+4. Constraints needing no prior setup are marked **GROUND STATE** (true at story start)
+5. **Terminate** when all constraints are resolved or ground state
+
+**Beat format:**
+```
+Beat:
+  Scene: [what happens — 2-3 sentences]
+  Characters Present: [who + why they must be there]
+  Location: [where + why it matters]
+  Conflict/Tension: [what's at stake in this moment]
+  World Elements Introduced:
+    - Characters: [new characters with role descriptions]
+    - Locations: [new locations with significance]
+    - Factions: [new factions/groups]
+    - Systems: [new world rules/mechanics]
+    - Situations: [new tensions/dynamics]
+  Constraints Resolved: [which open constraints this beat establishes]
+  New Open Constraints: [preconditions this beat requires]
+  Ground State Constraints: [preconditions true at story start, no setup needed]
+```
+
+### Prompt Structure (per iteration)
+
+```
+MSG 1 (system):
+You are working backwards from a story's climax toward its opening.
+You are given established beats and a list of open constraints —
+things that must be true but haven't been established yet.
+
+Design the NEXT beat backward (the latest-possible scene that
+establishes one or more open constraints).
+
+Rules:
+- Each beat must establish ≥1 open constraint
+- Each beat must declare its own preconditions (new open constraints)
+- World elements emerge from narrative necessity — never invented decoratively
+- "Latest-possible" — stay close to the goal before stepping further back
+- Ground-state constraints need no prior beat — mark as RESOLVED
+- Every beat must contain conflict, tension, or revelation — never pure exposition
+
+MSG 2 (user):
+GOAL: [statement + terminal condition]
+
+ESTABLISHED BEATS (newest-first, i.e. closest to the goal first):
+[all beats generated so far]
+
+OPEN CONSTRAINTS:
+- [constraint] (from Beat N)
+- [constraint] (from Beat N-1)
+
+RESOLVED CONSTRAINTS:
+- [constraint] → ground state
+- [constraint] → established by Beat M
+
+WORLD ELEMENTS DERIVED SO FAR:
+- Characters: [accumulated list]
+- Locations: [accumulated list]
+- Factions: [accumulated list]
+- Systems: [accumulated list]
+- Situations: [accumulated list]
+
+MSG 3 (user): Design the next beat backward.
+```
+
+### Why This Works with GLM 4.6
+
+- **200K context** holds the full beat history, preventing contradictions without a separate consistency pass
+- **Structured constraint tracking** gives the LLM a clear "game state" to reason about
+- **One beat per call** keeps reasoning sharp — long multi-beat generations lose causal discipline
+- **Newest-first ordering** keeps the most causally relevant beats closest to the generation point
+- **No tool use needed** — all structure via prompted output format
+
+### Checkpoints (Auto-Pause)
+
+The solver runs autonomously but pauses for user review when:
+- A **major character** is first introduced (protagonist, antagonist, mentor figure)
+- The chain reaches an approximate **act boundary** (estimated from beat count and constraint depth)
+- **Constraint explosion** — open constraints grow by >2 per beat for 3 consecutive beats
+- A **contradiction** is detected with earlier beats
+
+At checkpoints, the user can:
+- Accept and continue
+- Edit the latest beat (modifying elements or constraints)
+- Reject the latest beat and have the solver retry
+- Manually mark constraints as ground state (to limit chain depth)
+
+### Failure Modes
+
+| Failure | Detection | Mitigation |
+|---------|-----------|------------|
+| Constraint explosion | Open count growing faster than resolving | Pause, ask user to mark some as ground state |
+| Circular dependency | Beat requires something already established differently | Full history in context prevents this; flag if detected |
+| Bland beats | No conflict/tension in output | System prompt rule; can re-prompt with "this beat needs more tension" |
+| Chain too long | Beat count exceeds threshold (~15-20) | Prompt to consolidate remaining constraints into fewer beats |
+
+## Phase 3: World Element Merge
+
+After all goals complete backward chaining, merge the per-goal world element inventories.
+
+### Step 1: Element Mapping
+
+Give GLM all chains' world elements side by side. Ask for a mapping:
+- "Character X in Goal A = Character Y in Goal B" (or "distinct")
+- Same for locations, factions, systems, situations
+- Flag contradictions (same element with incompatible properties)
+
+### Step 2: Unified World Inventory
+
+With the mapping applied, GLM produces a single world inventory where:
+- Each element has its **multi-goal narrative purpose** (why it matters to each goal chain)
+- Characters have **competing motivations** from different goal chains → open-ended agency
+- Locations serve **multiple narrative functions** → rich, layered settings
+- Contradictions are resolved by GLM with rationale
+
+**This is the major user checkpoint.** The user reviews the merged world. The beats (scaffolding) are available on request for justification, but the primary artifact is the world element inventory.
+
+### Why Multi-Goal Elements Create Open-Endedness
+
+A character derived from one goal chain has a clear motivation. The same character appearing in two goal chains has *competing* motivations. This is the source of open-ended possibility — when the user "presses play," the character can move toward either goal, creating genuine narrative tension rather than predetermined outcomes.
+
+## Phase 4: DULFS Population
+
+The merged world elements map directly to Story Engine categories:
+
+| Element Type | DULFS Category |
+|---|---|
+| Characters | Dramatis Personae |
+| Systems | Universe Systems |
+| Locations | Locations |
+| Factions | Factions |
+| Situations | Situational Dynamics |
+
+Each element becomes a DULFS entry with:
+- **Name and description** from the merged inventory
+- **Narrative purpose** from the multi-goal analysis
+- **Relationships** to other elements from the beat scaffolding
+
+After population, the user can run SEGA to generate lorebook content + keys for each entry.
+
+## GLM 4.6 Prompting Notes
+
+- **Temperature 1.0** for all creative generation
+- **Structured output** via format specs in the prompt — GLM responds well to explicit field definitions
+- **No tool use** (unsupported) — all structure via prompted JSON/structured text
+- **No template** — context built manually via messages array
+- **Optional thinking** — useful for the merge step where reasoning is complex
+- **System messages kept concise** — format specs and examples in user messages
+
+## State Model
 
 ```
 CrucibleState {
-  phase: idle | seeding | expanding | committed
-  strategy: CrucibleStrategy | null
-  nodes: CrucibleNode[]
-  currentRound: number
-  windowOpen: boolean
-}
-```
-
-### Strategies
-
-Narrative lenses that bias node generation:
-- `character-driven` — protagonist web, relationships, internal conflicts
-- `faction-conflict` — power structures, rivalries, territory
-- `mystery-revelation` — secrets, clues, reveals
-- `exploration` — geography, discovery, frontiers
-- `slice-of-life` — daily routines, community, small stakes
-- `custom` — user-defined focus
-
-## Phases & Generation Flow
-
-### Phase 1: Seeding (`crucibleStarted` → `crucibleSeeded`)
-
-**Trigger:** User clicks "Refine in Crucible" from brainstorm or Story Engine panel.
-
-**Generation:** Single GLM call extracts an **intent node** from brainstorm history.
-- Input: unified SE prefix + brainstorm history + strategy (if selected)
-- Output: One `kind: "intent"` node — the story's central premise distilled
-- The intent node is the root; all subsequent nodes ultimately `serve` it
-
-**Prompt design:**
-```
-[CRUCIBLE — SEED EXTRACTION]
-Analyze the brainstorm conversation and extract the core story intent.
-
-Output a JSON object:
-{
-  "content": "Full description of the story intent (~100-150 words). What is this story ABOUT — not plot, but the central tension, world premise, and emotional core.",
-  "summary": "One-line summary (max 80 chars)"
+  phase: idle | goals | chaining | merging | reviewing | populating
+  goals: CrucibleGoal[]              // extracted goals with selection status
+  chains: Map<goalId, CrucibleChain> // per-goal backward chains
+  mergedWorld: MergedWorldInventory | null
+  checkpointReason: string | null    // why the solver paused
 }
 
-If a strategy lens is active: [strategy-specific bias instruction]
+CrucibleGoal {
+  id: string
+  goal: string
+  stakes: string
+  theme: string
+  emotionalArc: string
+  terminalCondition: string
+  selected: boolean
+}
 
-Output ONLY the JSON object. No markdown, no explanation.
+CrucibleChain {
+  goalId: string
+  beats: CrucibleBeat[]
+  openConstraints: Constraint[]
+  resolvedConstraints: Constraint[]
+  worldElements: WorldElements
+  complete: boolean
+}
+
+CrucibleBeat {
+  scene: string
+  charactersPresent: string[]
+  location: string
+  conflictTension: string
+  worldElementsIntroduced: WorldElements
+  constraintsResolved: string[]
+  newOpenConstraints: string[]
+  groundStateConstraints: string[]
+}
+
+Constraint {
+  id: string
+  description: string
+  sourceBeatIndex: number
+  status: open | resolved | groundState
+}
+
+WorldElements {
+  characters: NamedElement[]
+  locations: NamedElement[]
+  factions: NamedElement[]
+  systems: NamedElement[]
+  situations: NamedElement[]
+}
+
+MergedWorldInventory {
+  elements: MergedElement[]
+}
+
+MergedElement {
+  name: string
+  type: character | location | faction | system | situation
+  description: string
+  goalPurposes: Map<goalId, string>  // why this element matters to each goal
+  relationships: string[]
+}
 ```
-
-### Phase 2: Expanding (`nodesAdded`, `roundAdvanced`)
-
-**Trigger:** Automatic after seeding, or user clicks "Deepen" for another pass.
-
-**Generation:** GLM proposes nodes that serve the intent + accepted nodes. Each round:
-1. Build context: unified prefix + intent + all accepted/edited nodes + strategy lens
-2. GLM outputs a JSON array of proposed nodes
-3. Nodes arrive with `status: "pending"` — user must accept/edit/reject each
-4. User triggers next round when satisfied, or commits
-
-**Prompt design (per round):**
-```
-[CRUCIBLE — EXPANSION ROUND {N}]
-You are expanding a story world. The intent and accepted elements are below.
-
-[INTENT]
-{intent node content}
-
-[ACCEPTED NODES]
-{accepted/edited nodes, grouped by kind}
-
-[STRATEGY: {strategy name}]
-{strategy-specific expansion instruction}
-
-Propose 3-5 new world elements. Each must SERVE at least one existing node.
-Prioritize gaps: if no locations exist, propose locations. If characters lack
-factions, propose factions. Follow the interconnection principle — no isolates.
-
-Output a JSON array:
-[
-  {
-    "kind": "character|faction|location|system|situation|beat|opener",
-    "content": "Detailed description (~80-120 words)",
-    "summary": "One-line summary (max 80 chars)",
-    "serves": ["id-of-node-this-supports", ...]
-  }
-]
-
-Output ONLY the JSON array. No markdown, no explanation.
-```
-
-**Nudge node:** Each expansion round MAY include one `origin: "nudge"` node — a gentle challenge that pushes the story in a more interesting direction. Always rejectable. The prompt includes:
-```
-Additionally, propose ONE "nudge" — a surprising element that makes the world
-more interesting. Mark it with "nudge": true. The user can always reject it.
-```
-
-### Phase 3: Commit (`crucibleCommitted`)
-
-**Trigger:** User clicks "Commit to Story Engine".
-
-**Mapping rules:**
-| Node Kind | Target |
-|---|---|
-| `intent` | Canon field (merged into world/structure section) |
-| `character` | DULFS: Dramatis Personae (creates item + lorebook entry) |
-| `faction` | DULFS: Factions |
-| `location` | DULFS: Locations |
-| `system` | DULFS: Universe Systems |
-| `situation` | DULFS: Situational Dynamics |
-| `beat` | Stored as metadata (future: scene planner) |
-| `opener` | Bootstrap instruction (scene opening) |
-
-Commit dispatches existing actions (`dulfsItemAdded`, `fieldUpdated`, etc.) — the Crucible doesn't bypass the store. Only nodes with `status: "accepted" | "edited"` are committed. Rejected/pending are discarded.
-
-After commit, the user can run SEGA to flesh out the seeded entries (lorebook content + keys).
-
-## Strategy-Specific Bias Instructions
-
-Each strategy adds a paragraph to the expansion prompt:
-
-- **character-driven:** "Prioritize characters with conflicting motivations. Every proposed character should have a relationship tension with at least one existing character. Propose situations that force character choices."
-- **faction-conflict:** "Prioritize factions and power structures. Characters should be members or opponents of factions. Locations should be contested or strategic. Situations should involve faction interests colliding."
-- **mystery-revelation:** "Prioritize secrets, hidden information, and asymmetric knowledge. Characters should have something to hide. Locations should contain clues. Situations should involve information being revealed or suppressed."
-- **exploration:** "Prioritize locations, world systems, and frontiers. Characters should be discoverers or gatekeepers. Situations should involve the unknown or the boundary between known and unknown."
-- **slice-of-life:** "Prioritize mundane but meaningful details — daily routines, community bonds, small personal stakes. Characters should have domestic concerns alongside larger tensions. Locations should feel lived-in."
-- **custom:** User provides a free-text focus instruction stored in storyStorage (`kse-crucible-custom-strategy`).
-
-## UI (Window Extension)
-
-The Crucible UI is a **floating window** (`api.v1.ui.window.open()`), not a sidebar panel. This gives it screen real estate independent of the brainstorm/SE panels.
-
-### Layout
-
-```
-┌─ Crucible ──────────────────────────────────┐
-│ [Strategy: character-driven ▾]  [Round: 2]  │
-│─────────────────────────────────────────────│
-│ ◆ INTENT                                    │
-│ ┌─────────────────────────────────────────┐ │
-│ │ A smuggler's life-debt draws her into   │ │
-│ │ a three-way faction war over...         │ │
-│ │                          [✓] [✎] [✗]   │ │
-│ └─────────────────────────────────────────┘ │
-│                                             │
-│ ◆ CHARACTERS                                │
-│ ┌─────────────────────────────────────────┐ │
-│ │ Kael — Smuggler bound by debt           │ │
-│ │                          [✓] [✎] [✗]   │ │
-│ └─────────────────────────────────────────┘ │
-│ ┌─────────────────────────────────────────┐ │
-│ │ ⚠ Voss — Iron Pact enforcer (STALE)    │ │
-│ │                          [✓] [✎] [✗]   │ │
-│ └─────────────────────────────────────────┘ │
-│                                             │
-│ ◆ FACTIONS  ...                             │
-│─────────────────────────────────────────────│
-│ [Deepen]              [Commit to SE]        │
-└─────────────────────────────────────────────┘
-```
-
-### Node display
-- **Collapsed** (default): one-line summary + status icon + accept/edit/reject buttons
-- **Expanded** (click to toggle): full editable text + relationship tags (`serves: [...]`)
-- Stale nodes show yellow warning indicator
-- Nodes grouped by `kind`, ordered by round within each group
-- Nudge nodes visually distinct (italic? different accent?)
-
-### Interactions
-- **Strategy dropdown** — dispatch `strategySelected`
-- **Accept (✓)** — dispatch `nodeStatusChanged({ id, status: "accepted" })`
-- **Edit (✎)** — opens inline edit → dispatch `nodeEdited({ id, content, summary })`
-- **Reject (✗)** — dispatch `nodeStatusChanged({ id, status: "rejected" })` (marks dependents stale)
-- **Deepen** — triggers next expansion round generation
-- **Commit** — maps accepted nodes to SE fields, dispatches `crucibleCommitted`
-- **Window toggle** — `windowToggled` action, entry point from brainstorm/SE panel button
 
 ## Context Strategy
 
-Crucible generations use `buildStoryEnginePrefix()` (same unified prefix as all SE strategies) plus a volatile tail with crucible-specific instructions:
+Crucible generations use `buildStoryEnginePrefix()` (shared unified prefix) plus a volatile tail:
 
 - MSG 1-4: shared prefix (system prompt, story state, DULFS, story text)
-- MSG 5: crucible instruction (seed extraction or expansion round)
-- MSG 6: assistant prefill (`{` for seed, `[` for expansion)
+- MSG 5+: crucible-specific instruction (goal extraction, beat generation, or merge)
 
 Cache benefit: if the user runs Crucible after brainstorming, the prefix is already cached.
 
-## Generation Strategies (code)
-
-New file: `src/core/utils/crucible-strategy.ts`
-
-Exports:
-- `createCrucibleSeedFactory(getState): MessageFactory`
-- `createCrucibleExpandFactory(getState): MessageFactory`
-- `buildCrucibleSeedStrategy(getState): GenerationStrategy`
-- `buildCrucibleExpandStrategy(getState): GenerationStrategy`
-
-New `GenerationStrategy.target` variants:
-```typescript
-| { type: "crucibleSeed" }
-| { type: "crucibleExpand"; round: number }
-```
-
-New generation handler in `effects/generation-handlers.ts` for `crucibleSeed` and `crucibleExpand`:
-- Parse accumulated JSON text
-- Seed: dispatch `crucibleSeeded({ node })` with `id: api.v1.uuid()`, `kind: "intent"`, `origin: "solver"`, `status: "pending"`, `round: 0`
-- Expand: dispatch `nodesAdded({ nodes })` with generated IDs, `round: currentRound`, `status: "pending"`
-
-## Config (project.yaml)
-
-Two new config fields:
-- `crucible_seed_prompt` — prompt template for seed extraction
-- `crucible_expand_prompt` — prompt template for expansion rounds
-
-## Persistence
-
-Already wired — `CrucibleState` persists via `kse-persist` alongside story and brainstorm.
-
 ## Implementation Order
 
-1. ~~**State slice + types**~~ ✅ (committed)
-2. **Prompts + generation strategies** — `crucible-strategy.ts`, config fields in project.yaml, target variants in types.ts, generation request type
-3. **Generation handlers** — JSON parsing, node dispatch
-4. **Effects** — wire crucible UI actions to generation pipeline (seed on `crucibleStarted`, expand on deepen)
-5. **UI** — Window with node cards, strategy picker, deepen/commit buttons
-6. **Commit logic** — node-to-DULFS/Canon mapping, dispatch existing store actions
-
-## Open Questions
-
-- Should "Deepen" auto-run on accept (solver proposes more after each curation), or only on explicit button press? → **Leaning explicit** to avoid overwhelming the user.
-- Nudge: one per round always, or configurable? → Start with one per round, always rejectable.
-- Beat and opener nodes: store-only for now, or wire to actual scene generation? → **Store-only for v7**, flag for future.
-- Custom strategy: free-text input stored where? → `storyStorage` key `kse-crucible-custom-strategy`.
-- Should JSON output use structured generation / constrained decoding if GLM supports it? → No, parse manually with fallback.
+1. **State slice refactor** — replace node-based model with goal/chain/beat model
+2. **Goal extraction** — prompt + generation strategy + handler
+3. **Backward chaining loop** — prompt + strategy + handler + checkpoint logic
+4. **World element merge** — prompt + strategy + handler
+5. **DULFS population** — mapping logic using existing store actions
+6. **UI** — Window with goal selection, beat/constraint visualization, checkpoint controls, merged world review
