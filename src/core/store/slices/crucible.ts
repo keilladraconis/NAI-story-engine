@@ -4,35 +4,16 @@ import {
   CrucibleGoal,
   CrucibleBeat,
   CrucibleChain,
+  CrucibleBuilderState,
   Constraint,
-  WorldElements,
-  MergedWorldInventory,
   CruciblePhase,
-  NamedElement,
 } from "../types";
+import { DulfsFieldID } from "../../../config/field-definitions";
 
-const EMPTY_WORLD: WorldElements = {
-  characters: [],
-  locations: [],
-  factions: [],
-  systems: [],
-  situations: [],
+const EMPTY_BUILDER: CrucibleBuilderState = {
+  nodes: [],
+  lastProcessedBeatIndex: -1,
 };
-
-/** Merge world elements, deduplicating by name (case-insensitive). */
-function mergeWorldElements(existing: WorldElements, introduced: WorldElements): WorldElements {
-  const merge = (a: NamedElement[], b: NamedElement[]): NamedElement[] => {
-    const names = new Set(a.map((e) => e.name.toLowerCase()));
-    return [...a, ...b.filter((e) => !names.has(e.name.toLowerCase()))];
-  };
-  return {
-    characters: merge(existing.characters, introduced.characters),
-    locations: merge(existing.locations, introduced.locations),
-    factions: merge(existing.factions, introduced.factions),
-    systems: merge(existing.systems, introduced.systems),
-    situations: merge(existing.situations, introduced.situations),
-  };
-}
 
 export const initialCrucibleState: CrucibleState = {
   phase: "idle",
@@ -40,11 +21,14 @@ export const initialCrucibleState: CrucibleState = {
   goals: [],
   chains: {},
   activeGoalId: null,
-  mergedWorld: null,
   checkpointReason: null,
   autoChaining: false,
   solverStalls: 0,
+  builder: { ...EMPTY_BUILDER },
 };
+
+/** Valid phases after v5 migration. */
+const VALID_PHASES = new Set<CruciblePhase>(["idle", "goals", "chaining", "building"]);
 
 export const crucibleSlice = createSlice({
   name: "crucible",
@@ -53,11 +37,10 @@ export const crucibleSlice = createSlice({
     // Intent actions — effects handle the actual work
     crucibleGoalsRequested: (state) => state,
     crucibleChainRequested: (state) => state,
-    crucibleMergeRequested: (state) => state,
     crucibleStopRequested: (state) => state,
 
     // Intent phase reducers
-    crucibleIntentRequested: (state) => state, // Intent action — effect queues generation
+    crucibleIntentRequested: (state) => state,
     intentSet: (state, payload: { intent: string }) => {
       return { ...state, intent: payload.intent };
     },
@@ -92,7 +75,7 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    goalsConfirmed: (state) => state, // Intent action — effects start chaining
+    goalsConfirmed: (state) => state,
 
     chainStarted: (state, payload: { goalId: string }) => {
       const chain: CrucibleChain = {
@@ -100,7 +83,6 @@ export const crucibleSlice = createSlice({
         beats: [],
         openConstraints: [],
         resolvedConstraints: [],
-        worldElements: { ...EMPTY_WORLD },
         complete: false,
       };
       return {
@@ -147,7 +129,6 @@ export const crucibleSlice = createSlice({
         beats: [...chain.beats, payload.beat],
         openConstraints: allOpen,
         resolvedConstraints: [...chain.resolvedConstraints, ...nowResolved],
-        worldElements: mergeWorldElements(chain.worldElements, payload.beat.worldElementsIntroduced),
       };
 
       return {
@@ -182,7 +163,6 @@ export const crucibleSlice = createSlice({
         beats: chain.beats.slice(0, -1),
         openConstraints: [...openWithoutLast, ...restored],
         resolvedConstraints: remainingResolved,
-        // Note: worldElements are not reverted (accumulated approximation is acceptable)
       };
 
       return {
@@ -274,12 +254,57 @@ export const crucibleSlice = createSlice({
       return { ...state, phase: payload.phase };
     },
 
-    mergedWorldSet: (state, payload: { mergedWorld: MergedWorldInventory }) => {
-      return { ...state, phase: "reviewing" as const, mergedWorld: payload.mergedWorld };
+    // Builder reducers
+    crucibleBuildRequested: (state) => state,
+
+    builderNodeAdded: (state, payload: { itemId: string; fieldId: DulfsFieldID; name: string; beatIndex: number }) => {
+      const existing = state.builder.nodes.find(
+        (n) => n.name.toLowerCase() === payload.name.toLowerCase(),
+      );
+      if (existing) {
+        // FIFO update: add beatIndex, cap at 4
+        const beatIndices = [...existing.beatIndices, payload.beatIndex].slice(-4);
+        return {
+          ...state,
+          builder: {
+            ...state.builder,
+            nodes: state.builder.nodes.map((n) =>
+              n.name.toLowerCase() === payload.name.toLowerCase()
+                ? { ...n, beatIndices }
+                : n,
+            ),
+          },
+        };
+      }
+      return {
+        ...state,
+        builder: {
+          ...state.builder,
+          nodes: [
+            ...state.builder.nodes,
+            {
+              itemId: payload.itemId,
+              fieldId: payload.fieldId,
+              name: payload.name,
+              beatIndices: [payload.beatIndex],
+            },
+          ],
+        },
+      };
     },
 
-    crucibleCommitted: (state) => {
-      return { ...state, phase: "populating" as const, autoChaining: false };
+    builderBeatProcessed: (state, payload: { beatIndex: number }) => {
+      return {
+        ...state,
+        builder: {
+          ...state.builder,
+          lastProcessedBeatIndex: payload.beatIndex,
+        },
+      };
+    },
+
+    solverYielded: (state) => {
+      return { ...state, phase: "chaining" as const };
     },
 
     crucibleReset: () => {
@@ -287,16 +312,45 @@ export const crucibleSlice = createSlice({
     },
 
     crucibleLoaded: (_state, payload: { crucible: CrucibleState }) => {
-      return { ...payload.crucible, autoChaining: false };
-    },
+      const loaded = payload.crucible;
 
+      // v5 migration: clamp phase, strip dead fields from chains/beats
+      const phase = VALID_PHASES.has(loaded.phase) ? loaded.phase : "idle";
+
+      const chains: Record<string, CrucibleChain> = {};
+      for (const [goalId, chain] of Object.entries(loaded.chains)) {
+        chains[goalId] = {
+          goalId: chain.goalId,
+          beats: chain.beats.map((b) => ({
+            text: b.text,
+            constraintsResolved: b.constraintsResolved,
+            newOpenConstraints: b.newOpenConstraints,
+            groundStateConstraints: b.groundStateConstraints,
+          })),
+          openConstraints: chain.openConstraints,
+          resolvedConstraints: chain.resolvedConstraints,
+          complete: chain.complete,
+        };
+      }
+
+      return {
+        phase,
+        intent: loaded.intent,
+        goals: loaded.goals,
+        chains,
+        activeGoalId: loaded.activeGoalId,
+        checkpointReason: loaded.checkpointReason,
+        autoChaining: false,
+        solverStalls: 0,
+        builder: loaded.builder || { ...EMPTY_BUILDER },
+      };
+    },
   },
 });
 
 export const {
   crucibleGoalsRequested,
   crucibleChainRequested,
-  crucibleMergeRequested,
   crucibleStopRequested,
   crucibleIntentRequested,
   intentSet,
@@ -318,8 +372,10 @@ export const {
   autoChainStarted,
   autoChainStopped,
   phaseSet,
-  mergedWorldSet,
-  crucibleCommitted,
+  crucibleBuildRequested,
+  builderNodeAdded,
+  builderBeatProcessed,
+  solverYielded,
   crucibleReset,
   crucibleLoaded,
 } = crucibleSlice.actions;

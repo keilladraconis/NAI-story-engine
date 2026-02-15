@@ -55,6 +55,8 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
       brainstorm?: { messages: BrainstormMessage[] };
       crucible?: CrucibleState;
     }
+    // Crucible load is deferred to after ui.register() so selectors can updateParts
+    let pendingCrucible: CrucibleState | null = null;
     try {
       const persisted = await api.v1.storyStorage.get("kse-persist");
       if (persisted && typeof persisted === "object") {
@@ -68,7 +70,7 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
           if (Array.isArray(c.nodes) || Array.isArray(c.edges) || "currentRound" in c) {
             api.v1.log("[migration] Resetting pre-v4 Crucible state");
           } else {
-            store.dispatch(crucibleLoaded({ crucible }));
+            pendingCrucible = crucible;
           }
         }
       }
@@ -133,6 +135,11 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
       cruciblePanel,
       lorebookGenPanel,
     ]);
+
+    // 5b. Load crucible state after register — selectors need updateParts on registered elements
+    if (pendingCrucible) {
+      store.dispatch(crucibleLoaded({ crucible: pendingCrucible }));
+    }
 
     // Register lorebook entry selection hook
     api.v1.hooks.register("onLorebookEntrySelected", (params) => {

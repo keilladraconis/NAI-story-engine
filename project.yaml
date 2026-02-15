@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771184827
+updatedAt: 1771195789
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -354,7 +354,7 @@ config:
       [TERMINAL CONDITION] Concrete observable story state at achievement
   - name: crucible_chain_prompt
     prettyName: Crucible Chain Prompt
-    description: Prompt for backward-chaining beat generation
+    description: Prompt for backward-chaining beat generation (lean solver)
     type: string
     multiline: true
     default: |-
@@ -370,62 +370,52 @@ config:
       - Each beat must RESOLVE ≥1 open constraint (establish it as true)
       - Each beat must declare its own PRECONDITIONS (new open constraints)
       - Preconditions needing no prior setup → mark as GROUND STATE
-      - World elements emerge from narrative necessity — never decorative
       - "Latest-possible" — stay close to the goal before stepping further back
       - Every beat must contain conflict, tension, or revelation — never pure exposition
-      - World elements use brief descriptions: "Name — role/function"
       - If this is the FIRST beat, its scene IS the terminal condition itself
 
       TERMINATE when all constraints are resolved or ground state.
 
       Output using EXACTLY this tagged format:
-      [SCENE] What happens — 2-3 sentences describing the concrete event
-      [CHARACTERS] Name — reason they must be here; Name — reason
+      [SCENE] What happens — 2-3 sentences
+      [CONFLICT] What's at stake
       [LOCATION] Where — why it matters
-      [CONFLICT] What's at stake in this moment
-      [WORLD ELEMENTS]
-      - Character: Name — role/motivation
-      - Location: Name — significance
-      - Faction: Name — goal/method
-      - System: Name — mechanic/rule
-      - Situation: Name — tension/dynamic
       [RESOLVED] constraint1; constraint2
       [OPEN] constraint1; constraint2
       [GROUND] constraint1; constraint2
-  - name: crucible_merge_prompt
-    prettyName: Crucible Merge Prompt
-    description: Prompt for merging per-goal world elements into a unified inventory
+  - name: crucible_build_prompt
+    prettyName: Crucible Builder Prompt
+    description: Prompt for interleaved builder — reviews beats, emits DULFS nodes
     type: string
     multiline: true
     default: |-
-      [CRUCIBLE — WORLD ELEMENT MERGE]
-      You are given world elements derived from multiple backward-chaining
-      goal analyses. Your task: merge them into a UNIFIED world inventory.
+      [CRUCIBLE — BUILDER]
+      You are reviewing backward-chaining beats and extracting world elements
+      for the story's DULFS (Dramatis Personae, Universe Systems, Locations,
+      Factions, Situational Dynamics).
 
-      MERGE RULES:
-      - If Character X in Goal A = Character Y in Goal B, merge them.
-        The merged character has COMPETING MOTIVATIONS from different goals.
-        This creates open-ended agency — the character can pursue either goal.
-      - Same for locations, factions, systems, situations.
-      - If elements are DISTINCT, keep them separate.
-      - Flag and resolve contradictions (same element, incompatible properties).
-      - Every merged element must include its PURPOSE from EACH goal chain.
-
-      ANTI-DESTINATION PRINCIPLE:
-      Characters with single-goal purposes are puppets. Characters with
-      multi-goal purposes have genuine agency. Prefer merging over keeping
-      separate when narratively justified.
-
-      Element types: character, location, faction, system, situation
+      RULES:
+      - For each NEW beat, identify characters, locations, factions, systems,
+        or situations that are narratively necessary
+      - If an element already exists (listed in EXISTING WORLD ELEMENTS),
+        emit [LINK] instead of creating a duplicate
+      - Keep descriptions minimal — 1-2 sentences of narrative purpose
+      - When done reviewing all beats, emit [SOLVER] to resume chaining
 
       Output elements separated by +++ using this tagged format:
       +++
-      [NAME] Element name
-      [TYPE] character|location|faction|system|situation
-      [DESCRIPTION] Unified description
-      [PURPOSE] Goal1: why this element matters; Goal2: why it matters
-      [RELATIONSHIPS] name1, name2
+      [CHARACTER] Name
+      [DESCRIPTION] Role and narrative purpose — 1-2 sentences
       +++
+      [LOCATION] Name
+      [DESCRIPTION] Significance — 1-2 sentences
+      +++
+      [LINK] Existing Name
+      [BEAT] 3
+      +++
+      [SOLVER]
+
+      Valid element tags: CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION
   - name: story_engine_debug
     prettyName: Story Engine Debug
     description: Enable debug logging for Story Engine

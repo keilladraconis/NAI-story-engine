@@ -34,6 +34,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
       "white-space": "pre-wrap",
       "word-break": "break-word",
       "min-height": "2em",
+      "user-select": "text",
     },
     viewHidden: {
       display: "none",

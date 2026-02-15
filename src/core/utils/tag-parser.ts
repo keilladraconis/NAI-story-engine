@@ -5,8 +5,6 @@
  * Sections are separated by `+++`.
  */
 
-import { WorldElements, NamedElement } from "../store/types";
-
 /** Emoji mapping for tagged text display. */
 const TAG_EMOJI: Record<string, string> = {
   "CORE TENSION": "\u{1F525}",
@@ -19,18 +17,19 @@ const TAG_EMOJI: Record<string, string> = {
   "EMOTIONAL ARC": "\u{1F4AB}",
   "TERMINAL CONDITION": "\u{1F3C1}",
   "SCENE": "\u{1F3AC}",
-  "CHARACTERS": "\u{1F464}",
   "LOCATION": "\u{1F4CD}",
   "CONFLICT": "\u{2694}\u{FE0F}",
-  "WORLD ELEMENTS": "\u{1F310}",
   "RESOLVED": "\u{2705}",
   "OPEN": "\u{2B55}",
   "GROUND": "\u{26F0}\u{FE0F}",
-  "NAME": "\u{1F4DB}",
-  "TYPE": "\u{1F516}",
+  "CHARACTER": "\u{1F464}",
+  "FACTION": "\u{1F3F4}",
+  "SYSTEM": "\u{2699}\u{FE0F}",
+  "SITUATION": "\u{26A1}",
   "DESCRIPTION": "\u{1F4DD}",
-  "PURPOSE": "\u{1F3AF}",
-  "RELATIONSHIPS": "\u{1F517}",
+  "LINK": "\u{1F517}",
+  "BEAT": "\u{1F3B5}",
+  "SOLVER": "\u{1F504}",
 };
 
 /** Build reverse mapping: emoji → tag name. */
@@ -87,51 +86,3 @@ export function splitSections(text: string, sep = "+++"): string[] {
     .filter((s) => s.length > 0);
 }
 
-/**
- * Parse `[WORLD ELEMENTS]` block for `- Type: Name — desc` lines.
- * Supports: Character, Location, Faction, System, Situation.
- */
-export function parseWorldElementLines(text: string): WorldElements {
-  const block = parseTag(text, "WORLD ELEMENTS");
-  if (!block) {
-    return { characters: [], locations: [], factions: [], systems: [], situations: [] };
-  }
-
-  const result: WorldElements = {
-    characters: [],
-    locations: [],
-    factions: [],
-    systems: [],
-    situations: [],
-  };
-
-  const lines = block.split("\n").map((l) => l.trim()).filter((l) => l.startsWith("-"));
-  for (const line of lines) {
-    // Format: `- Type: Name — description` or `- Type: Name - description`
-    const match = line.match(/^-\s*(Character|Location|Faction|System|Situation):\s*(.+)/i);
-    if (!match) continue;
-
-    const type = match[1].toLowerCase();
-    const rest = match[2];
-
-    // Split on ` — ` or ` - ` for name/description
-    const dashIdx = rest.search(/\s[—-]\s/);
-    let element: NamedElement;
-    if (dashIdx !== -1) {
-      element = {
-        name: rest.slice(0, dashIdx).trim(),
-        description: rest.slice(dashIdx).replace(/^\s[—-]\s/, "").trim(),
-      };
-    } else {
-      element = { name: rest.trim(), description: "" };
-    }
-
-    if (type === "character") result.characters.push(element);
-    else if (type === "location") result.locations.push(element);
-    else if (type === "faction") result.factions.push(element);
-    else if (type === "system") result.systems.push(element);
-    else if (type === "situation") result.situations.push(element);
-  }
-
-  return result;
-}

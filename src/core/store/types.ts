@@ -104,7 +104,7 @@ export interface GenerationRequest {
   | "crucibleIntent"
   | "crucibleGoal"
   | "crucibleChain"
-  | "crucibleMerge";
+  | "crucibleBuild";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -126,7 +126,7 @@ export interface GenerationStrategy {
   | { type: "crucibleIntent" }
   | { type: "crucibleGoal"; goalId: string }
   | { type: "crucibleChain"; goalId: string }
-  | { type: "crucibleMerge" };
+  | { type: "crucibleBuild"; goalId: string };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };
@@ -144,7 +144,7 @@ export interface RuntimeState {
 
 // Crucible Types
 
-export type CruciblePhase = "idle" | "goals" | "chaining" | "merging" | "reviewing" | "populating";
+export type CruciblePhase = "idle" | "goals" | "chaining" | "building";
 
 export interface CrucibleGoal {
   id: string;
@@ -152,22 +152,8 @@ export interface CrucibleGoal {
   selected: boolean;
 }
 
-export interface NamedElement {
-  name: string;
-  description: string;
-}
-
-export interface WorldElements {
-  characters: NamedElement[];
-  locations: NamedElement[];
-  factions: NamedElement[];
-  systems: NamedElement[];
-  situations: NamedElement[];
-}
-
 export interface CrucibleBeat {
   text: string;
-  worldElementsIntroduced: WorldElements;
   constraintsResolved: string[];
   newOpenConstraints: string[];
   groundStateConstraints: string[];
@@ -187,20 +173,19 @@ export interface CrucibleChain {
   beats: CrucibleBeat[];
   openConstraints: Constraint[];
   resolvedConstraints: Constraint[];
-  worldElements: WorldElements;
   complete: boolean;
 }
 
-export type MergedElementType = "character" | "location" | "faction" | "system" | "situation";
-
-export interface MergedElement {
-  text: string;
-  type: MergedElementType;
+export interface CrucibleNodeLink {
+  itemId: string;
+  fieldId: DulfsFieldID;
   name: string;
+  beatIndices: number[];
 }
 
-export interface MergedWorldInventory {
-  elements: MergedElement[];
+export interface CrucibleBuilderState {
+  nodes: CrucibleNodeLink[];
+  lastProcessedBeatIndex: number;
 }
 
 export interface CrucibleState {
@@ -209,10 +194,10 @@ export interface CrucibleState {
   goals: CrucibleGoal[];
   chains: Record<string, CrucibleChain>;
   activeGoalId: string | null;
-  mergedWorld: MergedWorldInventory | null;
   checkpointReason: string | null;
   autoChaining: boolean;
   solverStalls: number;
+  builder: CrucibleBuilderState;
 }
 
 export interface RootState {

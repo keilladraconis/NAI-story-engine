@@ -34,21 +34,22 @@ import {
   requestCancelled,
   requestCompleted,
   crucibleLoaded,
-  crucibleCommitted,
   crucibleGoalsRequested,
   crucibleStopRequested,
   crucibleIntentRequested,
+  crucibleBuildRequested,
+  solverYielded,
   intentSet,
   goalAdded,
   goalsConfirmed,
   crucibleChainRequested,
-  crucibleMergeRequested,
   chainStarted,
   beatAdded,
   activeGoalAdvanced,
   autoChainStarted,
   autoChainStopped,
   checkpointCleared,
+  phaseSet,
 } from "./index";
 import {
   createLorebookContentFactory,
@@ -68,9 +69,8 @@ import {
   buildCrucibleIntentStrategy,
   buildCrucibleGoalStrategy,
   buildCrucibleChainStrategy,
-  buildCrucibleMergeStrategy,
 } from "../utils/crucible-strategy";
-import { parseTag } from "../utils/tag-parser";
+import { buildCrucibleBuildStrategy } from "../utils/crucible-builder-strategy";
 import { IDS } from "../../ui/framework/ids";
 import {
   DulfsFieldID,
@@ -238,7 +238,7 @@ function resolvePrefill(
   }
 
   // Crucible targets use explicit assistantPrefill (JSON anchors)
-  if (target.type === "crucibleIntent" || target.type === "crucibleGoal" || target.type === "crucibleChain" || target.type === "crucibleMerge") {
+  if (target.type === "crucibleIntent" || target.type === "crucibleGoal" || target.type === "crucibleChain" || target.type === "crucibleBuild") {
     if (assistantPrefill) return assistantPrefill;
   }
 
@@ -322,8 +322,8 @@ function cacheLabel(target: GenerationStrategy["target"]): string {
       return `crucible-goal:${target.goalId.slice(0, 8)}`;
     case "crucibleChain":
       return `crucible-chain:${target.goalId.slice(0, 8)}`;
-    case "crucibleMerge":
-      return "crucible-merge";
+    case "crucibleBuild":
+      return `crucible-build:${target.goalId.slice(0, 8)}`;
   }
 }
 
@@ -877,22 +877,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Merge Requested → queue merge generation
-  subscribeEffect(
-    matchesAction(crucibleMergeRequested),
-    async (_action, { dispatch }) => {
-      const strategy = buildCrucibleMergeStrategy(getState);
-      dispatch(
-        requestQueued({
-          id: strategy.requestId,
-          type: "crucibleMerge",
-          targetId: "crucible",
-        }),
-      );
-      dispatch(generationSubmitted(strategy));
-    },
-  );
-
   // Intent: Crucible Stop → cancel active request + stop auto-chain
   subscribeEffect(
     matchesAction(crucibleStopRequested),
@@ -902,10 +886,34 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         dispatch(autoChainStopped());
       }
       const activeRequest = state.runtime.activeRequest;
-      if (activeRequest && (activeRequest.type === "crucibleIntent" || activeRequest.type === "crucibleGoal" || activeRequest.type === "crucibleChain" || activeRequest.type === "crucibleMerge")) {
+      if (activeRequest && (activeRequest.type === "crucibleIntent" || activeRequest.type === "crucibleGoal" || activeRequest.type === "crucibleChain" || activeRequest.type === "crucibleBuild")) {
         dispatch(requestCancelled({ requestId: activeRequest.id }));
         genX.cancelAll();
       }
+    },
+  );
+
+  // Intent: Crucible Build Requested → queue builder generation
+  subscribeEffect(
+    matchesAction(crucibleBuildRequested),
+    async (_action, { dispatch, getState: getLatest }) => {
+      const state = getLatest();
+      const { activeGoalId } = state.crucible;
+      if (!activeGoalId) {
+        api.v1.log("[crucible] Build requested but no active goal");
+        return;
+      }
+
+      dispatch(phaseSet({ phase: "building" }));
+      const strategy = buildCrucibleBuildStrategy(getState, activeGoalId);
+      dispatch(
+        requestQueued({
+          id: strategy.requestId,
+          type: "crucibleBuild",
+          targetId: activeGoalId,
+        }),
+      );
+      dispatch(generationSubmitted(strategy));
     },
   );
 
@@ -913,7 +921,17 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   let chainStalls = 0;
   const MAX_CHAIN_STALLS = 3;
 
-  // Auto-chain continuation: on requestCompleted, advance chaining
+  /** Check if builder has unprocessed beats. */
+  function builderBehind(): boolean {
+    const state = getState();
+    const { activeGoalId, builder } = state.crucible;
+    if (!activeGoalId) return false;
+    const chain = state.crucible.chains[activeGoalId];
+    if (!chain || chain.beats.length === 0) return false;
+    return builder.lastProcessedBeatIndex < chain.beats.length - 1;
+  }
+
+  // Auto-chain continuation: interleaved Solver ↔ Builder loop
   subscribeEffect(
     matchesAction(requestCompleted),
     async () => {
@@ -921,43 +939,61 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       const state = getState();
       if (!state.crucible.autoChaining) return;
-      if (state.crucible.phase !== "chaining") return;
-      if (state.crucible.checkpointReason) return; // Paused at checkpoint
+      if (state.crucible.checkpointReason) return;
       if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
 
-      const { activeGoalId } = state.crucible;
+      const { phase, activeGoalId } = state.crucible;
       if (!activeGoalId) return;
 
       const chain = state.crucible.chains[activeGoalId];
       if (!chain) return;
 
-      if (chain.complete) {
-        // Advance to next unfinished goal
-        dispatch(activeGoalAdvanced());
-        const updated = getState();
-        if (updated.crucible.activeGoalId) {
-          // More goals to chain
-          chainStalls = 0;
-          dispatch(crucibleChainRequested());
-        } else {
-          // All goals complete → trigger merge
-          dispatch(autoChainStopped());
-          dispatch(crucibleMergeRequested());
+      if (phase === "chaining") {
+        if (chain.complete) {
+          // Goal complete — run builder catch-up if behind
+          if (builderBehind()) {
+            dispatch(crucibleBuildRequested());
+            return;
+          }
+          // Advance to next goal
+          dispatch(activeGoalAdvanced());
+          const updated = getState();
+          if (updated.crucible.activeGoalId) {
+            chainStalls = 0;
+            dispatch(crucibleChainRequested());
+          } else {
+            // All goals complete — final builder pass if needed
+            if (builderBehind()) {
+              dispatch(crucibleBuildRequested());
+            } else {
+              dispatch(autoChainStopped());
+              api.v1.ui.toast("All goals chained", { type: "success" });
+            }
+          }
+          return;
         }
-        return;
-      }
 
-      // Stall detection: if beat wasn't added (handler failed), increment stall
-      // The handler dispatches beatAdded on success, so check if chain grew
-      chainStalls++;
-      if (chainStalls >= MAX_CHAIN_STALLS) {
-        api.v1.log(`[crucible] Auto-chain stopped: ${chainStalls} consecutive stalls`);
-        dispatch(autoChainStopped());
-        return;
-      }
+        // Chain not complete — interleave builder if behind
+        if (builderBehind()) {
+          dispatch(crucibleBuildRequested());
+          return;
+        }
 
-      // Continue chaining
-      dispatch(crucibleChainRequested());
+        // Continue solving — stall detection
+        chainStalls++;
+        if (chainStalls >= MAX_CHAIN_STALLS) {
+          api.v1.log(`[crucible] Auto-chain stopped: ${chainStalls} consecutive stalls`);
+          dispatch(autoChainStopped());
+          return;
+        }
+        dispatch(crucibleChainRequested());
+      } else if (phase === "building") {
+        // Builder just completed — if it yielded [SOLVER], phase is already "chaining"
+        // so this only fires if builder didn't yield (e.g. continuation exhausted)
+        // Force yield back to solver
+        dispatch(solverYielded());
+        // Next requestCompleted will fire the chaining branch
+      }
     },
   );
 
@@ -990,55 +1026,9 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       const { requestId } = action.payload;
       if (
         state.runtime.activeRequest?.id === requestId &&
-        (state.runtime.activeRequest?.type === "crucibleIntent" || state.runtime.activeRequest?.type === "crucibleChain" || state.runtime.activeRequest?.type === "crucibleGoal")
+        (state.runtime.activeRequest?.type === "crucibleIntent" || state.runtime.activeRequest?.type === "crucibleChain" || state.runtime.activeRequest?.type === "crucibleGoal" || state.runtime.activeRequest?.type === "crucibleBuild")
       ) {
         dispatch(autoChainStopped());
-      }
-    },
-  );
-
-  // Intent: Crucible Export on Commit — map merged world elements to DULFS
-  subscribeEffect(
-    matchesAction(crucibleCommitted),
-    async (_action, { dispatch, getState }) => {
-      const state = getState();
-      const mergedWorld = state.crucible.mergedWorld;
-      if (!mergedWorld) return;
-
-      const typeToField: Record<string, DulfsFieldID | undefined> = {
-        character: FieldID.DramatisPersonae,
-        faction: FieldID.Factions,
-        location: FieldID.Locations,
-        system: FieldID.UniverseSystems,
-        situation: FieldID.SituationalDynamics,
-      };
-
-      let exported = 0;
-      for (const element of mergedWorld.elements) {
-        const fieldId = typeToField[element.type];
-        if (!fieldId) continue;
-
-        // Extract description and purpose from tagged text
-        const description = parseTag(element.text, "DESCRIPTION") || "";
-        const purpose = parseTag(element.text, "PURPOSE") || "";
-        const relationships = parseTag(element.text, "RELATIONSHIPS") || "";
-
-        const parts = [`${element.name}: ${description}`];
-        if (purpose) {
-          parts.push(`Narrative Purpose: ${purpose}`);
-        }
-        if (relationships) {
-          parts.push(`Relationships: ${relationships}`);
-        }
-
-        const itemId = api.v1.uuid();
-        await api.v1.storyStorage.set(`dulfs-item-${itemId}`, parts.join("\n"));
-        dispatch(dulfsItemAdded({ fieldId, item: { id: itemId, fieldId } }));
-        exported++;
-      }
-
-      if (exported > 0) {
-        api.v1.ui.toast(`Exported ${exported} elements to Story Engine`, { type: "success" });
       }
     },
   );
