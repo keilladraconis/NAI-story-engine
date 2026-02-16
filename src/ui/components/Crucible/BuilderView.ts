@@ -208,7 +208,7 @@ export const BuilderView = defineComponent<undefined, RootState>({
     );
 
     // Always start hidden — useSelector handles all rendering on state changes
-    // (crucibleLoaded / builderNodeAdded trigger the callback above)
+    // (persist/loaded / builderNodeAdded trigger the callback above)
     return column({
       id: CR.BUILDER_ROOT,
       style: this.style?.("hidden"),

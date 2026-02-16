@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771272099
+updatedAt: 1771274429
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -306,9 +306,6 @@ config:
 
       End with a single [TAGS] line: 3-8 short labels for genre, tone,
       motifs, or thematic markers.
-
-      No structured tags, no bullet points, no section headers — except
-      the final [TAGS] line. Dense prose only.
   - name: crucible_goals_prompt
     prettyName: Crucible Goals Prompt
     description: Prompt for generating a single story goal with starting constraints
@@ -379,7 +376,6 @@ config:
       - NEW element: emit tag + name, then [DESCRIPTION]. No [ID] — system assigns one.
       - UPDATE element: emit tag + name, then [ID:xx] alone on its own line,
         then [DESCRIPTION] with revised content. NEVER put text after [ID:xx].
-      - REFERENCE without changes: use [LINK] with [ID:xx].
       - Descriptions: 1-2 sentences of narrative purpose. No lorebook detail.
       - When done, emit [SOLVER] to resume chaining.
 
@@ -391,10 +387,6 @@ config:
       [CHARACTER] Revised Name
       [ID:C0]
       [DESCRIPTION] Updated role after new beats
-      +++
-      [LINK] Existing Name
-      [ID:L0]
-      [BEAT] 3
       +++
       [SOLVER]
 

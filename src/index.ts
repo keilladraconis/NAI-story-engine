@@ -1,12 +1,8 @@
 import {
   store,
-  brainstormLoaded,
-  storyLoaded,
-  crucibleLoaded,
+  persistedDataLoaded,
   uiLorebookEntrySelected,
 } from "./core/store";
-import { intentSet } from "./core/store/slices/crucible";
-import { StoryState, BrainstormMessage, CrucibleState } from "./core/store/types";
 import { registerEffects, syncEratoCompatibility } from "./core/store/effects";
 import { GenX } from "nai-gen-x";
 import { mount } from "nai-act";
@@ -51,33 +47,8 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
     registerEffects(store, genX);
 
     // 3. Load Data
-    interface PersistedState {
-      story?: StoryState;
-      brainstorm?: { messages: BrainstormMessage[] };
-      crucible?: CrucibleState;
-    }
-    // Crucible load is deferred to after ui.register() so selectors can updateParts
-    let pendingCrucible: CrucibleState | null = null;
-    try {
-      const persisted = await api.v1.storyStorage.get("kse-persist");
-      if (persisted && typeof persisted === "object") {
-        const { story, brainstorm, crucible } = persisted as PersistedState;
-        if (story) store.dispatch(storyLoaded({ story }));
-        if (brainstorm && brainstorm.messages)
-          store.dispatch(brainstormLoaded({ messages: brainstorm.messages }));
-        if (crucible) {
-          // Migration: v1-v3 had nodes/edges/currentRound — reset if old format
-          const c = crucible as any;
-          if (Array.isArray(c.nodes) || Array.isArray(c.edges) || "currentRound" in c) {
-            api.v1.log("[migration] Resetting pre-v4 Crucible state");
-          } else {
-            pendingCrucible = crucible;
-          }
-        }
-      }
-    } catch (e) {
-      api.v1.log("Error loading persisted data:", e);
-    }
+    const persisted = await api.v1.storyStorage.get("kse-persist");
+    if (persisted) store.dispatch(persistedDataLoaded(persisted));
 
     // 3b. Sync Erato compatibility (migrate entries/categories if toggled)
     await syncEratoCompatibility(store.getState);
@@ -136,23 +107,6 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
       cruciblePanel,
       lorebookGenPanel,
     ]);
-
-    // 5b. Load crucible state after register — selectors need updateParts on registered elements
-    if (pendingCrucible) {
-      api.v1.log(`[init] Dispatching crucibleLoaded, intent=${pendingCrucible.intent ? "yes" : "no"}, goals=${pendingCrucible.goals?.length ?? 0}`);
-      store.dispatch(crucibleLoaded({ crucible: pendingCrucible }));
-      api.v1.log(`[init] Post-load state intent=${store.getState().crucible.intent ? "yes" : "no"}`);
-    } else {
-      api.v1.log("[init] No pendingCrucible to load");
-    }
-    // Hydrate intent from storyStorage if Redux lost it
-    if (!store.getState().crucible.intent) {
-      const storedIntent = String((await api.v1.storyStorage.get("cr-intent")) || "");
-      if (storedIntent) {
-        api.v1.log(`[init] Hydrating intent from storyStorage (${storedIntent.length} chars)`);
-        store.dispatch(intentSet({ intent: storedIntent }));
-      }
-    }
 
     // Register lorebook entry selection hook
     api.v1.hooks.register("onLorebookEntrySelected", (params) => {

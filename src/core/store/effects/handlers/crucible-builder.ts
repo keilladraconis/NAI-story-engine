@@ -91,26 +91,6 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
         // Strip any residual [ID:xx] artifacts from description
         description = description.replace(/\[ID:\w+\]\s*:?\s*/g, "").trim();
 
-        // Check for [LINK] — reference to existing element
-        const linkName = parseTag(section, "LINK");
-        if (linkName) {
-          const beatStr = parseTag(section, "BEAT");
-          const beatIndex = beatStr ? parseInt(beatStr, 10) - 1 : chain.beats.length - 1;
-          // Prefer ID-based match, fall back to name-based
-          const existing = idNode || builder.nodes.find(
-            (n) => n.name.toLowerCase() === linkName.toLowerCase(),
-          );
-          if (existing) {
-            ctx.dispatch(builderNodeAdded({
-              id: existing.id,
-              fieldId: existing.fieldId,
-              name: existing.name,
-              beatIndex,
-            }));
-          }
-          continue;
-        }
-
         // Check for element tags ([CHARACTER], [LOCATION], etc.)
         for (const tag of ELEMENT_TAGS) {
           const name = parseTag(section, tag);
@@ -127,7 +107,6 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
               fieldId: idNode.fieldId,
               name,
               content: description || undefined,
-              beatIndex: chain.beats.length - 1,
             }));
             break;
           }
@@ -142,7 +121,6 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
               fieldId: existingNode.fieldId,
               name: existingNode.name,
               content: description || undefined,
-              beatIndex: chain.beats.length - 1,
             }));
             break;
           }
@@ -154,7 +132,6 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
             fieldId,
             name,
             content: description,
-            beatIndex: chain.beats.length - 1,
           }));
           break; // Only one element tag per section
         }

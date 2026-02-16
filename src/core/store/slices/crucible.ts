@@ -15,6 +15,57 @@ const EMPTY_BUILDER: CrucibleBuilderState = {
   lastProcessedBeatIndex: -1,
 };
 
+/** Migrate raw persisted crucible data — backfills shortIds, strips dead fields. */
+export function migrateCrucibleState(loaded: CrucibleState): CrucibleState {
+  const chains: Record<string, CrucibleChain> = {};
+  for (const [goalId, chain] of Object.entries(loaded.chains)) {
+    let nextIdx = (chain as { nextConstraintIndex?: number }).nextConstraintIndex ?? 0;
+    const backfillShortId = (c: Constraint): Constraint => {
+      if (c.shortId) return c;
+      return { ...c, shortId: `X${nextIdx++}` };
+    };
+
+    const openConstraints = chain.openConstraints.map(backfillShortId);
+    const resolvedConstraints = chain.resolvedConstraints.map(backfillShortId);
+
+    chains[goalId] = {
+      goalId: chain.goalId,
+      beats: chain.beats.map((b) => ({
+        text: b.text,
+        constraintsResolved: b.constraintsResolved,
+        newOpenConstraints: b.newOpenConstraints,
+        groundStateConstraints: b.groundStateConstraints,
+        ...(b.tainted ? { tainted: true } : {}),
+        ...(b.favorited ? { favorited: true } : {}),
+      })),
+      openConstraints,
+      resolvedConstraints,
+      complete: chain.complete,
+      nextConstraintIndex: nextIdx,
+    };
+  }
+
+  return {
+    builderActive: false,
+    intent: loaded.intent,
+    goals: loaded.goals,
+    chains,
+    activeGoalId: loaded.activeGoalId,
+    checkpointReason: loaded.checkpointReason,
+    autoChaining: false,
+    solverStalls: 0,
+    builder: loaded.builder
+      ? {
+        ...loaded.builder,
+        nodes: loaded.builder.nodes.map((n) => ({
+          ...n,
+          content: n.content || "",
+        })),
+      }
+      : { ...EMPTY_BUILDER },
+  };
+}
+
 export const initialCrucibleState: CrucibleState = {
   builderActive: false,
   intent: null,
@@ -389,12 +440,10 @@ export const crucibleSlice = createSlice({
     // Builder reducers
     crucibleBuildRequested: (state) => state,
 
-    builderNodeAdded: (state, payload: { id: string; fieldId: DulfsFieldID; name: string; content?: string; beatIndex: number }) => {
+    builderNodeAdded: (state, payload: { id: string; fieldId: DulfsFieldID; name: string; content?: string }) => {
       const existing = state.builder.nodes.find((n) => n.id === payload.id)
         || state.builder.nodes.find((n) => n.name.toLowerCase() === payload.name.toLowerCase());
       if (existing) {
-        // Revision: update beatIndices (FIFO cap 4), overwrite name + content if provided
-        const beatIndices = [...existing.beatIndices, payload.beatIndex].slice(-4);
         return {
           ...state,
           builder: {
@@ -403,7 +452,6 @@ export const crucibleSlice = createSlice({
               n.id === existing.id
                 ? {
                   ...n,
-                  beatIndices,
                   name: payload.name || n.name,
                   content: payload.content ?? n.content,
                 }
@@ -423,7 +471,6 @@ export const crucibleSlice = createSlice({
               fieldId: payload.fieldId,
               name: payload.name,
               content: payload.content || "",
-              beatIndices: [payload.beatIndex],
             },
           ],
         },
@@ -477,60 +524,6 @@ export const crucibleSlice = createSlice({
     crucibleReset: () => {
       return { ...initialCrucibleState };
     },
-
-    crucibleLoaded: (_state, payload: { crucible: CrucibleState }) => {
-      const loaded = payload.crucible;
-
-      // Strip dead fields from chains/beats + backfill shortIds for saved data
-      const chains: Record<string, CrucibleChain> = {};
-      for (const [goalId, chain] of Object.entries(loaded.chains)) {
-        // Backfill shortId on constraints that lack it (migration from pre-shortId data)
-        let nextIdx = (chain as { nextConstraintIndex?: number }).nextConstraintIndex ?? 0;
-        const backfillShortId = (c: Constraint): Constraint => {
-          if (c.shortId) return c;
-          return { ...c, shortId: `X${nextIdx++}` };
-        };
-
-        const openConstraints = chain.openConstraints.map(backfillShortId);
-        const resolvedConstraints = chain.resolvedConstraints.map(backfillShortId);
-
-        chains[goalId] = {
-          goalId: chain.goalId,
-          beats: chain.beats.map((b) => ({
-            text: b.text,
-            constraintsResolved: b.constraintsResolved,
-            newOpenConstraints: b.newOpenConstraints,
-            groundStateConstraints: b.groundStateConstraints,
-            ...(b.tainted ? { tainted: true } : {}),
-            ...(b.favorited ? { favorited: true } : {}),
-          })),
-          openConstraints,
-          resolvedConstraints,
-          complete: chain.complete,
-          nextConstraintIndex: nextIdx,
-        };
-      }
-
-      return {
-        builderActive: false,
-        intent: loaded.intent,
-        goals: loaded.goals,
-        chains,
-        activeGoalId: loaded.activeGoalId,
-        checkpointReason: loaded.checkpointReason,
-        autoChaining: false,
-        solverStalls: 0,
-        builder: loaded.builder
-          ? {
-            ...loaded.builder,
-            nodes: loaded.builder.nodes.map((n) => ({
-              ...n,
-              content: n.content || "",
-            })),
-          }
-          : { ...EMPTY_BUILDER },
-      };
-    },
   },
 });
 
@@ -569,5 +562,4 @@ export const {
   builderNodeRemoved,
   builderDeactivated,
   crucibleReset,
-  crucibleLoaded,
 } = crucibleSlice.actions;

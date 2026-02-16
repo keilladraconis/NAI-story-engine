@@ -26,14 +26,12 @@ import {
   dulfsItemRemoved,
   dulfsItemAdded,
   storyCleared,
-  storyLoaded,
   uiLorebookContentGenerationRequested,
   uiLorebookKeysGenerationRequested,
   uiLorebookItemGenerationRequested,
   uiLorebookRefineRequested,
   requestCancelled,
   requestCompleted,
-  crucibleLoaded,
   crucibleGoalsRequested,
   crucibleStopRequested,
   crucibleIntentRequested,
@@ -1055,9 +1053,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       action.type.startsWith("story/") ||
       action.type.startsWith("brainstorm/") ||
       action.type.startsWith("crucible/"),
-    async (action, { getState }) => {
-      if (action.type === storyLoaded.type) return; // Don't save on load trigger
-      if (action.type === crucibleLoaded.type) return; // Don't save on load trigger
+    async (_action, { getState }) => {
       try {
         const state = getState();
         const persistData = {

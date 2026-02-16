@@ -25,8 +25,6 @@ const TAG_EMOJI: Record<string, string> = {
   SYSTEM: '⚙️',
   SITUATION: '⚡',
   DESCRIPTION: '💬',
-  LINK: '🔗',
-  BEAT: '📝',
   SOLVER: '🔄'
 }
 

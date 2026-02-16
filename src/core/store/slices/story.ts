@@ -34,10 +34,6 @@ export const storySlice = createSlice({
   name: "story",
   initialState: initialStoryState,
   reducers: {
-    storyLoaded: (_state, payload: { story: StoryState }) => ({
-      ...initialStoryState, // Reset then merge
-      ...payload.story,
-    }),
     storyCleared: () => initialStoryState,
     fieldUpdated: (
       state,
@@ -103,7 +99,6 @@ export const storySlice = createSlice({
 });
 
 export const {
-  storyLoaded,
   storyCleared,
   fieldUpdated,
   dulfsItemAdded,

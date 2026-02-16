@@ -88,7 +88,7 @@ function formatBuilderContext(
       const sid = shortIds.get(node.id) || "??";
       const label = FIELD_LABEL[node.fieldId] || node.fieldId;
       const desc = node.content ? `: ${node.content}` : "";
-      sections.push(`  [${sid}] ${node.name} (${label})${desc} [beats: ${node.beatIndices.join(",")}]`);
+      sections.push(`  [${sid}] ${node.name} (${label})${desc}`);
     }
   }
 
@@ -129,7 +129,7 @@ export const createCrucibleBuildFactory = (
       },
       {
         role: "user",
-        content: context + "\n\nReview the new beats. Emit world elements or link existing ones, then yield to solver.",
+        content: context + "\n\nReview the new beats. Emit world elements, then yield to solver.",
       },
       { role: "assistant", content: "[" },
     ];

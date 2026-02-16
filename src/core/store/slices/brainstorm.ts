@@ -66,12 +66,6 @@ export const brainstormSlice = createSlice({
         messages: [],
       };
     },
-    brainstormLoaded: (state, payload: { messages: BrainstormMessage[] }) => {
-      return {
-        ...state,
-        messages: payload.messages,
-      };
-    },
     editingMessageIdSet: (state, id: string | null) => {
       return {
         ...state,
@@ -88,6 +82,5 @@ export const {
   messageRemoved,
   pruneHistory,
   messagesCleared,
-  brainstormLoaded,
   editingMessageIdSet,
 } = brainstormSlice.actions;

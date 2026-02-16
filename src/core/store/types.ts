@@ -183,7 +183,6 @@ export interface CrucibleNodeLink {
   fieldId: DulfsFieldID;
   name: string;
   content: string;
-  beatIndices: number[];
 }
 
 export interface CrucibleBuilderState {
