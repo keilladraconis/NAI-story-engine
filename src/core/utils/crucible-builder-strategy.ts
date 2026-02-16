@@ -14,7 +14,7 @@ import {
   CrucibleNodeLink,
 } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
-import { buildStoryEnginePrefix } from "./context-builder";
+import { buildCruciblePrefix } from "./context-builder";
 import { parseTag } from "./tag-parser";
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 
@@ -76,11 +76,7 @@ function formatBuilderContext(
       const beat = unprocessed[i];
       const beatNum = startIndex + i + 1;
       const scene = parseTag(beat.text, "SCENE") || beat.text.split("\n")[0];
-      const conflict = parseTag(beat.text, "CONFLICT") || "";
-      const location = parseTag(beat.text, "LOCATION") || "";
       sections.push(`  Beat ${beatNum}: ${scene}`);
-      if (conflict) sections.push(`    Conflict: ${conflict}`);
-      if (location) sections.push(`    Location: ${location}`);
     }
   }
 
@@ -120,7 +116,10 @@ export const createCrucibleBuildFactory = (
     );
 
     const context = formatBuilderContext(chain, goal, state.crucible.builder);
-    const prefix = await buildStoryEnginePrefix(getState);
+    const prefix = await buildCruciblePrefix(getState, {
+      includeDirection: true,
+      includeDulfs: true,
+    });
 
     const messages: Message[] = [
       ...prefix,

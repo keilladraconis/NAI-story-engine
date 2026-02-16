@@ -11,6 +11,9 @@ export const IDS = {
     ADD_GOAL_BTN: "cr-add-goal-btn",
     CLEAR_GOALS_BTN: "cr-clear-goals-btn",
     SOLVER_BODY: "cr-solver-body",
+    CONSTRAINTS_ROOT: "cr-constraints-root",
+    OPEN_LIST: "cr-constraints-open",
+    RESOLVED_LIST: "cr-constraints-resolved",
     BUILDER_ROOT: "cr-builder-root",
     goal: (id: string) => ({
       ROOT: `cr-goal-${id}`,

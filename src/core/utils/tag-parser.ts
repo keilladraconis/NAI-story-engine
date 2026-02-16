@@ -18,10 +18,8 @@ const TAG_EMOJI: Record<string, string> = {
   'TERMINAL CONDITION': '🏁',
   SCENE: '🎬',
   LOCATION: '📍',
-  CONFLICT: '⚔️',
   RESOLVED: '✅',
   OPEN: '⭕',
-  GROUND: '⛰️',
   CHARACTER: '👤',
   FACTION: '🏴',
   SYSTEM: '⚙️',
@@ -61,9 +59,9 @@ export function parseTag(text: string, tag: string): string | null {
   if (start === -1) return null;
 
   const contentStart = start + marker.length;
-  // Find next tag marker `[` that starts a `[SOMETHING]` pattern
+  // Find next tag marker: `[WORD]` or `[ID:xxx]` at start of a line
   const rest = text.slice(contentStart);
-  const nextTag = rest.search(/\n\[[\w\s]+\]/);
+  const nextTag = rest.search(/\n\[[\w\s:]+\]/);
   const content = nextTag === -1 ? rest : rest.slice(0, nextTag);
   return content.trim();
 }
@@ -76,6 +74,31 @@ export function parseTagList(text: string, tag: string, sep = ";"): string[] {
     .split(sep)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+/**
+ * Parse ALL occurrences of a repeated tag, returning each tag's content.
+ * For formats like:
+ *   [OPEN] first precondition
+ *   [OPEN] second precondition
+ * Returns ["first precondition", "second precondition"].
+ */
+export function parseTagAll(text: string, tag: string): string[] {
+  const marker = `[${tag}]`;
+  const results: string[] = [];
+  let pos = 0;
+  while (true) {
+    const start = text.indexOf(marker, pos);
+    if (start === -1) break;
+    const contentStart = start + marker.length;
+    const rest = text.slice(contentStart);
+    // Content extends to next [TAG] on a new line, or end of text
+    const nextTag = rest.search(/\n\[[\w\s:]+\]/);
+    const content = (nextTag === -1 ? rest : rest.slice(0, nextTag)).trim();
+    if (content) results.push(content);
+    pos = contentStart + (nextTag === -1 ? rest.length : nextTag);
+  }
+  return results;
 }
 
 /** Split text into sections by `===` separator, trimmed and non-empty. */

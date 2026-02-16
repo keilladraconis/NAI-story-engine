@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771263485
+updatedAt: 1771270504
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -282,151 +282,113 @@ config:
       Weave these connections naturally into the entry to create a cohesive world.
   - name: crucible_intent_prompt
     prettyName: Crucible Intent Prompt
-    description: Prompt for distilling brainstorm into a derived intent framework
+    description: Prompt for distilling brainstorm into the Direction — the sole
+      creative anchor for all downstream crucible generation
     type: string
     multiline: true
     default: |-
-      [CRUCIBLE — DERIVE INTENT]
-      Analyze the brainstorm conversation and story state. Write a dense,
-      natural prose paragraph that captures the story's full creative
-      direction. Look beyond what was explicitly discussed — identify the
-      UNSTATED intent, the story's soul.
+      Distill everything above into a single dense Direction — the SOLE
+      creative reference for all downstream generation. Goals, scenes,
+      and world elements will be built from this text alone, with no
+      access to the brainstorm or story state. It must be self-contained.
 
-      Your paragraph must weave together ALL of these elements into
-      connected prose — not as separate sections, but as a living whole:
-      - Characters: names, physical descriptions, personality, relationships,
-        the tensions between them
-      - World: setting, atmosphere, sensory details, what makes this place
-        distinct and alive
-      - Tone: genre sensibility, emotional register, the feeling the story
-        should evoke
-      - Core tension: the irreducible dramatic opposition that drives everything
-      - Narrative momentum: the direction the story wants to move (not an
-        ending — a trajectory)
+      Write connected natural prose that weaves together: the characters
+      (names, appearances, personalities, the tensions between them),
+      the world (setting, atmosphere, what makes it distinct), the tone
+      (genre sensibility, emotional register), the core dramatic
+      opposition that drives everything, and the trajectory the story
+      wants to follow — not an ending, a direction.
 
-      Suggest a story architecture that fits naturally:
-      hero's journey, pressure cooker, spiral descent, slice of life,
-      character study, powder keg, web of obligations, three-sphere,
-      frontier, intimate power — or invent one. Name it and explain
-      briefly how it applies.
+      Name a story architecture that fits (pressure cooker, powder keg,
+      web of obligations, three-sphere, frontier, intimate power, spiral
+      descent, character study — or invent one) and explain briefly how
+      it applies.
 
-      End with a single [TAGS] line: 3-8 short labels capturing genre,
-      tone, motifs, or thematic markers.
+      End with a single [TAGS] line: 3-8 short labels for genre, tone,
+      motifs, or thematic markers.
 
-      Write ONLY natural prose. No structured tags, no bullet points,
-      no section headers — except the final [TAGS] line.
+      No structured tags, no bullet points, no section headers — except
+      the final [TAGS] line. Dense prose only.
   - name: crucible_goals_prompt
     prettyName: Crucible Goals Prompt
-    description: Prompt for generating a single story goal with terminal condition
+    description: Prompt for generating a single story goal with starting constraints
     type: string
     multiline: true
     default: |-
-      [CRUCIBLE — GOAL GENERATION]
-      Using the DERIVED INTENT provided above, generate ONE Goal scenario
-      that pushes the core tension toward a dramatic possible conclusion.
-
-      The intent gives you the story's soul — find a cataclysmic endpoint
-      that would test it to destruction. This goal should approach the core
-      tension from a unique angle, ensuring the world elements generated
-      serve a distinct trajectory — anti-destination, not predestination.
-
-      This goal will anchor a backward-chaining world generation pass.
-
-      RULES:
-      - Goals are CATACLYSMIC ENDPOINTS, not mundane tasks.
-      - WRONG: "Finds a better apartment." RIGHT: "Destroys the housing cartel
-        that enslaved an entire city district."
-      - The goal must be specific, visceral, and irreversible.
-      - If a goal could appear on a to-do list, it is TOO BORING. Escalate.
-      - The goal must align with the narrative direction and tags from the intent.
-
-      The TERMINAL CONDITION is the concrete, observable story state when
-      the goal is achieved. It must be decomposable — the backward chainer
-      needs something specific to work backward from.
+      Generate ONE goal — a dramatic endpoint the story could arrive at.
+      The goal must be concrete enough to decompose into scenes.
       GOOD: "The colony ship arrives but the crew discovers it's already inhabited"
-      BAD: "Everything changes" (too vague to decompose)
+      BAD: "Everything changes" (too vague — no scene anchors on this)
 
-      Output using this tagged format (no +++ separators):
-      [GOAL] One-line goal statement
-      [STAKES] What's at risk if this goal fails
-      [THEME] The thematic question this goal explores
-      [EMOTIONAL ARC] What the reader should feel at resolution
-      [TERMINAL CONDITION] Concrete observable story state at achievement
+      Follow the Direction above. Each goal should approach the core
+      tension from a distinct angle, so multiple goals produce different
+      world elements.
+
+      Include 2-4 open constraints — things that must be true for this
+      goal to happen but aren't established yet.
+
+      Output format:
+      [GOAL] The endpoint — 1-2 sentences, concrete and vivid
+      [OPEN] constraint; another constraint; a third constraint
   - name: crucible_chain_prompt
     prettyName: Crucible Chain Prompt
     description: Prompt for backward-chaining beat generation (lean solver)
     type: string
     multiline: true
     default: |-
-      [CRUCIBLE — BACKWARD CHAINING]
-      You are working BACKWARDS from a story's climax toward its opening.
-      You are given established beats and a list of OPEN CONSTRAINTS —
-      things that must be true but haven't been established yet.
+      Design the NEXT beat backward — the latest-possible scene that
+      addresses open constraints. Stay close to the goal before stepping
+      further back. Every beat needs tension or revelation — not exposition.
 
-      Each open constraint has a short ID like [X0], [X1], [X2].
-
-      Design the NEXT beat backward — the LATEST-POSSIBLE scene that
-      establishes one or more open constraints.
+      CONSTRAINT DISCIPLINE (MANDATORY — violations are errors):
+      - Beat 1: IS the terminal scene. Open 1-3 preconditions. Resolve NOTHING.
+      - Beats 2-3: Open preconditions. Resolve at most 1 if it flows naturally.
+      - Beats 4-7: Resolve ≤2 per beat. Open ≤1.
+      - After beat 7: Resolve all remaining. Open NOTHING.
 
       RULES:
-      - [SCENE] is REQUIRED. All other tags are OPTIONAL — only include
-        tags that are genuinely relevant to this beat. Omit the rest.
-      - Early beats may ONLY open new constraints — resolving comes later
-        when there are open constraints to resolve
-      - Use [ID:Xn] to reference constraints in [RESOLVED] and [GROUND]
-      - New constraints in [OPEN] get no [ID] — the system assigns one
-      - Preconditions needing no prior setup → mark as GROUND STATE
-      - Do NOT resolve or reference constraints that don't exist yet
-      - "Latest-possible" — stay close to the goal before stepping further back
-      - Every beat must contain conflict, tension, or revelation — never pure exposition
-      - If this is the FIRST beat, its scene IS the terminal condition itself
-
-      CONVERGENCE:
-      - Aim for 6-10 beats total. Chains >10 are overlong.
-      - After 4 beats: resolve ≥2 constraints per beat, open ≤1
-      - After 7 beats: resolve ALL remaining constraints, do NOT open new ones
-      - The final beat(s) should be the OPENER — the story's chronological beginning
+      - [SCENE] is REQUIRED. Constraint tags only when relevant.
+      - ONE constraint per line. Never pack multiple constraints into one tag.
+      - [OPEN] must be NEW preconditions not already in OPEN CONSTRAINTS.
+      - Use [ID:Xn] in [RESOLVED]. For constraints needing no setup, add "ground":
+        [RESOLVED] [ID:X1] ground
+      - Never resolve or reference constraints that don't exist yet.
+      - Aim for 6-10 beats. Final beat(s) = story's chronological opening.
 
       TERMINATE when all constraints are resolved or ground state.
 
-      Output format — [SCENE] is required, include others only when relevant:
-      [SCENE] What happens — 1-2 sentences, dense and vivid
-      [CONFLICT] (optional) ≤1 sentence — what's at stake
-      [LOCATION] (optional) ≤1 sentence — where, and why it matters
-      [RESOLVED] (optional) [ID:X0] resolved; [ID:X2] resolved — only if open constraints exist
-      [OPEN] (optional) new precondition; another — things that must be true earlier
-      [GROUND] (optional) [ID:X1] assumed as given — only for existing constraints
+      Output — one tag per line, [SCENE] required, others as needed:
+      [SCENE] What happens — 1-2 vivid sentences
+      [RESOLVED] [ID:X0] how/why this is now established
+      [RESOLVED] [ID:X1] ground
+      [OPEN] one new precondition
+      [OPEN] another new precondition
   - name: crucible_build_prompt
     prettyName: Crucible Builder Prompt
-    description: Prompt for interleaved builder — reviews beats, emits DULFS nodes
+    description: Prompt for interleaved builder — reviews beats, emits world element nodes
     type: string
     multiline: true
     default: |-
-      [CRUCIBLE — BUILDER]
-      You are reviewing backward-chaining beats and extracting world elements
-      for the story's DULFS (Dramatis Personae, Universe Systems, Locations,
-      Factions, Situational Dynamics).
-
-      Each existing element has a short ID like [C0], [L1], [S0].
+      Review the new beats and extract world elements — characters,
+      locations, factions, systems, or situations that are narratively
+      necessary. Existing elements have short IDs like [C0], [L1], [S0].
 
       RULES:
-      - For each NEW beat, identify characters, locations, factions, systems,
-        or situations that are narratively necessary
-      - To UPDATE an existing element (name or description changed by new beats),
-        re-emit the element tag with [ID:xx] and updated content
-      - To reference without changes, use [LINK] with [ID:xx]
-      - For genuinely NEW elements, omit [ID] — the system assigns one
-      - Keep descriptions minimal — 1-2 sentences of narrative purpose
-      - When done reviewing all beats, emit [SOLVER] to resume chaining
+      - NEW element: emit tag + name, then [DESCRIPTION]. No [ID] — system assigns one.
+      - UPDATE element: emit tag + name, then [ID:xx] alone on its own line,
+        then [DESCRIPTION] with revised content. NEVER put text after [ID:xx].
+      - REFERENCE without changes: use [LINK] with [ID:xx].
+      - Descriptions: 1-2 sentences of narrative purpose. No lorebook detail.
+      - When done, emit [SOLVER] to resume chaining.
 
-      Output elements separated by +++ using this tagged format:
+      STRICT FORMAT — each tag on its own line, no text after [ID]:
       +++
       [CHARACTER] Name
-      [DESCRIPTION] Role and narrative purpose — 1-2 sentences
+      [DESCRIPTION] Role and narrative purpose
       +++
       [CHARACTER] Revised Name
       [ID:C0]
-      [DESCRIPTION] Updated role after new beats — 1-2 sentences
+      [DESCRIPTION] Updated role after new beats
       +++
       [LINK] Existing Name
       [ID:L0]

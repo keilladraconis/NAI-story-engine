@@ -10,26 +10,10 @@ import {
   GenerationStrategy,
   CrucibleChain,
   CrucibleGoal,
-  Constraint,
 } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
-import { buildStoryEnginePrefix } from "./context-builder";
+import { buildCruciblePrefix } from "./context-builder";
 import { parseTag } from "./tag-parser";
-
-// --- Constraint Short IDs ---
-
-/**
- * Compute stable short IDs for constraints.
- * Assigns X0, X1, X2... in array order.
- * Returns Map<constraintId, shortId>.
- */
-export function computeConstraintShortIds(constraints: Constraint[]): Map<string, string> {
-  const result = new Map<string, string>();
-  for (let i = 0; i < constraints.length; i++) {
-    result.set(constraints[i].id, `X${i}`);
-  }
-  return result;
-}
 
 // --- Chain Context Formatter ---
 
@@ -37,59 +21,48 @@ export function computeConstraintShortIds(constraints: Constraint[]): Map<string
  * Format chain context for the backward-chaining prompt.
  * Shows goal text, beats (newest-first), and open/resolved constraints with short IDs.
  */
-/** Number of most-recent beats that keep full tagged text in context. */
-const FULL_BEAT_WINDOW = 3;
-
 /**
  * Format pacing signal based on beat count and open constraints.
  * Guides the solver toward convergence as the chain grows.
  */
 function formatPacingSignal(beatCount: number, openCount: number): string {
-  if (beatCount <= 3) return "";
-  if (beatCount <= 6) {
-    return `\nPACING: Converge — resolve ≥2 constraints per beat, open ≤1. ${openCount} constraints remain open.`;
-  }
-  if (beatCount <= 8) {
-    return `\nPACING: Close out — resolve all remaining constraints. No new constraints. Target the OPENER. ${openCount} constraints remain.`;
-  }
-  return `\nPACING: OVERDUE — close all ${openCount} remaining constraints NOW. No new constraints. This is the final beat.`;
+  if (beatCount === 0)
+    return "\nPACING: FIRST BEAT — this IS the terminal scene. Open NEW preconditions only (not already listed above). Do NOT resolve anything.";
+  if (beatCount <= 3)
+    return `\nPACING: EARLY — open NEW preconditions. Resolve at most 1. ${openCount} open.`;
+  if (beatCount <= 6)
+    return `\nPACING: CONVERGE — resolve ≤2, open ≤1 NEW. ${openCount} remain.`;
+  if (beatCount <= 8)
+    return `\nPACING: CLOSE OUT — resolve all remaining. No new constraints. ${openCount} remain.`;
+  return `\nPACING: OVERDUE — final beat. Close all ${openCount} constraints NOW.`;
 }
 
 function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal): string {
   const sections: string[] = [];
 
-  // Goal — include full tagged text, mark if favorited
-  sections.push(goal.selected ? "ACTIVE GOAL (★ FAVORITED — prioritize this goal's themes):" : "ACTIVE GOAL:");
-  sections.push(goal.text);
+  // Goal — show [GOAL] text only, strip [OPEN] to avoid duplication
+  // (seed constraints are tracked in OPEN CONSTRAINTS below)
+  const goalText = parseTag(goal.text, "GOAL") || goal.text.split("\n")[0];
+  sections.push(goal.selected ? "ACTIVE GOAL (★ starred):" : "ACTIVE GOAL:");
+  sections.push(goalText);
 
-  // Beats (newest-first — closest to goal first)
-  // Only the last FULL_BEAT_WINDOW beats get full tagged text;
-  // older beats are compressed to their [SCENE] one-liner.
+  // Beats (newest-first — SCENE only)
+  // Constraint state lives in the dedicated OPEN/RESOLVED sections below.
+  // Showing constraint tags inside beats causes GLM to confuse ID formats.
   if (chain.beats.length > 0) {
     sections.push("\nESTABLISHED BEATS (newest-first, closest to goal first):");
     for (let i = chain.beats.length - 1; i >= 0; i--) {
-      const beat = chain.beats[i];
-      const beatNum = i + 1;
-      const isRecent = i >= chain.beats.length - FULL_BEAT_WINDOW;
-      if (isRecent) {
-        sections.push(`  Beat ${beatNum}:`);
-        for (const line of beat.text.split("\n")) {
-          sections.push(`    ${line}`);
-        }
-      } else {
-        const scene = parseTag(beat.text, "SCENE") || beat.text.split("\n")[0];
-        sections.push(`  Beat ${beatNum}: ${scene}`);
-      }
+      const scene = parseTag(chain.beats[i].text, "SCENE") || chain.beats[i].text.split("\n")[0];
+      sections.push(`  Beat ${i + 1}: ${scene}`);
     }
   }
 
-  // Open constraints with short IDs
+  // Open constraints with stable short IDs
   if (chain.openConstraints.length > 0) {
-    const shortIds = computeConstraintShortIds(chain.openConstraints);
-    sections.push("\nOPEN CONSTRAINTS (reference by [ID:Xn] when resolving or grounding):");
+    sections.push("\nOPEN CONSTRAINTS (already tracked — do NOT re-emit these in [OPEN]):");
     for (const c of chain.openConstraints) {
-      const sid = shortIds.get(c.id) || "X?";
-      sections.push(`  [${sid}] ${c.description} (from Beat ${c.sourceBeatIndex + 1})`);
+      const source = c.sourceBeatIndex === 0 && chain.beats.length === 0 ? "seed" : `Beat ${c.sourceBeatIndex + 1}`;
+      sections.push(`  [${c.shortId}] ${c.description} (${source})`);
     }
   }
 
@@ -122,7 +95,10 @@ export const createCrucibleIntentFactory = (
       (await api.v1.config.get("crucible_intent_prompt")) || "",
     );
 
-    const prefix = await buildStoryEnginePrefix(getState);
+    const prefix = await buildCruciblePrefix(getState, {
+      includeBrainstorm: true,
+      includeStoryState: true,
+    });
 
     const messages: Message[] = [
       ...prefix,
@@ -159,18 +135,11 @@ export const createCrucibleGoalFactory = (
       (await api.v1.config.get("crucible_goals_prompt")) || "",
     );
 
-    const prefix = state.crucible.intent
-      ? await buildStoryEnginePrefix(getState, { excludeSections: ["brainstorm"] })
-      : await buildStoryEnginePrefix(getState);
+    const prefix = await buildCruciblePrefix(getState, {
+      includeDirection: true,
+    });
 
     const messages: Message[] = [...prefix];
-
-    if (state.crucible.intent) {
-      messages.push({
-        role: "system",
-        content: `DERIVED INTENT (user-reviewed):\n${state.crucible.intent}`,
-      });
-    }
 
     const existingGoals = state.crucible.goals.filter(
       (g) => g.id !== goalId && g.text.trim(),
@@ -226,7 +195,10 @@ export const createCrucibleChainFactory = (
     );
 
     const context = formatChainContext(chain, goal);
-    const prefix = await buildStoryEnginePrefix(getState);
+    const prefix = await buildCruciblePrefix(getState, {
+      includeDirection: true,
+      includeDulfs: true,
+    });
 
     const messages: Message[] = [
       ...prefix,

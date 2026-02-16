@@ -17,10 +17,9 @@ import {
 import { IDS } from "../../../../ui/framework/ids";
 import {
   parseTag,
-  parseTagList,
+  parseTagAll,
   formatTagsWithEmoji,
 } from "../../../utils/tag-parser";
-import { computeConstraintShortIds } from "../../../utils/crucible-strategy";
 
 // --- Append-only stream transcript (module-level, not Redux) ---
 
@@ -124,46 +123,59 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
         return;
       }
 
-      // Build reverse map: shortId → constraint for ID-based resolution
-      const shortIds = computeConstraintShortIds(chain.openConstraints);
+      // Build reverse map: shortId → constraint (direct from constraint.shortId)
       const shortIdToConstraint = new Map<string, Constraint>();
       for (const c of chain.openConstraints) {
-        const sid = shortIds.get(c.id);
-        if (sid) shortIdToConstraint.set(sid.toUpperCase(), c);
+        shortIdToConstraint.set(c.shortId.toUpperCase(), c);
       }
 
-      /** Resolve a semicolon-separated item to its canonical description.
-       *  If [ID:Xn] is present, use the constraint's real description.
-       *  Otherwise fall back to the raw text. */
-      const resolveItem = (item: string): string => {
-        const idMatch = item.match(/\[ID:(\w+)\]/);
+      /** Extract shortId from an item string.
+       *  Matches [ID:Xn] (canonical) or bare [Xn] (common GLM mistake).
+       *  Returns the shortId if found and it maps to a known constraint, else null. */
+      const resolveShortId = (item: string): string | null => {
+        const idMatch = item.match(/\[ID:(X\d+)\]/i) || item.match(/\[(X\d+)\]/i);
         if (idMatch) {
-          const matched = shortIdToConstraint.get(idMatch[1].toUpperCase());
-          if (matched) return matched.description;
+          const key = idMatch[1].toUpperCase();
+          if (shortIdToConstraint.has(key)) return key;
         }
-        // Strip any [ID:...] artifact and use raw text as fallback
-        return item.replace(/\[ID:\w+\]\s*/g, "").trim();
+        return null;
       };
 
-      const rawResolved = parseTagList(text, "RESOLVED");
-      const rawOpen = parseTagList(text, "OPEN");
-      const rawGround = parseTagList(text, "GROUND");
+      // Parse one-per-line tagged constraints
+      const rawResolved = parseTagAll(text, "RESOLVED");
+      const rawOpen = parseTagAll(text, "OPEN");
 
-      const constraintsResolved = rawResolved.map(resolveItem).filter((s) => s.length > 0);
-      const newOpenConstraints = rawOpen.map((s) => s.replace(/\[ID:\w+\]\s*/g, "").trim()).filter((s) => s.length > 0);
-      const groundStateConstraints = rawGround.map(resolveItem).filter((s) => s.length > 0);
+      // Resolved: extract shortIds. Items marked "ground" go to groundState.
+      const constraintsResolved: string[] = [];
+      const groundStateConstraints: string[] = [];
+      for (const item of rawResolved) {
+        const sid = resolveShortId(item);
+        if (!sid) continue;
+        if (/\bground\b/i.test(item)) {
+          groundStateConstraints.push(sid);
+        } else {
+          constraintsResolved.push(sid);
+        }
+      }
+
+      // Open: strip any stray IDs, keep description text
+      const newOpenConstraints = rawOpen
+        .map((s) => s.replace(/\[ID:\w+\]\s*/g, "").replace(/\[X\d+\]\s*/gi, "").trim())
+        .filter((s) => s.length > 0);
 
       const beat: CrucibleBeat = {
         text,
-        constraintsResolved,
-        newOpenConstraints,
-        groundStateConstraints,
+        constraintsResolved,       // shortIds
+        newOpenConstraints,         // description strings (new constraints don't have IDs yet)
+        groundStateConstraints,     // shortIds
       };
 
       const beatIndex = chain.beats.length;
 
+      // opened constraints: shortId will be assigned by the reducer
       const opened: Constraint[] = newOpenConstraints.map((desc) => ({
         id: api.v1.uuid(),
+        shortId: "", // placeholder — reducer assigns monotonic shortId
         description: desc,
         sourceBeatIndex: beatIndex,
         status: "open" as const,
@@ -173,9 +185,9 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
         goalId,
         beat,
         constraints: {
-          resolved: constraintsResolved,
+          resolved: constraintsResolved,   // shortIds
           opened,
-          grounded: groundStateConstraints,
+          grounded: groundStateConstraints, // shortIds
         },
       }));
 

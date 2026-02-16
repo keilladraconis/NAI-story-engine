@@ -84,7 +84,7 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
     const { part: editable } = ctx.render(EditableText, {
       id: ids.TEXT,
       storageKey: `cr-goal-${goalId}`,
-      placeholder: "[GOAL] ...\n[STAKES] ...\n[THEME] ...",
+      placeholder: "[GOAL] ...\n[OPEN] ...",
       onSave: (content: string) =>
         dispatch(goalTextUpdated({ goalId, text: content })),
       extraControls: [genBtn, delBtn],

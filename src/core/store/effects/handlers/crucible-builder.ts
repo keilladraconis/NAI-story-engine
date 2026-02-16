@@ -56,6 +56,7 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
 
     try {
       const text = stripThinkingTags(ctx.accumulatedText).trim();
+      api.v1.log("[crucible-builder] Raw output:\n" + text.slice(0, 1500));
       const builder = state.crucible.builder;
 
       // Build reverse map: shortId → node
@@ -78,8 +79,17 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
         const shortId = idMatch ? idMatch[1].toUpperCase() : null;
         const idNode = shortId ? shortIdToNode.get(shortId) : null;
 
-        // Extract [DESCRIPTION] content
-        const description = parseTag(section, "DESCRIPTION") || "";
+        // Extract [DESCRIPTION] content.
+        // Fallback: if model put text directly after [ID:xx] without [DESCRIPTION],
+        // extract that text as the description (e.g. "[ID:C1]: A 4'6 coyote").
+        let description = parseTag(section, "DESCRIPTION") || "";
+        if (!description && idMatch) {
+          const afterId = section.slice((idMatch.index || 0) + idMatch[0].length);
+          const fallback = afterId.replace(/^[\s:]+/, "").split("\n")[0].trim();
+          if (fallback && !fallback.startsWith("[")) description = fallback;
+        }
+        // Strip any residual [ID:xx] artifacts from description
+        description = description.replace(/\[ID:\w+\]\s*:?\s*/g, "").trim();
 
         // Check for [LINK] — reference to existing element
         const linkName = parseTag(section, "LINK");
@@ -107,6 +117,8 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
           if (!name) continue;
 
           const fieldId = TAG_TO_FIELD[tag];
+          const mode = idNode ? "update" : "new";
+          api.v1.log(`[crucible-builder] ${mode} [${tag}] name="${name}" desc="${description.slice(0, 80)}" id=${shortId || "none"}`);
 
           // ID-based revision: model re-emitted tag with [ID:xx]
           if (idNode) {

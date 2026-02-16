@@ -8,6 +8,7 @@ import {
   Constraint,
 } from "../types";
 import { DulfsFieldID } from "../../../config/field-definitions";
+import { parseTagList } from "../../utils/tag-parser";
 
 const EMPTY_BUILDER: CrucibleBuilderState = {
   nodes: [],
@@ -78,12 +79,25 @@ export const crucibleSlice = createSlice({
       if (state.chains[payload.goalId]) {
         return { ...state, activeGoalId: payload.goalId };
       }
+
+      // Seed open constraints from the goal's [OPEN] tag if present
+      const goal = state.goals.find((g) => g.id === payload.goalId);
+      const seedDescs = goal ? parseTagList(goal.text, "OPEN") : [];
+      const seedConstraints: Constraint[] = seedDescs.map((desc, i) => ({
+        id: `seed-${payload.goalId}-${desc.slice(0, 20)}`,
+        shortId: `X${i}`,
+        description: desc,
+        sourceBeatIndex: 0,
+        status: "open" as const,
+      }));
+
       const chain: CrucibleChain = {
         goalId: payload.goalId,
         beats: [],
-        openConstraints: [],
+        openConstraints: seedConstraints,
         resolvedConstraints: [],
         complete: false,
+        nextConstraintIndex: seedDescs.length,
       };
       return {
         ...state,
@@ -98,36 +112,34 @@ export const crucibleSlice = createSlice({
         goalId: string;
         beat: CrucibleBeat;
         constraints: {
-          resolved: string[];
+          resolved: string[]; // shortIds (e.g. "X0", "X3")
           opened: Constraint[];
-          grounded: string[];
+          grounded: string[]; // shortIds
         };
       },
     ) => {
       const chain = state.chains[payload.goalId];
       if (!chain) return state;
 
-      // Mark resolved constraints
+      // Match by shortId instead of description
       const resolvedSet = new Set(payload.constraints.resolved);
       const groundedSet = new Set(payload.constraints.grounded);
       const updatedOpen = chain.openConstraints
         .map((c) => {
-          if (resolvedSet.has(c.description)) return { ...c, status: "resolved" as const };
-          if (groundedSet.has(c.description)) return { ...c, status: "groundState" as const };
+          if (resolvedSet.has(c.shortId)) return { ...c, status: "resolved" as const };
+          if (groundedSet.has(c.shortId)) return { ...c, status: "groundState" as const };
           return c;
         });
 
       const nowResolved = updatedOpen.filter((c) => c.status !== "open");
       const stillOpen = updatedOpen.filter((c) => c.status === "open");
 
-      // Add genuinely new constraints — dedup against existing open + just-resolved/grounded
-      const knownDescriptions = new Set([
-        ...stillOpen.map((c) => c.description),
-        ...nowResolved.map((c) => c.description),
-      ]);
-      const genuinelyNew = payload.constraints.opened.filter(
-        (c) => !knownDescriptions.has(c.description),
-      );
+      // Assign monotonic shortIds to new constraints
+      let nextIdx = chain.nextConstraintIndex;
+      const genuinelyNew = payload.constraints.opened.map((c) => ({
+        ...c,
+        shortId: `X${nextIdx++}`,
+      }));
       const allOpen = [...stillOpen, ...genuinelyNew];
 
       const updatedChain: CrucibleChain = {
@@ -135,6 +147,7 @@ export const crucibleSlice = createSlice({
         beats: [...chain.beats, payload.beat],
         openConstraints: allOpen,
         resolvedConstraints: [...chain.resolvedConstraints, ...nowResolved],
+        nextConstraintIndex: nextIdx,
       };
 
       return {
@@ -155,13 +168,14 @@ export const crucibleSlice = createSlice({
         (c) => c.sourceBeatIndex !== beatIndex,
       );
 
-      // Restore constraints that were resolved by this beat back to open
+      // Restore constraints that were resolved by this beat back to open (match by shortId)
       const resolvedByBeat = new Set(lastBeat.constraintsResolved);
+      const groundedByBeat = new Set(lastBeat.groundStateConstraints);
       const restored = chain.resolvedConstraints.filter(
-        (c) => resolvedByBeat.has(c.description),
+        (c) => resolvedByBeat.has(c.shortId) || groundedByBeat.has(c.shortId),
       ).map((c) => ({ ...c, status: "open" as const }));
       const remainingResolved = chain.resolvedConstraints.filter(
-        (c) => !resolvedByBeat.has(c.description),
+        (c) => !resolvedByBeat.has(c.shortId) && !groundedByBeat.has(c.shortId),
       );
 
       const updatedChain: CrucibleChain = {
@@ -246,6 +260,7 @@ export const crucibleSlice = createSlice({
       // Seed new chain with the beat's open constraints
       const newConstraints: Constraint[] = beat.newOpenConstraints.map((desc, i) => ({
         id: `${payload.newGoalId}-c${i}`,
+        shortId: `X${i}`,
         description: desc,
         sourceBeatIndex: -1,
         status: "open" as const,
@@ -257,6 +272,7 @@ export const crucibleSlice = createSlice({
         openConstraints: newConstraints,
         resolvedConstraints: [],
         complete: false,
+        nextConstraintIndex: newConstraints.length,
       };
 
       return {
@@ -272,16 +288,22 @@ export const crucibleSlice = createSlice({
 
       const keptBeats = chain.beats.slice(0, payload.fromIndex);
 
-      // Rebuild open constraints from the last kept beat's newOpenConstraints
-      // (or empty if no beats remain)
-      const lastBeat = keptBeats[keptBeats.length - 1];
-      const openDescs = lastBeat ? lastBeat.newOpenConstraints : [];
-      const openConstraints: Constraint[] = openDescs.map((desc, i) => ({
-        id: `${payload.goalId}-c${i}`,
-        description: desc,
-        sourceBeatIndex: keptBeats.length - 1,
-        status: "open" as const,
-      }));
+      // Keep only constraints whose sourceBeatIndex is within surviving beats (or seed = 0)
+      // and that are still open (not resolved by a surviving beat)
+      const survivingOpen = chain.openConstraints.filter(
+        (c) => c.sourceBeatIndex < payload.fromIndex,
+      );
+      const survivingResolved = chain.resolvedConstraints.filter(
+        (c) => c.sourceBeatIndex < payload.fromIndex,
+      );
+
+      // Recompute nextConstraintIndex as max existing shortId index + 1
+      const allSurviving = [...survivingOpen, ...survivingResolved];
+      let maxIdx = -1;
+      for (const c of allSurviving) {
+        const m = c.shortId.match(/^X(\d+)$/);
+        if (m) maxIdx = Math.max(maxIdx, parseInt(m[1], 10));
+      }
 
       return {
         ...state,
@@ -290,8 +312,10 @@ export const crucibleSlice = createSlice({
           [payload.goalId]: {
             ...chain,
             beats: keptBeats,
-            openConstraints,
+            openConstraints: survivingOpen,
+            resolvedConstraints: survivingResolved,
             complete: false,
+            nextConstraintIndex: maxIdx + 1,
           },
         },
       };
@@ -457,9 +481,19 @@ export const crucibleSlice = createSlice({
     crucibleLoaded: (_state, payload: { crucible: CrucibleState }) => {
       const loaded = payload.crucible;
 
-      // Strip dead fields from chains/beats
+      // Strip dead fields from chains/beats + backfill shortIds for saved data
       const chains: Record<string, CrucibleChain> = {};
       for (const [goalId, chain] of Object.entries(loaded.chains)) {
+        // Backfill shortId on constraints that lack it (migration from pre-shortId data)
+        let nextIdx = (chain as { nextConstraintIndex?: number }).nextConstraintIndex ?? 0;
+        const backfillShortId = (c: Constraint): Constraint => {
+          if (c.shortId) return c;
+          return { ...c, shortId: `X${nextIdx++}` };
+        };
+
+        const openConstraints = chain.openConstraints.map(backfillShortId);
+        const resolvedConstraints = chain.resolvedConstraints.map(backfillShortId);
+
         chains[goalId] = {
           goalId: chain.goalId,
           beats: chain.beats.map((b) => ({
@@ -470,9 +504,10 @@ export const crucibleSlice = createSlice({
             ...(b.tainted ? { tainted: true } : {}),
             ...(b.favorited ? { favorited: true } : {}),
           })),
-          openConstraints: chain.openConstraints,
-          resolvedConstraints: chain.resolvedConstraints,
+          openConstraints,
+          resolvedConstraints,
           complete: chain.complete,
+          nextConstraintIndex: nextIdx,
         };
       }
 

@@ -163,6 +163,7 @@ export type ConstraintStatus = "open" | "resolved" | "groundState";
 
 export interface Constraint {
   id: string;
+  shortId: string; // Monotonic "X0", "X1", etc. — never renumbered
   description: string;
   sourceBeatIndex: number;
   status: ConstraintStatus;
@@ -174,6 +175,7 @@ export interface CrucibleChain {
   openConstraints: Constraint[];
   resolvedConstraints: Constraint[];
   complete: boolean;
+  nextConstraintIndex: number; // Monotonic counter for shortId assignment
 }
 
 export interface CrucibleNodeLink {

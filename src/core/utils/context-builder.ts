@@ -354,6 +354,91 @@ export const buildStoryEnginePrefix = async (
   return messages;
 };
 
+// --- Crucible Prefix ---
+
+/**
+ * Options for buildCruciblePrefix — isolated context for all Crucible factories.
+ * Crucible uses its own system identity and only includes what each factory needs.
+ */
+export interface CruciblePrefixOptions {
+  /** Include brainstorm history (for intent derivation) */
+  includeBrainstorm?: boolean;
+  /** Include the crucible direction/intent text */
+  includeDirection?: boolean;
+  /** Include DULFS items (for chain, builder) */
+  includeDulfs?: boolean;
+  /** Include Setting + Canon if available (for intent derivation) */
+  includeStoryState?: boolean;
+}
+
+/**
+ * Builds a focused message prefix for Crucible generation strategies.
+ * Unlike buildStoryEnginePrefix, this uses a hardcoded structural identity
+ * and only includes context relevant to the specific Crucible phase.
+ *
+ * NO lorebook weaving. NO story text. NO ATTG. NO Style.
+ */
+export const buildCruciblePrefix = async (
+  getState: () => RootState,
+  options: CruciblePrefixOptions = {},
+): Promise<Message[]> => {
+  const state = getState();
+
+  // --- MSG 1: Crucible system identity (hardcoded, not configurable) ---
+  const messages: Message[] = [
+    {
+      role: "system",
+      content:
+        "You are a story structure architect working within the Crucible system — " +
+        "a backward-chaining world generator. Your outputs are structural: scenes, " +
+        "constraints, and world elements. Precision and constraint discipline " +
+        "matter more than prose style.",
+    },
+  ];
+
+  // --- MSG 2 (optional): Creative grounding ---
+  const groundingSections: string[] = [];
+
+  if (options.includeDirection && state.crucible.intent) {
+    groundingSections.push(`[DIRECTION]\n${state.crucible.intent}`);
+  }
+
+  if (options.includeStoryState) {
+    const setting = String(
+      (await api.v1.storyStorage.get("kse-setting")) || "",
+    );
+    if (setting) groundingSections.push(`[SETTING]\n${setting}`);
+
+    const canon = getFieldContent(state, FieldID.Canon);
+    if (canon) groundingSections.push(`[CANON]\n${canon}`);
+  }
+
+  if (options.includeBrainstorm) {
+    const brainstorm = getConsolidatedBrainstorm(state);
+    if (brainstorm) groundingSections.push(`[BRAINSTORM]\n${brainstorm}`);
+  }
+
+  if (groundingSections.length > 0) {
+    messages.push({
+      role: "system",
+      content: groundingSections.join("\n\n"),
+    });
+  }
+
+  // --- MSG 3 (optional): DULFS items ---
+  if (options.includeDulfs) {
+    const dulfsContext = await getAllDulfsContext(state);
+    if (dulfsContext) {
+      messages.push({
+        role: "system",
+        content: `[WORLD ENTRIES]\n${dulfsContext}`,
+      });
+    }
+  }
+
+  return messages;
+};
+
 // --- Strategy Factories ---
 
 /**
