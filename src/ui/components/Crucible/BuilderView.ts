@@ -1,7 +1,8 @@
 import { defineComponent } from "nai-act";
 import { RootState, CrucibleNodeLink } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
-import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
+import { FieldID, DulfsFieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
+import { ListItem, contentMinHeight, inputStyle } from "../Fields/ListItem";
 import {
   NAI_HEADER,
 } from "../../colors";
@@ -48,32 +49,61 @@ export const BuilderView = defineComponent<undefined, RootState>({
       "border-top": "1px solid rgba(255,255,255,0.08)",
       margin: "4px 0",
     },
-    nodeCard: {
-      padding: "4px 8px",
-      "border-radius": "3px",
-      "background-color": "rgba(255,255,255,0.03)",
-      "border-left": "2px solid rgba(129,212,250,0.4)",
-      gap: "2px",
-    },
-    nodeName: {
-      "font-size": "0.85em",
-      "font-weight": "bold",
-    },
   },
 
   build(_props, ctx) {
     const { useSelector } = ctx;
 
+    // Cache rendered ListItem components by itemId
+    const itemCache = new Map<string, { part: UIPart; unmount: () => void }>();
+
+    const ensureItem = (node: CrucibleNodeLink): UIPart => {
+      if (!itemCache.has(node.itemId)) {
+        const config = FIELD_CONFIGS.find((c) => c.id === node.fieldId);
+        if (!config) return text({ text: node.name });
+        const rendered = ctx.render(ListItem, {
+          config,
+          item: { id: node.itemId, fieldId: node.fieldId },
+        });
+        itemCache.set(node.itemId, rendered);
+      }
+      return itemCache.get(node.itemId)!.part;
+    };
+
+    /** Resize textareas to match their content after a re-render. */
+    const resizeItems = async (nodes: CrucibleNodeLink[]): Promise<void> => {
+      for (const node of nodes) {
+        const content = String(
+          (await api.v1.storyStorage.get(`dulfs-item-${node.itemId}`)) || "",
+        );
+        if (content) {
+          const inputId = `content-input-${node.itemId}`;
+          api.v1.ui.updateParts([
+            { id: inputId, style: inputStyle(contentMinHeight(content)) },
+          ]);
+        }
+      }
+    };
+
     useSelector(
       (s) => ({
         nodes: s.crucible.builder.nodes,
       }),
-      (slice) => {
+      async (slice) => {
         if (slice.nodes.length === 0) {
           api.v1.ui.updateParts([
             { id: CR.BUILDER_ROOT, style: this.style?.("hidden") },
           ]);
           return;
+        }
+
+        // Clean up removed items
+        const currentIds = new Set(slice.nodes.map((n) => n.itemId));
+        for (const [id, cached] of itemCache) {
+          if (!currentIds.has(id)) {
+            cached.unmount();
+            itemCache.delete(id);
+          }
         }
 
         const groups = groupByField(slice.nodes);
@@ -89,20 +119,15 @@ export const BuilderView = defineComponent<undefined, RootState>({
           );
 
           for (const node of nodes) {
-            sectionParts.push(
-              column({
-                style: this.style?.("nodeCard"),
-                content: [
-                  text({ text: node.name, style: this.style?.("nodeName") }),
-                ],
-              }),
-            );
+            sectionParts.push(ensureItem(node));
           }
         }
 
         api.v1.ui.updateParts([
           { id: CR.BUILDER_ROOT, style: this.style?.("root"), content: sectionParts },
         ]);
+
+        await resizeItems(slice.nodes);
       },
     );
 

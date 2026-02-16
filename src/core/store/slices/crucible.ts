@@ -120,8 +120,15 @@ export const crucibleSlice = createSlice({
       const nowResolved = updatedOpen.filter((c) => c.status !== "open");
       const stillOpen = updatedOpen.filter((c) => c.status === "open");
 
-      // Add newly opened constraints
-      const allOpen = [...stillOpen, ...payload.constraints.opened];
+      // Add genuinely new constraints — dedup against existing open + just-resolved/grounded
+      const knownDescriptions = new Set([
+        ...stillOpen.map((c) => c.description),
+        ...nowResolved.map((c) => c.description),
+      ]);
+      const genuinelyNew = payload.constraints.opened.filter(
+        (c) => !knownDescriptions.has(c.description),
+      );
+      const allOpen = [...stillOpen, ...genuinelyNew];
 
       const updatedChain: CrucibleChain = {
         ...chain,
@@ -404,6 +411,16 @@ export const crucibleSlice = createSlice({
       };
     },
 
+    builderNodeRemoved: (state, payload: { itemId: string }) => {
+      return {
+        ...state,
+        builder: {
+          ...state.builder,
+          nodes: state.builder.nodes.filter((n) => n.itemId !== payload.itemId),
+        },
+      };
+    },
+
     builderDeactivated: (state) => {
       return { ...state, builderActive: false };
     },
@@ -480,6 +497,7 @@ export const {
   crucibleBuildRequested,
   builderNodeAdded,
   builderBeatProcessed,
+  builderNodeRemoved,
   builderDeactivated,
   crucibleReset,
   crucibleLoaded,
