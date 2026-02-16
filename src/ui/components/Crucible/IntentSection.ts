@@ -5,7 +5,7 @@ import { IDS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
 import { EditableText } from "../EditableText";
 
-const { text, row, column } = api.v1.ui.part;
+const { row, column } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
@@ -19,16 +19,6 @@ export const IntentSection = defineComponent<undefined, RootState>({
   id: () => CR.INTENT_SECTION,
 
   styles: {
-    headerRow: {
-      "justify-content": "space-between",
-      "align-items": "center",
-      gap: "6px",
-    },
-    sectionTitle: {
-      "font-size": "0.85em",
-      "font-weight": "bold",
-      opacity: "0.9",
-    },
     divider: {
       "border-top": "1px solid rgba(255,255,255,0.08)",
       margin: "4px 0",
@@ -61,6 +51,8 @@ export const IntentSection = defineComponent<undefined, RootState>({
       id: CR.INTENT_TEXT,
       storageKey: "cr-intent",
       placeholder: "The story explores... [TAGS] tag1, tag2, tag3",
+      label: "Direction",
+      extraControls: [intentBtnPart],
     });
 
     // Intent display — seed storyStorage for EditableText
@@ -94,13 +86,6 @@ export const IntentSection = defineComponent<undefined, RootState>({
       style: { gap: "4px" },
       content: [
         row({ style: this.style?.("divider"), content: [] }),
-        row({
-          style: { ...this.style?.("headerRow"), gap: "6px" },
-          content: [
-            text({ text: "**Direction**", style: this.style?.("sectionTitle"), markdown: true }),
-            intentBtnPart,
-          ],
-        }),
         intentEditablePart,
       ],
     });

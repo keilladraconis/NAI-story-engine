@@ -17,7 +17,7 @@ import {
   NAI_DARK_BACKGROUND,
 } from "../../colors";
 
-const { text, row, column, button } = api.v1.ui.part;
+const { text, row, column, button, collapsibleSection } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
@@ -58,12 +58,21 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       "font-size": "0.8em",
       color: NAI_WARNING,
     },
+    starHint: {
+      "font-size": "0.8em",
+      opacity: "0.6",
+    },
     hidden: { display: "none" },
   },
 
   build(_props, ctx) {
     const { dispatch, useSelector } = ctx;
     const state = ctx.getState();
+    const { phase, goals } = state.crucible;
+    const preChaining = phase === "idle" || phase === "goals";
+    const hasGoals = goals.length > 0;
+    const hasSelectedGoals = goals.some((g) => g.selected);
+    const isGenerating = state.runtime.activeRequest !== null;
 
     const { part: goalsBtnPart } = ctx.render(GenerationButton, {
       id: CR.GOALS_BTN,
@@ -96,8 +105,22 @@ export const GoalsSection = defineComponent<undefined, RootState>({
     // Cache rendered GoalCard parts per goal
     const goalEditables = new Map<string, UIPart>();
 
-    const rebuildGoalsList = (goals: typeof state.crucible.goals): void => {
-      if (goals.length === 0) {
+    // Build initial GoalCards from current state
+    for (const goal of goals) {
+      const { part } = ctx.render(GoalCard, {
+        goalId: goal.id,
+        selected: goal.selected,
+      });
+      goalEditables.set(goal.id, part);
+      if (goal.text) {
+        api.v1.storyStorage.set(`cr-goal-${goal.id}`, goal.text);
+      }
+    }
+
+    const initialGoalParts = goals.map((g) => goalEditables.get(g.id)!);
+
+    const rebuildGoalsList = (currentGoals: typeof state.crucible.goals): void => {
+      if (currentGoals.length === 0) {
         goalEditables.clear();
         api.v1.ui.updateParts([
           { id: CR.GOALS_LIST, style: this.style?.("hidden") },
@@ -106,11 +129,11 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       }
 
       // Render GoalCard for new goals, clean up removed ones
-      const currentIds = new Set(goals.map((g) => g.id));
+      const currentIds = new Set(currentGoals.map((g) => g.id));
       for (const [id] of goalEditables) {
         if (!currentIds.has(id)) goalEditables.delete(id);
       }
-      for (const goal of goals) {
+      for (const goal of currentGoals) {
         if (!goalEditables.has(goal.id)) {
           const { part } = ctx.render(GoalCard, {
             goalId: goal.id,
@@ -121,21 +144,21 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       }
 
       // Seed storyStorage
-      for (const goal of goals) {
+      for (const goal of currentGoals) {
         if (goal.text) {
           api.v1.storyStorage.set(`cr-goal-${goal.id}`, goal.text);
         }
       }
 
       // Build and replace content tree
-      const goalParts = goals.map((goal) => goalEditables.get(goal.id)!);
+      const goalParts = currentGoals.map((goal) => goalEditables.get(goal.id)!);
 
       api.v1.ui.updateParts([
         { id: CR.GOALS_LIST, style: { display: "flex" }, content: goalParts },
       ]);
 
       // Update view text
-      const viewUpdates = goals.map((goal) => {
+      const viewUpdates = currentGoals.map((goal) => {
         const viewId = `${CR.goal(goal.id).TEXT}-view`;
         if (goal.text) {
           const display = formatTagsWithEmoji(goal.text)
@@ -153,6 +176,16 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       () => rebuildGoalsList(ctx.getState().crucible.goals),
     );
 
+    // Auto-collapse goals when entering chaining/building
+    useSelector(
+      (s) => s.crucible.phase,
+      (p) => {
+        if (p === "chaining" || p === "building") {
+          api.v1.storyStorage.set("cr-goals-collapsed", "true");
+        }
+      },
+    );
+
     // Goal controls + confirm button + star hint visibility by phase
     useSelector(
       (s) => ({
@@ -162,50 +195,48 @@ export const GoalsSection = defineComponent<undefined, RootState>({
         isGenerating: s.runtime.activeRequest !== null,
       }),
       (slice) => {
-        const preChaining = slice.phase === "idle" || slice.phase === "goals";
+        const pre = slice.phase === "idle" || slice.phase === "goals";
         const canAct = !slice.isGenerating;
 
         api.v1.ui.updateParts([
           {
             id: "cr-goal-controls",
-            style: preChaining ? { display: "flex" } : { display: "none" },
+            style: this.style?.("headerRow", !pre && "hidden"),
           },
           {
             id: "cr-confirm-goals-btn",
-            style: slice.phase === "goals" && slice.hasSelectedGoals && canAct
-              ? this.style?.("btnPrimary")
-              : this.style?.("hidden"),
+            style: this.style?.("btnPrimary",
+              !(slice.phase === "goals" && slice.hasSelectedGoals && canAct) && "hidden"),
           },
           {
             id: "cr-star-hint",
-            style: slice.hasGoals && !slice.hasSelectedGoals
-              ? { display: "block" }
-              : { display: "none" },
+            style: this.style?.("starHint",
+              !(slice.hasGoals && !slice.hasSelectedGoals) && "hidden"),
           },
         ]);
       },
     );
 
-    return column({
+    return collapsibleSection({
       id: "cr-goals-section",
-      style: { gap: "4px" },
+      title: "Goals",
+      storageKey: "story:cr-goals-collapsed",
+      style: { overflow: "visible" },
       content: [
-        row({ style: this.style?.("divider"), content: [] }),
         row({
           id: "cr-goal-controls",
-          style: { ...this.style?.("headerRow"), gap: "6px" },
+          style: this.style?.("headerRow", !preChaining && "hidden"),
           content: [
-            text({ text: "**Goals**", style: this.style?.("sectionTitle"), markdown: true }),
             goalsBtnPart,
             clearGoalsPart,
           ],
         }),
         column({
           id: CR.GOALS_LIST,
-          style: state.crucible.goals.length > 0
+          style: hasGoals
             ? this.style?.("section")
             : this.style?.("hidden"),
-          content: [],
+          content: initialGoalParts,
         }),
         button({
           id: CR.ADD_GOAL_BTN,
@@ -221,12 +252,12 @@ export const GoalsSection = defineComponent<undefined, RootState>({
           id: "cr-star-hint",
           text: "_Star the goals you want to build from._",
           markdown: true,
-          style: { display: "none", "font-size": "0.8em", opacity: "0.6" },
+          style: this.style?.("starHint", !(hasGoals && !hasSelectedGoals) && "hidden"),
         }),
         button({
           id: "cr-confirm-goals-btn",
           text: "Build World",
-          style: state.crucible.phase === "goals"
+          style: phase === "goals" && hasSelectedGoals && !isGenerating
             ? this.style?.("btnPrimary")
             : this.style?.("hidden"),
           callback: () => dispatch(goalsConfirmed()),

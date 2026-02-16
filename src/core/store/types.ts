@@ -157,6 +157,8 @@ export interface CrucibleBeat {
   constraintsResolved: string[];
   newOpenConstraints: string[];
   groundStateConstraints: string[];
+  tainted?: boolean;
+  favorited?: boolean;
 }
 
 export type ConstraintStatus = "open" | "resolved" | "groundState";

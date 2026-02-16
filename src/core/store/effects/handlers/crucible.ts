@@ -146,6 +146,13 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
         },
       }));
 
+      // Seed BeatCard storyStorage + populate view
+      api.v1.storyStorage.set(`cr-beat-${goalId}-${beatIndex}`, text);
+      const beatViewId = `${IDS.CRUCIBLE.beat(goalId, beatIndex).TEXT}-view`;
+      const beatDisplay = formatTagsWithEmoji(text)
+        .replace(/\n/g, "  \n").replace(/</g, "\\<");
+      api.v1.ui.updateParts([{ id: beatViewId, text: beatDisplay }]);
+
       // --- Checkpoint detection ---
       const updatedState = ctx.getState();
       const updatedChain = updatedState.crucible.chains[goalId];

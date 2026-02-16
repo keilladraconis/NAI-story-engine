@@ -7,6 +7,7 @@ import {
   CrucibleBuilderState,
   Constraint,
   CruciblePhase,
+
 } from "../types";
 import { DulfsFieldID } from "../../../config/field-definitions";
 
@@ -177,7 +178,7 @@ export const crucibleSlice = createSlice({
       if (!chain) return state;
 
       const updatedBeats = chain.beats.map((b, i) =>
-        i === payload.beatIndex ? payload.beat : b,
+        i === payload.beatIndex ? { ...payload.beat, tainted: true } : b,
       );
 
       return {
@@ -186,6 +187,77 @@ export const crucibleSlice = createSlice({
           ...state.chains,
           [payload.goalId]: { ...chain, beats: updatedBeats },
         },
+      };
+    },
+
+    beatTainted: (state, payload: { goalId: string; beatIndex: number }) => {
+      const chain = state.chains[payload.goalId];
+      if (!chain) return state;
+
+      const updatedBeats = chain.beats.map((b, i) =>
+        i === payload.beatIndex ? { ...b, tainted: true } : b,
+      );
+
+      return {
+        ...state,
+        chains: {
+          ...state.chains,
+          [payload.goalId]: { ...chain, beats: updatedBeats },
+        },
+      };
+    },
+
+    beatFavorited: (state, payload: { goalId: string; beatIndex: number }) => {
+      const chain = state.chains[payload.goalId];
+      if (!chain) return state;
+
+      const updatedBeats = chain.beats.map((b, i) =>
+        i === payload.beatIndex ? { ...b, favorited: !b.favorited } : b,
+      );
+
+      return {
+        ...state,
+        chains: {
+          ...state.chains,
+          [payload.goalId]: { ...chain, beats: updatedBeats },
+        },
+      };
+    },
+
+    beatForked: (state, payload: { goalId: string; beatIndex: number; newGoalId: string }) => {
+      const chain = state.chains[payload.goalId];
+      if (!chain) return state;
+
+      const beat = chain.beats[payload.beatIndex];
+      if (!beat) return state;
+
+      const sceneText = beat.text;
+      const newGoal: CrucibleGoal = {
+        id: payload.newGoalId,
+        text: sceneText,
+        selected: true,
+      };
+
+      // Seed new chain with the beat's open constraints
+      const newConstraints: Constraint[] = beat.newOpenConstraints.map((desc, i) => ({
+        id: `${payload.newGoalId}-c${i}`,
+        description: desc,
+        sourceBeatIndex: -1,
+        status: "open" as const,
+      }));
+
+      const newChain: CrucibleChain = {
+        goalId: payload.newGoalId,
+        beats: [],
+        openConstraints: newConstraints,
+        resolvedConstraints: [],
+        complete: false,
+      };
+
+      return {
+        ...state,
+        goals: [...state.goals, newGoal],
+        chains: { ...state.chains, [payload.newGoalId]: newChain },
       };
     },
 
@@ -326,6 +398,8 @@ export const crucibleSlice = createSlice({
             constraintsResolved: b.constraintsResolved,
             newOpenConstraints: b.newOpenConstraints,
             groundStateConstraints: b.groundStateConstraints,
+            ...(b.tainted ? { tainted: true } : {}),
+            ...(b.favorited ? { favorited: true } : {}),
           })),
           openConstraints: chain.openConstraints,
           resolvedConstraints: chain.resolvedConstraints,
@@ -364,6 +438,9 @@ export const {
   beatAdded,
   beatRejected,
   beatEdited,
+  beatTainted,
+  beatFavorited,
+  beatForked,
   constraintMarkedGroundState,
   chainCompleted,
   activeGoalAdvanced,

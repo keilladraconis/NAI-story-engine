@@ -23,6 +23,10 @@ export interface EditableTextProps {
   placeholder?: string;
   /** Called after save with the new content string. */
   onSave?: (content: string) => void;
+  /** Additional buttons placed in the header row alongside Edit/Save. */
+  extraControls?: UIPart[];
+  /** Optional bold title at the left of the header row. */
+  label?: string;
 }
 
 export const EditableText = defineComponent<EditableTextProps, RootState>({
@@ -50,8 +54,21 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
       "font-size": "0.85em",
       display: "none",
     },
-    btnRow: {
+    headerRow: {
+      "justify-content": "flex-end",
+      "align-items": "center",
       gap: "4px",
+    },
+    headerRowWithLabel: {
+      "justify-content": "space-between",
+      "align-items": "center",
+      gap: "4px",
+    },
+    label: {
+      "font-size": "0.85em",
+      "font-weight": "bold",
+      opacity: "0.9",
+      flex: "1",
     },
     btn: {
       padding: "3px 8px",
@@ -66,7 +83,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
 
   build(props, ctx) {
     const { dispatch, useSelector } = ctx;
-    const { id, storageKey, placeholder, onSave } = props;
+    const { id, storageKey, placeholder, onSave, extraControls, label } = props;
 
     const viewId = `${id}-view`;
     const editId = `${id}-edit`;
@@ -81,18 +98,17 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
       return `${Math.min(lines * 18, 400)}px`;
     };
 
-    // Begin edit: seed storyStorage from current view text
+    // Begin edit: dispatch immediately, then async height estimation
     const beginEdit = async (): Promise<void> => {
+      dispatch(uiFieldEditBegin({ id }));
       const currentText = String(
         (await api.v1.storyStorage.get(storageKey)) || "",
       );
       await api.v1.storyStorage.set(storageKey, currentText);
-      // Estimate height from content
       const height = estimateHeight(currentText);
       api.v1.ui.updateParts([
         { id: editId, style: { ...this.style?.("edit"), "min-height": height } },
       ]);
-      dispatch(uiFieldEditBegin({ id }));
     };
 
     // Save: read storyStorage, update view
@@ -120,10 +136,41 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
       },
     );
 
+    const headerContent: UIPart[] = [];
+
+    if (label) {
+      headerContent.push(
+        text({ text: `**${label}**`, style: this.style?.("label"), markdown: true }),
+      );
+    }
+
+    headerContent.push(
+      button({
+        id: editBtnId,
+        text: "Edit",
+        style: this.style?.("btn"),
+        callback: beginEdit,
+      }),
+      button({
+        id: saveBtnId,
+        text: "Save",
+        style: this.style?.("btnHidden"),
+        callback: save,
+      }),
+    );
+
+    if (extraControls) {
+      headerContent.push(...extraControls);
+    }
+
     return column({
       id,
       style: { gap: "4px" },
       content: [
+        row({
+          style: label ? this.style?.("headerRowWithLabel") : this.style?.("headerRow"),
+          content: headerContent,
+        }),
         text({
           id: viewId,
           text: "_No content._",
@@ -136,23 +183,6 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
           placeholder: placeholder || "Edit...",
           storageKey: `story:${storageKey}`,
           style: this.style?.("editHidden"),
-        }),
-        row({
-          style: this.style?.("btnRow"),
-          content: [
-            button({
-              id: editBtnId,
-              text: "Edit",
-              style: this.style?.("btn"),
-              callback: beginEdit,
-            }),
-            button({
-              id: saveBtnId,
-              text: "Save",
-              style: this.style?.("btnHidden"),
-              callback: save,
-            }),
-          ],
         }),
       ],
     });
