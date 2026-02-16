@@ -153,10 +153,11 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       () => rebuildGoalsList(ctx.getState().crucible.goals),
     );
 
-    // Goal controls + confirm button visibility by phase
+    // Goal controls + confirm button + star hint visibility by phase
     useSelector(
       (s) => ({
         phase: s.crucible.phase,
+        hasGoals: s.crucible.goals.length > 0,
         hasSelectedGoals: s.crucible.goals.some((g) => g.selected),
         isGenerating: s.runtime.activeRequest !== null,
       }),
@@ -174,6 +175,12 @@ export const GoalsSection = defineComponent<undefined, RootState>({
             style: slice.phase === "goals" && slice.hasSelectedGoals && canAct
               ? this.style?.("btnPrimary")
               : this.style?.("hidden"),
+          },
+          {
+            id: "cr-star-hint",
+            style: slice.hasGoals && !slice.hasSelectedGoals
+              ? { display: "block" }
+              : { display: "none" },
           },
         ]);
       },
@@ -206,13 +213,19 @@ export const GoalsSection = defineComponent<undefined, RootState>({
           style: this.style?.("btn"),
           callback: () => {
             dispatch(goalAdded({
-              goal: { id: api.v1.uuid(), text: "[GOAL] New goal\n[STAKES] \n[THEME] \n[EMOTIONAL ARC] \n[TERMINAL CONDITION] ", selected: true },
+              goal: { id: api.v1.uuid(), text: "[GOAL] New goal\n[STAKES] \n[THEME] \n[EMOTIONAL ARC] \n[TERMINAL CONDITION] ", selected: false },
             }));
           },
         }),
+        text({
+          id: "cr-star-hint",
+          text: "_Star the goals you want to build from._",
+          markdown: true,
+          style: { display: "none", "font-size": "0.8em", opacity: "0.6" },
+        }),
         button({
           id: "cr-confirm-goals-btn",
-          text: "Confirm Goals & Start Chaining",
+          text: "Build World",
           style: state.crucible.phase === "goals"
             ? this.style?.("btnPrimary")
             : this.style?.("hidden"),

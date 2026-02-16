@@ -97,7 +97,7 @@ export const IntentSection = defineComponent<undefined, RootState>({
         row({
           style: { ...this.style?.("headerRow"), gap: "6px" },
           content: [
-            text({ text: "**Intent**", style: this.style?.("sectionTitle"), markdown: true }),
+            text({ text: "**Direction**", style: this.style?.("sectionTitle"), markdown: true }),
             intentBtnPart,
           ],
         }),

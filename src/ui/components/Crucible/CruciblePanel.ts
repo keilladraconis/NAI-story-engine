@@ -4,7 +4,7 @@ import { IDS } from "../../framework/ids";
 import { CrucibleHeader } from "./CrucibleHeader";
 import { IntentSection } from "./IntentSection";
 import { GoalsSection } from "./GoalsSection";
-import { SolverView } from "./SolverView";
+import { WorldBuildingView } from "./WorldBuildingView";
 import { BuilderView } from "./BuilderView";
 
 const { column } = api.v1.ui.part;
@@ -18,7 +18,7 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
     const { part: headerPart } = ctx.render(CrucibleHeader, undefined);
     const { part: intentPart } = ctx.render(IntentSection, undefined);
     const { part: goalsPart } = ctx.render(GoalsSection, undefined);
-    const { part: solverPart } = ctx.render(SolverView, undefined);
+    const { part: worldBuildingPart } = ctx.render(WorldBuildingView, undefined);
     const { part: builderPart } = ctx.render(BuilderView, undefined);
 
     return column({
@@ -29,7 +29,7 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
         column({
           id: CR.SOLVER_BODY,
           style: { flex: "1", overflow: "auto", gap: "8px", padding: "0 10px 10px" },
-          content: [intentPart, goalsPart, solverPart, builderPart],
+          content: [intentPart, goalsPart, worldBuildingPart, builderPart],
         }),
       ],
     });

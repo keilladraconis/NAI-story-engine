@@ -21,6 +21,15 @@ import {
   formatTagsWithEmoji,
 } from "../../../utils/tag-parser";
 
+// --- Append-only stream transcript (module-level, not Redux) ---
+
+let _streamTranscript = "";
+export function getStreamTranscript(): string { return _streamTranscript; }
+export function appendToTranscript(chunk: string): void {
+  _streamTranscript += (_streamTranscript ? "\n\n---\n\n" : "") + chunk;
+}
+export function resetStreamTranscript(): void { _streamTranscript = ""; }
+
 /** Strip thinking-tag breakout artifacts from generated text. */
 function stripThinkingTags(text: string): string {
   return text.replace(/<\/?think>/g, "").replace(/<think>[\s\S]*$/g, "");
@@ -81,12 +90,18 @@ export const crucibleGoalHandler: GenerationHandlers<CrucibleGoalTarget> = {
 
 export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
   streaming(ctx: StreamingContext<CrucibleChainTarget>): void {
-    const display = formatTagsWithEmoji(stripThinkingTags(ctx.accumulatedText));
+    const liveChunk = formatTagsWithEmoji(stripThinkingTags(ctx.accumulatedText));
+    const prefix = _streamTranscript;
+    const display = prefix ? prefix + "\n\n---\n\n" + liveChunk : liveChunk;
     api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.STREAM_TEXT, text: display }]);
   },
 
   async completion(ctx: CompletionContext<CrucibleChainTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
+
+    // Append completed chunk to persistent transcript
+    const cleanText = formatTagsWithEmoji(stripThinkingTags(ctx.accumulatedText).trim());
+    if (cleanText) appendToTranscript(cleanText);
 
     const { goalId } = ctx.target;
     const state = ctx.getState();
@@ -143,13 +158,13 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
           (b) => b.newOpenConstraints.length - b.constraintsResolved.length > 2,
         ).length;
         if (explosionCount >= 3) {
-          ctx.dispatch(checkpointSet({ reason: "Constraint explosion — open constraints growing faster than resolving" }));
+          ctx.dispatch(checkpointSet({ reason: "The story is getting complex. Review and continue, or step back." }));
         }
       }
 
       // Beat count threshold
       if (updatedChain.beats.length >= 15) {
-        ctx.dispatch(checkpointSet({ reason: "Chain reached 15 beats — consider consolidating" }));
+        ctx.dispatch(checkpointSet({ reason: "This goal has developed extensively. Continue or step back." }));
       }
 
       // Chain completion: all open constraints resolved

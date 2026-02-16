@@ -38,6 +38,7 @@ import {
   crucibleStopRequested,
   crucibleIntentRequested,
   crucibleBuildRequested,
+  crucibleReset,
   solverYielded,
   intentSet,
   goalAdded,
@@ -71,6 +72,7 @@ import {
   buildCrucibleChainStrategy,
 } from "../utils/crucible-strategy";
 import { buildCrucibleBuildStrategy } from "../utils/crucible-builder-strategy";
+import { resetStreamTranscript } from "./effects/handlers/crucible";
 import { IDS } from "../../ui/framework/ids";
 import {
   DulfsFieldID,
@@ -817,7 +819,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       // Create 3 empty goals and queue generation for each
       for (let i = 0; i < 3; i++) {
         const goalId = api.v1.uuid();
-        dispatch(goalAdded({ goal: { id: goalId, text: "", selected: true } }));
+        dispatch(goalAdded({ goal: { id: goalId, text: "", selected: false } }));
 
         const strategy = buildCrucibleGoalStrategy(getState, goalId);
         dispatch(
@@ -836,6 +838,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   subscribeEffect(
     matchesAction(goalsConfirmed),
     (_action, { dispatch, getState: getLatest }) => {
+      resetStreamTranscript();
       const state = getLatest();
       const selectedGoals = state.crucible.goals.filter((g) => g.selected);
       if (selectedGoals.length === 0) {
@@ -891,6 +894,12 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         genX.cancelAll();
       }
     },
+  );
+
+  // Intent: Crucible Reset → clear stream transcript
+  subscribeEffect(
+    matchesAction(crucibleReset),
+    () => { resetStreamTranscript(); },
   );
 
   // Intent: Crucible Build Requested → queue builder generation

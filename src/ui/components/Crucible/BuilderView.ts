@@ -4,7 +4,6 @@ import { IDS } from "../../framework/ids";
 import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
 import {
   NAI_HEADER,
-  STATUS_COMPLETE,
 } from "../../colors";
 
 const { text, row, column } = api.v1.ui.part;
@@ -60,13 +59,6 @@ export const BuilderView = defineComponent<undefined, RootState>({
       "font-size": "0.85em",
       "font-weight": "bold",
     },
-    beatBadge: {
-      "font-size": "0.65em",
-      padding: "1px 4px",
-      "border-radius": "8px",
-      "background-color": "rgba(255,255,255,0.08)",
-      color: STATUS_COMPLETE,
-    },
   },
 
   build(_props, ctx) {
@@ -98,24 +90,11 @@ export const BuilderView = defineComponent<undefined, RootState>({
           );
 
           for (const node of nodes) {
-            const badges = node.beatIndices.map((bi) =>
-              text({
-                text: `B${bi + 1}`,
-                style: this.style?.("beatBadge"),
-              }),
-            );
-
             sectionParts.push(
               column({
                 style: this.style?.("nodeCard"),
                 content: [
-                  row({
-                    style: { gap: "4px", "align-items": "center" },
-                    content: [
-                      text({ text: node.name, style: this.style?.("nodeName") }),
-                      ...badges,
-                    ],
-                  }),
+                  text({ text: node.name, style: this.style?.("nodeName") }),
                 ],
               }),
             );

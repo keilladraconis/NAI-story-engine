@@ -16,6 +16,7 @@ import {
   formatTagsWithEmoji,
 } from "../../../utils/tag-parser";
 import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
+import { getStreamTranscript, appendToTranscript } from "./crucible";
 
 type CrucibleBuildTarget = { type: "crucibleBuild"; goalId: string };
 
@@ -37,12 +38,18 @@ function stripThinkingTags(text: string): string {
 
 export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
   streaming(ctx: StreamingContext<CrucibleBuildTarget>): void {
-    const display = formatTagsWithEmoji(stripThinkingTags(ctx.accumulatedText));
+    const liveChunk = formatTagsWithEmoji(stripThinkingTags(ctx.accumulatedText));
+    const prefix = getStreamTranscript();
+    const display = prefix ? prefix + "\n\n---\n\n" + liveChunk : liveChunk;
     api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.STREAM_TEXT, text: display }]);
   },
 
   async completion(ctx: CompletionContext<CrucibleBuildTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
+
+    // Append completed chunk to persistent transcript
+    const cleanText = formatTagsWithEmoji(stripThinkingTags(ctx.accumulatedText).trim());
+    if (cleanText) appendToTranscript(cleanText);
 
     const { goalId } = ctx.target;
     const state = ctx.getState();

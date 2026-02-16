@@ -79,7 +79,7 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
             button({
               id: ids.FAV_BTN,
               text: "",
-              iconId: "heart",
+              iconId: "star",
               style: selected ? FAV_STYLE : FAV_STYLE_OFF,
               callback: () => dispatch(goalToggled({ goalId })),
             }),

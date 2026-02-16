@@ -1,5 +1,5 @@
 import { defineComponent } from "nai-act";
-import { RootState, CruciblePhase } from "../../../core/store/types";
+import { RootState } from "../../../core/store/types";
 import {
   crucibleReset,
   crucibleStopRequested,
@@ -8,45 +8,33 @@ import {
 } from "../../../core/store/slices/crucible";
 import { IDS } from "../../framework/ids";
 import { BudgetFeedback } from "../BudgetFeedback";
-import { parseTag } from "../../../core/utils/tag-parser";
 import {
   NAI_HEADER,
   NAI_WARNING,
   NAI_DARK_BACKGROUND,
-  NAI_PARAGRAPH,
 } from "../../colors";
 
 const { text, row, column, button } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
-const PHASE_LABELS: Record<CruciblePhase, string> = {
-  idle: "Ready",
-  goals: "Goal Selection",
-  chaining: "Solver",
-  building: "Builder",
-};
-
 function computeStatusText(slice: {
-  phase: CruciblePhase;
+  phase: RootState["crucible"]["phase"];
   activeGoalId: string | null;
   goals: RootState["crucible"]["goals"];
   chains: RootState["crucible"]["chains"];
   autoChaining: boolean;
 }): string {
   if (slice.phase === "idle") {
-    return "Write or derive intent, then generate goals.";
+    return "Describe your story's direction, or let the AI derive it from your brainstorm.";
   } else if (slice.phase === "goals") {
-    const selected = slice.goals.filter((g) => g.selected).length;
-    return `${selected}/${slice.goals.length} goals selected.`;
-  } else if (slice.phase === "chaining") {
-    const goal = slice.goals.find((g) => g.id === slice.activeGoalId);
-    const chain = slice.activeGoalId ? slice.chains[slice.activeGoalId] : null;
-    const beats = chain?.beats.length || 0;
-    const open = chain?.openConstraints.length || 0;
-    const goalText = goal ? (parseTag(goal.text, "GOAL") || goal.text.slice(0, 40)) : "...";
-    const auto = slice.autoChaining ? " (auto)" : "";
-    return `Chaining: "${goalText.slice(0, 40)}" \u2014 ${beats} beats, ${open} open${auto}`;
+    return "Review the generated goals. Star the ones you want to explore.";
+  } else if (slice.phase === "chaining" || slice.phase === "building") {
+    const starredCount = slice.goals.filter((g) => g.selected).length;
+    if (slice.autoChaining) {
+      return `Building your world from ${starredCount} goal${starredCount !== 1 ? "s" : ""}...`;
+    }
+    return "World building paused.";
   }
   return "";
 }
@@ -64,13 +52,6 @@ export const CrucibleHeader = defineComponent<undefined, RootState>({
       "font-size": "1.1em",
       "font-weight": "bold",
       color: NAI_HEADER,
-    },
-    phaseTag: {
-      "font-size": "0.75em",
-      padding: "2px 8px",
-      "border-radius": "10px",
-      "background-color": "rgba(255,255,255,0.08)",
-      color: NAI_PARAGRAPH,
     },
     statusText: {
       "font-size": "0.8em",
@@ -112,16 +93,6 @@ export const CrucibleHeader = defineComponent<undefined, RootState>({
     const state = ctx.getState();
 
     const { part: budgetPart } = ctx.render(BudgetFeedback, { id: "cr-budget" });
-
-    // Phase display
-    useSelector(
-      (s) => s.crucible.phase,
-      (phase) => {
-        api.v1.ui.updateParts([
-          { id: CR.PHASE_TEXT, text: PHASE_LABELS[phase] || phase },
-        ]);
-      },
-    );
 
     // Status text
     useSelector(
@@ -177,11 +148,6 @@ export const CrucibleHeader = defineComponent<undefined, RootState>({
           style: this.style?.("headerRow"),
           content: [
             text({ text: "Crucible", style: this.style?.("title") }),
-            text({
-              id: CR.PHASE_TEXT,
-              text: PHASE_LABELS[state.crucible.phase],
-              style: this.style?.("phaseTag"),
-            }),
             button({
               id: CR.RESET_BTN,
               text: "Reset",
@@ -192,7 +158,7 @@ export const CrucibleHeader = defineComponent<undefined, RootState>({
         }),
         text({
           id: CR.STATUS_TEXT,
-          text: "Write or generate intent, then generate goals.",
+          text: "Describe your story's direction, or let the AI derive it from your brainstorm.",
           style: this.style?.("statusText"),
         }),
         budgetPart,
@@ -216,7 +182,7 @@ export const CrucibleHeader = defineComponent<undefined, RootState>({
                   callback: () => dispatch(checkpointCleared()),
                 }),
                 button({
-                  text: "Reject Beat",
+                  text: "Step Back",
                   style: this.style?.("btnDanger"),
                   callback: () => {
                     const s = ctx.getState();
