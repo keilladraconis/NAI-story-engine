@@ -1,13 +1,17 @@
 import { defineComponent } from "nai-act";
 import { RootState, CrucibleNodeLink } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
-import { FieldID, DulfsFieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
-import { ListItem, contentMinHeight, inputStyle } from "../Fields/ListItem";
+import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
+import {
+  builderNodeUpdated,
+  builderNodeRemoved,
+} from "../../../core/store/slices/crucible";
+import { EditableText } from "../EditableText";
 import {
   NAI_HEADER,
 } from "../../colors";
 
-const { text, row, column } = api.v1.ui.part;
+const { text, row, column, button } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
@@ -31,6 +35,31 @@ function groupByField(nodes: CrucibleNodeLink[]): Map<DulfsFieldID, CrucibleNode
   return groups;
 }
 
+/** Format node as "Name: content" for the editable text field. */
+function formatNodeText(node: CrucibleNodeLink): string {
+  return node.content ? `${node.name}: ${node.content}` : node.name;
+}
+
+/** Escape text for markdown view display. */
+function escapeViewText(raw: string): string {
+  return raw.replace(/\n/g, "  \n").replace(/</g, "\\<") || "_No content._";
+}
+
+/** Parse "Name: content" back into name and content parts. */
+function parseNodeText(raw: string): { name: string; content: string } {
+  const colonIdx = raw.indexOf(":");
+  if (colonIdx === -1) return { name: raw.trim(), content: "" };
+  return {
+    name: raw.slice(0, colonIdx).trim(),
+    content: raw.slice(colonIdx + 1).trim(),
+  };
+}
+
+/** Storage key for a node's editable text. */
+function nodeStorageKey(nodeId: string): string {
+  return `cr-node-${nodeId}`;
+}
+
 export const BuilderView = defineComponent<undefined, RootState>({
   id: () => CR.BUILDER_ROOT,
 
@@ -49,88 +78,136 @@ export const BuilderView = defineComponent<undefined, RootState>({
       "border-top": "1px solid rgba(255,255,255,0.08)",
       margin: "4px 0",
     },
+    nodeCard: {
+      padding: "4px 8px",
+      "border-radius": "3px",
+      "background-color": "rgba(255,255,255,0.03)",
+      "border-left": "2px solid rgba(129,212,250,0.4)",
+      gap: "2px",
+    },
+    deleteBtn: {
+      padding: "2px 6px",
+      "font-size": "0.7em",
+      opacity: "0.6",
+    },
   },
 
   build(_props, ctx) {
-    const { useSelector } = ctx;
+    const { dispatch, useSelector } = ctx;
 
-    // Cache rendered ListItem components by itemId
-    const itemCache = new Map<string, { part: UIPart; unmount: () => void }>();
+    // Mount-once cache: nodeId → full card UIPart (including EditableText)
+    const nodeCardCache = new Map<string, UIPart>();
 
-    const ensureItem = (node: CrucibleNodeLink): UIPart => {
-      if (!itemCache.has(node.itemId)) {
-        const config = FIELD_CONFIGS.find((c) => c.id === node.fieldId);
-        if (!config) return text({ text: node.name });
-        const rendered = ctx.render(ListItem, {
-          config,
-          item: { id: node.itemId, fieldId: node.fieldId },
+    /** Ensure a node card exists in the cache, mounting EditableText once.
+     *  Caller must seed storyStorage BEFORE calling this. */
+    const ensureNodeCard = (node: CrucibleNodeLink): UIPart => {
+      if (!nodeCardCache.has(node.id)) {
+        const storageKey = nodeStorageKey(node.id);
+
+        const { part: editable } = ctx.render(EditableText, {
+          id: `cr-node-${node.id}-text`,
+          storageKey,
+          placeholder: "Name: description...",
+          onSave: (raw: string) => {
+            const parsed = parseNodeText(raw);
+            dispatch(builderNodeUpdated({
+              id: node.id,
+              name: parsed.name,
+              content: parsed.content,
+            }));
+          },
+          label: node.name,
+          extraControls: [
+            button({
+              text: "Delete",
+              style: this.style?.("deleteBtn"),
+              callback: () => {
+                dispatch(builderNodeRemoved({ id: node.id }));
+                api.v1.storyStorage.set(storageKey, "");
+              },
+            }),
+          ],
         });
-        itemCache.set(node.itemId, rendered);
+
+        nodeCardCache.set(node.id, column({
+          id: `cr-node-card-${node.id}`,
+          style: this.style?.("nodeCard"),
+          content: [editable],
+        }));
       }
-      return itemCache.get(node.itemId)!.part;
+      return nodeCardCache.get(node.id)!;
     };
 
-    /** Resize textareas to match their content after a re-render. */
-    const resizeItems = async (nodes: CrucibleNodeLink[]): Promise<void> => {
-      for (const node of nodes) {
-        const content = String(
-          (await api.v1.storyStorage.get(`dulfs-item-${node.itemId}`)) || "",
+    /** Build the grouped section UIParts from current nodes. */
+    const buildSections = (nodes: CrucibleNodeLink[]): UIPart[] => {
+      const groups = groupByField(nodes);
+      const sectionParts: UIPart[] = [
+        row({ style: this.style?.("divider"), content: [] }),
+        text({ text: "World Elements", style: { ...this.style?.("sectionTitle"), color: NAI_HEADER } }),
+      ];
+
+      for (const [fieldId, fieldNodes] of groups) {
+        const label = FIELD_LABELS[fieldId] || fieldId;
+        sectionParts.push(
+          text({ text: label, style: this.style?.("sectionTitle") }),
         );
-        if (content) {
-          const inputId = `content-input-${node.itemId}`;
-          api.v1.ui.updateParts([
-            { id: inputId, style: inputStyle(contentMinHeight(content)) },
-          ]);
+        for (const node of fieldNodes) {
+          sectionParts.push(ensureNodeCard(node));
         }
       }
+      return sectionParts;
     };
 
     useSelector(
-      (s) => ({
-        nodes: s.crucible.builder.nodes,
-      }),
-      async (slice) => {
-        if (slice.nodes.length === 0) {
+      (s) => s.crucible.builder.nodes,
+      (nodes) => {
+        // Evict removed nodes from cache
+        const currentIds = new Set(nodes.map((n) => n.id));
+        for (const [id] of nodeCardCache) {
+          if (!currentIds.has(id)) {
+            nodeCardCache.delete(id);
+          }
+        }
+
+        if (nodes.length === 0) {
           api.v1.ui.updateParts([
-            { id: CR.BUILDER_ROOT, style: this.style?.("hidden") },
+            { id: CR.BUILDER_ROOT, style: this.style?.("hidden"), content: [] },
           ]);
           return;
         }
 
-        // Clean up removed items
-        const currentIds = new Set(slice.nodes.map((n) => n.itemId));
-        for (const [id, cached] of itemCache) {
-          if (!currentIds.has(id)) {
-            cached.unmount();
-            itemCache.delete(id);
-          }
+        // Seed storyStorage for all nodes BEFORE building sections
+        for (const node of nodes) {
+          api.v1.storyStorage.set(nodeStorageKey(node.id), formatNodeText(node));
         }
 
-        const groups = groupByField(slice.nodes);
-        const sectionParts: UIPart[] = [
-          row({ style: this.style?.("divider"), content: [] }),
-          text({ text: "World Elements", style: { ...this.style?.("sectionTitle"), color: NAI_HEADER } }),
-        ];
+        // Build section tree (ensureNodeCard mounts new EditableTexts once, reuses after)
+        const sectionParts = buildSections(nodes);
 
-        for (const [fieldId, nodes] of groups) {
-          const label = FIELD_LABELS[fieldId] || fieldId;
-          sectionParts.push(
-            text({ text: label, style: this.style?.("sectionTitle") }),
-          );
-
-          for (const node of nodes) {
-            sectionParts.push(ensureItem(node));
-          }
-        }
-
+        // Place tree — all view IDs now exist after this call
         api.v1.ui.updateParts([
           { id: CR.BUILDER_ROOT, style: this.style?.("root"), content: sectionParts },
         ]);
 
-        await resizeItems(slice.nodes);
+        // NOW update view text — view IDs are in the tree
+        for (const node of nodes) {
+          const viewText = escapeViewText(formatNodeText(node));
+          api.v1.ui.updateParts([
+            { id: `cr-node-${node.id}-text-view`, text: viewText },
+          ]);
+        }
+
+        // Update labels for existing nodes (name may have been revised by builder)
+        for (const node of nodes) {
+          api.v1.ui.updateParts([
+            { id: `cr-node-${node.id}-text-edit-btn`, text: "Edit" },
+          ]);
+        }
       },
     );
 
+    // Always start hidden — useSelector handles all rendering on state changes
+    // (crucibleLoaded / builderNodeAdded trigger the callback above)
     return column({
       id: CR.BUILDER_ROOT,
       style: this.style?.("hidden"),

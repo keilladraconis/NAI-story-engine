@@ -7,7 +7,6 @@ import {
   builderNodeAdded,
   builderBeatProcessed,
   builderDeactivated,
-  dulfsItemAdded,
 } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
 import {
@@ -17,6 +16,7 @@ import {
 } from "../../../utils/tag-parser";
 import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
 import { appendToTranscript, truncateToTail } from "./crucible";
+import { computeShortIds } from "../../../utils/crucible-builder-strategy";
 
 type CrucibleBuildTarget = { type: "crucibleBuild"; goalId: string };
 
@@ -58,6 +58,14 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
       const text = stripThinkingTags(ctx.accumulatedText).trim();
       const builder = state.crucible.builder;
 
+      // Build reverse map: shortId → node
+      const shortIds = computeShortIds(builder.nodes);
+      const shortIdToNode = new Map<string, typeof builder.nodes[0]>();
+      for (const node of builder.nodes) {
+        const sid = shortIds.get(node.id);
+        if (sid) shortIdToNode.set(sid.toUpperCase(), node);
+      }
+
       // Check for [SOLVER] yield signal
       const hasSolverYield = text.includes("[SOLVER]");
 
@@ -65,18 +73,26 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
       const sections = splitSections(text);
 
       for (const section of sections) {
+        // Extract [ID:xx] if present
+        const idMatch = section.match(/\[ID:(\w+)\]/);
+        const shortId = idMatch ? idMatch[1].toUpperCase() : null;
+        const idNode = shortId ? shortIdToNode.get(shortId) : null;
+
+        // Extract [DESCRIPTION] content
+        const description = parseTag(section, "DESCRIPTION") || "";
+
         // Check for [LINK] — reference to existing element
         const linkName = parseTag(section, "LINK");
         if (linkName) {
           const beatStr = parseTag(section, "BEAT");
           const beatIndex = beatStr ? parseInt(beatStr, 10) - 1 : chain.beats.length - 1;
-          // Find existing node and update beat indices
-          const existing = builder.nodes.find(
+          // Prefer ID-based match, fall back to name-based
+          const existing = idNode || builder.nodes.find(
             (n) => n.name.toLowerCase() === linkName.toLowerCase(),
           );
           if (existing) {
             ctx.dispatch(builderNodeAdded({
-              itemId: existing.itemId,
+              id: existing.id,
               fieldId: existing.fieldId,
               name: existing.name,
               beatIndex,
@@ -91,32 +107,41 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
           if (!name) continue;
 
           const fieldId = TAG_TO_FIELD[tag];
-          const description = parseTag(section, "DESCRIPTION") || "";
 
-          // Dedup: skip if name already exists
-          const existingNode = builder.nodes.find(
-            (n) => n.name.toLowerCase() === name.toLowerCase(),
-          );
-          if (existingNode) {
-            // Just link to existing
+          // ID-based revision: model re-emitted tag with [ID:xx]
+          if (idNode) {
             ctx.dispatch(builderNodeAdded({
-              itemId: existingNode.itemId,
-              fieldId: existingNode.fieldId,
-              name: existingNode.name,
+              id: idNode.id,
+              fieldId: idNode.fieldId,
+              name,
+              content: description || undefined,
               beatIndex: chain.beats.length - 1,
             }));
             break;
           }
 
-          // Create new DULFS item
-          const itemId = api.v1.uuid();
-          const content = description ? `${name}: ${description}` : name;
-          await api.v1.storyStorage.set(`dulfs-item-${itemId}`, content);
-          ctx.dispatch(dulfsItemAdded({ fieldId, item: { id: itemId, fieldId } }));
+          // Name-based dedup: match existing node
+          const existingNode = builder.nodes.find(
+            (n) => n.name.toLowerCase() === name.toLowerCase(),
+          );
+          if (existingNode) {
+            ctx.dispatch(builderNodeAdded({
+              id: existingNode.id,
+              fieldId: existingNode.fieldId,
+              name: existingNode.name,
+              content: description || undefined,
+              beatIndex: chain.beats.length - 1,
+            }));
+            break;
+          }
+
+          // Create new builder node
+          const nodeId = api.v1.uuid();
           ctx.dispatch(builderNodeAdded({
-            itemId,
+            id: nodeId,
             fieldId,
             name,
+            content: description,
             beatIndex: chain.beats.length - 1,
           }));
           break; // Only one element tag per section

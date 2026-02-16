@@ -11,13 +11,50 @@ import {
   CrucibleChain,
   CrucibleGoal,
   CrucibleBuilderState,
+  CrucibleNodeLink,
 } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "./context-builder";
 import { parseTag } from "./tag-parser";
+import { DulfsFieldID, FieldID } from "../../config/field-definitions";
+
+/** Short-ID prefix per DULFS field. */
+const FIELD_PREFIX: Record<DulfsFieldID, string> = {
+  [FieldID.DramatisPersonae]: "C",
+  [FieldID.UniverseSystems]: "U",
+  [FieldID.Locations]: "L",
+  [FieldID.Factions]: "F",
+  [FieldID.SituationalDynamics]: "S",
+};
 
 /**
- * Format builder context: goal + unprocessed beats + existing nodes for dedup.
+ * Compute stable short IDs for builder nodes.
+ * Assigns prefix+counter per fieldId in node-order: C0, C1, L0, etc.
+ * Returns Map<nodeId, shortId>.
+ */
+export function computeShortIds(nodes: CrucibleNodeLink[]): Map<string, string> {
+  const counters: Record<string, number> = {};
+  const result = new Map<string, string>();
+  for (const node of nodes) {
+    const prefix = FIELD_PREFIX[node.fieldId] || "X";
+    const idx = counters[prefix] || 0;
+    counters[prefix] = idx + 1;
+    result.set(node.id, `${prefix}${idx}`);
+  }
+  return result;
+}
+
+/** Display label for a DULFS fieldId. */
+const FIELD_LABEL: Record<DulfsFieldID, string> = {
+  [FieldID.DramatisPersonae]: "Character",
+  [FieldID.UniverseSystems]: "System",
+  [FieldID.Locations]: "Location",
+  [FieldID.Factions]: "Faction",
+  [FieldID.SituationalDynamics]: "Situation",
+};
+
+/**
+ * Format builder context: goal + unprocessed beats + existing nodes with short IDs.
  */
 function formatBuilderContext(
   chain: CrucibleChain,
@@ -47,11 +84,15 @@ function formatBuilderContext(
     }
   }
 
-  // Existing nodes for dedup
+  // Existing nodes with short IDs and content
   if (builder.nodes.length > 0) {
-    sections.push("\nEXISTING WORLD ELEMENTS (do NOT duplicate — use [LINK] to reference):");
+    const shortIds = computeShortIds(builder.nodes);
+    sections.push("\nEXISTING WORLD ELEMENTS (reference with [ID:xx], or re-emit tag + [ID:xx] to revise):");
     for (const node of builder.nodes) {
-      sections.push(`  - ${node.name} (${node.fieldId}) [beats: ${node.beatIndices.join(",")}]`);
+      const sid = shortIds.get(node.id) || "??";
+      const label = FIELD_LABEL[node.fieldId] || node.fieldId;
+      const desc = node.content ? `: ${node.content}` : "";
+      sections.push(`  [${sid}] ${node.name} (${label})${desc} [beats: ${node.beatIndices.join(",")}]`);
     }
   }
 

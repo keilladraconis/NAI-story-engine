@@ -3,7 +3,6 @@ import { RootState } from "../../../core/store/types";
 import {
   crucibleReset,
 } from "../../../core/store/slices/crucible";
-import { dulfsItemRemoved } from "../../../core/store/slices/story";
 import { IDS } from "../../framework/ids";
 import { BudgetFeedback } from "../BudgetFeedback";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
@@ -74,10 +73,6 @@ export const CrucibleHeader = defineComponent<undefined, RootState>({
       confirmLabel: "Clear?",
       buttonStyle: { padding: "4px 8px", opacity: 0.7 },
       onConfirm: () => {
-        const s = ctx.getState();
-        for (const node of s.crucible.builder.nodes) {
-          dispatch(dulfsItemRemoved({ fieldId: node.fieldId, itemId: node.itemId }));
-        }
         dispatch(crucibleReset());
       },
     });

@@ -10,16 +10,51 @@ import {
   GenerationStrategy,
   CrucibleChain,
   CrucibleGoal,
+  Constraint,
 } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "./context-builder";
+import { parseTag } from "./tag-parser";
+
+// --- Constraint Short IDs ---
+
+/**
+ * Compute stable short IDs for constraints.
+ * Assigns X0, X1, X2... in array order.
+ * Returns Map<constraintId, shortId>.
+ */
+export function computeConstraintShortIds(constraints: Constraint[]): Map<string, string> {
+  const result = new Map<string, string>();
+  for (let i = 0; i < constraints.length; i++) {
+    result.set(constraints[i].id, `X${i}`);
+  }
+  return result;
+}
 
 // --- Chain Context Formatter ---
 
 /**
  * Format chain context for the backward-chaining prompt.
- * Shows goal text, beats (newest-first), and open/resolved constraints.
+ * Shows goal text, beats (newest-first), and open/resolved constraints with short IDs.
  */
+/** Number of most-recent beats that keep full tagged text in context. */
+const FULL_BEAT_WINDOW = 3;
+
+/**
+ * Format pacing signal based on beat count and open constraints.
+ * Guides the solver toward convergence as the chain grows.
+ */
+function formatPacingSignal(beatCount: number, openCount: number): string {
+  if (beatCount <= 3) return "";
+  if (beatCount <= 6) {
+    return `\nPACING: Converge — resolve ≥2 constraints per beat, open ≤1. ${openCount} constraints remain open.`;
+  }
+  if (beatCount <= 8) {
+    return `\nPACING: Close out — resolve all remaining constraints. No new constraints. Target the OPENER. ${openCount} constraints remain.`;
+  }
+  return `\nPACING: OVERDUE — close all ${openCount} remaining constraints NOW. No new constraints. This is the final beat.`;
+}
+
 function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal): string {
   const sections: string[] = [];
 
@@ -28,22 +63,33 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal): string {
   sections.push(goal.text);
 
   // Beats (newest-first — closest to goal first)
+  // Only the last FULL_BEAT_WINDOW beats get full tagged text;
+  // older beats are compressed to their [SCENE] one-liner.
   if (chain.beats.length > 0) {
     sections.push("\nESTABLISHED BEATS (newest-first, closest to goal first):");
     for (let i = chain.beats.length - 1; i >= 0; i--) {
       const beat = chain.beats[i];
-      sections.push(`  Beat ${i + 1}:`);
-      for (const line of beat.text.split("\n")) {
-        sections.push(`    ${line}`);
+      const beatNum = i + 1;
+      const isRecent = i >= chain.beats.length - FULL_BEAT_WINDOW;
+      if (isRecent) {
+        sections.push(`  Beat ${beatNum}:`);
+        for (const line of beat.text.split("\n")) {
+          sections.push(`    ${line}`);
+        }
+      } else {
+        const scene = parseTag(beat.text, "SCENE") || beat.text.split("\n")[0];
+        sections.push(`  Beat ${beatNum}: ${scene}`);
       }
     }
   }
 
-  // Open constraints
+  // Open constraints with short IDs
   if (chain.openConstraints.length > 0) {
-    sections.push("\nOPEN CONSTRAINTS (must still be established):");
+    const shortIds = computeConstraintShortIds(chain.openConstraints);
+    sections.push("\nOPEN CONSTRAINTS (reference by [ID:Xn] when resolving or grounding):");
     for (const c of chain.openConstraints) {
-      sections.push(`  - ${c.description} (from Beat ${c.sourceBeatIndex + 1})`);
+      const sid = shortIds.get(c.id) || "X?";
+      sections.push(`  [${sid}] ${c.description} (from Beat ${c.sourceBeatIndex + 1})`);
     }
   }
 
@@ -55,6 +101,10 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal): string {
       sections.push(`  - ${c.description} → ${label}`);
     }
   }
+
+  // Pacing signal — dynamic convergence pressure
+  const pacing = formatPacingSignal(chain.beats.length, chain.openConstraints.length);
+  if (pacing) sections.push(pacing);
 
   return sections.join("\n");
 }

@@ -20,6 +20,7 @@ import {
   parseTagList,
   formatTagsWithEmoji,
 } from "../../../utils/tag-parser";
+import { computeConstraintShortIds } from "../../../utils/crucible-strategy";
 
 // --- Append-only stream transcript (module-level, not Redux) ---
 
@@ -123,9 +124,34 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
         return;
       }
 
-      const constraintsResolved = parseTagList(text, "RESOLVED");
-      const newOpenConstraints = parseTagList(text, "OPEN");
-      const groundStateConstraints = parseTagList(text, "GROUND");
+      // Build reverse map: shortId → constraint for ID-based resolution
+      const shortIds = computeConstraintShortIds(chain.openConstraints);
+      const shortIdToConstraint = new Map<string, Constraint>();
+      for (const c of chain.openConstraints) {
+        const sid = shortIds.get(c.id);
+        if (sid) shortIdToConstraint.set(sid.toUpperCase(), c);
+      }
+
+      /** Resolve a semicolon-separated item to its canonical description.
+       *  If [ID:Xn] is present, use the constraint's real description.
+       *  Otherwise fall back to the raw text. */
+      const resolveItem = (item: string): string => {
+        const idMatch = item.match(/\[ID:(\w+)\]/);
+        if (idMatch) {
+          const matched = shortIdToConstraint.get(idMatch[1].toUpperCase());
+          if (matched) return matched.description;
+        }
+        // Strip any [ID:...] artifact and use raw text as fallback
+        return item.replace(/\[ID:\w+\]\s*/g, "").trim();
+      };
+
+      const rawResolved = parseTagList(text, "RESOLVED");
+      const rawOpen = parseTagList(text, "OPEN");
+      const rawGround = parseTagList(text, "GROUND");
+
+      const constraintsResolved = rawResolved.map(resolveItem).filter((s) => s.length > 0);
+      const newOpenConstraints = rawOpen.map((s) => s.replace(/\[ID:\w+\]\s*/g, "").trim()).filter((s) => s.length > 0);
+      const groundStateConstraints = rawGround.map(resolveItem).filter((s) => s.length > 0);
 
       const beat: CrucibleBeat = {
         text,

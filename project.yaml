@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771259689
+updatedAt: 1771263485
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -363,26 +363,39 @@ config:
       You are given established beats and a list of OPEN CONSTRAINTS —
       things that must be true but haven't been established yet.
 
+      Each open constraint has a short ID like [X0], [X1], [X2].
+
       Design the NEXT beat backward — the LATEST-POSSIBLE scene that
       establishes one or more open constraints.
 
       RULES:
-      - Each beat must RESOLVE ≥1 open constraint (establish it as true)
-      - Each beat must declare its own PRECONDITIONS (new open constraints)
+      - [SCENE] is REQUIRED. All other tags are OPTIONAL — only include
+        tags that are genuinely relevant to this beat. Omit the rest.
+      - Early beats may ONLY open new constraints — resolving comes later
+        when there are open constraints to resolve
+      - Use [ID:Xn] to reference constraints in [RESOLVED] and [GROUND]
+      - New constraints in [OPEN] get no [ID] — the system assigns one
       - Preconditions needing no prior setup → mark as GROUND STATE
+      - Do NOT resolve or reference constraints that don't exist yet
       - "Latest-possible" — stay close to the goal before stepping further back
       - Every beat must contain conflict, tension, or revelation — never pure exposition
       - If this is the FIRST beat, its scene IS the terminal condition itself
 
+      CONVERGENCE:
+      - Aim for 6-10 beats total. Chains >10 are overlong.
+      - After 4 beats: resolve ≥2 constraints per beat, open ≤1
+      - After 7 beats: resolve ALL remaining constraints, do NOT open new ones
+      - The final beat(s) should be the OPENER — the story's chronological beginning
+
       TERMINATE when all constraints are resolved or ground state.
 
-      Output using EXACTLY this tagged format:
-      [SCENE] What happens — 2-3 sentences
-      [CONFLICT] What's at stake
-      [LOCATION] Where — why it matters
-      [RESOLVED] constraint1; constraint2
-      [OPEN] constraint1; constraint2
-      [GROUND] constraint1; constraint2
+      Output format — [SCENE] is required, include others only when relevant:
+      [SCENE] What happens — 1-2 sentences, dense and vivid
+      [CONFLICT] (optional) ≤1 sentence — what's at stake
+      [LOCATION] (optional) ≤1 sentence — where, and why it matters
+      [RESOLVED] (optional) [ID:X0] resolved; [ID:X2] resolved — only if open constraints exist
+      [OPEN] (optional) new precondition; another — things that must be true earlier
+      [GROUND] (optional) [ID:X1] assumed as given — only for existing constraints
   - name: crucible_build_prompt
     prettyName: Crucible Builder Prompt
     description: Prompt for interleaved builder — reviews beats, emits DULFS nodes
@@ -394,11 +407,15 @@ config:
       for the story's DULFS (Dramatis Personae, Universe Systems, Locations,
       Factions, Situational Dynamics).
 
+      Each existing element has a short ID like [C0], [L1], [S0].
+
       RULES:
       - For each NEW beat, identify characters, locations, factions, systems,
         or situations that are narratively necessary
-      - If an element already exists (listed in EXISTING WORLD ELEMENTS),
-        emit [LINK] instead of creating a duplicate
+      - To UPDATE an existing element (name or description changed by new beats),
+        re-emit the element tag with [ID:xx] and updated content
+      - To reference without changes, use [LINK] with [ID:xx]
+      - For genuinely NEW elements, omit [ID] — the system assigns one
       - Keep descriptions minimal — 1-2 sentences of narrative purpose
       - When done reviewing all beats, emit [SOLVER] to resume chaining
 
@@ -407,10 +424,12 @@ config:
       [CHARACTER] Name
       [DESCRIPTION] Role and narrative purpose — 1-2 sentences
       +++
-      [LOCATION] Name
-      [DESCRIPTION] Significance — 1-2 sentences
+      [CHARACTER] Revised Name
+      [ID:C0]
+      [DESCRIPTION] Updated role after new beats — 1-2 sentences
       +++
       [LINK] Existing Name
+      [ID:L0]
       [BEAT] 3
       +++
       [SOLVER]

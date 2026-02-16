@@ -41,7 +41,6 @@ import {
   crucibleReset,
   builderActivated,
   builderDeactivated,
-  builderNodeRemoved,
   intentSet,
   goalAdded,
   goalsConfirmed,
@@ -1099,12 +1098,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
     // Clean up storage
     await api.v1.storyStorage.set(`dulfs-item-${itemId}`, null);
-
-    // Remove from crucible builder nodes
-    const builderNode = getState().crucible.builder.nodes.find((n) => n.itemId === itemId);
-    if (builderNode) {
-      dispatch(builderNodeRemoved({ itemId }));
-    }
 
     // Remove empty category
     const categoryId = await findCategory(fieldId);

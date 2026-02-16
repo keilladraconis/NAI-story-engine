@@ -177,9 +177,10 @@ export interface CrucibleChain {
 }
 
 export interface CrucibleNodeLink {
-  itemId: string;
+  id: string;
   fieldId: DulfsFieldID;
   name: string;
+  content: string;
   beatIndices: number[];
 }
 

@@ -365,20 +365,24 @@ export const crucibleSlice = createSlice({
     // Builder reducers
     crucibleBuildRequested: (state) => state,
 
-    builderNodeAdded: (state, payload: { itemId: string; fieldId: DulfsFieldID; name: string; beatIndex: number }) => {
-      const existing = state.builder.nodes.find(
-        (n) => n.name.toLowerCase() === payload.name.toLowerCase(),
-      );
+    builderNodeAdded: (state, payload: { id: string; fieldId: DulfsFieldID; name: string; content?: string; beatIndex: number }) => {
+      const existing = state.builder.nodes.find((n) => n.id === payload.id)
+        || state.builder.nodes.find((n) => n.name.toLowerCase() === payload.name.toLowerCase());
       if (existing) {
-        // FIFO update: add beatIndex, cap at 4
+        // Revision: update beatIndices (FIFO cap 4), overwrite name + content if provided
         const beatIndices = [...existing.beatIndices, payload.beatIndex].slice(-4);
         return {
           ...state,
           builder: {
             ...state.builder,
             nodes: state.builder.nodes.map((n) =>
-              n.name.toLowerCase() === payload.name.toLowerCase()
-                ? { ...n, beatIndices }
+              n.id === existing.id
+                ? {
+                  ...n,
+                  beatIndices,
+                  name: payload.name || n.name,
+                  content: payload.content ?? n.content,
+                }
                 : n,
             ),
           },
@@ -391,9 +395,10 @@ export const crucibleSlice = createSlice({
           nodes: [
             ...state.builder.nodes,
             {
-              itemId: payload.itemId,
+              id: payload.id,
               fieldId: payload.fieldId,
               name: payload.name,
+              content: payload.content || "",
               beatIndices: [payload.beatIndex],
             },
           ],
@@ -411,12 +416,32 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    builderNodeRemoved: (state, payload: { itemId: string }) => {
+    builderNodeUpdated: (state, payload: { id: string; name?: string; content?: string }) => {
+      const existing = state.builder.nodes.find((n) => n.id === payload.id);
+      if (!existing) return state;
       return {
         ...state,
         builder: {
           ...state.builder,
-          nodes: state.builder.nodes.filter((n) => n.itemId !== payload.itemId),
+          nodes: state.builder.nodes.map((n) =>
+            n.id === payload.id
+              ? {
+                ...n,
+                ...(payload.name !== undefined ? { name: payload.name } : {}),
+                ...(payload.content !== undefined ? { content: payload.content } : {}),
+              }
+              : n,
+          ),
+        },
+      };
+    },
+
+    builderNodeRemoved: (state, payload: { id: string }) => {
+      return {
+        ...state,
+        builder: {
+          ...state.builder,
+          nodes: state.builder.nodes.filter((n) => n.id !== payload.id),
         },
       };
     },
@@ -460,7 +485,15 @@ export const crucibleSlice = createSlice({
         checkpointReason: loaded.checkpointReason,
         autoChaining: false,
         solverStalls: 0,
-        builder: loaded.builder || { ...EMPTY_BUILDER },
+        builder: loaded.builder
+          ? {
+            ...loaded.builder,
+            nodes: loaded.builder.nodes.map((n) => ({
+              ...n,
+              content: n.content || "",
+            })),
+          }
+          : { ...EMPTY_BUILDER },
       };
     },
   },
@@ -496,6 +529,7 @@ export const {
   builderActivated,
   crucibleBuildRequested,
   builderNodeAdded,
+  builderNodeUpdated,
   builderBeatProcessed,
   builderNodeRemoved,
   builderDeactivated,
