@@ -896,10 +896,16 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Reset → clear stream transcript
+  // Intent: Crucible Reset → clear stream transcript + storyStorage + view
   subscribeEffect(
     matchesAction(crucibleReset),
-    () => { resetStreamTranscript(); },
+    async () => {
+      resetStreamTranscript();
+      await api.v1.storyStorage.set("cr-intent", "");
+      api.v1.ui.updateParts([
+        { id: `${IDS.CRUCIBLE.INTENT_TEXT}-view`, text: "" },
+      ]);
+    },
   );
 
   // Intent: Crucible Build Requested → queue builder generation

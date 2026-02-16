@@ -5,6 +5,7 @@ import {
   crucibleLoaded,
   uiLorebookEntrySelected,
 } from "./core/store";
+import { intentSet } from "./core/store/slices/crucible";
 import { StoryState, BrainstormMessage, CrucibleState } from "./core/store/types";
 import { registerEffects, syncEratoCompatibility } from "./core/store/effects";
 import { GenX } from "nai-gen-x";
@@ -138,7 +139,19 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
 
     // 5b. Load crucible state after register — selectors need updateParts on registered elements
     if (pendingCrucible) {
+      api.v1.log(`[init] Dispatching crucibleLoaded, intent=${pendingCrucible.intent ? "yes" : "no"}, goals=${pendingCrucible.goals?.length ?? 0}`);
       store.dispatch(crucibleLoaded({ crucible: pendingCrucible }));
+      api.v1.log(`[init] Post-load state intent=${store.getState().crucible.intent ? "yes" : "no"}`);
+    } else {
+      api.v1.log("[init] No pendingCrucible to load");
+    }
+    // Hydrate intent from storyStorage if Redux lost it
+    if (!store.getState().crucible.intent) {
+      const storedIntent = String((await api.v1.storyStorage.get("cr-intent")) || "");
+      if (storedIntent) {
+        api.v1.log(`[init] Hydrating intent from storyStorage (${storedIntent.length} chars)`);
+        store.dispatch(intentSet({ intent: storedIntent }));
+      }
     }
 
     // Register lorebook entry selection hook

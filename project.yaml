@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771270504
+updatedAt: 1771272099
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -325,11 +325,13 @@ config:
       world elements.
 
       Include 2-4 open constraints — things that must be true for this
-      goal to happen but aren't established yet.
+      goal to happen but aren't established yet. One per line.
 
       Output format:
       [GOAL] The endpoint — 1-2 sentences, concrete and vivid
-      [OPEN] constraint; another constraint; a third constraint
+      [OPEN] first constraint
+      [OPEN] second constraint
+      [OPEN] third constraint
   - name: crucible_chain_prompt
     prettyName: Crucible Chain Prompt
     description: Prompt for backward-chaining beat generation (lean solver)

@@ -10,6 +10,7 @@ import { buildCrucibleGoalStrategy } from "../../../core/utils/crucible-strategy
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
 import { GenerationButton } from "../GenerationButton";
+import { formatTagsWithEmoji } from "../../../core/utils/tag-parser";
 
 const { column } = api.v1.ui.part;
 
@@ -81,13 +82,17 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
       callback: () => dispatch(goalRemoved({ goalId })),
     });
 
+    const goal = ctx.getState().crucible.goals.find((g) => g.id === goalId);
+    const goalDisplay = goal?.text ? formatTagsWithEmoji(goal.text) : undefined;
+
     const { part: editable } = ctx.render(EditableText, {
       id: ids.TEXT,
       storageKey: `cr-goal-${goalId}`,
-      placeholder: "[GOAL] ...\n[OPEN] ...",
+      placeholder: "[GOAL] ...\n[OPEN] ...\n[OPEN] ...",
       onSave: (content: string) =>
         dispatch(goalTextUpdated({ goalId, text: content })),
       extraControls: [genBtn, delBtn],
+      initialDisplay: goalDisplay,
     });
 
     return column({

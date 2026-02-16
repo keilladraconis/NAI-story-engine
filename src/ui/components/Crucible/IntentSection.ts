@@ -21,6 +21,7 @@ export const IntentSection = defineComponent<undefined, RootState>({
   build(_props, ctx) {
     const { useSelector } = ctx;
     const state = ctx.getState();
+    api.v1.log(`[intent-section] build: intent=${state.crucible.intent ? state.crucible.intent.slice(0, 40) + "..." : "null"}, goals=${state.crucible.goals.length}`);
 
     // Start expanded when there's no content yet, collapsed otherwise
     if (state.crucible.goals.length === 0 && !state.crucible.intent) {
@@ -52,12 +53,14 @@ export const IntentSection = defineComponent<undefined, RootState>({
       placeholder: "The story explores... [TAGS] tag1, tag2, tag3",
       label: "",
       extraControls: [intentBtnPart],
+      initialDisplay: state.crucible.intent ? formatForDisplay(state.crucible.intent) : undefined,
     });
 
     // Intent display — seed storyStorage for EditableText
     useSelector(
       (s) => s.crucible.intent,
       (intent) => {
+        api.v1.log(`[intent-section] useSelector fired, intent=${intent ? intent.slice(0, 40) + "..." : "null"}`);
         api.v1.storyStorage.set("cr-intent", intent ?? "");
         api.v1.ui.updateParts([
           { id: `${CR.INTENT_TEXT}-view`, text: intent ? formatForDisplay(intent) : "" },

@@ -9,6 +9,7 @@ import {
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
 import { NAI_HEADER, STATUS_GENERATING } from "../../colors";
+import { formatTagsWithEmoji } from "../../../core/utils/tag-parser";
 
 const { column, button } = api.v1.ui.part;
 
@@ -89,11 +90,15 @@ export const BeatCard = defineComponent<BeatCardProps, RootState>({
 
     const label = `Beat ${beatIndex + 1}`;
 
+    const currentBeat = ctx.getState().crucible.chains[goalId]?.beats[beatIndex];
+    const beatDisplay = currentBeat?.text ? formatTagsWithEmoji(currentBeat.text) : undefined;
+
     const { part: editable } = ctx.render(EditableText, {
       id: ids.TEXT,
       storageKey: `cr-beat-${goalId}-${beatIndex}`,
-      placeholder: "[SCENE] ...\n[CONFLICT] ...",
+      placeholder: "[SCENE] ...\n[OPEN] ...\n[RESOLVED] ...",
       label,
+      initialDisplay: beatDisplay,
       onSave: (content: string) => {
         const s = ctx.getState();
         const chain = s.crucible.chains[goalId];

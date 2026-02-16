@@ -66,16 +66,6 @@ export function parseTag(text: string, tag: string): string | null {
   return content.trim();
 }
 
-/** Parse a semicolon-separated (or custom separator) list from a tag's content. */
-export function parseTagList(text: string, tag: string, sep = ";"): string[] {
-  const content = parseTag(text, tag);
-  if (!content) return [];
-  return content
-    .split(sep)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}
-
 /**
  * Parse ALL occurrences of a repeated tag, returning each tag's content.
  * For formats like:

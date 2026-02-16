@@ -27,6 +27,8 @@ export interface EditableTextProps {
   extraControls?: UIPart[];
   /** Optional bold title at the left of the header row. */
   label?: string;
+  /** Initial display text (markdown). If provided, shown instead of "_No content._" on mount. */
+  initialDisplay?: string;
 }
 
 export const EditableText = defineComponent<EditableTextProps, RootState>({
@@ -83,7 +85,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
 
   build(props, ctx) {
     const { dispatch, useSelector } = ctx;
-    const { id, storageKey, placeholder, onSave, extraControls, label } = props;
+    const { id, storageKey, placeholder, onSave, extraControls, label, initialDisplay } = props;
 
     const viewId = `${id}-view`;
     const editId = `${id}-edit`;
@@ -173,7 +175,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
         }),
         text({
           id: viewId,
-          text: "_No content._",
+          text: initialDisplay || "_No content._",
           markdown: true,
           style: this.style?.("view"),
         }),

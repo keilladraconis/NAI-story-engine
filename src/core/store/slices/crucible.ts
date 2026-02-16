@@ -8,7 +8,7 @@ import {
   Constraint,
 } from "../types";
 import { DulfsFieldID } from "../../../config/field-definitions";
-import { parseTagList } from "../../utils/tag-parser";
+import { parseTagAll } from "../../utils/tag-parser";
 
 const EMPTY_BUILDER: CrucibleBuilderState = {
   nodes: [],
@@ -82,7 +82,7 @@ export const crucibleSlice = createSlice({
 
       // Seed open constraints from the goal's [OPEN] tag if present
       const goal = state.goals.find((g) => g.id === payload.goalId);
-      const seedDescs = goal ? parseTagList(goal.text, "OPEN") : [];
+      const seedDescs = goal ? parseTagAll(goal.text, "OPEN") : [];
       const seedConstraints: Constraint[] = seedDescs.map((desc, i) => ({
         id: `seed-${payload.goalId}-${desc.slice(0, 20)}`,
         shortId: `X${i}`,

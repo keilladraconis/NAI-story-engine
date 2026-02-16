@@ -27,7 +27,7 @@ import { parseTag } from "./tag-parser";
  */
 function formatPacingSignal(beatCount: number, openCount: number): string {
   if (beatCount === 0)
-    return "\nPACING: FIRST BEAT — this IS the terminal scene. Open NEW preconditions only (not already listed above). Do NOT resolve anything.";
+    return "\nPACING: FIRST BEAT — this IS the penultimate scene. Open NEW preconditions only (not already listed above). Do NOT resolve anything.";
   if (beatCount <= 3)
     return `\nPACING: EARLY — open NEW preconditions. Resolve at most 1. ${openCount} open.`;
   if (beatCount <= 6)

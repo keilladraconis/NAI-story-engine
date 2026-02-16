@@ -108,6 +108,7 @@ export const BuilderView = defineComponent<undefined, RootState>({
           id: `cr-node-${node.id}-text`,
           storageKey,
           placeholder: "Name: description...",
+          initialDisplay: formatNodeText(node),
           onSave: (raw: string) => {
             const parsed = parseNodeText(raw);
             dispatch(builderNodeUpdated({
