@@ -28,7 +28,7 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
         headerPart,
         column({
           id: CR.SOLVER_BODY,
-          style: { flex: "1", overflow: "auto", gap: "8px", padding: "0 10px 10px" },
+          style: { flex: "1", overflow: "auto", gap: "8px", padding: "0 10px 10px", "justify-content": "flex-start" },
           content: [intentPart, goalsPart, worldBuildingPart, builderPart],
         }),
       ],

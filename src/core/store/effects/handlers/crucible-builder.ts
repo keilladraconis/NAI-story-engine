@@ -6,7 +6,7 @@ import {
 import {
   builderNodeAdded,
   builderBeatProcessed,
-  solverYielded,
+  builderDeactivated,
   dulfsItemAdded,
 } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
@@ -16,7 +16,7 @@ import {
   formatTagsWithEmoji,
 } from "../../../utils/tag-parser";
 import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
-import { getStreamTranscript, appendToTranscript } from "./crucible";
+import { appendToTranscript, truncateToTail } from "./crucible";
 
 type CrucibleBuildTarget = { type: "crucibleBuild"; goalId: string };
 
@@ -39,9 +39,7 @@ function stripThinkingTags(text: string): string {
 export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
   streaming(ctx: StreamingContext<CrucibleBuildTarget>): void {
     const liveChunk = formatTagsWithEmoji(stripThinkingTags(ctx.accumulatedText));
-    const prefix = getStreamTranscript();
-    const display = prefix ? prefix + "\n\n---\n\n" + liveChunk : liveChunk;
-    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.STREAM_TEXT, text: display }]);
+    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.STREAM_TEXT, text: truncateToTail(liveChunk) }]);
   },
 
   async completion(ctx: CompletionContext<CrucibleBuildTarget>): Promise<void> {
@@ -133,7 +131,7 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
 
       // If [SOLVER] detected, yield back to solver
       if (hasSolverYield) {
-        ctx.dispatch(solverYielded());
+        ctx.dispatch(builderDeactivated());
       }
     } catch (e) {
       api.v1.log("[crucible-builder] Parse failed:", e);

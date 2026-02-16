@@ -30,6 +30,15 @@ export function appendToTranscript(chunk: string): void {
 }
 export function resetStreamTranscript(): void { _streamTranscript = ""; }
 
+const STREAM_WORD_LIMIT = 30;
+/** Keep only the last ~30 words for the streaming ticker. Flattens newlines to spaces. */
+export function truncateToTail(text: string): string {
+  const flat = text.replace(/\n+/g, " ");
+  const words = flat.split(/\s+/);
+  if (words.length <= STREAM_WORD_LIMIT) return flat;
+  return "\u2026 " + words.slice(-STREAM_WORD_LIMIT).join(" ");
+}
+
 /** Strip thinking-tag breakout artifacts from generated text. */
 function stripThinkingTags(text: string): string {
   return text.replace(/<\/?think>/g, "").replace(/<think>[\s\S]*$/g, "");
@@ -91,9 +100,7 @@ export const crucibleGoalHandler: GenerationHandlers<CrucibleGoalTarget> = {
 export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
   streaming(ctx: StreamingContext<CrucibleChainTarget>): void {
     const liveChunk = formatTagsWithEmoji(stripThinkingTags(ctx.accumulatedText));
-    const prefix = _streamTranscript;
-    const display = prefix ? prefix + "\n\n---\n\n" + liveChunk : liveChunk;
-    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.STREAM_TEXT, text: display }]);
+    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.STREAM_TEXT, text: truncateToTail(liveChunk) }]);
   },
 
   async completion(ctx: CompletionContext<CrucibleChainTarget>): Promise<void> {

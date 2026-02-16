@@ -39,7 +39,8 @@ import {
   crucibleIntentRequested,
   crucibleBuildRequested,
   crucibleReset,
-  solverYielded,
+  builderActivated,
+  builderDeactivated,
   intentSet,
   goalAdded,
   goalsConfirmed,
@@ -50,7 +51,6 @@ import {
   autoChainStarted,
   autoChainStopped,
   checkpointCleared,
-  phaseSet,
 } from "./index";
 import {
   createLorebookContentFactory,
@@ -913,7 +913,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
-      dispatch(phaseSet({ phase: "building" }));
+      dispatch(builderActivated());
       const strategy = buildCrucibleBuildStrategy(getState, activeGoalId);
       dispatch(
         requestQueued({
@@ -951,13 +951,14 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       if (state.crucible.checkpointReason) return;
       if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
 
-      const { phase, activeGoalId } = state.crucible;
+      const { builderActive, activeGoalId } = state.crucible;
       if (!activeGoalId) return;
 
       const chain = state.crucible.chains[activeGoalId];
       if (!chain) return;
 
-      if (phase === "chaining") {
+      if (!builderActive) {
+        // Solver branch
         if (chain.complete) {
           // Goal complete — run builder catch-up if behind
           if (builderBehind()) {
@@ -996,12 +997,12 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           return;
         }
         dispatch(crucibleChainRequested());
-      } else if (phase === "building") {
-        // Builder just completed — if it yielded [SOLVER], phase is already "chaining"
+      } else {
+        // Builder just completed — if it yielded [SOLVER], builderActive is already false
         // so this only fires if builder didn't yield (e.g. continuation exhausted)
-        // Force yield back to solver
-        dispatch(solverYielded());
-        // Next requestCompleted will fire the chaining branch
+        // Force deactivate back to solver
+        dispatch(builderDeactivated());
+        // Next requestCompleted will fire the solver branch
       }
     },
   );
@@ -1019,7 +1020,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     matchesAction(checkpointCleared),
     (_action, { dispatch, getState: getLatest }) => {
       const state = getLatest();
-      if (state.crucible.autoChaining && state.crucible.phase === "chaining") {
+      if (state.crucible.autoChaining && !state.crucible.builderActive) {
         dispatch(crucibleChainRequested());
       }
     },

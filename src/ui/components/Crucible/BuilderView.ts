@@ -67,10 +67,9 @@ export const BuilderView = defineComponent<undefined, RootState>({
     useSelector(
       (s) => ({
         nodes: s.crucible.builder.nodes,
-        phase: s.crucible.phase,
       }),
       (slice) => {
-        if (slice.nodes.length === 0 || (slice.phase !== "chaining" && slice.phase !== "building")) {
+        if (slice.nodes.length === 0) {
           api.v1.ui.updateParts([
             { id: CR.BUILDER_ROOT, style: this.style?.("hidden") },
           ]);

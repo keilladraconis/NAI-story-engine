@@ -4,6 +4,7 @@ import {
   beatEdited,
   beatFavorited,
   beatForked,
+  beatsDeletedFrom,
 } from "../../../core/store/slices/crucible";
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
@@ -78,6 +79,14 @@ export const BeatCard = defineComponent<BeatCardProps, RootState>({
       callback: () => dispatch(beatForked({ goalId, beatIndex, newGoalId: api.v1.uuid() })),
     });
 
+    const delBtn = button({
+      id: ids.DEL_BTN,
+      text: "",
+      iconId: "trash-2",
+      style: BEAT_BTN_STYLE,
+      callback: () => dispatch(beatsDeletedFrom({ goalId, fromIndex: beatIndex })),
+    });
+
     const label = `Beat ${beatIndex + 1}`;
 
     const { part: editable } = ctx.render(EditableText, {
@@ -103,7 +112,7 @@ export const BeatCard = defineComponent<BeatCardProps, RootState>({
           },
         }));
       },
-      extraControls: [favBtn, forkBtn],
+      extraControls: [favBtn, forkBtn, delBtn],
     });
 
     // Reactively update fav button style

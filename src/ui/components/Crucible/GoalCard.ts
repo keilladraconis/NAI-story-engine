@@ -1,35 +1,23 @@
 import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import {
-  goalToggled,
   goalRemoved,
   goalTextUpdated,
 } from "../../../core/store/slices/crucible";
+import { requestQueued } from "../../../core/store/slices/runtime";
+import { generationSubmitted } from "../../../core/store/slices/ui";
+import { buildCrucibleGoalStrategy } from "../../../core/utils/crucible-strategy";
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
-import { NAI_HEADER } from "../../colors";
+import { GenerationButton } from "../GenerationButton";
 
-const { column, button } = api.v1.ui.part;
+const { column } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
 export interface GoalCardProps {
   goalId: string;
-  selected: boolean;
 }
-
-const FAV_STYLE = {
-  padding: "2px 6px",
-  "font-size": "0.8em",
-  color: NAI_HEADER,
-  opacity: "1",
-};
-
-const FAV_STYLE_OFF = {
-  padding: "2px 6px",
-  "font-size": "0.8em",
-  opacity: "0.5",
-};
 
 const GOAL_BTN_STYLE = {
   padding: "2px 6px",
@@ -40,20 +28,52 @@ const GOAL_BTN_STYLE = {
 export const GoalCard = defineComponent<GoalCardProps, RootState>({
   id: (props) => CR.goal(props.goalId).ROOT,
 
+  styles: {
+    card: {
+      padding: "6px 8px",
+      "border-radius": "4px",
+      "background-color": "rgba(255,255,255,0.04)",
+      "border-left": "3px solid rgba(245,243,194,0.5)",
+      gap: "2px",
+    },
+  },
+
   build(props, ctx) {
-    const { dispatch, useSelector } = ctx;
-    const { goalId, selected } = props;
+    const { dispatch } = ctx;
+    const { goalId } = props;
     const ids = CR.goal(goalId);
 
-    const favBtn = button({
-      id: ids.FAV_BTN,
-      text: "",
-      iconId: "star",
-      style: selected ? FAV_STYLE : FAV_STYLE_OFF,
-      callback: () => dispatch(goalToggled({ goalId })),
+    const { part: genBtn } = ctx.render(GenerationButton, {
+      id: ids.GEN_BTN,
+      variant: "icon",
+      iconId: "refresh",
+      stateProjection: (s: RootState) => ({
+        activeType: s.runtime.activeRequest?.type,
+        activeTargetId: s.runtime.activeRequest?.targetId,
+        queueTargetIds: s.runtime.queue.map((q) => q.targetId),
+      }),
+      requestIdFromProjection: () => {
+        const s = ctx.getState();
+        if (s.runtime.activeRequest?.type === "crucibleGoal" && s.runtime.activeRequest.targetId === goalId) {
+          return s.runtime.activeRequest.id;
+        }
+        const queued = s.runtime.queue.find((q) => q.type === "crucibleGoal" && q.targetId === goalId);
+        return queued?.id;
+      },
+      isDisabledFromProjection: (proj: any) =>
+        proj.activeType === "crucibleChain" || proj.activeType === "crucibleBuild",
+      onGenerate: () => {
+        const strategy = buildCrucibleGoalStrategy(ctx.getState, goalId);
+        dispatch(requestQueued({
+          id: strategy.requestId,
+          type: "crucibleGoal",
+          targetId: goalId,
+        }));
+        dispatch(generationSubmitted(strategy));
+      },
     });
 
-    const delBtn = button({
+    const delBtn = api.v1.ui.part.button({
       id: ids.DEL_BTN,
       text: "",
       iconId: "trash-2",
@@ -67,28 +87,12 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
       placeholder: "[GOAL] ...\n[STAKES] ...\n[THEME] ...",
       onSave: (content: string) =>
         dispatch(goalTextUpdated({ goalId, text: content })),
-      extraControls: [favBtn, delBtn],
+      extraControls: [genBtn, delBtn],
     });
-
-    // Reactively update heart button style when selected state changes
-    useSelector(
-      (s) => s.crucible.goals.find((g) => g.id === goalId)?.selected ?? false,
-      (isFav) => {
-        api.v1.ui.updateParts([
-          { id: ids.FAV_BTN, style: isFav ? FAV_STYLE : FAV_STYLE_OFF },
-        ]);
-      },
-    );
 
     return column({
       id: ids.ROOT,
-      style: {
-        padding: "6px 8px",
-        "border-radius": "4px",
-        "background-color": "rgba(255,255,255,0.04)",
-        "border-left": "3px solid rgba(245,243,194,0.5)",
-        gap: "2px",
-      },
+      style: this.style?.("card"),
       content: [editable],
     });
   },

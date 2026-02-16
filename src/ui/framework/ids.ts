@@ -2,11 +2,7 @@ export const IDS = {
   CRUCIBLE: {
     WINDOW_ROOT: "cr-root",
     STATUS_TEXT: "cr-status",
-    GOALS_BTN: "cr-goals-btn",
-    STOP_BTN: "cr-stop-btn",
     RESET_BTN: "cr-reset-btn",
-    CHECKPOINT_ROW: "cr-checkpoint-row",
-    CHECKPOINT_TEXT: "cr-checkpoint-text",
     GOALS_LIST: "cr-goals-list",
     INTENT_BTN: "cr-intent-btn",
     INTENT_SECTION: "cr-intent-section",
@@ -19,17 +15,18 @@ export const IDS = {
     goal: (id: string) => ({
       ROOT: `cr-goal-${id}`,
       TEXT: `cr-goal-${id}-text`,
-      FAV_BTN: `cr-goal-${id}-fav`,
       DEL_BTN: `cr-goal-${id}-del`,
+      GEN_BTN: `cr-goal-${id}-gen`,
+      BUILD_BTN: `cr-goal-${id}-build`,
     }),
     beat: (goalId: string, beatIndex: number) => ({
       ROOT: `cr-beat-${goalId}-${beatIndex}`,
       TEXT: `cr-beat-${goalId}-${beatIndex}-text`,
       FAV_BTN: `cr-beat-${goalId}-${beatIndex}-fav`,
       FORK_BTN: `cr-beat-${goalId}-${beatIndex}-fork`,
+      DEL_BTN: `cr-beat-${goalId}-${beatIndex}-del`,
     }),
     GOAL_SECTION: (goalId: string) => `cr-goal-section-${goalId}`,
-    STREAM_CONTAINER: "cr-stream-container",
   },
   BRAINSTORM: {
     ROOT: "se-bs-root",

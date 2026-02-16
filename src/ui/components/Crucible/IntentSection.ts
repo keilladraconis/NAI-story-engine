@@ -5,7 +5,7 @@ import { IDS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
 import { EditableText } from "../EditableText";
 
-const { row, column } = api.v1.ui.part;
+const { collapsibleSection } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
@@ -18,15 +18,14 @@ function formatForDisplay(raw: string): string {
 export const IntentSection = defineComponent<undefined, RootState>({
   id: () => CR.INTENT_SECTION,
 
-  styles: {
-    divider: {
-      "border-top": "1px solid rgba(255,255,255,0.08)",
-      margin: "4px 0",
-    },
-  },
-
   build(_props, ctx) {
     const { useSelector } = ctx;
+    const state = ctx.getState();
+
+    // Start expanded when there's no content yet, collapsed otherwise
+    if (state.crucible.goals.length === 0 && !state.crucible.intent) {
+      api.v1.storyStorage.set("cr-intent-collapsed", "");
+    }
 
     const { part: intentBtnPart } = ctx.render(GenerationButton, {
       id: CR.INTENT_BTN,
@@ -51,7 +50,7 @@ export const IntentSection = defineComponent<undefined, RootState>({
       id: CR.INTENT_TEXT,
       storageKey: "cr-intent",
       placeholder: "The story explores... [TAGS] tag1, tag2, tag3",
-      label: "Direction",
+      label: "",
       extraControls: [intentBtnPart],
     });
 
@@ -59,35 +58,38 @@ export const IntentSection = defineComponent<undefined, RootState>({
     useSelector(
       (s) => s.crucible.intent,
       (intent) => {
-        if (!intent) return;
-        api.v1.storyStorage.set("cr-intent", intent);
+        api.v1.storyStorage.set("cr-intent", intent ?? "");
         api.v1.ui.updateParts([
-          { id: `${CR.INTENT_TEXT}-view`, text: formatForDisplay(intent) },
+          { id: `${CR.INTENT_TEXT}-view`, text: intent ? formatForDisplay(intent) : "" },
         ]);
       },
     );
 
-    // Intent button visibility by phase
+    // Intent button visibility + auto-collapse when auto-chaining or goals appear
     useSelector(
-      (s) => s.crucible.phase,
-      (phase) => {
-        const preChaining = phase === "idle" || phase === "goals";
+      (s) => ({
+        autoChaining: s.crucible.autoChaining,
+        hasGoals: s.crucible.goals.length > 0,
+      }),
+      (slice) => {
         api.v1.ui.updateParts([
           {
             id: `${CR.INTENT_BTN}`,
-            style: preChaining ? { display: "flex" } : { display: "none" },
+            style: !slice.autoChaining ? { display: "flex" } : { display: "none" },
           },
         ]);
+        if (slice.autoChaining || slice.hasGoals) {
+          api.v1.storyStorage.set("cr-intent-collapsed", "true");
+        }
       },
     );
 
-    return column({
+    return collapsibleSection({
       id: CR.INTENT_SECTION,
-      style: { gap: "4px" },
-      content: [
-        row({ style: this.style?.("divider"), content: [] }),
-        intentEditablePart,
-      ],
+      title: "Direction",
+      storageKey: "story:cr-intent-collapsed",
+      style: { overflow: "visible" },
+      content: [intentEditablePart],
     });
   },
 });

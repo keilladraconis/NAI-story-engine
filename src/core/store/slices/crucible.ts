@@ -6,8 +6,6 @@ import {
   CrucibleChain,
   CrucibleBuilderState,
   Constraint,
-  CruciblePhase,
-
 } from "../types";
 import { DulfsFieldID } from "../../../config/field-definitions";
 
@@ -17,7 +15,7 @@ const EMPTY_BUILDER: CrucibleBuilderState = {
 };
 
 export const initialCrucibleState: CrucibleState = {
-  phase: "idle",
+  builderActive: false,
   intent: null,
   goals: [],
   chains: {},
@@ -27,9 +25,6 @@ export const initialCrucibleState: CrucibleState = {
   solverStalls: 0,
   builder: { ...EMPTY_BUILDER },
 };
-
-/** Valid phases after v5 migration. */
-const VALID_PHASES = new Set<CruciblePhase>(["idle", "goals", "chaining", "building"]);
 
 export const crucibleSlice = createSlice({
   name: "crucible",
@@ -56,7 +51,7 @@ export const crucibleSlice = createSlice({
     },
 
     goalAdded: (state, payload: { goal: CrucibleGoal }) => {
-      return { ...state, phase: "goals" as const, goals: [...state.goals, payload.goal] };
+      return { ...state, goals: [...state.goals, payload.goal] };
     },
 
     goalRemoved: (state, payload: { goalId: string }) => {
@@ -79,6 +74,10 @@ export const crucibleSlice = createSlice({
     goalsConfirmed: (state) => state,
 
     chainStarted: (state, payload: { goalId: string }) => {
+      // Idempotent: if chain already exists, just set activeGoalId (enables resume)
+      if (state.chains[payload.goalId]) {
+        return { ...state, activeGoalId: payload.goalId };
+      }
       const chain: CrucibleChain = {
         goalId: payload.goalId,
         beats: [],
@@ -88,7 +87,6 @@ export const crucibleSlice = createSlice({
       };
       return {
         ...state,
-        phase: "chaining" as const,
         activeGoalId: payload.goalId,
         chains: { ...state.chains, [payload.goalId]: chain },
       };
@@ -261,6 +259,37 @@ export const crucibleSlice = createSlice({
       };
     },
 
+    beatsDeletedFrom: (state, payload: { goalId: string; fromIndex: number }) => {
+      const chain = state.chains[payload.goalId];
+      if (!chain) return state;
+
+      const keptBeats = chain.beats.slice(0, payload.fromIndex);
+
+      // Rebuild open constraints from the last kept beat's newOpenConstraints
+      // (or empty if no beats remain)
+      const lastBeat = keptBeats[keptBeats.length - 1];
+      const openDescs = lastBeat ? lastBeat.newOpenConstraints : [];
+      const openConstraints: Constraint[] = openDescs.map((desc, i) => ({
+        id: `${payload.goalId}-c${i}`,
+        description: desc,
+        sourceBeatIndex: keptBeats.length - 1,
+        status: "open" as const,
+      }));
+
+      return {
+        ...state,
+        chains: {
+          ...state.chains,
+          [payload.goalId]: {
+            ...chain,
+            beats: keptBeats,
+            openConstraints,
+            complete: false,
+          },
+        },
+      };
+    },
+
     constraintMarkedGroundState: (state, payload: { goalId: string; constraintId: string }) => {
       const chain = state.chains[payload.goalId];
       if (!chain) return state;
@@ -322,8 +351,8 @@ export const crucibleSlice = createSlice({
       return { ...state, autoChaining: false };
     },
 
-    phaseSet: (state, payload: { phase: CruciblePhase }) => {
-      return { ...state, phase: payload.phase };
+    builderActivated: (state) => {
+      return { ...state, builderActive: true };
     },
 
     // Builder reducers
@@ -375,8 +404,8 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    solverYielded: (state) => {
-      return { ...state, phase: "chaining" as const };
+    builderDeactivated: (state) => {
+      return { ...state, builderActive: false };
     },
 
     crucibleReset: () => {
@@ -386,9 +415,7 @@ export const crucibleSlice = createSlice({
     crucibleLoaded: (_state, payload: { crucible: CrucibleState }) => {
       const loaded = payload.crucible;
 
-      // v5 migration: clamp phase, strip dead fields from chains/beats
-      const phase = VALID_PHASES.has(loaded.phase) ? loaded.phase : "idle";
-
+      // Strip dead fields from chains/beats
       const chains: Record<string, CrucibleChain> = {};
       for (const [goalId, chain] of Object.entries(loaded.chains)) {
         chains[goalId] = {
@@ -408,7 +435,7 @@ export const crucibleSlice = createSlice({
       }
 
       return {
-        phase,
+        builderActive: false,
         intent: loaded.intent,
         goals: loaded.goals,
         chains,
@@ -441,6 +468,7 @@ export const {
   beatTainted,
   beatFavorited,
   beatForked,
+  beatsDeletedFrom,
   constraintMarkedGroundState,
   chainCompleted,
   activeGoalAdvanced,
@@ -448,11 +476,11 @@ export const {
   checkpointCleared,
   autoChainStarted,
   autoChainStopped,
-  phaseSet,
+  builderActivated,
   crucibleBuildRequested,
   builderNodeAdded,
   builderBeatProcessed,
-  solverYielded,
+  builderDeactivated,
   crucibleReset,
   crucibleLoaded,
 } = crucibleSlice.actions;

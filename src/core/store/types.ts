@@ -144,8 +144,6 @@ export interface RuntimeState {
 
 // Crucible Types
 
-export type CruciblePhase = "idle" | "goals" | "chaining" | "building";
-
 export interface CrucibleGoal {
   id: string;
   text: string;
@@ -191,7 +189,7 @@ export interface CrucibleBuilderState {
 }
 
 export interface CrucibleState {
-  phase: CruciblePhase;
+  builderActive: boolean;
   intent: string | null;
   goals: CrucibleGoal[];
   chains: Record<string, CrucibleChain>;
