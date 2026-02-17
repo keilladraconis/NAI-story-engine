@@ -2,6 +2,104 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-02-17 — Crucible Edition
+
+### Added
+
+#### Crucible — Backward-Reasoning World Generator
+
+The headline feature of 0.7.0. Crucible turns brainstormed ideas into a populated world by reasoning backward from dramatic endpoints. Scenes are scaffolding; world elements are the product.
+
+- **New sidebar panel** — "Crucible" panel with hexagon icon, four-step progressive workflow.
+- **Step 1: Direction** — AI distills the brainstorm into a single dense creative anchor (the Direction), or the user writes their own. Includes story architecture classification and thematic tags. All downstream generation references only this text.
+- **Step 2: Goals** — AI generates dramatic endpoints — possible futures for the world. Each goal has a "Build World" button to begin world generation from that goal. Manual add/edit/delete supported.
+- **Step 3: World Building** — The core loop. For each goal the user builds, three interleaved generators run:
+  - **Solver** — Generates scenes backward from the climax, resolving and opening constraints. Each scene discovers what the world must contain. Scene numbering ascends from 1 (closest to climax).
+  - **Builder** — Extracts world elements (characters, locations, factions, systems, situations) from new scenes. Can create new elements or update existing ones. Emits `[SOLVER]` to resume chaining.
+- **Step 4: Review & Merge** — World elements merge into Story Engine's DULFS fields and lorebook.
+- **Shared world state** — All goals contribute to and see the same world element inventory.
+- **Scene budget** — Configurable per-goal scene limit (default 5). Termination is budgeted, not emergent.
+- **Streaming-first** — All generation streams in real time. Scene cards and world elements appear as they're generated.
+
+#### New UI Components
+
+- **`EditableText`** — Reusable view/edit toggle component with markdown display, edit mode, optional label, format callbacks, and extra controls. Used throughout Crucible for direction, goals, and scenes.
+- **`BudgetFeedback`** — Budget wait overlay component for generation feedback.
+- **`CruciblePanel`** — Root panel composing Header, IntentSection, GoalsSection, and WorldBuildingView.
+- **`CrucibleHeader`** — Status line, reset (with confirmation), and stop button.
+- **`IntentSection`** — Direction editor with generate button.
+- **`GoalsSection`** — Goal list with generate/add/clear/build-world controls.
+- **`GoalCard`** — Edit, delete, build per goal.
+- **`WorldBuildingView`** — Streaming text area, world element inventory, scene cards per goal.
+- **`BuilderView`** — World element display organized by DULFS category.
+- **`SceneCard`** — Collapsible scene display with edit/delete, favoriting.
+
+#### New Utilities
+
+- **`tag-parser.ts`** — Streaming-safe tagged text parser: `parseTag`, `parseTagAll`, `splitSections`, `formatTagsWithEmoji`, `restoreTagsFromEmoji`. Handles `[TAG] content` format used throughout Crucible.
+- **`crucible-strategy.ts`** — Solver strategy factory. Builds context from direction, goal, existing scenes, open/resolved constraints, and world elements.
+- **`crucible-builder-strategy.ts`** — Builder strategy factory. Reviews new scenes, extracts and updates world elements.
+- **`buildCruciblePrefix`** in `context-builder.ts` — Separate prefix for Crucible generation (direction, story state, DULFS — no lorebook, no story text, no ATTG, no Style).
+
+#### New Config Prompts
+
+Five new configurable prompts in `project.yaml`:
+- `crucible_intent_prompt` — Direction distillation from brainstorm.
+- `crucible_goals_prompt` — Goal generation with starting constraints.
+- `crucible_chain_prompt` — Scene generation (lean solver) with constraint discipline.
+- `crucible_build_prompt` — Interleaved builder for world element extraction.
+
+### Breaking Changes
+
+- **DULFS list generation removed from S.E.G.A.** — The round-robin DULFS list population stage has been removed from SEGA. World population is now handled by Crucible. Users can still generate items per-category via individual "Generate Items" buttons.
+- **`storyLoaded` / `brainstormLoaded` actions removed** — Replaced by unified `persistedDataLoaded` action that hydrates all slices (story, brainstorm, crucible) in a single dispatch.
+- **`segaRoundRobinAdvanced` action removed** — No longer needed without DULFS list stage.
+- **`MIN_ITEMS_PER_CATEGORY` constant removed** — DULFS population is now user-driven via Crucible.
+- **`dulfsRoundRobin` state removed** from `SegaState`.
+- **`SegaStage` changed** — `"dulfsLists"` replaced by `"bootstrap"`.
+
+### Changed
+
+#### S.E.G.A. Pipeline
+
+- **Pipeline reordered** — Was: ATTG/Style → DULFS Lists → Canon → Lorebook. Now: ATTG/Style → Canon → Bootstrap → Lorebook. DULFS population delegated to Crucible.
+- **Bootstrap integrated** — SEGA now automatically generates an opening scene instruction (Bootstrap) after Canon, if the document is empty. Previously Bootstrap was manual-only.
+- **`queueSegaGeneration` simplified** — Renamed to `queueSegaFieldGeneration`; list-type generation path removed.
+
+#### State Management
+
+- **New `crucible` slice** — Fifth root state slice managing direction, goals, chains (scenes + constraints), world elements (builder state), and auto-chaining mode. Includes `migrateCrucibleState` for backward-compatible hydration.
+- **Unified data hydration** — `persistedDataLoaded` action intercepts at root reducer level, hydrating story, brainstorm, and crucible state in one dispatch. Eliminates separate load actions and the `PersistedState` interface from `index.ts`.
+- **New generation request types** — `crucibleDirection`, `crucibleGoal`, `crucibleChain`, `crucibleBuild`.
+- **`continuation` field on `GenerationStrategy`** — Supports multi-call generations (solver→builder→solver loops) with configurable `maxCalls`.
+
+#### Lorebook Templates
+
+- **All templates condensed** — Shorter, denser format targeting ~80 words (was ~150). Focus on narrative function over encyclopedic detail.
+- **Character template simplified** — Now: identity line, appearance (what a stranger notices), personality (behavior under pressure + defining quote), conflict (internal tension). Removed explicit BWH/measurements/physical stats fields.
+- **Location/Faction/System/Dynamic templates tightened** — Each reduced to essential fields with emphasis on narrative potential and atmosphere over enumeration.
+
+#### Lorebook Content Prompt
+
+- **Content directives rewritten** — Characters focus on camera-visible appearance, behavior-driven personality, and volatility. General entries require every sentence to earn its tokens. Templates are starting points with field additions encouraged by genre context.
+
+### Removed
+
+- `storyLoaded` action — Replaced by `persistedDataLoaded`.
+- `brainstormLoaded` action — Replaced by `persistedDataLoaded`.
+- `segaRoundRobinAdvanced` action and `dulfsRoundRobin` state.
+- `MIN_ITEMS_PER_CATEGORY` constant.
+- DULFS list generation stage from SEGA pipeline.
+
+### Developer Notes
+
+- 33 files changed, 5,017 insertions, 191 deletions (net +4,826 lines).
+- New crucible state slice: 632 lines (`src/core/store/slices/crucible.ts`).
+- New effect handlers: `crucible.ts` (248 lines), `crucible-builder.ts` (149 lines).
+- New strategy factories: `crucible-strategy.ts` (298 lines), `crucible-builder-strategy.ts` (173 lines).
+- 11 new UI components across `src/ui/components/Crucible/` and shared utilities.
+- Design docs: `crucible-design.md` (theory + implementation), `crucible-ux.md` (user experience spec).
+
 ## [0.6.0] - 2026-02-11
 
 ### Breaking Changes
