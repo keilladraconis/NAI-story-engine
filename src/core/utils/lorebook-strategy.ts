@@ -102,9 +102,11 @@ Setting: ${setting}
       { role: "assistant", content: assistantPrefill },
     );
 
+    const tailCount = template ? 4 : 3;
     return {
       messages,
       params: { model, max_tokens: 1024, temperature: 0.85, min_p: 0.05, frequency_penalty: 0.1 },
+      contextPinning: { head: 1, tail: tailCount },
     };
   };
 };
@@ -156,6 +158,7 @@ export const createLorebookKeysFactory = (
         min_p: 0.1,
         stop: ["\n"],
       },
+      contextPinning: { head: 1, tail: 3 },
     };
   };
 };
@@ -227,6 +230,7 @@ Setting: ${setting}
     return {
       messages,
       params: { model, max_tokens: 1024, temperature: 0.7, min_p: 0.05, frequency_penalty: 0.1 },
+      contextPinning: { head: 1, tail: 3 },
     };
   };
 };

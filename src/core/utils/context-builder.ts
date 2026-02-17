@@ -486,6 +486,7 @@ export const createCanonFactory = (
         presence_penalty: 0.1,
         max_tokens: 600,
       },
+      contextPinning: { head: 1, tail: 2 },
     };
   };
 };
@@ -551,6 +552,7 @@ export const createDulfsListFactory = (
     return {
       messages,
       params: { model, max_tokens: 350, temperature: 0.8, min_p: 0.1 },
+      contextPinning: { head: 1, tail: 3 },
     };
   };
 };
@@ -600,6 +602,7 @@ export const createATTGFactory = (
     return {
       messages,
       params: { model, max_tokens: 128, temperature: 0.7, min_p: 0.05 },
+      contextPinning: { head: 1, tail: 2 },
     };
   };
 };
@@ -649,6 +652,7 @@ export const createStyleFactory = (
     return {
       messages,
       params: { model, max_tokens: 128, temperature: 0.8, min_p: 0.05 },
+      contextPinning: { head: 1, tail: 2 },
     };
   };
 };
@@ -745,6 +749,7 @@ IMPORTANT: Do NOT use hash/pound signs in your output. Use bracketed labels like
         min_p: 0.05,
         presence_penalty: 0.1,
       },
+      contextPinning: { head: 1, tail: 3 },
     };
   };
 };
