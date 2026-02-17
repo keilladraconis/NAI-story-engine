@@ -10,6 +10,7 @@ import {
   GenerationStrategy,
   CrucibleChain,
   CrucibleGoal,
+  DirectorGuidance,
 } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildCruciblePrefix } from "./context-builder";
@@ -23,19 +24,18 @@ import { parseTag } from "./tag-parser";
  */
 /**
  * Format pacing signal based on beat count and open constraints.
- * Guides the solver toward convergence as the chain grows.
+ * No hard beat limits — the Director handles strategic pacing.
+ * When all constraints are resolved, signals OPENER mode.
  */
 function formatPacingSignal(beatCount: number, openCount: number): string {
+  if (openCount === 0 && beatCount > 0)
+    return "\nPACING: ALL CONSTRAINTS RESOLVED — write the [OPENER], the chronological first scene of this story. If you cannot write a satisfying opener from the current beats, open new constraints to fill gaps.";
   if (beatCount === 0)
     return "\nPACING: FIRST BEAT — this IS the penultimate scene. Open 1-2 NEW preconditions only (not already listed above). Do NOT resolve anything.";
-  if (beatCount <= 3)
-    return `\nPACING: EARLY — resolve 1-2, open at most 1 if essential. ${openCount} open.`;
-  if (beatCount <= 6)
-    return `\nPACING: CONVERGE — resolve only. No new constraints. ${openCount} remain.`;
-  return `\nPACING: OVERDUE — final beat. Close all ${openCount} constraints NOW.`;
+  return `\nPACING: Beat ${beatCount + 1}. ${openCount} open constraints. Resolve what you can, open new ones only if essential.`;
 }
 
-function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal): string {
+function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: DirectorGuidance | null): string {
   const sections: string[] = [];
 
   // Goal — show [GOAL] text only, strip [OPEN] to avoid duplication
@@ -76,6 +76,11 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal): string {
   // Pacing signal — dynamic convergence pressure
   const pacing = formatPacingSignal(chain.beats.length, chain.openConstraints.length);
   if (pacing) sections.push(pacing);
+
+  // Director guidance — strategic notes from meta-analysis
+  if (guidance?.solver) {
+    sections.push(`\nDIRECTOR GUIDANCE: ${guidance.solver}`);
+  }
 
   return sections.join("\n");
 }
@@ -192,7 +197,7 @@ export const createCrucibleChainFactory = (
       (await api.v1.config.get("crucible_chain_prompt")) || "",
     );
 
-    const context = formatChainContext(chain, goal);
+    const context = formatChainContext(chain, goal, state.crucible.directorGuidance);
     const prefix = await buildCruciblePrefix(getState, {
       includeDirection: true,
       includeDulfs: true,

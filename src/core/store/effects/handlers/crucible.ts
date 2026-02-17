@@ -214,13 +214,9 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
         }
       }
 
-      // Beat count threshold
-      if (updatedChain.beats.length >= 15) {
-        ctx.dispatch(checkpointSet({ reason: "This goal has developed extensively. Continue or step back." }));
-      }
-
-      // Chain completion: all open constraints resolved
-      if (updatedChain.openConstraints.length === 0 && updatedChain.beats.length > 0) {
+      // Chain completion: Solver produced an [OPENER] beat
+      if (parseTag(text, "OPENER")) {
+        api.v1.log(`[crucible] Opener detected at beat ${beatIndex + 1} — chain complete`);
         ctx.dispatch(chainCompleted({ goalId }));
       }
     } catch (e) {

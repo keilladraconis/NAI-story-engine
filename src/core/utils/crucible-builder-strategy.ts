@@ -12,6 +12,7 @@ import {
   CrucibleGoal,
   CrucibleBuilderState,
   CrucibleNodeLink,
+  DirectorGuidance,
 } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildCruciblePrefix } from "./context-builder";
@@ -60,6 +61,7 @@ function formatBuilderContext(
   chain: CrucibleChain,
   goal: CrucibleGoal,
   builder: CrucibleBuilderState,
+  guidance: DirectorGuidance | null,
 ): string {
   const sections: string[] = [];
 
@@ -92,6 +94,11 @@ function formatBuilderContext(
     }
   }
 
+  // Director guidance — strategic notes from meta-analysis
+  if (guidance?.builder) {
+    sections.push(`\nDIRECTOR GUIDANCE: ${guidance.builder}`);
+  }
+
   return sections.join("\n");
 }
 
@@ -115,7 +122,7 @@ export const createCrucibleBuildFactory = (
       (await api.v1.config.get("crucible_build_prompt")) || "",
     );
 
-    const context = formatBuilderContext(chain, goal, state.crucible.builder);
+    const context = formatBuilderContext(chain, goal, state.crucible.builder, state.crucible.directorGuidance);
     const prefix = await buildCruciblePrefix(getState, {
       includeDirection: true,
       includeDulfs: true,

@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771286092
+updatedAt: 1771291194
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -341,10 +341,9 @@ config:
       addresses open constraints. Stay close to the goal before stepping
       further back. Every beat needs tension or revelation — not exposition.
 
-      CONSTRAINT DISCIPLINE (MANDATORY — violations are errors):
+      CONSTRAINT DISCIPLINE:
       - Beat 1: IS the terminal scene. Open 1-2 preconditions. Resolve NOTHING.
-      - Beats 2-4: Resolve 1-2 per beat. Open at most 1 (only if essential).
-      - Beats 5+: Resolve only. Open NOTHING new.
+      - Later beats: Resolve 1-2 per beat. Open new ones only if essential.
 
       RULES:
       - [SCENE] is REQUIRED. Constraint tags only when relevant.
@@ -353,15 +352,18 @@ config:
       - Use [ID:Xn] in [RESOLVED]. For constraints needing no setup, add "ground":
         [RESOLVED] [ID:X1] ground
       - Never resolve or reference constraints that don't exist yet.
-      - Aim for 5-8 beats. Final beat(s) = story's chronological opening.
 
-      TERMINATE when all constraints are resolved or ground state.
+      OPENER: When ALL constraints are resolved, write the [OPENER] — the
+      chronological first scene that launches the story. If the current
+      beats don't support a satisfying opener, open new constraints to
+      fill gaps instead.
 
       Output — one tag per line, [SCENE] required, others as needed:
       [SCENE] What happens — 1-2 vivid sentences
       [RESOLVED] [ID:X0] how/why this is now established
       [RESOLVED] [ID:X1] ground
       [OPEN] one new precondition (only if essential)
+      [OPENER] The chronological first scene (only when all constraints resolved)
   - name: crucible_build_prompt
     prettyName: Crucible Builder Prompt
     description: Prompt for interleaved builder — reviews beats, emits world element nodes
@@ -391,6 +393,41 @@ config:
       [SOLVER]
 
       Valid element tags: CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION
+  - name: crucible_director_prompt
+    prettyName: Crucible Director Prompt
+    description: Prompt for the Director — periodic meta-analysis that guides Solver
+      and Builder toward coherent, diverse world construction
+    type: string
+    multiline: true
+    default: |-
+      You are the Director — a meta-narrative intelligence overseeing
+      backward-chain world construction. You see the full state: the
+      dramatic goal, every beat, all constraints, and the world elements
+      extracted by the Builder.
+
+      Your job is strategic synthesis — identify what the Solver and
+      Builder are missing, where they're redundant, and how to steer
+      the next phase of generation.
+
+      Analyze:
+      1. NARRATIVE SHAPE — Is the chain converging toward a satisfying
+         origin? Do beats cover distinct dramatic territory or repeat
+         themselves? Are any beats doing the same work?
+      2. CONSTRAINT HEALTH — Are open constraints diverse (not all
+         clustering around one theme)? Can any be resolved together in
+         a single scene? Are important preconditions missing?
+      3. WORLD COVERAGE — Do the Builder's elements span the DULFS
+         categories adequately? Are there gaps (no locations? no
+         systems?) or redundancies (similar factions)?
+      4. PACING — Given beat count and constraint count, how
+         aggressively should the Solver converge?
+
+      Output EXACTLY three sections. Be specific — reference constraint
+      IDs (X0, X1...) and element names. No vague advice.
+
+      [ASSESSMENT] 1-2 sentences on overall state
+      [FOR SOLVER] 2-3 sentences of concrete guidance for next beats
+      [FOR BUILDER] 2-3 sentences of concrete guidance for next pass
   - name: story_engine_debug
     prettyName: Story Engine Debug
     description: Enable debug logging for Story Engine

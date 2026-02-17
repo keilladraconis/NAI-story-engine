@@ -14,6 +14,7 @@ import {
   crucibleChainHandler,
 } from "./handlers/crucible";
 import { crucibleBuildHandler } from "./handlers/crucible-builder";
+import { crucibleDirectorHandler } from "./handlers/crucible-director";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -63,6 +64,10 @@ export type CrucibleBuildTarget = Extract<
   GenerationStrategy["target"],
   { type: "crucibleBuild" }
 >;
+export type CrucibleDirectorTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "crucibleDirector" }
+>;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
   target: T;
@@ -106,6 +111,7 @@ export const GENERATION_HANDLERS: {
   crucibleGoal: GenerationHandlers<CrucibleGoalTarget>;
   crucibleChain: GenerationHandlers<CrucibleChainTarget>;
   crucibleBuild: GenerationHandlers<CrucibleBuildTarget>;
+  crucibleDirector: GenerationHandlers<CrucibleDirectorTarget>;
 } = {
   brainstorm: brainstormHandler,
   bootstrap: bootstrapHandler,
@@ -118,6 +124,7 @@ export const GENERATION_HANDLERS: {
   crucibleGoal: crucibleGoalHandler,
   crucibleChain: crucibleChainHandler,
   crucibleBuild: crucibleBuildHandler,
+  crucibleDirector: crucibleDirectorHandler,
 };
 
 export function getHandler(

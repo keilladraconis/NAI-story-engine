@@ -6,6 +6,7 @@ import {
   CrucibleChain,
   CrucibleBuilderState,
   Constraint,
+  DirectorGuidance,
 } from "../types";
 import { DulfsFieldID } from "../../../config/field-definitions";
 import { parseTagAll } from "../../utils/tag-parser";
@@ -63,6 +64,7 @@ export function migrateCrucibleState(loaded: CrucibleState): CrucibleState {
         })),
       }
       : { ...EMPTY_BUILDER },
+    directorGuidance: (loaded as { directorGuidance?: DirectorGuidance | null }).directorGuidance ?? null,
   };
 }
 
@@ -76,6 +78,7 @@ export const initialCrucibleState: CrucibleState = {
   autoChaining: false,
   solverStalls: 0,
   builder: { ...EMPTY_BUILDER },
+  directorGuidance: null,
 };
 
 export const crucibleSlice = createSlice({
@@ -85,6 +88,7 @@ export const crucibleSlice = createSlice({
     // Intent actions — effects handle the actual work
     crucibleGoalsRequested: (state) => state,
     crucibleChainRequested: (state) => state,
+    crucibleDirectorRequested: (state) => state,
     crucibleStopRequested: (state) => state,
 
     // Intent phase reducers
@@ -117,7 +121,7 @@ export const crucibleSlice = createSlice({
     },
 
     goalsCleared: (state) => {
-      return { ...state, goals: [], chains: {}, activeGoalId: null };
+      return { ...state, goals: [], chains: {}, activeGoalId: null, directorGuidance: null };
     },
 
     goalToggled: (state, payload: { goalId: string }) => {
@@ -398,6 +402,89 @@ export const crucibleSlice = createSlice({
       };
     },
 
+    constraintAdded: (state, payload: { goalId: string; id: string; description: string }) => {
+      const chain = state.chains[payload.goalId];
+      if (!chain) return state;
+
+      const shortId = `X${chain.nextConstraintIndex}`;
+      const constraint: Constraint = {
+        id: payload.id,
+        shortId,
+        description: payload.description,
+        sourceBeatIndex: chain.beats.length, // Current beat position
+        status: "open",
+      };
+
+      return {
+        ...state,
+        chains: {
+          ...state.chains,
+          [payload.goalId]: {
+            ...chain,
+            openConstraints: [...chain.openConstraints, constraint],
+            nextConstraintIndex: chain.nextConstraintIndex + 1,
+          },
+        },
+      };
+    },
+
+    constraintRemoved: (state, payload: { goalId: string; constraintId: string }) => {
+      const chain = state.chains[payload.goalId];
+      if (!chain) return state;
+
+      return {
+        ...state,
+        chains: {
+          ...state.chains,
+          [payload.goalId]: {
+            ...chain,
+            openConstraints: chain.openConstraints.filter((c) => c.id !== payload.constraintId),
+            resolvedConstraints: chain.resolvedConstraints.filter((c) => c.id !== payload.constraintId),
+          },
+        },
+      };
+    },
+
+    constraintResolved: (state, payload: { goalId: string; constraintId: string }) => {
+      const chain = state.chains[payload.goalId];
+      if (!chain) return state;
+
+      const constraint = chain.openConstraints.find((c) => c.id === payload.constraintId);
+      if (!constraint) return state;
+
+      return {
+        ...state,
+        chains: {
+          ...state.chains,
+          [payload.goalId]: {
+            ...chain,
+            openConstraints: chain.openConstraints.filter((c) => c.id !== payload.constraintId),
+            resolvedConstraints: [...chain.resolvedConstraints, { ...constraint, status: "resolved" as const }],
+          },
+        },
+      };
+    },
+
+    constraintUnresolved: (state, payload: { goalId: string; constraintId: string }) => {
+      const chain = state.chains[payload.goalId];
+      if (!chain) return state;
+
+      const constraint = chain.resolvedConstraints.find((c) => c.id === payload.constraintId);
+      if (!constraint) return state;
+
+      return {
+        ...state,
+        chains: {
+          ...state.chains,
+          [payload.goalId]: {
+            ...chain,
+            resolvedConstraints: chain.resolvedConstraints.filter((c) => c.id !== payload.constraintId),
+            openConstraints: [...chain.openConstraints, { ...constraint, status: "open" as const }],
+          },
+        },
+      };
+    },
+
     chainCompleted: (state, payload: { goalId: string }) => {
       const chain = state.chains[payload.goalId];
       if (!chain) return state;
@@ -420,6 +507,11 @@ export const crucibleSlice = createSlice({
       return {
         ...state,
         activeGoalId: nextGoal?.id || null,
+        directorGuidance: null, // Clear — guidance is per-goal, stale across goal transitions
+        builder: {
+          ...state.builder,
+          lastProcessedBeatIndex: -1, // Reset — beats are per-chain, index is stale across goals
+        },
       };
     },
 
@@ -527,6 +619,17 @@ export const crucibleSlice = createSlice({
       return { ...state, builderActive: false };
     },
 
+    directorGuidanceSet: (state, payload: { solver: string; builder: string; atBeatIndex: number }) => {
+      return {
+        ...state,
+        directorGuidance: {
+          solver: payload.solver,
+          builder: payload.builder,
+          atBeatIndex: payload.atBeatIndex,
+        },
+      };
+    },
+
     crucibleReset: () => {
       return { ...initialCrucibleState };
     },
@@ -536,6 +639,7 @@ export const crucibleSlice = createSlice({
 export const {
   crucibleGoalsRequested,
   crucibleChainRequested,
+  crucibleDirectorRequested,
   crucibleStopRequested,
   crucibleIntentRequested,
   intentSet,
@@ -554,6 +658,10 @@ export const {
   beatForked,
   beatsDeletedFrom,
   constraintMarkedGroundState,
+  constraintAdded,
+  constraintRemoved,
+  constraintResolved,
+  constraintUnresolved,
   chainCompleted,
   activeGoalAdvanced,
   checkpointSet,
@@ -567,5 +675,6 @@ export const {
   builderBeatProcessed,
   builderNodeRemoved,
   builderDeactivated,
+  directorGuidanceSet,
   crucibleReset,
 } = crucibleSlice.actions;

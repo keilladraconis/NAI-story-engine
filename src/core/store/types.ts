@@ -104,7 +104,8 @@ export interface GenerationRequest {
   | "crucibleIntent"
   | "crucibleGoal"
   | "crucibleChain"
-  | "crucibleBuild";
+  | "crucibleBuild"
+  | "crucibleDirector";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -126,7 +127,8 @@ export interface GenerationStrategy {
   | { type: "crucibleIntent" }
   | { type: "crucibleGoal"; goalId: string }
   | { type: "crucibleChain"; goalId: string }
-  | { type: "crucibleBuild"; goalId: string };
+  | { type: "crucibleBuild"; goalId: string }
+  | { type: "crucibleDirector" };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };
@@ -190,6 +192,12 @@ export interface CrucibleBuilderState {
   lastProcessedBeatIndex: number;
 }
 
+export interface DirectorGuidance {
+  solver: string;
+  builder: string;
+  atBeatIndex: number; // Chain beat count when Director last ran
+}
+
 export interface CrucibleState {
   builderActive: boolean;
   intent: string | null;
@@ -200,6 +208,7 @@ export interface CrucibleState {
   autoChaining: boolean;
   solverStalls: number;
   builder: CrucibleBuilderState;
+  directorGuidance: DirectorGuidance | null;
 }
 
 export interface RootState {

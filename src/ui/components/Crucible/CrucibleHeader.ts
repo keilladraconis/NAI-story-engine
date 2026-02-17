@@ -14,23 +14,6 @@ const { text, row, column } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
-function computeStatusText(state: RootState["crucible"]): string {
-  const { goals, intent, autoChaining, activeGoalId, chains } = state;
-  const hasChain = activeGoalId != null && chains[activeGoalId] != null;
-
-  if (autoChaining || hasChain) {
-    if (autoChaining) {
-      return "Building your world...";
-    }
-    return "World building paused.";
-  } else if (goals.length > 0) {
-    return "Review the generated goals, then build a world from one.";
-  } else if (intent) {
-    return "Describe your story's direction, or let the AI derive it from your brainstorm.";
-  }
-  return "Describe your story's direction, or let the AI derive it from your brainstorm.";
-}
-
 export const CrucibleHeader = defineComponent<undefined, RootState>({
   id: () => "cr-header",
 
@@ -44,11 +27,6 @@ export const CrucibleHeader = defineComponent<undefined, RootState>({
       "font-size": "1.1em",
       "font-weight": "bold",
       color: NAI_HEADER,
-    },
-    statusText: {
-      "font-size": "0.8em",
-      opacity: "0.7",
-      "min-height": "1.2em",
     },
     streamText: {
       "font-size": "0.85em",
@@ -77,22 +55,6 @@ export const CrucibleHeader = defineComponent<undefined, RootState>({
       },
     });
 
-    // Status text
-    useSelector(
-      (s: RootState) => ({
-        goalsCount: s.crucible.goals.length,
-        intent: s.crucible.intent,
-        autoChaining: s.crucible.autoChaining,
-        activeGoalId: s.crucible.activeGoalId,
-        hasActiveChain: s.crucible.activeGoalId != null && s.crucible.chains[s.crucible.activeGoalId] != null,
-      }),
-      () => {
-        api.v1.ui.updateParts([
-          { id: CR.STATUS_TEXT, text: computeStatusText(ctx.getState().crucible) },
-        ]);
-      },
-    );
-
     // Stream text visibility: show when autoChaining or has an active chain
     useSelector(
       (s) => ({
@@ -120,11 +82,6 @@ export const CrucibleHeader = defineComponent<undefined, RootState>({
             text({ text: "Crucible", style: this.style?.("title") }),
             resetBtn,
           ],
-        }),
-        text({
-          id: CR.STATUS_TEXT,
-          text: computeStatusText(state.crucible),
-          style: this.style?.("statusText"),
         }),
         budgetPart,
         text({

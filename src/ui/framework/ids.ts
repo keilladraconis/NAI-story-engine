@@ -14,6 +14,10 @@ export const IDS = {
     CONSTRAINTS_ROOT: "cr-constraints-root",
     OPEN_LIST: "cr-constraints-open",
     RESOLVED_LIST: "cr-constraints-resolved",
+    CONSTRAINT_INPUT: "cr-constraint-input",
+    CONSTRAINT_ADD_BTN: "cr-constraint-add-btn",
+    DIRECTOR_ROOT: "cr-director-root",
+    DIRECTOR_TEXT: "cr-director-text",
     BUILDER_ROOT: "cr-builder-root",
     goal: (id: string) => ({
       ROOT: `cr-goal-${id}`,

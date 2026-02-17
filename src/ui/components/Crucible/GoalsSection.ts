@@ -5,6 +5,7 @@ import {
   goalsCleared,
   goalToggled,
   goalsConfirmed,
+  crucibleStopRequested,
 } from "../../../core/store/slices/crucible";
 import { requestQueued } from "../../../core/store/slices/runtime";
 import { generationSubmitted } from "../../../core/store/slices/ui";
@@ -93,17 +94,18 @@ export const GoalsSection = defineComponent<undefined, RootState>({
           }),
           requestIdFromProjection: () => {
             const s = ctx.getState();
-            // Track chaining/building requests for this goal
-            if (s.runtime.activeRequest?.targetId === goalId &&
-                (s.runtime.activeRequest.type === "crucibleChain" || s.runtime.activeRequest.type === "crucibleBuild")) {
+            // Track chaining/building/director requests for this goal
+            const crucibleTypes = new Set(["crucibleChain", "crucibleBuild", "crucibleDirector"]);
+            if (s.runtime.activeRequest && crucibleTypes.has(s.runtime.activeRequest.type)) {
               return s.runtime.activeRequest.id;
             }
             const queued = s.runtime.queue.find(
-              (q) => q.targetId === goalId && (q.type === "crucibleChain" || q.type === "crucibleBuild"),
+              (q) => crucibleTypes.has(q.type),
             );
             return queued?.id;
           },
           isDisabledFromProjection: () => false,
+          onCancel: () => dispatch(crucibleStopRequested()),
           onGenerate: () => {
             // Deselect all goals, then select only this one and start building
             const s = ctx.getState();

@@ -103,8 +103,8 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
 
     await api.v1.ui.register([
       brainstormPanel,
-      storyEnginePanel,
       cruciblePanel,
+      storyEnginePanel,
       lorebookGenPanel,
     ]);
 
