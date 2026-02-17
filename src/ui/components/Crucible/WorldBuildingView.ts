@@ -118,7 +118,7 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
     const state = ctx.getState();
     const { goals, chains, activeGoalId, directorGuidance } = state.crucible;
     const visible = activeGoalId != null && chains[activeGoalId] != null;
-    const selectedGoals = goals.filter((g) => g.selected);
+    const selectedGoals = goals.filter((g) => g.starred);
 
     // --- Goal progress lines ---
 
@@ -161,10 +161,10 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
     const { part: directorEditable } = ctx.render(EditableText, {
       id: CR.DIRECTOR_TEXT,
       storageKey: DIRECTOR_STORAGE_KEY,
-      placeholder: "Director guidance will appear here after a few beats...",
+      placeholder: "Director guidance will appear here after a few scenes...",
       initialDisplay: directorText
         ? directorText.replace(/\n/g, "  \n").replace(/</g, "\\<")
-        : "_No guidance yet \u2014 the Director runs after 3 beats._",
+        : "_No guidance yet \u2014 the Director runs after 3 scenes._",
       label: "\uD83C\uDFAC Director",
       onSave: (raw: string) => {
         const solver = parseTag(raw, "FOR SOLVER") || "";
@@ -176,7 +176,7 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
         dispatch(directorGuidanceSet({
           solver: solver.trim(),
           builder: builder.trim(),
-          atBeatIndex: chain?.beats.length ?? 0,
+          atSceneIndex: chain?.scenes.length ?? 0,
         }));
       },
     });
@@ -212,7 +212,7 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
       const icon = c.status === "groundState" ? "\u26F0\uFE0F" : "\u2705";
       const label = c.status === "groundState"
         ? "ground state"
-        : `Beat ${c.sourceBeatIndex + 1}`;
+        : `Scene ${c.sourceSceneIndex + 1}`;
       return row({
         id: `cr-cst-r-${c.shortId}`,
         style: this.style?.("resolvedLine"),
@@ -345,7 +345,7 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
     // Goal progress + constraints
     useSelector(
       (s) => ({
-        goals: s.crucible.goals.filter((g) => g.selected),
+        goals: s.crucible.goals.filter((g) => g.starred),
         chains: s.crucible.chains,
         activeGoalId: s.crucible.activeGoalId,
       }),
@@ -386,7 +386,7 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
 
         const display = dirText
           ? dirText.replace(/\n/g, "  \n").replace(/</g, "\\<")
-          : "_No guidance yet \u2014 the Director runs after 3 beats._";
+          : "_No guidance yet \u2014 the Director runs after 3 scenes._";
         api.v1.ui.updateParts([
           { id: `${CR.DIRECTOR_TEXT}-view`, text: display },
           { id: CR.DIRECTOR_ROOT, style: this.style?.("directorRoot", !guidance && "hidden") },

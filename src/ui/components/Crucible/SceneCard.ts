@@ -1,8 +1,8 @@
 import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import {
-  beatEdited,
-  beatsDeletedFrom,
+  sceneEdited,
+  scenesDeletedFrom,
 } from "../../../core/store/slices/crucible";
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
@@ -16,7 +16,7 @@ const CR = IDS.CRUCIBLE;
 
 export interface SceneCardProps {
   goalId: string;
-  beatIndex: number;
+  sceneIndex: number;
 }
 
 const SCENE_BTN_STYLE = {
@@ -24,7 +24,7 @@ const SCENE_BTN_STYLE = {
 };
 
 export const SceneCard = defineComponent<SceneCardProps, RootState>({
-  id: (props) => CR.beat(props.goalId, props.beatIndex).ROOT,
+  id: (props) => CR.scene(props.goalId, props.sceneIndex).ROOT,
 
   styles: {
     card: {
@@ -41,10 +41,10 @@ export const SceneCard = defineComponent<SceneCardProps, RootState>({
 
   build(props, ctx) {
     const { dispatch, useSelector } = ctx;
-    const { goalId, beatIndex } = props;
-    const ids = CR.beat(goalId, beatIndex);
+    const { goalId, sceneIndex } = props;
+    const ids = CR.scene(goalId, sceneIndex);
     const state = ctx.getState();
-    const scene = state.crucible.chains[goalId]?.beats[beatIndex];
+    const scene = state.crucible.chains[goalId]?.scenes[sceneIndex];
     const isTainted = scene?.tainted ?? false;
 
     const delBtn = button({
@@ -52,10 +52,10 @@ export const SceneCard = defineComponent<SceneCardProps, RootState>({
       text: "",
       iconId: "trash-2",
       style: SCENE_BTN_STYLE,
-      callback: () => dispatch(beatsDeletedFrom({ goalId, fromIndex: beatIndex })),
+      callback: () => dispatch(scenesDeletedFrom({ goalId, fromIndex: sceneIndex })),
     });
 
-    const label = `Scene ${sceneNumber(beatIndex)}`;
+    const label = `Scene ${sceneNumber(sceneIndex)}`;
 
     const formatDisplay = (content: string): string =>
       formatTagsWithEmoji(stripSceneTag(content));
@@ -64,7 +64,7 @@ export const SceneCard = defineComponent<SceneCardProps, RootState>({
 
     const { part: editable } = ctx.render(EditableText, {
       id: ids.TEXT,
-      storageKey: `cr-beat-${goalId}-${beatIndex}`,
+      storageKey: `cr-scene-${goalId}-${sceneIndex}`,
       placeholder: "[SCENE] ...\n[OPEN] ...\n[RESOLVED] ...",
       label,
       initialDisplay: sceneDisplay,
@@ -73,13 +73,13 @@ export const SceneCard = defineComponent<SceneCardProps, RootState>({
         const s = ctx.getState();
         const chain = s.crucible.chains[goalId];
         if (!chain) return;
-        const existing = chain.beats[beatIndex];
+        const existing = chain.scenes[sceneIndex];
         if (!existing) return;
 
-        dispatch(beatEdited({
+        dispatch(sceneEdited({
           goalId,
-          beatIndex,
-          beat: {
+          sceneIndex,
+          scene: {
             text: content,
             constraintsResolved: existing.constraintsResolved,
             newOpenConstraints: existing.newOpenConstraints,
@@ -92,7 +92,7 @@ export const SceneCard = defineComponent<SceneCardProps, RootState>({
 
     // Reactively update tainted indicator (border color)
     useSelector(
-      (s) => s.crucible.chains[goalId]?.beats[beatIndex]?.tainted ?? false,
+      (s) => s.crucible.chains[goalId]?.scenes[sceneIndex]?.tainted ?? false,
       (tainted) => {
         api.v1.ui.updateParts([
           { id: ids.ROOT, style: this.style?.("card", tainted && "tainted") },

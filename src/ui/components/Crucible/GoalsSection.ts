@@ -3,7 +3,7 @@ import { RootState } from "../../../core/store/types";
 import {
   goalAdded,
   goalsCleared,
-  goalToggled,
+  goalStarred,
   goalsConfirmed,
   crucibleStopRequested,
 } from "../../../core/store/slices/crucible";
@@ -70,12 +70,12 @@ export const GoalsSection = defineComponent<undefined, RootState>({
     const goalTitle = (goalText: string): string =>
       parseTag(goalText, "GOAL")?.slice(0, 40) || goalText.slice(0, 40) || "New goal";
 
-    const ensureSceneCard = (goalId: string, beatIndex: number, beatText: string): UIPart => {
-      const cacheKey = `${goalId}:${beatIndex}`;
+    const ensureSceneCard = (goalId: string, sceneIndex: number, sceneText: string): UIPart => {
+      const cacheKey = `${goalId}:${sceneIndex}`;
       if (!sceneCardCache.has(cacheKey)) {
-        const { part } = ctx.render(SceneCard, { goalId, beatIndex });
+        const { part } = ctx.render(SceneCard, { goalId, sceneIndex });
         sceneCardCache.set(cacheKey, part);
-        api.v1.storyStorage.set(`cr-beat-${goalId}-${beatIndex}`, beatText);
+        api.v1.storyStorage.set(`cr-scene-${goalId}-${sceneIndex}`, sceneText);
       }
       return sceneCardCache.get(cacheKey)!;
     };
@@ -110,13 +110,13 @@ export const GoalsSection = defineComponent<undefined, RootState>({
             // Deselect all goals, then select only this one and start building
             const s = ctx.getState();
             for (const g of s.crucible.goals) {
-              if (g.selected && g.id !== goalId) {
-                dispatch(goalToggled({ goalId: g.id }));
+              if (g.starred && g.id !== goalId) {
+                dispatch(goalStarred({ goalId: g.id }));
               }
             }
             const goal = s.crucible.goals.find((g) => g.id === goalId);
-            if (goal && !goal.selected) {
-              dispatch(goalToggled({ goalId }));
+            if (goal && !goal.starred) {
+              dispatch(goalStarred({ goalId }));
             }
             dispatch(goalsConfirmed());
           },
@@ -133,12 +133,12 @@ export const GoalsSection = defineComponent<undefined, RootState>({
         goalCardCache.set(goalId, part);
       }
 
-      // Build beat cards (newest first)
+      // Build scene cards (newest first)
       const chain = ctx.getState().crucible.chains[goalId];
       const sceneParts: UIPart[] = [];
       if (chain) {
-        for (let i = chain.beats.length - 1; i >= 0; i--) {
-          sceneParts.push(ensureSceneCard(goalId, i, chain.beats[i].text));
+        for (let i = chain.scenes.length - 1; i >= 0; i--) {
+          sceneParts.push(ensureSceneCard(goalId, i, chain.scenes[i].text));
         }
       }
 
@@ -166,7 +166,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
     const hasGoals = goals.length > 0;
     const initialGoalSections = goals.map((g) => buildGoalSection(g.id, g.text));
 
-    // --- Reactive: rebuild goal list on add/remove/text/beat changes ---
+    // --- Reactive: rebuild goal list on add/remove/text/scene changes ---
 
     const rebuildGoalsList = (): void => {
       const st = ctx.getState();
@@ -212,7 +212,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
         { id: CR.GOALS_LIST, style: this.style?.("goalsList"), content: sections },
       ]);
 
-      // Update view text for goal cards + beat cards
+      // Update view text for goal cards + scene cards
       for (const goal of currentGoals) {
         const viewId = `${CR.goal(goal.id).TEXT}-view`;
         if (goal.text) {
@@ -225,23 +225,23 @@ export const GoalsSection = defineComponent<undefined, RootState>({
 
         const chain = st.crucible.chains[goal.id];
         if (!chain) continue;
-        for (let i = 0; i < chain.beats.length; i++) {
-          const beatDisplay = formatTagsWithEmoji(stripSceneTag(chain.beats[i].text))
+        for (let i = 0; i < chain.scenes.length; i++) {
+          const sceneDisplay = formatTagsWithEmoji(stripSceneTag(chain.scenes[i].text))
             .replace(/\n/g, "  \n").replace(/</g, "\\<");
           api.v1.ui.updateParts([
-            { id: `${CR.beat(goal.id, i).TEXT}-view`, text: beatDisplay },
+            { id: `${CR.scene(goal.id, i).TEXT}-view`, text: sceneDisplay },
           ]);
         }
       }
     };
 
-    // Rebuild on goal add/remove/text changes OR beat count changes
+    // Rebuild on goal add/remove/text changes OR scene count changes
     useSelector(
       (s) => {
         const parts: string[] = [];
         for (const g of s.crucible.goals) {
-          const beatCount = s.crucible.chains[g.id]?.beats.length ?? 0;
-          parts.push(`${g.id}:${g.text}:${beatCount}`);
+          const sceneCount = s.crucible.chains[g.id]?.scenes.length ?? 0;
+          parts.push(`${g.id}:${g.text}:${sceneCount}`);
         }
         return parts.join("\0");
       },
@@ -309,7 +309,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
               style: this.style?.("btn"),
               callback: () => {
                 const goalId = api.v1.uuid();
-                dispatch(goalAdded({ goal: { id: goalId, text: "", selected: false } }));
+                dispatch(goalAdded({ goal: { id: goalId, text: "", starred: false } }));
                 const strategy = buildCrucibleGoalStrategy(ctx.getState, goalId);
                 dispatch(requestQueued({
                   id: strategy.requestId,

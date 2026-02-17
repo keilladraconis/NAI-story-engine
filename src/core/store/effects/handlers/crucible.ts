@@ -4,15 +4,15 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import {
-  CrucibleBeat,
+  CrucibleScene,
   Constraint,
 } from "../../types";
 import {
   goalTextUpdated,
-  beatAdded,
+  sceneAdded,
   chainCompleted,
   checkpointSet,
-  intentSet,
+  directionSet,
   directorGuidanceConsumed,
 } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
@@ -48,27 +48,27 @@ function stripThinkingTags(text: string): string {
 
 // --- Types for crucible targets ---
 
-type CrucibleIntentTarget = { type: "crucibleIntent" };
+type CrucibleDirectionTarget = { type: "crucibleDirection" };
 type CrucibleGoalTarget = { type: "crucibleGoal"; goalId: string };
 type CrucibleChainTarget = { type: "crucibleChain"; goalId: string };
 
-// --- Intent Handler ---
+// --- Direction Handler ---
 
-export const crucibleIntentHandler: GenerationHandlers<CrucibleIntentTarget> = {
-  streaming(ctx: StreamingContext<CrucibleIntentTarget>): void {
+export const crucibleDirectionHandler: GenerationHandlers<CrucibleDirectionTarget> = {
+  streaming(ctx: StreamingContext<CrucibleDirectionTarget>): void {
     const clean = stripThinkingTags(ctx.accumulatedText);
     const display = clean.replace(/\n/g, "  \n").replace(/</g, "\\<");
-    api.v1.ui.updateParts([{ id: `${IDS.CRUCIBLE.INTENT_TEXT}-view`, text: display }]);
+    api.v1.ui.updateParts([{ id: `${IDS.CRUCIBLE.DIRECTION_TEXT}-view`, text: display }]);
   },
 
-  async completion(ctx: CompletionContext<CrucibleIntentTarget>): Promise<void> {
+  async completion(ctx: CompletionContext<CrucibleDirectionTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
     const text = stripThinkingTags(ctx.accumulatedText).trim();
     if (text.length > 0) {
-      ctx.dispatch(intentSet({ intent: text }));
+      ctx.dispatch(directionSet({ direction: text }));
     } else {
-      api.v1.log("[crucible] Intent generation produced empty text");
+      api.v1.log("[crucible] Direction generation produced empty text");
     }
   },
 };
@@ -165,27 +165,27 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
         .map((s) => s.replace(/\[ID:\w+\]\s*/g, "").replace(/\[X\d+\]\s*/gi, "").trim())
         .filter((s) => s.length > 0);
 
-      const beat: CrucibleBeat = {
+      const scene: CrucibleScene = {
         text,
         constraintsResolved,       // shortIds
         newOpenConstraints,         // description strings (new constraints don't have IDs yet)
         groundStateConstraints,     // shortIds
       };
 
-      const beatIndex = chain.beats.length;
+      const sceneIndex = chain.scenes.length;
 
       // opened constraints: shortId will be assigned by the reducer
       const opened: Constraint[] = newOpenConstraints.map((desc) => ({
         id: api.v1.uuid(),
         shortId: "", // placeholder — reducer assigns monotonic shortId
         description: desc,
-        sourceBeatIndex: beatIndex,
+        sourceSceneIndex: sceneIndex,
         status: "open" as const,
       }));
 
-      ctx.dispatch(beatAdded({
+      ctx.dispatch(sceneAdded({
         goalId,
-        beat,
+        scene,
         constraints: {
           resolved: constraintsResolved,   // shortIds
           opened,
@@ -196,31 +196,31 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
       ctx.dispatch(directorGuidanceConsumed({ by: "solver" }));
 
       // Seed SceneCard storyStorage + populate view
-      api.v1.storyStorage.set(`cr-beat-${goalId}-${beatIndex}`, text);
-      const beatViewId = `${IDS.CRUCIBLE.beat(goalId, beatIndex).TEXT}-view`;
-      const beatDisplay = formatTagsWithEmoji(stripSceneTag(text))
+      api.v1.storyStorage.set(`cr-scene-${goalId}-${sceneIndex}`, text);
+      const sceneViewId = `${IDS.CRUCIBLE.scene(goalId, sceneIndex).TEXT}-view`;
+      const sceneDisplay = formatTagsWithEmoji(stripSceneTag(text))
         .replace(/\n/g, "  \n").replace(/</g, "\\<");
-      api.v1.ui.updateParts([{ id: beatViewId, text: beatDisplay }]);
+      api.v1.ui.updateParts([{ id: sceneViewId, text: sceneDisplay }]);
 
       // --- Checkpoint detection ---
       const updatedState = ctx.getState();
       const updatedChain = updatedState.crucible.chains[goalId];
       if (!updatedChain) return;
 
-      // Constraint explosion: net growth >1 for 3 consecutive beats
-      if (updatedChain.beats.length >= 3) {
-        const lastThree = updatedChain.beats.slice(-3);
+      // Constraint explosion: net growth >1 for 3 consecutive scenes
+      if (updatedChain.scenes.length >= 3) {
+        const lastThree = updatedChain.scenes.slice(-3);
         const explosionCount = lastThree.filter(
-          (b) => b.newOpenConstraints.length - b.constraintsResolved.length > 1,
+          (s) => s.newOpenConstraints.length - s.constraintsResolved.length > 1,
         ).length;
         if (explosionCount >= 3) {
           ctx.dispatch(checkpointSet({ reason: "The story is getting complex. Review and continue, or step back." }));
         }
       }
 
-      // Chain completion: Solver produced an [OPENER] beat
+      // Chain completion: Solver produced an [OPENER] scene
       if (parseTag(text, "OPENER")) {
-        api.v1.log(`[crucible] Opener detected at beat ${beatIndex + 1} — chain complete`);
+        api.v1.log(`[crucible] Opener detected at scene ${sceneIndex + 1} — chain complete`);
         ctx.dispatch(chainCompleted({ goalId }));
       }
     } catch (e) {

@@ -34,10 +34,10 @@ import {
   requestCompleted,
   crucibleGoalsRequested,
   crucibleStopRequested,
-  crucibleIntentRequested,
+  crucibleDirectionRequested,
   crucibleBuildRequested,
   crucibleReset,
-  intentSet,
+  directionSet,
   goalAdded,
   goalsConfirmed,
   crucibleChainRequested,
@@ -63,7 +63,7 @@ import {
   extractDulfsItemName,
 } from "../utils/context-builder";
 import {
-  buildCrucibleIntentStrategy,
+  buildCrucibleDirectionStrategy,
   buildCrucibleGoalStrategy,
   buildCrucibleChainStrategy,
 } from "../utils/crucible-strategy";
@@ -237,7 +237,7 @@ function resolvePrefill(
   }
 
   // Crucible targets use explicit assistantPrefill (JSON anchors)
-  if (target.type === "crucibleIntent" || target.type === "crucibleGoal" || target.type === "crucibleChain" || target.type === "crucibleBuild") {
+  if (target.type === "crucibleDirection" || target.type === "crucibleGoal" || target.type === "crucibleChain" || target.type === "crucibleBuild") {
     if (assistantPrefill) return assistantPrefill;
   }
 
@@ -315,8 +315,8 @@ function cacheLabel(target: GenerationStrategy["target"]): string {
       return `lb-refine:${target.entryId.slice(0, 8)}`;
     case "bootstrap":
       return "bootstrap";
-    case "crucibleIntent":
-      return "crucible-intent";
+    case "crucibleDirection":
+      return "crucible-direction";
     case "crucibleGoal":
       return `crucible-goal:${target.goalId.slice(0, 8)}`;
     case "crucibleChain":
@@ -787,15 +787,15 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Intent Requested → queue intent generation
+  // Intent: Crucible Direction Requested → queue direction generation
   subscribeEffect(
-    matchesAction(crucibleIntentRequested),
+    matchesAction(crucibleDirectionRequested),
     async (_action, { dispatch }) => {
-      const strategy = buildCrucibleIntentStrategy(getState);
+      const strategy = buildCrucibleDirectionStrategy(getState);
       dispatch(
         requestQueued({
           id: strategy.requestId,
-          type: "crucibleIntent",
+          type: "crucibleDirection",
           targetId: "crucible",
         }),
       );
@@ -808,17 +808,17 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     matchesAction(crucibleGoalsRequested),
     async (_action, { dispatch }) => {
       // Sync intent from storyStorage (user may have edited it)
-      const editedIntent = String(
-        (await api.v1.storyStorage.get("cr-intent")) || "",
+      const editedDirection = String(
+        (await api.v1.storyStorage.get("cr-direction")) || "",
       );
-      if (editedIntent) {
-        dispatch(intentSet({ intent: editedIntent }));
+      if (editedDirection) {
+        dispatch(directionSet({ direction: editedDirection }));
       }
 
       // Create 3 empty goals and queue generation for each
       for (let i = 0; i < 3; i++) {
         const goalId = api.v1.uuid();
-        dispatch(goalAdded({ goal: { id: goalId, text: "", selected: false } }));
+        dispatch(goalAdded({ goal: { id: goalId, text: "", starred: false } }));
 
         const strategy = buildCrucibleGoalStrategy(getState, goalId);
         dispatch(
@@ -839,14 +839,14 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     (_action, { dispatch, getState: getLatest }) => {
       resetStreamTranscript();
       const state = getLatest();
-      const selectedGoals = state.crucible.goals.filter((g) => g.selected);
-      if (selectedGoals.length === 0) {
-        api.v1.log("[crucible] No goals selected");
+      const starredGoals = state.crucible.goals.filter((g) => g.starred);
+      if (starredGoals.length === 0) {
+        api.v1.log("[crucible] No goals starred");
         return;
       }
 
-      // Init chains for all selected goals
-      for (const goal of selectedGoals) {
+      // Init chains for all starred goals
+      for (const goal of starredGoals) {
         dispatch(chainStarted({ goalId: goal.id }));
       }
 
@@ -888,7 +888,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         dispatch(autoChainStopped());
       }
       const activeRequest = state.runtime.activeRequest;
-      if (activeRequest && (activeRequest.type === "crucibleIntent" || activeRequest.type === "crucibleGoal" || activeRequest.type === "crucibleChain" || activeRequest.type === "crucibleBuild" || activeRequest.type === "crucibleDirector")) {
+      if (activeRequest && (activeRequest.type === "crucibleDirection" || activeRequest.type === "crucibleGoal" || activeRequest.type === "crucibleChain" || activeRequest.type === "crucibleBuild" || activeRequest.type === "crucibleDirector")) {
         dispatch(requestCancelled({ requestId: activeRequest.id }));
         genX.cancelAll();
       }
@@ -900,9 +900,9 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     matchesAction(crucibleReset),
     async () => {
       resetStreamTranscript();
-      await api.v1.storyStorage.set("cr-intent", "");
+      await api.v1.storyStorage.set("cr-direction", "");
       api.v1.ui.updateParts([
-        { id: `${IDS.CRUCIBLE.INTENT_TEXT}-view`, text: "" },
+        { id: `${IDS.CRUCIBLE.DIRECTION_TEXT}-view`, text: "" },
       ]);
     },
   );
@@ -946,9 +946,9 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  const DIRECTOR_BEAT_INTERVAL = 3; // Run Director every N beats
+  const DIRECTOR_SCENE_INTERVAL = 3; // Run Director every N scenes
 
-  /** Check if the Director should run before the next solver beat. */
+  /** Check if the Director should run before the next solver scene. */
   function needsDirector(): boolean {
     const state = getState();
     const { activeGoalId, directorGuidance } = state.crucible;
@@ -956,12 +956,12 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     const chain = state.crucible.chains[activeGoalId];
     if (!chain) return false;
 
-    const beatCount = chain.beats.length;
+    const sceneCount = chain.scenes.length;
     // Need enough material to assess
-    if (beatCount < DIRECTOR_BEAT_INTERVAL) return false;
-    // Run if no guidance yet, or enough beats since last run
+    if (sceneCount < DIRECTOR_SCENE_INTERVAL) return false;
+    // Run if no guidance yet, or enough scenes since last run
     if (!directorGuidance) return true;
-    return beatCount - directorGuidance.atBeatIndex >= DIRECTOR_BEAT_INTERVAL;
+    return sceneCount - directorGuidance.atSceneIndex >= DIRECTOR_SCENE_INTERVAL;
   }
 
   // Auto-chain continuation: interleaved Solver → Builder → (Director?) → Solver loop
@@ -982,8 +982,8 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       if (!chain) return;
 
       const builderBehind =
-        state.crucible.builder.lastProcessedBeatIndex < chain.beats.length - 1
-        && chain.beats.length > 0;
+        state.crucible.builder.lastProcessedSceneIndex < chain.scenes.length - 1
+        && chain.scenes.length > 0;
 
       // --- Goal complete ---
       if (chain.complete) {
@@ -1012,12 +1012,12 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       }
 
       if (needsDirector()) {
-        api.v1.log(`[crucible] Director assessment at beat ${chain.beats.length}`);
+        api.v1.log(`[crucible] Director assessment at scene ${chain.scenes.length}`);
         dispatch(crucibleDirectorRequested());
         return;
       }
 
-      api.v1.log(`[crucible] Continuing solver — beat ${chain.beats.length}`);
+      api.v1.log(`[crucible] Continuing solver — scene ${chain.scenes.length}`);
       dispatch(crucibleChainRequested());
     },
   );
@@ -1043,7 +1043,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       const { requestId } = action.payload;
       if (
         state.runtime.activeRequest?.id === requestId &&
-        (state.runtime.activeRequest?.type === "crucibleIntent" || state.runtime.activeRequest?.type === "crucibleChain" || state.runtime.activeRequest?.type === "crucibleGoal" || state.runtime.activeRequest?.type === "crucibleBuild")
+        (state.runtime.activeRequest?.type === "crucibleDirection" || state.runtime.activeRequest?.type === "crucibleChain" || state.runtime.activeRequest?.type === "crucibleGoal" || state.runtime.activeRequest?.type === "crucibleBuild")
       ) {
         dispatch(autoChainStopped());
       }

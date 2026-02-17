@@ -1,10 +1,10 @@
 import { defineComponent } from "nai-act";
-import { RootState, CrucibleNodeLink } from "../../../core/store/types";
+import { RootState, CrucibleWorldElement } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
 import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
 import {
-  builderNodeUpdated,
-  builderNodeRemoved,
+  builderElementUpdated,
+  builderElementRemoved,
 } from "../../../core/store/slices/crucible";
 import { EditableText } from "../EditableText";
 import {
@@ -24,20 +24,20 @@ const FIELD_LABELS: Record<DulfsFieldID, string> = {
   [FieldID.SituationalDynamics]: "Situations",
 };
 
-/** Group nodes by fieldId for display. */
-function groupByField(nodes: CrucibleNodeLink[]): Map<DulfsFieldID, CrucibleNodeLink[]> {
-  const groups = new Map<DulfsFieldID, CrucibleNodeLink[]>();
-  for (const node of nodes) {
-    const list = groups.get(node.fieldId) || [];
-    list.push(node);
-    groups.set(node.fieldId, list);
+/** Group elements by fieldId for display. */
+function groupByField(elements: CrucibleWorldElement[]): Map<DulfsFieldID, CrucibleWorldElement[]> {
+  const groups = new Map<DulfsFieldID, CrucibleWorldElement[]>();
+  for (const el of elements) {
+    const list = groups.get(el.fieldId) || [];
+    list.push(el);
+    groups.set(el.fieldId, list);
   }
   return groups;
 }
 
-/** Format node as "Name: content" for the editable text field. */
-function formatNodeText(node: CrucibleNodeLink): string {
-  return node.content ? `${node.name}: ${node.content}` : node.name;
+/** Format element as "Name: content" for the editable text field. */
+function formatElementText(el: CrucibleWorldElement): string {
+  return el.content ? `${el.name}: ${el.content}` : el.name;
 }
 
 /** Escape text for markdown view display. */
@@ -46,7 +46,7 @@ function escapeViewText(raw: string): string {
 }
 
 /** Parse "Name: content" back into name and content parts. */
-function parseNodeText(raw: string): { name: string; content: string } {
+function parseElementText(raw: string): { name: string; content: string } {
   const colonIdx = raw.indexOf(":");
   if (colonIdx === -1) return { name: raw.trim(), content: "" };
   return {
@@ -55,9 +55,9 @@ function parseNodeText(raw: string): { name: string; content: string } {
   };
 }
 
-/** Storage key for a node's editable text. */
-function nodeStorageKey(nodeId: string): string {
-  return `cr-node-${nodeId}`;
+/** Storage key for an element's editable text. */
+function elementStorageKey(elementId: string): string {
+  return `cr-element-${elementId}`;
 }
 
 export const BuilderView = defineComponent<undefined, RootState>({
@@ -93,96 +93,96 @@ export const BuilderView = defineComponent<undefined, RootState>({
   build(_props, ctx) {
     const { dispatch, useSelector } = ctx;
 
-    // Mount-once cache: nodeId → full card UIPart (including EditableText)
-    const nodeCardCache = new Map<string, UIPart>();
+    // Mount-once cache: elementId → full card UIPart (including EditableText)
+    const elementCardCache = new Map<string, UIPart>();
 
-    /** Ensure a node card exists in the cache, mounting EditableText once.
+    /** Ensure an element card exists in the cache, mounting EditableText once.
      *  Caller must seed storyStorage BEFORE calling this. */
-    const ensureNodeCard = (node: CrucibleNodeLink): UIPart => {
-      if (!nodeCardCache.has(node.id)) {
-        const storageKey = nodeStorageKey(node.id);
+    const ensureElementCard = (el: CrucibleWorldElement): UIPart => {
+      if (!elementCardCache.has(el.id)) {
+        const storageKey = elementStorageKey(el.id);
 
         const { part: editable } = ctx.render(EditableText, {
-          id: `cr-node-${node.id}-text`,
+          id: `cr-element-${el.id}-text`,
           storageKey,
           placeholder: "Name: description...",
-          initialDisplay: formatNodeText(node),
+          initialDisplay: formatElementText(el),
           onSave: (raw: string) => {
-            const parsed = parseNodeText(raw);
-            dispatch(builderNodeUpdated({
-              id: node.id,
+            const parsed = parseElementText(raw);
+            dispatch(builderElementUpdated({
+              id: el.id,
               name: parsed.name,
               content: parsed.content,
             }));
           },
-          label: node.name,
+          label: el.name,
           extraControls: [
             button({
               text: "",
               iconId: "trash-2",
               style: this.style?.("deleteBtn"),
               callback: () => {
-                dispatch(builderNodeRemoved({ id: node.id }));
+                dispatch(builderElementRemoved({ id: el.id }));
                 api.v1.storyStorage.set(storageKey, "");
               },
             }),
           ],
         });
 
-        nodeCardCache.set(node.id, column({
-          id: `cr-node-card-${node.id}`,
+        elementCardCache.set(el.id, column({
+          id: `cr-element-card-${el.id}`,
           style: this.style?.("nodeCard"),
           content: [editable],
         }));
       }
-      return nodeCardCache.get(node.id)!;
+      return elementCardCache.get(el.id)!;
     };
 
-    /** Build the grouped section UIParts from current nodes. */
-    const buildSections = (nodes: CrucibleNodeLink[]): UIPart[] => {
-      const groups = groupByField(nodes);
+    /** Build the grouped section UIParts from current elements. */
+    const buildSections = (elements: CrucibleWorldElement[]): UIPart[] => {
+      const groups = groupByField(elements);
       const sectionParts: UIPart[] = [
         row({ style: this.style?.("divider"), content: [] }),
         text({ text: "World Elements", style: { ...this.style?.("sectionTitle"), color: NAI_HEADER } }),
       ];
 
-      for (const [fieldId, fieldNodes] of groups) {
+      for (const [fieldId, fieldElements] of groups) {
         const label = FIELD_LABELS[fieldId] || fieldId;
         sectionParts.push(
           text({ text: label, style: this.style?.("sectionTitle") }),
         );
-        for (const node of fieldNodes) {
-          sectionParts.push(ensureNodeCard(node));
+        for (const el of fieldElements) {
+          sectionParts.push(ensureElementCard(el));
         }
       }
       return sectionParts;
     };
 
     useSelector(
-      (s) => s.crucible.builder.nodes,
-      (nodes) => {
-        // Evict removed nodes from cache
-        const currentIds = new Set(nodes.map((n) => n.id));
-        for (const [id] of nodeCardCache) {
+      (s) => s.crucible.builder.elements,
+      (elements) => {
+        // Evict removed elements from cache
+        const currentIds = new Set(elements.map((e) => e.id));
+        for (const [id] of elementCardCache) {
           if (!currentIds.has(id)) {
-            nodeCardCache.delete(id);
+            elementCardCache.delete(id);
           }
         }
 
-        if (nodes.length === 0) {
+        if (elements.length === 0) {
           api.v1.ui.updateParts([
             { id: CR.BUILDER_ROOT, style: this.style?.("hidden"), content: [] },
           ]);
           return;
         }
 
-        // Seed storyStorage for all nodes BEFORE building sections
-        for (const node of nodes) {
-          api.v1.storyStorage.set(nodeStorageKey(node.id), formatNodeText(node));
+        // Seed storyStorage for all elements BEFORE building sections
+        for (const el of elements) {
+          api.v1.storyStorage.set(elementStorageKey(el.id), formatElementText(el));
         }
 
-        // Build section tree (ensureNodeCard mounts new EditableTexts once, reuses after)
-        const sectionParts = buildSections(nodes);
+        // Build section tree (ensureElementCard mounts new EditableTexts once, reuses after)
+        const sectionParts = buildSections(elements);
 
         // Place tree — all view IDs now exist after this call
         api.v1.ui.updateParts([
@@ -190,10 +190,10 @@ export const BuilderView = defineComponent<undefined, RootState>({
         ]);
 
         // NOW update view text — view IDs are in the tree
-        for (const node of nodes) {
-          const viewText = escapeViewText(formatNodeText(node));
+        for (const el of elements) {
+          const viewText = escapeViewText(formatElementText(el));
           api.v1.ui.updateParts([
-            { id: `cr-node-${node.id}-text-view`, text: viewText },
+            { id: `cr-element-${el.id}-text-view`, text: viewText },
           ]);
         }
 
@@ -201,7 +201,7 @@ export const BuilderView = defineComponent<undefined, RootState>({
     );
 
     // Always start hidden — useSelector handles all rendering on state changes
-    // (persist/loaded / builderNodeAdded trigger the callback above)
+    // (persist/loaded / builderElementAdded trigger the callback above)
     return column({
       id: CR.BUILDER_ROOT,
       style: this.style?.("hidden"),

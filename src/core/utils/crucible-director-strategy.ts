@@ -1,12 +1,12 @@
 /**
  * Crucible Director Strategy — Periodic meta-analysis agent.
  *
- * The Director runs at builder→solver transitions when 3+ beats have
+ * The Director runs at builder→solver transitions when 3+ scenes have
  * accumulated since its last assessment. It sees the full chain state —
- * beats, constraints, builder nodes — and produces targeted guidance
+ * scenes, constraints, world elements — and produces targeted guidance
  * for both Solver and Builder.
  *
- * Output: ~200-400 tokens. Cost is negligible compared to the beats themselves.
+ * Output: ~200-400 tokens. Cost is negligible compared to the scenes themselves.
  */
 
 import {
@@ -14,7 +14,7 @@ import {
   GenerationStrategy,
   CrucibleChain,
   CrucibleGoal,
-  CrucibleNodeLink,
+  CrucibleWorldElement,
   DirectorGuidance,
 } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
@@ -35,13 +35,13 @@ const FIELD_LABEL: Record<DulfsFieldID, string> = {
 
 /**
  * Format a comprehensive snapshot for the Director.
- * Shows everything: goal, all beats, all constraints, all builder nodes,
+ * Shows everything: goal, all scenes, all constraints, all world elements,
  * and the previous Director guidance (if any).
  */
 function formatDirectorContext(
   goal: CrucibleGoal,
   chain: CrucibleChain,
-  nodes: CrucibleNodeLink[],
+  elements: CrucibleWorldElement[],
   previousGuidance: DirectorGuidance | null,
 ): string {
   const sections: string[] = [];
@@ -51,13 +51,13 @@ function formatDirectorContext(
   sections.push(`GOAL: ${goalText}`);
 
   // All scenes (story-chronological for Director — reading the screenplay)
-  if (chain.beats.length > 0) {
-    sections.push(`\nSCENES (${chain.beats.length} total, story order — Scene ${sceneNumber(chain.beats.length - 1)} → Scene ${sceneNumber(0)}):`);
-    for (let i = chain.beats.length - 1; i >= 0; i--) {
-      const scene = parseTag(chain.beats[i].text, "SCENE") || chain.beats[i].text.split("\n")[0];
+  if (chain.scenes.length > 0) {
+    sections.push(`\nSCENES (${chain.scenes.length} total, story order — Scene ${sceneNumber(chain.scenes.length - 1)} → Scene ${sceneNumber(0)}):`);
+    for (let i = chain.scenes.length - 1; i >= 0; i--) {
+      const scene = parseTag(chain.scenes[i].text, "SCENE") || chain.scenes[i].text.split("\n")[0];
       const markers: string[] = [];
-      if (chain.beats[i].favorited) markers.push("★");
-      if (chain.beats[i].tainted) markers.push("⚠ TAINTED");
+      if (chain.scenes[i].favorited) markers.push("★");
+      if (chain.scenes[i].tainted) markers.push("⚠ TAINTED");
       const suffix = markers.length > 0 ? ` (${markers.join(", ")})` : "";
       sections.push(`  Scene ${sceneNumber(i)}: ${scene}${suffix}`);
     }
@@ -78,20 +78,20 @@ function formatDirectorContext(
   if (resolved.length > 0) {
     sections.push("RESOLVED:");
     for (const c of resolved) {
-      const label = c.status === "groundState" ? "ground state" : `Scene ${sceneNumber(c.sourceBeatIndex)}`;
+      const label = c.status === "groundState" ? "ground state" : `Scene ${sceneNumber(c.sourceSceneIndex)}`;
       sections.push(`  [${c.shortId}] ${c.description} → ${label}`);
     }
   }
 
-  // Builder nodes
-  if (nodes.length > 0) {
-    const shortIds = computeShortIds(nodes);
-    sections.push(`\nWORLD ELEMENTS (${nodes.length}):`);
-    for (const node of nodes) {
-      const sid = shortIds.get(node.id) || "??";
-      const label = FIELD_LABEL[node.fieldId] || node.fieldId;
-      const desc = node.content ? ` — ${node.content}` : "";
-      sections.push(`  [${sid}] ${node.name} (${label})${desc}`);
+  // World elements
+  if (elements.length > 0) {
+    const shortIds = computeShortIds(elements);
+    sections.push(`\nWORLD ELEMENTS (${elements.length}):`);
+    for (const el of elements) {
+      const sid = shortIds.get(el.id) || "??";
+      const label = FIELD_LABEL[el.fieldId] || el.fieldId;
+      const desc = el.content ? ` — ${el.content}` : "";
+      sections.push(`  [${sid}] ${el.name} (${label})${desc}`);
     }
   } else {
     sections.push("\nWORLD ELEMENTS: none yet");
@@ -99,7 +99,7 @@ function formatDirectorContext(
 
   // Previous guidance (for continuity)
   if (previousGuidance) {
-    sections.push(`\nYOUR PREVIOUS GUIDANCE (at Scene ${sceneNumber(previousGuidance.atBeatIndex)}):`);
+    sections.push(`\nYOUR PREVIOUS GUIDANCE (at Scene ${sceneNumber(previousGuidance.atSceneIndex)}):`);
     sections.push(`  Solver: ${previousGuidance.solver}`);
     sections.push(`  Builder: ${previousGuidance.builder}`);
   }
@@ -130,7 +130,7 @@ export const createCrucibleDirectorFactory = (
     const context = formatDirectorContext(
       goal,
       chain,
-      state.crucible.builder.nodes,
+      state.crucible.builder.elements,
       state.crucible.directorGuidance,
     );
 

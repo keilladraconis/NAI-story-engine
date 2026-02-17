@@ -3,7 +3,7 @@ import {
   StreamingContext,
   CompletionContext,
 } from "../generation-handlers";
-import { directorGuidanceSet, beatRejected, beatTainted } from "../../index";
+import { directorGuidanceSet, sceneRejected, sceneTainted } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
 import {
   parseTag,
@@ -44,20 +44,20 @@ export const crucibleDirectorHandler: GenerationHandlers<CrucibleDirectorTarget>
       return;
     }
 
-    // Determine current beat index
+    // Determine current scene index
     const state = ctx.getState();
     const { activeGoalId } = state.crucible;
     const chain = activeGoalId ? state.crucible.chains[activeGoalId] : null;
-    const atBeatIndex = chain ? chain.beats.length : 0;
+    const atSceneIndex = chain ? chain.scenes.length : 0;
 
-    api.v1.log(`[crucible-director] Guidance at beat ${atBeatIndex}:`);
+    api.v1.log(`[crucible-director] Guidance at scene ${atSceneIndex}:`);
     if (solver) api.v1.log(`  Solver: ${solver.slice(0, 200)}`);
     if (builder) api.v1.log(`  Builder: ${builder.slice(0, 200)}`);
 
     ctx.dispatch(directorGuidanceSet({
       solver: solver.trim(),
       builder: builder.trim(),
-      atBeatIndex,
+      atSceneIndex,
     }));
 
     // Parse corrective actions
@@ -65,18 +65,18 @@ export const crucibleDirectorHandler: GenerationHandlers<CrucibleDirectorTarget>
     const taintMatch = text.match(/\[TAINT Scene (\d+)\]/);
 
     if (shouldReject) {
-      if (chain && chain.beats.length > 0) {
+      if (chain && chain.scenes.length > 0) {
         api.v1.log(`[crucible-director] REJECT — rolling back last scene`);
-        ctx.dispatch(beatRejected({ goalId: activeGoalId! }));
+        ctx.dispatch(sceneRejected({ goalId: activeGoalId! }));
       }
     }
 
     if (taintMatch) {
       const targetSceneNum = parseInt(taintMatch[1], 10);
-      const beatIndex = SCENE_OFFSET - targetSceneNum;
-      if (chain && beatIndex >= 0 && beatIndex < chain.beats.length) {
-        api.v1.log(`[crucible-director] TAINT Scene ${targetSceneNum} (beat index ${beatIndex})`);
-        ctx.dispatch(beatTainted({ goalId: activeGoalId!, beatIndex }));
+      const sceneIndex = SCENE_OFFSET - targetSceneNum;
+      if (chain && sceneIndex >= 0 && sceneIndex < chain.scenes.length) {
+        api.v1.log(`[crucible-director] TAINT Scene ${targetSceneNum} (scene index ${sceneIndex})`);
+        ctx.dispatch(sceneTainted({ goalId: activeGoalId!, sceneIndex }));
       }
     }
   },

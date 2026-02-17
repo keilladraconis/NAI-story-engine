@@ -4,8 +4,8 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import {
-  builderNodeAdded,
-  builderBeatProcessed,
+  builderElementAdded,
+  builderSceneProcessed,
   directorGuidanceConsumed,
 } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
@@ -59,22 +59,22 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
       api.v1.log("[crucible-builder] Raw output:\n" + text.slice(0, 1500));
       const builder = state.crucible.builder;
 
-      // Build reverse map: shortId → node
-      const shortIds = computeShortIds(builder.nodes);
-      const shortIdToNode = new Map<string, typeof builder.nodes[0]>();
-      for (const node of builder.nodes) {
-        const sid = shortIds.get(node.id);
-        if (sid) shortIdToNode.set(sid.toUpperCase(), node);
+      // Build reverse map: shortId → element
+      const shortIds = computeShortIds(builder.elements);
+      const shortIdToElement = new Map<string, typeof builder.elements[0]>();
+      for (const el of builder.elements) {
+        const sid = shortIds.get(el.id);
+        if (sid) shortIdToElement.set(sid.toUpperCase(), el);
       }
 
-      // Parse sections — each element/link is a section
+      // Parse sections — each element is a section
       const sections = splitSections(text);
 
       for (const section of sections) {
         // Extract [ID:xx] if present
         const idMatch = section.match(/\[ID:(\w+)\]/);
         const shortId = idMatch ? idMatch[1].toUpperCase() : null;
-        const idNode = shortId ? shortIdToNode.get(shortId) : null;
+        const idElement = shortId ? shortIdToElement.get(shortId) : null;
 
         // Extract [DESCRIPTION] content.
         // Fallback: if model put text directly after [ID:xx] without [DESCRIPTION],
@@ -94,38 +94,38 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
           if (!name) continue;
 
           const fieldId = TAG_TO_FIELD[tag];
-          const mode = idNode ? "update" : "new";
+          const mode = idElement ? "update" : "new";
           api.v1.log(`[crucible-builder] ${mode} [${tag}] name="${name}" desc="${description.slice(0, 80)}" id=${shortId || "none"}`);
 
           // ID-based revision: model re-emitted tag with [ID:xx]
-          if (idNode) {
-            ctx.dispatch(builderNodeAdded({
-              id: idNode.id,
-              fieldId: idNode.fieldId,
+          if (idElement) {
+            ctx.dispatch(builderElementAdded({
+              id: idElement.id,
+              fieldId: idElement.fieldId,
               name,
               content: description || undefined,
             }));
             break;
           }
 
-          // Name-based dedup: match existing node
-          const existingNode = builder.nodes.find(
-            (n) => n.name.toLowerCase() === name.toLowerCase(),
+          // Name-based dedup: match existing element
+          const existingElement = builder.elements.find(
+            (el) => el.name.toLowerCase() === name.toLowerCase(),
           );
-          if (existingNode) {
-            ctx.dispatch(builderNodeAdded({
-              id: existingNode.id,
-              fieldId: existingNode.fieldId,
-              name: existingNode.name,
+          if (existingElement) {
+            ctx.dispatch(builderElementAdded({
+              id: existingElement.id,
+              fieldId: existingElement.fieldId,
+              name: existingElement.name,
               content: description || undefined,
             }));
             break;
           }
 
-          // Create new builder node
-          const nodeId = api.v1.uuid();
-          ctx.dispatch(builderNodeAdded({
-            id: nodeId,
+          // Create new world element
+          const elementId = api.v1.uuid();
+          ctx.dispatch(builderElementAdded({
+            id: elementId,
             fieldId,
             name,
             content: description,
@@ -134,10 +134,10 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
         }
       }
 
-      // Mark beats as processed up to current chain length
-      const lastBeatIndex = chain.beats.length - 1;
-      if (lastBeatIndex >= 0) {
-        ctx.dispatch(builderBeatProcessed({ beatIndex: lastBeatIndex }));
+      // Mark scenes as processed up to current chain length
+      const lastSceneIndex = chain.scenes.length - 1;
+      if (lastSceneIndex >= 0) {
+        ctx.dispatch(builderSceneProcessed({ sceneIndex: lastSceneIndex }));
       }
 
       ctx.dispatch(directorGuidanceConsumed({ by: "builder" }));

@@ -1,7 +1,7 @@
 /**
- * Crucible Strategy — Factory functions for Crucible v5 lean solver.
+ * Crucible Strategy — Factory functions for Crucible lean solver.
  *
- * Three strategies: intent derivation, goals extraction, per-goal chain.
+ * Three strategies: direction derivation, goals extraction, per-goal chain.
  * All use tagged plaintext output format for streaming-first design.
  */
 
@@ -21,24 +21,24 @@ import { parseTag } from "./tag-parser";
 /** Scene numbers count down from 30 — GLM interprets descending numbers as backward temporal movement. */
 export const SCENE_OFFSET = 30;
 
-/** Convert a zero-based beat index to a descending scene number. */
-export function sceneNumber(beatIndex: number): number {
-  return SCENE_OFFSET - beatIndex;
+/** Convert a zero-based scene index to a descending scene number. */
+export function sceneNumber(sceneIndex: number): number {
+  return SCENE_OFFSET - sceneIndex;
 }
 
 // --- Chain Context Formatter ---
 
 /**
- * Format pacing signal based on beat count and open constraints.
- * No hard beat limits — the Director handles strategic pacing.
+ * Format pacing signal based on scene count and open constraints.
+ * No hard scene limits — the Director handles strategic pacing.
  * When all constraints are resolved, signals OPENER mode.
  */
-function formatPacingSignal(beatCount: number, openCount: number): string {
-  if (openCount === 0 && beatCount > 0)
-    return "\nPACING: ALL CONSTRAINTS RESOLVED — write Scene 1, the OPENER that launches this story. If you cannot write a satisfying opener from the current beats, open new constraints to fill gaps.";
-  if (beatCount === 0)
+function formatPacingSignal(sceneCount: number, openCount: number): string {
+  if (openCount === 0 && sceneCount > 0)
+    return "\nPACING: ALL CONSTRAINTS RESOLVED — write Scene 1, the OPENER that launches this story. If you cannot write a satisfying opener from the current scenes, open new constraints to fill gaps.";
+  if (sceneCount === 0)
     return `\nPACING: FIRST SCENE — this is the climax (Scene ${SCENE_OFFSET}). Open 1-2 NEW preconditions only (not already listed above). Do NOT resolve anything.`;
-  const nextNum = sceneNumber(beatCount);
+  const nextNum = sceneNumber(sceneCount);
   return `\nPACING: Write Scene ${nextNum}. ${openCount} open constraints. This scene happens BEFORE all scenes above. Resolve what you can, open new ones only if essential.`;
 }
 
@@ -48,18 +48,18 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
   // Goal — show [GOAL] text only, strip [OPEN] to avoid duplication
   // (seed constraints are tracked in OPEN CONSTRAINTS below)
   const goalText = parseTag(goal.text, "GOAL") || goal.text.split("\n")[0];
-  sections.push(goal.selected ? "ACTIVE GOAL (★ starred):" : "ACTIVE GOAL:");
+  sections.push(goal.starred ? "ACTIVE GOAL (★ starred):" : "ACTIVE GOAL:");
   sections.push(goalText);
 
-  // Beats (newest-first — SCENE only)
+  // Scenes (newest-first — SCENE only)
   // Constraint state lives in the dedicated OPEN/RESOLVED sections below.
-  // Showing constraint tags inside beats causes GLM to confuse ID formats.
-  if (chain.beats.length > 0) {
-    const lowestNum = sceneNumber(chain.beats.length - 1);
+  // Showing constraint tags inside scenes causes GLM to confuse ID formats.
+  if (chain.scenes.length > 0) {
+    const lowestNum = sceneNumber(chain.scenes.length - 1);
     sections.push(`\nESTABLISHED SCENES (earliest first — write what comes BEFORE Scene ${lowestNum}):`);
-    for (let i = chain.beats.length - 1; i >= 0; i--) {
-      const scene = parseTag(chain.beats[i].text, "SCENE") || chain.beats[i].text.split("\n")[0];
-      const taintedMark = chain.beats[i].tainted ? " ⚠ TAINTED — needs correction" : "";
+    for (let i = chain.scenes.length - 1; i >= 0; i--) {
+      const scene = parseTag(chain.scenes[i].text, "SCENE") || chain.scenes[i].text.split("\n")[0];
+      const taintedMark = chain.scenes[i].tainted ? " ⚠ TAINTED — needs correction" : "";
       sections.push(`  Scene ${sceneNumber(i)}: ${scene}${taintedMark}`);
     }
   }
@@ -68,7 +68,7 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
   if (chain.openConstraints.length > 0) {
     sections.push("\nOPEN CONSTRAINTS (already tracked — do NOT re-emit these in [OPEN]):");
     for (const c of chain.openConstraints) {
-      const source = c.sourceBeatIndex === 0 && chain.beats.length === 0 ? "seed" : `Scene ${sceneNumber(c.sourceBeatIndex)}`;
+      const source = c.sourceSceneIndex === 0 && chain.scenes.length === 0 ? "seed" : `Scene ${sceneNumber(c.sourceSceneIndex)}`;
       sections.push(`  [${c.shortId}] ${c.description} (${source})`);
     }
   }
@@ -77,13 +77,13 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
   if (chain.resolvedConstraints.length > 0) {
     sections.push("\nRESOLVED CONSTRAINTS:");
     for (const c of chain.resolvedConstraints) {
-      const label = c.status === "groundState" ? "ground state" : `Scene ${sceneNumber(c.sourceBeatIndex)}`;
+      const label = c.status === "groundState" ? "ground state" : `Scene ${sceneNumber(c.sourceSceneIndex)}`;
       sections.push(`  - ${c.description} → ${label}`);
     }
   }
 
   // Pacing signal — dynamic convergence pressure
-  const pacing = formatPacingSignal(chain.beats.length, chain.openConstraints.length);
+  const pacing = formatPacingSignal(chain.scenes.length, chain.openConstraints.length);
   if (pacing) sections.push(pacing);
 
   // Director guidance — strategic notes from meta-analysis
@@ -97,13 +97,13 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
 // --- Factory Functions ---
 
 /**
- * Creates a message factory for Crucible intent derivation.
+ * Creates a message factory for Crucible direction derivation.
  */
-export const createCrucibleIntentFactory = (
+export const createCrucibleDirectionFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const intentPrompt = String(
+    const directionPrompt = String(
       (await api.v1.config.get("crucible_intent_prompt")) || "",
     );
 
@@ -116,7 +116,7 @@ export const createCrucibleIntentFactory = (
       ...prefix,
       {
         role: "system",
-        content: intentPrompt,
+        content: directionPrompt,
       },
     ];
 
@@ -185,8 +185,8 @@ export const createCrucibleGoalFactory = (
 };
 
 /**
- * Creates a message factory for backward-chaining beat generation.
- * Lean beats: no world elements block — just scene, conflict, location, constraints.
+ * Creates a message factory for backward-chaining scene generation.
+ * Lean scenes: scene text + constraints.
  */
 export const createCrucibleChainFactory = (
   getState: () => RootState,
@@ -219,7 +219,7 @@ export const createCrucibleChainFactory = (
       },
       {
         role: "user",
-        content: context + `\n\nWrite Scene ${chain.beats.length === 0 ? SCENE_OFFSET : sceneNumber(chain.beats.length)}.`,
+        content: context + `\n\nWrite Scene ${chain.scenes.length === 0 ? SCENE_OFFSET : sceneNumber(chain.scenes.length)}.`,
       },
       { role: "assistant", content: "[SCENE] " },
     ];
@@ -239,13 +239,13 @@ export const createCrucibleChainFactory = (
 
 // --- Strategy Builders ---
 
-export const buildCrucibleIntentStrategy = (
+export const buildCrucibleDirectionStrategy = (
   getState: () => RootState,
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createCrucibleIntentFactory(getState),
-    target: { type: "crucibleIntent" },
+    messageFactory: createCrucibleDirectionFactory(getState),
+    target: { type: "crucibleDirection" },
     prefillBehavior: "trim",
   };
 };

@@ -101,7 +101,7 @@ export interface GenerationRequest {
   | "lorebookKeys"
   | "lorebookRefine"
   | "bootstrap"
-  | "crucibleIntent"
+  | "crucibleDirection"
   | "crucibleGoal"
   | "crucibleChain"
   | "crucibleBuild"
@@ -124,7 +124,7 @@ export interface GenerationStrategy {
   | { type: "lorebookKeys"; entryId: string }
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }
-  | { type: "crucibleIntent" }
+  | { type: "crucibleDirection" }
   | { type: "crucibleGoal"; goalId: string }
   | { type: "crucibleChain"; goalId: string }
   | { type: "crucibleBuild"; goalId: string }
@@ -149,10 +149,10 @@ export interface RuntimeState {
 export interface CrucibleGoal {
   id: string;
   text: string;
-  selected: boolean;
+  starred: boolean;
 }
 
-export interface CrucibleBeat {
+export interface CrucibleScene {
   text: string;
   constraintsResolved: string[];
   newOpenConstraints: string[];
@@ -167,20 +167,20 @@ export interface Constraint {
   id: string;
   shortId: string; // Monotonic "X0", "X1", etc. — never renumbered
   description: string;
-  sourceBeatIndex: number;
+  sourceSceneIndex: number;
   status: ConstraintStatus;
 }
 
 export interface CrucibleChain {
   goalId: string;
-  beats: CrucibleBeat[];
+  scenes: CrucibleScene[];
   openConstraints: Constraint[];
   resolvedConstraints: Constraint[];
   complete: boolean;
   nextConstraintIndex: number; // Monotonic counter for shortId assignment
 }
 
-export interface CrucibleNodeLink {
+export interface CrucibleWorldElement {
   id: string;
   fieldId: DulfsFieldID;
   name: string;
@@ -188,18 +188,18 @@ export interface CrucibleNodeLink {
 }
 
 export interface CrucibleBuilderState {
-  nodes: CrucibleNodeLink[];
-  lastProcessedBeatIndex: number;
+  elements: CrucibleWorldElement[];
+  lastProcessedSceneIndex: number;
 }
 
 export interface DirectorGuidance {
   solver: string;
   builder: string;
-  atBeatIndex: number; // Chain beat count when Director last ran
+  atSceneIndex: number; // Chain scene count when Director last ran
 }
 
 export interface CrucibleState {
-  intent: string | null;
+  direction: string | null;
   goals: CrucibleGoal[];
   chains: Record<string, CrucibleChain>;
   activeGoalId: string | null;

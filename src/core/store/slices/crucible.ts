@@ -2,7 +2,7 @@ import { createSlice } from "nai-store";
 import {
   CrucibleState,
   CrucibleGoal,
-  CrucibleBeat,
+  CrucibleScene,
   CrucibleChain,
   CrucibleBuilderState,
   Constraint,
@@ -12,8 +12,8 @@ import { DulfsFieldID } from "../../../config/field-definitions";
 import { parseTagAll } from "../../utils/tag-parser";
 
 const EMPTY_BUILDER: CrucibleBuilderState = {
-  nodes: [],
-  lastProcessedBeatIndex: -1,
+  elements: [],
+  lastProcessedSceneIndex: -1,
 };
 
 /** Migrate raw persisted crucible data — backfills shortIds, strips dead fields. */
@@ -31,13 +31,13 @@ export function migrateCrucibleState(loaded: CrucibleState): CrucibleState {
 
     chains[goalId] = {
       goalId: chain.goalId,
-      beats: chain.beats.map((b) => ({
-        text: b.text,
-        constraintsResolved: b.constraintsResolved,
-        newOpenConstraints: b.newOpenConstraints,
-        groundStateConstraints: b.groundStateConstraints,
-        ...(b.tainted ? { tainted: true } : {}),
-        ...(b.favorited ? { favorited: true } : {}),
+      scenes: chain.scenes.map((s) => ({
+        text: s.text,
+        constraintsResolved: s.constraintsResolved,
+        newOpenConstraints: s.newOpenConstraints,
+        groundStateConstraints: s.groundStateConstraints,
+        ...(s.tainted ? { tainted: true } : {}),
+        ...(s.favorited ? { favorited: true } : {}),
       })),
       openConstraints,
       resolvedConstraints,
@@ -47,7 +47,7 @@ export function migrateCrucibleState(loaded: CrucibleState): CrucibleState {
   }
 
   return {
-    intent: loaded.intent,
+    direction: loaded.direction,
     goals: loaded.goals,
     chains,
     activeGoalId: loaded.activeGoalId,
@@ -57,9 +57,9 @@ export function migrateCrucibleState(loaded: CrucibleState): CrucibleState {
     builder: loaded.builder
       ? {
         ...loaded.builder,
-        nodes: loaded.builder.nodes.map((n) => ({
-          ...n,
-          content: n.content || "",
+        elements: loaded.builder.elements.map((el) => ({
+          ...el,
+          content: el.content || "",
         })),
       }
       : { ...EMPTY_BUILDER },
@@ -68,7 +68,7 @@ export function migrateCrucibleState(loaded: CrucibleState): CrucibleState {
 }
 
 export const initialCrucibleState: CrucibleState = {
-  intent: null,
+  direction: null,
   goals: [],
   chains: {},
   activeGoalId: null,
@@ -83,16 +83,16 @@ export const crucibleSlice = createSlice({
   name: "crucible",
   initialState: initialCrucibleState,
   reducers: {
-    // Intent actions — effects handle the actual work
+    // Signal actions — effects handle the actual work
     crucibleGoalsRequested: (state) => state,
     crucibleChainRequested: (state) => state,
     crucibleDirectorRequested: (state) => state,
     crucibleStopRequested: (state) => state,
 
-    // Intent phase reducers
-    crucibleIntentRequested: (state) => state,
-    intentSet: (state, payload: { intent: string }) => {
-      return { ...state, intent: payload.intent };
+    // Direction phase reducers
+    crucibleDirectionRequested: (state) => state,
+    directionSet: (state, payload: { direction: string }) => {
+      return { ...state, direction: payload.direction };
     },
 
     goalTextUpdated: (state, payload: { goalId: string; text: string }) => {
@@ -122,11 +122,11 @@ export const crucibleSlice = createSlice({
       return { ...state, goals: [], chains: {}, activeGoalId: null, directorGuidance: null };
     },
 
-    goalToggled: (state, payload: { goalId: string }) => {
+    goalStarred: (state, payload: { goalId: string }) => {
       return {
         ...state,
         goals: state.goals.map((g) =>
-          g.id === payload.goalId ? { ...g, selected: !g.selected } : g,
+          g.id === payload.goalId ? { ...g, starred: !g.starred } : g,
         ),
       };
     },
@@ -146,13 +146,13 @@ export const crucibleSlice = createSlice({
         id: `seed-${payload.goalId}-${desc.slice(0, 20)}`,
         shortId: `X${i}`,
         description: desc,
-        sourceBeatIndex: 0,
+        sourceSceneIndex: 0,
         status: "open" as const,
       }));
 
       const chain: CrucibleChain = {
         goalId: payload.goalId,
-        beats: [],
+        scenes: [],
         openConstraints: seedConstraints,
         resolvedConstraints: [],
         complete: false,
@@ -165,11 +165,11 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    beatAdded: (
+    sceneAdded: (
       state,
       payload: {
         goalId: string;
-        beat: CrucibleBeat;
+        scene: CrucibleScene;
         constraints: {
           resolved: string[]; // shortIds (e.g. "X0", "X3")
           opened: Constraint[];
@@ -203,7 +203,7 @@ export const crucibleSlice = createSlice({
 
       const updatedChain: CrucibleChain = {
         ...chain,
-        beats: [...chain.beats, payload.beat],
+        scenes: [...chain.scenes, payload.scene],
         openConstraints: allOpen,
         resolvedConstraints: [...chain.resolvedConstraints, ...nowResolved],
         nextConstraintIndex: nextIdx,
@@ -215,31 +215,31 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    beatRejected: (state, payload: { goalId: string }) => {
+    sceneRejected: (state, payload: { goalId: string }) => {
       const chain = state.chains[payload.goalId];
-      if (!chain || chain.beats.length === 0) return state;
+      if (!chain || chain.scenes.length === 0) return state;
 
-      const lastBeat = chain.beats[chain.beats.length - 1];
-      const beatIndex = chain.beats.length - 1;
+      const lastScene = chain.scenes[chain.scenes.length - 1];
+      const sceneIndex = chain.scenes.length - 1;
 
-      // Remove constraints opened by this beat
+      // Remove constraints opened by this scene
       const openWithoutLast = chain.openConstraints.filter(
-        (c) => c.sourceBeatIndex !== beatIndex,
+        (c) => c.sourceSceneIndex !== sceneIndex,
       );
 
-      // Restore constraints that were resolved by this beat back to open (match by shortId)
-      const resolvedByBeat = new Set(lastBeat.constraintsResolved);
-      const groundedByBeat = new Set(lastBeat.groundStateConstraints);
+      // Restore constraints that were resolved by this scene back to open (match by shortId)
+      const resolvedByScene = new Set(lastScene.constraintsResolved);
+      const groundedByScene = new Set(lastScene.groundStateConstraints);
       const restored = chain.resolvedConstraints.filter(
-        (c) => resolvedByBeat.has(c.shortId) || groundedByBeat.has(c.shortId),
+        (c) => resolvedByScene.has(c.shortId) || groundedByScene.has(c.shortId),
       ).map((c) => ({ ...c, status: "open" as const }));
       const remainingResolved = chain.resolvedConstraints.filter(
-        (c) => !resolvedByBeat.has(c.shortId) && !groundedByBeat.has(c.shortId),
+        (c) => !resolvedByScene.has(c.shortId) && !groundedByScene.has(c.shortId),
       );
 
       const updatedChain: CrucibleChain = {
         ...chain,
-        beats: chain.beats.slice(0, -1),
+        scenes: chain.scenes.slice(0, -1),
         openConstraints: [...openWithoutLast, ...restored],
         resolvedConstraints: remainingResolved,
       };
@@ -251,83 +251,83 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    beatEdited: (state, payload: { goalId: string; beatIndex: number; beat: CrucibleBeat }) => {
+    sceneEdited: (state, payload: { goalId: string; sceneIndex: number; scene: CrucibleScene }) => {
       const chain = state.chains[payload.goalId];
       if (!chain) return state;
 
-      const updatedBeats = chain.beats.map((b, i) =>
-        i === payload.beatIndex ? { ...payload.beat, tainted: true } : b,
+      const updatedScenes = chain.scenes.map((s, i) =>
+        i === payload.sceneIndex ? { ...payload.scene, tainted: true } : s,
       );
 
       return {
         ...state,
         chains: {
           ...state.chains,
-          [payload.goalId]: { ...chain, beats: updatedBeats },
+          [payload.goalId]: { ...chain, scenes: updatedScenes },
         },
       };
     },
 
-    beatTainted: (state, payload: { goalId: string; beatIndex: number }) => {
+    sceneTainted: (state, payload: { goalId: string; sceneIndex: number }) => {
       const chain = state.chains[payload.goalId];
       if (!chain) return state;
 
-      const updatedBeats = chain.beats.map((b, i) =>
-        i === payload.beatIndex ? { ...b, tainted: true } : b,
+      const updatedScenes = chain.scenes.map((s, i) =>
+        i === payload.sceneIndex ? { ...s, tainted: true } : s,
       );
 
       return {
         ...state,
         chains: {
           ...state.chains,
-          [payload.goalId]: { ...chain, beats: updatedBeats },
+          [payload.goalId]: { ...chain, scenes: updatedScenes },
         },
       };
     },
 
-    beatFavorited: (state, payload: { goalId: string; beatIndex: number }) => {
+    sceneFavorited: (state, payload: { goalId: string; sceneIndex: number }) => {
       const chain = state.chains[payload.goalId];
       if (!chain) return state;
 
-      const updatedBeats = chain.beats.map((b, i) =>
-        i === payload.beatIndex ? { ...b, favorited: !b.favorited } : b,
+      const updatedScenes = chain.scenes.map((s, i) =>
+        i === payload.sceneIndex ? { ...s, favorited: !s.favorited } : s,
       );
 
       return {
         ...state,
         chains: {
           ...state.chains,
-          [payload.goalId]: { ...chain, beats: updatedBeats },
+          [payload.goalId]: { ...chain, scenes: updatedScenes },
         },
       };
     },
 
-    beatForked: (state, payload: { goalId: string; beatIndex: number; newGoalId: string }) => {
+    sceneForked: (state, payload: { goalId: string; sceneIndex: number; newGoalId: string }) => {
       const chain = state.chains[payload.goalId];
       if (!chain) return state;
 
-      const beat = chain.beats[payload.beatIndex];
-      if (!beat) return state;
+      const scene = chain.scenes[payload.sceneIndex];
+      if (!scene) return state;
 
-      const sceneText = beat.text;
+      const sceneText = scene.text;
       const newGoal: CrucibleGoal = {
         id: payload.newGoalId,
         text: sceneText,
-        selected: true,
+        starred: true,
       };
 
-      // Seed new chain with the beat's open constraints
-      const newConstraints: Constraint[] = beat.newOpenConstraints.map((desc, i) => ({
+      // Seed new chain with the scene's open constraints
+      const newConstraints: Constraint[] = scene.newOpenConstraints.map((desc, i) => ({
         id: `${payload.newGoalId}-c${i}`,
         shortId: `X${i}`,
         description: desc,
-        sourceBeatIndex: -1,
+        sourceSceneIndex: -1,
         status: "open" as const,
       }));
 
       const newChain: CrucibleChain = {
         goalId: payload.newGoalId,
-        beats: [],
+        scenes: [],
         openConstraints: newConstraints,
         resolvedConstraints: [],
         complete: false,
@@ -341,19 +341,19 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    beatsDeletedFrom: (state, payload: { goalId: string; fromIndex: number }) => {
+    scenesDeletedFrom: (state, payload: { goalId: string; fromIndex: number }) => {
       const chain = state.chains[payload.goalId];
       if (!chain) return state;
 
-      const keptBeats = chain.beats.slice(0, payload.fromIndex);
+      const keptScenes = chain.scenes.slice(0, payload.fromIndex);
 
-      // Keep only constraints whose sourceBeatIndex is within surviving beats (or seed = 0)
-      // and that are still open (not resolved by a surviving beat)
+      // Keep only constraints whose sourceSceneIndex is within surviving scenes (or seed = 0)
+      // and that are still open (not resolved by a surviving scene)
       const survivingOpen = chain.openConstraints.filter(
-        (c) => c.sourceBeatIndex < payload.fromIndex,
+        (c) => c.sourceSceneIndex < payload.fromIndex,
       );
       const survivingResolved = chain.resolvedConstraints.filter(
-        (c) => c.sourceBeatIndex < payload.fromIndex,
+        (c) => c.sourceSceneIndex < payload.fromIndex,
       );
 
       // Recompute nextConstraintIndex as max existing shortId index + 1
@@ -370,7 +370,7 @@ export const crucibleSlice = createSlice({
           ...state.chains,
           [payload.goalId]: {
             ...chain,
-            beats: keptBeats,
+            scenes: keptScenes,
             openConstraints: survivingOpen,
             resolvedConstraints: survivingResolved,
             complete: false,
@@ -409,7 +409,7 @@ export const crucibleSlice = createSlice({
         id: payload.id,
         shortId,
         description: payload.description,
-        sourceBeatIndex: chain.beats.length, // Current beat position
+        sourceSceneIndex: chain.scenes.length, // Current scene position
         status: "open",
       };
 
@@ -497,8 +497,8 @@ export const crucibleSlice = createSlice({
     },
 
     activeGoalAdvanced: (state) => {
-      const selectedGoals = state.goals.filter((g) => g.selected);
-      const nextGoal = selectedGoals.find((g) => {
+      const starredGoals = state.goals.filter((g) => g.starred);
+      const nextGoal = starredGoals.find((g) => {
         const chain = state.chains[g.id];
         return !chain || !chain.complete;
       });
@@ -508,7 +508,7 @@ export const crucibleSlice = createSlice({
         directorGuidance: null, // Clear — guidance is per-goal, stale across goal transitions
         builder: {
           ...state.builder,
-          lastProcessedBeatIndex: -1, // Reset — beats are per-chain, index is stale across goals
+          lastProcessedSceneIndex: -1, // Reset — scenes are per-chain, index is stale across goals
         },
       };
     },
@@ -532,22 +532,22 @@ export const crucibleSlice = createSlice({
     // Builder reducers
     crucibleBuildRequested: (state) => state,
 
-    builderNodeAdded: (state, payload: { id: string; fieldId: DulfsFieldID; name: string; content?: string }) => {
-      const existing = state.builder.nodes.find((n) => n.id === payload.id)
-        || state.builder.nodes.find((n) => n.name.toLowerCase() === payload.name.toLowerCase());
+    builderElementAdded: (state, payload: { id: string; fieldId: DulfsFieldID; name: string; content?: string }) => {
+      const existing = state.builder.elements.find((el) => el.id === payload.id)
+        || state.builder.elements.find((el) => el.name.toLowerCase() === payload.name.toLowerCase());
       if (existing) {
         return {
           ...state,
           builder: {
             ...state.builder,
-            nodes: state.builder.nodes.map((n) =>
-              n.id === existing.id
+            elements: state.builder.elements.map((el) =>
+              el.id === existing.id
                 ? {
-                  ...n,
-                  name: payload.name || n.name,
-                  content: payload.content ?? n.content,
+                  ...el,
+                  name: payload.name || el.name,
+                  content: payload.content ?? el.content,
                 }
-                : n,
+                : el,
             ),
           },
         };
@@ -556,8 +556,8 @@ export const crucibleSlice = createSlice({
         ...state,
         builder: {
           ...state.builder,
-          nodes: [
-            ...state.builder.nodes,
+          elements: [
+            ...state.builder.elements,
             {
               id: payload.id,
               fieldId: payload.fieldId,
@@ -569,42 +569,42 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    builderBeatProcessed: (state, payload: { beatIndex: number }) => {
+    builderSceneProcessed: (state, payload: { sceneIndex: number }) => {
       return {
         ...state,
         builder: {
           ...state.builder,
-          lastProcessedBeatIndex: payload.beatIndex,
+          lastProcessedSceneIndex: payload.sceneIndex,
         },
       };
     },
 
-    builderNodeUpdated: (state, payload: { id: string; name?: string; content?: string }) => {
-      const existing = state.builder.nodes.find((n) => n.id === payload.id);
+    builderElementUpdated: (state, payload: { id: string; name?: string; content?: string }) => {
+      const existing = state.builder.elements.find((el) => el.id === payload.id);
       if (!existing) return state;
       return {
         ...state,
         builder: {
           ...state.builder,
-          nodes: state.builder.nodes.map((n) =>
-            n.id === payload.id
+          elements: state.builder.elements.map((el) =>
+            el.id === payload.id
               ? {
-                ...n,
+                ...el,
                 ...(payload.name !== undefined ? { name: payload.name } : {}),
                 ...(payload.content !== undefined ? { content: payload.content } : {}),
               }
-              : n,
+              : el,
           ),
         },
       };
     },
 
-    builderNodeRemoved: (state, payload: { id: string }) => {
+    builderElementRemoved: (state, payload: { id: string }) => {
       return {
         ...state,
         builder: {
           ...state.builder,
-          nodes: state.builder.nodes.filter((n) => n.id !== payload.id),
+          elements: state.builder.elements.filter((el) => el.id !== payload.id),
         },
       };
     },
@@ -618,13 +618,13 @@ export const crucibleSlice = createSlice({
       return { ...state, directorGuidance: updated };
     },
 
-    directorGuidanceSet: (state, payload: { solver: string; builder: string; atBeatIndex: number }) => {
+    directorGuidanceSet: (state, payload: { solver: string; builder: string; atSceneIndex: number }) => {
       return {
         ...state,
         directorGuidance: {
           solver: payload.solver,
           builder: payload.builder,
-          atBeatIndex: payload.atBeatIndex,
+          atSceneIndex: payload.atSceneIndex,
         },
       };
     },
@@ -640,22 +640,22 @@ export const {
   crucibleChainRequested,
   crucibleDirectorRequested,
   crucibleStopRequested,
-  crucibleIntentRequested,
-  intentSet,
+  crucibleDirectionRequested,
+  directionSet,
   goalTextUpdated,
   goalAdded,
   goalRemoved,
   goalsCleared,
-  goalToggled,
+  goalStarred,
   goalsConfirmed,
   chainStarted,
-  beatAdded,
-  beatRejected,
-  beatEdited,
-  beatTainted,
-  beatFavorited,
-  beatForked,
-  beatsDeletedFrom,
+  sceneAdded,
+  sceneRejected,
+  sceneEdited,
+  sceneTainted,
+  sceneFavorited,
+  sceneForked,
+  scenesDeletedFrom,
   constraintMarkedGroundState,
   constraintAdded,
   constraintRemoved,
@@ -668,10 +668,10 @@ export const {
   autoChainStarted,
   autoChainStopped,
   crucibleBuildRequested,
-  builderNodeAdded,
-  builderNodeUpdated,
-  builderBeatProcessed,
-  builderNodeRemoved,
+  builderElementAdded,
+  builderElementUpdated,
+  builderSceneProcessed,
+  builderElementRemoved,
   directorGuidanceConsumed,
   directorGuidanceSet,
   crucibleReset,

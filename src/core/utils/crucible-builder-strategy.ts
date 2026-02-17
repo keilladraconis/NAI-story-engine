@@ -1,8 +1,8 @@
 /**
- * Crucible Builder Strategy — Reviews solver beats and emits DULFS nodes.
+ * Crucible Builder Strategy — Reviews solver scenes and emits world elements.
  *
- * After each solver beat, the builder inspects unprocessed beats and creates
- * or links world elements. Yields [SOLVER] to resume chaining.
+ * After each solver scene, the builder inspects unprocessed scenes and creates
+ * or updates world elements. Yields [SOLVER] to resume chaining.
  */
 
 import {
@@ -11,7 +11,7 @@ import {
   CrucibleChain,
   CrucibleGoal,
   CrucibleBuilderState,
-  CrucibleNodeLink,
+  CrucibleWorldElement,
   DirectorGuidance,
 } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
@@ -30,18 +30,18 @@ const FIELD_PREFIX: Record<DulfsFieldID, string> = {
 };
 
 /**
- * Compute stable short IDs for builder nodes.
- * Assigns prefix+counter per fieldId in node-order: C0, C1, L0, etc.
- * Returns Map<nodeId, shortId>.
+ * Compute stable short IDs for world elements.
+ * Assigns prefix+counter per fieldId in element-order: C0, C1, L0, etc.
+ * Returns Map<elementId, shortId>.
  */
-export function computeShortIds(nodes: CrucibleNodeLink[]): Map<string, string> {
+export function computeShortIds(elements: CrucibleWorldElement[]): Map<string, string> {
   const counters: Record<string, number> = {};
   const result = new Map<string, string>();
-  for (const node of nodes) {
-    const prefix = FIELD_PREFIX[node.fieldId] || "X";
+  for (const el of elements) {
+    const prefix = FIELD_PREFIX[el.fieldId] || "X";
     const idx = counters[prefix] || 0;
     counters[prefix] = idx + 1;
-    result.set(node.id, `${prefix}${idx}`);
+    result.set(el.id, `${prefix}${idx}`);
   }
   return result;
 }
@@ -56,7 +56,7 @@ const FIELD_LABEL: Record<DulfsFieldID, string> = {
 };
 
 /**
- * Format builder context: goal + unprocessed beats + existing nodes with short IDs.
+ * Format builder context: goal + unprocessed scenes + existing elements with short IDs.
  */
 function formatBuilderContext(
   chain: CrucibleChain,
@@ -70,27 +70,27 @@ function formatBuilderContext(
   const goalText = parseTag(goal.text, "GOAL") || goal.text.slice(0, 100);
   sections.push(`GOAL: ${goalText}`);
 
-  // Unprocessed beats
-  const startIndex = builder.lastProcessedBeatIndex + 1;
-  const unprocessed = chain.beats.slice(startIndex);
+  // Unprocessed scenes
+  const startIndex = builder.lastProcessedSceneIndex + 1;
+  const unprocessed = chain.scenes.slice(startIndex);
   if (unprocessed.length > 0) {
     sections.push("\nNEW SCENES TO REVIEW:");
     for (let i = 0; i < unprocessed.length; i++) {
-      const beat = unprocessed[i];
-      const scene = parseTag(beat.text, "SCENE") || beat.text.split("\n")[0];
+      const sceneData = unprocessed[i];
+      const scene = parseTag(sceneData.text, "SCENE") || sceneData.text.split("\n")[0];
       sections.push(`  Scene ${sceneNumber(startIndex + i)}: ${scene}`);
     }
   }
 
-  // Existing nodes with short IDs and content
-  if (builder.nodes.length > 0) {
-    const shortIds = computeShortIds(builder.nodes);
+  // Existing elements with short IDs and content
+  if (builder.elements.length > 0) {
+    const shortIds = computeShortIds(builder.elements);
     sections.push("\nEXISTING WORLD ELEMENTS (reference with [ID:xx], or re-emit tag + [ID:xx] to revise):");
-    for (const node of builder.nodes) {
-      const sid = shortIds.get(node.id) || "??";
-      const label = FIELD_LABEL[node.fieldId] || node.fieldId;
-      const desc = node.content ? `: ${node.content}` : "";
-      sections.push(`  [${sid}] ${node.name} (${label})${desc}`);
+    for (const el of builder.elements) {
+      const sid = shortIds.get(el.id) || "??";
+      const label = FIELD_LABEL[el.fieldId] || el.fieldId;
+      const desc = el.content ? `: ${el.content}` : "";
+      sections.push(`  [${sid}] ${el.name} (${label})${desc}`);
     }
   }
 

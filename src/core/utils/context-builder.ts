@@ -399,8 +399,8 @@ export const buildCruciblePrefix = async (
   // --- MSG 2 (optional): Creative grounding ---
   const groundingSections: string[] = [];
 
-  if (options.includeDirection && state.crucible.intent) {
-    groundingSections.push(`[DIRECTION]\n${state.crucible.intent}`);
+  if (options.includeDirection && state.crucible.direction) {
+    groundingSections.push(`[DIRECTION]\n${state.crucible.direction}`);
   }
 
   if (options.includeStoryState) {
