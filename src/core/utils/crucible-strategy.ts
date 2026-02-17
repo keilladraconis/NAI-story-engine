@@ -27,13 +27,11 @@ import { parseTag } from "./tag-parser";
  */
 function formatPacingSignal(beatCount: number, openCount: number): string {
   if (beatCount === 0)
-    return "\nPACING: FIRST BEAT — this IS the penultimate scene. Open NEW preconditions only (not already listed above). Do NOT resolve anything.";
+    return "\nPACING: FIRST BEAT — this IS the penultimate scene. Open 1-2 NEW preconditions only (not already listed above). Do NOT resolve anything.";
   if (beatCount <= 3)
-    return `\nPACING: EARLY — open NEW preconditions. Resolve at most 1. ${openCount} open.`;
+    return `\nPACING: EARLY — resolve 1-2, open at most 1 if essential. ${openCount} open.`;
   if (beatCount <= 6)
-    return `\nPACING: CONVERGE — resolve ≤2, open ≤1 NEW. ${openCount} remain.`;
-  if (beatCount <= 8)
-    return `\nPACING: CLOSE OUT — resolve all remaining. No new constraints. ${openCount} remain.`;
+    return `\nPACING: CONVERGE — resolve only. No new constraints. ${openCount} remain.`;
   return `\nPACING: OVERDUE — final beat. Close all ${openCount} constraints NOW.`;
 }
 

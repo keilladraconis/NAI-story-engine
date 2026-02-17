@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771274429
+updatedAt: 1771286092
 config:
   - name: erato_compatibility
     prettyName: Erato Compatibility
@@ -321,14 +321,16 @@ config:
       tension from a distinct angle, so multiple goals produce different
       world elements.
 
-      Include 2-4 open constraints — things that must be true for this
+      Include 2-3 open constraints — things that must be true for this
       goal to happen but aren't established yet. One per line.
+      The LAST constraint should anchor the story's approximate origin —
+      where the protagonist starts before the events of this goal unfold.
+      This gives the chain a horizon to work toward.
 
       Output format:
       [GOAL] The endpoint — 1-2 sentences, concrete and vivid
-      [OPEN] first constraint
-      [OPEN] second constraint
-      [OPEN] third constraint
+      [OPEN] a precondition close to the goal
+      [OPEN] origin — where/how the story begins
   - name: crucible_chain_prompt
     prettyName: Crucible Chain Prompt
     description: Prompt for backward-chaining beat generation (lean solver)
@@ -340,10 +342,9 @@ config:
       further back. Every beat needs tension or revelation — not exposition.
 
       CONSTRAINT DISCIPLINE (MANDATORY — violations are errors):
-      - Beat 1: IS the terminal scene. Open 1-3 preconditions. Resolve NOTHING.
-      - Beats 2-3: Open preconditions. Resolve at most 1 if it flows naturally.
-      - Beats 4-7: Resolve ≤2 per beat. Open ≤1.
-      - After beat 7: Resolve all remaining. Open NOTHING.
+      - Beat 1: IS the terminal scene. Open 1-2 preconditions. Resolve NOTHING.
+      - Beats 2-4: Resolve 1-2 per beat. Open at most 1 (only if essential).
+      - Beats 5+: Resolve only. Open NOTHING new.
 
       RULES:
       - [SCENE] is REQUIRED. Constraint tags only when relevant.
@@ -352,7 +353,7 @@ config:
       - Use [ID:Xn] in [RESOLVED]. For constraints needing no setup, add "ground":
         [RESOLVED] [ID:X1] ground
       - Never resolve or reference constraints that don't exist yet.
-      - Aim for 6-10 beats. Final beat(s) = story's chronological opening.
+      - Aim for 5-8 beats. Final beat(s) = story's chronological opening.
 
       TERMINATE when all constraints are resolved or ground state.
 
@@ -360,8 +361,7 @@ config:
       [SCENE] What happens — 1-2 vivid sentences
       [RESOLVED] [ID:X0] how/why this is now established
       [RESOLVED] [ID:X1] ground
-      [OPEN] one new precondition
-      [OPEN] another new precondition
+      [OPEN] one new precondition (only if essential)
   - name: crucible_build_prompt
     prettyName: Crucible Builder Prompt
     description: Prompt for interleaved builder — reviews beats, emits world element nodes

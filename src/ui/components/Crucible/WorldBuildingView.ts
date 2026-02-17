@@ -135,6 +135,9 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
       });
     };
 
+    // Toggle resolved list visibility
+    let resolvedExpanded = false;
+
     const buildConstraintTracker = (
       chain: CrucibleChain,
       goalId: string,
@@ -189,9 +192,6 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
     const initialConstraintParts = visible && activeGoalId && activeChain
       ? buildConstraintTracker(activeChain, activeGoalId)
       : [];
-
-    // Toggle resolved list visibility
-    let resolvedExpanded = false;
 
     useSelector(
       (s) => ({

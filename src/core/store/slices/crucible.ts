@@ -107,11 +107,17 @@ export const crucibleSlice = createSlice({
     },
 
     goalRemoved: (state, payload: { goalId: string }) => {
-      return { ...state, goals: state.goals.filter((g) => g.id !== payload.goalId) };
+      const { [payload.goalId]: _, ...remainingChains } = state.chains;
+      return {
+        ...state,
+        goals: state.goals.filter((g) => g.id !== payload.goalId),
+        chains: remainingChains,
+        activeGoalId: state.activeGoalId === payload.goalId ? null : state.activeGoalId,
+      };
     },
 
     goalsCleared: (state) => {
-      return { ...state, goals: [] };
+      return { ...state, goals: [], chains: {}, activeGoalId: null };
     },
 
     goalToggled: (state, payload: { goalId: string }) => {

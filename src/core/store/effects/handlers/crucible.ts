@@ -203,11 +203,11 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
       const updatedChain = updatedState.crucible.chains[goalId];
       if (!updatedChain) return;
 
-      // Constraint explosion: net growth >2 for 3 consecutive beats
+      // Constraint explosion: net growth >1 for 3 consecutive beats
       if (updatedChain.beats.length >= 3) {
         const lastThree = updatedChain.beats.slice(-3);
         const explosionCount = lastThree.filter(
-          (b) => b.newOpenConstraints.length - b.constraintsResolved.length > 2,
+          (b) => b.newOpenConstraints.length - b.constraintsResolved.length > 1,
         ).length;
         if (explosionCount >= 3) {
           ctx.dispatch(checkpointSet({ reason: "The story is getting complex. Review and continue, or step back." }));
