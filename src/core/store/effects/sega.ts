@@ -235,9 +235,8 @@ async function queueSegaLorebookGeneration(
     segaStatusUpdated({ statusText: `Lorebook: ${category} - ${name}` }),
   );
 
-  // Track both as SEGA-initiated
+  // Track content as SEGA-initiated
   dispatch(segaRequestTracked({ requestId: contentRequestId }));
-  dispatch(segaRequestTracked({ requestId: keysRequestId }));
 
   // Queue content generation
   const contentFactory = createLorebookContentFactory(getState, item.id);
@@ -251,9 +250,13 @@ async function queueSegaLorebookGeneration(
     }),
   );
 
-  // Queue keys generation (runs after content; factory fetches fresh entry.text)
-  const keysPayload = await buildLorebookKeysPayload(getState, item.id, keysRequestId);
-  dispatch(generationSubmitted(keysPayload));
+  // Queue keys generation unless user opted out
+  const skipKeys = (await api.v1.config.get("sega_skip_lorebook_keys")) || false;
+  if (!skipKeys) {
+    dispatch(segaRequestTracked({ requestId: keysRequestId }));
+    const keysPayload = await buildLorebookKeysPayload(getState, item.id, keysRequestId);
+    dispatch(generationSubmitted(keysPayload));
+  }
 }
 
 /**

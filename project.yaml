@@ -8,6 +8,13 @@ description: A helper for writing stories with GLM
 memoryLimit: 8
 updatedAt: 1771300469
 config:
+  - name: sega_skip_lorebook_keys
+    prettyName: Skip Lorebook Keys (SEGA)
+    description: >-
+      When enabled, SEGA will skip automatic lorebook key generation after
+      generating entry content. Useful if you prefer to set keys manually.
+    type: boolean
+    default: false
   - name: erato_compatibility
     prettyName: Erato Compatibility
     description: >-
