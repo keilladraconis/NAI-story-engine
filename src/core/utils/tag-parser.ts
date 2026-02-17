@@ -95,6 +95,11 @@ export function stripSceneTag(text: string): string {
   return text.replace(/^\[SCENE\]\s*(?:\d+\s*[-–—:.]\s*)?/m, "").trim();
 }
 
+/** Strip `[OPENER]` tag prefix, keeping the description. */
+export function stripOpenerTag(text: string): string {
+  return text.replace(/^\[OPENER\]\s*/m, "").trim();
+}
+
 /** Split text into sections by `===` separator, trimmed and non-empty. */
 export function splitSections(text: string, sep = "+++"): string[] {
   return text

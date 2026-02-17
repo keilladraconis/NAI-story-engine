@@ -4,7 +4,8 @@
  * Orchestrates automatic generation of story components in sequence:
  * 1. ATTG & Style (anchor tone/genre first)
  * 2. Canon (synthesize from world entries)
- * 3. Lorebook (content + keys per entry)
+ * 3. Bootstrap (scene opening instruction, if document is empty)
+ * 4. Lorebook (content + keys per entry)
  *
  * DULFS list population is handled by Crucible (v7). Users can still
  * generate items per-category via the "Generate Items" button.
@@ -69,6 +70,14 @@ async function needsATTG(): Promise<boolean> {
 async function needsStyle(): Promise<boolean> {
   const content = await api.v1.storyStorage.get("kse-field-style");
   return !content || !String(content).trim();
+}
+
+/**
+ * Check if Bootstrap is needed (document has no sections yet).
+ */
+async function needsBootstrap(): Promise<boolean> {
+  const ids = await api.v1.document.sectionIds();
+  return ids.length === 0;
 }
 
 /**
@@ -282,7 +291,18 @@ async function scheduleNextSegaTask(
     return;
   }
 
-  // Stage 3: Lorebook (content + keys per entry, unified prefix)
+  // Stage 3: Bootstrap (scene opening instruction, if document is empty)
+  if (await needsBootstrap()) {
+    api.v1.log("[sega] scheduling: bootstrap");
+    dispatch(segaStageSet({ stage: "bootstrap" }));
+    const requestId = "gen-bootstrap";
+    dispatch(segaStatusUpdated({ statusText: "Bootstrap: scene opening" }));
+    dispatch(segaRequestTracked({ requestId }));
+    dispatch(uiGenerationRequested({ id: requestId, type: "bootstrap", targetId: "bootstrap" }));
+    return;
+  }
+
+  // Stage 4: Lorebook (content + keys per entry, unified prefix)
   const nextEntry = await findEntryNeedingContent(state);
   if (nextEntry) {
     api.v1.log(`[sega] scheduling: lorebook ${nextEntry.id.slice(0, 8)}`);

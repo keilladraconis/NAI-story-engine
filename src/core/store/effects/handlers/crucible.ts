@@ -20,6 +20,7 @@ import {
   parseTagAll,
   formatTagsWithEmoji,
   stripSceneTag,
+  stripOpenerTag,
 } from "../../../utils/tag-parser";
 import { getMaxScenes } from "../../../utils/crucible-strategy";
 
@@ -120,10 +121,48 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
     try {
       const text = stripThinkingTags(ctx.accumulatedText).trim();
 
-      if (!parseTag(text, "SCENE")) {
-        api.v1.log("[crucible] Chain parse: missing [SCENE]");
+      // --- Opener path: dedicated opener scene ---
+      if (parseTag(text, "OPENER")) {
+        const sceneIndex = chain.scenes.length;
+        const scene: CrucibleScene = {
+          text,
+          constraintsResolved: [],
+          newOpenConstraints: [],
+          groundStateConstraints: [],
+          isOpener: true,
+        };
+
+        ctx.dispatch(sceneAdded({
+          goalId,
+          scene,
+          constraints: { resolved: [], opened: [], grounded: [] },
+        }));
+        ctx.dispatch(directorGuidanceConsumed({ by: "solver" }));
+        ctx.dispatch(chainCompleted({ goalId }));
+
+        // Seed SceneCard storyStorage + populate view
+        api.v1.storyStorage.set(`cr-scene-${goalId}-${sceneIndex}`, text);
+        const sceneViewId = `${IDS.CRUCIBLE.scene(goalId, sceneIndex).TEXT}-view`;
+        const sceneDisplay = formatTagsWithEmoji(stripOpenerTag(text))
+          .replace(/\n/g, "  \n").replace(/</g, "\\<");
+        api.v1.ui.updateParts([{ id: sceneViewId, text: sceneDisplay }]);
+
+        api.v1.log(`[crucible] Opener scene at index ${sceneIndex} — chain complete`);
         return;
       }
+
+      // --- Fallback: no valid tag ---
+      if (!parseTag(text, "SCENE")) {
+        api.v1.log("[crucible] Chain parse: missing [SCENE]");
+        const maxScenes = await getMaxScenes();
+        if (chain.scenes.length >= maxScenes) {
+          api.v1.log(`[crucible] Budget reached with no valid tag — forcing chain complete`);
+          ctx.dispatch(chainCompleted({ goalId }));
+        }
+        return;
+      }
+
+      // --- Normal scene path ---
 
       // Build reverse map: shortId → constraint (direct from constraint.shortId)
       const shortIdToConstraint = new Map<string, Constraint>();
@@ -201,23 +240,6 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
       const sceneDisplay = formatTagsWithEmoji(stripSceneTag(text))
         .replace(/\n/g, "  \n").replace(/</g, "\\<");
       api.v1.ui.updateParts([{ id: sceneViewId, text: sceneDisplay }]);
-
-      // --- Checkpoint detection ---
-      const updatedState = ctx.getState();
-      const updatedChain = updatedState.crucible.chains[goalId];
-      if (!updatedChain) return;
-
-      // Chain completion: Solver produced an [OPENER] scene
-      if (parseTag(text, "OPENER")) {
-        api.v1.log(`[crucible] Opener detected at scene ${sceneIndex + 1} — chain complete`);
-        ctx.dispatch(chainCompleted({ goalId }));
-      } else if (!updatedChain.complete) {
-        const maxScenes = await getMaxScenes();
-        if (updatedChain.scenes.length >= maxScenes) {
-          api.v1.log(`[crucible] Scene budget reached (${maxScenes}) — chain complete`);
-          ctx.dispatch(chainCompleted({ goalId }));
-        }
-      }
     } catch (e) {
       api.v1.log("[crucible] Chain parse failed:", e);
       api.v1.log("[crucible] Raw text:", ctx.accumulatedText.slice(0, 500));

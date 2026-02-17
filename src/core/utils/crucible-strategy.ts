@@ -38,14 +38,16 @@ export function sceneNumber(sceneIndex: number): number {
  * Includes remaining-scene urgency when budget is tight.
  */
 function formatPacingSignal(sceneCount: number, openCount: number, maxScenes: number): string {
+  if (sceneCount >= maxScenes)
+    return "\nPACING: ALL SCENES COMPLETE — write the [OPENER] now.";
   if (openCount === 0 && sceneCount > 0)
-    return "\nPACING: ALL CONSTRAINTS RESOLVED — write the OPENER that launches this story. If you cannot write a satisfying opener from the current scenes, open new constraints to fill gaps.";
+    return "\nPACING: ALL CONSTRAINTS RESOLVED — open new constraints to fill gaps or resolve remaining as ground state.";
   if (sceneCount === 0)
     return "\nPACING: FIRST SCENE — this is the climax. Open 1-2 preconditions that are DRAMATICALLY far from this moment — foundational circumstances, not adjacent causes.";
   const remaining = maxScenes - sceneCount;
   const nextNum = sceneNumber(sceneCount);
   if (remaining <= 1)
-    return `\nPACING: FINAL SCENE (Scene ${nextNum}) — resolve remaining constraints or write the opener.`;
+    return `\nPACING: FINAL SCENE (Scene ${nextNum}) — resolve remaining constraints.`;
   if (remaining <= 2)
     return `\nPACING: Scene ${nextNum} of ${maxScenes}. 2 scenes remaining — focus on resolving constraints. ${openCount} open.`;
   return `\nPACING: Scene ${nextNum} of ${maxScenes}. You are spanning from climax to origin — each scene should cover roughly equal narrative distance. ${openCount} open constraints.`;
@@ -214,11 +216,16 @@ export const createCrucibleChainFactory = (
     );
 
     const maxScenes = await getMaxScenes();
+    const isOpenerMode = chain.scenes.length >= maxScenes;
     const context = formatChainContext(chain, goal, state.crucible.directorGuidance, maxScenes);
     const prefix = await buildCruciblePrefix(getState, {
       includeDirection: true,
       includeDulfs: true,
     });
+
+    const userContent = isOpenerMode
+      ? context + "\n\nWrite the [OPENER] — the scene that launches this story."
+      : context + `\n\nWrite Scene ${sceneNumber(chain.scenes.length)}.`;
 
     const messages: Message[] = [
       ...prefix,
@@ -228,9 +235,9 @@ export const createCrucibleChainFactory = (
       },
       {
         role: "user",
-        content: context + `\n\nWrite Scene ${sceneNumber(chain.scenes.length)}.`,
+        content: userContent,
       },
-      { role: "assistant", content: "[SCENE] " },
+      { role: "assistant", content: isOpenerMode ? "[OPENER] " : "[SCENE] " },
     ];
 
     return {
@@ -272,15 +279,20 @@ export const buildCrucibleGoalStrategy = (
   };
 };
 
-export const buildCrucibleChainStrategy = (
+export const buildCrucibleChainStrategy = async (
   getState: () => RootState,
   goalId: string,
-): GenerationStrategy => {
+): Promise<GenerationStrategy> => {
+  const state = getState();
+  const chain = state.crucible.chains[goalId];
+  const maxScenes = await getMaxScenes();
+  const isOpenerMode = chain && chain.scenes.length >= maxScenes;
+
   return {
     requestId: api.v1.uuid(),
     messageFactory: createCrucibleChainFactory(getState, goalId),
     target: { type: "crucibleChain", goalId },
     prefillBehavior: "keep",
-    assistantPrefill: "[SCENE] ",
+    assistantPrefill: isOpenerMode ? "[OPENER] " : "[SCENE] ",
   };
 };

@@ -11,6 +11,7 @@ export type SegaStage =
   | "idle"
   | "canon"
   | "attgStyle"
+  | "bootstrap"
   | "lorebookContent"
   | "completed";
 
@@ -152,6 +153,7 @@ export interface CrucibleScene {
   groundStateConstraints: string[];
   tainted?: boolean;
   favorited?: boolean;
+  isOpener?: boolean;
 }
 
 export type ConstraintStatus = "open" | "resolved" | "groundState";

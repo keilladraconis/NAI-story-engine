@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771357602
+updatedAt: 1771370027
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -376,16 +376,11 @@ config:
         [RESOLVED] [ID:X1] ground
       - Never resolve or reference constraints that don't exist yet.
 
-      OPENER: When ALL constraints are resolved, write the [OPENER] — the
-      scene that launches the story. If the current scenes don't support
-      a satisfying opener, open new constraints to fill gaps instead.
-
       Output — one tag per line, [SCENE] required, others as needed:
       [SCENE] What happens — 1-2 vivid sentences
       [RESOLVED] [ID:X0] how/why this is now established
       [RESOLVED] [ID:X1] ground
       [OPEN] one new precondition (only if essential)
-      [OPENER] The scene that launches the story (only when all constraints resolved)
   - name: crucible_build_prompt
     prettyName: Crucible Builder Prompt
     description: Prompt for interleaved builder — reviews scenes, emits world elements

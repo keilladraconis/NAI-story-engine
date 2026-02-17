@@ -7,7 +7,7 @@ import {
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
 import { STATUS_GENERATING } from "../../colors";
-import { formatTagsWithEmoji, stripSceneTag } from "../../../core/utils/tag-parser";
+import { formatTagsWithEmoji, stripSceneTag, stripOpenerTag } from "../../../core/utils/tag-parser";
 import { sceneNumber } from "../../../core/utils/crucible-strategy";
 
 const { column, button } = api.v1.ui.part;
@@ -37,6 +37,9 @@ export const SceneCard = defineComponent<SceneCardProps, RootState>({
     tainted: {
       "border-left": `3px solid ${STATUS_GENERATING}`,
     },
+    opener: {
+      "border-left": "3px solid rgba(100,220,100,0.4)",
+    },
   },
 
   build(props, ctx) {
@@ -46,6 +49,7 @@ export const SceneCard = defineComponent<SceneCardProps, RootState>({
     const state = ctx.getState();
     const scene = state.crucible.chains[goalId]?.scenes[sceneIndex];
     const isTainted = scene?.tainted ?? false;
+    const isOpener = scene?.isOpener ?? false;
 
     const delBtn = button({
       id: ids.DEL_BTN,
@@ -55,17 +59,22 @@ export const SceneCard = defineComponent<SceneCardProps, RootState>({
       callback: () => dispatch(scenesDeletedFrom({ goalId, fromIndex: sceneIndex })),
     });
 
-    const label = `Scene ${sceneNumber(sceneIndex)}`;
+    const label = isOpener ? "Opener" : `Scene ${sceneNumber(sceneIndex)}`;
 
-    const formatDisplay = (content: string): string =>
-      formatTagsWithEmoji(stripSceneTag(content));
+    const formatDisplay = isOpener
+      ? (content: string): string => formatTagsWithEmoji(stripOpenerTag(content))
+      : (content: string): string => formatTagsWithEmoji(stripSceneTag(content));
 
     const sceneDisplay = scene?.text ? formatDisplay(scene.text) : undefined;
+
+    const placeholder = isOpener
+      ? "[OPENER] The scene that launches the story..."
+      : "[SCENE] ...\n[OPEN] ...\n[RESOLVED] ...";
 
     const { part: editable } = ctx.render(EditableText, {
       id: ids.TEXT,
       storageKey: `cr-scene-${goalId}-${sceneIndex}`,
-      placeholder: "[SCENE] ...\n[OPEN] ...\n[RESOLVED] ...",
+      placeholder,
       label,
       initialDisplay: sceneDisplay,
       formatDisplay,
@@ -100,9 +109,11 @@ export const SceneCard = defineComponent<SceneCardProps, RootState>({
       },
     );
 
+    const cardStyle = isOpener ? "opener" : (isTainted && "tainted");
+
     return column({
       id: ids.ROOT,
-      style: this.style?.("card", isTainted && "tainted"),
+      style: this.style?.("card", cardStyle),
       content: [editable],
     });
   },

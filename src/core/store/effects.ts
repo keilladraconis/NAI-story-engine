@@ -867,7 +867,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
-      const strategy = buildCrucibleChainStrategy(getState, activeGoalId);
+      const strategy = await buildCrucibleChainStrategy(getState, activeGoalId);
       dispatch(
         requestQueued({
           id: strategy.requestId,
