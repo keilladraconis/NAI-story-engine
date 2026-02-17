@@ -11,7 +11,6 @@ import {
   goalTextUpdated,
   sceneAdded,
   chainCompleted,
-  crucibleDirectorRequested,
   directionSet,
   directorGuidanceConsumed,
 } from "../../index";
@@ -207,18 +206,6 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
       const updatedState = ctx.getState();
       const updatedChain = updatedState.crucible.chains[goalId];
       if (!updatedChain) return;
-
-      // Constraint explosion: net growth >1 for 3 consecutive scenes → call Director
-      if (updatedChain.scenes.length >= 3) {
-        const lastThree = updatedChain.scenes.slice(-3);
-        const explosionCount = lastThree.filter(
-          (s) => s.newOpenConstraints.length - s.constraintsResolved.length > 1,
-        ).length;
-        if (explosionCount >= 3) {
-          api.v1.log("[crucible] Constraint explosion detected — requesting Director");
-          ctx.dispatch(crucibleDirectorRequested());
-        }
-      }
 
       // Chain completion: Solver produced an [OPENER] scene
       if (parseTag(text, "OPENER")) {

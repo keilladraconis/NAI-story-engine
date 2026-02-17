@@ -89,8 +89,8 @@ function formatBuilderContext(
     for (const el of builder.elements) {
       const sid = shortIds.get(el.id) || "??";
       const label = FIELD_LABEL[el.fieldId] || el.fieldId;
-      const desc = el.content ? `: ${el.content}` : "";
-      sections.push(`  [${sid}] ${el.name} (${label})${desc}`);
+      // Don't include description, to prevent anchoring on later formation of element.
+      sections.push(`  [${sid}] ${el.name} - ${label}`);
     }
   }
 
@@ -138,7 +138,7 @@ export const createCrucibleBuildFactory = (
         role: "user",
         content: context + "\n\nReview the new scenes. Emit world elements, then yield to solver.",
       },
-      { role: "assistant", content: "[" },
+      { role: "assistant", content: "+++\n" },
     ];
 
     return {

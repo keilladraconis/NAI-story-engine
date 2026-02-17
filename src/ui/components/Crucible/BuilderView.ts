@@ -231,8 +231,20 @@ export const BuilderView = defineComponent<undefined, RootState>({
       },
     );
 
-    // Always start hidden — useSelector handles all rendering on state changes
-    // (persist/loaded / builderElementAdded trigger the callback above)
+    // Build initial state from persisted data (useSelector won't fire on mount)
+    const initialElements = ctx.getState().crucible.builder.elements;
+    if (initialElements.length > 0) {
+      for (const el of initialElements) {
+        api.v1.storyStorage.set(elementStorageKey(el.id), formatElementText(el));
+      }
+      const initialSections = buildSections(initialElements);
+      return column({
+        id: CR.BUILDER_ROOT,
+        style: this.style?.("root"),
+        content: initialSections,
+      });
+    }
+
     return column({
       id: CR.BUILDER_ROOT,
       style: this.style?.("hidden"),

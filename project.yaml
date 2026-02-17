@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771348750
+updatedAt: 1771357602
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -458,12 +458,20 @@ config:
         removing. It stays but is flagged. The Solver will see the
         warning and work around it.
 
+      TEMPORAL AWARENESS: The TEMPORAL POSITION section tells you where
+      the Solver is working in the story's timeline. The chain runs
+      BACKWARD from climax to origin. Your [FOR SOLVER] directive MUST
+      be appropriate to the era the Solver is currently exploring. If
+      the Solver is near the origin, direct toward foundational elements
+      (childhood, formative events, early world state) — NOT climactic
+      confrontations or late-story revelations.
+
       Output format — three required sections, corrective tags optional:
 
       [ASSESSMENT] 2-3 sentences on world inventory state and readiness
       [FOR SOLVER] A specific creative directive for the next scene —
         what world elements it should reveal, who's involved, what
-        constraints to target. This is a brief, not a suggestion.
+        constraints to target. MUST fit the current temporal position.
       [FOR BUILDER] A specific directive for world elements — what to
         create, deepen, or connect. Name gaps and describe what fills them.
       [REJECT] (optional) Cut the last scene — explain why in [FOR SOLVER]

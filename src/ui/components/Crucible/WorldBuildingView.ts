@@ -117,8 +117,13 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
     const { dispatch, useSelector } = ctx;
     const state = ctx.getState();
     const { goals, chains, activeGoalId, directorGuidance } = state.crucible;
-    const visible = activeGoalId != null && chains[activeGoalId] != null;
     const selectedGoals = goals.filter((g) => g.starred);
+
+    // Display goal: active goal if set, otherwise first starred goal with a chain
+    const displayGoalId = activeGoalId
+      ?? selectedGoals.find((g) => chains[g.id] != null)?.id
+      ?? null;
+    const visible = displayGoalId != null && chains[displayGoalId] != null;
 
     // --- Goal progress lines ---
 
@@ -330,12 +335,12 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
     // --- Initial render ---
 
     const initialProgressParts = visible
-      ? selectedGoals.map((g) => buildProgressLine(g, chains[g.id], activeGoalId))
+      ? selectedGoals.map((g) => buildProgressLine(g, chains[g.id], displayGoalId))
       : [];
 
-    const activeChain = activeGoalId ? chains[activeGoalId] : undefined;
-    const initialConstraintParts = visible && activeGoalId && activeChain
-      ? buildConstraintTracker(activeChain, activeGoalId)
+    const displayChain = displayGoalId ? chains[displayGoalId] : undefined;
+    const initialConstraintParts = visible && displayGoalId && displayChain
+      ? buildConstraintTracker(displayChain, displayGoalId)
       : [];
 
     const hasDirector = directorGuidance != null;
@@ -350,22 +355,26 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
         activeGoalId: s.crucible.activeGoalId,
       }),
       (slice) => {
-        const vis = slice.activeGoalId != null && slice.chains[slice.activeGoalId] != null;
+        // Display goal: active if set, else first starred with a chain
+        const dgId = slice.activeGoalId
+          ?? slice.goals.find((g) => slice.chains[g.id] != null)?.id
+          ?? null;
+        const vis = dgId != null && slice.chains[dgId] != null;
         api.v1.ui.updateParts([
           { id: "cr-world-building-view", style: this.style?.("root", !vis && "hidden") },
         ]);
         if (!vis) return;
 
         const progressParts = slice.goals.map((g) =>
-          buildProgressLine(g, slice.chains[g.id], slice.activeGoalId),
+          buildProgressLine(g, slice.chains[g.id], dgId),
         );
         api.v1.ui.updateParts([
           { id: "cr-goal-progress", style: this.style?.("goalProgress"), content: progressParts },
         ]);
 
-        const chain = slice.activeGoalId ? slice.chains[slice.activeGoalId] : undefined;
-        if (chain && slice.activeGoalId) {
-          const constraintParts = buildConstraintTracker(chain, slice.activeGoalId);
+        const chain = dgId ? slice.chains[dgId] : undefined;
+        if (chain && dgId) {
+          const constraintParts = buildConstraintTracker(chain, dgId);
           api.v1.ui.updateParts([
             { id: CR.CONSTRAINTS_ROOT, style: this.style?.("constraintsRoot"), content: constraintParts },
           ]);

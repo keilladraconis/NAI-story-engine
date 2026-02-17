@@ -895,12 +895,20 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Reset → clear stream transcript + storyStorage + view
+  // Intent: Crucible Reset → clear stream transcript + all cr- storyStorage keys + view
   subscribeEffect(
     matchesAction(crucibleReset),
     async () => {
       resetStreamTranscript();
-      await api.v1.storyStorage.set("cr-direction", "");
+
+      // Remove all cr- prefixed storyStorage keys (goals, scenes, sections, etc.)
+      const allKeys = await api.v1.storyStorage.list();
+      for (const key of allKeys) {
+        if (key.startsWith("cr-")) {
+          await api.v1.storyStorage.remove(key);
+        }
+      }
+
       api.v1.ui.updateParts([
         { id: `${IDS.CRUCIBLE.DIRECTION_TEXT}-view`, text: "" },
       ]);
@@ -975,22 +983,11 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  const DIRECTOR_SCENE_INTERVAL = 3; // Run Director every N scenes
-
-  /** Check if the Director should run before the next solver scene. */
+  /** Check if the Director should run before the next solver scene.
+   *  Currently disabled — letting Solver/Builder work autonomously.
+   *  Director infrastructure remains for manual invocation. */
   function needsDirector(): boolean {
-    const state = getState();
-    const { activeGoalId, directorGuidance } = state.crucible;
-    if (!activeGoalId) return false;
-    const chain = state.crucible.chains[activeGoalId];
-    if (!chain) return false;
-
-    const sceneCount = chain.scenes.length;
-    // Need enough material to assess
-    if (sceneCount < DIRECTOR_SCENE_INTERVAL) return false;
-    // Run if no guidance yet, or enough scenes since last run
-    if (!directorGuidance) return true;
-    return sceneCount - directorGuidance.atSceneIndex >= DIRECTOR_SCENE_INTERVAL;
+    return false;
   }
 
   // Auto-chain continuation: interleaved Solver → Builder → (Director?) → Solver loop
@@ -1168,6 +1165,8 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         /^draft-/, // Draft content (text fields, brainstorm messages)
         /^dulfs-item-/, // DULFS item content
         /^se-bs-input$/, // Brainstorm input
+        /^cr-/, // Crucible (goals, scenes, sections, direction, etc.)
+        /^lb-/, // Lorebook drafts
       ];
 
       for (const key of allKeys) {

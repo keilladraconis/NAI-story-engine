@@ -329,6 +329,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
           max: 15,
           step: 1,
           defaultValue: 5,
+          initialValue: 5,
           preventDecimal: true,
           storageKey: "story:cr-scene-budget",
         }),

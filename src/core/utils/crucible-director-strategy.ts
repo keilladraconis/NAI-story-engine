@@ -21,7 +21,7 @@ import { MessageFactory } from "nai-gen-x";
 import { buildCruciblePrefix } from "./context-builder";
 import { parseTag } from "./tag-parser";
 import { computeShortIds } from "./crucible-builder-strategy";
-import { sceneNumber } from "./crucible-strategy";
+import { sceneNumber, getMaxScenes } from "./crucible-strategy";
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 
 /** DULFS field label for Director context. */
@@ -43,6 +43,7 @@ function formatDirectorContext(
   chain: CrucibleChain,
   elements: CrucibleWorldElement[],
   previousGuidance: DirectorGuidance | null,
+  maxScenes: number,
 ): string {
   const sections: string[] = [];
 
@@ -81,6 +82,23 @@ function formatDirectorContext(
       const label = c.status === "groundState" ? "ground state" : `Scene ${sceneNumber(c.sourceSceneIndex)}`;
       sections.push(`  [${c.shortId}] ${c.description} → ${label}`);
     }
+  }
+
+  // Temporal position — tells Director where in the arc the Solver is working
+  const sceneCount = chain.scenes.length;
+  const remaining = maxScenes - sceneCount;
+  if (sceneCount === 0) {
+    sections.push("\nTEMPORAL POSITION: Solver has not started yet — next scene is the CLIMAX (Scene 1).");
+  } else if (remaining <= 1) {
+    sections.push(`\nTEMPORAL POSITION: Scene ${sceneNumber(sceneCount)} of ${maxScenes} — Solver is at the ORIGIN, the very beginning of the story. Guidance must fit foundational, pre-story circumstances.`);
+  } else if (remaining <= 2) {
+    sections.push(`\nTEMPORAL POSITION: Scene ${sceneNumber(sceneCount)} of ${maxScenes} — Solver is near the ORIGIN. Guidance should target early life, formative events, foundational world state.`);
+  } else if (sceneCount <= 2) {
+    sections.push(`\nTEMPORAL POSITION: Scene ${sceneNumber(sceneCount)} of ${maxScenes} — Solver is near the CLIMAX. Guidance should target mid-to-late story elements, escalating tensions.`);
+  } else {
+    const progress = sceneCount / maxScenes;
+    const era = progress < 0.4 ? "mid-story" : progress < 0.7 ? "early-mid story" : "early story";
+    sections.push(`\nTEMPORAL POSITION: Scene ${sceneNumber(sceneCount)} of ${maxScenes} — Solver is exploring the ${era}. Guidance must be temporally appropriate to this era.`);
   }
 
   // World elements
@@ -127,11 +145,13 @@ export const createCrucibleDirectorFactory = (
       (await api.v1.config.get("crucible_director_prompt")) || "",
     );
 
+    const maxScenes = await getMaxScenes();
     const context = formatDirectorContext(
       goal,
       chain,
       state.crucible.builder.elements,
       state.crucible.directorGuidance,
+      maxScenes,
     );
 
     const prefix = await buildCruciblePrefix(getState, {
