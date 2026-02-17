@@ -13,6 +13,7 @@ import {
   chainCompleted,
   checkpointSet,
   intentSet,
+  directorGuidanceConsumed,
 } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
 import {
@@ -190,6 +191,8 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
           grounded: groundStateConstraints, // shortIds
         },
       }));
+
+      ctx.dispatch(directorGuidanceConsumed({ by: "solver" }));
 
       // Seed BeatCard storyStorage + populate view
       api.v1.storyStorage.set(`cr-beat-${goalId}-${beatIndex}`, text);

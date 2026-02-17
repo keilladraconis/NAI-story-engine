@@ -16,12 +16,18 @@ import { MessageFactory } from "nai-gen-x";
 import { buildCruciblePrefix } from "./context-builder";
 import { parseTag } from "./tag-parser";
 
+// --- Scene Numbering ---
+
+/** Scene numbers count down from 30 — GLM interprets descending numbers as backward temporal movement. */
+export const SCENE_OFFSET = 30;
+
+/** Convert a zero-based beat index to a descending scene number. */
+export function sceneNumber(beatIndex: number): number {
+  return SCENE_OFFSET - beatIndex;
+}
+
 // --- Chain Context Formatter ---
 
-/**
- * Format chain context for the backward-chaining prompt.
- * Shows goal text, beats (newest-first), and open/resolved constraints with short IDs.
- */
 /**
  * Format pacing signal based on beat count and open constraints.
  * No hard beat limits — the Director handles strategic pacing.
@@ -29,10 +35,11 @@ import { parseTag } from "./tag-parser";
  */
 function formatPacingSignal(beatCount: number, openCount: number): string {
   if (openCount === 0 && beatCount > 0)
-    return "\nPACING: ALL CONSTRAINTS RESOLVED — write the [OPENER], the chronological first scene of this story. If you cannot write a satisfying opener from the current beats, open new constraints to fill gaps.";
+    return "\nPACING: ALL CONSTRAINTS RESOLVED — write Scene 1, the OPENER that launches this story. If you cannot write a satisfying opener from the current beats, open new constraints to fill gaps.";
   if (beatCount === 0)
-    return "\nPACING: FIRST BEAT — this IS the penultimate scene. Open 1-2 NEW preconditions only (not already listed above). Do NOT resolve anything.";
-  return `\nPACING: Beat ${beatCount + 1}. ${openCount} open constraints. Resolve what you can, open new ones only if essential.`;
+    return `\nPACING: FIRST SCENE — this is the climax (Scene ${SCENE_OFFSET}). Open 1-2 NEW preconditions only (not already listed above). Do NOT resolve anything.`;
+  const nextNum = sceneNumber(beatCount);
+  return `\nPACING: Write Scene ${nextNum}. ${openCount} open constraints. This scene happens BEFORE all scenes above. Resolve what you can, open new ones only if essential.`;
 }
 
 function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: DirectorGuidance | null): string {
@@ -48,10 +55,12 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
   // Constraint state lives in the dedicated OPEN/RESOLVED sections below.
   // Showing constraint tags inside beats causes GLM to confuse ID formats.
   if (chain.beats.length > 0) {
-    sections.push("\nESTABLISHED BEATS (newest-first, closest to goal first):");
+    const lowestNum = sceneNumber(chain.beats.length - 1);
+    sections.push(`\nESTABLISHED SCENES (earliest first — write what comes BEFORE Scene ${lowestNum}):`);
     for (let i = chain.beats.length - 1; i >= 0; i--) {
       const scene = parseTag(chain.beats[i].text, "SCENE") || chain.beats[i].text.split("\n")[0];
-      sections.push(`  Beat ${i + 1}: ${scene}`);
+      const taintedMark = chain.beats[i].tainted ? " ⚠ TAINTED — needs correction" : "";
+      sections.push(`  Scene ${sceneNumber(i)}: ${scene}${taintedMark}`);
     }
   }
 
@@ -59,7 +68,7 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
   if (chain.openConstraints.length > 0) {
     sections.push("\nOPEN CONSTRAINTS (already tracked — do NOT re-emit these in [OPEN]):");
     for (const c of chain.openConstraints) {
-      const source = c.sourceBeatIndex === 0 && chain.beats.length === 0 ? "seed" : `Beat ${c.sourceBeatIndex + 1}`;
+      const source = c.sourceBeatIndex === 0 && chain.beats.length === 0 ? "seed" : `Scene ${sceneNumber(c.sourceBeatIndex)}`;
       sections.push(`  [${c.shortId}] ${c.description} (${source})`);
     }
   }
@@ -68,7 +77,7 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
   if (chain.resolvedConstraints.length > 0) {
     sections.push("\nRESOLVED CONSTRAINTS:");
     for (const c of chain.resolvedConstraints) {
-      const label = c.status === "groundState" ? "ground state" : `Beat ${c.sourceBeatIndex + 1}`;
+      const label = c.status === "groundState" ? "ground state" : `Scene ${sceneNumber(c.sourceBeatIndex)}`;
       sections.push(`  - ${c.description} → ${label}`);
     }
   }
@@ -79,7 +88,7 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
 
   // Director guidance — strategic notes from meta-analysis
   if (guidance?.solver) {
-    sections.push(`\nDIRECTOR GUIDANCE: ${guidance.solver}`);
+    sections.push(`\nDIRECTOR GUIDANCE (act on this NOW — it will not repeat): ${guidance.solver}`);
   }
 
   return sections.join("\n");
@@ -211,7 +220,7 @@ export const createCrucibleChainFactory = (
       },
       {
         role: "user",
-        content: context + "\n\nDesign the next beat backward.",
+        content: context + `\n\nWrite Scene ${chain.beats.length === 0 ? SCENE_OFFSET : sceneNumber(chain.beats.length)}.`,
       },
       { role: "assistant", content: "[SCENE] " },
     ];

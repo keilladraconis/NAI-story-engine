@@ -17,6 +17,7 @@ import {
 import { MessageFactory } from "nai-gen-x";
 import { buildCruciblePrefix } from "./context-builder";
 import { parseTag } from "./tag-parser";
+import { sceneNumber } from "./crucible-strategy";
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 
 /** Short-ID prefix per DULFS field. */
@@ -73,12 +74,11 @@ function formatBuilderContext(
   const startIndex = builder.lastProcessedBeatIndex + 1;
   const unprocessed = chain.beats.slice(startIndex);
   if (unprocessed.length > 0) {
-    sections.push("\nNEW BEATS TO REVIEW:");
+    sections.push("\nNEW SCENES TO REVIEW:");
     for (let i = 0; i < unprocessed.length; i++) {
       const beat = unprocessed[i];
-      const beatNum = startIndex + i + 1;
       const scene = parseTag(beat.text, "SCENE") || beat.text.split("\n")[0];
-      sections.push(`  Beat ${beatNum}: ${scene}`);
+      sections.push(`  Scene ${sceneNumber(startIndex + i)}: ${scene}`);
     }
   }
 
@@ -96,7 +96,7 @@ function formatBuilderContext(
 
   // Director guidance — strategic notes from meta-analysis
   if (guidance?.builder) {
-    sections.push(`\nDIRECTOR GUIDANCE: ${guidance.builder}`);
+    sections.push(`\nDIRECTOR GUIDANCE (act on this NOW — it will not repeat): ${guidance.builder}`);
   }
 
   return sections.join("\n");
@@ -136,7 +136,7 @@ export const createCrucibleBuildFactory = (
       },
       {
         role: "user",
-        content: context + "\n\nReview the new beats. Emit world elements, then yield to solver.",
+        content: context + "\n\nReview the new scenes. Emit world elements, then yield to solver.",
       },
       { role: "assistant", content: "[" },
     ];

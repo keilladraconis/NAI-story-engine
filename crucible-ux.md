@@ -89,6 +89,12 @@ These are summary indicators, not an alternate view of the content. The stream i
 - Brief description
 - Which goals it serves (if multiple — that's the good stuff, that's where dramatic tension lives)
 
+**Guidance**: The AI periodically assesses progress — narrative shape, world coverage, pacing — and shows a brief guidance note. The user can read and edit this to steer the AI's next decisions. When the AI acts on guidance, it's consumed and won't repeat. Label: "Guidance".
+
+**Constraints** (progressive disclosure): An expandable section shows the AI's open questions (constraints). Power users can add questions, mark them resolved, reopen them, or delete them. This is advanced — most users will never touch it.
+
+**Beat cards**: Each goal's reasoning appears as collapsible cards within the goal section. The stream remains the primary reading experience; cards are for reference and re-reading.
+
 **The user's role during building**: Mostly watching. But the AI may pause at natural moments:
 - "A major power structure is emerging. Does this feel right?"
 - "The world is getting complex — 12 elements across 3 goals. Continue or simplify?"
@@ -125,8 +131,7 @@ They can:
 ## What the user NEVER sees or needs to understand
 
 - "Phases" or phase transitions
-- "Beats" or "beat cards" — the backward chain steps are the AI's internal reasoning, shown as a readable stream, not decomposed into indexed units
-- "Constraints" — open/resolved/ground state are implementation details of the solver
+- "Beats" as primary UI — beat cards exist for reference, but the stream is the primary reading experience. The user never needs to think in terms of "beat 3" or "beat index"
 - "Chaining" or "backward chaining" — the user sees "building your world"
 - "Solver" or "Builder" — these are internal pipeline stages
 - "Selected" as a default state — nothing is pre-selected

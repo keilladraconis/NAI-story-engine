@@ -6,7 +6,7 @@ import {
 import {
   builderNodeAdded,
   builderBeatProcessed,
-  builderDeactivated,
+  directorGuidanceConsumed,
 } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
 import {
@@ -66,9 +66,6 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
         const sid = shortIds.get(node.id);
         if (sid) shortIdToNode.set(sid.toUpperCase(), node);
       }
-
-      // Check for [SOLVER] yield signal
-      const hasSolverYield = text.includes("[SOLVER]");
 
       // Parse sections — each element/link is a section
       const sections = splitSections(text);
@@ -143,10 +140,7 @@ export const crucibleBuildHandler: GenerationHandlers<CrucibleBuildTarget> = {
         ctx.dispatch(builderBeatProcessed({ beatIndex: lastBeatIndex }));
       }
 
-      // If [SOLVER] detected, yield back to solver
-      if (hasSolverYield) {
-        ctx.dispatch(builderDeactivated());
-      }
+      ctx.dispatch(directorGuidanceConsumed({ by: "builder" }));
     } catch (e) {
       api.v1.log("[crucible-builder] Parse failed:", e);
       api.v1.log("[crucible-builder] Raw text:", ctx.accumulatedText.slice(0, 500));

@@ -3,13 +3,14 @@ import {
   StreamingContext,
   CompletionContext,
 } from "../generation-handlers";
-import { directorGuidanceSet } from "../../index";
+import { directorGuidanceSet, beatRejected, beatTainted } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
 import {
   parseTag,
   formatTagsWithEmoji,
 } from "../../../utils/tag-parser";
 import { appendToTranscript, truncateToTail } from "./crucible";
+import { SCENE_OFFSET } from "../../../utils/crucible-strategy";
 
 type CrucibleDirectorTarget = { type: "crucibleDirector" };
 
@@ -58,5 +59,25 @@ export const crucibleDirectorHandler: GenerationHandlers<CrucibleDirectorTarget>
       builder: builder.trim(),
       atBeatIndex,
     }));
+
+    // Parse corrective actions
+    const shouldReject = text.includes("[REJECT]");
+    const taintMatch = text.match(/\[TAINT Scene (\d+)\]/);
+
+    if (shouldReject) {
+      if (chain && chain.beats.length > 0) {
+        api.v1.log(`[crucible-director] REJECT — rolling back last scene`);
+        ctx.dispatch(beatRejected({ goalId: activeGoalId! }));
+      }
+    }
+
+    if (taintMatch) {
+      const targetSceneNum = parseInt(taintMatch[1], 10);
+      const beatIndex = SCENE_OFFSET - targetSceneNum;
+      if (chain && beatIndex >= 0 && beatIndex < chain.beats.length) {
+        api.v1.log(`[crucible-director] TAINT Scene ${targetSceneNum} (beat index ${beatIndex})`);
+        ctx.dispatch(beatTainted({ goalId: activeGoalId!, beatIndex }));
+      }
+    }
   },
 };

@@ -21,6 +21,7 @@ import { MessageFactory } from "nai-gen-x";
 import { buildCruciblePrefix } from "./context-builder";
 import { parseTag } from "./tag-parser";
 import { computeShortIds } from "./crucible-builder-strategy";
+import { sceneNumber } from "./crucible-strategy";
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 
 /** DULFS field label for Director context. */
@@ -49,16 +50,16 @@ function formatDirectorContext(
   const goalText = parseTag(goal.text, "GOAL") || goal.text.split("\n")[0];
   sections.push(`GOAL: ${goalText}`);
 
-  // All beats (chronological for Director — unlike Solver which sees newest-first)
+  // All scenes (story-chronological for Director — reading the screenplay)
   if (chain.beats.length > 0) {
-    sections.push(`\nBEATS (${chain.beats.length} total, newest = closest to goal):`);
-    for (let i = 0; i < chain.beats.length; i++) {
+    sections.push(`\nSCENES (${chain.beats.length} total, story order — Scene ${sceneNumber(chain.beats.length - 1)} → Scene ${sceneNumber(0)}):`);
+    for (let i = chain.beats.length - 1; i >= 0; i--) {
       const scene = parseTag(chain.beats[i].text, "SCENE") || chain.beats[i].text.split("\n")[0];
       const markers: string[] = [];
       if (chain.beats[i].favorited) markers.push("★");
-      if (chain.beats[i].tainted) markers.push("edited");
+      if (chain.beats[i].tainted) markers.push("⚠ TAINTED");
       const suffix = markers.length > 0 ? ` (${markers.join(", ")})` : "";
-      sections.push(`  Beat ${i + 1}: ${scene}${suffix}`);
+      sections.push(`  Scene ${sceneNumber(i)}: ${scene}${suffix}`);
     }
   }
 
@@ -77,7 +78,7 @@ function formatDirectorContext(
   if (resolved.length > 0) {
     sections.push("RESOLVED:");
     for (const c of resolved) {
-      const label = c.status === "groundState" ? "ground state" : `Beat ${c.sourceBeatIndex + 1}`;
+      const label = c.status === "groundState" ? "ground state" : `Scene ${sceneNumber(c.sourceBeatIndex)}`;
       sections.push(`  [${c.shortId}] ${c.description} → ${label}`);
     }
   }
@@ -98,7 +99,7 @@ function formatDirectorContext(
 
   // Previous guidance (for continuity)
   if (previousGuidance) {
-    sections.push(`\nYOUR PREVIOUS GUIDANCE (at beat ${previousGuidance.atBeatIndex}):`);
+    sections.push(`\nYOUR PREVIOUS GUIDANCE (at Scene ${sceneNumber(previousGuidance.atBeatIndex)}):`);
     sections.push(`  Solver: ${previousGuidance.solver}`);
     sections.push(`  Builder: ${previousGuidance.builder}`);
   }
@@ -154,7 +155,7 @@ export const createCrucibleDirectorFactory = (
       messages,
       params: {
         model: "glm-4-6",
-        max_tokens: 512,
+        max_tokens: 700,
         temperature: 0.8,
         min_p: 0.05,
         stop: ["</think>"],

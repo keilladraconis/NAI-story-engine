@@ -199,7 +199,6 @@ export interface DirectorGuidance {
 }
 
 export interface CrucibleState {
-  builderActive: boolean;
   intent: string | null;
   goals: CrucibleGoal[];
   chains: Record<string, CrucibleChain>;

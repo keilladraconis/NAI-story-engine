@@ -37,14 +37,11 @@ import {
   crucibleIntentRequested,
   crucibleBuildRequested,
   crucibleReset,
-  builderActivated,
-  builderDeactivated,
   intentSet,
   goalAdded,
   goalsConfirmed,
   crucibleChainRequested,
   chainStarted,
-  beatAdded,
   activeGoalAdvanced,
   autoChainStarted,
   autoChainStopped,
@@ -326,6 +323,8 @@ function cacheLabel(target: GenerationStrategy["target"]): string {
       return `crucible-chain:${target.goalId.slice(0, 8)}`;
     case "crucibleBuild":
       return `crucible-build:${target.goalId.slice(0, 8)}`;
+    case "crucibleDirector":
+      return "crucible-director";
   }
 }
 
@@ -919,7 +918,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
-      dispatch(builderActivated());
       const strategy = buildCrucibleBuildStrategy(getState, activeGoalId);
       dispatch(
         requestQueued({
@@ -948,20 +946,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Local stall counter for auto-chaining
-  let chainStalls = 0;
-  const MAX_CHAIN_STALLS = 3;
   const DIRECTOR_BEAT_INTERVAL = 3; // Run Director every N beats
-
-  /** Check if builder has unprocessed beats. */
-  function builderBehind(): boolean {
-    const state = getState();
-    const { activeGoalId, builder } = state.crucible;
-    if (!activeGoalId) return false;
-    const chain = state.crucible.chains[activeGoalId];
-    if (!chain || chain.beats.length === 0) return false;
-    return builder.lastProcessedBeatIndex < chain.beats.length - 1;
-  }
 
   /** Check if the Director should run before the next solver beat. */
   function needsDirector(): boolean {
@@ -979,7 +964,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     return beatCount - directorGuidance.atBeatIndex >= DIRECTOR_BEAT_INTERVAL;
   }
 
-  // Auto-chain continuation: interleaved Solver ↔ Builder loop
+  // Auto-chain continuation: interleaved Solver → Builder → (Director?) → Solver loop
   subscribeEffect(
     matchesAction(requestCompleted),
     async () => {
@@ -990,79 +975,50 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       if (state.crucible.checkpointReason) return;
       if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
 
-      const { builderActive, activeGoalId } = state.crucible;
+      const { activeGoalId } = state.crucible;
       if (!activeGoalId) return;
 
       const chain = state.crucible.chains[activeGoalId];
       if (!chain) return;
 
-      if (builderActive) {
-        // Builder just completed — if it yielded [SOLVER], builderActive would already
-        // be false. This means the builder exhausted continuations without yielding.
-        // Force deactivate and fall through to solver branch.
-        api.v1.log("[crucible] Builder exhausted without [SOLVER] — force deactivating");
-        dispatch(builderDeactivated());
-        // Fall through to solver logic below (don't return!)
-      }
+      const builderBehind =
+        state.crucible.builder.lastProcessedBeatIndex < chain.beats.length - 1
+        && chain.beats.length > 0;
 
-      // Solver branch (also handles post-builder-deactivation)
+      // --- Goal complete ---
       if (chain.complete) {
-        // Goal complete — run builder catch-up if behind
-        if (builderBehind()) {
-          api.v1.log("[crucible] Goal complete, builder behind — running catch-up");
+        if (builderBehind) {
+          api.v1.log("[crucible] Goal complete, builder behind — catch-up");
           dispatch(crucibleBuildRequested());
           return;
         }
-        // Advance to next goal
         dispatch(activeGoalAdvanced());
         const updated = getState();
         if (updated.crucible.activeGoalId) {
           api.v1.log(`[crucible] Advanced to goal ${updated.crucible.activeGoalId}`);
-          chainStalls = 0;
           dispatch(crucibleChainRequested());
         } else {
-          // All goals complete — final builder pass if needed
-          if (builderBehind()) {
-            dispatch(crucibleBuildRequested());
-          } else {
-            api.v1.log("[crucible] All goals complete — stopping auto-chain");
-            dispatch(autoChainStopped());
-          }
+          api.v1.log("[crucible] All goals complete");
+          dispatch(autoChainStopped());
         }
         return;
       }
 
-      // Chain not complete — interleave builder if behind
-      if (builderBehind()) {
-        api.v1.log(`[crucible] Builder behind (processed=${getState().crucible.builder.lastProcessedBeatIndex}, beats=${chain.beats.length}) — building`);
+      // --- Normal loop: Solver → Builder → (Director?) → Solver ---
+      if (builderBehind) {
+        api.v1.log(`[crucible] Builder behind — building`);
         dispatch(crucibleBuildRequested());
         return;
       }
 
-      // Director check — run meta-analysis before next solver beat
       if (needsDirector()) {
         api.v1.log(`[crucible] Director assessment at beat ${chain.beats.length}`);
         dispatch(crucibleDirectorRequested());
         return;
       }
 
-      // Continue solving — stall detection
-      chainStalls++;
-      if (chainStalls >= MAX_CHAIN_STALLS) {
-        api.v1.log(`[crucible] Auto-chain stopped: ${chainStalls} consecutive stalls`);
-        dispatch(autoChainStopped());
-        return;
-      }
-      api.v1.log(`[crucible] Continuing solver — beat ${chain.beats.length}, stalls=${chainStalls}`);
+      api.v1.log(`[crucible] Continuing solver — beat ${chain.beats.length}`);
       dispatch(crucibleChainRequested());
-    },
-  );
-
-  // Reset stall counter when a beat is successfully added
-  subscribeEffect(
-    matchesAction(beatAdded),
-    () => {
-      chainStalls = 0;
     },
   );
 
@@ -1071,7 +1027,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     matchesAction(checkpointCleared),
     (_action, { dispatch, getState: getLatest }) => {
       const state = getLatest();
-      if (state.crucible.autoChaining && !state.crucible.builderActive) {
+      if (state.crucible.autoChaining) {
         dispatch(crucibleChainRequested());
       }
     },

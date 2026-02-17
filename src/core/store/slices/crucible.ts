@@ -47,7 +47,6 @@ export function migrateCrucibleState(loaded: CrucibleState): CrucibleState {
   }
 
   return {
-    builderActive: false,
     intent: loaded.intent,
     goals: loaded.goals,
     chains,
@@ -69,7 +68,6 @@ export function migrateCrucibleState(loaded: CrucibleState): CrucibleState {
 }
 
 export const initialCrucibleState: CrucibleState = {
-  builderActive: false,
   intent: null,
   goals: [],
   chains: {},
@@ -531,10 +529,6 @@ export const crucibleSlice = createSlice({
       return { ...state, autoChaining: false };
     },
 
-    builderActivated: (state) => {
-      return { ...state, builderActive: true };
-    },
-
     // Builder reducers
     crucibleBuildRequested: (state) => state,
 
@@ -615,8 +609,13 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    builderDeactivated: (state) => {
-      return { ...state, builderActive: false };
+    directorGuidanceConsumed: (state, payload: { by: "solver" | "builder" }) => {
+      if (!state.directorGuidance) return state;
+      const updated = { ...state.directorGuidance };
+      if (payload.by === "solver") updated.solver = "";
+      if (payload.by === "builder") updated.builder = "";
+      if (!updated.solver && !updated.builder) return { ...state, directorGuidance: null };
+      return { ...state, directorGuidance: updated };
     },
 
     directorGuidanceSet: (state, payload: { solver: string; builder: string; atBeatIndex: number }) => {
@@ -668,13 +667,12 @@ export const {
   checkpointCleared,
   autoChainStarted,
   autoChainStopped,
-  builderActivated,
   crucibleBuildRequested,
   builderNodeAdded,
   builderNodeUpdated,
   builderBeatProcessed,
   builderNodeRemoved,
-  builderDeactivated,
+  directorGuidanceConsumed,
   directorGuidanceSet,
   crucibleReset,
 } = crucibleSlice.actions;
