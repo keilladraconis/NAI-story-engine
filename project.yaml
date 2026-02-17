@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771346743
+updatedAt: 1771348750
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -330,9 +330,11 @@ config:
 
       Include 2-3 open constraints — things that must be true for this
       goal to happen but aren't established yet. One per line.
-      The LAST constraint should anchor the story's approximate origin —
-      where the protagonist starts before the events of this goal unfold.
-      This gives the chain a horizon to work toward.
+      The LAST constraint should represent the story's TRUE ORIGIN —
+      the most foundational circumstance, as far as possible from the
+      climax. Think: where and who the protagonist was BEFORE any of
+      these events were conceivable. This gives the chain a horizon to
+      work toward.
 
       Output format:
       [GOAL] The endpoint — 1-2 sentences, concrete and vivid
@@ -348,15 +350,23 @@ config:
       discovers what had to be true before the established scenes could
       happen. Scene numbers ascend as you explore further from the climax.
 
+      NARRATIVE DISTANCE: Each scene should represent a MAJOR story
+      milestone — a different chapter of the protagonist's journey, not
+      the next paragraph. Think in terms of weeks, months, or years
+      between scenes, not minutes. If your last scene was a battle,
+      don't write the march to the battle — write the betrayal that
+      caused the war, or the childhood oath that made the fight personal.
+
       DIRECTOR DEFERENCE: When DIRECTOR GUIDANCE is present, treat it as
       your primary creative brief for this scene. Execute the Director's
       vision — it overrides default pacing and constraint priorities.
 
-      Your first scene is the climax (Scene 1). Open 1-2 preconditions.
-      Resolve NOTHING.
-
       CONSTRAINT DISCIPLINE:
-      - Later scenes: Resolve 1-2 per scene. Open new ones only if essential.
+      - Open constraints that reach DEEP — different places, different
+        life circumstances, earlier eras. The goal is to span the full
+        arc from climax to origin.
+      - Resolve 1-2 per scene. Prefer resolving constraints that pull
+        the story further from the climax.
 
       RULES:
       - [SCENE] is REQUIRED. Constraint tags only when relevant.

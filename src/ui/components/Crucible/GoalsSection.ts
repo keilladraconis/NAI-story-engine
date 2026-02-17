@@ -20,7 +20,7 @@ import {
   NAI_WARNING,
 } from "../../colors";
 
-const { row, column, button, collapsibleSection } = api.v1.ui.part;
+const { row, column, button, collapsibleSection, sliderInput } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
@@ -321,6 +321,16 @@ export const GoalsSection = defineComponent<undefined, RootState>({
             }),
             clearGoalsPart,
           ],
+        }),
+        sliderInput({
+          id: CR.SCENE_BUDGET_SLIDER,
+          label: "Scenes per Goal",
+          min: 3,
+          max: 15,
+          step: 1,
+          defaultValue: 5,
+          preventDecimal: true,
+          storageKey: "story:cr-scene-budget",
         }),
         column({
           id: CR.GOALS_LIST,

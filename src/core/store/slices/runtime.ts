@@ -11,7 +11,6 @@ const initialSegaState: SegaState = {
   stage: "idle",
   statusText: "",
   activeRequestIds: [],
-  dulfsRoundRobin: { currentIndex: 0, passes: 0 },
 };
 
 export const initialRuntimeState: RuntimeState = {
@@ -146,22 +145,6 @@ export const runtimeSlice = createSlice({
       },
     }),
 
-    segaRoundRobinAdvanced: (state) => {
-      const { currentIndex } = state.sega.dulfsRoundRobin;
-      const nextIndex = (currentIndex + 1) % 5; // 5 DULFS categories
-      const newPasses =
-        nextIndex === 0
-          ? state.sega.dulfsRoundRobin.passes + 1
-          : state.sega.dulfsRoundRobin.passes;
-      return {
-        ...state,
-        sega: {
-          ...state.sega,
-          dulfsRoundRobin: { currentIndex: nextIndex, passes: newPasses },
-        },
-      };
-    },
-
     segaReset: (state) => ({
       ...state,
       sega: initialSegaState,
@@ -187,7 +170,6 @@ export const {
   segaStageSet,
   segaRequestTracked,
   segaRequestUntracked,
-  segaRoundRobinAdvanced,
   segaReset,
   segaStatusUpdated,
 } = runtimeSlice.actions;

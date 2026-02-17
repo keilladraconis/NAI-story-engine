@@ -19,6 +19,7 @@ export const IDS = {
     DIRECTOR_ROOT: "cr-director-root",
     DIRECTOR_TEXT: "cr-director-text",
     BUILDER_ROOT: "cr-builder-root",
+    SCENE_BUDGET_SLIDER: "cr-scene-budget",
     goal: (id: string) => ({
       ROOT: `cr-goal-${id}`,
       TEXT: `cr-goal-${id}-text`,

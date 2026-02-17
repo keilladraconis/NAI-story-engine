@@ -22,7 +22,7 @@ import {
   formatTagsWithEmoji,
   stripSceneTag,
 } from "../../../utils/tag-parser";
-import { MAX_SCENES_PER_GOAL } from "../../../utils/crucible-strategy";
+import { getMaxScenes } from "../../../utils/crucible-strategy";
 
 // --- Append-only stream transcript (module-level, not Redux) ---
 
@@ -224,9 +224,12 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
       if (parseTag(text, "OPENER")) {
         api.v1.log(`[crucible] Opener detected at scene ${sceneIndex + 1} — chain complete`);
         ctx.dispatch(chainCompleted({ goalId }));
-      } else if (!updatedChain.complete && updatedChain.scenes.length >= MAX_SCENES_PER_GOAL) {
-        api.v1.log(`[crucible] Scene budget reached (${MAX_SCENES_PER_GOAL}) — chain complete`);
-        ctx.dispatch(chainCompleted({ goalId }));
+      } else if (!updatedChain.complete) {
+        const maxScenes = await getMaxScenes();
+        if (updatedChain.scenes.length >= maxScenes) {
+          api.v1.log(`[crucible] Scene budget reached (${maxScenes}) — chain complete`);
+          ctx.dispatch(chainCompleted({ goalId }));
+        }
       }
     } catch (e) {
       api.v1.log("[crucible] Chain parse failed:", e);

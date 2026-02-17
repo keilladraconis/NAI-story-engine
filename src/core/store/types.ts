@@ -11,7 +11,6 @@ export type SegaStage =
   | "idle"
   | "canon"
   | "attgStyle"
-  | "dulfsLists"
   | "lorebookContent"
   | "completed";
 
@@ -19,10 +18,6 @@ export interface SegaState {
   stage: SegaStage;
   statusText: string; // Current status for UI display
   activeRequestIds: string[]; // Track SEGA-initiated requests for cancellation
-  dulfsRoundRobin: {
-    currentIndex: number;
-    passes: number; // Track complete cycles to ensure all categories have items
-  };
 }
 
 export const DULFS_CATEGORIES: DulfsFieldID[] = [
@@ -32,8 +27,6 @@ export const DULFS_CATEGORIES: DulfsFieldID[] = [
   FieldID.Factions,
   FieldID.SituationalDynamics,
 ];
-
-export const MIN_ITEMS_PER_CATEGORY = 2;
 
 export interface StoryField {
   id: string;

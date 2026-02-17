@@ -3,9 +3,11 @@
  *
  * Orchestrates automatic generation of story components in sequence:
  * 1. ATTG & Style (anchor tone/genre first)
- * 2. DULFS Lists (round-robin until each has MIN_ITEMS_PER_CATEGORY items)
- * 3. Canon (synthesize from world entries)
- * 4. Lorebook (content + keys per entry)
+ * 2. Canon (synthesize from world entries)
+ * 3. Lorebook (content + keys per entry)
+ *
+ * DULFS list population is handled by Crucible (v7). Users can still
+ * generate items per-category via the "Generate Items" button.
  *
  * CACHE STRATEGY: All Story Engine strategies share a unified message prefix
  * (system prompt + weaving, cross-refs, story state). Content and keys for the
@@ -18,17 +20,15 @@ import { GenX } from "nai-gen-x";
 import {
   RootState,
   DULFS_CATEGORIES,
-  MIN_ITEMS_PER_CATEGORY,
   DulfsItem,
   AppDispatch,
 } from "../types";
-import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
+import { FieldID } from "../../../config/field-definitions";
 import {
   segaToggled,
   segaStageSet,
   segaRequestTracked,
   segaRequestUntracked,
-  segaRoundRobinAdvanced,
   segaReset,
   segaStatusUpdated,
   uiGenerationRequested,
@@ -69,27 +69,6 @@ async function needsATTG(): Promise<boolean> {
 async function needsStyle(): Promise<boolean> {
   const content = await api.v1.storyStorage.get("kse-field-style");
   return !content || !String(content).trim();
-}
-
-/**
- * Get the next DULFS category that needs items, using round-robin.
- * Returns null if all categories have sufficient items.
- */
-function getNextDulfsCategory(state: RootState): DulfsFieldID | null {
-  const { currentIndex } = state.runtime.sega.dulfsRoundRobin;
-
-  // Scan from current index looking for a category that needs items
-  for (let i = 0; i < DULFS_CATEGORIES.length; i++) {
-    const idx = (currentIndex + i) % DULFS_CATEGORIES.length;
-    const category = DULFS_CATEGORIES[idx];
-    const items = state.story.dulfs[category] || [];
-
-    if (items.length < MIN_ITEMS_PER_CATEGORY) {
-      return category;
-    }
-  }
-
-  return null; // All categories have enough items
 }
 
 /**
@@ -175,41 +154,23 @@ async function enableSyncForField(
 }
 
 /**
- * Queue a SEGA-initiated generation and track the request ID.
+ * Queue a SEGA-initiated field generation and track the request ID.
  * Uses the same request ID pattern as the UI buttons for proper tracking.
  */
-async function queueSegaGeneration(
+async function queueSegaFieldGeneration(
   dispatch: AppDispatch,
   getState: () => RootState,
-  type: "field" | "list",
   targetId: string,
 ): Promise<string> {
-  // Use the same request ID pattern as GenerationButton for proper UI tracking
-  // Fields: gen-{fieldId}, Lists: gen-list-{fieldId}
-  const requestId =
-    type === "field" ? `gen-${targetId}` : `gen-list-${targetId}`;
+  const requestId = `gen-${targetId}`;
 
-  // Update status text
   const fieldName = targetId.replace("dulfs-", "");
-  const label = type === "list" ? `List: ${fieldName}` : `Field: ${fieldName}`;
-  dispatch(segaStatusUpdated({ statusText: label }));
+  dispatch(segaStatusUpdated({ statusText: `Field: ${fieldName}` }));
 
-  // Enable sync for ATTG/Style before generation
-  if (type === "field") {
-    await enableSyncForField(targetId, dispatch, getState);
-  }
+  await enableSyncForField(targetId, dispatch, getState);
 
-  // Track this request as SEGA-initiated
   dispatch(segaRequestTracked({ requestId }));
-
-  // Queue the generation request
-  dispatch(
-    uiGenerationRequested({
-      id: requestId,
-      type,
-      targetId,
-    }),
-  );
+  dispatch(uiGenerationRequested({ id: requestId, type: "field", targetId }));
 
   return requestId;
 }
@@ -303,35 +264,25 @@ async function scheduleNextSegaTask(
   if (await needsATTG()) {
     api.v1.log("[sega] scheduling: attg");
     dispatch(segaStageSet({ stage: "attgStyle" }));
-    await queueSegaGeneration(dispatch, getState, "field", FieldID.ATTG);
+    await queueSegaFieldGeneration(dispatch, getState, FieldID.ATTG);
     return;
   }
   if (await needsStyle()) {
     api.v1.log("[sega] scheduling: style");
     dispatch(segaStageSet({ stage: "attgStyle" }));
-    await queueSegaGeneration(dispatch, getState, "field", FieldID.Style);
+    await queueSegaFieldGeneration(dispatch, getState, FieldID.Style);
     return;
   }
 
-  // Stage 2: DULFS Lists (round-robin)
-  const nextCategory = getNextDulfsCategory(state);
-  if (nextCategory) {
-    api.v1.log(`[sega] scheduling: list ${nextCategory}`);
-    dispatch(segaStageSet({ stage: "dulfsLists" }));
-    await queueSegaGeneration(dispatch, getState, "list", nextCategory);
-    dispatch(segaRoundRobinAdvanced());
-    return;
-  }
-
-  // Stage 3: Canon (synthesize from world entries)
+  // Stage 2: Canon (synthesize from world entries)
   if (await needsCanon(state)) {
     api.v1.log("[sega] scheduling: canon");
     dispatch(segaStageSet({ stage: "canon" }));
-    await queueSegaGeneration(dispatch, getState, "field", FieldID.Canon);
+    await queueSegaFieldGeneration(dispatch, getState, FieldID.Canon);
     return;
   }
 
-  // Stage 4: Lorebook (content + keys per entry, unified prefix)
+  // Stage 3: Lorebook (content + keys per entry, unified prefix)
   const nextEntry = await findEntryNeedingContent(state);
   if (nextEntry) {
     api.v1.log(`[sega] scheduling: lorebook ${nextEntry.id.slice(0, 8)}`);

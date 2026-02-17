@@ -16,10 +16,15 @@ import { MessageFactory } from "nai-gen-x";
 import { buildCruciblePrefix } from "./context-builder";
 import { parseTag } from "./tag-parser";
 
-// --- Scene Numbering ---
+// --- Scene Budget ---
 
-/** Maximum scenes per goal before budget termination. */
-export const MAX_SCENES_PER_GOAL = 5;
+/** Read scene budget from storyStorage slider. Falls back to 5. */
+export async function getMaxScenes(): Promise<number> {
+  const value = await api.v1.storyStorage.get("cr-scene-budget");
+  return Number(value) || 5;
+}
+
+// --- Scene Numbering ---
 
 /** Convert a zero-based scene index to an ascending scene number. */
 export function sceneNumber(sceneIndex: number): number {
@@ -36,17 +41,17 @@ function formatPacingSignal(sceneCount: number, openCount: number, maxScenes: nu
   if (openCount === 0 && sceneCount > 0)
     return "\nPACING: ALL CONSTRAINTS RESOLVED — write the OPENER that launches this story. If you cannot write a satisfying opener from the current scenes, open new constraints to fill gaps.";
   if (sceneCount === 0)
-    return "\nPACING: FIRST SCENE — this is the climax. Open 1-2 NEW preconditions only (not already listed above). Do NOT resolve anything.";
+    return "\nPACING: FIRST SCENE — this is the climax. Open 1-2 preconditions that are DRAMATICALLY far from this moment — foundational circumstances, not adjacent causes.";
   const remaining = maxScenes - sceneCount;
   const nextNum = sceneNumber(sceneCount);
   if (remaining <= 1)
     return `\nPACING: FINAL SCENE (Scene ${nextNum}) — resolve remaining constraints or write the opener.`;
   if (remaining <= 2)
-    return `\nPACING: Write Scene ${nextNum}. ${remaining} scenes remaining — focus on resolving constraints. ${openCount} open.`;
-  return `\nPACING: Write Scene ${nextNum}. ${openCount} open constraints. Resolve what you can, open new ones only if essential.`;
+    return `\nPACING: Scene ${nextNum} of ${maxScenes}. 2 scenes remaining — focus on resolving constraints. ${openCount} open.`;
+  return `\nPACING: Scene ${nextNum} of ${maxScenes}. You are spanning from climax to origin — each scene should cover roughly equal narrative distance. ${openCount} open constraints.`;
 }
 
-function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: DirectorGuidance | null): string {
+function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: DirectorGuidance | null, maxScenes: number): string {
   const sections: string[] = [];
 
   // Goal — show [GOAL] text only, strip [OPEN] to avoid duplication
@@ -86,7 +91,7 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
   }
 
   // Pacing signal — dynamic convergence pressure
-  const pacing = formatPacingSignal(chain.scenes.length, chain.openConstraints.length, MAX_SCENES_PER_GOAL);
+  const pacing = formatPacingSignal(chain.scenes.length, chain.openConstraints.length, maxScenes);
   if (pacing) sections.push(pacing);
 
   // Director guidance — strategic notes from meta-analysis
@@ -208,7 +213,8 @@ export const createCrucibleChainFactory = (
       (await api.v1.config.get("crucible_chain_prompt")) || "",
     );
 
-    const context = formatChainContext(chain, goal, state.crucible.directorGuidance);
+    const maxScenes = await getMaxScenes();
+    const context = formatChainContext(chain, goal, state.crucible.directorGuidance, maxScenes);
     const prefix = await buildCruciblePrefix(getState, {
       includeDirection: true,
       includeDulfs: true,
