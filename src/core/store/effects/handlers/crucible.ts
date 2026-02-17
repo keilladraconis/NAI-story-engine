@@ -20,6 +20,7 @@ import {
   parseTag,
   parseTagAll,
   formatTagsWithEmoji,
+  stripSceneTag,
 } from "../../../utils/tag-parser";
 
 // --- Append-only stream transcript (module-level, not Redux) ---
@@ -194,10 +195,10 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
 
       ctx.dispatch(directorGuidanceConsumed({ by: "solver" }));
 
-      // Seed BeatCard storyStorage + populate view
+      // Seed SceneCard storyStorage + populate view
       api.v1.storyStorage.set(`cr-beat-${goalId}-${beatIndex}`, text);
       const beatViewId = `${IDS.CRUCIBLE.beat(goalId, beatIndex).TEXT}-view`;
-      const beatDisplay = formatTagsWithEmoji(text)
+      const beatDisplay = formatTagsWithEmoji(stripSceneTag(text))
         .replace(/\n/g, "  \n").replace(/</g, "\\<");
       api.v1.ui.updateParts([{ id: beatViewId, text: beatDisplay }]);
 

@@ -86,8 +86,6 @@ export const BuilderView = defineComponent<undefined, RootState>({
       gap: "2px",
     },
     deleteBtn: {
-      padding: "2px 6px",
-      "font-size": "0.7em",
       opacity: "0.6",
     },
   },
@@ -120,7 +118,8 @@ export const BuilderView = defineComponent<undefined, RootState>({
           label: node.name,
           extraControls: [
             button({
-              text: "Delete",
+              text: "",
+              iconId: "trash-2",
               style: this.style?.("deleteBtn"),
               callback: () => {
                 dispatch(builderNodeRemoved({ id: node.id }));
@@ -198,12 +197,6 @@ export const BuilderView = defineComponent<undefined, RootState>({
           ]);
         }
 
-        // Update labels for existing nodes (name may have been revised by builder)
-        for (const node of nodes) {
-          api.v1.ui.updateParts([
-            { id: `cr-node-${node.id}-text-edit-btn`, text: "Edit" },
-          ]);
-        }
       },
     );
 

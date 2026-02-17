@@ -29,6 +29,8 @@ export interface EditableTextProps {
   label?: string;
   /** Initial display text (markdown). If provided, shown instead of "_No content._" on mount. */
   initialDisplay?: string;
+  /** Optional formatter applied to content before displaying in view mode (e.g. emoji tags). */
+  formatDisplay?: (content: string) => string;
 }
 
 export const EditableText = defineComponent<EditableTextProps, RootState>({
@@ -72,20 +74,15 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
       opacity: "0.9",
       flex: "1",
     },
-    btn: {
-      padding: "3px 8px",
-      "font-size": "0.75em",
-    },
+    btn: {},
     btnHidden: {
-      padding: "3px 8px",
-      "font-size": "0.75em",
       display: "none",
     },
   },
 
   build(props, ctx) {
     const { dispatch, useSelector } = ctx;
-    const { id, storageKey, placeholder, onSave, extraControls, label, initialDisplay } = props;
+    const { id, storageKey, placeholder, onSave, extraControls, label, initialDisplay, formatDisplay } = props;
 
     const viewId = `${id}-view`;
     const editId = `${id}-edit`;
@@ -118,8 +115,9 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
       const content = String(
         (await api.v1.storyStorage.get(storageKey)) || "",
       );
+      const displayText = formatDisplay ? formatDisplay(content) : content;
       api.v1.ui.updateParts([
-        { id: viewId, text: content.replace(/\n/g, "  \n").replace(/</g, "\\<") || "_No content._" },
+        { id: viewId, text: displayText.replace(/\n/g, "  \n").replace(/</g, "\\<") || "_No content._" },
       ]);
       dispatch(uiFieldEditEnd({ id }));
       if (onSave) onSave(content);
@@ -149,13 +147,15 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
     headerContent.push(
       button({
         id: editBtnId,
-        text: "Edit",
+        text: "",
+        iconId: "edit",
         style: this.style?.("btn"),
         callback: beginEdit,
       }),
       button({
         id: saveBtnId,
-        text: "Save",
+        text: "",
+        iconId: "save",
         style: this.style?.("btnHidden"),
         callback: save,
       }),

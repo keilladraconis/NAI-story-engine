@@ -118,7 +118,6 @@ export const createCrucibleIntentFactory = (
         role: "system",
         content: intentPrompt,
       },
-      { role: "assistant", content: "The story " },
     ];
 
     return {
@@ -247,8 +246,7 @@ export const buildCrucibleIntentStrategy = (
     requestId: api.v1.uuid(),
     messageFactory: createCrucibleIntentFactory(getState),
     target: { type: "crucibleIntent" },
-    prefillBehavior: "keep",
-    assistantPrefill: "The story ",
+    prefillBehavior: "trim",
   };
 };
 

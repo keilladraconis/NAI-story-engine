@@ -89,6 +89,11 @@ export function parseTagAll(text: string, tag: string): string[] {
   return results;
 }
 
+/** Remove the `[SCENE] N` line, preserving scene content on subsequent lines. */
+export function stripSceneTag(text: string): string {
+  return text.replace(/^\[SCENE\][^\n]*\n?/m, "").trim();
+}
+
 /** Split text into sections by `===` separator, trimmed and non-empty. */
 export function splitSections(text: string, sep = "+++"): string[] {
   return text

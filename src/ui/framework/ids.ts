@@ -29,8 +29,6 @@ export const IDS = {
     beat: (goalId: string, beatIndex: number) => ({
       ROOT: `cr-beat-${goalId}-${beatIndex}`,
       TEXT: `cr-beat-${goalId}-${beatIndex}-text`,
-      FAV_BTN: `cr-beat-${goalId}-${beatIndex}-fav`,
-      FORK_BTN: `cr-beat-${goalId}-${beatIndex}-fork`,
       DEL_BTN: `cr-beat-${goalId}-${beatIndex}-del`,
     }),
     GOAL_SECTION: (goalId: string) => `cr-goal-section-${goalId}`,

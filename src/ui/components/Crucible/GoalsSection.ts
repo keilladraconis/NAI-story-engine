@@ -14,8 +14,8 @@ import { IDS } from "../../framework/ids";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 import { GenerationButton } from "../GenerationButton";
 import { GoalCard } from "./GoalCard";
-import { BeatCard } from "./BeatCard";
-import { parseTag, formatTagsWithEmoji } from "../../../core/utils/tag-parser";
+import { SceneCard } from "./SceneCard";
+import { parseTag, formatTagsWithEmoji, stripSceneTag } from "../../../core/utils/tag-parser";
 import {
   NAI_WARNING,
 } from "../../colors";
@@ -65,19 +65,19 @@ export const GoalsSection = defineComponent<undefined, RootState>({
     // --- Per-goal section cache ---
     const goalCardCache = new Map<string, UIPart>();
     const buildBtnCache = new Map<string, UIPart>();
-    const beatCardCache = new Map<string, UIPart>();
+    const sceneCardCache = new Map<string, UIPart>();
 
     const goalTitle = (goalText: string): string =>
       parseTag(goalText, "GOAL")?.slice(0, 40) || goalText.slice(0, 40) || "New goal";
 
-    const ensureBeatCard = (goalId: string, beatIndex: number, beatText: string): UIPart => {
+    const ensureSceneCard = (goalId: string, beatIndex: number, beatText: string): UIPart => {
       const cacheKey = `${goalId}:${beatIndex}`;
-      if (!beatCardCache.has(cacheKey)) {
-        const { part } = ctx.render(BeatCard, { goalId, beatIndex });
-        beatCardCache.set(cacheKey, part);
+      if (!sceneCardCache.has(cacheKey)) {
+        const { part } = ctx.render(SceneCard, { goalId, beatIndex });
+        sceneCardCache.set(cacheKey, part);
         api.v1.storyStorage.set(`cr-beat-${goalId}-${beatIndex}`, beatText);
       }
-      return beatCardCache.get(cacheKey)!;
+      return sceneCardCache.get(cacheKey)!;
     };
 
     const ensureBuildBtn = (goalId: string): UIPart => {
@@ -135,10 +135,10 @@ export const GoalsSection = defineComponent<undefined, RootState>({
 
       // Build beat cards (newest first)
       const chain = ctx.getState().crucible.chains[goalId];
-      const beatParts: UIPart[] = [];
+      const sceneParts: UIPart[] = [];
       if (chain) {
         for (let i = chain.beats.length - 1; i >= 0; i--) {
-          beatParts.push(ensureBeatCard(goalId, i, chain.beats[i].text));
+          sceneParts.push(ensureSceneCard(goalId, i, chain.beats[i].text));
         }
       }
 
@@ -149,7 +149,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
         style: { overflow: "visible" },
         content: [
           ensureBuildBtn(goalId),
-          ...beatParts,
+          ...sceneParts,
           goalCardCache.get(goalId)!,
         ],
       });
@@ -175,7 +175,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       if (currentGoals.length === 0) {
         goalCardCache.clear();
         buildBtnCache.clear();
-        beatCardCache.clear();
+        sceneCardCache.clear();
         api.v1.ui.updateParts([
           { id: CR.GOALS_LIST, style: this.style?.("hidden") },
         ]);
@@ -190,9 +190,9 @@ export const GoalsSection = defineComponent<undefined, RootState>({
           buildBtnCache.delete(id);
         }
       }
-      for (const [key] of beatCardCache) {
+      for (const [key] of sceneCardCache) {
         const goalId = key.split(":")[0];
-        if (!currentIds.has(goalId)) beatCardCache.delete(key);
+        if (!currentIds.has(goalId)) sceneCardCache.delete(key);
       }
 
       // Seed storyStorage + auto-expand new goals
@@ -226,7 +226,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
         const chain = st.crucible.chains[goal.id];
         if (!chain) continue;
         for (let i = 0; i < chain.beats.length; i++) {
-          const beatDisplay = formatTagsWithEmoji(chain.beats[i].text)
+          const beatDisplay = formatTagsWithEmoji(stripSceneTag(chain.beats[i].text))
             .replace(/\n/g, "  \n").replace(/</g, "\\<");
           api.v1.ui.updateParts([
             { id: `${CR.beat(goal.id, i).TEXT}-view`, text: beatDisplay },

@@ -2,7 +2,6 @@ import { defineComponent } from "nai-act";
 import { mergeStyles } from "nai-act";
 import { RootState, CrucibleGoal, CrucibleChain, Constraint, DirectorGuidance } from "../../../core/store/types";
 import {
-  constraintMarkedGroundState,
   constraintAdded,
   constraintRemoved,
   constraintResolved,
@@ -79,8 +78,6 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
       "white-space": "nowrap",
     },
     constraintBtn: {
-      "font-size": "0.7em",
-      padding: "1px 4px",
       "flex-shrink": "0",
     },
     addRow: {
@@ -196,17 +193,14 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
             style: this.style?.("constraintText"),
           }),
           button({
-            text: "Resolve",
+            text: "",
+            iconId: "check",
             style: this.style?.("constraintBtn"),
             callback: () => dispatch(constraintResolved({ goalId, constraintId: c.id })),
           }),
           button({
-            text: "Ground",
-            style: this.style?.("constraintBtn"),
-            callback: () => dispatch(constraintMarkedGroundState({ goalId, constraintId: c.id })),
-          }),
-          button({
-            text: "\u2715",
+            text: "",
+            iconId: "trash-2",
             style: this.style?.("constraintBtn"),
             callback: () => dispatch(constraintRemoved({ goalId, constraintId: c.id })),
           }),
@@ -228,12 +222,14 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
             style: this.style?.("resolvedText"),
           }),
           button({
-            text: "Reopen",
+            text: "",
+            iconId: "rotate-ccw",
             style: this.style?.("constraintBtn"),
             callback: () => dispatch(constraintUnresolved({ goalId, constraintId: c.id })),
           }),
           button({
-            text: "\u2715",
+            text: "",
+            iconId: "trash-2",
             style: this.style?.("constraintBtn"),
             callback: () => dispatch(constraintRemoved({ goalId, constraintId: c.id })),
           }),
@@ -254,7 +250,8 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
             style: this.style?.("addInput"),
           }),
           button({
-            text: "Add",
+            text: "",
+            iconId: "plus",
             style: this.style?.("constraintBtn"),
             callback: async () => {
               const desc = String(

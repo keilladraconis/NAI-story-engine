@@ -2,44 +2,28 @@ import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import {
   beatEdited,
-  beatFavorited,
-  beatForked,
   beatsDeletedFrom,
 } from "../../../core/store/slices/crucible";
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
-import { NAI_HEADER, STATUS_GENERATING } from "../../colors";
-import { formatTagsWithEmoji } from "../../../core/utils/tag-parser";
+import { STATUS_GENERATING } from "../../colors";
+import { formatTagsWithEmoji, stripSceneTag } from "../../../core/utils/tag-parser";
+import { sceneNumber } from "../../../core/utils/crucible-strategy";
 
 const { column, button } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
-export interface BeatCardProps {
+export interface SceneCardProps {
   goalId: string;
   beatIndex: number;
 }
 
-const FAV_STYLE = {
-  padding: "2px 6px",
-  "font-size": "0.8em",
-  color: NAI_HEADER,
-  opacity: "1",
-};
-
-const FAV_STYLE_OFF = {
-  padding: "2px 6px",
-  "font-size": "0.8em",
+const SCENE_BTN_STYLE = {
   opacity: "0.5",
 };
 
-const BEAT_BTN_STYLE = {
-  padding: "2px 6px",
-  "font-size": "0.8em",
-  opacity: "0.5",
-};
-
-export const BeatCard = defineComponent<BeatCardProps, RootState>({
+export const SceneCard = defineComponent<SceneCardProps, RootState>({
   id: (props) => CR.beat(props.goalId, props.beatIndex).ROOT,
 
   styles: {
@@ -60,75 +44,51 @@ export const BeatCard = defineComponent<BeatCardProps, RootState>({
     const { goalId, beatIndex } = props;
     const ids = CR.beat(goalId, beatIndex);
     const state = ctx.getState();
-    const beat = state.crucible.chains[goalId]?.beats[beatIndex];
-    const isTainted = beat?.tainted ?? false;
-    const isFav = beat?.favorited ?? false;
-
-    const favBtn = button({
-      id: ids.FAV_BTN,
-      text: "",
-      iconId: "star",
-      style: isFav ? FAV_STYLE : FAV_STYLE_OFF,
-      callback: () => dispatch(beatFavorited({ goalId, beatIndex })),
-    });
-
-    const forkBtn = button({
-      id: ids.FORK_BTN,
-      text: "",
-      iconId: "share-2",
-      style: BEAT_BTN_STYLE,
-      callback: () => dispatch(beatForked({ goalId, beatIndex, newGoalId: api.v1.uuid() })),
-    });
+    const scene = state.crucible.chains[goalId]?.beats[beatIndex];
+    const isTainted = scene?.tainted ?? false;
 
     const delBtn = button({
       id: ids.DEL_BTN,
       text: "",
       iconId: "trash-2",
-      style: BEAT_BTN_STYLE,
+      style: SCENE_BTN_STYLE,
       callback: () => dispatch(beatsDeletedFrom({ goalId, fromIndex: beatIndex })),
     });
 
-    const label = `Beat ${beatIndex + 1}`;
+    const label = `Scene ${sceneNumber(beatIndex)}`;
 
-    const currentBeat = ctx.getState().crucible.chains[goalId]?.beats[beatIndex];
-    const beatDisplay = currentBeat?.text ? formatTagsWithEmoji(currentBeat.text) : undefined;
+    const formatDisplay = (content: string): string =>
+      formatTagsWithEmoji(stripSceneTag(content));
+
+    const sceneDisplay = scene?.text ? formatDisplay(scene.text) : undefined;
 
     const { part: editable } = ctx.render(EditableText, {
       id: ids.TEXT,
       storageKey: `cr-beat-${goalId}-${beatIndex}`,
       placeholder: "[SCENE] ...\n[OPEN] ...\n[RESOLVED] ...",
       label,
-      initialDisplay: beatDisplay,
+      initialDisplay: sceneDisplay,
+      formatDisplay,
       onSave: (content: string) => {
         const s = ctx.getState();
         const chain = s.crucible.chains[goalId];
         if (!chain) return;
-        const existingBeat = chain.beats[beatIndex];
-        if (!existingBeat) return;
+        const existing = chain.beats[beatIndex];
+        if (!existing) return;
 
         dispatch(beatEdited({
           goalId,
           beatIndex,
           beat: {
             text: content,
-            constraintsResolved: existingBeat.constraintsResolved,
-            newOpenConstraints: existingBeat.newOpenConstraints,
-            groundStateConstraints: existingBeat.groundStateConstraints,
+            constraintsResolved: existing.constraintsResolved,
+            newOpenConstraints: existing.newOpenConstraints,
+            groundStateConstraints: existing.groundStateConstraints,
           },
         }));
       },
-      extraControls: [favBtn, forkBtn, delBtn],
+      extraControls: [delBtn],
     });
-
-    // Reactively update fav button style
-    useSelector(
-      (s) => s.crucible.chains[goalId]?.beats[beatIndex]?.favorited ?? false,
-      (fav) => {
-        api.v1.ui.updateParts([
-          { id: ids.FAV_BTN, style: fav ? FAV_STYLE : FAV_STYLE_OFF },
-        ]);
-      },
-    );
 
     // Reactively update tainted indicator (border color)
     useSelector(
