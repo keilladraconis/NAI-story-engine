@@ -16,52 +16,17 @@ const EMPTY_BUILDER: CrucibleBuilderState = {
   lastProcessedSceneIndex: -1,
 };
 
-/** Migrate raw persisted crucible data — backfills shortIds, strips dead fields. */
-export function migrateCrucibleState(loaded: CrucibleState): CrucibleState {
-  const chains: Record<string, CrucibleChain> = {};
-  for (const [goalId, chain] of Object.entries(loaded.chains)) {
-    let nextIdx = (chain as { nextConstraintIndex?: number }).nextConstraintIndex ?? 0;
-    const backfillShortId = (c: Constraint): Constraint => {
-      if (c.shortId) return c;
-      return { ...c, shortId: `X${nextIdx++}` };
-    };
-
-    const openConstraints = chain.openConstraints.map(backfillShortId);
-    const resolvedConstraints = chain.resolvedConstraints.map(backfillShortId);
-
-    chains[goalId] = {
-      goalId: chain.goalId,
-      scenes: chain.scenes.map((s) => ({
-        text: s.text,
-        constraintsResolved: s.constraintsResolved,
-        newOpenConstraints: s.newOpenConstraints,
-        groundStateConstraints: s.groundStateConstraints,
-        ...(s.tainted ? { tainted: true } : {}),
-        ...(s.favorited ? { favorited: true } : {}),
-      })),
-      openConstraints,
-      resolvedConstraints,
-      complete: chain.complete,
-      nextConstraintIndex: nextIdx,
-    };
-  }
-
+/** Coerce persisted crucible data into current shape. Pre-1.0: no migrations, just defaults. */
+export function migrateCrucibleState(loaded: Partial<CrucibleState>): CrucibleState {
   return {
-    direction: loaded.direction,
-    goals: loaded.goals,
-    chains,
-    activeGoalId: loaded.activeGoalId,
-    checkpointReason: loaded.checkpointReason,
+    ...initialCrucibleState,
+    direction: loaded.direction ?? null,
+    goals: Array.isArray(loaded.goals) ? loaded.goals : [],
+    chains: loaded.chains && typeof loaded.chains === "object" ? loaded.chains : {},
+    activeGoalId: loaded.activeGoalId ?? null,
     autoChaining: false,
-    solverStalls: 0,
-    builder: loaded.builder
-      ? {
-        ...loaded.builder,
-        elements: loaded.builder.elements.map((el) => ({
-          ...el,
-          content: el.content || "",
-        })),
-      }
+    builder: loaded.builder && Array.isArray(loaded.builder.elements)
+      ? loaded.builder
       : { ...EMPTY_BUILDER },
     directorGuidance: (loaded as { directorGuidance?: DirectorGuidance | null }).directorGuidance ?? null,
   };
@@ -72,9 +37,7 @@ export const initialCrucibleState: CrucibleState = {
   goals: [],
   chains: {},
   activeGoalId: null,
-  checkpointReason: null,
   autoChaining: false,
-  solverStalls: 0,
   builder: { ...EMPTY_BUILDER },
   directorGuidance: null,
 };
@@ -88,6 +51,7 @@ export const crucibleSlice = createSlice({
     crucibleChainRequested: (state) => state,
     crucibleDirectorRequested: (state) => state,
     crucibleStopRequested: (state) => state,
+    crucibleMergeRequested: (state) => state,
 
     // Direction phase reducers
     crucibleDirectionRequested: (state) => state,
@@ -247,7 +211,6 @@ export const crucibleSlice = createSlice({
       return {
         ...state,
         chains: { ...state.chains, [payload.goalId]: updatedChain },
-        checkpointReason: null,
       };
     },
 
@@ -513,16 +476,8 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    checkpointSet: (state, payload: { reason: string }) => {
-      return { ...state, checkpointReason: payload.reason };
-    },
-
-    checkpointCleared: (state) => {
-      return { ...state, checkpointReason: null };
-    },
-
     autoChainStarted: (state) => {
-      return { ...state, autoChaining: true, solverStalls: 0 };
+      return { ...state, autoChaining: true };
     },
 
     autoChainStopped: (state) => {
@@ -640,6 +595,7 @@ export const {
   crucibleChainRequested,
   crucibleDirectorRequested,
   crucibleStopRequested,
+  crucibleMergeRequested,
   crucibleDirectionRequested,
   directionSet,
   goalTextUpdated,
@@ -663,8 +619,6 @@ export const {
   constraintUnresolved,
   chainCompleted,
   activeGoalAdvanced,
-  checkpointSet,
-  checkpointCleared,
   autoChainStarted,
   autoChainStopped,
   crucibleBuildRequested,

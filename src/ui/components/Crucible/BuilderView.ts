@@ -5,8 +5,10 @@ import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
 import {
   builderElementUpdated,
   builderElementRemoved,
+  crucibleMergeRequested,
 } from "../../../core/store/slices/crucible";
 import { EditableText } from "../EditableText";
+import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 import {
   NAI_HEADER,
 } from "../../colors";
@@ -93,6 +95,34 @@ export const BuilderView = defineComponent<undefined, RootState>({
   build(_props, ctx) {
     const { dispatch, useSelector } = ctx;
 
+    // Merge button — mounted once, visibility controlled by useSelector
+    const { part: mergeButton } = ctx.render(ButtonWithConfirmation, {
+      id: "cr-merge-btn",
+      label: "Merge to Story Engine",
+      confirmLabel: "Populate DULFS fields?",
+      onConfirm: () => dispatch(crucibleMergeRequested()),
+      style: { marginTop: "4px" },
+    });
+
+    // Track merge button visibility
+    useSelector(
+      (s) => {
+        const hasElements = s.crucible.builder.elements.length > 0;
+        const starredGoals = s.crucible.goals.filter((g) => g.starred);
+        const allComplete = starredGoals.length > 0 && starredGoals.every((g) => {
+          const chain = s.crucible.chains[g.id];
+          return chain?.complete;
+        });
+        return hasElements && allComplete;
+      },
+      (showMerge) => {
+        api.v1.ui.updateParts([{
+          id: "cr-merge-btn",
+          style: { display: showMerge ? "flex" : "none", marginTop: "4px" },
+        }]);
+      },
+    );
+
     // Mount-once cache: elementId → full card UIPart (including EditableText)
     const elementCardCache = new Map<string, UIPart>();
 
@@ -155,6 +185,7 @@ export const BuilderView = defineComponent<undefined, RootState>({
           sectionParts.push(ensureElementCard(el));
         }
       }
+      sectionParts.push(mergeButton);
       return sectionParts;
     };
 

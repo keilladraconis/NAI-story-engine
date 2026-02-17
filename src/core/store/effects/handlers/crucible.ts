@@ -11,7 +11,7 @@ import {
   goalTextUpdated,
   sceneAdded,
   chainCompleted,
-  checkpointSet,
+  crucibleDirectorRequested,
   directionSet,
   directorGuidanceConsumed,
 } from "../../index";
@@ -22,6 +22,7 @@ import {
   formatTagsWithEmoji,
   stripSceneTag,
 } from "../../../utils/tag-parser";
+import { MAX_SCENES_PER_GOAL } from "../../../utils/crucible-strategy";
 
 // --- Append-only stream transcript (module-level, not Redux) ---
 
@@ -207,20 +208,24 @@ export const crucibleChainHandler: GenerationHandlers<CrucibleChainTarget> = {
       const updatedChain = updatedState.crucible.chains[goalId];
       if (!updatedChain) return;
 
-      // Constraint explosion: net growth >1 for 3 consecutive scenes
+      // Constraint explosion: net growth >1 for 3 consecutive scenes → call Director
       if (updatedChain.scenes.length >= 3) {
         const lastThree = updatedChain.scenes.slice(-3);
         const explosionCount = lastThree.filter(
           (s) => s.newOpenConstraints.length - s.constraintsResolved.length > 1,
         ).length;
         if (explosionCount >= 3) {
-          ctx.dispatch(checkpointSet({ reason: "The story is getting complex. Review and continue, or step back." }));
+          api.v1.log("[crucible] Constraint explosion detected — requesting Director");
+          ctx.dispatch(crucibleDirectorRequested());
         }
       }
 
       // Chain completion: Solver produced an [OPENER] scene
       if (parseTag(text, "OPENER")) {
         api.v1.log(`[crucible] Opener detected at scene ${sceneIndex + 1} — chain complete`);
+        ctx.dispatch(chainCompleted({ goalId }));
+      } else if (!updatedChain.complete && updatedChain.scenes.length >= MAX_SCENES_PER_GOAL) {
+        api.v1.log(`[crucible] Scene budget reached (${MAX_SCENES_PER_GOAL}) — chain complete`);
         ctx.dispatch(chainCompleted({ goalId }));
       }
     } catch (e) {

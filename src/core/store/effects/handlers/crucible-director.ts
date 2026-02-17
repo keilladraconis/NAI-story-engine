@@ -10,7 +10,6 @@ import {
   formatTagsWithEmoji,
 } from "../../../utils/tag-parser";
 import { appendToTranscript, truncateToTail } from "./crucible";
-import { SCENE_OFFSET } from "../../../utils/crucible-strategy";
 
 type CrucibleDirectorTarget = { type: "crucibleDirector" };
 
@@ -73,7 +72,7 @@ export const crucibleDirectorHandler: GenerationHandlers<CrucibleDirectorTarget>
 
     if (taintMatch) {
       const targetSceneNum = parseInt(taintMatch[1], 10);
-      const sceneIndex = SCENE_OFFSET - targetSceneNum;
+      const sceneIndex = targetSceneNum - 1;
       if (chain && sceneIndex >= 0 && sceneIndex < chain.scenes.length) {
         api.v1.log(`[crucible-director] TAINT Scene ${targetSceneNum} (scene index ${sceneIndex})`);
         ctx.dispatch(sceneTainted({ goalId: activeGoalId!, sceneIndex }));

@@ -18,28 +18,32 @@ import { parseTag } from "./tag-parser";
 
 // --- Scene Numbering ---
 
-/** Scene numbers count down from 30 — GLM interprets descending numbers as backward temporal movement. */
-export const SCENE_OFFSET = 30;
+/** Maximum scenes per goal before budget termination. */
+export const MAX_SCENES_PER_GOAL = 5;
 
-/** Convert a zero-based scene index to a descending scene number. */
+/** Convert a zero-based scene index to an ascending scene number. */
 export function sceneNumber(sceneIndex: number): number {
-  return SCENE_OFFSET - sceneIndex;
+  return sceneIndex + 1;
 }
 
 // --- Chain Context Formatter ---
 
 /**
- * Format pacing signal based on scene count and open constraints.
- * No hard scene limits — the Director handles strategic pacing.
- * When all constraints are resolved, signals OPENER mode.
+ * Format pacing signal based on scene count, open constraints, and budget.
+ * Includes remaining-scene urgency when budget is tight.
  */
-function formatPacingSignal(sceneCount: number, openCount: number): string {
+function formatPacingSignal(sceneCount: number, openCount: number, maxScenes: number): string {
   if (openCount === 0 && sceneCount > 0)
-    return "\nPACING: ALL CONSTRAINTS RESOLVED — write Scene 1, the OPENER that launches this story. If you cannot write a satisfying opener from the current scenes, open new constraints to fill gaps.";
+    return "\nPACING: ALL CONSTRAINTS RESOLVED — write the OPENER that launches this story. If you cannot write a satisfying opener from the current scenes, open new constraints to fill gaps.";
   if (sceneCount === 0)
-    return `\nPACING: FIRST SCENE — this is the climax (Scene ${SCENE_OFFSET}). Open 1-2 NEW preconditions only (not already listed above). Do NOT resolve anything.`;
+    return "\nPACING: FIRST SCENE — this is the climax. Open 1-2 NEW preconditions only (not already listed above). Do NOT resolve anything.";
+  const remaining = maxScenes - sceneCount;
   const nextNum = sceneNumber(sceneCount);
-  return `\nPACING: Write Scene ${nextNum}. ${openCount} open constraints. This scene happens BEFORE all scenes above. Resolve what you can, open new ones only if essential.`;
+  if (remaining <= 1)
+    return `\nPACING: FINAL SCENE (Scene ${nextNum}) — resolve remaining constraints or write the opener.`;
+  if (remaining <= 2)
+    return `\nPACING: Write Scene ${nextNum}. ${remaining} scenes remaining — focus on resolving constraints. ${openCount} open.`;
+  return `\nPACING: Write Scene ${nextNum}. ${openCount} open constraints. Resolve what you can, open new ones only if essential.`;
 }
 
 function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: DirectorGuidance | null): string {
@@ -51,13 +55,12 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
   sections.push(goal.starred ? "ACTIVE GOAL (★ starred):" : "ACTIVE GOAL:");
   sections.push(goalText);
 
-  // Scenes (newest-first — SCENE only)
+  // Scenes (ascending order — Scene 1 = first explored, closest to climax)
   // Constraint state lives in the dedicated OPEN/RESOLVED sections below.
   // Showing constraint tags inside scenes causes GLM to confuse ID formats.
   if (chain.scenes.length > 0) {
-    const lowestNum = sceneNumber(chain.scenes.length - 1);
-    sections.push(`\nESTABLISHED SCENES (earliest first — write what comes BEFORE Scene ${lowestNum}):`);
-    for (let i = chain.scenes.length - 1; i >= 0; i--) {
+    sections.push("\nESTABLISHED SCENES:");
+    for (let i = 0; i < chain.scenes.length; i++) {
       const scene = parseTag(chain.scenes[i].text, "SCENE") || chain.scenes[i].text.split("\n")[0];
       const taintedMark = chain.scenes[i].tainted ? " ⚠ TAINTED — needs correction" : "";
       sections.push(`  Scene ${sceneNumber(i)}: ${scene}${taintedMark}`);
@@ -83,7 +86,7 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
   }
 
   // Pacing signal — dynamic convergence pressure
-  const pacing = formatPacingSignal(chain.scenes.length, chain.openConstraints.length);
+  const pacing = formatPacingSignal(chain.scenes.length, chain.openConstraints.length, MAX_SCENES_PER_GOAL);
   if (pacing) sections.push(pacing);
 
   // Director guidance — strategic notes from meta-analysis
@@ -219,7 +222,7 @@ export const createCrucibleChainFactory = (
       },
       {
         role: "user",
-        content: context + `\n\nWrite Scene ${chain.scenes.length === 0 ? SCENE_OFFSET : sceneNumber(chain.scenes.length)}.`,
+        content: context + `\n\nWrite Scene ${sceneNumber(chain.scenes.length)}.`,
       },
       { role: "assistant", content: "[SCENE] " },
     ];

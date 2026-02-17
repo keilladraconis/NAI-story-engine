@@ -34,6 +34,7 @@ import {
   requestCompleted,
   crucibleGoalsRequested,
   crucibleStopRequested,
+  crucibleMergeRequested,
   crucibleDirectionRequested,
   crucibleBuildRequested,
   crucibleReset,
@@ -45,7 +46,6 @@ import {
   activeGoalAdvanced,
   autoChainStarted,
   autoChainStopped,
-  checkpointCleared,
   crucibleDirectorRequested,
 } from "./index";
 import {
@@ -907,6 +907,35 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
+  // Intent: Crucible Merge → write builder elements to DULFS
+  subscribeEffect(
+    matchesAction(crucibleMergeRequested),
+    async (_action, { dispatch, getState: getLatest }) => {
+      const state = getLatest();
+      const { elements } = state.crucible.builder;
+      if (elements.length === 0) {
+        api.v1.log("[crucible] Merge requested but no elements");
+        return;
+      }
+
+      let count = 0;
+      for (const el of elements) {
+        const newId = api.v1.uuid();
+        const content = el.content ? `${el.name}: ${el.content}` : el.name;
+
+        // Write to storyStorage (lorebook sync effect reads this)
+        await api.v1.storyStorage.set(`dulfs-item-${newId}`, content);
+
+        // Add to DULFS state — triggers lorebook sync effect automatically
+        dispatch(dulfsItemAdded({ fieldId: el.fieldId, item: { id: newId, fieldId: el.fieldId } }));
+        count++;
+      }
+
+      api.v1.log(`[crucible] Merged ${count} elements to DULFS`);
+      api.v1.ui.toast(`Merged ${count} world elements to DULFS`, { type: "success" });
+    },
+  );
+
   // Intent: Crucible Build Requested → queue builder generation
   subscribeEffect(
     matchesAction(crucibleBuildRequested),
@@ -972,7 +1001,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       const state = getState();
       if (!state.crucible.autoChaining) return;
-      if (state.crucible.checkpointReason) return;
       if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
 
       const { activeGoalId } = state.crucible;
@@ -1019,17 +1047,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       api.v1.log(`[crucible] Continuing solver — scene ${chain.scenes.length}`);
       dispatch(crucibleChainRequested());
-    },
-  );
-
-  // Checkpoint cleared → resume auto-chaining
-  subscribeEffect(
-    matchesAction(checkpointCleared),
-    (_action, { dispatch, getState: getLatest }) => {
-      const state = getLatest();
-      if (state.crucible.autoChaining) {
-        dispatch(crucibleChainRequested());
-      }
     },
   );
 

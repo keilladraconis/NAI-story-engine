@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771341902
+updatedAt: 1771346743
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -339,20 +339,20 @@ config:
       [OPEN] (optional) additional preconditions
   - name: crucible_chain_prompt
     prettyName: Crucible Chain Prompt
-    description: Prompt for backward-chaining beat generation (lean solver)
+    description: Prompt for scene generation (lean solver)
     type: string
     multiline: true
     default: |-
-      TEMPORAL RULE: You are writing BACKWARD through time. Scene numbers
-      count down. Each new scene happens BEFORE all established scenes.
-      Scene 1 is the opener. Never write a scene that happens AFTER an
-      existing one.
+      You are exploring a world by imagining dramatic moments that reveal
+      something essential about it. Scene 1 is the climax. Each new scene
+      discovers what had to be true before the established scenes could
+      happen. Scene numbers ascend as you explore further from the climax.
 
       DIRECTOR DEFERENCE: When DIRECTOR GUIDANCE is present, treat it as
       your primary creative brief for this scene. Execute the Director's
       vision — it overrides default pacing and constraint priorities.
 
-      Your first scene is the climax (Scene 30). Open 1-2 preconditions.
+      Your first scene is the climax (Scene 1). Open 1-2 preconditions.
       Resolve NOTHING.
 
       CONSTRAINT DISCIPLINE:
@@ -366,20 +366,19 @@ config:
         [RESOLVED] [ID:X1] ground
       - Never resolve or reference constraints that don't exist yet.
 
-      OPENER: When ALL constraints are resolved, write Scene 1, the [OPENER] —
-      the chronological first scene that launches the story. If the current
-      scenes don't support a satisfying opener, open new constraints to
-      fill gaps instead.
+      OPENER: When ALL constraints are resolved, write the [OPENER] — the
+      scene that launches the story. If the current scenes don't support
+      a satisfying opener, open new constraints to fill gaps instead.
 
       Output — one tag per line, [SCENE] required, others as needed:
       [SCENE] What happens — 1-2 vivid sentences
       [RESOLVED] [ID:X0] how/why this is now established
       [RESOLVED] [ID:X1] ground
       [OPEN] one new precondition (only if essential)
-      [OPENER] The chronological first scene (only when all constraints resolved)
+      [OPENER] The scene that launches the story (only when all constraints resolved)
   - name: crucible_build_prompt
     prettyName: Crucible Builder Prompt
-    description: Prompt for interleaved builder — reviews beats, emits world element nodes
+    description: Prompt for interleaved builder — reviews scenes, emits world elements
     type: string
     multiline: true
     default: |-
@@ -413,35 +412,37 @@ config:
     type: string
     multiline: true
     default: |-
-      You are the Director — the creative intelligence steering this
-      backward-chain world construction. You see everything: the dramatic
-      goal, every scene, all constraints, and the world elements built
-      so far.
+      You are the Director — the creative intelligence assessing world
+      readiness. You see everything: the dramatic goal, every scene, all
+      constraints, and the world elements built so far.
 
-      Your job is not to observe — it's to DIRECT. Make specific creative
-      calls. Be bold. Your guidance fires once and is consumed.
+      Your job is to evaluate the WORLD ELEMENT INVENTORY and steer both
+      Solver and Builder toward a complete, coherent world. Your guidance
+      fires once and is consumed. Be specific. Be bold.
 
-      Analyze and direct:
-      1. TEMPORAL COHERENCE — Are scenes moving backward in time? Flag
-         any that feel like sequels rather than prequels. If the last
-         scene broke temporal flow, use [REJECT] to cut it.
-      2. NARRATIVE SHAPE — Do scenes cover distinct dramatic territory or
-         repeat the same register? Push for contrast. Name the specific
-         emotional beat you want next.
-      3. THEMATIC THREADING — Are the Direction's themes surfacing? If a
-         core theme hasn't appeared, call for it now.
-      4. CHARACTER CONTINUITY — Do characters thread across scenes or
-         appear once and vanish? Direct the Solver to weave them back.
-      5. WORLD COVERAGE — Does the Builder's inventory span DULFS
-         categories? Call for specific missing types by name.
-      6. CONVERGENCE — How aggressively should the Solver push toward
-         the opener? If sprawling, call for resolution. If rushing,
-         call for depth.
+      Assess:
+      1. DULFS COVERAGE — Does the inventory span all five categories
+         (Characters, Systems, Locations, Factions, Situations)? Name
+         specific missing types. If a category is empty, call for it.
+      2. ELEMENT DEPTH — Are elements shallow placeholders or rich with
+         tension and narrative hooks? Call for deepening where needed.
+      3. CROSS-GOAL CONNECTIONS — Do elements from different goals relate
+         to each other? Look for shared characters, overlapping factions,
+         connected locations. Direct the Builder to weave connections.
+      4. CONTRADICTIONS — Flag any world elements that contradict each
+         other. Name the conflict and suggest resolution.
+      5. THEMATIC THREADING — Are the Direction's themes reflected in the
+         world elements? If a core theme hasn't materialized as concrete
+         world detail, call for it.
+      6. WORLD READINESS — Given the remaining scene budget, is the world
+         rich enough? If thin, direct the Solver to explore scenes that
+         will produce the missing elements. If sufficient, push toward
+         resolution.
 
       CORRECTIVE ACTIONS (optional, use when needed):
       - [REJECT] — The last scene was wrong. It will be rolled back.
         Your [FOR SOLVER] guidance becomes the creative brief for the
-        retry. Use when temporal flow is broken or the scene fundamentally
+        retry. Use when a scene adds nothing to the world or fundamentally
         misses the mark.
       - [TAINT Scene N] — An earlier scene is suspect but not worth
         removing. It stays but is flagged. The Solver will see the
@@ -449,9 +450,9 @@ config:
 
       Output format — three required sections, corrective tags optional:
 
-      [ASSESSMENT] 2-3 sentences on the screenplay's state
+      [ASSESSMENT] 2-3 sentences on world inventory state and readiness
       [FOR SOLVER] A specific creative directive for the next scene —
-        what happens, who's involved, what emotional register, which
+        what world elements it should reveal, who's involved, what
         constraints to target. This is a brief, not a suggestion.
       [FOR BUILDER] A specific directive for world elements — what to
         create, deepen, or connect. Name gaps and describe what fills them.

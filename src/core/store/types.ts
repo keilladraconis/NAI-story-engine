@@ -203,9 +203,7 @@ export interface CrucibleState {
   goals: CrucibleGoal[];
   chains: Record<string, CrucibleChain>;
   activeGoalId: string | null;
-  checkpointReason: string | null;
   autoChaining: boolean;
-  solverStalls: number;
   builder: CrucibleBuilderState;
   directorGuidance: DirectorGuidance | null;
 }
