@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771370027
+updatedAt: 1771370586
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -106,83 +106,63 @@ config:
       You are the **Archivist**.
       Generate a structured Lorebook Entry for "[itemName]".
 
-      **Format Rules:**
-      1. **Identity:**
-         - Line 1: `[Entry Name]`
-         - Line 2: `Type: [Category]` (e.g. Character, Location, Faction, System, Item)
-         - Line 3: `Setting: original`
-      2. **Attributes:** Add a few essential `[Key]: [Value]` pairs RELEVANT to the Type to establish core facts.
-      3. **Description:** Follow with rich, descriptive free text focusing on history, sensory details, and narrative potential.
+      **Format:** Identity header (Name, Type, Setting), then a few key
+      attributes, then dense prose. Follow the template for this entry type.
 
       **Content Directives:**
-      - **Characters:** Focus on internal conflicts, motivations, and *susceptibilities*—what pressures or temptations this character is vulnerable to. Do NOT predetermine their narrative role, alliances, or fate. **REQUIRED FIELDS:** You MUST include ALL of: Age, Gender, Occupation, Height (cm and ft/in), Weight (kg and lbs), BWH or CWH with cup size, Talents, Body, Hair, Eyes, Personality, Description, Quotes, and Core Conflict. Do NOT skip measurements.
-      - **General:** Focus on "Narrative Vectors"—how this entry creates *potential* for conflict or opportunity, not predetermined outcomes.
-      - **Adaptability:** DO NOT include irrelevant fields.
-      - **Structure:** Maintain the strict line-by-line format for the identity and attributes, but allow the description to flow naturally.
+      - **Characters:** Appearance a camera would capture, personality
+        through behavior not adjectives, and the internal conflict that
+        makes them volatile. Include a defining quote in Personality.
+      - **General:** Every sentence must earn its tokens — focus on what
+        creates narrative potential, not encyclopedic detail.
+      - Start from the template, but add fields when genre, setting, or
+        existing lorebook entries call for them (e.g. Race, Allegiance,
+        Tech Level, vital statistics, measurements). No filler.
 
       **CRITICAL:** Describe what IS and what COULD BE, never what WILL BE.
 
   - name: lorebook_template_character
     prettyName: Lorebook Template (Character)
-    description: Strict template for Character entries.
+    description: Dense character template — identity, appearance, personality, conflict.
     type: string
     multiline: true
     default: |-
       [Entry Name]
       Type: Character
       Setting: original
-      Age: [number or N/A]
-      Gender: [male, female, etc.]
-      [Race, optional]: [fey, orc, halfling, etc.]
-      [Species, optional]: [animal species if applicable]
-      Occupation: [role/job]
-      Height: [cm] cm ([feet]'[inches]")
-      Weight: [kg] kg ([lbs] lbs)
-      BWH: [bust]-[waist]-[hip] cm ([bust][cup]-[waist]-[hip] in) / CWH: [chest]-[waist]-[hip] cm ([chest]-[waist]-[hip] in)
-      Talents: [3-4 key skills]
-      Body: [brief physical descriptors]
-      Hair: [color, length, style]
-      Eyes: [color, quality]
-      Personality: [3-4 traits]
-      Description: [Physical presence, mannerisms, sensory details. ~100-150 words.]
-      Quotes: "[Character-defining statement]" —Character Name
-      Core Conflict:
-      - Axis: [fundamental duality]
-      - Pillar (Self): [internal manifestation]
-      - Pillar (World): [external role]
-      - Source: [formative past event]
+      Age: [number] | Gender: [gender] | Occupation: [role]
+      Appearance: [What a stranger notices first — build, coloring, distinguishing features, how they carry themselves. 2-3 sentences.]
+      Personality: [How they behave under pressure, what they want, what they hide. Weave in a defining quote. 2-3 sentences.]
+      Conflict: [The internal tension driving their choices — name the duality and its origin.]
 
   - name: lorebook_template_location
     prettyName: Lorebook Template (Location)
-    description: Template for Location entries.
+    description: Dense location template — atmosphere and narrative function.
     type: string
     multiline: true
     default: |-
       [Entry Name]
       Type: Location
       Setting: original
-      Region: [City, Continent, or Sector]
-      Climate/Atmosphere: [Weather, lighting, smell, and general "vibe"]
-      Description: [Visuals, history, and layout. ~150 words. Focus on specific landmarks and how the environment affects those within it.]
-      Narrative Vector: [How this location drives conflict or opportunity]
+      Region: [where this sits in the world]
+      Atmosphere: [Sensory snapshot — what you see, hear, smell on arrival]
+      Description: [What this place is, its history, how it shapes those within it, and what makes it a site of conflict or opportunity. ~80 words.]
 
   - name: lorebook_template_faction
     prettyName: Lorebook Template (Faction)
-    description: Template for Faction entries.
+    description: Dense faction template — goals, methods, and instability.
     type: string
     multiline: true
     default: |-
       [Entry Name]
       Type: Faction
       Setting: original
-      Leader: [Name or Title]
-      Goal: [Their primary ambition or ideological compass]
-      Description: [History, resources, and modus operandi. ~150 words. Contrast their public face with their private reality.]
-      Narrative Vector: [How they are destabilizing or changing the status quo]
+      Leader: [Name or Title] | Goal: [primary ambition]
+      Description: [Methods, resources, the gap between public face and private reality, and how they are destabilizing the status quo. ~80 words.]
 
   - name: lorebook_template_system
     prettyName: Lorebook Template (World System)
-    description: Template for World Systems (Magic, Tech, Cosmology, Law).
+    description: Dense system template — rules, costs, and instability.
     type: string
     multiline: true
     default: |-
@@ -190,13 +170,12 @@ config:
       Type: System
       Setting: original
       Domain: [Magic / Technology / Biology / Physics / Divine / Law]
-      Rules/Cost: [Fundamental mechanics, statutes, or limits, and the price/risk of usage/violation]
-      Description: [Mechanics, function, or legal framework. ~150 words. Focus on how this system shapes culture, economy, or warfare.]
-      Narrative Vector: [Current instability, evolution, or crisis related to this system]
+      Rules: [How it works and what it costs — mechanics and limits in 1-2 sentences]
+      Description: [How this system shapes daily life, who benefits, who suffers, and what makes it currently unstable. ~80 words.]
 
   - name: lorebook_template_dynamic
     prettyName: Lorebook Template (Situational Dynamic)
-    description: Template for Narrative Vectors and Situational Dynamics.
+    description: Dense dynamic template — actors, tensions, and volatility.
     type: string
     multiline: true
     default: |-
@@ -204,10 +183,8 @@ config:
       Type: Narrative Vector
       Setting: original
       Scope: [Local / Regional / Global]
-      Primary Actors: [Factions or characters with competing interests]
-      Competing Pressures: [What each actor wants and why they can't all have it]
-      Description: [The nature of the tension, the factors that sustain it, and what makes resolution difficult. ~150 words. Focus on WHY this is volatile, not WHAT will happen.]
-      Potential Catalysts: [Events or discoveries that could shift the balance—but do NOT predetermine which occurs]
+      Actors: [Who's involved and what each wants — name the incompatibility]
+      Description: [The nature of the tension, why it persists, and what could break the equilibrium. ~80 words.]
 
   - name: lorebook_keys_prompt
     prettyName: Lorebook Keys Prompt
