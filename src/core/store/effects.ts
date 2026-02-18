@@ -420,6 +420,20 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   subscribeEffect(
     (action) => action.type === uiBrainstormSubmitUserMessage.type,
     async (_action, { dispatch, getState }) => {
+      // Save and close any in-progress message edit before adding messages.
+      // Adding messages triggers List to unmount/remount all Message components,
+      // which resets their edit UI to hidden. If editingMessageId isn't cleared,
+      // the orphaned state prevents the edit button from working again (the
+      // selector sees no change from X→X, so the callback never fires).
+      const editingId = getState().brainstorm.editingMessageId;
+      if (editingId) {
+        const editInputId = IDS.BRAINSTORM.message(editingId).INPUT;
+        const editContent =
+          (await api.v1.storyStorage.get(`draft-${editInputId}`)) || "";
+        dispatch(messageUpdated({ id: editingId, content: String(editContent) }));
+        dispatch(editingMessageIdSet(null));
+      }
+
       const storageKey = IDS.BRAINSTORM.INPUT;
       const content = (await api.v1.storyStorage.get(storageKey)) || "";
 
