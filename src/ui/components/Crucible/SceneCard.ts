@@ -47,9 +47,11 @@ export const SceneCard = defineComponent<SceneCardProps, RootState>({
     const { goalId, sceneIndex } = props;
     const ids = CR.scene(goalId, sceneIndex);
     const state = ctx.getState();
-    const scene = state.crucible.chains[goalId]?.scenes[sceneIndex];
+    const chain = state.crucible.chains[goalId];
+    const scene = chain?.scenes[sceneIndex];
     const isTainted = scene?.tainted ?? false;
     const isOpener = scene?.isOpener ?? false;
+    const budget = chain?.sceneBudget ?? 5;
 
     const delBtn = button({
       id: ids.DEL_BTN,
@@ -59,7 +61,7 @@ export const SceneCard = defineComponent<SceneCardProps, RootState>({
       callback: () => dispatch(scenesDeletedFrom({ goalId, fromIndex: sceneIndex })),
     });
 
-    const label = isOpener ? "Opener" : `Scene ${sceneNumber(sceneIndex)}`;
+    const label = isOpener ? "Opener" : `Scene ${sceneNumber(sceneIndex, budget)}`;
 
     const formatDisplay = isOpener
       ? (content: string): string => formatTagsWithEmoji(stripOpenerTag(content))

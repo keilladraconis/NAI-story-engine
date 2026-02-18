@@ -17,7 +17,7 @@ import {
 import { MessageFactory } from "nai-gen-x";
 import { buildCruciblePrefix } from "./context-builder";
 import { parseTag } from "./tag-parser";
-import { sceneNumber } from "./crucible-strategy";
+import { sceneNumber, getMaxScenes } from "./crucible-strategy";
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 
 /** Short-ID prefix per DULFS field. */
@@ -63,6 +63,7 @@ function formatBuilderContext(
   goal: CrucibleGoal,
   builder: CrucibleBuilderState,
   guidance: DirectorGuidance | null,
+  maxScenes: number,
 ): string {
   const sections: string[] = [];
 
@@ -78,7 +79,7 @@ function formatBuilderContext(
     for (let i = 0; i < unprocessed.length; i++) {
       const sceneData = unprocessed[i];
       const scene = parseTag(sceneData.text, "SCENE") || sceneData.text.split("\n")[0];
-      sections.push(`  Scene ${sceneNumber(startIndex + i)}: ${scene}`);
+      sections.push(`  Scene ${sceneNumber(startIndex + i, maxScenes)}: ${scene}`);
     }
   }
 
@@ -122,7 +123,8 @@ export const createCrucibleBuildFactory = (
       (await api.v1.config.get("crucible_build_prompt")) || "",
     );
 
-    const context = formatBuilderContext(chain, goal, state.crucible.builder, state.crucible.directorGuidance);
+    const maxScenes = await getMaxScenes();
+    const context = formatBuilderContext(chain, goal, state.crucible.builder, state.crucible.directorGuidance, maxScenes);
     const prefix = await buildCruciblePrefix(getState, {
       includeDirection: true,
       includeDulfs: true,

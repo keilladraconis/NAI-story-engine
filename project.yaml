@@ -1,12 +1,12 @@
 compatibilityVersion: naiscript-1.0
 id: e6c35faa-e4f2-4c3b-af4a-d56e4c992d87
 name: Story Engine
-version: 0.7.1
+version: 0.7.2
 createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771424892
+updatedAt: 1771432764
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -323,15 +323,17 @@ config:
     multiline: true
     default: |-
       You are exploring a world by imagining dramatic moments that reveal
-      something essential about it. Scene 1 is the climax. Each new scene
-      discovers what had to be true before the established scenes could
-      happen. Scene numbers ascend as you explore further from the climax.
+      something essential about it. The GOAL is the climax — it is already
+      established and is not a scene. Each scene you write explores a
+      dramatic moment EARLIER in the timeline. Scene numbers descend from
+      the climax toward the origin — Scene N is the first precursor to
+      the climax, and Scene 1 is furthest back, near the story's beginning.
 
       NARRATIVE DISTANCE: Each scene should represent a MAJOR story
       milestone — a different chapter of the protagonist's journey, not
       the next paragraph. Think in terms of weeks, months, or years
-      between scenes, not minutes. If your last scene was a battle,
-      don't write the march to the battle — write the betrayal that
+      between scenes, not minutes. If the goal or last scene depicts a
+      battle, don't write the march to battle — write the betrayal that
       caused the war, or the childhood oath that made the fight personal.
 
       DIRECTOR DEFERENCE: When DIRECTOR GUIDANCE is present, treat it as

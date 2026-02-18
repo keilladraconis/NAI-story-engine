@@ -140,7 +140,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
 
     if (label) {
       headerContent.push(
-        text({ text: `**${label}**`, style: this.style?.("label"), markdown: true }),
+        text({ id: `${id}-label`, text: `**${label}**`, style: this.style?.("label"), markdown: true }),
       );
     }
 

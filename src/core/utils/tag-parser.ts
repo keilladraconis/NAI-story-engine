@@ -89,10 +89,9 @@ export function parseTagAll(text: string, tag: string): string[] {
   return results;
 }
 
-/** Strip `[SCENE]` tag and optional scene number prefix, keeping the description.
- *  e.g. `[SCENE] 3 - The castle falls` → `The castle falls` */
+/** Strip `[SCENE]` tag prefix, keeping the description. */
 export function stripSceneTag(text: string): string {
-  return text.replace(/^\[SCENE\]\s*(?:\d+\s*[-–—:.]\s*)?/m, "").trim();
+  return text.replace(/^\[SCENE\]\s*/m, "").trim();
 }
 
 /** Strip `[OPENER]` tag prefix, keeping the description. */

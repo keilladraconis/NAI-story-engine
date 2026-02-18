@@ -40,9 +40,13 @@ import {
   crucibleReset,
   directionSet,
   goalAdded,
+  goalRemoved,
   goalsConfirmed,
   crucibleChainRequested,
+  sceneBudgetUpdated,
   chainStarted,
+  scenesDeletedFrom,
+  sceneRejected,
   activeGoalAdvanced,
   autoChainStarted,
   autoChainStopped,
@@ -66,6 +70,7 @@ import {
   buildCrucibleDirectionStrategy,
   buildCrucibleGoalStrategy,
   buildCrucibleChainStrategy,
+  getMaxScenes,
 } from "../utils/crucible-strategy";
 import { buildCrucibleBuildStrategy } from "../utils/crucible-builder-strategy";
 import { buildCrucibleDirectorStrategy } from "../utils/crucible-director-strategy";
@@ -881,6 +886,10 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
+      // Sync scene budget from slider into chain state before generation
+      const budget = await getMaxScenes();
+      dispatch(sceneBudgetUpdated({ goalId: activeGoalId, budget }));
+
       const strategy = await buildCrucibleChainStrategy(getState, activeGoalId);
       dispatch(
         requestQueued({
@@ -926,6 +935,54 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       api.v1.ui.updateParts([
         { id: `${IDS.CRUCIBLE.DIRECTION_TEXT}-view`, text: "" },
       ]);
+    },
+  );
+
+  // Intent: Goal Removed → clean up goal/scene storyStorage keys
+  subscribeEffect(
+    matchesAction(goalRemoved),
+    async (action) => {
+      const { goalId } = action.payload;
+      const allKeys = await api.v1.storyStorage.list();
+      for (const key of allKeys) {
+        if (
+          key === `cr-goal-${goalId}` ||
+          key === `cr-goal-section-${goalId}` ||
+          key.startsWith(`cr-scene-${goalId}-`)
+        ) {
+          await api.v1.storyStorage.remove(key);
+        }
+      }
+    },
+  );
+
+  // Intent: Scenes Deleted From → clean up orphaned scene storyStorage keys
+  subscribeEffect(
+    matchesAction(scenesDeletedFrom),
+    async (action) => {
+      const { goalId, fromIndex } = action.payload;
+      const allKeys = await api.v1.storyStorage.list();
+      const prefix = `cr-scene-${goalId}-`;
+      for (const key of allKeys) {
+        if (!key.startsWith(prefix)) continue;
+        const idx = parseInt(key.slice(prefix.length), 10);
+        if (!isNaN(idx) && idx >= fromIndex) {
+          await api.v1.storyStorage.remove(key);
+        }
+      }
+    },
+  );
+
+  // Intent: Scene Rejected → clean up last scene's storyStorage key
+  subscribeEffect(
+    matchesAction(sceneRejected),
+    async (action, { getState: getLatest }) => {
+      const { goalId } = action.payload;
+      // After reducer, chain.scenes.length is the old length - 1
+      const chain = getLatest().crucible.chains[goalId];
+      if (chain) {
+        await api.v1.storyStorage.remove(`cr-scene-${goalId}-${chain.scenes.length}`);
+      }
     },
   );
 

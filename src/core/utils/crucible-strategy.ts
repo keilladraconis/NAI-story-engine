@@ -26,9 +26,11 @@ export async function getMaxScenes(): Promise<number> {
 
 // --- Scene Numbering ---
 
-/** Convert a zero-based scene index to an ascending scene number. */
-export function sceneNumber(sceneIndex: number): number {
-  return sceneIndex + 1;
+/** Convert a zero-based scene index to a timeline-order scene number.
+ *  Index 0 (first explored, nearest climax) → highest number.
+ *  Index maxScenes-1 (last explored, nearest origin) → 1. */
+export function sceneNumber(sceneIndex: number, maxScenes: number): number {
+  return maxScenes - sceneIndex;
 }
 
 // --- Chain Context Formatter ---
@@ -43,9 +45,9 @@ function formatPacingSignal(sceneCount: number, openCount: number, maxScenes: nu
   if (openCount === 0 && sceneCount > 0)
     return "\nPACING: ALL CONSTRAINTS RESOLVED — open new constraints to fill gaps or resolve remaining as ground state.";
   if (sceneCount === 0)
-    return "\nPACING: FIRST SCENE — this is the climax. Open 1-2 preconditions that are DRAMATICALLY far from this moment — foundational circumstances, not adjacent causes.";
+    return "\nPACING: FIRST SCENE — the GOAL above is the climax, already established. Write a dramatic precursor set BEFORE it. Open 1-2 preconditions that are DRAMATICALLY far from the goal — foundational circumstances, not adjacent causes.";
   const remaining = maxScenes - sceneCount;
-  const nextNum = sceneNumber(sceneCount);
+  const nextNum = sceneNumber(sceneCount, maxScenes);
   if (remaining <= 1)
     return `\nPACING: FINAL SCENE (Scene ${nextNum}) — resolve remaining constraints.`;
   if (remaining <= 2)
@@ -62,7 +64,7 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
   sections.push(goal.starred ? "ACTIVE GOAL (★ starred):" : "ACTIVE GOAL:");
   sections.push(goalText);
 
-  // Scenes (ascending order — Scene 1 = first explored, closest to climax)
+  // Scenes (timeline order — highest number = nearest climax, lowest = nearest origin)
   // Constraint state lives in the dedicated OPEN/RESOLVED sections below.
   // Showing constraint tags inside scenes causes GLM to confuse ID formats.
   if (chain.scenes.length > 0) {
@@ -70,7 +72,7 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
     for (let i = 0; i < chain.scenes.length; i++) {
       const scene = parseTag(chain.scenes[i].text, "SCENE") || chain.scenes[i].text.split("\n")[0];
       const taintedMark = chain.scenes[i].tainted ? " ⚠ TAINTED — needs correction" : "";
-      sections.push(`  Scene ${sceneNumber(i)}: ${scene}${taintedMark}`);
+      sections.push(`  Scene ${sceneNumber(i, maxScenes)}: ${scene}${taintedMark}`);
     }
   }
 
@@ -78,7 +80,7 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
   if (chain.openConstraints.length > 0) {
     sections.push("\nOPEN CONSTRAINTS (already tracked — do NOT re-emit these in [OPEN]):");
     for (const c of chain.openConstraints) {
-      const source = c.sourceSceneIndex === 0 && chain.scenes.length === 0 ? "seed" : `Scene ${sceneNumber(c.sourceSceneIndex)}`;
+      const source = c.sourceSceneIndex === 0 && chain.scenes.length === 0 ? "seed" : `Scene ${sceneNumber(c.sourceSceneIndex, maxScenes)}`;
       sections.push(`  [${c.shortId}] ${c.description} (${source})`);
     }
   }
@@ -87,7 +89,7 @@ function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: 
   if (chain.resolvedConstraints.length > 0) {
     sections.push("\nRESOLVED CONSTRAINTS:");
     for (const c of chain.resolvedConstraints) {
-      const label = c.status === "groundState" ? "ground state" : `Scene ${sceneNumber(c.sourceSceneIndex)}`;
+      const label = c.status === "groundState" ? "ground state" : `Scene ${sceneNumber(c.sourceSceneIndex, maxScenes)}`;
       sections.push(`  - ${c.description} → ${label}`);
     }
   }
@@ -225,7 +227,7 @@ export const createCrucibleChainFactory = (
 
     const userContent = isOpenerMode
       ? context + "\n\nWrite the [OPENER] — the scene that launches this story."
-      : context + `\n\nWrite Scene ${sceneNumber(chain.scenes.length)}.`;
+      : context + `\n\nWrite Scene ${sceneNumber(chain.scenes.length, maxScenes)}.`;
 
     const messages: Message[] = [
       ...prefix,

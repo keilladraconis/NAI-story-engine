@@ -53,14 +53,14 @@ function formatDirectorContext(
 
   // All scenes (story-chronological for Director — reading the screenplay)
   if (chain.scenes.length > 0) {
-    sections.push(`\nSCENES (${chain.scenes.length} total, story order — Scene ${sceneNumber(chain.scenes.length - 1)} → Scene ${sceneNumber(0)}):`);
+    sections.push(`\nSCENES (${chain.scenes.length} total, story order — Scene ${sceneNumber(chain.scenes.length - 1, maxScenes)} → Scene ${sceneNumber(0, maxScenes)}):`);
     for (let i = chain.scenes.length - 1; i >= 0; i--) {
       const scene = parseTag(chain.scenes[i].text, "SCENE") || chain.scenes[i].text.split("\n")[0];
       const markers: string[] = [];
       if (chain.scenes[i].favorited) markers.push("★");
       if (chain.scenes[i].tainted) markers.push("⚠ TAINTED");
       const suffix = markers.length > 0 ? ` (${markers.join(", ")})` : "";
-      sections.push(`  Scene ${sceneNumber(i)}: ${scene}${suffix}`);
+      sections.push(`  Scene ${sceneNumber(i, maxScenes)}: ${scene}${suffix}`);
     }
   }
 
@@ -79,7 +79,7 @@ function formatDirectorContext(
   if (resolved.length > 0) {
     sections.push("RESOLVED:");
     for (const c of resolved) {
-      const label = c.status === "groundState" ? "ground state" : `Scene ${sceneNumber(c.sourceSceneIndex)}`;
+      const label = c.status === "groundState" ? "ground state" : `Scene ${sceneNumber(c.sourceSceneIndex, maxScenes)}`;
       sections.push(`  [${c.shortId}] ${c.description} → ${label}`);
     }
   }
@@ -88,17 +88,17 @@ function formatDirectorContext(
   const sceneCount = chain.scenes.length;
   const remaining = maxScenes - sceneCount;
   if (sceneCount === 0) {
-    sections.push("\nTEMPORAL POSITION: Solver has not started yet — next scene is the CLIMAX (Scene 1).");
+    sections.push(`\nTEMPORAL POSITION: Solver has not started yet — next scene is Scene ${sceneNumber(0, maxScenes)} (nearest to the climax).`);
   } else if (remaining <= 1) {
-    sections.push(`\nTEMPORAL POSITION: Scene ${sceneNumber(sceneCount)} of ${maxScenes} — Solver is at the ORIGIN, the very beginning of the story. Guidance must fit foundational, pre-story circumstances.`);
+    sections.push(`\nTEMPORAL POSITION: Scene ${sceneNumber(sceneCount, maxScenes)} of ${maxScenes} — Solver is at the ORIGIN, the very beginning of the story. Guidance must fit foundational, pre-story circumstances.`);
   } else if (remaining <= 2) {
-    sections.push(`\nTEMPORAL POSITION: Scene ${sceneNumber(sceneCount)} of ${maxScenes} — Solver is near the ORIGIN. Guidance should target early life, formative events, foundational world state.`);
+    sections.push(`\nTEMPORAL POSITION: Scene ${sceneNumber(sceneCount, maxScenes)} of ${maxScenes} — Solver is near the ORIGIN. Guidance should target early life, formative events, foundational world state.`);
   } else if (sceneCount <= 2) {
-    sections.push(`\nTEMPORAL POSITION: Scene ${sceneNumber(sceneCount)} of ${maxScenes} — Solver is near the CLIMAX. Guidance should target mid-to-late story elements, escalating tensions.`);
+    sections.push(`\nTEMPORAL POSITION: Scene ${sceneNumber(sceneCount, maxScenes)} of ${maxScenes} — Solver is near the CLIMAX. Guidance should target mid-to-late story elements, escalating tensions.`);
   } else {
     const progress = sceneCount / maxScenes;
     const era = progress < 0.4 ? "mid-story" : progress < 0.7 ? "early-mid story" : "early story";
-    sections.push(`\nTEMPORAL POSITION: Scene ${sceneNumber(sceneCount)} of ${maxScenes} — Solver is exploring the ${era}. Guidance must be temporally appropriate to this era.`);
+    sections.push(`\nTEMPORAL POSITION: Scene ${sceneNumber(sceneCount, maxScenes)} of ${maxScenes} — Solver is exploring the ${era}. Guidance must be temporally appropriate to this era.`);
   }
 
   // World elements
@@ -117,7 +117,7 @@ function formatDirectorContext(
 
   // Previous guidance (for continuity)
   if (previousGuidance) {
-    sections.push(`\nYOUR PREVIOUS GUIDANCE (at Scene ${sceneNumber(previousGuidance.atSceneIndex)}):`);
+    sections.push(`\nYOUR PREVIOUS GUIDANCE (at Scene ${sceneNumber(previousGuidance.atSceneIndex, maxScenes)}):`);
     sections.push(`  Solver: ${previousGuidance.solver}`);
     sections.push(`  Builder: ${previousGuidance.builder}`);
   }

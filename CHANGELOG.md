@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.2] - 2026-02-18
+
+### Changed
+
+#### Crucible — Reverse Scene Numbering
+
+- **Timeline-order scene labels** — Scene numbers now reflect story chronology: Scene 1 is the earliest (nearest origin), highest number is nearest the climax. Previously Scene 1 was the first *explored* scene (nearest climax), which was confusing. `sceneNumber(index, maxScenes)` now computes `maxScenes - index`.
+- **Scene budget stored on chain** — `CrucibleChain.sceneBudget` tracks the slider value, synced before each generation via new `sceneBudgetUpdated` action. UI components read this for label computation instead of making assumptions.
+- **`EditableText` label targetable** — The label `text()` part now receives an id (`${id}-label`), enabling reactive label updates from parent components (e.g. scene labels updating when budget changes).
+- **Chain prompt updated** — Scene numbering description in `crucible_chain_prompt` corrected to match reverse numbering: "Scene N is the first precursor to the climax, and Scene 1 is furthest back."
+- **Director temporal position text fixed** — Was "next scene is the CLIMAX (Scene 1)"; now correctly says "Scene N (nearest to the climax)."
+
+### Fixed
+
+- **Orphaned storyStorage keys on goal deletion** — Deleting a goal now cleans up `cr-goal-{id}`, `cr-goal-section-{id}`, and all `cr-scene-{id}-*` keys from storyStorage. Previously these persisted indefinitely.
+- **Orphaned storyStorage keys on scene deletion** — `scenesDeletedFrom` cleans up scene keys for deleted indices. `sceneRejected` cleans up the removed scene's key.
+
 ## [0.7.0] - 2026-02-17 — Crucible Edition
 
 ### Added
@@ -14,7 +31,7 @@ The headline feature of 0.7.0. Crucible turns brainstormed ideas into a populate
 - **Step 1: Direction** — AI distills the brainstorm into a single dense creative anchor (the Direction), or the user writes their own. Includes story architecture classification and thematic tags. All downstream generation references only this text.
 - **Step 2: Goals** — AI generates dramatic endpoints — possible futures for the world. Each goal has a "Build World" button to begin world generation from that goal. Manual add/edit/delete supported.
 - **Step 3: World Building** — The core loop. For each goal the user builds, three interleaved generators run:
-  - **Solver** — Generates scenes backward from the climax, resolving and opening constraints. Each scene discovers what the world must contain. Scene numbering ascends from 1 (closest to climax).
+  - **Solver** — Generates scenes backward from the climax, resolving and opening constraints. Each scene discovers what the world must contain. Scene numbering follows story chronology (Scene 1 = earliest).
   - **Builder** — Extracts world elements (characters, locations, factions, systems, situations) from new scenes. Can create new elements or update existing ones. Emits `[SOLVER]` to resume chaining.
 - **Step 4: Review & Merge** — World elements merge into Story Engine's DULFS fields and lorebook.
 - **Shared world state** — All goals contribute to and see the same world element inventory.

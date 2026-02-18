@@ -16,6 +16,7 @@ import { GenerationButton } from "../GenerationButton";
 import { GoalCard } from "./GoalCard";
 import { SceneCard } from "./SceneCard";
 import { parseTag, formatTagsWithEmoji, stripSceneTag } from "../../../core/utils/tag-parser";
+import { sceneNumber } from "../../../core/utils/crucible-strategy";
 import {
   NAI_WARNING,
 } from "../../colors";
@@ -225,11 +226,19 @@ export const GoalsSection = defineComponent<undefined, RootState>({
 
         const chain = st.crucible.chains[goal.id];
         if (!chain) continue;
+        const budget = chain.sceneBudget ?? 5;
         for (let i = 0; i < chain.scenes.length; i++) {
           const sceneDisplay = formatTagsWithEmoji(stripSceneTag(chain.scenes[i].text))
             .replace(/\n/g, "  \n").replace(/</g, "\\<");
           api.v1.ui.updateParts([
             { id: `${CR.scene(goal.id, i).TEXT}-view`, text: sceneDisplay },
+          ]);
+
+          // Update scene label to reflect current budget
+          const labelId = `${CR.scene(goal.id, i).TEXT}-label`;
+          const sceneLabel = chain.scenes[i].isOpener ? "Opener" : `Scene ${sceneNumber(i, budget)}`;
+          api.v1.ui.updateParts([
+            { id: labelId, text: `**${sceneLabel}**` },
           ]);
         }
       }
@@ -240,8 +249,10 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       (s) => {
         const parts: string[] = [];
         for (const g of s.crucible.goals) {
-          const sceneCount = s.crucible.chains[g.id]?.scenes.length ?? 0;
-          parts.push(`${g.id}:${g.text}:${sceneCount}`);
+          const chain = s.crucible.chains[g.id];
+          const sceneCount = chain?.scenes.length ?? 0;
+          const budget = chain?.sceneBudget ?? 0;
+          parts.push(`${g.id}:${g.text}:${sceneCount}:${budget}`);
         }
         return parts.join("\0");
       },

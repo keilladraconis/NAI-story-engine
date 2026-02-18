@@ -173,6 +173,7 @@ export interface CrucibleChain {
   resolvedConstraints: Constraint[];
   complete: boolean;
   nextConstraintIndex: number; // Monotonic counter for shortId assignment
+  sceneBudget: number; // Max scenes per goal (synced from slider before each generation)
 }
 
 export interface CrucibleWorldElement {

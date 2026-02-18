@@ -121,11 +121,24 @@ export const crucibleSlice = createSlice({
         resolvedConstraints: [],
         complete: false,
         nextConstraintIndex: seedDescs.length,
+        sceneBudget: 5,
       };
       return {
         ...state,
         activeGoalId: payload.goalId,
         chains: { ...state.chains, [payload.goalId]: chain },
+      };
+    },
+
+    sceneBudgetUpdated: (state, payload: { goalId: string; budget: number }) => {
+      const chain = state.chains[payload.goalId];
+      if (!chain) return state;
+      return {
+        ...state,
+        chains: {
+          ...state.chains,
+          [payload.goalId]: { ...chain, sceneBudget: payload.budget },
+        },
       };
     },
 
@@ -295,6 +308,7 @@ export const crucibleSlice = createSlice({
         resolvedConstraints: [],
         complete: false,
         nextConstraintIndex: newConstraints.length,
+        sceneBudget: chain.sceneBudget,
       };
 
       return {
@@ -605,6 +619,7 @@ export const {
   goalStarred,
   goalsConfirmed,
   chainStarted,
+  sceneBudgetUpdated,
   sceneAdded,
   sceneRejected,
   sceneEdited,

@@ -9,6 +9,7 @@ import {
   directorGuidanceSet,
 } from "../../../core/store/slices/crucible";
 import { parseTag } from "../../../core/utils/tag-parser";
+import { sceneNumber } from "../../../core/utils/crucible-strategy";
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
 import {
@@ -213,11 +214,11 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
       });
     };
 
-    const buildResolvedLine = (c: Constraint, goalId: string): UIPart => {
+    const buildResolvedLine = (c: Constraint, goalId: string, budget: number): UIPart => {
       const icon = c.status === "groundState" ? "\u26F0\uFE0F" : "\u2705";
       const label = c.status === "groundState"
         ? "ground state"
-        : `Scene ${c.sourceSceneIndex + 1}`;
+        : `Scene ${sceneNumber(c.sourceSceneIndex, budget)}`;
       return row({
         id: `cr-cst-r-${c.shortId}`,
         style: this.style?.("resolvedLine"),
@@ -324,7 +325,7 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
           column({
             id: CR.RESOLVED_LIST,
             style: mergeStyles(this.style?.("resolvedList"), resolvedExpanded ? undefined : { display: "none" }),
-            content: chain.resolvedConstraints.map((c) => buildResolvedLine(c, goalId)),
+            content: chain.resolvedConstraints.map((c) => buildResolvedLine(c, goalId, chain.sceneBudget ?? 5)),
           }),
         );
       }
