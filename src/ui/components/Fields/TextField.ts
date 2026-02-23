@@ -25,6 +25,7 @@ import {
   registerActiveEditor,
   clearActiveEditor,
 } from "../../framework/editable-draft";
+import { attgForMemory } from "../../../core/utils/filters";
 
 export type TextFieldProps = FieldConfig;
 
@@ -164,7 +165,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
             `kse-field-${config.id}`,
           );
           if (content) {
-            await api.v1.memory.set(String(content));
+            await api.v1.memory.set(await attgForMemory(String(content)));
           }
         }
       });
@@ -211,7 +212,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
               "kse-sync-attg-memory",
             );
             if (syncEnabled) {
-              await api.v1.memory.set(value);
+              await api.v1.memory.set(await attgForMemory(value));
             }
           },
         });

@@ -1,10 +1,13 @@
 import { BindContext } from "nai-act";
-import { chatSwitched, chatDeleted } from "../../../core/store/slices/brainstorm";
+import { chatSwitched, chatDeleted, chatRenamed } from "../../../core/store/slices/brainstorm";
 import { RootState } from "../../../core/store/types";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
+import { EditableText } from "../EditableText";
 import { IDS } from "../../framework/ids";
 
-const { row, text, button, column } = api.v1.ui.part;
+const { text, column, button } = api.v1.ui.part;
+
+const ACTION_BTN_STYLE = { width: "24px", padding: "4px", "flex-shrink": "0" };
 
 type Modal = {
   update: (options: { content: UIPart[] }) => Promise<void>;
@@ -22,52 +25,60 @@ function buildSessionRows(
   return chats.map((chat, index) => {
     const isCurrent = index === currentChatIndex;
     const canDelete = chats.length > 1;
+    const rowId = IDS.BRAINSTORM.sessionRow(index);
 
-    const deleteContent: UIPart[] = [];
+    // Action buttons passed as extraControls to EditableText
+    const controls: UIPart[] = [
+      button({
+        id: `${rowId}-load`,
+        iconId: "folder",
+        style: ACTION_BTN_STYLE,
+        callback: () => {
+          ctx.dispatch(chatSwitched(index));
+          modal.close();
+        },
+      }),
+    ];
+
     if (canDelete) {
       const { part, unmount } = ctx.render(ButtonWithConfirmation, {
-        id: `${IDS.BRAINSTORM.sessionRow(index)}-del`,
+        id: `${rowId}-del`,
         label: "",
         confirmLabel: "Delete?",
         iconId: "trash" as IconId,
-        buttonStyle: { width: "24px", padding: "4px", opacity: "0.5" },
+        buttonStyle: { ...ACTION_BTN_STYLE, opacity: "0.5" },
         onConfirm: () => {
           ctx.dispatch(chatDeleted(index));
           rebuildModal(ctx, modal, cleanups);
         },
       });
       cleanups.push(unmount);
-      deleteContent.push(part);
+      controls.push(part);
     }
 
-    return row({
-      id: IDS.BRAINSTORM.sessionRow(index),
+    const { part: titleRow, unmount: unmountTitle } = ctx.render(EditableText, {
+      id: `${rowId}-title`,
+      getContent: () => ctx.getState().brainstorm.chats[index]?.title ?? "",
+      placeholder: "Session title...",
+      singleLine: true,
+      initialDisplay: chat.title,
+      extraControls: controls,
+      onSave: (title: string) => {
+        ctx.dispatch(chatRenamed({ index, title: title.trim() || chat.title }));
+        rebuildModal(ctx, modal, cleanups);
+      },
+    });
+    cleanups.push(unmountTitle);
+
+    // EditableText singleLine returns a row — wrap it to add per-row styling
+    return column({
+      id: rowId,
       style: {
-        padding: "8px",
-        "align-items": "center",
-        gap: "8px",
+        padding: "6px 8px",
         "border-bottom": "1px solid rgba(255, 255, 255, 0.05)",
         "background-color": isCurrent ? "rgba(64, 156, 255, 0.15)" : "transparent",
       },
-      content: [
-        text({
-          text: chat.title,
-          style: {
-            flex: "1",
-            opacity: isCurrent ? "1" : "0.7",
-          },
-        }),
-        button({
-          id: `${IDS.BRAINSTORM.sessionRow(index)}-load`,
-          iconId: "folder",
-          style: { width: "24px", padding: "4px" },
-          callback: () => {
-            ctx.dispatch(chatSwitched(index));
-            modal.close();
-          },
-        }),
-        ...deleteContent,
-      ],
+      content: [titleRow],
     });
   });
 }
@@ -77,12 +88,17 @@ function rebuildModal(
   modal: Modal,
   cleanups: (() => void)[],
 ) {
-  // Unmount previous ButtonWithConfirmation instances
+  // Unmount previous mounted component instances
   cleanups.forEach((fn) => fn());
   cleanups.length = 0;
 
   modal.update({
     content: [
+      text({
+        text: "_The active session is included as Story Engine context._",
+        markdown: true,
+        style: { "font-size": "0.8em", opacity: "0.6", padding: "4px 8px" },
+      }),
       column({
         style: { gap: "2px" },
         content: buildSessionRows(ctx, modal, cleanups),

@@ -1,6 +1,6 @@
 import { FieldID } from "../../../../config/field-definitions";
 import { fieldUpdated } from "../../index";
-import { applyFieldFilters } from "../../../utils/filters";
+import { applyFieldFilters, attgForMemory } from "../../../utils/filters";
 import {
   GenerationHandlers,
   FieldTarget,
@@ -53,7 +53,7 @@ export const fieldHandler: GenerationHandlers<FieldTarget> = {
           "kse-sync-attg-memory",
         );
         if (syncEnabled) {
-          await api.v1.memory.set(filteredText);
+          await api.v1.memory.set(await attgForMemory(filteredText));
         }
       } else if (ctx.target.fieldId === FieldID.Style) {
         const syncEnabled = await api.v1.storyStorage.get("kse-sync-style-an");

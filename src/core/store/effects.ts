@@ -83,6 +83,7 @@ import {
   FIELD_CONFIGS,
 } from "../../config/field-definitions";
 import { getHandler } from "./effects/generation-handlers";
+import { attgForMemory } from "../utils/filters";
 
 // Lorebook sync constants
 const SE_CATEGORY_PREFIX = "SE: ";
@@ -176,7 +177,7 @@ export async function syncEratoCompatibility(
   // Manage "End of Lorebook" marker entry
   // Erato has no clean boundary between lorebook (pos 400) and story text (pos 0).
   // A forced-activation entry with "***\n" acts as a visual separator.
-  // The user must manually set its insertion position to 1.
+  // The user must manually set its insertion order to 1.
   const allEntries = await api.v1.lorebook.entries();
   const existingMarker = allEntries.find(
     (e) => e.displayName === SE_ERATO_MARKER_NAME,
@@ -192,11 +193,20 @@ export async function syncEratoCompatibility(
       forceActivation: true,
     });
     api.v1.ui.toast(
-      'Created "SE: End of Lorebook" entry. Set its insertion position to 1.',
+      'Created "SE: End of Lorebook" entry. Set its insertion order to 1.',
       { type: "info" },
     );
   } else if (!erato && existingMarker) {
     await api.v1.lorebook.removeEntry(existingMarker.id);
+  }
+
+  // Re-sync ATTG → Memory through attgForMemory (adds/removes [ S:4 ] as needed)
+  const attgSyncEnabled = await api.v1.storyStorage.get("kse-sync-attg-memory");
+  if (attgSyncEnabled) {
+    const attgContent = String((await api.v1.storyStorage.get("kse-field-attg")) || "");
+    if (attgContent) {
+      await api.v1.memory.set(await attgForMemory(attgContent));
+    }
   }
 }
 

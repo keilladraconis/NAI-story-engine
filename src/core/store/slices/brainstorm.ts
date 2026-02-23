@@ -111,6 +111,15 @@ export const brainstormSlice = createSlice({
         editingMessageId: null,
       };
     },
+    chatRenamed: (state, payload: { index: number; title: string }) => {
+      if (payload.index < 0 || payload.index >= state.chats.length) return state;
+      return {
+        ...state,
+        chats: state.chats.map((chat, i) =>
+          i === payload.index ? { ...chat, title: payload.title } : chat,
+        ),
+      };
+    },
     chatSwitched: (state, index: number) => {
       if (index < 0 || index >= state.chats.length) return state;
       return {
@@ -151,6 +160,7 @@ export const {
   messagesCleared,
   editingMessageIdSet,
   chatCreated,
+  chatRenamed,
   chatSwitched,
   chatDeleted,
 } = brainstormSlice.actions;

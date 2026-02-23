@@ -64,3 +64,15 @@ export function applyFilter(filterName: FilterType, text: string): string {
   const filterFn = FILTER_FUNCTIONS[filterName];
   return filterFn ? filterFn(text) : text;
 }
+
+/**
+ * Appends `[ S:4 ]` to ATTG content for Erato compatibility mode.
+ * This signals the model to write with higher quality.
+ */
+export async function attgForMemory(content: string): Promise<string> {
+  const erato = (await api.v1.config.get("erato_compatibility")) || false;
+  if (erato && content.trim()) {
+    return `${content.trimEnd()}[ S:4 ]`;
+  }
+  return content;
+}
