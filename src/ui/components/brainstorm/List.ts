@@ -1,5 +1,6 @@
 import { BindContext, defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
+import { currentMessages } from "../../../core/store/slices/brainstorm";
 import { IDS } from "../../framework/ids";
 import { Message } from "./Message";
 
@@ -13,7 +14,7 @@ export const List = defineComponent({
     let messageCleanups: (() => void)[] = [];
 
     // Read initial messages
-    const initialMessages = ctx.getState().brainstorm.messages;
+    const initialMessages = currentMessages(ctx.getState().brainstorm);
     const initialReversed = initialMessages.slice().reverse();
     const initialChildren = initialReversed.map((msg) => {
       const { part, unmount } = ctx.render(Message, { message: msg });
@@ -23,7 +24,7 @@ export const List = defineComponent({
 
     // Subscribe for future changes
     useSelector(
-      (state) => state.brainstorm.messages,
+      (state) => currentMessages(state.brainstorm),
       (messages) => {
         // Cleanup previous
         messageCleanups.forEach((fn) => fn());

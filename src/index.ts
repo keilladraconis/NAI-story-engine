@@ -10,6 +10,7 @@ import { stateUpdated, requestActivated } from "./core/store/slices/runtime";
 import { IDS } from "./ui/framework/ids";
 
 // Brainstorm components
+import { BrainstormHeader } from "./ui/components/brainstorm/BrainstormHeader";
 import { List } from "./ui/components/brainstorm/List";
 import { Input } from "./ui/components/brainstorm/Input";
 
@@ -54,6 +55,7 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
     await syncEratoCompatibility(store.getState);
 
     // 4. Mount all components (returns UIPart + sets up subscriptions)
+    const { part: brainstormHeaderPart } = mount(BrainstormHeader, undefined, store);
     const { part: listPart } = mount(List, undefined, store);
     const { part: inputPart } = mount(Input, {}, store);
     const { part: headerPart } = mount(Header, {}, store);
@@ -71,7 +73,7 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
         column({
           id: IDS.BRAINSTORM.ROOT,
           style: { height: "100%", "justify-content": "space-between" },
-          content: [listPart, inputPart],
+          content: [brainstormHeaderPart, listPart, inputPart],
         }),
       ],
     });

@@ -39,6 +39,11 @@ export const IDS = {
     LIST: "se-bs-list",
     INPUT: "se-bs-input",
     SEND_BTN: "se-bs-send-btn",
+    HEADER: "se-bs-header",
+    TITLE: "se-bs-title",
+    NEW_BTN: "se-bs-new-btn",
+    SESSIONS_BTN: "se-bs-sessions-btn",
+    sessionRow: (index: number) => `se-bs-session-${index}`,
 
     message: (id: string) => ({
       ROOT: `se-bs-msg-${id}`,

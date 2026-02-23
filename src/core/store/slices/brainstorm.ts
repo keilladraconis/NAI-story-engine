@@ -1,75 +1,142 @@
 import { createSlice } from "nai-store";
-import { BrainstormState, BrainstormMessage } from "../types";
+import { BrainstormState, BrainstormMessage, BrainstormChat } from "../types";
+
+function makeChat(index: number): BrainstormChat {
+  return {
+    id: api.v1.uuid(),
+    title: `Brainstorm ${index}`,
+    messages: [],
+  };
+}
 
 export const initialBrainstormState: BrainstormState = {
-  messages: [],
+  chats: [makeChat(1)],
+  currentChatIndex: 0,
   editingMessageId: null,
 };
+
+/** Accessor: current chat (never undefined — slice guarantees ≥1 chat). */
+export function currentChat(state: BrainstormState): BrainstormChat {
+  return state.chats[state.currentChatIndex];
+}
+
+/** Accessor: messages of the current chat. */
+export function currentMessages(state: BrainstormState): BrainstormMessage[] {
+  return currentChat(state).messages;
+}
+
+/** Immutable update helper for the current chat. */
+function updateCurrentChat(
+  state: BrainstormState,
+  updater: (chat: BrainstormChat) => BrainstormChat,
+): BrainstormState {
+  const chats = state.chats.map((chat, i) =>
+    i === state.currentChatIndex ? updater(chat) : chat,
+  );
+  return { ...state, chats };
+}
 
 export const brainstormSlice = createSlice({
   name: "brainstorm",
   initialState: initialBrainstormState,
   reducers: {
     messageAdded: (state, message: BrainstormMessage) => {
-      return {
-        ...state,
-        messages: [...state.messages, message],
-      };
+      return updateCurrentChat(state, (chat) => ({
+        ...chat,
+        messages: [...chat.messages, message],
+      }));
     },
     messageUpdated: (state, payload: { id: string; content: string }) => {
-      return {
-        ...state,
-        messages: state.messages.map((msg) =>
+      return updateCurrentChat(state, (chat) => ({
+        ...chat,
+        messages: chat.messages.map((msg) =>
           msg.id === payload.id ? { ...msg, content: payload.content } : msg,
         ),
-      };
+      }));
     },
     messageAppended: (state, payload: { id: string; content: string }) => {
-      return {
-        ...state,
-        messages: state.messages.map((msg) =>
+      return updateCurrentChat(state, (chat) => ({
+        ...chat,
+        messages: chat.messages.map((msg) =>
           msg.id === payload.id
             ? { ...msg, content: msg.content + payload.content }
             : msg,
         ),
-      };
+      }));
     },
     messageRemoved: (state, id: string) => {
-      return {
-        ...state,
-        messages: state.messages.filter((msg) => msg.id !== id),
-      };
+      return updateCurrentChat(state, (chat) => ({
+        ...chat,
+        messages: chat.messages.filter((msg) => msg.id !== id),
+      }));
     },
     pruneHistory: (state, id: string) => {
-      const index = state.messages.findIndex((msg) => msg.id === id);
-      if (index === -1) return state;
+      return updateCurrentChat(state, (chat) => {
+        const index = chat.messages.findIndex((msg) => msg.id === id);
+        if (index === -1) return chat;
 
-      const targetMessage = state.messages[index];
-      let newMessages;
+        const targetMessage = chat.messages[index];
+        let newMessages;
 
-      if (targetMessage.role === "user") {
-        // Keep up to and including the user message
-        newMessages = state.messages.slice(0, index + 1);
-      } else {
-        // Assistant message: Remove it and everything after, keeping up to the previous message
-        newMessages = state.messages.slice(0, index);
-      }
+        if (targetMessage.role === "user") {
+          newMessages = chat.messages.slice(0, index + 1);
+        } else {
+          newMessages = chat.messages.slice(0, index);
+        }
 
-      return {
-        ...state,
-        messages: newMessages,
-      };
+        return { ...chat, messages: newMessages };
+      });
     },
     messagesCleared: (state) => {
-      return {
-        ...state,
+      return updateCurrentChat(state, (chat) => ({
+        ...chat,
         messages: [],
-      };
+      }));
     },
     editingMessageIdSet: (state, id: string | null) => {
       return {
         ...state,
         editingMessageId: id,
+      };
+    },
+    chatCreated: (state) => {
+      // Don't create a new chat if the current one is empty
+      if (currentMessages(state).length === 0) return state;
+
+      const newChat = makeChat(state.chats.length + 1);
+      return {
+        ...state,
+        chats: [...state.chats, newChat],
+        currentChatIndex: state.chats.length,
+        editingMessageId: null,
+      };
+    },
+    chatSwitched: (state, index: number) => {
+      if (index < 0 || index >= state.chats.length) return state;
+      return {
+        ...state,
+        currentChatIndex: index,
+        editingMessageId: null,
+      };
+    },
+    chatDeleted: (state, index: number) => {
+      if (state.chats.length <= 1) return state;
+      if (index < 0 || index >= state.chats.length) return state;
+
+      const chats = state.chats.filter((_, i) => i !== index);
+      let currentChatIndex = state.currentChatIndex;
+
+      if (index < currentChatIndex) {
+        currentChatIndex--;
+      } else if (index === currentChatIndex) {
+        currentChatIndex = Math.min(currentChatIndex, chats.length - 1);
+      }
+
+      return {
+        ...state,
+        chats,
+        currentChatIndex,
+        editingMessageId: null,
       };
     },
   },
@@ -83,4 +150,7 @@ export const {
   pruneHistory,
   messagesCleared,
   editingMessageIdSet,
+  chatCreated,
+  chatSwitched,
+  chatDeleted,
 } = brainstormSlice.actions;

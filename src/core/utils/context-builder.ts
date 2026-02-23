@@ -21,6 +21,7 @@ import {
   BrainstormMessage,
   GenerationStrategy,
 } from "../store/types";
+import { currentMessages } from "../store/slices/brainstorm";
 import { MessageFactory } from "nai-gen-x";
 import {
   FieldID,
@@ -34,7 +35,7 @@ const getFieldContent = (state: RootState, id: string): string => {
 };
 
 const getBrainstormHistory = (state: RootState): BrainstormMessage[] => {
-  return state.brainstorm.messages || [];
+  return currentMessages(state.brainstorm) || [];
 };
 
 /**

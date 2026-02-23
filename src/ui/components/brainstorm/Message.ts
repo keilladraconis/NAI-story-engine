@@ -9,6 +9,7 @@ import {
   uiBrainstormMessageEditEnd,
   uiBrainstormRetryGeneration,
 } from "../../../core/store";
+import { currentMessages } from "../../../core/store/slices/brainstorm";
 import { IDS } from "../../framework/ids";
 import { calculateTextAreaHeight } from "../../utils";
 
@@ -90,7 +91,7 @@ export const Message = defineComponent({
     // Bind: Content Updates (Streaming)
     useSelector(
       (state) =>
-        state.brainstorm.messages.find((m) => m.id === props.message.id)
+        currentMessages(state.brainstorm).find((m) => m.id === props.message.id)
           ?.content,
       (content) => {
         if (content !== undefined) {

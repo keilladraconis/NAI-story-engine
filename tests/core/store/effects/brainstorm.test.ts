@@ -6,6 +6,7 @@ import {
   uiBrainstormMessageEditEnd,
   uiBrainstormRetryGeneration,
 } from "../../../../src/core/store";
+import { currentMessages } from "../../../../src/core/store/slices/brainstorm";
 import { registerEffects } from "../../../../src/core/store/effects";
 import { IDS } from "../../../../src/ui/framework/ids";
 import { GenX } from "nai-gen-x";
@@ -68,9 +69,9 @@ describe("Brainstorm Effects", () => {
     await wait();
 
     // Verify A saved
-    const updatedA = store
-      .getState()
-      .brainstorm.messages.find((m) => m.id === msgA.id);
+    const updatedA = currentMessages(store.getState().brainstorm).find(
+      (m) => m.id === msgA.id,
+    );
     expect(updatedA?.content).toBe("Content A Modified");
 
     // Verify storage seeded for B
@@ -92,9 +93,9 @@ describe("Brainstorm Effects", () => {
     await wait();
 
     // Verify B saved
-    const updatedB = store
-      .getState()
-      .brainstorm.messages.find((m) => m.id === msgB.id);
+    const updatedB = currentMessages(store.getState().brainstorm).find(
+      (m) => m.id === msgB.id,
+    );
     expect(updatedB?.content).toBe("Content B Modified");
 
     // Verify editing ID cleared
@@ -129,7 +130,7 @@ describe("Brainstorm Effects", () => {
     await wait();
 
     // Verify history pruned (msg4 removed, msg3 kept)
-    const messages = store.getState().brainstorm.messages;
+    const messages = currentMessages(store.getState().brainstorm);
     expect(messages.length).toBe(4); // User 1, Asst 1, User 2, NEW Asst
     expect(messages[2].id).toBe(msg3.id);
     expect(messages[3].id).not.toBe(msg4.id); // New ID

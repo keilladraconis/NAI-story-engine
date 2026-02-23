@@ -4,7 +4,7 @@ import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
 import { storySlice, initialStoryState } from "./slices/story";
 import { crucibleSlice, migrateCrucibleState } from "./slices/crucible";
-import { RootState, StoryState, BrainstormMessage, CrucibleState } from "./types";
+import { RootState, StoryState, BrainstormChat, CrucibleState } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Persisted data loaded action
@@ -12,7 +12,7 @@ import { RootState, StoryState, BrainstormMessage, CrucibleState } from "./types
 
 interface PersistedData {
   story?: StoryState;
-  brainstorm?: { messages: BrainstormMessage[] };
+  brainstorm?: { chats: BrainstormChat[]; currentChatIndex: number };
   crucible?: CrucibleState;
 }
 
@@ -46,8 +46,8 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
       story: data.story
         ? { ...initialStoryState, ...data.story }
         : current.story,
-      brainstorm: data.brainstorm?.messages
-        ? { ...current.brainstorm, messages: data.brainstorm.messages }
+      brainstorm: data.brainstorm?.chats
+        ? { ...current.brainstorm, chats: data.brainstorm.chats, currentChatIndex: data.brainstorm.currentChatIndex }
         : current.brainstorm,
       crucible: data.crucible
         ? migrateCrucibleState(data.crucible)

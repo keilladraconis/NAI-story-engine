@@ -53,8 +53,15 @@ export interface BrainstormMessage {
   content: string;
 }
 
-export interface BrainstormState {
+export interface BrainstormChat {
+  id: string;
+  title: string;
   messages: BrainstormMessage[];
+}
+
+export interface BrainstormState {
+  chats: BrainstormChat[];
+  currentChatIndex: number;
   editingMessageId: string | null;
 }
 

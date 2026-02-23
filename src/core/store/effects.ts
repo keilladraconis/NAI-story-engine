@@ -5,6 +5,7 @@ import {
   GenerationStrategy,
   AppDispatch,
 } from "./types";
+import { currentMessages } from "./slices/brainstorm";
 import { GenX, MessageFactory } from "nai-gen-x";
 import { registerSegaEffects } from "./effects/sega";
 import {
@@ -217,7 +218,7 @@ function resolvePrefill(
   const state = getState();
 
   if (target.type === "brainstorm") {
-    const message = state.brainstorm.messages.find(
+    const message = currentMessages(state.brainstorm).find(
       (m) => m.id === target.messageId,
     );
     return message?.content || "";
@@ -374,7 +375,7 @@ function registerBrainstormEditEffects(
       }
 
       // 2. Prepare the NEW message for editing
-      const newMessage = state.brainstorm.messages.find((m) => m.id === newId);
+      const newMessage = currentMessages(state.brainstorm).find((m) => m.id === newId);
       if (newMessage) {
         // Seed the storage so the input shows the current content
         const newInputId = IDS.BRAINSTORM.message(newId).INPUT;
@@ -458,7 +459,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         dispatch(messageAdded(userMsg));
       }
 
-      const lastMessage = getState().brainstorm.messages.at(-1);
+      const lastMessage = currentMessages(getState().brainstorm).at(-1);
       if (lastMessage?.role == "user") {
         // User sent a message
         // Add Assistant Placeholder
@@ -506,8 +507,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       // 2. If we retried an Assistant message, we pruned it. We need a new Assistant response.
 
       const state = getState(); // Get updated state
-      const lastMessage =
-        state.brainstorm.messages[state.brainstorm.messages.length - 1];
+      const lastMessage = currentMessages(state.brainstorm).at(-1);
 
       let assistantId: string;
 
