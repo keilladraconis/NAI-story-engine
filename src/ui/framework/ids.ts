@@ -47,6 +47,9 @@ export const IDS = {
     TITLE: "se-bs-title",
     NEW_BTN: "se-bs-new-btn",
     SESSIONS_BTN: "se-bs-sessions-btn",
+    MODE_COWRITER_BTN: "se-bs-mode-cowriter",
+    MODE_CRITIC_BTN: "se-bs-mode-critic",
+    SUMMARIZE_BTN: "se-bs-summarize",
     sessionRow: (index: number) => `se-bs-session-${index}`,
 
     message: (id: string) => ({

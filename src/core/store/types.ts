@@ -47,6 +47,8 @@ export interface StoryState {
   styleEnabled: boolean;
 }
 
+export type BrainstormMode = "cowriter" | "critic";
+
 export interface BrainstormMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -57,6 +59,7 @@ export interface BrainstormChat {
   id: string;
   title: string;
   messages: BrainstormMessage[];
+  mode: BrainstormMode;
 }
 
 export interface BrainstormState {

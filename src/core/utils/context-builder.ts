@@ -19,6 +19,7 @@
 import {
   RootState,
   BrainstormMessage,
+  BrainstormMode,
   GenerationStrategy,
 } from "../store/types";
 import { currentMessages } from "../store/slices/brainstorm";
@@ -445,9 +446,11 @@ export const buildCruciblePrefix = async (
 /**
  * Creates a message factory for brainstorm generation.
  * The factory defers data fetching until execution time.
+ * Mode selects the persona prompt: cowriter (default) or critic.
  */
 export const createBrainstormFactory = (
   getState: () => RootState,
+  mode?: BrainstormMode,
 ): MessageFactory => {
   return async () => {
     const state = getState();
@@ -455,8 +458,9 @@ export const createBrainstormFactory = (
     const systemPrompt = String(
       (await api.v1.config.get("system_prompt")) || "",
     );
+    const promptKey = mode === "critic" ? "brainstorm_critic_prompt" : "brainstorm_prompt";
     const brainstormInstruction = String(
-      (await api.v1.config.get("brainstorm_prompt")) || "",
+      (await api.v1.config.get(promptKey)) || "",
     );
 
     const systemMsg: Message = {
@@ -521,10 +525,88 @@ export const createBrainstormFactory = (
 export const buildBrainstormStrategy = (
   getState: () => RootState,
   messageId: string,
+  mode?: BrainstormMode,
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createBrainstormFactory(getState),
+    messageFactory: createBrainstormFactory(getState, mode),
+    target: {
+      type: "brainstorm",
+      messageId,
+    },
+    prefillBehavior: "keep",
+  };
+};
+
+/**
+ * Creates a message factory for summarize generation.
+ * Captures chat history at creation time (before messages are cleared).
+ */
+export const createSummarizeFactory = (
+  getState: () => RootState,
+  chatHistory: BrainstormMessage[],
+): MessageFactory => {
+  return async () => {
+    const model = "glm-4-6";
+    const systemPrompt = String(
+      (await api.v1.config.get("system_prompt")) || "",
+    );
+    const summarizeInstruction = String(
+      (await api.v1.config.get("brainstorm_summarize_prompt")) || "",
+    );
+
+    const systemMsg: Message = {
+      role: "system",
+      content: `${systemPrompt}\n\n${summarizeInstruction}`,
+    };
+
+    const messages: Message[] = [systemMsg];
+
+    // Include story context
+    const storyContext = await getStoryContextMessages();
+    messages.push(...storyContext);
+
+    const state = getState();
+    const canon = getFieldContent(state, FieldID.Canon);
+    const setting = String(
+      (await api.v1.storyStorage.get("kse-setting")) || "",
+    );
+
+    let contextBlock = "";
+    if (canon) contextBlock += `CANON:\n${canon}\n\n`;
+    if (setting) contextBlock += `SETTING:\n${setting}\n\n`;
+    if (contextBlock) {
+      messages.push({ role: "user", content: contextBlock.trim() });
+      messages.push({ role: "assistant", content: "Understood." });
+    }
+
+    // Replay the captured chat history
+    const chatText = chatHistory
+      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+      .join("\n");
+    messages.push({
+      role: "user",
+      content: `Here is the brainstorm conversation to summarize:\n\n${chatText}\n\nProvide a faithful synopsis.`,
+    });
+
+    return {
+      messages,
+      params: { model, max_tokens: 600, temperature: 0.7, min_p: 0.05 },
+    };
+  };
+};
+
+/**
+ * Builds a summarize generation strategy.
+ */
+export const buildSummarizeStrategy = (
+  getState: () => RootState,
+  messageId: string,
+  chatHistory: BrainstormMessage[],
+): GenerationStrategy => {
+  return {
+    requestId: api.v1.uuid(),
+    messageFactory: createSummarizeFactory(getState, chatHistory),
     target: {
       type: "brainstorm",
       messageId,

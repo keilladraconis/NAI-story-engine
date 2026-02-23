@@ -38,6 +38,7 @@ export const uiSlice = createSlice({
     uiBrainstormMessageEditEnd: (state) => state,
     uiBrainstormRetryGeneration: (state, _payload: { messageId: string }) =>
       state,
+    uiBrainstormSummarize: (state) => state,
     // Internal: Submit generation to GenX (not a user intent)
     generationSubmitted: (state, _strategy: any) => state,
     uiCancelRequest: (state, _payload: { requestId: string }) => state,
@@ -94,6 +95,7 @@ export const {
   uiBrainstormMessageEditBegin,
   uiBrainstormMessageEditEnd,
   uiBrainstormRetryGeneration,
+  uiBrainstormSummarize,
   generationSubmitted,
   uiCancelRequest,
   uiEditableActivate,

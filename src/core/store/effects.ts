@@ -5,7 +5,7 @@ import {
   GenerationStrategy,
   AppDispatch,
 } from "./types";
-import { currentMessages } from "./slices/brainstorm";
+import { currentChat, currentMessages } from "./slices/brainstorm";
 import { GenX, MessageFactory } from "nai-gen-x";
 import { registerSegaEffects } from "./effects/sega";
 import {
@@ -22,7 +22,9 @@ import {
   uiBrainstormMessageEditEnd,
   editingMessageIdSet,
   uiBrainstormRetryGeneration,
+  uiBrainstormSummarize,
   pruneHistory,
+  messagesCleared,
   uiGenerationRequested,
   dulfsItemRemoved,
   dulfsItemAdded,
@@ -60,6 +62,7 @@ import {
 } from "../utils/lorebook-strategy";
 import {
   buildBrainstormStrategy,
+  buildSummarizeStrategy,
   buildBootstrapStrategy,
   buildCanonStrategy,
   buildDulfsListStrategy,
@@ -489,7 +492,8 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       }
 
       // Request Generation - use factory pattern for JIT message building
-      const strategy = buildBrainstormStrategy(getState, assistantId);
+      const mode = currentChat(getState().brainstorm).mode || "cowriter";
+      const strategy = buildBrainstormStrategy(getState, assistantId, mode);
       dispatch(
         requestQueued({
           id: strategy.requestId,
@@ -543,7 +547,44 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       }
 
       // Request Generation - use factory pattern for JIT message building
-      const strategy = buildBrainstormStrategy(getState, assistantId);
+      const mode = currentChat(getState().brainstorm).mode || "cowriter";
+      const strategy = buildBrainstormStrategy(getState, assistantId, mode);
+      dispatch(
+        requestQueued({
+          id: strategy.requestId,
+          type: "brainstorm",
+          targetId: assistantId,
+        }),
+      );
+      dispatch(generationSubmitted(strategy));
+    },
+  );
+
+  // Intent: Brainstorm Summarize
+  subscribeEffect(
+    matchesAction(uiBrainstormSummarize),
+    async (_action, { dispatch, getState }) => {
+      const messages = currentMessages(getState().brainstorm);
+      if (messages.length === 0) {
+        api.v1.ui.toast("Nothing to summarize", { type: "info" });
+        return;
+      }
+
+      // Capture history before clearing
+      const chatHistory = [...messages];
+
+      // Clear chat and add assistant placeholder
+      dispatch(messagesCleared());
+      const assistantId = api.v1.uuid();
+      dispatch(
+        messageAdded({
+          id: assistantId,
+          role: "assistant",
+          content: "",
+        }),
+      );
+
+      const strategy = buildSummarizeStrategy(getState, assistantId, chatHistory);
       dispatch(
         requestQueued({
           id: strategy.requestId,

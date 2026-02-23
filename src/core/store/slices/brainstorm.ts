@@ -1,11 +1,12 @@
 import { createSlice } from "nai-store";
-import { BrainstormState, BrainstormMessage, BrainstormChat } from "../types";
+import { BrainstormState, BrainstormMessage, BrainstormChat, BrainstormMode } from "../types";
 
 function makeChat(index: number): BrainstormChat {
   return {
     id: api.v1.uuid(),
     title: `Brainstorm ${index}`,
     messages: [],
+    mode: "cowriter",
   };
 }
 
@@ -93,6 +94,12 @@ export const brainstormSlice = createSlice({
         messages: [],
       }));
     },
+    modeChanged: (state, mode: BrainstormMode) => {
+      return updateCurrentChat(state, (chat) => ({
+        ...chat,
+        mode,
+      }));
+    },
     editingMessageIdSet: (state, id: string | null) => {
       return {
         ...state,
@@ -158,6 +165,7 @@ export const {
   messageRemoved,
   pruneHistory,
   messagesCleared,
+  modeChanged,
   editingMessageIdSet,
   chatCreated,
   chatRenamed,
