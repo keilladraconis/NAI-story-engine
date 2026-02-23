@@ -57,11 +57,6 @@ function parseElementText(raw: string): { name: string; content: string } {
   };
 }
 
-/** Storage key for an element's editable text. */
-function elementStorageKey(elementId: string): string {
-  return `cr-element-${elementId}`;
-}
-
 export const BuilderView = defineComponent<undefined, RootState>({
   id: () => CR.BUILDER_ROOT,
 
@@ -130,11 +125,12 @@ export const BuilderView = defineComponent<undefined, RootState>({
      *  Caller must seed storyStorage BEFORE calling this. */
     const ensureElementCard = (el: CrucibleWorldElement): UIPart => {
       if (!elementCardCache.has(el.id)) {
-        const storageKey = elementStorageKey(el.id);
-
         const { part: editable } = ctx.render(EditableText, {
           id: `cr-element-${el.id}-text`,
-          storageKey,
+          getContent: () => {
+            const current = ctx.getState().crucible.builder.elements.find((e) => e.id === el.id);
+            return current ? formatElementText(current) : formatElementText(el);
+          },
           placeholder: "Name: description...",
           initialDisplay: formatElementText(el),
           onSave: (raw: string) => {
@@ -153,7 +149,6 @@ export const BuilderView = defineComponent<undefined, RootState>({
               style: this.style?.("deleteBtn"),
               callback: () => {
                 dispatch(builderElementRemoved({ id: el.id }));
-                api.v1.storyStorage.set(storageKey, "");
               },
             }),
           ],
@@ -207,11 +202,6 @@ export const BuilderView = defineComponent<undefined, RootState>({
           return;
         }
 
-        // Seed storyStorage for all elements BEFORE building sections
-        for (const el of elements) {
-          api.v1.storyStorage.set(elementStorageKey(el.id), formatElementText(el));
-        }
-
         // Build section tree (ensureElementCard mounts new EditableTexts once, reuses after)
         const sectionParts = buildSections(elements);
 
@@ -234,9 +224,6 @@ export const BuilderView = defineComponent<undefined, RootState>({
     // Build initial state from persisted data (useSelector won't fire on mount)
     const initialElements = ctx.getState().crucible.builder.elements;
     if (initialElements.length > 0) {
-      for (const el of initialElements) {
-        api.v1.storyStorage.set(elementStorageKey(el.id), formatElementText(el));
-      }
       const initialSections = buildSections(initialElements);
       return column({
         id: CR.BUILDER_ROOT,

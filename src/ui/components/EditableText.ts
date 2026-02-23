@@ -1,25 +1,31 @@
 /**
- * EditableText — Reusable view/edit toggle component.
+ * EditableText — Reusable view/edit toggle component (singleton pattern).
  *
- * Shows markdown text in view mode, multiline input in edit mode.
- * Uses uiFieldEditBegin/uiFieldEditEnd actions and editModes state.
+ * All instances share a single draft storageKey. At most one editor is
+ * active at a time; activating a new one auto-saves the previous.
  *
- * Parent sets content via: updateParts([{ id: `${id}-view`, text }])
- * and seeds storyStorage key before showing.
+ * Parent provides content via `getContent` (called on edit begin).
+ * Parent persists via `onSave` (called on save/auto-save).
  */
 
 import { defineComponent } from "nai-act";
 import { RootState } from "../../core/store/types";
 import {
-  uiFieldEditBegin,
-  uiFieldEditEnd,
+  uiEditableActivate,
+  uiEditableDeactivate,
 } from "../../core/store/slices/ui";
+import { EDITABLE_DRAFT_RAW, EDITABLE_DRAFT_KEY } from "../framework/ids";
+import {
+  flushActiveEditor,
+  registerActiveEditor,
+  clearActiveEditor,
+} from "../framework/editable-draft";
 
 const { text, row, column, button, multilineTextInput } = api.v1.ui.part;
 
 export interface EditableTextProps {
   id: string;
-  storageKey: string;
+  getContent: () => string | Promise<string>;
   placeholder?: string;
   /** Called after save with the new content string. */
   onSave?: (content: string) => void;
@@ -82,7 +88,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
 
   build(props, ctx) {
     const { dispatch, useSelector } = ctx;
-    const { id, storageKey, placeholder, onSave, extraControls, label, initialDisplay, formatDisplay } = props;
+    const { id, getContent, placeholder, onSave, extraControls, label, initialDisplay, formatDisplay } = props;
 
     const viewId = `${id}-view`;
     const editId = `${id}-edit`;
@@ -97,35 +103,36 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
       return `${Math.min(lines * 18, 400)}px`;
     };
 
-    // Begin edit: dispatch immediately, then async height estimation
-    const beginEdit = async (): Promise<void> => {
-      dispatch(uiFieldEditBegin({ id }));
-      const currentText = String(
-        (await api.v1.storyStorage.get(storageKey)) || "",
-      );
-      await api.v1.storyStorage.set(storageKey, currentText);
-      const height = estimateHeight(currentText);
-      api.v1.ui.updateParts([
-        { id: editId, style: { ...this.style?.("edit"), "min-height": height } },
-      ]);
-    };
-
-    // Save: read storyStorage, update view
-    const save = async (): Promise<void> => {
+    // Save implementation — reads from shared draft, updates view, calls onSave
+    const saveImpl = async (): Promise<void> => {
       const content = String(
-        (await api.v1.storyStorage.get(storageKey)) || "",
+        (await api.v1.storyStorage.get(EDITABLE_DRAFT_RAW)) || "",
       );
       const displayText = formatDisplay ? formatDisplay(content) : content;
       api.v1.ui.updateParts([
         { id: viewId, text: displayText.replace(/\n/g, "  \n").replace(/</g, "\\<") || "_No content._" },
       ]);
-      dispatch(uiFieldEditEnd({ id }));
+      clearActiveEditor();
+      dispatch(uiEditableDeactivate());
       if (onSave) onSave(content);
     };
 
-    // React to edit mode changes
+    // Begin edit: flush previous editor, load content, activate
+    const beginEdit = async (): Promise<void> => {
+      await flushActiveEditor();
+      const content = String((await getContent()) || "");
+      await api.v1.storyStorage.set(EDITABLE_DRAFT_RAW, content);
+      registerActiveEditor(saveImpl);
+      dispatch(uiEditableActivate({ id }));
+      const height = estimateHeight(content);
+      api.v1.ui.updateParts([
+        { id: editId, style: { ...this.style?.("edit"), "min-height": height } },
+      ]);
+    };
+
+    // React to active edit changes
     useSelector(
-      (s) => s.ui.editModes[id],
+      (s) => s.ui.activeEditId === id,
       (isEditing) => {
         api.v1.ui.updateParts([
           { id: viewId, style: isEditing ? this.style?.("viewHidden") : this.style?.("view") },
@@ -157,7 +164,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
         text: "",
         iconId: "save",
         style: this.style?.("btnHidden"),
-        callback: save,
+        callback: saveImpl,
       }),
     );
 
@@ -183,7 +190,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
           id: editId,
           initialValue: "",
           placeholder: placeholder || "Edit...",
-          storageKey: `story:${storageKey}`,
+          storageKey: EDITABLE_DRAFT_KEY,
           style: this.style?.("editHidden"),
         }),
       ],

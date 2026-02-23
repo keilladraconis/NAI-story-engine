@@ -87,7 +87,10 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
 
     const { part: editable } = ctx.render(EditableText, {
       id: ids.TEXT,
-      storageKey: `cr-goal-${goalId}`,
+      getContent: () => {
+        const g = ctx.getState().crucible.goals.find((g) => g.id === goalId);
+        return g?.text ?? "";
+      },
       placeholder: "[GOAL] ...\n[OPEN] ...\n[OPEN] ...",
       onSave: (content: string) =>
         dispatch(goalTextUpdated({ goalId, text: content })),

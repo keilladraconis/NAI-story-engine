@@ -7,7 +7,7 @@ const initialLorebookState: LorebookUIState = {
 };
 
 export const initialUIState: UIState = {
-  editModes: {},
+  activeEditId: null,
   inputs: {},
   brainstorm: {
     input: "",
@@ -41,20 +41,14 @@ export const uiSlice = createSlice({
     // Internal: Submit generation to GenX (not a user intent)
     generationSubmitted: (state, _strategy: any) => state,
     uiCancelRequest: (state, _payload: { requestId: string }) => state,
-    // Field editing (state change + side effects in component useEffect)
-    uiFieldEditBegin: (state, payload: { id: string }) => ({
+    // Editable singleton — at most one editor active at a time
+    uiEditableActivate: (state, payload: { id: string }) => ({
       ...state,
-      editModes: {
-        ...state.editModes,
-        [payload.id]: true,
-      },
+      activeEditId: payload.id,
     }),
-    uiFieldEditEnd: (state, payload: { id: string }) => ({
+    uiEditableDeactivate: (state) => ({
       ...state,
-      editModes: {
-        ...state.editModes,
-        [payload.id]: false,
-      },
+      activeEditId: null,
     }),
     // Lorebook user intents (handled by effects)
     uiLorebookEntrySelected: (
@@ -102,8 +96,8 @@ export const {
   uiBrainstormRetryGeneration,
   generationSubmitted,
   uiCancelRequest,
-  uiFieldEditBegin,
-  uiFieldEditEnd,
+  uiEditableActivate,
+  uiEditableDeactivate,
   uiLorebookEntrySelected,
   uiLorebookContentGenerationRequested,
   uiLorebookKeysGenerationRequested,

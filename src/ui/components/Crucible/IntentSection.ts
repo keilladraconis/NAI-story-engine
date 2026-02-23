@@ -1,6 +1,6 @@
 import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
-import { crucibleDirectionRequested } from "../../../core/store/slices/crucible";
+import { crucibleDirectionRequested, crucibleDirectionEdited } from "../../../core/store/slices/crucible";
 import { IDS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
 import { EditableText } from "../EditableText";
@@ -19,7 +19,7 @@ export const IntentSection = defineComponent<undefined, RootState>({
   id: () => CR.DIRECTION_SECTION,
 
   build(_props, ctx) {
-    const { useSelector } = ctx;
+    const { useSelector, dispatch } = ctx;
     const state = ctx.getState();
 
     // Start expanded when there's no content yet, collapsed otherwise
@@ -48,18 +48,18 @@ export const IntentSection = defineComponent<undefined, RootState>({
 
     const { part: directionEditablePart } = ctx.render(EditableText, {
       id: CR.DIRECTION_TEXT,
-      storageKey: "cr-direction",
+      getContent: () => ctx.getState().crucible.direction ?? "",
       placeholder: "The story explores... [TAGS] tag1, tag2, tag3",
       label: "",
       extraControls: [directionBtnPart],
       initialDisplay: state.crucible.direction ? formatForDisplay(state.crucible.direction) : undefined,
+      onSave: (content: string) => dispatch(crucibleDirectionEdited({ text: content })),
     });
 
-    // Direction display — seed storyStorage for EditableText
+    // Direction display — update view text when state changes (e.g. from generation)
     useSelector(
       (s) => s.crucible.direction,
       (direction) => {
-        api.v1.storyStorage.set("cr-direction", direction ?? "");
         api.v1.ui.updateParts([
           { id: `${CR.DIRECTION_TEXT}-view`, text: direction ? formatForDisplay(direction) : "" },
         ]);

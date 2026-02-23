@@ -71,7 +71,7 @@ export interface LorebookUIState {
 }
 
 export interface UIState {
-  editModes: Record<string, boolean>;
+  activeEditId: string | null;
   inputs: Record<string, string>;
   brainstorm: {
     input: string;

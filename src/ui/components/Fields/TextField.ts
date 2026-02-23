@@ -8,8 +8,8 @@ import {
   styleToggled,
 } from "../../../core/store/slices/story";
 import {
-  uiFieldEditBegin,
-  uiFieldEditEnd,
+  uiEditableActivate,
+  uiEditableDeactivate,
 } from "../../../core/store/slices/ui";
 import { uiGenerationRequested } from "../../../core/store/slices/runtime";
 import { GenerationButton } from "../GenerationButton";
@@ -19,6 +19,12 @@ import {
   STATUS_QUEUED,
   STATUS_COMPLETE,
 } from "../../colors";
+import { EDITABLE_DRAFT_RAW, EDITABLE_DRAFT_KEY } from "../../framework/ids";
+import {
+  flushActiveEditor,
+  registerActiveEditor,
+  clearActiveEditor,
+} from "../../framework/editable-draft";
 
 export type TextFieldProps = FieldConfig;
 
@@ -281,16 +287,30 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
       });
     }
 
-    // Standard fields with edit/save modality
+    // Standard fields with edit/save modality (singleton pattern)
     const toggleEditId = `btn-edit-${config.id}`;
     const toggleSaveId = `btn-save-${config.id}`;
     const inputId = `input-${config.id}`;
     const textId = `text-display-${config.id}`;
-    const storageKey = `draft-${config.id}`;
     const isCanonField = config.id === FieldID.Canon;
 
-    const beginEdit = () => dispatch(uiFieldEditBegin({ id: config.id }));
-    const save = () => dispatch(uiFieldEditEnd({ id: config.id }));
+    // Save implementation — reads shared draft, dispatches field update
+    const saveImpl = async () => {
+      const content = String(await api.v1.storyStorage.get(EDITABLE_DRAFT_RAW) || "");
+      clearActiveEditor();
+      dispatch(uiEditableDeactivate());
+      dispatch(fieldUpdated({ fieldId: config.id, content }));
+    };
+
+    const beginEdit = async () => {
+      await flushActiveEditor();
+      const content = getState().story.fields[config.id]?.content || "";
+      await api.v1.storyStorage.set(EDITABLE_DRAFT_RAW, content);
+      registerActiveEditor(saveImpl);
+      dispatch(uiEditableActivate({ id: config.id }));
+    };
+
+    const save = () => { saveImpl(); };
 
     // Build gen button content (and bootstrap for Canon)
     const genBtnContent: UIPart[] = [genBtnPart];
@@ -312,29 +332,9 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
       genBtnContent.push(bootstrapPart);
     }
 
-    // Effect: Handle edit begin - push current content to storage
-    useEffect(
-      matchesAction(uiFieldEditBegin, (p) => p.id === config.id),
-      async (_action, { getState }) => {
-        const content = getState().story.fields[config.id]?.content || "";
-        await api.v1.storyStorage.set(storageKey, content);
-      },
-    );
-
-    // Effect: Handle edit end - read from storage and update state
-    useEffect(
-      matchesAction(uiFieldEditEnd, (p) => p.id === config.id),
-      async (_action, { dispatch }) => {
-        const content = (await api.v1.storyStorage.get(storageKey)) || "";
-        dispatch(
-          fieldUpdated({ fieldId: config.id, content: String(content) }),
-        );
-      },
-    );
-
     // React to Edit Mode
     useSelector(
-      (state) => state.ui.editModes[config.id],
+      (state) => state.ui.activeEditId === config.id,
       (isEditing) => {
         api.v1.ui.updateParts([
           {
@@ -421,7 +421,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
         id: inputId,
         placeholder: config.placeholder,
         initialValue: "",
-        storageKey: `story:draft-${config.id}`,
+        storageKey: EDITABLE_DRAFT_KEY,
         style: this.style?.("textArea", "hidden"),
       }),
       text({

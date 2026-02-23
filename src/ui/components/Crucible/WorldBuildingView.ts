@@ -21,9 +21,6 @@ import {
 const { text, column, row, button, textInput } = api.v1.ui.part;
 const CR = IDS.CRUCIBLE;
 
-/** Storage key for Director guidance editable text. */
-const DIRECTOR_STORAGE_KEY = "cr-director-text";
-
 /** Format Director guidance for display/editing. */
 function formatDirectorDisplay(guidance: DirectorGuidance | null): string {
   if (!guidance) return "";
@@ -160,13 +157,11 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
 
     // --- Director guidance section ---
 
-    // Seed storyStorage for Director editable text
     const directorText = formatDirectorDisplay(directorGuidance);
-    api.v1.storyStorage.set(DIRECTOR_STORAGE_KEY, directorText);
 
     const { part: directorEditable } = ctx.render(EditableText, {
       id: CR.DIRECTOR_TEXT,
-      storageKey: DIRECTOR_STORAGE_KEY,
+      getContent: () => formatDirectorDisplay(ctx.getState().crucible.directorGuidance),
       placeholder: "Director guidance will appear here after a few scenes...",
       initialDisplay: directorText
         ? directorText.replace(/\n/g, "  \n").replace(/</g, "\\<")
@@ -392,8 +387,6 @@ export const WorldBuildingView = defineComponent<undefined, RootState>({
       (s) => s.crucible.directorGuidance,
       (guidance) => {
         const dirText = formatDirectorDisplay(guidance);
-        api.v1.storyStorage.set(DIRECTOR_STORAGE_KEY, dirText);
-
         const display = dirText
           ? dirText.replace(/\n/g, "  \n").replace(/</g, "\\<")
           : "_No guidance yet \u2014 the Director runs after 3 scenes._";

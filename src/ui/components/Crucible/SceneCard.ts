@@ -75,7 +75,10 @@ export const SceneCard = defineComponent<SceneCardProps, RootState>({
 
     const { part: editable } = ctx.render(EditableText, {
       id: ids.TEXT,
-      storageKey: `cr-scene-${goalId}-${sceneIndex}`,
+      getContent: () => {
+        const c = ctx.getState().crucible.chains[goalId];
+        return c?.scenes[sceneIndex]?.text ?? "";
+      },
       placeholder,
       label,
       initialDisplay: sceneDisplay,

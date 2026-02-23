@@ -58,6 +58,9 @@ export const crucibleSlice = createSlice({
     directionSet: (state, payload: { direction: string }) => {
       return { ...state, direction: payload.direction };
     },
+    crucibleDirectionEdited: (state, payload: { text: string }) => {
+      return { ...state, direction: payload.text };
+    },
 
     goalTextUpdated: (state, payload: { goalId: string; text: string }) => {
       return {
@@ -612,6 +615,7 @@ export const {
   crucibleMergeRequested,
   crucibleDirectionRequested,
   directionSet,
+  crucibleDirectionEdited,
   goalTextUpdated,
   goalAdded,
   goalRemoved,

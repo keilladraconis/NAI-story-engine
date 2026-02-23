@@ -1,3 +1,7 @@
+// Shared draft key for the singleton editable pattern
+export const EDITABLE_DRAFT_RAW = "kse-editable-draft"; // for storyStorage.get/set
+export const EDITABLE_DRAFT_KEY = "story:kse-editable-draft"; // for multilineTextInput storageKey
+
 export const IDS = {
   CRUCIBLE: {
     WINDOW_ROOT: "cr-root",

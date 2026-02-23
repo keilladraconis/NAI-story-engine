@@ -56,6 +56,9 @@ npm run test       # vitest run
 - Trust `.d.ts` files implicitly — do not wrap API calls in defensive existence checks unless handling a documented optional feature.
 - Use `api.v1.hooks` (not deprecated `api.v1.events`). Use `api.v1.uuid()` for ID generation.
 - No singletons/globals — prefer dependency injection wired in `src/index.ts`.
+- Be bold, don't worry about data migration or supporting legacy patterns as we iterate.
+- Adhere to the KISS Principle.
+- Follow the Boyscout Rule. 
 
 **UI Input Patterns:**
 
