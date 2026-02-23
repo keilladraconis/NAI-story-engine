@@ -11,10 +11,13 @@ import {
 import {
   crucibleDirectionHandler,
   crucibleGoalHandler,
-  crucibleChainHandler,
 } from "./handlers/crucible";
-import { crucibleBuildHandler } from "./handlers/crucible-builder";
-import { crucibleDirectorHandler } from "./handlers/crucible-director";
+import {
+  structuralGoalHandler,
+  prerequisitesHandler,
+  elementsHandler,
+  expansionHandler,
+} from "./handlers/crucible-chain";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -56,17 +59,21 @@ export type CrucibleGoalTarget = Extract<
   GenerationStrategy["target"],
   { type: "crucibleGoal" }
 >;
-export type CrucibleChainTarget = Extract<
+export type CrucibleStructuralGoalTarget = Extract<
   GenerationStrategy["target"],
-  { type: "crucibleChain" }
+  { type: "crucibleStructuralGoal" }
 >;
-export type CrucibleBuildTarget = Extract<
+export type CruciblePrereqsTarget = Extract<
   GenerationStrategy["target"],
-  { type: "crucibleBuild" }
+  { type: "cruciblePrereqs" }
 >;
-export type CrucibleDirectorTarget = Extract<
+export type CrucibleElementsTarget = Extract<
   GenerationStrategy["target"],
-  { type: "crucibleDirector" }
+  { type: "crucibleElements" }
+>;
+export type CrucibleExpansionTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "crucibleExpansion" }
 >;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
@@ -109,9 +116,10 @@ export const GENERATION_HANDLERS: {
   lorebookRefine: GenerationHandlers<LorebookRefineTarget>;
   crucibleDirection: GenerationHandlers<CrucibleDirectionTarget>;
   crucibleGoal: GenerationHandlers<CrucibleGoalTarget>;
-  crucibleChain: GenerationHandlers<CrucibleChainTarget>;
-  crucibleBuild: GenerationHandlers<CrucibleBuildTarget>;
-  crucibleDirector: GenerationHandlers<CrucibleDirectorTarget>;
+  crucibleStructuralGoal: GenerationHandlers<CrucibleStructuralGoalTarget>;
+  cruciblePrereqs: GenerationHandlers<CruciblePrereqsTarget>;
+  crucibleElements: GenerationHandlers<CrucibleElementsTarget>;
+  crucibleExpansion: GenerationHandlers<CrucibleExpansionTarget>;
 } = {
   brainstorm: brainstormHandler,
   bootstrap: bootstrapHandler,
@@ -122,9 +130,10 @@ export const GENERATION_HANDLERS: {
   lorebookRefine: lorebookRefineHandler,
   crucibleDirection: crucibleDirectionHandler,
   crucibleGoal: crucibleGoalHandler,
-  crucibleChain: crucibleChainHandler,
-  crucibleBuild: crucibleBuildHandler,
-  crucibleDirector: crucibleDirectorHandler,
+  crucibleStructuralGoal: structuralGoalHandler,
+  cruciblePrereqs: prerequisitesHandler,
+  crucibleElements: elementsHandler,
+  crucibleExpansion: expansionHandler,
 };
 
 export function getHandler(

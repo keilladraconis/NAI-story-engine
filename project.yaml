@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1771864645
+updatedAt: 1771874937
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -318,8 +318,8 @@ config:
     multiline: true
     default: |-
       Distill everything above into a single dense Direction — the SOLE
-      creative reference for all downstream generation. Goals, scenes,
-      and world elements will be built from this text alone, with no
+      creative reference for all downstream generation. Goals and world
+      elements will be built from this text alone, with no
       access to the brainstorm or story state. It must be self-contained.
 
       Write connected natural prose that weaves together: the characters
@@ -338,164 +338,137 @@ config:
       motifs, or thematic markers.
   - name: crucible_goals_prompt
     prettyName: Crucible Goals Prompt
-    description: Prompt for generating a single story goal with starting constraints
+    description: Prompt for generating a single dramatic endpoint goal
     type: string
     multiline: true
     default: |-
-      Generate ONE goal — a dramatic endpoint the story could arrive at.
-      The goal must be concrete enough to decompose into scenes.
-      GOOD: "The colony ship arrives but the crew discovers it's already inhabited"
-      BAD: "Everything changes" (too vague — no scene anchors on this)
+      Generate ONE goal — a vivid dramatic endpoint the story arrives at.
+      It will be reframed into a structural impossible choice, so lean toward
+      moments where two things the protagonist values become irreconcilable.
 
-      Follow the Direction above. Each goal should approach the core
-      tension from a distinct angle, so multiple goals produce different
-      world elements.
+      GOOD: "The colony ship arrives — but the planet is already inhabited by
+      a civilization no record prepared them for"
+      GOOD: "The siblings reunite at their parent's deathbed — the parent who
+      once chose between them"
+      BAD: "Everything changes" (no dramatic moment, nothing to anchor on)
+      BAD: "The hero wins" (outcome without cost — what must winning destroy?)
 
-      Include 2-3 open constraints — things that must be true for this
-      goal to happen but aren't established yet. One per line.
-      The LAST constraint should represent the story's TRUE ORIGIN —
-      the most foundational circumstance, as far as possible from the
-      climax. Think: where and who the protagonist was BEFORE any of
-      these events were conceivable. This gives the chain a horizon to
-      work toward.
+      Follow the Direction above. Each goal should approach the core tension
+      from a distinct angle — multiple goals produce different structural
+      choices and different world elements.
 
       Output format:
       [GOAL] The endpoint — 1-2 sentences, concrete and vivid
-      [OPEN] (optional) additional preconditions
-  - name: crucible_chain_prompt
-    prettyName: Crucible Chain Prompt
-    description: Prompt for scene generation (lean solver)
+  - name: crucible_structural_goal_prompt
+    prettyName: Crucible Structural Goal Prompt
+    description: Prompt for reframing a user's dramatic goal as a structural
+      impossible choice
     type: string
     multiline: true
     default: |-
-      You are exploring a world by imagining dramatic moments that reveal
-      something essential about it. The GOAL is the climax — it is already
-      established and is not a scene. Each scene you write explores a
-      dramatic moment EARLIER in the timeline. Scene numbers descend from
-      the climax toward the origin — Scene N is the first precursor to
-      the climax, and Scene 1 is furthest back, near the story's beginning.
+      Reframe the user's dramatic goal as a STRUCTURAL IMPOSSIBLE CHOICE —
+      the class of moment where two things the protagonist values become
+      irreconcilable.
 
-      NARRATIVE DISTANCE: Each scene should represent a MAJOR story
-      milestone — a different chapter of the protagonist's journey, not
-      the next paragraph. Think in terms of weeks, months, or years
-      between scenes, not minutes. If the goal or last scene depicts a
-      battle, don't write the march to battle — write the betrayal that
-      caused the war, or the childhood oath that made the fight personal.
+      NOT: "The hero defeats the villain" (that's a plot point)
+      YES: "A moment where protecting what was built requires becoming
+      what was fought against" (that's a structural endpoint)
 
-      DIRECTOR DEFERENCE: When DIRECTOR GUIDANCE is present, treat it as
-      your primary creative brief for this scene. Execute the Director's
-      vision — it overrides default pacing and constraint priorities.
+      The goal must be:
+      - Specific enough to constrain world-building (not "something bad happens")
+      - Open enough that many story paths can reach it (not "X kills Y at location Z")
+      - Defined by the TENSION between values, not by the outcome
 
-      CONSTRAINT DISCIPLINE:
-      - Open constraints that reach DEEP — different places, different
-        life circumstances, earlier eras. The goal is to span the full
-        arc from climax to origin.
-      - Resolve 1-2 per scene. Prefer resolving constraints that pull
-        the story further from the climax.
-
-      RULES:
-      - [SCENE] is REQUIRED. Constraint tags only when relevant.
-      - ONE constraint per line. Never pack multiple constraints into one tag.
-      - [OPEN] must be NEW preconditions not already in OPEN CONSTRAINTS.
-      - Use [ID:Xn] in [RESOLVED]. For constraints needing no setup, add "ground":
-        [RESOLVED] [ID:X1] ground
-      - Never resolve or reference constraints that don't exist yet.
-
-      Output — one tag per line, [SCENE] required, others as needed:
-      [SCENE] What happens — 1-2 vivid sentences
-      [RESOLVED] [ID:X0] how/why this is now established
-      [RESOLVED] [ID:X1] ground
-      [OPEN] one new precondition (only if essential)
-  - name: crucible_build_prompt
-    prettyName: Crucible Builder Prompt
-    description: Prompt for interleaved builder — reviews scenes, emits world elements
+      Output format — two tags:
+      [GOAL] The structural impossible choice — 1-2 sentences
+      [WHY] Why this framing constrains world-building better than the original
+  - name: crucible_prerequisites_prompt
+    prettyName: Crucible Prerequisites Prompt
+    description: Prompt for deriving load-bearing prerequisites from structural goals
     type: string
     multiline: true
     default: |-
-      Review the new scenes and extract world elements — characters,
-      locations, factions, systems, or situations that are narratively
-      necessary. Existing elements have short IDs like [C0], [L1], [S0].
+      Derive 5-7 LOAD-BEARING PREREQUISITES — things that must exist
+      at story start for the structural goals to land with full force.
 
-      RULES:
-      - NEW element: emit tag + name, then [DESCRIPTION]. No [ID] — system assigns one.
-      - UPDATE element: emit tag + name, then [ID:xx] alone on its own line,
-        then [DESCRIPTION] with revised content. NEVER put text after [ID:xx].
-      - Descriptions: 1-2 sentences of narrative purpose. No lorebook detail.
-      - When done, emit [SOLVER] to resume chaining.
+      NECESSITY TEST: For each prerequisite, ask: "If this were absent,
+      would the goal still land with full emotional/dramatic weight?"
+      If yes → exclude it. Only include what is structurally necessary.
 
-      STRICT FORMAT — each tag on its own line, no text after [ID]:
+      Categories: RELATIONSHIP, SECRET, POWER, HISTORY, OBJECT, BELIEF, PLACE
+
+      Each prerequisite describes WHAT MUST BE TRUE, not who or where.
+      The world elements step will make these concrete.
+
+      Output format — one section per prerequisite, separated by +++:
+      [PREREQ] What must be true — one clear statement
+      [LOADBEARING] Why it's necessary — what breaks if it's absent
+      [CATEGORY] One of: RELATIONSHIP, SECRET, POWER, HISTORY, OBJECT, BELIEF, PLACE
+      +++
+      [PREREQ] Another thing that must be true
+      [LOADBEARING] Why
+      [CATEGORY] Type
+  - name: crucible_elements_prompt
+    prettyName: Crucible Elements Prompt
+    description: Prompt for deriving minimal necessary world elements from prerequisites
+    type: string
+    multiline: true
+    default: |-
+      Derive 3-6 MINIMAL NECESSARY WORLD ELEMENTS from the prerequisites.
+      Each element must satisfy at least one prerequisite.
+
+      ZERO GENERIC DESCRIPTORS: Every trait must change what the element
+      does in a scene. "Brave warrior" is generic. "Former occupation
+      soldier who can't stop protecting people even when they don't want
+      protection" changes scenes.
+
+      For characters: include [WANT] (conscious desire) and [NEED]
+      (unconscious need) that are in TENSION with each other.
+
+      Every element must have at least one [RELATIONSHIP] — a structurally
+      necessary connection to another element in this world.
+
+      Element types: CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION
+
+      Output format — one section per element, separated by +++:
       +++
       [CHARACTER] Name
-      [DESCRIPTION] Role and narrative purpose
+      [DESCRIPTION] Role and narrative function — 2-3 sentences, zero generics
+      [WANT] What they consciously pursue
+      [NEED] What they actually need but don't see
+      [RELATIONSHIP] Key structural connection to another element
+      [SATISFIES] Comma-separated list of prerequisite categories satisfied
       +++
-      [CHARACTER] Revised Name
-      [ID:C0]
-      [DESCRIPTION] Updated role after new beats
-      +++
-      [SOLVER]
-
-      Valid element tags: CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION
-  - name: crucible_director_prompt
-    prettyName: Crucible Director Prompt
-    description: Prompt for the Director — periodic meta-analysis that guides Solver
-      and Builder toward coherent, diverse world construction
+      [LOCATION] Name
+      [DESCRIPTION] What this place enables or prevents narratively
+      [RELATIONSHIP] How it connects to characters or factions
+      [SATISFIES] PLACE, POWER
+  - name: crucible_expansion_prompt
+    prettyName: Crucible Expansion Prompt
+    description: Prompt for expanding a specific world element with new
+      prerequisites and elements
     type: string
     multiline: true
     default: |-
-      You are the Director — the creative intelligence assessing world
-      readiness. You see everything: the dramatic goal, every scene, all
-      constraints, and the world elements built so far.
+      You are expanding a specific world element. Derive 2-3 NEW
+      prerequisites that this element specifically requires — things
+      that must exist for this element to function in the story but
+      are NOT YET present in the existing world.
 
-      Your job is to evaluate the WORLD ELEMENT INVENTORY and steer both
-      Solver and Builder toward a complete, coherent world. Your guidance
-      fires once and is consumed. Be specific. Be bold.
+      Then derive 1-3 NEW world elements to satisfy those prerequisites.
+      Do NOT recreate existing elements — only add what's missing.
 
-      Assess:
-      1. DULFS COVERAGE — Does the inventory span all five categories
-         (Characters, Systems, Locations, Factions, Situations)? Name
-         specific missing types. If a category is empty, call for it.
-      2. ELEMENT DEPTH — Are elements shallow placeholders or rich with
-         tension and narrative hooks? Call for deepening where needed.
-      3. CROSS-GOAL CONNECTIONS — Do elements from different goals relate
-         to each other? Look for shared characters, overlapping factions,
-         connected locations. Direct the Builder to weave connections.
-      4. CONTRADICTIONS — Flag any world elements that contradict each
-         other. Name the conflict and suggest resolution.
-      5. THEMATIC THREADING — Are the Direction's themes reflected in the
-         world elements? If a core theme hasn't materialized as concrete
-         world detail, call for it.
-      6. WORLD READINESS — Given the remaining scene budget, is the world
-         rich enough? If thin, direct the Solver to explore scenes that
-         will produce the missing elements. If sufficient, push toward
-         resolution.
-
-      CORRECTIVE ACTIONS (optional, use when needed):
-      - [REJECT] — The last scene was wrong. It will be rolled back.
-        Your [FOR SOLVER] guidance becomes the creative brief for the
-        retry. Use when a scene adds nothing to the world or fundamentally
-        misses the mark.
-      - [TAINT Scene N] — An earlier scene is suspect but not worth
-        removing. It stays but is flagged. The Solver will see the
-        warning and work around it.
-
-      TEMPORAL AWARENESS: The TEMPORAL POSITION section tells you where
-      the Solver is working in the story's timeline. The chain runs
-      BACKWARD from climax to origin. Your [FOR SOLVER] directive MUST
-      be appropriate to the era the Solver is currently exploring. If
-      the Solver is near the origin, direct toward foundational elements
-      (childhood, formative events, early world state) — NOT climactic
-      confrontations or late-story revelations.
-
-      Output format — three required sections, corrective tags optional:
-
-      [ASSESSMENT] 2-3 sentences on world inventory state and readiness
-      [FOR SOLVER] A specific creative directive for the next scene —
-        what world elements it should reveal, who's involved, what
-        constraints to target. MUST fit the current temporal position.
-      [FOR BUILDER] A specific directive for world elements — what to
-        create, deepen, or connect. Name gaps and describe what fills them.
-      [REJECT] (optional) Cut the last scene — explain why in [FOR SOLVER]
-      [TAINT Scene N] (optional) Flag a specific scene as suspect
+      Output format — prerequisites first, then elements:
+      [PREREQ] What the seed element requires
+      [LOADBEARING] Why it's necessary for this element specifically
+      [CATEGORY] Type
+      +++
+      [CHARACTER] Name
+      [DESCRIPTION] Role
+      [WANT] Desire
+      [NEED] Unconscious need
+      [RELATIONSHIP] Connection
+      [SATISFIES] Categories
   - name: story_engine_debug
     prettyName: Story Engine Debug
     description: Enable debug logging for Story Engine

@@ -107,9 +107,10 @@ export interface GenerationRequest {
   | "bootstrap"
   | "crucibleDirection"
   | "crucibleGoal"
-  | "crucibleChain"
-  | "crucibleBuild"
-  | "crucibleDirector";
+  | "crucibleStructuralGoal"
+  | "cruciblePrereqs"
+  | "crucibleElements"
+  | "crucibleExpansion";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -130,9 +131,10 @@ export interface GenerationStrategy {
   | { type: "bootstrap" }
   | { type: "crucibleDirection" }
   | { type: "crucibleGoal"; goalId: string }
-  | { type: "crucibleChain"; goalId: string }
-  | { type: "crucibleBuild"; goalId: string }
-  | { type: "crucibleDirector" };
+  | { type: "crucibleStructuralGoal"; goalId: string }
+  | { type: "cruciblePrereqs" }
+  | { type: "crucibleElements" }
+  | { type: "crucibleExpansion"; elementId: string };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };
@@ -150,40 +152,29 @@ export interface RuntimeState {
 
 // Crucible Types
 
+export type CruciblePhase = "direction" | "goals" | "building" | "review" | "merged" | "expanding";
+
 export interface CrucibleGoal {
   id: string;
   text: string;
   starred: boolean;
 }
 
-export interface CrucibleScene {
-  text: string;
-  constraintsResolved: string[];
-  newOpenConstraints: string[];
-  groundStateConstraints: string[];
-  tainted?: boolean;
-  favorited?: boolean;
-  isOpener?: boolean;
-}
-
-export type ConstraintStatus = "open" | "resolved" | "groundState";
-
-export interface Constraint {
+export interface StructuralGoal {
   id: string;
-  shortId: string; // Monotonic "X0", "X1", etc. — never renumbered
-  description: string;
-  sourceSceneIndex: number;
-  status: ConstraintStatus;
+  sourceGoalId: string;
+  text: string;
+  why: string;
 }
 
-export interface CrucibleChain {
-  goalId: string;
-  scenes: CrucibleScene[];
-  openConstraints: Constraint[];
-  resolvedConstraints: Constraint[];
-  complete: boolean;
-  nextConstraintIndex: number; // Monotonic counter for shortId assignment
-  sceneBudget: number; // Max scenes per goal (synced from slider before each generation)
+export type PrereqCategory = "RELATIONSHIP" | "SECRET" | "POWER" | "HISTORY" | "OBJECT" | "BELIEF" | "PLACE";
+
+export interface Prerequisite {
+  id: string;
+  element: string;
+  loadBearing: string;
+  category: PrereqCategory;
+  satisfiedBy: string[];
 }
 
 export interface CrucibleWorldElement {
@@ -191,27 +182,21 @@ export interface CrucibleWorldElement {
   fieldId: DulfsFieldID;
   name: string;
   content: string;
-}
-
-export interface CrucibleBuilderState {
-  elements: CrucibleWorldElement[];
-  lastProcessedSceneIndex: number;
-}
-
-export interface DirectorGuidance {
-  solver: string;
-  builder: string;
-  atSceneIndex: number; // Chain scene count when Director last ran
+  want?: string;
+  need?: string;
+  relationship?: string;
+  satisfies: string[];
 }
 
 export interface CrucibleState {
+  phase: CruciblePhase;
   direction: string | null;
   goals: CrucibleGoal[];
-  chains: Record<string, CrucibleChain>;
-  activeGoalId: string | null;
-  autoChaining: boolean;
-  builder: CrucibleBuilderState;
-  directorGuidance: DirectorGuidance | null;
+  structuralGoals: StructuralGoal[];
+  prerequisites: Prerequisite[];
+  elements: CrucibleWorldElement[];
+  expandingElementId: string | null;
+  expansionPrereqs: Prerequisite[];
 }
 
 export interface RootState {

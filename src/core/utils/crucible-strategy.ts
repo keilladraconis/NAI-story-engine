@@ -1,110 +1,16 @@
 /**
- * Crucible Strategy — Factory functions for Crucible lean solver.
+ * Crucible Strategy — Factory functions for direction derivation and goals extraction.
  *
- * Three strategies: direction derivation, goals extraction, per-goal chain.
- * All use tagged plaintext output format for streaming-first design.
+ * The three-step chain strategies (structural goal, prerequisites, elements)
+ * are in crucible-chain-strategy.ts.
  */
 
 import {
   RootState,
   GenerationStrategy,
-  CrucibleChain,
-  CrucibleGoal,
-  DirectorGuidance,
 } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildCruciblePrefix } from "./context-builder";
-import { parseTag } from "./tag-parser";
-
-// --- Scene Budget ---
-
-/** Read scene budget from storyStorage slider. Falls back to 5. */
-export async function getMaxScenes(): Promise<number> {
-  const value = await api.v1.storyStorage.get("cr-scene-budget");
-  return Number(value) || 5;
-}
-
-// --- Scene Numbering ---
-
-/** Convert a zero-based scene index to a timeline-order scene number.
- *  Index 0 (first explored, nearest climax) → highest number.
- *  Index maxScenes-1 (last explored, nearest origin) → 1. */
-export function sceneNumber(sceneIndex: number, maxScenes: number): number {
-  return maxScenes - sceneIndex;
-}
-
-// --- Chain Context Formatter ---
-
-/**
- * Format pacing signal based on scene count, open constraints, and budget.
- * Includes remaining-scene urgency when budget is tight.
- */
-function formatPacingSignal(sceneCount: number, openCount: number, maxScenes: number): string {
-  if (sceneCount >= maxScenes)
-    return "\nPACING: ALL SCENES COMPLETE — write the [OPENER] now.";
-  if (openCount === 0 && sceneCount > 0)
-    return "\nPACING: ALL CONSTRAINTS RESOLVED — open new constraints to fill gaps or resolve remaining as ground state.";
-  if (sceneCount === 0)
-    return "\nPACING: FIRST SCENE — the GOAL above is the climax, already established. Write a dramatic precursor set BEFORE it. Open 1-2 preconditions that are DRAMATICALLY far from the goal — foundational circumstances, not adjacent causes.";
-  const remaining = maxScenes - sceneCount;
-  const nextNum = sceneNumber(sceneCount, maxScenes);
-  if (remaining <= 1)
-    return `\nPACING: FINAL SCENE (Scene ${nextNum}) — resolve remaining constraints.`;
-  if (remaining <= 2)
-    return `\nPACING: Scene ${nextNum} of ${maxScenes}. 2 scenes remaining — focus on resolving constraints. ${openCount} open.`;
-  return `\nPACING: Scene ${nextNum} of ${maxScenes}. You are spanning from climax to origin — each scene should cover roughly equal narrative distance. ${openCount} open constraints.`;
-}
-
-function formatChainContext(chain: CrucibleChain, goal: CrucibleGoal, guidance: DirectorGuidance | null, maxScenes: number): string {
-  const sections: string[] = [];
-
-  // Goal — show [GOAL] text only, strip [OPEN] to avoid duplication
-  // (seed constraints are tracked in OPEN CONSTRAINTS below)
-  const goalText = parseTag(goal.text, "GOAL") || goal.text.split("\n")[0];
-  sections.push(goal.starred ? "ACTIVE GOAL (★ starred):" : "ACTIVE GOAL:");
-  sections.push(goalText);
-
-  // Scenes (timeline order — highest number = nearest climax, lowest = nearest origin)
-  // Constraint state lives in the dedicated OPEN/RESOLVED sections below.
-  // Showing constraint tags inside scenes causes GLM to confuse ID formats.
-  if (chain.scenes.length > 0) {
-    sections.push("\nESTABLISHED SCENES:");
-    for (let i = 0; i < chain.scenes.length; i++) {
-      const scene = parseTag(chain.scenes[i].text, "SCENE") || chain.scenes[i].text.split("\n")[0];
-      const taintedMark = chain.scenes[i].tainted ? " ⚠ TAINTED — needs correction" : "";
-      sections.push(`  Scene ${sceneNumber(i, maxScenes)}: ${scene}${taintedMark}`);
-    }
-  }
-
-  // Open constraints with stable short IDs
-  if (chain.openConstraints.length > 0) {
-    sections.push("\nOPEN CONSTRAINTS (already tracked — do NOT re-emit these in [OPEN]):");
-    for (const c of chain.openConstraints) {
-      const source = c.sourceSceneIndex === 0 && chain.scenes.length === 0 ? "seed" : `Scene ${sceneNumber(c.sourceSceneIndex, maxScenes)}`;
-      sections.push(`  [${c.shortId}] ${c.description} (${source})`);
-    }
-  }
-
-  // Resolved constraints
-  if (chain.resolvedConstraints.length > 0) {
-    sections.push("\nRESOLVED CONSTRAINTS:");
-    for (const c of chain.resolvedConstraints) {
-      const label = c.status === "groundState" ? "ground state" : `Scene ${sceneNumber(c.sourceSceneIndex, maxScenes)}`;
-      sections.push(`  - ${c.description} → ${label}`);
-    }
-  }
-
-  // Pacing signal — dynamic convergence pressure
-  const pacing = formatPacingSignal(chain.scenes.length, chain.openConstraints.length, maxScenes);
-  if (pacing) sections.push(pacing);
-
-  // Director guidance — strategic notes from meta-analysis
-  if (guidance?.solver) {
-    sections.push(`\nDIRECTOR GUIDANCE (act on this NOW — it will not repeat): ${guidance.solver}`);
-  }
-
-  return sections.join("\n");
-}
 
 // --- Factory Functions ---
 
@@ -196,65 +102,6 @@ export const createCrucibleGoalFactory = (
   };
 };
 
-/**
- * Creates a message factory for backward-chaining scene generation.
- * Lean scenes: scene text + constraints.
- */
-export const createCrucibleChainFactory = (
-  getState: () => RootState,
-  goalId: string,
-): MessageFactory => {
-  return async () => {
-    const state = getState();
-    const chain = state.crucible.chains[goalId];
-    const goal = state.crucible.goals.find((g) => g.id === goalId);
-
-    if (!chain || !goal) {
-      throw new Error(`[crucible] Chain or goal not found for ${goalId}`);
-    }
-
-    const chainPrompt = String(
-      (await api.v1.config.get("crucible_chain_prompt")) || "",
-    );
-
-    const maxScenes = await getMaxScenes();
-    const isOpenerMode = chain.scenes.length >= maxScenes;
-    const context = formatChainContext(chain, goal, state.crucible.directorGuidance, maxScenes);
-    const prefix = await buildCruciblePrefix(getState, {
-      includeDirection: true,
-      includeDulfs: true,
-    });
-
-    const userContent = isOpenerMode
-      ? context + "\n\nWrite the [OPENER] — the scene that launches this story."
-      : context + `\n\nWrite Scene ${sceneNumber(chain.scenes.length, maxScenes)}.`;
-
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: chainPrompt,
-      },
-      {
-        role: "user",
-        content: userContent,
-      },
-      { role: "assistant", content: isOpenerMode ? "[OPENER] " : "[SCENE] " },
-    ];
-
-    return {
-      messages,
-      params: {
-        model: "glm-4-6",
-        max_tokens: 1024,
-        temperature: 1.0,
-        min_p: 0.05,
-        stop: ["</think>"],
-      },
-    };
-  };
-};
-
 // --- Strategy Builders ---
 
 export const buildCrucibleDirectionStrategy = (
@@ -278,23 +125,5 @@ export const buildCrucibleGoalStrategy = (
     target: { type: "crucibleGoal", goalId },
     prefillBehavior: "keep",
     assistantPrefill: "[GOAL] ",
-  };
-};
-
-export const buildCrucibleChainStrategy = async (
-  getState: () => RootState,
-  goalId: string,
-): Promise<GenerationStrategy> => {
-  const state = getState();
-  const chain = state.crucible.chains[goalId];
-  const maxScenes = await getMaxScenes();
-  const isOpenerMode = chain && chain.scenes.length >= maxScenes;
-
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory: createCrucibleChainFactory(getState, goalId),
-    target: { type: "crucibleChain", goalId },
-    prefillBehavior: "keep",
-    assistantPrefill: isOpenerMode ? "[OPENER] " : "[SCENE] ",
   };
 };

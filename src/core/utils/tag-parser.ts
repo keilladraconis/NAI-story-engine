@@ -16,16 +16,20 @@ const TAG_EMOJI: Record<string, string> = {
   THEME: '💡',
   'EMOTIONAL ARC': '💫',
   'TERMINAL CONDITION': '🏁',
-  SCENE: '🎬',
   LOCATION: '📍',
-  RESOLVED: '✅',
-  OPEN: '⭕',
   CHARACTER: '👤',
   FACTION: '🏴',
   SYSTEM: '⚙️',
   SITUATION: '⚡',
   DESCRIPTION: '💬',
-  SOLVER: '🔄'
+  WHY: '💭',
+  PREREQ: '🔗',
+  LOADBEARING: '⚖️',
+  CATEGORY: '📂',
+  WANT: '💫',
+  NEED: '🔑',
+  RELATIONSHIP: '🤝',
+  SATISFIES: '✅',
 }
 
 /** Build reverse mapping: emoji → tag name. */
@@ -87,16 +91,6 @@ export function parseTagAll(text: string, tag: string): string[] {
     pos = contentStart + (nextTag === -1 ? rest.length : nextTag);
   }
   return results;
-}
-
-/** Strip `[SCENE]` tag prefix, keeping the description. */
-export function stripSceneTag(text: string): string {
-  return text.replace(/^\[SCENE\]\s*/m, "").trim();
-}
-
-/** Strip `[OPENER]` tag prefix, keeping the description. */
-export function stripOpenerTag(text: string): string {
-  return text.replace(/^\[OPENER\]\s*/m, "").trim();
 }
 
 /** Split text into sections by `===` separator, trimmed and non-empty. */

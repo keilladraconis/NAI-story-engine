@@ -2,14 +2,11 @@ import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import {
   goalRemoved,
+  goalStarred,
   goalTextUpdated,
 } from "../../../core/store/slices/crucible";
-import { requestQueued } from "../../../core/store/slices/runtime";
-import { generationSubmitted } from "../../../core/store/slices/ui";
-import { buildCrucibleGoalStrategy } from "../../../core/utils/crucible-strategy";
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
-import { GenerationButton } from "../GenerationButton";
 import { formatTagsWithEmoji } from "../../../core/utils/tag-parser";
 
 const { column } = api.v1.ui.part;
@@ -40,39 +37,27 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
   },
 
   build(props, ctx) {
-    const { dispatch } = ctx;
+    const { dispatch, useSelector } = ctx;
     const { goalId } = props;
     const ids = CR.goal(goalId);
 
-    const { part: genBtn } = ctx.render(GenerationButton, {
-      id: ids.GEN_BTN,
-      variant: "icon",
-      iconId: "refresh",
-      stateProjection: (s: RootState) => ({
-        activeType: s.runtime.activeRequest?.type,
-        activeTargetId: s.runtime.activeRequest?.targetId,
-        queueTargetIds: s.runtime.queue.map((q) => q.targetId),
-      }),
-      requestIdFromProjection: () => {
-        const s = ctx.getState();
-        if (s.runtime.activeRequest?.type === "crucibleGoal" && s.runtime.activeRequest.targetId === goalId) {
-          return s.runtime.activeRequest.id;
-        }
-        const queued = s.runtime.queue.find((q) => q.type === "crucibleGoal" && q.targetId === goalId);
-        return queued?.id;
-      },
-      isDisabledFromProjection: (proj: any) =>
-        proj.activeType === "crucibleChain" || proj.activeType === "crucibleBuild",
-      onGenerate: () => {
-        const strategy = buildCrucibleGoalStrategy(ctx.getState, goalId);
-        dispatch(requestQueued({
-          id: strategy.requestId,
-          type: "crucibleGoal",
-          targetId: goalId,
-        }));
-        dispatch(generationSubmitted(strategy));
-      },
+    const starBtnId = `${ids.ROOT}-star`;
+    const goal = ctx.getState().crucible.goals.find((g) => g.id === goalId);
+    const starBtn = api.v1.ui.part.button({
+      id: starBtnId,
+      text: goal?.starred ? "★" : "☆",
+      style: { ...GOAL_BTN_STYLE, opacity: goal?.starred ? "1" : "0.4" },
+      callback: () => dispatch(goalStarred({ goalId })),
     });
+
+    useSelector(
+      (s) => s.crucible.goals.find((g) => g.id === goalId)?.starred,
+      (starred) => {
+        api.v1.ui.updateParts([
+          { id: starBtnId, text: starred ? "★" : "☆", style: { ...GOAL_BTN_STYLE, opacity: starred ? "1" : "0.4" } },
+        ]);
+      },
+    );
 
     const delBtn = api.v1.ui.part.button({
       id: ids.DEL_BTN,
@@ -82,7 +67,6 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
       callback: () => dispatch(goalRemoved({ goalId })),
     });
 
-    const goal = ctx.getState().crucible.goals.find((g) => g.id === goalId);
     const goalDisplay = goal?.text ? formatTagsWithEmoji(goal.text) : undefined;
 
     const { part: editable } = ctx.render(EditableText, {
@@ -91,10 +75,10 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
         const g = ctx.getState().crucible.goals.find((g) => g.id === goalId);
         return g?.text ?? "";
       },
-      placeholder: "[GOAL] ...\n[OPEN] ...\n[OPEN] ...",
+      placeholder: "[GOAL] ...",
       onSave: (content: string) =>
         dispatch(goalTextUpdated({ goalId, text: content })),
-      extraControls: [genBtn, delBtn],
+      extraControls: [starBtn, delBtn],
       initialDisplay: goalDisplay,
     });
 

@@ -43,7 +43,7 @@ export const IntentSection = defineComponent<undefined, RootState>({
         return queued?.id;
       },
       isDisabledFromProjection: (proj: any) =>
-        proj.activeType === "crucibleChain" || proj.activeType === "crucibleBuild" || proj.activeType === "crucibleGoal",
+        proj.activeType === "crucibleStructuralGoal" || proj.activeType === "cruciblePrereqs" || proj.activeType === "crucibleElements" || proj.activeType === "crucibleGoal",
     });
 
     const { part: directionEditablePart } = ctx.render(EditableText, {
@@ -66,20 +66,20 @@ export const IntentSection = defineComponent<undefined, RootState>({
       },
     );
 
-    // Direction button visibility + auto-collapse when auto-chaining or goals appear
+    // Auto-collapse when building phase starts or goals appear
     useSelector(
       (s) => ({
-        autoChaining: s.crucible.autoChaining,
+        phase: s.crucible.phase,
         hasGoals: s.crucible.goals.length > 0,
       }),
       (slice) => {
         api.v1.ui.updateParts([
           {
             id: `${CR.DIRECTION_BTN}`,
-            style: !slice.autoChaining ? { display: "flex" } : { display: "none" },
+            style: slice.phase === "direction" || slice.phase === "goals" ? { display: "flex" } : { display: "none" },
           },
         ]);
-        if (slice.autoChaining || slice.hasGoals) {
+        if (slice.phase === "building" || slice.hasGoals) {
           api.v1.storyStorage.set("cr-direction-collapsed", "true");
         }
       },

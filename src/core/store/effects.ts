@@ -44,16 +44,8 @@ import {
   directionSet,
   goalAdded,
   goalRemoved,
-  goalsConfirmed,
-  crucibleChainRequested,
-  sceneBudgetUpdated,
-  chainStarted,
-  scenesDeletedFrom,
-  sceneRejected,
-  activeGoalAdvanced,
-  autoChainStarted,
-  autoChainStopped,
-  crucibleDirectorRequested,
+  phaseTransitioned,
+  expansionStarted,
 } from "./index";
 import {
   createLorebookContentFactory,
@@ -73,12 +65,13 @@ import {
 import {
   buildCrucibleDirectionStrategy,
   buildCrucibleGoalStrategy,
-  buildCrucibleChainStrategy,
-  getMaxScenes,
 } from "../utils/crucible-strategy";
-import { buildCrucibleBuildStrategy } from "../utils/crucible-builder-strategy";
-import { buildCrucibleDirectorStrategy } from "../utils/crucible-director-strategy";
-import { resetStreamTranscript } from "./effects/handlers/crucible";
+import {
+  buildStructuralGoalStrategy,
+  buildPrereqsStrategy,
+  buildElementsStrategy,
+  buildExpansionStrategy,
+} from "../utils/crucible-chain-strategy";
 import { IDS } from "../../ui/framework/ids";
 import {
   DulfsFieldID,
@@ -178,9 +171,6 @@ export async function syncEratoCompatibility(
   }
 
   // Manage "End of Lorebook" marker entry
-  // Erato has no clean boundary between lorebook (pos 400) and story text (pos 0).
-  // A forced-activation entry with "***\n" acts as a visual separator.
-  // The user must manually set its insertion order to 1.
   const allEntries = await api.v1.lorebook.entries();
   const existingMarker = allEntries.find(
     (e) => e.displayName === SE_ERATO_MARKER_NAME,
@@ -238,10 +228,7 @@ function resolvePrefill(
   }
 
   if (target.type === "field") {
-    // Use explicit assistantPrefill if provided (for factory-based strategies)
     if (assistantPrefill) return assistantPrefill;
-
-    // Fallback: extract from messages array
     if (messages) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg?.role === "assistant" && lastMsg.content) {
@@ -250,13 +237,19 @@ function resolvePrefill(
     }
   }
 
-  // For lorebookKeys, use explicit assistantPrefill (entry name as first key)
   if (target.type === "lorebookKeys") {
     if (assistantPrefill) return assistantPrefill;
   }
 
-  // Crucible targets use explicit assistantPrefill (JSON anchors)
-  if (target.type === "crucibleDirection" || target.type === "crucibleGoal" || target.type === "crucibleChain" || target.type === "crucibleBuild") {
+  // Crucible targets use explicit assistantPrefill
+  if (
+    target.type === "crucibleDirection" ||
+    target.type === "crucibleGoal" ||
+    target.type === "crucibleStructuralGoal" ||
+    target.type === "cruciblePrereqs" ||
+    target.type === "crucibleElements" ||
+    target.type === "crucibleExpansion"
+  ) {
     if (assistantPrefill) return assistantPrefill;
   }
 
@@ -338,12 +331,14 @@ function cacheLabel(target: GenerationStrategy["target"]): string {
       return "crucible-direction";
     case "crucibleGoal":
       return `crucible-goal:${target.goalId.slice(0, 8)}`;
-    case "crucibleChain":
-      return `crucible-chain:${target.goalId.slice(0, 8)}`;
-    case "crucibleBuild":
-      return `crucible-build:${target.goalId.slice(0, 8)}`;
-    case "crucibleDirector":
-      return "crucible-director";
+    case "crucibleStructuralGoal":
+      return `crucible-sg:${target.goalId.slice(0, 8)}`;
+    case "cruciblePrereqs":
+      return "crucible-prereqs";
+    case "crucibleElements":
+      return "crucible-elements";
+    case "crucibleExpansion":
+      return `crucible-expand:${target.elementId.slice(0, 8)}`;
   }
 }
 
@@ -390,7 +385,6 @@ function registerBrainstormEditEffects(
       // 2. Prepare the NEW message for editing
       const newMessage = currentMessages(state.brainstorm).find((m) => m.id === newId);
       if (newMessage) {
-        // Seed the storage so the input shows the current content
         const newInputId = IDS.BRAINSTORM.message(newId).INPUT;
         await api.v1.storyStorage.set(
           `draft-${newInputId}`,
@@ -439,11 +433,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   subscribeEffect(
     (action) => action.type === uiBrainstormSubmitUserMessage.type,
     async (_action, { dispatch, getState }) => {
-      // Save and close any in-progress message edit before adding messages.
-      // Adding messages triggers List to unmount/remount all Message components,
-      // which resets their edit UI to hidden. If editingMessageId isn't cleared,
-      // the orphaned state prevents the edit button from working again (the
-      // selector sees no change from X→X, so the callback never fires).
       const editingId = getState().brainstorm.editingMessageId;
       if (editingId) {
         const editInputId = IDS.BRAINSTORM.message(editingId).INPUT;
@@ -458,11 +447,10 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       // Clear Input
       await api.v1.storyStorage.set(storageKey, "");
-      api.v1.ui.updateParts([{ id: IDS.BRAINSTORM.INPUT, value: "" }]); // Reset UI
+      api.v1.ui.updateParts([{ id: IDS.BRAINSTORM.INPUT, value: "" }]);
 
       let assistantId;
 
-      // Add User Message if user typed something
       if (content.trim()) {
         const userMsg: BrainstormMessage = {
           id: api.v1.uuid(),
@@ -474,8 +462,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       const lastMessage = currentMessages(getState().brainstorm).at(-1);
       if (lastMessage?.role == "user") {
-        // User sent a message
-        // Add Assistant Placeholder
         assistantId = api.v1.uuid();
         const assistantMsg: BrainstormMessage = {
           id: assistantId,
@@ -484,14 +470,11 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         };
         dispatch(messageAdded(assistantMsg));
       } else if (lastMessage?.role == "assistant") {
-        // Continue the most recent assistant message.
         assistantId = lastMessage.id;
       } else {
-        // There are no messages
         return;
       }
 
-      // Request Generation - use factory pattern for JIT message building
       const mode = currentChat(getState().brainstorm).mode || "cowriter";
       const strategy = buildBrainstormStrategy(getState, assistantId, mode);
       dispatch(
@@ -510,32 +493,16 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     matchesAction(uiBrainstormRetryGeneration),
     async (action, { dispatch, getState }) => {
       const { messageId } = action.payload;
-
-      // Prune history (keep up to user, remove assistant response if target is assistant)
-      // Or if target is user, keep up to that user message.
-      // The logic inside pruneHistory handles role-based pruning.
       dispatch(pruneHistory(messageId));
 
-      // After pruning, we need to generate a response.
-      // 1. If we retried a User message, we pruned everything after it. We need an Assistant response.
-      // 2. If we retried an Assistant message, we pruned it. We need a new Assistant response.
-
-      const state = getState(); // Get updated state
+      const state = getState();
       const lastMessage = currentMessages(state.brainstorm).at(-1);
 
       let assistantId: string;
 
       if (lastMessage && lastMessage.role === "assistant") {
-        // Should not happen if we just pruned to generate?
-        // If we pruned an assistant message, the last one should be User.
-        // If we pruned a user message, the last one is that User message.
-        // So in both cases we need a new Assistant placeholder.
-        // Wait, if we are "retrying" a user message, do we want to edit it? No, that's Edit.
-        // Retry on User message usually means "Regenerate the response to this message".
-        // Retry on Assistant message means "Regenerate this response".
         assistantId = api.v1.uuid();
       } else {
-        // Last is user (or system), add assistant placeholder
         assistantId = api.v1.uuid();
         dispatch(
           messageAdded({
@@ -546,7 +513,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         );
       }
 
-      // Request Generation - use factory pattern for JIT message building
       const mode = currentChat(getState().brainstorm).mode || "cowriter";
       const strategy = buildBrainstormStrategy(getState, assistantId, mode);
       dispatch(
@@ -570,10 +536,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
-      // Capture history before clearing
       const chatHistory = [...messages];
-
-      // Clear chat and add assistant placeholder
       dispatch(messagesCleared());
       const assistantId = api.v1.uuid();
       dispatch(
@@ -603,9 +566,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       const { id: requestId, type, targetId } = action.payload;
 
       if (type === "field") {
-        // Single field (e.g., Canon) or DULFS item (format: "fieldId:itemId")
         if (targetId.includes(":")) {
-          // DULFS item content generation (skip for now per requirements)
           return;
         }
 
@@ -623,19 +584,16 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           return;
         }
 
-        strategy.requestId = requestId; // Use store's ID for queue tracking
+        strategy.requestId = requestId;
         dispatch(generationSubmitted(strategy));
       } else if (type === "list") {
-        // DULFS list generation (generate names)
         const strategy = buildDulfsListStrategy(getState, targetId);
-        strategy.requestId = requestId; // Use store's ID for queue tracking
+        strategy.requestId = requestId;
         dispatch(generationSubmitted(strategy));
       } else if (type === "bootstrap") {
-        // Bootstrap generation - scene opening instruction
         const strategy = buildBootstrapStrategy(getState, requestId);
         dispatch(generationSubmitted(strategy));
       }
-      // "brainstorm" type is handled via separate submit/retry effects
     },
   );
 
@@ -646,17 +604,13 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       const strategy = action.payload;
       const { requestId, messages, messageFactory, params, target } = strategy;
 
-      // 1. Resolve prefix for resumption
       let accumulatedText = resolvePrefill(strategy, getState);
 
-      // 2. Determine what to pass to GenX: factory or messages
-      // Wrap with instrumentation to log uncached token counts
       let messagesOrFactory: Message[] | MessageFactory | undefined;
       let resolvedMessages: Message[] | undefined;
       const apiParams = { ...params };
 
       if (messageFactory && strategy.continuation) {
-        // Continuation strategies: resolve eagerly — need messages for continuation rebuilds
         const result = await messageFactory();
         resolvedMessages = result.messages;
         if (result.params) Object.assign(apiParams, result.params);
@@ -664,7 +618,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);
         messagesOrFactory = resolvedMessages;
       } else if (messageFactory) {
-        // Wrap factory to instrument after resolution
         messagesOrFactory = async () => {
           const result = await messageFactory();
           const uncached = await api.v1.script.countUncachedInputTokens(result.messages, "glm-4-6");
@@ -672,7 +625,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           return result;
         };
       } else if (messages) {
-        // Instrument static messages inline
         const uncached = await api.v1.script.countUncachedInputTokens(messages, "glm-4-6");
         api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);
         messagesOrFactory = messages;
@@ -682,13 +634,10 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
-      // 3. Queue lorebook requests if needed (for button state tracking)
       queueLorebookRequestIfNeeded(target, requestId, getState, dispatch);
 
-      // 4. Capture rollback state for lorebook
       const rollbackState = await captureRollbackState(target);
 
-      // 5. Get handler for this target type
       const handler = getHandler(target.type);
       let generationSucceeded = false;
 
@@ -718,9 +667,8 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
           while (calls < maxCalls && finishReason === "length") {
             api.v1.log(`[continuation] Call ${calls + 1}/${maxCalls}, extending output...`);
 
-            // Rebuild messages with accumulated text as assistant message
             const continuationMessages: Message[] = [
-              ...resolvedMessages.slice(0, -1), // everything except original prefill
+              ...resolvedMessages.slice(0, -1),
               { role: "assistant", content: accumulatedText },
             ];
 
@@ -751,17 +699,12 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         generationSucceeded = false;
       }
 
-      // 6. Check cancellation
       const wasCancelled = checkCancellation(requestId, getState);
       if (wasCancelled) {
         api.v1.log(`[effects] Generation was cancelled for ${requestId}`);
         generationSucceeded = false;
       }
 
-      // 7. Run completion handler BEFORE signaling completion.
-      // SEGA schedules the next task on requestCompleted — the handler must
-      // finish updating state (e.g. adding DULFS items) first, otherwise the
-      // scheduler sees stale counts and re-schedules the same category.
       try {
         await handler.completion({
           target,
@@ -776,9 +719,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         api.v1.log(`[effects] Completion handler error for ${requestId}:`, e);
       }
 
-      // 8. Signal completion (after handler has updated state).
-      // Always dispatch — this clears activeRequest so UI buttons reset.
-      // SEGA relies on this signal to advance — without it, SEGA gets stuck.
       if (generationSucceeded) {
         api.v1.log(
           `[effects] Generation completed successfully for ${requestId}`,
@@ -794,7 +734,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       }
       dispatch(requestCompleted({ requestId }));
 
-      // 9. Show toast notification for Story Engine generations
+      // Toast notifications for Story Engine generations
       if (generationSucceeded) {
         if (target.type === "list") {
           const fieldConfig = FIELD_CONFIGS.find(
@@ -822,13 +762,8 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   // Intent: Specific Cancellation
   subscribeEffect(matchesAction(uiCancelRequest), (action, { dispatch }) => {
     const { requestId } = action.payload;
-
-    // Mark as cancelled in state (for detection after generation completes)
     dispatch(requestCancelled({ requestId }));
-
-    // Try to cancel if queued
     genX.cancelQueued(requestId);
-    // If it's the current one?
     const status = genX.getTaskStatus(requestId);
     if (status === "processing") {
       genX.cancelAll();
@@ -839,12 +774,10 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   subscribeEffect(
     (action) => action.type === uiRequestCancellation.type,
     (_action, { dispatch, getState }) => {
-      // Mark the active request as cancelled
       const activeRequest = getState().runtime.activeRequest;
       if (activeRequest) {
         dispatch(requestCancelled({ requestId: activeRequest.id }));
       }
-
       genX.cancelAll();
     },
   );
@@ -877,7 +810,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   subscribeEffect(
     matchesAction(crucibleGoalsRequested),
     async (_action, { dispatch }) => {
-      // Sync intent from storyStorage (user may have edited it)
       const editedDirection = String(
         (await api.v1.storyStorage.get("cr-direction")) || "",
       );
@@ -885,7 +817,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         dispatch(directionSet({ direction: editedDirection }));
       }
 
-      // Create 3 empty goals and queue generation for each
       for (let i = 0; i < 3; i++) {
         const goalId = api.v1.uuid();
         dispatch(goalAdded({ goal: { id: goalId, text: "", starred: false } }));
@@ -900,82 +831,167 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         );
         dispatch(generationSubmitted(strategy));
       }
+
+      dispatch(phaseTransitioned({ phase: "goals" }));
     },
   );
 
-  // Intent: Goals Confirmed → init chains for selected goals, start auto-chaining
+  // Intent: Crucible Build Requested → three-step chain pipeline
   subscribeEffect(
-    matchesAction(goalsConfirmed),
-    (_action, { dispatch, getState: getLatest }) => {
-      resetStreamTranscript();
+    matchesAction(crucibleBuildRequested),
+    async (_action, { dispatch, getState: getLatest }) => {
+      dispatch(phaseTransitioned({ phase: "building" }));
+
       const state = getLatest();
       const starredGoals = state.crucible.goals.filter((g) => g.starred);
       if (starredGoals.length === 0) {
-        api.v1.log("[crucible] No goals starred");
+        api.v1.log("[crucible] Build requested but no goals starred");
         return;
       }
 
-      // Init chains for all starred goals
-      for (const goal of starredGoals) {
-        dispatch(chainStarted({ goalId: goal.id }));
-      }
+      api.v1.ui.updateParts([{
+        id: IDS.CRUCIBLE.PROGRESS_ROOT,
+        text: "Finding the heart of your story...",
+      }]);
 
-      // Start auto-chaining with the first goal
-      dispatch(autoChainStarted());
-      dispatch(crucibleChainRequested());
+      // Queue structural goal derivation for each starred goal
+      for (const goal of starredGoals) {
+        const strategy = buildStructuralGoalStrategy(getState, goal.id);
+        dispatch(
+          requestQueued({
+            id: strategy.requestId,
+            type: "crucibleStructuralGoal",
+            targetId: goal.id,
+          }),
+        );
+        dispatch(generationSubmitted(strategy));
+      }
     },
   );
 
-  // Intent: Crucible Chain Requested → queue chain generation for activeGoalId
+  // Pipeline continuation: when a crucible request completes, advance to next step
   subscribeEffect(
-    matchesAction(crucibleChainRequested),
-    async (_action, { dispatch, getState: getLatest }) => {
-      const state = getLatest();
-      const { activeGoalId } = state.crucible;
-      if (!activeGoalId) {
-        api.v1.log("[crucible] Chain requested but no active goal");
+    matchesAction(requestCompleted),
+    async () => {
+      await api.v1.timers.sleep(150);
+
+      const state = getState();
+      if (state.crucible.phase !== "building" && state.crucible.phase !== "expanding") return;
+      if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
+
+      const starredGoals = state.crucible.goals.filter((g) => g.starred);
+
+      if (state.crucible.phase === "building") {
+        // Check which step we're at based on what data exists
+        const hasAllStructuralGoals = starredGoals.every((g) =>
+          state.crucible.structuralGoals.some((sg) => sg.sourceGoalId === g.id),
+        );
+
+        if (!hasAllStructuralGoals) {
+          // Structural goals still generating or failed — don't advance
+          api.v1.log("[crucible] Waiting for structural goals to complete");
+          return;
+        }
+
+        if (state.crucible.prerequisites.length === 0) {
+          // Step 2: Queue prerequisites
+          api.v1.log("[crucible] Structural goals complete → queuing prerequisites");
+          api.v1.ui.updateParts([{
+            id: IDS.CRUCIBLE.PROGRESS_ROOT,
+            text: "Deriving what must be true...",
+          }]);
+
+          const strategy = buildPrereqsStrategy(getState);
+          dispatch(
+            requestQueued({
+              id: strategy.requestId,
+              type: "cruciblePrereqs",
+              targetId: "crucible",
+            }),
+          );
+          dispatch(generationSubmitted(strategy));
+          return;
+        }
+
+        if (state.crucible.elements.length === 0) {
+          // Step 3: Queue world elements
+          api.v1.log("[crucible] Prerequisites complete → queuing world elements");
+          api.v1.ui.updateParts([{
+            id: IDS.CRUCIBLE.PROGRESS_ROOT,
+            text: "Building your world...",
+          }]);
+
+          const strategy = buildElementsStrategy(getState);
+          dispatch(
+            requestQueued({
+              id: strategy.requestId,
+              type: "crucibleElements",
+              targetId: "crucible",
+            }),
+          );
+          dispatch(generationSubmitted(strategy));
+          return;
+        }
+
+        // All steps complete → transition to review
+        api.v1.log("[crucible] All steps complete → transitioning to review");
+        dispatch(phaseTransitioned({ phase: "review" }));
+        api.v1.ui.toast("World elements ready for review", { type: "success" });
         return;
       }
 
-      // Sync scene budget from slider into chain state before generation
-      const budget = await getMaxScenes();
-      dispatch(sceneBudgetUpdated({ goalId: activeGoalId, budget }));
+      if (state.crucible.phase === "expanding") {
+        // Expansion complete — stay in expanding phase for user review
+        api.v1.log("[crucible] Expansion complete");
+        api.v1.ui.toast("Expansion complete — review new elements", { type: "success" });
+      }
+    },
+  );
 
-      const strategy = await buildCrucibleChainStrategy(getState, activeGoalId);
+  // Intent: Crucible Expansion Started → queue expansion strategy
+  subscribeEffect(
+    matchesAction(expansionStarted),
+    async (action, { dispatch }) => {
+      const { elementId } = action.payload;
+      api.v1.ui.updateParts([{
+        id: IDS.CRUCIBLE.PROGRESS_ROOT,
+        text: "Expanding...",
+      }]);
+
+      const strategy = buildExpansionStrategy(getState, elementId);
       dispatch(
         requestQueued({
           id: strategy.requestId,
-          type: "crucibleChain",
-          targetId: activeGoalId,
+          type: "crucibleExpansion",
+          targetId: elementId,
         }),
       );
       dispatch(generationSubmitted(strategy));
     },
   );
 
-  // Intent: Crucible Stop → cancel active request + stop auto-chain
+  // Intent: Crucible Stop → cancel active crucible request
   subscribeEffect(
     matchesAction(crucibleStopRequested),
     (_action, { dispatch, getState: getLatest }) => {
       const state = getLatest();
-      if (state.crucible.autoChaining) {
-        dispatch(autoChainStopped());
-      }
       const activeRequest = state.runtime.activeRequest;
-      if (activeRequest && (activeRequest.type === "crucibleDirection" || activeRequest.type === "crucibleGoal" || activeRequest.type === "crucibleChain" || activeRequest.type === "crucibleBuild" || activeRequest.type === "crucibleDirector")) {
+      const crucibleTypes = new Set([
+        "crucibleDirection", "crucibleGoal",
+        "crucibleStructuralGoal", "cruciblePrereqs",
+        "crucibleElements", "crucibleExpansion",
+      ]);
+      if (activeRequest && crucibleTypes.has(activeRequest.type)) {
         dispatch(requestCancelled({ requestId: activeRequest.id }));
         genX.cancelAll();
       }
     },
   );
 
-  // Intent: Crucible Reset → clear stream transcript + all cr- storyStorage keys + view
+  // Intent: Crucible Reset → clean up cr- storyStorage keys
   subscribeEffect(
     matchesAction(crucibleReset),
     async () => {
-      resetStreamTranscript();
-
-      // Remove all cr- prefixed storyStorage keys (goals, scenes, sections, etc.)
       const allKeys = await api.v1.storyStorage.list();
       for (const key of allKeys) {
         if (key.startsWith("cr-")) {
@@ -989,7 +1005,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Goal Removed → clean up goal/scene storyStorage keys
+  // Intent: Goal Removed → clean up goal storyStorage keys
   subscribeEffect(
     matchesAction(goalRemoved),
     async (action) => {
@@ -998,8 +1014,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       for (const key of allKeys) {
         if (
           key === `cr-goal-${goalId}` ||
-          key === `cr-goal-section-${goalId}` ||
-          key.startsWith(`cr-scene-${goalId}-`)
+          key === `cr-goal-section-${goalId}`
         ) {
           await api.v1.storyStorage.remove(key);
         }
@@ -1007,181 +1022,57 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Scenes Deleted From → clean up orphaned scene storyStorage keys
-  subscribeEffect(
-    matchesAction(scenesDeletedFrom),
-    async (action) => {
-      const { goalId, fromIndex } = action.payload;
-      const allKeys = await api.v1.storyStorage.list();
-      const prefix = `cr-scene-${goalId}-`;
-      for (const key of allKeys) {
-        if (!key.startsWith(prefix)) continue;
-        const idx = parseInt(key.slice(prefix.length), 10);
-        if (!isNaN(idx) && idx >= fromIndex) {
-          await api.v1.storyStorage.remove(key);
-        }
-      }
-    },
-  );
-
-  // Intent: Scene Rejected → clean up last scene's storyStorage key
-  subscribeEffect(
-    matchesAction(sceneRejected),
-    async (action, { getState: getLatest }) => {
-      const { goalId } = action.payload;
-      // After reducer, chain.scenes.length is the old length - 1
-      const chain = getLatest().crucible.chains[goalId];
-      if (chain) {
-        await api.v1.storyStorage.remove(`cr-scene-${goalId}-${chain.scenes.length}`);
-      }
-    },
-  );
-
-  // Intent: Crucible Merge → write builder elements to DULFS
+  // Intent: Crucible Merge → write elements to DULFS
   subscribeEffect(
     matchesAction(crucibleMergeRequested),
     async (_action, { dispatch, getState: getLatest }) => {
       const state = getLatest();
-      const { elements } = state.crucible.builder;
+      const { elements } = state.crucible;
       if (elements.length === 0) {
         api.v1.log("[crucible] Merge requested but no elements");
+        api.v1.ui.toast("No world elements to merge", { type: "info" });
         return;
       }
 
       let count = 0;
       for (const el of elements) {
         const newId = api.v1.uuid();
-        const content = el.content ? `${el.name}: ${el.content}` : el.name;
+        // Build content including want/need/relationship if present
+        const parts = [el.name];
+        if (el.content) parts.push(el.content);
+        if (el.want) parts.push(`Want: ${el.want}`);
+        if (el.need) parts.push(`Need: ${el.need}`);
+        if (el.relationship) parts.push(`Relationship: ${el.relationship}`);
+        const content = parts.join("\n");
 
-        // Write to storyStorage (lorebook sync effect reads this)
         await api.v1.storyStorage.set(`dulfs-item-${newId}`, content);
-
-        // Add to DULFS state — triggers lorebook sync effect automatically
         dispatch(dulfsItemAdded({ fieldId: el.fieldId, item: { id: newId, fieldId: el.fieldId } }));
         count++;
       }
 
+      dispatch(phaseTransitioned({ phase: "merged" }));
       api.v1.log(`[crucible] Merged ${count} elements to DULFS`);
       api.v1.ui.toast(`Merged ${count} world elements to DULFS`, { type: "success" });
     },
   );
 
-  // Intent: Crucible Build Requested → queue builder generation
-  subscribeEffect(
-    matchesAction(crucibleBuildRequested),
-    async (_action, { dispatch, getState: getLatest }) => {
-      const state = getLatest();
-      const { activeGoalId } = state.crucible;
-      if (!activeGoalId) {
-        api.v1.log("[crucible] Build requested but no active goal");
-        return;
-      }
-
-      const strategy = buildCrucibleBuildStrategy(getState, activeGoalId);
-      dispatch(
-        requestQueued({
-          id: strategy.requestId,
-          type: "crucibleBuild",
-          targetId: activeGoalId,
-        }),
-      );
-      dispatch(generationSubmitted(strategy));
-    },
-  );
-
-  // Intent: Crucible Director Requested → queue Director assessment
-  subscribeEffect(
-    matchesAction(crucibleDirectorRequested),
-    async (_action, { dispatch }) => {
-      const strategy = buildCrucibleDirectorStrategy(getState);
-      dispatch(
-        requestQueued({
-          id: strategy.requestId,
-          type: "crucibleDirector",
-          targetId: "director",
-        }),
-      );
-      dispatch(generationSubmitted(strategy));
-    },
-  );
-
-  /** Check if the Director should run before the next solver scene.
-   *  Currently disabled — letting Solver/Builder work autonomously.
-   *  Director infrastructure remains for manual invocation. */
-  function needsDirector(): boolean {
-    return false;
-  }
-
-  // Auto-chain continuation: interleaved Solver → Builder → (Director?) → Solver loop
-  subscribeEffect(
-    matchesAction(requestCompleted),
-    async () => {
-      await api.v1.timers.sleep(150);
-
-      const state = getState();
-      if (!state.crucible.autoChaining) return;
-      if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
-
-      const { activeGoalId } = state.crucible;
-      if (!activeGoalId) return;
-
-      const chain = state.crucible.chains[activeGoalId];
-      if (!chain) return;
-
-      const builderBehind =
-        state.crucible.builder.lastProcessedSceneIndex < chain.scenes.length - 1
-        && chain.scenes.length > 0;
-
-      // --- Goal complete ---
-      if (chain.complete) {
-        if (builderBehind) {
-          api.v1.log("[crucible] Goal complete, builder behind — catch-up");
-          dispatch(crucibleBuildRequested());
-          return;
-        }
-        dispatch(activeGoalAdvanced());
-        const updated = getState();
-        if (updated.crucible.activeGoalId) {
-          api.v1.log(`[crucible] Advanced to goal ${updated.crucible.activeGoalId}`);
-          dispatch(crucibleChainRequested());
-        } else {
-          api.v1.log("[crucible] All goals complete");
-          dispatch(autoChainStopped());
-        }
-        return;
-      }
-
-      // --- Normal loop: Solver → Builder → (Director?) → Solver ---
-      if (builderBehind) {
-        api.v1.log(`[crucible] Builder behind — building`);
-        dispatch(crucibleBuildRequested());
-        return;
-      }
-
-      if (needsDirector()) {
-        api.v1.log(`[crucible] Director assessment at scene ${chain.scenes.length}`);
-        dispatch(crucibleDirectorRequested());
-        return;
-      }
-
-      api.v1.log(`[crucible] Continuing solver — scene ${chain.scenes.length}`);
-      dispatch(crucibleChainRequested());
-    },
-  );
-
-  // Stop auto-chain on cancellation
+  // Stop crucible pipeline on cancellation
   subscribeEffect(
     matchesAction(requestCancelled),
     (action) => {
       const state = getState();
-      if (!state.crucible.autoChaining) return;
+      if (state.crucible.phase !== "building" && state.crucible.phase !== "expanding") return;
 
       const { requestId } = action.payload;
+      const crucibleTypes = new Set([
+        "crucibleStructuralGoal", "cruciblePrereqs",
+        "crucibleElements", "crucibleExpansion",
+      ]);
       if (
         state.runtime.activeRequest?.id === requestId &&
-        (state.runtime.activeRequest?.type === "crucibleDirection" || state.runtime.activeRequest?.type === "crucibleChain" || state.runtime.activeRequest?.type === "crucibleGoal" || state.runtime.activeRequest?.type === "crucibleBuild")
+        crucibleTypes.has(state.runtime.activeRequest?.type || "")
       ) {
-        dispatch(autoChainStopped());
+        api.v1.log("[crucible] Pipeline cancelled, staying in current phase for retry");
       }
     },
   );
@@ -1207,8 +1098,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Lorebook Sync: Item Added - imported from dulfsItemAdded action
-  // Note: dulfsItemAdded is now dispatched from list.ts handler
+  // Lorebook Sync: Item Added
   subscribeEffect(
     matchesAction(dulfsItemAdded),
     async (action) => {
@@ -1216,7 +1106,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       const content =
         (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "";
 
-      // Extract name from full content using field-specific parser
       const name = extractDulfsItemName(String(content), fieldId);
 
       const categoryId = await ensureCategory(fieldId);
@@ -1224,7 +1113,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         id: item.id,
         category: categoryId,
         displayName: name,
-        keys: [], // Keys are generated separately via lorebook generation
+        keys: [],
         enabled: true,
       });
     },
@@ -1234,13 +1123,9 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   subscribeEffect(matchesAction(dulfsItemRemoved), async (action) => {
     const { fieldId, itemId } = action.payload;
 
-    // Remove lorebook entry (same ID as item)
     await api.v1.lorebook.removeEntry(itemId);
-
-    // Clean up storage
     await api.v1.storyStorage.set(`dulfs-item-${itemId}`, null);
 
-    // Remove empty category
     const categoryId = await findCategory(fieldId);
     if (categoryId) {
       const entries = await api.v1.lorebook.entries(categoryId);
@@ -1254,7 +1139,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
   subscribeEffect(
     (action) => action.type === storyCleared.type,
     async (_action, { dispatch }) => {
-      // Clear lorebook entries and categories
       const categories = await api.v1.lorebook.categories();
       const seCategories = categories.filter((c) =>
         c.name?.startsWith(SE_CATEGORY_PREFIX),
@@ -1268,7 +1152,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         await api.v1.lorebook.removeCategory(category.id);
       }
 
-      // Remove Erato marker entry (uncategorized, so not caught above)
       const allEntries = await api.v1.lorebook.entries();
       const marker = allEntries.find(
         (e) => e.displayName === SE_ERATO_MARKER_NAME,
@@ -1277,18 +1160,16 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         await api.v1.lorebook.removeEntry(marker.id);
       }
 
-      // Clear storage keys used by storageKey-based UI components
-      // This prevents orphaned keys from polluting the user's story storage
       const allKeys = await api.v1.storyStorage.list();
       const patternsToRemove = [
-        /^kse-field-/, // ATTG, Style field content
-        /^kse-sync-/, // Sync checkbox states
-        /^kse-section-/, // Collapsible section states
-        /^draft-/, // Draft content (text fields, brainstorm messages)
-        /^dulfs-item-/, // DULFS item content
-        /^se-bs-input$/, // Brainstorm input
-        /^cr-/, // Crucible (goals, scenes, sections, direction, etc.)
-        /^lb-/, // Lorebook drafts
+        /^kse-field-/,
+        /^kse-sync-/,
+        /^kse-section-/,
+        /^draft-/,
+        /^dulfs-item-/,
+        /^se-bs-input$/,
+        /^cr-/,
+        /^lb-/,
       ];
 
       for (const key of allKeys) {
@@ -1297,13 +1178,11 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         }
       }
 
-      // Flush runtime queue so border selectors re-evaluate
-      // (ATTG/Style check storyStorage which is now clean)
       dispatch(queueCleared());
     },
   );
 
-  // Intent: Lorebook Content Generation (uses factory for JIT building)
+  // Intent: Lorebook Content Generation
   subscribeEffect(
     matchesAction(uiLorebookContentGenerationRequested),
     async (action, { dispatch, getState }) => {
@@ -1317,7 +1196,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
-      // Create factory that builds strategy at execution time
       const messageFactory = createLorebookContentFactory(
         getState,
         selectedEntryId,
@@ -1327,7 +1205,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         generationSubmitted({
           requestId,
           messageFactory,
-          params: { model: "glm-4-6", max_tokens: 512 }, // Base params, factory can override
+          params: { model: "glm-4-6", max_tokens: 512 },
           target: { type: "lorebookContent", entryId: selectedEntryId },
           prefillBehavior: "trim",
         }),
@@ -1335,7 +1213,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Lorebook Keys Generation (CRITICAL: uses factory to get fresh entry.text)
+  // Intent: Lorebook Keys Generation
   subscribeEffect(
     matchesAction(uiLorebookKeysGenerationRequested),
     async (action, { dispatch, getState }) => {
@@ -1352,13 +1230,12 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Lorebook Item Generation (queues both content + keys from DULFS list)
+  // Intent: Lorebook Item Generation
   subscribeEffect(
     matchesAction(uiLorebookItemGenerationRequested),
     async (action, { dispatch, getState }) => {
       const { entryId, contentRequestId, keysRequestId } = action.payload;
 
-      // Queue BOTH items in store first for immediate visibility
       dispatch(
         requestQueued({
           id: contentRequestId,
@@ -1374,7 +1251,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         }),
       );
 
-      // Now dispatch generation requests (they'll skip re-queuing since already in queue)
       const contentFactory = createLorebookContentFactory(getState, entryId);
       dispatch(
         generationSubmitted({
@@ -1386,13 +1262,12 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         }),
       );
 
-      // Queue keys generation (JIT factory ensures fresh content is used)
       const keysPayload = await buildLorebookKeysPayload(getState, entryId, keysRequestId);
       dispatch(generationSubmitted(keysPayload));
     },
   );
 
-  // Intent: Lorebook Refine (modify existing entry with natural language instructions)
+  // Intent: Lorebook Refine
   subscribeEffect(
     matchesAction(uiLorebookRefineRequested),
     async (action, { dispatch, getState }) => {
@@ -1404,7 +1279,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
-      // Create factory that fetches instructions at execution time
       const getInstructions = async () =>
         String(
           (await api.v1.storyStorage.get(IDS.LOREBOOK.REFINE_INSTRUCTIONS_RAW)) ||
