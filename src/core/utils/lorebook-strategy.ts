@@ -144,17 +144,17 @@ export const createLorebookKeysFactory = (
       },
       {
         role: "user",
-        content: `Entry Name: ${displayName}\n\nEntry Content:\n${entryText}`,
+        content: `ENTRY:\n\n${entryText}`,
       },
-      { role: "assistant", content: `${displayName.toLowerCase()}, ` },
+      { role: "assistant", content: `KEYS: ` },
     ];
 
     return {
       messages,
       params: {
         model,
-        max_tokens: 96,
-        temperature: 0.3,
+        max_tokens: 200,
+        temperature: 0.8,
         min_p: 0.1,
         stop: ["\n"],
       },

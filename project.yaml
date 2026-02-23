@@ -1,7 +1,7 @@
 compatibilityVersion: naiscript-1.0
 id: e6c35faa-e4f2-4c3b-af4a-d56e4c992d87
 name: Story Engine
-version: 0.7.2
+version: 0.7.3
 createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
@@ -192,30 +192,35 @@ config:
     type: string
     multiline: true
     default: |-
-      Generate activation keys for a lorebook entry.
-      Keys trigger entry injection when matched in story text. Think of them as database index terms — precise, lowercase, topical.
-      ALL keys MUST be lowercase. Output ONLY a comma-separated list of 6-12 keys.
+      Generate activation keys for a lorebook entry. Keys fire when matched in story text, injecting the entry as context.
 
-      GOOD KEYS — proper nouns that predict narrative involvement:
-      - Name variants: first name, surname, nickname, title ("elena", "voss", "the magistrate")
-      - Related characters by name: allies, rivals, family, lovers
-      - Locations where this entity operates or resides
-      - Factions or organizations this entity belongs to or opposes
-      - For name/term variants, use regex: /kath(erine|y|leen)?/, /grey|gray/
-      - Root forms only: "forge" not "the ancient forge"
+      TARGET: 2-5 keys only.
 
-      NEVER generate these — they are the most common failure mode:
-      - Ages, numbers, dates, measurements, dimensions
-      - Adjectives or descriptors (tall, brave, mysterious, ancient, simmering)
-      - Physical traits (hair, eyes, posture, build, height, weight)
-      - Personality words (resentful, kind, ambitious)
-      - Generic nouns usable in any scene (woman, city, war, sword, breaks)
-      - Habits, routines, schedules, activities
-      - Sentence fragments or phrases copied from the entry
+      ---
 
-      Test each key: "Does this word UNIQUELY signal this entry? Would it appear naturally in prose referring to this entity?"
+      ENTRY: Mira Voss is a surgeon operating out of Caldera Station's black market medical bay. She has a cold bedside manner and a reputation for saving people who shouldn't be saveable. She owes a significant debt to the Ashfield syndicate.
 
-      ONLY output the comma-separated key list. Nothing else.
+      REJECTED: surgeon, cold, debt, medical, doctor — too generic, match any medical scene
+      REJECTED: mira voss — full name as single key, split instead
+      KEYS: /mir(a|ra)?/, voss, caldera station, ashfield
+
+      ---
+
+      ENTRY: The Sunken Arcade is a flooded entertainment district in the lower city, now home to smugglers and illegal gambling dens. Mira Voss runs her clinic out of a back room here. The Ashfield syndicate uses it as a meeting ground.
+
+      REJECTED: mira voss — character names don't activate locations, locations activate characters
+      REJECTED: flooded, gambling, smugglers, entertainment — generic descriptors
+      KEYS: sunken arcade, lower city, ashfield
+
+      ---
+
+      ENTRY: The Ashfield Syndicate is a criminal organization controlling the lower city's black markets. They operate through intimidation and selective bribery of port officials. Their symbol is a broken anchor.
+
+      REJECTED: criminal, black market, bribery, intimidation — appear in any crime scene
+      REJECTED: broken anchor — object description, not a name
+      KEYS: /ashfield/, lower city, caldera station
+
+      ---
 
   - name: attg_generate_prompt
     prettyName: ATTG Generate Prompt
