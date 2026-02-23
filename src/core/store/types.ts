@@ -134,7 +134,7 @@ export interface GenerationStrategy {
   | { type: "crucibleStructuralGoal"; goalId: string }
   | { type: "cruciblePrereqs" }
   | { type: "crucibleElements" }
-  | { type: "crucibleExpansion"; elementId: string };
+  | { type: "crucibleExpansion"; elementId?: string };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };
@@ -152,7 +152,7 @@ export interface RuntimeState {
 
 // Crucible Types
 
-export type CruciblePhase = "direction" | "goals" | "building" | "review" | "merged" | "expanding";
+export type CruciblePhase = "direction" | "goals" | "building" | "review" | "merged";
 
 export interface CrucibleGoal {
   id: string;
@@ -195,8 +195,6 @@ export interface CrucibleState {
   structuralGoals: StructuralGoal[];
   prerequisites: Prerequisite[];
   elements: CrucibleWorldElement[];
-  expandingElementId: string | null;
-  expansionPrereqs: Prerequisite[];
 }
 
 export interface RootState {

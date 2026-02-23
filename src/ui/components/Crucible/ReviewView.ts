@@ -7,11 +7,13 @@ import {
   elementRemoved,
   elementUpdated,
   crucibleMergeRequested,
+  expansionTriggered,
 } from "../../../core/store/slices/crucible";
+import { GenerationButton } from "../GenerationButton";
 import { EditableText } from "../EditableText";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 
-const { text, row, column, collapsibleSection, button } = api.v1.ui.part;
+const { text, row, column, collapsibleSection, button, multilineTextInput } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
@@ -122,6 +124,28 @@ export const ReviewView = defineComponent<undefined, RootState>({
       style: { marginTop: "4px" },
     });
 
+    // Expansion input + button (pre-rendered, stable)
+    const expansionInput = multilineTextInput({
+      id: "cr-expand-prompt-input",
+      placeholder: "What to explore? Leave blank to find what's missing.",
+      storageKey: "story:cr-expand-prompt",
+      style: { "font-size": "0.85em" },
+    });
+    const { part: expandGenBtn } = ctx.render(GenerationButton, {
+      id: "cr-expand-gen-btn",
+      label: "Expand World",
+      stateProjection: (s: RootState) => ({
+        activeIsExpansion: s.runtime.activeRequest?.type === "crucibleExpansion",
+        queueHasExpansion: s.runtime.queue.some((q) => q.type === "crucibleExpansion"),
+      }),
+      requestIdFromProjection: () => {
+        const s = ctx.getState();
+        if (s.runtime.activeRequest?.type === "crucibleExpansion") return s.runtime.activeRequest.id;
+        return s.runtime.queue.find((q) => q.type === "crucibleExpansion")?.id;
+      },
+      onGenerate: () => dispatch(expansionTriggered({})),
+    });
+
     // Caches
     const sgCardCache = new Map<string, UIPart>();
     const prereqCardCache = new Map<string, UIPart>();
@@ -212,6 +236,22 @@ export const ReviewView = defineComponent<undefined, RootState>({
           ],
         });
 
+        const { part: expandBtn } = ctx.render(GenerationButton, {
+          id: `${CR.element(el.id).ROOT}-expand`,
+          label: "Expand",
+          style: { "font-size": "0.75em", padding: "2px 6px", "font-weight": "normal" },
+          stateProjection: (s: RootState) => ({
+            activeIsExpansion: s.runtime.activeRequest?.type === "crucibleExpansion",
+            queueHasExpansion: s.runtime.queue.some((q) => q.type === "crucibleExpansion"),
+          }),
+          requestIdFromProjection: () => {
+            const s = ctx.getState();
+            if (s.runtime.activeRequest?.type === "crucibleExpansion") return s.runtime.activeRequest.id;
+            return s.runtime.queue.find((q) => q.type === "crucibleExpansion")?.id;
+          },
+          onGenerate: () => dispatch(expansionTriggered({ elementId: el.id })),
+        });
+
         elementCardCache.set(el.id, column({
           id: CR.element(el.id).ROOT,
           style: this.style?.("elementCard"),
@@ -220,6 +260,7 @@ export const ReviewView = defineComponent<undefined, RootState>({
               style: { gap: "6px", "align-items": "center" },
               content: [
                 text({ text: FIELD_LABEL_SINGULAR[el.fieldId] || el.fieldId, style: this.style?.("badge") }),
+                expandBtn,
               ],
             }),
             editable,
@@ -279,6 +320,16 @@ export const ReviewView = defineComponent<undefined, RootState>({
           storageKey: "story:cr-elements-section",
           content: elementParts,
         }));
+
+        parts.push(column({
+          id: "cr-expansion-section",
+          style: { gap: "4px" },
+          content: [
+            text({ text: "Expand", style: this.style?.("sectionTitle") }),
+            expansionInput,
+            expandGenBtn,
+          ],
+        }));
       }
 
       parts.push(mergeButton);
@@ -295,7 +346,7 @@ export const ReviewView = defineComponent<undefined, RootState>({
       }),
       () => {
         const state = ctx.getState();
-        if (state.crucible.phase !== "review" && state.crucible.phase !== "expanding") return;
+        if (state.crucible.phase !== "review") return;
 
         // Evict removed items from caches
         const currentSGIds = new Set(state.crucible.structuralGoals.map((sg) => sg.id));
@@ -328,7 +379,7 @@ export const ReviewView = defineComponent<undefined, RootState>({
 
     // Build initial state
     const state = ctx.getState();
-    if (state.crucible.phase === "review" || state.crucible.phase === "expanding") {
+    if (state.crucible.phase === "review") {
       const initialSections = buildFullReview();
       return column({
         id: CR.REVIEW_ROOT,

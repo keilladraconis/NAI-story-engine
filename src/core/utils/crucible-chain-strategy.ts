@@ -218,16 +218,16 @@ export const buildElementsStrategy = (
 
 export const createExpansionFactory = (
   getState: () => RootState,
-  elementId: string,
+  elementId?: string,
 ): MessageFactory => {
   return async () => {
     const state = getState();
-    const element = state.crucible.elements.find((e) => e.id === elementId);
-    if (!element) throw new Error(`[crucible] Element not found: ${elementId}`);
-
     const prompt = String(
       (await api.v1.config.get("crucible_expansion_prompt")) || "",
     );
+
+    // Optional free-form direction from the expansion prompt input
+    const freePrompt = String((await api.v1.storyStorage.get("cr-expand-prompt")) || "").trim();
 
     const prefix = await buildCruciblePrefix(getState, {
       includeDirection: true,
@@ -245,15 +245,27 @@ export const createExpansionFactory = (
       .map((sg) => `- ${sg.text}`)
       .join("\n");
 
+    // Build the expansion question
+    let expansionQuestion: string;
+    if (elementId) {
+      const element = state.crucible.elements.find((e) => e.id === elementId);
+      const seedLabel = element
+        ? `${element.name} (${FIELD_LABEL[element.fieldId] || element.fieldId}): ${element.content}`
+        : elementId;
+      expansionQuestion = `EXPANSION SEED:\n${seedLabel}\n\nWhat does this element specifically require that is not yet present in this world?`;
+      if (freePrompt) expansionQuestion += `\n\nADDITIONAL DIRECTION:\n${freePrompt}`;
+    } else {
+      expansionQuestion = freePrompt
+        ? `EXPANSION DIRECTION:\n${freePrompt}\n\nWhat must exist in this world to support this?`
+        : "What is most conspicuously absent from this world given the structural goals?";
+    }
+
     const messages: Message[] = [
       ...prefix,
-      {
-        role: "system",
-        content: prompt,
-      },
+      { role: "system", content: prompt },
       {
         role: "user",
-        content: `EXPANSION SEED:\n${element.name} (${FIELD_LABEL[element.fieldId] || element.fieldId}): ${element.content}\n\nSTRUCTURAL GOALS:\n${goalsContext}\n\nEXISTING WORLD:\n${worldContext}\n\nWhat does "${element.name}" specifically require that is not yet present in this world?`,
+        content: `STRUCTURAL GOALS:\n${goalsContext}\n\nEXISTING WORLD:\n${worldContext}\n\n${expansionQuestion}`,
       },
       { role: "assistant", content: "[PREREQ] " },
     ];
@@ -273,7 +285,7 @@ export const createExpansionFactory = (
 
 export const buildExpansionStrategy = (
   getState: () => RootState,
-  elementId: string,
+  elementId?: string,
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),

@@ -11,7 +11,6 @@ import {
   structuralGoalDerived,
   prerequisitesDerived,
   elementsDerived,
-  expansionPrereqsDerived,
 } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
 import {
@@ -44,7 +43,7 @@ const VALID_CATEGORIES = new Set<string>(["RELATIONSHIP", "SECRET", "POWER", "HI
 type StructuralGoalTarget = { type: "crucibleStructuralGoal"; goalId: string };
 type PrereqsTarget = { type: "cruciblePrereqs" };
 type ElementsTarget = { type: "crucibleElements" };
-type ExpansionTarget = { type: "crucibleExpansion"; elementId: string };
+type ExpansionTarget = { type: "crucibleExpansion"; elementId?: string };
 
 // --- Structural Goal Handler ---
 
@@ -216,10 +215,10 @@ export const expansionHandler: GenerationHandlers<ExpansionTarget> = {
 
     const text = stripThinkingTags(ctx.accumulatedText).trim();
 
-    // Parse prereqs from the expansion output
+    // Parse prereqs from the expansion output — go directly into main prerequisites
     const prereqs = parsePrerequisites(text);
     if (prereqs.length > 0) {
-      ctx.dispatch(expansionPrereqsDerived({ prerequisites: prereqs }));
+      ctx.dispatch(prerequisitesDerived({ prerequisites: prereqs }));
       api.v1.log(`[crucible] Expansion: ${prereqs.length} prerequisites derived`);
     }
 

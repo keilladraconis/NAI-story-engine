@@ -17,16 +17,19 @@ export function migrateCrucibleState(loaded: Partial<CrucibleState>): CrucibleSt
     return { ...initialCrucibleState, direction: loaded.direction ?? null };
   }
 
+  // Clamp persisted phase — "expanding" no longer exists
+  const rawPhase = loaded.phase as string;
+  const validPhases = new Set(["direction", "goals", "building", "review", "merged"]);
+  const phase = validPhases.has(rawPhase) ? (rawPhase as CruciblePhase) : "direction";
+
   return {
     ...initialCrucibleState,
-    phase: (loaded.phase as CruciblePhase) ?? "direction",
+    phase,
     direction: loaded.direction ?? null,
     goals: Array.isArray(loaded.goals) ? loaded.goals : [],
     structuralGoals: Array.isArray(loaded.structuralGoals) ? loaded.structuralGoals : [],
     prerequisites: Array.isArray(loaded.prerequisites) ? loaded.prerequisites : [],
     elements: Array.isArray(loaded.elements) ? loaded.elements : [],
-    expandingElementId: loaded.expandingElementId ?? null,
-    expansionPrereqs: Array.isArray(loaded.expansionPrereqs) ? loaded.expansionPrereqs : [],
   };
 }
 
@@ -37,8 +40,6 @@ export const initialCrucibleState: CrucibleState = {
   structuralGoals: [],
   prerequisites: [],
   elements: [],
-  expandingElementId: null,
-  expansionPrereqs: [],
 };
 
 export const crucibleSlice = createSlice({
@@ -50,6 +51,7 @@ export const crucibleSlice = createSlice({
     crucibleStopRequested: (state) => state,
     crucibleMergeRequested: (state) => state,
     crucibleBuildRequested: (state) => state,
+    expansionTriggered: (state, _payload: { elementId?: string }) => state,
 
     // Phase transitions
     phaseTransitioned: (state, payload: { phase: CruciblePhase }) => {
@@ -175,22 +177,6 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    // Expansion
-    expansionStarted: (state, payload: { elementId: string }) => {
-      return { ...state, phase: "expanding" as CruciblePhase, expandingElementId: payload.elementId, expansionPrereqs: [] };
-    },
-
-    expansionPrereqsDerived: (state, payload: { prerequisites: Prerequisite[] }) => {
-      return {
-        ...state,
-        expansionPrereqs: [...state.expansionPrereqs, ...payload.prerequisites],
-      };
-    },
-
-    expansionMerged: (state) => {
-      return { ...state, phase: "merged" as CruciblePhase, expandingElementId: null, expansionPrereqs: [] };
-    },
-
     crucibleReset: () => {
       return { ...initialCrucibleState };
     },
@@ -218,8 +204,6 @@ export const {
   elementsDerived,
   elementRemoved,
   elementUpdated,
-  expansionStarted,
-  expansionPrereqsDerived,
-  expansionMerged,
+  expansionTriggered,
   crucibleReset,
 } = crucibleSlice.actions;

@@ -4,11 +4,12 @@ import { IDS } from "../../framework/ids";
 import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
 import {
   crucibleReset,
-  expansionStarted,
+  expansionTriggered,
 } from "../../../core/store/slices/crucible";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
+import { GenerationButton } from "../GenerationButton";
 
-const { text, row, column, button } = api.v1.ui.part;
+const { text, row, column, multilineTextInput } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
@@ -74,6 +75,52 @@ export const MergedView = defineComponent<undefined, RootState>({
       onConfirm: () => dispatch(crucibleReset()),
     });
 
+    // Expansion input + button (pre-rendered, stable)
+    const expansionInput = multilineTextInput({
+      id: "cr-merged-expand-prompt-input",
+      placeholder: "What to explore? Leave blank to find what's missing.",
+      storageKey: "story:cr-expand-prompt",
+      style: { "font-size": "0.85em" },
+    });
+    const { part: expandGenBtn } = ctx.render(GenerationButton, {
+      id: "cr-merged-expand-gen-btn",
+      label: "Expand World",
+      stateProjection: (s: RootState) => ({
+        activeIsExpansion: s.runtime.activeRequest?.type === "crucibleExpansion",
+        queueHasExpansion: s.runtime.queue.some((q) => q.type === "crucibleExpansion"),
+      }),
+      requestIdFromProjection: () => {
+        const s = ctx.getState();
+        if (s.runtime.activeRequest?.type === "crucibleExpansion") return s.runtime.activeRequest.id;
+        return s.runtime.queue.find((q) => q.type === "crucibleExpansion")?.id;
+      },
+      onGenerate: () => dispatch(expansionTriggered({})),
+    });
+
+    // Cache for per-element expand buttons
+    const expandBtnCache = new Map<string, UIPart>();
+    const ensureExpandBtn = (el: CrucibleWorldElement): UIPart => {
+      if (!expandBtnCache.has(el.id)) {
+        const { part: expandBtn } = ctx.render(GenerationButton, {
+          id: `cr-merged-expand-${el.id}`,
+          label: "Expand",
+          style: this.style?.("expandBtn"),
+          stateProjection: (s: RootState) => ({
+            activeIsExpansion: s.runtime.activeRequest?.type === "crucibleExpansion",
+            queueHasExpansion: s.runtime.queue.some((q) => q.type === "crucibleExpansion"),
+          }),
+          requestIdFromProjection: () => {
+            const s = ctx.getState();
+            if (s.runtime.activeRequest?.type === "crucibleExpansion") return s.runtime.activeRequest.id;
+            return s.runtime.queue.find((q) => q.type === "crucibleExpansion")?.id;
+          },
+          onGenerate: () => dispatch(expansionTriggered({ elementId: el.id })),
+        });
+        expandBtnCache.set(el.id, expandBtn);
+      }
+      return expandBtnCache.get(el.id)!;
+    };
+
     // Build element inventory
     const buildInventory = (elements: CrucibleWorldElement[]): UIPart[] => {
       const groups = new Map<DulfsFieldID, CrucibleWorldElement[]>();
@@ -98,16 +145,21 @@ export const MergedView = defineComponent<undefined, RootState>({
             style: this.style?.("elementRow"),
             content: [
               text({ text: el.name, style: this.style?.("elementName") }),
-              button({
-                text: "Expand",
-                style: this.style?.("expandBtn"),
-                callback: () => dispatch(expansionStarted({ elementId: el.id })),
-              }),
+              ensureExpandBtn(el),
             ],
           }));
         }
       }
 
+      parts.push(column({
+        id: "cr-merged-expansion-section",
+        style: { gap: "4px" },
+        content: [
+          text({ text: "Expand", style: this.style?.("sectionTitle") }),
+          expansionInput,
+          expandGenBtn,
+        ],
+      }));
       parts.push(resetBtn);
       return parts;
     };

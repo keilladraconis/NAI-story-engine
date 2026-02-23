@@ -36,7 +36,7 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
       (s) => s.crucible.phase,
       (phase) => {
         const showProgress = phase === "building";
-        const showReview = phase === "review" || phase === "expanding";
+        const showReview = phase === "review";
         const showMerged = phase === "merged";
 
         api.v1.ui.updateParts([
@@ -49,7 +49,7 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
 
     const phase = state.crucible.phase;
     const showProgress = phase === "building";
-    const showReview = phase === "review" || phase === "expanding";
+    const showReview = phase === "review";
     const showMerged = phase === "merged";
 
     return column({

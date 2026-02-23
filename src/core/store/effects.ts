@@ -45,7 +45,7 @@ import {
   goalAdded,
   goalRemoved,
   phaseTransitioned,
-  expansionStarted,
+  expansionTriggered,
 } from "./index";
 import {
   createLorebookContentFactory,
@@ -338,7 +338,7 @@ function cacheLabel(target: GenerationStrategy["target"]): string {
     case "crucibleElements":
       return "crucible-elements";
     case "crucibleExpansion":
-      return `crucible-expand:${target.elementId.slice(0, 8)}`;
+      return `crucible-expand:${(target.elementId ?? "free").slice(0, 8)}`;
   }
 }
 
@@ -876,96 +876,57 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       await api.v1.timers.sleep(150);
 
       const state = getState();
-      if (state.crucible.phase !== "building" && state.crucible.phase !== "expanding") return;
+      if (state.crucible.phase !== "building") return;
       if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
 
       const starredGoals = state.crucible.goals.filter((g) => g.starred);
 
-      if (state.crucible.phase === "building") {
-        // Check which step we're at based on what data exists
-        const hasAllStructuralGoals = starredGoals.every((g) =>
-          state.crucible.structuralGoals.some((sg) => sg.sourceGoalId === g.id),
-        );
+      // Check which step we're at based on what data exists
+      const hasAllStructuralGoals = starredGoals.every((g) =>
+        state.crucible.structuralGoals.some((sg) => sg.sourceGoalId === g.id),
+      );
 
-        if (!hasAllStructuralGoals) {
-          // Structural goals still generating or failed — don't advance
-          api.v1.log("[crucible] Waiting for structural goals to complete");
-          return;
-        }
-
-        if (state.crucible.prerequisites.length === 0) {
-          // Step 2: Queue prerequisites
-          api.v1.log("[crucible] Structural goals complete → queuing prerequisites");
-          api.v1.ui.updateParts([{
-            id: IDS.CRUCIBLE.PROGRESS_ROOT,
-            text: "Deriving what must be true...",
-          }]);
-
-          const strategy = buildPrereqsStrategy(getState);
-          dispatch(
-            requestQueued({
-              id: strategy.requestId,
-              type: "cruciblePrereqs",
-              targetId: "crucible",
-            }),
-          );
-          dispatch(generationSubmitted(strategy));
-          return;
-        }
-
-        if (state.crucible.elements.length === 0) {
-          // Step 3: Queue world elements
-          api.v1.log("[crucible] Prerequisites complete → queuing world elements");
-          api.v1.ui.updateParts([{
-            id: IDS.CRUCIBLE.PROGRESS_ROOT,
-            text: "Building your world...",
-          }]);
-
-          const strategy = buildElementsStrategy(getState);
-          dispatch(
-            requestQueued({
-              id: strategy.requestId,
-              type: "crucibleElements",
-              targetId: "crucible",
-            }),
-          );
-          dispatch(generationSubmitted(strategy));
-          return;
-        }
-
-        // All steps complete → transition to review
-        api.v1.log("[crucible] All steps complete → transitioning to review");
-        dispatch(phaseTransitioned({ phase: "review" }));
-        api.v1.ui.toast("World elements ready for review", { type: "success" });
+      if (!hasAllStructuralGoals) {
+        api.v1.log("[crucible] Waiting for structural goals to complete");
         return;
       }
 
-      if (state.crucible.phase === "expanding") {
-        // Expansion complete — stay in expanding phase for user review
-        api.v1.log("[crucible] Expansion complete");
-        api.v1.ui.toast("Expansion complete — review new elements", { type: "success" });
+      if (state.crucible.prerequisites.length === 0) {
+        // Step 2: Queue prerequisites
+        api.v1.log("[crucible] Structural goals complete → queuing prerequisites");
+        const strategy = buildPrereqsStrategy(getState);
+        dispatch(requestQueued({ id: strategy.requestId, type: "cruciblePrereqs", targetId: "crucible" }));
+        dispatch(generationSubmitted(strategy));
+        return;
       }
+
+      if (state.crucible.elements.length === 0) {
+        // Step 3: Queue world elements
+        api.v1.log("[crucible] Prerequisites complete → queuing world elements");
+        const strategy = buildElementsStrategy(getState);
+        dispatch(requestQueued({ id: strategy.requestId, type: "crucibleElements", targetId: "crucible" }));
+        dispatch(generationSubmitted(strategy));
+        return;
+      }
+
+      // All steps complete → transition to review
+      api.v1.log("[crucible] All steps complete → transitioning to review");
+      dispatch(phaseTransitioned({ phase: "review" }));
+      api.v1.ui.toast("World elements ready for review", { type: "success" });
     },
   );
 
-  // Intent: Crucible Expansion Started → queue expansion strategy
+  // Intent: Expansion Triggered → queue expansion strategy (no phase change)
   subscribeEffect(
-    matchesAction(expansionStarted),
+    matchesAction(expansionTriggered),
     async (action, { dispatch }) => {
       const { elementId } = action.payload;
-      api.v1.ui.updateParts([{
-        id: IDS.CRUCIBLE.PROGRESS_ROOT,
-        text: "Expanding...",
-      }]);
-
       const strategy = buildExpansionStrategy(getState, elementId);
-      dispatch(
-        requestQueued({
-          id: strategy.requestId,
-          type: "crucibleExpansion",
-          targetId: elementId,
-        }),
-      );
+      dispatch(requestQueued({
+        id: strategy.requestId,
+        type: "crucibleExpansion",
+        targetId: elementId ?? "crucible",
+      }));
       dispatch(generationSubmitted(strategy));
     },
   );
@@ -1061,7 +1022,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     matchesAction(requestCancelled),
     (action) => {
       const state = getState();
-      if (state.crucible.phase !== "building" && state.crucible.phase !== "expanding") return;
+      if (state.crucible.phase !== "building") return;
 
       const { requestId } = action.payload;
       const crucibleTypes = new Set([

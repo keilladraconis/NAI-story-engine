@@ -20,7 +20,6 @@ const PHASE_STATUS: Record<CruciblePhase, string> = {
   building: "Building world...",
   review: "Review — or star more goals and rebuild",
   merged: "World merged to DULFS",
-  expanding: "Expanding element...",
 };
 
 const CRUCIBLE_GEN_TYPES = new Set([
