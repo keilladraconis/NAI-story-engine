@@ -1,6 +1,6 @@
 import { RootState } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
-import { buildStoryEnginePrefix } from "./context-builder";
+import { buildStoryEnginePrefix, formatCrucibleElementsContext } from "./context-builder";
 
 // Category-to-template mapping
 const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
@@ -94,6 +94,14 @@ Setting: ${setting}
       });
     }
 
+    const crucibleContext = formatCrucibleElementsContext(getState());
+    if (crucibleContext) {
+      messages.push({
+        role: "system",
+        content: `[WORLD STRUCTURE]\n${crucibleContext}`,
+      });
+    }
+
     messages.push(
       {
         role: "user",
@@ -102,7 +110,7 @@ Setting: ${setting}
       { role: "assistant", content: assistantPrefill },
     );
 
-    const tailCount = template ? 4 : 3;
+    const tailCount = template ? (crucibleContext ? 5 : 4) : (crucibleContext ? 4 : 3);
     return {
       messages,
       params: { model, max_tokens: 1024, temperature: 0.85, min_p: 0.05, frequency_penalty: 0.1 },
@@ -126,7 +134,6 @@ export const createLorebookKeysFactory = (
       throw new Error(`Lorebook entry not found: ${entryId}`);
     }
 
-    const displayName = entry.displayName || "Unnamed Entry";
     const entryText = entry.text || "";
 
     const model = "glm-4-6";
@@ -214,23 +221,35 @@ Setting: ${setting}
 
     const prefix = await buildStoryEnginePrefix(getState);
 
+    const crucibleContext = formatCrucibleElementsContext(getState());
+
     const messages: Message[] = [
       ...prefix,
       {
         role: "system",
         content: `[LOREBOOK ENTRY REFINEMENT]\n${refinePrompt}${template ? `\n\nTEMPLATE:\n${template}` : ""}`,
       },
+    ];
+
+    if (crucibleContext) {
+      messages.push({
+        role: "system",
+        content: `[WORLD STRUCTURE]\n${crucibleContext}`,
+      });
+    }
+
+    messages.push(
       {
         role: "user",
         content: `CURRENT ENTRY:\n${currentContent}\n\nMODIFICATION INSTRUCTIONS:\n${instructions}`,
       },
       { role: "assistant", content: prefillContent },
-    ];
+    );
 
     return {
       messages,
       params: { model, max_tokens: 1024, temperature: 0.7, min_p: 0.05, frequency_penalty: 0.1 },
-      contextPinning: { head: 1, tail: 3 },
+      contextPinning: { head: 1, tail: crucibleContext ? 4 : 3 },
     };
   };
 };

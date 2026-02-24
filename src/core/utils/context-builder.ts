@@ -359,6 +359,33 @@ export const buildStoryEnginePrefix = async (
 // --- Crucible Prefix ---
 
 /**
+ * Formats crucible world elements as a structured list for injection into
+ * lorebook generation context. Grouped by DULFS category, one line per element.
+ * Returns empty string if no elements exist.
+ */
+export const formatCrucibleElementsContext = (state: RootState): string => {
+  const { elements } = state.crucible;
+  if (elements.length === 0) return "";
+
+  const groups = new Map<string, typeof elements>();
+  for (const el of elements) {
+    const list = groups.get(el.fieldId) || [];
+    list.push(el);
+    groups.set(el.fieldId, list);
+  }
+
+  const lines: string[] = [];
+  for (const [fieldId, fieldElements] of groups) {
+    const label = FIELD_CONFIGS.find((f) => f.id === fieldId)?.label || fieldId;
+    lines.push(`${label}:`);
+    for (const el of fieldElements) {
+      lines.push(`- ${el.content ? `${el.name}: ${el.content}` : el.name}`);
+    }
+  }
+  return lines.join("\n");
+};
+
+/**
  * Options for buildCruciblePrefix — isolated context for all Crucible factories.
  * Crucible uses its own system identity and only includes what each factory needs.
  */

@@ -120,39 +120,29 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       // Clean up removed goals
       const currentIds = new Set(currentGoals.map((g) => g.id));
       for (const [id] of goalCardCache) {
-        if (!currentIds.has(id)) {
-          goalCardCache.delete(id);
-        }
+        if (!currentIds.has(id)) goalCardCache.delete(id);
       }
 
       const sections = currentGoals.map((g) => ensureGoalCard(g.id));
 
+      // Restore view texts for goals that already have content — the content update
+      // above re-applies initial UIPart properties (which may be stale for old cards).
+      const viewTextUpdates = currentGoals
+        .filter((g) => g.text)
+        .map((g) => ({
+          id: `${CR.goal(g.id).TEXT}-view`,
+          text: formatTagsWithEmoji(g.text).replace(/\n/g, "  \n").replace(/</g, "\\<"),
+        }));
+
       api.v1.ui.updateParts([
         { id: CR.GOALS_LIST, style: this.style?.("goalsList"), content: sections },
+        ...viewTextUpdates,
       ]);
-
-      // Update view text for goal cards
-      for (const goal of currentGoals) {
-        const viewId = `${CR.goal(goal.id).TEXT}-view`;
-        if (goal.text) {
-          const display = formatTagsWithEmoji(goal.text)
-            .replace(/\n/g, "  \n").replace(/</g, "\\<");
-          api.v1.ui.updateParts([{ id: viewId, text: display }]);
-        } else {
-          api.v1.ui.updateParts([{ id: viewId, text: "_Generating..._" }]);
-        }
-      }
     };
 
-    // Rebuild on goal add/remove/text changes
+    // Rebuild list structure only when goals are added/removed
     useSelector(
-      (s) => {
-        const parts: string[] = [];
-        for (const g of s.crucible.goals) {
-          parts.push(`${g.id}:${g.text}`);
-        }
-        return parts.join("\0");
-      },
+      (s) => s.crucible.goals.map((g) => g.id).join(","),
       () => rebuildGoalsList(),
     );
 

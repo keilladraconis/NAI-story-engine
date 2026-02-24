@@ -998,13 +998,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       let count = 0;
       for (const el of elements) {
         const newId = api.v1.uuid();
-        // Build content including want/need/relationship if present
-        const parts = [el.name];
-        if (el.content) parts.push(el.content);
-        if (el.want) parts.push(`Want: ${el.want}`);
-        if (el.need) parts.push(`Need: ${el.need}`);
-        if (el.relationship) parts.push(`Relationship: ${el.relationship}`);
-        const content = parts.join("\n");
+        const content = el.content ? `${el.name}: ${el.content}` : el.name;
 
         await api.v1.storyStorage.set(`dulfs-item-${newId}`, content);
         dispatch(dulfsItemAdded({ fieldId: el.fieldId, item: { id: newId, fieldId: el.fieldId } }));

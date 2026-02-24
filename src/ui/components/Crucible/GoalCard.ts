@@ -43,6 +43,18 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
 
     const starBtnId = `${ids.ROOT}-star`;
     const goal = ctx.getState().crucible.goals.find((g) => g.id === goalId);
+
+    // Reactively update view text when goal text changes (owns its own display state)
+    useSelector(
+      (s) => s.crucible.goals.find((g) => g.id === goalId)?.text,
+      (text) => {
+        const display = text
+          ? formatTagsWithEmoji(text).replace(/\n/g, "  \n").replace(/</g, "\\<")
+          : "_Generating..._";
+        api.v1.ui.updateParts([{ id: `${ids.TEXT}-view`, text: display }]);
+      },
+    );
+
     const starBtn = api.v1.ui.part.button({
       id: starBtnId,
       text: goal?.starred ? "★" : "☆",
@@ -67,7 +79,9 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
       callback: () => dispatch(goalRemoved({ goalId })),
     });
 
-    const goalDisplay = goal?.text ? formatTagsWithEmoji(goal.text) : undefined;
+    const goalDisplay = goal?.text
+      ? formatTagsWithEmoji(goal.text).replace(/\n/g, "  \n").replace(/</g, "\\<")
+      : goal ? "_Generating..._" : undefined;
 
     const { part: editable } = ctx.render(EditableText, {
       id: ids.TEXT,
