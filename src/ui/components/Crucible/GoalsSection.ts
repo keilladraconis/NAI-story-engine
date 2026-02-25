@@ -13,7 +13,6 @@ import { IDS } from "../../framework/ids";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 import { GenerationButton } from "../GenerationButton";
 import { GoalCard } from "./GoalCard";
-import { formatTagsWithEmoji } from "../../../core/utils/tag-parser";
 import {
   NAI_WARNING,
 } from "../../colors";
@@ -125,19 +124,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
 
       const sections = currentGoals.map((g) => ensureGoalCard(g.id));
 
-      // Restore view texts for goals that already have content — the content update
-      // above re-applies initial UIPart properties (which may be stale for old cards).
-      const viewTextUpdates = currentGoals
-        .filter((g) => g.text)
-        .map((g) => ({
-          id: `${CR.goal(g.id).TEXT}-view`,
-          text: formatTagsWithEmoji(g.text).replace(/\n/g, "  \n").replace(/</g, "\\<"),
-        }));
-
-      api.v1.ui.updateParts([
-        { id: CR.GOALS_LIST, style: this.style?.("goalsList"), content: sections },
-        ...viewTextUpdates,
-      ]);
+      api.v1.ui.updateParts([{ id: CR.GOALS_LIST, style: this.style?.("goalsList"), content: sections }]);
     };
 
     // Rebuild list structure only when goals are added/removed

@@ -82,7 +82,7 @@ export const crucibleSlice = createSlice({
     },
 
     goalAdded: (state, payload: { goal: CrucibleGoal }) => {
-      return { ...state, goals: [...state.goals, payload.goal] };
+      return { ...state, goals: [...state.goals, { ...payload.goal, text: "_Generating..._" }] };
     },
 
     goalRemoved: (state, payload: { goalId: string }) => {
