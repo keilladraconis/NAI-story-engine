@@ -21,67 +21,6 @@ const FIELD_LABEL: Record<DulfsFieldID, string> = {
   [FieldID.SituationalDynamics]: "Situation",
 };
 
-// --- Structural Goal ---
-
-export const createStructuralGoalFactory = (
-  getState: () => RootState,
-  goalId: string,
-): MessageFactory => {
-  return async () => {
-    const state = getState();
-    const goal = state.crucible.goals.find((g) => g.id === goalId);
-    if (!goal) throw new Error(`[crucible] Goal not found: ${goalId}`);
-
-    const prompt = String(
-      (await api.v1.config.get("crucible_structural_goal_prompt")) || "",
-    );
-
-    const prefix = await buildCruciblePrefix(getState, {
-      includeDirection: true,
-      includeBrainstorm: true,
-    });
-
-    // Include the user's goal text as context
-    const goalText = parseTag(goal.text, "GOAL") || goal.text;
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: prompt,
-      },
-      {
-        role: "user",
-        content: `USER'S DRAMATIC GOAL:\n${goalText}`,
-      },
-      { role: "assistant", content: "[GOAL] " },
-    ];
-
-    return {
-      messages,
-      params: {
-        model: "glm-4-6",
-        max_tokens: 1024,
-        temperature: 1.0,
-        min_p: 0.05,
-        stop: ["</think>"],
-      },
-    };
-  };
-};
-
-export const buildStructuralGoalStrategy = (
-  getState: () => RootState,
-  goalId: string,
-): GenerationStrategy => {
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory: createStructuralGoalFactory(getState, goalId),
-    target: { type: "crucibleStructuralGoal", goalId },
-    prefillBehavior: "keep",
-    assistantPrefill: "[GOAL] ",
-  };
-};
-
 // --- Prerequisites ---
 
 export const createPrereqsFactory = (
@@ -98,9 +37,13 @@ export const createPrereqsFactory = (
       includeBrainstorm: true,
     });
 
-    // Format structural goals for context
-    const goalsContext = state.crucible.structuralGoals
-      .map((sg) => `[GOAL] ${sg.text}\n[WHY] ${sg.why}`)
+    // Format starred goals for context
+    const starredGoals = state.crucible.goals.filter((g) => g.starred);
+    const goalsContext = starredGoals
+      .map((g) => {
+        const goalText = parseTag(g.text, "GOAL") || g.text;
+        return g.why ? `[GOAL] ${goalText}\n[WHY] ${g.why}` : `[GOAL] ${goalText}`;
+      })
       .join("\n+++\n");
 
     const messages: Message[] = [
@@ -158,9 +101,10 @@ export const createElementsFactory = (
       includeDulfs: state.crucible.elements.length > 0,
     });
 
-    // Format structural goals
-    const goalsContext = state.crucible.structuralGoals
-      .map((sg) => `- ${sg.text}`)
+    // Format starred goals
+    const goalsContext = state.crucible.goals
+      .filter((g) => g.starred)
+      .map((g) => `- ${parseTag(g.text, "GOAL") || g.text}`)
       .join("\n");
 
     // Format prerequisites
@@ -240,9 +184,10 @@ export const createExpansionFactory = (
       .map((e) => `- ${e.name} (${FIELD_LABEL[e.fieldId] || e.fieldId}): ${e.content.slice(0, 100)}`)
       .join("\n");
 
-    // Format structural goals
-    const goalsContext = state.crucible.structuralGoals
-      .map((sg) => `- ${sg.text}`)
+    // Format starred goals
+    const goalsContext = state.crucible.goals
+      .filter((g) => g.starred)
+      .map((g) => `- ${parseTag(g.text, "GOAL") || g.text}`)
       .join("\n");
 
     // Build the expansion question

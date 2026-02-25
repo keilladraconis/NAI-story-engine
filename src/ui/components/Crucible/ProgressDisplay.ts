@@ -42,27 +42,17 @@ export const ProgressDisplay = defineComponent<undefined, RootState>({
     // Reactive step checklist
     useSelector(
       (s) => ({
-        sgCount: s.crucible.structuralGoals.length,
         prereqCount: s.crucible.prerequisites.length,
         elementCount: s.crucible.elements.length,
-        starredCount: s.crucible.goals.filter((g) => g.starred).length,
       }),
       (data) => {
         const steps: string[] = [];
-        steps.push("✓ Direction captured");
-
-        if (data.sgCount >= data.starredCount && data.starredCount > 0) {
-          steps.push(`✓ ${data.sgCount} structural goal${data.sgCount !== 1 ? "s" : ""} derived`);
-        } else if (data.sgCount > 0) {
-          steps.push(`⟳ Deriving structural goals... (${data.sgCount}/${data.starredCount})`);
-        } else {
-          steps.push("⟳ Finding the heart of your story...");
-        }
+        steps.push("✓ Goals shaped");
 
         if (data.prereqCount > 0) {
           steps.push(`✓ ${data.prereqCount} prerequisites found`);
-        } else if (data.sgCount >= data.starredCount && data.starredCount > 0) {
-          steps.push("⟳ Deriving what must be true...");
+        } else {
+          steps.push("⟳ Finding what must be true...");
         }
 
         if (data.elementCount > 0) {
@@ -76,7 +66,7 @@ export const ProgressDisplay = defineComponent<undefined, RootState>({
       },
     );
 
-    const initialSteps = "✓ Direction captured  \n⟳ Finding the heart of your story...";
+    const initialSteps = "✓ Goals shaped  \n⟳ Finding what must be true...";
 
     return column({
       id: CR.PROGRESS_ROOT,

@@ -106,8 +106,8 @@ export interface GenerationRequest {
   | "lorebookRefine"
   | "bootstrap"
   | "crucibleDirection"
+  | "crucibleShapeDetection"
   | "crucibleGoal"
-  | "crucibleStructuralGoal"
   | "cruciblePrereqs"
   | "crucibleElements"
   | "crucibleExpansion";
@@ -130,8 +130,8 @@ export interface GenerationStrategy {
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }
   | { type: "crucibleDirection" }
+  | { type: "crucibleShapeDetection" }
   | { type: "crucibleGoal"; goalId: string }
-  | { type: "crucibleStructuralGoal"; goalId: string }
   | { type: "cruciblePrereqs" }
   | { type: "crucibleElements" }
   | { type: "crucibleExpansion"; elementId?: string };
@@ -152,19 +152,13 @@ export interface RuntimeState {
 
 // Crucible Types
 
-export type CruciblePhase = "direction" | "goals" | "building" | "review" | "merged";
+export type CruciblePhase = "direction" | "goals" | "building" | "review";
 
 export interface CrucibleGoal {
   id: string;
   text: string;
-  starred: boolean;
-}
-
-export interface StructuralGoal {
-  id: string;
-  sourceGoalId: string;
-  text: string;
   why: string;
+  starred: boolean;
 }
 
 export type PrereqCategory = "RELATIONSHIP" | "SECRET" | "POWER" | "HISTORY" | "OBJECT" | "BELIEF" | "PLACE";
@@ -191,8 +185,9 @@ export interface CrucibleWorldElement {
 export interface CrucibleState {
   phase: CruciblePhase;
   direction: string | null;
+  detectedShape: string | null;
+  merged: boolean;
   goals: CrucibleGoal[];
-  structuralGoals: StructuralGoal[];
   prerequisites: Prerequisite[];
   elements: CrucibleWorldElement[];
 }

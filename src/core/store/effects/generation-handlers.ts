@@ -10,10 +10,10 @@ import {
 } from "./handlers/lorebook";
 import {
   crucibleDirectionHandler,
+  shapeDetectionHandler,
   crucibleGoalHandler,
 } from "./handlers/crucible";
 import {
-  structuralGoalHandler,
   prerequisitesHandler,
   elementsHandler,
   expansionHandler,
@@ -55,13 +55,13 @@ export type CrucibleDirectionTarget = Extract<
   GenerationStrategy["target"],
   { type: "crucibleDirection" }
 >;
+export type CrucibleShapeDetectionTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "crucibleShapeDetection" }
+>;
 export type CrucibleGoalTarget = Extract<
   GenerationStrategy["target"],
   { type: "crucibleGoal" }
->;
-export type CrucibleStructuralGoalTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "crucibleStructuralGoal" }
 >;
 export type CruciblePrereqsTarget = Extract<
   GenerationStrategy["target"],
@@ -115,8 +115,8 @@ export const GENERATION_HANDLERS: {
   lorebookKeys: GenerationHandlers<LorebookKeysTarget>;
   lorebookRefine: GenerationHandlers<LorebookRefineTarget>;
   crucibleDirection: GenerationHandlers<CrucibleDirectionTarget>;
+  crucibleShapeDetection: GenerationHandlers<CrucibleShapeDetectionTarget>;
   crucibleGoal: GenerationHandlers<CrucibleGoalTarget>;
-  crucibleStructuralGoal: GenerationHandlers<CrucibleStructuralGoalTarget>;
   cruciblePrereqs: GenerationHandlers<CruciblePrereqsTarget>;
   crucibleElements: GenerationHandlers<CrucibleElementsTarget>;
   crucibleExpansion: GenerationHandlers<CrucibleExpansionTarget>;
@@ -129,8 +129,8 @@ export const GENERATION_HANDLERS: {
   lorebookKeys: lorebookKeysHandler,
   lorebookRefine: lorebookRefineHandler,
   crucibleDirection: crucibleDirectionHandler,
+  crucibleShapeDetection: shapeDetectionHandler,
   crucibleGoal: crucibleGoalHandler,
-  crucibleStructuralGoal: structuralGoalHandler,
   cruciblePrereqs: prerequisitesHandler,
   crucibleElements: elementsHandler,
   crucibleExpansion: expansionHandler,

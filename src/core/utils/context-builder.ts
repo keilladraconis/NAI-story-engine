@@ -615,12 +615,12 @@ export const createSummarizeFactory = (
       .join("\n");
     messages.push({
       role: "user",
-      content: `Here is the brainstorm conversation to summarize:\n\n${chatText}\n\nProvide a faithful synopsis.`,
+      content: `Brainstorm conversation:\n\n${chatText}`,
     });
 
     return {
       messages,
-      params: { model, max_tokens: 600, temperature: 0.7, min_p: 0.05 },
+      params: { model, max_tokens: 1024, temperature: 0.7, min_p: 0.05 },
     };
   };
 };

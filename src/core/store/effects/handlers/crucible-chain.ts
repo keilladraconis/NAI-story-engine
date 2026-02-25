@@ -8,7 +8,6 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import {
-  structuralGoalDerived,
   prerequisitesDerived,
   elementsDerived,
 } from "../../index";
@@ -40,45 +39,9 @@ const VALID_CATEGORIES = new Set<string>(["RELATIONSHIP", "SECRET", "POWER", "HI
 
 // --- Target types ---
 
-type StructuralGoalTarget = { type: "crucibleStructuralGoal"; goalId: string };
 type PrereqsTarget = { type: "cruciblePrereqs" };
 type ElementsTarget = { type: "crucibleElements" };
 type ExpansionTarget = { type: "crucibleExpansion"; elementId?: string };
-
-// --- Structural Goal Handler ---
-
-export const structuralGoalHandler: GenerationHandlers<StructuralGoalTarget> = {
-  streaming(ctx: StreamingContext<StructuralGoalTarget>): void {
-    const text = stripThinkingTags(ctx.accumulatedText);
-    const tail = text.replace(/\n+/g, " ").slice(-120);
-    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.TICKER_TEXT, text: tail }]);
-  },
-
-  async completion(ctx: CompletionContext<StructuralGoalTarget>): Promise<void> {
-    if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
-
-    const { goalId } = ctx.target;
-    const text = stripThinkingTags(ctx.accumulatedText).trim();
-
-    const goalText = parseTag(text, "GOAL");
-    const whyText = parseTag(text, "WHY") || "";
-
-    if (goalText) {
-      ctx.dispatch(structuralGoalDerived({
-        goal: {
-          id: api.v1.uuid(),
-          sourceGoalId: goalId,
-          text: goalText,
-          why: whyText,
-        },
-      }));
-      api.v1.log(`[crucible] Structural goal derived for ${goalId}: ${goalText.slice(0, 80)}`);
-    } else {
-      api.v1.log("[crucible] Structural goal parse: missing [GOAL]");
-      api.v1.log("[crucible] Raw text:", text.slice(0, 500));
-    }
-  },
-};
 
 // --- Prerequisites Handler ---
 

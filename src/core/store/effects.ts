@@ -24,7 +24,6 @@ import {
   uiBrainstormRetryGeneration,
   uiBrainstormSummarize,
   pruneHistory,
-  messagesCleared,
   uiGenerationRequested,
   dulfsItemRemoved,
   dulfsItemAdded,
@@ -36,11 +35,15 @@ import {
   requestCancelled,
   requestCompleted,
   crucibleGoalsRequested,
+  crucibleAddGoalRequested,
   crucibleStopRequested,
   crucibleMergeRequested,
   crucibleDirectionRequested,
   crucibleBuildRequested,
   crucibleReset,
+  mergeCompleted,
+  chatCreated,
+  chatRenamed,
   directionSet,
   goalAdded,
   goalRemoved,
@@ -64,10 +67,10 @@ import {
 } from "../utils/context-builder";
 import {
   buildCrucibleDirectionStrategy,
+  buildShapeDetectionStrategy,
   buildCrucibleGoalStrategy,
 } from "../utils/crucible-strategy";
 import {
-  buildStructuralGoalStrategy,
   buildPrereqsStrategy,
   buildElementsStrategy,
   buildExpansionStrategy,
@@ -244,8 +247,8 @@ function resolvePrefill(
   // Crucible targets use explicit assistantPrefill
   if (
     target.type === "crucibleDirection" ||
+    target.type === "crucibleShapeDetection" ||
     target.type === "crucibleGoal" ||
-    target.type === "crucibleStructuralGoal" ||
     target.type === "cruciblePrereqs" ||
     target.type === "crucibleElements" ||
     target.type === "crucibleExpansion"
@@ -329,10 +332,10 @@ function cacheLabel(target: GenerationStrategy["target"]): string {
       return "bootstrap";
     case "crucibleDirection":
       return "crucible-direction";
+    case "crucibleShapeDetection":
+      return "crucible-shape";
     case "crucibleGoal":
       return `crucible-goal:${target.goalId.slice(0, 8)}`;
-    case "crucibleStructuralGoal":
-      return `crucible-sg:${target.goalId.slice(0, 8)}`;
     case "cruciblePrereqs":
       return "crucible-prereqs";
     case "crucibleElements":
@@ -526,35 +529,30 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Brainstorm Summarize
+  // Intent: Brainstorm Summarize → create a new chat, generate summary there (original chat preserved)
   subscribeEffect(
     matchesAction(uiBrainstormSummarize),
-    async (_action, { dispatch, getState }) => {
-      const messages = currentMessages(getState().brainstorm);
+    async (_action, { dispatch, getState: getLatest }) => {
+      const state = getLatest();
+      const messages = currentMessages(state.brainstorm);
       if (messages.length === 0) {
         api.v1.ui.toast("Nothing to summarize", { type: "info" });
         return;
       }
 
       const chatHistory = [...messages];
-      dispatch(messagesCleared());
-      const assistantId = api.v1.uuid();
-      dispatch(
-        messageAdded({
-          id: assistantId,
-          role: "assistant",
-          content: "",
-        }),
-      );
+      const sourceTitle = currentChat(state.brainstorm).title;
 
-      const strategy = buildSummarizeStrategy(getState, assistantId, chatHistory);
-      dispatch(
-        requestQueued({
-          id: strategy.requestId,
-          type: "brainstorm",
-          targetId: assistantId,
-        }),
-      );
+      // Create a new chat (original is preserved); chatCreated switches to it
+      dispatch(chatCreated());
+      const newIndex = getLatest().brainstorm.currentChatIndex;
+      dispatch(chatRenamed({ index: newIndex, title: `Summary: ${sourceTitle}` }));
+
+      const assistantId = api.v1.uuid();
+      dispatch(messageAdded({ id: assistantId, role: "assistant", content: "" }));
+
+      const strategy = buildSummarizeStrategy(getLatest, assistantId, chatHistory);
+      dispatch(requestQueued({ id: strategy.requestId, type: "brainstorm", targetId: assistantId }));
       dispatch(generationSubmitted(strategy));
     },
   );
@@ -806,7 +804,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Goals Requested → sync intent, create 3 empty goals, queue per-goal generation
+  // Intent: Crucible Goals Requested → sync intent, run shape detection, then queue goals on completion
   subscribeEffect(
     matchesAction(crucibleGoalsRequested),
     async (_action, { dispatch }) => {
@@ -817,26 +815,50 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         dispatch(directionSet({ direction: editedDirection }));
       }
 
-      for (let i = 0; i < 3; i++) {
-        const goalId = api.v1.uuid();
-        dispatch(goalAdded({ goal: { id: goalId, text: "", starred: false } }));
-
-        const strategy = buildCrucibleGoalStrategy(getState, goalId);
-        dispatch(
-          requestQueued({
-            id: strategy.requestId,
-            type: "crucibleGoal",
-            targetId: goalId,
-          }),
-        );
-        dispatch(generationSubmitted(strategy));
-      }
-
       dispatch(phaseTransitioned({ phase: "goals" }));
+
+      // Step 1: Detect narrative shape — goals will be queued in the requestCompleted handler
+      const strategy = buildShapeDetectionStrategy(getState);
+      dispatch(
+        requestQueued({
+          id: strategy.requestId,
+          type: "crucibleShapeDetection",
+          targetId: "crucible",
+        }),
+      );
+      dispatch(generationSubmitted(strategy));
     },
   );
 
-  // Intent: Crucible Build Requested → three-step chain pipeline
+  // Intent: Add Single Goal → ensure goals phase, create goal, run shape detection if needed first
+  subscribeEffect(
+    matchesAction(crucibleAddGoalRequested),
+    async (_action, { dispatch, getState: getLatest }) => {
+      const state = getLatest();
+
+      if (state.crucible.phase === "direction") {
+        dispatch(phaseTransitioned({ phase: "goals" }));
+      }
+
+      const goalId = api.v1.uuid();
+      dispatch(goalAdded({ goal: { id: goalId, text: "", why: "", starred: false } }));
+
+      // If shape is unknown, queue shape detection first.
+      // The goal JIT factory reads detectedShape from state at execution time,
+      // so it will have the result by the time it runs.
+      if (state.crucible.detectedShape === null) {
+        const shapeStrategy = buildShapeDetectionStrategy(getState);
+        dispatch(requestQueued({ id: shapeStrategy.requestId, type: "crucibleShapeDetection", targetId: "crucible" }));
+        dispatch(generationSubmitted(shapeStrategy));
+      }
+
+      const goalStrategy = buildCrucibleGoalStrategy(getState, goalId);
+      dispatch(requestQueued({ id: goalStrategy.requestId, type: "crucibleGoal", targetId: goalId }));
+      dispatch(generationSubmitted(goalStrategy));
+    },
+  );
+
+  // Intent: Crucible Build Requested → two-step chain pipeline (prereqs → elements)
   subscribeEffect(
     matchesAction(crucibleBuildRequested),
     async (_action, { dispatch, getState: getLatest }) => {
@@ -854,18 +876,10 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         text: "Finding the heart of your story...",
       }]);
 
-      // Queue structural goal derivation for each starred goal
-      for (const goal of starredGoals) {
-        const strategy = buildStructuralGoalStrategy(getState, goal.id);
-        dispatch(
-          requestQueued({
-            id: strategy.requestId,
-            type: "crucibleStructuralGoal",
-            targetId: goal.id,
-          }),
-        );
-        dispatch(generationSubmitted(strategy));
-      }
+      // Queue prerequisites directly — shape-native goals are the structural endpoints
+      const strategy = buildPrereqsStrategy(getState);
+      dispatch(requestQueued({ id: strategy.requestId, type: "cruciblePrereqs", targetId: "crucible" }));
+      dispatch(generationSubmitted(strategy));
     },
   );
 
@@ -876,32 +890,29 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       await api.v1.timers.sleep(150);
 
       const state = getState();
+
+      // Goals phase: shape detection completed → queue 3 shape-native goals
+      if (state.crucible.phase === "goals") {
+        if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
+        if (state.crucible.detectedShape === null) return;
+        if (state.crucible.goals.length > 0) return; // goals already queued
+
+        api.v1.log(`[crucible] Shape detected: ${state.crucible.detectedShape} → queuing goals`);
+        for (let i = 0; i < 3; i++) {
+          const goalId = api.v1.uuid();
+          dispatch(goalAdded({ goal: { id: goalId, text: "", why: "", starred: false } }));
+          const strategy = buildCrucibleGoalStrategy(getState, goalId);
+          dispatch(requestQueued({ id: strategy.requestId, type: "crucibleGoal", targetId: goalId }));
+          dispatch(generationSubmitted(strategy));
+        }
+        return;
+      }
+
       if (state.crucible.phase !== "building") return;
       if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
 
-      const starredGoals = state.crucible.goals.filter((g) => g.starred);
-
-      // Check which step we're at based on what data exists
-      const hasAllStructuralGoals = starredGoals.every((g) =>
-        state.crucible.structuralGoals.some((sg) => sg.sourceGoalId === g.id),
-      );
-
-      if (!hasAllStructuralGoals) {
-        api.v1.log("[crucible] Waiting for structural goals to complete");
-        return;
-      }
-
-      if (state.crucible.prerequisites.length === 0) {
-        // Step 2: Queue prerequisites
-        api.v1.log("[crucible] Structural goals complete → queuing prerequisites");
-        const strategy = buildPrereqsStrategy(getState);
-        dispatch(requestQueued({ id: strategy.requestId, type: "cruciblePrereqs", targetId: "crucible" }));
-        dispatch(generationSubmitted(strategy));
-        return;
-      }
-
       if (state.crucible.elements.length === 0) {
-        // Step 3: Queue world elements
+        // Step 2: Queue world elements
         api.v1.log("[crucible] Prerequisites complete → queuing world elements");
         const strategy = buildElementsStrategy(getState);
         dispatch(requestQueued({ id: strategy.requestId, type: "crucibleElements", targetId: "crucible" }));
@@ -1005,7 +1016,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         count++;
       }
 
-      dispatch(phaseTransitioned({ phase: "merged" }));
+      dispatch(mergeCompleted());
       api.v1.log(`[crucible] Merged ${count} elements to DULFS`);
       api.v1.ui.toast(`Merged ${count} world elements to DULFS`, { type: "success" });
     },

@@ -3,7 +3,6 @@ import {
   CrucibleState,
   CrucibleGoal,
   CruciblePhase,
-  StructuralGoal,
   Prerequisite,
   CrucibleWorldElement,
 } from "../types";
@@ -17,17 +16,20 @@ export function migrateCrucibleState(loaded: Partial<CrucibleState>): CrucibleSt
     return { ...initialCrucibleState, direction: loaded.direction ?? null };
   }
 
-  // Clamp persisted phase — "expanding" no longer exists
+  // Clamp persisted phase — "merged" is now a boolean flag, not a phase
   const rawPhase = loaded.phase as string;
-  const validPhases = new Set(["direction", "goals", "building", "review", "merged"]);
-  const phase = validPhases.has(rawPhase) ? (rawPhase as CruciblePhase) : "direction";
+  const validPhases = new Set(["direction", "goals", "building", "review"]);
+  const phase = validPhases.has(rawPhase) ? (rawPhase as CruciblePhase) : "review";
+  // Old persisted "merged" phase maps to review + merged:true
+  const merged = rawPhase === "merged" ? true : (loaded.merged ?? false);
 
   return {
     ...initialCrucibleState,
     phase,
     direction: loaded.direction ?? null,
+    detectedShape: loaded.detectedShape ?? null,
+    merged,
     goals: Array.isArray(loaded.goals) ? loaded.goals : [],
-    structuralGoals: Array.isArray(loaded.structuralGoals) ? loaded.structuralGoals : [],
     prerequisites: Array.isArray(loaded.prerequisites) ? loaded.prerequisites : [],
     elements: Array.isArray(loaded.elements) ? loaded.elements : [],
   };
@@ -36,8 +38,9 @@ export function migrateCrucibleState(loaded: Partial<CrucibleState>): CrucibleSt
 export const initialCrucibleState: CrucibleState = {
   phase: "direction",
   direction: null,
+  detectedShape: null,
+  merged: false,
   goals: [],
-  structuralGoals: [],
   prerequisites: [],
   elements: [],
 };
@@ -48,6 +51,7 @@ export const crucibleSlice = createSlice({
   reducers: {
     // Signal actions — effects handle the actual work
     crucibleGoalsRequested: (state) => state,
+    crucibleAddGoalRequested: (state) => state,
     crucibleStopRequested: (state) => state,
     crucibleMergeRequested: (state) => state,
     crucibleBuildRequested: (state) => state,
@@ -57,9 +61,19 @@ export const crucibleSlice = createSlice({
     phaseTransitioned: (state, payload: { phase: CruciblePhase }) => {
       // Starting a fresh build — clear all derived data so previous results don't accumulate
       if (payload.phase === "building") {
-        return { ...state, phase: payload.phase, structuralGoals: [], prerequisites: [], elements: [], expandingElementId: null, expansionPrereqs: [] };
+        return { ...state, phase: payload.phase, merged: false, prerequisites: [], elements: [] };
       }
       return { ...state, phase: payload.phase };
+    },
+
+    // Merge outcome
+    mergeCompleted: (state) => {
+      return { ...state, merged: true };
+    },
+
+    // Shape detection
+    shapeDetected: (state, payload: { shape: string }) => {
+      return { ...state, detectedShape: payload.shape };
     },
 
     // Direction phase reducers
@@ -72,29 +86,30 @@ export const crucibleSlice = createSlice({
     },
 
     // Goal management
-    goalTextUpdated: (state, payload: { goalId: string; text: string }) => {
+    goalTextUpdated: (state, payload: { goalId: string; text: string; why?: string }) => {
       return {
         ...state,
         goals: state.goals.map((g) =>
-          g.id === payload.goalId ? { ...g, text: payload.text } : g,
+          g.id === payload.goalId
+            ? { ...g, text: payload.text, ...(payload.why !== undefined ? { why: payload.why } : {}) }
+            : g,
         ),
       };
     },
 
     goalAdded: (state, payload: { goal: CrucibleGoal }) => {
-      return { ...state, goals: [...state.goals, { ...payload.goal, text: "_Generating..._" }] };
+      return { ...state, goals: [...state.goals, { ...payload.goal, text: "_Generating..._", why: "" }] };
     },
 
     goalRemoved: (state, payload: { goalId: string }) => {
       return {
         ...state,
         goals: state.goals.filter((g) => g.id !== payload.goalId),
-        structuralGoals: state.structuralGoals.filter((sg) => sg.sourceGoalId !== payload.goalId),
       };
     },
 
     goalsCleared: (state) => {
-      return { ...state, goals: [], structuralGoals: [] };
+      return { ...state, goals: [], detectedShape: null };
     },
 
     goalStarred: (state, payload: { goalId: string }) => {
@@ -103,14 +118,6 @@ export const crucibleSlice = createSlice({
         goals: state.goals.map((g) =>
           g.id === payload.goalId ? { ...g, starred: !g.starred } : g,
         ),
-      };
-    },
-
-    // Structural goal derivation
-    structuralGoalDerived: (state, payload: { goal: StructuralGoal }) => {
-      return {
-        ...state,
-        structuralGoals: [...state.structuralGoals, payload.goal],
       };
     },
 
@@ -185,10 +192,13 @@ export const crucibleSlice = createSlice({
 
 export const {
   crucibleGoalsRequested,
+  crucibleAddGoalRequested,
   crucibleStopRequested,
   crucibleMergeRequested,
+  mergeCompleted,
   crucibleBuildRequested,
   phaseTransitioned,
+  shapeDetected,
   crucibleDirectionRequested,
   directionSet,
   crucibleDirectionEdited,
@@ -197,7 +207,6 @@ export const {
   goalRemoved,
   goalsCleared,
   goalStarred,
-  structuralGoalDerived,
   prerequisitesDerived,
   prerequisiteRemoved,
   prerequisiteUpdated,

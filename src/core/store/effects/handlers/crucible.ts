@@ -6,6 +6,7 @@ import {
 import {
   goalTextUpdated,
   directionSet,
+  shapeDetected,
 } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
 import {
@@ -21,6 +22,7 @@ function stripThinkingTags(text: string): string {
 // --- Types for crucible targets ---
 
 type CrucibleDirectionTarget = { type: "crucibleDirection" };
+type CrucibleShapeDetectionTarget = { type: "crucibleShapeDetection" };
 type CrucibleGoalTarget = { type: "crucibleGoal"; goalId: string };
 
 // --- Direction Handler ---
@@ -48,6 +50,43 @@ export const crucibleDirectionHandler: GenerationHandlers<CrucibleDirectionTarge
   },
 };
 
+// --- Shape Detection Handler ---
+
+const VALID_SHAPES = new Set([
+  "CLIMACTIC_CHOICE",
+  "SPIRAL_DESCENT",
+  "THRESHOLD_CROSSING",
+  "EQUILIBRIUM_RESTORED",
+  "ACCUMULATED_WEIGHT",
+  "REVELATION",
+]);
+
+export const shapeDetectionHandler: GenerationHandlers<CrucibleShapeDetectionTarget> = {
+  streaming(ctx: StreamingContext<CrucibleShapeDetectionTarget>): void {
+    const text = stripThinkingTags(ctx.accumulatedText);
+    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.TICKER_TEXT, text: text.slice(-60) }]);
+  },
+
+  async completion(ctx: CompletionContext<CrucibleShapeDetectionTarget>): Promise<void> {
+    if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
+
+    const text = stripThinkingTags(ctx.accumulatedText).trim();
+    // accumulatedText includes the prefill "SHAPE: " — extract the value after it
+    const shapeMatch = text.match(/SHAPE:\s*([A-Z_]+)/);
+    const raw = shapeMatch ? shapeMatch[1].trim() : "";
+    const shape = VALID_SHAPES.has(raw) ? raw : "CLIMACTIC_CHOICE";
+
+    if (!VALID_SHAPES.has(raw)) {
+      api.v1.log("[crucible] Shape parse: unrecognised shape, defaulting to CLIMACTIC_CHOICE");
+      api.v1.log("[crucible] Raw text:", text.slice(0, 200));
+    } else {
+      api.v1.log(`[crucible] Shape detected: ${shape}`);
+    }
+
+    ctx.dispatch(shapeDetected({ shape }));
+  },
+};
+
 // --- Per-Goal Handler ---
 
 export const crucibleGoalHandler: GenerationHandlers<CrucibleGoalTarget> = {
@@ -68,8 +107,10 @@ export const crucibleGoalHandler: GenerationHandlers<CrucibleGoalTarget> = {
     const { goalId } = ctx.target;
     const text = stripThinkingTags(ctx.accumulatedText).trim();
 
-    if (parseTag(text, "GOAL")) {
-      ctx.dispatch(goalTextUpdated({ goalId, text }));
+    const goalText = parseTag(text, "GOAL");
+    if (goalText) {
+      const why = parseTag(text, "WHY") || "";
+      ctx.dispatch(goalTextUpdated({ goalId, text, why }));
     } else {
       api.v1.log("[crucible] Goal parse: missing [GOAL]");
       api.v1.log("[crucible] Raw text:", text.slice(0, 500));

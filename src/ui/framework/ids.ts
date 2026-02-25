@@ -16,8 +16,7 @@ export const IDS = {
     TICKER_TEXT: "cr-ticker",
     PROGRESS_ROOT: "cr-progress-root",
     REVIEW_ROOT: "cr-review-root",
-    MERGED_ROOT: "cr-merged-root",
-    STRUCTURAL_GOALS_SECTION: "cr-structural-goals",
+    SHAPE_BADGE: "cr-shape-badge",
     PREREQS_SECTION: "cr-prereqs",
     ELEMENTS_SECTION: "cr-elements",
     MERGE_BTN: "cr-merge-btn",
@@ -25,10 +24,6 @@ export const IDS = {
       ROOT: `cr-goal-${id}`,
       TEXT: `cr-goal-${id}-text`,
       DEL_BTN: `cr-goal-${id}-del`,
-    }),
-    structuralGoal: (id: string) => ({
-      ROOT: `cr-sg-${id}`,
-      TEXT: `cr-sg-${id}-text`,
     }),
     prereq: (id: string) => ({
       ROOT: `cr-prereq-${id}`,

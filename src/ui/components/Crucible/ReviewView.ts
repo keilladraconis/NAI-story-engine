@@ -1,5 +1,5 @@
 import { defineComponent } from "nai-act";
-import { RootState, CrucibleWorldElement, Prerequisite, StructuralGoal } from "../../../core/store/types";
+import { RootState, CrucibleWorldElement, Prerequisite } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
 import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
 import {
@@ -73,18 +73,16 @@ export const ReviewView = defineComponent<undefined, RootState>({
     root: {
       gap: "8px",
     },
+    mergedText: {
+      "font-size": "0.85em",
+      color: "#81c784",
+      "margin-top": "4px",
+    },
     sectionTitle: {
       "font-size": "0.75em",
       "font-weight": "bold",
       "text-transform": "uppercase",
       opacity: "0.6",
-    },
-    sgCard: {
-      padding: "6px 8px",
-      "border-radius": "4px",
-      "background-color": "rgba(255,255,255,0.03)",
-      "border-left": "3px solid rgba(168,162,255,0.4)",
-      gap: "2px",
     },
     prereqCard: {
       padding: "4px 8px",
@@ -115,13 +113,26 @@ export const ReviewView = defineComponent<undefined, RootState>({
   build(_props, ctx) {
     const { dispatch, useSelector } = ctx;
 
-    // Merge button
+    // Pre-merge footer: confirm button
     const { part: mergeButton } = ctx.render(ButtonWithConfirmation, {
       id: CR.MERGE_BTN,
       label: "Merge to Story Engine",
       confirmLabel: "Populate DULFS fields?",
       onConfirm: () => dispatch(crucibleMergeRequested()),
       style: { marginTop: "4px" },
+    });
+
+    const isMerged = ctx.getState().crucible.merged;
+    const mergedFooter = text({
+      id: "cr-merged-footer",
+      text: "✓ Merged to DULFS",
+      markdown: true,
+      style: isMerged ? this.style?.("mergedText") : this.style?.("hidden"),
+    });
+    const preMergeFooter = column({
+      id: "cr-premerge-footer",
+      style: isMerged ? this.style?.("hidden") : {},
+      content: [mergeButton],
     });
 
     // Expansion input + button (pre-rendered, stable)
@@ -147,28 +158,8 @@ export const ReviewView = defineComponent<undefined, RootState>({
     });
 
     // Caches
-    const sgCardCache = new Map<string, UIPart>();
     const prereqCardCache = new Map<string, UIPart>();
     const elementCardCache = new Map<string, UIPart>();
-
-    // --- Structural Goal Cards ---
-    const ensureSGCard = (sg: StructuralGoal): UIPart => {
-      if (!sgCardCache.has(sg.id)) {
-        sgCardCache.set(sg.id, column({
-          id: CR.structuralGoal(sg.id).ROOT,
-          style: this.style?.("sgCard"),
-          content: [
-            text({
-              id: CR.structuralGoal(sg.id).TEXT,
-              text: escapeViewText(`${sg.text}\n\n_Why: ${sg.why}_`),
-              markdown: true,
-              style: { "font-size": "0.85em" },
-            }),
-          ],
-        }));
-      }
-      return sgCardCache.get(sg.id)!;
-    };
 
     // --- Prerequisite Cards ---
     const ensurePrereqCard = (prereq: Prerequisite): UIPart => {
@@ -275,17 +266,6 @@ export const ReviewView = defineComponent<undefined, RootState>({
       const state = ctx.getState();
       const parts: UIPart[] = [];
 
-      // Structural goals section
-      if (state.crucible.structuralGoals.length > 0) {
-        const sgParts = state.crucible.structuralGoals.map((sg) => ensureSGCard(sg));
-        parts.push(collapsibleSection({
-          id: CR.STRUCTURAL_GOALS_SECTION,
-          title: `Structural Goals (${state.crucible.structuralGoals.length})`,
-          storageKey: "story:cr-sg-section",
-          content: sgParts,
-        }));
-      }
-
       // Prerequisites section
       if (state.crucible.prerequisites.length > 0) {
         const prereqParts = state.crucible.prerequisites.map((p) => ensurePrereqCard(p));
@@ -332,27 +312,24 @@ export const ReviewView = defineComponent<undefined, RootState>({
         }));
       }
 
-      parts.push(mergeButton);
+      parts.push(preMergeFooter);
+      parts.push(mergedFooter);
       return parts;
     };
 
     // Reactive rebuild
     useSelector(
       (s) => ({
-        sgCount: s.crucible.structuralGoals.length,
         prereqCount: s.crucible.prerequisites.length,
         elementIds: s.crucible.elements.map((e) => e.id).join(","),
         phase: s.crucible.phase,
+        merged: s.crucible.merged,
       }),
       () => {
         const state = ctx.getState();
         if (state.crucible.phase !== "review") return;
 
         // Evict removed items from caches
-        const currentSGIds = new Set(state.crucible.structuralGoals.map((sg) => sg.id));
-        for (const [id] of sgCardCache) {
-          if (!currentSGIds.has(id)) sgCardCache.delete(id);
-        }
         const currentPrereqIds = new Set(state.crucible.prerequisites.map((p) => p.id));
         for (const [id] of prereqCardCache) {
           if (!currentPrereqIds.has(id)) prereqCardCache.delete(id);
@@ -363,8 +340,14 @@ export const ReviewView = defineComponent<undefined, RootState>({
         }
 
         const sections = buildFullReview();
+        const merged = state.crucible.merged;
         api.v1.ui.updateParts([
           { id: CR.REVIEW_ROOT, style: this.style?.("root"), content: sections },
+        ]);
+        // Re-apply footer styles after content rebuild (build-time styles may be stale)
+        api.v1.ui.updateParts([
+          { id: "cr-merged-footer", style: merged ? this.style?.("mergedText") : this.style?.("hidden") },
+          { id: "cr-premerge-footer", style: merged ? this.style?.("hidden") : {} },
         ]);
 
         // Update view text for elements

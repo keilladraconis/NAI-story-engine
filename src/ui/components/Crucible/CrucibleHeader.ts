@@ -19,12 +19,11 @@ const PHASE_STATUS: Record<CruciblePhase, string> = {
   goals: "Star goals ★ then click Build World",
   building: "Building world...",
   review: "Review — or star more goals and rebuild",
-  merged: "World merged to DULFS",
 };
 
 const CRUCIBLE_GEN_TYPES = new Set([
-  "crucibleDirection", "crucibleGoal",
-  "crucibleStructuralGoal", "cruciblePrereqs", "crucibleElements", "crucibleExpansion",
+  "crucibleDirection", "crucibleShapeDetection", "crucibleGoal",
+  "cruciblePrereqs", "crucibleElements", "crucibleExpansion",
 ]);
 
 export const CrucibleHeader = defineComponent<undefined, RootState>({

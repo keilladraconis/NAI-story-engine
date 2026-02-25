@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772028763
+updatedAt: 1772049626
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -91,14 +91,7 @@ config:
     multiline: true
     type: string
     default: |-
-      Summarize the following brainstorm conversation into a faithful synopsis.
-
-      GUIDELINES:
-      - Write in prose, organized by topic — not chronologically.
-      - Preserve all specific details: names, places, mechanics, relationships, tensions.
-      - Include ideas that were debated or rejected if they shaped the direction.
-      - Target 150-300 words. Be dense, not padded.
-      - Do NOT add new ideas or interpretations. Report what was discussed.
+      Summarize the brainstorm conversation that follows. Begin directly with the content — no document title, no introductory sentence. Use markdown (## section headers, bullet points, bold for emphasis) to organize by topic, not chronologically. Cover all significant ideas, decisions, open questions, and rejected alternatives that shaped the direction. Do not add new ideas or interpretations beyond what was discussed.
 
   - name: canon_generate_prompt
     prettyName: Canon Generate Prompt

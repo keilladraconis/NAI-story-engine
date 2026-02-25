@@ -43,7 +43,8 @@ export const IntentSection = defineComponent<undefined, RootState>({
         return queued?.id;
       },
       isDisabledFromProjection: (proj: any) =>
-        proj.activeType === "crucibleStructuralGoal" || proj.activeType === "cruciblePrereqs" || proj.activeType === "crucibleElements" || proj.activeType === "crucibleGoal",
+        proj.activeType === "crucibleShapeDetection" || proj.activeType === "crucibleGoal" ||
+        proj.activeType === "cruciblePrereqs" || proj.activeType === "crucibleElements",
     });
 
     const { part: directionEditablePart } = ctx.render(EditableText, {
