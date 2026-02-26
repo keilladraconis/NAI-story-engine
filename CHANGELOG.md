@@ -2,6 +2,65 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2026-02-26
+
+### Added
+
+#### Crucible — Shape-Native Goal Pipeline (Complete Redesign)
+
+The v7 constraint-solving architecture (solver → builder → director, 15+ calls per chain) has been replaced with a leaner backward-reasoning pipeline that derives world elements directly from dramatic endpoints.
+
+- **Shape detection** — Before goals are generated, the AI classifies the story's narrative structure from six archetypes: Climactic Choice, Spiral Descent, Threshold Crossing, Equilibrium Restored, Accumulated Weight, Revelation. Displayed as a badge in the Goals section; conditions how goals are framed.
+- **Shape-native goals with `why`** — Goals are now structural endpoints, not scene scaffolds. Each `CrucibleGoal` includes a `why` field explaining its narrative function. The separate "reframe" step is gone; `StructuralGoal` type removed entirely.
+- **Star goals** — Goals can be starred to focus world-building on the most compelling endpoints.
+- **Prerequisites** — World-building now derives prerequisites (relationships, secrets, power structures, histories, objects, beliefs, places) that must exist for a goal to be narratively possible. `Prerequisite` interface: `{ id, element, loadBearing, category, satisfiedBy[] }`.
+- **World elements** — Elements satisfy prerequisites directly, mapping to DULFS fields. Each `CrucibleWorldElement` can carry `want`, `need`, and `relationship` attributes for richer characters and factions.
+- **Expand** — Any merged world element can seed a mini-chain (expansion prereqs → new elements), accessible from ReviewView after merging.
+- **`ReviewView`** — New review phase UI showing prerequisites grouped by category and world elements grouped by DULFS field, each individually editable before merge. Replaces the old `WorldBuildingView` + `SceneCard` layout.
+- **`ProgressDisplay`** — Step checklist visible during the building phase.
+- **`GoalCard` with why** — Goal cards show both the goal text and the AI's reasoning for why it's a compelling endpoint.
+
+#### Brainstorm — Sessions & Summarization
+
+- **Multiple sessions** — Brainstorm now supports named chat sessions. Create, rename, switch between, and delete sessions via the Sessions modal (folder icon in BrainstormHeader). The active session is used as context for all Story Engine and Crucible generation.
+- **Summarize** — "Sum" button in the header collapses the current chat into a dense summary using the configurable `brainstorm_summarize_prompt`. Useful for long brainstorms before moving to Crucible.
+- **Mode toggle** — "Co" (cowriter) and "Crit" (critic) mode buttons switch the AI's brainstorming persona.
+
+#### SEGA — Lorebook Relational Maps
+
+- **Relational map stage** — SEGA now generates a relational map per lorebook entry before key generation. The map captures cross-entry dependencies (primary locations, affiliated factions, known associates, relevant objects) to inform key generation with full world context.
+- **Reconciliation pass** — Entries with no primary characters or high collision risk receive a second map pass, reducing activation conflicts.
+- **Stub keys** — After content generation, SEGA immediately inserts stub activation keys (`["kse-stub", ...nameWords]`) so entries activate in story text without waiting for Stage 7. Keys generation then replaces stubs with map-informed proper keys.
+- **Skip flags** — `sega_skip_lorebook_relational_map` and `sega_skip_lorebook_keys` config toggles allow skipping these stages independently.
+
+#### Erato Compatibility
+
+- **`erato_compatibility` toggle** — Config flag for interoperability with Erato scripts. When enabled: lorebook category `entryHeader` is cleared, `"----\n"` separators move into entry content, and a `"SE: End of Lorebook"` sentinel marker entry is created at insertion order 1. Toggling off restores standard formatting.
+
+### Changed
+
+- **EditableText** — New props: `initialDisplay` (shown on mount when content is empty, instead of "_No content._"), `formatDisplay` (optional display formatter), `singleLine` (compact single-line layout for titles/short fields).
+- **Crucible context builder** — `buildCruciblePrefix` now accepts `{ includeBrainstorm, includeDirection }` options for finer control across generation stages.
+- **Keys stop token** — Changed from `["\n\n", "\n---"]` to `["\n---"]` only, preventing premature cutoff before the `KEYS:` line in long relational maps.
+- **Keys parser** — Requires a `KEYS:` line; no raw-text fallback. Logs and skips if absent rather than producing keys from unstructured output.
+
+### Breaking Changes
+
+- **Crucible state wiped on upgrade** — v7 state (with `chains`, `builder`, `autoChaining`) is automatically detected and replaced with a clean initial state via `migrateCrucibleState`. Scene cards and constraints are not preserved.
+- **Scene-based workflow removed** — Scenes, scene budget, scene cards, constraints, and the solver/builder/director loop are gone. World-building is now: prerequisites → world elements.
+- **`StructuralGoal` type removed** — Replaced by `CrucibleGoal` with a `why` field.
+- **Generation request types** — `crucibleChain` and `crucibleBuild` replaced by `cruciblePrereqs`, `crucibleElements`, and `crucibleExpansion`.
+- **Brainstorm state shape** — Existing single-session data is automatically wrapped into the first entry of the new `chats[]` array on load.
+
+### Developer Notes
+
+- 10 commits on v8 branch.
+- `src/core/store/slices/crucible.ts`: complete rewrite — new `CrucibleGoal`, `Prerequisite`, `CrucibleWorldElement`, `CruciblePhase` types.
+- New strategies: `crucible-strategy.ts` (direction, shape, goals), `crucible-chain-strategy.ts` (prereqs, elements, expansion).
+- New handlers: `handlers/crucible.ts`, `handlers/crucible-chain.ts`.
+- New/rewritten UI: `ReviewView`, `ProgressDisplay`, `GoalCard`, `IntentSection`, `GoalsSection`.
+- Design docs removed from repo: `crucible-redesign.md`, `goal-redesign.md`, `lorebook-keys-redesign.md`, `CODEREVIEW.md`.
+
 ## [0.7.2] - 2026-02-18
 
 ### Changed
