@@ -6,13 +6,21 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772049626
+updatedAt: 1772068932
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
     description: >-
       When enabled, SEGA will skip automatic lorebook key generation after
       generating entry content. Useful if you prefer to set keys manually.
+    type: boolean
+    default: false
+  - name: sega_skip_lorebook_relational_map
+    prettyName: Skip Lorebook Relational Map (SEGA)
+    description: >-
+      When enabled, SEGA will skip the relational map pass and generate keys
+      directly from entry prose. Keys quality may be lower for generic-named
+      entries without this cross-entry context pass.
     type: boolean
     default: false
   - name: erato_compatibility
@@ -226,33 +234,136 @@ config:
     type: string
     multiline: true
     default: |-
-      Generate activation keys for a lorebook entry. Keys fire when matched in story text, injecting the entry as context.
+      Assign activation keys to the lorebook entry below. Keys fire when matched in story text, loading the entry as context.
 
-      TARGET: 2-5 keys only.
+      DIRECTION RULE: Keys pull an entry into the narrative — they do not describe it.
+      - Character entries activate when the story enters their domain. Keys are name variants, associated locations, and associated factions. Not traits, roles, or backstory.
+      - Location entries activate when the story arrives there. Keys are the location's own name variants and associated factions. Character names are a last resort only when the location has no distinctive proper name (name is: generic, collision risk: high) and is inseparable from specific occupants.
+      - Faction/object entries activate through their own name, associated locations, and key figures.
+
+      BANNED: numbers, roles (surgeon, captain), traits (cold, ruthless), themes (debt, power), generic nouns valid in any scene (room, clinic, alley), full multi-word names as a single key, protagonist name on any entry not specifically about the protagonist.
+
+      TARGET: 2–5 keys. Fewer precise keys beat many weak ones.
 
       ---
 
-      ENTRY: Mira Voss is a surgeon operating out of Caldera Station's black market medical bay. She has a cold bedside manner and a reputation for saving people who shouldn't be saveable. She owes a significant debt to the Ashfield syndicate.
+      ENTRY: Mira Voss [Character]
+        - primary locations: Caldera Station, Sunken Arcade
+        - primary characters: none named
+        - factions/organizations: Ashfield Syndicate
+        - name is: distinctive
+        - collision risk: low
 
-      REJECTED: surgeon, cold, debt, medical, doctor — too generic, match any medical scene
-      REJECTED: mira voss — full name as single key, split instead
+      REJECTED: surgeon, doctor, cold, debt — traits and role; not anchors to her domain
+      REJECTED: mira voss — full multi-word name; split into variants
       KEYS: /mir(a|ra)?/, voss, caldera station, ashfield
 
       ---
 
-      ENTRY: The Sunken Arcade is a flooded entertainment district in the lower city, now home to smugglers and illegal gambling dens. Mira Voss runs her clinic out of a back room here. The Ashfield syndicate uses it as a meeting ground.
+      ENTRY: Sunken Arcade [Location]
+        - primary locations: lower city
+        - primary characters: Mira Voss
+        - factions/organizations: Ashfield Syndicate
+        - name is: distinctive
+        - collision risk: low
 
-      REJECTED: mira voss — character names don't activate locations, locations activate characters
       REJECTED: flooded, gambling, smugglers, entertainment — generic descriptors
-      KEYS: sunken arcade, lower city, ashfield
+      REJECTED: mira voss — direction rule: name is distinctive; character names do not activate locations
+      KEYS: sunken arcade, /lower.?city/, ashfield
 
       ---
 
-      ENTRY: The Ashfield Syndicate is a criminal organization controlling the lower city's black markets. They operate through intimidation and selective bribery of port officials. Their symbol is a broken anchor.
+      ENTRY: Mira's operating room [Location]
+        - primary locations: Sunken Arcade basement
+        - primary characters: Mira Voss
+        - factions/organizations: none
+        - name is: generic
+        - collision risk: high
 
-      REJECTED: criminal, black market, bribery, intimidation — appear in any crime scene
-      REJECTED: broken anchor — object description, not a name
-      KEYS: /ashfield/, lower city, caldera station
+      REJECTED: room, basement, operating — common nouns; appear in any scene
+      REJECTED: sunken arcade — fires the Arcade entry; collision with a broader location
+      NOTE: name is generic, collision risk high — character names are the only viable anchor
+      KEYS: mira voss, voss
+
+      ---
+
+  - name: lorebook_relational_map_prompt
+    prettyName: Lorebook Relational Map Prompt
+    description: Extracts structured relationship data incrementally. MAP SO FAR
+      provides cross-entry context for inferring associations not stated in the
+      entry text itself.
+    type: string
+    multiline: true
+    default: |-
+      Extract the relationship structure for the entry. Use MAP SO FAR to fill in associations not stated in the entry text itself.
+
+      ---
+
+      MAP SO FAR:
+      (none yet)
+
+      ---
+
+      ENTRY:
+      Mira Voss is a surgeon operating out of Caldera Station's black market medical bay. She has a cold bedside manner and a reputation for saving people who shouldn't be saveable. She owes a significant debt to the Ashfield syndicate.
+
+      Mira Voss [Character]
+        - primary locations: Caldera Station, Sunken Arcade
+        - primary characters: none named
+        - factions/organizations: Ashfield Syndicate
+        - name is: distinctive
+        - collision risk: low
+
+      ---
+
+      MAP SO FAR:
+      Mira Voss [Character]
+        - primary locations: Caldera Station, Sunken Arcade
+        - primary characters: none named
+        - factions/organizations: Ashfield Syndicate
+        - name is: distinctive
+        - collision risk: low
+
+      ---
+
+      ENTRY:
+      The Sunken Arcade is a flooded entertainment district in the lower city, now home to smugglers and illegal gambling dens. The Ashfield syndicate uses it as a meeting ground.
+
+      Sunken Arcade [Location]
+        - primary locations: lower city
+        - primary characters: Mira Voss
+        - factions/organizations: Ashfield Syndicate
+        - name is: distinctive
+        - collision risk: low
+
+      ---
+
+      MAP SO FAR:
+      Mira Voss [Character]
+        - primary locations: Caldera Station, Sunken Arcade
+        - primary characters: none named
+        - factions/organizations: Ashfield Syndicate
+        - name is: distinctive
+        - collision risk: low
+
+      Sunken Arcade [Location]
+        - primary locations: lower city
+        - primary characters: Mira Voss
+        - factions/organizations: Ashfield Syndicate
+        - name is: distinctive
+        - collision risk: low
+
+      ---
+
+      ENTRY:
+      There is a room behind a false wall in the Sunken Arcade's basement. It has no sign and no official designation.
+
+      Mira's operating room [Location]
+        - primary locations: Sunken Arcade basement
+        - primary characters: Mira Voss
+        - factions/organizations: none
+        - name is: generic
+        - collision risk: high
 
       ---
 

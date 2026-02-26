@@ -2,12 +2,14 @@ import { IDS } from "../../../../ui/framework/ids";
 import {
   GenerationHandlers,
   LorebookContentTarget,
+  LorebookRelationalMapTarget,
   LorebookKeysTarget,
   LorebookRefineTarget,
   StreamingContext,
   CompletionContext,
 } from "../generation-handlers";
-import { buildLorebookPrefill } from "../../../utils/lorebook-strategy";
+import { buildLorebookPrefill, CATEGORY_TO_TYPE } from "../../../utils/lorebook-strategy";
+import { segaRelationalMapStored } from "../../slices/runtime";
 
 // Cache for prefills during streaming (cleared on completion)
 const prefillCache = new Map<string, string>();
@@ -85,6 +87,18 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
           text: finalContent,
         });
 
+        // Insert stub keys so the entry activates in story text immediately.
+        // Stage 7 (keys) will replace these with map-informed proper keys.
+        // "kse-stub" sentinel lets findEntryNeedingKeys detect stub entries.
+        const lorebookEntry = await api.v1.lorebook.entry(entryId);
+        const stubNameWords = (lorebookEntry?.displayName || "")
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((w) => w.length > 1);
+        await api.v1.lorebook.updateEntry(entryId, {
+          keys: ["kse-stub", ...stubNameWords],
+        });
+
         // Update draft with full content if viewing this entry
         if (entryId === currentSelected) {
           await api.v1.storyStorage.set(
@@ -107,21 +121,63 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
     },
   };
 
-export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
-  streaming(ctx: StreamingContext<LorebookKeysTarget>, _newText: string): void {
-    // Stream to storageKey - UI auto-updates via binding
+export const lorebookRelationalMapHandler: GenerationHandlers<LorebookRelationalMapTarget> = {
+  streaming(ctx: StreamingContext<LorebookRelationalMapTarget>, _newText: string): void {
+    // Stream to shared draft for progress visibility when entry is selected
     const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
     if (ctx.target.entryId === currentSelected) {
-      api.v1.storyStorage.set(IDS.LOREBOOK.KEYS_DRAFT_RAW, ctx.accumulatedText);
+      api.v1.storyStorage.set(IDS.LOREBOOK.MAP_DRAFT_RAW, ctx.accumulatedText);
     }
+  },
+
+  async completion(ctx: CompletionContext<LorebookRelationalMapTarget>): Promise<void> {
+    if (ctx.generationSucceeded && ctx.accumulatedText.trim()) {
+      // Reconstruct the full map text: the factory's assistant prefill is
+      // "${displayName} [${entryType}]\n  - primary locations:" but that prefix
+      // is not included in accumulatedText (only the model's continuation is).
+      const entry = await api.v1.lorebook.entry(ctx.target.entryId);
+      const displayName = entry?.displayName || "Unknown";
+      let categoryName = "";
+      if (entry?.category) {
+        const categories = await api.v1.lorebook.categories();
+        const category = categories.find((c) => c.id === entry.category);
+        categoryName = category?.name || "";
+      }
+      const entryType = CATEGORY_TO_TYPE[categoryName] || "Entry";
+      const mapText = `${displayName} [${entryType}]\n  - primary locations:${ctx.accumulatedText}`.trim();
+
+      ctx.dispatch(segaRelationalMapStored({
+        entryId: ctx.target.entryId,
+        mapText,
+      }));
+    }
+    // On failure: no dispatch; state entry stays absent — keys factory falls back to prose
+  },
+};
+
+export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
+  streaming(_ctx: StreamingContext<LorebookKeysTarget>, _newText: string): void {
+    // No streaming display for keys — raw LLM output is noisy mid-stream
   },
 
   async completion(ctx: CompletionContext<LorebookKeysTarget>): Promise<void> {
     const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
 
     if (ctx.generationSucceeded && ctx.accumulatedText) {
+      // Find the KEYS: line — search all lines case-insensitively
+      const keysLine = ctx.accumulatedText
+        .split("\n")
+        .find((l) => /^keys:/i.test(l.trim()));
+
+      if (!keysLine) {
+        api.v1.log(`[lorebook-keys] no KEYS: line found for ${ctx.target.entryId.slice(0, 8)} — skipping`);
+        return;
+      }
+
+      const keysSource = keysLine.replace(/^keys:/i, "").trim();
+
       // Parse comma-separated keys
-      const keys = ctx.accumulatedText
+      const keys = keysSource
         .split(",")
         .map((k) => k.trim().toLowerCase())
         .filter((k) => k.length > 0 && k.length < 50);

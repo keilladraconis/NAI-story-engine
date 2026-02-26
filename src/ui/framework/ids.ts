@@ -74,15 +74,18 @@ export const IDS = {
     // Raw keys for storyStorage.set/get calls
     CONTENT_DRAFT_RAW: "lb-draft-content",
     KEYS_DRAFT_RAW: "lb-draft-keys",
+    MAP_DRAFT_RAW: "lb-draft-relational-map",
     REFINE_INSTRUCTIONS_RAW: "lb-refine-instructions",
     // Prefixed keys for storageKey binding on UI inputs
     CONTENT_DRAFT_KEY: "story:lb-draft-content",
     KEYS_DRAFT_KEY: "story:lb-draft-keys",
+    MAP_DRAFT_KEY: "story:lb-draft-relational-map",
     REFINE_INSTRUCTIONS_KEY: "story:lb-refine-instructions",
 
     // Entry-specific IDs (for synchronization with LorebookIconButton)
     entry: (entryId: string) => ({
       CONTENT_REQ: `lb-item-${entryId}-content`,
+      MAP_REQ: `lb-item-${entryId}-relational-map`,
       KEYS_REQ: `lb-item-${entryId}-keys`,
       REFINE_REQ: `lb-item-${entryId}-refine`,
     }),

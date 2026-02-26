@@ -1,6 +1,7 @@
 import { RootState } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix, formatCrucibleElementsContext } from "./context-builder";
+import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 
 // Category-to-template mapping
 const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
@@ -12,7 +13,7 @@ const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
 };
 
 // Category-to-type mapping for anchored prefills
-const CATEGORY_TO_TYPE: Record<string, string> = {
+export const CATEGORY_TO_TYPE: Record<string, string> = {
   "SE: Dramatis Personae": "Character",
   "SE: Universe Systems": "System",
   "SE: Locations": "Location",
@@ -23,6 +24,31 @@ const CATEGORY_TO_TYPE: Record<string, string> = {
 const getEntryType = (categoryName: string): string => {
   return CATEGORY_TO_TYPE[categoryName] || "Entry";
 };
+
+/**
+ * Dependency order for relational map generation.
+ * Characters are self-contained; locations/systems/factions/dynamics benefit
+ * from character context when building MAP SO FAR.
+ */
+export const MAP_DEPENDENCY_ORDER: DulfsFieldID[] = [
+  FieldID.DramatisPersonae,
+  FieldID.Locations,
+  FieldID.UniverseSystems,
+  FieldID.Factions,
+  FieldID.SituationalDynamics,
+];
+
+/**
+ * Returns true if a relational map entry needs reconciliation:
+ * no primary characters identified AND collision risk is high.
+ * These entries benefit from a second pass with the complete map as context.
+ */
+export function parseNeedsReconciliation(mapText: string): boolean {
+  const charLine = mapText.match(/- primary characters:\s*(.*)/i)?.[1]?.trim() ?? "";
+  const riskLine = mapText.match(/- collision risk:\s*(.*)/i)?.[1]?.trim() ?? "";
+  const noChars = !charLine || /^(none|n\/a|—|-)$/i.test(charLine);
+  return noChars && /high/i.test(riskLine);
+}
 
 // --- Factory Builders for JIT Strategy Building ---
 
@@ -120,6 +146,81 @@ Setting: ${setting}
 };
 
 /**
+ * Creates a message factory for lorebook relational map generation.
+ * Reads MAP SO FAR from state at JIT time, enabling incremental cross-entry inference.
+ * Characters → Locations → Systems → Factions → Dynamics (MAP_DEPENDENCY_ORDER).
+ */
+export const createLorebookRelationalMapFactory = (
+  getState: () => RootState,
+  entryId: string,
+): MessageFactory => {
+  return async () => {
+    const entry = await api.v1.lorebook.entry(entryId);
+    if (!entry) {
+      throw new Error(`Lorebook entry not found: ${entryId}`);
+    }
+
+    let categoryName = "";
+    if (entry.category) {
+      const categories = await api.v1.lorebook.categories();
+      const category = categories.find((c) => c.id === entry.category);
+      categoryName = category?.name || "";
+    }
+
+    const displayName = entry.displayName || "Unnamed Entry";
+    const entryType = getEntryType(categoryName);
+    const entryText = entry.text || "";
+
+    // Build MAP SO FAR: all maps in dependency order, excluding this entry
+    const state = getState();
+    const mapSoFarParts: string[] = [];
+    for (const fieldId of MAP_DEPENDENCY_ORDER) {
+      const items = state.story.dulfs[fieldId] || [];
+      for (const item of items) {
+        if (item.id === entryId) continue;
+        const mapText = state.runtime.sega.relationalMaps[item.id];
+        if (mapText) mapSoFarParts.push(mapText);
+      }
+    }
+    const mapSoFar = mapSoFarParts.join("\n\n");
+
+    const model = "glm-4-6";
+    const prompt = String(
+      (await api.v1.config.get("lorebook_relational_map_prompt")) || "",
+    );
+
+    const prefix = await buildStoryEnginePrefix(getState);
+
+    const messages: Message[] = [
+      ...prefix,
+      {
+        role: "system",
+        content: `[LOREBOOK RELATIONAL MAP]\n${prompt}`,
+      },
+      {
+        role: "user",
+        content: `MAP SO FAR:\n${mapSoFar || "(none yet)"}\n\n---\n\nENTRY:\n${entryText}`,
+      },
+      {
+        role: "assistant",
+        content: `${displayName} [${entryType}]\n  - primary locations:`,
+      },
+    ];
+
+    return {
+      messages,
+      params: {
+        model,
+        max_tokens: 256,
+        temperature: 0.5,
+        stop: ["\n\n---", "\n\n\n"],
+      },
+      contextPinning: { head: 1, tail: 3 },
+    };
+  };
+};
+
+/**
  * Creates a message factory for lorebook keys generation.
  * Uses unified prefix (excludes self) + volatile tail with keys-specific instruction.
  * CRITICAL: Fetches entry.text at execution time for fresh content from preceding generation.
@@ -134,7 +235,10 @@ export const createLorebookKeysFactory = (
       throw new Error(`Lorebook entry not found: ${entryId}`);
     }
 
-    const entryText = entry.text || "";
+    // Prefer relational map over raw prose — falls back to prose when running
+    // outside SEGA or after SEGA reset.
+    const relationalMap = getState().runtime.sega.relationalMaps[entryId] ?? "";
+    const entryText = relationalMap || (entry.text || "");
 
     const model = "glm-4-6";
     const prompt = String(
@@ -153,17 +257,17 @@ export const createLorebookKeysFactory = (
         role: "user",
         content: `ENTRY:\n\n${entryText}`,
       },
-      { role: "assistant", content: `KEYS: ` },
+      { role: "assistant", content: `REJECTED:\n` },
     ];
 
     return {
       messages,
       params: {
         model,
-        max_tokens: 200,
+        max_tokens: 256,
         temperature: 0.8,
         min_p: 0.1,
-        stop: ["\n"],
+        stop: ["\n---"],
       },
       contextPinning: { head: 1, tail: 3 },
     };
@@ -270,17 +374,13 @@ export const buildLorebookKeysPayload = async (
   prefillBehavior: "keep";
   assistantPrefill: string;
 }> => {
-  // Fetch entry to get displayName for prefill
-  const entry = await api.v1.lorebook.entry(entryId);
-  const displayName = entry?.displayName || "Unnamed Entry";
-
   return {
     requestId,
     messageFactory: createLorebookKeysFactory(getState, entryId),
-    params: { model: "glm-4-6", max_tokens: 96 },
+    params: { model: "glm-4-6", max_tokens: 256 },
     target: { type: "lorebookKeys", entryId },
     prefillBehavior: "keep",
-    assistantPrefill: `${displayName.toLowerCase()}, `,
+    assistantPrefill: `REJECTED:\n`,
   };
 };
 

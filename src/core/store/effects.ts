@@ -324,6 +324,8 @@ function cacheLabel(target: GenerationStrategy["target"]): string {
       return `brainstorm:${target.messageId}`;
     case "lorebookContent":
       return `lb-content:${target.entryId.slice(0, 8)}`;
+    case "lorebookRelationalMap":
+      return `lb-relmap:${target.entryId.slice(0, 8)}`;
     case "lorebookKeys":
       return `lb-keys:${target.entryId.slice(0, 8)}`;
     case "lorebookRefine":

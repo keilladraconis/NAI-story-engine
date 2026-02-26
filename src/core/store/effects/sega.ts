@@ -40,7 +40,10 @@ import { generationSubmitted } from "../slices/ui";
 import { attgToggled, styleToggled } from "../slices/story";
 import {
   createLorebookContentFactory,
+  createLorebookRelationalMapFactory,
   buildLorebookKeysPayload,
+  MAP_DEPENDENCY_ORDER,
+  parseNeedsReconciliation,
 } from "../../utils/lorebook-strategy";
 import { hashEntryPosition, getStoryIdSeed } from "../../utils/seeded-random";
 
@@ -130,6 +133,95 @@ async function findEntryNeedingContent(state: RootState): Promise<DulfsItem | nu
   return needsContent[0];
 }
 
+/**
+ * Find the next DULFS entry that needs a relational map.
+ * Processes in MAP_DEPENDENCY_ORDER (characters first) so later entries
+ * can reference earlier ones via MAP SO FAR.
+ */
+async function findEntryNeedingRelationalMap(state: RootState): Promise<DulfsItem | null> {
+  const needsMap: Array<{ item: DulfsItem; orderIdx: number }> = [];
+  const seed = await getStoryIdSeed();
+
+  for (let i = 0; i < MAP_DEPENDENCY_ORDER.length; i++) {
+    const fieldId = MAP_DEPENDENCY_ORDER[i];
+    const items = state.story.dulfs[fieldId] || [];
+    for (const item of items) {
+      const entry = await api.v1.lorebook.entry(item.id);
+      if (!entry?.text?.trim()) continue;
+      if (!state.runtime.sega.relationalMaps[item.id]) {
+        needsMap.push({ item, orderIdx: i });
+      }
+    }
+  }
+
+  if (needsMap.length === 0) return null;
+
+  // Sort by dependency order first, then by hash within the same field
+  needsMap.sort((a, b) => {
+    if (a.orderIdx !== b.orderIdx) return a.orderIdx - b.orderIdx;
+    return hashEntryPosition(seed, a.item.id) - hashEntryPosition(seed, b.item.id);
+  });
+
+  return needsMap[0].item;
+}
+
+/**
+ * Find the next DULFS entry whose relational map needs reconciliation.
+ * Targets entries with no primary characters and high collision risk —
+ * these benefit from a second pass with the full map as context.
+ */
+async function findEntryNeedingReconciliation(state: RootState): Promise<DulfsItem | null> {
+  const needsReconcile: DulfsItem[] = [];
+  const seed = await getStoryIdSeed();
+
+  for (const fieldId of MAP_DEPENDENCY_ORDER) {
+    const items = state.story.dulfs[fieldId] || [];
+    for (const item of items) {
+      const mapText = state.runtime.sega.relationalMaps[item.id];
+      if (mapText && parseNeedsReconciliation(mapText)) {
+        needsReconcile.push(item);
+      }
+    }
+  }
+
+  if (needsReconcile.length === 0) return null;
+
+  needsReconcile.sort(
+    (a, b) => hashEntryPosition(seed, a.id) - hashEntryPosition(seed, b.id),
+  );
+
+  return needsReconcile[0];
+}
+
+/**
+ * Find the next DULFS entry that needs keys generation.
+ * Includes entries with no keys AND entries with only stub keys ("kse-stub"),
+ * which were inserted by the content handler as placeholders.
+ */
+async function findEntryNeedingKeys(state: RootState): Promise<DulfsItem | null> {
+  const needsKeys: DulfsItem[] = [];
+  const seed = await getStoryIdSeed();
+
+  for (const category of DULFS_CATEGORIES) {
+    const items = state.story.dulfs[category] || [];
+    for (const item of items) {
+      const entry = await api.v1.lorebook.entry(item.id);
+      if (!entry?.text?.trim()) continue;
+      const isStub = entry.keys?.includes("kse-stub") ?? false;
+      if (!isStub && entry.keys && entry.keys.length > 0) continue;
+      needsKeys.push(item);
+    }
+  }
+
+  if (needsKeys.length === 0) return null;
+
+  needsKeys.sort(
+    (a, b) => hashEntryPosition(seed, a.id) - hashEntryPosition(seed, b.id),
+  );
+
+  return needsKeys[0];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SEGA Orchestration
 // ─────────────────────────────────────────────────────────────────────────────
@@ -185,19 +277,15 @@ async function queueSegaFieldGeneration(
 }
 
 /**
- * Queue lorebook content + keys generation for a DULFS item.
- * With the unified prefix, content and keys share the same message prefix,
- * so keys generation immediately after content has near-zero uncached tokens.
+ * Queue lorebook content generation for a DULFS item.
  */
-async function queueSegaLorebookGeneration(
+async function queueSegaLorebookContent(
   dispatch: AppDispatch,
   getState: () => RootState,
   item: DulfsItem,
 ): Promise<void> {
   const contentRequestId = `lb-item-${item.id}-content`;
-  const keysRequestId = `lb-item-${item.id}-keys`;
 
-  // Update status text with category and entry name
   const entry = await api.v1.lorebook.entry(item.id);
   const name = entry?.displayName || item.id;
   const category = item.fieldId.replace("dulfs-", "");
@@ -205,10 +293,8 @@ async function queueSegaLorebookGeneration(
     segaStatusUpdated({ statusText: `Lorebook: ${category} - ${name}` }),
   );
 
-  // Track content as SEGA-initiated
   dispatch(segaRequestTracked({ requestId: contentRequestId }));
 
-  // Queue content generation
   const contentFactory = createLorebookContentFactory(getState, item.id);
   dispatch(
     generationSubmitted({
@@ -219,14 +305,59 @@ async function queueSegaLorebookGeneration(
       prefillBehavior: "trim",
     }),
   );
+}
 
-  // Queue keys generation unless user opted out
-  const skipKeys = (await api.v1.config.get("sega_skip_lorebook_keys")) || false;
-  if (!skipKeys) {
-    dispatch(segaRequestTracked({ requestId: keysRequestId }));
-    const keysPayload = await buildLorebookKeysPayload(getState, item.id, keysRequestId);
-    dispatch(generationSubmitted(keysPayload));
-  }
+/**
+ * Queue relational map generation for a DULFS item.
+ * Same function handles both initial map pass and reconciliation —
+ * the factory reads MAP SO FAR from state at JIT time.
+ */
+async function queueSegaRelationalMapGeneration(
+  dispatch: AppDispatch,
+  getState: () => RootState,
+  item: DulfsItem,
+): Promise<void> {
+  const mapRequestId = `lb-item-${item.id}-relational-map`;
+
+  const entry = await api.v1.lorebook.entry(item.id);
+  const name = entry?.displayName || item.id;
+  const category = item.fieldId.replace("dulfs-", "");
+  dispatch(
+    segaStatusUpdated({ statusText: `Relational Map: ${category} - ${name}` }),
+  );
+
+  dispatch(segaRequestTracked({ requestId: mapRequestId }));
+  dispatch(
+    generationSubmitted({
+      requestId: mapRequestId,
+      messageFactory: createLorebookRelationalMapFactory(getState, item.id),
+      params: { model: "glm-4-6", max_tokens: 256 },
+      target: { type: "lorebookRelationalMap", entryId: item.id },
+      prefillBehavior: "trim",
+    }),
+  );
+}
+
+/**
+ * Queue lorebook keys generation for a DULFS item.
+ */
+async function queueSegaLorebookKeys(
+  dispatch: AppDispatch,
+  getState: () => RootState,
+  item: DulfsItem,
+): Promise<void> {
+  const keysRequestId = `lb-item-${item.id}-keys`;
+
+  const entry = await api.v1.lorebook.entry(item.id);
+  const name = entry?.displayName || item.id;
+  const category = item.fieldId.replace("dulfs-", "");
+  dispatch(
+    segaStatusUpdated({ statusText: `Keys: ${category} - ${name}` }),
+  );
+
+  dispatch(segaRequestTracked({ requestId: keysRequestId }));
+  const keysPayload = await buildLorebookKeysPayload(getState, item.id, keysRequestId);
+  dispatch(generationSubmitted(keysPayload));
 }
 
 /**
@@ -302,13 +433,50 @@ async function scheduleNextSegaTask(
     return;
   }
 
-  // Stage 4: Lorebook (content + keys per entry, unified prefix)
-  const nextEntry = await findEntryNeedingContent(state);
-  if (nextEntry) {
-    api.v1.log(`[sega] scheduling: lorebook ${nextEntry.id.slice(0, 8)}`);
+  // Read skip flags once — used across multiple stages below
+  const skipRelationalMap = (await api.v1.config.get("sega_skip_lorebook_relational_map")) || false;
+  const skipKeys = (await api.v1.config.get("sega_skip_lorebook_keys")) || false;
+
+  // Stage 4: Content (stub keys inserted by the content handler)
+  const nextContent = await findEntryNeedingContent(state);
+  if (nextContent) {
+    api.v1.log(`[sega] scheduling: lorebook content ${nextContent.id.slice(0, 8)}`);
     dispatch(segaStageSet({ stage: "lorebookContent" }));
-    await queueSegaLorebookGeneration(dispatch, getState, nextEntry);
+    await queueSegaLorebookContent(dispatch, getState, nextContent);
     return;
+  }
+
+  // Stage 5: Relational map (initial pass, dependency order)
+  if (!skipRelationalMap) {
+    const nextMap = await findEntryNeedingRelationalMap(state);
+    if (nextMap) {
+      api.v1.log(`[sega] scheduling: relational map ${nextMap.id.slice(0, 8)}`);
+      dispatch(segaStageSet({ stage: "lorebookRelationalMap" }));
+      await queueSegaRelationalMapGeneration(dispatch, getState, nextMap);
+      return;
+    }
+  }
+
+  // Stage 6: Reconcile (after all maps exist)
+  if (!skipRelationalMap) {
+    const nextReconcile = await findEntryNeedingReconciliation(state);
+    if (nextReconcile) {
+      api.v1.log(`[sega] scheduling: relational map reconcile ${nextReconcile.id.slice(0, 8)}`);
+      dispatch(segaStageSet({ stage: "lorebookRelationalMapReconcile" }));
+      await queueSegaRelationalMapGeneration(dispatch, getState, nextReconcile);
+      return;
+    }
+  }
+
+  // Stage 7: Keys — replaces stub keys with map-informed proper keys
+  if (!skipKeys) {
+    const nextKeys = await findEntryNeedingKeys(state);
+    if (nextKeys) {
+      api.v1.log(`[sega] scheduling: lorebook keys ${nextKeys.id.slice(0, 8)}`);
+      dispatch(segaStageSet({ stage: "lorebookKeys" }));
+      await queueSegaLorebookKeys(dispatch, getState, nextKeys);
+      return;
+    }
   }
 
   // All done!

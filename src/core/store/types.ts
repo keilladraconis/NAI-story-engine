@@ -13,12 +13,16 @@ export type SegaStage =
   | "attgStyle"
   | "bootstrap"
   | "lorebookContent"
+  | "lorebookRelationalMap"
+  | "lorebookRelationalMapReconcile"
+  | "lorebookKeys"
   | "completed";
 
 export interface SegaState {
   stage: SegaStage;
   statusText: string; // Current status for UI display
   activeRequestIds: string[]; // Track SEGA-initiated requests for cancellation
+  relationalMaps: Record<string, string>; // entryId → map text, ephemeral (cleared on reset)
 }
 
 export const DULFS_CATEGORIES: DulfsFieldID[] = [
@@ -102,6 +106,7 @@ export interface GenerationRequest {
   | "list"
   | "brainstorm"
   | "lorebookContent"
+  | "lorebookRelationalMap"
   | "lorebookKeys"
   | "lorebookRefine"
   | "bootstrap"
@@ -126,6 +131,7 @@ export interface GenerationStrategy {
   | { type: "field"; fieldId: string }
   | { type: "list"; fieldId: string }
   | { type: "lorebookContent"; entryId: string }
+  | { type: "lorebookRelationalMap"; entryId: string }
   | { type: "lorebookKeys"; entryId: string }
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }

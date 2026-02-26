@@ -11,6 +11,7 @@ const initialSegaState: SegaState = {
   stage: "idle",
   statusText: "",
   activeRequestIds: [],
+  relationalMaps: {},
 };
 
 export const initialRuntimeState: RuntimeState = {
@@ -154,6 +155,20 @@ export const runtimeSlice = createSlice({
       ...state,
       sega: { ...state.sega, statusText: payload.statusText },
     }),
+
+    segaRelationalMapStored: (
+      state,
+      payload: { entryId: string; mapText: string },
+    ) => ({
+      ...state,
+      sega: {
+        ...state.sega,
+        relationalMaps: {
+          ...state.sega.relationalMaps,
+          [payload.entryId]: payload.mapText,
+        },
+      },
+    }),
   },
 });
 
@@ -172,4 +187,5 @@ export const {
   segaRequestUntracked,
   segaReset,
   segaStatusUpdated,
+  segaRelationalMapStored,
 } = runtimeSlice.actions;
