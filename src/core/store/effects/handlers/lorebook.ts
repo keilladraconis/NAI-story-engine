@@ -40,86 +40,84 @@ const clearPrefillCache = (entryId: string): void => {
 };
 
 export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
-  {
-    streaming(
-      ctx: StreamingContext<LorebookContentTarget>,
-      _newText: string,
-    ): void {
-      const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
-      if (ctx.target.entryId !== currentSelected) return;
+{
+  streaming(
+    ctx: StreamingContext<LorebookContentTarget>,
+    _newText: string,
+  ): void {
+    const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
+    if (ctx.target.entryId !== currentSelected) return;
 
-      // Ensure prefill is being cached (fire-and-forget on first call)
-      ensurePrefillCached(ctx.target.entryId);
+    // Ensure prefill is being cached (fire-and-forget on first call)
+    ensurePrefillCached(ctx.target.entryId);
 
-      // Get cached prefill if available, prepend to streaming content
-      const prefill = getCachedPrefill(ctx.target.entryId) || "";
-      const displayContent = prefill + ctx.accumulatedText;
+    // Get cached prefill if available, prepend to streaming content
+    const prefill = getCachedPrefill(ctx.target.entryId) || "";
+    const displayContent = prefill + ctx.accumulatedText;
 
-      api.v1.storyStorage.set(IDS.LOREBOOK.CONTENT_DRAFT_RAW, displayContent);
-    },
+    api.v1.storyStorage.set(IDS.LOREBOOK.CONTENT_DRAFT_RAW, displayContent);
+  },
 
-    async completion(
-      ctx: CompletionContext<LorebookContentTarget>,
-    ): Promise<void> {
-      const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
-      const entryId = ctx.target.entryId;
+  async completion(
+    ctx: CompletionContext<LorebookContentTarget>,
+  ): Promise<void> {
+    const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
+    const entryId = ctx.target.entryId;
 
-      if (ctx.generationSucceeded && ctx.accumulatedText) {
-        // Get prefill from cache or rebuild it
-        let prefill = getCachedPrefill(entryId);
-        if (!prefill) {
-          prefill = await buildLorebookPrefill(entryId);
-        }
-
-        // Combine prefill + accumulated text for the full entry
-        const fullContent = prefill + ctx.accumulatedText;
-
-        // Erato compatibility: prepend separator if needed
-        const erato =
-          (await api.v1.config.get("erato_compatibility")) || false;
-        const finalContent =
-          erato && !fullContent.startsWith("----\n")
-            ? "----\n" + fullContent
-            : fullContent;
-
-        // Update lorebook entry with generated content
-        await api.v1.lorebook.updateEntry(entryId, {
-          text: finalContent,
-        });
-
-        // Insert stub keys so the entry activates in story text immediately.
-        // Stage 7 (keys) will replace these with map-informed proper keys.
-        // "kse-stub" sentinel lets findEntryNeedingKeys detect stub entries.
-        const lorebookEntry = await api.v1.lorebook.entry(entryId);
-        const stubNameWords = (lorebookEntry?.displayName || "")
-          .toLowerCase()
-          .split(/\s+/)
-          .filter((w) => w.length > 1);
-        await api.v1.lorebook.updateEntry(entryId, {
-          keys: ["kse-stub", ...stubNameWords],
-        });
-
-        // Update draft with full content if viewing this entry
-        if (entryId === currentSelected) {
-          await api.v1.storyStorage.set(
-            IDS.LOREBOOK.CONTENT_DRAFT_RAW,
-            finalContent,
-          );
-        }
-      } else {
-        // Cancelled or failed: restore draft to original content if viewing this entry
-        if (entryId === currentSelected) {
-          await api.v1.storyStorage.set(
-            IDS.LOREBOOK.CONTENT_DRAFT_RAW,
-            ctx.originalContent || "",
-          );
-        }
+    if (ctx.generationSucceeded && ctx.accumulatedText) {
+      // Get prefill from cache or rebuild it
+      let prefill = getCachedPrefill(entryId);
+      if (!prefill) {
+        prefill = await buildLorebookPrefill(entryId);
       }
 
-      // Clear cache for this entry
-      clearPrefillCache(entryId);
-    },
-  };
+      // Combine prefill + accumulated text for the full entry
+      const fullContent = prefill + ctx.accumulatedText;
+
+      // Erato compatibility: prepend separator if needed
+      const erato =
+        (await api.v1.config.get("erato_compatibility")) || false;
+      const finalContent =
+        erato && !fullContent.startsWith("----\n")
+          ? "----\n" + fullContent
+          : fullContent;
+
+      // Update lorebook entry with generated content
+      await api.v1.lorebook.updateEntry(entryId, {
+        text: finalContent,
+      });
+
+      // Insert stub keys so the entry activates in story text immediately.
+      // Stage 7 (keys) will replace these with map-informed proper keys.
+      // "kse-stub" sentinel lets findEntryNeedingKeys detect stub entries.
+      const lorebookEntry = await api.v1.lorebook.entry(entryId);
+      const stubNameWords = (lorebookEntry?.displayName || "")
+        .toLowerCase()
+      await api.v1.lorebook.updateEntry(entryId, {
+        keys: ["kse-stub", ...stubNameWords],
+      });
+
+      // Update draft with full content if viewing this entry
+      if (entryId === currentSelected) {
+        await api.v1.storyStorage.set(
+          IDS.LOREBOOK.CONTENT_DRAFT_RAW,
+          finalContent,
+        );
+      }
+    } else {
+      // Cancelled or failed: restore draft to original content if viewing this entry
+      if (entryId === currentSelected) {
+        await api.v1.storyStorage.set(
+          IDS.LOREBOOK.CONTENT_DRAFT_RAW,
+          ctx.originalContent || "",
+        );
+      }
+    }
+
+    // Clear cache for this entry
+    clearPrefillCache(entryId);
+  },
+};
 
 export const lorebookRelationalMapHandler: GenerationHandlers<LorebookRelationalMapTarget> = {
   streaming(ctx: StreamingContext<LorebookRelationalMapTarget>, _newText: string): void {

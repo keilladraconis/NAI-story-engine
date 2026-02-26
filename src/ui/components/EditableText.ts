@@ -128,6 +128,18 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
     const { dispatch, useSelector } = ctx;
     const { id, getContent, placeholder, onSave, extraControls, label, initialDisplay, formatDisplay, singleLine } = props;
 
+    // Prefer getContent() over initialDisplay when formatDisplay is provided —
+    // this ensures a freshly-built component always shows current state rather
+    // than whatever was baked into initialDisplay at a potentially-stale build time.
+    const contentResult = formatDisplay ? getContent() : undefined;
+    const syncContent = typeof contentResult === "string" ? contentResult : undefined;
+    const slViewText = (syncContent && formatDisplay)
+      ? (formatDisplay(syncContent) || "_No content._")
+      : (initialDisplay || "_No content._");
+    const mlViewText = (syncContent && formatDisplay)
+      ? (formatDisplay(syncContent).replace(/\n/g, "  \n").replace(/</g, "\\<") || "_No content._")
+      : (initialDisplay || "_No content._");
+
     const viewId = `${id}-view`;
     const editId = `${id}-edit`;
     const editBtnId = `${id}-edit-btn`;
@@ -183,7 +195,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
       const parts: UIPart[] = [
         text({
           id: viewId,
-          text: initialDisplay || "_No content._",
+          text: slViewText,
           style: this.style?.("slView"),
         }),
         textInput({
@@ -273,7 +285,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
         }),
         text({
           id: viewId,
-          text: initialDisplay || "_No content._",
+          text: mlViewText,
           markdown: true,
           style: this.style?.("view"),
         }),

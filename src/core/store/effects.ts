@@ -1008,19 +1008,35 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
         return;
       }
 
-      let count = 0;
-      for (const el of elements) {
-        const newId = api.v1.uuid();
-        const content = el.content ? `${el.name}: ${el.content}` : el.name;
+      // Pre-create categories sequentially to avoid races in concurrent dulfsItemAdded handlers
+      const uniqueFieldIds = [...new Set(elements.map((el) => el.fieldId))];
+      for (const fieldId of uniqueFieldIds) {
+        await ensureCategory(fieldId);
+      }
 
-        await api.v1.storyStorage.set(`dulfs-item-${newId}`, content);
-        dispatch(dulfsItemAdded({ fieldId: el.fieldId, item: { id: newId, fieldId: el.fieldId } }));
-        count++;
+      let created = 0;
+      let updated = 0;
+      for (const el of elements) {
+        const content = el.content ? `${el.name}: ${el.content}` : el.name;
+        const existingItem = getLatest().story.dulfs[el.fieldId]?.find((item) => item.id === el.id);
+
+        await api.v1.storyStorage.set(`dulfs-item-${el.id}`, content);
+        if (existingItem) {
+          // Upsert: sync lorebook display name to match updated content
+          const name = extractDulfsItemName(content, el.fieldId);
+          await api.v1.lorebook.updateEntry(el.id, { displayName: name });
+          updated++;
+        } else {
+          dispatch(dulfsItemAdded({ fieldId: el.fieldId, item: { id: el.id, fieldId: el.fieldId } }));
+          created++;
+        }
       }
 
       dispatch(mergeCompleted());
-      api.v1.log(`[crucible] Merged ${count} elements to DULFS`);
-      api.v1.ui.toast(`Merged ${count} world elements to DULFS`, { type: "success" });
+      const parts = [created && `${created} created`, updated && `${updated} updated`].filter(Boolean);
+      const msg = parts.join(", ") || "no changes";
+      api.v1.log(`[crucible] Merged to DULFS: ${msg}`);
+      api.v1.ui.toast(`Merged to DULFS: ${msg}`, { type: "success" });
     },
   );
 

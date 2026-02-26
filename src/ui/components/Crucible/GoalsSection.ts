@@ -141,15 +141,17 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       onGenerate: () => dispatch(crucibleGoalsRequested()),
     });
 
-    // --- Per-goal card cache ---
-    const goalCardCache = new Map<string, UIPart>();
+    // --- Per-goal card cache (stores unmount so cards can be properly rebuilt) ---
+    const goalCardCache = new Map<string, { part: UIPart; unmount: () => void }>();
 
+    // Always rebuild GoalCards from scratch so getContent() reads current state at build time.
+    // Unmounting the old card first cleans up its subscriptions.
     const ensureGoalCard = (goalId: string): UIPart => {
-      if (!goalCardCache.has(goalId)) {
-        const { part } = ctx.render(GoalCard, { goalId });
-        goalCardCache.set(goalId, part);
-      }
-      return goalCardCache.get(goalId)!;
+      const existing = goalCardCache.get(goalId);
+      if (existing) existing.unmount();
+      const result = ctx.render(GoalCard, { goalId });
+      goalCardCache.set(goalId, result);
+      return result.part;
     };
 
     const hasGoals = goals.length > 0;
@@ -169,6 +171,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       ]);
 
       if (nowEmpty) {
+        for (const { unmount } of goalCardCache.values()) unmount();
         goalCardCache.clear();
         api.v1.ui.updateParts([{ id: CR.GOALS_LIST, style: this.style?.("hidden") }]);
         return;
@@ -176,8 +179,8 @@ export const GoalsSection = defineComponent<undefined, RootState>({
 
       // Clean up removed goals
       const currentIds = new Set(currentGoals.map((g) => g.id));
-      for (const [id] of goalCardCache) {
-        if (!currentIds.has(id)) goalCardCache.delete(id);
+      for (const [id, { unmount }] of goalCardCache) {
+        if (!currentIds.has(id)) { unmount(); goalCardCache.delete(id); }
       }
 
       api.v1.ui.updateParts([{

@@ -131,7 +131,6 @@ export const ReviewView = defineComponent<undefined, RootState>({
     });
     const preMergeFooter = column({
       id: "cr-premerge-footer",
-      style: isMerged ? this.style?.("hidden") : {},
       content: [mergeButton],
     });
 
@@ -344,10 +343,9 @@ export const ReviewView = defineComponent<undefined, RootState>({
         api.v1.ui.updateParts([
           { id: CR.REVIEW_ROOT, style: this.style?.("root"), content: sections },
         ]);
-        // Re-apply footer styles after content rebuild (build-time styles may be stale)
+        // Re-apply footer style after content rebuild (build-time style may be stale)
         api.v1.ui.updateParts([
           { id: "cr-merged-footer", style: merged ? this.style?.("mergedText") : this.style?.("hidden") },
-          { id: "cr-premerge-footer", style: merged ? this.style?.("hidden") : {} },
         ]);
 
         // Update view text for elements

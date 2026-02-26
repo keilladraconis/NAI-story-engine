@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772068932
+updatedAt: 1772128693
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)

@@ -77,10 +77,6 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
       callback: () => dispatch(goalRemoved({ goalId })),
     });
 
-    const goalDisplay = goal
-      ? formatTagsWithEmoji(goal.text).replace(/\n/g, "  \n").replace(/</g, "\\<")
-      : undefined;
-
     const { part: editable } = ctx.render(EditableText, {
       id: ids.TEXT,
       getContent: () => {
@@ -88,10 +84,10 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
         return g?.text ?? "";
       },
       placeholder: "[GOAL] ...",
+      formatDisplay: formatTagsWithEmoji,
       onSave: (content: string) =>
         dispatch(goalTextUpdated({ goalId, text: content })),
       extraControls: [starBtn, delBtn],
-      initialDisplay: goalDisplay,
     });
 
     return column({
