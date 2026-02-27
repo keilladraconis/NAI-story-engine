@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.1] - 2026-02-27
+
+### Fixed
+
+- **Stub keys** — SEGA's lorebook content stage now inserts a single stub key equal to the entry's lowercased display name, replacing the old `["kse-stub", ...nameWords]` pattern. This removes the internal `kse-stub` sentinel from the visible lorebook UI and eliminates spurious one- or two-letter keys that could appear when a title contained short words. `findEntryNeedingKeys` now detects stubs by checking for exactly one key matching the entry's own name.
+
 ## [0.8.0] - 2026-02-26
 
 ### Added

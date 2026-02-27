@@ -195,8 +195,9 @@ async function findEntryNeedingReconciliation(state: RootState): Promise<DulfsIt
 
 /**
  * Find the next DULFS entry that needs keys generation.
- * Includes entries with no keys AND entries with only stub keys ("kse-stub"),
- * which were inserted by the content handler as placeholders.
+ * Includes entries with no keys AND entries with only a stub key (a single key
+ * equal to the entry's lowercased display name), which was inserted by the
+ * content handler as a placeholder.
  */
 async function findEntryNeedingKeys(state: RootState): Promise<DulfsItem | null> {
   const needsKeys: DulfsItem[] = [];
@@ -207,7 +208,9 @@ async function findEntryNeedingKeys(state: RootState): Promise<DulfsItem | null>
     for (const item of items) {
       const entry = await api.v1.lorebook.entry(item.id);
       if (!entry?.text?.trim()) continue;
-      const isStub = entry.keys?.includes("kse-stub") ?? false;
+      const isStub =
+        entry.keys?.length === 1 &&
+        entry.keys[0] === (entry.displayName || "").toLowerCase();
       if (!isStub && entry.keys && entry.keys.length > 0) continue;
       needsKeys.push(item);
     }

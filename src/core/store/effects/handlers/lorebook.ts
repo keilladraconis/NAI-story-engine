@@ -87,14 +87,14 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
         text: finalContent,
       });
 
-      // Insert stub keys so the entry activates in story text immediately.
-      // Stage 7 (keys) will replace these with map-informed proper keys.
-      // "kse-stub" sentinel lets findEntryNeedingKeys detect stub entries.
+      // Insert a stub key so the entry activates in story text immediately.
+      // Stage 7 (keys) will replace this with map-informed proper keys.
+      // The stub is just the lowercased entry name; findEntryNeedingKeys
+      // detects stubs by checking for a single key equal to the display name.
       const lorebookEntry = await api.v1.lorebook.entry(entryId);
-      const stubNameWords = (lorebookEntry?.displayName || "")
-        .toLowerCase()
+      const stubKey = (lorebookEntry?.displayName || "").toLowerCase();
       await api.v1.lorebook.updateEntry(entryId, {
-        keys: ["kse-stub", ...stubNameWords],
+        keys: [stubKey],
       });
 
       // Update draft with full content if viewing this entry
