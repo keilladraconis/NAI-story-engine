@@ -1,0 +1,41 @@
+name: Update Type Definitions
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # Daily at 04:00 UTC on main
+  workflow_dispatch: # Runs on whichever branch is selected
+
+permissions:
+  contents: write
+
+jobs:
+  update-definitions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build (pulls latest type definitions via nibs-cli)
+        run: npm run build
+
+      - name: Commit updated definitions if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add external/
+          if git diff --cached --quiet; then
+            echo "No changes to external/ — skipping commit."
+          else
+            git commit -m "chore: update NovelAI type definitions"
+            git push origin HEAD
+          fi
