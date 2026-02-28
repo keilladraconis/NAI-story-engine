@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772308143
+updatedAt: 1772312815
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -433,15 +433,24 @@ config:
     type: string
     multiline: true
     default: |-
-      Distill everything above into a single dense Direction — the SOLE
-      creative reference for all downstream generation. Goals and world
-      elements will be built from this text alone, with no
-      access to the brainstorm or story state. It must be self-contained.
+      Synthesize everything above and expand it imaginatively into a single
+      dense Direction — the SOLE creative reference for all downstream
+      generation. Goals and world elements will be built from this text
+      alone, with no access to the brainstorm or story state. It must be
+      self-contained and richly populated.
+
+      When the material is sparse, extrapolate: invent what the scenario
+      implies. What are the characters' occupations and social worlds? Who
+      else exists in their orbit — a rival, an interloper, a complication?
+      What forces are already in motion before the story begins? What
+      tensions are already present that haven't been named? The Direction
+      should read like a rich story seed, not a compressed summary.
 
       Write connected natural prose that weaves together: the characters
-      (names, appearances, personalities, the tensions between them),
-      the world (setting, atmosphere, what makes it distinct), the tone
-      (genre sensibility, emotional register), and the core dramatic
+      (names, appearances, personalities, the tensions between them), the
+      world (setting, atmosphere, what makes it distinct), the tone (genre
+      sensibility, emotional register), the supporting cast and background
+      forces that make the world feel inhabited, and the core dramatic
       opposition that drives everything. If a story shape is established
       above, let its structural logic inform the trajectory — not an
       ending, a direction toward that kind of moment.
@@ -516,6 +525,10 @@ config:
 
       Generate an endpoint native to the story's shape — the most total, most resonant version of that structural logic.
 
+      A goal may involve characters, forces, or complications not yet named
+      in the direction — if they are organic extensions of the scenario and
+      create interesting world-building constraints downstream.
+
       BAD ENDPOINTS:
       BAD: "Everything changes" — no dramatic moment, nothing to anchor on
       BAD: "The hero wins" — outcome without cost
@@ -535,7 +548,10 @@ config:
 
       NECESSITY TEST: For each prerequisite, ask: "If this were absent,
       would the goal still land with full emotional/dramatic weight?"
-      If yes → exclude it. Only include what is structurally necessary.
+      Prioritize what is structurally necessary, but also include the
+      conditions that make the world feel inhabited and real — the social
+      textures, existing relationships, and background pressures that give
+      the structurally necessary elements their weight.
 
       Categories: RELATIONSHIP, SECRET, POWER, HISTORY, OBJECT, BELIEF, PLACE
 
@@ -556,8 +572,11 @@ config:
     type: string
     multiline: true
     default: |-
-      Derive 3-6 MINIMAL NECESSARY WORLD ELEMENTS from the prerequisites.
-      Each element must satisfy at least one prerequisite.
+      Derive sufficient ESSENTIAL WORLD ELEMENTS from the prerequisites.
+      Each element must satisfy at least one prerequisite. Include primary
+      characters, secondary characters, rivals, complicating figures, and
+      background forces that make the world feel inhabited — not just the
+      direct satisfiers of prerequisites.
 
       ZERO GENERIC DESCRIPTORS: Every trait must change what the element
       does in a scene. "Brave warrior" is generic. "Former occupation
