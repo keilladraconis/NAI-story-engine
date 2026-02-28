@@ -3,7 +3,7 @@ import { brainstormSlice } from "./slices/brainstorm";
 import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
 import { storySlice, initialStoryState } from "./slices/story";
-import { crucibleSlice, migrateCrucibleState } from "./slices/crucible";
+import { crucibleSlice, initialCrucibleState } from "./slices/crucible";
 import { RootState, StoryState, BrainstormChat, CrucibleState } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
         ? { ...current.brainstorm, chats: data.brainstorm.chats, currentChatIndex: data.brainstorm.currentChatIndex }
         : current.brainstorm,
       crucible: data.crucible
-        ? migrateCrucibleState(data.crucible)
+        ? { ...initialCrucibleState, ...data.crucible }
         : current.crucible,
     };
   }

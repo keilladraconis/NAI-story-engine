@@ -13,11 +13,7 @@ import { GenerationButton } from "../GenerationButton";
 import { GoalCard } from "./GoalCard";
 import { NAI_WARNING } from "../../colors";
 
-function toTitleCase(s: string): string {
-  return s.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-const { row, column, collapsibleSection, text } = api.v1.ui.part;
+const { row, column, collapsibleSection } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
@@ -42,14 +38,6 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       "font-size": "0.8em",
       color: NAI_WARNING,
     },
-    shapeBadge: {
-      "font-size": "0.7em",
-      padding: "2px 6px",
-      "border-radius": "3px",
-      "background-color": "rgba(168,162,255,0.15)",
-      color: "rgba(168,162,255,0.9)",
-      "letter-spacing": "0.04em",
-    },
     hidden: { display: "none" },
   },
 
@@ -57,7 +45,6 @@ export const GoalsSection = defineComponent<undefined, RootState>({
     const { dispatch, useSelector } = ctx;
     const state = ctx.getState();
     const { goals } = state.crucible;
-    const shapeName = state.crucible.shape?.name ?? null;
 
     const { part: clearGoalsPart } = ctx.render(ButtonWithConfirmation, {
       id: CR.CLEAR_GOALS_BTN,
@@ -76,7 +63,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       stateProjection: (s: RootState) => ({
         activeType: s.runtime.activeRequest?.type,
         queueLen: s.runtime.queue.length,
-        hasStarred: s.crucible.goals.some((g) => g.starred),
+        hasAccepted: s.crucible.goals.some((g) => g.accepted),
         phase: s.crucible.phase,
       }),
       requestIdFromProjection: () => {
@@ -90,35 +77,14 @@ export const GoalsSection = defineComponent<undefined, RootState>({
         );
         return queued?.id;
       },
-      isDisabledFromProjection: (proj: any) => !proj.hasStarred,
+      isDisabledFromProjection: (proj: any) => !proj.hasAccepted,
       onCancel: () => dispatch(crucibleStopRequested()),
       onGenerate: () => {
         dispatch(crucibleBuildRequested());
       },
     });
 
-    // Shape badge — shows generated narrative shape name
-    const initialShapeLabel = shapeName ? toTitleCase(shapeName) : "";
-    const shapeBadgePart = text({
-      id: CR.SHAPE_BADGE,
-      text: initialShapeLabel,
-      style: initialShapeLabel ? this.style?.("shapeBadge") : this.style?.("hidden"),
-    });
-
-    useSelector(
-      (s) => s.crucible.shape?.name,
-      () => {
-        const name = ctx.getState().crucible.shape?.name ?? null;
-        const label = name ? toTitleCase(name) : "";
-        api.v1.ui.updateParts([{
-          id: CR.SHAPE_BADGE,
-          text: label,
-          style: label ? this.style?.("shapeBadge") : this.style?.("hidden"),
-        }]);
-      },
-    );
-
-    // "Generate Goals" button — shape detection + 3 goals; shown when no goals exist
+    // "Generate Goals" button — queues 3 goals (shape context read at JIT time if available)
     const { part: generateGoalsBtn } = ctx.render(GenerationButton, {
       id: "cr-generate-goals-btn",
       label: "Generate Goals",
@@ -129,9 +95,8 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       }),
       requestIdFromProjection: () => {
         const s = ctx.getState();
-        const types = new Set(["crucibleShape", "crucibleGoal"]);
-        if (s.runtime.activeRequest && types.has(s.runtime.activeRequest.type)) return s.runtime.activeRequest.id;
-        return s.runtime.queue.find((q) => types.has(q.type))?.id;
+        if (s.runtime.activeRequest?.type === "crucibleGoal") return s.runtime.activeRequest.id;
+        return s.runtime.queue.find((q) => q.type === "crucibleGoal")?.id;
       },
       onGenerate: () => dispatch(crucibleGoalsRequested()),
     });
@@ -206,12 +171,11 @@ export const GoalsSection = defineComponent<undefined, RootState>({
               style: hasGoals ? this.style?.("hidden") : this.style?.("headerRow"),
               content: [generateGoalsBtn],
             }),
-            // Populated state: shape badge, add goal, clear
+            // Populated state: add goal, clear
             row({
               id: "cr-goal-controls",
               style: hasGoals ? this.style?.("headerRow") : this.style?.("hidden"),
               content: [
-                shapeBadgePart,
                 api.v1.ui.part.button({
                   id: CR.ADD_GOAL_BTN,
                   text: "+ Goal",

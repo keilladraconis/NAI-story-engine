@@ -2,6 +2,7 @@ import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
 import { CrucibleHeader } from "./CrucibleHeader";
+import { ShapeSection } from "./ShapeSection";
 import { IntentSection } from "./IntentSection";
 import { GoalsSection } from "./GoalsSection";
 import { ProgressDisplay } from "./ProgressDisplay";
@@ -24,6 +25,7 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
     const state = ctx.getState();
 
     const { part: headerPart } = ctx.render(CrucibleHeader, undefined);
+    const { part: shapePart } = ctx.render(ShapeSection, undefined);
     const { part: intentPart } = ctx.render(IntentSection, undefined);
     const { part: goalsPart } = ctx.render(GoalsSection, undefined);
     const { part: progressPart } = ctx.render(ProgressDisplay, undefined);
@@ -56,6 +58,7 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
           id: "cr-body",
           style: { flex: "1", overflow: "auto", gap: "8px", padding: "0 10px 10px", "justify-content": "flex-start" },
           content: [
+            column({ id: "cr-shape-wrap", style: {}, content: [shapePart] }),
             column({ id: "cr-intent-wrap", style: {}, content: [intentPart] }),
             column({ id: "cr-goals-wrap", style: {}, content: [goalsPart] }),
             column({ id: "cr-progress-wrap", style: showProgress ? {} : this.style?.("hidden"), content: [progressPart] }),

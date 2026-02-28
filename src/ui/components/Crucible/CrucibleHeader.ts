@@ -16,9 +16,9 @@ const CR = IDS.CRUCIBLE;
 
 const PHASE_STATUS: Record<CruciblePhase, string> = {
   direction: "",
-  goals: "Star goals ★ then click Build World",
+  goals: "Generate goals then click Build World",
   building: "Building world...",
-  review: "Review — or star more goals and rebuild",
+  review: "Review — or create more goals and rebuild",
 };
 
 const CRUCIBLE_GEN_TYPES = new Set([

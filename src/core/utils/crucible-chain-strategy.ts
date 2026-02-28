@@ -37,8 +37,8 @@ export const createPrereqsFactory = (
       includeBrainstorm: true,
     });
 
-    // Format starred goals for context
-    const starredGoals = state.crucible.goals.filter((g) => g.starred);
+    // Format accepted goals for context
+    const starredGoals = state.crucible.goals.filter((g) => g.accepted);
     const goalsContext = starredGoals
       .map((g) => {
         const goalText = parseTag(g.text, "GOAL") || g.text;
@@ -101,9 +101,9 @@ export const createElementsFactory = (
       includeDulfs: state.crucible.elements.length > 0,
     });
 
-    // Format starred goals
+    // Format accepted goals
     const goalsContext = state.crucible.goals
-      .filter((g) => g.starred)
+      .filter((g) => g.accepted)
       .map((g) => `- ${parseTag(g.text, "GOAL") || g.text}`)
       .join("\n");
 
@@ -184,9 +184,9 @@ export const createExpansionFactory = (
       .map((e) => `- ${e.name} (${FIELD_LABEL[e.fieldId] || e.fieldId}): ${e.content.slice(0, 100)}`)
       .join("\n");
 
-    // Format starred goals
+    // Format accepted goals
     const goalsContext = state.crucible.goals
-      .filter((g) => g.starred)
+      .filter((g) => g.accepted)
       .map((g) => `- ${parseTag(g.text, "GOAL") || g.text}`)
       .join("\n");
 

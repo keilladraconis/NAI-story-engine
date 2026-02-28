@@ -34,6 +34,7 @@ import {
   uiLorebookRefineRequested,
   requestCancelled,
   requestCompleted,
+  crucibleShapeRequested,
   crucibleGoalsRequested,
   crucibleAddGoalRequested,
   crucibleStopRequested,
@@ -790,24 +791,30 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
     },
   );
 
-  // Intent: Crucible Direction Requested → generate shape first, then direction (JIT reads shape at exec time)
+  // Intent: Shape Requested → queue shape generation
+  subscribeEffect(
+    matchesAction(crucibleShapeRequested),
+    async (_action, { dispatch }) => {
+      const strategy = buildCrucibleShapeStrategy(getState);
+      dispatch(requestQueued({ id: strategy.requestId, type: "crucibleShape", targetId: "crucible" }));
+      dispatch(generationSubmitted(strategy));
+    },
+  );
+
+  // Intent: Crucible Direction Requested → queue direction (reads shape from state at JIT time if available)
   subscribeEffect(
     matchesAction(crucibleDirectionRequested),
     async (_action, { dispatch }) => {
-      const shapeStrategy = buildCrucibleShapeStrategy(getState);
-      dispatch(requestQueued({ id: shapeStrategy.requestId, type: "crucibleShape", targetId: "crucible" }));
-      dispatch(generationSubmitted(shapeStrategy));
-
       const directionStrategy = buildCrucibleDirectionStrategy(getState);
       dispatch(requestQueued({ id: directionStrategy.requestId, type: "crucibleDirection", targetId: "crucible" }));
       dispatch(generationSubmitted(directionStrategy));
     },
   );
 
-  // Intent: Crucible Goals Requested → sync intent, then queue goals (or shape first if unknown)
+  // Intent: Crucible Goals Requested → sync intent, queue 3 goals (shape read at JIT time if available)
   subscribeEffect(
     matchesAction(crucibleGoalsRequested),
-    async (_action, { dispatch, getState: getLatest }) => {
+    async (_action, { dispatch }) => {
       const editedDirection = String(
         (await api.v1.storyStorage.get("cr-direction")) || "",
       );
@@ -817,27 +824,17 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
 
       dispatch(phaseTransitioned({ phase: "goals" }));
 
-      const state = getLatest();
-      if (state.crucible.shape !== null) {
-        // Shape already known — queue 3 goals directly
-        api.v1.log(`[crucible] Shape already known: ${state.crucible.shape.name} → queuing goals`);
-        for (let i = 0; i < 3; i++) {
-          const goalId = api.v1.uuid();
-          dispatch(goalAdded({ goal: { id: goalId, text: "", why: "", starred: false } }));
-          const goalStrategy = buildCrucibleGoalStrategy(getState, goalId);
-          dispatch(requestQueued({ id: goalStrategy.requestId, type: "crucibleGoal", targetId: goalId }));
-          dispatch(generationSubmitted(goalStrategy));
-        }
-      } else {
-        // Shape unknown — generate shape first; goals auto-follow via requestCompleted
-        const shapeStrategy = buildCrucibleShapeStrategy(getState);
-        dispatch(requestQueued({ id: shapeStrategy.requestId, type: "crucibleShape", targetId: "crucible" }));
-        dispatch(generationSubmitted(shapeStrategy));
+      for (let i = 0; i < 3; i++) {
+        const goalId = api.v1.uuid();
+        dispatch(goalAdded({ goal: { id: goalId, text: "", why: "", accepted: true } }));
+        const goalStrategy = buildCrucibleGoalStrategy(getState, goalId);
+        dispatch(requestQueued({ id: goalStrategy.requestId, type: "crucibleGoal", targetId: goalId }));
+        dispatch(generationSubmitted(goalStrategy));
       }
     },
   );
 
-  // Intent: Add Single Goal → ensure goals phase, create goal, run shape detection if needed first
+  // Intent: Add Single Goal → ensure goals phase, create goal
   subscribeEffect(
     matchesAction(crucibleAddGoalRequested),
     async (_action, { dispatch, getState: getLatest }) => {
@@ -848,17 +845,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       }
 
       const goalId = api.v1.uuid();
-      dispatch(goalAdded({ goal: { id: goalId, text: "", why: "", starred: false } }));
-
-      // If shape is unknown, generate it first.
-      // The goal JIT factory reads shape from state at execution time,
-      // so it will have the result by the time it runs.
-      if (state.crucible.shape === null) {
-        const shapeStrategy = buildCrucibleShapeStrategy(getState);
-        dispatch(requestQueued({ id: shapeStrategy.requestId, type: "crucibleShape", targetId: "crucible" }));
-        dispatch(generationSubmitted(shapeStrategy));
-      }
-
+      dispatch(goalAdded({ goal: { id: goalId, text: "", why: "", accepted: true } }));
       const goalStrategy = buildCrucibleGoalStrategy(getState, goalId);
       dispatch(requestQueued({ id: goalStrategy.requestId, type: "crucibleGoal", targetId: goalId }));
       dispatch(generationSubmitted(goalStrategy));
@@ -872,9 +859,9 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       dispatch(phaseTransitioned({ phase: "building" }));
 
       const state = getLatest();
-      const starredGoals = state.crucible.goals.filter((g) => g.starred);
+      const starredGoals = state.crucible.goals.filter((g) => g.accepted);
       if (starredGoals.length === 0) {
-        api.v1.log("[crucible] Build requested but no goals starred");
+        api.v1.log("[crucible] Build requested but no goals accepted");
         return;
       }
 
@@ -897,23 +884,6 @@ export function registerEffects(store: Store<RootState>, genX: GenX) {
       await api.v1.timers.sleep(150);
 
       const state = getState();
-
-      // Goals phase: shape generated → queue 3 shape-native goals
-      if (state.crucible.phase === "goals") {
-        if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
-        if (state.crucible.shape === null) return;
-        if (state.crucible.goals.length > 0) return; // goals already queued
-
-        api.v1.log(`[crucible] Shape generated: ${state.crucible.shape.name} → queuing goals`);
-        for (let i = 0; i < 3; i++) {
-          const goalId = api.v1.uuid();
-          dispatch(goalAdded({ goal: { id: goalId, text: "", why: "", starred: false } }));
-          const strategy = buildCrucibleGoalStrategy(getState, goalId);
-          dispatch(requestQueued({ id: strategy.requestId, type: "crucibleGoal", targetId: goalId }));
-          dispatch(generationSubmitted(strategy));
-        }
-        return;
-      }
 
       if (state.crucible.phase !== "building") return;
       if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;

@@ -60,28 +60,30 @@ const SHAPE_FALLBACK = {
 export const crucibleShapeHandler: GenerationHandlers<CrucibleShapeTarget> = {
   streaming(ctx: StreamingContext<CrucibleShapeTarget>): void {
     const text = stripThinkingTags(ctx.accumulatedText);
-    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.TICKER_TEXT, text: text.slice(-60) }]);
+    const display = text.replace(/\n/g, "  \n").replace(/</g, "\\<");
+    api.v1.ui.updateParts([
+      { id: `${IDS.CRUCIBLE.SHAPE_TEXT}-view`, text: display },
+      { id: IDS.CRUCIBLE.TICKER_TEXT, text: text.replace(/\n+/g, " ").slice(-60) },
+    ]);
   },
 
   async completion(ctx: CompletionContext<CrucibleShapeTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
+    // prefillBehavior: "trim" strips "SHAPE: " — text starts with the shape title
     const text = stripThinkingTags(ctx.accumulatedText).trim();
-    // accumulatedText includes the prefill "SHAPE: " — parse both lines
-    const shapeMatch = text.match(/SHAPE:\s*([A-Z_]+)/);
-    const instructionMatch = text.match(/INSTRUCTION:\s*(.+)/s);
+    const blankLine = text.indexOf("\n\n");
+    const name = (blankLine !== -1 ? text.slice(0, blankLine) : text.split("\n")[0]).trim();
+    const instruction = (blankLine !== -1 ? text.slice(blankLine) : "").trim();
 
-    if (!shapeMatch || !instructionMatch) {
+    if (!name) {
       api.v1.log("[crucible] Shape parse failed — using fallback shape");
-      api.v1.log("[crucible] Raw text:", text.slice(0, 300));
       ctx.dispatch(shapeDetected(SHAPE_FALLBACK));
       return;
     }
 
-    const name = shapeMatch[1].trim();
-    const instruction = instructionMatch[1].trim();
     api.v1.log(`[crucible] Shape generated: ${name}`);
-    ctx.dispatch(shapeDetected({ name, instruction }));
+    ctx.dispatch(shapeDetected({ name, instruction: instruction || SHAPE_FALLBACK.instruction }));
   },
 };
 

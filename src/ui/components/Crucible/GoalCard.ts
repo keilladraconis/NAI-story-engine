@@ -2,12 +2,13 @@ import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import {
   goalRemoved,
-  goalStarred,
+  goalAcceptanceToggled,
   goalTextUpdated,
 } from "../../../core/store/slices/crucible";
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
 import { formatTagsWithEmoji } from "../../../core/utils/tag-parser";
+import { NAI_WARNING } from "../../colors";
 
 const { column } = api.v1.ui.part;
 
@@ -22,6 +23,14 @@ const GOAL_BTN_STYLE = {
   "font-size": "0.8em",
   opacity: "0.5",
 };
+
+const ACCEPT_BTN_BASE = { padding: "2px 6px", "font-size": "0.8em" };
+const COLOR_ACCEPTED = "rgb(100, 220, 120)";
+const COLOR_REJECTED = NAI_WARNING;
+
+function acceptBtnStyle(accepted: boolean) {
+  return { ...ACCEPT_BTN_BASE, color: accepted ? COLOR_ACCEPTED : COLOR_REJECTED };
+}
 
 export const GoalCard = defineComponent<GoalCardProps, RootState>({
   id: (props) => CR.goal(props.goalId).ROOT,
@@ -41,8 +50,9 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
     const { goalId } = props;
     const ids = CR.goal(goalId);
 
-    const starBtnId = `${ids.ROOT}-star`;
+    const acceptBtnId = `${ids.ROOT}-accept`;
     const goal = ctx.getState().crucible.goals.find((g) => g.id === goalId);
+    const initialAccepted = goal?.accepted ?? true;
 
     // Reactively update view text when this goal's text changes.
     useSelector(
@@ -53,25 +63,25 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
       },
     );
 
-    const starBtn = api.v1.ui.part.button({
-      id: starBtnId,
-      text: goal?.starred ? "★" : "☆",
-      style: { ...GOAL_BTN_STYLE, opacity: goal?.starred ? "1" : "0.4" },
-      callback: () => dispatch(goalStarred({ goalId })),
+    const acceptBtn = api.v1.ui.part.button({
+      id: acceptBtnId,
+      iconId: initialAccepted ? "check" : "x",
+      style: acceptBtnStyle(initialAccepted),
+      callback: () => dispatch(goalAcceptanceToggled({ goalId })),
     });
 
     useSelector(
-      (s) => s.crucible.goals.find((g) => g.id === goalId)?.starred,
-      (starred) => {
+      (s) => s.crucible.goals.find((g) => g.id === goalId)?.accepted,
+      (accepted) => {
+        const a = accepted ?? true;
         api.v1.ui.updateParts([
-          { id: starBtnId, text: starred ? "★" : "☆", style: { ...GOAL_BTN_STYLE, opacity: starred ? "1" : "0.4" } },
+          { id: acceptBtnId, iconId: a ? "check" : "x", style: acceptBtnStyle(a) },
         ]);
       },
     );
 
     const delBtn = api.v1.ui.part.button({
       id: ids.DEL_BTN,
-      text: "",
       iconId: "trash-2",
       style: GOAL_BTN_STYLE,
       callback: () => dispatch(goalRemoved({ goalId })),
@@ -87,7 +97,7 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
       formatDisplay: formatTagsWithEmoji,
       onSave: (content: string) =>
         dispatch(goalTextUpdated({ goalId, text: content })),
-      extraControls: [starBtn, delBtn],
+      extraControls: [acceptBtn, delBtn],
     });
 
     return column({

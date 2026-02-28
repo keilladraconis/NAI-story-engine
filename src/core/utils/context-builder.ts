@@ -421,7 +421,6 @@ export const buildCruciblePrefix = async (
         "You are a story structure architect working within the Crucible system — " +
         "a backward-reasoning world generator. Given dramatic endpoints, you derive " +
         "what must exist in the world for those endpoints to land with full force. " +
-        "Your outputs are structural: goals, prerequisites, and world elements. " +
         "Every element must be load-bearing — if it could be removed without " +
         "weakening the story, it shouldn't exist.",
     },

@@ -164,7 +164,7 @@ export interface CrucibleGoal {
   id: string;
   text: string;
   why: string;
-  starred: boolean;
+  accepted: boolean;
 }
 
 export type PrereqCategory = "RELATIONSHIP" | "SECRET" | "POWER" | "HISTORY" | "OBJECT" | "BELIEF" | "PLACE";
