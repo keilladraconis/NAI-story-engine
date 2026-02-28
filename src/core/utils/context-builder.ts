@@ -413,17 +413,12 @@ export const buildCruciblePrefix = async (
 ): Promise<Message[]> => {
   const state = getState();
 
-  // --- MSG 1: Crucible system identity (hardcoded, not configurable) ---
+  // --- MSG 1: Crucible system identity ---
+  const systemPrompt = String(
+    (await api.v1.config.get("crucible_system_prompt")) || "",
+  );
   const messages: Message[] = [
-    {
-      role: "system",
-      content:
-        "You are a story structure architect working within the Crucible system — " +
-        "a backward-reasoning world generator. Given dramatic endpoints, you derive " +
-        "what must exist in the world for those endpoints to land with full force. " +
-        "Every element must be load-bearing — if it could be removed without " +
-        "weakening the story, it shouldn't exist.",
-    },
+    { role: "system", content: systemPrompt },
   ];
 
   // --- MSG 2 (optional): Creative grounding ---

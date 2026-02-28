@@ -118,29 +118,26 @@ export const createCrucibleGoalFactory = (
 
     const messages: Message[] = [...prefix];
 
+    // Consolidate task context into a single user turn to avoid stacked system messages
+    // confusing GLM's chat template and producing <|system|> delimiters in output.
+    const userParts: string[] = [];
+
+    if (shape) {
+      userParts.push(`SHAPE: ${shape.name}\n${shape.instruction}`);
+    }
+
     const existingGoals = state.crucible.goals.filter(
       (g) => g.id !== goalId && g.text.trim(),
     );
     if (existingGoals.length > 0) {
       const existingText = existingGoals.map((g) => g.text.trim()).join("\n+++\n");
-      messages.push({
-        role: "system",
-        content: `EXISTING GOALS (do NOT repeat these — approach the core tension from a DIFFERENT angle):\n${existingText}`,
-      });
+      userParts.push(`EXISTING GOALS (do NOT repeat these — approach the core tension from a DIFFERENT angle):\n${existingText}`);
     }
 
-    if (shape) {
-      messages.push({
-        role: "system",
-        content: `SHAPE: ${shape.name}\n${shape.instruction}`,
-      });
-    }
+    userParts.push(goalsPrompt);
 
     messages.push(
-      {
-        role: "system",
-        content: goalsPrompt,
-      },
+      { role: "user", content: userParts.join("\n\n") },
       { role: "assistant", content: "[GOAL] " },
     );
 
@@ -148,10 +145,10 @@ export const createCrucibleGoalFactory = (
       messages,
       params: {
         model: "glm-4-6",
-        max_tokens: 1024,
+        max_tokens: 300,
         temperature: 1.0,
         min_p: 0.05,
-        stop: ["</think>"],
+        stop: ["</think>", "\n#", "\n---", "<|system|>"],
       },
     };
   };
@@ -166,7 +163,7 @@ export const buildCrucibleShapeStrategy = (
     requestId: api.v1.uuid(),
     messageFactory: createCrucibleShapeFactory(getState),
     target: { type: "crucibleShape" },
-    prefillBehavior: "keep",
+    prefillBehavior: "trim",
     assistantPrefill: "SHAPE: ",
   };
 };

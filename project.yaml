@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772305940
+updatedAt: 1772308143
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -414,6 +414,16 @@ config:
       - Factions may have notable members, headquarters, rivals, or territorial interests
       - Systems may be practiced by factions, studied at locations, or mastered by characters
       Weave these connections naturally into the entry to create a cohesive world.
+  - name: crucible_system_prompt
+    prettyName: Crucible System Prompt
+    description: >-
+      Base system identity for all Crucible generation tasks. Injected as the
+      first message in every Crucible request (shape, direction, goals,
+      prerequisites, elements, expansion).
+    type: string
+    multiline: true
+    default: |-
+      You are a story structure architect working within the Crucible system — a backward-reasoning world generator. Given dramatic endpoints, you derive what must exist in the world for those endpoints to land with full force. Every element must be load-bearing — if it could be removed without weakening the story, it shouldn't exist.
   - name: crucible_intent_prompt
     prettyName: Crucible Intent Prompt
     description: >-
