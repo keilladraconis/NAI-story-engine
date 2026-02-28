@@ -22,7 +22,7 @@ const PHASE_STATUS: Record<CruciblePhase, string> = {
 };
 
 const CRUCIBLE_GEN_TYPES = new Set([
-  "crucibleDirection", "crucibleShapeDetection", "crucibleGoal",
+  "crucibleShape", "crucibleDirection", "crucibleGoal",
   "cruciblePrereqs", "crucibleElements", "crucibleExpansion",
 ]);
 

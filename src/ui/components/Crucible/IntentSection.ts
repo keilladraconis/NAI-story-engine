@@ -43,7 +43,7 @@ export const IntentSection = defineComponent<undefined, RootState>({
         return queued?.id;
       },
       isDisabledFromProjection: (proj: any) =>
-        proj.activeType === "crucibleShapeDetection" || proj.activeType === "crucibleGoal" ||
+        proj.activeType === "crucibleGoal" ||
         proj.activeType === "cruciblePrereqs" || proj.activeType === "crucibleElements",
     });
 

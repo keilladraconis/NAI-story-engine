@@ -27,7 +27,7 @@ export function migrateCrucibleState(loaded: Partial<CrucibleState>): CrucibleSt
     ...initialCrucibleState,
     phase,
     direction: loaded.direction ?? null,
-    detectedShape: loaded.detectedShape ?? null,
+    shape: null, // shape regenerates; old detectedShape string cannot be migrated
     merged,
     goals: Array.isArray(loaded.goals) ? loaded.goals : [],
     prerequisites: Array.isArray(loaded.prerequisites) ? loaded.prerequisites : [],
@@ -38,7 +38,7 @@ export function migrateCrucibleState(loaded: Partial<CrucibleState>): CrucibleSt
 export const initialCrucibleState: CrucibleState = {
   phase: "direction",
   direction: null,
-  detectedShape: null,
+  shape: null,
   merged: false,
   goals: [],
   prerequisites: [],
@@ -71,9 +71,9 @@ export const crucibleSlice = createSlice({
       return { ...state, merged: true };
     },
 
-    // Shape detection
-    shapeDetected: (state, payload: { shape: string }) => {
-      return { ...state, detectedShape: payload.shape };
+    // Shape generation
+    shapeDetected: (state, payload: { name: string; instruction: string }) => {
+      return { ...state, shape: { name: payload.name, instruction: payload.instruction } };
     },
 
     // Direction phase reducers
@@ -109,7 +109,7 @@ export const crucibleSlice = createSlice({
     },
 
     goalsCleared: (state) => {
-      return { ...state, goals: [], detectedShape: null };
+      return { ...state, goals: [] };
     },
 
     goalStarred: (state, payload: { goalId: string }) => {

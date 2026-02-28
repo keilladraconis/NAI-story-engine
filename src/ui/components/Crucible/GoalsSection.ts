@@ -13,15 +13,9 @@ import { GenerationButton } from "../GenerationButton";
 import { GoalCard } from "./GoalCard";
 import { NAI_WARNING } from "../../colors";
 
-/** Human-readable labels for detected narrative shapes. */
-const SHAPE_LABELS: Record<string, string> = {
-  CLIMACTIC_CHOICE: "Climactic Choice",
-  SPIRAL_DESCENT: "Spiral Descent",
-  THRESHOLD_CROSSING: "Threshold Crossing",
-  EQUILIBRIUM_RESTORED: "Equilibrium Restored",
-  ACCUMULATED_WEIGHT: "Accumulated Weight",
-  REVELATION: "Revelation",
-};
+function toTitleCase(s: string): string {
+  return s.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const { row, column, collapsibleSection, text } = api.v1.ui.part;
 
@@ -62,7 +56,8 @@ export const GoalsSection = defineComponent<undefined, RootState>({
   build(_props, ctx) {
     const { dispatch, useSelector } = ctx;
     const state = ctx.getState();
-    const { goals, detectedShape } = state.crucible;
+    const { goals } = state.crucible;
+    const shapeName = state.crucible.shape?.name ?? null;
 
     const { part: clearGoalsPart } = ctx.render(ButtonWithConfirmation, {
       id: CR.CLEAR_GOALS_BTN,
@@ -102,8 +97,8 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       },
     });
 
-    // Shape badge — shows detected narrative shape
-    const initialShapeLabel = detectedShape ? (SHAPE_LABELS[detectedShape] || detectedShape) : "";
+    // Shape badge — shows generated narrative shape name
+    const initialShapeLabel = shapeName ? toTitleCase(shapeName) : "";
     const shapeBadgePart = text({
       id: CR.SHAPE_BADGE,
       text: initialShapeLabel,
@@ -111,10 +106,10 @@ export const GoalsSection = defineComponent<undefined, RootState>({
     });
 
     useSelector(
-      (s) => s.crucible.detectedShape,
+      (s) => s.crucible.shape?.name,
       () => {
-        const shape = ctx.getState().crucible.detectedShape;
-        const label = shape ? (SHAPE_LABELS[shape] || shape) : "";
+        const name = ctx.getState().crucible.shape?.name ?? null;
+        const label = name ? toTitleCase(name) : "";
         api.v1.ui.updateParts([{
           id: CR.SHAPE_BADGE,
           text: label,
@@ -134,7 +129,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       }),
       requestIdFromProjection: () => {
         const s = ctx.getState();
-        const types = new Set(["crucibleShapeDetection", "crucibleGoal"]);
+        const types = new Set(["crucibleShape", "crucibleGoal"]);
         if (s.runtime.activeRequest && types.has(s.runtime.activeRequest.type)) return s.runtime.activeRequest.id;
         return s.runtime.queue.find((q) => types.has(q.type))?.id;
       },

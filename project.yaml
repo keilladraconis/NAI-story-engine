@@ -1,12 +1,12 @@
 compatibilityVersion: naiscript-1.0
 id: e6c35faa-e4f2-4c3b-af4a-d56e4c992d87
 name: Story Engine
-version: 0.8.1
+version: 0.9.0
 createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772132631
+updatedAt: 1772291518
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -440,52 +440,58 @@ config:
 
       End with a single [TAGS] line: 3-8 short labels for genre, tone,
       motifs, or thematic markers.
-  - name: crucible_goals_prompt
-    prettyName: Crucible Goals Prompt
-    description: Prompt for generating a single dramatic endpoint goal
+  - name: crucible_shape_prompt
+    prettyName: Crucible Shape Prompt
+    description: >-
+      Prompt for generative shape invention — GLM reads the brainstorm and
+      invents the narrative shape that fits. Includes example shapes spanning
+      the full tonal spectrum so GLM sees dramatic and casual shapes as equally
+      valid. Output must be two lines: SHAPE: [NAME] and INSTRUCTION: [text].
     type: string
     multiline: true
     default: |-
-      Generate ONE goal — a vivid dramatic endpoint the story arrives at.
-      It will be reframed into a structural impossible choice, so lean toward
-      moments where two things the protagonist values become irreconcilable.
+      You are a story architect. Given the story material below, invent the narrative shape this story is leaning toward.
 
-      GOOD: "The colony ship arrives — but the planet is already inhabited by
-      a civilization no record prepared them for"
-      GOOD: "The siblings reunite at their parent's deathbed — the parent who
-      once chose between them"
-      BAD: "Everything changes" (no dramatic moment, nothing to anchor on)
-      BAD: "The hero wins" (outcome without cost — what must winning destroy?)
+      A shape is a structural lens — not a genre, not a plot, but the kind of moment the story is building toward and the structural logic that governs its endpoint.
 
-      Follow the Direction above. Each goal should approach the core tension
-      from a distinct angle — multiple goals produce different structural
-      choices and different world elements.
+      Example shapes (for reference — do not limit yourself to these):
+
+      CLIMACTIC_CHOICE: Lean toward moments where two things the protagonist values become irreconcilable. The endpoint is a configuration, not an event.
+      SPIRAL_DESCENT: Lean toward moments of depth recognition — where the protagonist arrives somewhere structurally identical to where they began. Do not imply escape, recovery, or a choice between continuing and stopping.
+      THRESHOLD_CROSSING: Lean toward the moment after which the protagonist cannot be what they were — not because they overcame something, but because the crossing made the before-self permanently past.
+      EQUILIBRIUM_RESTORED: Lean toward a restored stability legible precisely because of what it carefully excludes. The equilibrium is different from the original even where it looks identical.
+      ACCUMULATED_WEIGHT: Lean toward a saturation point — where all elements are simultaneously present and the full gravity of the situation becomes legible. Not a breaking point. Not a release. The story ends because there is nothing more to add.
+      REVELATION: Lean toward a disclosure that changes the meaning of every prior scene — not by adding a new fact, but by revealing that the frame itself was the constructed object.
+      INTIMATE_MOMENT: Lean toward a scene of ordinary life so specific to these particular people that it becomes unrepeatable — not because something changes, but because it captures exactly what this shared existence is.
+      ROMANTIC_GRAVITY: Lean toward the weighted moment where what both characters feel becomes impossible to ignore — not the resolution, but the charged beat before it, where knowing and not-saying are the same breath.
+      LIVED_TEXTURE: Lean toward a scene chosen for the quality of life it makes visible — how this particular world is inhabited, not what breaks or changes within it.
+
+      Any of these shapes — or a new one you invent — is equally valid. Match the shape to the material, not to dramatic convention.
+
+      Respond on exactly two lines:
+      SHAPE: [EVOCATIVE_SHAPE_NAME_IN_CAPS_WITH_UNDERSCORES]
+      INSTRUCTION: [2-4 sentences describing what structural moments this shape leans toward]
+  - name: crucible_goals_prompt
+    prettyName: Crucible Goals Prompt
+    description: >-
+      Prompt for generating a single shape-native goal. The shape name and
+      instruction are injected automatically before this prompt — write as if
+      the shape context is already present above.
+    type: string
+    multiline: true
+    default: |-
+      Generate ONE goal — a vivid structural endpoint the story arrives at.
+
+      Generate an endpoint native to the story's shape — the most total, most resonant version of that structural logic.
+
+      BAD ENDPOINTS:
+      BAD: "Everything changes" — no dramatic moment, nothing to anchor on
+      BAD: "The hero wins" — outcome without cost
+      BAD: Any endpoint that could be described as partial, modest, or preliminary
 
       Output format:
       [GOAL] The endpoint — 1-2 sentences, concrete and vivid
-  - name: crucible_structural_goal_prompt
-    prettyName: Crucible Structural Goal Prompt
-    description: Prompt for reframing a user's dramatic goal as a structural
-      impossible choice
-    type: string
-    multiline: true
-    default: |-
-      Reframe the user's dramatic goal as a STRUCTURAL IMPOSSIBLE CHOICE —
-      the class of moment where two things the protagonist values become
-      irreconcilable.
-
-      NOT: "The hero defeats the villain" (that's a plot point)
-      YES: "A moment where protecting what was built requires becoming
-      what was fought against" (that's a structural endpoint)
-
-      The goal must be:
-      - Specific enough to constrain world-building (not "something bad happens")
-      - Open enough that many story paths can reach it (not "X kills Y at location Z")
-      - Defined by the TENSION between values, not by the outcome
-
-      Output format — two tags:
-      [GOAL] The structural impossible choice — 1-2 sentences
-      [WHY] Why this framing constrains world-building better than the original
+      [WHY] Why this framing constrains world-building better than a plot description
   - name: crucible_prerequisites_prompt
     prettyName: Crucible Prerequisites Prompt
     description: Prompt for deriving load-bearing prerequisites from structural goals

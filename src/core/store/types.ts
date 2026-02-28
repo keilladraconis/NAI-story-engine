@@ -111,7 +111,7 @@ export interface GenerationRequest {
   | "lorebookRefine"
   | "bootstrap"
   | "crucibleDirection"
-  | "crucibleShapeDetection"
+  | "crucibleShape"
   | "crucibleGoal"
   | "cruciblePrereqs"
   | "crucibleElements"
@@ -136,7 +136,7 @@ export interface GenerationStrategy {
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }
   | { type: "crucibleDirection" }
-  | { type: "crucibleShapeDetection" }
+  | { type: "crucibleShape" }
   | { type: "crucibleGoal"; goalId: string }
   | { type: "cruciblePrereqs" }
   | { type: "crucibleElements" }
@@ -191,7 +191,7 @@ export interface CrucibleWorldElement {
 export interface CrucibleState {
   phase: CruciblePhase;
   direction: string | null;
-  detectedShape: string | null;
+  shape: { name: string; instruction: string } | null;
   merged: boolean;
   goals: CrucibleGoal[];
   prerequisites: Prerequisite[];

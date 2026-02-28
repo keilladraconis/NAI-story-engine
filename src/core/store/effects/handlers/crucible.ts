@@ -22,7 +22,7 @@ function stripThinkingTags(text: string): string {
 // --- Types for crucible targets ---
 
 type CrucibleDirectionTarget = { type: "crucibleDirection" };
-type CrucibleShapeDetectionTarget = { type: "crucibleShapeDetection" };
+type CrucibleShapeTarget = { type: "crucibleShape" };
 type CrucibleGoalTarget = { type: "crucibleGoal"; goalId: string };
 
 // --- Direction Handler ---
@@ -50,40 +50,38 @@ export const crucibleDirectionHandler: GenerationHandlers<CrucibleDirectionTarge
   },
 };
 
-// --- Shape Detection Handler ---
+// --- Generative Shape Handler ---
 
-const VALID_SHAPES = new Set([
-  "CLIMACTIC_CHOICE",
-  "SPIRAL_DESCENT",
-  "THRESHOLD_CROSSING",
-  "EQUILIBRIUM_RESTORED",
-  "ACCUMULATED_WEIGHT",
-  "REVELATION",
-]);
+const SHAPE_FALLBACK = {
+  name: "STORY",
+  instruction: "Lean toward the moment that best captures the story's essential nature.",
+};
 
-export const shapeDetectionHandler: GenerationHandlers<CrucibleShapeDetectionTarget> = {
-  streaming(ctx: StreamingContext<CrucibleShapeDetectionTarget>): void {
+export const crucibleShapeHandler: GenerationHandlers<CrucibleShapeTarget> = {
+  streaming(ctx: StreamingContext<CrucibleShapeTarget>): void {
     const text = stripThinkingTags(ctx.accumulatedText);
     api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.TICKER_TEXT, text: text.slice(-60) }]);
   },
 
-  async completion(ctx: CompletionContext<CrucibleShapeDetectionTarget>): Promise<void> {
+  async completion(ctx: CompletionContext<CrucibleShapeTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
     const text = stripThinkingTags(ctx.accumulatedText).trim();
-    // accumulatedText includes the prefill "SHAPE: " — extract the value after it
+    // accumulatedText includes the prefill "SHAPE: " — parse both lines
     const shapeMatch = text.match(/SHAPE:\s*([A-Z_]+)/);
-    const raw = shapeMatch ? shapeMatch[1].trim() : "";
-    const shape = VALID_SHAPES.has(raw) ? raw : "CLIMACTIC_CHOICE";
+    const instructionMatch = text.match(/INSTRUCTION:\s*(.+)/s);
 
-    if (!VALID_SHAPES.has(raw)) {
-      api.v1.log("[crucible] Shape parse: unrecognised shape, defaulting to CLIMACTIC_CHOICE");
-      api.v1.log("[crucible] Raw text:", text.slice(0, 200));
-    } else {
-      api.v1.log(`[crucible] Shape detected: ${shape}`);
+    if (!shapeMatch || !instructionMatch) {
+      api.v1.log("[crucible] Shape parse failed — using fallback shape");
+      api.v1.log("[crucible] Raw text:", text.slice(0, 300));
+      ctx.dispatch(shapeDetected(SHAPE_FALLBACK));
+      return;
     }
 
-    ctx.dispatch(shapeDetected({ shape }));
+    const name = shapeMatch[1].trim();
+    const instruction = instructionMatch[1].trim();
+    api.v1.log(`[crucible] Shape generated: ${name}`);
+    ctx.dispatch(shapeDetected({ name, instruction }));
   },
 };
 
