@@ -130,7 +130,7 @@ async function captureRollbackState(
 /**
  * Descriptive label for cache instrumentation logs.
  */
-function cacheLabel(target: GenerationStrategy["target"]): string {
+function cacheLabel(target: GenerationStrategy["target"]) {
   switch (target.type) {
     case "field":
       return `field:${target.fieldId}`;
@@ -289,14 +289,22 @@ export function registerGenerationEngineEffects(
           let calls = 1;
           const maxCalls = strategy.continuation.maxCalls;
           let finishReason = result.choices?.[0]?.finish_reason;
+          api.v1.log(`[continuation] finish_reason="${finishReason}" after call 1/${maxCalls}`);
 
-          while (calls < maxCalls && finishReason === "length") {
+          const isTruncated = (r: string | undefined) =>
+            r === "length" || r === "max_tokens";
+
+          while (calls < maxCalls && isTruncated(finishReason)) {
             if (checkCancellation(requestId, getState)) break;
 
             api.v1.log(`[continuation] Call ${calls + 1}/${maxCalls}, extending output...`);
 
+            const lastMsg = resolvedMessages[resolvedMessages.length - 1];
+            const baseMessages = lastMsg?.role === "assistant"
+              ? resolvedMessages.slice(0, -1)
+              : resolvedMessages;
             const continuationMessages: Message[] = [
-              ...resolvedMessages.slice(0, -1),
+              ...baseMessages,
               { role: "assistant", content: accumulatedText },
             ];
 

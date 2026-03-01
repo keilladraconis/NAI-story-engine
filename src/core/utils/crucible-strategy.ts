@@ -129,7 +129,7 @@ export const createCrucibleGoalFactory = (
     const existingGoals = state.crucible.goals.filter(
       (g) => g.id !== goalId && g.text.trim(),
     );
-    if (existingGoals.length > 0) {
+  if (existingGoals.length > 0) {
       const existingText = existingGoals.map((g) => g.text.trim()).join("\n+++\n");
       userParts.push(`EXISTING GOALS (do NOT repeat these — approach the core tension from a DIFFERENT angle):\n${existingText}`);
     }
