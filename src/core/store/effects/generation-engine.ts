@@ -232,31 +232,28 @@ export function registerGenerationEngineEffects(
       const { requestId, messages, messageFactory, params, target } = strategy;
 
       let accumulatedText = resolvePrefill(strategy, getState);
-
-      let messagesOrFactory: Message[] | MessageFactory | undefined;
-      let resolvedMessages: Message[] | undefined;
       const apiParams = { ...params };
 
-      if (messageFactory && strategy.continuation) {
-        const result = await messageFactory();
-        resolvedMessages = result.messages;
-        if (result.params) Object.assign(apiParams, result.params);
-        const uncached = await api.v1.script.countUncachedInputTokens(result.messages, "glm-4-6");
-        api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);
-        messagesOrFactory = resolvedMessages;
-      } else if (messageFactory) {
-        messagesOrFactory = async () => {
+      // Resolved messages captured via closure for potential continuation calls
+      let resolvedMessages: Message[] | undefined;
+
+      let messagesInput: Message[] | MessageFactory;
+      if (messageFactory) {
+        // Wrap factory to capture resolved messages and instrument cache at JIT time
+        messagesInput = async () => {
           const result = await messageFactory();
+          resolvedMessages = result.messages;
+          if (result.params) Object.assign(apiParams, result.params);
           const uncached = await api.v1.script.countUncachedInputTokens(result.messages, "glm-4-6");
           api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);
           return result;
         };
       } else if (messages) {
+        resolvedMessages = messages;
         const uncached = await api.v1.script.countUncachedInputTokens(messages, "glm-4-6");
         api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);
-        messagesOrFactory = messages;
-      }
-      if (!messagesOrFactory) {
+        messagesInput = messages;
+      } else {
         api.v1.log("Generation failed: no messages or factory provided");
         return;
       }
@@ -268,30 +265,34 @@ export function registerGenerationEngineEffects(
       const handler = getHandler(target.type);
       let generationSucceeded = false;
 
+      const onStream = (choices: GenerationChoice[], _final: boolean) => {
+        const text = choices[0]?.text || "";
+        if (text) {
+          accumulatedText += text;
+          handler.streaming({ target, getState, accumulatedText }, text);
+        }
+      };
+
       try {
         const result = await genX.generate(
-          messagesOrFactory,
+          messagesInput,
           { ...apiParams, taskId: requestId },
-          (choices, _final) => {
-            const text = choices[0]?.text || "";
-            if (text) {
-              accumulatedText += text;
-              handler.streaming({ target, getState, accumulatedText }, text);
-            }
-          },
+          onStream,
           "background",
           await api.v1.createCancellationSignal(),
         );
 
         generationSucceeded = true;
 
-        // Continuation: extend output beyond single max_tokens call
-        if (strategy.continuation && resolvedMessages && result) {
+        // Continuation: extend output when truncated by token limit
+        if (strategy.continuation && resolvedMessages) {
           let calls = 1;
           const maxCalls = strategy.continuation.maxCalls;
           let finishReason = result.choices?.[0]?.finish_reason;
 
           while (calls < maxCalls && finishReason === "length") {
+            if (checkCancellation(requestId, getState)) break;
+
             api.v1.log(`[continuation] Call ${calls + 1}/${maxCalls}, extending output...`);
 
             const continuationMessages: Message[] = [
@@ -299,25 +300,15 @@ export function registerGenerationEngineEffects(
               { role: "assistant", content: accumulatedText },
             ];
 
-            try {
-              const contResult = await api.v1.generate(
-                continuationMessages,
-                { ...apiParams, max_tokens: 1024 },
-                (choices) => {
-                  const text = choices[0]?.text || "";
-                  if (text) {
-                    accumulatedText += text;
-                    handler.streaming({ target, getState, accumulatedText }, text);
-                  }
-                },
-                "background",
-                await api.v1.createCancellationSignal(),
-              );
-              finishReason = contResult.choices?.[0]?.finish_reason;
-            } catch (e) {
-              api.v1.log("[continuation] Error:", e);
-              break;
-            }
+            const contResult = await genX.generate(
+              continuationMessages,
+              { ...apiParams, taskId: `${requestId}-cont-${calls}`, max_tokens: 1024 },
+              onStream,
+              "background",
+              await api.v1.createCancellationSignal(),
+            );
+
+            finishReason = contResult.choices?.[0]?.finish_reason;
             calls++;
           }
         }
