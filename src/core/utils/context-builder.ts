@@ -566,7 +566,6 @@ export const buildBrainstormStrategy = (
  * Captures chat history at creation time (before messages are cleared).
  */
 export const createSummarizeFactory = (
-  getState: () => RootState,
   chatHistory: BrainstormMessage[],
 ): MessageFactory => {
   return async () => {
@@ -585,37 +584,70 @@ export const createSummarizeFactory = (
 
     const messages: Message[] = [systemMsg];
 
-    // Include story context
-    const storyContext = await getStoryContextMessages();
-    messages.push(...storyContext);
-
-    const state = getState();
-    const canon = getFieldContent(state, FieldID.Canon);
-    const setting = String(
-      (await api.v1.storyStorage.get("kse-setting")) || "",
-    );
-
-    let contextBlock = "";
-    if (canon) contextBlock += `CANON:\n${canon}\n\n`;
-    if (setting) contextBlock += `SETTING:\n${setting}\n\n`;
-    if (contextBlock) {
-      messages.push({ role: "user", content: contextBlock.trim() });
-      messages.push({ role: "assistant", content: "Understood." });
-    }
-
     // Replay the captured chat history
     const chatText = chatHistory
       .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
       .join("\n");
     messages.push({
       role: "user",
-      content: `Brainstorm conversation:\n\n${chatText}`,
+      content: `Brainstorm transcript:\n\n${chatText}\n\nStart your response with the "## World" section.`,
     });
 
     return {
       messages,
-      params: { model, max_tokens: 1024, temperature: 0.7, min_p: 0.05 },
+      params: { model, max_tokens: 1024, temperature: 0.5, min_p: 0.05 },
     };
+  };
+};
+
+/**
+ * Creates a message factory for brainstorm chat title generation.
+ * Captures chat history at creation time and produces a short evocative title.
+ */
+export const createBrainstormTitleFactory = (
+  chatHistory: BrainstormMessage[],
+): MessageFactory => {
+  return async () => {
+    const model = "glm-4-6";
+    const systemPrompt = String(
+      (await api.v1.config.get("system_prompt")) || "",
+    );
+
+    const chatText = chatHistory
+      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+      .join("\n");
+
+    const messages: Message[] = [
+      {
+        role: "system",
+        content: `${systemPrompt}\n\nYou are a creative assistant. Given a brainstorm conversation, output a short evocative title (3–6 words) that captures the core theme or subject. Output ONLY the title — no punctuation at the end, no quotes, no explanation.`,
+      },
+      {
+        role: "user",
+        content: `Brainstorm conversation:\n\n${chatText}\n\nGenerate a short title for this conversation.`,
+      },
+    ];
+
+    return {
+      messages,
+      params: { model, max_tokens: 20, temperature: 0.8, min_p: 0.05 },
+    };
+  };
+};
+
+/**
+ * Builds a brainstorm chat title generation strategy.
+ * On completion, dispatches chatRenamed for the given chat index.
+ */
+export const buildBrainstormTitleStrategy = (
+  chatIndex: number,
+  chatHistory: BrainstormMessage[],
+): GenerationStrategy => {
+  return {
+    requestId: api.v1.uuid(),
+    messageFactory: createBrainstormTitleFactory(chatHistory),
+    target: { type: "brainstormChatTitle", chatIndex },
+    prefillBehavior: "trim",
   };
 };
 
@@ -623,18 +655,18 @@ export const createSummarizeFactory = (
  * Builds a summarize generation strategy.
  */
 export const buildSummarizeStrategy = (
-  getState: () => RootState,
   messageId: string,
   chatHistory: BrainstormMessage[],
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createSummarizeFactory(getState, chatHistory),
+    messageFactory: createSummarizeFactory(chatHistory),
     target: {
       type: "brainstorm",
       messageId,
     },
     prefillBehavior: "keep",
+    continuation: { maxCalls: 3 },
   };
 };
 

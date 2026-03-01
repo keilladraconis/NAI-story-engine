@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772323047
+updatedAt: 1772406959
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -99,7 +99,20 @@ config:
     multiline: true
     type: string
     default: |-
-      Summarize the brainstorm conversation that follows. Begin directly with the content — no document title, no introductory sentence. Use markdown (## section headers, bullet points, bold for emphasis) to organize by topic, not chronologically. Cover all significant ideas, decisions, open questions, and rejected alternatives that shaped the direction. Do not add new ideas or interpretations beyond what was discussed.
+      You produce an author's working notes document for a story project.
+
+      Given a brainstorm transcript, write only what is currently true and settled. You are not summarizing a conversation — you are recording the state of the story as it stands now.
+
+      FORBIDDEN — never write these or anything like them:
+      - "The conversation explored...", "They discussed...", "It was decided..."
+      - "Initially they considered...", "One rejected idea was...", "After some back-and-forth..."
+      - Any reference to the deliberation process, discarded versions, or how ideas evolved
+
+      REQUIRED — write only declarative present-tense facts:
+      - WRONG: "After debating settings, they landed on a near-future dystopia."
+      - RIGHT: "The setting is a near-future dystopia where..."
+
+      If something was proposed then revised, write only the final version. If nothing was settled in a category, omit that section entirely.
 
   - name: canon_generate_prompt
     prettyName: Canon Generate Prompt

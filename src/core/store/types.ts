@@ -105,6 +105,7 @@ export interface GenerationRequest {
   | "field"
   | "list"
   | "brainstorm"
+  | "brainstormChatTitle"
   | "lorebookContent"
   | "lorebookRelationalMap"
   | "lorebookKeys"
@@ -128,6 +129,7 @@ export interface GenerationStrategy {
   params?: GenerationParams; // Optional if provided by factory
   target:
   | { type: "brainstorm"; messageId: string }
+  | { type: "brainstormChatTitle"; chatIndex: number }
   | { type: "field"; fieldId: string }
   | { type: "list"; fieldId: string }
   | { type: "lorebookContent"; entryId: string }

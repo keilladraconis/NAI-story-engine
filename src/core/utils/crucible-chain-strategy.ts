@@ -81,6 +81,7 @@ export const buildPrereqsStrategy = (
     target: { type: "cruciblePrereqs" },
     prefillBehavior: "keep",
     assistantPrefill: "[PREREQ] ",
+    continuation: { maxCalls: 3 },
   };
 };
 
@@ -155,6 +156,7 @@ export const buildElementsStrategy = (
     target: { type: "crucibleElements" },
     prefillBehavior: "keep",
     assistantPrefill: "+++\n",
+    continuation: { maxCalls: 3 },
   };
 };
 
@@ -238,5 +240,6 @@ export const buildExpansionStrategy = (
     target: { type: "crucibleExpansion", elementId },
     prefillBehavior: "keep",
     assistantPrefill: "[PREREQ] ",
+    continuation: { maxCalls: 3 },
   };
 };

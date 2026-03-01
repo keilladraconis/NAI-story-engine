@@ -1,5 +1,5 @@
 import { RootState, GenerationStrategy, AppDispatch } from "../types";
-import { brainstormHandler } from "./handlers/brainstorm";
+import { brainstormHandler, brainstormChatTitleHandler } from "./handlers/brainstorm";
 import { bootstrapHandler } from "./handlers/bootstrap";
 import { fieldHandler } from "./handlers/field";
 import { listHandler } from "./handlers/list";
@@ -27,6 +27,10 @@ export type TargetType = GenerationStrategy["target"]["type"];
 export type BrainstormTarget = Extract<
   GenerationStrategy["target"],
   { type: "brainstorm" }
+>;
+export type BrainstormChatTitleTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "brainstormChatTitle" }
 >;
 export type FieldTarget = Extract<
   GenerationStrategy["target"],
@@ -113,6 +117,7 @@ export interface GenerationHandlers<T = GenerationStrategy["target"]> {
 // Handler registry mapping target types to their handlers
 export const GENERATION_HANDLERS: {
   brainstorm: GenerationHandlers<BrainstormTarget>;
+  brainstormChatTitle: GenerationHandlers<BrainstormChatTitleTarget>;
   bootstrap: GenerationHandlers<BootstrapTarget>;
   field: GenerationHandlers<FieldTarget>;
   list: GenerationHandlers<ListTarget>;
@@ -128,6 +133,7 @@ export const GENERATION_HANDLERS: {
   crucibleExpansion: GenerationHandlers<CrucibleExpansionTarget>;
 } = {
   brainstorm: brainstormHandler,
+  brainstormChatTitle: brainstormChatTitleHandler,
   bootstrap: bootstrapHandler,
   field: fieldHandler,
   list: listHandler,

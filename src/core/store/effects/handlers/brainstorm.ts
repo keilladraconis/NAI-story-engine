@@ -1,8 +1,9 @@
 import { IDS } from "../../../../ui/framework/ids";
-import { messageUpdated } from "../../index";
+import { messageUpdated, chatRenamed } from "../../index";
 import {
   GenerationHandlers,
   BrainstormTarget,
+  BrainstormChatTitleTarget,
   StreamingContext,
   CompletionContext,
 } from "../generation-handlers";
@@ -21,6 +22,20 @@ export const brainstormHandler: GenerationHandlers<BrainstormTarget> = {
           content: ctx.accumulatedText,
         }),
       );
+    }
+  },
+};
+
+export const brainstormChatTitleHandler: GenerationHandlers<BrainstormChatTitleTarget> = {
+  streaming(_ctx: StreamingContext<BrainstormChatTitleTarget>, _newText: string): void {
+    // Title generation streams silently — no intermediate UI update needed
+  },
+
+  async completion(ctx: CompletionContext<BrainstormChatTitleTarget>): Promise<void> {
+    if (!ctx.generationSucceeded) return;
+    const title = ctx.accumulatedText.trim().replace(/[.!?]+$/, "");
+    if (title) {
+      ctx.dispatch(chatRenamed({ index: ctx.target.chatIndex, title }));
     }
   },
 };

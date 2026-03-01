@@ -19,6 +19,7 @@ import {
 import {
   buildBrainstormStrategy,
   buildSummarizeStrategy,
+  buildBrainstormTitleStrategy,
 } from "../../utils/context-builder";
 import { IDS } from "../../../ui/framework/ids";
 
@@ -81,14 +82,14 @@ export function registerBrainstormEffects(
   // Intent: Brainstorm Submit
   subscribeEffect(
     (action) => action.type === uiBrainstormSubmitUserMessage.type,
-    async (_action, { dispatch: localDispatch, getState: getLatest }) => {
+    async (_action, { getState: getLatest }) => {
       const editingId = getLatest().brainstorm.editingMessageId;
       if (editingId) {
         const editInputId = IDS.BRAINSTORM.message(editingId).INPUT;
         const editContent =
           (await api.v1.storyStorage.get(`draft-${editInputId}`)) || "";
-        localDispatch(messageUpdated({ id: editingId, content: String(editContent) }));
-        localDispatch(editingMessageIdSet(null));
+        dispatch(messageUpdated({ id: editingId, content: String(editContent) }));
+        dispatch(editingMessageIdSet(null));
       }
 
       const storageKey = IDS.BRAINSTORM.INPUT;
@@ -106,7 +107,7 @@ export function registerBrainstormEffects(
           role: "user",
           content: String(content),
         };
-        localDispatch(messageAdded(userMsg));
+        dispatch(messageAdded(userMsg));
       }
 
       const lastMessage = currentMessages(getLatest().brainstorm).at(-1);
@@ -117,7 +118,7 @@ export function registerBrainstormEffects(
           role: "assistant",
           content: "",
         };
-        localDispatch(messageAdded(assistantMsg));
+        dispatch(messageAdded(assistantMsg));
       } else if (lastMessage?.role == "assistant") {
         assistantId = lastMessage.id;
       } else {
@@ -126,23 +127,23 @@ export function registerBrainstormEffects(
 
       const mode = currentChat(getLatest().brainstorm).mode || "cowriter";
       const strategy = buildBrainstormStrategy(getState, assistantId, mode);
-      localDispatch(
+      dispatch(
         requestQueued({
           id: strategy.requestId,
           type: "brainstorm",
           targetId: assistantId,
         }),
       );
-      localDispatch(generationSubmitted(strategy));
+      dispatch(generationSubmitted(strategy));
     },
   );
 
   // Intent: Brainstorm Retry
   subscribeEffect(
     matchesAction(uiBrainstormRetryGeneration),
-    async (action, { dispatch: localDispatch, getState: getLatest }) => {
+    async (action, { dispatch, getState: getLatest }) => {
       const { messageId } = action.payload;
-      localDispatch(pruneHistory(messageId));
+      dispatch(pruneHistory(messageId));
 
       const state = getLatest();
       const lastMessage = currentMessages(state.brainstorm).at(-1);
@@ -153,7 +154,7 @@ export function registerBrainstormEffects(
         assistantId = api.v1.uuid();
       } else {
         assistantId = api.v1.uuid();
-        localDispatch(
+        dispatch(
           messageAdded({
             id: assistantId,
             role: "assistant",
@@ -164,21 +165,21 @@ export function registerBrainstormEffects(
 
       const mode = currentChat(getLatest().brainstorm).mode || "cowriter";
       const strategy = buildBrainstormStrategy(getState, assistantId, mode);
-      localDispatch(
+      dispatch(
         requestQueued({
           id: strategy.requestId,
           type: "brainstorm",
           targetId: assistantId,
         }),
       );
-      localDispatch(generationSubmitted(strategy));
+      dispatch(generationSubmitted(strategy));
     },
   );
 
   // Intent: Brainstorm Summarize → create a new chat, generate summary there (original chat preserved)
   subscribeEffect(
     matchesAction(uiBrainstormSummarize),
-    async (_action, { dispatch: localDispatch, getState: getLatest }) => {
+    async (_action, { getState: getLatest }) => {
       const state = getLatest();
       const messages = currentMessages(state.brainstorm);
       if (messages.length === 0) {
@@ -190,16 +191,20 @@ export function registerBrainstormEffects(
       const sourceTitle = currentChat(state.brainstorm).title;
 
       // Create a new chat (original is preserved); chatCreated switches to it
-      localDispatch(chatCreated());
+      dispatch(chatCreated());
       const newIndex = getLatest().brainstorm.currentChatIndex;
-      localDispatch(chatRenamed({ index: newIndex, title: `Summary: ${sourceTitle}` }));
+      dispatch(chatRenamed({ index: newIndex, title: `Summary: ${sourceTitle}` }));
 
       const assistantId = api.v1.uuid();
-      localDispatch(messageAdded({ id: assistantId, role: "assistant", content: "" }));
+      dispatch(messageAdded({ id: assistantId, role: "assistant", content: "" }));
 
-      const strategy = buildSummarizeStrategy(getLatest, assistantId, chatHistory);
-      localDispatch(requestQueued({ id: strategy.requestId, type: "brainstorm", targetId: assistantId }));
-      localDispatch(generationSubmitted(strategy));
+      const strategy = buildSummarizeStrategy(assistantId, chatHistory);
+      dispatch(requestQueued({ id: strategy.requestId, type: "brainstorm", targetId: assistantId }));
+      dispatch(generationSubmitted(strategy));
+
+      const titleStrategy = buildBrainstormTitleStrategy(newIndex, chatHistory);
+      dispatch(requestQueued({ id: titleStrategy.requestId, type: "brainstormChatTitle", targetId: String(newIndex) }));
+      dispatch(generationSubmitted(titleStrategy));
     },
   );
 }
