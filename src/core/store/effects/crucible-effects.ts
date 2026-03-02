@@ -46,7 +46,8 @@ export function registerCrucibleEffects(
   subscribeEffect(
     matchesAction(crucibleShapeRequested),
     async () => {
-      const strategy = buildCrucibleShapeStrategy(getState);
+      const prefillName = String((await api.v1.storyStorage.get("cr-shape-name")) || "").trim() || undefined;
+      const strategy = buildCrucibleShapeStrategy(getState, prefillName);
       dispatch(requestQueued({ id: strategy.requestId, type: "crucibleShape", targetId: "crucible" }));
       dispatch(generationSubmitted(strategy));
     },

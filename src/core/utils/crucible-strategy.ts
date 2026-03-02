@@ -17,9 +17,12 @@ import { buildCruciblePrefix } from "./context-builder";
 /**
  * Creates a message factory for generative shape production.
  * Reads brainstorm + story state and invents the shape that fits.
+ * If prefillName is provided, it is injected as the assistant prefill so GLM
+ * only needs to generate the instruction, not the shape name.
  */
 export const createCrucibleShapeFactory = (
   getState: () => RootState,
+  prefillName?: string,
 ): MessageFactory => {
   return async () => {
     const shapePrompt = String(
@@ -31,10 +34,12 @@ export const createCrucibleShapeFactory = (
       includeStoryState: true,
     });
 
+    const prefill = prefillName ? `SHAPE: ${prefillName}\n\n` : "SHAPE: ";
+
     const messages: Message[] = [
       ...prefix,
       { role: "system", content: shapePrompt },
-      { role: "assistant", content: "SHAPE: " },
+      { role: "assistant", content: prefill },
     ];
 
     return {
@@ -158,13 +163,14 @@ export const createCrucibleGoalFactory = (
 
 export const buildCrucibleShapeStrategy = (
   getState: () => RootState,
+  prefillName?: string,
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createCrucibleShapeFactory(getState),
-    target: { type: "crucibleShape" },
+    messageFactory: createCrucibleShapeFactory(getState, prefillName),
+    target: { type: "crucibleShape", prefillName },
     prefillBehavior: "trim",
-    assistantPrefill: "SHAPE: ",
+    assistantPrefill: prefillName ? `SHAPE: ${prefillName}\n\n` : "SHAPE: ",
   };
 };
 
@@ -176,6 +182,7 @@ export const buildCrucibleDirectionStrategy = (
     messageFactory: createCrucibleDirectionFactory(getState),
     target: { type: "crucibleDirection" },
     prefillBehavior: "trim",
+    continuation: { maxCalls: 2 },
   };
 };
 

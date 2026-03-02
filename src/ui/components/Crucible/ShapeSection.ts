@@ -9,7 +9,7 @@ import { IDS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
 import { EditableText } from "../EditableText";
 
-const { collapsibleSection } = api.v1.ui.part;
+const { collapsibleSection, textInput } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
@@ -49,6 +49,13 @@ export const ShapeSection = defineComponent<undefined, RootState>({
       api.v1.storyStorage.set("cr-shape-collapsed", "");
     }
 
+    const nameInputPart = textInput({
+      id: CR.SHAPE_NAME,
+      storageKey: "story:cr-shape-name",
+      label: "Shape Name",
+      placeholder: "e.g. Slice of Life, Hero's Journey...",
+    });
+
     const { part: shapeBtnPart } = ctx.render(GenerationButton, {
       id: CR.SHAPE_BTN,
       label: "",
@@ -87,10 +94,13 @@ export const ShapeSection = defineComponent<undefined, RootState>({
       (s) => s.crucible.shape?.name + "||" + s.crucible.shape?.instruction,
       () => {
         const shape = ctx.getState().crucible.shape;
-        api.v1.ui.updateParts([{
-          id: `${CR.SHAPE_TEXT}-view`,
-          text: shape ? shapeToDisplay(shape) : "",
-        }]);
+        const name = shape?.name ?? "";
+        // Keep Name input in sync with state (fires after generation or manual save)
+        api.v1.storyStorage.set("cr-shape-name", name);
+        api.v1.ui.updateParts([
+          { id: `${CR.SHAPE_TEXT}-view`, text: shape ? shapeToDisplay(shape) : "" },
+          { id: CR.SHAPE_NAME, value: name },
+        ]);
       },
     );
 
@@ -99,7 +109,7 @@ export const ShapeSection = defineComponent<undefined, RootState>({
       title: "Story Shape",
       storageKey: "story:cr-shape-collapsed",
       style: { overflow: "visible" },
-      content: [shapeEditablePart],
+      content: [nameInputPart, shapeEditablePart],
     });
   },
 });

@@ -138,7 +138,7 @@ export interface GenerationStrategy {
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }
   | { type: "crucibleDirection" }
-  | { type: "crucibleShape" }
+  | { type: "crucibleShape"; prefillName?: string }
   | { type: "crucibleGoal"; goalId: string }
   | { type: "cruciblePrereqs" }
   | { type: "crucibleElements" }

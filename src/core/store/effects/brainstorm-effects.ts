@@ -1,5 +1,5 @@
 import { Store, matchesAction } from "nai-store";
-import { RootState, BrainstormMessage, AppDispatch } from "../types";
+import { RootState, BrainstormMessage, AppDispatch, GenerationStrategy } from "../types";
 import { currentChat, currentMessages } from "../slices/brainstorm";
 import {
   uiBrainstormSubmitUserMessage,
@@ -12,10 +12,15 @@ import {
   editingMessageIdSet,
   pruneHistory,
   requestQueued,
+  requestCompleted,
   generationSubmitted,
   chatCreated,
   chatRenamed,
 } from "../index";
+
+// Pending title strategies keyed by their summary's requestId.
+// Title generation is deferred until the summary (and all its continuations) finishes.
+const pendingSummaryTitles = new Map<string, { strategy: GenerationStrategy; targetId: string }>();
 import {
   buildBrainstormStrategy,
   buildSummarizeStrategy,
@@ -202,9 +207,30 @@ export function registerBrainstormEffects(
       dispatch(requestQueued({ id: strategy.requestId, type: "brainstorm", targetId: assistantId }));
       dispatch(generationSubmitted(strategy));
 
+      // Register title to run after summary (and all its continuations) finish.
       const titleStrategy = buildBrainstormTitleStrategy(newIndex, chatHistory);
-      dispatch(requestQueued({ id: titleStrategy.requestId, type: "brainstormChatTitle", targetId: String(newIndex) }));
-      dispatch(generationSubmitted(titleStrategy));
+      pendingSummaryTitles.set(strategy.requestId, {
+        strategy: titleStrategy,
+        targetId: String(newIndex),
+      });
+    },
+  );
+
+  // Intent: Fire pending title generation once the summary request fully completes.
+  subscribeEffect(
+    matchesAction(requestCompleted),
+    (action) => {
+      const { requestId } = action.payload;
+      const pending = pendingSummaryTitles.get(requestId);
+      if (!pending) return;
+
+      pendingSummaryTitles.delete(requestId);
+      dispatch(requestQueued({
+        id: pending.strategy.requestId,
+        type: "brainstormChatTitle",
+        targetId: pending.targetId,
+      }));
+      dispatch(generationSubmitted(pending.strategy));
     },
   );
 }

@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772409165
+updatedAt: 1772466992
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -491,7 +491,9 @@ config:
 
       A shape is a structural lens — not a genre, not a plot, but the kind of moment the story is building toward and the structural logic that governs its endpoint.
 
-      Example shapes (for reference — do not limit yourself to these):
+      RULE: If the story material explicitly names a shape, genre, or structural intent (e.g. "slice of life", "hero's journey", "romance"), use it directly — do not substitute a different shape.
+
+      Otherwise, use one of these shapes when it fits, or invent a new one:
 
       SHAPE: Climactic Choice
 
@@ -501,35 +503,19 @@ config:
 
       Lean toward moments of depth recognition — where the protagonist arrives somewhere structurally identical to where they began. Do not imply escape, recovery, or a choice between continuing and stopping.
 
-      SHAPE: Threshold Crossing
+      SHAPE: Hero's Journey
 
-      Lean toward the moment after which the protagonist cannot be what they were — not because they overcame something, but because the crossing made the before-self permanently past.
-
-      SHAPE: Equilibrium Restored
-
-      Lean toward a restored stability legible precisely because of what it carefully excludes. The equilibrium is different from the original even where it looks identical.
-
-      SHAPE: Accumulated Weight
-
-      Lean toward a saturation point — where all elements are simultaneously present and the full gravity of the situation becomes legible. Not a breaking point. Not a release. The story ends because there is nothing more to add.
-
-      SHAPE: Revelation
-
-      Lean toward a disclosure that changes the meaning of every prior scene — not by adding a new fact, but by revealing that the frame itself was the constructed object.
+      Lean toward the moment of return — where the protagonist brings back something that cannot be unfelt: a capacity, a loss, or a changed relationship to the world they left. The journey's endpoint is not triumph but transformation made visible.
 
       SHAPE: Intimate Moment
 
-      Lean toward a scene of ordinary life so specific to these particular people that it becomes unrepeatable — not because something changes, but because it captures exactly what this shared existence is.
+      Lean toward a scene so specific to these particular people that it becomes unrepeatable — not because something changes, but because it captures exactly what this shared existence is.
 
-      SHAPE: Romantic Gravity
+      SHAPE: Slice of Life
 
-      Lean toward the weighted moment where what both characters feel becomes impossible to ignore — not the resolution, but the charged beat before it, where knowing and not-saying are the same breath.
+      Lean toward scenes of ordinary continuity — the texture of how these specific people inhabit their world, not what disrupts or changes it. The story ends not because something resolves but because the window is fully inhabited.
 
-      SHAPE: Lived Texture
-
-      Lean toward a scene chosen for the quality of life it makes visible — how this particular world is inhabited, not what breaks or changes within it.
-
-      Any of these shapes — or a new one you invent — is equally valid. Match the shape to the material, not to dramatic convention.
+      Match the shape to the material. Invent a new shape only when none of the examples fit.
 
       Respond with a shape name on the first line, then a blank line, then 2-4 sentences describing what structural moments this shape leans toward.
   - name: crucible_goals_prompt

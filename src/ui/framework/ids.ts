@@ -17,6 +17,7 @@ export const IDS = {
     PROGRESS_ROOT: "cr-progress-root",
     REVIEW_ROOT: "cr-review-root",
     SHAPE_SECTION: "cr-shape-section",
+    SHAPE_NAME: "cr-shape-name",
     SHAPE_TEXT: "cr-shape-text",
     SHAPE_BTN: "cr-shape-btn",
     PREREQS_SECTION: "cr-prereqs",

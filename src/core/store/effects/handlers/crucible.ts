@@ -22,7 +22,7 @@ function stripThinkingTags(text: string): string {
 // --- Types for crucible targets ---
 
 type CrucibleDirectionTarget = { type: "crucibleDirection" };
-type CrucibleShapeTarget = { type: "crucibleShape" };
+type CrucibleShapeTarget = { type: "crucibleShape"; prefillName?: string };
 type CrucibleGoalTarget = { type: "crucibleGoal"; goalId: string };
 
 // --- Direction Handler ---
@@ -60,7 +60,9 @@ const SHAPE_FALLBACK = {
 export const crucibleShapeHandler: GenerationHandlers<CrucibleShapeTarget> = {
   streaming(ctx: StreamingContext<CrucibleShapeTarget>): void {
     const text = stripThinkingTags(ctx.accumulatedText);
-    const display = text.replace(/\n/g, "  \n").replace(/</g, "\\<");
+    // When a name was prefilled, show it above the streaming instruction
+    const prefix = ctx.target.prefillName ? `${ctx.target.prefillName}\n\n` : "";
+    const display = (prefix + text).replace(/\n/g, "  \n").replace(/</g, "\\<");
     api.v1.ui.updateParts([
       { id: `${IDS.CRUCIBLE.SHAPE_TEXT}-view`, text: display },
       { id: IDS.CRUCIBLE.TICKER_TEXT, text: text.replace(/\n+/g, " ").slice(-60) },
@@ -70,8 +72,19 @@ export const crucibleShapeHandler: GenerationHandlers<CrucibleShapeTarget> = {
   async completion(ctx: CompletionContext<CrucibleShapeTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
-    // prefillBehavior: "trim" strips "SHAPE: " — text starts with the shape title
     const text = stripThinkingTags(ctx.accumulatedText).trim();
+
+    // When a name was prefilled, the output IS the instruction — no parsing needed
+    if (ctx.target.prefillName) {
+      api.v1.log(`[crucible] Shape generated (prefill): ${ctx.target.prefillName}`);
+      ctx.dispatch(shapeDetected({
+        name: ctx.target.prefillName,
+        instruction: text || SHAPE_FALLBACK.instruction,
+      }));
+      return;
+    }
+
+    // Otherwise: prefillBehavior "trim" stripped "SHAPE: " — first line is the name
     const blankLine = text.indexOf("\n\n");
     const name = (blankLine !== -1 ? text.slice(0, blankLine) : text.split("\n")[0]).trim();
     const instruction = (blankLine !== -1 ? text.slice(blankLine) : "").trim();
@@ -84,6 +97,10 @@ export const crucibleShapeHandler: GenerationHandlers<CrucibleShapeTarget> = {
 
     api.v1.log(`[crucible] Shape generated: ${name}`);
     ctx.dispatch(shapeDetected({ name, instruction: instruction || SHAPE_FALLBACK.instruction }));
+
+    // Populate the Name input so the user can see and reuse the generated name
+    await api.v1.storyStorage.set("cr-shape-name", name);
+    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.SHAPE_NAME, value: name }]);
   },
 };
 

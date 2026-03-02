@@ -1,5 +1,5 @@
 import { Store, matchesAction } from "nai-store";
-import { RootState, GenerationStrategy, AppDispatch } from "../types";
+import { RootState, GenerationStrategy, GenerationRequest, AppDispatch } from "../types";
 import { currentMessages } from "../slices/brainstorm";
 import { GenX, MessageFactory } from "nai-gen-x";
 import {
@@ -25,6 +25,34 @@ import { getHandler } from "./generation-handlers";
 // ─────────────────────────────────────────────────────────────────────────────
 // Private Helpers
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Maps a strategy target to the { type, targetId } needed for requestQueued.
+ * Used to register continuation tasks in the runtime so the UI can track them.
+ */
+function targetToQueueEntry(
+  target: GenerationStrategy["target"],
+): { type: GenerationRequest["type"]; targetId: string } {
+  switch (target.type) {
+    case "brainstorm":          return { type: "brainstorm",          targetId: target.messageId };
+    case "brainstormChatTitle": return { type: "brainstormChatTitle", targetId: String(target.chatIndex) };
+    case "field":               return { type: "field",               targetId: target.fieldId };
+    case "list":                return { type: "list",                targetId: target.fieldId };
+    case "lorebookContent":     return { type: "lorebookContent",     targetId: target.entryId };
+    case "lorebookRelationalMap": return { type: "lorebookRelationalMap", targetId: target.entryId };
+    case "lorebookKeys":        return { type: "lorebookKeys",        targetId: target.entryId };
+    case "lorebookRefine":      return { type: "lorebookRefine",      targetId: target.entryId };
+    case "bootstrap":           return { type: "bootstrap",           targetId: "" };
+    case "crucibleDirection":   return { type: "crucibleDirection",   targetId: "" };
+    case "crucibleShape":       return { type: "crucibleShape",       targetId: "" };
+    case "crucibleGoal":        return { type: "crucibleGoal",        targetId: target.goalId };
+    case "cruciblePrereqs":     return { type: "cruciblePrereqs",     targetId: "" };
+    case "crucibleElements":    return { type: "crucibleElements",    targetId: "" };
+    case "crucibleExpansion":   return { type: "crucibleExpansion",   targetId: target.elementId ?? "" };
+  }
+  // Unreachable — satisfies noImplicitReturns for exhaustive switch
+  throw new Error(`Unhandled target type: ${(target as any).type}`);
+}
 
 /**
  * Resolve the prefix text for resumption scenarios
@@ -160,6 +188,8 @@ function cacheLabel(target: GenerationStrategy["target"]) {
       return "crucible-elements";
     case "crucibleExpansion":
       return `crucible-expand:${(target.elementId ?? "free").slice(0, 8)}`;
+    case "brainstormChatTitle":
+      return `brainstorm-title:${target.chatIndex}`;
   }
 }
 
@@ -294,10 +324,17 @@ export function registerGenerationEngineEffects(
           const isTruncated = (r: string | undefined) =>
             r === "length" || r === "max_tokens";
 
+          const queueEntry = targetToQueueEntry(target);
+
           while (calls < maxCalls && isTruncated(finishReason)) {
             if (checkCancellation(requestId, getState)) break;
 
+            const contTaskId = `${requestId}-cont-${calls}`;
             api.v1.log(`[continuation] Call ${calls + 1}/${maxCalls}, extending output...`);
+
+            // Register in runtime so onTaskStarted → requestActivated can track it
+            // and UI buttons (stateProjection) see a live request of the same type.
+            dispatch(requestQueued({ id: contTaskId, ...queueEntry }));
 
             const lastMsg = resolvedMessages[resolvedMessages.length - 1];
             const baseMessages = lastMsg?.role === "assistant"
@@ -310,12 +347,13 @@ export function registerGenerationEngineEffects(
 
             const contResult = await genX.generate(
               continuationMessages,
-              { ...apiParams, taskId: `${requestId}-cont-${calls}`, max_tokens: 1024 },
+              { ...apiParams, taskId: contTaskId, max_tokens: 1024 },
               onStream,
               "background",
               await api.v1.createCancellationSignal(),
             );
 
+            dispatch(requestCompleted({ requestId: contTaskId }));
             finishReason = contResult.choices?.[0]?.finish_reason;
             calls++;
           }
