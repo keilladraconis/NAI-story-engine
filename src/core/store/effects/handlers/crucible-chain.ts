@@ -90,6 +90,7 @@ export const prerequisitesHandler: GenerationHandlers<PrereqsTarget> = {
     } else {
       api.v1.log("[crucible] Prerequisites parse: no valid prereqs found");
       api.v1.log("[crucible] Raw text:", text.slice(0, 500));
+      api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.TICKER_TEXT, text: "No prerequisites found — proceeding to world elements..." }]);
     }
   },
 };
@@ -160,6 +161,7 @@ export const elementsHandler: GenerationHandlers<ElementsTarget> = {
     } else {
       api.v1.log("[crucible] Elements parse: no valid elements found");
       api.v1.log("[crucible] Raw text:", text.slice(0, 500));
+      api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.TICKER_TEXT, text: "No world elements parsed — build will complete with empty results" }]);
     }
   },
 };

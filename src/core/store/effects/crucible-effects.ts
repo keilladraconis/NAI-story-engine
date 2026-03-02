@@ -42,6 +42,8 @@ export function registerCrucibleEffects(
   getState: () => RootState,
   genX: GenX,
 ): void {
+  let elementsAttempted = false;
+  let buildCancelled = false;
   // Intent: Shape Requested → queue shape generation
   subscribeEffect(
     matchesAction(crucibleShapeRequested),
@@ -108,6 +110,8 @@ export function registerCrucibleEffects(
   subscribeEffect(
     matchesAction(crucibleBuildRequested),
     async (_action, { getState: getLatest }) => {
+      elementsAttempted = false;
+      buildCancelled = false;
       dispatch(phaseTransitioned({ phase: "building" }));
 
       const state = getLatest();
@@ -140,8 +144,17 @@ export function registerCrucibleEffects(
       if (state.crucible.phase !== "building") return;
       if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
 
-      if (state.crucible.elements.length === 0) {
-        // Step 2: Queue world elements
+      // Cancelled: revert to goals so the user can retry
+      if (buildCancelled) {
+        buildCancelled = false;
+        dispatch(phaseTransitioned({ phase: "goals" }));
+        api.v1.ui.toast("Build cancelled — click Build World to retry", { type: "info" });
+        return;
+      }
+
+      // Elements step not yet tried
+      if (state.crucible.elements.length === 0 && !elementsAttempted) {
+        elementsAttempted = true;
         api.v1.log("[crucible] Prerequisites complete → queuing world elements");
         const strategy = buildElementsStrategy(getState);
         dispatch(requestQueued({ id: strategy.requestId, type: "crucibleElements", targetId: "crucible" }));
@@ -149,10 +162,15 @@ export function registerCrucibleEffects(
         return;
       }
 
-      // All steps complete → transition to review
+      // Elements step has run (with or without results) → review
       api.v1.log("[crucible] All steps complete → transitioning to review");
       dispatch(phaseTransitioned({ phase: "review" }));
-      api.v1.ui.toast("World elements ready for review", { type: "success" });
+      api.v1.ui.toast(
+        state.crucible.elements.length > 0
+          ? "World elements ready for review"
+          : "Build complete — no elements were generated",
+        { type: state.crucible.elements.length > 0 ? "success" : "info" },
+      );
     },
   );
 
@@ -171,16 +189,26 @@ export function registerCrucibleEffects(
     },
   );
 
-  // Intent: Crucible Stop → cancel active crucible request
+  // Intent: Crucible Stop → cancel active and queued crucible requests
   subscribeEffect(
     matchesAction(crucibleStopRequested),
     (_action, { getState: getLatest }) => {
       const state = getLatest();
-      const activeRequest = state.runtime.activeRequest;
       const crucibleTypes = new Set([
         "crucibleShape", "crucibleDirection", "crucibleGoal",
         "cruciblePrereqs", "crucibleElements", "crucibleExpansion",
       ]);
+
+      // Cancel all queued crucible requests first
+      for (const req of state.runtime.queue) {
+        if (crucibleTypes.has(req.type)) {
+          dispatch(requestCancelled({ requestId: req.id }));
+          genX.cancelQueued(req.id);
+        }
+      }
+
+      // Cancel the active request
+      const activeRequest = state.runtime.activeRequest;
       if (activeRequest && crucibleTypes.has(activeRequest.type)) {
         dispatch(requestCancelled({ requestId: activeRequest.id }));
         genX.cancelAll();
@@ -266,7 +294,7 @@ export function registerCrucibleEffects(
     },
   );
 
-  // Stop crucible pipeline on cancellation
+  // Track cancellations during building phase so requestCompleted can revert to goals
   subscribeEffect(
     matchesAction(requestCancelled),
     (action) => {
@@ -275,14 +303,17 @@ export function registerCrucibleEffects(
 
       const { requestId } = action.payload;
       const crucibleTypes = new Set([
-        "crucibleStructuralGoal", "cruciblePrereqs",
+        "crucibleGoal", "cruciblePrereqs",
         "crucibleElements", "crucibleExpansion",
       ]);
-      if (
-        state.runtime.activeRequest?.id === requestId &&
-        crucibleTypes.has(state.runtime.activeRequest?.type || "")
-      ) {
-        api.v1.log("[crucible] Pipeline cancelled, staying in current phase for retry");
+      const matchesActive = state.runtime.activeRequest?.id === requestId &&
+        crucibleTypes.has(state.runtime.activeRequest?.type || "");
+      const matchesQueued = state.runtime.queue.some(
+        (r) => r.id === requestId && crucibleTypes.has(r.type),
+      );
+      if (matchesActive || matchesQueued) {
+        buildCancelled = true;
+        api.v1.log("[crucible] Pipeline cancellation detected — will revert to goals phase");
       }
     },
   );

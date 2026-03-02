@@ -211,6 +211,22 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       }
     };
 
+    // Cancel from wait state: immediately stop the timer and clear the display,
+    // then dispatch the cancel action (don't wait for store propagation).
+    const cancelWait = () => {
+      isTimerActive = false;
+      if (timerId) {
+        api.v1.timers.clearTimeout(timerId);
+        timerId = null;
+      }
+      if (variant === "icon") {
+        api.v1.ui.updateParts([{ id, text: undefined, iconId, style: iconStyles.idle, callback: () => generate() }]);
+      } else {
+        updateButtonVariant("gen", undefined);
+      }
+      cancelActive();
+    };
+
     const handleContinue = () => {
       if (props.onContinue) {
         props.onContinue();
@@ -232,7 +248,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             text: `${remaining}`,
             iconId: undefined,
             style: iconStyles.wait,
-            callback: () => cancelActive(),
+            callback: () => cancelWait(),
           },
         ]);
       } else {
@@ -442,7 +458,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
               text: `${initialRemaining}`,
               iconId: undefined,
               style: iconStyles.wait,
-              callback: () => cancelActive(),
+              callback: () => cancelWait(),
             },
           ]);
           updateTimer(endTime);
@@ -500,7 +516,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
             ...buttonStyles.wait,
             display: mode === "wait" ? "block" : "none",
           },
-          callback: () => cancelActive(),
+          callback: () => cancelWait(),
         },
       ]);
 
@@ -565,7 +581,7 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       id: `${id}-wait`,
       text: label ? `⏳ Wait` : "⏳",
       style: { ...styles.wait, display: "none" },
-      callback: () => cancelActive(),
+      callback: () => cancelWait(),
     });
 
     return row({
