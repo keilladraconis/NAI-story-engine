@@ -2,6 +2,69 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2026-03-02
+
+### Added
+
+#### Crucible — Generative Shape System
+
+Shape is no longer detected from a fixed list of six archetypes. The AI now *invents* a shape that fits your story material — any structural lens, including casual or slice-of-life forms that the old classifier ignored.
+
+- **`ShapeSection`** — New collapsible panel section (above Direction) with a name input, an editable instruction textarea, and a GenerationButton. The shape name and instruction together form the structural context injected into Direction and Goal generation. Auto-expands when no shape is set.
+- **Generative shape prompt** (`crucible_shape_prompt`) — New config field. The prompt includes nine example shapes spanning the full tonal range (dramatic: Climactic Choice, Spiral Descent, Hero's Journey; casual: Intimate Moment, Slice of Life; plus more). GLM reads the brainstorm and invents the shape that fits, or names one directly if the brainstorm specifies it. Shape name can be pre-filled to constrain generation to just the instruction.
+- **Crucible system prompt** (`crucible_system_prompt`) — New config field. A base system identity injected as the first message in every Crucible request (shape, direction, goals, prerequisites, elements, expansion). Previously this was hardcoded.
+- **`crucibleShapeRequested`** — New signal action; triggers shape generation. Independent of goals — `goalsCleared` no longer resets the shape.
+
+#### GenerationButton — Immediate Cancel from Wait State
+
+- Clicking cancel during the budget-wait countdown now immediately clears the timer display and stops the countdown, without waiting for store propagation. Previously the countdown would continue briefly after clicking cancel.
+
+### Changed
+
+#### Crucible
+
+- **Goal acceptance replaces starring** — `CrucibleGoal.starred` renamed to `accepted`. The star/unstar button is replaced by a check/X toggle: green check = included in world build, red X = excluded. The delete button is hidden while a goal is accepted, preventing accidental removal.
+- **Shape badge removed from Goals section** — Shape is now managed in ShapeSection; the purple badge in the Goals header is gone.
+- **Goals no longer clear shape** — `goalsCleared` resets goals only; shape is independent.
+- **Goals generated without placeholder text** — Goals are added to the list before generation completes without the `"_Generating..._"` stub, so the list layout doesn't shift.
+- **Direction prompt expanded** — Now instructs GLM to *extrapolate* when the brainstorm is sparse: invent implied occupations, social worlds, secondary figures, and latent tensions. Removed the "name a story architecture" instruction (that role now belongs to ShapeSection).
+- **Goals prompt simplified** — Shape context is now provided by ShapeSection; the goals prompt focuses on endpoint quality and format. `crucible_structural_goal_prompt` (the reframe step) removed — goals are shape-native directly.
+- **Prerequisites prompt** — Now explicitly includes social textures, background pressures, and existing relationships alongside structurally necessary elements.
+- **Elements prompt** — Now requests secondary characters, rivals, complicating figures, and background forces, not just direct prerequisite satisfiers.
+
+#### Prompt Rewrites
+
+- **Critic prompt** — Richer and more genre-fluid. New character texture section calls out specific gaps to probe: wants vs. needs, surface/shadow/history, occupation, living situation, haunts. Guidance updated: respect the genre, lead with the gap, stay conversational.
+- **Summarize prompt** — Completely rewritten. Now produces declarative present-tense working notes ("The setting is..."), not a summary of the conversation process. Forbidden language includes any reference to deliberation, rejected ideas, or how the brainstorm evolved.
+
+#### Developer
+
+- **Effects module split** — `effects.ts` (1,288 lines) broken into focused modules:
+  - `effects/generation-engine.ts` — Core GenX dispatch loop, request lifecycle, budget management
+  - `effects/brainstorm-effects.ts` — Brainstorm submit, edit, retry, summarize, title generation
+  - `effects/crucible-effects.ts` — Full Crucible pipeline (shape → direction → goals → build → merge → expand)
+  - `effects/lorebook-generation.ts` — Lorebook content, map, keys, refine scheduling
+  - `effects/lorebook-sync.ts` — Bidirectional lorebook ↔ DULFS sync
+  - `effects/autosave.ts` — Persistence effects
+
+### Breaking Changes
+
+- **`CrucibleState.detectedShape: string | null`** replaced by **`shape: { name: string; instruction: string } | null`**. Old persisted shape strings cannot be migrated; shape resets to null on upgrade.
+- **`CrucibleGoal.starred`** renamed to **`accepted`**. Persisted goal data will lose star state on upgrade.
+- **`crucibleShapeDetection` request type** renamed to **`crucibleShape`**.
+- **`shapeDetected` action** replaced by **`updateShape`**.
+- **`goalStarred` action** replaced by **`goalAcceptanceToggled`**.
+- **`crucible_structural_goal_prompt` config field** removed — the reframe step no longer exists.
+- **`migrateCrucibleState`** removed from `crucible.ts` — no longer needed.
+
+### Developer Notes
+
+- 11 commits on v9 branch.
+- 26 files changed, 1,938 insertions, 1,672 deletions (net +266 lines — the god-module split accounts for most movement).
+- New UI component: `src/ui/components/Crucible/ShapeSection.ts`.
+- New effects modules: `effects/generation-engine.ts`, `effects/brainstorm-effects.ts`, `effects/crucible-effects.ts`, `effects/lorebook-generation.ts`, `effects/lorebook-sync.ts`, `effects/autosave.ts`.
+- New config fields: `crucible_system_prompt`, `crucible_shape_prompt`. Removed: `crucible_structural_goal_prompt`.
+
 ## [0.8.1] - 2026-02-27
 
 ### Fixed

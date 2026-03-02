@@ -10,12 +10,13 @@ A dedicated sidebar panel for freeform idea conversation with the AI. Supports m
 
 ### Crucible — Backward-Reasoning World Generator
 
-Crucible derives your world directly from dramatic endpoints. Give it a direction and a goal; it reasons backward to discover what the world must contain.
+Crucible derives your world directly from dramatic endpoints. Give it a shape and a direction; it reasons backward to discover what the world must contain.
 
-1. **Direction** — AI distills your brainstorm into a dense creative anchor (characters, tone, tensions, narrative architecture).
-2. **Goals** — AI generates dramatic endpoints with shape detection (Climactic Choice, Spiral Descent, Threshold Crossing, etc.) and a `why` for each goal. Star the ones worth building.
-3. **Build World** — For each starred goal, Crucible derives prerequisites (relationships, secrets, histories, power structures) then generates world elements (characters, locations, factions, systems, situations) that satisfy them.
-4. **Review & Merge** — Edit elements before merging them into DULFS fields and lorebook. Expand any element post-merge to branch into deeper generation.
+1. **Shape** — AI reads your brainstorm and invents the structural lens your story is leaning toward — any shape, from Climactic Choice to Slice of Life. Edit the name and instruction directly, or generate and refine.
+2. **Direction** — AI distills your brainstorm (informed by the shape) into a dense creative anchor: characters, world, tone, tensions, supporting cast.
+3. **Goals** — AI generates vivid dramatic endpoints, shaped by the structural lens, with a `why` for each. Accept the ones worth building (check = included, X = excluded).
+4. **Build World** — For each accepted goal, Crucible derives prerequisites (relationships, secrets, histories, power structures) then generates world elements (characters, locations, factions, systems, situations) that satisfy them.
+5. **Review & Merge** — Edit elements before merging them into DULFS fields and lorebook. Expand any element post-merge to branch into deeper generation.
 
 ### S.E.G.A. (Story Engine Generate All)
 
