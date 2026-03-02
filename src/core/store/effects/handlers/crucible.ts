@@ -6,7 +6,7 @@ import {
 import {
   goalTextUpdated,
   directionSet,
-  shapeDetected,
+  updateShape,
 } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
 import {
@@ -60,9 +60,7 @@ const SHAPE_FALLBACK = {
 export const crucibleShapeHandler: GenerationHandlers<CrucibleShapeTarget> = {
   streaming(ctx: StreamingContext<CrucibleShapeTarget>): void {
     const text = stripThinkingTags(ctx.accumulatedText);
-    // When a name was prefilled, show it above the streaming instruction
-    const prefix = ctx.target.prefillName ? `${ctx.target.prefillName}\n\n` : "";
-    const display = (prefix + text).replace(/\n/g, "  \n").replace(/</g, "\\<");
+    const display = text.replace(/\n/g, "  \n").replace(/</g, "\\<");
     api.v1.ui.updateParts([
       { id: `${IDS.CRUCIBLE.SHAPE_TEXT}-view`, text: display },
       { id: IDS.CRUCIBLE.TICKER_TEXT, text: text.replace(/\n+/g, " ").slice(-60) },
@@ -77,7 +75,7 @@ export const crucibleShapeHandler: GenerationHandlers<CrucibleShapeTarget> = {
     // When a name was prefilled, the output IS the instruction — no parsing needed
     if (ctx.target.prefillName) {
       api.v1.log(`[crucible] Shape generated (prefill): ${ctx.target.prefillName}`);
-      ctx.dispatch(shapeDetected({
+      ctx.dispatch(updateShape({
         name: ctx.target.prefillName,
         instruction: text || SHAPE_FALLBACK.instruction,
       }));
@@ -91,12 +89,12 @@ export const crucibleShapeHandler: GenerationHandlers<CrucibleShapeTarget> = {
 
     if (!name) {
       api.v1.log("[crucible] Shape parse failed — using fallback shape");
-      ctx.dispatch(shapeDetected(SHAPE_FALLBACK));
+      ctx.dispatch(updateShape(SHAPE_FALLBACK));
       return;
     }
 
     api.v1.log(`[crucible] Shape generated: ${name}`);
-    ctx.dispatch(shapeDetected({ name, instruction: instruction || SHAPE_FALLBACK.instruction }));
+    ctx.dispatch(updateShape({ name, instruction: instruction || SHAPE_FALLBACK.instruction }));
 
     // Populate the Name input so the user can see and reuse the generated name
     await api.v1.storyStorage.set("cr-shape-name", name);

@@ -3,7 +3,7 @@ import { RootState } from "../../../core/store/types";
 import {
   crucibleShapeRequested,
   crucibleStopRequested,
-  shapeDetected,
+  updateShape,
 } from "../../../core/store/slices/crucible";
 import { IDS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
@@ -13,29 +13,6 @@ const { collapsibleSection, textInput } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
-const FALLBACK_INSTRUCTION = "Lean toward the moment that best captures the story's essential nature.";
-
-/** Combine shape into editable text: name on first line, instruction below. */
-function shapeToContent(shape: { name: string; instruction: string }): string {
-  return `${shape.name}\n\n${shape.instruction}`;
-}
-
-/** Format combined shape text for markdown display. */
-function shapeToDisplay(shape: { name: string; instruction: string }): string {
-  return shapeToContent(shape).replace(/\n/g, "  \n").replace(/</g, "\\<");
-}
-
-/** Parse user-edited text back into name + instruction. */
-function parseShapeContent(text: string): { name: string; instruction: string } {
-  const trimmed = text.trim();
-  const blankLine = trimmed.indexOf("\n\n");
-  const name = (blankLine !== -1 ? trimmed.slice(0, blankLine) : trimmed.split("\n")[0]).trim();
-  const instruction = (blankLine !== -1 ? trimmed.slice(blankLine) : "").trim();
-  return {
-    name: name || "Story",
-    instruction: instruction || FALLBACK_INSTRUCTION,
-  };
-}
 
 export const ShapeSection = defineComponent<undefined, RootState>({
   id: () => CR.SHAPE_SECTION,
@@ -52,7 +29,7 @@ export const ShapeSection = defineComponent<undefined, RootState>({
     const nameInputPart = textInput({
       id: CR.SHAPE_NAME,
       storageKey: "story:cr-shape-name",
-      label: "Shape Name",
+      label: "",
       placeholder: "e.g. Slice of Life, Hero's Journey...",
     });
 
@@ -75,17 +52,16 @@ export const ShapeSection = defineComponent<undefined, RootState>({
 
     const { part: shapeEditablePart } = ctx.render(EditableText, {
       id: CR.SHAPE_TEXT,
-      getContent: () => {
-        const shape = ctx.getState().crucible.shape;
-        return shape ? shapeToContent(shape) : "";
-      },
-      placeholder: "Generate or type your story shape...\n\nLine 1: Shape Name (e.g. Intimate Moment)\nLine 3+: What structural moments this shape leans toward.",
+      getContent: () => ctx.getState().crucible.shape?.instruction ?? "",
+      placeholder: "Generate or type the shape instruction...\n\nWhat structural moments this shape leans toward.",
       label: "",
       extraControls: [shapeBtnPart],
-      initialDisplay: state.crucible.shape ? shapeToDisplay(state.crucible.shape) : undefined,
+      initialDisplay: state.crucible.shape?.instruction,
       onSave: (content: string) => {
-        const { name, instruction } = parseShapeContent(content);
-        dispatch(shapeDetected({ name, instruction }));
+        dispatch(updateShape({
+          name: ctx.getState().crucible.shape?.name ?? "Story",
+          instruction: content,
+        }));
       },
     });
 
@@ -95,10 +71,10 @@ export const ShapeSection = defineComponent<undefined, RootState>({
       () => {
         const shape = ctx.getState().crucible.shape;
         const name = shape?.name ?? "";
-        // Keep Name input in sync with state (fires after generation or manual save)
+        // Keep Name input in sync with state (fires after generation)
         api.v1.storyStorage.set("cr-shape-name", name);
         api.v1.ui.updateParts([
-          { id: `${CR.SHAPE_TEXT}-view`, text: shape ? shapeToDisplay(shape) : "" },
+          { id: `${CR.SHAPE_TEXT}-view`, text: shape?.instruction ?? "" },
           { id: CR.SHAPE_NAME, value: name },
         ]);
       },

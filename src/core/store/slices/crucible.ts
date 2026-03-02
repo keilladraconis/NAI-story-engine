@@ -45,7 +45,7 @@ export const crucibleSlice = createSlice({
     },
 
     // Shape generation
-    shapeDetected: (state, payload: { name: string; instruction: string }) => {
+    updateShape: (state, payload: { name: string; instruction: string }) => {
       return { ...state, shape: { name: payload.name, instruction: payload.instruction } };
     },
 
@@ -172,7 +172,7 @@ export const {
   mergeCompleted,
   crucibleBuildRequested,
   phaseTransitioned,
-  shapeDetected,
+  updateShape,
   crucibleDirectionRequested,
   directionSet,
   crucibleDirectionEdited,

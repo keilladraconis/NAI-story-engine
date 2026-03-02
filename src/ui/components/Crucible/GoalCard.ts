@@ -21,7 +21,6 @@ export interface GoalCardProps {
 const GOAL_BTN_STYLE = {
   padding: "2px 6px",
   "font-size": "0.8em",
-  opacity: "0.5",
 };
 
 const ACCEPT_BTN_BASE = { padding: "2px 6px", "font-size": "0.8em" };
@@ -30,6 +29,10 @@ const COLOR_REJECTED = NAI_WARNING;
 
 function acceptBtnStyle(accepted: boolean) {
   return { ...ACCEPT_BTN_BASE, color: accepted ? COLOR_ACCEPTED : COLOR_REJECTED };
+}
+
+function delBtnStyle(accepted: boolean) {
+  return { ...GOAL_BTN_STYLE, display: accepted ? "none" : "" };
 }
 
 export const GoalCard = defineComponent<GoalCardProps, RootState>({
@@ -76,6 +79,7 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
         const a = accepted ?? true;
         api.v1.ui.updateParts([
           { id: acceptBtnId, iconId: a ? "check" : "x", style: acceptBtnStyle(a) },
+          { id: ids.DEL_BTN, style: delBtnStyle(a) },
         ]);
       },
     );
@@ -83,7 +87,7 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
     const delBtn = api.v1.ui.part.button({
       id: ids.DEL_BTN,
       iconId: "trash-2",
-      style: GOAL_BTN_STYLE,
+      style: delBtnStyle(initialAccepted),
       callback: () => dispatch(goalRemoved({ goalId })),
     });
 
