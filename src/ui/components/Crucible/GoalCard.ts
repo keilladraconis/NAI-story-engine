@@ -8,6 +8,7 @@ import {
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
 import { formatTagsWithEmoji } from "../../../core/utils/tag-parser";
+import { escapeForMarkdown } from "../../utils";
 import { NAI_WARNING } from "../../colors";
 
 const { column } = api.v1.ui.part;
@@ -61,7 +62,7 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
     useSelector(
       (s) => s.crucible.goals.find((g) => g.id === goalId)?.text,
       (text) => {
-        const display = formatTagsWithEmoji(text ?? "_Generating..._").replace(/\n/g, "  \n").replace(/</g, "\\<");
+        const display = escapeForMarkdown(formatTagsWithEmoji(text ?? "_Generating..._"));
         api.v1.ui.updateParts([{ id: `${ids.TEXT}-view`, text: display }]);
       },
     );

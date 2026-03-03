@@ -3,7 +3,7 @@ import { RootState, DulfsItem } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
 import { dulfsItemRemoved } from "../../../core/store/slices/story";
 import { uiLorebookItemGenerationRequested } from "../../../core/store/slices/ui";
-import { GenerationButton } from "../GenerationButton";
+import { GenerationIconButton } from "../GenerationButton";
 import { extractDulfsItemName } from "../../../core/utils/context-builder";
 
 const { row, button, multilineTextInput } = api.v1.ui.part;
@@ -45,9 +45,8 @@ export const ListItem = defineComponent<ListItemProps, RootState>({
     const deleteBtnId = `btn-del-${entryId}`;
 
     // Render the lorebook icon button with full props
-    const { part: bookBtnPart } = ctx.render(GenerationButton, {
+    const { part: bookBtnPart } = ctx.render(GenerationIconButton, {
       id: bookBtnId,
-      variant: "icon",
       iconId: "book",
       requestIds: [`lb-item-${entryId}-content`, `lb-item-${entryId}-keys`],
       onGenerate: () => {

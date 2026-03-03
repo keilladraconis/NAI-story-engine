@@ -12,6 +12,7 @@ import {
 import { GenerationButton } from "../GenerationButton";
 import { EditableText } from "../EditableText";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
+import { escapeForMarkdown } from "../../utils";
 
 const { text, row, column, collapsibleSection, button, multilineTextInput } = api.v1.ui.part;
 
@@ -34,10 +35,6 @@ const FIELD_LABEL_SINGULAR: Record<DulfsFieldID, string> = {
   [FieldID.SituationalDynamics]: "Situation",
 };
 
-/** Escape text for markdown view display. */
-function escapeViewText(raw: string): string {
-  return raw.replace(/\n/g, "  \n").replace(/</g, "\\<") || "_No content._";
-}
 
 /** Format element for display. */
 function formatElementDisplay(el: CrucibleWorldElement): string {
@@ -173,7 +170,7 @@ export const ReviewView = defineComponent<undefined, RootState>({
                 text({ text: prereq.category, style: this.style?.("badge") }),
                 text({
                   id: CR.prereq(prereq.id).TEXT,
-                  text: escapeViewText(prereq.element),
+                  text: escapeForMarkdown(prereq.element, "_No content._"),
                   markdown: true,
                   style: { "font-size": "0.85em", flex: "1" },
                 }),
@@ -206,7 +203,7 @@ export const ReviewView = defineComponent<undefined, RootState>({
             return current ? formatElementText(current) : formatElementText(el);
           },
           placeholder: "Name: description...",
-          initialDisplay: escapeViewText(formatElementDisplay(el)),
+          initialDisplay: escapeForMarkdown(formatElementDisplay(el), "_No content._"),
           onSave: (raw: string) => {
             const parsed = parseElementText(raw);
             dispatch(elementUpdated({
@@ -354,7 +351,7 @@ export const ReviewView = defineComponent<undefined, RootState>({
 
         // Update view text for elements
         for (const el of state.crucible.elements) {
-          const viewText = escapeViewText(formatElementDisplay(el));
+          const viewText = escapeForMarkdown(formatElementDisplay(el), "_No content._");
           api.v1.ui.updateParts([
             { id: `${CR.element(el.id).TEXT}-view`, text: viewText },
           ]);

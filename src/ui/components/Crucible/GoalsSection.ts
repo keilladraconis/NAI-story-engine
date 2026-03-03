@@ -77,7 +77,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
         );
         return queued?.id;
       },
-      isDisabledFromProjection: (proj: any) => !proj.hasAccepted,
+      isDisabledFromProjection: (proj: { hasAccepted: boolean }) => !proj.hasAccepted,
       onCancel: () => dispatch(crucibleStopRequested()),
       onGenerate: () => {
         dispatch(crucibleBuildRequested());
@@ -113,14 +113,12 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       ...goalsBtnProps,
     });
 
-    // --- Per-goal card cache (stores unmount so cards can be properly rebuilt) ---
+    // --- Per-goal card cache (stores unmount so removed cards can be cleaned up) ---
     const goalCardCache = new Map<string, { part: UIPart; unmount: () => void }>();
 
-    // Always rebuild GoalCards from scratch so getContent() reads current state at build time.
-    // Unmounting the old card first cleans up its subscriptions.
     const ensureGoalCard = (goalId: string): UIPart => {
       const existing = goalCardCache.get(goalId);
-      if (existing) existing.unmount();
+      if (existing) return existing.part;
       const result = ctx.render(GoalCard, { goalId });
       goalCardCache.set(goalId, result);
       return result.part;

@@ -4,16 +4,11 @@ import { crucibleDirectionRequested, crucibleDirectionEdited } from "../../../co
 import { IDS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
 import { EditableText } from "../EditableText";
+import { escapeForMarkdown, updateVisibility } from "../../utils";
 
 const { collapsibleSection } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
-
-/** Format direction prose for display: only apply emoji to [TAGS], rest is natural prose. */
-function formatForDisplay(raw: string): string {
-  const display = raw.replace(/\[TAGS\]/g, "\uD83C\uDFF7\uFE0F");
-  return display.replace(/\n/g, "  \n").replace(/</g, "\\<");
-}
 
 export const IntentSection = defineComponent<undefined, RootState>({
   id: () => CR.DIRECTION_SECTION,
@@ -42,7 +37,7 @@ export const IntentSection = defineComponent<undefined, RootState>({
         const queued = s.runtime.queue.find((q) => q.type === "crucibleDirection");
         return queued?.id;
       },
-      isDisabledFromProjection: (proj: any) =>
+      isDisabledFromProjection: (proj: { activeType: string | undefined }) =>
         proj.activeType === "crucibleGoal" ||
         proj.activeType === "cruciblePrereqs" || proj.activeType === "crucibleElements",
     });
@@ -53,7 +48,7 @@ export const IntentSection = defineComponent<undefined, RootState>({
       placeholder: "The story explores... [TAGS] tag1, tag2, tag3",
       label: "",
       extraControls: [directionBtnPart],
-      initialDisplay: state.crucible.direction ? formatForDisplay(state.crucible.direction) : undefined,
+      initialDisplay: state.crucible.direction ? escapeForMarkdown(state.crucible.direction) : undefined,
       onSave: (content: string) => dispatch(crucibleDirectionEdited({ text: content })),
     });
 
@@ -62,7 +57,7 @@ export const IntentSection = defineComponent<undefined, RootState>({
       (s) => s.crucible.direction,
       (direction) => {
         api.v1.ui.updateParts([
-          { id: `${CR.DIRECTION_TEXT}-view`, text: direction ? formatForDisplay(direction) : "" },
+          { id: `${CR.DIRECTION_TEXT}-view`, text: direction ? escapeForMarkdown(direction) : "" },
         ]);
       },
     );
@@ -74,12 +69,7 @@ export const IntentSection = defineComponent<undefined, RootState>({
         hasGoals: s.crucible.goals.length > 0,
       }),
       (slice) => {
-        api.v1.ui.updateParts([
-          {
-            id: `${CR.DIRECTION_BTN}`,
-            style: slice.phase === "direction" || slice.phase === "goals" ? { display: "flex" } : { display: "none" },
-          },
-        ]);
+        updateVisibility([[`${CR.DIRECTION_BTN}`, slice.phase === "direction" || slice.phase === "goals"]]);
         if (slice.phase === "building" || slice.hasGoals) {
           api.v1.storyStorage.set("cr-direction-collapsed", "true");
         }

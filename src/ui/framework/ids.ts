@@ -1,3 +1,10 @@
+// ─── storyStorage key conventions ────────────────────────────────────────────
+// "story:" prefix  — UI/layout state persisted automatically by NAI's storageKey
+//                    binding on inputs/collapsibles; NOT managed by reset effects.
+// "cr-"    prefix  — Crucible content managed manually; cleared by crucibleReset.
+// (no prefix)      — Misc keys accessed directly via storyStorage.get/set.
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Shared draft key for the singleton editable pattern
 export const EDITABLE_DRAFT_RAW = "kse-editable-draft"; // for storyStorage.get/set
 export const EDITABLE_DRAFT_KEY = "story:kse-editable-draft"; // for multilineTextInput storageKey

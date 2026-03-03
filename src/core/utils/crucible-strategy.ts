@@ -89,6 +89,8 @@ export const createCrucibleDirectionFactory = (
       content: directionPrompt,
     });
 
+    messages.push({ role: "assistant", content: "The story " });
+
     return {
       messages,
       params: {
@@ -181,7 +183,8 @@ export const buildCrucibleDirectionStrategy = (
     requestId: api.v1.uuid(),
     messageFactory: createCrucibleDirectionFactory(getState),
     target: { type: "crucibleDirection" },
-    prefillBehavior: "trim",
+    assistantPrefill: "The story ",
+    prefillBehavior: "keep",
     continuation: { maxCalls: 2 },
   };
 };

@@ -1,6 +1,7 @@
 import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
+import { updateVisibility } from "../../utils";
 import { CrucibleHeader } from "./CrucibleHeader";
 import { ShapeSection } from "./ShapeSection";
 import { IntentSection } from "./IntentSection";
@@ -38,10 +39,7 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
         const showProgress = phase === "building";
         const showReview = phase === "review";
 
-        api.v1.ui.updateParts([
-          { id: "cr-progress-wrap", style: showProgress ? this.style?.("visible") : this.style?.("hidden") },
-          { id: "cr-review-wrap", style: showReview ? this.style?.("visible") : this.style?.("hidden") },
-        ]);
+        updateVisibility([["cr-progress-wrap", showProgress], ["cr-review-wrap", showReview]]);
       },
     );
 

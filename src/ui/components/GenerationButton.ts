@@ -36,7 +36,7 @@ export interface GenerationButtonProps {
   /** Determine disabled state from projection result */
   isDisabledFromProjection?: (projection: any) => boolean;
   /** Action to dispatch on generate (for field buttons) */
-  generateAction?: any;
+  generateAction?: { type: string };
   /** Callback to run on generate (for lorebook/custom buttons) */
   onGenerate?: () => void;
   /** Label text (only shown for 'button' variant) */
@@ -589,5 +589,16 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       style: { gap: "4px", alignItems: "center", ...style },
       content: [btnGenerate, btnQueued, btnCancel, btnContinue, btnWait],
     });
+  },
+};
+
+/** Thin wrapper that pre-configures `variant: "icon"` so callers don't need to repeat it. */
+export type GenerationIconButtonProps = Omit<GenerationButtonProps, "variant" | "label">;
+
+export const GenerationIconButton: Component<GenerationIconButtonProps, RootState> = {
+  id: (props) => `${props.id}-icon-wrap`,
+  build(props, ctx) {
+    const { part } = ctx.render(GenerationButton, { ...props, variant: "icon" });
+    return part;
   },
 };
