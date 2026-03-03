@@ -7,7 +7,7 @@ import {
   uiBrainstormRetryGeneration,
 } from "../../../../src/core/store";
 import { currentMessages } from "../../../../src/core/store/slices/brainstorm";
-import { registerEffects } from "../../../../src/core/store/effects";
+import { registerEffects } from "../../../../src/core/store/register-effects";
 import { IDS } from "../../../../src/ui/framework/ids";
 import { GenX } from "nai-gen-x";
 

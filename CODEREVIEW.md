@@ -168,7 +168,7 @@ The issue is UX discoverability: the per-element Expand button is visually minim
 
 ---
 
-### 3.4 Effects File Naming
+### 3.4 Effects File Naming ✓ DONE
 
 `src/core/store/effects.ts` (hub file that calls `registerXEffects`) and `src/core/store/effects/` (directory of individual effect modules) share the same name with different paths. This is confusing when navigating — a file named `effects.ts` sits one level above a folder named `effects/`. The hub file could be renamed `register-effects.ts` or moved into the effects directory as `effects/index.ts` (but `effects/index.ts` already exists and does something else).
 
@@ -352,7 +352,7 @@ The `buildStoryEnginePrefix` and `buildCruciblePrefix` context builders construc
 | 3.1 | StorageKey naming — document convention | Low | Trivial |
 | 3.2 | Direction sync via storage key | Medium | Small |
 | 3.3 | Expansion UX discoverability | Medium | Small | ✓ DONE |
-| 3.4 | `effects.ts` naming collision | Low | Trivial |
+| 3.4 | `effects.ts` naming collision | Low | Trivial | ✓ DONE |
 | 4.1 | `escapeForMarkdown` duplication | Low | Small |
 | 4.2 | `updateVisibility` repeated pattern | Low | Small |
 | 4.3 | GenerationButton icon variant coupling | Low | Medium |

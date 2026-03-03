@@ -3,7 +3,7 @@ import {
   persistedDataLoaded,
   uiLorebookEntrySelected,
 } from "./core/store";
-import { registerEffects, syncEratoCompatibility } from "./core/store/effects";
+import { registerEffects, syncEratoCompatibility } from "./core/store/register-effects";
 import { GenX } from "nai-gen-x";
 import { mount } from "nai-act";
 import { stateUpdated, requestActivated } from "./core/store/slices/runtime";
