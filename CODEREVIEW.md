@@ -158,7 +158,7 @@ When the user clicks "Generate Goals," the effect syncs the direction from stora
 
 ---
 
-### 3.3 Expansion Feature Is Working But Undiscoverable
+### 3.3 Expansion Feature Is Working But Undiscoverable ✓ DONE
 
 The Expansion pipeline is complete end-to-end: `expansionTriggered` action → effect in `crucible-effects.ts:177` → `buildExpansionStrategy` → handler. The per-element "Expand" button in `ReviewView.ts:229-243` dispatches `expansionTriggered({ elementId })`, and the global "Expand World" section dispatches `expansionTriggered({})` (no element ID). Both work.
 
@@ -351,7 +351,7 @@ The `buildStoryEnginePrefix` and `buildCruciblePrefix` context builders construc
 | 2.4 | `any` casts in GenerationButton props | Low | Small |
 | 3.1 | StorageKey naming — document convention | Low | Trivial |
 | 3.2 | Direction sync via storage key | Medium | Small |
-| 3.3 | Expansion UX discoverability | Medium | Small |
+| 3.3 | Expansion UX discoverability | Medium | Small | ✓ DONE |
 | 3.4 | `effects.ts` naming collision | Low | Trivial |
 | 4.1 | `escapeForMarkdown` duplication | Low | Small |
 | 4.2 | `updateVisibility` repeated pattern | Low | Small |

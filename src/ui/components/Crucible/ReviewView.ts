@@ -228,8 +228,7 @@ export const ReviewView = defineComponent<undefined, RootState>({
 
         const { part: expandBtn } = ctx.render(GenerationButton, {
           id: `${CR.element(el.id).ROOT}-expand`,
-          label: "Expand",
-          style: { "font-size": "0.75em", padding: "2px 6px", "font-weight": "normal" },
+          label: "Expand Element",
           stateProjection: (s: RootState) => ({
             activeIsExpansion: s.runtime.activeRequest?.type === "crucibleExpansion",
             queueHasExpansion: s.runtime.queue.some((q) => q.type === "crucibleExpansion"),
@@ -255,10 +254,10 @@ export const ReviewView = defineComponent<undefined, RootState>({
               style: { gap: "6px", "align-items": "center" },
               content: [
                 text({ text: FIELD_LABEL_SINGULAR[el.fieldId] || el.fieldId, style: this.style?.("badge") }),
-                expandBtn,
               ],
             }),
             editable,
+            expandBtn,
           ],
         }));
       }
