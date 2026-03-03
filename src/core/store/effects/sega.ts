@@ -32,6 +32,7 @@ import {
   segaRequestUntracked,
   segaReset,
   segaStatusUpdated,
+  stateUpdated,
   uiGenerationRequested,
   requestCompleted,
   requestCancelled,
@@ -365,6 +366,10 @@ async function queueSegaLorebookKeys(
 
 /**
  * Cancel all SEGA-tracked requests.
+ *
+ * Force-clears tracked requests from the store immediately so UI buttons
+ * revert to idle without waiting for genX to resolve its pending generate()
+ * call — which may be blocked in waiting_for_user or waiting_for_budget state.
  */
 function cancelAllSegaTasks(
   getState: () => RootState,
@@ -373,20 +378,33 @@ function cancelAllSegaTasks(
 ): void {
   const { activeRequestIds } = getState().runtime.sega;
 
-  // Cancel queued requests
+  // Cancel queued requests in genX
   for (const requestId of activeRequestIds) {
     genX.cancelQueued(requestId);
   }
 
-  // Cancel current if SEGA-initiated
+  // Cancel active request if SEGA-initiated: mark as cancelled in the store
+  // so the generationSubmitted effect detects it and discards any partial text.
   const activeRequest = getState().runtime.activeRequest;
   if (activeRequest && activeRequestIds.includes(activeRequest.id)) {
+    dispatch(requestCancelled({ requestId: activeRequest.id }));
     genX.cancelAll();
+    // genX.cancelAll() only sets queueLength=0 when a task is active — it does
+    // NOT set status="idle" (it waits for waitForAllowedOutput to resolve, which
+    // can block indefinitely). Force the store to idle immediately so buttons clear.
+    dispatch(stateUpdated({ genxState: { status: "idle", queueLength: 0 } }));
   }
 
-  // Clear tracking
+  // Untrack all SEGA requests FIRST so the requestCompleted effect below
+  // doesn't treat these as SEGA completions and schedule the next task.
   for (const requestId of activeRequestIds) {
     dispatch(segaRequestUntracked({ requestId }));
+  }
+
+  // Force-complete all tracked requests so the store is cleared immediately.
+  // This causes GenerationButtons to revert to idle without waiting for genX.
+  for (const requestId of activeRequestIds) {
+    dispatch(requestCompleted({ requestId }));
   }
 }
 
