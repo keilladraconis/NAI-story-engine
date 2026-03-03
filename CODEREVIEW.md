@@ -300,7 +300,7 @@ Unlike shape (prefill: `"SHAPE: "`) and goals (prefill: `"[GOAL] "`), direction 
 
 ---
 
-### 6.2 Lorebook Keys Parser: No Fallback on Missing `KEYS:` Line
+### 6.2 Lorebook Keys Parser: No Fallback on Missing `KEYS:` Line ✓ DONE
 
 **File:** `src/core/utils/lorebook-strategy.ts`
 
@@ -361,7 +361,7 @@ The `buildStoryEnginePrefix` and `buildCruciblePrefix` context builders construc
 | 5.1 | Verbose reducer spread (flag only) | None | — |
 | 5.2 | Ephemeral relational maps (flag only) | None | — |
 | 6.1 | Direction missing prefill | Low | Trivial |
-| 6.2 | Lorebook keys parser no fallback | Medium | Small |
+| 6.2 | Lorebook keys parser no fallback | Medium | Small | ✓ DONE |
 | 7.1 | No reducer unit tests | High | Medium | ✓ DONE |
 | 7.2 | No handler parsing tests | High | Medium | ✓ DONE |
 | 7.3 | No strategy factory tests | Medium | Medium |

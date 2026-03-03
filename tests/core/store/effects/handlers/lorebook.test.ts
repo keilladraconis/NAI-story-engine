@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { parseLorebookKeys } from "../../../../../src/core/store/effects/handlers/lorebook";
+import {
+  parseLorebookKeys,
+  keysFromDisplayName,
+} from "../../../../../src/core/store/effects/handlers/lorebook";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // parseLorebookKeys
@@ -68,5 +71,43 @@ describe("parseLorebookKeys", () => {
       "More content here.",
     ].join("\n");
     expect(parseLorebookKeys(text)).toEqual(["elara", "lady elara", "the disgraced"]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// keysFromDisplayName
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("keysFromDisplayName", () => {
+  it("splits a simple name into word tokens", () => {
+    expect(keysFromDisplayName("Elara Nightshade")).toEqual(["elara", "nightshade"]);
+  });
+
+  it("lowercases all tokens", () => {
+    expect(keysFromDisplayName("Silver Court")).toEqual(["silver", "court"]);
+  });
+
+  it("splits on hyphens", () => {
+    expect(keysFromDisplayName("Maren-Voss")).toEqual(["maren", "voss"]);
+  });
+
+  it("splits on underscores", () => {
+    expect(keysFromDisplayName("iron_throne")).toEqual(["iron", "throne"]);
+  });
+
+  it("filters out single-character tokens", () => {
+    expect(keysFromDisplayName("A Long Name")).toEqual(["long", "name"]);
+  });
+
+  it("handles extra whitespace", () => {
+    expect(keysFromDisplayName("  Elara  Nightshade  ")).toEqual(["elara", "nightshade"]);
+  });
+
+  it("returns empty array for a blank display name", () => {
+    expect(keysFromDisplayName("")).toEqual([]);
+  });
+
+  it("returns empty array when all tokens are single characters", () => {
+    expect(keysFromDisplayName("A B C")).toEqual([]);
   });
 });

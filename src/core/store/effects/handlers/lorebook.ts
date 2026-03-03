@@ -168,6 +168,17 @@ export function parseLorebookKeys(text: string): string[] | null {
     .filter((k) => k.length > 0 && k.length < 50);
 }
 
+/**
+ * Extract lowercase word tokens from an entry display name for use as fallback keys.
+ * Splits on whitespace, commas, hyphens, and underscores; drops single-character tokens.
+ */
+export function keysFromDisplayName(displayName: string): string[] {
+  return displayName
+    .toLowerCase()
+    .split(/[\s,_-]+/)
+    .filter((w) => w.length > 1 && w.length < 50);
+}
+
 export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
   streaming(_ctx: StreamingContext<LorebookKeysTarget>, _newText: string): void {
     // No streaming display for keys — raw LLM output is noisy mid-stream
@@ -177,21 +188,23 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
     const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
 
     if (ctx.generationSucceeded && ctx.accumulatedText) {
-      const keys = parseLorebookKeys(ctx.accumulatedText);
+      let keys = parseLorebookKeys(ctx.accumulatedText);
 
       if (!keys) {
-        api.v1.log(`[lorebook-keys] no KEYS: line found for ${ctx.target.entryId.slice(0, 8)} — skipping`);
-        return;
+        api.v1.log(`[lorebook-keys] no KEYS: line found for ${ctx.target.entryId.slice(0, 8)} — falling back to display name`);
+        const entry = await api.v1.lorebook.entry(ctx.target.entryId);
+        keys = entry?.displayName ? keysFromDisplayName(entry.displayName) : [];
       }
 
-      // Update lorebook entry with generated keys
+      if (keys.length === 0) return;
+
+      // Update lorebook entry with generated (or fallback) keys
       await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys });
 
       // Update draft with parsed keys if viewing this entry
       // (storageKey binding auto-updates UI)
       if (ctx.target.entryId === currentSelected) {
-        const keysStr = keys.join(", ");
-        await api.v1.storyStorage.set(IDS.LOREBOOK.KEYS_DRAFT_RAW, keysStr);
+        await api.v1.storyStorage.set(IDS.LOREBOOK.KEYS_DRAFT_RAW, keys.join(", "));
       }
     } else {
       // Cancelled or failed: restore draft to original keys if viewing this entry
