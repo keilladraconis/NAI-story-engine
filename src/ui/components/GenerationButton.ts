@@ -368,6 +368,9 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
           }
         }
 
+        // Skip update if the visible state hasn't changed
+        if (mode === lastMode) return;
+
         // Update UI based on variant
         if (variant === "icon") {
           updateIconVariant(mode, budgetWaitEndTime);
