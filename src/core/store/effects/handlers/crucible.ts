@@ -95,10 +95,6 @@ export const crucibleShapeHandler: GenerationHandlers<CrucibleShapeTarget> = {
 
     api.v1.log(`[crucible] Shape generated: ${name}`);
     ctx.dispatch(updateShape({ name, instruction: instruction || SHAPE_FALLBACK.instruction }));
-
-    // Populate the Name input so the user can see and reuse the generated name
-    await api.v1.storyStorage.set("cr-shape-name", name);
-    api.v1.ui.updateParts([{ id: IDS.CRUCIBLE.SHAPE_NAME, value: name }]);
   },
 };
 

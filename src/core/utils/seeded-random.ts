@@ -35,26 +35,6 @@ export const createSeededRandom = (seed: number): (() => number) => {
 };
 
 /**
- * Shuffles an array using Fisher-Yates with a seeded PRNG.
- * Produces deterministic ordering for the same seed.
- *
- * @param array - Array to shuffle
- * @param seed - Numeric seed for deterministic shuffling
- * @returns New shuffled array (original not modified)
- */
-export const seededShuffle = <T>(array: T[], seed: number): T[] => {
-  const result = [...array];
-  const random = createSeededRandom(seed);
-
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-
-  return result;
-};
-
-/**
  * Computes a stable hash position for a lorebook entry.
  * Each entry gets a fixed position regardless of how many other entries exist.
  * Used for cache-optimal ordering: new entries slot into position without
@@ -85,40 +65,3 @@ export const getStoryIdSeed = async (): Promise<number> => {
   return 42;
 };
 
-/**
- * Sorts items by creation order (array index), with optional seeded shuffle
- * within same-priority groups. New items naturally appear at the end.
- *
- * @param items - Items with id property
- * @param existingOrder - Array of IDs in creation order
- * @param seed - Optional seed for shuffling items not in existingOrder
- * @returns Sorted array with new items at end
- */
-export const stableOrderWithNewAtEnd = <T extends { id: string }>(
-  items: T[],
-  existingOrder: string[],
-  seed?: number,
-): T[] => {
-  // Partition into known (in creation order) and new items
-  const orderMap = new Map(existingOrder.map((id, idx) => [id, idx]));
-
-  const known: T[] = [];
-  const unknown: T[] = [];
-
-  for (const item of items) {
-    if (orderMap.has(item.id)) {
-      known.push(item);
-    } else {
-      unknown.push(item);
-    }
-  }
-
-  // Sort known items by their creation order
-  known.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
-
-  // Optionally shuffle unknown items (new entries) with seed
-  const sortedUnknown = seed !== undefined ? seededShuffle(unknown, seed) : unknown;
-
-  // Known items first (stable order), then new items at end
-  return [...known, ...sortedUnknown];
-};
