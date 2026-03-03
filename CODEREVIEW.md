@@ -312,7 +312,7 @@ The keys parser requires an exact `KEYS:` line in the output. If the model fails
 
 ## 7. Testing
 
-### 7.1 Reducer Coverage Is Zero
+### 7.1 Reducer Coverage Is Zero ✓ DONE
 
 The state slices (`story.ts`, `brainstorm.ts`, `runtime.ts`, `ui.ts`, `crucible.ts`) have no unit tests. Reducers are pure functions and trivially testable.
 
@@ -320,7 +320,7 @@ The state slices (`story.ts`, `brainstorm.ts`, `runtime.ts`, `ui.ts`, `crucible.
 
 ---
 
-### 7.2 Handler Parsing Has No Tests
+### 7.2 Handler Parsing Has No Tests ✓ DONE
 
 The tagged-text parsers in `handlers/crucible-chain.ts` (prerequisites, elements), `handlers/lorebook.ts` (keys, content), and `tag-parser.ts` are pure text → data transforms. They're the most fragile part of the pipeline (model output varies) and have zero test coverage.
 
@@ -362,8 +362,8 @@ The `buildStoryEnginePrefix` and `buildCruciblePrefix` context builders construc
 | 5.2 | Ephemeral relational maps (flag only) | None | — |
 | 6.1 | Direction missing prefill | Low | Trivial |
 | 6.2 | Lorebook keys parser no fallback | Medium | Small |
-| 7.1 | No reducer unit tests | High | Medium |
-| 7.2 | No handler parsing tests | High | Medium |
+| 7.1 | No reducer unit tests | High | Medium | ✓ DONE |
+| 7.2 | No handler parsing tests | High | Medium | ✓ DONE |
 | 7.3 | No strategy factory tests | Medium | Medium |
 
 ---
@@ -375,5 +375,5 @@ The most important items before calling this BETA-ready:
 1. **Fix 1.1** (shape name dual storage) — real bug waiting to surface
 2. **Fix 4.4** (Generate Goals UX) — users will want to regenerate goals without clearing
 3. **Fix 4.5** (expansion per-element spinner) — incorrect feedback during generation
-4. **Address 7.1 + 7.2** (reducer and handler tests) — without these, Crucible phase machine and lorebook parsing can silently regress
-5. **Delete 2.1–2.3** (dead files) — trivial cleanup that signals the codebase is maintained
+4. **Address 7.1 + 7.2** (reducer and handler tests) — without these, Crucible phase machine and lorebook parsing can silently regress ✓ DONE
+5. **Delete 2.1–2.3** (dead files) — trivial cleanup that signals the codebase is maintained ✓ DONE

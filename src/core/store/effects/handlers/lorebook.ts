@@ -153,6 +153,21 @@ export const lorebookRelationalMapHandler: GenerationHandlers<LorebookRelational
   },
 };
 
+/**
+ * Parse a KEYS: line from lorebook key generation output.
+ * Returns trimmed, lowercased, comma-separated keys, or null if no KEYS: line found.
+ */
+export function parseLorebookKeys(text: string): string[] | null {
+  const keysLine = text.split("\n").find((l) => /^keys:/i.test(l.trim()));
+  if (!keysLine) return null;
+  return keysLine
+    .replace(/^keys:/i, "")
+    .trim()
+    .split(",")
+    .map((k) => k.trim().toLowerCase())
+    .filter((k) => k.length > 0 && k.length < 50);
+}
+
 export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
   streaming(_ctx: StreamingContext<LorebookKeysTarget>, _newText: string): void {
     // No streaming display for keys — raw LLM output is noisy mid-stream
@@ -162,23 +177,12 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
     const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
 
     if (ctx.generationSucceeded && ctx.accumulatedText) {
-      // Find the KEYS: line — search all lines case-insensitively
-      const keysLine = ctx.accumulatedText
-        .split("\n")
-        .find((l) => /^keys:/i.test(l.trim()));
+      const keys = parseLorebookKeys(ctx.accumulatedText);
 
-      if (!keysLine) {
+      if (!keys) {
         api.v1.log(`[lorebook-keys] no KEYS: line found for ${ctx.target.entryId.slice(0, 8)} — skipping`);
         return;
       }
-
-      const keysSource = keysLine.replace(/^keys:/i, "").trim();
-
-      // Parse comma-separated keys
-      const keys = keysSource
-        .split(",")
-        .map((k) => k.trim().toLowerCase())
-        .filter((k) => k.length > 0 && k.length < 50);
 
       // Update lorebook entry with generated keys
       await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys });

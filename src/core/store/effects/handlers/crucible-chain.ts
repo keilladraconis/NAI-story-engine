@@ -45,7 +45,7 @@ type ExpansionTarget = { type: "crucibleExpansion"; elementId?: string };
 
 // --- Prerequisites Handler ---
 
-function parsePrerequisites(text: string): Prerequisite[] {
+export function parsePrerequisites(text: string): Prerequisite[] {
   const sections = splitSections(text, "+++");
   const prereqs: Prerequisite[] = [];
 
@@ -97,7 +97,7 @@ export const prerequisitesHandler: GenerationHandlers<PrereqsTarget> = {
 
 // --- Elements Handler ---
 
-function parseElements(text: string): CrucibleWorldElement[] {
+export function parseElements(text: string): CrucibleWorldElement[] {
   const sections = splitSections(text, "+++");
   const elements: CrucibleWorldElement[] = [];
 
