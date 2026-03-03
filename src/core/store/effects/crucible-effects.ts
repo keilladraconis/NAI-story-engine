@@ -16,7 +16,6 @@ import {
   expansionTriggered,
   generationSubmitted,
   requestQueued,
-  directionSet,
   goalAdded,
   phaseTransitioned,
   mergeCompleted,
@@ -35,6 +34,7 @@ import {
 import { extractDulfsItemName } from "../../utils/context-builder";
 import { ensureCategory } from "./lorebook-sync";
 import { IDS } from "../../../ui/framework/ids";
+import { flushActiveEditor } from "../../../ui/framework/editable-draft";
 
 export function registerCrucibleEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
@@ -69,12 +69,9 @@ export function registerCrucibleEffects(
   subscribeEffect(
     matchesAction(crucibleGoalsRequested),
     async () => {
-      const editedDirection = String(
-        (await api.v1.storyStorage.get("cr-direction")) || "",
-      );
-      if (editedDirection) {
-        dispatch(directionSet({ direction: editedDirection }));
-      }
+      // Flush any active EditableText editor (e.g. an unsaved direction edit)
+      // so its content reaches state before we build goal context.
+      await flushActiveEditor();
 
       dispatch(phaseTransitioned({ phase: "goals" }));
 

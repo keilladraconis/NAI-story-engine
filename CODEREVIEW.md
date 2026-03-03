@@ -139,7 +139,7 @@ The `crucibleReset` effect correctly iterates all keys and removes those startin
 
 ---
 
-### 3.2 `crucibleGoalsRequested` Reads StorageKey for Direction Sync
+### 3.2 `crucibleGoalsRequested` Reads StorageKey for Direction Sync ✓ DONE
 
 **File:** `src/core/store/effects/crucible-effects.ts:72-78`
 
