@@ -4,6 +4,7 @@ import {
   uiLorebookEntrySelected,
 } from "./core/store";
 import { registerEffects, syncEratoCompatibility } from "./core/store/register-effects";
+import { migrateLorebookCategories } from "./core/store/effects/lorebook-sync";
 import { GenX } from "nai-gen-x";
 import { mount } from "nai-act";
 import { stateUpdated, requestActivated } from "./core/store/slices/runtime";
@@ -51,7 +52,10 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
     const persisted = await api.v1.storyStorage.get("kse-persist");
     if (persisted) store.dispatch(persistedDataLoaded(persisted));
 
-    // 3b. Sync Erato compatibility (migrate entries/categories if toggled)
+    // 3b. Migrate legacy lorebook category names
+    await migrateLorebookCategories();
+
+    // 3c. Sync Erato compatibility (migrate entries/categories if toggled)
     await syncEratoCompatibility(store.getState);
 
     // 4. Mount all components (returns UIPart + sets up subscriptions)

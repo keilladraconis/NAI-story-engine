@@ -14,6 +14,7 @@ export const initialStoryState: StoryState = {
     [FieldID.Locations]: [],
     [FieldID.Factions]: [],
     [FieldID.SituationalDynamics]: [],
+    [FieldID.Topics]: [],
   } as Record<DulfsFieldID, DulfsItem[]>,
   attgEnabled: false,
   styleEnabled: false,
@@ -58,7 +59,7 @@ export const storySlice = createSlice({
         },
       };
     },
-    // DULFS
+    // World Entries
     dulfsItemAdded: (
       state,
       payload: { fieldId: DulfsFieldID; item: DulfsItem },

@@ -5,20 +5,22 @@ import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 
 // Category-to-template mapping
 const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
-  "SE: Dramatis Personae": "lorebook_template_character",
-  "SE: Universe Systems": "lorebook_template_system",
+  "SE: Characters": "lorebook_template_character",
+  "SE: Systems": "lorebook_template_system",
   "SE: Locations": "lorebook_template_location",
   "SE: Factions": "lorebook_template_faction",
-  "SE: Situational Dynamics": "lorebook_template_dynamic",
+  "SE: Narrative Vectors": "lorebook_template_dynamic",
+  "SE: Topics": "lorebook_template_topic",
 };
 
 // Category-to-type mapping for anchored prefills
 export const CATEGORY_TO_TYPE: Record<string, string> = {
-  "SE: Dramatis Personae": "Character",
-  "SE: Universe Systems": "System",
+  "SE: Characters": "Character",
+  "SE: Systems": "System",
   "SE: Locations": "Location",
   "SE: Factions": "Faction",
-  "SE: Situational Dynamics": "Dynamic",
+  "SE: Narrative Vectors": "Dynamic",
+  "SE: Topics": "Topic",
 };
 
 const getEntryType = (categoryName: string): string => {
@@ -35,6 +37,7 @@ export const MAP_DEPENDENCY_ORDER: DulfsFieldID[] = [
   FieldID.Locations,
   FieldID.UniverseSystems,
   FieldID.Factions,
+  FieldID.Topics,
   FieldID.SituationalDynamics,
 ];
 

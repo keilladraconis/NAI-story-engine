@@ -14,6 +14,28 @@ import { attgForMemory } from "../../utils/filters";
 export const SE_CATEGORY_PREFIX = "SE: ";
 export const SE_ERATO_MARKER_NAME = "SE: End of Lorebook";
 
+// Legacy category names → new names (for migration)
+const CATEGORY_RENAME_MAP: Record<string, string> = {
+  "SE: Dramatis Personae": "SE: Characters",
+  "SE: Universe Systems": "SE: Systems",
+  "SE: Situational Dynamics": "SE: Narrative Vectors",
+};
+
+/**
+ * Migrate old lorebook category names to new names.
+ * Safe to call multiple times — skips already-renamed categories.
+ */
+export async function migrateLorebookCategories(): Promise<void> {
+  const categories = await api.v1.lorebook.categories();
+  for (const category of categories) {
+    const newName = CATEGORY_RENAME_MAP[category.name];
+    if (newName) {
+      await api.v1.lorebook.updateCategory(category.id, { name: newName });
+      api.v1.log(`[lorebook] Renamed category "${category.name}" → "${newName}"`);
+    }
+  }
+}
+
 // Helper: Find or create a category for a DULFS field
 export async function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
   const config = FIELD_CONFIGS.find((c) => c.id === fieldId);

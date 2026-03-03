@@ -12,13 +12,14 @@ import { buildCruciblePrefix } from "./context-builder";
 import { parseTag } from "./tag-parser";
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 
-/** DULFS field display labels for context formatting. */
+/** World Entry field display labels for context formatting. */
 const FIELD_LABEL: Record<DulfsFieldID, string> = {
   [FieldID.DramatisPersonae]: "Character",
   [FieldID.UniverseSystems]: "System",
   [FieldID.Locations]: "Location",
   [FieldID.Factions]: "Faction",
   [FieldID.SituationalDynamics]: "Situation",
+  [FieldID.Topics]: "Topic",
 };
 
 // --- Prerequisites ---

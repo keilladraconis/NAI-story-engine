@@ -25,12 +25,13 @@ export interface SegaState {
   relationalMaps: Record<string, string>; // entryId → map text, ephemeral (cleared on reset)
 }
 
-export const DULFS_CATEGORIES: DulfsFieldID[] = [
+export const WORLD_ENTRY_CATEGORIES: DulfsFieldID[] = [
   FieldID.DramatisPersonae,
   FieldID.UniverseSystems,
   FieldID.Locations,
   FieldID.Factions,
   FieldID.SituationalDynamics,
+  FieldID.Topics,
 ];
 
 export interface StoryField {

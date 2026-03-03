@@ -6,6 +6,7 @@ export enum FieldID {
   Locations = "locations",
   Factions = "factions",
   SituationalDynamics = "situationalDynamics",
+  Topics = "topics",
   ATTG = "attg",
   Style = "style",
 }
@@ -15,7 +16,8 @@ export type DulfsFieldID =
   | FieldID.UniverseSystems
   | FieldID.Locations
   | FieldID.Factions
-  | FieldID.SituationalDynamics;
+  | FieldID.SituationalDynamics
+  | FieldID.Topics;
 
 export type TextFieldID =
   | FieldID.Canon
@@ -30,6 +32,7 @@ export function isDulfsField(id: string): id is DulfsFieldID {
     FieldID.Locations,
     FieldID.Factions,
     FieldID.SituationalDynamics,
+    FieldID.Topics,
   ].includes(id as FieldID);
 }
 
@@ -88,7 +91,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
   },
   {
     id: FieldID.DramatisPersonae,
-    label: "Dramatis Personae",
+    label: "Characters",
     description: "Characters by name, age, description, tell",
     placeholder: "Character names, descriptions, motivations...",
     icon: "user",
@@ -106,7 +109,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
   },
   {
     id: FieldID.UniverseSystems,
-    label: "Universe Systems",
+    label: "Systems",
     description: "Rules, magic, technology, laws, and world mechanics",
     placeholder: "How this world works - magic, physics, laws...",
     icon: "settings" as IconId,
@@ -161,7 +164,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
   },
   {
     id: FieldID.SituationalDynamics,
-    label: "Situational Dynamics",
+    label: "Narrative Vectors",
     description: "Narrative vectors: tensions, pressures, and volatile situations",
     placeholder: "Directions of pressure, not predetermined outcomes...",
     icon: "activity",
@@ -175,6 +178,25 @@ export const FIELD_CONFIGS: FieldConfig[] = [
       "One line per vector: name and competing pressures. Actors and stakes only, no outcomes.",
     exampleFormat:
       "Vector Name: Competing pressures and actors.\nExample: The Succession Crisis: Three legitimate heirs; military, merchants, and clergy each back different candidates.",
+    filters: ["scrubBrackets", "scrubMarkdown"],
+    parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
+  },
+  {
+    id: FieldID.Topics,
+    label: "Topics",
+    description: "What characters discuss — rumors, debates, shared history",
+    placeholder: "Conversations, debates, rumors...",
+    icon: "message-circle" as IconId,
+    layout: "list",
+    fieldType: "dulfs",
+    listGenerationInstruction:
+      "List only topic names. Focus on what characters actually discuss, debate, or gossip about.",
+    listExampleFormat:
+      "- The Missing Shipment\n- Who Killed the Old Mayor\n- The Festival Preparations",
+    generationInstruction:
+      "One line per topic: name and what makes it contentious or interesting. Actors and their positions only, no resolution.",
+    exampleFormat:
+      "Topic Name: What makes it contentious.\nExample: The Missing Shipment: Three factions blame each other; the truth implicates none of them.",
     filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },

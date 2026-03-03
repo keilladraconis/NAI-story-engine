@@ -44,7 +44,7 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
     return {
       ...current,
       story: data.story
-        ? { ...initialStoryState, ...data.story }
+        ? { ...initialStoryState, ...data.story, dulfs: { ...initialStoryState.dulfs, ...data.story?.dulfs } }
         : current.story,
       brainstorm: data.brainstorm?.chats
         ? { ...current.brainstorm, chats: data.brainstorm.chats, currentChatIndex: data.brainstorm.currentChatIndex }

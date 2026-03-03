@@ -7,7 +7,7 @@
  * 3. Bootstrap (scene opening instruction, if document is empty)
  * 4. Lorebook (content + keys per entry)
  *
- * DULFS list population is handled by Crucible (v7). Users can still
+ * World Entry list population is handled by Crucible (v7). Users can still
  * generate items per-category via the "Generate Items" button.
  *
  * CACHE STRATEGY: All Story Engine strategies share a unified message prefix
@@ -20,7 +20,7 @@ import { Store, matchesAction } from "nai-store";
 import { GenX } from "nai-gen-x";
 import {
   RootState,
-  DULFS_CATEGORIES,
+  WORLD_ENTRY_CATEGORIES,
   DulfsItem,
   AppDispatch,
 } from "../types";
@@ -85,7 +85,7 @@ async function needsBootstrap(): Promise<boolean> {
 }
 
 /**
- * Find the next DULFS entry that needs content generation.
+ * Find the next entry that needs content generation.
  * Entries are sorted by hash position (matching cross-reference order)
  * so SEGA generates them in an order that produces append-only cache growth.
  * Returns null if all entries have content.
@@ -96,7 +96,7 @@ async function findEntryNeedingContent(state: RootState): Promise<DulfsItem | nu
   let withContent = 0;
   let noEntry = 0;
 
-  for (const category of DULFS_CATEGORIES) {
+  for (const category of WORLD_ENTRY_CATEGORIES) {
     const items = state.story.dulfs[category] || [];
     for (const item of items) {
       totalEntries++;
@@ -135,7 +135,7 @@ async function findEntryNeedingContent(state: RootState): Promise<DulfsItem | nu
 }
 
 /**
- * Find the next DULFS entry that needs a relational map.
+ * Find the next entry that needs a relational map.
  * Processes in MAP_DEPENDENCY_ORDER (characters first) so later entries
  * can reference earlier ones via MAP SO FAR.
  */
@@ -167,7 +167,7 @@ async function findEntryNeedingRelationalMap(state: RootState): Promise<DulfsIte
 }
 
 /**
- * Find the next DULFS entry whose relational map needs reconciliation.
+ * Find the next entry whose relational map needs reconciliation.
  * Targets entries with no primary characters and high collision risk —
  * these benefit from a second pass with the full map as context.
  */
@@ -195,7 +195,7 @@ async function findEntryNeedingReconciliation(state: RootState): Promise<DulfsIt
 }
 
 /**
- * Find the next DULFS entry that needs keys generation.
+ * Find the next entry that needs keys generation.
  * Includes entries with no keys AND entries with only a stub key (a single key
  * equal to the entry's lowercased display name), which was inserted by the
  * content handler as a placeholder.
@@ -204,7 +204,7 @@ async function findEntryNeedingKeys(state: RootState): Promise<DulfsItem | null>
   const needsKeys: DulfsItem[] = [];
   const seed = await getStoryIdSeed();
 
-  for (const category of DULFS_CATEGORIES) {
+  for (const category of WORLD_ENTRY_CATEGORIES) {
     const items = state.story.dulfs[category] || [];
     for (const item of items) {
       const entry = await api.v1.lorebook.entry(item.id);
@@ -281,7 +281,7 @@ async function queueSegaFieldGeneration(
 }
 
 /**
- * Queue lorebook content generation for a DULFS item.
+ * Queue lorebook content generation for a World Entry item.
  */
 async function queueSegaLorebookContent(
   dispatch: AppDispatch,
@@ -312,7 +312,7 @@ async function queueSegaLorebookContent(
 }
 
 /**
- * Queue relational map generation for a DULFS item.
+ * Queue relational map generation for a World Entry item.
  * Same function handles both initial map pass and reconciliation —
  * the factory reads MAP SO FAR from state at JIT time.
  */
@@ -343,7 +343,7 @@ async function queueSegaRelationalMapGeneration(
 }
 
 /**
- * Queue lorebook keys generation for a DULFS item.
+ * Queue lorebook keys generation for a World Entry item.
  */
 async function queueSegaLorebookKeys(
   dispatch: AppDispatch,

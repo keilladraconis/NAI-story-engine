@@ -253,7 +253,7 @@ export function registerCrucibleEffects(
     },
   );
 
-  // Intent: Crucible Merge → write elements to DULFS
+  // Intent: Crucible Merge → write elements to World Entries
   subscribeEffect(
     matchesAction(crucibleMergeRequested),
     async (_action, { getState: getLatest }) => {
@@ -292,8 +292,8 @@ export function registerCrucibleEffects(
       dispatch(mergeCompleted());
       const parts = [created && `${created} created`, updated && `${updated} updated`].filter(Boolean);
       const msg = parts.join(", ") || "no changes";
-      api.v1.log(`[crucible] Merged to DULFS: ${msg}`);
-      api.v1.ui.toast(`Merged to DULFS: ${msg}`, { type: "success" });
+      api.v1.log(`[crucible] Merged to World Entries: ${msg}`);
+      api.v1.ui.toast(`Merged to World Entries: ${msg}`, { type: "success" });
     },
   );
 

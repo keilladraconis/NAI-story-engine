@@ -1,12 +1,12 @@
 compatibilityVersion: naiscript-1.0
 id: e6c35faa-e4f2-4c3b-af4a-d56e4c992d87
 name: Story Engine
-version: 0.9.3
+version: 0.10.0
 createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772554594
+updatedAt: 1772566599
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -181,6 +181,19 @@ config:
         existing lorebook entries call for them (e.g. Race, Allegiance,
         Tech Level, vital statistics, measurements). No filler.
 
+      **Container Discipline (STRICT):**
+      - **Characters:** ONLY internal/solitary data (Appearance, Personality, History, internal Conflict). Never name another character to define a dynamic — that belongs in a Narrative Vector.
+      - **Locations:** ONLY sensory/spatial/atmosphere data. No recurring events, schedules, or complex mechanics — those belong in Systems. Character-specific goals belong in Motive lines.
+      - **Narrative Vectors:** Active pressure ONLY — the dynamic between actors in a specific situation. No deep history of the relationship, no outcomes or predictions.
+      - **Systems:** Mechanical rules ONLY — laws, universal behaviors, and their immediate effects. No specific events, narrative dynamics, or character histories.
+      - **Topics:** What characters discuss — per-actor positions on a subject. No narrative resolution.
+      - If an entry feels bloated, extract detail into a supporting System or Narrative Vector.
+
+      **Character Motive Lines:**
+      In Location, System, and Narrative Vector entries, include Motive lines where situationally appropriate:
+      > [CHARACTER]'s Motive ([GOAL]): [need. trigger. tactic.]
+      Motives state setup and strategy, not outcome. NEVER place motives in Character or Faction entries.
+
       **CRITICAL:** Describe what IS and what COULD BE, never what WILL BE.
 
   - name: lorebook_template_character
@@ -195,7 +208,8 @@ config:
       Age: [number] | Gender: [gender] | Occupation: [role]
       Appearance: [What a stranger notices first — build, coloring, distinguishing features, how they carry themselves. 2-3 sentences.]
       Personality: [How they behave under pressure, what they want, what they hide. Weave in a defining quote. 2-3 sentences.]
-      Conflict: [The internal tension driving their choices — name the duality and its origin.]
+      History: [The core events that shaped who they are today. 2-3 sentences.]
+      Conflict: [Optional. The internal tension driving this character's choices — the duality within them alone. One sentence naming the conflict, one naming its origin. No other characters, no relationship dynamics, no outcomes.]
 
   - name: lorebook_template_location
     prettyName: Lorebook Template (Location)
@@ -207,8 +221,10 @@ config:
       Type: Location
       Setting: original
       Region: [where this sits in the world]
-      Atmosphere: [Sensory snapshot — what you see, hear, smell on arrival]
-      Description: [What this place is, its history, how it shapes those within it, and what makes it a site of conflict or opportunity. ~80 words.]
+      Atmosphere: [Sensory snapshot — what you see, hear, smell on arrival. 2-3 sentences.]
+      Description: [What this place is, how it shapes those within it, and what makes it a site of conflict or opportunity. 3-5 sentences.]
+      History: [Optional. How this place came to exist and what shaped its current form. 2-3 sentences.]
+      Culture: [Optional. How people behave here, what the unwritten rules are, what makes this place distinct. 2-3 sentences.]
 
   - name: lorebook_template_faction
     prettyName: Lorebook Template (Faction)
@@ -220,7 +236,10 @@ config:
       Type: Faction
       Setting: original
       Leader: [Name or Title] | Goal: [primary ambition]
-      Description: [Methods, resources, the gap between public face and private reality, and how they are destabilizing the status quo. ~80 words.]
+      Members: [Optional. Comma-separated list of key members.]
+      Description: [Methods, resources, the gap between public face and private reality, and how they are destabilizing the status quo. 3-5 sentences.]
+      History: [Optional. How this faction came to exist and what shaped its current form. 2-3 sentences.]
+      Culture: [Optional. How this faction thinks, behaves, and organises itself internally. Values, customs, social structure. 2-3 sentences.]
 
   - name: lorebook_template_system
     prettyName: Lorebook Template (World System)
@@ -231,9 +250,9 @@ config:
       [Entry Name]
       Type: System
       Setting: original
-      Domain: [Magic / Technology / Biology / Physics / Divine / Law]
+      Domain: [Sociology / Psychology / Biology / Physics / Divine / Law]
       Rules: [How it works and what it costs — mechanics and limits in 1-2 sentences]
-      Description: [How this system shapes daily life, who benefits, who suffers, and what makes it currently unstable. ~80 words.]
+      Description: [How this system shapes daily life, who benefits, who suffers, and what makes it currently unstable. 3-5 sentences.]
 
   - name: lorebook_template_dynamic
     prettyName: Lorebook Template (Situational Dynamic)
@@ -245,9 +264,24 @@ config:
       Type: Narrative Vector
       Setting: original
       Scope: [Local / Regional / Global]
-      Actors: [Who's involved and what each wants — name the incompatibility]
-      Description: [The nature of the tension, why it persists, and what could break the equilibrium. ~80 words.]
+      Actors:
+      - [Character]: [Their role in this dynamic and why they are in tension with the other actor(s).]
+      - [Character]: [Their role in this dynamic and why they are in tension with the other actor(s).]
+      Description: [The nature of the dynamic and the pressure it creates. Setup only — no outcomes, no resolved emotions, no predictions. 3-5 sentences.]
 
+  - name: lorebook_template_topic
+    prettyName: Lorebook Template (Topic)
+    description: Dense topic template — what characters discuss and their positions.
+    type: string
+    multiline: true
+    default: |-
+      [Entry Name]
+      Type: Topic
+      Setting: original
+      Scope: [Rumor / Current Events / Shared History / Entertainment / Future Plans / Conflict / Other]
+      Actors:
+      - [Character]: [Their position or opinion on this topic.]
+      - [Character]: [Their position or opinion on this topic, and how it aligns or conflicts with the above.]
   - name: lorebook_keys_prompt
     prettyName: Lorebook Keys Prompt
     description: Prompt for generating Lorebook keys.
@@ -433,7 +467,19 @@ config:
       - Locations may be controlled by factions, inhabited by characters, or connected to other places
       - Factions may have notable members, headquarters, rivals, or territorial interests
       - Systems may be practiced by factions, studied at locations, or mastered by characters
+      - Topics may involve characters with opposing positions, connect to factions or locations
       Weave these connections naturally into the entry to create a cohesive world.
+
+      **Container Boundaries:**
+      - Character entries: internal/solitary data only — never name another character to define a dynamic
+      - Location entries: sensory/spatial/atmosphere only — no events or mechanics
+      - Narrative Vectors: active pressure only — no deep history or outcomes
+      - Systems: mechanical rules only — no events or character histories
+      - Topics: what characters discuss — per-actor positions, no resolution
+
+      **Character Motive Lines** (Location, System, and Narrative Vector entries only):
+      > [CHARACTER]'s Motive ([GOAL]): [need. trigger. tactic.]
+      Include where situationally appropriate. Never in Character or Faction entries.
   - name: crucible_system_prompt
     prettyName: Crucible System Prompt
     description: >-

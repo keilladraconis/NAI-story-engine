@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-NAI Story Engine is a NovelAI script (.naiscript) that guides structured worldbuilding through an 8-stage pipeline: brainstorming → story prompt → world snapshot → DULFS (Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics). Runs in NovelAI's web worker environment (QuickJS, no DOM).
+NAI Story Engine is a NovelAI script (.naiscript) that guides structured worldbuilding through an 8-stage pipeline: brainstorming → story prompt → world snapshot → World Entries (Characters, Systems, Locations, Factions, Situational Dynamics, Topics). Runs in NovelAI's web worker environment (QuickJS, no DOM).
 
 ## Commands
 
@@ -25,7 +25,7 @@ npm run test       # vitest run
 
 **State (`src/core/store/`):**
 
-- `slices/story.ts` — Field contents and DULFS items
+- `slices/story.ts` — Field contents and World Entry items
 - `slices/brainstorm.ts` — Chat messages
 - `slices/ui.ts` — Edit modes, temporary inputs
 - `slices/runtime.ts` — Generation queue status, GenX state
@@ -46,9 +46,9 @@ npm run test       # vitest run
 **Generation pipeline:**
 
 - Context is layered: System → Setting → Story Prompt → World Snapshot → Volatile Data
-- DULFS uses two-phase generation: Phase 1 generates a list of names, Phase 2 generates detailed content per item
+- World Entries use two-phase generation: Phase 1 generates a list of names, Phase 2 generates detailed content per item
 - S.E.G.A. (Story Engine Generate All) fills blank fields using round-robin queueing across categories
-- Lorebook Sync is bidirectional between DULFS items and NovelAI Lorebook entries; manual NAI edits are protected
+- Lorebook Sync is bidirectional between World Entry items and NovelAI Lorebook entries; manual NAI edits are protected
 
 ## Coding Guidelines
 

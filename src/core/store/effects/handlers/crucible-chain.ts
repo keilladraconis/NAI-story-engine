@@ -24,13 +24,14 @@ function stripThinkingTags(text: string): string {
   return text.replace(/<\/?think>/g, "").replace(/<think>[\s\S]*$/g, "");
 }
 
-/** Map builder tag names to DULFS field IDs. */
+/** Map builder tag names to World Entry field IDs. */
 const TAG_TO_FIELD: Record<string, DulfsFieldID> = {
   CHARACTER: FieldID.DramatisPersonae,
   LOCATION: FieldID.Locations,
   FACTION: FieldID.Factions,
   SYSTEM: FieldID.UniverseSystems,
   SITUATION: FieldID.SituationalDynamics,
+  TOPIC: FieldID.Topics,
 };
 
 const ELEMENT_TAGS = Object.keys(TAG_TO_FIELD);

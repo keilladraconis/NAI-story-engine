@@ -18,13 +18,14 @@ const { text, row, column, collapsibleSection, button, multilineTextInput } = ap
 
 const CR = IDS.CRUCIBLE;
 
-/** Map DULFS field IDs to display labels. */
+/** Map World Entry field IDs to display labels. */
 const FIELD_LABELS: Record<DulfsFieldID, string> = {
   [FieldID.DramatisPersonae]: "Characters",
   [FieldID.UniverseSystems]: "Systems",
   [FieldID.Locations]: "Locations",
   [FieldID.Factions]: "Factions",
-  [FieldID.SituationalDynamics]: "Situations",
+  [FieldID.SituationalDynamics]: "Narrative Vectors",
+  [FieldID.Topics]: "Topics",
 };
 
 const FIELD_LABEL_SINGULAR: Record<DulfsFieldID, string> = {
@@ -32,7 +33,8 @@ const FIELD_LABEL_SINGULAR: Record<DulfsFieldID, string> = {
   [FieldID.UniverseSystems]: "System",
   [FieldID.Locations]: "Location",
   [FieldID.Factions]: "Faction",
-  [FieldID.SituationalDynamics]: "Situation",
+  [FieldID.SituationalDynamics]: "Narrative Vector",
+  [FieldID.Topics]: "Topic",
 };
 
 
@@ -114,7 +116,7 @@ export const ReviewView = defineComponent<undefined, RootState>({
     const { part: mergeButton } = ctx.render(ButtonWithConfirmation, {
       id: CR.MERGE_BTN,
       label: "Merge to Story Engine",
-      confirmLabel: "Populate DULFS fields?",
+      confirmLabel: "Populate World Entry fields?",
       onConfirm: () => dispatch(crucibleMergeRequested()),
       style: { marginTop: "4px" },
     });
@@ -122,7 +124,7 @@ export const ReviewView = defineComponent<undefined, RootState>({
     const isMerged = ctx.getState().crucible.merged;
     const mergedFooter = text({
       id: "cr-merged-footer",
-      text: "✓ Merged to DULFS",
+      text: "✓ Merged to World Entries",
       markdown: true,
       style: isMerged ? this.style?.("mergedText") : this.style?.("hidden"),
     });

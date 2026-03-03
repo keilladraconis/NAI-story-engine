@@ -7,7 +7,7 @@
  *   MSG 1 (SYSTEM): systemPrompt + weaving prompt             [STABLE]
  *   MSG 2 (SYSTEM): story state snapshot (ATTG, style,        [STABLE during SEGA]
  *                    setting, brainstorm, canon)
- *   MSG 3 (SYSTEM): DULFS items                               [GROWS during list stage]
+ *   MSG 3 (SYSTEM): World Entry items                               [GROWS during list stage]
  *   MSG 4 (SYSTEM): story text (rolling window)               [VOLATILE — at end]
  *   ─── cache boundary ───
  *   MSG 5+ : strategy-specific instructions                   [VOLATILE]
@@ -40,7 +40,7 @@ const getBrainstormHistory = (state: RootState): BrainstormMessage[] => {
 };
 
 /**
- * Extracts the name portion from a DULFS item content using field-specific parsing.
+ * Extracts the name portion from a World Entry item content using field-specific parsing.
  * Falls back to raw content if no regex match.
  */
 export const extractDulfsItemName = (
@@ -66,7 +66,7 @@ export const extractDulfsItemName = (
 };
 
 /**
- * Gets existing DULFS item content for a field, joined with newlines.
+ * Gets existing World Entry item content for a field, joined with newlines.
  * Items are returned in creation order (array index order) for stable context.
  * Returns empty string if no items exist.
  */
@@ -88,7 +88,7 @@ export const getExistingDulfsItems = async (
 };
 
 /**
- * All DULFS field IDs for iteration.
+ * All World Entry field IDs for iteration.
  */
 const ALL_DULFS_FIELDS: DulfsFieldID[] = [
   FieldID.DramatisPersonae,
@@ -96,10 +96,11 @@ const ALL_DULFS_FIELDS: DulfsFieldID[] = [
   FieldID.Locations,
   FieldID.Factions,
   FieldID.SituationalDynamics,
+  FieldID.Topics,
 ];
 
 /**
- * Gets all DULFS items across all fields, grouped by category label.
+ * Gets all World Entry items across all fields, grouped by category label.
  * Categories are in fixed order (DP → US → Loc → Fac → SD).
  * Items within each category are in creation order (stable).
  * Returns formatted string for context injection.
@@ -234,7 +235,7 @@ export const getStoryContextMessages = async (
  *   MSG 1 (SYSTEM): systemPrompt + weaving prompt             [STABLE]
  *   MSG 2 (SYSTEM): story state snapshot (ATTG, style,        [STABLE during SEGA]
  *                    setting, brainstorm, canon)
- *   MSG 3 (SYSTEM): DULFS items                               [GROWS during list stage]
+ *   MSG 3 (SYSTEM): World Entry items                               [GROWS during list stage]
  *   MSG 4 (SYSTEM): story text (rolling window)               [VOLATILE — at end]
  *
  * After the prefix, each factory appends its own volatile tail
@@ -304,7 +305,7 @@ export const buildStoryEnginePrefix = async (
     if (canon) stableSections.push(`[CANON]\n${canon}`);
   }
 
-  // --- MSG 3: DULFS items (GROWS during list stage, stable during lorebook) ---
+  // --- MSG 3: World Entry items (GROWS during list stage, stable during lorebook) ---
   // Separate message so growth doesn't invalidate MSG 2's cached tokens.
   let dulfsContent = "";
   if (!excluded.has("dulfs")) {
@@ -360,7 +361,7 @@ export const buildStoryEnginePrefix = async (
 
 /**
  * Formats crucible world elements as a structured list for injection into
- * lorebook generation context. Grouped by DULFS category, one line per element.
+ * lorebook generation context. Grouped by World Entry category, one line per element.
  * Returns empty string if no elements exist.
  */
 export const formatCrucibleElementsContext = (state: RootState): string => {
@@ -394,7 +395,7 @@ export interface CruciblePrefixOptions {
   includeBrainstorm?: boolean;
   /** Include the crucible direction/intent text */
   includeDirection?: boolean;
-  /** Include DULFS items (for chain, builder) */
+  /** Include World Entry items (for chain, builder) */
   includeDulfs?: boolean;
   /** Include Setting + Canon if available (for intent derivation) */
   includeStoryState?: boolean;
@@ -450,7 +451,7 @@ export const buildCruciblePrefix = async (
     });
   }
 
-  // --- MSG 3 (optional): DULFS items ---
+  // --- MSG 3 (optional): World Entry items ---
   if (options.includeDulfs) {
     const dulfsContext = await getAllDulfsContext(state);
     if (dulfsContext) {
@@ -730,7 +731,7 @@ export const buildCanonStrategy = (
 };
 
 /**
- * Creates a message factory for DULFS list generation.
+ * Creates a message factory for World Entry list generation.
  * Uses unified prefix + volatile tail with list-specific instruction.
  */
 export const createDulfsListFactory = (
@@ -781,7 +782,7 @@ export const createDulfsListFactory = (
 };
 
 /**
- * Builds a DULFS list generation strategy using JIT factory pattern.
+ * Builds a World Entry list generation strategy using JIT factory pattern.
  */
 export const buildDulfsListStrategy = (
   getState: () => RootState,
