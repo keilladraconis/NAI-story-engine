@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.3] - 2026-03-03
+
+### Fixed
+
+- **Lorebook keys fallback** — When key generation produces no `KEYS:` line, keys now fall back to tokens derived from the entry's display name (`keysFromDisplayName`) instead of silently doing nothing. Single-character tokens are dropped.
+- **Direction flush before goal generation** — Goal generation now calls `flushActiveEditor()` before proceeding, ensuring any unsaved direction edit reaches state before context is built. Previously it read `cr-direction` from storyStorage directly and dispatched `directionSet`, which could produce stale context if the draft was out of sync.
+- **ReviewView Expand button layout** — "Expand Element" button moved below the editable element text (was in the badge header row), where it doesn't visually conflict with the field label. Label updated from "Expand" to "Expand Element".
+
+### Changed
+
+- **Direction generation uses prefill** — Strategy now uses `assistantPrefill: "The story "` with `prefillBehavior: "keep"` and `continuation: { maxCalls: 2 }`, improving output structure and handling truncation gracefully.
+- **`effects.ts` → `register-effects.ts`** — The module that wires all effect registrations is now `src/core/store/register-effects.ts`, which better reflects its role.
+
+### Performance
+
+- **`GenerationButton` fan-out eliminated** — Every mounted `GenerationButton` previously called `api.v1.ui.updateParts` on every store dispatch, regardless of whether the button's visible state actually changed. With 50+ icon buttons mounted in a populated DULFS list, a single click could trigger hundreds of synchronous worker-boundary API calls. A mode guard (`if (mode === lastMode) return`) skips `updateParts` unless the button truly needs to change appearance.
+
+### Developer
+
+- **`escapeForMarkdown` utility** — New shared helper in `src/ui/utils.ts` (accepts optional `fallback`) replaces inline `escapeViewText` / `formatForDisplay` functions that were duplicated across `IntentSection`, `GoalCard`, and `ReviewView`.
+- **`updateVisibility` utility** — New batch helper in `src/ui/utils.ts` accepts `[id, visible][]` tuples and issues a single `updateParts` call with `display:flex` / `display:none`.
+- **`GenerationIconButton` component** — Typed wrapper in `GenerationButton.ts` that pre-configures `variant: "icon"`, replacing manual `variant: "icon"` prop at call sites (e.g. `ListItem`).
+- **storyStorage key conventions documented** — Comment block added to `ids.ts` explaining `story:`, `cr-`, and unprefixed key semantics.
+- **`generateAction` type tightened** — `GenerationButtonProps.generateAction` is now `{ type: string }` instead of `any`.
+
+## [0.9.2] - 2026-03-02
+
+### Fixed
+
+- **Multi-goal generation** — Generating several goals in parallel no longer breaks. `GoalsSection`'s card cache (`ensureGoalCard`) now returns the existing mounted card instead of remounting on every render, preventing subscription leaks and stale UI state during concurrent generation.
+- **Stop cleans up in-progress goals** — When Crucible stop is requested, goals that were actively generating (queued or active `crucibleGoal` requests) are detected and removed from state. Previously, partial or empty goal text remained in the list after a stop.
+- **Add Goal no longer triggers generation** — `crucibleAddGoalRequested` now only creates an empty goal slot for manual writing. It no longer dispatches a generation request; Add ≠ Generate.
+
+### Developer
+
+- **`parseLorebookKeys` extracted** — Moved out of `lorebookKeysHandler` into a standalone exported function in `handlers/lorebook.ts` for independent testability.
+- **Tests added** — New suites: `tests/core/store/slices/crucible.test.ts`, `tests/core/store/effects/handlers/crucible-chain.test.ts`, `tests/core/store/effects/handlers/lorebook.test.ts`, `tests/core/utils/tag-parser.test.ts`.
+
+## [0.9.1] - 2026-03-02
+
+### Fixed
+
+- **SEGA cancellation stuck state** — `cancelAllSegaTasks` now force-clears all tracked requests from the store immediately: dispatches `requestCancelled`, then `stateUpdated({ status: "idle", queueLength: 0 })`, then `requestCompleted` for every SEGA-tracked request. Previously, GenX's internal wait (e.g. `waiting_for_user` or `waiting_for_budget`) could block indefinitely, leaving generation buttons stuck in an active state after the user pressed stop.
+
+### Removed
+
+- **Dead code purge** — `src/core/subscribable.ts` (old pub/sub remnant), `src/core/utils/seeded-random.ts` (`seededShuffle` and `stableOrderWithNewAtEnd` had no callers), `src/ui/components/Crucible/MergedView.ts` (orphaned component). The stale shape-handler side effect that wrote the generated name directly to storyStorage and called `updateParts` on the shape input is gone — shape state is now driven entirely by `updateShape` + `useSelector`.
+
 ## [0.9.0] - 2026-03-02
 
 ### Added
