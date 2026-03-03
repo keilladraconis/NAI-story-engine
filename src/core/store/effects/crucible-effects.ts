@@ -88,21 +88,17 @@ export function registerCrucibleEffects(
     },
   );
 
-  // Intent: Add Single Goal → ensure goals phase, create goal
+  // Intent: Add Single Goal → ensure goals phase, create empty goal for manual writing
   subscribeEffect(
     matchesAction(crucibleAddGoalRequested),
-    async (_action, { getState: getLatest }) => {
+    (_action, { getState: getLatest }) => {
       const state = getLatest();
 
       if (state.crucible.phase === "direction") {
         dispatch(phaseTransitioned({ phase: "goals" }));
       }
 
-      const goalId = api.v1.uuid();
-      dispatch(goalAdded({ goal: { id: goalId, text: "", why: "", accepted: true } }));
-      const goalStrategy = buildCrucibleGoalStrategy(getState, goalId);
-      dispatch(requestQueued({ id: goalStrategy.requestId, type: "crucibleGoal", targetId: goalId }));
-      dispatch(generationSubmitted(goalStrategy));
+      dispatch(goalAdded({ goal: { id: api.v1.uuid(), text: "", why: "", accepted: true } }));
     },
   );
 
@@ -199,9 +195,13 @@ export function registerCrucibleEffects(
         "cruciblePrereqs", "crucibleElements", "crucibleExpansion",
       ]);
 
+      // Track which goal IDs are being cancelled so we can remove them from state
+      const cancelledGoalIds = new Set<string>();
+
       // Cancel all queued crucible requests first
       for (const req of state.runtime.queue) {
         if (crucibleTypes.has(req.type)) {
+          if (req.type === "crucibleGoal") cancelledGoalIds.add(req.targetId);
           dispatch(requestCancelled({ requestId: req.id }));
           genX.cancelQueued(req.id);
         }
@@ -210,8 +210,14 @@ export function registerCrucibleEffects(
       // Cancel the active request
       const activeRequest = state.runtime.activeRequest;
       if (activeRequest && crucibleTypes.has(activeRequest.type)) {
+        if (activeRequest.type === "crucibleGoal") cancelledGoalIds.add(activeRequest.targetId);
         dispatch(requestCancelled({ requestId: activeRequest.id }));
         genX.cancelAll();
+      }
+
+      // Remove goals that were mid-generation — they're empty or partial and unrecoverable
+      for (const goalId of cancelledGoalIds) {
+        dispatch(goalRemoved({ goalId }));
       }
     },
   );

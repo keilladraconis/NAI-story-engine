@@ -84,11 +84,8 @@ export const GoalsSection = defineComponent<undefined, RootState>({
       },
     });
 
-    // "Generate Goals" button — queues 3 goals (shape context read at JIT time if available)
-    const { part: generateGoalsBtn } = ctx.render(GenerationButton, {
-      id: "cr-generate-goals-btn",
-      label: "Generate Goals",
-      variant: "button",
+    const goalsBtnProps = {
+      variant: "button" as const,
       stateProjection: (s: RootState) => ({
         activeType: s.runtime.activeRequest?.type,
         queueTypes: s.runtime.queue.map((q) => q.type),
@@ -99,6 +96,21 @@ export const GoalsSection = defineComponent<undefined, RootState>({
         return s.runtime.queue.find((q) => q.type === "crucibleGoal")?.id;
       },
       onGenerate: () => dispatch(crucibleGoalsRequested()),
+      onCancel: () => dispatch(crucibleStopRequested()),
+    };
+
+    // "Generate Goals" button — shown in empty state
+    const { part: generateGoalsBtn } = ctx.render(GenerationButton, {
+      id: "cr-generate-goals-btn",
+      label: "Generate Goals",
+      ...goalsBtnProps,
+    });
+
+    // "Generate Goals" button — shown in populated state (generates 3 more goals)
+    const { part: moreGoalsBtn } = ctx.render(GenerationButton, {
+      id: "cr-more-goals-btn",
+      label: "Generate Goals",
+      ...goalsBtnProps,
     });
 
     // --- Per-goal card cache (stores unmount so cards can be properly rebuilt) ---
@@ -171,7 +183,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
               style: hasGoals ? this.style?.("hidden") : this.style?.("headerRow"),
               content: [generateGoalsBtn],
             }),
-            // Populated state: add goal, clear
+            // Populated state: add goal, generate more, clear
             row({
               id: "cr-goal-controls",
               style: hasGoals ? this.style?.("headerRow") : this.style?.("hidden"),
@@ -182,6 +194,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
                   style: this.style?.("btn"),
                   callback: () => dispatch(crucibleAddGoalRequested()),
                 }),
+                moreGoalsBtn,
                 clearGoalsPart,
               ],
             }),

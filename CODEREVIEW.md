@@ -228,7 +228,7 @@ This is a small extraction but has high call frequency — worth doing.
 
 ---
 
-### 4.4 `GoalsSection`: "Generate Goals" Hidden When Goals Exist
+### 4.4 `GoalsSection`: "Generate Goals" Hidden When Goals Exist ✓ DONE
 
 When goals are populated, `GoalsSection` hides the "Generate Goals" button and shows only "+ Goal" and the trash can. But the user might want to regenerate all goals (e.g., after updating Direction). The only way to get a fresh batch is to clear goals first, then generate.
 
@@ -236,7 +236,7 @@ When goals are populated, `GoalsSection` hides the "Generate Goals" button and s
 
 ---
 
-### 4.5 Expansion Per-Element Buttons Share One Request Slot
+### 4.5 Expansion Per-Element Buttons Share One Request Slot ✓ DONE
 
 As noted in 3.3: each element card in ReviewView renders its own `GenerationButton` with `onGenerate: () => dispatch(expansionTriggered({ elementId: el.id }))`, but the `requestIdFromProjection` for all of them returns the same ID (the active or queued `crucibleExpansion` request). This means all element Expand buttons simultaneously enter "generating" state when any one fires.
 
@@ -356,8 +356,8 @@ The `buildStoryEnginePrefix` and `buildCruciblePrefix` context builders construc
 | 4.1 | `escapeForMarkdown` duplication | Low | Small |
 | 4.2 | `updateVisibility` repeated pattern | Low | Small |
 | 4.3 | GenerationButton icon variant coupling | Low | Medium |
-| 4.4 | "Generate Goals" hidden when populated | Medium | Small |
-| 4.5 | Expansion buttons share one request slot | Medium | Small |
+| 4.4 | "Generate Goals" hidden when populated | Medium | Small | ✓ DONE |
+| 4.5 | Expansion buttons share one request slot | Medium | Small | ✓ DONE |
 | 5.1 | Verbose reducer spread (flag only) | None | — |
 | 5.2 | Ephemeral relational maps (flag only) | None | — |
 | 6.1 | Direction missing prefill | Low | Trivial |

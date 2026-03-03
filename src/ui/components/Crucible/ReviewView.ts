@@ -236,8 +236,13 @@ export const ReviewView = defineComponent<undefined, RootState>({
           }),
           requestIdFromProjection: () => {
             const s = ctx.getState();
-            if (s.runtime.activeRequest?.type === "crucibleExpansion") return s.runtime.activeRequest.id;
-            return s.runtime.queue.find((q) => q.type === "crucibleExpansion")?.id;
+            if (s.runtime.activeRequest?.type === "crucibleExpansion" &&
+                s.runtime.activeRequest.targetId === el.id) {
+              return s.runtime.activeRequest.id;
+            }
+            return s.runtime.queue.find(
+              (q) => q.type === "crucibleExpansion" && q.targetId === el.id,
+            )?.id;
           },
           onGenerate: () => dispatch(expansionTriggered({ elementId: el.id })),
         });
