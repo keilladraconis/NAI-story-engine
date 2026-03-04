@@ -4,36 +4,29 @@ import { GenX } from "nai-gen-x";
 import {
   crucibleShapeRequested,
   crucibleDirectionRequested,
-  crucibleGoalsRequested,
-  crucibleAddGoalRequested,
-  crucibleBuildRequested,
+  crucibleTensionsRequested,
+  crucibleBuildPassRequested,
   crucibleStopRequested,
   crucibleMergeRequested,
   crucibleReset,
-  goalRemoved,
-  requestCompleted,
+  tensionRemoved,
   requestCancelled,
-  expansionTriggered,
   generationSubmitted,
   requestQueued,
-  goalAdded,
   phaseTransitioned,
   mergeCompleted,
   dulfsItemAdded,
   updateShape,
   directionSet,
   persistedDataLoaded,
+  buildPassCompleted,
 } from "../index";
 import {
   buildCrucibleShapeStrategy,
   buildCrucibleDirectionStrategy,
-  buildCrucibleGoalStrategy,
+  buildCrucibleTensionStrategy,
 } from "../../utils/crucible-strategy";
-import {
-  buildPrereqsStrategy,
-  buildGoalElementsStrategy,
-  buildExpansionStrategy,
-} from "../../utils/crucible-chain-strategy";
+import { buildBuildPassStrategy } from "../../utils/crucible-build-strategy";
 import { extractDulfsItemName } from "../../utils/context-builder";
 import { ensureCategory } from "./lorebook-sync";
 import { IDS } from "../../../ui/framework/ids";
@@ -45,17 +38,14 @@ export function registerCrucibleEffects(
   getState: () => RootState,
   genX: GenX,
 ): void {
-  let elementsAttempted = false;
-  let buildCancelled = false;
-
   // --- Section collapse/expand helpers ---
   const SECTION_KEYS = {
     shape: "cr-shape-collapsed",
     direction: "cr-direction-collapsed",
-    goals: "cr-goals-collapsed",
+    tensions: "cr-tensions-collapsed",
   } as const;
 
-  const setCollapsed = async (section: "shape" | "direction" | "goals", collapsed: boolean) => {
+  const setCollapsed = async (section: "shape" | "direction" | "tensions", collapsed: boolean) => {
     await api.v1.storyStorage.set(SECTION_KEYS[section], collapsed);
   };
 
@@ -64,33 +54,31 @@ export function registerCrucibleEffects(
     const s = getState();
     const hasShape = !!s.crucible.shape;
     const hasDirection = !!s.crucible.direction;
-    const hasGoals = s.crucible.goals.length > 0;
+    const hasTensions = s.crucible.tensions.length > 0;
 
     if (!hasShape) {
       await setCollapsed("shape", false);
       await setCollapsed("direction", true);
-      await setCollapsed("goals", true);
+      await setCollapsed("tensions", true);
     } else if (!hasDirection) {
       await setCollapsed("shape", true);
       await setCollapsed("direction", false);
-      await setCollapsed("goals", true);
-    } else if (!hasGoals) {
+      await setCollapsed("tensions", true);
+    } else if (!hasTensions) {
       await setCollapsed("shape", true);
       await setCollapsed("direction", true);
-      await setCollapsed("goals", false);
+      await setCollapsed("tensions", false);
     } else {
       await setCollapsed("shape", true);
       await setCollapsed("direction", true);
-      await setCollapsed("goals", true);
+      await setCollapsed("tensions", true);
     }
   };
 
   // After persisted data loads, sync storage keys to match loaded state
-  // (components handle initial render via initialCollapsed; this ensures
-  // storageKey values are correct for subsequent effect-driven transitions)
   subscribeEffect(matchesAction(persistedDataLoaded), applySectionFocus);
 
-  // Shape completes → expand Direction (let user see shape output)
+  // Shape completes → expand Direction
   subscribeEffect(
     matchesAction(updateShape),
     () => {
@@ -98,11 +86,11 @@ export function registerCrucibleEffects(
     },
   );
 
-  // Direction completes → expand Goals (let user see direction output)
+  // Direction completes → expand Tensions
   subscribeEffect(
     matchesAction(directionSet),
     () => {
-      setCollapsed("goals", false);
+      setCollapsed("tensions", false);
     },
   );
 
@@ -129,132 +117,65 @@ export function registerCrucibleEffects(
     },
   );
 
-  // Intent: Crucible Goals Requested → sync intent, queue 3 goals (shape read at JIT time if available)
+  // Intent: Crucible Tensions Requested → flush editor, queue tension generation
   subscribeEffect(
-    matchesAction(crucibleGoalsRequested),
+    matchesAction(crucibleTensionsRequested),
     async () => {
-      // Flush any active EditableText editor (e.g. an unsaved direction edit)
-      // so its content reaches state before we build goal context.
       await flushActiveEditor();
 
-      // Collapse Shape & Direction — goals are the focus now
+      // Collapse Shape & Direction — tensions are the focus now
       setCollapsed("shape", true);
       setCollapsed("direction", true);
 
-      dispatch(phaseTransitioned({ phase: "goals" }));
+      dispatch(phaseTransitioned({ phase: "tensions" }));
 
-      for (let i = 0; i < 3; i++) {
-        const goalId = api.v1.uuid();
-        dispatch(goalAdded({ goal: { id: goalId, text: "", why: "", accepted: true } }));
-        const goalStrategy = buildCrucibleGoalStrategy(getState, goalId);
-        dispatch(requestQueued({ id: goalStrategy.requestId, type: "crucibleGoal", targetId: goalId }));
-        dispatch(generationSubmitted(goalStrategy));
-      }
-    },
-  );
-
-  // Intent: Add Single Goal → ensure goals phase, create empty goal for manual writing
-  subscribeEffect(
-    matchesAction(crucibleAddGoalRequested),
-    (_action, { getState: getLatest }) => {
-      const state = getLatest();
-
-      if (state.crucible.phase === "direction") {
-        dispatch(phaseTransitioned({ phase: "goals" }));
-      }
-
-      dispatch(goalAdded({ goal: { id: api.v1.uuid(), text: "", why: "", accepted: true } }));
-    },
-  );
-
-  // Intent: Crucible Build Requested → two-step chain pipeline (prereqs → elements)
-  subscribeEffect(
-    matchesAction(crucibleBuildRequested),
-    async (_action, { getState: getLatest }) => {
-      elementsAttempted = false;
-      buildCancelled = false;
-
-      // Collapse goals — building phase is the focus now
-      setCollapsed("goals", true);
-
-      dispatch(phaseTransitioned({ phase: "building" }));
-
-      const state = getLatest();
-      const starredGoals = state.crucible.goals.filter((g) => g.accepted);
-      if (starredGoals.length === 0) {
-        api.v1.log("[crucible] Build requested but no goals accepted");
-        return;
-      }
-
-      api.v1.ui.updateParts([{
-        id: IDS.CRUCIBLE.PROGRESS_ROOT,
-        text: "Finding the heart of your story...",
-      }]);
-
-      // Queue prerequisites directly — shape-native goals are the structural endpoints
-      const strategy = buildPrereqsStrategy(getState);
-      dispatch(requestQueued({ id: strategy.requestId, type: "cruciblePrereqs", targetId: "crucible" }));
+      const strategy = buildCrucibleTensionStrategy(getState);
+      dispatch(requestQueued({ id: strategy.requestId, type: "crucibleTension", targetId: "crucible" }));
       dispatch(generationSubmitted(strategy));
     },
   );
 
-  // Pipeline continuation: when a crucible request completes, advance to next step
+  // Intent: Build Pass Requested → read guidance, queue build pass strategy
   subscribeEffect(
-    matchesAction(requestCompleted),
+    matchesAction(crucibleBuildPassRequested),
     async () => {
-      await api.v1.timers.sleep(150);
+      await flushActiveEditor();
 
       const state = getState();
-
-      if (state.crucible.phase !== "building") return;
-      if (state.runtime.activeRequest || state.runtime.queue.length > 0) return;
-
-      // Cancelled: revert to goals so the user can retry
-      if (buildCancelled) {
-        buildCancelled = false;
-        dispatch(phaseTransitioned({ phase: "goals" }));
-        api.v1.ui.toast("Build cancelled — click Build World to retry", { type: "info" });
+      const acceptedTensions = state.crucible.tensions.filter((t) => t.accepted);
+      if (acceptedTensions.length === 0) {
+        api.v1.log("[crucible] Build pass requested but no tensions accepted");
         return;
       }
 
-      // Elements step not yet tried — queue per-goal element generation
-      if (!elementsAttempted) {
-        elementsAttempted = true;
-        const goals = state.crucible.goals.filter((g) => g.accepted);
-        api.v1.log(`[crucible] Prerequisites complete → queuing elements for ${goals.length} goals`);
+      // Determine pass number
+      const passNumber = state.crucible.passes.length + 1;
 
-        for (const goal of goals) {
-          const strategy = buildGoalElementsStrategy(getState, goal.id);
-          dispatch(requestQueued({ id: strategy.requestId, type: "crucibleElements", targetId: goal.id }));
-          dispatch(generationSubmitted(strategy));
-        }
-        return;
+      // Read guidance from storage input
+      const guidance = String((await api.v1.storyStorage.get("cr-build-guidance")) || "").trim();
+
+      // Transition to building phase on first pass only
+      if (passNumber === 1) {
+        // Collapse tensions section
+        setCollapsed("tensions", true);
+        dispatch(phaseTransitioned({ phase: "building" }));
       }
 
-      // Elements step has run (with or without results) → review
-      api.v1.log("[crucible] All steps complete → transitioning to review");
-      dispatch(phaseTransitioned({ phase: "review" }));
-      api.v1.ui.toast(
-        state.crucible.elements.length > 0
-          ? "World elements ready for review"
-          : "Build complete — no elements were generated",
-        { type: state.crucible.elements.length > 0 ? "success" : "info" },
-      );
+      // Clear guidance input after reading
+      await api.v1.storyStorage.set("cr-build-guidance", "");
+
+      const strategy = buildBuildPassStrategy(getState, passNumber, guidance);
+      dispatch(requestQueued({ id: strategy.requestId, type: "crucibleBuildPass", targetId: "crucible" }));
+      dispatch(generationSubmitted(strategy));
     },
   );
 
-  // Intent: Expansion Triggered → queue expansion strategy (no phase change)
+  // Build pass completed → update UI (NO auto-continuation — user-controlled)
   subscribeEffect(
-    matchesAction(expansionTriggered),
-    async (action) => {
-      const { elementId } = action.payload;
-      const strategy = buildExpansionStrategy(getState, elementId);
-      dispatch(requestQueued({
-        id: strategy.requestId,
-        type: "crucibleExpansion",
-        targetId: elementId ?? "crucible",
-      }));
-      dispatch(generationSubmitted(strategy));
+    matchesAction(buildPassCompleted),
+    (action) => {
+      const { passNumber, commandLog } = action.payload;
+      api.v1.log(`[crucible] Build pass ${passNumber} complete: ${commandLog.length} commands`);
     },
   );
 
@@ -264,17 +185,13 @@ export function registerCrucibleEffects(
     (_action, { getState: getLatest }) => {
       const state = getLatest();
       const crucibleTypes = new Set([
-        "crucibleShape", "crucibleDirection", "crucibleGoal",
-        "cruciblePrereqs", "crucibleElements", "crucibleExpansion",
+        "crucibleShape", "crucibleDirection",
+        "crucibleTension", "crucibleBuildPass",
       ]);
-
-      // Track which goal IDs are being cancelled so we can remove them from state
-      const cancelledGoalIds = new Set<string>();
 
       // Cancel all queued crucible requests first
       for (const req of state.runtime.queue) {
         if (crucibleTypes.has(req.type)) {
-          if (req.type === "crucibleGoal") cancelledGoalIds.add(req.targetId);
           dispatch(requestCancelled({ requestId: req.id }));
           genX.cancelQueued(req.id);
         }
@@ -283,14 +200,8 @@ export function registerCrucibleEffects(
       // Cancel the active request
       const activeRequest = state.runtime.activeRequest;
       if (activeRequest && crucibleTypes.has(activeRequest.type)) {
-        if (activeRequest.type === "crucibleGoal") cancelledGoalIds.add(activeRequest.targetId);
         dispatch(requestCancelled({ requestId: activeRequest.id }));
         genX.cancelAll();
-      }
-
-      // Remove goals that were mid-generation — they're empty or partial and unrecoverable
-      for (const goalId of cancelledGoalIds) {
-        dispatch(goalRemoved({ goalId }));
       }
     },
   );
@@ -315,17 +226,14 @@ export function registerCrucibleEffects(
     },
   );
 
-  // Intent: Goal Removed → clean up goal storyStorage keys
+  // Intent: Tension Removed → clean up tension storyStorage keys
   subscribeEffect(
-    matchesAction(goalRemoved),
+    matchesAction(tensionRemoved),
     async (action) => {
-      const { goalId } = action.payload;
+      const { tensionId } = action.payload;
       const allKeys = await api.v1.storyStorage.list();
       for (const key of allKeys) {
-        if (
-          key === `cr-goal-${goalId}` ||
-          key === `cr-goal-section-${goalId}`
-        ) {
+        if (key === `cr-tension-${tensionId}`) {
           await api.v1.storyStorage.remove(key);
         }
       }
@@ -373,30 +281,6 @@ export function registerCrucibleEffects(
       const msg = parts.join(", ") || "no changes";
       api.v1.log(`[crucible] Merged to World Entries: ${msg}`);
       api.v1.ui.toast(`Merged to World Entries: ${msg}`, { type: "success" });
-    },
-  );
-
-  // Track cancellations during building phase so requestCompleted can revert to goals
-  subscribeEffect(
-    matchesAction(requestCancelled),
-    (action) => {
-      const state = getState();
-      if (state.crucible.phase !== "building") return;
-
-      const { requestId } = action.payload;
-      const crucibleTypes = new Set([
-        "crucibleGoal", "cruciblePrereqs",
-        "crucibleElements", "crucibleExpansion",
-      ]);
-      const matchesActive = state.runtime.activeRequest?.id === requestId &&
-        crucibleTypes.has(state.runtime.activeRequest?.type || "");
-      const matchesQueued = state.runtime.queue.some(
-        (r) => r.id === requestId && crucibleTypes.has(r.type),
-      );
-      if (matchesActive || matchesQueued) {
-        buildCancelled = true;
-        api.v1.log("[crucible] Pipeline cancellation detected — will revert to goals phase");
-      }
     },
   );
 }

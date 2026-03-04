@@ -1,13 +1,12 @@
 import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import {
-  goalRemoved,
-  goalAcceptanceToggled,
-  goalTextUpdated,
+  tensionRemoved,
+  tensionAcceptanceToggled,
+  tensionTextUpdated,
 } from "../../../core/store/slices/crucible";
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
-import { formatTagsWithEmoji } from "../../../core/utils/tag-parser";
 import { escapeForMarkdown } from "../../utils";
 import { NAI_WARNING } from "../../colors";
 
@@ -15,14 +14,9 @@ const { column } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
-export interface GoalCardProps {
-  goalId: string;
+export interface TensionCardProps {
+  tensionId: string;
 }
-
-const GOAL_BTN_STYLE = {
-  padding: "2px 6px",
-  "font-size": "0.8em",
-};
 
 const ACCEPT_BTN_BASE = { padding: "2px 6px", "font-size": "0.8em" };
 const COLOR_ACCEPTED = "rgb(100, 220, 120)";
@@ -33,11 +27,11 @@ function acceptBtnStyle(accepted: boolean) {
 }
 
 function delBtnStyle(accepted: boolean) {
-  return { ...GOAL_BTN_STYLE, display: accepted ? "none" : "" };
+  return { padding: "2px 6px", "font-size": "0.8em", display: accepted ? "none" : "" };
 }
 
-export const GoalCard = defineComponent<GoalCardProps, RootState>({
-  id: (props) => CR.goal(props.goalId).ROOT,
+export const TensionCard = defineComponent<TensionCardProps, RootState>({
+  id: (props) => CR.tension(props.tensionId).ROOT,
 
   styles: {
     card: {
@@ -51,18 +45,18 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
 
   build(props, ctx) {
     const { dispatch, useSelector } = ctx;
-    const { goalId } = props;
-    const ids = CR.goal(goalId);
+    const { tensionId } = props;
+    const ids = CR.tension(tensionId);
 
     const acceptBtnId = `${ids.ROOT}-accept`;
-    const goal = ctx.getState().crucible.goals.find((g) => g.id === goalId);
-    const initialAccepted = goal?.accepted ?? true;
+    const tension = ctx.getState().crucible.tensions.find((t) => t.id === tensionId);
+    const initialAccepted = tension?.accepted ?? true;
 
-    // Reactively update view text when this goal's text changes.
+    // Reactively update view text when this tension's text changes.
     useSelector(
-      (s) => s.crucible.goals.find((g) => g.id === goalId)?.text,
+      (s) => s.crucible.tensions.find((t) => t.id === tensionId)?.text,
       (text) => {
-        const display = escapeForMarkdown(formatTagsWithEmoji(text ?? "_Generating..._"));
+        const display = escapeForMarkdown(text ?? "_Generating..._");
         api.v1.ui.updateParts([{ id: `${ids.TEXT}-view`, text: display }]);
       },
     );
@@ -71,11 +65,11 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
       id: acceptBtnId,
       iconId: initialAccepted ? "check" : "x",
       style: acceptBtnStyle(initialAccepted),
-      callback: () => dispatch(goalAcceptanceToggled({ goalId })),
+      callback: () => dispatch(tensionAcceptanceToggled({ tensionId })),
     });
 
     useSelector(
-      (s) => s.crucible.goals.find((g) => g.id === goalId)?.accepted,
+      (s) => s.crucible.tensions.find((t) => t.id === tensionId)?.accepted,
       (accepted) => {
         const a = accepted ?? true;
         api.v1.ui.updateParts([
@@ -89,19 +83,24 @@ export const GoalCard = defineComponent<GoalCardProps, RootState>({
       id: ids.DEL_BTN,
       iconId: "trash-2",
       style: delBtnStyle(initialAccepted),
-      callback: () => dispatch(goalRemoved({ goalId })),
+      callback: () => dispatch(tensionRemoved({ tensionId })),
     });
+
+    const initialText = tension?.text ?? "";
+    const initialDisplay = initialText
+      ? escapeForMarkdown(initialText)
+      : "_Generating..._";
 
     const { part: editable } = ctx.render(EditableText, {
       id: ids.TEXT,
+      initialDisplay,
       getContent: () => {
-        const g = ctx.getState().crucible.goals.find((g) => g.id === goalId);
-        return g?.text ?? "";
+        const t = ctx.getState().crucible.tensions.find((t) => t.id === tensionId);
+        return t?.text ?? "";
       },
-      placeholder: "[GOAL] ...",
-      formatDisplay: formatTagsWithEmoji,
+      placeholder: "A narrative tension...",
       onSave: (content: string) =>
-        dispatch(goalTextUpdated({ goalId, text: content })),
+        dispatch(tensionTextUpdated({ tensionId, text: content })),
       extraControls: [acceptBtn, delBtn],
     });
 

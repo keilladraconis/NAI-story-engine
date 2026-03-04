@@ -5,9 +5,8 @@ import { updateVisibility } from "../../utils";
 import { CrucibleHeader } from "./CrucibleHeader";
 import { ShapeSection } from "./ShapeSection";
 import { IntentSection } from "./IntentSection";
-import { GoalsSection } from "./GoalsSection";
-import { ProgressDisplay } from "./ProgressDisplay";
-import { ReviewView } from "./ReviewView";
+import { TensionsSection } from "./TensionsSection";
+import { BuildPassView } from "./BuildPassView";
 
 const { column } = api.v1.ui.part;
 
@@ -28,24 +27,20 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
     const { part: headerPart } = ctx.render(CrucibleHeader, undefined);
     const { part: shapePart } = ctx.render(ShapeSection, undefined);
     const { part: intentPart } = ctx.render(IntentSection, undefined);
-    const { part: goalsPart } = ctx.render(GoalsSection, undefined);
-    const { part: progressPart } = ctx.render(ProgressDisplay, undefined);
-    const { part: reviewPart } = ctx.render(ReviewView, undefined);
+    const { part: tensionsPart } = ctx.render(TensionsSection, undefined);
+    const { part: buildPart } = ctx.render(BuildPassView, undefined);
 
     // React to phase changes — show/hide pipeline sections
     useSelector(
       (s) => s.crucible.phase,
       (phase) => {
-        const showProgress = phase === "building";
-        const showReview = phase === "review";
-
-        updateVisibility([["cr-progress-wrap", showProgress], ["cr-review-wrap", showReview]]);
+        const showBuild = phase === "building";
+        updateVisibility([["cr-build-wrap", showBuild]]);
       },
     );
 
     const phase = state.crucible.phase;
-    const showProgress = phase === "building";
-    const showReview = phase === "review";
+    const showBuild = phase === "building";
 
     return column({
       id: CR.WINDOW_ROOT,
@@ -58,9 +53,8 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
           content: [
             column({ id: "cr-shape-wrap", style: {}, content: [shapePart] }),
             column({ id: "cr-intent-wrap", style: {}, content: [intentPart] }),
-            column({ id: "cr-goals-wrap", style: {}, content: [goalsPart] }),
-            column({ id: "cr-progress-wrap", style: showProgress ? {} : this.style?.("hidden"), content: [progressPart] }),
-            column({ id: "cr-review-wrap", style: showReview ? {} : this.style?.("hidden"), content: [reviewPart] }),
+            column({ id: "cr-tensions-wrap", style: {}, content: [tensionsPart] }),
+            column({ id: "cr-build-wrap", style: showBuild ? {} : this.style?.("hidden"), content: [buildPart] }),
           ],
         }),
       ],

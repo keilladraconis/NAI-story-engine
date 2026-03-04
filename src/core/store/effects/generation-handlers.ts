@@ -12,13 +12,9 @@ import {
 import {
   crucibleDirectionHandler,
   crucibleShapeHandler,
-  crucibleGoalHandler,
+  crucibleTensionHandler,
 } from "./handlers/crucible";
-import {
-  prerequisitesHandler,
-  elementsHandler,
-  expansionHandler,
-} from "./handlers/crucible-chain";
+import { crucibleBuildPassHandler } from "./handlers/crucible-build";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -68,21 +64,13 @@ export type CrucibleShapeTarget = Extract<
   GenerationStrategy["target"],
   { type: "crucibleShape" }
 >;
-export type CrucibleGoalTarget = Extract<
+export type CrucibleTensionTarget = Extract<
   GenerationStrategy["target"],
-  { type: "crucibleGoal" }
+  { type: "crucibleTension" }
 >;
-export type CruciblePrereqsTarget = Extract<
+export type CrucibleBuildPassTarget = Extract<
   GenerationStrategy["target"],
-  { type: "cruciblePrereqs" }
->;
-export type CrucibleElementsTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "crucibleElements" }
->;
-export type CrucibleExpansionTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "crucibleExpansion" }
+  { type: "crucibleBuildPass" }
 >;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
@@ -127,10 +115,8 @@ export const GENERATION_HANDLERS: {
   lorebookRefine: GenerationHandlers<LorebookRefineTarget>;
   crucibleDirection: GenerationHandlers<CrucibleDirectionTarget>;
   crucibleShape: GenerationHandlers<CrucibleShapeTarget>;
-  crucibleGoal: GenerationHandlers<CrucibleGoalTarget>;
-  cruciblePrereqs: GenerationHandlers<CruciblePrereqsTarget>;
-  crucibleElements: GenerationHandlers<CrucibleElementsTarget>;
-  crucibleExpansion: GenerationHandlers<CrucibleExpansionTarget>;
+  crucibleTension: GenerationHandlers<CrucibleTensionTarget>;
+  crucibleBuildPass: GenerationHandlers<CrucibleBuildPassTarget>;
 } = {
   brainstorm: brainstormHandler,
   brainstormChatTitle: brainstormChatTitleHandler,
@@ -143,10 +129,8 @@ export const GENERATION_HANDLERS: {
   lorebookRefine: lorebookRefineHandler,
   crucibleDirection: crucibleDirectionHandler,
   crucibleShape: crucibleShapeHandler,
-  crucibleGoal: crucibleGoalHandler,
-  cruciblePrereqs: prerequisitesHandler,
-  crucibleElements: elementsHandler,
-  crucibleExpansion: expansionHandler,
+  crucibleTension: crucibleTensionHandler,
+  crucibleBuildPass: crucibleBuildPassHandler,
 };
 
 export function getHandler(

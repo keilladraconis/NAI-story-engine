@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772637894
+updatedAt: 1772647309
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -489,7 +489,7 @@ config:
     type: string
     multiline: true
     default: |-
-      You are a story structure architect working within the Crucible system — a backward-reasoning world generator. Given dramatic endpoints, you derive what must exist in the world for those endpoints to land with full force. Every element must be load-bearing — if it could be removed without weakening the story, it shouldn't exist.
+      You are a story structure architect working within the Crucible system — a procedural world generator. Given narrative tensions and creative direction, you build richly inhabited worlds for interactive storytelling. Every element must be load-bearing — if it could be removed without weakening the story, it shouldn't exist. You communicate through structured commands that the harness parses and executes.
   - name: crucible_intent_prompt
     prettyName: Crucible Intent Prompt
     description: >-
@@ -564,170 +564,86 @@ config:
       Match the shape to the material. Invent a new shape only when none of the examples fit.
 
       Respond with a shape name on the first line, then a blank line, then 2-4 sentences describing what structural moments this shape leans toward.
-  - name: crucible_goals_prompt
-    prettyName: Crucible Goals Prompt
+  - name: crucible_tensions_prompt
+    prettyName: Crucible Tensions Prompt
     description: >-
-      Prompt for generating a single shape-native goal. The shape name and
-      instruction are injected automatically before this prompt — write as if
-      the shape context is already present above.
+      Prompt for generating 3-5 narrative tensions. Tensions are forward-looking
+      vectors active at story start — not endpoints.
     type: string
     multiline: true
     default: |-
-      Generate ONE goal — a vivid structural endpoint the story arrives at.
+      Generate 3-5 NARRATIVE TENSIONS — forces, relationships, or
+      contradictions that are active at the story's beginning and create
+      pressure for world-building.
 
-      Generate an endpoint native to the story's shape — the most total, most resonant version of that structural logic.
+      A tension is NOT an endpoint or a goal. It is a condition that
+      exists and generates narrative energy. It describes what pulls in
+      opposing directions, what cannot coexist peacefully, what is
+      unstable and demanding resolution.
 
-      A goal may involve characters, forces, or complications not yet named
-      in the direction — if they are organic extensions of the scenario and
-      create interesting world-building constraints downstream.
+      GOOD TENSIONS:
+      - "An apprentice's blind loyalty to a mentor whose methods have grown increasingly ruthless"
+      - "A city's prosperity built on a resource that is slowly poisoning its poorest district"
+      - "Two childhood friends now leading opposing factions, each convinced the other betrayed first"
 
-      BAD ENDPOINTS:
-      BAD: "Everything changes" — no dramatic moment, nothing to anchor on
-      BAD: "The hero wins" — outcome without cost
-      BAD: Any endpoint that could be described as partial, modest, or preliminary
+      BAD TENSIONS:
+      - "The hero discovers the truth" — that's an endpoint, not a tension
+      - "There is conflict" — too vague, no specific opposing forces
+      - "Everything is fine" — no tension at all
 
-      Output format:
-      [GOAL] The endpoint — 1-2 sentences, concrete and vivid
-      [WHY] Why this framing constrains world-building better than a plot description
-  - name: crucible_prerequisites_prompt
-    prettyName: Crucible Prerequisites Prompt
-    description: Prompt for deriving load-bearing prerequisites from structural goals
+      Each tension should imply characters, places, or systems that must
+      exist in the world without naming them explicitly.
+
+      Output format — one tension per section, separated by +++:
+      [TENSION] The tension — 1-2 sentences describing the opposing forces
+      +++
+      [TENSION] Another tension
+  - name: crucible_build_pass_prompt
+    prettyName: Crucible Build Pass Prompt
+    description: >-
+      Prompt for the build loop. GLM reads direction, tensions, and current
+      world state, then emits structured commands to create, revise, link, or
+      delete world elements.
     type: string
     multiline: true
     default: |-
-      Derive 8-15 LOAD-BEARING PREREQUISITES — things that must exist
-      at story start for the structural goals to land with full force.
+      You are building a world for interactive storytelling. Use the
+      DIRECTION, TENSIONS, and current WORLD STATE above as context.
 
-      NECESSITY TEST: For each prerequisite, ask: "If this were absent,
-      would the goal still land with full emotional/dramatic weight?"
-      Prioritize what is structurally necessary, but also include the
-      conditions that make the world feel inhabited and real — the social
-      textures, existing relationships, and background pressures that give
-      the structurally necessary elements their weight.
+      Emit structured commands to populate and refine the world.
+      Available commands:
 
-      Categories: RELATIONSHIP, SECRET, POWER, HISTORY, OBJECT, BELIEF, PLACE
+      [CREATE TYPE "Name"]
+      Description of the element — 2-3 sentences, zero generics.
+      Every trait must change what the element does in a scene.
 
-      Each prerequisite describes WHAT MUST BE TRUE, not who or where.
-      The world elements step will make these concrete.
+      [REVISE "Name"]
+      Updated description replacing the previous one.
 
-      Output format — one section per prerequisite, separated by +++:
-      [PREREQ] What must be true — one clear statement
-      [LOADBEARING] Why it's necessary — what breaks if it's absent
-      [CATEGORY] One of: RELATIONSHIP, SECRET, POWER, HISTORY, OBJECT, BELIEF, PLACE
-      +++
-      [PREREQ] Another thing that must be true
-      [LOADBEARING] Why
-      [CATEGORY] Type
-  - name: crucible_elements_prompt
-    prettyName: Crucible Elements Prompt
-    description: Prompt for deriving minimal necessary world elements from prerequisites
-    type: string
-    multiline: true
-    default: |-
-      Derive sufficient ESSENTIAL WORLD ELEMENTS from the prerequisites.
-      Each element must satisfy at least one prerequisite. Include primary
-      characters, secondary characters, rivals, complicating figures, and
-      background forces that make the world feel inhabited — not just the
-      direct satisfiers of prerequisites.
+      [LINK "Name" → "Name"]
+      What connects them — structural relationship, not mere proximity.
 
-      ZERO GENERIC DESCRIPTORS: Every trait must change what the element
-      does in a scene. "Brave warrior" is generic. "Former occupation
-      soldier who can't stop protecting people even when they don't want
-      protection" changes scenes.
+      [DELETE "Name"]
+      (Use sparingly — only for elements that weaken the world.)
 
-      For characters: include [WANT] (conscious desire) and [NEED]
-      (unconscious need) that are in TENSION with each other.
+      [CRITIQUE]
+      Self-assessment: what's missing, what's weak, what's disconnected.
 
-      Every element must have at least one [RELATIONSHIP] — a structurally
-      necessary connection to another element in this world.
+      [DONE]
+      Signal that this pass is complete.
 
-      Element types: CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC
+      RULES:
+      - Each element name must be UNIQUE. CREATE with an existing name
+        will be rejected. Use REVISE to update existing elements.
+      - Element types: CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC
+      - Every CHARACTER should have relationships to other elements.
+      - Aim for a diverse mix of element types — not all characters.
+      - ZERO GENERIC DESCRIPTORS. "Brave warrior" is generic. "Former
+        soldier who can't stop protecting people even when they don't
+        want protection" changes scenes.
+      - End every pass with [CRITIQUE] and [DONE].
 
-      Output format — one section per element, separated by +++:
-      +++
-      [CHARACTER] Name
-      [DESCRIPTION] Role and narrative function — 2-3 sentences, zero generics
-      [WANT] What they consciously pursue
-      [NEED] What they actually need but don't see
-      [RELATIONSHIP] Key structural connection to another element
-      [SATISFIES] Comma-separated list of prerequisite categories satisfied
-      +++
-      [LOCATION] Name
-      [DESCRIPTION] What this place enables or prevents narratively
-      [RELATIONSHIP] How it connects to characters or factions
-      [SATISFIES] PLACE, POWER
-  - name: crucible_goal_elements_prompt
-    prettyName: Crucible Per-Goal Elements Prompt
-    description: Prompt for deriving world elements focused on a single structural goal
-    type: string
-    multiline: true
-    default: |-
-      Derive 5-8 ESSENTIAL WORLD ELEMENTS that serve the TARGET GOAL below.
-      You have access to the shared prerequisite foundation. Use prerequisites
-      to guide what kinds of elements are needed, but the goal is your focus.
-
-      AVOID DUPLICATION: If an existing element with the same name OR the same
-      narrative role already appears in EXISTING WORLD ELEMENTS, do NOT recreate
-      it. An existing character can serve multiple goals — you do not need to
-      invent a new one. Only create elements that are UNIQUELY REQUIRED by this
-      goal and not yet present.
-
-      ZERO GENERIC DESCRIPTORS: Every trait must change what the element
-      does in a scene. "Brave warrior" is generic. "Former occupation
-      soldier who can't stop protecting people even when they don't want
-      protection" changes scenes.
-
-      For characters: include [WANT] (conscious desire) and [NEED]
-      (unconscious need) that are in TENSION with each other.
-
-      Every element must have at least one [RELATIONSHIP] — a structurally
-      necessary connection to another element in this world.
-
-      Include primary characters, secondary characters, rivals, complicating
-      figures, locations, factions, systems, situations, and topics that make
-      the world feel inhabited — not just the direct satisfiers of prerequisites.
-
-      Element types: CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC
-
-      Output format — one section per element, separated by +++:
-      +++
-      [CHARACTER] Name
-      [DESCRIPTION] Role and narrative function — 2-3 sentences, zero generics
-      [WANT] What they consciously pursue
-      [NEED] What they actually need but don't see
-      [RELATIONSHIP] Key structural connection to another element
-      [SATISFIES] Comma-separated list of prerequisite categories satisfied
-      +++
-      [LOCATION] Name
-      [DESCRIPTION] What this place enables or prevents narratively
-      [RELATIONSHIP] How it connects to characters or factions
-      [SATISFIES] PLACE, POWER
-  - name: crucible_expansion_prompt
-    prettyName: Crucible Expansion Prompt
-    description: Prompt for expanding a specific world element with new
-      prerequisites and elements
-    type: string
-    multiline: true
-    default: |-
-      You are expanding a specific world element. Derive 2-3 NEW
-      prerequisites that this element specifically requires — things
-      that must exist for this element to function in the story but
-      are NOT YET present in the existing world.
-
-      Then derive 1-3 NEW world elements to satisfy those prerequisites.
-      Do NOT recreate existing elements — only add what's missing.
-
-      Output format — prerequisites first, then elements:
-      [PREREQ] What the seed element requires
-      [LOADBEARING] Why it's necessary for this element specifically
-      [CATEGORY] Type
-      +++
-      [CHARACTER] Name
-      [DESCRIPTION] Role
-      [WANT] Desire
-      [NEED] Unconscious need
-      [RELATIONSHIP] Connection
-      [SATISFIES] Categories
+      Output commands directly — no preamble, no explanation.
   - name: story_engine_debug
     prettyName: Story Engine Debug
     description: Enable debug logging for Story Engine

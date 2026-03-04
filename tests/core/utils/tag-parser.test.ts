@@ -114,9 +114,9 @@ describe("splitSections", () => {
 
 describe("formatTagsWithEmoji", () => {
   it("replaces known tags with emoji", () => {
-    expect(formatTagsWithEmoji("[GOAL] something")).toBe("🎯 something");
-    expect(formatTagsWithEmoji("[WHY] reason")).toBe("💭 reason");
-    expect(formatTagsWithEmoji("[PREREQ] dep")).toBe("🔗 dep");
+    expect(formatTagsWithEmoji("[TENSION] something")).toBe("🔥 something");
+    expect(formatTagsWithEmoji("[CREATE] element")).toBe("✨ element");
+    expect(formatTagsWithEmoji("[LINK] dep")).toBe("🔗 dep");
   });
 
   it("replaces unknown tags with bold text", () => {
@@ -124,10 +124,10 @@ describe("formatTagsWithEmoji", () => {
   });
 
   it("replaces multiple tags in the same string", () => {
-    const text = "[GOAL] end state\n[WHY] motivation";
+    const text = "[TENSION] end state\n[CREATE] element";
     const result = formatTagsWithEmoji(text);
-    expect(result).toContain("🎯");
-    expect(result).toContain("💭");
+    expect(result).toContain("🔥");
+    expect(result).toContain("✨");
   });
 
   it("leaves untagged text unchanged", () => {
@@ -141,11 +141,11 @@ describe("formatTagsWithEmoji", () => {
 
 describe("restoreTagsFromEmoji", () => {
   it("restores emoji back to tag format", () => {
-    expect(restoreTagsFromEmoji("🎯 something")).toBe("[GOAL] something");
+    expect(restoreTagsFromEmoji("🔥 something")).toBe("[TENSION] something");
   });
 
   it("is the inverse of formatTagsWithEmoji for known tags", () => {
-    const original = "[GOAL] end\n[WHY] because";
+    const original = "[TENSION] end\n[CREATE] element";
     const roundTripped = restoreTagsFromEmoji(formatTagsWithEmoji(original));
     expect(roundTripped).toBe(original);
   });

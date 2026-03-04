@@ -45,10 +45,8 @@ function targetToQueueEntry(
     case "bootstrap":           return { type: "bootstrap",           targetId: "" };
     case "crucibleDirection":   return { type: "crucibleDirection",   targetId: "" };
     case "crucibleShape":       return { type: "crucibleShape",       targetId: "" };
-    case "crucibleGoal":        return { type: "crucibleGoal",        targetId: target.goalId };
-    case "cruciblePrereqs":     return { type: "cruciblePrereqs",     targetId: "" };
-    case "crucibleElements":    return { type: "crucibleElements",    targetId: "" };
-    case "crucibleExpansion":   return { type: "crucibleExpansion",   targetId: target.elementId ?? "" };
+    case "crucibleTension":     return { type: "crucibleTension",     targetId: "" };
+    case "crucibleBuildPass":   return { type: "crucibleBuildPass",   targetId: String(target.passNumber) };
   }
   // Unreachable — satisfies noImplicitReturns for exhaustive switch
   throw new Error(`Unhandled target type: ${(target as any).type}`);
@@ -92,10 +90,8 @@ function resolvePrefill(
   if (
     target.type === "crucibleDirection" ||
     target.type === "crucibleShape" ||
-    target.type === "crucibleGoal" ||
-    target.type === "cruciblePrereqs" ||
-    target.type === "crucibleElements" ||
-    target.type === "crucibleExpansion"
+    target.type === "crucibleTension" ||
+    target.type === "crucibleBuildPass"
   ) {
     if (assistantPrefill) return assistantPrefill;
   }
@@ -180,14 +176,10 @@ function cacheLabel(target: GenerationStrategy["target"]) {
       return "crucible-direction";
     case "crucibleShape":
       return "crucible-shape";
-    case "crucibleGoal":
-      return `crucible-goal:${target.goalId.slice(0, 8)}`;
-    case "cruciblePrereqs":
-      return "crucible-prereqs";
-    case "crucibleElements":
-      return "crucible-elements";
-    case "crucibleExpansion":
-      return `crucible-expand:${(target.elementId ?? "free").slice(0, 8)}`;
+    case "crucibleTension":
+      return "crucible-tension";
+    case "crucibleBuildPass":
+      return `crucible-build:${target.passNumber}`;
     case "brainstormChatTitle":
       return `brainstorm-title:${target.chatIndex}`;
   }

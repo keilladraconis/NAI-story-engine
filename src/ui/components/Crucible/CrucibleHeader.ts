@@ -16,14 +16,13 @@ const CR = IDS.CRUCIBLE;
 
 const PHASE_STATUS: Record<CruciblePhase, string> = {
   direction: "",
-  goals: "Generate goals then click Build World",
-  building: "Building world...",
-  review: "Review — or create more goals and rebuild",
+  tensions: "Generate tensions then click Build World",
+  building: "Building world — run passes, then Merge",
 };
 
 const CRUCIBLE_GEN_TYPES = new Set([
-  "crucibleShape", "crucibleDirection", "crucibleGoal",
-  "cruciblePrereqs", "crucibleElements", "crucibleExpansion",
+  "crucibleShape", "crucibleDirection",
+  "crucibleTension", "crucibleBuildPass",
 ]);
 
 export const CrucibleHeader = defineComponent<undefined, RootState>({

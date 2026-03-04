@@ -33,8 +33,8 @@ export const IntentSection = defineComponent<undefined, RootState>({
         return queued?.id;
       },
       isDisabledFromProjection: (proj: { activeType: string | undefined }) =>
-        proj.activeType === "crucibleGoal" ||
-        proj.activeType === "cruciblePrereqs" || proj.activeType === "crucibleElements",
+        proj.activeType === "crucibleTension" ||
+        proj.activeType === "crucibleBuildPass",
     });
 
     const { part: directionEditablePart } = ctx.render(EditableText, {
@@ -63,7 +63,7 @@ export const IntentSection = defineComponent<undefined, RootState>({
         phase: s.crucible.phase,
       }),
       (slice) => {
-        updateVisibility([[`${CR.DIRECTION_BTN}`, slice.phase === "direction" || slice.phase === "goals"]]);
+        updateVisibility([[`${CR.DIRECTION_BTN}`, slice.phase === "direction" || slice.phase === "tensions"]]);
       },
     );
 

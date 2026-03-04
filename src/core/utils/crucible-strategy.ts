@@ -1,8 +1,8 @@
 /**
- * Crucible Strategy — Factory functions for direction derivation, shape generation, and goals extraction.
+ * Crucible Strategy — Factory functions for shape generation, direction derivation,
+ * and tension extraction.
  *
- * The three-step chain strategies (prerequisites, elements, expansion)
- * are in crucible-chain-strategy.ts.
+ * The build loop strategy is in crucible-build-strategy.ts.
  */
 
 import {
@@ -105,19 +105,19 @@ export const createCrucibleDirectionFactory = (
 };
 
 /**
- * Creates a message factory for a single shape-native goal generation.
- * Reads shape.instruction directly from state and injects it as context before the config prompt.
+ * Creates a message factory for tension generation.
+ * Generates 3-5 narrative tensions in a single call.
  */
-export const createCrucibleGoalFactory = (
+export const createCrucibleTensionFactory = (
   getState: () => RootState,
-  goalId: string,
 ): MessageFactory => {
   return async () => {
+    const tensionPrompt = String(
+      (await api.v1.config.get("crucible_tensions_prompt")) || "",
+    );
+
     const state = getState();
     const shape = state.crucible.shape;
-    const goalsPrompt = String(
-      (await api.v1.config.get("crucible_goals_prompt")) || "",
-    );
 
     const prefix = await buildCruciblePrefix(getState, {
       includeDirection: true,
@@ -125,37 +125,35 @@ export const createCrucibleGoalFactory = (
 
     const messages: Message[] = [...prefix];
 
-    // Consolidate task context into a single user turn to avoid stacked system messages
-    // confusing GLM's chat template and producing <|system|> delimiters in output.
+    // Consolidate task context into a single user turn
     const userParts: string[] = [];
 
     if (shape) {
       userParts.push(`SHAPE: ${shape.name}\n${shape.instruction}`);
     }
 
-    const existingGoals = state.crucible.goals.filter(
-      (g) => g.id !== goalId && g.text.trim(),
-    );
-  if (existingGoals.length > 0) {
-      const existingText = existingGoals.map((g) => g.text.trim()).join("\n+++\n");
-      userParts.push(`EXISTING GOALS (do NOT repeat these — approach the core tension from a DIFFERENT angle):\n${existingText}`);
+    // Show existing tensions for dedup
+    const existingTensions = state.crucible.tensions.filter((t) => t.text.trim());
+    if (existingTensions.length > 0) {
+      const existingText = existingTensions.map((t) => `- ${t.text.trim()}`).join("\n");
+      userParts.push(`EXISTING TENSIONS (do NOT repeat these):\n${existingText}`);
     }
 
-    userParts.push(goalsPrompt);
+    userParts.push(tensionPrompt);
 
     messages.push(
       { role: "user", content: userParts.join("\n\n") },
-      { role: "assistant", content: "[GOAL] " },
+      { role: "assistant", content: "[TENSION] " },
     );
 
     return {
       messages,
       params: {
         model: "glm-4-6",
-        max_tokens: 300,
+        max_tokens: 1024,
         temperature: 1.0,
         min_p: 0.05,
-        stop: ["</think>", "\n#", "\n---", "<|system|>"],
+        stop: ["</think>", "\n#", "<|system|>"],
       },
     };
   };
@@ -189,15 +187,15 @@ export const buildCrucibleDirectionStrategy = (
   };
 };
 
-export const buildCrucibleGoalStrategy = (
+export const buildCrucibleTensionStrategy = (
   getState: () => RootState,
-  goalId: string,
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createCrucibleGoalFactory(getState, goalId),
-    target: { type: "crucibleGoal", goalId },
+    messageFactory: createCrucibleTensionFactory(getState),
+    target: { type: "crucibleTension" },
     prefillBehavior: "keep",
-    assistantPrefill: "[GOAL] ",
+    assistantPrefill: "[TENSION] ",
+    continuation: { maxCalls: 2 },
   };
 };

@@ -4,15 +4,13 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import {
-  goalTextUpdated,
+  tensionsDerived,
   directionSet,
   updateShape,
 } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
-import {
-  parseTag,
-  formatTagsWithEmoji,
-} from "../../../utils/tag-parser";
+import { CrucibleTension } from "../../types";
+import { splitSections } from "../../../utils/tag-parser";
 
 /** Strip thinking-tag breakout artifacts from generated text. */
 function stripThinkingTags(text: string): string {
@@ -23,7 +21,7 @@ function stripThinkingTags(text: string): string {
 
 type CrucibleDirectionTarget = { type: "crucibleDirection" };
 type CrucibleShapeTarget = { type: "crucibleShape"; prefillName?: string };
-type CrucibleGoalTarget = { type: "crucibleGoal"; goalId: string };
+type CrucibleTensionTarget = { type: "crucibleTension" };
 
 // --- Direction Handler ---
 
@@ -98,32 +96,56 @@ export const crucibleShapeHandler: GenerationHandlers<CrucibleShapeTarget> = {
   },
 };
 
-// --- Per-Goal Handler ---
+// --- Tension Handler ---
 
-export const crucibleGoalHandler: GenerationHandlers<CrucibleGoalTarget> = {
-  streaming(ctx: StreamingContext<CrucibleGoalTarget>): void {
-    const { goalId } = ctx.target;
+/**
+ * Parse [TENSION] tags from GLM output. Sections separated by +++ or newlines.
+ */
+function parseTensions(text: string): CrucibleTension[] {
+  // Try +++ sections first
+  const sections = splitSections(text, "+++");
+  const tensions: CrucibleTension[] = [];
+
+  for (const section of sections) {
+    // Extract content after [TENSION] tag
+    const marker = "[TENSION]";
+    const idx = section.indexOf(marker);
+    const content = idx !== -1
+      ? section.slice(idx + marker.length).trim()
+      : section.trim();
+
+    if (content) {
+      tensions.push({
+        id: api.v1.uuid(),
+        text: content,
+        accepted: true,
+      });
+    }
+  }
+
+  return tensions;
+}
+
+export const crucibleTensionHandler: GenerationHandlers<CrucibleTensionTarget> = {
+  streaming(ctx: StreamingContext<CrucibleTensionTarget>): void {
     const stripped = stripThinkingTags(ctx.accumulatedText);
-    const display = formatTagsWithEmoji(stripped);
     const tail = stripped.replace(/\n+/g, " ").slice(-120);
     api.v1.ui.updateParts([
-      { id: `${IDS.CRUCIBLE.goal(goalId).TEXT}-view`, text: display },
       { id: IDS.CRUCIBLE.TICKER_TEXT, text: tail },
     ]);
   },
 
-  async completion(ctx: CompletionContext<CrucibleGoalTarget>): Promise<void> {
+  async completion(ctx: CompletionContext<CrucibleTensionTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
-    const { goalId } = ctx.target;
     const text = stripThinkingTags(ctx.accumulatedText).trim();
+    const tensions = parseTensions(text);
 
-    const goalText = parseTag(text, "GOAL");
-    if (goalText) {
-      const why = parseTag(text, "WHY") || "";
-      ctx.dispatch(goalTextUpdated({ goalId, text, why }));
+    if (tensions.length > 0) {
+      ctx.dispatch(tensionsDerived({ tensions }));
+      api.v1.log(`[crucible] ${tensions.length} tensions derived`);
     } else {
-      api.v1.log("[crucible] Goal parse: missing [GOAL]");
+      api.v1.log("[crucible] Tension parse: no valid tensions found");
       api.v1.log("[crucible] Raw text:", text.slice(0, 500));
     }
   },

@@ -1,10 +1,10 @@
 import { createSlice } from "nai-store";
 import {
   CrucibleState,
-  CrucibleGoal,
+  CrucibleTension,
   CruciblePhase,
-  Prerequisite,
   CrucibleWorldElement,
+  CrucibleLink,
 } from "../types";
 
 export const initialCrucibleState: CrucibleState = {
@@ -12,9 +12,11 @@ export const initialCrucibleState: CrucibleState = {
   direction: null,
   shape: null,
   merged: false,
-  goals: [],
-  prerequisites: [],
+  tensions: [],
   elements: [],
+  links: [],
+  passes: [],
+  activeCritique: null,
 };
 
 export const crucibleSlice = createSlice({
@@ -23,18 +25,24 @@ export const crucibleSlice = createSlice({
   reducers: {
     // Signal actions — effects handle the actual work
     crucibleShapeRequested: (state) => state,
-    crucibleGoalsRequested: (state) => state,
-    crucibleAddGoalRequested: (state) => state,
+    crucibleTensionsRequested: (state) => state,
+    crucibleBuildPassRequested: (state) => state,
     crucibleStopRequested: (state) => state,
     crucibleMergeRequested: (state) => state,
-    crucibleBuildRequested: (state) => state,
-    expansionTriggered: (state, _payload: { elementId?: string }) => state,
 
     // Phase transitions
     phaseTransitioned: (state, payload: { phase: CruciblePhase }) => {
       // Starting a fresh build — clear all derived data so previous results don't accumulate
       if (payload.phase === "building") {
-        return { ...state, phase: payload.phase, merged: false, prerequisites: [], elements: [] };
+        return {
+          ...state,
+          phase: payload.phase,
+          merged: false,
+          elements: [],
+          links: [],
+          passes: [],
+          activeCritique: null,
+        };
       }
       return { ...state, phase: payload.phase };
     },
@@ -58,77 +66,80 @@ export const crucibleSlice = createSlice({
       return { ...state, direction: payload.text };
     },
 
-    // Goal management
-    goalTextUpdated: (state, payload: { goalId: string; text: string; why?: string }) => {
+    // Tension management
+    tensionsDerived: (state, payload: { tensions: CrucibleTension[] }) => {
+      return { ...state, tensions: [...state.tensions, ...payload.tensions] };
+    },
+
+    tensionRemoved: (state, payload: { tensionId: string }) => {
       return {
         ...state,
-        goals: state.goals.map((g) =>
-          g.id === payload.goalId
-            ? { ...g, text: payload.text, ...(payload.why !== undefined ? { why: payload.why } : {}) }
-            : g,
+        tensions: state.tensions.filter((t) => t.id !== payload.tensionId),
+      };
+    },
+
+    tensionTextUpdated: (state, payload: { tensionId: string; text: string }) => {
+      return {
+        ...state,
+        tensions: state.tensions.map((t) =>
+          t.id === payload.tensionId ? { ...t, text: payload.text } : t,
         ),
       };
     },
 
-    goalAdded: (state, payload: { goal: CrucibleGoal }) => {
-      return { ...state, goals: [...state.goals, payload.goal] };
-    },
-
-    goalRemoved: (state, payload: { goalId: string }) => {
+    tensionAcceptanceToggled: (state, payload: { tensionId: string }) => {
       return {
         ...state,
-        goals: state.goals.filter((g) => g.id !== payload.goalId),
-      };
-    },
-
-    goalsCleared: (state) => {
-      return { ...state, goals: [] };
-    },
-
-    goalAcceptanceToggled: (state, payload: { goalId: string }) => {
-      return {
-        ...state,
-        goals: state.goals.map((g) =>
-          g.id === payload.goalId ? { ...g, accepted: !g.accepted } : g,
+        tensions: state.tensions.map((t) =>
+          t.id === payload.tensionId ? { ...t, accepted: !t.accepted } : t,
         ),
       };
     },
 
-    // Prerequisites
-    prerequisitesDerived: (state, payload: { prerequisites: Prerequisite[] }) => {
+    tensionsCleared: (state) => {
+      return { ...state, tensions: [] };
+    },
+
+    // World elements (from command parser)
+    elementCreated: (state, payload: { element: CrucibleWorldElement }) => {
+      return { ...state, elements: [...state.elements, payload.element] };
+    },
+
+    elementRevised: (state, payload: { id: string; content: string }) => {
       return {
         ...state,
-        prerequisites: [...state.prerequisites, ...payload.prerequisites],
+        elements: state.elements.map((e) =>
+          e.id === payload.id ? { ...e, content: payload.content } : e,
+        ),
       };
     },
 
-    prerequisiteRemoved: (state, payload: { id: string }) => {
+    elementDeleted: (state, payload: { id: string }) => {
       return {
         ...state,
-        prerequisites: state.prerequisites.filter((p) => p.id !== payload.id),
+        elements: state.elements.filter((e) => e.id !== payload.id),
+        // Also remove any links referencing this element
+        links: state.links.filter((l) => {
+          const el = state.elements.find((e) => e.id === payload.id);
+          if (!el) return true;
+          return l.fromName !== el.name && l.toName !== el.name;
+        }),
       };
     },
 
-    prerequisiteUpdated: (state, payload: { id: string; element?: string; loadBearing?: string }) => {
+    // Manual element editing (from review UI)
+    elementUpdated: (state, payload: { id: string; name?: string; content?: string }) => {
       return {
         ...state,
-        prerequisites: state.prerequisites.map((p) =>
-          p.id === payload.id
+        elements: state.elements.map((e) =>
+          e.id === payload.id
             ? {
-              ...p,
-              ...(payload.element !== undefined ? { element: payload.element } : {}),
-              ...(payload.loadBearing !== undefined ? { loadBearing: payload.loadBearing } : {}),
+              ...e,
+              ...(payload.name !== undefined ? { name: payload.name } : {}),
+              ...(payload.content !== undefined ? { content: payload.content } : {}),
             }
-            : p,
+            : e,
         ),
-      };
-    },
-
-    // World elements
-    elementsDerived: (state, payload: { elements: CrucibleWorldElement[] }) => {
-      return {
-        ...state,
-        elements: [...state.elements, ...payload.elements],
       };
     },
 
@@ -139,21 +150,32 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    elementUpdated: (state, payload: { id: string; name?: string; content?: string; want?: string; need?: string; relationship?: string }) => {
+    // Links
+    linkCreated: (state, payload: { link: CrucibleLink }) => {
+      return { ...state, links: [...state.links, payload.link] };
+    },
+
+    linkRemoved: (state, payload: { id: string }) => {
       return {
         ...state,
-        elements: state.elements.map((e) =>
-          e.id === payload.id
-            ? {
-              ...e,
-              ...(payload.name !== undefined ? { name: payload.name } : {}),
-              ...(payload.content !== undefined ? { content: payload.content } : {}),
-              ...(payload.want !== undefined ? { want: payload.want } : {}),
-              ...(payload.need !== undefined ? { need: payload.need } : {}),
-              ...(payload.relationship !== undefined ? { relationship: payload.relationship } : {}),
-            }
-            : e,
-        ),
+        links: state.links.filter((l) => l.id !== payload.id),
+      };
+    },
+
+    // Critique
+    critiqueSet: (state, payload: { critique: string }) => {
+      return { ...state, activeCritique: payload.critique };
+    },
+
+    // Build pass completed
+    buildPassCompleted: (state, payload: { passNumber: number; commandLog: string[]; guidance: string }) => {
+      return {
+        ...state,
+        passes: [...state.passes, {
+          passNumber: payload.passNumber,
+          commandLog: payload.commandLog,
+          guidance: payload.guidance,
+        }],
       };
     },
 
@@ -165,28 +187,29 @@ export const crucibleSlice = createSlice({
 
 export const {
   crucibleShapeRequested,
-  crucibleGoalsRequested,
-  crucibleAddGoalRequested,
+  crucibleTensionsRequested,
+  crucibleBuildPassRequested,
   crucibleStopRequested,
   crucibleMergeRequested,
   mergeCompleted,
-  crucibleBuildRequested,
   phaseTransitioned,
   updateShape,
   crucibleDirectionRequested,
   directionSet,
   crucibleDirectionEdited,
-  goalTextUpdated,
-  goalAdded,
-  goalRemoved,
-  goalsCleared,
-  goalAcceptanceToggled,
-  prerequisitesDerived,
-  prerequisiteRemoved,
-  prerequisiteUpdated,
-  elementsDerived,
-  elementRemoved,
+  tensionsDerived,
+  tensionRemoved,
+  tensionTextUpdated,
+  tensionAcceptanceToggled,
+  tensionsCleared,
+  elementCreated,
+  elementRevised,
+  elementDeleted,
   elementUpdated,
-  expansionTriggered,
+  elementRemoved,
+  linkCreated,
+  linkRemoved,
+  critiqueSet,
+  buildPassCompleted,
   crucibleReset,
 } = crucibleSlice.actions;

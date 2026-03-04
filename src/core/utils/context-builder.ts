@@ -29,6 +29,7 @@ import {
   FIELD_CONFIGS,
   DulfsFieldID,
 } from "../../config/field-definitions";
+import { formatWorldState } from "./crucible-world-formatter";
 // --- Helpers ---
 
 const getFieldContent = (state: RootState, id: string): string => {
@@ -359,32 +360,8 @@ export const buildStoryEnginePrefix = async (
 
 // --- Crucible Prefix ---
 
-/**
- * Formats crucible world elements as a structured list for injection into
- * lorebook generation context. Grouped by World Entry category, one line per element.
- * Returns empty string if no elements exist.
- */
-export const formatCrucibleElementsContext = (state: RootState): string => {
-  const { elements } = state.crucible;
-  if (elements.length === 0) return "";
-
-  const groups = new Map<string, typeof elements>();
-  for (const el of elements) {
-    const list = groups.get(el.fieldId) || [];
-    list.push(el);
-    groups.set(el.fieldId, list);
-  }
-
-  const lines: string[] = [];
-  for (const [fieldId, fieldElements] of groups) {
-    const label = FIELD_CONFIGS.find((f) => f.id === fieldId)?.label || fieldId;
-    lines.push(`${label}:`);
-    for (const el of fieldElements) {
-      lines.push(`- ${el.content ? `${el.name}: ${el.content}` : el.name}`);
-    }
-  }
-  return lines.join("\n");
-};
+// Re-export from new location for backward compatibility
+export { formatCrucibleElementsContext } from "./crucible-world-formatter";
 
 /**
  * Options for buildCruciblePrefix — isolated context for all Crucible factories.
@@ -399,6 +376,10 @@ export interface CruciblePrefixOptions {
   includeDulfs?: boolean;
   /** Include Setting + Canon if available (for intent derivation) */
   includeStoryState?: boolean;
+  /** Include accepted tensions as [TENSIONS] section */
+  includeTensions?: boolean;
+  /** Include formatted crucible world state (elements, links, critique) */
+  includeWorldState?: boolean;
 }
 
 /**
@@ -444,11 +425,28 @@ export const buildCruciblePrefix = async (
     if (brainstorm) groundingSections.push(`[BRAINSTORM]\n${brainstorm}`);
   }
 
+  // Tensions
+  if (options.includeTensions) {
+    const accepted = state.crucible.tensions.filter((t) => t.accepted);
+    if (accepted.length > 0) {
+      const tensionLines = accepted.map((t) => `- ${t.text}`).join("\n");
+      groundingSections.push(`[TENSIONS]\n${tensionLines}`);
+    }
+  }
+
   if (groundingSections.length > 0) {
     messages.push({
       role: "system",
       content: groundingSections.join("\n\n"),
     });
+  }
+
+  // --- Optional: Crucible world state (elements, links, critique) ---
+  if (options.includeWorldState) {
+    const worldState = formatWorldState(state.crucible);
+    if (worldState) {
+      messages.push({ role: "system", content: worldState });
+    }
   }
 
   // --- MSG 3 (optional): World Entry items ---

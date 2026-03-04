@@ -114,10 +114,8 @@ export interface GenerationRequest {
   | "bootstrap"
   | "crucibleDirection"
   | "crucibleShape"
-  | "crucibleGoal"
-  | "cruciblePrereqs"
-  | "crucibleElements"
-  | "crucibleExpansion";
+  | "crucibleTension"
+  | "crucibleBuildPass";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -140,10 +138,8 @@ export interface GenerationStrategy {
   | { type: "bootstrap" }
   | { type: "crucibleDirection" }
   | { type: "crucibleShape"; prefillName?: string }
-  | { type: "crucibleGoal"; goalId: string }
-  | { type: "cruciblePrereqs" }
-  | { type: "crucibleElements" }
-  | { type: "crucibleExpansion"; elementId?: string };
+  | { type: "crucibleTension" }
+  | { type: "crucibleBuildPass"; passNumber: number };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };
@@ -161,23 +157,25 @@ export interface RuntimeState {
 
 // Crucible Types
 
-export type CruciblePhase = "direction" | "goals" | "building" | "review";
+export type CruciblePhase = "direction" | "tensions" | "building";
 
-export interface CrucibleGoal {
+export interface CrucibleTension {
   id: string;
   text: string;
-  why: string;
   accepted: boolean;
 }
 
-export type PrereqCategory = "RELATIONSHIP" | "SECRET" | "POWER" | "HISTORY" | "OBJECT" | "BELIEF" | "PLACE";
-
-export interface Prerequisite {
+export interface CrucibleLink {
   id: string;
-  element: string;
-  loadBearing: string;
-  category: PrereqCategory;
-  satisfiedBy: string[];
+  fromName: string;
+  toName: string;
+  description: string;
+}
+
+export interface CrucibleBuildPass {
+  passNumber: number;
+  commandLog: string[];
+  guidance: string;
 }
 
 export interface CrucibleWorldElement {
@@ -185,10 +183,6 @@ export interface CrucibleWorldElement {
   fieldId: DulfsFieldID;
   name: string;
   content: string;
-  want?: string;
-  need?: string;
-  relationship?: string;
-  satisfies: string[];
 }
 
 export interface CrucibleState {
@@ -196,9 +190,11 @@ export interface CrucibleState {
   direction: string | null;
   shape: { name: string; instruction: string } | null;
   merged: boolean;
-  goals: CrucibleGoal[];
-  prerequisites: Prerequisite[];
+  tensions: CrucibleTension[];
   elements: CrucibleWorldElement[];
+  links: CrucibleLink[];
+  passes: CrucibleBuildPass[];
+  activeCritique: string | null;
 }
 
 export interface RootState {
