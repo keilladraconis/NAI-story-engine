@@ -39,11 +39,14 @@ export const ProgressDisplay = defineComponent<undefined, RootState>({
   build(_props, ctx) {
     const { dispatch, useSelector } = ctx;
 
-    // Reactive step checklist
+    // Reactive step checklist — tracks per-goal element progress
     useSelector(
       (s) => ({
         prereqCount: s.crucible.prerequisites.length,
         elementCount: s.crucible.elements.length,
+        acceptedGoalCount: s.crucible.goals.filter((g) => g.accepted).length,
+        elementsQueuedOrActive: s.runtime.queue.filter((r) => r.type === "crucibleElements").length
+          + (s.runtime.activeRequest?.type === "crucibleElements" ? 1 : 0),
       }),
       (data) => {
         const steps: string[] = [];
@@ -55,7 +58,10 @@ export const ProgressDisplay = defineComponent<undefined, RootState>({
           steps.push("⟳ Finding what must be true...");
         }
 
-        if (data.elementCount > 0) {
+        if (data.prereqCount > 0 && data.elementsQueuedOrActive > 0) {
+          const goalsComplete = data.acceptedGoalCount - data.elementsQueuedOrActive;
+          steps.push(`⟳ Building elements (${goalsComplete}/${data.acceptedGoalCount} goals, ${data.elementCount} elements so far)`);
+        } else if (data.elementCount > 0) {
           steps.push(`✓ ${data.elementCount} world elements created`);
         } else if (data.prereqCount > 0) {
           steps.push("⟳ Building your world...");

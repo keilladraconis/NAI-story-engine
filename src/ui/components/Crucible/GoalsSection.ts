@@ -172,6 +172,7 @@ export const GoalsSection = defineComponent<undefined, RootState>({
         collapsibleSection({
           id: "cr-goals-collapsible",
           title: "Goals",
+          initialCollapsed: true,
           storageKey: "story:cr-goals-collapsed",
           style: { overflow: "visible" },
           content: [

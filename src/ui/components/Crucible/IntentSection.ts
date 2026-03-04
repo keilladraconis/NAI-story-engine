@@ -17,11 +17,6 @@ export const IntentSection = defineComponent<undefined, RootState>({
     const { useSelector, dispatch } = ctx;
     const state = ctx.getState();
 
-    // Start expanded when there's no content yet, collapsed otherwise
-    if (state.crucible.goals.length === 0 && !state.crucible.direction) {
-      api.v1.storyStorage.set("cr-direction-collapsed", "");
-    }
-
     const { part: directionBtnPart } = ctx.render(GenerationButton, {
       id: CR.DIRECTION_BTN,
       label: "",
@@ -62,23 +57,20 @@ export const IntentSection = defineComponent<undefined, RootState>({
       },
     );
 
-    // Auto-collapse when building phase starts or goals appear
+    // Hide generate button during building phase
     useSelector(
       (s) => ({
         phase: s.crucible.phase,
-        hasGoals: s.crucible.goals.length > 0,
       }),
       (slice) => {
         updateVisibility([[`${CR.DIRECTION_BTN}`, slice.phase === "direction" || slice.phase === "goals"]]);
-        if (slice.phase === "building" || slice.hasGoals) {
-          api.v1.storyStorage.set("cr-direction-collapsed", "true");
-        }
       },
     );
 
     return collapsibleSection({
       id: CR.DIRECTION_SECTION,
       title: "Direction",
+      initialCollapsed: true,
       storageKey: "story:cr-direction-collapsed",
       style: { overflow: "visible" },
       content: [directionEditablePart],

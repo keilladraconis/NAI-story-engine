@@ -1,5 +1,5 @@
 import { defineComponent } from "nai-act";
-import { RootState, CrucibleWorldElement, Prerequisite } from "../../../core/store/types";
+import { RootState, CrucibleWorldElement, Prerequisite, WORLD_ENTRY_CATEGORIES } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
 import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
 import {
@@ -106,6 +106,17 @@ export const ReviewView = defineComponent<undefined, RootState>({
       "border-radius": "3px",
       "background-color": "rgba(255,255,255,0.08)",
       opacity: "0.7",
+    },
+    expandSection: {
+      gap: "6px",
+      padding: "10px 12px",
+      "border-radius": "6px",
+      "background-color": "rgba(255,255,255,0.03)",
+      "border": "1px solid rgba(129,212,250,0.15)",
+    },
+    expandSummary: {
+      "font-size": "0.85em",
+      opacity: "0.8",
     },
   },
 
@@ -268,6 +279,36 @@ export const ReviewView = defineComponent<undefined, RootState>({
       const state = ctx.getState();
       const parts: UIPart[] = [];
 
+      // Deepen Your World — expansion CTA at the top with element count summary
+      if (state.crucible.elements.length > 0) {
+        const countsByField = new Map<DulfsFieldID, number>();
+        for (const el of state.crucible.elements) {
+          countsByField.set(el.fieldId, (countsByField.get(el.fieldId) || 0) + 1);
+        }
+
+        const summaryParts: string[] = [];
+        for (const fieldId of WORLD_ENTRY_CATEGORIES) {
+          const count = countsByField.get(fieldId);
+          if (count) summaryParts.push(`${count} ${count === 1 ? FIELD_LABEL_SINGULAR[fieldId] : FIELD_LABELS[fieldId]}`);
+        }
+
+        parts.push(column({
+          id: "cr-expansion-section",
+          style: this.style?.("expandSection"),
+          content: [
+            text({ text: "Deepen Your World", style: { "font-weight": "bold", "font-size": "0.9em" } }),
+            text({
+              id: "cr-expand-summary",
+              text: `Your world: **${summaryParts.join("** · **")}**`,
+              markdown: true,
+              style: this.style?.("expandSummary"),
+            }),
+            expansionInput,
+            expandGenBtn,
+          ],
+        }));
+      }
+
       // Prerequisites section
       if (state.crucible.prerequisites.length > 0) {
         const prereqParts = state.crucible.prerequisites.map((p) => ensurePrereqCard(p));
@@ -301,16 +342,6 @@ export const ReviewView = defineComponent<undefined, RootState>({
           title: `World Elements (${state.crucible.elements.length})`,
           storageKey: "story:cr-elements-section",
           content: elementParts,
-        }));
-
-        parts.push(column({
-          id: "cr-expansion-section",
-          style: { gap: "4px" },
-          content: [
-            text({ text: "Expand", style: this.style?.("sectionTitle") }),
-            expansionInput,
-            expandGenBtn,
-          ],
         }));
       }
 

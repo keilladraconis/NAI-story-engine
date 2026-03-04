@@ -20,6 +20,9 @@ import {
   phaseTransitioned,
   mergeCompleted,
   dulfsItemAdded,
+  updateShape,
+  directionSet,
+  persistedDataLoaded,
 } from "../index";
 import {
   buildCrucibleShapeStrategy,
@@ -28,7 +31,7 @@ import {
 } from "../../utils/crucible-strategy";
 import {
   buildPrereqsStrategy,
-  buildElementsStrategy,
+  buildGoalElementsStrategy,
   buildExpansionStrategy,
 } from "../../utils/crucible-chain-strategy";
 import { extractDulfsItemName } from "../../utils/context-builder";
@@ -44,6 +47,65 @@ export function registerCrucibleEffects(
 ): void {
   let elementsAttempted = false;
   let buildCancelled = false;
+
+  // --- Section collapse/expand helpers ---
+  const SECTION_KEYS = {
+    shape: "cr-shape-collapsed",
+    direction: "cr-direction-collapsed",
+    goals: "cr-goals-collapsed",
+  } as const;
+
+  const setCollapsed = async (section: "shape" | "direction" | "goals", collapsed: boolean) => {
+    await api.v1.storyStorage.set(SECTION_KEYS[section], collapsed);
+  };
+
+  // Expand the first empty section, collapse everything else
+  const applySectionFocus = async () => {
+    const s = getState();
+    const hasShape = !!s.crucible.shape;
+    const hasDirection = !!s.crucible.direction;
+    const hasGoals = s.crucible.goals.length > 0;
+
+    if (!hasShape) {
+      await setCollapsed("shape", false);
+      await setCollapsed("direction", true);
+      await setCollapsed("goals", true);
+    } else if (!hasDirection) {
+      await setCollapsed("shape", true);
+      await setCollapsed("direction", false);
+      await setCollapsed("goals", true);
+    } else if (!hasGoals) {
+      await setCollapsed("shape", true);
+      await setCollapsed("direction", true);
+      await setCollapsed("goals", false);
+    } else {
+      await setCollapsed("shape", true);
+      await setCollapsed("direction", true);
+      await setCollapsed("goals", true);
+    }
+  };
+
+  // After persisted data loads, sync storage keys to match loaded state
+  // (components handle initial render via initialCollapsed; this ensures
+  // storageKey values are correct for subsequent effect-driven transitions)
+  subscribeEffect(matchesAction(persistedDataLoaded), applySectionFocus);
+
+  // Shape completes → expand Direction (let user see shape output)
+  subscribeEffect(
+    matchesAction(updateShape),
+    () => {
+      setCollapsed("direction", false);
+    },
+  );
+
+  // Direction completes → expand Goals (let user see direction output)
+  subscribeEffect(
+    matchesAction(directionSet),
+    () => {
+      setCollapsed("goals", false);
+    },
+  );
+
   // Intent: Shape Requested → queue shape generation
   subscribeEffect(
     matchesAction(crucibleShapeRequested),
@@ -55,10 +117,12 @@ export function registerCrucibleEffects(
     },
   );
 
-  // Intent: Crucible Direction Requested → queue direction (reads shape from state at JIT time if available)
+  // Intent: Crucible Direction Requested → collapse Shape, queue direction
   subscribeEffect(
     matchesAction(crucibleDirectionRequested),
     async () => {
+      setCollapsed("shape", true);
+
       const directionStrategy = buildCrucibleDirectionStrategy(getState);
       dispatch(requestQueued({ id: directionStrategy.requestId, type: "crucibleDirection", targetId: "crucible" }));
       dispatch(generationSubmitted(directionStrategy));
@@ -72,6 +136,10 @@ export function registerCrucibleEffects(
       // Flush any active EditableText editor (e.g. an unsaved direction edit)
       // so its content reaches state before we build goal context.
       await flushActiveEditor();
+
+      // Collapse Shape & Direction — goals are the focus now
+      setCollapsed("shape", true);
+      setCollapsed("direction", true);
 
       dispatch(phaseTransitioned({ phase: "goals" }));
 
@@ -105,6 +173,10 @@ export function registerCrucibleEffects(
     async (_action, { getState: getLatest }) => {
       elementsAttempted = false;
       buildCancelled = false;
+
+      // Collapse goals — building phase is the focus now
+      setCollapsed("goals", true);
+
       dispatch(phaseTransitioned({ phase: "building" }));
 
       const state = getLatest();
@@ -145,13 +217,17 @@ export function registerCrucibleEffects(
         return;
       }
 
-      // Elements step not yet tried
-      if (state.crucible.elements.length === 0 && !elementsAttempted) {
+      // Elements step not yet tried — queue per-goal element generation
+      if (!elementsAttempted) {
         elementsAttempted = true;
-        api.v1.log("[crucible] Prerequisites complete → queuing world elements");
-        const strategy = buildElementsStrategy(getState);
-        dispatch(requestQueued({ id: strategy.requestId, type: "crucibleElements", targetId: "crucible" }));
-        dispatch(generationSubmitted(strategy));
+        const goals = state.crucible.goals.filter((g) => g.accepted);
+        api.v1.log(`[crucible] Prerequisites complete → queuing elements for ${goals.length} goals`);
+
+        for (const goal of goals) {
+          const strategy = buildGoalElementsStrategy(getState, goal.id);
+          dispatch(requestQueued({ id: strategy.requestId, type: "crucibleElements", targetId: goal.id }));
+          dispatch(generationSubmitted(strategy));
+        }
         return;
       }
 
@@ -219,7 +295,7 @@ export function registerCrucibleEffects(
     },
   );
 
-  // Intent: Crucible Reset → clean up cr- storyStorage keys
+  // Intent: Crucible Reset → clean up cr- storyStorage keys, re-focus on Shape
   subscribeEffect(
     matchesAction(crucibleReset),
     async () => {
@@ -233,6 +309,9 @@ export function registerCrucibleEffects(
       api.v1.ui.updateParts([
         { id: `${IDS.CRUCIBLE.DIRECTION_TEXT}-view`, text: "" },
       ]);
+
+      // State is now empty — expand Shape, collapse others
+      await applySectionFocus();
     },
   );
 

@@ -21,11 +21,6 @@ export const ShapeSection = defineComponent<undefined, RootState>({
     const { dispatch, useSelector } = ctx;
     const state = ctx.getState();
 
-    // Start expanded when there's no shape yet
-    if (!state.crucible.shape) {
-      api.v1.storyStorage.set("cr-shape-collapsed", "");
-    }
-
     const nameInputPart = textInput({
       id: CR.SHAPE_NAME,
       storageKey: "story:cr-shape-name",
@@ -83,6 +78,7 @@ export const ShapeSection = defineComponent<undefined, RootState>({
     return collapsibleSection({
       id: CR.SHAPE_SECTION,
       title: "Story Shape",
+      initialCollapsed: false,
       storageKey: "story:cr-shape-collapsed",
       style: { overflow: "visible" },
       content: [nameInputPart, shapeEditablePart],

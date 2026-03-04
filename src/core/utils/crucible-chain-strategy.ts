@@ -86,15 +86,16 @@ export const buildPrereqsStrategy = (
   };
 };
 
-// --- World Elements ---
+// --- Per-Goal World Elements ---
 
-export const createElementsFactory = (
+export const createGoalElementsFactory = (
   getState: () => RootState,
+  goalId: string,
 ): MessageFactory => {
   return async () => {
     const state = getState();
     const prompt = String(
-      (await api.v1.config.get("crucible_elements_prompt")) || "",
+      (await api.v1.config.get("crucible_goal_elements_prompt")) || "",
     );
 
     const prefix = await buildCruciblePrefix(getState, {
@@ -103,22 +104,27 @@ export const createElementsFactory = (
       includeDulfs: state.crucible.elements.length > 0,
     });
 
-    // Format accepted goals
-    const goalsContext = state.crucible.goals
-      .filter((g) => g.accepted)
-      .map((g) => `- ${parseTag(g.text, "GOAL") || g.text}`)
-      .join("\n");
+    // Format the target goal
+    const goal = state.crucible.goals.find((g) => g.id === goalId);
+    const goalText = goal ? (parseTag(goal.text, "GOAL") || goal.text) : "";
+    const goalContext = goal?.why
+      ? `[GOAL] ${goalText}\n[WHY] ${goal.why}`
+      : `[GOAL] ${goalText}`;
 
-    // Format prerequisites
+    // Format prerequisites (shared foundation)
     const prereqsContext = state.crucible.prerequisites
       .map((p) => `- [${p.category}] ${p.element} — ${p.loadBearing}`)
       .join("\n");
 
-    // Format existing elements if any
+    // Format existing elements if any (JIT: accumulates across sequential calls)
+    // Include description so GLM understands what each element covers
     let existingContext = "";
     if (state.crucible.elements.length > 0) {
-      existingContext = "\n\nEXISTING WORLD ELEMENTS:\n" + state.crucible.elements
-        .map((e) => `- ${e.name} (${FIELD_LABEL[e.fieldId] || e.fieldId})`)
+      existingContext = "\n\nEXISTING WORLD ELEMENTS (do NOT create any element with the same name or role):\n" + state.crucible.elements
+        .map((e) => {
+          const desc = e.content ? `: ${e.content.slice(0, 120)}` : "";
+          return `- ${e.name} (${FIELD_LABEL[e.fieldId] || e.fieldId})${desc}`;
+        })
         .join("\n");
     }
 
@@ -130,7 +136,7 @@ export const createElementsFactory = (
       },
       {
         role: "user",
-        content: `STRUCTURAL GOALS:\n${goalsContext}\n\nPREREQUISITES:\n${prereqsContext}${existingContext}`,
+        content: `TARGET GOAL:\n${goalContext}\n\nSHARED PREREQUISITES:\n${prereqsContext}${existingContext}`,
       },
       { role: "assistant", content: "+++\n" },
     ];
@@ -148,12 +154,13 @@ export const createElementsFactory = (
   };
 };
 
-export const buildElementsStrategy = (
+export const buildGoalElementsStrategy = (
   getState: () => RootState,
+  goalId: string,
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createElementsFactory(getState),
+    messageFactory: createGoalElementsFactory(getState, goalId),
     target: { type: "crucibleElements" },
     prefillBehavior: "keep",
     assistantPrefill: "+++\n",
