@@ -67,6 +67,38 @@ export function formatJournal(): string {
   return lines.join("\n");
 }
 
+const SEGA_LABELS = /^(field:|list:|lb-content:|lb-relmap:|lb-keys:|lb-refine:|bootstrap)/;
+
+export function formatDigest(): string {
+  const sega = journal.filter((e) => SEGA_LABELS.test(e.label) && e.success);
+  if (sega.length === 0) return "# SEGA Digest\n\nNo SEGA entries recorded.";
+
+  const lines: string[] = ["# SEGA Digest\n"];
+
+  for (const entry of sega) {
+    lines.push(`## ${entry.label}`);
+
+    if (entry.label.startsWith("lb-keys:")) {
+      // Keys: just show the key line
+      const keysMatch = entry.response.match(/KEYS:\s*(.+)/);
+      if (keysMatch) {
+        lines.push(keysMatch[1].trim());
+      } else {
+        lines.push(entry.response);
+      }
+    } else if (entry.label.startsWith("lb-relmap:")) {
+      lines.push(entry.response);
+    } else {
+      lines.push(entry.response);
+    }
+
+    lines.push("");
+    lines.push("---\n");
+  }
+
+  return lines.join("\n");
+}
+
 export async function clearJournal(): Promise<void> {
   journal = [];
   await api.v1.storyStorage.set(STORAGE_KEY, journal);

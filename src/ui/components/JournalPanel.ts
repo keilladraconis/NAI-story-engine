@@ -2,6 +2,7 @@ import { BindContext, defineComponent } from "nai-act";
 import { RootState } from "../../core/store/types";
 import {
   formatJournal,
+  formatDigest,
   clearJournal,
   getJournalCount,
 } from "../../core/generation-journal";
@@ -27,6 +28,12 @@ export const JournalPanel = defineComponent({
       const md = formatJournal();
       await api.v1.clipboard.writeText(md);
       api.v1.ui.toast("Journal copied to clipboard", { type: "success" });
+    };
+
+    const copyDigest = async () => {
+      const md = formatDigest();
+      await api.v1.clipboard.writeText(md);
+      api.v1.ui.toast("SEGA digest copied to clipboard", { type: "success" });
     };
 
     const clearAndUpdate = async () => {
@@ -63,10 +70,17 @@ export const JournalPanel = defineComponent({
             }),
             button({
               id: "kse-journal-copy-btn",
-              text: "Copy Journal",
+              text: "Full",
               iconId: "clipboard",
               style: this.style?.("btn"),
               callback: copyJournal,
+            }),
+            button({
+              id: "kse-journal-digest-btn",
+              text: "SEGA Digest",
+              iconId: "clipboard",
+              style: this.style?.("btn"),
+              callback: copyDigest,
             }),
             button({
               id: "kse-journal-clear-btn",

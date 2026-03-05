@@ -141,11 +141,9 @@ export const TensionsSection = defineComponent<undefined, RootState>({
         return;
       }
 
-      // Clean up removed tensions
-      const currentIds = new Set(currentTensions.map((t) => t.id));
-      for (const [id, { unmount }] of tensionCardCache) {
-        if (!currentIds.has(id)) { unmount(); tensionCardCache.delete(id); }
-      }
+      // Unmount all cached cards so they re-render with fresh state from getState()
+      for (const { unmount } of tensionCardCache.values()) unmount();
+      tensionCardCache.clear();
 
       api.v1.ui.updateParts([{
         id: CR.TENSIONS_LIST,
