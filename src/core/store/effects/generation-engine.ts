@@ -21,6 +21,7 @@ import {
 } from "../../utils/context-builder";
 import { FieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
 import { getHandler } from "./generation-handlers";
+import { recordEntry, JournalEntry } from "../../generation-journal";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Private Helpers
@@ -154,7 +155,7 @@ async function captureRollbackState(
 /**
  * Descriptive label for cache instrumentation logs.
  */
-function cacheLabel(target: GenerationStrategy["target"]) {
+export function cacheLabel(target: GenerationStrategy["target"]) {
   switch (target.type) {
     case "field":
       return `field:${target.fieldId}`;
@@ -258,6 +259,7 @@ export function registerGenerationEngineEffects(
 
       // Resolved messages captured via closure for potential continuation calls
       let resolvedMessages: Message[] | undefined;
+      let pendingUncached = 0;
 
       let messagesInput: Message[] | MessageFactory;
       if (messageFactory) {
@@ -267,12 +269,14 @@ export function registerGenerationEngineEffects(
           resolvedMessages = result.messages;
           if (result.params) Object.assign(apiParams, result.params);
           const uncached = await api.v1.script.countUncachedInputTokens(result.messages, "glm-4-6");
+          pendingUncached = uncached;
           api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);
           return result;
         };
       } else if (messages) {
         resolvedMessages = messages;
         const uncached = await api.v1.script.countUncachedInputTokens(messages, "glm-4-6");
+        pendingUncached = uncached;
         api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);
         messagesInput = messages;
       } else {
@@ -373,6 +377,21 @@ export function registerGenerationEngineEffects(
         });
       } catch (e) {
         api.v1.log(`[effects] Completion handler error for ${requestId}:`, e);
+      }
+
+      // Record to generation journal
+      if (resolvedMessages) {
+        const journalEntry: JournalEntry = {
+          id: requestId,
+          timestamp: Date.now(),
+          label: cacheLabel(target),
+          messages: resolvedMessages.map((m) => ({ role: m.role, content: m.content })),
+          params: apiParams,
+          response: accumulatedText,
+          uncachedTokens: pendingUncached,
+          success: generationSucceeded,
+        };
+        recordEntry(journalEntry).catch(() => {});
       }
 
       if (generationSucceeded) {

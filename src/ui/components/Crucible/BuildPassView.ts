@@ -386,11 +386,11 @@ export const BuildPassView = defineComponent<undefined, RootState>({
         ]);
 
         // Critique display
-        if (data.critique) {
-          api.v1.ui.updateParts([
-            { id: "cr-critique-display", text: `**Self-critique:** ${data.critique}`, style: this.style?.("critiqueText") },
-          ]);
-        }
+        api.v1.ui.updateParts([
+          data.critique
+            ? { id: "cr-critique-display", text: `**Self-critique:** ${data.critique}`, style: this.style?.("critiqueText") }
+            : { id: "cr-critique-display", text: "", style: { display: "none" } },
+        ]);
 
         // Evict removed items from caches
         const currentElementIds = new Set(st.crucible.elements.map((e) => e.id));

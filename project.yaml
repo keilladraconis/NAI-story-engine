@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772647309
+updatedAt: 1772719701
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -21,6 +21,14 @@ config:
       When enabled, SEGA will skip the relational map pass and generate keys
       directly from entry prose. Keys quality may be lower for generic-named
       entries without this cross-entry context pass.
+    type: boolean
+    default: false
+  - name: generation_journal
+    prettyName: Generation Journal
+    description: >-
+      Enables the Generation Journal panel, which records all prompts and
+      responses sent during generation. Use "Copy Journal" to paste into Claude
+      for quality review.
     type: boolean
     default: false
   - name: erato_compatibility

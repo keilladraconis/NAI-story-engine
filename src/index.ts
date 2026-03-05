@@ -26,8 +26,12 @@ import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelCont
 // Crucible
 import { CruciblePanel } from "./ui/components/Crucible/CruciblePanel";
 
+// Journal
+import { JournalPanel } from "./ui/components/JournalPanel";
+import { loadJournal } from "./core/generation-journal";
+
 const { column } = api.v1.ui.part;
-const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
+const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
 
 (async () => {
   try {
@@ -107,12 +111,29 @@ const { sidebarPanel, lorebookPanel } = api.v1.ui.extension;
       content: [cruciblePart],
     });
 
-    await api.v1.ui.register([
+    // 6. Conditional: Generation Journal panel
+    const panels: any[] = [
       brainstormPanel,
       cruciblePanel,
       storyEnginePanel,
       lorebookGenPanel,
-    ]);
+    ];
+
+    const journalEnabled = await api.v1.config.get("generation_journal");
+    if (journalEnabled) {
+      api.v1.permissions.request(["clipboardWrite"]);
+      await loadJournal();
+      const { part: journalPart } = mount(JournalPanel, undefined, store);
+      panels.push(
+        scriptPanel({
+          id: "kse-journal",
+          name: "Generation Journal",
+          content: [journalPart],
+        }),
+      );
+    }
+
+    await api.v1.ui.register(panels);
 
     // Register lorebook entry selection hook
     api.v1.hooks.register("onLorebookEntrySelected", (params) => {
