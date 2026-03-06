@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772729598
+updatedAt: 1772744640
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -185,6 +185,7 @@ config:
         makes them volatile. Include a defining quote in Personality.
       - **General:** Every sentence must earn its tokens — focus on what
         creates narrative potential, not encyclopedic detail.
+      - **Template placeholders:** Fill ALL bracketed placeholders (e.g. [number], [gender], [role]) with concrete values. Infer from world context when explicitly stated; when not stated, make a reasonable creative choice that fits the character and setting. Never leave bracket placeholders in the output.
       - Start from the template, but add fields when genre, setting, or
         existing lorebook entries call for them (e.g. Race, Allegiance,
         Tech Level, vital statistics, measurements). No filler.
@@ -244,7 +245,6 @@ config:
       Type: Faction
       Setting: original
       Leader: [Name or Title] | Goal: [primary ambition]
-      Members: [Optional. Comma-separated list of key members.]
       Description: [Methods, resources, the gap between public face and private reality, and how they are destabilizing the status quo. 3-5 sentences.]
       History: [Optional. How this faction came to exist and what shaped its current form. 2-3 sentences.]
       Culture: [Optional. How this faction thinks, behaves, and organises itself internally. Values, customs, social structure. 2-3 sentences.]
@@ -602,6 +602,11 @@ config:
       Each tension should imply characters, places, or systems that must
       exist in the world without naming them explicitly.
 
+      Do not restate what is already explicit in the Direction. Surface
+      pressures that are implied by the scenario but not yet named —
+      resource costs, social fault lines, hidden dependencies, ticking
+      clocks the characters haven't noticed.
+
       Output format — one tension per section, separated by +++:
       [TENSION] The tension — 1-2 sentences describing the opposing forces
       +++
@@ -636,6 +641,8 @@ config:
 
       [CRITIQUE]
       Self-assessment: what's missing, what's weak, what's disconnected.
+      Assess the world as built — do not describe story beats, plot
+      sequences, or narrative trajectory.
 
       [DONE]
       Signal that this pass is complete.
@@ -650,6 +657,10 @@ config:
         soldier who can't stop protecting people even when they don't
         want protection" changes scenes.
       - End every pass with [CRITIQUE] and [DONE].
+
+      - Do not restate or paraphrase the Direction. Every element you
+        CREATE must add information not already present in the Direction
+        or existing World State.
 
       Output commands directly — no preamble, no explanation.
   - name: story_engine_debug

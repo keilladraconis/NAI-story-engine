@@ -437,6 +437,13 @@ async function scheduleNextSegaTask(
 
   // Stage 2: Canon (synthesize from world entries)
   if (await needsCanon(state)) {
+    // Warn if no world entries exist — Canon benefits from world context
+    const hasWorldEntries = WORLD_ENTRY_CATEGORIES.some(
+      (cat) => (state.story.dulfs[cat] || []).length > 0,
+    );
+    if (!hasWorldEntries) {
+      api.v1.log("[sega] Warning: no world entries found — Canon may generate without world context");
+    }
     api.v1.log("[sega] scheduling: canon");
     dispatch(segaStageSet({ stage: "canon" }));
     await queueSegaFieldGeneration(dispatch, getState, FieldID.Canon);

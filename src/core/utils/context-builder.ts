@@ -706,7 +706,7 @@ export const createCanonFactory = (
         temperature: 0.9,
         min_p: 0.05,
         presence_penalty: 0.1,
-        max_tokens: 600,
+        max_tokens: 900,
       },
       contextPinning: { head: 1, tail: 2 },
     };

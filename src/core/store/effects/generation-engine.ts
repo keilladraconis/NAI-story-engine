@@ -365,6 +365,9 @@ export function registerGenerationEngineEffects(
         generationSucceeded = false;
       }
 
+      // Trim leading whitespace from model output (prevents double-space artifacts after prefill)
+      accumulatedText = accumulatedText.replace(/^\s+/, "");
+
       try {
         await handler.completion({
           target,

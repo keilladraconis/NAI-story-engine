@@ -157,6 +157,23 @@ export const lorebookRelationalMapHandler: GenerationHandlers<LorebookRelational
  * Parse a KEYS: line from lorebook key generation output.
  * Returns trimmed, lowercased, comma-separated keys, or null if no KEYS: line found.
  */
+/**
+ * Validate a single key — plain text passes through, regex keys are checked.
+ * Fixes missing closing delimiter; drops unparseable regex.
+ */
+function validateKey(key: string): string | null {
+  if (!key.startsWith("/")) return key;
+  let regex = key;
+  if (!regex.endsWith("/")) regex += "/";
+  try {
+    new RegExp(regex.slice(1, -1));
+    return regex;
+  } catch {
+    api.v1.log(`[lorebook-keys] dropping invalid regex: ${key}`);
+    return null;
+  }
+}
+
 export function parseLorebookKeys(text: string): string[] | null {
   const keysLine = text.split("\n").find((l) => /^keys:/i.test(l.trim()));
   if (!keysLine) return null;
@@ -164,8 +181,8 @@ export function parseLorebookKeys(text: string): string[] | null {
     .replace(/^keys:/i, "")
     .trim()
     .split(",")
-    .map((k) => k.trim().toLowerCase())
-    .filter((k) => k.length > 0 && k.length < 50);
+    .map((k) => validateKey(k.trim().toLowerCase()))
+    .filter((k): k is string => k !== null && k.length > 0 && k.length < 50);
 }
 
 /**
@@ -198,8 +215,17 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
 
       if (keys.length === 0) return;
 
-      // Update lorebook entry with generated (or fallback) keys
-      await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys });
+      // Merge with existing keys (dedup case-insensitive, preserve first casing)
+      const entry = await api.v1.lorebook.entry(ctx.target.entryId);
+      const existing = entry?.keys || [];
+      const seen = new Set<string>();
+      const merged: string[] = [];
+      for (const k of [...existing, ...keys]) {
+        const lower = k.toLowerCase();
+        if (!seen.has(lower)) { seen.add(lower); merged.push(k); }
+      }
+
+      await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys: merged });
 
       // Update draft with parsed keys if viewing this entry
       // (storageKey binding auto-updates UI)
