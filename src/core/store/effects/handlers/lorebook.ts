@@ -9,7 +9,7 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import { buildLorebookPrefill, CATEGORY_TO_TYPE } from "../../../utils/lorebook-strategy";
-import { segaRelationalMapStored } from "../../slices/runtime";
+import { segaRelationalMapStored, segaKeysCompleted } from "../../slices/runtime";
 
 // Cache for prefills during streaming (cleared on completion)
 const prefillCache = new Map<string, string>();
@@ -154,26 +154,42 @@ export const lorebookRelationalMapHandler: GenerationHandlers<LorebookRelational
 };
 
 /**
- * Parse a KEYS: line from lorebook key generation output.
- * Returns trimmed, lowercased, comma-separated keys, or null if no KEYS: line found.
- */
-/**
  * Validate a single key — plain text passes through, regex keys are checked.
- * Fixes missing closing delimiter; drops unparseable regex.
+ * Regex format: /pattern/[imsu] — rejects malformed or overbroad patterns.
+ * Compound keys (parts joined by " & ") are validated recursively.
  */
 function validateKey(key: string): string | null {
+  // Compound key (e.g. "elara & operating") — validate each part
+  if (key.includes(" & ")) {
+    const parts = key.split(" & ").map(p => p.trim()).filter(Boolean);
+    if (parts.length < 2) return null;
+    const validated = parts.map(p => validateKey(p));
+    if (validated.some(v => v === null)) return null;
+    return validated.join(" & ");
+  }
+
+  // Plain text key
   if (!key.startsWith("/")) return key;
-  let regex = key;
-  if (!regex.endsWith("/")) regex += "/";
+
+  // Regex key: must be /pattern/ or /pattern/flags
+  const match = key.match(/^\/(.+)\/([imsu]*)$/);
+  if (!match) {
+    api.v1.log(`[lorebook-keys] dropping malformed regex: ${key}`);
+    return null;
+  }
+  const [, pattern, flags] = match;
   try {
-    const pattern = new RegExp(regex.slice(1, -1));
+    const re = new RegExp(pattern, flags);
     // Reject overbroad patterns that match very short strings
-    const twoCharStrings = ["ab", "el", "th", "an", "in", "re", "st"];
-    if (twoCharStrings.some(s => pattern.test(s))) {
+    const shortStrings = [
+      "ab", "el", "th", "an", "in", "re", "st",
+      "any", "the", "len", "ion", "ing", "ers", "for", "are",
+    ];
+    if (shortStrings.some(s => re.test(s))) {
       api.v1.log(`[lorebook-keys] dropping overbroad regex: ${key}`);
       return null;
     }
-    return regex;
+    return key;
   } catch {
     api.v1.log(`[lorebook-keys] dropping invalid regex: ${key}`);
     return null;
@@ -187,7 +203,12 @@ export function parseLorebookKeys(text: string): string[] | null {
     .replace(/^keys:/i, "")
     .trim()
     .split(",")
-    .map((k) => validateKey(k.trim().replace(/^-\s*/, "").toLowerCase()))
+    .map((k) => {
+      const cleaned = k.trim().replace(/^-\s*/, "");
+      // Don't lowercase regex keys — they control case sensitivity via /i flag
+      const normalized = cleaned.startsWith("/") ? cleaned : cleaned.toLowerCase();
+      return validateKey(normalized);
+    })
     .filter((k): k is string => k !== null && k.length > 0 && k.length < 50);
 }
 
@@ -235,6 +256,9 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
       }
 
       await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys: merged });
+
+      // Mark keys as completed so findEntryNeedingKeys skips this entry
+      ctx.dispatch(segaKeysCompleted({ entryId: ctx.target.entryId }));
 
       // Update draft with parsed keys if viewing this entry
       // (storageKey binding auto-updates UI)

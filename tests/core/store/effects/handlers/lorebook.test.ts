@@ -75,6 +75,83 @@ describe("parseLorebookKeys", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// validateKey (tested indirectly via parseLorebookKeys)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("validateKey via parseLorebookKeys", () => {
+  it("passes through plain-text keys unchanged", () => {
+    expect(parseLorebookKeys("KEYS: elara, voss")).toEqual(["elara", "voss"]);
+  });
+
+  it("keeps valid regex keys that don't match short strings", () => {
+    expect(parseLorebookKeys("KEYS: /anya/, voss")).toEqual(["/anya/", "voss"]);
+  });
+
+  it("drops regex that matches 2-char test strings", () => {
+    expect(parseLorebookKeys("KEYS: /an/, voss")).toEqual(["voss"]);
+  });
+
+  it("drops regex that matches 3-char test strings like 'any'", () => {
+    expect(parseLorebookKeys("KEYS: /any(a|ya)?/, voss")).toEqual(["voss"]);
+  });
+
+  it("drops regex matching 'the'", () => {
+    expect(parseLorebookKeys("KEYS: /the/, voss")).toEqual(["voss"]);
+  });
+
+  it("drops regex matching 'len'", () => {
+    expect(parseLorebookKeys("KEYS: /len(a|na)?/, voss")).toEqual(["voss"]);
+  });
+
+  it("keeps regex that requires more than 3 chars to match", () => {
+    expect(parseLorebookKeys("KEYS: /caldera/, voss")).toEqual(["/caldera/", "voss"]);
+  });
+
+  // Regex with flags
+  it("accepts regex with /i flag", () => {
+    expect(parseLorebookKeys("KEYS: /caldera/i, voss")).toEqual(["/caldera/i", "voss"]);
+  });
+
+  it("accepts regex with no flags (case-sensitive)", () => {
+    expect(parseLorebookKeys("KEYS: /caldera/, voss")).toEqual(["/caldera/", "voss"]);
+  });
+
+  it("accepts regex with multiple valid flags", () => {
+    expect(parseLorebookKeys("KEYS: /vor(tex|tices)/im, voss")).toEqual(["/vor(tex|tices)/im", "voss"]);
+  });
+
+  it("drops malformed regex with no closing slash", () => {
+    expect(parseLorebookKeys("KEYS: /caldera, voss")).toEqual(["voss"]);
+  });
+
+  it("does not lowercase regex keys", () => {
+    const result = parseLorebookKeys("KEYS: /Caldera/i, Voss");
+    expect(result).toEqual(["/Caldera/i", "voss"]);
+  });
+
+  // Compound & keys
+  it("accepts compound & keys", () => {
+    expect(parseLorebookKeys("KEYS: mira & operating, voss")).toEqual(["mira & operating", "voss"]);
+  });
+
+  it("drops compound key when any part is overbroad regex", () => {
+    expect(parseLorebookKeys("KEYS: mira & /th/i, voss")).toEqual(["voss"]);
+  });
+
+  it("accepts compound key with valid regex part", () => {
+    expect(parseLorebookKeys("KEYS: /caldera/i & voss, elara")).toEqual(["/caldera/i & voss", "elara"]);
+  });
+
+  it("drops syntactically invalid regex", () => {
+    expect(parseLorebookKeys("KEYS: /[invalid/, voss")).toEqual(["voss"]);
+  });
+
+  it("strips leading dash from keys", () => {
+    expect(parseLorebookKeys("KEYS: - elara, - voss")).toEqual(["elara", "voss"]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // keysFromDisplayName
 // ─────────────────────────────────────────────────────────────────────────────
 

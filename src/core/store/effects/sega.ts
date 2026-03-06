@@ -168,7 +168,7 @@ async function findEntryNeedingRelationalMap(state: RootState): Promise<DulfsIte
 
 /**
  * Find the next entry whose relational map needs reconciliation.
- * Targets entries with no primary characters and high collision risk —
+ * Targets entries with no related characters and high collision risk —
  * these benefit from a second pass with the full map as context.
  */
 async function findEntryNeedingReconciliation(state: RootState): Promise<DulfsItem | null> {
@@ -207,6 +207,7 @@ async function findEntryNeedingKeys(state: RootState): Promise<DulfsItem | null>
   for (const category of WORLD_ENTRY_CATEGORIES) {
     const items = state.story.dulfs[category] || [];
     for (const item of items) {
+      if (state.runtime.sega.keysCompleted[item.id]) continue;
       const entry = await api.v1.lorebook.entry(item.id);
       if (!entry?.text?.trim()) continue;
       const isStub =

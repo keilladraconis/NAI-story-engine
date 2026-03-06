@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772822979
+updatedAt: 1772830068
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -298,12 +298,17 @@ config:
     default: |-
       Assign activation keys to the lorebook entry below. Keys fire when matched in story text, loading the entry as context.
 
+      KEY TYPES:
+      - Plain text: case-insensitive match. Use for names, places, factions. This is the default and preferred type.
+      - Regex: /pattern/i — case-insensitive regex. Use ONLY for genuine variant matching (plurals, transliterations). Always include the i flag. Never use regex to match name fragments — `elara` is always better than `/el(a|ara)?/i`.
+      - Compound: word1 & word2 — activates only when ALL parts appear in the search window. Use when a word alone would collide with unrelated context.
+
       DIRECTION RULE: Keys pull an entry into the narrative — they do not describe it.
       - Character entries activate when the story enters their domain. Keys are name variants, associated locations, and associated factions. Not traits, roles, or backstory.
       - Location entries activate when the story arrives there. Keys are the location's own name variants and associated factions. Character names are a last resort only when the location has no distinctive proper name (name is: generic, collision risk: high) and is inseparable from specific occupants.
       - Faction/object entries activate through their own name, associated locations, and key figures.
 
-      BANNED: numbers, roles (surgeon, captain), traits (cold, ruthless), themes (debt, power), generic nouns valid in any scene (room, clinic, alley), full multi-word names as a single key, protagonist name on any entry not specifically about the protagonist.
+      BANNED: numbers, roles (surgeon, captain), traits (cold, ruthless), themes (debt, power), generic nouns valid in any scene (room, clinic, alley), full multi-word names as a single key, protagonist name on any entry not specifically about the protagonist, fragmentary name regex.
 
       TARGET: 2–5 keys. Fewer precise keys beat many weak ones.
 
@@ -311,41 +316,55 @@ config:
 
       ENTRY: Mira Voss [Character]
         - primary locations: Caldera Station, Sunken Arcade
-        - primary characters: none named
+        - related characters: none named
         - factions/organizations: Ashfield Syndicate
         - name is: distinctive
         - collision risk: low
 
       REJECTED: surgeon, doctor, cold, debt — traits and role; not anchors to her domain
       REJECTED: mira voss — full multi-word name; split into variants
-      KEYS: /mir(a|ra)?/, voss, caldera station, ashfield
+      REJECTED: /mir(a|ra)?/i — fragmentary name regex; plain mira is simpler and sufficient
+      KEYS: mira, voss, caldera station, ashfield
 
       ---
 
       ENTRY: Sunken Arcade [Location]
         - primary locations: lower city
-        - primary characters: Mira Voss
+        - related characters: Mira Voss
         - factions/organizations: Ashfield Syndicate
         - name is: distinctive
         - collision risk: low
 
       REJECTED: flooded, gambling, smugglers, entertainment — generic descriptors
       REJECTED: mira voss — direction rule: name is distinctive; character names do not activate locations
-      KEYS: sunken arcade, /lower.?city/, ashfield
+      KEYS: sunken arcade, lower city, ashfield
 
       ---
 
       ENTRY: Mira's operating room [Location]
         - primary locations: Sunken Arcade basement
-        - primary characters: Mira Voss
+        - related characters: Mira Voss
         - factions/organizations: none
         - name is: generic
         - collision risk: high
 
       REJECTED: room, basement, operating — common nouns; appear in any scene
       REJECTED: sunken arcade — fires the Arcade entry; collision with a broader location
-      NOTE: name is generic, collision risk high — character names are the only viable anchor
-      KEYS: mira voss, voss
+      NOTE: name is generic, collision risk high — compound key anchors to specific context
+      KEYS: mira & operating, voss
+
+      ---
+
+      ENTRY: Vortex Collective [Faction]
+        - primary locations: Ashmark Spire
+        - related characters: Sable, Director Krin
+        - factions/organizations: City Council (rival)
+        - name is: distinctive
+        - collision risk: low
+
+      REJECTED: collective, group, faction — generic role nouns
+      NOTE: regex matches both singular "Vortex" and plural "Vortices"
+      KEYS: /vor(tex|tices)/i, sable, ashmark
 
       ---
 
@@ -371,7 +390,7 @@ config:
 
       Mira Voss [Character]
         - primary locations: Caldera Station, Sunken Arcade
-        - primary characters: none named
+        - related characters: none named
         - factions/organizations: Ashfield Syndicate
         - name is: distinctive
         - collision risk: low
@@ -381,7 +400,7 @@ config:
       MAP SO FAR:
       Mira Voss [Character]
         - primary locations: Caldera Station, Sunken Arcade
-        - primary characters: none named
+        - related characters: none named
         - factions/organizations: Ashfield Syndicate
         - name is: distinctive
         - collision risk: low
@@ -393,7 +412,7 @@ config:
 
       Sunken Arcade [Location]
         - primary locations: lower city
-        - primary characters: Mira Voss
+        - related characters: Mira Voss
         - factions/organizations: Ashfield Syndicate
         - name is: distinctive
         - collision risk: low
@@ -403,14 +422,14 @@ config:
       MAP SO FAR:
       Mira Voss [Character]
         - primary locations: Caldera Station, Sunken Arcade
-        - primary characters: none named
+        - related characters: none named
         - factions/organizations: Ashfield Syndicate
         - name is: distinctive
         - collision risk: low
 
       Sunken Arcade [Location]
         - primary locations: lower city
-        - primary characters: Mira Voss
+        - related characters: Mira Voss
         - factions/organizations: Ashfield Syndicate
         - name is: distinctive
         - collision risk: low
@@ -422,7 +441,7 @@ config:
 
       Mira's operating room [Location]
         - primary locations: Sunken Arcade basement
-        - primary characters: Mira Voss
+        - related characters: Mira Voss
         - factions/organizations: none
         - name is: generic
         - collision risk: high

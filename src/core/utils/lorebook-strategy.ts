@@ -43,11 +43,11 @@ export const MAP_DEPENDENCY_ORDER: DulfsFieldID[] = [
 
 /**
  * Returns true if a relational map entry needs reconciliation:
- * no primary characters identified AND collision risk is high.
+ * no related characters identified AND collision risk is high.
  * These entries benefit from a second pass with the complete map as context.
  */
 export function parseNeedsReconciliation(mapText: string): boolean {
-  const charLine = mapText.match(/- primary characters:\s*(.*)/i)?.[1]?.trim() ?? "";
+  const charLine = mapText.match(/- related characters:\s*(.*)/i)?.[1]?.trim() ?? "";
   const riskLine = mapText.match(/- collision risk:\s*(.*)/i)?.[1]?.trim() ?? "";
   const noChars = !charLine || /^(none|n\/a|—|-)$/i.test(charLine);
   return noChars && /high/i.test(riskLine);

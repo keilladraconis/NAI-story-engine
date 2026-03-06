@@ -12,6 +12,7 @@ const initialSegaState: SegaState = {
   statusText: "",
   activeRequestIds: [],
   relationalMaps: {},
+  keysCompleted: {},
 };
 
 export const initialRuntimeState: RuntimeState = {
@@ -169,6 +170,20 @@ export const runtimeSlice = createSlice({
         },
       },
     }),
+
+    segaKeysCompleted: (
+      state,
+      payload: { entryId: string },
+    ) => ({
+      ...state,
+      sega: {
+        ...state.sega,
+        keysCompleted: {
+          ...state.sega.keysCompleted,
+          [payload.entryId]: true,
+        },
+      },
+    }),
   },
 });
 
@@ -188,4 +203,5 @@ export const {
   segaReset,
   segaStatusUpdated,
   segaRelationalMapStored,
+  segaKeysCompleted,
 } = runtimeSlice.actions;

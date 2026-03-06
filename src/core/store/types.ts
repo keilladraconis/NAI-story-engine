@@ -23,6 +23,7 @@ export interface SegaState {
   statusText: string; // Current status for UI display
   activeRequestIds: string[]; // Track SEGA-initiated requests for cancellation
   relationalMaps: Record<string, string>; // entryId → map text, ephemeral (cleared on reset)
+  keysCompleted: Record<string, boolean>; // entryId → true when keys generated (cleared on reset)
 }
 
 export const WORLD_ENTRY_CATEGORIES: DulfsFieldID[] = [
