@@ -148,6 +148,25 @@ More random text
     expect((commands[1] as any).content).toBe("");
   });
 
+  it("parses REVISE with optional type argument", () => {
+    const text = `[REVISE FACTION "The Neighborhood Watch"]
+Updated: A paranoid community militia.`;
+
+    const commands = parseCommands(text);
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toEqual({
+      kind: "REVISE",
+      name: "The Neighborhood Watch",
+      content: "Updated: A paranoid community militia.",
+    });
+  });
+
+  it("parses REVISE with type arg same as without", () => {
+    const withType = parseCommands(`[REVISE CHARACTER "Elara"]\nNew content.`);
+    const withoutType = parseCommands(`[REVISE "Elara"]\nNew content.`);
+    expect(withType[0]).toEqual(withoutType[0]);
+  });
+
   it("handles multiline content", () => {
     const text = `[CREATE CHARACTER "Elara"]
 Line one of description.

@@ -113,8 +113,8 @@ export function parseCommands(text: string): ParsedCommand[] {
       continue;
     }
 
-    // [REVISE "Name"]
-    const reviseMatch = line.match(/^\[REVISE\s+"([^"]+)"\]/);
+    // [REVISE "Name"] or [REVISE TYPE "Name"]
+    const reviseMatch = line.match(/^\[REVISE\s+(?:[A-Z]+\s+)?"([^"]+)"\]/);
     if (reviseMatch) {
       const name = reviseMatch[1].trim();
       const content = collectContent(lines, i + 1);
@@ -147,6 +147,11 @@ export function parseCommands(text: string): ParsedCommand[] {
       i += countContentLines(lines, i + 1);
       commands.push({ kind: "CRITIQUE", content });
       continue;
+    }
+
+    // Warn about unrecognized command-like lines
+    if (line.startsWith("[") && line.includes("]")) {
+      api.v1.log(`[crucible-parser] unrecognized command: ${line}`);
     }
   }
 
@@ -251,15 +256,18 @@ export function executeCommands(
       }
 
       case "LINK": {
-        const fromEl = findElementByName(getState(), cmd.fromName);
-        const toEl = findElementByName(getState(), cmd.toName);
-        if (!fromEl) {
-          log.push(`⚠ LINK: "${cmd.fromName}" not found`);
-          break;
-        }
-        if (!toEl) {
-          log.push(`⚠ LINK: "${cmd.toName}" not found`);
-          break;
+        // Auto-create stub elements for LINK targets that don't exist yet
+        for (const name of [cmd.fromName, cmd.toName]) {
+          if (!findElementByName(getState(), name)) {
+            const stub: CrucibleWorldElement = {
+              id: api.v1.uuid(),
+              fieldId: FieldID.DramatisPersonae,
+              name,
+              content: "",
+            };
+            dispatch(elementCreated({ element: stub }));
+            log.push(`✓ AUTO-CREATE CHARACTER "${name}" (stub for LINK)`);
+          }
         }
         const link: CrucibleLink = {
           id: api.v1.uuid(),

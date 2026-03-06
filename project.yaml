@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772744640
+updatedAt: 1772822979
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -147,7 +147,7 @@ config:
 
       **Characters:** Who exists, where they are, starting relationships and active tensions between them.
 
-      **Structure:** Choose the narrative architecture that best fits this story and explain how it applies:
+      **Structure:** If a narrative shape is provided above, use that shape name and explain how it applies to this story. Otherwise, choose the narrative architecture that best fits:
       - *Three-Sphere* — Three interconnected domains (e.g. Industry + Crime + Politics) whose overlaps create dilemmas
       - *Powder Keg* — Multiple forces in unstable equilibrium; any small change cascades
       - *Pressure Cooker* — Confined setting forcing characters with incompatible needs into proximity

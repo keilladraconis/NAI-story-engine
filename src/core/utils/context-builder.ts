@@ -689,6 +689,18 @@ export const createCanonFactory = (
 
     const messages: Message[] = [
       ...prefix,
+    ];
+
+    // Inject Crucible shape if available — guides Structure section
+    const state = getState();
+    if (state.crucible?.shape) {
+      messages.push({
+        role: "system",
+        content: `[NARRATIVE SHAPE]\nThis story uses the narrative shape "${state.crucible.shape.name}": ${state.crucible.shape.instruction}`,
+      });
+    }
+
+    messages.push(
       {
         role: "system",
         content: `[CANON GENERATION]\n${prompt}`,
@@ -697,7 +709,7 @@ export const createCanonFactory = (
         role: "assistant",
         content: "**World:**",
       },
-    ];
+    );
 
     return {
       messages,

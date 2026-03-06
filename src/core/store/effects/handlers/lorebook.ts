@@ -166,7 +166,13 @@ function validateKey(key: string): string | null {
   let regex = key;
   if (!regex.endsWith("/")) regex += "/";
   try {
-    new RegExp(regex.slice(1, -1));
+    const pattern = new RegExp(regex.slice(1, -1));
+    // Reject overbroad patterns that match very short strings
+    const twoCharStrings = ["ab", "el", "th", "an", "in", "re", "st"];
+    if (twoCharStrings.some(s => pattern.test(s))) {
+      api.v1.log(`[lorebook-keys] dropping overbroad regex: ${key}`);
+      return null;
+    }
     return regex;
   } catch {
     api.v1.log(`[lorebook-keys] dropping invalid regex: ${key}`);
@@ -181,7 +187,7 @@ export function parseLorebookKeys(text: string): string[] | null {
     .replace(/^keys:/i, "")
     .trim()
     .split(",")
-    .map((k) => validateKey(k.trim().toLowerCase()))
+    .map((k) => validateKey(k.trim().replace(/^-\s*/, "").toLowerCase()))
     .filter((k): k is string => k !== null && k.length > 0 && k.length < 50);
 }
 
@@ -216,12 +222,15 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
       if (keys.length === 0) return;
 
       // Merge with existing keys (dedup case-insensitive, preserve first casing)
+      // Drop stub key (lowercased displayName) now that real keys exist
       const entry = await api.v1.lorebook.entry(ctx.target.entryId);
       const existing = entry?.keys || [];
+      const stubKey = (entry?.displayName || "").toLowerCase();
       const seen = new Set<string>();
       const merged: string[] = [];
       for (const k of [...existing, ...keys]) {
         const lower = k.toLowerCase();
+        if (lower === stubKey && keys.length > 0) continue;
         if (!seen.has(lower)) { seen.add(lower); merged.push(k); }
       }
 
