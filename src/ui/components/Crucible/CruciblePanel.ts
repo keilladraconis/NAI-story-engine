@@ -8,7 +8,7 @@ import { IntentSection } from "./IntentSection";
 import { TensionsSection } from "./TensionsSection";
 import { BuildPassView } from "./BuildPassView";
 
-const { column } = api.v1.ui.part;
+const { column, row, text, textInput } = api.v1.ui.part;
 
 const CR = IDS.CRUCIBLE;
 
@@ -51,6 +51,20 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
           id: "cr-body",
           style: { flex: "1", overflow: "auto", gap: "8px", padding: "0 10px 10px", "justify-content": "flex-start" },
           content: [
+            row({
+              id: "cr-setting-row",
+              style: { "align-items": "center", gap: "8px" },
+              content: [
+                text({ text: "Setting:", style: { "font-weight": "bold", opacity: 0.8, "white-space": "nowrap" } }),
+                textInput({
+                  id: "cr-setting-input",
+                  initialValue: "Original",
+                  placeholder: "Original, Star Wars...",
+                  storageKey: "story:kse-setting",
+                  style: { flex: 1 },
+                }),
+              ],
+            }),
             column({ id: "cr-shape-wrap", style: {}, content: [shapePart] }),
             column({ id: "cr-intent-wrap", style: {}, content: [intentPart] }),
             column({ id: "cr-tensions-wrap", style: {}, content: [tensionsPart] }),

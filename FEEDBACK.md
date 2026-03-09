@@ -107,7 +107,7 @@ Test 6 used Critic mode for the first time. The Critic's final message — "you 
 
 Critic mode is useful mid-brainstorm: the grain store note and the smell-of-the-city note both came from Critic and materially improved the world. The problem is specifically a catalyst-seeking final message propagating through shape detection, Direction generation, and build pass CRITIQUEs.
 
-**Action:** Document in the walkthrough that Critic mode works best mid-brainstorm, not as the final step before moving to Crucible. A Critic question asking for a plot catalyst should not be the last message before switching panels.
+**Action (walkthrough):** Critic mode works best mid-brainstorm, not as the final step before moving to Crucible. A Critic question asking for a plot catalyst should not be the last message before switching panels. No code fix needed.
 
 ---
 
@@ -132,9 +132,7 @@ The Physician has no personal name. The relmap correctly flags this: "name is: g
 
 This is a world-building gap the engine cannot fill — the Direction never named the character, and the build pass had no mechanism to flag or resolve it.
 
-**Action (short-term):** Ensure the collision risk flag surfaces visibly in the UI so the user knows to add a name before writing.
-
-**Action (long-term):** Prompt the Direction generator to always name all major characters. Consider adding an unnamed protagonist check to the build pass CRITIQUE instructions.
+**Action (walkthrough):** The collision risk flag in the relmap output (`name is: generic, collision risk: high`) is the signal — users should add a personal name to any protagonist with this flag before writing. No code fix needed; this is a world-building gap the engine cannot fill.
 
 ---
 
@@ -159,11 +157,11 @@ This is a world-building gap the engine cannot fill — the Direction never name
 | # | Issue | Severity | Type | Status |
 |---|-------|----------|------|--------|
 | 1 | `crucible-build` needs continuation support | High | Bug | ✅ Improved / open |
-| 4 | Faction Members field not filled | Low | Bug | ⚠️ Partial |
+| 4 | Faction Members field not filled | Low | Bug | 🚫 Not reproducible |
 | 5 | Duplicate key/relmap sets per entry | Medium | Bug | ✅ Fixed R4 |
 | 6 | Leading dash artifacts in keys | Medium | Bug | ✅ Fixed R4 |
 | 8 | Relmap self-reference + duplicate runs | Low | Bug | ✅ Fixed R4 |
 | 17 | Canon shape label wrong / contradicts Direction | Medium | Bug | ✅ Fixed R4 |
-| 18 | Critic mode final message contaminates pipeline | Medium | Design | 🆕 New |
+| 18 | Critic mode final message contaminates pipeline | Medium | Design | 📖 Walkthrough |
 | 19 | Shape description degrades with pre-filled name | Low | Design | ✅ Fixed R4 |
-| 20 | Unnamed protagonist — lorebook collision risk | Medium | Design | 🆕 New |
+| 20 | Unnamed protagonist — lorebook collision risk | Medium | Design | 📖 Walkthrough |

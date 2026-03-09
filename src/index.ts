@@ -17,7 +17,6 @@ import { Input } from "./ui/components/brainstorm/Input";
 
 // Sidebar components
 import { Header } from "./ui/components/Sidebar/Header";
-import { SettingField } from "./ui/components/Sidebar/SettingField";
 import { FieldList } from "./ui/components/Sidebar/FieldList";
 
 // Lorebook components
@@ -67,7 +66,6 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
     const { part: listPart } = mount(List, undefined, store);
     const { part: inputPart } = mount(Input, {}, store);
     const { part: headerPart } = mount(Header, {}, store);
-    const { part: settingPart } = mount(SettingField, {}, store);
     const { part: fieldListPart } = mount(FieldList, {}, store);
     const { part: lorebookPart } = mount(LorebookPanelContent, undefined, store);
     const { part: cruciblePart } = mount(CruciblePanel, undefined, store);
@@ -92,7 +90,7 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
       iconId: "lightning",
       content: [
         column({
-          content: [headerPart, settingPart, fieldListPart],
+          content: [headerPart, fieldListPart],
         }),
       ],
     });

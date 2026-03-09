@@ -29,7 +29,7 @@ This is where your story begins — a freeform conversation with the AI about wh
 **When to move on:** When you feel like you've described the *kind* of story you want to tell — characters, world, tone, conflicts. You don't need a complete outline, just enough creative raw material.
 
 **Tips:**
-- The **Co / Crit** buttons in the header switch the AI between cowriter mode (generative, adds ideas) and critic mode (interrogates your assumptions).
+- The **Co / Crit** buttons in the header switch the AI between cowriter mode (generative, adds ideas) and critic mode (interrogates your assumptions). Critic mode is most useful mid-brainstorm — surface gaps, push back on thin ideas, then switch back to Cowriter to develop them. **Avoid ending on a Critic message before heading to Crucible:** if the last message is a Critic question asking for a plot catalyst or a "missing spark," that framing propagates into Shape, Direction, and the build pass CRITIQUEs. Let the brainstorm end on generative material.
 - If the chat is getting long, click **Sum** to collapse it into a dense summary before heading to Crucible.
 - Use the **folder icon** to manage multiple named sessions — useful for keeping separate story ideas organized.
 
@@ -40,6 +40,10 @@ This is where your story begins — a freeform conversation with the AI about wh
 > *Panel: Crucible*
 
 Crucible turns your brainstorm into a populated world. It works by first identifying the structural shape of your story, then generating dramatic tensions, then building world elements through an iterative command-driven process.
+
+### Setting
+
+At the top of the Crucible panel, set the **Setting** field before generating anything. Type the universe or leave it as "Original" for an original world. This value flows into the lorebook entry headers (e.g. `Setting: Star Wars`) and the Crucible context so generated world elements are grounded in the right universe.
 
 ### 2a. Shape
 
@@ -140,7 +144,8 @@ Start writing, or click Generate in the editor to let the AI continue from the b
 - **Run multiple build passes.** Each pass can refine, add, or remove elements. Use guidance to steer the AI ("add a rival faction," "this character needs a secret"). More passes = richer, more interconnected world.
 - **Edit the Direction freely.** It's the single source of truth for Crucible. A small tweak there changes everything downstream.
 - **Shape is optional but useful.** You can skip it entirely — Direction and Tensions work without it. But setting a shape first (even just typing a name like "Slice of Life") gives Tension generation a clearer structural target.
-- **Name your shape before generating.** If you type a name in the Shape name field before clicking Generate, the AI will only generate the instruction — faster and more focused than letting it invent the name too.
+- **Name your shape before generating.** If you type a name in the Shape name field before clicking Generate, the AI generates only the instruction — faster than blank-name generation. Note: the description should be structural logic (what kind of moment this shape leans toward), not a plot summary. If the output reads like a story pitch or references specific characters, edit it toward the abstract structural principle.
 - **Summarize long brainstorms.** Before heading to Crucible, click **Sum** to compress a sprawling chat into dense material the Direction generator can work with.
 - **The Lorebook panel** (in Lorebook view) lets you refine individual entries with natural language — "make her taller," "add a connection to the Silver Court," "rewrite this as more ominous."
-- **Setting field** in Story Engine: if your story is set in an existing universe (Star Wars, Lord of the Rings), type it in the Setting field before running anything. Leave it as "Original" for original worlds.
+- **Set the Setting field first.** It's at the top of the Crucible panel. If your story is set in an existing universe (Star Wars, Lord of the Rings), type it before generating anything. Defaults to "Original" for original worlds.
+- **Unnamed protagonists and lorebook collision.** If your protagonist has no personal name (e.g., "the physician," "the captain"), their lorebook entry will have a `name is: generic, collision risk: high` flag in its relational map output. A generic key like `physician` will fire on any medical reference in the story text, not just scenes about that character. Before you start writing, open the lorebook entry and add a personal name — then regenerate its keys so the activation is specific.
