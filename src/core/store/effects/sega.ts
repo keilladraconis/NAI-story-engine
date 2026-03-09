@@ -147,6 +147,7 @@ async function findEntryNeedingRelationalMap(state: RootState): Promise<DulfsIte
     const fieldId = MAP_DEPENDENCY_ORDER[i];
     const items = state.story.dulfs[fieldId] || [];
     for (const item of items) {
+      if (state.runtime.sega.relmapsCompleted[item.id]) continue;
       const entry = await api.v1.lorebook.entry(item.id);
       if (!entry?.text?.trim()) continue;
       if (!state.runtime.sega.relationalMaps[item.id]) {
@@ -196,9 +197,9 @@ async function findEntryNeedingReconciliation(state: RootState): Promise<DulfsIt
 
 /**
  * Find the next entry that needs keys generation.
- * Includes entries with no keys AND entries with only a stub key (a single key
- * equal to the entry's lowercased display name), which was inserted by the
- * content handler as a placeholder.
+ * Includes entries with no keys AND entries with only a stub key — a single key
+ * equal to `displayName.toLowerCase()` inserted by the content handler as a
+ * placeholder that also activates the entry in story text immediately.
  */
 async function findEntryNeedingKeys(state: RootState): Promise<DulfsItem | null> {
   const needsKeys: DulfsItem[] = [];
@@ -497,7 +498,7 @@ async function scheduleNextSegaTask(
     }
   }
 
-  // Stage 7: Keys — replaces stub keys with map-informed proper keys
+  // Stage 7: Keys — replaces displayName stub with map-informed proper keys
   if (!skipKeys) {
     const nextKeys = await findEntryNeedingKeys(state);
     if (nextKeys) {

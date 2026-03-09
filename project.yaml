@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1772830068
+updatedAt: 1773062202
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -147,14 +147,14 @@ config:
 
       **Characters:** Who exists, where they are, starting relationships and active tensions between them.
 
-      **Structure:** If a narrative shape is provided above, use that shape name and explain how it applies to this story. Otherwise, choose the narrative architecture that best fits:
+      **Structure:** If [NARRATIVE SHAPE — REQUIRED] is provided above, you MUST use exactly that shape name — do not substitute another. Explain how it applies to this specific story. If no shape is provided, choose the architecture that best fits:
       - *Three-Sphere* — Three interconnected domains (e.g. Industry + Crime + Politics) whose overlaps create dilemmas
       - *Powder Keg* — Multiple forces in unstable equilibrium; any small change cascades
       - *Pressure Cooker* — Confined setting forcing characters with incompatible needs into proximity
       - *Web of Obligations* — Characters bound by debts, secrets, duties; pulling one thread moves everyone
       - *Frontier* — Story at the boundary between known/unknown, old/new; the boundary itself generates conflict
       - *Intimate Power* — Characters connected by desire and separated by power imbalance, hierarchy, or taboo; social roles and proximity make avoidance impossible
-      Name the method, then describe the specific spheres, forces, or tensions it creates in THIS world.
+      Name the shape/architecture, then describe the specific spheres, forces, or tensions it creates in THIS world.
 
       **Tone:** Genre sensibility, atmosphere, and thematic currents to explore.
 

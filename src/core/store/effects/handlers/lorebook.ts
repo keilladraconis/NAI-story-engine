@@ -9,7 +9,7 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import { buildLorebookPrefill, CATEGORY_TO_TYPE } from "../../../utils/lorebook-strategy";
-import { segaRelationalMapStored, segaKeysCompleted } from "../../slices/runtime";
+import { segaRelationalMapStored, segaRelmapsCompleted, segaKeysCompleted } from "../../slices/runtime";
 
 // Cache for prefills during streaming (cleared on completion)
 const prefillCache = new Map<string, string>();
@@ -88,14 +88,12 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
       });
 
       // Insert a stub key so the entry activates in story text immediately.
-      // Stage 7 (keys) will replace this with map-informed proper keys.
-      // The stub is just the lowercased entry name; findEntryNeedingKeys
-      // detects stubs by checking for a single key equal to the display name.
+      // displayName.toLowerCase() doubles as an unambiguous sentinel (single key
+      // matching the lorebook title) and as a useful plain-text activation key.
+      // Stage 7 (keys) replaces it with map-informed proper keys.
       const lorebookEntry = await api.v1.lorebook.entry(entryId);
       const stubKey = (lorebookEntry?.displayName || "").toLowerCase();
-      await api.v1.lorebook.updateEntry(entryId, {
-        keys: [stubKey],
-      });
+      await api.v1.lorebook.updateEntry(entryId, { keys: [stubKey] });
 
       // Update draft with full content if viewing this entry
       if (entryId === currentSelected) {
@@ -130,6 +128,10 @@ export const lorebookRelationalMapHandler: GenerationHandlers<LorebookRelational
 
   async completion(ctx: CompletionContext<LorebookRelationalMapTarget>): Promise<void> {
     if (ctx.generationSucceeded && ctx.accumulatedText.trim()) {
+      // Mark completed BEFORE async reads to prevent re-queue race condition.
+      // segaRelationalMapStored follows shortly after with the full map text.
+      ctx.dispatch(segaRelmapsCompleted({ entryId: ctx.target.entryId }));
+
       // Reconstruct the full map text: the factory's assistant prefill is
       // "${displayName} [${entryType}]\n  - primary locations:" but that prefix
       // is not included in accumulatedText (only the model's continuation is).
@@ -242,8 +244,11 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
 
       if (keys.length === 0) return;
 
+      // Mark completed BEFORE async reads to prevent re-queue race condition
+      ctx.dispatch(segaKeysCompleted({ entryId: ctx.target.entryId }));
+
       // Merge with existing keys (dedup case-insensitive, preserve first casing)
-      // Drop stub key (lowercased displayName) now that real keys exist
+      // Drop the displayName stub — real keys have arrived
       const entry = await api.v1.lorebook.entry(ctx.target.entryId);
       const existing = entry?.keys || [];
       const stubKey = (entry?.displayName || "").toLowerCase();
@@ -256,9 +261,6 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
       }
 
       await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys: merged });
-
-      // Mark keys as completed so findEntryNeedingKeys skips this entry
-      ctx.dispatch(segaKeysCompleted({ entryId: ctx.target.entryId }));
 
       // Update draft with parsed keys if viewing this entry
       // (storageKey binding auto-updates UI)
