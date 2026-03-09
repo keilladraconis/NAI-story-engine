@@ -199,14 +199,33 @@ function validateKey(key: string): string | null {
 }
 
 export function parseLorebookKeys(text: string): string[] | null {
-  const keysLine = text.split("\n").find((l) => /^keys:/i.test(l.trim()));
-  if (!keysLine) return null;
-  return keysLine
-    .replace(/^keys:/i, "")
-    .trim()
+  const lines = text.split("\n");
+  const keyLineIdx = lines.findIndex((l) => /^keys:/i.test(l.trim()));
+  if (keyLineIdx === -1) return null;
+
+  // Extract inline content after "KEYS:" on the same line
+  const inlineContent = lines[keyLineIdx].replace(/^keys:/i, "").trim();
+
+  // If no inline content, LLM used multi-line format — collect subsequent non-blank lines
+  let rawKeys = inlineContent;
+  if (!rawKeys) {
+    const nextLines: string[] = [];
+    for (let i = keyLineIdx + 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) break;
+      if (/^keys:/i.test(line)) break;
+      nextLines.push(line);
+    }
+    rawKeys = nextLines.join(", ");
+  }
+
+  if (!rawKeys) return null;
+
+  return rawKeys
     .split(",")
     .map((k) => {
-      const cleaned = k.trim().replace(/^-\s*/, "");
+      // Wider dash class: hyphen, en-dash, em-dash, bullet, asterisk
+      const cleaned = k.trim().replace(/^[\-\u2013\u2014\u2022*]\s*/, "");
       // Don't lowercase regex keys — they control case sensitivity via /i flag
       const normalized = cleaned.startsWith("/") ? cleaned : cleaned.toLowerCase();
       return validateKey(normalized);
