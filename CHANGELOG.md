@@ -2,6 +2,100 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0] - 2026-03-10
+
+### Added
+
+#### Crucible — Command-Driven Build Loop
+
+The v9 prerequisites → elements pipeline is replaced by a structured command loop where GLM emits discrete world-building commands that are parsed and executed against live world state.
+
+- **Command vocabulary** — GLM emits `[CREATE <TYPE> "<Name>"]`, `[REVISE "<Name>"]`, `[LINK "<From>" → "<To>"]`, `[DELETE "<Name>"]`, `[CRITIQUE]`, and `[DONE]` commands in each build pass. These are parsed by `crucible-command-parser.ts` and executed atomically against the store.
+- **Multi-pass with guidance** — Each build pass is user-triggered. A guidance input accepts freeform instructions (e.g. "add more factions") before kicking off the next pass. Pass 1 establishes the world; subsequent passes refine and extend it.
+- **`[CRITIQUE]` self-assessment loop** — GLM critiques its own output at the end of each pass, identifying gaps and contradictions. The critique is displayed to the user and informs the next pass via a structured `[DONE]` signal.
+- **`[LINK]` relationship graph** — Explicit relationships between world elements are now tracked as `CrucibleLink` objects and displayed in the build view, making cross-element dependencies visible.
+- **`BuildPassView`** — New build UI showing the live command ticker during generation, the command log per pass, all world elements (grouped by DULFS type), and the relationship link graph. Replaces `ReviewView` and `ProgressDisplay`.
+- **`crucible-world-formatter.ts`** — Shared formatter serializes the current world state (elements + links) into a structured text block injected into pass 2+ context.
+
+#### Tensions (formerly Goals)
+
+The "Goals" step is redesigned as **Tensions** — structural pressures and irresolvable conflicts that drive the world, rather than dramatic endpoints to build toward.
+
+- **`TensionsSection`** — Replaces `GoalsSection`. Generates tensions from shape + direction; each tension has an accept/reject toggle (accepted tensions are used in the build pass). Build World button launches the first pass.
+- **`TensionCard`** — Replaces `GoalCard`. Displays tension text with accept/reject and delete controls. No `why` field.
+- **`crucibleTensionsRequested`** — New signal action replacing `crucibleGoalsRequested`.
+- **`crucibleBuildPassRequested`** — New signal action replacing `crucibleBuildRequested`; carries pass number and guidance.
+
+#### Topics — New DULFS Category
+
+- **Topics** (`FieldID.Topics`) — Sixth DULFS category: "What characters discuss — rumors, debates, shared history." Each topic is a name + one-line description of what makes it contentious and who holds which positions. Bidirectionally synced with lorebook.
+- Topic entries flow through SEGA lorebook generation alongside existing DULFS categories.
+
+#### Generation Journal
+
+- **Journal panel** — New sidebar panel (book icon) that records every generation request: label, timestamp, full prompt, response, uncached token count, and success status. Copy as markdown or as a compact digest. Useful for diagnosing prompt quality and cache efficiency.
+- **`generation-journal.ts`** — Backing module persisted to `kse-gen-journal` in storyStorage.
+
+#### Setting Field Moved to Crucible
+
+- The "Setting" text input (formerly in the Story Engine sidebar header) is now a field within the Crucible panel's context section, where it belongs conceptually alongside shape and direction.
+
+### Changed
+
+#### Crucible
+
+- **Tensions replace Goals** — `CrucibleGoal` renamed to `CrucibleTension`. `goals` state array replaced by `tensions`. Phase `"goals"` renamed to `"tensions"`. UI, actions, and handlers updated throughout.
+- **Prerequisites removed** — The separate prerequisite derivation step is gone. The build pass command loop generates world elements directly from tensions.
+- **`passes` log in state** — `CrucibleState` tracks completed build passes as `CrucibleBuildPass[]`, each with its command log and guidance text.
+- **Canon context strengthened** — `createCanonFactory` now injects Crucible Direction as a `[DIRECTION — AUTHORITATIVE]` system message (supersedes brainstorm exchanges on all character and world facts) and Shape as `[NARRATIVE SHAPE — REQUIRED]` (model must use the exact shape name). `contextPinning.tail: 3` pins these to the context window tail when present.
+- **Shape prompt quality** — Added a CRITICAL instruction: description must express structural logic, not a plot synopsis or character list. Pre-filled name generation no longer anchors to specific characters.
+
+#### SEGA — Lorebook Reliability
+
+- **Duplicate relmap runs fixed** — `relmapsCompleted` flag (symmetric with `keysCompleted`) dispatched at the top of the relmap completion handler, before any `await`. Prevents re-queue during the 100ms scheduling window.
+- **Duplicate keys runs fixed** — `keysCompleted` flag moved to the top of the keys completion handler (was dispatched after async lorebook API calls), closing the race window that caused multiple key sets per entry.
+- **Relmap self-reference rule** — Relational map prompt now explicitly prohibits listing the entry's own subject in the related characters field.
+
+#### Lorebook Keys
+
+- **`validateKey` overhaul** — Parses `/pattern/flags` format; supports `i`, `s`, `m`, `u` flags per NAI spec. Rejects malformed regex (no closing `/`). Handles `&` compound keys by splitting on ` & ` and validating each part recursively. Preserves original casing on regex keys.
+- **Overbroad check extended** — 3-character test strings added: `"any"`, `"the"`, `"len"`, `"ion"`, `"ing"`, `"ers"`, `"for"`, `"are"`.
+- **Multi-line `KEYS:` format supported** — `parseLorebookKeys` now detects the multi-line format (header line + one key per subsequent bullet line) and collects correctly. Previously returned empty, leaving stub keys and triggering re-queue.
+- **Dash character class widened** — Strip pattern now matches en-dash, em-dash, and bullet characters (`\u2013`, `\u2014`, `\u2022`, `*`) in addition to ASCII hyphen.
+- **Keys prompt rewritten** — Added KEY TYPES reference section: plain text (preferred), `/regex/i`, compound `&`. Explicitly bans fragmentary name regex. Updated all examples: plain keys predominate, regex only for legitimate plural/variant, compound keys demonstrated with `&`.
+
+### Breaking Changes
+
+- **`CrucibleGoal`** renamed to **`CrucibleTension`**. Persisted goal data is not migrated.
+- **`goals`** replaced by **`tensions`** in `CrucibleState`. Old goal arrays are dropped on upgrade.
+- **`prerequisites`** removed from `CrucibleState`. Prerequisite data is not preserved.
+- **`crucibleGoalsRequested`** renamed to **`crucibleTensionsRequested`**.
+- **`crucibleBuildRequested`** replaced by **`crucibleBuildPassRequested`**.
+- **`goalAcceptanceToggled`** replaced by **`tensionAcceptanceToggled`**.
+- **`goalAdded` / `goalRemoved` / `goalsCleared` / `goalTextUpdated`** replaced by tension equivalents.
+- **`crucibleChain` / `cruciblePrereqs` / `crucibleElements` / `crucibleExpansion`** request types removed. Replaced by **`crucibleTension`** and **`crucibleBuildPass`**.
+- **`ReviewView` / `ProgressDisplay`** removed. Replaced by `BuildPassView`.
+- **`crucible-chain-strategy.ts`** removed. Replaced by `crucible-build-strategy.ts`.
+- **Topics (`FieldID.Topics`)** added as sixth DULFS category. Existing lorebook entries are unaffected, but the Topics panel is new and empty on upgrade.
+
+### Developer
+
+- **`crucible-command-parser.ts`** — Full command parser + executor. `parseCommands(text)` returns typed command objects; `executeCommands(commands, getState, dispatch)` applies them to store and returns a command log.
+- **`crucible-build-strategy.ts`** — `buildBuildPassStrategy` / `createBuildPassFactory`; builds context from direction + tensions + current world state + optional user guidance.
+- **`crucible-world-formatter.ts`** — `formatWorldState` / `formatWorldSummary` for injecting current elements + links into pass context.
+- **`generation-journal.ts`** — `recordEntry`, `formatJournal`, `formatDigest`, `clearJournal`; persisted to `kse-gen-journal`.
+- **`crucible-build.test.ts`** — 12 tests covering command parsing, execution, CREATE/REVISE/LINK/DELETE/CRITIQUE/DONE semantics.
+- **`crucible-command-parser.test.ts`** — 18 tests covering parse edge cases, compound commands, unknown types, malformed input.
+- **`crucible-chain.test.ts` / `crucible-chain-strategy.ts`** — Removed (no callers).
+
+### Developer Notes
+
+- 13 commits on v10 branch.
+- 49 files changed, 3,257 insertions, 2,195 deletions.
+- New UI: `BuildPassView.ts` (507 lines), `TensionsSection.ts`, `TensionCard.ts`, `JournalPanel.ts`.
+- New utilities: `crucible-command-parser.ts`, `crucible-build-strategy.ts`, `crucible-world-formatter.ts`, `generation-journal.ts`.
+- Removed: `GoalsSection.ts`, `ReviewView.ts`, `ProgressDisplay.ts`, `GoalCard.ts`, `crucible-chain-strategy.ts`, `handlers/crucible-chain.ts`, `Sidebar/SettingField.ts`.
+
 ## [0.9.3] - 2026-03-03
 
 ### Fixed

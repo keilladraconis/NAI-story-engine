@@ -8,15 +8,15 @@
 
 A dedicated sidebar panel for freeform idea conversation with the AI. Supports multiple named sessions, a summarize button to compress long chats into dense material, and Co/Crit mode toggle for different AI personas.
 
-### Crucible — Backward-Reasoning World Generator
+### Crucible — Command-Driven World Generator
 
-Crucible derives your world directly from dramatic endpoints. Give it a shape and a direction; it reasons backward to discover what the world must contain.
+Crucible derives your world from structural tensions. Give it a shape and a direction; it identifies the pressures at the core of your story, then builds a world around them through an iterative command loop.
 
 1. **Shape** — AI reads your brainstorm and invents the structural lens your story is leaning toward — any shape, from Climactic Choice to Slice of Life. Edit the name and instruction directly, or generate and refine.
 2. **Direction** — AI distills your brainstorm (informed by the shape) into a dense creative anchor: characters, world, tone, tensions, supporting cast.
-3. **Goals** — AI generates vivid dramatic endpoints, shaped by the structural lens, with a `why` for each. Accept the ones worth building (check = included, X = excluded).
-4. **Build World** — For each accepted goal, Crucible derives prerequisites (relationships, secrets, histories, power structures) then generates world elements (characters, locations, factions, systems, situations) that satisfy them.
-5. **Review & Merge** — Edit elements before merging them into DULFS fields and lorebook. Expand any element post-merge to branch into deeper generation.
+3. **Tensions** — AI identifies the structural pressures and irresolvable conflicts at the heart of the scenario. Accept the ones worth building.
+4. **Build World** — GLM runs a command loop, emitting `CREATE`, `REVISE`, `LINK`, and `DELETE` commands to build world elements (characters, locations, factions, systems, narrative vectors, topics) that embody the tensions. Each pass ends with a self-`CRITIQUE`; you can add guidance and run another pass to extend or refine.
+5. **Merge** — Edit elements and merge them into DULFS fields and lorebook.
 
 ### S.E.G.A. (Story Engine Generate All)
 
@@ -29,7 +29,7 @@ One-button scenario completion. Runs through: ATTG & Style → Canon → Bootstr
 
 ### DULFS & Lorebook Sync
 
-Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics. Every DULFS entry is bidirectionally synced with the NovelAI Lorebook — edits in either direction are reflected immediately.
+Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics, and Topics. Every DULFS entry is bidirectionally synced with the NovelAI Lorebook — edits in either direction are reflected immediately.
 
 ### Lorebook Panel
 
