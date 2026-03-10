@@ -13,7 +13,6 @@ import {
 import { GenerationButton } from "../GenerationButton";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 import { EditableText } from "../EditableText";
-import { formatWorldSummary } from "../../../core/utils/crucible-world-formatter";
 import { escapeForMarkdown } from "../../utils";
 
 const { text, row, column, collapsibleSection, button, multilineTextInput } = api.v1.ui.part;
@@ -39,9 +38,15 @@ const FIELD_LABEL_SINGULAR: Record<DulfsFieldID, string> = {
   [FieldID.Topics]: "Topic",
 };
 
-/** Format element for display. */
+/** Format element for display (name in bold + content). */
 function formatElementDisplay(el: CrucibleWorldElement): string {
-  return el.content || "_No content._";
+  return el.content ? `**${el.name}**\n${el.content}` : `**${el.name}**`;
+}
+
+/** Format raw "Name: content" edit text for display. */
+function formatRawElementDisplay(raw: string): string {
+  const { name, content } = parseElementText(raw);
+  return content ? `**${name}**\n${content}` : `**${name}**`;
 }
 
 /** Format element for editing. */
@@ -91,16 +96,6 @@ export const BuildPassView = defineComponent<undefined, RootState>({
     guidanceLabel: {
       "font-size": "0.8em",
       opacity: "0.6",
-    },
-    btnRow: {
-      gap: "8px",
-      "align-items": "center",
-    },
-    stopBtn: {
-      padding: "5px 10px",
-      "font-size": "0.8em",
-      opacity: "0.7",
-      "align-self": "flex-start",
     },
     // Review-absorbed styles
     mergedText: {
@@ -168,7 +163,7 @@ export const BuildPassView = defineComponent<undefined, RootState>({
             return current ? formatElementText(current) : formatElementText(el);
           },
           placeholder: "Name: description...",
-          initialDisplay: escapeForMarkdown(formatElementDisplay(el), "_No content._"),
+          formatDisplay: formatRawElementDisplay,
           onSave: (raw: string) => {
             const parsed = parseElementText(raw);
             dispatch(elementUpdated({
@@ -177,7 +172,6 @@ export const BuildPassView = defineComponent<undefined, RootState>({
               content: parsed.content,
             }));
           },
-          label: el.name,
           extraControls: [
             button({
               text: "",
@@ -280,9 +274,6 @@ export const BuildPassView = defineComponent<undefined, RootState>({
       return parts;
     };
 
-    // --- World summary ---
-    const initialSummary = formatWorldSummary(state.crucible);
-
     // --- World summary counts ---
     const buildSummaryCount = (): string => {
       const s = ctx.getState();
@@ -328,13 +319,6 @@ export const BuildPassView = defineComponent<undefined, RootState>({
       onGenerate: () => dispatch(crucibleBuildPassRequested()),
     });
 
-    // --- Stop button ---
-    const stopBtn = button({
-      id: "cr-stop-build-btn",
-      text: "Stop",
-      style: this.style?.("stopBtn"),
-      callback: () => dispatch(crucibleStopRequested()),
-    });
 
     // --- Merge button (from ReviewView) ---
     const { part: mergeButton } = ctx.render(ButtonWithConfirmation, {
@@ -361,21 +345,15 @@ export const BuildPassView = defineComponent<undefined, RootState>({
 
     // --- Reactive: update world summary, command log, critique, AND element/link sections ---
     useSelector(
-      (s) => ({
-        elementIds: s.crucible.elements.map((e) => e.id).join(","),
-        linkIds: s.crucible.links.map((l) => l.id).join(","),
-        passCount: s.crucible.passes.length,
-        critique: s.crucible.activeCritique,
-        merged: s.crucible.merged,
-      }),
-      (data) => {
+      (s) => [
+        s.crucible.elements.map((e) => e.id).join(","),
+        s.crucible.links.map((l) => l.id).join(","),
+        String(s.crucible.passes.length),
+        s.crucible.activeCritique ?? "",
+        String(s.crucible.merged),
+      ].join("|"),
+      (_key) => {
         const st = ctx.getState();
-
-        // World summary line
-        const summary = formatWorldSummary(st.crucible);
-        api.v1.ui.updateParts([
-          { id: CR.BUILD_WORLD_SUMMARY, text: summary },
-        ]);
 
         // Command log
         const logLines = st.crucible.passes
@@ -387,8 +365,8 @@ export const BuildPassView = defineComponent<undefined, RootState>({
 
         // Critique display
         api.v1.ui.updateParts([
-          data.critique
-            ? { id: "cr-critique-display", text: `**Self-critique:** ${data.critique}`, style: this.style?.("critiqueText") }
+          st.crucible.activeCritique
+            ? { id: "cr-critique-display", text: `**Self-critique:** ${st.crucible.activeCritique}`, style: this.style?.("critiqueText") }
             : { id: "cr-critique-display", text: "", style: { display: "none" } },
         ]);
 
@@ -428,7 +406,7 @@ export const BuildPassView = defineComponent<undefined, RootState>({
 
         // Merged footer
         api.v1.ui.updateParts([
-          { id: "cr-merged-footer", style: data.merged ? this.style?.("mergedText") : this.style?.("hidden") },
+          { id: "cr-merged-footer", style: st.crucible.merged ? this.style?.("mergedText") : this.style?.("hidden") },
         ]);
       },
     );
@@ -438,11 +416,6 @@ export const BuildPassView = defineComponent<undefined, RootState>({
       style: this.style?.("root"),
       content: [
         text({ text: "Build World", style: { "font-weight": "bold", "font-size": "0.9em" } }),
-        text({
-          id: CR.BUILD_WORLD_SUMMARY,
-          text: initialSummary,
-          style: this.style?.("worldSummary"),
-        }),
         // World summary count
         column({
           id: "cr-review-summary",
@@ -486,10 +459,7 @@ export const BuildPassView = defineComponent<undefined, RootState>({
         text({ text: "Guidance for next pass:", style: this.style?.("guidanceLabel") }),
         guidanceInput,
         // Buttons
-        column({
-          style: this.style?.("btnRow"),
-          content: [nextPassBtn, stopBtn],
-        }),
+        nextPassBtn,
         // Merge
         column({
           id: "cr-merge-footer",

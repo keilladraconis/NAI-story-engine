@@ -59,11 +59,9 @@ export const IntentSection = defineComponent<undefined, RootState>({
 
     // Hide generate button during building phase
     useSelector(
-      (s) => ({
-        phase: s.crucible.phase,
-      }),
-      (slice) => {
-        updateVisibility([[`${CR.DIRECTION_BTN}`, slice.phase === "direction" || slice.phase === "tensions"]]);
+      (s) => s.crucible.phase,
+      (phase) => {
+        updateVisibility([[`${CR.DIRECTION_BTN}`, phase === "direction" || phase === "tensions"]]);
       },
     );
 
