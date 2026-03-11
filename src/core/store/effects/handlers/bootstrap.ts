@@ -7,9 +7,7 @@ import {
 
 // --- Streaming state (reset per generation) ---
 let buffer = "";
-let activeSectionId: number | null = null;
 let opChain: Promise<void> = Promise.resolve();
-let updatePending = false;
 let streamActive = false;
 
 /** Serialize an async document operation onto the chain. */
@@ -17,73 +15,24 @@ function enqueue(fn: () => Promise<void>): void {
   opChain = opChain.then(fn);
 }
 
-/** Coalesced live update — reads buffer at execution time, skips if one is already pending. */
-function scheduleLiveUpdate(): void {
-  if (updatePending) return;
-  updatePending = true;
-  enqueue(async () => {
-    updatePending = false;
-    const text = buffer.trim();
-    if (!text) return;
-    if (activeSectionId === null) {
-      await api.v1.document.appendParagraph({
-        text,
-        source: "instruction",
-        origin: [{
-          position: 0,
-          length: text.length,
-          data: "prompt",
-        }],
-      });
-      const ids = await api.v1.document.sectionIds();
-      activeSectionId = ids[ids.length - 1];
-    } else {
-      await api.v1.document.updateParagraph(activeSectionId, {
-        text,
-        source: "instruction",
-        origin: [{
-          position: 0,
-          length: text.length,
-          data: "prompt"
-        }]
-      });
-    }
-  });
-}
-
 /** Finalize a completed paragraph and reset activeSectionId so the next update creates a new one. */
 function finalizeParagraph(text: string): void {
   enqueue(async () => {
-    if (activeSectionId !== null) {
-      await api.v1.document.updateParagraph(activeSectionId, {
-        text,
-        source: "instruction",
-        origin: [{
-          position: 0,
-          length: text.length,
-          data: "prompt",
-        }],
-      });
-    } else {
-      await api.v1.document.appendParagraph({
-        text,
-        source: "instruction",
-        origin: [{
-          position: 0,
-          length: text.length,
-          data: "prompt",
-        }],
-      });
-    }
-    activeSectionId = null;
+    await api.v1.document.appendParagraph({
+      text,
+      source: "instruction",
+      origin: [{
+        position: 0,
+        length: text.length,
+        data: "prompt",
+      }],
+    });
   });
 }
 
 function resetState(): void {
   buffer = "";
-  activeSectionId = null;
   opChain = Promise.resolve();
-  updatePending = false;
   streamActive = false;
 }
 
@@ -105,9 +54,6 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
         finalizeParagraph(paragraph);
       }
     }
-
-    // Live-update the current in-progress paragraph
-    scheduleLiveUpdate();
   },
 
   async completion(ctx: CompletionContext<BootstrapTarget>): Promise<void> {
@@ -124,27 +70,15 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
     // Flush remaining buffer as final paragraph
     const remaining = buffer.trim();
     if (remaining) {
-      if (activeSectionId !== null) {
-        await api.v1.document.updateParagraph(activeSectionId, {
-          text: remaining,
-          source: "instruction",
-          origin: [{
-            position: 0,
-            length: remaining.length,
-            data: "prompt",
-          }],
-        });
-      } else {
-        await api.v1.document.appendParagraph({
-          text: remaining,
-          source: "instruction",
-          origin: [{
-            position: 0,
-            length: remaining.length,
-            data: "prompt",
-          }],
-        });
-      }
+      await api.v1.document.appendParagraph({
+        text: remaining,
+        source: "instruction",
+        origin: [{
+          position: 0,
+          length: remaining.length,
+          data: "prompt",
+        }],
+      });
     }
 
     resetState();

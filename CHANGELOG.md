@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.2] - 2026-03-11
+
+### Fixed
+
+- **Bootstrap streaming no longer pollutes undo history** — Previously, Bootstrap streamed each token as a live `updateParagraph` call, creating hundreds of undo/redo entries in the NAI editor per generation. The live-update coalescing machinery (`scheduleLiveUpdate`, `updatePending`, in-place `activeSectionId` tracking) has been removed. Paragraphs are now finalized to the document only at `\n\n` boundaries during streaming; the final partial paragraph is written once on completion. This produces one undo entry per paragraph instead of one per token.
+
+### Changed
+
+- **Lorebook Refine supports continuation** — Refine generation now uses `continuation: { maxCalls: 3 }`, allowing the model to continue across up to three calls if the response is cut off mid-entry.
+
 ## [0.10.1] - 2026-03-11
 
 ### Fixed

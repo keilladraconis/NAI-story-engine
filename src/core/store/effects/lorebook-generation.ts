@@ -135,6 +135,7 @@ export function registerLorebookGenerationEffects(
           params: { model: "glm-4-6", max_tokens: 700 },
           target: { type: "lorebookRefine", entryId: selectedEntryId },
           prefillBehavior: "trim",
+          continuation: { maxCalls: 3 },
         }),
       );
     },
