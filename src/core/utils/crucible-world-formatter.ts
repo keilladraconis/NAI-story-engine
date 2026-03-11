@@ -74,6 +74,21 @@ export function formatWorldState(state: CrucibleState): string {
     sections.push(linkLines.join("\n"));
   }
 
+  // Names referenced in links but lacking a world element — GLM must CREATE them
+  if (state.links.length > 0) {
+    const elementNames = new Set(state.elements.map((e) => e.name.toLowerCase()));
+    const missing = new Set<string>();
+    for (const link of state.links) {
+      if (!elementNames.has(link.fromName.toLowerCase())) missing.add(link.fromName);
+      if (!elementNames.has(link.toName.toLowerCase())) missing.add(link.toName);
+    }
+    if (missing.size > 0) {
+      const missingLines = ["[MISSING ELEMENTS]"];
+      for (const name of missing) missingLines.push(`- ${name}`);
+      sections.push(missingLines.join("\n"));
+    }
+  }
+
   // Previous critique
   if (state.activeCritique) {
     sections.push(`[PREVIOUS CRITIQUE]\n${state.activeCritique}`);

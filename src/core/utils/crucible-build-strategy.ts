@@ -56,6 +56,31 @@ export const createBuildPassFactory = (
         userParts.push(`CURRENT WORLD:\n${worldState}`);
       }
       userParts.push(`This is pass ${passNumber}. Refine the existing world — add what's missing, revise what's weak, connect what's isolated.`);
+
+      // Mandatory attention list — these must be handled this pass
+      const { elements, links } = state.crucible;
+      const unfilled = elements.filter((el) => !el.content).map((el) => el.name);
+      const elementNames = new Set(elements.map((e) => e.name.toLowerCase()));
+      const missingFromLinks: string[] = [];
+      for (const link of links) {
+        if (!elementNames.has(link.fromName.toLowerCase())) missingFromLinks.push(link.fromName);
+        if (!elementNames.has(link.toName.toLowerCase())) missingFromLinks.push(link.toName);
+      }
+
+      const requiredLines: string[] = [];
+      if (unfilled.length > 0) {
+        requiredLines.push(
+          `REVISE these elements — they exist but have no description:\n${unfilled.map((n) => `- ${n}`).join("\n")}`,
+        );
+      }
+      if (missingFromLinks.length > 0) {
+        requiredLines.push(
+          `CREATE these elements — referenced in relationships but missing (use the correct TYPE):\n${missingFromLinks.map((n) => `- ${n}`).join("\n")}`,
+        );
+      }
+      if (requiredLines.length > 0) {
+        userParts.push(`REQUIRED THIS PASS:\n${requiredLines.join("\n\n")}`);
+      }
     }
 
     // User guidance

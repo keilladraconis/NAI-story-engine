@@ -256,17 +256,10 @@ export function executeCommands(
       }
 
       case "LINK": {
-        // Auto-create stub elements for LINK targets that don't exist yet
+        // Warn about unknown link endpoints — they surface in MISSING ELEMENTS on the next pass
         for (const name of [cmd.fromName, cmd.toName]) {
           if (!findElementByName(getState(), name)) {
-            const stub: CrucibleWorldElement = {
-              id: api.v1.uuid(),
-              fieldId: FieldID.DramatisPersonae,
-              name,
-              content: "",
-            };
-            dispatch(elementCreated({ element: stub }));
-            log.push(`✓ AUTO-CREATE CHARACTER "${name}" (stub for LINK)`);
+            log.push(`⚠ LINK: "${name}" not found — will appear in MISSING ELEMENTS next pass`);
           }
         }
         const link: CrucibleLink = {

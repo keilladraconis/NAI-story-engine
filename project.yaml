@@ -1,12 +1,12 @@
 compatibilityVersion: naiscript-1.0
 id: e6c35faa-e4f2-4c3b-af4a-d56e4c992d87
 name: Story Engine
-version: 0.10.0
+version: 0.10.1
 createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1773247511
+updatedAt: 1773258785
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -673,7 +673,8 @@ config:
       RULES:
       - Each element name must be UNIQUE. CREATE with an existing name
         will be rejected. Use REVISE to update existing elements.
-      - REVISE any element shown as [unfilled] to give it a proper description.
+      - REVISE any element shown as [unfilled]. CREATE any element listed under
+        [MISSING ELEMENTS] using the correct TYPE for what it actually is.
       - Element types: CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC
       - Every CHARACTER should have relationships to other elements.
       - Aim for a diverse mix of element types — not all characters.

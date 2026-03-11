@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.1] - 2026-03-11
+
+### Fixed
+
+#### Crucible — Build Loop Stub Reliability
+
+- **LINK no longer auto-creates wrong-type stubs** — Previously, `[LINK "A" → "B"]` commands would silently create a CHARACTER stub for any unknown endpoint, even if the referenced element was a Location, System, or Topic. These stubs were then left empty with the wrong type. Now, unknown endpoints are logged as warnings and surface to GLM explicitly instead.
+- **`[MISSING ELEMENTS]` section in world state** — `formatWorldState` now appends a `[MISSING ELEMENTS]` block listing any name referenced in a relationship that has no corresponding world element. GLM sees the missing names and is instructed to CREATE them with the correct type.
+- **`[unfilled]` annotation for empty elements** — World elements with no content now render as `- Name [unfilled]` in the formatted world state, making gaps visible at a glance rather than appearing as a bare name with no signal.
+- **Mandatory revision block in build pass context** — `createBuildPassFactory` now computes unfilled elements and missing link endpoints at JIT time and injects a `REQUIRED THIS PASS:` block directly into the user message. This is more reliable than a world-state annotation alone — the instruction appears prominently and names every element that must be addressed in the current pass.
+
 ## [0.10.0] - 2026-03-10
 
 ### Added
