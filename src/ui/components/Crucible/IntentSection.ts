@@ -32,9 +32,6 @@ export const IntentSection = defineComponent<undefined, RootState>({
         const queued = s.runtime.queue.find((q) => q.type === "crucibleDirection");
         return queued?.id;
       },
-      isDisabledFromProjection: (proj: { activeType: string | undefined }) =>
-        proj.activeType === "crucibleTension" ||
-        proj.activeType === "crucibleBuildPass",
     });
 
     const { part: directionEditablePart } = ctx.render(EditableText, {

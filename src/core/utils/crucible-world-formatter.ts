@@ -57,7 +57,7 @@ export function formatWorldState(state: CrucibleState): string {
       const label = FIELD_LABEL_PLURAL[fieldId] || fieldId;
       elementLines.push(`${label}:`);
       for (const el of fieldElements) {
-        const desc = el.content ? `: ${truncate(el.content, MAX_DESC_LENGTH)}` : "";
+        const desc = el.content ? `: ${truncate(el.content, MAX_DESC_LENGTH)}` : " [unfilled]";
         elementLines.push(`- ${el.name}${desc}`);
       }
     }
