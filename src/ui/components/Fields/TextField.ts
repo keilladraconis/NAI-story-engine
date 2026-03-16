@@ -368,19 +368,14 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
     );
 
     // Sync State -> Display
-    useSelector(
+    ctx.bindPart(
+      textId,
       (state) => state.story.fields[config.id]?.content,
-      (content) => {
-        const safeContent = content || "";
-        api.v1.ui.updateParts([
-          {
-            id: textId,
-            text: (safeContent || "_No content._")
-              .replace(/\n/g, "  \n")
-              .replace(/\</g, "\\<"),
-          },
-        ]);
-      },
+      (content) => ({
+        text: (content || "_No content._")
+          .replace(/\n/g, "  \n")
+          .replace(/\</g, "\\<"),
+      }),
     );
 
     const header = row({
@@ -414,8 +409,6 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
       ],
     });
 
-    const fieldContent = getState().story.fields[config.id]?.content
-
     const sectionContent: UIPart[] = [
       header,
       multilineTextInput({
@@ -427,9 +420,12 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
       }),
       text({
         id: textId,
-        text: fieldContent || "_No content._",
         markdown: true,
         style: this.style?.("textDisplay"),
+        // Initial text populated by bindPart above
+        text: (getState().story.fields[config.id]?.content || "_No content._")
+          .replace(/\n/g, "  \n")
+          .replace(/\</g, "\\<"),
       }),
     ];
 

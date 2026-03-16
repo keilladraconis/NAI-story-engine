@@ -1,4 +1,4 @@
-import { Component } from "nai-act";
+import { defineComponent } from "nai-act";
 import { RootState } from "../../core/store/types";
 import {
   uiCancelRequest,
@@ -142,7 +142,7 @@ const getIconStyles = () => ({
 
 type ButtonMode = "gen" | "queue" | "cancel" | "continue" | "wait" | "disabled";
 
-export const GenerationButton: Component<GenerationButtonProps, RootState> = {
+export const GenerationButton = defineComponent<GenerationButtonProps, RootState>({
   id: (props) => props.id,
 
   build(props, { dispatch, useSelector }) {
@@ -593,15 +593,15 @@ export const GenerationButton: Component<GenerationButtonProps, RootState> = {
       content: [btnGenerate, btnQueued, btnCancel, btnContinue, btnWait],
     });
   },
-};
+});
 
 /** Thin wrapper that pre-configures `variant: "icon"` so callers don't need to repeat it. */
 export type GenerationIconButtonProps = Omit<GenerationButtonProps, "variant" | "label">;
 
-export const GenerationIconButton: Component<GenerationIconButtonProps, RootState> = {
+export const GenerationIconButton = defineComponent<GenerationIconButtonProps, RootState>({
   id: (props) => `${props.id}-icon-wrap`,
   build(props, ctx) {
     const { part } = ctx.render(GenerationButton, { ...props, variant: "icon" });
     return part;
   },
-};
+});

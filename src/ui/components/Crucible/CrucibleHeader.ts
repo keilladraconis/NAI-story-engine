@@ -56,8 +56,7 @@ export const CrucibleHeader = defineComponent<undefined, RootState>({
   },
 
   build(_props, ctx) {
-    const { dispatch, useSelector } = ctx;
-    const state = ctx.getState();
+    const { dispatch } = ctx;
 
     const { part: budgetPart } = ctx.render(BudgetFeedback, { id: "cr-budget" });
 
@@ -70,38 +69,6 @@ export const CrucibleHeader = defineComponent<undefined, RootState>({
         dispatch(crucibleReset());
       },
     });
-
-    // Phase-aware status text
-    useSelector(
-      (s) => s.crucible.phase,
-      (phase) => {
-        const statusStr = PHASE_STATUS[phase] || "";
-        api.v1.ui.updateParts([
-          { id: CR.STATUS_TEXT, text: statusStr, style: statusStr ? this.style?.("statusText") : this.style?.("hidden") },
-        ]);
-      },
-    );
-
-    // Show/hide ticker based on whether a Crucible generation is active; clear text when idle
-    useSelector(
-      (s) => s.runtime.activeRequest?.type,
-      (activeType) => {
-        const active = !!(activeType && CRUCIBLE_GEN_TYPES.has(activeType));
-        if (!active) {
-          api.v1.ui.updateParts([
-            { id: CR.TICKER_TEXT, text: "", style: this.style?.("hidden") },
-          ]);
-        } else {
-          api.v1.ui.updateParts([
-            { id: CR.TICKER_TEXT, style: this.style?.("tickerText") },
-          ]);
-        }
-      },
-    );
-
-    const initialStatus = PHASE_STATUS[state.crucible.phase] || "";
-    const initialActiveType = state.runtime.activeRequest?.type;
-    const tickerVisible = !!(initialActiveType && CRUCIBLE_GEN_TYPES.has(initialActiveType));
 
     return column({
       id: "cr-header",
@@ -117,14 +84,29 @@ export const CrucibleHeader = defineComponent<undefined, RootState>({
         budgetPart,
         text({
           id: CR.STATUS_TEXT,
-          text: initialStatus,
           markdown: true,
-          style: initialStatus ? this.style?.("statusText") : this.style?.("hidden"),
+          ...ctx.bindPart(
+            CR.STATUS_TEXT,
+            (s) => s.crucible.phase,
+            (phase) => {
+              const statusStr = PHASE_STATUS[phase] || "";
+              return { text: statusStr, style: statusStr ? this.style?.("statusText") : this.style?.("hidden") };
+            },
+          ),
         }),
         text({
           id: CR.TICKER_TEXT,
           text: "",
-          style: tickerVisible ? this.style?.("tickerText") : this.style?.("hidden"),
+          ...ctx.bindPart(
+            CR.TICKER_TEXT,
+            (s) => s.runtime.activeRequest?.type,
+            (activeType) => {
+              const active = !!(activeType && CRUCIBLE_GEN_TYPES.has(activeType));
+              return active
+                ? { style: this.style?.("tickerText") }
+                : { text: "", style: this.style?.("hidden") };
+            },
+          ),
         }),
       ],
     });

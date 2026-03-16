@@ -1,4 +1,4 @@
-import { Component } from "nai-act";
+import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import { IDS } from "../../framework/ids";
 import {
@@ -15,11 +15,11 @@ const STYLES = {
   CLEAR_BTN: { flex: "0.3" },
 };
 
-export const Input: Component<{}, RootState> = {
+export const Input = defineComponent<{}, RootState>({
   id: () => `${IDS.BRAINSTORM.INPUT}-area`,
 
   build(_props, ctx) {
-    const { dispatch, useSelector } = ctx;
+    const { dispatch } = ctx;
     const ids = IDS.BRAINSTORM;
 
     // Render child components
@@ -50,25 +50,6 @@ export const Input: Component<{}, RootState> = {
 
     const submit = () => dispatch(uiBrainstormSubmitUserMessage());
 
-    // Reactive State: Only handle Input disabled state
-    useSelector(
-      (state) => ({
-        activeRequest: state.runtime.activeRequest,
-        genxStatus: state.runtime.genx.status,
-      }),
-      ({ activeRequest, genxStatus }) => {
-        const isBrainstormGenerating =
-          activeRequest?.type === "brainstorm" && genxStatus === "generating";
-
-        api.v1.ui.updateParts([
-          {
-            id: ids.INPUT,
-            disabled: isBrainstormGenerating,
-          },
-        ]);
-      },
-    );
-
     return column({
       content: [
         multilineTextInput({
@@ -77,6 +58,12 @@ export const Input: Component<{}, RootState> = {
           storageKey: `story:${ids.INPUT}`,
           style: { "min-height": "60px", "max-height": "120px" },
           onSubmit: submit,
+          // Bind disabled state reactively
+          ...ctx.bindPart(
+            ids.INPUT,
+            (state) => state.runtime.activeRequest?.type === "brainstorm" && state.runtime.genx.status === "generating",
+            (isBrainstormGenerating) => ({ disabled: isBrainstormGenerating }),
+          ),
         }),
         row({
           id: `${ids.INPUT}-btn-row`,
@@ -86,4 +73,4 @@ export const Input: Component<{}, RootState> = {
       ],
     });
   },
-};
+});

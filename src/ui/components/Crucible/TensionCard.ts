@@ -53,12 +53,10 @@ export const TensionCard = defineComponent<TensionCardProps, RootState>({
     const initialAccepted = tension?.accepted ?? true;
 
     // Reactively update view text when this tension's text changes.
-    useSelector(
+    ctx.bindPart(
+      `${ids.TEXT}-view`,
       (s) => s.crucible.tensions.find((t) => t.id === tensionId)?.text,
-      (text) => {
-        const display = escapeForMarkdown(text ?? "_Generating..._");
-        api.v1.ui.updateParts([{ id: `${ids.TEXT}-view`, text: display }]);
-      },
+      (txt) => ({ text: escapeForMarkdown(txt ?? "_Generating..._") }),
     );
 
     const acceptBtn = api.v1.ui.part.button({

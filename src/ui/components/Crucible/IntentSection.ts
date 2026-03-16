@@ -45,13 +45,10 @@ export const IntentSection = defineComponent<undefined, RootState>({
     });
 
     // Direction display — update view text when state changes (e.g. from generation)
-    useSelector(
+    ctx.bindPart(
+      `${CR.DIRECTION_TEXT}-view`,
       (s) => s.crucible.direction,
-      (direction) => {
-        api.v1.ui.updateParts([
-          { id: `${CR.DIRECTION_TEXT}-view`, text: direction ? escapeForMarkdown(direction) : "" },
-        ]);
-      },
+      (direction) => ({ text: direction ? escapeForMarkdown(direction) : "" }),
     );
 
     // Hide generate button during building phase

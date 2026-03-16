@@ -10,46 +10,8 @@ export const List = defineComponent({
   id: () => IDS.BRAINSTORM.LIST,
 
   build(_props: void, ctx: BindContext<RootState>) {
-    const { useSelector } = ctx;
-    let messageCleanups: (() => void)[] = [];
-
-    // Read initial messages
-    const initialMessages = currentMessages(ctx.getState().brainstorm);
-    const initialReversed = initialMessages.slice().reverse();
-    const initialChildren = initialReversed.map((msg) => {
-      const { part, unmount } = ctx.render(Message, { message: msg });
-      messageCleanups.push(unmount);
-      return part;
-    });
-
-    // Subscribe for future changes
-    useSelector(
-      (state) => currentMessages(state.brainstorm),
-      (messages) => {
-        // Cleanup previous
-        messageCleanups.forEach((fn) => fn());
-        messageCleanups = [];
-
-        const reversed = messages.slice().reverse();
-
-        const children = reversed.map((msg) => {
-          const { part, unmount } = ctx.render(Message, { message: msg });
-          messageCleanups.push(unmount);
-          return part;
-        });
-
-        api.v1.ui.updateParts([
-          {
-            id: IDS.BRAINSTORM.LIST,
-            content: children,
-          },
-        ]);
-      },
-    );
-
     return column({
       id: IDS.BRAINSTORM.LIST,
-      content: initialChildren,
       style: {
         flex: 1,
         overflow: "auto",
@@ -59,6 +21,12 @@ export const List = defineComponent({
         "flex-direction": "column-reverse",
         "justify-content": "flex-start",
       },
+      content: ctx.bindList(
+        IDS.BRAINSTORM.LIST,
+        (state) => currentMessages(state.brainstorm).slice().reverse(),
+        (msg) => msg.id,
+        (msg) => ({ component: Message, props: { message: msg } }),
+      ),
     });
   },
 });

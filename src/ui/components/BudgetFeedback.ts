@@ -1,4 +1,4 @@
-import { Component } from "nai-act";
+import { defineComponent } from "nai-act";
 import { RootState } from "../../core/store/types";
 import { uiUserPresenceConfirmed } from "../../core/store";
 import { NAI_HEADER, NAI_DARK_BACKGROUND, NAI_PARAGRAPH } from "../colors";
@@ -9,29 +9,29 @@ export interface BudgetFeedbackProps {
 
 const { button, row, text } = api.v1.ui.part;
 
-const styles = {
-  root: {
-    gap: "4px",
-    "align-items": "center",
-  },
-  continueBtn: {
-    padding: "3px 8px",
-    "font-size": "0.75em",
-    background: NAI_HEADER,
-    color: NAI_DARK_BACKGROUND,
-    "border-radius": "4px",
-    "font-weight": "bold",
-  },
-  waitText: {
-    "font-size": "0.75em",
-    color: NAI_PARAGRAPH,
-    opacity: "0.7",
-  },
-  hidden: { display: "none" },
-};
-
-export const BudgetFeedback: Component<BudgetFeedbackProps, RootState> = {
+export const BudgetFeedback = defineComponent<BudgetFeedbackProps, RootState>({
   id: (props) => props.id,
+
+  styles: {
+    root: {
+      gap: "4px",
+      "align-items": "center",
+    },
+    continueBtn: {
+      padding: "3px 8px",
+      "font-size": "0.75em",
+      background: NAI_HEADER,
+      color: NAI_DARK_BACKGROUND,
+      "border-radius": "4px",
+      "font-weight": "bold",
+    },
+    waitText: {
+      "font-size": "0.75em",
+      color: NAI_PARAGRAPH,
+      opacity: "0.7",
+    },
+    hidden: { display: "none" },
+  },
 
   build(props, { dispatch, useSelector }) {
     const { id } = props;
@@ -80,11 +80,11 @@ export const BudgetFeedback: Component<BudgetFeedbackProps, RootState> = {
         api.v1.ui.updateParts([
           {
             id: continueId,
-            style: showContinue ? styles.continueBtn : styles.hidden,
+            style: showContinue ? this.style?.("continueBtn") : this.style?.("hidden"),
           },
           {
             id: waitId,
-            style: showWait ? styles.waitText : styles.hidden,
+            style: showWait ? this.style?.("waitText") : this.style?.("hidden"),
           },
         ]);
 
@@ -105,21 +105,21 @@ export const BudgetFeedback: Component<BudgetFeedbackProps, RootState> = {
 
     return row({
       id,
-      style: styles.root,
+      style: this.style?.("root"),
       content: [
         button({
           id: continueId,
           text: "Continue",
           iconId: "fast-forward",
-          style: styles.hidden,
+          style: this.style?.("hidden"),
           callback: handleContinue,
         }),
         text({
           id: waitId,
           text: "",
-          style: styles.hidden,
+          style: this.style?.("hidden"),
         }),
       ],
     });
   },
-};
+});

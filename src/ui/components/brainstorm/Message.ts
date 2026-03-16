@@ -88,25 +88,18 @@ export const Message = defineComponent({
       },
     );
 
-    // Bind: Content Updates (Streaming)
-    useSelector(
-      (state) =>
-        currentMessages(state.brainstorm).find((m) => m.id === props.message.id)
-          ?.content,
-      (content) => {
-        if (content !== undefined) {
-          api.v1.ui.updateParts([{ id: ids.TEXT, text: content }]);
-        }
-      },
-    );
-
     // --- View Mode ---
 
     const textDisplay = text({
       id: ids.TEXT,
-      text: message.content,
       markdown: true,
       style: this.style?.("textDisplay"),
+      // Bind content reactively (handles streaming updates)
+      ...ctx.bindPart(
+        ids.TEXT,
+        (state) => currentMessages(state.brainstorm).find((m) => m.id === props.message.id)?.content,
+        (content) => ({ text: content ?? message.content }),
+      ),
     });
 
     const viewButtons = row({

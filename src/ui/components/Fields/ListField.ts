@@ -60,7 +60,6 @@ export const ListField = defineComponent<ListFieldProps, RootState>({
     const sectionId = `section-${props.id}`;
     const itemsColId = `items-col-${props.id}`;
     const listGenId = `gen-list-${props.id}`;
-    const itemParts = new Map<string, { part: UIPart; unmount: () => void }>();
 
     // Helper to resize all item textareas based on stored content
     const updateItemHeights = async (list: DulfsItem[]) => {
@@ -163,56 +162,20 @@ export const ListField = defineComponent<ListFieldProps, RootState>({
       },
     );
 
-    // Read initial items
+    // Initialize display state
     const initialItems =
       ctx.getState().story.dulfs[props.id as DulfsFieldID] || [];
-
-    // Mount initial items
-    for (const item of initialItems) {
-      itemParts.set(item.id, ctx.render(ListItem, { config: props, item }));
-    }
-
-    // Initialize display state (selectors only fire on future changes)
     api.v1.ui.updateParts([{
       id: sectionId,
       style: this.style?.(borderStyleMap[initialItems.length > 0 ? "complete" : "empty"]),
     }]);
     updateTitleWithCount(initialItems);
 
-    // Sync Items on future changes
+    // Side effects on item list changes (heights + title count)
     useSelector(
       (state) => state.story.dulfs[props.id as DulfsFieldID] || [],
       async (list) => {
-        // Mount new items
-        for (const item of list) {
-          if (!itemParts.has(item.id)) {
-            itemParts.set(
-              item.id,
-              ctx.render(ListItem, { config: props, item }),
-            );
-          }
-        }
-
-        // Unmount removed items
-        for (const [id] of itemParts) {
-          if (!list.some((item) => item.id === id)) {
-            itemParts.get(id)!.unmount();
-            itemParts.delete(id);
-          }
-        }
-
-        // Update container content
-        api.v1.ui.updateParts([
-          {
-            id: itemsColId,
-            content: list.map((item) => itemParts.get(item.id)!.part),
-          },
-        ]);
-
-        // Resize textareas after re-render replaces the subtree
         await updateItemHeights(list);
-
-        // Update title with lorebook count
         await updateTitleWithCount(list);
       },
     );
@@ -237,11 +200,16 @@ export const ListField = defineComponent<ListFieldProps, RootState>({
           text: props.description,
           style: this.style?.("description"),
         }),
-        // Items List
+        // Items List — bindList handles mount/unmount/reorder automatically
         column({
           id: itemsColId,
           style: this.style?.("itemsColumn"),
-          content: initialItems.map((item) => itemParts.get(item.id)!.part),
+          content: ctx.bindList(
+            itemsColId,
+            (state) => state.story.dulfs[props.id as DulfsFieldID] || [],
+            (item) => item.id,
+            (item) => ({ component: ListItem, props: { config: props, item } }),
+          ),
         }),
         // Actions
         row({
