@@ -10,11 +10,7 @@ import {
 import { buildPassCompleted } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
 import { parseCommands, executeCommands } from "../../../utils/crucible-command-parser";
-
-/** Strip thinking-tag breakout artifacts from generated text. */
-function stripThinkingTags(text: string): string {
-  return text.replace(/<\/?think>/g, "").replace(/<think>[\s\S]*$/g, "");
-}
+import { stripThinkingTags } from "../../../utils/tag-parser";
 
 type BuildPassTarget = { type: "crucibleBuildPass"; passNumber: number };
 

@@ -38,7 +38,7 @@ export const BudgetFeedback = defineComponent<BudgetFeedbackProps, RootState>({
     const continueId = `${id}-continue`;
     const waitId = `${id}-wait`;
 
-    let timerId: any = null;
+    let timerId: number | null = null;
     let isTimerActive = false;
 
     const handleContinue = () => {

@@ -110,7 +110,7 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
     });
 
     // 6. Conditional: Generation Journal panel
-    const panels: any[] = [
+    const panels: UIExtension[] = [
       brainstormPanel,
       cruciblePanel,
       storyEnginePanel,

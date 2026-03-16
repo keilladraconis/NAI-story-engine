@@ -110,13 +110,14 @@ export async function syncEratoCompatibility(
     const entry = await api.v1.lorebook.entry(entryId);
     if (!entry?.text) continue;
 
-    if (erato && !entry.text.startsWith("----\n")) {
+    const ERATO_SEPARATOR = "----\n";
+    if (erato && !entry.text.startsWith(ERATO_SEPARATOR)) {
       await api.v1.lorebook.updateEntry(entryId, {
-        text: "----\n" + entry.text,
+        text: ERATO_SEPARATOR + entry.text,
       });
-    } else if (!erato && entry.text.startsWith("----\n")) {
+    } else if (!erato && entry.text.startsWith(ERATO_SEPARATOR)) {
       await api.v1.lorebook.updateEntry(entryId, {
-        text: entry.text.slice(5),
+        text: entry.text.slice(ERATO_SEPARATOR.length),
       });
     }
   }

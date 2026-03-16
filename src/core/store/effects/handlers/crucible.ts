@@ -10,12 +10,7 @@ import {
 } from "../../index";
 import { IDS } from "../../../../ui/framework/ids";
 import { CrucibleTension } from "../../types";
-import { splitSections } from "../../../utils/tag-parser";
-
-/** Strip thinking-tag breakout artifacts from generated text. */
-function stripThinkingTags(text: string): string {
-  return text.replace(/<\/?think>/g, "").replace(/<think>[\s\S]*$/g, "");
-}
+import { splitSections, stripThinkingTags } from "../../../utils/tag-parser";
 
 // --- Types for crucible targets ---
 

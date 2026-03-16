@@ -116,7 +116,7 @@ export function registerBrainstormEffects(
       }
 
       const lastMessage = currentMessages(getLatest().brainstorm).at(-1);
-      if (lastMessage?.role == "user") {
+      if (lastMessage?.role === "user") {
         assistantId = api.v1.uuid();
         const assistantMsg: BrainstormMessage = {
           id: assistantId,

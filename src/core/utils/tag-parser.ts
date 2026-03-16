@@ -92,6 +92,11 @@ export function parseTagAll(text: string, tag: string): string[] {
   return results;
 }
 
+/** Strip `<think>` / `</think>` breakout artifacts from generated text. */
+export function stripThinkingTags(text: string): string {
+  return text.replace(/<\/?think>/g, "").replace(/<think>[\s\S]*$/g, "");
+}
+
 /** Split text into sections by `===` separator, trimmed and non-empty. */
 export function splitSections(text: string, sep = "+++"): string[] {
   return text

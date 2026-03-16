@@ -108,53 +108,18 @@ export const TensionsSection = defineComponent<undefined, RootState>({
       ...tensionsBtnProps,
     });
 
-    // --- Per-tension card cache ---
-    const tensionCardCache = new Map<string, { part: UIPart; unmount: () => void }>();
-
-    const ensureTensionCard = (tensionId: string): UIPart => {
-      const existing = tensionCardCache.get(tensionId);
-      if (existing) return existing.part;
-      const result = ctx.render(TensionCard, { tensionId });
-      tensionCardCache.set(tensionId, result);
-      return result.part;
-    };
-
     const hasTensions = tensions.length > 0;
-    const initialTensionCards = tensions.map((t) => ensureTensionCard(t.id));
 
-    // --- Reactive: rebuild tension list ---
-    const rebuildTensionsList = (): void => {
-      const st = ctx.getState();
-      const currentTensions = st.crucible.tensions;
-      const nowEmpty = currentTensions.length === 0;
-
-      // Swap controls visibility
-      api.v1.ui.updateParts([
-        { id: "cr-empty-row", style: nowEmpty ? this.style?.("headerRow") : this.style?.("hidden") },
-        { id: "cr-tension-controls", style: nowEmpty ? this.style?.("hidden") : this.style?.("headerRow") },
-      ]);
-
-      if (nowEmpty) {
-        for (const { unmount } of tensionCardCache.values()) unmount();
-        tensionCardCache.clear();
-        api.v1.ui.updateParts([{ id: CR.TENSIONS_LIST, style: this.style?.("hidden") }]);
-        return;
-      }
-
-      // Unmount all cached cards so they re-render with fresh state from getState()
-      for (const { unmount } of tensionCardCache.values()) unmount();
-      tensionCardCache.clear();
-
-      api.v1.ui.updateParts([{
-        id: CR.TENSIONS_LIST,
-        style: this.style?.("tensionsList"),
-        content: currentTensions.map((t) => ensureTensionCard(t.id)),
-      }]);
-    };
-
+    // Reactive: toggle empty/populated controls visibility
     useSelector(
-      (s) => s.crucible.tensions.map((t) => t.id).join(","),
-      () => rebuildTensionsList(),
+      (s) => s.crucible.tensions.length > 0,
+      (hasTensionsNow) => {
+        api.v1.ui.updateParts([
+          { id: "cr-empty-row", style: hasTensionsNow ? this.style?.("hidden") : this.style?.("headerRow") },
+          { id: "cr-tension-controls", style: hasTensionsNow ? this.style?.("headerRow") : this.style?.("hidden") },
+          { id: CR.TENSIONS_LIST, style: hasTensionsNow ? this.style?.("tensionsList") : this.style?.("hidden") },
+        ]);
+      },
     );
 
     return column({
@@ -186,7 +151,12 @@ export const TensionsSection = defineComponent<undefined, RootState>({
             column({
               id: CR.TENSIONS_LIST,
               style: hasTensions ? this.style?.("tensionsList") : this.style?.("hidden"),
-              content: initialTensionCards,
+              content: ctx.bindList(
+                CR.TENSIONS_LIST,
+                (s) => s.crucible.tensions,
+                (t) => t.id,
+                (t) => ({ component: TensionCard, props: { tensionId: t.id } }),
+              ),
             }),
           ],
         }),

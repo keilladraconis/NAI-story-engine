@@ -149,7 +149,7 @@ export const GenerationButton = defineComponent<GenerationButtonProps, RootState
     const { id, variant = "button", label = "", style = {}, iconId } = props;
     const buttonStyles = getButtonStyles();
     const iconStyles = getIconStyles();
-    let timerId: any = null;
+    let timerId: number | null = null;
     let isTimerActive = false;
     let hasContent = props.hasContent ?? false;
     let lastMode: ButtonMode | null = null;
