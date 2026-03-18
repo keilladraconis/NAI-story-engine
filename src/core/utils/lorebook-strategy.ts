@@ -2,6 +2,7 @@ import { RootState } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix, formatCrucibleElementsContext } from "./context-builder";
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
+import { STORAGE_KEYS } from "../../ui/framework/ids";
 
 // Category-to-template mapping
 const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
@@ -92,13 +93,13 @@ export const createLorebookContentFactory = (
 
     // Item's short description from DULFS
     const itemContent = String(
-      (await api.v1.storyStorage.get(`dulfs-item-${entryId}`)) || "",
+      (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(entryId))) || "",
     );
 
     // Anchored assistant prefill
     const entryType = getEntryType(categoryName);
     const setting = String(
-      (await api.v1.storyStorage.get("kse-setting")) || "",
+      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
     );
     const assistantPrefill = `Name: ${displayName}
 Type: ${entryType}
@@ -306,7 +307,7 @@ export const createLorebookRefineFactory = (
 
     const entryType = getEntryType(categoryName);
     const setting = String(
-      (await api.v1.storyStorage.get("kse-setting")) || "",
+      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
     );
 
     // Get template based on category
@@ -409,7 +410,7 @@ export const buildLorebookPrefill = async (
 
   const entryType = getEntryType(categoryName);
   const setting = String(
-    (await api.v1.storyStorage.get("kse-setting")) || "",
+    (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
   );
 
   return `Name: ${displayName}

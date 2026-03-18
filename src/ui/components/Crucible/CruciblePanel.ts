@@ -1,6 +1,6 @@
 import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
-import { IDS } from "../../framework/ids";
+import { IDS, STORAGE_KEYS } from "../../framework/ids";
 import { CrucibleHeader } from "./CrucibleHeader";
 import { ShapeSection } from "./ShapeSection";
 import { IntentSection } from "./IntentSection";
@@ -44,7 +44,7 @@ export const CruciblePanel = defineComponent<undefined, RootState>({
                   id: "cr-setting-input",
                   initialValue: "Original",
                   placeholder: "Original, Star Wars...",
-                  storageKey: "story:kse-setting",
+                  storageKey: STORAGE_KEYS.SETTING_UI,
                   style: { flex: 1 },
                 }),
               ],

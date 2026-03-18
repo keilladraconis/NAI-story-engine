@@ -1,6 +1,6 @@
 import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
-import { IDS } from "../../framework/ids";
+import { IDS, STORAGE_KEYS } from "../../framework/ids";
 import {
   messagesCleared,
   uiBrainstormSubmitUserMessage,
@@ -55,7 +55,7 @@ export const Input = defineComponent<{}, RootState>({
         multilineTextInput({
           id: ids.INPUT,
           placeholder: "Type an idea...",
-          storageKey: `story:${ids.INPUT}`,
+          storageKey: STORAGE_KEYS.brainstormInputUI(ids.INPUT),
           style: { "min-height": "60px", "max-height": "120px" },
           onSubmit: submit,
           // Bind disabled state reactively

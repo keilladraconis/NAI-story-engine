@@ -8,7 +8,7 @@ import { migrateLorebookCategories } from "./core/store/effects/lorebook-sync";
 import { GenX } from "nai-gen-x";
 import { mount } from "nai-act";
 import { stateUpdated, requestActivated } from "./core/store/slices/runtime";
-import { IDS } from "./ui/framework/ids";
+import { IDS, STORAGE_KEYS } from "./ui/framework/ids";
 
 // Brainstorm components
 import { BrainstormHeader } from "./ui/components/brainstorm/BrainstormHeader";
@@ -52,7 +52,7 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
     registerEffects(store, genX);
 
     // 3. Load Data
-    const persisted = await api.v1.storyStorage.get("kse-persist");
+    const persisted = await api.v1.storyStorage.get(STORAGE_KEYS.PERSIST);
     if (persisted) store.dispatch(persistedDataLoaded(persisted));
 
     // 3b. Migrate legacy lorebook category names

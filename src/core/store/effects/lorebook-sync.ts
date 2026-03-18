@@ -6,7 +6,8 @@ import {
   storyCleared,
   queueCleared,
 } from "../index";
-import { DulfsFieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
+import { DulfsFieldID, FieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
+import { STORAGE_KEYS } from "../../../ui/framework/ids";
 import { extractDulfsItemName } from "../../utils/context-builder";
 import { attgForMemory } from "../../utils/filters";
 
@@ -28,7 +29,7 @@ const CATEGORY_RENAME_MAP: Record<string, string> = {
 export async function migrateLorebookCategories(): Promise<void> {
   const categories = await api.v1.lorebook.categories();
   for (const category of categories) {
-    const newName = CATEGORY_RENAME_MAP[category.name];
+    const newName = category.name && CATEGORY_RENAME_MAP[category.name];
     if (newName) {
       await api.v1.lorebook.updateCategory(category.id, { name: newName });
       api.v1.log(`[lorebook] Renamed category "${category.name}" → "${newName}"`);
@@ -146,9 +147,9 @@ export async function syncEratoCompatibility(
   }
 
   // Re-sync ATTG → Memory through attgForMemory (adds/removes [ S:4 ] as needed)
-  const attgSyncEnabled = await api.v1.storyStorage.get("kse-sync-attg-memory");
+  const attgSyncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_ATTG_MEMORY);
   if (attgSyncEnabled) {
-    const attgContent = String((await api.v1.storyStorage.get("kse-field-attg")) || "");
+    const attgContent = String((await api.v1.storyStorage.get(STORAGE_KEYS.field(FieldID.ATTG))) || "");
     if (attgContent) {
       await api.v1.memory.set(await attgForMemory(attgContent));
     }
@@ -166,7 +167,7 @@ export function registerLorebookSyncEffects(
     async (action) => {
       const { fieldId, item } = action.payload;
       const content =
-        (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "";
+        (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(item.id))) || "";
 
       const name = extractDulfsItemName(String(content), fieldId);
 
@@ -186,7 +187,7 @@ export function registerLorebookSyncEffects(
     const { fieldId, itemId } = action.payload;
 
     await api.v1.lorebook.removeEntry(itemId);
-    await api.v1.storyStorage.set(`dulfs-item-${itemId}`, null);
+    await api.v1.storyStorage.set(STORAGE_KEYS.dulfsItem(itemId), null);
 
     const categoryId = await findCategory(fieldId);
     if (categoryId) {

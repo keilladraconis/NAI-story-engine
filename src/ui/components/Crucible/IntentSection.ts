@@ -1,7 +1,7 @@
 import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
 import { crucibleDirectionRequested, crucibleDirectionEdited } from "../../../core/store/slices/crucible";
-import { IDS } from "../../framework/ids";
+import { IDS, STORAGE_KEYS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
 import { EditableText } from "../EditableText";
 import { escapeForMarkdown, updateVisibility } from "../../utils";
@@ -63,7 +63,7 @@ export const IntentSection = defineComponent<undefined, RootState>({
       id: CR.DIRECTION_SECTION,
       title: "Direction",
       initialCollapsed: true,
-      storageKey: "story:cr-direction-collapsed",
+      storageKey: STORAGE_KEYS.CR_DIRECTION_COLLAPSED_UI,
       style: { overflow: "visible" },
       content: [directionEditablePart],
     });

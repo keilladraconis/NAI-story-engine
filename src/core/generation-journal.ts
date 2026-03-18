@@ -1,4 +1,6 @@
-const STORAGE_KEY = "kse-gen-journal";
+import { STORAGE_KEYS } from "../ui/framework/ids";
+
+const STORAGE_KEY = STORAGE_KEYS.JOURNAL;
 
 export interface JournalEntry {
   id: string;
@@ -12,13 +14,16 @@ export interface JournalEntry {
 }
 
 let journal: JournalEntry[] = [];
+let enabled = false;
 
 export async function loadJournal(): Promise<void> {
   const stored = await api.v1.storyStorage.get(STORAGE_KEY);
   journal = Array.isArray(stored) ? stored : [];
+  enabled = true;
 }
 
 export async function recordEntry(entry: JournalEntry): Promise<void> {
+  if (!enabled) return;
   journal.push(entry);
   await api.v1.storyStorage.set(STORAGE_KEY, journal);
 }

@@ -3,6 +3,7 @@ import {
   defineComponent,
 } from "nai-act";
 import { BrainstormMessage, RootState } from "../../../core/store/types";
+import { STORAGE_KEYS } from "../../framework/ids";
 import {
   messageRemoved,
   uiBrainstormMessageEditBegin,
@@ -148,7 +149,7 @@ export const Message = defineComponent({
 
     const textInput = multilineTextInput({
       id: ids.INPUT,
-      storageKey: `story:draft-${ids.INPUT}`,
+      storageKey: `story:${STORAGE_KEYS.brainstormDraft(ids.INPUT)}`,
       style: {
         ...this.style?.("textInput"),
         height: calculateTextAreaHeight(message.content),

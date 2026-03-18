@@ -2,6 +2,7 @@ import { defineComponent } from "nai-act";
 import { RootState, DulfsItem } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
 import { dulfsItemRemoved } from "../../../core/store/slices/story";
+import { STORAGE_KEYS } from "../../framework/ids";
 import { uiLorebookItemGenerationRequested } from "../../../core/store/slices/ui";
 import { GenerationIconButton } from "../GenerationButton";
 import { extractDulfsItemName } from "../../../core/utils/context-builder";
@@ -86,7 +87,7 @@ export const ListItem = defineComponent<ListItemProps, RootState>({
         multilineTextInput({
           id: contentInputId,
           initialValue: "",
-          storageKey: `story:dulfs-item-${entryId}`,
+          storageKey: STORAGE_KEYS.dulfsItemUI(entryId),
           style: inputStyle("3rem"),
           onChange: async (value: string) => {
             // Extract name using field-specific parser and sync to lorebook displayName only

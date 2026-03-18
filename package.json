@@ -27,7 +27,7 @@
     "nai-act": "^0.2.0",
     "nai-gen-x": "^0.3.0",
     "nai-store": "^0.2.0",
-    "nibs-cli": "^4.2.1",
+    "nibs-cli": "^4.2.2",
     "prettier": "^3.7.4",
     "vitest": "^4.0.17"
   }

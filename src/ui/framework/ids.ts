@@ -9,6 +9,57 @@
 export const EDITABLE_DRAFT_RAW = "kse-editable-draft"; // for storyStorage.get/set
 export const EDITABLE_DRAFT_KEY = "story:kse-editable-draft"; // for multilineTextInput storageKey
 
+/**
+ * Centralized storage key registry.
+ * Raw keys are for `storyStorage.get/set` calls.
+ * Keys with `story:` prefix are for UI `storageKey` bindings.
+ */
+export const STORAGE_KEYS = {
+  // Core persistence
+  PERSIST: "kse-persist",
+  JOURNAL: "kse-gen-journal",
+
+  // Setting (Crucible reads this too)
+  SETTING: "kse-setting",
+  SETTING_UI: "story:kse-setting",
+
+  // Sync toggles
+  SYNC_ATTG_MEMORY: "kse-sync-attg-memory",
+  SYNC_ATTG_MEMORY_UI: "story:kse-sync-attg-memory",
+  SYNC_STYLE_AN: "kse-sync-style-an",
+  SYNC_STYLE_AN_UI: "story:kse-sync-style-an",
+
+  // Field content & sections (dynamic by fieldId)
+  field: (fieldId: string) => `kse-field-${fieldId}`,
+  fieldUI: (fieldId: string) => `story:kse-field-${fieldId}`,
+  sectionUI: (fieldId: string) => `story:kse-section-${fieldId}`,
+
+  // DULFS list items (dynamic by itemId)
+  dulfsItem: (itemId: string) => `dulfs-item-${itemId}`,
+  dulfsItemUI: (itemId: string) => `story:dulfs-item-${itemId}`,
+
+  // Brainstorm message drafts (dynamic by inputId)
+  brainstormDraft: (inputId: string) => `draft-${inputId}`,
+  brainstormInputUI: (inputId: string) => `story:${inputId}`,
+
+  // Crucible content
+  CR_SHAPE_NAME: "cr-shape-name",
+  CR_SHAPE_NAME_UI: "story:cr-shape-name",
+  CR_BUILD_GUIDANCE: "cr-build-guidance",
+  CR_BUILD_GUIDANCE_UI: "story:cr-build-guidance",
+
+  // Crucible UI collapse states (raw + story: prefixed)
+  CR_SHAPE_COLLAPSED: "cr-shape-collapsed",
+  CR_SHAPE_COLLAPSED_UI: "story:cr-shape-collapsed",
+  CR_DIRECTION_COLLAPSED: "cr-direction-collapsed",
+  CR_DIRECTION_COLLAPSED_UI: "story:cr-direction-collapsed",
+  CR_TENSIONS_COLLAPSED: "cr-tensions-collapsed",
+  CR_TENSIONS_COLLAPSED_UI: "story:cr-tensions-collapsed",
+  CR_LINKS_SECTION_UI: "story:cr-links-section",
+  CR_ELEMENTS_SECTION_UI: "story:cr-elements-section",
+  CR_BUILD_LOG_COLLAPSED_UI: "story:cr-build-log-collapsed",
+};
+
 export const IDS = {
   CRUCIBLE: {
     WINDOW_ROOT: "cr-root",

@@ -1,6 +1,6 @@
 import { defineComponent } from "nai-act";
 import { RootState, CrucibleWorldElement, CrucibleLink, WORLD_ENTRY_CATEGORIES } from "../../../core/store/types";
-import { IDS } from "../../framework/ids";
+import { IDS, STORAGE_KEYS } from "../../framework/ids";
 import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
 import {
   crucibleStopRequested,
@@ -239,7 +239,7 @@ export const BuildPassView = defineComponent<undefined, RootState>({
         parts.push(collapsibleSection({
           id: "cr-links-section",
           title: `Relationships (${s.crucible.links.length})`,
-          storageKey: "story:cr-links-section",
+          storageKey: STORAGE_KEYS.CR_LINKS_SECTION_UI,
           content: linkParts,
         }));
       }
@@ -266,7 +266,7 @@ export const BuildPassView = defineComponent<undefined, RootState>({
         parts.push(collapsibleSection({
           id: CR.ELEMENTS_SECTION,
           title: `World Elements (${s.crucible.elements.length})`,
-          storageKey: "story:cr-elements-section",
+          storageKey: STORAGE_KEYS.CR_ELEMENTS_SECTION_UI,
           content: elementParts,
         }));
       }
@@ -335,7 +335,7 @@ export const BuildPassView = defineComponent<undefined, RootState>({
     const guidanceInput = multilineTextInput({
       id: "cr-build-guidance-input",
       placeholder: "Guide the next pass (e.g. 'more factions', 'Mira is too generic')...",
-      storageKey: "story:cr-build-guidance",
+      storageKey: STORAGE_KEYS.CR_BUILD_GUIDANCE_UI,
       style: { "font-size": "0.85em" },
     });
 
@@ -438,7 +438,7 @@ export const BuildPassView = defineComponent<undefined, RootState>({
         collapsibleSection({
           id: "cr-log-section",
           title: "Command Log",
-          storageKey: "story:cr-build-log-collapsed",
+          storageKey: STORAGE_KEYS.CR_BUILD_LOG_COLLAPSED_UI,
           content: [
             text({
               id: CR.BUILD_LOG,

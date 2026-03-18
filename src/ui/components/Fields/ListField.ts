@@ -2,6 +2,7 @@ import { defineComponent } from "nai-act";
 import { matchesAction } from "nai-store";
 import { RootState, DulfsItem } from "../../../core/store/types";
 import { FieldConfig, DulfsFieldID } from "../../../config/field-definitions";
+import { STORAGE_KEYS } from "../../framework/ids";
 import { dulfsItemAdded } from "../../../core/store/slices/story";
 import {
   uiGenerationRequested,
@@ -66,7 +67,7 @@ export const ListField = defineComponent<ListFieldProps, RootState>({
       const updates = await Promise.all(
         list.map(async (item) => {
           const content = String(
-            (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "",
+            (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(item.id))) || "",
           );
           return {
             id: `content-input-${item.id}`,
@@ -92,7 +93,7 @@ export const ListField = defineComponent<ListFieldProps, RootState>({
 
     const addItem = async () => {
       const itemId = api.v1.uuid();
-      await api.v1.storyStorage.set(`dulfs-item-${itemId}`, "");
+      await api.v1.storyStorage.set(STORAGE_KEYS.dulfsItem(itemId), "");
       dispatch(
         dulfsItemAdded({
           fieldId: props.id as DulfsFieldID,
@@ -194,7 +195,7 @@ export const ListField = defineComponent<ListFieldProps, RootState>({
       id: sectionId,
       title: props.label,
       iconId: props.icon,
-      storageKey: `story:kse-section-${props.id}`,
+      storageKey: STORAGE_KEYS.sectionUI(props.id),
       content: [
         text({
           text: props.description,

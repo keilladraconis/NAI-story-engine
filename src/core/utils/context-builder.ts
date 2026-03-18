@@ -30,6 +30,7 @@ import {
   DulfsFieldID,
 } from "../../config/field-definitions";
 import { formatWorldState } from "./crucible-world-formatter";
+import { STORAGE_KEYS } from "../../ui/framework/ids";
 // --- Helpers ---
 
 const getFieldContent = (state: RootState, id: string): string => {
@@ -81,7 +82,7 @@ export const getExistingDulfsItems = async (
   const contents: string[] = [];
   for (const item of items) {
     const content = String(
-      (await api.v1.storyStorage.get(`dulfs-item-${item.id}`)) || "",
+      (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(item.id))) || "",
     );
     if (content) contents.push(content);
   }
@@ -273,7 +274,7 @@ export const buildStoryEnginePrefix = async (
   // ATTG
   if (!excluded.has("attg")) {
     const attg = String(
-      (await api.v1.storyStorage.get("kse-field-attg")) || "",
+      (await api.v1.storyStorage.get(STORAGE_KEYS.field(FieldID.ATTG))) || "",
     );
     if (attg) stableSections.push(`[ATTG]\n${attg}`);
   }
@@ -281,7 +282,7 @@ export const buildStoryEnginePrefix = async (
   // Style
   if (!excluded.has("style")) {
     const style = String(
-      (await api.v1.storyStorage.get("kse-field-style")) || "",
+      (await api.v1.storyStorage.get(STORAGE_KEYS.field(FieldID.Style))) || "",
     );
     if (style) stableSections.push(`[STYLE]\n${style}`);
   }
@@ -289,7 +290,7 @@ export const buildStoryEnginePrefix = async (
   // Setting
   if (!excluded.has("setting")) {
     const setting = String(
-      (await api.v1.storyStorage.get("kse-setting")) || "",
+      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
     );
     if (setting) stableSections.push(`[SETTING]\n${setting}`);
   }
@@ -412,7 +413,7 @@ export const buildCruciblePrefix = async (
 
   if (options.includeStoryState) {
     const setting = String(
-      (await api.v1.storyStorage.get("kse-setting")) || "",
+      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
     );
     if (setting) groundingSections.push(`[SETTING]\n${setting}`);
 
@@ -496,7 +497,7 @@ export const createBrainstormFactory = (
 
     const canon = getFieldContent(state, FieldID.Canon);
     const setting = String(
-      (await api.v1.storyStorage.get("kse-setting")) || "",
+      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
     );
 
     let contextBlock = "Here is the current state of the story:\n";

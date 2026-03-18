@@ -7,6 +7,7 @@ import {
   StreamingContext,
   CompletionContext,
 } from "../generation-handlers";
+import { STORAGE_KEYS } from "../../../../ui/framework/ids";
 
 export const fieldHandler: GenerationHandlers<FieldTarget> = {
   streaming(ctx: StreamingContext<FieldTarget>, _newText: string): void {
@@ -16,7 +17,7 @@ export const fieldHandler: GenerationHandlers<FieldTarget> = {
       ctx.target.fieldId === FieldID.Style
     ) {
       const inputId = `input-${ctx.target.fieldId}`;
-      const storageKey = `kse-field-${ctx.target.fieldId}`;
+      const storageKey = STORAGE_KEYS.field(ctx.target.fieldId);
       api.v1.ui.updateParts([{ id: inputId, value: ctx.accumulatedText }]);
       api.v1.storyStorage.set(storageKey, ctx.accumulatedText);
     } else {
@@ -40,7 +41,7 @@ export const fieldHandler: GenerationHandlers<FieldTarget> = {
       ctx.target.fieldId === FieldID.ATTG ||
       ctx.target.fieldId === FieldID.Style
     ) {
-      const storageKey = `kse-field-${ctx.target.fieldId}`;
+      const storageKey = STORAGE_KEYS.field(ctx.target.fieldId);
       await api.v1.storyStorage.set(storageKey, filteredText);
 
       // Update UI with filtered content
@@ -50,13 +51,13 @@ export const fieldHandler: GenerationHandlers<FieldTarget> = {
       // Trigger sync to Memory / Author's Note if enabled
       if (ctx.target.fieldId === FieldID.ATTG) {
         const syncEnabled = await api.v1.storyStorage.get(
-          "kse-sync-attg-memory",
+          STORAGE_KEYS.SYNC_ATTG_MEMORY,
         );
         if (syncEnabled) {
           await api.v1.memory.set(await attgForMemory(filteredText));
         }
       } else if (ctx.target.fieldId === FieldID.Style) {
-        const syncEnabled = await api.v1.storyStorage.get("kse-sync-style-an");
+        const syncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_AN);
         if (syncEnabled) {
           await api.v1.an.set(filteredText);
         }

@@ -6,7 +6,7 @@ import {
   crucibleBuildPassRequested,
   crucibleTensionsRequested,
 } from "../../../core/store/slices/crucible";
-import { IDS } from "../../framework/ids";
+import { IDS, STORAGE_KEYS } from "../../framework/ids";
 import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 import { GenerationButton } from "../GenerationButton";
 import { TensionCard } from "./TensionCard";
@@ -130,7 +130,7 @@ export const TensionsSection = defineComponent<undefined, RootState>({
           id: "cr-tensions-collapsible",
           title: "Tensions",
           initialCollapsed: true,
-          storageKey: "story:cr-tensions-collapsed",
+          storageKey: STORAGE_KEYS.CR_TENSIONS_COLLAPSED_UI,
           style: { overflow: "visible" },
           content: [
             // Empty state: just the "Generate Tensions" button

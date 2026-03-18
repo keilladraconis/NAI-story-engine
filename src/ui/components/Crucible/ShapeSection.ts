@@ -5,7 +5,7 @@ import {
   crucibleStopRequested,
   updateShape,
 } from "../../../core/store/slices/crucible";
-import { IDS } from "../../framework/ids";
+import { IDS, STORAGE_KEYS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
 import { EditableText } from "../EditableText";
 
@@ -23,7 +23,7 @@ export const ShapeSection = defineComponent<undefined, RootState>({
 
     const nameInputPart = textInput({
       id: CR.SHAPE_NAME,
-      storageKey: "story:cr-shape-name",
+      storageKey: STORAGE_KEYS.CR_SHAPE_NAME_UI,
       label: "",
       placeholder: "e.g. Slice of Life, Hero's Journey...",
     });
@@ -67,7 +67,7 @@ export const ShapeSection = defineComponent<undefined, RootState>({
         const shape = ctx.getState().crucible.shape;
         const name = shape?.name ?? "";
         // Keep Name input in sync with state (fires after generation)
-        api.v1.storyStorage.set("cr-shape-name", name);
+        api.v1.storyStorage.set(STORAGE_KEYS.CR_SHAPE_NAME, name);
         api.v1.ui.updateParts([
           { id: `${CR.SHAPE_TEXT}-view`, text: shape?.instruction ?? "" },
           { id: CR.SHAPE_NAME, value: name },
@@ -79,7 +79,7 @@ export const ShapeSection = defineComponent<undefined, RootState>({
       id: CR.SHAPE_SECTION,
       title: "Story Shape",
       initialCollapsed: false,
-      storageKey: "story:cr-shape-collapsed",
+      storageKey: STORAGE_KEYS.CR_SHAPE_COLLAPSED_UI,
       style: { overflow: "visible" },
       content: [nameInputPart, shapeEditablePart],
     });

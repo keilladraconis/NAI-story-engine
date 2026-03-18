@@ -19,7 +19,7 @@ import {
   STATUS_QUEUED,
   STATUS_COMPLETE,
 } from "../../colors";
-import { EDITABLE_DRAFT_RAW, EDITABLE_DRAFT_KEY } from "../../framework/ids";
+import { EDITABLE_DRAFT_RAW, EDITABLE_DRAFT_KEY, STORAGE_KEYS } from "../../framework/ids";
 import {
   flushActiveEditor,
   registerActiveEditor,
@@ -108,7 +108,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
         if (isPlainTextField) {
           // ATTG/Style use storyStorage
           const stored = await api.v1.storyStorage.get(
-            `kse-field-${config.id}`,
+            STORAGE_KEYS.field(config.id),
           );
           hasContent = !!stored && String(stored).trim().length > 0;
         } else {
@@ -162,7 +162,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
         if (config.id !== FieldID.ATTG) return;
         if (getState().story.attgEnabled) {
           const content = await api.v1.storyStorage.get(
-            `kse-field-${config.id}`,
+            STORAGE_KEYS.field(config.id),
           );
           if (content) {
             await api.v1.memory.set(await attgForMemory(String(content)));
@@ -175,7 +175,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
         if (config.id !== FieldID.Style) return;
         if (getState().story.styleEnabled) {
           const content = await api.v1.storyStorage.get(
-            `kse-field-${config.id}`,
+            STORAGE_KEYS.field(config.id),
           );
           if (content) {
             await api.v1.an.set(String(content));
@@ -205,11 +205,11 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
           id: `input-${config.id}`,
           placeholder: config.placeholder,
           initialValue: "",
-          storageKey: `story:kse-field-${config.id}`,
+          storageKey: STORAGE_KEYS.fieldUI(config.id),
           style: this.style?.("textArea"),
           onChange: async (value: string) => {
             const syncEnabled = await api.v1.storyStorage.get(
-              "kse-sync-attg-memory",
+              STORAGE_KEYS.SYNC_ATTG_MEMORY,
             );
             if (syncEnabled) {
               await api.v1.memory.set(await attgForMemory(value));
@@ -221,11 +221,11 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
           id: `input-${config.id}`,
           placeholder: config.placeholder,
           initialValue: "",
-          storageKey: `story:kse-field-${config.id}`,
+          storageKey: STORAGE_KEYS.fieldUI(config.id),
           style: this.style?.("textArea"),
           onChange: async (value: string) => {
             const syncEnabled =
-              await api.v1.storyStorage.get("kse-sync-style-an");
+              await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_AN);
             if (syncEnabled) {
               await api.v1.an.set(value);
             }
@@ -236,7 +236,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
           id: `input-${config.id}`,
           placeholder: config.placeholder,
           initialValue: "",
-          storageKey: `story:kse-field-${config.id}`,
+          storageKey: STORAGE_KEYS.fieldUI(config.id),
           style: this.style?.("textArea"),
         });
       }
@@ -252,7 +252,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
               checkboxInput({
                 id: `checkbox-sync-${config.id}`,
                 initialValue: false,
-                storageKey: "story:kse-sync-attg-memory",
+                storageKey: STORAGE_KEYS.SYNC_ATTG_MEMORY_UI,
                 label: "Copy to Memory",
                 onChange: attgSyncToggled,
               }),
@@ -270,7 +270,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
               checkboxInput({
                 id: `checkbox-sync-${config.id}`,
                 initialValue: false,
-                storageKey: "story:kse-sync-style-an",
+                storageKey: STORAGE_KEYS.SYNC_STYLE_AN_UI,
                 label: "Copy to Author's Note",
                 onChange: styleSyncToggled,
               }),
@@ -283,7 +283,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
         id: sectionId,
         title: config.label,
         iconId: config.icon,
-        storageKey: `story:kse-section-${config.id}`,
+        storageKey: STORAGE_KEYS.sectionUI(config.id),
         content,
       });
     }
@@ -433,7 +433,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
       id: sectionId,
       title: config.label,
       iconId: config.icon,
-      storageKey: `story:kse-section-${config.id}`,
+      storageKey: STORAGE_KEYS.sectionUI(config.id),
       content: sectionContent,
     });
   },

@@ -29,7 +29,7 @@ import {
 import { buildBuildPassStrategy } from "../../utils/crucible-build-strategy";
 import { extractDulfsItemName } from "../../utils/context-builder";
 import { ensureCategory } from "./lorebook-sync";
-import { IDS } from "../../../ui/framework/ids";
+import { IDS, STORAGE_KEYS } from "../../../ui/framework/ids";
 import { flushActiveEditor } from "../../../ui/framework/editable-draft";
 
 export function registerCrucibleEffects(
@@ -40,9 +40,9 @@ export function registerCrucibleEffects(
 ): void {
   // --- Section collapse/expand helpers ---
   const SECTION_KEYS = {
-    shape: "cr-shape-collapsed",
-    direction: "cr-direction-collapsed",
-    tensions: "cr-tensions-collapsed",
+    shape: STORAGE_KEYS.CR_SHAPE_COLLAPSED,
+    direction: STORAGE_KEYS.CR_DIRECTION_COLLAPSED,
+    tensions: STORAGE_KEYS.CR_TENSIONS_COLLAPSED,
   } as const;
 
   const setCollapsed = async (section: "shape" | "direction" | "tensions", collapsed: boolean) => {
@@ -98,7 +98,7 @@ export function registerCrucibleEffects(
   subscribeEffect(
     matchesAction(crucibleShapeRequested),
     async () => {
-      const prefillName = String((await api.v1.storyStorage.get("cr-shape-name")) || "").trim() || undefined;
+      const prefillName = String((await api.v1.storyStorage.get(STORAGE_KEYS.CR_SHAPE_NAME)) || "").trim() || undefined;
       const strategy = buildCrucibleShapeStrategy(getState, prefillName);
       dispatch(requestQueued({ id: strategy.requestId, type: "crucibleShape", targetId: "crucible" }));
       dispatch(generationSubmitted(strategy));
@@ -152,7 +152,7 @@ export function registerCrucibleEffects(
       const passNumber = state.crucible.passes.length + 1;
 
       // Read guidance from storage input
-      const guidance = String((await api.v1.storyStorage.get("cr-build-guidance")) || "").trim();
+      const guidance = String((await api.v1.storyStorage.get(STORAGE_KEYS.CR_BUILD_GUIDANCE)) || "").trim();
 
       // Transition to building phase on first pass only
       if (passNumber === 1) {
@@ -162,7 +162,7 @@ export function registerCrucibleEffects(
       }
 
       // Clear guidance input after reading
-      await api.v1.storyStorage.set("cr-build-guidance", "");
+      await api.v1.storyStorage.set(STORAGE_KEYS.CR_BUILD_GUIDANCE, "");
 
       const strategy = buildBuildPassStrategy(getState, passNumber, guidance);
       dispatch(requestQueued({ id: strategy.requestId, type: "crucibleBuildPass", targetId: "crucible" }));
@@ -264,7 +264,7 @@ export function registerCrucibleEffects(
         const content = el.content ? `${el.name}: ${el.content}` : el.name;
         const existingItem = getLatest().story.dulfs[el.fieldId]?.find((item) => item.id === el.id);
 
-        await api.v1.storyStorage.set(`dulfs-item-${el.id}`, content);
+        await api.v1.storyStorage.set(STORAGE_KEYS.dulfsItem(el.id), content);
         if (existingItem) {
           // Upsert: sync lorebook display name to match updated content
           const name = extractDulfsItemName(content, el.fieldId);

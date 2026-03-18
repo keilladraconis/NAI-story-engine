@@ -1,5 +1,6 @@
 import { Store } from "nai-store";
 import { RootState } from "../types";
+import { STORAGE_KEYS } from "../../../ui/framework/ids";
 
 export function registerAutosaveEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
@@ -19,7 +20,7 @@ export function registerAutosaveEffects(
           brainstorm: state.brainstorm,
           crucible: state.crucible,
         };
-        api.v1.storyStorage.set("kse-persist", persistData);
+        api.v1.storyStorage.set(STORAGE_KEYS.PERSIST, persistData);
       } catch (e) {
         /* ignore */
       }

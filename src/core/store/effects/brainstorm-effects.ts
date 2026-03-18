@@ -26,7 +26,7 @@ import {
   buildSummarizeStrategy,
   buildBrainstormTitleStrategy,
 } from "../../utils/context-builder";
-import { IDS } from "../../../ui/framework/ids";
+import { IDS, STORAGE_KEYS } from "../../../ui/framework/ids";
 
 export function registerBrainstormEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
@@ -45,7 +45,7 @@ export function registerBrainstormEffects(
       if (currentEditingId && currentEditingId !== newId) {
         const prevInputId = IDS.BRAINSTORM.message(currentEditingId).INPUT;
         const content =
-          (await api.v1.storyStorage.get(`draft-${prevInputId}`)) || "";
+          (await api.v1.storyStorage.get(STORAGE_KEYS.brainstormDraft(prevInputId))) || "";
         dispatch(
           messageUpdated({ id: currentEditingId, content: String(content) }),
         );
@@ -56,7 +56,7 @@ export function registerBrainstormEffects(
       if (newMessage) {
         const newInputId = IDS.BRAINSTORM.message(newId).INPUT;
         await api.v1.storyStorage.set(
-          `draft-${newInputId}`,
+          STORAGE_KEYS.brainstormDraft(newInputId),
           newMessage.content,
         );
 
@@ -76,7 +76,7 @@ export function registerBrainstormEffects(
       if (editingId) {
         const inputId = IDS.BRAINSTORM.message(editingId).INPUT;
         const content =
-          (await api.v1.storyStorage.get(`draft-${inputId}`)) || "";
+          (await api.v1.storyStorage.get(STORAGE_KEYS.brainstormDraft(inputId))) || "";
 
         dispatch(messageUpdated({ id: editingId, content: String(content) }));
         dispatch(editingMessageIdSet(null));
@@ -92,7 +92,7 @@ export function registerBrainstormEffects(
       if (editingId) {
         const editInputId = IDS.BRAINSTORM.message(editingId).INPUT;
         const editContent =
-          (await api.v1.storyStorage.get(`draft-${editInputId}`)) || "";
+          (await api.v1.storyStorage.get(STORAGE_KEYS.brainstormDraft(editInputId))) || "";
         dispatch(messageUpdated({ id: editingId, content: String(editContent) }));
         dispatch(editingMessageIdSet(null));
       }

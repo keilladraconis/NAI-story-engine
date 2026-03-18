@@ -47,6 +47,7 @@ import {
   parseNeedsReconciliation,
 } from "../../utils/lorebook-strategy";
 import { hashEntryPosition, getStoryIdSeed } from "../../utils/seeded-random";
+import { STORAGE_KEYS } from "../../../ui/framework/ids";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper Functions
@@ -64,7 +65,7 @@ async function needsCanon(state: RootState): Promise<boolean> {
  * Check if ATTG field needs generation.
  */
 async function needsATTG(): Promise<boolean> {
-  const content = await api.v1.storyStorage.get("kse-field-attg");
+  const content = await api.v1.storyStorage.get(STORAGE_KEYS.field(FieldID.ATTG));
   return !content || !String(content).trim();
 }
 
@@ -72,7 +73,7 @@ async function needsATTG(): Promise<boolean> {
  * Check if Style field needs generation.
  */
 async function needsStyle(): Promise<boolean> {
-  const content = await api.v1.storyStorage.get("kse-field-style");
+  const content = await api.v1.storyStorage.get(STORAGE_KEYS.field(FieldID.Style));
   return !content || !String(content).trim();
 }
 
@@ -245,14 +246,14 @@ async function enableSyncForField(
 ): Promise<void> {
   if (fieldId === FieldID.ATTG) {
     // Enable the sync storage key
-    await api.v1.storyStorage.set("kse-sync-attg-memory", true);
+    await api.v1.storyStorage.set(STORAGE_KEYS.SYNC_ATTG_MEMORY, true);
     // Enable ATTG in state if not already enabled
     if (!getState().story.attgEnabled) {
       dispatch(attgToggled());
     }
   } else if (fieldId === FieldID.Style) {
     // Enable the sync storage key
-    await api.v1.storyStorage.set("kse-sync-style-an", true);
+    await api.v1.storyStorage.set(STORAGE_KEYS.SYNC_STYLE_AN, true);
     // Enable Style in state if not already enabled
     if (!getState().story.styleEnabled) {
       dispatch(styleToggled());

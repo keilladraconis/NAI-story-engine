@@ -55,9 +55,7 @@ Identical implementation was in two files. **FIXED** — extracted to `src/core/
 
 ### Storage keys
 
-22 occurrences of bare storage key strings (e.g., `"kse-persist"`, `"kse-field-..."`, `"kse-sync-attg-memory"`) scattered across 9 files with no centralized registry.
-
-**Fix:** Create a `STORAGE_KEYS` constant map in `src/ui/framework/ids.ts` (which already centralizes element IDs) and reference it everywhere. This prevents typo-induced silent bugs.
+**FIXED** — Added `STORAGE_KEYS` registry to `src/ui/framework/ids.ts` with all literal and dynamic key builders. Updated 18 files to import and use `STORAGE_KEYS` instead of bare strings. Regex patterns in bulk cleanup (`lorebook-sync.ts` `storyCleared` handler) left as-is since they match key prefixes.
 
 ### Magic number
 
