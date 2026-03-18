@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.3] - 2026-03-18
+
+### Fixed
+
+- **Stale content in dynamic lists** — Editing a Tension Card's text and then adding or removing a tension would revert your edits. The same issue affected World Entry lists. Root cause: the framework's `bindList` reused build-time part specs on container rebuilds, overwriting any post-mount text changes. Fixed in nai-act 0.3.0 (full remount on structural change); `TensionsSection` and `ListField` now use `ctx.bindList` directly.
+
+- **Storage key mismatches** — A prior refactor left several storage keys inconsistent, causing data (ATTG sync state, field content, list item content) to silently fail to load. All storage keys are now defined in a centralized `STORAGE_KEYS` registry in `ids.ts` and used consistently throughout the codebase.
+
+- **Generation journal premature writes** — `recordEntry` now guards against writes before `loadJournal()` completes on script startup.
+
+- **Lorebook category migration crash** — `migrateLorebookCategories` no longer throws when a lorebook category has a null/empty name.
+
+### Changed
+
+- **Brainstorm message bubbles** — The custom view/edit toggle in `Message` has been replaced with `EditableText` styled as a bubble. Simpler and consistent with other editable fields.
+
+- **Framework update: nai-act 0.3.0 + nai-store 0.3.0** — `bindList` now correctly remounts all children from current state on structural changes and fires only when key values actually change (not on every action). `useSelector`/`subscribeSelector` accept an optional `equals` function for custom change detection.
+
 ## [0.10.2] - 2026-03-11
 
 ### Fixed
