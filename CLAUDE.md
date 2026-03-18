@@ -66,6 +66,20 @@ npm run test       # vitest run
 - Exception: Use `onChange` callbacks alongside `storageKey` when syncing to non-UIPart targets (e.g., `api.v1.an.set()`, `api.v1.memory.set()`). See ATTG/Style fields in `TextField.ts` for example.
 - **Never dispatch actions in `onChange` callbacks.** The reducer overhead is too high for keystroke-frequency events. Direct API calls are acceptable in `onChange` when syncing to external APIs (e.g., `api.v1.lorebook.updateEntry()`). See `ListItem.ts` for example.
 
+**UI Rendering Rules (nai-act constraints — these cause recurrent bugs when violated):**
+
+- **Parts are static objects.** A `UIPart` returned from `build()` is a frozen spec. If a container's `content` array is ever updated via `updateParts`, the NovelAI UI engine re-applies all child specs — overwriting any text/style previously set by direct `updateParts` calls to those children. There is no `appendPart`; updating a container always re-initializes its children.
+
+- **`useSelector` and `bindPart` do NOT fire on mount.** They fire only on subsequent state changes. Always populate initial display values using `ctx.getState()` inside `build()`. Never rely on a subscription to set the first render's content.
+
+- **`initialDisplay` on `EditableText` is mandatory for correctness, not optional styling.** It must reflect current state at build time. Passing a prop value that may be stale (e.g., `message.content` when the message was just added with `content: ""`) will bake `"_No content._"` into the part spec permanently — and any future container rebuild will restore that blank state.
+
+- **`bindPart` returns the initial mapped value — don't discard it silently.** Calling `ctx.bindPart(...)` as a statement means the initial text is never set in the part spec; it only updates on future state changes. Either spread the return value into the part definition, or set the initial text separately via `ctx.getState()`.
+
+- **`bindList` is safe for mutable-content items.** The framework (nai-act) correctly remounts all child components from current state on every structural change, and uses array-equality comparison so it only fires when key values actually change — not on every action. Just use `ctx.bindList` normally; it handles the rest.
+
+- **`useSelector` accepts an optional `equals` function** for custom comparison (e.g., array equality). Use it when the selector returns a new object/array reference on every call but you only want to fire on value changes.
+
 ## Key Constraints
 
 - **No DOM:** Runs in QuickJS web worker. No `setTimeout` (use `api.v1.timers`), no `console.log` (use `api.v1.log()`).

@@ -72,7 +72,6 @@ export interface BrainstormChat {
 export interface BrainstormState {
   chats: BrainstormChat[];
   currentChatIndex: number;
-  editingMessageId: string | null;
 }
 
 export interface LorebookUIState {

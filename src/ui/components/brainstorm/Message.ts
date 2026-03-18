@@ -1,44 +1,25 @@
-import {
-  BindContext,
-  defineComponent,
-} from "nai-act";
+import { BindContext, defineComponent } from "nai-act";
 import { BrainstormMessage, RootState } from "../../../core/store/types";
-import { STORAGE_KEYS } from "../../framework/ids";
 import {
   messageRemoved,
-  uiBrainstormMessageEditBegin,
-  uiBrainstormMessageEditEnd,
+  messageUpdated,
   uiBrainstormRetryGeneration,
 } from "../../../core/store";
 import { currentMessages } from "../../../core/store/slices/brainstorm";
 import { IDS } from "../../framework/ids";
-import { calculateTextAreaHeight } from "../../utils";
+import { EditableText } from "../EditableText";
 
 export interface MessageProps {
   message: BrainstormMessage;
 }
 
-const { text, row, column, button, multilineTextInput } = api.v1.ui.part;
+const { row, column, button } = api.v1.ui.part;
 
 export const Message = defineComponent({
   id: (props: MessageProps) => `kse-bs-msg-${props.message.id}`,
 
   styles: {
-    textDisplay: { "word-break": "break-word", "user-select": "text" },
-    viewButtonsRow: {
-      "margin-top": "5px",
-      gap: "5px",
-      "justify-content": "flex-end",
-      opacity: 0.6,
-    },
     buttonIcon: { padding: "4px" },
-    labelText: { "font-size": "0.7em", opacity: 0.7, "margin-bottom": "2px" },
-    editContainer: { width: "100%" },
-    saveRow: { "justify-content": "flex-end", "margin-top": "4px" },
-    viewContainer: { width: "100%" },
-    buttonRow: { "justify-content": "space-between" },
-    textInput: { "min-height": "40px", width: "100%" },
-    saveButton: { padding: "4px", background: "none" },
     rootRow: { width: "100%" },
     rootRowUser: { "justify-content": "flex-end" },
     rootRowAssistant: { "justify-content": "flex-start" },
@@ -51,130 +32,47 @@ export const Message = defineComponent({
       "background-color": "rgba(255, 255, 255, 0.05)",
       "border-radius": "12px 12px 12px 0",
     },
-    hidden: { display: "none" },
-    visible: { display: "block" },
   },
 
   build(props: MessageProps, ctx: BindContext<RootState>) {
-    const { dispatch, useSelector } = ctx;
+    const { dispatch } = ctx;
     const { message } = props;
     const ids = IDS.BRAINSTORM.message(message.id);
     const isUser = message.role === "user";
 
-    const editMessage = () => dispatch(uiBrainstormMessageEditBegin({ id: message.id }));
-    const saveMessage = () => dispatch(uiBrainstormMessageEditEnd());
-    const retryMessage = () => dispatch(uiBrainstormRetryGeneration({ messageId: message.id }));
-    const deleteMessage = () => dispatch(messageRemoved(message.id));
+    const retryBtn = button({
+      id: `${ids.ROOT}-btn-retry`,
+      iconId: "rotate-cw",
+      style: this.style?.("buttonIcon"),
+      callback: () => dispatch(uiBrainstormRetryGeneration({ messageId: message.id })),
+    });
 
-    // Bind: Toggle View/Edit
-    useSelector(
-      (state) => state.brainstorm.editingMessageId === props.message.id,
-      (isEditing) => {
-        api.v1.ui.updateParts([
-          {
-            id: ids.VIEW,
-            style: this.style?.(
-              "viewContainer",
-              isEditing ? "hidden" : "visible",
-            ),
-          },
-          {
-            id: ids.EDIT,
-            style: this.style?.(
-              "editContainer",
-              isEditing ? "visible" : "hidden",
-            ),
-          },
-        ]);
-      },
-    );
+    const deleteBtn = button({
+      id: `${ids.ROOT}-btn-delete`,
+      iconId: "trash",
+      style: this.style?.("buttonIcon"),
+      callback: () => dispatch(messageRemoved(message.id)),
+    });
 
-    // --- View Mode ---
-
-    const textDisplay = text({
+    const { part: editable } = ctx.render(EditableText, {
       id: ids.TEXT,
-      markdown: true,
-      style: this.style?.("textDisplay"),
-      // Bind content reactively (handles streaming updates)
-      ...ctx.bindPart(
-        ids.TEXT,
-        (state) => currentMessages(state.brainstorm).find((m) => m.id === props.message.id)?.content,
-        (content) => ({ text: content ?? message.content }),
-      ),
-    });
-
-    const viewButtons = row({
-      style: this.style?.("viewButtonsRow"),
-      content: [
-        button({
-          iconId: "edit-3",
-          style: this.style?.("buttonIcon"),
-          callback: editMessage,
-          id: `${ids.ROOT}-btn-edit`,
-        }),
-        button({
-          iconId: "rotate-cw",
-          style: this.style?.("buttonIcon"),
-          callback: retryMessage,
-          id: `${ids.ROOT}-btn-retry`,
-        }),
-        button({
-          iconId: "trash",
-          style: this.style?.("buttonIcon"),
-          callback: deleteMessage,
-          id: `${ids.ROOT}-btn-delete`,
-        }),
-      ],
-    });
-
-    const viewContainer = column({
-      id: ids.VIEW,
-      style: this.style?.("viewContainer"),
-      content: [
-        row({
-          style: this.style?.("buttonRow"),
-          content: [
-            text({
-              text: isUser ? "You" : "Brainstorm",
-              style: this.style?.("labelText"),
-            }),
-            viewButtons,
-          ],
-        }),
-        textDisplay,
-      ],
-    });
-
-    // --- Edit Mode ---
-
-    const textInput = multilineTextInput({
-      id: ids.INPUT,
-      storageKey: `story:${STORAGE_KEYS.brainstormDraft(ids.INPUT)}`,
-      style: {
-        ...this.style?.("textInput"),
-        height: calculateTextAreaHeight(message.content),
+      getContent: () => {
+        const msgs = currentMessages(ctx.getState().brainstorm);
+        return msgs.find((m) => m.id === message.id)?.content ?? message.content;
       },
-      initialValue: message.content,
+      initialDisplay: message.content || undefined,
+      label: isUser ? "You" : "Brainstorm",
+      placeholder: "Edit message...",
+      extraControls: [retryBtn, deleteBtn],
+      onSave: (content: string) => dispatch(messageUpdated({ id: message.id, content })),
     });
 
-    const saveButton = button({
-      iconId: "save",
-      style: this.style?.("saveButton"),
-      callback: saveMessage,
-      id: `${ids.ROOT}-btn-save`,
-    });
-
-    const editContainer = column({
-      id: ids.EDIT,
-      style: this.style?.("editContainer", "hidden"),
-      content: [
-        row({
-          style: this.style?.("saveRow"),
-          content: [saveButton],
-        }),
-        textInput,
-      ],
-    });
+    // Reactive: update view text when message content changes (streaming + completion)
+    ctx.bindPart(
+      `${ids.TEXT}-view`,
+      (state) => currentMessages(state.brainstorm).find((m) => m.id === message.id)?.content,
+      (content) => ({ text: content ?? message.content }),
+    );
 
     return row({
       id: ids.ROOT,
@@ -188,7 +86,7 @@ export const Message = defineComponent({
             "bubble",
             isUser ? "bubbleUser" : "bubbleAssistant",
           ),
-          content: [viewContainer, editContainer],
+          content: [editable],
         }),
       ],
     });

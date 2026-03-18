@@ -38,8 +38,6 @@ export const STORAGE_KEYS = {
   dulfsItem: (itemId: string) => `dulfs-item-${itemId}`,
   dulfsItemUI: (itemId: string) => `story:dulfs-item-${itemId}`,
 
-  // Brainstorm message drafts (dynamic by inputId)
-  brainstormDraft: (inputId: string) => `draft-${inputId}`,
   brainstormInputUI: (inputId: string) => `story:${inputId}`,
 
   // Crucible content
@@ -112,10 +110,7 @@ export const IDS = {
 
     message: (id: string) => ({
       ROOT: `se-bs-msg-${id}`,
-      VIEW: `se-bs-msg-${id}-view`,
-      EDIT: `se-bs-msg-${id}-edit`,
       TEXT: `se-bs-msg-${id}-text`,
-      INPUT: `se-bs-msg-${id}-input`,
     }),
   },
   LOREBOOK: {

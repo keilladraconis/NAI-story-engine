@@ -3,13 +3,9 @@ import { RootState, BrainstormMessage, AppDispatch, GenerationStrategy } from ".
 import { currentChat, currentMessages } from "../slices/brainstorm";
 import {
   uiBrainstormSubmitUserMessage,
-  uiBrainstormMessageEditBegin,
-  uiBrainstormMessageEditEnd,
   uiBrainstormRetryGeneration,
   uiBrainstormSummarize,
   messageAdded,
-  messageUpdated,
-  editingMessageIdSet,
   pruneHistory,
   requestQueued,
   requestCompleted,
@@ -26,76 +22,19 @@ import {
   buildSummarizeStrategy,
   buildBrainstormTitleStrategy,
 } from "../../utils/context-builder";
-import { IDS, STORAGE_KEYS } from "../../../ui/framework/ids";
+import { IDS } from "../../../ui/framework/ids";
+import { flushActiveEditor } from "../../../ui/framework/editable-draft";
 
 export function registerBrainstormEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
   dispatch: AppDispatch,
   getState: () => RootState,
 ): void {
-  // Intent: Brainstorm Edit Begin
-  subscribeEffect(
-    matchesAction(uiBrainstormMessageEditBegin),
-    async (action) => {
-      const { id: newId } = action.payload;
-      const state = getState();
-      const currentEditingId = state.brainstorm.editingMessageId;
-
-      // 1. If currently editing another message, save it first
-      if (currentEditingId && currentEditingId !== newId) {
-        const prevInputId = IDS.BRAINSTORM.message(currentEditingId).INPUT;
-        const content =
-          (await api.v1.storyStorage.get(STORAGE_KEYS.brainstormDraft(prevInputId))) || "";
-        dispatch(
-          messageUpdated({ id: currentEditingId, content: String(content) }),
-        );
-      }
-
-      // 2. Prepare the NEW message for editing
-      const newMessage = currentMessages(state.brainstorm).find((m) => m.id === newId);
-      if (newMessage) {
-        const newInputId = IDS.BRAINSTORM.message(newId).INPUT;
-        await api.v1.storyStorage.set(
-          STORAGE_KEYS.brainstormDraft(newInputId),
-          newMessage.content,
-        );
-
-        // 3. Set the editing ID
-        dispatch(editingMessageIdSet(newId));
-      }
-    },
-  );
-
-  // Intent: Brainstorm Edit End (Save)
-  subscribeEffect(
-    (action) => action.type === uiBrainstormMessageEditEnd.type,
-    async () => {
-      const state = getState();
-      const editingId = state.brainstorm.editingMessageId;
-
-      if (editingId) {
-        const inputId = IDS.BRAINSTORM.message(editingId).INPUT;
-        const content =
-          (await api.v1.storyStorage.get(STORAGE_KEYS.brainstormDraft(inputId))) || "";
-
-        dispatch(messageUpdated({ id: editingId, content: String(content) }));
-        dispatch(editingMessageIdSet(null));
-      }
-    },
-  );
-
   // Intent: Brainstorm Submit
   subscribeEffect(
     (action) => action.type === uiBrainstormSubmitUserMessage.type,
     async (_action, { getState: getLatest }) => {
-      const editingId = getLatest().brainstorm.editingMessageId;
-      if (editingId) {
-        const editInputId = IDS.BRAINSTORM.message(editingId).INPUT;
-        const editContent =
-          (await api.v1.storyStorage.get(STORAGE_KEYS.brainstormDraft(editInputId))) || "";
-        dispatch(messageUpdated({ id: editingId, content: String(editContent) }));
-        dispatch(editingMessageIdSet(null));
-      }
+      await flushActiveEditor(); // auto-save any active message edit before submitting
 
       const storageKey = IDS.BRAINSTORM.INPUT;
       const content = (await api.v1.storyStorage.get(storageKey)) || "";

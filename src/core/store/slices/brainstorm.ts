@@ -13,7 +13,6 @@ function makeChat(index: number): BrainstormChat {
 export const initialBrainstormState: BrainstormState = {
   chats: [makeChat(1)],
   currentChatIndex: 0,
-  editingMessageId: null,
 };
 
 /** Accessor: current chat (never undefined — slice guarantees ≥1 chat). */
@@ -100,12 +99,6 @@ export const brainstormSlice = createSlice({
         mode,
       }));
     },
-    editingMessageIdSet: (state, id: string | null) => {
-      return {
-        ...state,
-        editingMessageId: id,
-      };
-    },
     chatCreated: (state) => {
       // Don't create a new chat if the current one is empty
       if (currentMessages(state).length === 0) return state;
@@ -115,7 +108,6 @@ export const brainstormSlice = createSlice({
         ...state,
         chats: [...state.chats, newChat],
         currentChatIndex: state.chats.length,
-        editingMessageId: null,
       };
     },
     chatRenamed: (state, payload: { index: number; title: string }) => {
@@ -132,7 +124,6 @@ export const brainstormSlice = createSlice({
       return {
         ...state,
         currentChatIndex: index,
-        editingMessageId: null,
       };
     },
     chatDeleted: (state, index: number) => {
@@ -152,7 +143,6 @@ export const brainstormSlice = createSlice({
         ...state,
         chats,
         currentChatIndex,
-        editingMessageId: null,
       };
     },
   },
@@ -166,7 +156,6 @@ export const {
   pruneHistory,
   messagesCleared,
   modeChanged,
-  editingMessageIdSet,
   chatCreated,
   chatRenamed,
   chatSwitched,

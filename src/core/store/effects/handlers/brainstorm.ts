@@ -10,8 +10,8 @@ import {
 
 export const brainstormHandler: GenerationHandlers<BrainstormTarget> = {
   streaming(ctx: StreamingContext<BrainstormTarget>, _newText: string): void {
-    const uiId = IDS.BRAINSTORM.message(ctx.target.messageId).TEXT;
-    api.v1.ui.updateParts([{ id: uiId, text: ctx.accumulatedText }]);
+    const viewId = `${IDS.BRAINSTORM.message(ctx.target.messageId).TEXT}-view`;
+    api.v1.ui.updateParts([{ id: viewId, text: ctx.accumulatedText }]);
   },
 
   async completion(ctx: CompletionContext<BrainstormTarget>): Promise<void> {
