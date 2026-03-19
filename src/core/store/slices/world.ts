@@ -108,7 +108,10 @@ export const worldSlice = createSlice({
     forgeRequested: (state) => state,
     forgeFromBrainstormRequested: (state) => state,
     castAllRequested: (state) => state,
+    forgeCastCompleted: (state) => state,
     entityRegenRequested: (state, _payload: { entityId: string }) => state,
+    entityReforgeRequested: (state, _payload: { entityId: string }) => state,
+    batchReforgeRequested: (state, _payload: { batchId: string }) => state,
 
     // Immediate state reducers (Phase 2 adds lorebook-side effects for these)
     entityDiscardRequested: (state, payload: { entityId: string }) => ({
@@ -140,7 +143,10 @@ export const {
   forgeRequested,
   forgeFromBrainstormRequested,
   castAllRequested,
+  forgeCastCompleted,
   entityRegenRequested,
+  entityReforgeRequested,
+  batchReforgeRequested,
   entityDiscardRequested,
   discardAllRequested,
 } = worldSlice.actions;

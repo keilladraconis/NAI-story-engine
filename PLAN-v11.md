@@ -115,11 +115,11 @@ Updated `src/index.ts`:
 
 ---
 
-## Phase 2: Forge Engine (Crucible Rewrite)
+## Phase 2: Forge Engine (Crucible Rewrite) ✅
 
 **Goal:** Make the forge always-available, intent-driven, and batch-aware.
 
-### 2.1 — Intent-Driven Forge Strategy
+### 2.1 — Intent-Driven Forge Strategy ✅
 
 Create `src/core/utils/forge-strategy.ts`:
 
@@ -131,7 +131,7 @@ Create `src/core/utils/forge-strategy.ts`:
   - Produces BUILD/LINK commands (reuse command vocabulary from `crucible-command-parser.ts`)
   - System prompt emphasizes "Main" batch semantics for first forge
 
-### 2.2 — Forge Handler
+### 2.2 — Forge Handler ✅
 
 Create `src/core/store/effects/handlers/forge.ts`:
 
@@ -140,7 +140,7 @@ Create `src/core/store/effects/handlers/forge.ts`:
 - Entities land in draft state within the current Forge batch
 - Auto-generate batch name from intent if not set
 
-### 2.3 — Forge Effects
+### 2.3 — Forge Effects ✅
 
 Create `src/core/store/effects/forge-effects.ts`:
 
@@ -148,7 +148,7 @@ Create `src/core/store/effects/forge-effects.ts`:
 - Handle `forgeFromBrainstormRequested` → same, with brainstorm context injected
 - Handle `batchReforgeRequested` → lift batch to Forge, set batch name + context
 
-### 2.4 — Cast Flow
+### 2.4 — Cast Flow ✅
 
 Update `src/core/store/effects/sega.ts` or create new `cast-effects.ts`:
 
@@ -163,12 +163,12 @@ Update `src/core/store/effects/sega.ts` or create new `cast-effects.ts`:
   - Freshly forged (never Cast) → remove from world state
   - Reforged (was Live) → return to Live unchanged, restore to original batch
 
-### 2.5 — Reforge Flow
+### 2.5 — Reforge Flow ✅
 
 - `batchReforgeRequested`: All entities in batch → draft, batch lifts to Forge section with existing members as context
 - `entityReforgeRequested`: Single entity → draft, lifted to Forge. Batch name pre-filled with original batch name.
 
-### 2.6 — Retire Old Crucible Pipeline
+### 2.6 — Retire Old Crucible Pipeline ✅
 
 - Delete `src/core/utils/crucible-strategy.ts` (shape/direction/tension factories)
 - Delete `src/core/utils/crucible-build-strategy.ts` (replaced by forge-strategy)

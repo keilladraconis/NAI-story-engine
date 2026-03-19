@@ -44,10 +44,7 @@ function targetToQueueEntry(
     case "lorebookKeys":        return { type: "lorebookKeys",        targetId: target.entryId };
     case "lorebookRefine":      return { type: "lorebookRefine",      targetId: target.entryId };
     case "bootstrap":           return { type: "bootstrap",           targetId: "" };
-    case "crucibleDirection":   return { type: "crucibleDirection",   targetId: "" };
-    case "crucibleShape":       return { type: "crucibleShape",       targetId: "" };
-    case "crucibleTension":     return { type: "crucibleTension",     targetId: "" };
-    case "crucibleBuildPass":   return { type: "crucibleBuildPass",   targetId: String(target.passNumber) };
+    case "forge":               return { type: "forge",               targetId: target.batchId };
   }
   // Unreachable — satisfies noImplicitReturns for exhaustive switch
   throw new Error(`Unhandled target type: ${(target as any).type}`);
@@ -87,13 +84,7 @@ function resolvePrefill(
     if (assistantPrefill) return assistantPrefill;
   }
 
-  // Crucible targets use explicit assistantPrefill
-  if (
-    target.type === "crucibleDirection" ||
-    target.type === "crucibleShape" ||
-    target.type === "crucibleTension" ||
-    target.type === "crucibleBuildPass"
-  ) {
+  if (target.type === "forge") {
     if (assistantPrefill) return assistantPrefill;
   }
 
@@ -173,14 +164,8 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `lb-refine:${target.entryId.slice(0, 8)}`;
     case "bootstrap":
       return "bootstrap";
-    case "crucibleDirection":
-      return "crucible-direction";
-    case "crucibleShape":
-      return "crucible-shape";
-    case "crucibleTension":
-      return "crucible-tension";
-    case "crucibleBuildPass":
-      return `crucible-build:${target.passNumber}`;
+    case "forge":
+      return `forge:${target.batchId.slice(0, 8)}`;
     case "brainstormChatTitle":
       return `brainstorm-title:${target.chatIndex}`;
   }

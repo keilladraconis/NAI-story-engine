@@ -113,10 +113,7 @@ export interface GenerationRequest {
   | "lorebookKeys"
   | "lorebookRefine"
   | "bootstrap"
-  | "crucibleDirection"
-  | "crucibleShape"
-  | "crucibleTension"
-  | "crucibleBuildPass";
+  | "forge";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -137,10 +134,7 @@ export interface GenerationStrategy {
   | { type: "lorebookKeys"; entryId: string }
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }
-  | { type: "crucibleDirection" }
-  | { type: "crucibleShape"; prefillName?: string }
-  | { type: "crucibleTension" }
-  | { type: "crucibleBuildPass"; passNumber: number };
+  | { type: "forge"; batchId: string };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };

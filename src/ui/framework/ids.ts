@@ -98,6 +98,7 @@ export const IDS = {
     BRAINSTORM_BTN: "se-forge-brainstorm-btn",
     BATCH_NAME: "se-forge-batch-name",
     ENTITY_LIST: "se-forge-entity-list",
+    TICKER: "se-forge-ticker",
     CAST_ALL_BTN: "se-forge-cast-all",
     DISCARD_ALL_BTN: "se-forge-discard-all",
     CAST_DISCARD_ROW: "se-forge-cast-discard-row",

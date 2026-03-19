@@ -9,12 +9,7 @@ import {
   lorebookKeysHandler,
   lorebookRefineHandler,
 } from "./handlers/lorebook";
-import {
-  crucibleDirectionHandler,
-  crucibleShapeHandler,
-  crucibleTensionHandler,
-} from "./handlers/crucible";
-import { crucibleBuildPassHandler } from "./handlers/crucible-build";
+import { forgeHandler } from "./handlers/forge";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -56,21 +51,9 @@ export type BootstrapTarget = Extract<
   GenerationStrategy["target"],
   { type: "bootstrap" }
 >;
-export type CrucibleDirectionTarget = Extract<
+export type ForgeTarget = Extract<
   GenerationStrategy["target"],
-  { type: "crucibleDirection" }
->;
-export type CrucibleShapeTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "crucibleShape" }
->;
-export type CrucibleTensionTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "crucibleTension" }
->;
-export type CrucibleBuildPassTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "crucibleBuildPass" }
+  { type: "forge" }
 >;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
@@ -113,10 +96,7 @@ export const GENERATION_HANDLERS: {
   lorebookRelationalMap: GenerationHandlers<LorebookRelationalMapTarget>;
   lorebookKeys: GenerationHandlers<LorebookKeysTarget>;
   lorebookRefine: GenerationHandlers<LorebookRefineTarget>;
-  crucibleDirection: GenerationHandlers<CrucibleDirectionTarget>;
-  crucibleShape: GenerationHandlers<CrucibleShapeTarget>;
-  crucibleTension: GenerationHandlers<CrucibleTensionTarget>;
-  crucibleBuildPass: GenerationHandlers<CrucibleBuildPassTarget>;
+  forge: GenerationHandlers<ForgeTarget>;
 } = {
   brainstorm: brainstormHandler,
   brainstormChatTitle: brainstormChatTitleHandler,
@@ -127,10 +107,7 @@ export const GENERATION_HANDLERS: {
   lorebookRelationalMap: lorebookRelationalMapHandler,
   lorebookKeys: lorebookKeysHandler,
   lorebookRefine: lorebookRefineHandler,
-  crucibleDirection: crucibleDirectionHandler,
-  crucibleShape: crucibleShapeHandler,
-  crucibleTension: crucibleTensionHandler,
-  crucibleBuildPass: crucibleBuildPassHandler,
+  forge: forgeHandler,
 };
 
 export function getHandler(

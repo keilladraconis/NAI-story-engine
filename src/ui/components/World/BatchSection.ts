@@ -1,6 +1,6 @@
 import { defineComponent } from "nai-act";
 import { RootState, WorldEntity } from "../../../core/store/types";
-import { batchReforged } from "../../../core/store/slices/world";
+import { batchReforgeRequested } from "../../../core/store/slices/world";
 import { IDS, STORAGE_KEYS } from "../../framework/ids";
 import { EntityRow } from "./EntityRow";
 
@@ -57,7 +57,7 @@ export const BatchSection = defineComponent<BatchSectionProps, RootState>({
       id: B.REFORGE_BTN,
       text: "⟲ Reforge",
       style: this.style?.("reforgeBtn"),
-      callback: () => dispatch(batchReforged({ batchId: props.batchId })),
+      callback: () => dispatch(batchReforgeRequested({ batchId: props.batchId })),
     });
 
     return collapsibleSection({

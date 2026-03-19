@@ -1,6 +1,6 @@
 import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
-import { entityReforged, entityDeleted, entityRegenRequested } from "../../../core/store/slices/world";
+import { entityReforgeRequested, entityDeleted, entityRegenRequested } from "../../../core/store/slices/world";
 import { IDS } from "../../framework/ids";
 
 const { row, text, button, column } = api.v1.ui.part;
@@ -48,7 +48,7 @@ export const EntityRow = defineComponent<EntityRowProps, RootState>({
           id: E.REFORGE_BTN,
           text: "⟲ Reforge",
           style: this.style?.("actionBtn"),
-          callback: () => dispatch(entityReforged({ entityId: props.entityId })),
+          callback: () => dispatch(entityReforgeRequested({ entityId: props.entityId })),
         }),
         button({
           id: E.REGEN_BTN,

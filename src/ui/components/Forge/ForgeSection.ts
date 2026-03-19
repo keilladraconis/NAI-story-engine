@@ -56,6 +56,13 @@ export const ForgeSection = defineComponent<undefined, RootState>({
       callback: () => dispatch(forgeFromBrainstormRequested()),
     });
 
+    // ── Ticker (streaming output) ──────────────────────────────────────────
+    const ticker = text({
+      id: FG.TICKER,
+      text: "",
+      style: { "font-size": "0.75em", opacity: "0.5", "font-style": "italic", "min-height": "1em" },
+    });
+
     // ── Batch name ─────────────────────────────────────────────────────────
     const batchNameInput = textInput({
       id: FG.BATCH_NAME,
@@ -117,6 +124,7 @@ export const ForgeSection = defineComponent<undefined, RootState>({
             intentInput,
             forgeBtnPart,
             brainstormBtn,
+            ticker,
             text({ style: this.style?.("separator") }),
             batchNameInput,
             entityList,
