@@ -4,9 +4,9 @@ import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
 import { storySlice, initialStoryState } from "./slices/story";
 import { crucibleSlice, initialCrucibleState } from "./slices/crucible";
-import { worldSlice } from "./slices/world";
-import { foundationSlice } from "./slices/foundation";
-import { RootState, StoryState, BrainstormChat, CrucibleState } from "./types";
+import { worldSlice, initialWorldState } from "./slices/world";
+import { foundationSlice, initialFoundationState } from "./slices/foundation";
+import { RootState, StoryState, BrainstormChat, CrucibleState, WorldState, FoundationState } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Persisted data loaded action
@@ -16,6 +16,8 @@ interface PersistedData {
   story?: StoryState;
   brainstorm?: { chats: BrainstormChat[]; currentChatIndex: number };
   crucible?: CrucibleState;
+  world?: WorldState;
+  foundation?: FoundationState;
 }
 
 const PERSISTED_DATA_LOADED = "persist/loaded";
@@ -56,6 +58,12 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
       crucible: data.crucible
         ? { ...initialCrucibleState, ...data.crucible }
         : current.crucible,
+      world: data.world
+        ? { ...initialWorldState, ...data.world }
+        : current.world,
+      foundation: data.foundation
+        ? { ...initialFoundationState, ...data.foundation }
+        : current.foundation,
     };
   }
 

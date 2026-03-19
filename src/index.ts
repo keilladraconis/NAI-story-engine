@@ -17,24 +17,25 @@ import { Input } from "./ui/components/brainstorm/Input";
 
 // Sidebar components
 import { Header } from "./ui/components/Sidebar/Header";
-import { FieldList } from "./ui/components/Sidebar/FieldList";
+
+// v11 Story Engine components
+import { NarrativeFoundation } from "./ui/components/Foundation/NarrativeFoundation";
+import { ForgeSection } from "./ui/components/Forge/ForgeSection";
+import { WorldBatchList } from "./ui/components/World/WorldBatchList";
 
 // Lorebook components
 import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelContent";
-
-// Crucible
-import { CruciblePanel } from "./ui/components/Crucible/CruciblePanel";
 
 // Journal
 import { JournalPanel } from "./ui/components/JournalPanel";
 import { loadJournal } from "./core/generation-journal";
 
-const { column } = api.v1.ui.part;
+const { column, row, button } = api.v1.ui.part;
 const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
 
 (async () => {
   try {
-    api.v1.log("Initializing Story Engine (Refactored)...");
+    api.v1.log("Initializing Story Engine v11...");
 
     api.v1.permissions.request(["storyEdit", "lorebookEdit", "documentEdit"]);
 
@@ -61,16 +62,17 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
     // 3c. Sync Erato compatibility (migrate entries/categories if toggled)
     await syncEratoCompatibility(store.getState);
 
-    // 4. Mount all components (returns UIPart + sets up subscriptions)
+    // 4. Mount all components
     const { part: brainstormHeaderPart } = mount(BrainstormHeader, undefined, store);
     const { part: listPart } = mount(List, undefined, store);
     const { part: inputPart } = mount(Input, {}, store);
     const { part: headerPart } = mount(Header, {}, store);
-    const { part: fieldListPart } = mount(FieldList, {}, store);
+    const { part: foundationPart } = mount(NarrativeFoundation, undefined, store);
+    const { part: forgePart } = mount(ForgeSection, undefined, store);
+    const { part: batchListPart } = mount(WorldBatchList, undefined, store);
     const { part: lorebookPart } = mount(LorebookPanelContent, undefined, store);
-    const { part: cruciblePart } = mount(CruciblePanel, undefined, store);
 
-    // 5. Compose panels from returned parts
+    // 5. Compose panels
     const brainstormPanel = sidebarPanel({
       id: "kse-brainstorm-sidebar",
       name: "Brainstorm",
@@ -90,7 +92,38 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
       iconId: "lightning",
       content: [
         column({
-          content: [headerPart, fieldListPart],
+          style: { gap: "8px" },
+          content: [
+            headerPart,
+            foundationPart,
+            forgePart,
+            batchListPart,
+            // Footer: Relationships | Bind New | Rebind
+            row({
+              id: "se-footer",
+              style: { gap: "4px", "margin-top": "8px" },
+              content: [
+                button({
+                  id: "se-footer-relationships",
+                  text: "Relationships",
+                  style: { flex: "1", "font-size": "0.8em" },
+                  callback: () => { /* Phase 6: Relationships modal */ },
+                }),
+                button({
+                  id: "se-footer-bind-new",
+                  text: "Bind New",
+                  style: { flex: "1", "font-size": "0.8em" },
+                  callback: () => { /* Phase 5: Bulk Bind modal */ },
+                }),
+                button({
+                  id: "se-footer-rebind",
+                  text: "Rebind",
+                  style: { flex: "1", "font-size": "0.8em" },
+                  callback: () => { /* Phase 5: Rebind modal */ },
+                }),
+              ],
+            }),
+          ],
         }),
       ],
     });
@@ -102,17 +135,9 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
       content: [lorebookPart],
     });
 
-    const cruciblePanel = sidebarPanel({
-      id: "kse-crucible-sidebar",
-      name: "Crucible",
-      iconId: "hexagon",
-      content: [cruciblePart],
-    });
-
     // 6. Conditional: Generation Journal panel
     const panels: UIExtension[] = [
       brainstormPanel,
-      cruciblePanel,
       storyEnginePanel,
       lorebookGenPanel,
     ];
@@ -143,7 +168,7 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
       );
     });
 
-    api.v1.log("Story Engine Initialized.");
+    api.v1.log("Story Engine v11 Initialized.");
   } catch (e) {
     api.v1.log("Startup error:", e);
   }

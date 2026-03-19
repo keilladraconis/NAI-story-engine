@@ -103,6 +103,23 @@ export const worldSlice = createSlice({
         r.id === payload.relationshipId ? { ...r, description: payload.description } : r,
       ),
     }),
+
+    // Signal actions — Phase 2 effects handle the actual work
+    forgeRequested: (state) => state,
+    forgeFromBrainstormRequested: (state) => state,
+    castAllRequested: (state) => state,
+    entityRegenRequested: (state, _payload: { entityId: string }) => state,
+
+    // Immediate state reducers (Phase 2 adds lorebook-side effects for these)
+    entityDiscardRequested: (state, payload: { entityId: string }) => ({
+      ...state,
+      entities: state.entities.filter((e) => e.id !== payload.entityId),
+    }),
+
+    discardAllRequested: (state) => ({
+      ...state,
+      entities: state.entities.filter((e) => e.lifecycle !== "draft"),
+    }),
   },
 });
 
@@ -120,4 +137,10 @@ export const {
   relationshipAdded,
   relationshipRemoved,
   relationshipUpdated,
+  forgeRequested,
+  forgeFromBrainstormRequested,
+  castAllRequested,
+  entityRegenRequested,
+  entityDiscardRequested,
+  discardAllRequested,
 } = worldSlice.actions;

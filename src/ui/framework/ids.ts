@@ -56,9 +56,71 @@ export const STORAGE_KEYS = {
   CR_LINKS_SECTION_UI: "story:cr-links-section",
   CR_ELEMENTS_SECTION_UI: "story:cr-elements-section",
   CR_BUILD_LOG_COLLAPSED_UI: "story:cr-build-log-collapsed",
+
+  // Foundation UI (v11)
+  FOUNDATION_SECTION_UI: "story:se-foundation-section",
+  FOUNDATION_ATTG_UI: "story:se-foundation-attg",
+  FOUNDATION_STYLE_UI: "story:se-foundation-style",
+
+  // Forge UI (v11)
+  FORGE_SECTION_UI: "story:se-forge-section",
+  FORGE_INTENT_UI: "story:se-forge-intent",
+  FORGE_BATCH_NAME_UI: "story:se-forge-batch-name",
+
+  // World batch UI (v11) — dynamic by batchId
+  worldBatchSectionUI: (batchId: string) => `story:se-world-batch-${batchId}`,
 };
 
 export const IDS = {
+  FOUNDATION: {
+    SECTION: "se-fn-section",
+    SHAPE_TEXT: "se-fn-shape",
+    SHAPE_BTN: "se-fn-shape-btn",
+    INTENT_TEXT: "se-fn-intent",
+    INTENT_BTN: "se-fn-intent-btn",
+    WORLD_STATE_TEXT: "se-fn-world-state",
+    WORLD_STATE_BTN: "se-fn-world-state-btn",
+    TENSIONS_LIST: "se-fn-tensions-list",
+    ADD_TENSION_BTN: "se-fn-add-tension",
+    ATTG_INPUT: "se-fn-attg",
+    STYLE_INPUT: "se-fn-style",
+    tension: (id: string) => ({
+      ROOT: `se-fn-tension-${id}`,
+      TEXT: `se-fn-tension-${id}-text`,
+      RESOLVE_BTN: `se-fn-tension-${id}-resolve`,
+      DELETE_BTN: `se-fn-tension-${id}-del`,
+    }),
+  },
+  FORGE: {
+    SECTION: "se-forge-section",
+    INTENT_INPUT: "se-forge-intent",
+    FORGE_BTN: "se-forge-btn",
+    BRAINSTORM_BTN: "se-forge-brainstorm-btn",
+    BATCH_NAME: "se-forge-batch-name",
+    ENTITY_LIST: "se-forge-entity-list",
+    CAST_ALL_BTN: "se-forge-cast-all",
+    DISCARD_ALL_BTN: "se-forge-discard-all",
+    CAST_DISCARD_ROW: "se-forge-cast-discard-row",
+    entity: (id: string) => ({
+      ROOT: `se-forge-entity-${id}`,
+      DISCARD_BTN: `se-forge-entity-${id}-discard`,
+    }),
+  },
+  WORLD: {
+    BATCH_LIST: "se-world-batch-list",
+    batch: (id: string) => ({
+      SECTION: `se-world-batch-${id}`,
+      ENTITY_LIST: `se-world-batch-${id}-entities`,
+      REFORGE_BTN: `se-world-batch-${id}-reforge`,
+    }),
+    entity: (id: string) => ({
+      ROOT: `se-world-entity-${id}`,
+      ACTION_BAR: `se-world-entity-${id}-actions`,
+      REFORGE_BTN: `se-world-entity-${id}-reforge`,
+      REGEN_BTN: `se-world-entity-${id}-regen`,
+      DELETE_BTN: `se-world-entity-${id}-delete`,
+    }),
+  },
   CRUCIBLE: {
     WINDOW_ROOT: "cr-root",
     STATUS_TEXT: "cr-status",

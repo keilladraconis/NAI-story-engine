@@ -69,68 +69,49 @@ Created `src/core/store/slices/foundation.ts`:
 
 ---
 
-## Phase 1: Unified Story Engine Panel
+## Phase 1: Unified Story Engine Panel ✅
 
 **Goal:** Merge Crucible and Story Engine sidebars into one panel.
 
-### 1.1 — Narrative Foundation UI
+### 1.1 — Narrative Foundation UI ✅
 
-Create `src/ui/components/Foundation/NarrativeFoundation.ts`:
+Created `src/ui/components/Foundation/NarrativeFoundation.ts` + `TensionRow.ts`:
+- Collapsible "Narrative Foundation" section with Shape, Intent, World State, Tensions, ATTG, Style
+- Tensions use `bindList` with active/resolved split; resolved header hides reactively
+- ATTG/Style: `multilineTextInput` + sync checkbox (ATTG→Memory, Style→AN)
+- Added signal actions: `shapeGenerationRequested`, `intentGenerationRequested`, `worldStateGenerationRequested`
 
-- Collapsible section containing:
-  - Shape: display + `GenerationButton`
-  - Intent: `EditableText` + `GenerationButton` (seeded from Direction)
-  - World State: `EditableText` + `GenerationButton` (seeded from Canon)
-  - Tensions: list with `EditableText` per tension, `[✓ Resolve]` button, resolved divider, `[⚡ Add Tension]`
-  - ATTG: `textInput` + sync checkbox
-  - Style: `textInput` + sync checkbox
-- Wire to `foundation` slice via `useSelector`/`bindList`
+### 1.2 — Forge Section UI ✅
 
-### 1.2 — Forge Section UI
+Created `src/ui/components/Forge/ForgeSection.ts` + `ForgeEntityRow.ts`:
+- Collapsible "Forge" section with intent input, Forge + Forge from Brainstorm buttons, batch name, draft entity list, Cast All / Discard All
+- Draft entity list via `bindList(ForgeEntityRow)`; Cast/Discard row hides when no draft entities
+- `entityDiscardRequested` and `discardAllRequested` are immediate reducers (entities removed from state)
+- `forgeRequested`, `castAllRequested` are signals (Phase 2 adds effects)
 
-Create `src/ui/components/Forge/ForgeSection.ts`:
+### 1.3 — World Batches UI ✅
 
-- Collapsible section containing:
-  - Intent `multilineTextInput` + `GenerationButton`
-  - `[⚡ Forge from Brainstorm]` button
-  - Batch name `textInput` (auto-generated, editable)
-  - Draft entity list via `bindList` — single-line rows with `[✕]` per-entity discard
-  - `[⚡ Cast All]` and `[✕ Discard All]` buttons
-- Wire forge generation to existing Crucible build pass machinery (reuse `crucible-build-strategy.ts`)
+Created `src/ui/components/World/BatchSection.ts`, `EntityRow.ts`, `WorldBatchList.ts`:
+- `WorldBatchList`: container, renders one `BatchSection` per batch via `bindList`
+- `BatchSection`: collapsible section per batch, title updates reactively with live entity count; entity list via `bindList(EntityRow)`
+- `EntityRow`: name + summary row with tap-to-expand action bar (`[⟲ Reforge] [⚡ Regen] [✕ Delete]`)
+- Reforge dispatches `entityReforged` directly (Phase 2 adds lorebook cleanup effect)
+- Delete dispatches `entityDeleted` (removes entity + relationships from state)
 
-### 1.3 — World Batches UI
+### 1.4 — Compose the Unified Panel ✅
 
-Create `src/ui/components/World/BatchSection.ts`:
+Updated `src/index.ts`:
+- Removed `kse-crucible-sidebar` panel
+- `kse-sidebar` now: Header → NarrativeFoundation → ForgeSection → WorldBatchList → Footer (Relationships / Bind New / Rebind stubs)
+- Crucible effects unregistered from `register-effects.ts`
+- world + foundation state included in autosave and `persistedDataLoaded`
 
-- One `collapsibleSection` per batch, header: `"Name (N entities) [⟲ Reforge]"`
-- Entity rows via `bindList`: single-line, name + summary
-- Tap-to-expand action bar: `[⟲ Reforge] [⚡ Regen] [✕ Delete]`
+### 1.5 — Retire Old Sidebar Components ✅
 
-Create `src/ui/components/World/EntityRow.ts`:
-
-- Single-line display with expand/collapse for action bar
-- Uses `useSelector` to track generation state per entity
-
-### 1.4 — Compose the Unified Panel
-
-Update `src/index.ts`:
-
-- Remove `kse-crucible-sidebar` panel registration
-- Replace `kse-sidebar` contents:
-  - Header (SEGA controls, status marquee)
-  - NarrativeFoundation
-  - ForgeSection
-  - BatchSection × N (one per batch from `world.batches`)
-  - Story Opening (bootstrap)
-  - Footer: `[Relationships]` `[Bind New]` `[Rebind]`
-
-### 1.5 — Retire Old Sidebar Components
-
-- Delete `src/ui/components/Crucible/` (CruciblePanel, CrucibleHeader, ShapeSection, IntentSection, TensionsSection, TensionCard, BuildPassView)
-- Delete `src/ui/components/Sidebar/FieldList.ts`
-- Delete `src/ui/components/Fields/TextField.ts` (Canon, Brainstorm fields absorbed into Foundation)
-- Delete `src/ui/components/Fields/ListField.ts`, `ListItem.ts` (replaced by BatchSection/EntityRow)
-- Keep `src/ui/components/Sidebar/Header.ts` (adapted for v11)
+- Deleted `src/ui/components/Crucible/` (all 7 files)
+- Deleted `src/ui/components/Sidebar/FieldList.ts`
+- Deleted `src/ui/components/Fields/TextField.ts`, `ListField.ts`, `ListItem.ts`
+- Kept `src/ui/components/Sidebar/Header.ts`
 
 ---
 
