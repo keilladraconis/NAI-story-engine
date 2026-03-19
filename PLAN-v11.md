@@ -4,20 +4,20 @@ Reference: `FUTURE.md` for design rationale and UI sketches.
 
 ---
 
-## Phase 0: Rename and Reorganize (Foundation)
+## Phase 0: Rename and Reorganize (Foundation) ✅
 
 **Goal:** Establish v11 naming conventions and state structure without changing behavior.
 
-### 0.1 — Rename "Merge" to "Cast"
+### 0.1 — Rename "Merge" to "Cast" ✅
 
 - `src/core/store/slices/crucible.ts`: Rename `crucibleMergeRequested` → `crucibleCastRequested`, `mergeCompleted` → `castCompleted`, `merged` → `cast` in `CrucibleState`
 - `src/core/store/effects/crucible-effects.ts`: Update action references
 - `src/ui/components/Crucible/BuildPassView.ts`: Update button label "Merge to Story" → "Cast"
-- Update all imports/references across codebase
+- Updated test file, `ids.ts` (`MERGE_BTN` → `CAST_BTN`)
 
-### 0.2 — Introduce Batch and Relationship Types
+### 0.2 — Introduce Batch and Relationship Types ✅
 
-New types in `src/core/store/types.ts`:
+New types in `src/core/store/types.ts` (`WorldBatch`, `WorldEntity`, `Relationship`, `EntityLifecycle`, `WorldState`, `FoundationState`, `Tension`):
 
 ```ts
 type EntityLifecycle = "draft" | "live"
@@ -46,28 +46,26 @@ type WorldEntity = {
 }
 ```
 
-### 0.3 — New State Slice: `world.ts`
+### 0.3 — New State Slice: `world.ts` ✅
 
-Create `src/core/store/slices/world.ts` as the v11 successor to DULFS + Crucible elements:
+Created `src/core/store/slices/world.ts`:
 
 - State: `{ batches: WorldBatch[], entities: WorldEntity[], relationships: Relationship[] }`
-- Actions: `entityForged`, `entityCast`, `entityReforged`, `entityDeleted`, `batchCreated`, `batchRenamed`, `batchReforged`, `relationshipAdded`, `relationshipRemoved`, `relationshipUpdated`, `entityBound`, `entityUnbound`
-- Add to `RootState`
+- Actions: `entityForged`, `entityCast`, `entityReforged`, `entityDeleted`, `entitySummaryUpdated`, `batchCreated`, `batchRenamed`, `batchReforged`, `relationshipAdded`, `relationshipRemoved`, `relationshipUpdated`, `entityBound`, `entityUnbound`
 
-### 0.4 — New State Slice: `foundation.ts`
+### 0.4 — New State Slice: `foundation.ts` ✅
 
-Create `src/core/store/slices/foundation.ts` — the Narrative Foundation:
+Created `src/core/store/slices/foundation.ts`:
 
 - State: `{ shape, intent, worldState, tensions: Tension[], attg, style, attgSyncEnabled, styleSyncEnabled }`
-- `Tension`: `{ id: string, text: string, resolved: boolean }`
 - Actions: `shapeUpdated`, `intentUpdated`, `worldStateUpdated`, `tensionAdded`, `tensionEdited`, `tensionResolved`, `tensionDeleted`, `attgUpdated`, `styleUpdated`, `attgSyncToggled`, `styleSyncToggled`
-- Absorbs fields from `story.ts` (Canon → worldState, Direction → intent) and `crucible.ts` (shape, tensions)
 
-### 0.5 — Add `world` and `foundation` to Store
+### 0.5 — Add `world` and `foundation` to Store ✅
 
-- Update `src/core/store/types.ts`: Add to `RootState`
-- Update store creation in `src/core/store/index.ts`
-- Delete old slices (`story.ts`, `crucible.ts`) and remove from `RootState` — no migration needed, alpha wipe is fine
+- Added `WorldState`, `FoundationState`, `Tension` types to `src/core/store/types.ts`
+- Added `world` and `foundation` to `RootState`
+- Wired into `combineReducers` and exported from `src/core/store/index.ts`
+- **Deferred:** Deletion of `story.ts` and `crucible.ts` slices — kept alive until Phase 1 UI replaces them (per Phase 8 guidance: don't delete old code until new code works)
 
 ---
 

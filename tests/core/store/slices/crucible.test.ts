@@ -8,7 +8,7 @@ import {
   tensionTextUpdated,
   tensionAcceptanceToggled,
   tensionsCleared,
-  mergeCompleted,
+  castCompleted,
   updateShape,
   directionSet,
   crucibleDirectionEdited,
@@ -62,11 +62,11 @@ describe("crucible reducer — phaseTransitioned", () => {
     expect(next.phase).toBe("tensions");
   });
 
-  it("clears elements, links, passes, critique, and merged flag when transitioning to building", () => {
+  it("clears elements, links, passes, critique, and cast flag when transitioning to building", () => {
     const state: CrucibleState = {
       ...initialCrucibleState,
       phase: "tensions",
-      merged: true,
+      cast: true,
       elements: [makeElement()],
       links: [makeLink()],
       passes: [{ passNumber: 1, commandLog: ["test"], guidance: "" }],
@@ -78,7 +78,7 @@ describe("crucible reducer — phaseTransitioned", () => {
     expect(next.links).toEqual([]);
     expect(next.passes).toEqual([]);
     expect(next.activeCritique).toBeNull();
-    expect(next.merged).toBe(false);
+    expect(next.cast).toBe(false);
   });
 
   it("does NOT clear tensions when transitioning to building", () => {
@@ -169,11 +169,11 @@ describe("crucible reducer — shape and direction", () => {
 // Merge
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("crucible reducer — mergeCompleted", () => {
-  it("sets merged to true", () => {
-    expect(initialCrucibleState.merged).toBe(false);
-    const next = reduce(initialCrucibleState, mergeCompleted());
-    expect(next.merged).toBe(true);
+describe("crucible reducer — castCompleted", () => {
+  it("sets cast to true", () => {
+    expect(initialCrucibleState.cast).toBe(false);
+    const next = reduce(initialCrucibleState, castCompleted());
+    expect(next.cast).toBe(true);
   });
 });
 
@@ -283,7 +283,7 @@ describe("crucible reducer — crucibleReset", () => {
   it("returns to initial state", () => {
     const dirty: CrucibleState = {
       phase: "building",
-      merged: true,
+      cast: true,
       shape: { name: "TRAGEDY", instruction: "Loss." },
       direction: "A story of loss.",
       tensions: [makeTension()],

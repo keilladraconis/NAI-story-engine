@@ -156,6 +156,58 @@ export interface RuntimeState {
   budgetTimeRemaining: number;
 }
 
+// World Types (v11)
+
+export type EntityLifecycle = "draft" | "live";
+
+export interface WorldBatch {
+  id: string;
+  name: string;       // "Main", "Rusty Anchor Regulars", etc.
+  entityIds: string[]; // ordered
+}
+
+export interface Relationship {
+  id: string;
+  fromEntityId: string;
+  toEntityId: string;
+  description: string;
+}
+
+export interface WorldEntity {
+  id: string;
+  batchId: string;
+  categoryId: DulfsFieldID; // Character, Location, etc. — metadata
+  lifecycle: EntityLifecycle;
+  lorebookEntryId?: string; // set on Cast, cleared on Reforge
+  name: string;
+  summary: string; // engine-derived, read-only display
+}
+
+export interface WorldState {
+  batches: WorldBatch[];
+  entities: WorldEntity[];
+  relationships: Relationship[];
+}
+
+// Foundation Types (v11)
+
+export interface Tension {
+  id: string;
+  text: string;
+  resolved: boolean;
+}
+
+export interface FoundationState {
+  shape: string;
+  intent: string;
+  worldState: string;
+  tensions: Tension[];
+  attg: string;
+  style: string;
+  attgSyncEnabled: boolean;
+  styleSyncEnabled: boolean;
+}
+
 // Crucible Types
 
 export type CruciblePhase = "direction" | "tensions" | "building";
@@ -190,7 +242,7 @@ export interface CrucibleState {
   phase: CruciblePhase;
   direction: string | null;
   shape: { name: string; instruction: string } | null;
-  merged: boolean;
+  cast: boolean;
   tensions: CrucibleTension[];
   elements: CrucibleWorldElement[];
   links: CrucibleLink[];
@@ -204,4 +256,6 @@ export interface RootState {
   ui: UIState;
   runtime: RuntimeState;
   crucible: CrucibleState;
+  world: WorldState;
+  foundation: FoundationState;
 }

@@ -4,6 +4,8 @@ import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
 import { storySlice, initialStoryState } from "./slices/story";
 import { crucibleSlice, initialCrucibleState } from "./slices/crucible";
+import { worldSlice } from "./slices/world";
+import { foundationSlice } from "./slices/foundation";
 import { RootState, StoryState, BrainstormChat, CrucibleState } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,6 +36,8 @@ const sliceReducer = combineReducers({
   ui: uiSlice.reducer,
   runtime: runtimeSlice.reducer,
   crucible: crucibleSlice.reducer,
+  world: worldSlice.reducer,
+  foundation: foundationSlice.reducer,
 });
 
 function rootReducer(state: RootState | undefined, action: Action): RootState {
@@ -70,3 +74,5 @@ export * from "./slices/ui";
 export * from "./slices/runtime";
 export * from "./slices/story";
 export * from "./slices/crucible";
+export * from "./slices/world";
+export * from "./slices/foundation";

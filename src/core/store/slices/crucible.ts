@@ -11,7 +11,7 @@ export const initialCrucibleState: CrucibleState = {
   phase: "direction",
   direction: null,
   shape: null,
-  merged: false,
+  cast: false,
   tensions: [],
   elements: [],
   links: [],
@@ -28,7 +28,7 @@ export const crucibleSlice = createSlice({
     crucibleTensionsRequested: (state) => state,
     crucibleBuildPassRequested: (state) => state,
     crucibleStopRequested: (state) => state,
-    crucibleMergeRequested: (state) => state,
+    crucibleCastRequested: (state) => state,
 
     // Phase transitions
     phaseTransitioned: (state, payload: { phase: CruciblePhase }) => {
@@ -37,7 +37,7 @@ export const crucibleSlice = createSlice({
         return {
           ...state,
           phase: payload.phase,
-          merged: false,
+          cast: false,
           elements: [],
           links: [],
           passes: [],
@@ -47,9 +47,9 @@ export const crucibleSlice = createSlice({
       return { ...state, phase: payload.phase };
     },
 
-    // Merge outcome
-    mergeCompleted: (state) => {
-      return { ...state, merged: true };
+    // Cast outcome
+    castCompleted: (state) => {
+      return { ...state, cast: true };
     },
 
     // Shape generation
@@ -190,8 +190,8 @@ export const {
   crucibleTensionsRequested,
   crucibleBuildPassRequested,
   crucibleStopRequested,
-  crucibleMergeRequested,
-  mergeCompleted,
+  crucibleCastRequested,
+  castCompleted,
   phaseTransitioned,
   updateShape,
   crucibleDirectionRequested,

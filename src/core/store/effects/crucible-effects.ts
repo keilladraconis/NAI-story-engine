@@ -7,14 +7,14 @@ import {
   crucibleTensionsRequested,
   crucibleBuildPassRequested,
   crucibleStopRequested,
-  crucibleMergeRequested,
+  crucibleCastRequested,
   crucibleReset,
   tensionRemoved,
   requestCancelled,
   generationSubmitted,
   requestQueued,
   phaseTransitioned,
-  mergeCompleted,
+  castCompleted,
   dulfsItemAdded,
   updateShape,
   directionSet,
@@ -240,15 +240,15 @@ export function registerCrucibleEffects(
     },
   );
 
-  // Intent: Crucible Merge → write elements to World Entries
+  // Intent: Crucible Cast → write elements to World Entries
   subscribeEffect(
-    matchesAction(crucibleMergeRequested),
+    matchesAction(crucibleCastRequested),
     async (_action, { getState: getLatest }) => {
       const state = getLatest();
       const { elements } = state.crucible;
       if (elements.length === 0) {
-        api.v1.log("[crucible] Merge requested but no elements");
-        api.v1.ui.toast("No world elements to merge", { type: "info" });
+        api.v1.log("[crucible] Cast requested but no elements");
+        api.v1.ui.toast("No world elements to cast", { type: "info" });
         return;
       }
 
@@ -276,11 +276,11 @@ export function registerCrucibleEffects(
         }
       }
 
-      dispatch(mergeCompleted());
+      dispatch(castCompleted());
       const parts = [created && `${created} created`, updated && `${updated} updated`].filter(Boolean);
       const msg = parts.join(", ") || "no changes";
-      api.v1.log(`[crucible] Merged to World Entries: ${msg}`);
-      api.v1.ui.toast(`Merged to World Entries: ${msg}`, { type: "success" });
+      api.v1.log(`[crucible] Cast to World Entries: ${msg}`);
+      api.v1.ui.toast(`Cast to World Entries: ${msg}`, { type: "success" });
     },
   );
 }

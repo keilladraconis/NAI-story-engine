@@ -73,7 +73,7 @@ export const IDS = {
     SHAPE_TEXT: "cr-shape-text",
     SHAPE_BTN: "cr-shape-btn",
     ELEMENTS_SECTION: "cr-elements",
-    MERGE_BTN: "cr-merge-btn",
+    CAST_BTN: "cr-cast-btn",
     // Build pass
     BUILD_PASS_ROOT: "cr-build-root",
     BUILD_GUIDANCE_INPUT: "cr-build-guidance",

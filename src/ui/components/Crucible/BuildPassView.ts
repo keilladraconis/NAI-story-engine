@@ -5,7 +5,7 @@ import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
 import {
   crucibleStopRequested,
   crucibleBuildPassRequested,
-  crucibleMergeRequested,
+  crucibleCastRequested,
   elementRemoved,
   elementUpdated,
   linkRemoved,
@@ -322,14 +322,14 @@ export const BuildPassView = defineComponent<undefined, RootState>({
 
     // --- Merge button (from ReviewView) ---
     const { part: mergeButton } = ctx.render(ButtonWithConfirmation, {
-      id: CR.MERGE_BTN,
-      label: "Merge to Story Engine",
+      id: CR.CAST_BTN,
+      label: "Cast",
       confirmLabel: "Populate World Entry fields?",
-      onConfirm: () => dispatch(crucibleMergeRequested()),
+      onConfirm: () => dispatch(crucibleCastRequested()),
       style: { marginTop: "4px" },
     });
 
-    const isMerged = state.crucible.merged;
+    const isMerged = state.crucible.cast;
 
     // --- Guidance input ---
     const guidanceInput = multilineTextInput({
@@ -350,7 +350,7 @@ export const BuildPassView = defineComponent<undefined, RootState>({
         s.crucible.links.map((l) => l.id).join(","),
         String(s.crucible.passes.length),
         s.crucible.activeCritique ?? "",
-        String(s.crucible.merged),
+        String(s.crucible.cast),
       ].join("|"),
       (_key) => {
         const st = ctx.getState();
@@ -406,7 +406,7 @@ export const BuildPassView = defineComponent<undefined, RootState>({
 
         // Merged footer
         api.v1.ui.updateParts([
-          { id: "cr-merged-footer", style: st.crucible.merged ? this.style?.("mergedText") : this.style?.("hidden") },
+          { id: "cr-merged-footer", style: st.crucible.cast ? this.style?.("mergedText") : this.style?.("hidden") },
         ]);
       },
     );
