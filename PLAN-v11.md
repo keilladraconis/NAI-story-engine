@@ -288,11 +288,11 @@ Create `src/core/utils/category-detect.ts`:
 
 ---
 
-## Phase 6: Relationships Modal
+## Phase 6: Relationships Modal ✅
 
 **Goal:** Whole-web relationship overview accessible from the Story Engine panel.
 
-### 6.1 — Relationships Modal UI
+### 6.1 — Relationships Modal UI ✅
 
 Create `src/ui/components/Relationships/RelationshipsModal.ts`:
 

@@ -29,6 +29,9 @@ import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelCont
 // Bind modal
 import { openBindModal } from "./ui/components/Bind/BindModal";
 
+// Relationships modal
+import { openRelationshipsModal } from "./ui/components/Relationships/RelationshipsModal";
+
 // Journal
 import { JournalPanel } from "./ui/components/JournalPanel";
 import { loadJournal } from "./core/generation-journal";
@@ -110,7 +113,7 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
                   id: "se-footer-relationships",
                   text: "Relationships",
                   style: { flex: "1", "font-size": "0.8em" },
-                  callback: () => { /* Phase 6: Relationships modal */ },
+                  callback: () => openRelationshipsModal({ getState: store.getState, dispatch: store.dispatch }),
                 }),
                 button({
                   id: "se-footer-bind-new",
