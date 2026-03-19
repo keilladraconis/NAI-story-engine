@@ -26,6 +26,9 @@ import { WorldBatchList } from "./ui/components/World/WorldBatchList";
 // Lorebook components
 import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelContent";
 
+// Bind modal
+import { openBindModal } from "./ui/components/Bind/BindModal";
+
 // Journal
 import { JournalPanel } from "./ui/components/JournalPanel";
 import { loadJournal } from "./core/generation-journal";
@@ -113,13 +116,13 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
                   id: "se-footer-bind-new",
                   text: "Bind New",
                   style: { flex: "1", "font-size": "0.8em" },
-                  callback: () => { /* Phase 5: Bulk Bind modal */ },
+                  callback: () => openBindModal({ getState: store.getState, dispatch: store.dispatch }),
                 }),
                 button({
                   id: "se-footer-rebind",
                   text: "Rebind",
                   style: { flex: "1", "font-size": "0.8em" },
-                  callback: () => { /* Phase 5: Rebind modal */ },
+                  callback: () => openBindModal({ getState: store.getState, dispatch: store.dispatch }),
                 }),
               ],
             }),

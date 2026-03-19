@@ -248,7 +248,7 @@ Update `src/ui/components/Lorebook/LorebookPanelContent.ts`:
 
 ---
 
-## Phase 5: Bind System
+## Phase 5: Bind System ✅
 
 **Goal:** Allow users to adopt existing lorebook entries into Story Engine.
 
