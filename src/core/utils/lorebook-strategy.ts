@@ -1,8 +1,9 @@
 import { RootState } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
-import { buildStoryEnginePrefix, formatCrucibleElementsContext } from "./context-builder";
-import { DulfsFieldID, FieldID } from "../../config/field-definitions";
+import { buildStoryEnginePrefix } from "./context-builder";
+import { DulfsFieldID, FIELD_CONFIGS } from "../../config/field-definitions";
 import { STORAGE_KEYS } from "../../ui/framework/ids";
+import { WORLD_ENTRY_CATEGORIES } from "../store/types";
 
 // Category-to-template mapping
 const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
@@ -28,30 +29,51 @@ const getEntryType = (categoryName: string): string => {
   return CATEGORY_TO_TYPE[categoryName] || "Entry";
 };
 
-/**
- * Dependency order for relational map generation.
- * Characters are self-contained; locations/systems/factions/dynamics benefit
- * from character context when building MAP SO FAR.
- */
-export const MAP_DEPENDENCY_ORDER: DulfsFieldID[] = [
-  FieldID.DramatisPersonae,
-  FieldID.Locations,
-  FieldID.UniverseSystems,
-  FieldID.Factions,
-  FieldID.Topics,
-  FieldID.SituationalDynamics,
-];
+// --- v11 World Context Helpers ---
 
-/**
- * Returns true if a relational map entry needs reconciliation:
- * no related characters identified AND collision risk is high.
- * These entries benefit from a second pass with the complete map as context.
- */
-export function parseNeedsReconciliation(mapText: string): boolean {
-  const charLine = mapText.match(/- related characters:\s*(.*)/i)?.[1]?.trim() ?? "";
-  const riskLine = mapText.match(/- collision risk:\s*(.*)/i)?.[1]?.trim() ?? "";
-  const noChars = !charLine || /^(none|n\/a|—|-)$/i.test(charLine);
-  return noChars && /high/i.test(riskLine);
+/** Find the WorldEntity associated with a lorebook entry ID, if any. */
+function findEntityForEntry(state: RootState, entryId: string) {
+  return state.world.entities.find((e) => e.lorebookEntryId === entryId);
+}
+
+/** Format the relationships of a specific entity as context text. */
+function formatEntityRelationships(state: RootState, entityId: string): string {
+  const rels = state.world.relationships.filter(
+    (r) => r.fromEntityId === entityId || r.toEntityId === entityId,
+  );
+  if (rels.length === 0) return "";
+
+  const lines = rels.map((r) => {
+    const fromName = state.world.entities.find((e) => e.id === r.fromEntityId)?.name || "";
+    const toName = state.world.entities.find((e) => e.id === r.toEntityId)?.name || "";
+    return `- ${fromName} → ${toName}: ${r.description}`;
+  });
+  return lines.join("\n");
+}
+
+/** Format live world entities as context, grouped by category. */
+function formatLiveWorldEntitiesContext(state: RootState): string {
+  const liveEntities = state.world.entities.filter((e) => e.lifecycle === "live");
+  if (liveEntities.length === 0) return "";
+
+  const groups = new Map<DulfsFieldID, typeof liveEntities>();
+  for (const entity of liveEntities) {
+    const list = groups.get(entity.categoryId) || [];
+    list.push(entity);
+    groups.set(entity.categoryId, list);
+  }
+
+  const lines: string[] = [];
+  for (const fieldId of WORLD_ENTRY_CATEGORIES) {
+    const fieldEntities = groups.get(fieldId);
+    if (!fieldEntities) continue;
+    const label = FIELD_CONFIGS.find((f) => f.id === fieldId)?.label || fieldId;
+    lines.push(`${label}:`);
+    for (const entity of fieldEntities) {
+      lines.push(`- ${entity.name}${entity.summary ? `: ${entity.summary.slice(0, 100)}` : ""}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 // --- Factory Builders for JIT Strategy Building ---
@@ -91,7 +113,7 @@ export const createLorebookContentFactory = (
       ? String((await api.v1.config.get(templateKey)) || "")
       : "";
 
-    // Item's short description from DULFS
+    // Item's short description from DULFS (for backward compat with old DULFS items)
     const itemContent = String(
       (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(entryId))) || "",
     );
@@ -124,11 +146,23 @@ Setting: ${setting}
       });
     }
 
-    const crucibleContext = formatCrucibleElementsContext(getState());
-    if (crucibleContext) {
+    // v11 world context: live entities grouped by category
+    const state = getState();
+    const worldContext = formatLiveWorldEntitiesContext(state);
+    if (worldContext) {
       messages.push({
         role: "system",
-        content: `[WORLD STRUCTURE]\n${crucibleContext}`,
+        content: `[WORLD STRUCTURE]\n${worldContext}`,
+      });
+    }
+
+    // Entity-specific relationships from v11 world slice
+    const entity = findEntityForEntry(state, entryId);
+    const relContext = entity ? formatEntityRelationships(state, entity.id) : "";
+    if (relContext) {
+      messages.push({
+        role: "system",
+        content: `[RELATIONSHIPS]\n${relContext}`,
       });
     }
 
@@ -140,7 +174,8 @@ Setting: ${setting}
       { role: "assistant", content: assistantPrefill },
     );
 
-    const tailCount = template ? (crucibleContext ? 5 : 4) : (crucibleContext ? 4 : 3);
+    const tailCount =
+      (template ? 1 : 0) + (worldContext ? 1 : 0) + (relContext ? 1 : 0) + 3;
     return {
       messages,
       params: { model, max_tokens: 1024, temperature: 0.85, min_p: 0.05, frequency_penalty: 0.1 },
@@ -150,83 +185,8 @@ Setting: ${setting}
 };
 
 /**
- * Creates a message factory for lorebook relational map generation.
- * Reads MAP SO FAR from state at JIT time, enabling incremental cross-entry inference.
- * Characters → Locations → Systems → Factions → Dynamics (MAP_DEPENDENCY_ORDER).
- */
-export const createLorebookRelationalMapFactory = (
-  getState: () => RootState,
-  entryId: string,
-): MessageFactory => {
-  return async () => {
-    const entry = await api.v1.lorebook.entry(entryId);
-    if (!entry) {
-      throw new Error(`Lorebook entry not found: ${entryId}`);
-    }
-
-    let categoryName = "";
-    if (entry.category) {
-      const categories = await api.v1.lorebook.categories();
-      const category = categories.find((c) => c.id === entry.category);
-      categoryName = category?.name || "";
-    }
-
-    const displayName = entry.displayName || "Unnamed Entry";
-    const entryType = getEntryType(categoryName);
-    const entryText = entry.text || "";
-
-    // Build MAP SO FAR: all maps in dependency order, excluding this entry
-    const state = getState();
-    const mapSoFarParts: string[] = [];
-    for (const fieldId of MAP_DEPENDENCY_ORDER) {
-      const items = state.story.dulfs[fieldId] || [];
-      for (const item of items) {
-        if (item.id === entryId) continue;
-        const mapText = state.runtime.sega.relationalMaps[item.id];
-        if (mapText) mapSoFarParts.push(mapText);
-      }
-    }
-    const mapSoFar = mapSoFarParts.join("\n\n");
-
-    const model = "glm-4-6";
-    const prompt = String(
-      (await api.v1.config.get("lorebook_relational_map_prompt")) || "",
-    );
-
-    const prefix = await buildStoryEnginePrefix(getState);
-
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: `[LOREBOOK RELATIONAL MAP]\n${prompt}`,
-      },
-      {
-        role: "user",
-        content: `MAP SO FAR:\n${mapSoFar || "(none yet)"}\n\n---\n\nENTRY:\n${entryText}`,
-      },
-      {
-        role: "assistant",
-        content: `${displayName} [${entryType}]\n  - primary locations:`,
-      },
-    ];
-
-    return {
-      messages,
-      params: {
-        model,
-        max_tokens: 256,
-        temperature: 0.5,
-        stop: ["\n\n---", "\n\n\n"],
-      },
-      contextPinning: { head: 1, tail: 3 },
-    };
-  };
-};
-
-/**
  * Creates a message factory for lorebook keys generation.
- * Uses unified prefix (excludes self) + volatile tail with keys-specific instruction.
+ * Uses unified prefix + entry text + relationship context.
  * CRITICAL: Fetches entry.text at execution time for fresh content from preceding generation.
  */
 export const createLorebookKeysFactory = (
@@ -239,17 +199,22 @@ export const createLorebookKeysFactory = (
       throw new Error(`Lorebook entry not found: ${entryId}`);
     }
 
-    // Prefer relational map over raw prose — falls back to prose when running
-    // outside SEGA or after SEGA reset.
-    const relationalMap = getState().runtime.sega.relationalMaps[entryId] ?? "";
-    const entryText = relationalMap || (entry.text || "");
-
+    const entryText = entry.text || "";
     const model = "glm-4-6";
     const prompt = String(
       (await api.v1.config.get("lorebook_keys_prompt")) || "",
     );
 
     const prefix = await buildStoryEnginePrefix(getState);
+
+    // Build relationship context for this entry from v11 world slice
+    const state = getState();
+    const entity = findEntityForEntry(state, entryId);
+    const relContext = entity ? formatEntityRelationships(state, entity.id) : "";
+
+    const contextContent = relContext
+      ? `${entryText}\n\n${relContext}`
+      : entryText;
 
     const messages: Message[] = [
       ...prefix,
@@ -259,7 +224,7 @@ export const createLorebookKeysFactory = (
       },
       {
         role: "user",
-        content: `ENTRY:\n\n${entryText}`,
+        content: `ENTRY:\n\n${contextContent}`,
       },
       { role: "assistant", content: `REJECTED:\n` },
     ];
@@ -329,7 +294,10 @@ Setting: ${setting}
 
     const prefix = await buildStoryEnginePrefix(getState);
 
-    const crucibleContext = formatCrucibleElementsContext(getState());
+    // v11 world context
+    const state = getState();
+    const entity = findEntityForEntry(state, entryId);
+    const relContext = entity ? formatEntityRelationships(state, entity.id) : "";
 
     const messages: Message[] = [
       ...prefix,
@@ -339,10 +307,10 @@ Setting: ${setting}
       },
     ];
 
-    if (crucibleContext) {
+    if (relContext) {
       messages.push({
         role: "system",
-        content: `[WORLD STRUCTURE]\n${crucibleContext}`,
+        content: `[RELATIONSHIPS]\n${relContext}`,
       });
     }
 
@@ -357,7 +325,7 @@ Setting: ${setting}
     return {
       messages,
       params: { model, max_tokens: 1024, temperature: 0.7, min_p: 0.05, frequency_penalty: 0.1 },
-      contextPinning: { head: 1, tail: crucibleContext ? 4 : 3 },
+      contextPinning: { head: 1, tail: relContext ? 4 : 3 },
     };
   };
 };

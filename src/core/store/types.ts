@@ -9,12 +9,7 @@ export type AppDispatch = (action: Action) => void;
 // SEGA Types
 export type SegaStage =
   | "idle"
-  | "canon"
-  | "attgStyle"
-  | "bootstrap"
   | "lorebookContent"
-  | "lorebookRelationalMap"
-  | "lorebookRelationalMapReconcile"
   | "lorebookKeys"
   | "completed";
 
@@ -22,8 +17,6 @@ export interface SegaState {
   stage: SegaStage;
   statusText: string; // Current status for UI display
   activeRequestIds: string[]; // Track SEGA-initiated requests for cancellation
-  relationalMaps: Record<string, string>; // entryId → map text, ephemeral (cleared on reset)
-  relmapsCompleted: Record<string, boolean>; // entryId → true when relmap generated (cleared on reset)
   keysCompleted: Record<string, boolean>; // entryId → true when keys generated (cleared on reset)
 }
 
@@ -109,7 +102,6 @@ export interface GenerationRequest {
   | "brainstorm"
   | "brainstormChatTitle"
   | "lorebookContent"
-  | "lorebookRelationalMap"
   | "lorebookKeys"
   | "lorebookRefine"
   | "bootstrap"
@@ -130,7 +122,6 @@ export interface GenerationStrategy {
   | { type: "field"; fieldId: string }
   | { type: "list"; fieldId: string }
   | { type: "lorebookContent"; entryId: string }
-  | { type: "lorebookRelationalMap"; entryId: string }
   | { type: "lorebookKeys"; entryId: string }
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }

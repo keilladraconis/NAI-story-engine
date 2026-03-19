@@ -2,14 +2,13 @@ import { IDS } from "../../../../ui/framework/ids";
 import {
   GenerationHandlers,
   LorebookContentTarget,
-  LorebookRelationalMapTarget,
   LorebookKeysTarget,
   LorebookRefineTarget,
   StreamingContext,
   CompletionContext,
 } from "../generation-handlers";
-import { buildLorebookPrefill, CATEGORY_TO_TYPE } from "../../../utils/lorebook-strategy";
-import { segaRelationalMapStored, segaRelmapsCompleted, segaKeysCompleted } from "../../slices/runtime";
+import { buildLorebookPrefill } from "../../../utils/lorebook-strategy";
+import { segaKeysCompleted } from "../../slices/runtime";
 
 // Cache for prefills during streaming (cleared on completion)
 const prefillCache = new Map<string, string>();
@@ -114,44 +113,6 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
 
     // Clear cache for this entry
     clearPrefillCache(entryId);
-  },
-};
-
-export const lorebookRelationalMapHandler: GenerationHandlers<LorebookRelationalMapTarget> = {
-  streaming(ctx: StreamingContext<LorebookRelationalMapTarget>, _newText: string): void {
-    // Stream to shared draft for progress visibility when entry is selected
-    const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
-    if (ctx.target.entryId === currentSelected) {
-      api.v1.storyStorage.set(IDS.LOREBOOK.MAP_DRAFT_RAW, ctx.accumulatedText);
-    }
-  },
-
-  async completion(ctx: CompletionContext<LorebookRelationalMapTarget>): Promise<void> {
-    if (ctx.generationSucceeded && ctx.accumulatedText.trim()) {
-      // Mark completed BEFORE async reads to prevent re-queue race condition.
-      // segaRelationalMapStored follows shortly after with the full map text.
-      ctx.dispatch(segaRelmapsCompleted({ entryId: ctx.target.entryId }));
-
-      // Reconstruct the full map text: the factory's assistant prefill is
-      // "${displayName} [${entryType}]\n  - primary locations:" but that prefix
-      // is not included in accumulatedText (only the model's continuation is).
-      const entry = await api.v1.lorebook.entry(ctx.target.entryId);
-      const displayName = entry?.displayName || "Unknown";
-      let categoryName = "";
-      if (entry?.category) {
-        const categories = await api.v1.lorebook.categories();
-        const category = categories.find((c) => c.id === entry.category);
-        categoryName = category?.name || "";
-      }
-      const entryType = CATEGORY_TO_TYPE[categoryName] || "Entry";
-      const mapText = `${displayName} [${entryType}]\n  - primary locations:${ctx.accumulatedText}`.trim();
-
-      ctx.dispatch(segaRelationalMapStored({
-        entryId: ctx.target.entryId,
-        mapText,
-      }));
-    }
-    // On failure: no dispatch; state entry stays absent — keys factory falls back to prose
   },
 };
 

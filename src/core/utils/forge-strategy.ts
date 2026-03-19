@@ -10,7 +10,7 @@
 import { RootState, GenerationStrategy } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
-import { FieldID, FIELD_CONFIGS, DulfsFieldID } from "../../config/field-definitions";
+import { FieldID, DulfsFieldID } from "../../config/field-definitions";
 
 /** Map World Entry field IDs to display labels (plural). */
 const FIELD_LABEL_PLURAL: Record<DulfsFieldID, string> = {

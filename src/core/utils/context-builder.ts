@@ -245,7 +245,7 @@ export const getStoryContextMessages = async (
  */
 export interface StoryEnginePrefixOptions {
   /** Snapshot sections to exclude (e.g., "canon" when generating canon) */
-  excludeSections?: Array<"canon" | "setting" | "attg" | "style" | "brainstorm" | "dulfs" | "storyText">;
+  excludeSections?: Array<"canon" | "setting" | "attg" | "style" | "brainstorm" | "dulfs" | "storyText" | "foundation">;
 }
 
 export const buildStoryEnginePrefix = async (
@@ -267,24 +267,36 @@ export const buildStoryEnginePrefix = async (
     : systemPrompt;
 
   // --- MSG 2: Story state snapshot (STABLE sections) ---
-  // Order matches generation pipeline: ATTG/Style first (tone anchors),
-  // then setting/brainstorm (foundational), then canon last (synthesis).
+  // Order: Foundation (tone/intent anchors), then setting/brainstorm, then canon.
   const stableSections: string[] = [];
 
-  // ATTG
+  // ATTG — read from v11 foundation state (populated via NarrativeFoundation onChange)
   if (!excluded.has("attg")) {
-    const attg = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.field(FieldID.ATTG))) || "",
-    );
+    const attg = state.foundation.attg;
     if (attg) stableSections.push(`[ATTG]\n${attg}`);
   }
 
-  // Style
+  // Style — read from v11 foundation state
   if (!excluded.has("style")) {
-    const style = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.field(FieldID.Style))) || "",
-    );
+    const style = state.foundation.style;
     if (style) stableSections.push(`[STYLE]\n${style}`);
+  }
+
+  // Foundation context (shape, intent, worldState, active tensions)
+  if (!excluded.has("foundation")) {
+    const { shape, intent, worldState, tensions } = state.foundation;
+    const foundationParts: string[] = [];
+    if (shape) foundationParts.push(`Shape: ${shape}`);
+    if (intent) foundationParts.push(`Intent: ${intent}`);
+    if (worldState) foundationParts.push(`World State: ${worldState}`);
+    const activeTensions = tensions.filter((t) => !t.resolved);
+    if (activeTensions.length > 0) {
+      const tensionLines = activeTensions.map((t) => `- ${t.text}`).join("\n");
+      foundationParts.push(`Tensions:\n${tensionLines}`);
+    }
+    if (foundationParts.length > 0) {
+      stableSections.push(`[NARRATIVE FOUNDATION]\n${foundationParts.join("\n")}`);
+    }
   }
 
   // Setting
@@ -360,9 +372,6 @@ export const buildStoryEnginePrefix = async (
 };
 
 // --- Crucible Prefix ---
-
-// Re-export from new location for backward compatibility
-export { formatCrucibleElementsContext } from "./crucible-world-formatter";
 
 /**
  * Options for buildCruciblePrefix — isolated context for all Crucible factories.

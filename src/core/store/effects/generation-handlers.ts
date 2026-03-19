@@ -5,7 +5,6 @@ import { fieldHandler } from "./handlers/field";
 import { listHandler } from "./handlers/list";
 import {
   lorebookContentHandler,
-  lorebookRelationalMapHandler,
   lorebookKeysHandler,
   lorebookRefineHandler,
 } from "./handlers/lorebook";
@@ -34,10 +33,6 @@ export type ListTarget = Extract<
 export type LorebookContentTarget = Extract<
   GenerationStrategy["target"],
   { type: "lorebookContent" }
->;
-export type LorebookRelationalMapTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "lorebookRelationalMap" }
 >;
 export type LorebookKeysTarget = Extract<
   GenerationStrategy["target"],
@@ -93,7 +88,6 @@ export const GENERATION_HANDLERS: {
   field: GenerationHandlers<FieldTarget>;
   list: GenerationHandlers<ListTarget>;
   lorebookContent: GenerationHandlers<LorebookContentTarget>;
-  lorebookRelationalMap: GenerationHandlers<LorebookRelationalMapTarget>;
   lorebookKeys: GenerationHandlers<LorebookKeysTarget>;
   lorebookRefine: GenerationHandlers<LorebookRefineTarget>;
   forge: GenerationHandlers<ForgeTarget>;
@@ -104,7 +98,6 @@ export const GENERATION_HANDLERS: {
   field: fieldHandler,
   list: listHandler,
   lorebookContent: lorebookContentHandler,
-  lorebookRelationalMap: lorebookRelationalMapHandler,
   lorebookKeys: lorebookKeysHandler,
   lorebookRefine: lorebookRefineHandler,
   forge: forgeHandler,

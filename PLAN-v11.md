@@ -180,7 +180,7 @@ Update `src/core/store/effects/sega.ts` or create new `cast-effects.ts`:
 
 ---
 
-## Phase 3: SEGA Rewrite
+## Phase 3: SEGA Rewrite ✅
 
 **Goal:** Simplify SEGA — remove relational maps, run on Cast, support incremental realization.
 

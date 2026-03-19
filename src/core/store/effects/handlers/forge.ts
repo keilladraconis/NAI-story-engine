@@ -10,7 +10,7 @@ import {
 } from "../generation-handlers";
 import { GenerationStrategy } from "../../types";
 import { WorldEntity, Relationship } from "../../types";
-import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
+import { DulfsFieldID } from "../../../../config/field-definitions";
 import {
   entityForged,
   entitySummaryUpdated,

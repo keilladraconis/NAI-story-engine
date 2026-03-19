@@ -1,30 +1,21 @@
 /**
- * S.E.G.A. (Story Engine Generate All) Effects
+ * S.E.G.A. (Story Engine Generate All) Effects — v11
  *
- * Orchestrates automatic generation of story components in sequence:
- * 1. ATTG & Style (anchor tone/genre first)
- * 2. Canon (synthesize from world entries)
- * 3. Bootstrap (scene opening instruction, if document is empty)
- * 4. Lorebook (content + keys per entry)
+ * Simplified two-stage pipeline per entity:
+ *   1. Lorebook Content (generate entry text)
+ *   2. Lorebook Keys (generate activation keys)
  *
- * World Entry list population is handled by Crucible (v7). Users can still
- * generate items per-category via the "Generate Items" button.
+ * Triggered automatically after Cast (forgeCastCompleted) and on-demand
+ * via the SEGA toggle button.
  *
- * CACHE STRATEGY: All Story Engine strategies share a unified message prefix
- * (system prompt + weaving, cross-refs, story state). Content and keys for the
- * same entry have identical prefixes, so keys generation has near-zero uncached
- * tokens. Entries are generated in hash order for append-only cross-ref growth.
+ * Works on Live entities with lorebookEntryIds (v11 world slice).
+ * Dependency on ATTG/Style/Canon/Bootstrap removed — those are now
+ * generated on-demand via Narrative Foundation.
  */
 
 import { Store, matchesAction } from "nai-store";
 import { GenX } from "nai-gen-x";
-import {
-  RootState,
-  WORLD_ENTRY_CATEGORIES,
-  DulfsItem,
-  AppDispatch,
-} from "../types";
-import { FieldID } from "../../../config/field-definitions";
+import { RootState, WorldEntity, AppDispatch } from "../types";
 import {
   segaToggled,
   segaStageSet,
@@ -33,346 +24,135 @@ import {
   segaReset,
   segaStatusUpdated,
   stateUpdated,
-  uiGenerationRequested,
   requestCompleted,
   requestCancelled,
 } from "../slices/runtime";
+import { forgeCastCompleted } from "../slices/world";
 import { generationSubmitted } from "../slices/ui";
-import { attgToggled, styleToggled } from "../slices/story";
 import {
   createLorebookContentFactory,
-  createLorebookRelationalMapFactory,
   buildLorebookKeysPayload,
-  MAP_DEPENDENCY_ORDER,
-  parseNeedsReconciliation,
 } from "../../utils/lorebook-strategy";
 import { hashEntryPosition, getStoryIdSeed } from "../../utils/seeded-random";
-import { STORAGE_KEYS } from "../../../ui/framework/ids";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper Functions
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Check if Canon needs generation.
+ * Find the next live entity that needs lorebook content generation.
+ * Only considers entities with a lorebookEntryId and no entry text.
  */
-async function needsCanon(state: RootState): Promise<boolean> {
-  const content = state.story.fields[FieldID.Canon]?.content?.trim();
-  return !content;
-}
+async function findEntityNeedingContent(state: RootState): Promise<WorldEntity | null> {
+  const liveEntities = state.world.entities.filter(
+    (e) => e.lifecycle === "live" && e.lorebookEntryId,
+  );
 
-/**
- * Check if ATTG field needs generation.
- */
-async function needsATTG(): Promise<boolean> {
-  const content = await api.v1.storyStorage.get(STORAGE_KEYS.field(FieldID.ATTG));
-  return !content || !String(content).trim();
-}
-
-/**
- * Check if Style field needs generation.
- */
-async function needsStyle(): Promise<boolean> {
-  const content = await api.v1.storyStorage.get(STORAGE_KEYS.field(FieldID.Style));
-  return !content || !String(content).trim();
-}
-
-/**
- * Check if Bootstrap is needed (document has no sections yet).
- */
-async function needsBootstrap(): Promise<boolean> {
-  const ids = await api.v1.document.sectionIds();
-  return ids.length === 0;
-}
-
-/**
- * Find the next entry that needs content generation.
- * Entries are sorted by hash position (matching cross-reference order)
- * so SEGA generates them in an order that produces append-only cache growth.
- * Returns null if all entries have content.
- */
-async function findEntryNeedingContent(state: RootState): Promise<DulfsItem | null> {
-  const needsContent: DulfsItem[] = [];
-  let totalEntries = 0;
-  let withContent = 0;
-  let noEntry = 0;
-
-  for (const category of WORLD_ENTRY_CATEGORIES) {
-    const items = state.story.dulfs[category] || [];
-    for (const item of items) {
-      totalEntries++;
-      const entry = await api.v1.lorebook.entry(item.id);
-      if (!entry) {
-        noEntry++;
-        continue;
-      }
-
-      if (!entry.text || !entry.text.trim()) {
-        needsContent.push(item);
-      } else {
-        withContent++;
-      }
+  const needsContent: WorldEntity[] = [];
+  for (const entity of liveEntities) {
+    const entry = await api.v1.lorebook.entry(entity.lorebookEntryId!);
+    if (!entry) continue;
+    if (!entry.text || !entry.text.trim()) {
+      needsContent.push(entity);
     }
   }
 
-  api.v1.log(
-    `[sega] findEntryNeedingContent: ${totalEntries} total, ${withContent} with content, ${needsContent.length} need content, ${noEntry} no entry`,
-  );
-
   if (needsContent.length === 0) return null;
 
-  // Sort by hash position for cache-optimal ordering
   const seed = await getStoryIdSeed();
   needsContent.sort(
     (a, b) => hashEntryPosition(seed, a.id) - hashEntryPosition(seed, b.id),
   );
 
-  const nextEntry = await api.v1.lorebook.entry(needsContent[0].id);
   api.v1.log(
-    `[sega] next entry: ${nextEntry?.displayName || needsContent[0].id.slice(0, 8)} (${needsContent[0].fieldId})`,
+    `[sega] findEntityNeedingContent: ${needsContent.length} need content, next: ${needsContent[0].name}`,
   );
 
   return needsContent[0];
 }
 
 /**
- * Find the next entry that needs a relational map.
- * Processes in MAP_DEPENDENCY_ORDER (characters first) so later entries
- * can reference earlier ones via MAP SO FAR.
+ * Find the next live entity that needs keys generation.
+ * Includes entities with no keys AND entities with only the stub key
+ * (displayName.toLowerCase()) inserted by the content handler.
  */
-async function findEntryNeedingRelationalMap(state: RootState): Promise<DulfsItem | null> {
-  const needsMap: Array<{ item: DulfsItem; orderIdx: number }> = [];
-  const seed = await getStoryIdSeed();
-
-  for (let i = 0; i < MAP_DEPENDENCY_ORDER.length; i++) {
-    const fieldId = MAP_DEPENDENCY_ORDER[i];
-    const items = state.story.dulfs[fieldId] || [];
-    for (const item of items) {
-      if (state.runtime.sega.relmapsCompleted[item.id]) continue;
-      const entry = await api.v1.lorebook.entry(item.id);
-      if (!entry?.text?.trim()) continue;
-      if (!state.runtime.sega.relationalMaps[item.id]) {
-        needsMap.push({ item, orderIdx: i });
-      }
-    }
-  }
-
-  if (needsMap.length === 0) return null;
-
-  // Sort by dependency order first, then by hash within the same field
-  needsMap.sort((a, b) => {
-    if (a.orderIdx !== b.orderIdx) return a.orderIdx - b.orderIdx;
-    return hashEntryPosition(seed, a.item.id) - hashEntryPosition(seed, b.item.id);
-  });
-
-  return needsMap[0].item;
-}
-
-/**
- * Find the next entry whose relational map needs reconciliation.
- * Targets entries with no related characters and high collision risk —
- * these benefit from a second pass with the full map as context.
- */
-async function findEntryNeedingReconciliation(state: RootState): Promise<DulfsItem | null> {
-  const needsReconcile: DulfsItem[] = [];
-  const seed = await getStoryIdSeed();
-
-  for (const fieldId of MAP_DEPENDENCY_ORDER) {
-    const items = state.story.dulfs[fieldId] || [];
-    for (const item of items) {
-      const mapText = state.runtime.sega.relationalMaps[item.id];
-      if (mapText && parseNeedsReconciliation(mapText)) {
-        needsReconcile.push(item);
-      }
-    }
-  }
-
-  if (needsReconcile.length === 0) return null;
-
-  needsReconcile.sort(
-    (a, b) => hashEntryPosition(seed, a.id) - hashEntryPosition(seed, b.id),
+async function findEntityNeedingKeys(state: RootState): Promise<WorldEntity | null> {
+  const liveEntities = state.world.entities.filter(
+    (e) => e.lifecycle === "live" && e.lorebookEntryId,
   );
 
-  return needsReconcile[0];
-}
-
-/**
- * Find the next entry that needs keys generation.
- * Includes entries with no keys AND entries with only a stub key — a single key
- * equal to `displayName.toLowerCase()` inserted by the content handler as a
- * placeholder that also activates the entry in story text immediately.
- */
-async function findEntryNeedingKeys(state: RootState): Promise<DulfsItem | null> {
-  const needsKeys: DulfsItem[] = [];
-  const seed = await getStoryIdSeed();
-
-  for (const category of WORLD_ENTRY_CATEGORIES) {
-    const items = state.story.dulfs[category] || [];
-    for (const item of items) {
-      if (state.runtime.sega.keysCompleted[item.id]) continue;
-      const entry = await api.v1.lorebook.entry(item.id);
-      if (!entry?.text?.trim()) continue;
-      const isStub =
-        entry.keys?.length === 1 &&
-        entry.keys[0] === (entry.displayName || "").toLowerCase();
-      if (!isStub && entry.keys && entry.keys.length > 0) continue;
-      needsKeys.push(item);
-    }
+  const needsKeys: WorldEntity[] = [];
+  for (const entity of liveEntities) {
+    if (state.runtime.sega.keysCompleted[entity.id]) continue;
+    const entry = await api.v1.lorebook.entry(entity.lorebookEntryId!);
+    if (!entry?.text?.trim()) continue;
+    const isStub =
+      entry.keys?.length === 1 &&
+      entry.keys[0] === (entry.displayName || "").toLowerCase();
+    if (!isStub && entry.keys && entry.keys.length > 0) continue;
+    needsKeys.push(entity);
   }
 
   if (needsKeys.length === 0) return null;
 
+  const seed = await getStoryIdSeed();
   needsKeys.sort(
     (a, b) => hashEntryPosition(seed, a.id) - hashEntryPosition(seed, b.id),
+  );
+
+  api.v1.log(
+    `[sega] findEntityNeedingKeys: ${needsKeys.length} need keys, next: ${needsKeys[0].name}`,
   );
 
   return needsKeys[0];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SEGA Orchestration
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Enable sync toggle for ATTG/Style fields.
- * - Sets storage key for sync checkbox (checkbox UI auto-syncs via storageKey binding)
- * - Dispatches state toggle if not already enabled
- * This ensures SEGA-generated content is synced to Memory/Author's Note.
- */
-async function enableSyncForField(
-  fieldId: string,
-  dispatch: AppDispatch,
-  getState: () => RootState,
-): Promise<void> {
-  if (fieldId === FieldID.ATTG) {
-    // Enable the sync storage key
-    await api.v1.storyStorage.set(STORAGE_KEYS.SYNC_ATTG_MEMORY, true);
-    // Enable ATTG in state if not already enabled
-    if (!getState().story.attgEnabled) {
-      dispatch(attgToggled());
-    }
-  } else if (fieldId === FieldID.Style) {
-    // Enable the sync storage key
-    await api.v1.storyStorage.set(STORAGE_KEYS.SYNC_STYLE_AN, true);
-    // Enable Style in state if not already enabled
-    if (!getState().story.styleEnabled) {
-      dispatch(styleToggled());
-    }
-  }
-}
-
-/**
- * Queue a SEGA-initiated field generation and track the request ID.
- * Uses the same request ID pattern as the UI buttons for proper tracking.
- */
-async function queueSegaFieldGeneration(
-  dispatch: AppDispatch,
-  getState: () => RootState,
-  targetId: string,
-): Promise<string> {
-  const requestId = `gen-${targetId}`;
-
-  const fieldName = targetId.replace("dulfs-", "");
-  dispatch(segaStatusUpdated({ statusText: `Field: ${fieldName}` }));
-
-  await enableSyncForField(targetId, dispatch, getState);
-
-  dispatch(segaRequestTracked({ requestId }));
-  dispatch(uiGenerationRequested({ id: requestId, type: "field", targetId }));
-
-  return requestId;
-}
-
-/**
- * Queue lorebook content generation for a World Entry item.
+ * Queue lorebook content generation for a world entity.
  */
 async function queueSegaLorebookContent(
   dispatch: AppDispatch,
   getState: () => RootState,
-  item: DulfsItem,
+  entity: WorldEntity,
 ): Promise<void> {
-  const contentRequestId = `lb-item-${item.id}-content`;
+  const entryId = entity.lorebookEntryId!;
+  const contentRequestId = `lb-entity-${entity.id}-content`;
 
-  const entry = await api.v1.lorebook.entry(item.id);
-  const name = entry?.displayName || item.id;
-  const category = item.fieldId.replace("dulfs-", "");
-  dispatch(
-    segaStatusUpdated({ statusText: `Lorebook: ${category} - ${name}` }),
-  );
-
+  dispatch(segaStatusUpdated({ statusText: `Lorebook: ${entity.name}` }));
   dispatch(segaRequestTracked({ requestId: contentRequestId }));
 
-  const contentFactory = createLorebookContentFactory(getState, item.id);
+  const contentFactory = createLorebookContentFactory(getState, entryId);
   dispatch(
     generationSubmitted({
       requestId: contentRequestId,
       messageFactory: contentFactory,
-      params: { model: "glm-4-6", max_tokens: 700 },
-      target: { type: "lorebookContent", entryId: item.id },
+      params: { model: "glm-4-6", max_tokens: 1024 },
+      target: { type: "lorebookContent", entryId },
       prefillBehavior: "trim",
     }),
   );
 }
 
 /**
- * Queue relational map generation for a World Entry item.
- * Same function handles both initial map pass and reconciliation —
- * the factory reads MAP SO FAR from state at JIT time.
- */
-async function queueSegaRelationalMapGeneration(
-  dispatch: AppDispatch,
-  getState: () => RootState,
-  item: DulfsItem,
-): Promise<void> {
-  const mapRequestId = `lb-item-${item.id}-relational-map`;
-
-  const entry = await api.v1.lorebook.entry(item.id);
-  const name = entry?.displayName || item.id;
-  const category = item.fieldId.replace("dulfs-", "");
-  dispatch(
-    segaStatusUpdated({ statusText: `Relational Map: ${category} - ${name}` }),
-  );
-
-  dispatch(segaRequestTracked({ requestId: mapRequestId }));
-  dispatch(
-    generationSubmitted({
-      requestId: mapRequestId,
-      messageFactory: createLorebookRelationalMapFactory(getState, item.id),
-      params: { model: "glm-4-6", max_tokens: 256 },
-      target: { type: "lorebookRelationalMap", entryId: item.id },
-      prefillBehavior: "trim",
-    }),
-  );
-}
-
-/**
- * Queue lorebook keys generation for a World Entry item.
+ * Queue lorebook keys generation for a world entity.
  */
 async function queueSegaLorebookKeys(
   dispatch: AppDispatch,
   getState: () => RootState,
-  item: DulfsItem,
+  entity: WorldEntity,
 ): Promise<void> {
-  const keysRequestId = `lb-item-${item.id}-keys`;
+  const entryId = entity.lorebookEntryId!;
+  const keysRequestId = `lb-entity-${entity.id}-keys`;
 
-  const entry = await api.v1.lorebook.entry(item.id);
-  const name = entry?.displayName || item.id;
-  const category = item.fieldId.replace("dulfs-", "");
-  dispatch(
-    segaStatusUpdated({ statusText: `Keys: ${category} - ${name}` }),
-  );
-
+  dispatch(segaStatusUpdated({ statusText: `Keys: ${entity.name}` }));
   dispatch(segaRequestTracked({ requestId: keysRequestId }));
-  const keysPayload = await buildLorebookKeysPayload(getState, item.id, keysRequestId);
+
+  const keysPayload = await buildLorebookKeysPayload(getState, entryId, keysRequestId);
   dispatch(generationSubmitted(keysPayload));
 }
 
 /**
  * Cancel all SEGA-tracked requests.
- *
- * Force-clears tracked requests from the store immediately so UI buttons
- * revert to idle without waiting for genX to resolve its pending generate()
- * call — which may be blocked in waiting_for_user or waiting_for_budget state.
  */
 function cancelAllSegaTasks(
   getState: () => RootState,
@@ -381,39 +161,28 @@ function cancelAllSegaTasks(
 ): void {
   const { activeRequestIds } = getState().runtime.sega;
 
-  // Cancel queued requests in genX
   for (const requestId of activeRequestIds) {
     genX.cancelQueued(requestId);
   }
 
-  // Cancel active request if SEGA-initiated: mark as cancelled in the store
-  // so the generationSubmitted effect detects it and discards any partial text.
   const activeRequest = getState().runtime.activeRequest;
   if (activeRequest && activeRequestIds.includes(activeRequest.id)) {
     dispatch(requestCancelled({ requestId: activeRequest.id }));
     genX.cancelAll();
-    // genX.cancelAll() only sets queueLength=0 when a task is active — it does
-    // NOT set status="idle" (it waits for waitForAllowedOutput to resolve, which
-    // can block indefinitely). Force the store to idle immediately so buttons clear.
     dispatch(stateUpdated({ genxState: { status: "idle", queueLength: 0 } }));
   }
 
-  // Untrack all SEGA requests FIRST so the requestCompleted effect below
-  // doesn't treat these as SEGA completions and schedule the next task.
   for (const requestId of activeRequestIds) {
     dispatch(segaRequestUntracked({ requestId }));
   }
 
-  // Force-complete all tracked requests so the store is cleared immediately.
-  // This causes GenerationButtons to revert to idle without waiting for genX.
   for (const requestId of activeRequestIds) {
     dispatch(requestCompleted({ requestId }));
   }
 }
 
 /**
- * Main SEGA orchestration function.
- * Determines and schedules the next task in the pipeline.
+ * Main SEGA orchestration: Content → Keys.
  */
 async function scheduleNextSegaTask(
   dispatch: AppDispatch,
@@ -421,89 +190,24 @@ async function scheduleNextSegaTask(
 ): Promise<void> {
   const state = getState();
 
-  // Check if SEGA is still running
   if (!state.runtime.segaRunning) return;
 
-  // Stage 1: ATTG & Style (anchor tone/genre first)
-  if (await needsATTG()) {
-    api.v1.log("[sega] scheduling: attg");
-    dispatch(segaStageSet({ stage: "attgStyle" }));
-    await queueSegaFieldGeneration(dispatch, getState, FieldID.ATTG);
-    return;
-  }
-  if (await needsStyle()) {
-    api.v1.log("[sega] scheduling: style");
-    dispatch(segaStageSet({ stage: "attgStyle" }));
-    await queueSegaFieldGeneration(dispatch, getState, FieldID.Style);
-    return;
-  }
-
-  // Stage 2: Canon (synthesize from world entries)
-  if (await needsCanon(state)) {
-    // Warn if no world entries exist — Canon benefits from world context
-    const hasWorldEntries = WORLD_ENTRY_CATEGORIES.some(
-      (cat) => (state.story.dulfs[cat] || []).length > 0,
-    );
-    if (!hasWorldEntries) {
-      api.v1.log("[sega] Warning: no world entries found — Canon may generate without world context");
-    }
-    api.v1.log("[sega] scheduling: canon");
-    dispatch(segaStageSet({ stage: "canon" }));
-    await queueSegaFieldGeneration(dispatch, getState, FieldID.Canon);
-    return;
-  }
-
-  // Stage 3: Bootstrap (scene opening instruction, if document is empty)
-  if (await needsBootstrap()) {
-    api.v1.log("[sega] scheduling: bootstrap");
-    dispatch(segaStageSet({ stage: "bootstrap" }));
-    const requestId = "gen-bootstrap";
-    dispatch(segaStatusUpdated({ statusText: "Bootstrap: scene opening" }));
-    dispatch(segaRequestTracked({ requestId }));
-    dispatch(uiGenerationRequested({ id: requestId, type: "bootstrap", targetId: "bootstrap" }));
-    return;
-  }
-
-  // Read skip flags once — used across multiple stages below
-  const skipRelationalMap = (await api.v1.config.get("sega_skip_lorebook_relational_map")) || false;
-  const skipKeys = (await api.v1.config.get("sega_skip_lorebook_keys")) || false;
-
-  // Stage 4: Content (stub keys inserted by the content handler)
-  const nextContent = await findEntryNeedingContent(state);
+  // Stage 1: Content
+  const nextContent = await findEntityNeedingContent(state);
   if (nextContent) {
-    api.v1.log(`[sega] scheduling: lorebook content ${nextContent.id.slice(0, 8)}`);
+    api.v1.log(`[sega] scheduling: lorebook content for ${nextContent.name}`);
     dispatch(segaStageSet({ stage: "lorebookContent" }));
     await queueSegaLorebookContent(dispatch, getState, nextContent);
     return;
   }
 
-  // Stage 5: Relational map (initial pass, dependency order)
-  if (!skipRelationalMap) {
-    const nextMap = await findEntryNeedingRelationalMap(state);
-    if (nextMap) {
-      api.v1.log(`[sega] scheduling: relational map ${nextMap.id.slice(0, 8)}`);
-      dispatch(segaStageSet({ stage: "lorebookRelationalMap" }));
-      await queueSegaRelationalMapGeneration(dispatch, getState, nextMap);
-      return;
-    }
-  }
+  const skipKeys = (await api.v1.config.get("sega_skip_lorebook_keys")) || false;
 
-  // Stage 6: Reconcile (after all maps exist)
-  if (!skipRelationalMap) {
-    const nextReconcile = await findEntryNeedingReconciliation(state);
-    if (nextReconcile) {
-      api.v1.log(`[sega] scheduling: relational map reconcile ${nextReconcile.id.slice(0, 8)}`);
-      dispatch(segaStageSet({ stage: "lorebookRelationalMapReconcile" }));
-      await queueSegaRelationalMapGeneration(dispatch, getState, nextReconcile);
-      return;
-    }
-  }
-
-  // Stage 7: Keys — replaces displayName stub with map-informed proper keys
+  // Stage 2: Keys
   if (!skipKeys) {
-    const nextKeys = await findEntryNeedingKeys(state);
+    const nextKeys = await findEntityNeedingKeys(state);
     if (nextKeys) {
-      api.v1.log(`[sega] scheduling: lorebook keys ${nextKeys.id.slice(0, 8)}`);
+      api.v1.log(`[sega] scheduling: lorebook keys for ${nextKeys.name}`);
       dispatch(segaStageSet({ stage: "lorebookKeys" }));
       await queueSegaLorebookKeys(dispatch, getState, nextKeys);
       return;
@@ -527,12 +231,12 @@ export function registerSegaEffects(
   getState: () => RootState,
   genX: GenX,
 ): void {
-  // Effect 1: SEGA Toggle Handler
+  // Effect 1: SEGA Toggle Handler (manual trigger)
   subscribeEffect(matchesAction(segaToggled), async (_action) => {
     const state = getState();
 
     if (state.runtime.segaRunning) {
-      // SEGA was just turned ON (state already updated by reducer)
+      // SEGA was just turned ON
       dispatch(segaReset());
       await scheduleNextSegaTask(dispatch, getState);
     } else {
@@ -542,22 +246,35 @@ export function registerSegaEffects(
     }
   });
 
-  // Effect 2: Continuation on Request Completion
+  // Effect 2: Auto-trigger SEGA after Cast
+  subscribeEffect(matchesAction(forgeCastCompleted), async (_action) => {
+    const state = getState();
+    if (state.runtime.segaRunning) {
+      api.v1.log("[sega] forgeCastCompleted while SEGA running — scheduling next task");
+      await scheduleNextSegaTask(dispatch, getState);
+      return;
+    }
+
+    // Auto-start SEGA if there are entities needing realization
+    const needsContent = await findEntityNeedingContent(getState());
+    if (needsContent) {
+      api.v1.log("[sega] forgeCastCompleted — auto-starting SEGA for new entities");
+      dispatch(segaReset());
+      dispatch(segaToggled()); // This sets segaRunning = true; the segaToggled effect above handles scheduling
+    }
+  });
+
+  // Effect 3: Continuation on Request Completion
   subscribeEffect(matchesAction(requestCompleted), async (action) => {
     const { requestId } = action.payload;
     const state = getState();
 
-    // Check if this was a SEGA-initiated request
     if (!state.runtime.sega.activeRequestIds.includes(requestId)) {
       return;
     }
 
-    // Untrack the completed request
     dispatch(segaRequestUntracked({ requestId }));
 
-    // Wait for ALL paired requests to finish before scheduling next task.
-    // content+keys are queued together — scheduling on content completion
-    // would queue the NEXT entry before keys runs, causing double-generation.
     const updated = getState();
     const remaining = updated.runtime.sega.activeRequestIds;
     if (remaining.length > 0) {
@@ -566,30 +283,26 @@ export function registerSegaEffects(
     }
 
     if (updated.runtime.segaRunning) {
-      api.v1.log(`[sega] ${requestId} done, all paired complete — scheduling next`);
+      api.v1.log(`[sega] ${requestId} done — scheduling next`);
       await api.v1.timers.sleep(100);
       await scheduleNextSegaTask(dispatch, getState);
     } else {
-      api.v1.log(`[sega] ${requestId} done, but SEGA no longer running`);
+      api.v1.log(`[sega] ${requestId} done, SEGA no longer running`);
     }
   });
 
-  // Effect 3: Continuation on Request Cancellation
+  // Effect 4: Continuation on Request Cancellation
   subscribeEffect(matchesAction(requestCancelled), async (action) => {
     const { requestId } = action.payload;
     const state = getState();
 
-    // Check if this was a SEGA-initiated request
     if (!state.runtime.sega.activeRequestIds.includes(requestId)) {
       return;
     }
 
     api.v1.log(`[sega] ${requestId} cancelled`);
-
-    // Untrack the cancelled request
     dispatch(segaRequestUntracked({ requestId }));
 
-    // Wait for ALL paired requests to finish before scheduling next
     const updated = getState();
     const remaining = updated.runtime.sega.activeRequestIds;
     if (remaining.length > 0) {

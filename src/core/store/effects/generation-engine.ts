@@ -40,7 +40,6 @@ function targetToQueueEntry(
     case "field":               return { type: "field",               targetId: target.fieldId };
     case "list":                return { type: "list",                targetId: target.fieldId };
     case "lorebookContent":     return { type: "lorebookContent",     targetId: target.entryId };
-    case "lorebookRelationalMap": return { type: "lorebookRelationalMap", targetId: target.entryId };
     case "lorebookKeys":        return { type: "lorebookKeys",        targetId: target.entryId };
     case "lorebookRefine":      return { type: "lorebookRefine",      targetId: target.entryId };
     case "bootstrap":           return { type: "bootstrap",           targetId: "" };
@@ -156,8 +155,6 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `brainstorm:${target.messageId}`;
     case "lorebookContent":
       return `lb-content:${target.entryId.slice(0, 8)}`;
-    case "lorebookRelationalMap":
-      return `lb-relmap:${target.entryId.slice(0, 8)}`;
     case "lorebookKeys":
       return `lb-keys:${target.entryId.slice(0, 8)}`;
     case "lorebookRefine":
