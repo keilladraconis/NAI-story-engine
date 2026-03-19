@@ -220,7 +220,7 @@ Simplify `SegaState`:
 
 ---
 
-## Phase 4: Lorebook Extension Update
+## Phase 4: Lorebook Extension Update ✅
 
 **Goal:** Add lifecycle awareness, relationship editing, Bind/Unbind to the script tab.
 

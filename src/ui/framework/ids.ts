@@ -67,6 +67,10 @@ export const STORAGE_KEYS = {
   FORGE_INTENT_UI: "story:se-forge-intent",
   FORGE_BATCH_NAME_UI: "story:se-forge-batch-name",
 
+  // Lorebook relationship add form
+  REL_FORM_DESC: "lb-rel-form-desc",
+  REL_FORM_DESC_UI: "story:lb-rel-form-desc",
+
   // World batch UI (v11) — dynamic by batchId
   worldBatchSectionUI: (batchId: string) => `story:se-world-batch-${batchId}`,
 };
@@ -183,6 +187,7 @@ export const IDS = {
     NOT_MANAGED: "lb-not-managed",
     MAIN_CONTENT: "lb-main-content",
     ENTRY_NAME: "lb-entry-name",
+    LIFECYCLE_BADGE: "lb-lifecycle-badge",
     CONTENT_INPUT: "lb-content-input",
     KEYS_INPUT: "lb-keys-input",
     GEN_CONTENT_BTN: "lb-gen-content-btn",
@@ -190,24 +195,45 @@ export const IDS = {
     REFINE_BTN: "lb-refine-btn",
     REFINE_INSTRUCTIONS_INPUT: "lb-refine-instructions",
 
+    // Relationship section (managed view)
+    RELATIONSHIPS_SECTION: "lb-rels-section",
+    RELATIONSHIPS_LIST: "lb-rels-list",
+    ADD_REL_BTN: "lb-add-rel-btn",
+    REL_FORM: "lb-rel-form",
+    REL_FORM_TARGET_BTN: "lb-rel-form-target",
+    REL_FORM_DESC: "lb-rel-form-desc",
+    REL_FORM_ADD_BTN: "lb-rel-form-add",
+    REL_FORM_CANCEL_BTN: "lb-rel-form-cancel",
+
+    // Action buttons (managed view)
+    REFORGE_ENTITY_BTN: "lb-reforge-entity-btn",
+    UNBIND_BTN: "lb-unbind-btn",
+
+    // Bind view (unmanaged)
+    BIND_BTN: "lb-bind-btn",
+    CATEGORY_BTN: "lb-category-btn",
+
     // Storage keys for streaming drafts
     // Raw keys for storyStorage.set/get calls
     CONTENT_DRAFT_RAW: "lb-draft-content",
     KEYS_DRAFT_RAW: "lb-draft-keys",
-    MAP_DRAFT_RAW: "lb-draft-relational-map",
     REFINE_INSTRUCTIONS_RAW: "lb-refine-instructions",
     // Prefixed keys for storageKey binding on UI inputs
     CONTENT_DRAFT_KEY: "story:lb-draft-content",
     KEYS_DRAFT_KEY: "story:lb-draft-keys",
-    MAP_DRAFT_KEY: "story:lb-draft-relational-map",
     REFINE_INSTRUCTIONS_KEY: "story:lb-refine-instructions",
 
     // Entry-specific IDs (for synchronization with LorebookIconButton)
     entry: (entryId: string) => ({
       CONTENT_REQ: `lb-item-${entryId}-content`,
-      MAP_REQ: `lb-item-${entryId}-relational-map`,
       KEYS_REQ: `lb-item-${entryId}-keys`,
       REFINE_REQ: `lb-item-${entryId}-refine`,
+    }),
+
+    // Per-relationship IDs
+    relationship: (relId: string) => ({
+      ROOT: `lb-rel-${relId}`,
+      DELETE_BTN: `lb-rel-${relId}-del`,
     }),
   },
 };
