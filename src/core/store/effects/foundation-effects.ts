@@ -39,64 +39,48 @@ async function getSystemPrompt(): Promise<string> {
 
 const createShapeFactory = (getState: () => RootState): MessageFactory => async () => {
   const systemPrompt = await getSystemPrompt();
+  const shapePrompt = String((await api.v1.config.get("crucible_shape_prompt")) || "");
   const state = getState();
   const foundation = formatFoundationContext(state);
-
-  const instruction = [
-    "Generate a dramatic shape for this story.",
-    "A shape is a single evocative word or short phrase naming the narrative archetype (e.g. TRAGEDY, HEIST, REDEMPTION ARC, SLOW BURN, WHODUNIT).",
-    "Follow it with a single sentence describing what that shape means for this specific story.",
-    "Format: SHAPE_NAME: one sentence description.",
-    "Output only this — no preamble, no explanation.",
-  ].join(" ");
 
   const messages: Message[] = [
     { role: "system" as const, content: systemPrompt },
     ...(foundation ? [{ role: "system" as const, content: foundation }] : []),
-    { role: "user" as const, content: instruction },
+    { role: "system" as const, content: shapePrompt },
+    { role: "assistant" as const, content: "SHAPE: " },
   ];
 
-  return { messages, params: { model: "glm-4-6", max_tokens: 128, temperature: 0.85, stop: ["</think>"] } };
+  return { messages, params: { model: "glm-4-6", max_tokens: 128, temperature: 0.7, min_p: 0.05, stop: ["</think>"] } };
 };
 
 const createIntentFactory = (getState: () => RootState): MessageFactory => async () => {
   const systemPrompt = await getSystemPrompt();
+  const intentPrompt = String((await api.v1.config.get("crucible_intent_prompt")) || "");
   const state = getState();
   const foundation = formatFoundationContext(state);
-
-  const instruction = [
-    "Write the narrative intent for this story in 2-3 sentences.",
-    "Describe what the story is fundamentally about — the core themes, the emotional journey, what the author wants to explore.",
-    "Be specific and evocative. Output only the intent — no preamble.",
-  ].join(" ");
 
   const messages: Message[] = [
     { role: "system" as const, content: systemPrompt },
     ...(foundation ? [{ role: "system" as const, content: foundation }] : []),
-    { role: "user" as const, content: instruction },
+    { role: "system" as const, content: intentPrompt },
   ];
 
-  return { messages, params: { model: "glm-4-6", max_tokens: 256, temperature: 0.85, stop: ["</think>"] } };
+  return { messages, params: { model: "glm-4-6", max_tokens: 1024, temperature: 1.0, min_p: 0.05, stop: ["</think>"] } };
 };
 
 const createWorldStateFactory = (getState: () => RootState): MessageFactory => async () => {
   const systemPrompt = await getSystemPrompt();
+  const worldStatePrompt = String((await api.v1.config.get("foundation_world_state_prompt")) || "");
   const state = getState();
   const foundation = formatFoundationContext(state);
-
-  const instruction = [
-    "Describe the current state of the world at the story's opening.",
-    "Cover: the dominant mood or atmosphere, ongoing conflicts or tensions, power dynamics, and what is visibly in flux.",
-    "3-5 sentences. Output only the world state description — no preamble.",
-  ].join(" ");
 
   const messages: Message[] = [
     { role: "system" as const, content: systemPrompt },
     ...(foundation ? [{ role: "system" as const, content: foundation }] : []),
-    { role: "user" as const, content: instruction },
+    { role: "system" as const, content: worldStatePrompt },
   ];
 
-  return { messages, params: { model: "glm-4-6", max_tokens: 256, temperature: 0.85, stop: ["</think>"] } };
+  return { messages, params: { model: "glm-4-6", max_tokens: 256, temperature: 0.85, min_p: 0.05, stop: ["</think>"] } };
 };
 
 // ─── Strategy builders ────────────────────────────────────────────────────────

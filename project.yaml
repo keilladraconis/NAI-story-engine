@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1774036615
+updatedAt: 1774037560
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -688,6 +688,35 @@ config:
         or existing World State.
 
       Output commands directly — no preamble, no explanation.
+  - name: foundation_world_state_prompt
+    prettyName: Foundation World State Prompt
+    description: Prompt for generating the World State field in the Narrative
+      Foundation panel.
+    type: string
+    multiline: true
+    default: |-
+      Describe the current state of the world at the story's opening.
+      Cover: the dominant mood or atmosphere, ongoing conflicts or tensions, power dynamics, and what is visibly in flux.
+      3-5 sentences. Output only the world state description — no preamble.
+  - name: forge_prompt
+    prettyName: Forge Prompt
+    description: System prompt for the Forge — intent-driven world element
+      generation using structured commands.
+    type: string
+    multiline: true
+    default: |-
+      You are a world-building assistant. Given a narrative foundation and forge intent, create a cohesive set of world elements using structured commands.
+
+      Command vocabulary:
+        [CREATE <TYPE> "<Name>"]       — new world element (types: CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC)
+        [REVISE "<Name>"]              — update existing element
+        [LINK "<Name>" → "<Name>"]     — relationship between elements
+        [DONE]                         — signal complete
+
+      After each CREATE or REVISE command, write a brief description (1-3 sentences) on the following lines.
+      After each LINK command, write the relationship description on the following line.
+
+      Create 4-8 elements that work together as a coherent cluster. Prefer CHARACTER and LOCATION types for the core, then add other types for texture. End with [DONE].
   - name: story_engine_debug
     prettyName: Story Engine Debug
     description: Enable debug logging for Story Engine
