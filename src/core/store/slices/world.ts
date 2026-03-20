@@ -104,6 +104,8 @@ export const worldSlice = createSlice({
       ),
     }),
 
+    worldCleared: () => initialWorldState,
+
     // Signal actions — Phase 2 effects handle the actual work
     forgeRequested: (state) => state,
     forgeFromBrainstormRequested: (state) => state,
@@ -127,6 +129,7 @@ export const worldSlice = createSlice({
 });
 
 export const {
+  worldCleared,
   entityForged,
   entityCast,
   entityReforged,

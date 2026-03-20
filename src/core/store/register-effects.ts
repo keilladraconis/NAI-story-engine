@@ -8,6 +8,7 @@ import { registerLorebookSyncEffects } from "./effects/lorebook-sync";
 import { registerLorebookGenerationEffects } from "./effects/lorebook-generation";
 import { registerAutosaveEffects } from "./effects/autosave";
 import { registerForgeEffects } from "./effects/forge-effects";
+import { registerFoundationEffects } from "./effects/foundation-effects";
 
 export { syncEratoCompatibility } from "./effects/lorebook-sync";
 
@@ -20,4 +21,5 @@ export function registerEffects(store: Store<RootState>, genX: GenX): void {
   registerLorebookGenerationEffects(subscribeEffect, dispatch, getState);
   registerAutosaveEffects(subscribeEffect, getState);
   registerForgeEffects(subscribeEffect, dispatch, getState, genX);
+  registerFoundationEffects(subscribeEffect, dispatch, getState);
 }

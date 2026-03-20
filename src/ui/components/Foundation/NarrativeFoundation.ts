@@ -43,6 +43,13 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
       id: FN.SHAPE_BTN,
       label: "Generate",
       onGenerate: () => dispatch(shapeGenerationRequested()),
+      stateProjection: (s) => {
+        const queued = s.runtime.queue.find((r) => r.type === "foundation" && r.targetId === "shape");
+        const active = s.runtime.activeRequest?.type === "foundation" && s.runtime.activeRequest.targetId === "shape"
+          ? s.runtime.activeRequest : null;
+        return queued?.id ?? active?.id;
+      },
+      requestIdFromProjection: (id: string | undefined) => id,
     });
 
     const { part: shapeEditablePart } = ctx.render(EditableText, {
@@ -66,6 +73,13 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
       id: FN.INTENT_BTN,
       label: "Generate",
       onGenerate: () => dispatch(intentGenerationRequested()),
+      stateProjection: (s) => {
+        const queued = s.runtime.queue.find((r) => r.type === "foundation" && r.targetId === "intent");
+        const active = s.runtime.activeRequest?.type === "foundation" && s.runtime.activeRequest.targetId === "intent"
+          ? s.runtime.activeRequest : null;
+        return queued?.id ?? active?.id;
+      },
+      requestIdFromProjection: (id: string | undefined) => id,
     });
 
     const { part: intentEditablePart } = ctx.render(EditableText, {
@@ -89,6 +103,13 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
       id: FN.WORLD_STATE_BTN,
       label: "Generate",
       onGenerate: () => dispatch(worldStateGenerationRequested()),
+      stateProjection: (s) => {
+        const queued = s.runtime.queue.find((r) => r.type === "foundation" && r.targetId === "worldState");
+        const active = s.runtime.activeRequest?.type === "foundation" && s.runtime.activeRequest.targetId === "worldState"
+          ? s.runtime.activeRequest : null;
+        return queued?.id ?? active?.id;
+      },
+      requestIdFromProjection: (id: string | undefined) => id,
     });
 
     const { part: worldStateEditablePart } = ctx.render(EditableText, {

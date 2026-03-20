@@ -134,11 +134,11 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
     const contentResult = formatDisplay ? getContent() : undefined;
     const syncContent = typeof contentResult === "string" ? contentResult : undefined;
     const slViewText = (syncContent && formatDisplay)
-      ? (formatDisplay(syncContent) || "_No content._")
-      : (initialDisplay || "_No content._");
+      ? formatDisplay(syncContent)
+      : initialDisplay;
     const mlViewText = (syncContent && formatDisplay)
-      ? (formatDisplay(syncContent).replace(/\n/g, "  \n").replace(/</g, "\\<") || "_No content._")
-      : (initialDisplay || "_No content._");
+      ? formatDisplay(syncContent).replace(/\n/g, "  \n").replace(/</g, "\\<")
+      : initialDisplay;
 
     const viewId = `${id}-view`;
     const editId = `${id}-edit`;
@@ -152,8 +152,8 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
       );
       const displayText = formatDisplay ? formatDisplay(content) : content;
       const escaped = singleLine
-        ? (displayText || "_No content._")
-        : (displayText.replace(/\n/g, "  \n").replace(/</g, "\\<") || "_No content._");
+        ? displayText
+        : displayText.replace(/\n/g, "  \n").replace(/</g, "\\<");
       api.v1.ui.updateParts([{ id: viewId, text: escaped }]);
       clearActiveEditor();
       dispatch(uiEditableDeactivate());

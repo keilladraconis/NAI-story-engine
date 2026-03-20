@@ -44,6 +44,7 @@ function targetToQueueEntry(
     case "lorebookRefine":      return { type: "lorebookRefine",      targetId: target.entryId };
     case "bootstrap":           return { type: "bootstrap",           targetId: "" };
     case "forge":               return { type: "forge",               targetId: target.batchId };
+    case "foundation":          return { type: "foundation",          targetId: target.field };
   }
   // Unreachable — satisfies noImplicitReturns for exhaustive switch
   throw new Error(`Unhandled target type: ${(target as any).type}`);
@@ -165,6 +166,8 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `forge:${target.batchId.slice(0, 8)}`;
     case "brainstormChatTitle":
       return `brainstorm-title:${target.chatIndex}`;
+    case "foundation":
+      return `foundation:${target.field}`;
   }
 }
 

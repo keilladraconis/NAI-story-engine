@@ -4,7 +4,7 @@ import {
   uiLorebookEntrySelected,
 } from "./core/store";
 import { registerEffects, syncEratoCompatibility } from "./core/store/register-effects";
-import { migrateLorebookCategories } from "./core/store/effects/lorebook-sync";
+import { migrateLorebookCategories, registerLorebookSyncHooks, reconcileEntitySummaries } from "./core/store/effects/lorebook-sync";
 import { GenX } from "nai-gen-x";
 import { mount } from "nai-act";
 import { stateUpdated, requestActivated } from "./core/store/slices/runtime";
@@ -43,7 +43,7 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
   try {
     api.v1.log("Initializing Story Engine v11...");
 
-    api.v1.permissions.request(["storyEdit", "lorebookEdit", "documentEdit"]);
+    await api.v1.permissions.request(["storyEdit", "lorebookEdit", "documentEdit"]);
 
     // 1. Initialize GenX with lifecycle hooks
     const genX = new GenX({
@@ -67,6 +67,9 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
 
     // 3c. Sync Erato compatibility (migrate entries/categories if toggled)
     await syncEratoCompatibility(store.getState);
+
+    // 3d. Register Phase 7 lorebook sync hooks (onBeforeContextBuild)
+    registerLorebookSyncHooks(store.dispatch, store.getState);
 
     // 4. Mount all components
     const { part: brainstormHeaderPart } = mount(BrainstormHeader, undefined, store);
@@ -164,14 +167,17 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
 
     await api.v1.ui.register(panels);
 
-    // Register lorebook entry selection hook
-    api.v1.hooks.register("onLorebookEntrySelected", (params) => {
+    // Register lorebook entry selection hook (7.2: also refresh entity summary)
+    api.v1.hooks.register("onLorebookEntrySelected", async (params) => {
       store.dispatch(
         uiLorebookEntrySelected({
           entryId: params.entryId || null,
           categoryId: params.categoryId || null,
         }),
       );
+      if (params.entryId) {
+        await reconcileEntitySummaries(store.dispatch, store.getState, params.entryId);
+      }
     });
 
     api.v1.log("Story Engine v11 Initialized.");

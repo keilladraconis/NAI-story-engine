@@ -304,49 +304,47 @@ Create `src/ui/components/Relationships/RelationshipsModal.ts`:
 
 ---
 
-## Phase 7: Lorebook Sync
+## Phase 7: Lorebook Sync ✅
 
 **Goal:** Eventual consistency between Story Engine state and NovelAI lorebook.
 
-### 7.1 — Reconciliation on Context Build
+### 7.1 — Reconciliation on Context Build ✅
 
-Update or create hook in `src/core/store/effects/lorebook-sync.ts`:
+Updated `src/core/store/effects/lorebook-sync.ts`:
 
-- Register `onBeforeContextBuild` hook
-- Diff managed entities against `api.v1.lorebook.entries()`
-- Detect: text changes, key changes, deletions
-- Update WorldEntity summaries from lorebook content
-- Flag missing entries in world state
+- `extractEntitySummary(text)`: strips header lines (`Name:`, `Type:`, `Setting:`, `----`, `***`), returns first content line (capped at 120 chars)
+- `reconcileEntitySummaries(dispatch, getState, singleEntryId?)`: diffs live entities against lorebook entries, dispatches `entitySummaryUpdated` when text has changed
+- `registerLorebookSyncHooks(dispatch, getState)`: registers `onBeforeContextBuild` hook — runs full reconciliation pass before every generation
+- Missing entries (entry deleted from lorebook) are already surfaced by the Rebind modal via `lorebookEntryId` pointing to a non-existent entry; no extra state needed
 
-### 7.2 — Reconciliation on Entry Selected
+### 7.2 — Reconciliation on Entry Selected ✅
 
-- Existing `onLorebookEntrySelected` hook: also refresh managed entry state
+- `onLorebookEntrySelected` hook in `src/index.ts`: now async; after dispatching `uiLorebookEntrySelected`, calls `reconcileEntitySummaries(..., params.entryId)` to refresh the single selected entity's summary immediately
 
 ---
 
-## Phase 8: Cleanup
+## Phase 8: Cleanup ✅
 
 **Goal:** Remove dead code and unused references.
 
-### 8.1 — Delete Dead Code
+### 8.1 — Delete Dead Code ✅
 
-- Delete `src/core/utils/crucible-strategy.ts`
-- Delete `src/core/utils/crucible-build-strategy.ts`
-- Delete `src/core/store/effects/crucible-effects.ts`
-- Delete `src/core/store/effects/handlers/crucible.ts`
-- Delete `src/core/store/effects/handlers/crucible-build.ts`
-- Delete lorebook relational map handler code from `src/core/store/effects/handlers/lorebook.ts`
-- Remove `MAP_DEPENDENCY_ORDER`, `parseNeedsReconciliation` from `lorebook-strategy.ts`
-- Delete `src/ui/components/Crucible/` (entire directory)
-- Delete `src/ui/components/Fields/` (entire directory)
-- Delete `src/ui/components/Sidebar/FieldList.ts`
-- Clean up `src/ui/framework/ids.ts` — remove unused IDs/storage keys
+Previously deleted in earlier phases: `crucible-strategy.ts`, `crucible-build-strategy.ts`, `crucible-effects.ts`, `handlers/crucible.ts`, `handlers/crucible-build.ts`, `src/ui/components/Crucible/`, `src/ui/components/Fields/` (contents), `src/ui/components/Sidebar/FieldList.ts`, lorebook relational map handler, `MAP_DEPENDENCY_ORDER`/`parseNeedsReconciliation`.
 
-### 8.2 — Update Tests
+Phase 8 completed:
+- Removed `src/ui/components/Fields/` (empty directory)
+- Removed `IDS.CRUCIBLE` block from `src/ui/framework/ids.ts`
+- Removed `STORAGE_KEYS.CR_*` constants from `src/ui/framework/ids.ts`
+- `CATEGORY_TO_TYPE` in `lorebook-strategy.ts` remains (used internally by `getEntryType`)
+- `crucible-command-parser.ts` and `crucible-world-formatter.ts` remain (reused by forge pipeline)
 
-- Update test mocks in `tests/setup.ts` for new state shape
-- Migrate existing tests to reference `world` and `foundation` slices
-- Add tests for: forge strategy, cast flow, discard flow, reforge flow, bind, category detection, relationship CRUD
+### 8.2 — Update Tests ✅
+
+- Deleted `tests/core/store/slices/crucible.test.ts` (old slice tests)
+- Deleted `tests/core/store/effects/handlers/crucible-build.test.ts` (old executeCommands tests)
+- Added `tests/core/utils/command-parser.test.ts` — covers `parseCommands` (still live, used by forge)
+- Added `tests/core/utils/category-detect.test.ts` — covers `detectCategory`, `cycleDulfsCategory`, `DULFS_CATEGORY_LABELS`
+- Added `tests/core/store/slices/world.test.ts` — covers all world slice actions (entity lifecycle, batch management, relationship CRUD)
 
 ---
 

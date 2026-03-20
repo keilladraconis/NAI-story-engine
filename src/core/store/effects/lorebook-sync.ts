@@ -5,9 +5,12 @@ import {
   dulfsItemRemoved,
   storyCleared,
   queueCleared,
+  entitySummaryUpdated,
+  foundationCleared,
+  worldCleared,
 } from "../index";
 import { DulfsFieldID, FieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
-import { STORAGE_KEYS } from "../../../ui/framework/ids";
+import { STORAGE_KEYS, IDS } from "../../../ui/framework/ids";
 import { extractDulfsItemName } from "../../utils/context-builder";
 import { attgForMemory } from "../../utils/filters";
 
@@ -156,6 +159,71 @@ export async function syncEratoCompatibility(
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 7: Lorebook Sync — summary reconciliation
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Extract a short display summary from lorebook entry text. Skips the header block. */
+function extractEntitySummary(entryText: string): string {
+  const HEADER_PREFIXES = ["Name:", "Type:", "Setting:", "----", "***"];
+  const lines = entryText.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (HEADER_PREFIXES.some((p) => trimmed.startsWith(p))) continue;
+    return trimmed.length > 120 ? trimmed.slice(0, 117) + "..." : trimmed;
+  }
+  return "";
+}
+
+/**
+ * Reconcile WorldEntity summaries against current lorebook entry content.
+ * Called from onBeforeContextBuild (full pass) and onLorebookEntrySelected (single entry).
+ */
+export async function reconcileEntitySummaries(
+  dispatch: AppDispatch,
+  getState: () => RootState,
+  singleEntryId?: string,
+): Promise<void> {
+  const state = getState();
+  const liveEntities = state.world.entities.filter(
+    (e) => e.lifecycle === "live" && e.lorebookEntryId,
+  );
+
+  if (liveEntities.length === 0) return;
+
+  const allEntries = singleEntryId ? null : await api.v1.lorebook.entries();
+
+  for (const entity of liveEntities) {
+    if (singleEntryId && entity.lorebookEntryId !== singleEntryId) continue;
+
+    const entry = singleEntryId
+      ? await api.v1.lorebook.entry(singleEntryId)
+      : allEntries!.find((e) => e.id === entity.lorebookEntryId);
+
+    if (!entry?.text) continue;
+
+    const newSummary = extractEntitySummary(entry.text);
+    if (newSummary !== entity.summary) {
+      dispatch(entitySummaryUpdated({ entityId: entity.id, summary: newSummary }));
+    }
+  }
+}
+
+/**
+ * Register NovelAI API hooks for lorebook sync (Phase 7).
+ * Call from index.ts after store is ready.
+ */
+export function registerLorebookSyncHooks(
+  dispatch: AppDispatch,
+  getState: () => RootState,
+): void {
+  // 7.1 — Reconcile summaries before every context build
+  api.v1.hooks.register("onBeforeContextBuild", async () => {
+    await reconcileEntitySummaries(dispatch, getState);
+  });
+}
+
 export function registerLorebookSyncEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
   _dispatch: AppDispatch,
@@ -233,6 +301,9 @@ export function registerLorebookSyncEffects(
         /^se-bs-input$/,
         /^cr-/,
         /^lb-/,
+        /^story:se-fn-/,
+        /^story:se-forge-/,
+        /^story:se-world-/,
       ];
 
       for (const key of allKeys) {
@@ -241,7 +312,15 @@ export function registerLorebookSyncEffects(
         }
       }
 
+      dispatch(foundationCleared());
+      dispatch(worldCleared());
       dispatch(queueCleared());
+
+      // Reset foundation textarea UI inputs (bound via storageKey, won't react to state alone)
+      api.v1.ui.updateParts([
+        { id: IDS.FOUNDATION.ATTG_INPUT, value: "" },
+        { id: IDS.FOUNDATION.STYLE_INPUT, value: "" },
+      ]);
     },
   );
 }

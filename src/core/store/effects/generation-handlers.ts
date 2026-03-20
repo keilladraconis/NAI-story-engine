@@ -9,6 +9,7 @@ import {
   lorebookRefineHandler,
 } from "./handlers/lorebook";
 import { forgeHandler } from "./handlers/forge";
+import { foundationHandler } from "./handlers/foundation";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -49,6 +50,10 @@ export type BootstrapTarget = Extract<
 export type ForgeTarget = Extract<
   GenerationStrategy["target"],
   { type: "forge" }
+>;
+export type FoundationTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "foundation" }
 >;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
@@ -91,6 +96,7 @@ export const GENERATION_HANDLERS: {
   lorebookKeys: GenerationHandlers<LorebookKeysTarget>;
   lorebookRefine: GenerationHandlers<LorebookRefineTarget>;
   forge: GenerationHandlers<ForgeTarget>;
+  foundation: GenerationHandlers<FoundationTarget>;
 } = {
   brainstorm: brainstormHandler,
   brainstormChatTitle: brainstormChatTitleHandler,
@@ -101,6 +107,7 @@ export const GENERATION_HANDLERS: {
   lorebookKeys: lorebookKeysHandler,
   lorebookRefine: lorebookRefineHandler,
   forge: forgeHandler,
+  foundation: foundationHandler,
 };
 
 export function getHandler(

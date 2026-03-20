@@ -105,7 +105,8 @@ export interface GenerationRequest {
   | "lorebookKeys"
   | "lorebookRefine"
   | "bootstrap"
-  | "forge";
+  | "forge"
+  | "foundation";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -125,7 +126,8 @@ export interface GenerationStrategy {
   | { type: "lorebookKeys"; entryId: string }
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }
-  | { type: "forge"; batchId: string };
+  | { type: "forge"; batchId: string }
+  | { type: "foundation"; field: "shape" | "intent" | "worldState" };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };

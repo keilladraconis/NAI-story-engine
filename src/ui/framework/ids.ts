@@ -40,23 +40,6 @@ export const STORAGE_KEYS = {
 
   brainstormInputUI: (inputId: string) => `story:${inputId}`,
 
-  // Crucible content
-  CR_SHAPE_NAME: "cr-shape-name",
-  CR_SHAPE_NAME_UI: "story:cr-shape-name",
-  CR_BUILD_GUIDANCE: "cr-build-guidance",
-  CR_BUILD_GUIDANCE_UI: "story:cr-build-guidance",
-
-  // Crucible UI collapse states (raw + story: prefixed)
-  CR_SHAPE_COLLAPSED: "cr-shape-collapsed",
-  CR_SHAPE_COLLAPSED_UI: "story:cr-shape-collapsed",
-  CR_DIRECTION_COLLAPSED: "cr-direction-collapsed",
-  CR_DIRECTION_COLLAPSED_UI: "story:cr-direction-collapsed",
-  CR_TENSIONS_COLLAPSED: "cr-tensions-collapsed",
-  CR_TENSIONS_COLLAPSED_UI: "story:cr-tensions-collapsed",
-  CR_LINKS_SECTION_UI: "story:cr-links-section",
-  CR_ELEMENTS_SECTION_UI: "story:cr-elements-section",
-  CR_BUILD_LOG_COLLAPSED_UI: "story:cr-build-log-collapsed",
-
   // Foundation UI (v11)
   FOUNDATION_SECTION_UI: "story:se-foundation-section",
   FOUNDATION_ATTG_UI: "story:se-foundation-attg",
@@ -124,41 +107,6 @@ export const IDS = {
       REFORGE_BTN: `se-world-entity-${id}-reforge`,
       REGEN_BTN: `se-world-entity-${id}-regen`,
       DELETE_BTN: `se-world-entity-${id}-delete`,
-    }),
-  },
-  CRUCIBLE: {
-    WINDOW_ROOT: "cr-root",
-    STATUS_TEXT: "cr-status",
-    RESET_BTN: "cr-reset-btn",
-    TENSIONS_LIST: "cr-tensions-list",
-    DIRECTION_BTN: "cr-direction-btn",
-    DIRECTION_SECTION: "cr-direction-section",
-    DIRECTION_TEXT: "cr-direction-text",
-    TICKER_TEXT: "cr-ticker",
-    SHAPE_SECTION: "cr-shape-section",
-    SHAPE_NAME: "cr-shape-name",
-    SHAPE_TEXT: "cr-shape-text",
-    SHAPE_BTN: "cr-shape-btn",
-    ELEMENTS_SECTION: "cr-elements",
-    CAST_BTN: "cr-cast-btn",
-    // Build pass
-    BUILD_PASS_ROOT: "cr-build-root",
-    BUILD_GUIDANCE_INPUT: "cr-build-guidance",
-    BUILD_PASS_BTN: "cr-build-pass-btn",
-    BUILD_LOG: "cr-build-log",
-    BUILD_WORLD_SUMMARY: "cr-build-world-summary",
-    // Dynamic ID helpers
-    tension: (id: string) => ({
-      ROOT: `cr-tension-${id}`,
-      TEXT: `cr-tension-${id}-text`,
-      DEL_BTN: `cr-tension-${id}-del`,
-    }),
-    element: (id: string) => ({
-      ROOT: `cr-element-${id}`,
-      TEXT: `cr-element-${id}-text`,
-    }),
-    link: (id: string) => ({
-      ROOT: `cr-link-${id}`,
     }),
   },
   BRAINSTORM: {
