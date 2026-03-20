@@ -703,20 +703,19 @@ export const createCanonFactory = (
 
     const state = getState();
 
-    // Inject Crucible Direction as the authoritative creative source.
-    // It supersedes the brainstorm for character details, framing, and world facts.
-    if (state.crucible?.direction) {
+    // Inject Intent as the authoritative creative source if available.
+    if (state.foundation?.intent) {
       messages.push({
         role: "system",
-        content: `[DIRECTION — AUTHORITATIVE]\nThe following Direction is the definitive creative reference for this story. It supersedes any earlier brainstorm exchanges on all character details, world facts, and framing.\n\n${state.crucible.direction}`,
+        content: `[INTENT — AUTHORITATIVE]\nThe following Intent is the definitive creative reference for this story. It supersedes any earlier brainstorm exchanges on all character details, world facts, and framing.\n\n${state.foundation.intent}`,
       });
     }
 
-    // Inject Crucible shape — required for Structure section
-    if (state.crucible?.shape) {
+    // Inject shape — required for Structure section
+    if (state.foundation?.shape) {
       messages.push({
         role: "system",
-        content: `[NARRATIVE SHAPE — REQUIRED]\nThis story uses the narrative shape "${state.crucible.shape.name}": ${state.crucible.shape.instruction}`,
+        content: `[NARRATIVE SHAPE — REQUIRED]\n${state.foundation.shape}`,
       });
     }
 
@@ -740,7 +739,7 @@ export const createCanonFactory = (
         presence_penalty: 0.1,
         max_tokens: 900,
       },
-      contextPinning: { head: 1, tail: state.crucible?.direction || state.crucible?.shape ? 3 : 2 },
+      contextPinning: { head: 1, tail: state.foundation?.intent || state.foundation?.shape ? 3 : 2 },
     };
   };
 };
