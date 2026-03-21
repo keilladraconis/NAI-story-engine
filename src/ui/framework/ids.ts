@@ -7,7 +7,7 @@
 
 // Shared draft key for the singleton editable pattern
 export const EDITABLE_DRAFT_RAW = "kse-editable-draft"; // for storyStorage.get/set
-export const EDITABLE_DRAFT_KEY = "story:kse-editable-draft"; // for multilineTextInput storageKey
+export const EDITABLE_DRAFT_KEY = "kse-editable-draft"; // for multilineTextInput storageKey (add story: at binding site)
 
 /**
  * Centralized storage key registry.
@@ -21,46 +21,48 @@ export const STORAGE_KEYS = {
 
   // Setting (Crucible reads this too)
   SETTING: "kse-setting",
-  SETTING_UI: "story:kse-setting",
+  SETTING_UI: "kse-setting",
 
   // Sync toggles
   SYNC_ATTG_MEMORY: "kse-sync-attg-memory",
-  SYNC_ATTG_MEMORY_UI: "story:kse-sync-attg-memory",
+  SYNC_ATTG_MEMORY_UI: "kse-sync-attg-memory",
   SYNC_STYLE_AN: "kse-sync-style-an",
-  SYNC_STYLE_AN_UI: "story:kse-sync-style-an",
+  SYNC_STYLE_AN_UI: "kse-sync-style-an",
 
   // Field content & sections (dynamic by fieldId)
   field: (fieldId: string) => `kse-field-${fieldId}`,
-  fieldUI: (fieldId: string) => `story:kse-field-${fieldId}`,
-  sectionUI: (fieldId: string) => `story:kse-section-${fieldId}`,
+  fieldUI: (fieldId: string) => `kse-field-${fieldId}`,
+  sectionUI: (fieldId: string) => `kse-section-${fieldId}`,
 
   // DULFS list items (dynamic by itemId)
   dulfsItem: (itemId: string) => `dulfs-item-${itemId}`,
-  dulfsItemUI: (itemId: string) => `story:dulfs-item-${itemId}`,
+  dulfsItemUI: (itemId: string) => `dulfs-item-${itemId}`,
 
-  brainstormInputUI: (inputId: string) => `story:${inputId}`,
+  brainstormInputUI: (inputId: string) => inputId,
 
   // Foundation UI (v11)
-  FOUNDATION_SECTION_UI: "story:se-foundation-section",
-  FOUNDATION_ATTG_UI: "story:se-foundation-attg",
-  FOUNDATION_STYLE_UI: "story:se-foundation-style",
+  FOUNDATION_SECTION_UI: "se-foundation-section",
+  FOUNDATION_SHAPE_NAME_UI: "se-fn-shape-name",
+  FOUNDATION_ATTG_UI: "se-foundation-attg",
+  FOUNDATION_STYLE_UI: "se-foundation-style",
 
   // Forge UI (v11)
-  FORGE_SECTION_UI: "story:se-forge-section",
-  FORGE_INTENT_UI: "story:se-forge-intent",
-  FORGE_BATCH_NAME_UI: "story:se-forge-batch-name",
+  FORGE_SECTION_UI: "se-forge-section",
+  FORGE_INTENT_UI: "se-forge-intent",
+  FORGE_BATCH_NAME_UI: "se-forge-batch-name",
 
   // Lorebook relationship add form
   REL_FORM_DESC: "lb-rel-form-desc",
-  REL_FORM_DESC_UI: "story:lb-rel-form-desc",
+  REL_FORM_DESC_UI: "lb-rel-form-desc",
 
   // World batch UI (v11) — dynamic by batchId
-  worldBatchSectionUI: (batchId: string) => `story:se-world-batch-${batchId}`,
+  worldBatchSectionUI: (batchId: string) => `se-world-batch-${batchId}`,
 };
 
 export const IDS = {
   FOUNDATION: {
     SECTION: "se-fn-section",
+    SHAPE_NAME: "se-fn-shape-name",
     SHAPE_TEXT: "se-fn-shape",
     SHAPE_BTN: "se-fn-shape-btn",
     INTENT_TEXT: "se-fn-intent",
@@ -161,15 +163,13 @@ export const IDS = {
     BIND_BTN: "lb-bind-btn",
     CATEGORY_BTN: "lb-category-btn",
 
-    // Storage keys for streaming drafts
-    // Raw keys for storyStorage.set/get calls
+    // Storage keys for streaming drafts (same key used for both storyStorage and storageKey binding)
     CONTENT_DRAFT_RAW: "lb-draft-content",
     KEYS_DRAFT_RAW: "lb-draft-keys",
     REFINE_INSTRUCTIONS_RAW: "lb-refine-instructions",
-    // Prefixed keys for storageKey binding on UI inputs
-    CONTENT_DRAFT_KEY: "story:lb-draft-content",
-    KEYS_DRAFT_KEY: "story:lb-draft-keys",
-    REFINE_INSTRUCTIONS_KEY: "story:lb-refine-instructions",
+    CONTENT_DRAFT_KEY: "lb-draft-content",
+    KEYS_DRAFT_KEY: "lb-draft-keys",
+    REFINE_INSTRUCTIONS_KEY: "lb-refine-instructions",
 
     // Entry-specific IDs (for synchronization with LorebookIconButton)
     entry: (entryId: string) => ({

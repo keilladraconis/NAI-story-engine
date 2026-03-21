@@ -63,7 +63,7 @@ export const BatchSection = defineComponent<BatchSectionProps, RootState>({
     return collapsibleSection({
       id: B.SECTION,
       title: `${batchName} (${liveCount})`,
-      storageKey: STORAGE_KEYS.worldBatchSectionUI(props.batchId),
+      storageKey: `story:${STORAGE_KEYS.worldBatchSectionUI(props.batchId)}`,
       content: [
         column({
           style: { gap: "4px" },

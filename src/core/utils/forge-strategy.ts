@@ -69,7 +69,7 @@ function formatFoundationContext(state: RootState): string {
   const { foundation } = state;
   const sections: string[] = [];
 
-  if (foundation.shape) sections.push(`Shape: ${foundation.shape}`);
+  if (foundation.shape) sections.push(`Shape: ${foundation.shape.name}: ${foundation.shape.description}`);
   if (foundation.intent) sections.push(`Intent: ${foundation.intent}`);
   if (foundation.worldState) sections.push(`World State: ${foundation.worldState}`);
 

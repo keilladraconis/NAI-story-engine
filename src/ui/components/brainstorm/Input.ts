@@ -55,7 +55,7 @@ export const Input = defineComponent<{}, RootState>({
         multilineTextInput({
           id: ids.INPUT,
           placeholder: "Type an idea...",
-          storageKey: STORAGE_KEYS.brainstormInputUI(ids.INPUT),
+          storageKey: `story:${STORAGE_KEYS.brainstormInputUI(ids.INPUT)}`,
           style: { "min-height": "60px", "max-height": "120px" },
           onSubmit: submit,
           // Bind disabled state reactively

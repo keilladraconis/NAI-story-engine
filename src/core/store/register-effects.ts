@@ -9,11 +9,13 @@ import { registerLorebookGenerationEffects } from "./effects/lorebook-generation
 import { registerAutosaveEffects } from "./effects/autosave";
 import { registerForgeEffects } from "./effects/forge-effects";
 import { registerFoundationEffects } from "./effects/foundation-effects";
+import { registerStoryEffects } from "./effects/story-effects";
 
 export { syncEratoCompatibility } from "./effects/lorebook-sync";
 
 export function registerEffects(store: Store<RootState>, genX: GenX): void {
   const { subscribeEffect, dispatch, getState } = store;
+  registerStoryEffects(subscribeEffect, dispatch, getState);
   registerBrainstormEffects(subscribeEffect, dispatch, getState);
   registerSegaEffects(subscribeEffect, dispatch, getState, genX);
   registerGenerationEngineEffects(subscribeEffect, dispatch, getState, genX);

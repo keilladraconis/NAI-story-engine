@@ -18,7 +18,7 @@ import { TensionRow } from "./TensionRow";
 import { escapeForMarkdown } from "../../utils";
 import { attgForMemory } from "../../../core/utils/filters";
 
-const { column, row, text, button, collapsibleSection, multilineTextInput, checkboxInput } = api.v1.ui.part;
+const { column, row, text, button, collapsibleSection, multilineTextInput, checkboxInput, textInput } = api.v1.ui.part;
 
 const FN = IDS.FOUNDATION;
 
@@ -39,6 +39,15 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
     const state = ctx.getState();
 
     // ── Shape ──────────────────────────────────────────────────────────────
+    const shapeLabel = text({ text: "**Shape**", markdown: true, style: this.style?.("label") });
+
+    const shapeNameInput = textInput({
+      id: FN.SHAPE_NAME,
+      storageKey: `story:${STORAGE_KEYS.FOUNDATION_SHAPE_NAME_UI}`,
+      label: "",
+      placeholder: "e.g. Slice of Life, Tragedy, Heist… (leave blank to invent)",
+    });
+
     const { part: shapeBtnPart } = ctx.render(GenerationButton, {
       id: FN.SHAPE_BTN,
       label: "Generate",
@@ -54,18 +63,25 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
 
     const { part: shapeEditablePart } = ctx.render(EditableText, {
       id: FN.SHAPE_TEXT,
-      getContent: () => ctx.getState().foundation.shape,
-      placeholder: "The shape of the story — e.g. TRAGEDY, HEIST...",
-      label: "Shape",
+      getContent: () => ctx.getState().foundation.shape?.description ?? "",
+      placeholder: "Generate or describe the shape — what structural moments this story leans toward.",
+      label: "",
       extraControls: [shapeBtnPart],
-      initialDisplay: state.foundation.shape ? escapeForMarkdown(state.foundation.shape) : undefined,
-      onSave: (content: string) => dispatch(shapeUpdated({ shape: content })),
+      initialDisplay: state.foundation.shape?.description
+        ? escapeForMarkdown(state.foundation.shape.description)
+        : undefined,
+      onSave: async (content: string) => {
+        const nameRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FOUNDATION_SHAPE_NAME_UI);
+        const name = String(nameRaw || "").trim();
+        dispatch(shapeUpdated({ shape: content ? { name, description: content } : null }));
+      },
     });
 
+    // Sync description view when state changes (e.g. after generation)
     ctx.bindPart(
       `${FN.SHAPE_TEXT}-view`,
-      (s) => s.foundation.shape,
-      (shape) => ({ text: shape ? escapeForMarkdown(shape) : "" }),
+      (s) => s.foundation.shape?.description,
+      (description) => ({ text: description ? escapeForMarkdown(description) : "" }),
     );
 
     // ── Intent ─────────────────────────────────────────────────────────────
@@ -197,7 +213,7 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
       id: FN.ATTG_INPUT,
       placeholder: "Author's thought-to-generation notes...",
       initialValue: "",
-      storageKey: STORAGE_KEYS.FOUNDATION_ATTG_UI,
+      storageKey: `story:${STORAGE_KEYS.FOUNDATION_ATTG_UI}`,
       style: this.style?.("syncTextArea"),
       onChange: async (value: string) => {
         dispatch(attgUpdated({ attg: value }));
@@ -211,7 +227,7 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
     const attgCheckbox = checkboxInput({
       id: "se-fn-attg-sync-checkbox",
       initialValue: false,
-      storageKey: STORAGE_KEYS.SYNC_ATTG_MEMORY_UI,
+      storageKey: `story:${STORAGE_KEYS.SYNC_ATTG_MEMORY_UI}`,
       label: "Copy to Memory",
     });
 
@@ -220,7 +236,7 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
       id: FN.STYLE_INPUT,
       placeholder: "Writing style, tone, prose directives...",
       initialValue: "",
-      storageKey: STORAGE_KEYS.FOUNDATION_STYLE_UI,
+      storageKey: `story:${STORAGE_KEYS.FOUNDATION_STYLE_UI}`,
       style: this.style?.("syncTextArea"),
       onChange: async (value: string) => {
         dispatch(styleUpdated({ style: value }));
@@ -234,18 +250,20 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
     const styleCheckbox = checkboxInput({
       id: "se-fn-style-sync-checkbox",
       initialValue: false,
-      storageKey: STORAGE_KEYS.SYNC_STYLE_AN_UI,
+      storageKey: `story:${STORAGE_KEYS.SYNC_STYLE_AN_UI}`,
       label: "Copy to Author's Note",
     });
 
     return collapsibleSection({
       id: FN.SECTION,
       title: "Narrative Foundation",
-      storageKey: STORAGE_KEYS.FOUNDATION_SECTION_UI,
+      storageKey: `story:${STORAGE_KEYS.FOUNDATION_SECTION_UI}`,
       content: [
         column({
           style: { gap: "8px" },
           content: [
+            shapeLabel,
+            shapeNameInput,
             shapeEditablePart,
             intentEditablePart,
             worldStateEditablePart,

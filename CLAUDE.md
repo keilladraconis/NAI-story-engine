@@ -37,11 +37,19 @@ npm run test       # vitest run
 **UI (`src/ui/`):**
 
 - Components follow nai-act pattern: static `describe()` returns UIPart tree, `onMount()` sets up reactive subscriptions via `ctx.useSelector()`
-- All UI mutations use `api.v1.ui.updateParts()` — never re-render
+- Non-storageKey UI mutations use `api.v1.ui.updateParts()` — never re-render. storageKey-bound inputs are the exception: update them via storyStorage, not updateParts (see UI Input Patterns below).
 - Element IDs centralized in `src/ui/framework/ids.ts` with prefixes: `se-` (story engine), `se-bs-` (brainstorm), `kse-` (storage keys)
 - `src/core/utils/context-builder.ts` — Builds layered AI prompts from current state
 
 **Prompts:** Configurable via `project.yaml` config fields (system prompt, brainstorm, world snapshot, lorebook generation, ATTG, style, etc.).
+
+**Prompt configuration policy — prompts belong in `project.yaml`, not in code.** NovelAI exposes `project.yaml` config fields as a user-editable settings panel. Generation prompts must live there so users can tune them without touching the script. The rule:
+
+- Every generation prompt (system identity, shape, intent, world state, forge, lorebook, ATTG, style, brainstorm, etc.) must be a `type: string, multiline: true` config field in `project.yaml` with a solid default.
+- Read at JIT time via `api.v1.config.get("field_name")` inside the message factory — never at module load time.
+- **Never hardcode a prompt as a string literal in a strategy or effect file.** If you find a hardcoded prompt, move it to `project.yaml`. Fallback to `""` is acceptable; the prompt author is responsible for providing a non-empty default in the yaml.
+- Before adding a new config field, check whether an existing field already covers the use case. Prompts often survive feature renames (e.g. `crucible_shape_prompt` is still the right key for Foundation shape generation). Duplicate config fields that say the same thing are worse than reusing a slightly-misnamed one.
+- Config field names use `snake_case`. `prettyName` is what the user sees. `description` explains what the field controls and any formatting constraints the model must respect.
 
 **Generation pipeline:**
 
@@ -65,6 +73,8 @@ npm run test       # vitest run
 - Prefer `storageKey` on inputs for automatic persistence — avoid manual onChange handlers for simple state sync.
 - Exception: Use `onChange` callbacks alongside `storageKey` when syncing to non-UIPart targets (e.g., `api.v1.an.set()`, `api.v1.memory.set()`). See ATTG/Style fields in `TextField.ts` for example.
 - **Never dispatch actions in `onChange` callbacks.** The reducer overhead is too high for keystroke-frequency events. Direct API calls are acceptable in `onChange` when syncing to external APIs (e.g., `api.v1.lorebook.updateEntry()`). See `ListItem.ts` for example.
+- **`storageKey` inputs are owned by storyStorage — never use `updateParts` to set their value.** Read with `api.v1.storyStorage.get(key)`, write with `api.v1.storyStorage.set(key, value)`, clear with `api.v1.storyStorage.remove(key)`. The input reads from its storageKey automatically. Using `updateParts({ value })` on a storageKey-bound input is incorrect — the stored value and displayed value will diverge.
+- **`story:` prefix routing**: In a `storageKey` binding, `story:` is a routing directive the UI framework strips — `storageKey: "story:my-key"` persists under bare key `"my-key"` in storyStorage. `storyStorage.get("my-key")` reads the same slot; `storyStorage.get("story:my-key")` reads a literally different key and is always wrong. Never embed `story:` in storage key constants — add it only at the `storageKey` binding site. Pattern: constant = `"my-key"`, binding = `` `story:${MY_KEY}` ``, direct API = `storyStorage.get(MY_KEY)`. Use `storyStorage.remove(key)` to clear (not `set(key, null)`).
 
 **UI Rendering Rules (nai-act constraints — these cause recurrent bugs when violated):**
 

@@ -37,7 +37,7 @@ export const ForgeSection = defineComponent<undefined, RootState>({
       id: FG.INTENT_INPUT,
       placeholder: "What kind of world elements do you want to forge?",
       initialValue: "",
-      storageKey: STORAGE_KEYS.FORGE_INTENT_UI,
+      storageKey: `story:${STORAGE_KEYS.FORGE_INTENT_UI}`,
       style: this.style?.("intentInput"),
     });
 
@@ -68,7 +68,7 @@ export const ForgeSection = defineComponent<undefined, RootState>({
       id: FG.BATCH_NAME,
       placeholder: "Batch name (auto-generated)...",
       initialValue: "",
-      storageKey: STORAGE_KEYS.FORGE_BATCH_NAME_UI,
+      storageKey: `story:${STORAGE_KEYS.FORGE_BATCH_NAME_UI}`,
       style: this.style?.("batchNameInput"),
     });
 
@@ -116,7 +116,7 @@ export const ForgeSection = defineComponent<undefined, RootState>({
     return collapsibleSection({
       id: FG.SECTION,
       title: "Forge",
-      storageKey: STORAGE_KEYS.FORGE_SECTION_UI,
+      storageKey: `story:${STORAGE_KEYS.FORGE_SECTION_UI}`,
       content: [
         column({
           style: { gap: "6px" },

@@ -3,14 +3,10 @@ import { RootState, AppDispatch } from "../types";
 import {
   dulfsItemAdded,
   dulfsItemRemoved,
-  storyCleared,
-  queueCleared,
   entitySummaryUpdated,
-  foundationCleared,
-  worldCleared,
 } from "../index";
 import { DulfsFieldID, FieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
-import { STORAGE_KEYS, IDS } from "../../../ui/framework/ids";
+import { STORAGE_KEYS } from "../../../ui/framework/ids";
 import { extractDulfsItemName } from "../../utils/context-builder";
 import { attgForMemory } from "../../utils/filters";
 
@@ -266,61 +262,4 @@ export function registerLorebookSyncEffects(
     }
   });
 
-  // Lorebook Sync & Storage Cleanup: Story Cleared
-  subscribeEffect(
-    (action) => action.type === storyCleared.type,
-    async (_action, { dispatch }) => {
-      const categories = await api.v1.lorebook.categories();
-      const seCategories = categories.filter((c) =>
-        c.name?.startsWith(SE_CATEGORY_PREFIX),
-      );
-
-      for (const category of seCategories) {
-        const entries = await api.v1.lorebook.entries(category.id);
-        for (const entry of entries) {
-          await api.v1.lorebook.removeEntry(entry.id);
-        }
-        await api.v1.lorebook.removeCategory(category.id);
-      }
-
-      const allEntries = await api.v1.lorebook.entries();
-      const marker = allEntries.find(
-        (e) => e.displayName === SE_ERATO_MARKER_NAME,
-      );
-      if (marker) {
-        await api.v1.lorebook.removeEntry(marker.id);
-      }
-
-      const allKeys = await api.v1.storyStorage.list();
-      const patternsToRemove = [
-        /^kse-field-/,
-        /^kse-sync-/,
-        /^kse-section-/,
-        /^draft-/,
-        /^dulfs-item-/,
-        /^se-bs-input$/,
-        /^cr-/,
-        /^lb-/,
-        /^story:se-fn-/,
-        /^story:se-forge-/,
-        /^story:se-world-/,
-      ];
-
-      for (const key of allKeys) {
-        if (patternsToRemove.some((pattern) => pattern.test(key))) {
-          await api.v1.storyStorage.remove(key);
-        }
-      }
-
-      dispatch(foundationCleared());
-      dispatch(worldCleared());
-      dispatch(queueCleared());
-
-      // Reset foundation textarea UI inputs (bound via storageKey, won't react to state alone)
-      api.v1.ui.updateParts([
-        { id: IDS.FOUNDATION.ATTG_INPUT, value: "" },
-        { id: IDS.FOUNDATION.STYLE_INPUT, value: "" },
-      ]);
-    },
-  );
 }

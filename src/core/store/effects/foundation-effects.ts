@@ -20,24 +20,32 @@ import {
 } from "../index";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "../../utils/context-builder";
+import { STORAGE_KEYS } from "../../../ui/framework/ids";
 
 // ─── Factories ────────────────────────────────────────────────────────────────
 
 /**
  * Shape: reads brainstorm + setting + canon, excludes foundation entirely.
- * "SHAPE: " assistant anchor constrains output format without appearing in stored text.
+ * If the user has typed a name in the shape name input, it is injected as an
+ * assistant prefill so the model only generates the structural description.
+ * Otherwise the model invents both name and description freely.
  */
 const createShapeFactory = (getState: () => RootState): MessageFactory => async () => {
   const shapePrompt = String((await api.v1.config.get("crucible_shape_prompt")) || "");
+  const nameRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FOUNDATION_SHAPE_NAME_UI);
+  const prefillName = String(nameRaw || "").trim();
 
   const prefix = await buildStoryEnginePrefix(getState, {
     excludeSections: ["foundation"],
   });
 
+  // If the user supplied a name, anchor the model to it; otherwise let it invent freely.
+  const prefill = prefillName ? `SHAPE: ${prefillName}\n\n` : "SHAPE: ";
+
   const messages: Message[] = [
     ...prefix,
     { role: "system" as const, content: shapePrompt },
-    { role: "assistant" as const, content: "SHAPE: " },
+    { role: "assistant" as const, content: prefill },
   ];
 
   return { messages, params: { model: "glm-4-6", max_tokens: 128, temperature: 0.7, min_p: 0.05, stop: ["</think>"] } };
@@ -60,7 +68,7 @@ const createIntentFactory = (getState: () => RootState): MessageFactory => async
   if (shape) {
     messages.push({
       role: "system" as const,
-      content: `[NARRATIVE SHAPE]\n${shape}`,
+      content: `[NARRATIVE SHAPE]\n${shape.name}: ${shape.description}`,
     });
   }
 
@@ -84,7 +92,7 @@ const createWorldStateFactory = (getState: () => RootState): MessageFactory => a
 
   const { shape, intent } = getState().foundation;
   const anchors: string[] = [];
-  if (shape) anchors.push(`Shape: ${shape}`);
+  if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
   if (intent) anchors.push(`Intent: ${intent}`);
   if (anchors.length > 0) {
     messages.push({ role: "system" as const, content: anchors.join("\n") });

@@ -286,7 +286,7 @@ export const buildStoryEnginePrefix = async (
   if (!excluded.has("foundation")) {
     const { shape, intent, worldState, tensions } = state.foundation;
     const foundationParts: string[] = [];
-    if (shape) foundationParts.push(`Shape: ${shape}`);
+    if (shape) foundationParts.push(`Shape: ${shape.name}\n${shape.description}`);
     if (intent) foundationParts.push(`Intent: ${intent}`);
     if (worldState) foundationParts.push(`World State: ${worldState}`);
     const activeTensions = tensions.filter((t) => !t.resolved);
@@ -715,7 +715,7 @@ export const createCanonFactory = (
     if (state.foundation?.shape) {
       messages.push({
         role: "system",
-        content: `[NARRATIVE SHAPE — REQUIRED]\n${state.foundation.shape}`,
+        content: `[NARRATIVE SHAPE — REQUIRED]\nThis story uses the narrative shape "${state.foundation.shape.name}": ${state.foundation.shape.description}`,
       });
     }
 

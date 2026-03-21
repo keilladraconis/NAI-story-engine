@@ -178,6 +178,11 @@ export interface WorldState {
 
 // Foundation Types (v11)
 
+export interface ShapeData {
+  name: string;        // Short label — e.g. "Slice of Life", "Tragedy"
+  description: string; // Structural logic — what this shape leans toward
+}
+
 export interface Tension {
   id: string;
   text: string;
@@ -185,7 +190,7 @@ export interface Tension {
 }
 
 export interface FoundationState {
-  shape: string;
+  shape: ShapeData | null;
   intent: string;
   worldState: string;
   tensions: Tension[];

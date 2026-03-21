@@ -44,9 +44,9 @@ const ENTITY_BTN = { "font-size": "12px", "flex-shrink": "0", padding: "2px 6px"
 const DESC_INPUT = { "font-size": "12px", flex: "1" };
 
 const STORAGE_FROM = "lb-relmodal-from-desc";
-const STORAGE_FROM_UI = "story:lb-relmodal-from-desc";
+const STORAGE_FROM_UI = "lb-relmodal-from-desc";
 const STORAGE_EDIT = "lb-relmodal-edit-desc";
-const STORAGE_EDIT_UI = "story:lb-relmodal-edit-desc";
+const STORAGE_EDIT_UI = "lb-relmodal-edit-desc";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Context interface (same as BindModal)
@@ -139,7 +139,7 @@ export async function openRelationshipsModal(
             textInput({
               initialValue: "",
               placeholder: "Describe relationship...",
-              storageKey: STORAGE_FROM_UI,
+              storageKey: `story:${STORAGE_FROM_UI}`,
               style: DESC_INPUT,
             }),
             button({
@@ -214,7 +214,7 @@ export async function openRelationshipsModal(
                   textInput({
                     initialValue: rel.description,
                     placeholder: "Describe relationship...",
-                    storageKey: STORAGE_EDIT_UI,
+                    storageKey: `story:${STORAGE_EDIT_UI}`,
                     style: DESC_INPUT,
                   }),
                   button({
