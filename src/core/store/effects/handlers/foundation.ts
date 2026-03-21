@@ -1,5 +1,5 @@
 import { GenerationStrategy, ShapeData } from "../../types";
-import { shapeUpdated, intentUpdated, worldStateUpdated } from "../../index";
+import { shapeUpdated, intentUpdated, worldStateUpdated, tensionEdited } from "../../index";
 import {
   GenerationHandlers,
   StreamingContext,
@@ -53,6 +53,20 @@ async function parseShape(text: string): Promise<ShapeData> {
 
   return { name, description: description || text.trim() };
 }
+
+type TensionTarget = Extract<GenerationStrategy["target"], { type: "tension" }>;
+
+export const tensionHandler: GenerationHandlers<TensionTarget> = {
+  streaming(ctx: StreamingContext<TensionTarget>, _newText: string): void {
+    const viewId = `${IDS.FOUNDATION.tension(ctx.target.tensionId).TEXT}-view`;
+    api.v1.ui.updateParts([{ id: viewId, text: escapeForMarkdown(ctx.accumulatedText) }]);
+  },
+
+  async completion(ctx: CompletionContext<TensionTarget>): Promise<void> {
+    if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
+    ctx.dispatch(tensionEdited({ tensionId: ctx.target.tensionId, text: ctx.accumulatedText.trim() }));
+  },
+};
 
 export const foundationHandler: GenerationHandlers<FoundationTarget> = {
   streaming(ctx: StreamingContext<FoundationTarget>, _newText: string): void {

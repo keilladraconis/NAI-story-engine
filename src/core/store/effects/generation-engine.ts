@@ -168,6 +168,8 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `brainstorm-title:${target.chatIndex}`;
     case "foundation":
       return `foundation:${target.field}`;
+    case "tension":
+      return `tension:${target.tensionId.slice(0, 8)}`;
   }
 }
 

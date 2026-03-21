@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1774121961
+updatedAt: 1774122817
 config:
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
@@ -598,14 +598,13 @@ config:
   - name: crucible_tensions_prompt
     prettyName: Crucible Tensions Prompt
     description: >-
-      Prompt for generating 3-5 narrative tensions. Tensions are forward-looking
-      vectors active at story start — not endpoints.
+      Prompt for generating a single narrative tension. Tensions are
+      forward-looking forces active at story start — not endpoints.
     type: string
     multiline: true
     default: |-
-      Generate 3-5 NARRATIVE TENSIONS — forces, relationships, or
-      contradictions that are active at the story's beginning and create
-      pressure for world-building.
+      Generate one NARRATIVE TENSION — a force, relationship, or contradiction
+      that is active at the story's beginning and creates pressure.
 
       A tension is NOT an endpoint or a goal. It is a condition that
       exists and generates narrative energy. It describes what pulls in
@@ -622,18 +621,11 @@ config:
       - "There is conflict" — too vague, no specific opposing forces
       - "Everything is fine" — no tension at all
 
-      Each tension should imply characters, places, or systems that must
-      exist in the world without naming them explicitly.
-
-      Do not restate what is already explicit in the Direction. Surface
-      pressures that are implied by the scenario but not yet named —
+      Surface pressures that are implied by the scenario but not yet named —
       resource costs, social fault lines, hidden dependencies, ticking
-      clocks the characters haven't noticed.
+      clocks the characters haven't noticed. Do not restate existing tensions.
 
-      Output format — one tension per section, separated by +++:
-      [TENSION] The tension — 1-2 sentences describing the opposing forces
-      +++
-      [TENSION] Another tension
+      Output only the tension — 1-2 sentences of plain prose, no labels, no preamble.
   - name: crucible_build_pass_prompt
     prettyName: Crucible Build Pass Prompt
     description: >-

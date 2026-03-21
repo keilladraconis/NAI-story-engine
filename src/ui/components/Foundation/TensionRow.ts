@@ -1,8 +1,9 @@
 import { defineComponent } from "nai-act";
 import { RootState } from "../../../core/store/types";
-import { tensionEdited, tensionResolved, tensionDeleted } from "../../../core/store/slices/foundation";
+import { tensionEdited, tensionResolved, tensionDeleted, tensionGenerationRequested } from "../../../core/store/slices/foundation";
 import { IDS } from "../../framework/ids";
 import { EditableText } from "../EditableText";
+import { GenerationButton } from "../GenerationButton";
 import { escapeForMarkdown } from "../../utils";
 
 const { row, button, column, text } = api.v1.ui.part;
@@ -56,6 +57,19 @@ export const TensionRow = defineComponent<TensionRowProps, RootState>({
       });
     }
 
+    const { part: genBtnPart } = ctx.render(GenerationButton, {
+      id: `${T.TEXT}-gen`,
+      label: "Generate",
+      onGenerate: () => dispatch(tensionGenerationRequested({ tensionId: props.tensionId })),
+      stateProjection: (s) => {
+        const queued = s.runtime.queue.find((r) => r.type === "tension" && r.targetId === props.tensionId);
+        const active = s.runtime.activeRequest?.type === "tension" && s.runtime.activeRequest.targetId === props.tensionId
+          ? s.runtime.activeRequest : null;
+        return queued?.id ?? active?.id;
+      },
+      requestIdFromProjection: (id: string | undefined) => id,
+    });
+
     const { part: editablePart } = ctx.render(EditableText, {
       id: T.TEXT,
       getContent: () => {
@@ -65,7 +79,7 @@ export const TensionRow = defineComponent<TensionRowProps, RootState>({
       placeholder: "A tension or dramatic element...",
       initialDisplay: props.initialText ? escapeForMarkdown(props.initialText) : undefined,
       onSave: (text: string) => dispatch(tensionEdited({ tensionId: props.tensionId, text })),
-      extraControls: [resolveBtn, deleteBtn],
+      extraControls: [genBtnPart, resolveBtn, deleteBtn],
     });
 
     ctx.bindPart(

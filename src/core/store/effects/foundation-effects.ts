@@ -15,6 +15,8 @@ import {
   shapeGenerationRequested,
   intentGenerationRequested,
   worldStateGenerationRequested,
+  tensionAdded,
+  tensionGenerationRequested,
   generationSubmitted,
   requestQueued,
 } from "../index";
@@ -103,6 +105,39 @@ const createWorldStateFactory = (getState: () => RootState): MessageFactory => a
   return { messages, params: { model: "glm-4-6", max_tokens: 256, temperature: 0.85, min_p: 0.05, stop: ["</think>"] } };
 };
 
+/**
+ * Tension: reads full foundation context (shape, intent, world state, existing tensions).
+ * Generates a single new tension as plain prose.
+ */
+const createTensionFactory = (getState: () => RootState, tensionId: string): MessageFactory => async () => {
+  const tensionPrompt = String((await api.v1.config.get("crucible_tensions_prompt")) || "");
+
+  const prefix = await buildStoryEnginePrefix(getState, {
+    excludeSections: ["foundation"],
+  });
+
+  const messages: Message[] = [...prefix];
+
+  const { shape, intent, worldState, tensions } = getState().foundation;
+  const anchors: string[] = [];
+  if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
+  if (intent) anchors.push(`Intent: ${intent}`);
+  if (worldState) anchors.push(`World State: ${worldState}`);
+
+  const existingTensions = tensions.filter((t) => !t.resolved && t.id !== tensionId && t.text);
+  if (existingTensions.length > 0) {
+    anchors.push(`Existing Tensions:\n${existingTensions.map((t) => `- ${t.text}`).join("\n")}`);
+  }
+
+  if (anchors.length > 0) {
+    messages.push({ role: "system" as const, content: anchors.join("\n\n") });
+  }
+
+  messages.push({ role: "system" as const, content: tensionPrompt });
+
+  return { messages, params: { model: "glm-4-6", max_tokens: 128, temperature: 1.0, min_p: 0.05, stop: ["</think>"] } };
+};
+
 // ─── Strategy builders ────────────────────────────────────────────────────────
 
 function buildFoundationStrategy(
@@ -125,6 +160,17 @@ function buildFoundationStrategy(
 
 // ─── Effect registration ──────────────────────────────────────────────────────
 
+function submitTensionGeneration(dispatch: AppDispatch, getState: () => RootState, tensionId: string): void {
+  const strategy: GenerationStrategy = {
+    requestId: api.v1.uuid(),
+    messageFactory: createTensionFactory(getState, tensionId),
+    target: { type: "tension", tensionId },
+    prefillBehavior: "trim",
+  };
+  dispatch(requestQueued({ id: strategy.requestId, type: "tension", targetId: tensionId }));
+  dispatch(generationSubmitted(strategy));
+}
+
 export function registerFoundationEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
   dispatch: AppDispatch,
@@ -146,5 +192,13 @@ export function registerFoundationEffects(
     const strategy = buildFoundationStrategy(getState, "worldState");
     dispatch(requestQueued({ id: strategy.requestId, type: "foundation", targetId: "worldState" }));
     dispatch(generationSubmitted(strategy));
+  });
+
+  subscribeEffect(matchesAction(tensionAdded), (action) => {
+    submitTensionGeneration(dispatch, getState, action.payload.tension.id);
+  });
+
+  subscribeEffect(matchesAction(tensionGenerationRequested), (action) => {
+    submitTensionGeneration(dispatch, getState, action.payload.tensionId);
   });
 }

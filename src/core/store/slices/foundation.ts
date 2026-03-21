@@ -81,6 +81,7 @@ export const foundationSlice = createSlice({
     shapeGenerationRequested: (state) => state,
     intentGenerationRequested: (state) => state,
     worldStateGenerationRequested: (state) => state,
+    tensionGenerationRequested: (state, _payload: { tensionId: string }) => state,
   },
 });
 
@@ -100,4 +101,5 @@ export const {
   shapeGenerationRequested,
   intentGenerationRequested,
   worldStateGenerationRequested,
+  tensionGenerationRequested,
 } = foundationSlice.actions;
