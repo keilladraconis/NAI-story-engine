@@ -2,7 +2,6 @@ import { defineComponent } from "nai-act";
 import { RootState, WorldEntity } from "../../../core/store/types";
 import {
   forgeRequested,
-  forgeFromBrainstormRequested,
   castAllRequested,
   discardAllRequested,
 } from "../../../core/store/slices/world";
@@ -20,7 +19,6 @@ export const ForgeSection = defineComponent<undefined, RootState>({
   styles: {
     intentInput: { "min-height": "60px", "font-size": "0.85em" },
     batchNameInput: { "font-size": "0.85em" },
-    brainstormBtn: { "font-size": "0.85em", width: "100%" },
     actionBtn: { flex: "1", "font-size": "0.85em" },
     separator: { "border-top": "1px solid rgba(128,128,128,0.2)", margin: "6px 0" },
     castDiscardRow: { gap: "4px", "margin-top": "4px" },
@@ -35,7 +33,7 @@ export const ForgeSection = defineComponent<undefined, RootState>({
     // ── Forge intent ───────────────────────────────────────────────────────
     const intentInput = multilineTextInput({
       id: FG.INTENT_INPUT,
-      placeholder: "What kind of world elements do you want to forge?",
+      placeholder: "What should I forge next? Leave blank to forge from Brainstorm...",
       initialValue: "",
       storageKey: `story:${STORAGE_KEYS.FORGE_INTENT_UI}`,
       style: this.style?.("intentInput"),
@@ -46,14 +44,6 @@ export const ForgeSection = defineComponent<undefined, RootState>({
       id: FG.FORGE_BTN,
       label: "Forge",
       onGenerate: () => dispatch(forgeRequested()),
-    });
-
-    // ── Forge from Brainstorm ──────────────────────────────────────────────
-    const brainstormBtn = button({
-      id: FG.BRAINSTORM_BTN,
-      text: "⚡ Forge from Brainstorm",
-      style: this.style?.("brainstormBtn"),
-      callback: () => dispatch(forgeFromBrainstormRequested()),
     });
 
     // ── Ticker (streaming output) ──────────────────────────────────────────
@@ -123,7 +113,6 @@ export const ForgeSection = defineComponent<undefined, RootState>({
           content: [
             intentInput,
             forgeBtnPart,
-            brainstormBtn,
             ticker,
             text({ style: this.style?.("separator") }),
             batchNameInput,

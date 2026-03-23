@@ -1,5 +1,5 @@
 import { GenerationStrategy, ShapeData } from "../../types";
-import { shapeUpdated, intentUpdated, worldStateUpdated, tensionEdited } from "../../index";
+import { shapeUpdated, intentUpdated, worldStateUpdated, tensionEdited, attgUpdated, styleUpdated } from "../../index";
 import {
   GenerationHandlers,
   StreamingContext,
@@ -7,6 +7,7 @@ import {
 } from "../generation-handlers";
 import { IDS, STORAGE_KEYS } from "../../../../ui/framework/ids";
 import { escapeForMarkdown } from "../../../../ui/utils";
+import { attgForMemory } from "../../../../core/utils/filters";
 
 type FoundationTarget = Extract<
   GenerationStrategy["target"],
@@ -20,6 +21,11 @@ function viewIdForField(field: "shape" | "intent" | "worldState"): string {
     case "worldState": return `${IDS.FOUNDATION.WORLD_STATE_TEXT}-view`;
   }
 }
+
+const FIELD_TO_STORAGE_KEY = {
+  attg:  STORAGE_KEYS.FOUNDATION_ATTG_UI,
+  style: STORAGE_KEYS.FOUNDATION_STYLE_UI,
+} as const;
 
 /**
  * Parses shape generation output into { name, description }.
@@ -70,15 +76,27 @@ export const tensionHandler: GenerationHandlers<TensionTarget> = {
 
 export const foundationHandler: GenerationHandlers<FoundationTarget> = {
   streaming(ctx: StreamingContext<FoundationTarget>, _newText: string): void {
-    const viewId = viewIdForField(ctx.target.field);
-    api.v1.ui.updateParts([{ id: viewId, text: escapeForMarkdown(ctx.accumulatedText) }]);
+    switch (ctx.target.field) {
+      case "shape":
+      case "intent":
+      case "worldState": {
+        const viewId = viewIdForField(ctx.target.field);
+        api.v1.ui.updateParts([{ id: viewId, text: escapeForMarkdown(ctx.accumulatedText) }]);
+        break;
+      }
+      case "attg":
+        api.v1.ui.updateParts([{ id: IDS.FOUNDATION.ATTG_INPUT, value: ctx.accumulatedText }]);
+        break;
+      case "style":
+        api.v1.ui.updateParts([{ id: IDS.FOUNDATION.STYLE_INPUT, value: ctx.accumulatedText }]);
+        break;
+    }
   },
 
   async completion(ctx: CompletionContext<FoundationTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
     const text = ctx.accumulatedText.trim();
-    const viewId = viewIdForField(ctx.target.field);
 
     switch (ctx.target.field) {
       case "shape": {
@@ -87,14 +105,34 @@ export const foundationHandler: GenerationHandlers<FoundationTarget> = {
         ctx.dispatch(shapeUpdated({ shape }));
         break;
       }
-      case "intent":
+      case "intent": {
         ctx.dispatch(intentUpdated({ intent: text }));
-        api.v1.ui.updateParts([{ id: viewId, text: escapeForMarkdown(text) }]);
+        api.v1.ui.updateParts([{ id: `${IDS.FOUNDATION.INTENT_TEXT}-view`, text: escapeForMarkdown(text) }]);
         break;
-      case "worldState":
+      }
+      case "worldState": {
         ctx.dispatch(worldStateUpdated({ worldState: text }));
-        api.v1.ui.updateParts([{ id: viewId, text: escapeForMarkdown(text) }]);
+        api.v1.ui.updateParts([{ id: `${IDS.FOUNDATION.WORLD_STATE_TEXT}-view`, text: escapeForMarkdown(text) }]);
         break;
+      }
+      case "attg": {
+        await api.v1.storyStorage.set(FIELD_TO_STORAGE_KEY.attg, text);
+        ctx.dispatch(attgUpdated({ attg: text }));
+        const attgSyncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_ATTG_MEMORY);
+        if (attgSyncEnabled) {
+          await api.v1.memory.set(await attgForMemory(text));
+        }
+        break;
+      }
+      case "style": {
+        await api.v1.storyStorage.set(FIELD_TO_STORAGE_KEY.style, text);
+        ctx.dispatch(styleUpdated({ style: text }));
+        const styleSyncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_AN);
+        if (styleSyncEnabled) {
+          await api.v1.an.set(text);
+        }
+        break;
+      }
     }
   },
 };

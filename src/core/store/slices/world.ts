@@ -50,6 +50,13 @@ export const worldSlice = createSlice({
       ),
     }),
 
+    entityEdited: (state, payload: { entityId: string; name: string; summary: string }) => ({
+      ...state,
+      entities: state.entities.map((e) =>
+        e.id === payload.entityId ? { ...e, name: payload.name, summary: payload.summary } : e,
+      ),
+    }),
+
     // Bind/Unbind (adopt existing lorebook entries)
     entityBound: (state, payload: { entity: WorldEntity }) => ({
       ...state,
@@ -135,6 +142,7 @@ export const {
   entityReforged,
   entityDeleted,
   entitySummaryUpdated,
+  entityEdited,
   entityBound,
   entityUnbound,
   batchCreated,

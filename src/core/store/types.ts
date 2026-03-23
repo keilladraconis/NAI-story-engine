@@ -128,7 +128,7 @@ export interface GenerationStrategy {
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }
   | { type: "forge"; batchId: string }
-  | { type: "foundation"; field: "shape" | "intent" | "worldState" }
+  | { type: "foundation"; field: "shape" | "intent" | "worldState" | "attg" | "style" }
   | { type: "tension"; tensionId: string };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;

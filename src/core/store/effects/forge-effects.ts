@@ -12,7 +12,6 @@ import { RootState, AppDispatch } from "../types";
 import { GenX } from "nai-gen-x";
 import {
   forgeRequested,
-  forgeFromBrainstormRequested,
   castAllRequested,
   forgeCastCompleted,
   batchCreated,
@@ -26,7 +25,7 @@ import {
 } from "../index";
 import { buildForgeStrategy } from "../../utils/forge-strategy";
 import { ensureCategory } from "./lorebook-sync";
-import { currentMessages } from "../slices/brainstorm";
+import { getConsolidatedBrainstorm } from "../../utils/context-builder";
 import { IDS, STORAGE_KEYS } from "../../../ui/framework/ids";
 
 export function registerForgeEffects(
@@ -36,38 +35,17 @@ export function registerForgeEffects(
   _genX: GenX,
 ): void {
   // ─── Forge Requested ──────────────────────────────────────────────────────
+  // If intent is blank, falls back to using the full brainstorm conversation as context.
 
   subscribeEffect(matchesAction(forgeRequested), async () => {
     const intentRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_INTENT_UI);
     const forgeIntent = String(intentRaw || "").trim();
 
-    const batchNameRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_BATCH_NAME_UI);
-    const batchName = String(batchNameRaw || "").trim() || "Draft";
-
-    const batchId = api.v1.uuid();
-    dispatch(batchCreated({ batch: { id: batchId, name: batchName, entityIds: [] } }));
-
-    const strategy = buildForgeStrategy(getState, batchId, forgeIntent);
-    dispatch(requestQueued({ id: strategy.requestId, type: "forge", targetId: batchId }));
-    dispatch(generationSubmitted(strategy));
-  });
-
-  // ─── Forge from Brainstorm ────────────────────────────────────────────────
-
-  subscribeEffect(matchesAction(forgeFromBrainstormRequested), async () => {
-    const state = getState();
-    const messages = currentMessages(state.brainstorm);
-    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
-    const brainstormContext = lastAssistant?.content || "";
-
-    if (!brainstormContext) {
-      api.v1.log("[forge] forgeFromBrainstorm: no brainstorm content found");
-      api.v1.ui.toast("No brainstorm content to forge from", { type: "info" });
+    const brainstormContext = forgeIntent ? "" : getConsolidatedBrainstorm(getState());
+    if (!forgeIntent && !brainstormContext) {
+      api.v1.ui.toast("Add a forge intent or run a brainstorm first", { type: "info" });
       return;
     }
-
-    const intentRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_INTENT_UI);
-    const forgeIntent = String(intentRaw || "").trim();
 
     const batchNameRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_BATCH_NAME_UI);
     const batchName = String(batchNameRaw || "").trim() || "Draft";

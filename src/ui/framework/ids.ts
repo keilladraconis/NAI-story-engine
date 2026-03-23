@@ -72,7 +72,9 @@ export const IDS = {
     TENSIONS_LIST: "se-fn-tensions-list",
     ADD_TENSION_BTN: "se-fn-add-tension",
     ATTG_INPUT: "se-fn-attg",
+    ATTG_GEN_BTN: "se-fn-attg-gen",
     STYLE_INPUT: "se-fn-style",
+    STYLE_GEN_BTN: "se-fn-style-gen",
     tension: (id: string) => ({
       ROOT: `se-fn-tension-${id}`,
       TEXT: `se-fn-tension-${id}-text`,
@@ -93,6 +95,7 @@ export const IDS = {
     CAST_DISCARD_ROW: "se-forge-cast-discard-row",
     entity: (id: string) => ({
       ROOT: `se-forge-entity-${id}`,
+      ACTION_BAR: `se-forge-entity-${id}-actions`,
       DISCARD_BTN: `se-forge-entity-${id}-discard`,
     }),
   },

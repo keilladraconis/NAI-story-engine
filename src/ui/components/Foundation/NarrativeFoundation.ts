@@ -10,6 +10,8 @@ import {
   shapeGenerationRequested,
   intentGenerationRequested,
   worldStateGenerationRequested,
+  attgGenerationRequested,
+  styleGenerationRequested,
 } from "../../../core/store/slices/foundation";
 import { IDS, STORAGE_KEYS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
@@ -209,6 +211,19 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
     });
 
     // ── ATTG ───────────────────────────────────────────────────────────────
+    const { part: attgBtnPart } = ctx.render(GenerationButton, {
+      id: FN.ATTG_GEN_BTN,
+      label: "Generate",
+      onGenerate: () => dispatch(attgGenerationRequested()),
+      stateProjection: (s) => {
+        const queued = s.runtime.queue.find((r) => r.type === "foundation" && r.targetId === "attg");
+        const active = s.runtime.activeRequest?.type === "foundation" && s.runtime.activeRequest.targetId === "attg"
+          ? s.runtime.activeRequest : null;
+        return queued?.id ?? active?.id;
+      },
+      requestIdFromProjection: (id: string | undefined) => id,
+    });
+
     const attgInput = multilineTextInput({
       id: FN.ATTG_INPUT,
       placeholder: "Author's thought-to-generation notes...",
@@ -229,9 +244,28 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
       initialValue: false,
       storageKey: `story:${STORAGE_KEYS.SYNC_ATTG_MEMORY_UI}`,
       label: "Copy to Memory",
+      onChange: async (checked: boolean) => {
+        if (checked) {
+          const value = String((await api.v1.storyStorage.get(STORAGE_KEYS.FOUNDATION_ATTG_UI)) || "");
+          await api.v1.memory.set(await attgForMemory(value));
+        }
+      },
     });
 
     // ── Style ──────────────────────────────────────────────────────────────
+    const { part: styleBtnPart } = ctx.render(GenerationButton, {
+      id: FN.STYLE_GEN_BTN,
+      label: "Generate",
+      onGenerate: () => dispatch(styleGenerationRequested()),
+      stateProjection: (s) => {
+        const queued = s.runtime.queue.find((r) => r.type === "foundation" && r.targetId === "style");
+        const active = s.runtime.activeRequest?.type === "foundation" && s.runtime.activeRequest.targetId === "style"
+          ? s.runtime.activeRequest : null;
+        return queued?.id ?? active?.id;
+      },
+      requestIdFromProjection: (id: string | undefined) => id,
+    });
+
     const styleInput = multilineTextInput({
       id: FN.STYLE_INPUT,
       placeholder: "Writing style, tone, prose directives...",
@@ -252,6 +286,12 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
       initialValue: false,
       storageKey: `story:${STORAGE_KEYS.SYNC_STYLE_AN_UI}`,
       label: "Copy to Author's Note",
+      onChange: async (checked: boolean) => {
+        if (checked) {
+          const value = String((await api.v1.storyStorage.get(STORAGE_KEYS.FOUNDATION_STYLE_UI)) || "");
+          await api.v1.an.set(value);
+        }
+      },
     });
 
     return collapsibleSection({
@@ -271,7 +311,13 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
             column({
               style: { gap: "4px" },
               content: [
-                text({ text: "**ATTG**", markdown: true, style: this.style?.("label") }),
+                row({
+                  style: { "align-items": "center", "justify-content": "space-between" },
+                  content: [
+                    text({ text: "**ATTG**", markdown: true, style: this.style?.("label") }),
+                    attgBtnPart,
+                  ],
+                }),
                 attgInput,
                 row({ style: this.style?.("checkboxRow"), content: [attgCheckbox] }),
               ],
@@ -279,7 +325,13 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
             column({
               style: { gap: "4px" },
               content: [
-                text({ text: "**Style**", markdown: true, style: this.style?.("label") }),
+                row({
+                  style: { "align-items": "center", "justify-content": "space-between" },
+                  content: [
+                    text({ text: "**Style**", markdown: true, style: this.style?.("label") }),
+                    styleBtnPart,
+                  ],
+                }),
                 styleInput,
                 row({ style: this.style?.("checkboxRow"), content: [styleCheckbox] }),
               ],

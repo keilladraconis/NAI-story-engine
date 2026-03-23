@@ -15,6 +15,8 @@ import {
   shapeGenerationRequested,
   intentGenerationRequested,
   worldStateGenerationRequested,
+  attgGenerationRequested,
+  styleGenerationRequested,
   tensionAdded,
   tensionGenerationRequested,
   generationSubmitted,
@@ -106,6 +108,52 @@ const createWorldStateFactory = (getState: () => RootState): MessageFactory => a
 };
 
 /**
+ * ATTG: reads foundation context (shape, intent, world state) and generates an ATTG block.
+ */
+const createAttgFactory = (getState: () => RootState): MessageFactory => async () => {
+  const attgPrompt = String((await api.v1.config.get("attg_generate_prompt")) || "");
+
+  const prefix = await buildStoryEnginePrefix(getState, { excludeSections: ["foundation"] });
+  const messages: Message[] = [...prefix];
+
+  const { shape, intent, worldState } = getState().foundation;
+  const anchors: string[] = [];
+  if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
+  if (intent) anchors.push(`Intent: ${intent}`);
+  if (worldState) anchors.push(`World State: ${worldState}`);
+  if (anchors.length > 0) {
+    messages.push({ role: "system" as const, content: anchors.join("\n") });
+  }
+
+  messages.push({ role: "system" as const, content: attgPrompt });
+
+  return { messages, params: { model: "glm-4-6", max_tokens: 64, temperature: 0.7, min_p: 0.05, stop: ["</think>"] } };
+};
+
+/**
+ * Style: reads foundation context (shape, intent, world state) and generates a Style block.
+ */
+const createStyleFactory = (getState: () => RootState): MessageFactory => async () => {
+  const stylePrompt = String((await api.v1.config.get("style_generate_prompt")) || "");
+
+  const prefix = await buildStoryEnginePrefix(getState, { excludeSections: ["foundation"] });
+  const messages: Message[] = [...prefix];
+
+  const { shape, intent, worldState } = getState().foundation;
+  const anchors: string[] = [];
+  if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
+  if (intent) anchors.push(`Intent: ${intent}`);
+  if (worldState) anchors.push(`World State: ${worldState}`);
+  if (anchors.length > 0) {
+    messages.push({ role: "system" as const, content: anchors.join("\n") });
+  }
+
+  messages.push({ role: "system" as const, content: stylePrompt });
+
+  return { messages, params: { model: "glm-4-6", max_tokens: 128, temperature: 0.7, min_p: 0.05, stop: ["</think>"] } };
+};
+
+/**
  * Tension: reads full foundation context (shape, intent, world state, existing tensions).
  * Generates a single new tension as plain prose.
  */
@@ -142,12 +190,14 @@ const createTensionFactory = (getState: () => RootState, tensionId: string): Mes
 
 function buildFoundationStrategy(
   getState: () => RootState,
-  field: "shape" | "intent" | "worldState",
+  field: "shape" | "intent" | "worldState" | "attg" | "style",
 ): GenerationStrategy {
   const factoryMap = {
     shape:      createShapeFactory,
     intent:     createIntentFactory,
     worldState: createWorldStateFactory,
+    attg:       createAttgFactory,
+    style:      createStyleFactory,
   };
 
   return {
@@ -200,5 +250,17 @@ export function registerFoundationEffects(
 
   subscribeEffect(matchesAction(tensionGenerationRequested), (action) => {
     submitTensionGeneration(dispatch, getState, action.payload.tensionId);
+  });
+
+  subscribeEffect(matchesAction(attgGenerationRequested), () => {
+    const strategy = buildFoundationStrategy(getState, "attg");
+    dispatch(requestQueued({ id: strategy.requestId, type: "foundation", targetId: "attg" }));
+    dispatch(generationSubmitted(strategy));
+  });
+
+  subscribeEffect(matchesAction(styleGenerationRequested), () => {
+    const strategy = buildFoundationStrategy(getState, "style");
+    dispatch(requestQueued({ id: strategy.requestId, type: "foundation", targetId: "style" }));
+    dispatch(generationSubmitted(strategy));
   });
 }
