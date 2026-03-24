@@ -67,7 +67,7 @@ export interface DeleteCommand {
 
 export interface CritiqueCommand {
   kind: "CRITIQUE";
-  content: string;
+  text: string;
 }
 
 export interface DoneCommand {
@@ -106,8 +106,8 @@ export function parseCommands(text: string): ParsedCommand[] {
     if (createMatch) {
       const elementType = createMatch[1];
       const name = createMatch[2].trim();
-      // Collect content lines until next command or end
-      const content = collectContent(lines, i + 1);
+      const inline = line.slice(createMatch[0].length).trim();
+      const content = collectContent(lines, i + 1, inline);
       i += countContentLines(lines, i + 1);
       commands.push({ kind: "CREATE", elementType, name, content });
       continue;
@@ -117,7 +117,8 @@ export function parseCommands(text: string): ParsedCommand[] {
     const reviseMatch = line.match(/^\[REVISE\s+(?:[A-Z]+\s+)?"([^"]+)"\]/);
     if (reviseMatch) {
       const name = reviseMatch[1].trim();
-      const content = collectContent(lines, i + 1);
+      const inline = line.slice(reviseMatch[0].length).trim();
+      const content = collectContent(lines, i + 1, inline);
       i += countContentLines(lines, i + 1);
       commands.push({ kind: "REVISE", name, content });
       continue;
@@ -128,7 +129,8 @@ export function parseCommands(text: string): ParsedCommand[] {
     if (linkMatch) {
       const fromName = linkMatch[1].trim();
       const toName = linkMatch[2].trim();
-      const description = collectContent(lines, i + 1);
+      const inline = line.slice(linkMatch[0].length).trim();
+      const description = collectContent(lines, i + 1, inline);
       i += countContentLines(lines, i + 1);
       commands.push({ kind: "LINK", fromName, toName, description });
       continue;
@@ -142,10 +144,12 @@ export function parseCommands(text: string): ParsedCommand[] {
     }
 
     // [CRITIQUE]
-    if (line === "[CRITIQUE]") {
-      const content = collectContent(lines, i + 1);
+    const critiqueMatch = line.match(/^\[CRITIQUE\]/);
+    if (critiqueMatch) {
+      const inline = line.slice(critiqueMatch[0].length).trim();
+      const content = collectContent(lines, i + 1, inline);
       i += countContentLines(lines, i + 1);
-      commands.push({ kind: "CRITIQUE", content });
+      commands.push({ kind: "CRITIQUE", text: content });
       continue;
     }
 
@@ -158,9 +162,12 @@ export function parseCommands(text: string): ParsedCommand[] {
   return commands;
 }
 
-/** Collect non-command lines following a command as its content. */
-function collectContent(lines: string[], startIdx: number): string {
+/** Collect non-command lines following a command as its content.
+ *  `inline` captures any text on the same line as the command (after the `]`).
+ */
+function collectContent(lines: string[], startIdx: number, inline = ""): string {
   const contentLines: string[] = [];
+  if (inline) contentLines.push(inline);
   for (let i = startIdx; i < lines.length; i++) {
     const line = lines[i].trim();
     if (isCommandLine(line)) break;
@@ -274,8 +281,8 @@ export function executeCommands(
       }
 
       case "CRITIQUE": {
-        critique = cmd.content;
-        dispatch(critiqueSet({ critique: cmd.content }));
+        critique = cmd.text;
+        dispatch(critiqueSet({ critique: cmd.text }));
         log.push("✓ CRITIQUE recorded");
         break;
       }

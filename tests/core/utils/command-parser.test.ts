@@ -47,7 +47,7 @@ describe("parseCommands", () => {
     expect(commands).toHaveLength(1);
     expect(commands[0].kind).toBe("CRITIQUE");
     if (commands[0].kind === "CRITIQUE") {
-      expect(commands[0].content).toBe("Needs more factions.");
+      expect(commands[0].text).toBe("Needs more factions.");
     }
   });
 

@@ -59,7 +59,7 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
         ? { ...initialCrucibleState, ...data.crucible }
         : current.crucible,
       world: data.world
-        ? { ...initialWorldState, ...data.world }
+        ? { ...initialWorldState, ...data.world, forgeLoopActive: false }
         : current.world,
       foundation: data.foundation
         ? { ...initialFoundationState, ...data.foundation }

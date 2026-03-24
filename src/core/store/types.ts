@@ -127,7 +127,7 @@ export interface GenerationStrategy {
   | { type: "lorebookKeys"; entryId: string }
   | { type: "lorebookRefine"; entryId: string }
   | { type: "bootstrap" }
-  | { type: "forge"; batchId: string }
+  | { type: "forge"; batchId: string; step: number; forgeIntent: string; brainstormContext: string }
   | { type: "foundation"; field: "shape" | "intent" | "worldState" | "attg" | "style" }
   | { type: "tension"; tensionId: string };
   prefillBehavior: "keep" | "trim";
@@ -176,6 +176,7 @@ export interface WorldState {
   batches: WorldBatch[];
   entities: WorldEntity[];
   relationships: Relationship[];
+  forgeLoopActive: boolean;
 }
 
 // Foundation Types (v11)

@@ -1,19 +1,34 @@
 /**
  * Forge Strategy — Intent-driven world element generation.
  *
- * Reads Narrative Foundation (shape, intent, worldState, tensions, attg, style)
- * and all Live entities for world awareness, then produces a GenerationStrategy
- * that emits CREATE/LINK/REVISE/DELETE/DONE commands via the command vocabulary
- * from crucible-command-parser.ts.
+ * Message ordering (cache-stability first):
+ *   1. system: forge_prompt
+ *   2. assistant: [BRAINSTORM]      — stable, captured at loop start
+ *   3. assistant: [STORY SHAPE]     — stable
+ *   4. assistant: [INTENT]          — stable
+ *   5. assistant: === ESTABLISHED WORLD === — semi-stable (changes on cast)
+ *   6. assistant: === WORLD STATE ===     — volatile (recent narrative changes)
+ *   7. user: step instruction
+ *   8. assistant: prior command log — grows each step; primed with trailing [
+ *
+ * The prior command log is the key context mechanism: GLM sees its own prior
+ * output verbatim and naturally continues the command sequence, preventing
+ * recreation of already-forged elements without any extra dedup logic.
  */
 
 import { RootState, GenerationStrategy } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
 import { FieldID, DulfsFieldID } from "../../config/field-definitions";
+import { TYPE_TO_FIELD } from "./crucible-command-parser";
 
-/** Map World Entry field IDs to display labels (plural). */
-const FIELD_LABEL_PLURAL: Record<DulfsFieldID, string> = {
+const FIELD_TO_TYPE: Record<string, string> = Object.fromEntries(
+  Object.entries(TYPE_TO_FIELD).map(([type, fieldId]) => [fieldId, type]),
+);
+
+export const FORGE_MAX_STEPS = 12;
+
+const FIELD_LABEL: Record<DulfsFieldID, string> = {
   [FieldID.DramatisPersonae]: "Characters",
   [FieldID.UniverseSystems]: "Systems",
   [FieldID.Locations]: "Locations",
@@ -22,74 +37,100 @@ const FIELD_LABEL_PLURAL: Record<DulfsFieldID, string> = {
   [FieldID.Topics]: "Topics",
 };
 
-/**
- * Formats live world entities as context for the forge prompt.
- * Groups by category and lists name + summary for each entity.
- */
-function formatLiveWorldContext(state: RootState): string {
-  const liveEntities = state.world.entities.filter((e) => e.lifecycle === "live");
-  if (liveEntities.length === 0) return "";
+function formatEstablishedWorld(state: RootState): string {
+  const live = state.world.entities.filter((e) => e.lifecycle === "live");
+  if (live.length === 0) return "";
 
-  const groups = new Map<DulfsFieldID, typeof liveEntities>();
-  for (const entity of liveEntities) {
-    const list = groups.get(entity.categoryId) || [];
-    list.push(entity);
-    groups.set(entity.categoryId, list);
+  const groups = new Map<DulfsFieldID, typeof live>();
+  for (const e of live) {
+    const list = groups.get(e.categoryId) ?? [];
+    list.push(e);
+    groups.set(e.categoryId, list);
   }
 
-  const lines: string[] = ["[EXISTING WORLD]"];
+  const lines: string[] = ["=== ESTABLISHED WORLD ==="];
   for (const fieldId of WORLD_ENTRY_CATEGORIES) {
-    const fieldEntities = groups.get(fieldId);
-    if (!fieldEntities) continue;
-    const label = FIELD_LABEL_PLURAL[fieldId] || fieldId;
-    lines.push(`${label}:`);
-    for (const entity of fieldEntities) {
-      const desc = entity.summary ? `: ${entity.summary.slice(0, 100)}` : "";
-      lines.push(`- ${entity.name}${desc}`);
+    const group = groups.get(fieldId);
+    if (!group) continue;
+    lines.push(`${FIELD_LABEL[fieldId]}:`);
+    for (const e of group) {
+      lines.push(`  - ${e.name}${e.summary ? `: ${e.summary.slice(0, 120)}` : ""}`);
     }
   }
 
-  // Relationships
   if (state.world.relationships.length > 0) {
     lines.push("Relationships:");
     for (const rel of state.world.relationships) {
-      const from = state.world.entities.find((e) => e.id === rel.fromEntityId)?.name || rel.fromEntityId;
-      const to = state.world.entities.find((e) => e.id === rel.toEntityId)?.name || rel.toEntityId;
-      lines.push(`- ${from} → ${to}: ${rel.description}`);
+      const from = state.world.entities.find((e) => e.id === rel.fromEntityId)?.name ?? rel.fromEntityId;
+      const to = state.world.entities.find((e) => e.id === rel.toEntityId)?.name ?? rel.toEntityId;
+      lines.push(`  - ${from} → ${to}: ${rel.description}`);
     }
   }
 
   return lines.join("\n");
 }
 
-/**
- * Formats narrative foundation as context for the forge prompt.
- */
-function formatFoundationContext(state: RootState): string {
+function formatWorldState(state: RootState): string {
   const { foundation } = state;
-  const sections: string[] = [];
+  const parts: string[] = [];
 
-  if (foundation.shape) sections.push(`Shape: ${foundation.shape.name}: ${foundation.shape.description}`);
-  if (foundation.intent) sections.push(`Intent: ${foundation.intent}`);
-  if (foundation.worldState) sections.push(`World State: ${foundation.worldState}`);
+  if (foundation.worldState) {
+    parts.push(`=== WORLD STATE ===\n${foundation.worldState}`);
+  }
 
   const activeTensions = foundation.tensions.filter((t) => !t.resolved);
   if (activeTensions.length > 0) {
-    const tensionLines = activeTensions.map((t) => `- ${t.text}`).join("\n");
-    sections.push(`Active Tensions:\n${tensionLines}`);
+    parts.push(`=== TENSIONS ===\n${activeTensions.map((t) => `- ${t.text}`).join("\n")}`);
   }
 
-  return sections.join("\n");
+  return parts.join("\n");
 }
 
 /**
- * Creates a message factory for a forge pass.
- * Reads Foundation + live world at JIT time for freshness.
+ * Synthesizes the prior-step command log from successfully parsed entities
+ * and relationships in state. Only correct-syntax commands appear — bad GLM
+ * output that failed to parse never enters context.
+ */
+function buildForgePassLog(state: RootState, batchId: string): string {
+  const batchEntities = state.world.entities.filter(
+    (e) => e.batchId === batchId && e.lifecycle === "draft",
+  );
+  if (batchEntities.length === 0) return "";
+
+  const batchEntityIds = new Set(batchEntities.map((e) => e.id));
+  const lines: string[] = [];
+
+  for (const entity of batchEntities) {
+    const type = FIELD_TO_TYPE[entity.categoryId] ?? "CHARACTER";
+    lines.push(`[CREATE ${type} "${entity.name}"]`);
+    if (entity.summary) lines.push(entity.summary);
+    lines.push("");
+  }
+
+  const batchRels = state.world.relationships.filter(
+    (r) => batchEntityIds.has(r.fromEntityId) && batchEntityIds.has(r.toEntityId),
+  );
+  for (const rel of batchRels) {
+    const from = batchEntities.find((e) => e.id === rel.fromEntityId)!;
+    const to = batchEntities.find((e) => e.id === rel.toEntityId)!;
+    lines.push(`[LINK "${from.name}" → "${to.name}"]`);
+    if (rel.description) lines.push(rel.description);
+    lines.push("");
+  }
+
+  return lines.join("\n").trim();
+}
+
+/**
+ * Message factory for one step of the forge loop.
+ * All state is read JIT so the synthesized pass log is always current.
  */
 export const createForgeFactory = (
   getState: () => RootState,
+  batchId: string,
+  step: number,
   forgeIntent: string,
-  brainstormContext?: string,
+  brainstormContext: string,
 ): MessageFactory => {
   return async () => {
     const systemPrompt = String(
@@ -97,81 +138,114 @@ export const createForgeFactory = (
     );
 
     const state = getState();
-    const foundationContext = formatFoundationContext(state);
-    const worldContext = formatLiveWorldContext(state);
+    const { foundation } = state;
 
     const messages: Message[] = [];
 
+    // 1. System prompt
     messages.push({ role: "system", content: systemPrompt });
 
-    if (foundationContext) {
-      messages.push({ role: "system", content: foundationContext });
-    }
-
-    if (worldContext) {
-      messages.push({ role: "system", content: worldContext });
-    }
-
-    const userParts: string[] = [];
-
-    if (forgeIntent.trim()) {
-      userParts.push(`FORGE INTENT: ${forgeIntent.trim()}`);
-    }
-
+    // 2. Brainstorm context — stable, captured at loop start
     if (brainstormContext) {
-      userParts.push(`BRAINSTORM CONTEXT:\n${brainstormContext}`);
+      messages.push({ role: "assistant", content: `=== BRAINSTORM ===\n${brainstormContext}` });
     }
 
-    if (!forgeIntent.trim() && !brainstormContext) {
-      userParts.push("Generate a set of world elements that fit the narrative foundation above.");
+    // 3. Story shape — stable
+    if (foundation.shape) {
+      messages.push({
+        role: "assistant",
+        content: `=== STORY SHAPE ===\n${foundation.shape.name}\n${foundation.shape.description}`,
+      });
     }
 
-    messages.push(
-      { role: "user", content: userParts.join("\n\n") },
-      { role: "assistant", content: "[" },
-    );
+    // 4. Forge intent — stable
+    if (forgeIntent.trim()) {
+      messages.push({ role: "assistant", content: `=== INTENT ===\n${forgeIntent.trim()}` });
+    }
+
+    // 5. Established world (live entities) — semi-stable
+    const establishedWorld = formatEstablishedWorld(state);
+    if (establishedWorld) {
+      messages.push({ role: "assistant", content: establishedWorld });
+    }
+
+    // 6. World state + tensions — volatile (recent narrative changes)
+    const worldStateText = formatWorldState(state);
+    if (worldStateText) {
+      messages.push({ role: "assistant", content: worldStateText });
+    }
+
+    // 7. User: step instruction
+    const stepNote = step === FORGE_MAX_STEPS - 1
+      ? `Step ${step} of ${FORGE_MAX_STEPS}. Consider closing with [CRITIQUE] if the draft is complete.`
+      : `Step ${step} of ${FORGE_MAX_STEPS}. Emit one command.`;
+    messages.push({ role: "user", content: stepNote });
+
+    // 8. Prior command log + prefill primer — single assistant message.
+    //    Combining the pass log and prefill "[" into one message avoids
+    //    consecutive assistant turns. The prefill "[" MUST be in the messages
+    //    array sent to GLM so GLM generates the continuation (e.g. "CREATE...")
+    //    rather than the full command (e.g. "[CREATE..."). The strategy's
+    //    assistantPrefill then prepends "[" client-side to accumulatedText,
+    //    giving the handler a fully-formed "[CREATE CHARACTER ...]" to parse.
+    const passLog = buildForgePassLog(state, batchId);
+    const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE" : "[";
+    const assistantContent = passLog ? `${passLog}\n${prefill}` : prefill;
+    messages.push({ role: "assistant", content: assistantContent });
 
     return {
       messages,
       params: {
         model: "glm-4-6",
-        max_tokens: 1024,
+        max_tokens: 256,
         temperature: 0.85,
         min_p: 0.05,
-        stop: ["</think>"],
       },
     };
   };
 };
 
 /**
- * Builds a forge strategy for intent-driven world element generation.
+ * Builds a GenerationStrategy for one step of the forge loop.
  */
 export const buildForgeStrategy = (
   getState: () => RootState,
   batchId: string,
+  step: number,
   forgeIntent: string,
   brainstormContext?: string,
 ): GenerationStrategy => {
+  const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE" : "[";
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createForgeFactory(getState, forgeIntent, brainstormContext),
-    target: { type: "forge", batchId },
+    messageFactory: createForgeFactory(getState, batchId, step, forgeIntent, brainstormContext ?? ""),
+    target: {
+      type: "forge",
+      batchId,
+      step,
+      forgeIntent,
+      brainstormContext: brainstormContext ?? "",
+    },
     prefillBehavior: "keep",
-    assistantPrefill: "[",
-    continuation: { maxCalls: 2 },
+    assistantPrefill: prefill,
   };
 };
 
-const DEFAULT_FORGE_PROMPT = `You are a world-building assistant. Given a narrative foundation and forge intent, create a cohesive set of world elements using structured commands.
+export const DEFAULT_FORGE_PROMPT = `You are a world-building assistant operating in a step-by-step forge loop.
+
+Each response emits exactly ONE command. Do not emit multiple commands.
 
 Command vocabulary:
-  [CREATE <TYPE> "<Name>"]       — new world element (types: CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC)
-  [REVISE "<Name>"]              — update existing element
-  [LINK "<Name>" → "<Name>"]     — relationship between elements
-  [DONE]                         — signal complete
+  [CREATE <TYPE> "<Name>"]       — new world element (CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC)
+  [REVISE "<Name>"]              — update an existing draft element
+  [LINK "<Name>" → "<Name>"]     — relationship between two elements
+  [DELETE "<Name>"]              — remove a draft element
+  [CRITIQUE]                     — self-assessment; ends this forge pass
 
-After each CREATE or REVISE command, write a brief description (1-3 sentences) on the following lines.
-After each LINK command, write the relationship description on the following line.
+After CREATE or REVISE, write a brief description (1–3 sentences) on the following lines.
+After LINK, write the relationship description on the following line.
+After [CRITIQUE], write 2–4 sentences: what works, what is missing, what to address next.
 
-Create 4-8 elements that work together as a coherent cluster. Prefer CHARACTER and LOCATION types for the core, then add other types for texture. End with [DONE].`;
+The ESTABLISHED WORLD section lists what already exists — do not recreate those elements.
+The prior command sequence shows what has been built this pass — continue it naturally.
+When the draft feels complete, emit [CRITIQUE] to end the pass.`;

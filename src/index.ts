@@ -22,6 +22,8 @@ import { Header } from "./ui/components/Sidebar/Header";
 import { NarrativeFoundation } from "./ui/components/Foundation/NarrativeFoundation";
 import { ForgeSection } from "./ui/components/Forge/ForgeSection";
 import { WorldBatchList } from "./ui/components/World/WorldBatchList";
+import { ButtonWithConfirmation } from "./ui/components/ButtonWithConfirmation";
+import { forgeClearRequested } from "./core/store/slices/world";
 
 // Lorebook components
 import { LorebookPanelContent } from "./ui/components/Lorebook/LorebookPanelContent";
@@ -79,6 +81,13 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
     const { part: foundationPart } = mount(NarrativeFoundation, undefined, store);
     const { part: forgePart } = mount(ForgeSection, undefined, store);
     const { part: batchListPart } = mount(WorldBatchList, undefined, store);
+    const { part: clearForgePart } = mount(ButtonWithConfirmation, {
+      id: "se-footer-clear-forge",
+      label: "Clear Forge",
+      confirmLabel: "Clear all forge data?",
+      buttonStyle: { flex: "1", "font-size": "0.8em" },
+      onConfirm: () => store.dispatch(forgeClearRequested()),
+    }, store);
     const { part: lorebookPart } = mount(LorebookPanelContent, undefined, store);
 
     // 5. Compose panels
@@ -107,7 +116,7 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
             foundationPart,
             forgePart,
             batchListPart,
-            // Footer: Relationships | Bind New | Rebind
+            // Footer: Relationships | Bind New | Rebind | Clear Forge
             row({
               id: "se-footer",
               style: { gap: "4px", "margin-top": "8px" },
@@ -130,6 +139,7 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
                   style: { flex: "1", "font-size": "0.8em" },
                   callback: () => openBindModal({ getState: store.getState, dispatch: store.dispatch }),
                 }),
+                clearForgePart,
               ],
             }),
           ],

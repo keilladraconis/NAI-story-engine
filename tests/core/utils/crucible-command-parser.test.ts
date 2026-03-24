@@ -93,7 +93,7 @@ The world lacks factions. All characters are individuals without institutional b
     expect(commands).toHaveLength(1);
     expect(commands[0]).toEqual({
       kind: "CRITIQUE",
-      content: "The world lacks factions. All characters are individuals without institutional backing.",
+      text: "The world lacks factions. All characters are individuals without institutional backing.",
     });
   });
 

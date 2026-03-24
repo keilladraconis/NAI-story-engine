@@ -92,6 +92,7 @@ export const IDS = {
     TICKER: "se-forge-ticker",
     CAST_ALL_BTN: "se-forge-cast-all",
     DISCARD_ALL_BTN: "se-forge-discard-all",
+    CLEAR_BTN: "se-forge-clear-btn",
     CAST_DISCARD_ROW: "se-forge-cast-discard-row",
     entity: (id: string) => ({
       ROOT: `se-forge-entity-${id}`,

@@ -5,6 +5,7 @@ export const initialWorldState: WorldState = {
   batches: [],
   entities: [],
   relationships: [],
+  forgeLoopActive: false,
 };
 
 export const worldSlice = createSlice({
@@ -113,7 +114,17 @@ export const worldSlice = createSlice({
 
     worldCleared: () => initialWorldState,
 
+    forgeLoopStarted: (state) => ({ ...state, forgeLoopActive: true }),
+    forgeLoopEnded: (state) => ({ ...state, forgeLoopActive: false }),
+
+    forgeStepCompleted: (
+      state,
+      _payload: { batchId: string; step: number; forgeIntent: string; brainstormContext: string },
+    ) => state,
+    forgeCritiqueReceived: (state, _payload: { batchId: string; critiqueText: string }) => state,
+
     // Signal actions — Phase 2 effects handle the actual work
+    forgeClearRequested: (state) => state,
     forgeRequested: (state) => state,
     forgeFromBrainstormRequested: (state) => state,
     castAllRequested: (state) => state,
@@ -151,6 +162,11 @@ export const {
   relationshipAdded,
   relationshipRemoved,
   relationshipUpdated,
+  forgeLoopStarted,
+  forgeLoopEnded,
+  forgeStepCompleted,
+  forgeCritiqueReceived,
+  forgeClearRequested,
   forgeRequested,
   forgeFromBrainstormRequested,
   castAllRequested,

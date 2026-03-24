@@ -40,10 +40,22 @@ export const ForgeSection = defineComponent<undefined, RootState>({
     });
 
     // ── Forge button ───────────────────────────────────────────────────────
+    // stateProjection surfaces the active forge request ID so GenerationButton
+    // can show its cancel control. When looping between steps (no active request),
+    // isDisabledFromProjection keeps the button disabled without a cancel.
     const { part: forgeBtnPart } = ctx.render(GenerationButton, {
       id: FG.FORGE_BTN,
       label: "Forge",
       onGenerate: () => dispatch(forgeRequested()),
+      stateProjection: (s: RootState) => ({
+        loopActive: s.world.forgeLoopActive,
+        activeForgeId: s.runtime.activeRequest?.type === "forge"
+          ? s.runtime.activeRequest.id
+          : undefined,
+      }),
+      requestIdFromProjection: (p: { loopActive: boolean; activeForgeId?: string }) => p.activeForgeId,
+      isDisabledFromProjection: (p: { loopActive: boolean; activeForgeId?: string }) =>
+        p.loopActive && !p.activeForgeId,
     });
 
     // ── Ticker (streaming output) ──────────────────────────────────────────

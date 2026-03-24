@@ -2,7 +2,9 @@
  * Forge Effects — Side effects for the Forge system.
  *
  * Handles:
- *  - forgeRequested / forgeFromBrainstormRequested → build strategy, submit to GenX
+ *  - forgeRequested → create batch, start loop (step 1)
+ *  - forgeStepCompleted → schedule next step
+ *  - forgeCritiqueReceived → write critique to FORGE_INTENT field, end loop
  *  - castAllRequested → create lorebook entries, move entities to live
  *  - batchReforged / entityReforged → pre-fill batch name input in UI
  */
@@ -12,6 +14,12 @@ import { RootState, AppDispatch } from "../types";
 import { GenX } from "nai-gen-x";
 import {
   forgeRequested,
+  forgeClearRequested,
+  forgeLoopStarted,
+  forgeLoopEnded,
+  forgeStepCompleted,
+  forgeCritiqueReceived,
+  worldCleared,
   castAllRequested,
   forgeCastCompleted,
   batchCreated,
@@ -23,7 +31,7 @@ import {
   generationSubmitted,
   requestQueued,
 } from "../index";
-import { buildForgeStrategy } from "../../utils/forge-strategy";
+import { buildForgeStrategy, FORGE_MAX_STEPS } from "../../utils/forge-strategy";
 import { ensureCategory } from "./lorebook-sync";
 import { getConsolidatedBrainstorm } from "../../utils/context-builder";
 import { IDS, STORAGE_KEYS } from "../../../ui/framework/ids";
@@ -35,7 +43,7 @@ export function registerForgeEffects(
   _genX: GenX,
 ): void {
   // ─── Forge Requested ──────────────────────────────────────────────────────
-  // If intent is blank, falls back to using the full brainstorm conversation as context.
+  // Creates batch, starts the loop at step 1.
 
   subscribeEffect(matchesAction(forgeRequested), async () => {
     const intentRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_INTENT_UI);
@@ -52,10 +60,54 @@ export function registerForgeEffects(
 
     const batchId = api.v1.uuid();
     dispatch(batchCreated({ batch: { id: batchId, name: batchName, entityIds: [] } }));
+    dispatch(forgeLoopStarted());
 
-    const strategy = buildForgeStrategy(getState, batchId, forgeIntent, brainstormContext);
+    const strategy = buildForgeStrategy(getState, batchId, 1, forgeIntent, brainstormContext);
     dispatch(requestQueued({ id: strategy.requestId, type: "forge", targetId: batchId }));
     dispatch(generationSubmitted(strategy));
+  });
+
+  // ─── Forge Clear Requested → discard all drafts + clear inputs ───────────
+
+  subscribeEffect(matchesAction(forgeClearRequested), async () => {
+    dispatch(worldCleared());
+    await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_INTENT_UI, "");
+    await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_BATCH_NAME_UI, "");
+    api.v1.ui.updateParts([
+      { id: IDS.FORGE.INTENT_INPUT, value: "" },
+      { id: IDS.FORGE.BATCH_NAME, value: "" },
+    ]);
+  });
+
+  // ─── Forge Step Completed → schedule next step ────────────────────────────
+
+  subscribeEffect(matchesAction(forgeStepCompleted), ({ payload }) => {
+    const state = getState();
+    const batchExists = state.world.batches.some((b) => b.id === payload.batchId);
+    if (!batchExists || !state.world.forgeLoopActive) {
+      dispatch(forgeLoopEnded());
+      return;
+    }
+
+    const nextStep = payload.step + 1;
+    if (nextStep > FORGE_MAX_STEPS) {
+      dispatch(forgeLoopEnded());
+      return;
+    }
+
+    const strategy = buildForgeStrategy(getState, payload.batchId, nextStep, payload.forgeIntent, payload.brainstormContext);
+    dispatch(requestQueued({ id: strategy.requestId, type: "forge", targetId: payload.batchId }));
+    dispatch(generationSubmitted(strategy));
+  });
+
+  // ─── Forge Critique Received → write to FORGE_INTENT field, end loop ──────
+
+  subscribeEffect(matchesAction(forgeCritiqueReceived), async ({ payload }) => {
+    if (payload.critiqueText) {
+      await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_INTENT_UI, payload.critiqueText);
+      api.v1.ui.updateParts([{ id: IDS.FORGE.INTENT_INPUT, value: payload.critiqueText }]);
+    }
+    dispatch(forgeLoopEnded());
   });
 
   // ─── Cast All Requested ───────────────────────────────────────────────────

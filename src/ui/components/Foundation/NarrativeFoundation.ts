@@ -1,26 +1,22 @@
 import { defineComponent } from "nai-act";
-import { RootState, Tension } from "../../../core/store/types";
+import { RootState } from "../../../core/store/types";
 import {
   shapeUpdated,
   intentUpdated,
-  worldStateUpdated,
-  tensionAdded,
   attgUpdated,
   styleUpdated,
   shapeGenerationRequested,
   intentGenerationRequested,
-  worldStateGenerationRequested,
   attgGenerationRequested,
   styleGenerationRequested,
 } from "../../../core/store/slices/foundation";
 import { IDS, STORAGE_KEYS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
 import { EditableText } from "../EditableText";
-import { TensionRow } from "./TensionRow";
 import { escapeForMarkdown } from "../../utils";
 import { attgForMemory } from "../../../core/utils/filters";
 
-const { column, row, text, button, collapsibleSection, multilineTextInput, checkboxInput, textInput } = api.v1.ui.part;
+const { column, row, text, collapsibleSection, multilineTextInput, checkboxInput, textInput } = api.v1.ui.part;
 
 const FN = IDS.FOUNDATION;
 
@@ -29,15 +25,12 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
 
   styles: {
     label: { "font-size": "0.8em", "font-weight": "bold", opacity: "0.7", "margin-bottom": "2px" },
-    resolvedLabel: { "font-size": "0.75em", opacity: "0.5", "font-style": "italic", display: "none" },
-    resolvedLabelVisible: { "font-size": "0.75em", opacity: "0.5", "font-style": "italic" },
-    addTensionBtn: { "font-size": "0.85em", width: "100%", "margin-top": "4px" },
     checkboxRow: { "margin-top": "4px", gap: "8px" },
     syncTextArea: { "min-height": "60px", "font-size": "0.85em" },
   },
 
   build(_props, ctx) {
-    const { dispatch, useSelector } = ctx;
+    const { dispatch } = ctx;
     const state = ctx.getState();
 
     // ── Shape ──────────────────────────────────────────────────────────────
@@ -115,100 +108,6 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
       (s) => s.foundation.intent,
       (intent) => ({ text: intent ? escapeForMarkdown(intent) : "" }),
     );
-
-    // ── World State ────────────────────────────────────────────────────────
-    const { part: worldStateBtnPart } = ctx.render(GenerationButton, {
-      id: FN.WORLD_STATE_BTN,
-      label: "Generate",
-      onGenerate: () => dispatch(worldStateGenerationRequested()),
-      stateProjection: (s) => {
-        const queued = s.runtime.queue.find((r) => r.type === "foundation" && r.targetId === "worldState");
-        const active = s.runtime.activeRequest?.type === "foundation" && s.runtime.activeRequest.targetId === "worldState"
-          ? s.runtime.activeRequest : null;
-        return queued?.id ?? active?.id;
-      },
-      requestIdFromProjection: (id: string | undefined) => id,
-    });
-
-    const { part: worldStateEditablePart } = ctx.render(EditableText, {
-      id: FN.WORLD_STATE_TEXT,
-      getContent: () => ctx.getState().foundation.worldState,
-      placeholder: "The current state of the world — ongoing conflicts, factions, mood...",
-      label: "World State",
-      extraControls: [worldStateBtnPart],
-      initialDisplay: state.foundation.worldState ? escapeForMarkdown(state.foundation.worldState) : undefined,
-      onSave: (content: string) => dispatch(worldStateUpdated({ worldState: content })),
-    });
-
-    ctx.bindPart(
-      `${FN.WORLD_STATE_TEXT}-view`,
-      (s) => s.foundation.worldState,
-      (ws) => ({ text: ws ? escapeForMarkdown(ws) : "" }),
-    );
-
-    // ── Tensions ───────────────────────────────────────────────────────────
-    const resolvedCount = state.foundation.tensions.filter((t) => t.resolved).length;
-
-    // Show/hide resolved section header based on resolved count
-    useSelector(
-      (s) => s.foundation.tensions.filter((t) => t.resolved).length,
-      (count) => {
-        api.v1.ui.updateParts([
-          {
-            id: `${FN.TENSIONS_LIST}-resolved-header`,
-            style: count > 0 ? this.style?.("resolvedLabelVisible") : this.style?.("resolvedLabel"),
-          },
-        ]);
-      },
-    );
-
-    const addTensionBtn = button({
-      id: FN.ADD_TENSION_BTN,
-      text: "⚡ Add Tension",
-      style: this.style?.("addTensionBtn"),
-      callback: () => {
-        dispatch(tensionAdded({ tension: { id: api.v1.uuid(), text: "", resolved: false } }));
-      },
-    });
-
-    const tensionsSection = column({
-      style: { gap: "4px" },
-      content: [
-        text({ text: "**Tensions**", markdown: true, style: this.style?.("label") }),
-        column({
-          id: FN.TENSIONS_LIST,
-          style: { gap: "4px" },
-          content: ctx.bindList(
-            FN.TENSIONS_LIST,
-            (s) => s.foundation.tensions.filter((t) => !t.resolved),
-            (t: Tension) => t.id,
-            (t: Tension) => ({
-              component: TensionRow,
-              props: { tensionId: t.id, initialText: t.text, resolved: false },
-            }),
-          ),
-        }),
-        text({
-          id: `${FN.TENSIONS_LIST}-resolved-header`,
-          text: "— resolved —",
-          style: resolvedCount > 0 ? this.style?.("resolvedLabelVisible") : this.style?.("resolvedLabel"),
-        }),
-        column({
-          id: `${FN.TENSIONS_LIST}-resolved`,
-          style: { gap: "4px" },
-          content: ctx.bindList(
-            `${FN.TENSIONS_LIST}-resolved`,
-            (s) => s.foundation.tensions.filter((t) => t.resolved),
-            (t: Tension) => t.id,
-            (t: Tension) => ({
-              component: TensionRow,
-              props: { tensionId: t.id, initialText: t.text, resolved: true },
-            }),
-          ),
-        }),
-        addTensionBtn,
-      ],
-    });
 
     // ── ATTG ───────────────────────────────────────────────────────────────
     const { part: attgBtnPart } = ctx.render(GenerationButton, {
@@ -306,8 +205,6 @@ export const NarrativeFoundation = defineComponent<undefined, RootState>({
             shapeNameInput,
             shapeEditablePart,
             intentEditablePart,
-            worldStateEditablePart,
-            tensionsSection,
             column({
               style: { gap: "4px" },
               content: [

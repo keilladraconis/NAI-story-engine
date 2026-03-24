@@ -1,6 +1,7 @@
 /**
  * Forge Handler — Parses and executes structured commands from GLM's forge output,
  * dispatching results to the world slice (entityForged, relationshipAdded, etc.).
+ * Drives the atomic forge loop by dispatching step/critique/done signals.
  */
 
 import {
@@ -16,10 +17,14 @@ import {
   entitySummaryUpdated,
   entityDeleted,
   relationshipAdded,
+  forgeStepCompleted,
+  forgeCritiqueReceived,
+  forgeLoopEnded,
 } from "../../slices/world";
-import { parseCommands } from "../../../utils/crucible-command-parser";
+import { parseCommands, CritiqueCommand } from "../../../utils/crucible-command-parser";
 import { TYPE_TO_FIELD } from "../../../utils/crucible-command-parser";
 import { stripThinkingTags } from "../../../utils/tag-parser";
+import { FORGE_MAX_STEPS } from "../../../utils/forge-strategy";
 import { IDS } from "../../../../ui/framework/ids";
 
 type ForgeTarget = Extract<GenerationStrategy["target"], { type: "forge" }>;
@@ -40,6 +45,10 @@ function executeForgeCommands(
   for (const cmd of commands) {
     switch (cmd.kind) {
       case "CREATE": {
+        if (!cmd.content.trim()) {
+          api.v1.log(`[forge] CREATE rejected: no content for "${cmd.name}"`);
+          break;
+        }
         const fieldId = TYPE_TO_FIELD[cmd.elementType] as DulfsFieldID | undefined;
         if (!fieldId) {
           api.v1.log(`[forge] CREATE: unknown type "${cmd.elementType}" for "${cmd.name}"`);
@@ -69,6 +78,10 @@ function executeForgeCommands(
       }
 
       case "REVISE": {
+        if (!cmd.content.trim()) {
+          api.v1.log(`[forge] REVISE rejected: no content for "${cmd.name}"`);
+          break;
+        }
         const entity = getState().world.entities.find(
           (e) => e.name.toLowerCase() === cmd.name.toLowerCase(),
         );
@@ -131,7 +144,7 @@ function executeForgeCommands(
         break;
 
       case "CRITIQUE":
-        api.v1.log(`[forge] CRITIQUE: ${cmd.content.slice(0, 100)}`);
+        api.v1.log(`[forge] CRITIQUE: ${cmd.text.slice(0, 100)}`);
         break;
     }
   }
@@ -147,7 +160,7 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
     const tail = lastCommand || text.replace(/\n+/g, " ").slice(-80);
 
     api.v1.ui.updateParts([
-      { id: IDS.FORGE.TICKER, text: tail },
+      { id: IDS.FORGE.TICKER, text: `[${ctx.target.step}/${FORGE_MAX_STEPS}] ${tail}` },
     ]);
   },
 
@@ -155,22 +168,40 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
     // Clear ticker
     api.v1.ui.updateParts([{ id: IDS.FORGE.TICKER, text: "" }]);
 
-    if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
+    if (!ctx.generationSucceeded || !ctx.accumulatedText) {
+      ctx.dispatch(forgeLoopEnded());
+      return;
+    }
 
     const text = stripThinkingTags(ctx.accumulatedText).trim();
     const commands = parseCommands(text);
 
+    const stepPayload = {
+      batchId: ctx.target.batchId,
+      step: ctx.target.step,
+      forgeIntent: ctx.target.forgeIntent,
+      brainstormContext: ctx.target.brainstormContext,
+    };
+
     if (commands.length === 0) {
-      api.v1.log("[forge] No valid commands found in GLM output");
-      api.v1.log("[forge] Raw text:", text.slice(0, 500));
+      api.v1.log("[forge] No valid commands found — consuming step and continuing");
+      ctx.dispatch(forgeStepCompleted(stepPayload));
       return;
     }
 
     executeForgeCommands(commands, ctx.target.batchId, ctx.getState, ctx.dispatch);
 
-    const newDrafts = ctx.getState().world.entities.filter(
-      (e) => e.batchId === ctx.target.batchId && e.lifecycle === "draft",
-    );
-    api.v1.log(`[forge] Batch "${ctx.target.batchId}": ${newDrafts.length} draft entities`);
+    const critique = commands.find((c): c is CritiqueCommand => c.kind === "CRITIQUE");
+    if (critique) {
+      ctx.dispatch(forgeCritiqueReceived({ batchId: ctx.target.batchId, critiqueText: critique.text }));
+      return;
+    }
+
+    if (commands.some((c) => c.kind === "DONE")) {
+      ctx.dispatch(forgeLoopEnded());
+      return;
+    }
+
+    ctx.dispatch(forgeStepCompleted(stepPayload));
   },
 };
