@@ -98,6 +98,15 @@ export const IDS = {
       ROOT: `se-forge-entity-${id}`,
       ACTION_BAR: `se-forge-entity-${id}-actions`,
       DISCARD_BTN: `se-forge-entity-${id}-discard`,
+      LINKS_SECTION: `se-forge-entity-${id}-links`,
+      LINKS_LIST: `se-forge-entity-${id}-links-list`,
+      ADD_LINK_BTN: `se-forge-entity-${id}-add-link`,
+      NEW_LINK_INPUT: `se-forge-entity-${id}-new-link-input`,
+      NEW_LINK_KEY: `se-forge-new-link-${id}`,
+      rel: (relId: string) => ({
+        ROOT: `se-forge-entity-${id}-rel-${relId}`,
+        DELETE_BTN: `se-forge-entity-${id}-rel-${relId}-del`,
+      }),
     }),
   },
   WORLD: {
