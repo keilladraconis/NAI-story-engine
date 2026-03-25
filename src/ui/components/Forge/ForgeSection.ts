@@ -19,7 +19,7 @@ export const ForgeSection = defineComponent<undefined, RootState>({
   id: () => FG.SECTION,
 
   styles: {
-    intentInput: { "min-height": "60px", "font-size": "0.85em" },
+    intentInput: { "min-height": "5em", "font-size": "0.85em" },
     batchNameInput: { "font-size": "0.85em" },
     actionBtn: { flex: "1", "font-size": "0.85em" },
     separator: { "border-top": "1px solid rgba(128,128,128,0.2)", margin: "6px 0" },
@@ -43,10 +43,10 @@ export const ForgeSection = defineComponent<undefined, RootState>({
 
     // ── Forge intent ───────────────────────────────────────────────────────
     const intentInput = multilineTextInput({
-      id: FG.INTENT_INPUT,
+      id: FG.GUIDANCE_INPUT,
       placeholder: "What should the Forge build? Leave blank to draw from your Brainstorm conversation.",
       initialValue: "",
-      storageKey: `story:${STORAGE_KEYS.FORGE_INTENT_UI}`,
+      storageKey: `story:${STORAGE_KEYS.FORGE_GUIDANCE_UI}`,
       style: this.style?.("intentInput"),
     });
 

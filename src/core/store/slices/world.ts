@@ -119,7 +119,7 @@ export const worldSlice = createSlice({
 
     forgeStepCompleted: (
       state,
-      _payload: { batchId: string; step: number; forgeIntent: string; brainstormContext: string },
+      _payload: { batchId: string; step: number; forgeGuidance: string; brainstormContext: string },
     ) => state,
     forgeCritiqueReceived: (state, _payload: { batchId: string; critiqueText: string }) => state,
 

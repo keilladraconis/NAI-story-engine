@@ -48,7 +48,7 @@ export const STORAGE_KEYS = {
 
   // Forge UI (v11)
   FORGE_SECTION_UI: "se-forge-section",
-  FORGE_INTENT_UI: "se-forge-intent",
+  FORGE_GUIDANCE_UI: "se-forge-guidance",
   FORGE_BATCH_NAME_UI: "se-forge-batch-name",
 
   // Lorebook relationship add form
@@ -105,7 +105,7 @@ export const IDS = {
   }),
   FORGE: {
     SECTION: "se-forge-section",
-    INTENT_INPUT: "se-forge-intent",
+    GUIDANCE_INPUT: "se-forge-guidance",
     FORGE_BTN: "se-forge-btn",
     BRAINSTORM_BTN: "se-forge-brainstorm-btn",
     BATCH_NAME: "se-forge-batch-name",

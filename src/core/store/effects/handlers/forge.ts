@@ -184,7 +184,7 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
     const stepPayload = {
       batchId: ctx.target.batchId,
       step: ctx.target.step,
-      forgeIntent: ctx.target.forgeIntent,
+      forgeGuidance: ctx.target.forgeGuidance,
       brainstormContext: ctx.target.brainstormContext,
     };
 

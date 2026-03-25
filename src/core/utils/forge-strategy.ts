@@ -3,13 +3,14 @@
  *
  * Message ordering (cache-stability first):
  *   1. system: forge_prompt
- *   2. assistant: [BRAINSTORM]      — stable, captured at loop start
- *   3. assistant: [STORY SHAPE]     — stable
- *   4. assistant: [INTENT]          — stable
- *   5. assistant: === ESTABLISHED WORLD === — semi-stable (changes on cast)
- *   6. assistant: === WORLD STATE ===     — volatile (recent narrative changes)
- *   7. user: step instruction
- *   8. assistant: prior command log — grows each step; primed with trailing [
+ *   2. assistant: [BRAINSTORM]        — stable, captured at loop start
+ *   3. assistant: [STORY SHAPE]       — stable (foundation.shape + storyStorage name fallback)
+ *   4. assistant: [STORY INTENT]      — stable (foundation.intent — strategic/persistent)
+ *   5. assistant: [FORGE GUIDANCE]     — stable (forge input — tactical/per-session)
+ *   6. assistant: === ESTABLISHED WORLD === — semi-stable (changes on cast)
+ *   7. assistant: === WORLD STATE ===       — volatile (recent narrative changes)
+ *   8. user: step instruction
+ *   9. assistant: prior command log — grows each step; primed with trailing [
  *
  * The prior command log is the key context mechanism: GLM sees its own prior
  * output verbatim and naturally continues the command sequence, preventing
@@ -21,6 +22,7 @@ import { MessageFactory } from "nai-gen-x";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
 import { FieldID, DulfsFieldID } from "../../config/field-definitions";
 import { TYPE_TO_FIELD } from "./crucible-command-parser";
+import { STORAGE_KEYS } from "../../ui/framework/ids";
 
 const FIELD_TO_TYPE: Record<string, string> = Object.fromEntries(
   Object.entries(TYPE_TO_FIELD).map(([type, fieldId]) => [fieldId, type]),
@@ -129,7 +131,7 @@ export const createForgeFactory = (
   getState: () => RootState,
   batchId: string,
   step: number,
-  forgeIntent: string,
+  forgeGuidance: string,
   brainstormContext: string,
 ): MessageFactory => {
   return async () => {
@@ -150,38 +152,48 @@ export const createForgeFactory = (
       messages.push({ role: "assistant", content: `=== BRAINSTORM ===\n${brainstormContext}` });
     }
 
-    // 3. Story shape — stable
+    // 3. Story shape — stable; fall back to storyStorage name if description not yet saved
+    const shapeName = String(
+      (await api.v1.storyStorage.get(STORAGE_KEYS.FOUNDATION_SHAPE_NAME_UI)) || "",
+    ).trim();
     if (foundation.shape) {
       messages.push({
         role: "assistant",
-        content: `=== STORY SHAPE ===\n${foundation.shape.name}\n${foundation.shape.description}`,
+        content: `=== STORY SHAPE ===\n${foundation.shape.name || shapeName}\n${foundation.shape.description}`,
       });
+    } else if (shapeName) {
+      messages.push({ role: "assistant", content: `=== STORY SHAPE ===\n${shapeName}` });
     }
 
-    // 4. Forge intent — stable
-    if (forgeIntent.trim()) {
-      messages.push({ role: "assistant", content: `=== INTENT ===\n${forgeIntent.trim()}` });
+    // 4. Foundation intent (strategic, persistent) — stable
+    if (foundation.intent) {
+      messages.push({ role: "assistant", content: `=== STORY INTENT ===\n${foundation.intent}` });
     }
 
-    // 5. Established world (live entities) — semi-stable
+    // 5. Forge intent (tactical, per-session) — stable
+    if (forgeGuidance.trim()) {
+      messages.push({ role: "assistant", content: `=== FORGE GUIDANCE ===\n${forgeGuidance.trim()}` });
+    }
+
+    // 6. Established world (live entities) — semi-stable
     const establishedWorld = formatEstablishedWorld(state);
     if (establishedWorld) {
       messages.push({ role: "assistant", content: establishedWorld });
     }
 
-    // 6. World state + tensions — volatile (recent narrative changes)
+    // 7. World state + tensions — volatile (recent narrative changes)
     const worldStateText = formatWorldState(state);
     if (worldStateText) {
       messages.push({ role: "assistant", content: worldStateText });
     }
 
-    // 7. User: step instruction
+    // 8. User: step instruction
     const stepNote = step === FORGE_MAX_STEPS - 1
       ? `Step ${step} of ${FORGE_MAX_STEPS}. Consider closing with [CRITIQUE] if the draft is complete.`
       : `Step ${step} of ${FORGE_MAX_STEPS}. Emit one command.`;
     messages.push({ role: "user", content: stepNote });
 
-    // 8. Prior command log + prefill primer — single assistant message.
+    // 9. Prior command log + prefill primer — single assistant message.
     //    Combining the pass log and prefill "[" into one message avoids
     //    consecutive assistant turns. The prefill "[" MUST be in the messages
     //    array sent to GLM so GLM generates the continuation (e.g. "CREATE...")
@@ -212,18 +224,18 @@ export const buildForgeStrategy = (
   getState: () => RootState,
   batchId: string,
   step: number,
-  forgeIntent: string,
+  forgeGuidance: string,
   brainstormContext?: string,
 ): GenerationStrategy => {
   const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE" : "[";
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createForgeFactory(getState, batchId, step, forgeIntent, brainstormContext ?? ""),
+    messageFactory: createForgeFactory(getState, batchId, step, forgeGuidance, brainstormContext ?? ""),
     target: {
       type: "forge",
       batchId,
       step,
-      forgeIntent,
+      forgeGuidance,
       brainstormContext: brainstormContext ?? "",
     },
     prefillBehavior: "keep",

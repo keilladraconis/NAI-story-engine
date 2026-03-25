@@ -4,7 +4,7 @@
  * Handles:
  *  - forgeRequested → create batch, start loop (step 1)
  *  - forgeStepCompleted → schedule next step
- *  - forgeCritiqueReceived → write critique to FORGE_INTENT field, end loop
+ *  - forgeCritiqueReceived → write critique to FORGE_GUIDANCE field, end loop
  *  - castAllRequested → create lorebook entries, move entities to live
  *  - batchReforged / entityReforged → pre-fill batch name input in UI
  */
@@ -47,29 +47,32 @@ export function registerForgeEffects(
   // Creates batch, starts the loop at step 1.
 
   subscribeEffect(matchesAction(forgeRequested), async () => {
-    const intentRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_INTENT_UI);
-    const forgeIntent = String(intentRaw || "").trim();
+    const guidanceRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_GUIDANCE_UI);
+    const forgeGuidance = String(guidanceRaw || "").trim();
 
-    const brainstormContext = forgeIntent ? "" : getConsolidatedBrainstorm(getState());
-    if (!forgeIntent && !brainstormContext) {
-      api.v1.ui.toast("Add a forge intent or run a brainstorm first", { type: "info" });
+    const brainstormContext = forgeGuidance ? "" : getConsolidatedBrainstorm(getState());
+    if (!forgeGuidance && !brainstormContext) {
+      api.v1.ui.toast("Add forge guidance or run a brainstorm first", { type: "info" });
       return;
     }
 
-    // Auto-default: "Main" for the very first forge; first 4 intent words for subsequent
+    // Auto-default: "Main" for the very first forge; first 4 guidance words for subsequent
     const noBatches = getState().world.batches.length === 0;
-    const intentWords = forgeIntent.trim().split(/\s+/).slice(0, 4).join(" ");
-    const defaultName = noBatches ? "Main" : (intentWords || "New Batch");
+    const guidanceWords = forgeGuidance.trim().split(/\s+/).slice(0, 4).join(" ");
+    const defaultName = noBatches ? "Main" : (guidanceWords || "New Batch");
 
     const batchNameRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_BATCH_NAME_UI);
     const batchName = String(batchNameRaw || "").trim() || defaultName;
 
-    // Merge-on-match: if a live batch with this name already exists, forge into it.
-    // Otherwise generate a new ID — the batch record is created at Cast time.
-    const existingBatch = getState().world.batches.find(
-      (b) => b.name.toLowerCase() === batchName.toLowerCase(),
-    );
-    const batchId = existingBatch?.id ?? api.v1.uuid();
+    // If draft entities already exist, append to their batch (user hasn't cast yet).
+    // Otherwise merge-on-match against live batches (reforge scenario), or mint a new ID.
+    // Batch records for fresh drafts are deferred to Cast time.
+    const existingDraftBatchId = getState().world.entities
+      .find((e) => e.lifecycle === "draft")?.batchId ?? null;
+    const existingLiveBatch = !existingDraftBatchId
+      ? getState().world.batches.find((b) => b.name.toLowerCase() === batchName.toLowerCase())
+      : null;
+    const batchId = existingDraftBatchId ?? existingLiveBatch?.id ?? api.v1.uuid();
 
     // Pre-populate the batch name input so the user sees the auto-derived name
     if (!String(batchNameRaw || "").trim()) {
@@ -79,7 +82,7 @@ export function registerForgeEffects(
 
     dispatch(forgeLoopStarted());
 
-    const strategy = buildForgeStrategy(getState, batchId, 1, forgeIntent, brainstormContext);
+    const strategy = buildForgeStrategy(getState, batchId, 1, forgeGuidance, brainstormContext);
     dispatch(requestQueued({ id: strategy.requestId, type: "forge", targetId: batchId }));
     dispatch(generationSubmitted(strategy));
   });
@@ -88,10 +91,10 @@ export function registerForgeEffects(
 
   subscribeEffect(matchesAction(forgeClearRequested), async () => {
     dispatch(worldCleared());
-    await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_INTENT_UI, "");
+    await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_GUIDANCE_UI, "");
     await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_BATCH_NAME_UI, "");
     api.v1.ui.updateParts([
-      { id: IDS.FORGE.INTENT_INPUT, value: "" },
+      { id: IDS.FORGE.GUIDANCE_INPUT, value: "" },
       { id: IDS.FORGE.BATCH_NAME, value: "" },
     ]);
   });
@@ -111,7 +114,7 @@ export function registerForgeEffects(
       return;
     }
 
-    const strategy = buildForgeStrategy(getState, payload.batchId, nextStep, payload.forgeIntent, payload.brainstormContext);
+    const strategy = buildForgeStrategy(getState, payload.batchId, nextStep, payload.forgeGuidance, payload.brainstormContext);
     dispatch(requestQueued({ id: strategy.requestId, type: "forge", targetId: payload.batchId }));
     dispatch(generationSubmitted(strategy));
   });
@@ -120,8 +123,8 @@ export function registerForgeEffects(
 
   subscribeEffect(matchesAction(forgeCritiqueReceived), async ({ payload }) => {
     if (payload.critiqueText) {
-      await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_INTENT_UI, payload.critiqueText);
-      api.v1.ui.updateParts([{ id: IDS.FORGE.INTENT_INPUT, value: payload.critiqueText }]);
+      await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_GUIDANCE_UI, payload.critiqueText);
+      api.v1.ui.updateParts([{ id: IDS.FORGE.GUIDANCE_INPUT, value: payload.critiqueText }]);
     }
     dispatch(forgeLoopEnded());
   });
@@ -172,10 +175,10 @@ export function registerForgeEffects(
     api.v1.ui.toast(`${count} ${count === 1 ? "entity" : "entities"} cast`, { type: "success" });
 
     // Clear forge intent and batch name inputs
-    await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_INTENT_UI, "");
+    await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_GUIDANCE_UI, "");
     await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_BATCH_NAME_UI, "");
     api.v1.ui.updateParts([
-      { id: IDS.FORGE.INTENT_INPUT, value: "" },
+      { id: IDS.FORGE.GUIDANCE_INPUT, value: "" },
       { id: IDS.FORGE.BATCH_NAME, value: "" },
     ]);
   });
