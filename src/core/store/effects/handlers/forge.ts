@@ -17,6 +17,7 @@ import {
   entitySummaryUpdated,
   entityDeleted,
   relationshipAdded,
+  relationshipUpdated,
   forgeStepCompleted,
   forgeCritiqueReceived,
   forgeLoopEnded,
@@ -119,12 +120,16 @@ function executeForgeCommands(
           break;
         }
 
-        // Dedup: skip if relationship already exists
+        // Update existing relationship rather than duplicating — check both
+        // directions since the model may emit A→B and B→A as separate commands.
         const existing = getState().world.relationships.find(
-          (r) => r.fromEntityId === from.id && r.toEntityId === to.id,
+          (r) =>
+            (r.fromEntityId === from.id && r.toEntityId === to.id) ||
+            (r.fromEntityId === to.id && r.toEntityId === from.id),
         );
         if (existing) {
-          api.v1.log(`[forge] LINK: "${cmd.fromName}" → "${cmd.toName}" already exists`);
+          dispatch(relationshipUpdated({ relationshipId: existing.id, description: cmd.description }));
+          api.v1.log(`[forge] LINK updated "${cmd.fromName}" → "${cmd.toName}"`);
           break;
         }
 

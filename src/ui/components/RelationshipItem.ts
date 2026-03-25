@@ -1,30 +1,30 @@
 import { defineComponent } from "nai-act";
-import { RootState, Relationship } from "../../../core/store/types";
+import { RootState, Relationship } from "../../core/store/types";
 import {
   relationshipRemoved,
   relationshipUpdated,
   relationshipAdded,
-} from "../../../core/store/slices/world";
-import { IDS } from "../../framework/ids";
-import { EditableText } from "../EditableText";
+} from "../../core/store/slices/world";
+import { IDS } from "../framework/ids";
+import { EditableText } from "./EditableText";
 
 const { button } = api.v1.ui.part;
 
-export interface ForgeRelationshipItemProps {
-  entityId: string;      // the entity whose Links section hosts this row
+export interface RelationshipItemProps {
+  entityId: string;
   relationshipId: string;
+  lifecycle: "draft" | "live";
 }
 
-export const ForgeRelationshipItem = defineComponent<ForgeRelationshipItemProps, RootState>({
-  id: (props) => IDS.FORGE.entity(props.entityId).rel(props.relationshipId).ROOT,
+export const RelationshipItem = defineComponent<RelationshipItemProps, RootState>({
+  id: (props) => IDS.entity(props.entityId, props.lifecycle).rel(props.relationshipId).ROOT,
 
   build(props, ctx) {
     const { dispatch } = ctx;
-    const R = IDS.FORGE.entity(props.entityId).rel(props.relationshipId);
+    const R = IDS.entity(props.entityId, props.lifecycle).rel(props.relationshipId);
     const state = ctx.getState();
 
     const rel = state.world.relationships.find((r) => r.id === props.relationshipId);
-    // Determine which side the hosting entity is on
     const isFrom = rel?.fromEntityId === props.entityId;
     const otherEntityId = isFrom ? rel?.toEntityId : rel?.fromEntityId;
     const otherEntity = state.world.entities.find((e) => e.id === otherEntityId);
@@ -63,7 +63,6 @@ export const ForgeRelationshipItem = defineComponent<ForgeRelationshipItemProps,
       const currentOther = ctx.getState().world.entities.find((e) => e.id === currentOtherId);
 
       if (parsed.otherName.toLowerCase() !== currentOther?.name.toLowerCase()) {
-        // Other-side entity changed — retarget while preserving direction from this entity's perspective
         const newOther = ctx.getState().world.entities.find(
           (e) => e.name.toLowerCase() === parsed.otherName.toLowerCase(),
         );

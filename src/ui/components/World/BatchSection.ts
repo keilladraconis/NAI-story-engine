@@ -2,9 +2,9 @@ import { defineComponent } from "nai-act";
 import { RootState, WorldEntity } from "../../../core/store/types";
 import { batchReforgeRequested } from "../../../core/store/slices/world";
 import { IDS, STORAGE_KEYS } from "../../framework/ids";
-import { EntityRow } from "./EntityRow";
+import { EntityCard } from "../EntityCard";
 
-const { column, row, text, button, collapsibleSection } = api.v1.ui.part;
+const { column, row, button, collapsibleSection } = api.v1.ui.part;
 
 export interface BatchSectionProps {
   batchId: string;
@@ -44,18 +44,21 @@ export const BatchSection = defineComponent<BatchSectionProps, RootState>({
 
     const entityList = column({
       id: B.ENTITY_LIST,
-      style: { gap: "4px" },
+      style: { gap: "2px" },
       content: ctx.bindList(
         B.ENTITY_LIST,
         (s) => s.world.entities.filter((e) => e.batchId === props.batchId && e.lifecycle === "live"),
         (e: WorldEntity) => e.id,
-        (e: WorldEntity) => ({ component: EntityRow, props: { entityId: e.id } }),
+        (e: WorldEntity) => ({
+          component: EntityCard,
+          props: { entityId: e.id, lifecycle: "live" as const },
+        }),
       ),
     });
 
     const reforgeBtn = button({
       id: B.REFORGE_BTN,
-      text: "⟲ Reforge",
+      text: "⟲ Reforge All",
       style: this.style?.("reforgeBtn"),
       callback: () => dispatch(batchReforgeRequested({ batchId: props.batchId })),
     });
@@ -70,10 +73,7 @@ export const BatchSection = defineComponent<BatchSectionProps, RootState>({
           content: [
             row({
               style: this.style?.("batchHeader"),
-              content: [
-                text({ text: `**${batchName}**`, markdown: true, style: { flex: "1" } }),
-                reforgeBtn,
-              ],
+              content: [reforgeBtn],
             }),
             entityList,
           ],

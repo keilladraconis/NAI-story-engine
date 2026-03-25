@@ -82,6 +82,27 @@ export const IDS = {
       DELETE_BTN: `se-fn-tension-${id}-del`,
     }),
   },
+  // Entity IDs — qualified by lifecycle so draft/live instances are distinct parts.
+  // This prevents the framework from conflating a live EntityCard with a reforged
+  // (now-draft) one that shares the same entityId.
+  entity: (id: string, lifecycle: "draft" | "live") => ({
+    ROOT: `se-entity-${lifecycle}-${id}`,
+    CAST_BTN: `se-entity-${lifecycle}-${id}-cast`,
+    DISCARD_BTN: `se-entity-${lifecycle}-${id}-discard`,
+    REFORGE_BTN: `se-entity-${lifecycle}-${id}-reforge`,
+    REGEN_BTN: `se-entity-${lifecycle}-${id}-regen`,
+    MOVE_BTN: `se-entity-${lifecycle}-${id}-move`,
+    DELETE_BTN: `se-entity-${lifecycle}-${id}-delete`,
+    LINKS_SECTION: `se-entity-${lifecycle}-${id}-links`,
+    LINKS_LIST: `se-entity-${lifecycle}-${id}-links-list`,
+    ADD_LINK_BTN: `se-entity-${lifecycle}-${id}-add-link`,
+    NEW_LINK_INPUT: `se-entity-${lifecycle}-${id}-new-link-input`,
+    NEW_LINK_KEY: `se-entity-new-link-${lifecycle}-${id}`,
+    rel: (relId: string) => ({
+      ROOT: `se-entity-${lifecycle}-${id}-rel-${relId}`,
+      DELETE_BTN: `se-entity-${lifecycle}-${id}-rel-${relId}-del`,
+    }),
+  }),
   FORGE: {
     SECTION: "se-forge-section",
     INTENT_INPUT: "se-forge-intent",
@@ -94,20 +115,6 @@ export const IDS = {
     DISCARD_ALL_BTN: "se-forge-discard-all",
     CLEAR_BTN: "se-forge-clear-btn",
     CAST_DISCARD_ROW: "se-forge-cast-discard-row",
-    entity: (id: string) => ({
-      ROOT: `se-forge-entity-${id}`,
-      ACTION_BAR: `se-forge-entity-${id}-actions`,
-      DISCARD_BTN: `se-forge-entity-${id}-discard`,
-      LINKS_SECTION: `se-forge-entity-${id}-links`,
-      LINKS_LIST: `se-forge-entity-${id}-links-list`,
-      ADD_LINK_BTN: `se-forge-entity-${id}-add-link`,
-      NEW_LINK_INPUT: `se-forge-entity-${id}-new-link-input`,
-      NEW_LINK_KEY: `se-forge-new-link-${id}`,
-      rel: (relId: string) => ({
-        ROOT: `se-forge-entity-${id}-rel-${relId}`,
-        DELETE_BTN: `se-forge-entity-${id}-rel-${relId}-del`,
-      }),
-    }),
   },
   WORLD: {
     BATCH_LIST: "se-world-batch-list",
@@ -115,13 +122,7 @@ export const IDS = {
       SECTION: `se-world-batch-${id}`,
       ENTITY_LIST: `se-world-batch-${id}-entities`,
       REFORGE_BTN: `se-world-batch-${id}-reforge`,
-    }),
-    entity: (id: string) => ({
-      ROOT: `se-world-entity-${id}`,
-      ACTION_BAR: `se-world-entity-${id}-actions`,
-      REFORGE_BTN: `se-world-entity-${id}-reforge`,
-      REGEN_BTN: `se-world-entity-${id}-regen`,
-      DELETE_BTN: `se-world-entity-${id}-delete`,
+      RENAME_INPUT: `se-world-batch-${id}-rename`,
     }),
   },
   BRAINSTORM: {

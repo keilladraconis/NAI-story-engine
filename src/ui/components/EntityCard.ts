@@ -1,10 +1,29 @@
+/**
+ * EntityCard — Unified entity UI for both draft (Forge) and live (World) entities.
+ *
+ * Displays name + editable summary, outgoing/incoming relationships, and a
+ * category icon. Action buttons are rendered based on entity.lifecycle — no
+ * callback injection through props (which risks staleness under updateParts).
+ *
+ *  draft  → Cast (send) + Discard (trash)
+ *  live   → Reforge (rotate-ccw) + Regen (zap) + Delete (trash)
+ */
+
 import { defineComponent } from "nai-act";
-import { RootState, Relationship } from "../../../core/store/types";
-import { entityDiscardRequested, entityEdited, entitySummaryUpdated, relationshipAdded } from "../../../core/store/slices/world";
-import { FieldID } from "../../../config/field-definitions";
-import { IDS } from "../../framework/ids";
-import { EditableText } from "../EditableText";
-import { ForgeRelationshipItem } from "./ForgeRelationshipItem";
+import { RootState, Relationship } from "../../core/store/types";
+import {
+  entityEdited,
+  entitySummaryUpdated,
+  relationshipAdded,
+  entityCastRequested,
+  entityDiscardRequested,
+  entityDeleted,
+} from "../../core/store/slices/world";
+import { openMoveModal } from "./MoveModal";
+import { FieldID } from "../../config/field-definitions";
+import { IDS } from "../framework/ids";
+import { EditableText } from "./EditableText";
+import { RelationshipItem } from "./RelationshipItem";
 
 const { column, button, collapsibleSection, textInput } = api.v1.ui.part;
 
@@ -17,12 +36,13 @@ const CATEGORY_ICON: Record<string, IconId> = {
   [FieldID.Topics]: "hash",
 };
 
-export interface ForgeEntityRowProps {
+export interface EntityCardProps {
   entityId: string;
+  lifecycle: "draft" | "live";
 }
 
-export const ForgeEntityRow = defineComponent<ForgeEntityRowProps, RootState>({
-  id: (props) => IDS.FORGE.entity(props.entityId).ROOT,
+export const EntityCard = defineComponent<EntityCardProps, RootState>({
+  id: (props) => IDS.entity(props.entityId, props.lifecycle).ROOT,
 
   styles: {
     linksSection: { "margin-top": "2px" },
@@ -30,7 +50,7 @@ export const ForgeEntityRow = defineComponent<ForgeEntityRowProps, RootState>({
 
   build(props, ctx) {
     const { dispatch, useSelector } = ctx;
-    const E = IDS.FORGE.entity(props.entityId);
+    const E = IDS.entity(props.entityId, props.lifecycle);
     const entity = ctx.getState().world.entities.find((e) => e.id === props.entityId);
 
     const name = entity?.name ?? "";
@@ -49,6 +69,14 @@ export const ForgeEntityRow = defineComponent<ForgeEntityRowProps, RootState>({
       return e ? `${e.name}: ${e.summary}` : `${name}: ${summary}`;
     };
 
+    const parseNameSummary = (content: string): { name: string; summary: string } | null => {
+      const sep = content.indexOf(": ");
+      if (sep === -1) return null;
+      const parsedName = content.slice(0, sep).trim();
+      if (!parsedName || parsedName.length > 64) return null;
+      return { name: parsedName, summary: content.slice(sep + 2).trim() };
+    };
+
     const onSave = (content: string) => {
       const parsed = parseNameSummary(content);
       if (parsed) {
@@ -58,18 +86,53 @@ export const ForgeEntityRow = defineComponent<ForgeEntityRowProps, RootState>({
       }
     };
 
-    const parseNameSummary = (content: string): { name: string; summary: string } | null => {
-      const sep = content.indexOf(": ");
-      if (sep === -1) return null;
-      const name = content.slice(0, sep).trim();
-      if (!name || name.length > 64) return null;
-      return { name, summary: content.slice(sep + 2).trim() };
-    };
-
     const formatDisplay = (content: string) => {
       const parsed = parseNameSummary(content);
       return parsed ? parsed.summary : content.trim();
     };
+
+    // Reactively update summary view text when entity content changes in the store
+    const summaryViewId = `${E.ROOT}-summary-view`;
+    useSelector(
+      (s) => {
+        const e = s.world.entities.find((en) => en.id === props.entityId);
+        return e ? formatDisplay(`${e.name}: ${e.summary}`) : "";
+      },
+      (displayText) => {
+        const escaped = displayText.replace(/\n/g, "  \n").replace(/</g, "\\<");
+        api.v1.ui.updateParts([{ id: summaryViewId, text: escaped }]);
+      },
+    );
+
+    // Action buttons are determined by props.lifecycle (fixed at mount time for
+    // this instance) — never by reading state, which could lag behind bindList.
+    const actionButtons: UIPart[] = props.lifecycle === "draft"
+      ? [
+          button({
+            id: E.CAST_BTN,
+            iconId: "send",
+            callback: () => dispatch(entityCastRequested({ entityId: props.entityId })),
+          }),
+          button({
+            id: E.DISCARD_BTN,
+            iconId: "trash",
+            callback: () => dispatch(entityDiscardRequested({ entityId: props.entityId })),
+          }),
+        ]
+      : [
+          button({
+            id: E.MOVE_BTN,
+            iconId: "logout",
+            callback: () => {
+              void openMoveModal(props.entityId, { getState: ctx.getState, dispatch });
+            },
+          }),
+          button({
+            id: E.DELETE_BTN,
+            iconId: "trash",
+            callback: () => dispatch(entityDeleted({ entityId: props.entityId })),
+          }),
+        ];
 
     const { part: summaryEditable } = ctx.render(EditableText, {
       id: `${E.ROOT}-summary`,
@@ -78,16 +141,10 @@ export const ForgeEntityRow = defineComponent<ForgeEntityRowProps, RootState>({
       formatDisplay,
       initialDisplay: summary,
       placeholder: "Name: Summary…",
-      extraControls: [
-        button({
-          id: E.DISCARD_BTN,
-          iconId: "trash",
-          callback: () => dispatch(entityDiscardRequested({ entityId: props.entityId })),
-        }),
-      ],
+      extraControls: actionButtons,
     });
 
-    // ── Outgoing links ──────────────────────────────────────────────────────
+    // ── Outgoing/incoming links ──────────────────────────────────────────────
 
     const linksList = column({
       id: E.LINKS_LIST,
@@ -97,8 +154,8 @@ export const ForgeEntityRow = defineComponent<ForgeEntityRowProps, RootState>({
         (s) => s.world.relationships.filter((r) => r.fromEntityId === props.entityId || r.toEntityId === props.entityId),
         (r: Relationship) => r.id,
         (r: Relationship) => ({
-          component: ForgeRelationshipItem,
-          props: { entityId: props.entityId, relationshipId: r.id },
+          component: RelationshipItem,
+          props: { entityId: props.entityId, relationshipId: r.id, lifecycle: props.lifecycle },
         }),
       ),
     });
@@ -143,7 +200,6 @@ export const ForgeEntityRow = defineComponent<ForgeEntityRowProps, RootState>({
               } satisfies Relationship,
             }));
           }
-          // Always clear and hide — silent rejection on bad format or unknown entity
           await api.v1.storyStorage.remove(E.NEW_LINK_KEY);
           api.v1.ui.updateParts([
             { id: E.NEW_LINK_INPUT, style: { display: "none", width: "100%", "font-size": "0.85em" } },
@@ -174,7 +230,6 @@ export const ForgeEntityRow = defineComponent<ForgeEntityRowProps, RootState>({
       initialCollapsed: false,
       content: [
         column({
-          id: E.ACTION_BAR,
           style: { gap: "6px" },
           content: [summaryEditable, linksSection],
         }),

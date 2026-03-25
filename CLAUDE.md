@@ -90,6 +90,8 @@ npm run test       # vitest run
 
 - **`useSelector` accepts an optional `equals` function** for custom comparison (e.g., array equality). Use it when the selector returns a new object/array reference on every call but you only want to fire on value changes.
 
+- **Component root IDs must be unique per context, not just per entity.** The framework identifies component instances by their root ID. If the same logical entity can appear in two different contexts (e.g., draft in ForgeSection, live in BatchSection), each context must produce a distinct root ID — e.g., `se-entity-draft-${id}` vs `se-entity-live-${id}`. Reusing the same ID across contexts causes the framework to treat a context switch as an in-place update, silently retaining stale callbacks from the previous context. The `IDS.entity(id, lifecycle)` factory enforces this: `lifecycle` is a required argument with no default so TypeScript will catch any omission.
+
 ## Key Constraints
 
 - **No DOM:** Runs in QuickJS web worker. No `setTimeout` (use `api.v1.timers`), no `console.log` (use `api.v1.log()`).

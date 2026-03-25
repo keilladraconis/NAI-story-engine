@@ -7,7 +7,7 @@ import {
 } from "../../../core/store/slices/world";
 import { IDS, STORAGE_KEYS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
-import { ForgeEntityRow } from "./ForgeEntityRow";
+import { EntityCard } from "../EntityCard";
 
 const { column, row, text, button, collapsibleSection, multilineTextInput, textInput } = api.v1.ui.part;
 
@@ -40,9 +40,6 @@ export const ForgeSection = defineComponent<undefined, RootState>({
     });
 
     // ── Forge button ───────────────────────────────────────────────────────
-    // stateProjection surfaces the active forge request ID so GenerationButton
-    // can show its cancel control. When looping between steps (no active request),
-    // isDisabledFromProjection keeps the button disabled without a cancel.
     const { part: forgeBtnPart } = ctx.render(GenerationButton, {
       id: FG.FORGE_BTN,
       label: "Forge",
@@ -82,7 +79,10 @@ export const ForgeSection = defineComponent<undefined, RootState>({
         FG.ENTITY_LIST,
         (s) => s.world.entities.filter((e) => e.lifecycle === "draft"),
         (e: WorldEntity) => e.id,
-        (e: WorldEntity) => ({ component: ForgeEntityRow, props: { entityId: e.id } }),
+        (e: WorldEntity) => ({
+          component: EntityCard,
+          props: { entityId: e.id, lifecycle: "draft" as const },
+        }),
       ),
     });
 
@@ -102,7 +102,7 @@ export const ForgeSection = defineComponent<undefined, RootState>({
       content: [
         button({
           id: FG.CAST_ALL_BTN,
-          text: "⚡ Cast All",
+          text: "→ Cast All",
           style: this.style?.("actionBtn"),
           callback: () => dispatch(castAllRequested()),
         }),

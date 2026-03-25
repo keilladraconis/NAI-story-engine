@@ -134,6 +134,15 @@ export const worldSlice = createSlice({
     batchReforgeRequested: (state, _payload: { batchId: string }) => state,
 
     // Immediate state reducers (Phase 2 adds lorebook-side effects for these)
+    entityCastRequested: (state, _payload: { entityId: string }) => state,
+
+    entityMoved: (state, payload: { entityId: string; targetBatchId: string }) => ({
+      ...state,
+      entities: state.entities.map((e) =>
+        e.id === payload.entityId ? { ...e, batchId: payload.targetBatchId } : e,
+      ),
+    }),
+
     entityDiscardRequested: (state, payload: { entityId: string }) => ({
       ...state,
       entities: state.entities.filter((e) => e.id !== payload.entityId),
@@ -174,6 +183,8 @@ export const {
   entityRegenRequested,
   entityReforgeRequested,
   batchReforgeRequested,
+  entityMoved,
+  entityCastRequested,
   entityDiscardRequested,
   discardAllRequested,
 } = worldSlice.actions;

@@ -24,6 +24,7 @@ import {
   forgeCastCompleted,
   batchCreated,
   entityCast,
+  entityCastRequested,
   batchReforged,
   entityReforged,
   entityReforgeRequested,
@@ -55,11 +56,29 @@ export function registerForgeEffects(
       return;
     }
 
-    const batchNameRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_BATCH_NAME_UI);
-    const batchName = String(batchNameRaw || "").trim() || "Draft";
+    // Auto-default: "Main" for the very first forge; first 4 intent words for subsequent
+    const noBatches = getState().world.batches.length === 0;
+    const intentWords = forgeIntent.trim().split(/\s+/).slice(0, 4).join(" ");
+    const defaultName = noBatches ? "Main" : (intentWords || "New Batch");
 
-    const batchId = api.v1.uuid();
-    dispatch(batchCreated({ batch: { id: batchId, name: batchName, entityIds: [] } }));
+    const batchNameRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_BATCH_NAME_UI);
+    const batchName = String(batchNameRaw || "").trim() || defaultName;
+
+    // Merge-on-match: if a batch with this name already exists, forge into it
+    const existingBatch = getState().world.batches.find(
+      (b) => b.name.toLowerCase() === batchName.toLowerCase(),
+    );
+    const batchId = existingBatch?.id ?? api.v1.uuid();
+    if (!existingBatch) {
+      dispatch(batchCreated({ batch: { id: batchId, name: batchName, entityIds: [] } }));
+    }
+
+    // Pre-populate the batch name input so the user sees the auto-derived name
+    if (!String(batchNameRaw || "").trim()) {
+      await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_BATCH_NAME_UI, batchName);
+      api.v1.ui.updateParts([{ id: IDS.FORGE.BATCH_NAME, value: batchName }]);
+    }
+
     dispatch(forgeLoopStarted());
 
     const strategy = buildForgeStrategy(getState, batchId, 1, forgeIntent, brainstormContext);
@@ -169,6 +188,31 @@ export function registerForgeEffects(
       await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_BATCH_NAME_UI, batch.name);
       api.v1.ui.updateParts([{ id: IDS.FORGE.BATCH_NAME, value: batch.name }]);
     }
+  });
+
+  // ─── Entity Cast Requested → Cast a single draft entity to lorebook ─────────
+
+  subscribeEffect(matchesAction(entityCastRequested), async (action) => {
+    const { entityId } = action.payload;
+    const state = getState();
+    const entity = state.world.entities.find((e) => e.id === entityId);
+
+    if (!entity || entity.lifecycle !== "draft") {
+      api.v1.ui.toast("Entity is not a draft", { type: "info" });
+      return;
+    }
+
+    await ensureCategory(entity.categoryId);
+
+    const lorebookEntryId = await api.v1.lorebook.createEntry({
+      id: api.v1.uuid(),
+      displayName: entity.name,
+      text: entity.summary ? `${entity.name}: ${entity.summary}` : entity.name,
+      keys: [],
+      enabled: true,
+    });
+    dispatch(entityCast({ entityId: entity.id, lorebookEntryId }));
+    api.v1.ui.toast(`${entity.name} cast`, { type: "success" });
   });
 
   // ─── Entity Reforge Requested → Set entity to draft, pre-fill batch name ──
