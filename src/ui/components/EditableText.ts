@@ -41,6 +41,8 @@ export interface EditableTextProps {
   initialDisplay?: string;
   /** Optional formatter applied to content before displaying in view mode (e.g. emoji tags). */
   formatDisplay?: (content: string) => string;
+  /** If provided, EditableText subscribes to this selector and keeps the view text live. */
+  liveSelector?: (s: RootState) => string;
   /** Use single-line textInput in a compact row layout. Default: false (multiline). */
   singleLine?: boolean;
 }
@@ -126,7 +128,7 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
 
   build(props, ctx) {
     const { dispatch, useSelector } = ctx;
-    const { id, getContent, placeholder, onSave, extraControls, label, initialDisplay, formatDisplay, singleLine } = props;
+    const { id, getContent, placeholder, onSave, extraControls, label, initialDisplay, formatDisplay, liveSelector, singleLine } = props;
 
     // Prefer getContent() over initialDisplay when formatDisplay is provided —
     // this ensures a freshly-built component always shows current state rather
@@ -144,6 +146,16 @@ export const EditableText = defineComponent<EditableTextProps, RootState>({
     const editId = `${id}-edit`;
     const editBtnId = `${id}-edit-btn`;
     const saveBtnId = `${id}-save-btn`;
+
+    if (liveSelector) {
+      useSelector(liveSelector, (content) => {
+        const formatted = formatDisplay ? formatDisplay(content) : content;
+        const escaped = singleLine
+          ? formatted
+          : formatted.replace(/\n/g, "  \n").replace(/</g, "\\<");
+        api.v1.ui.updateParts([{ id: viewId, text: escaped }]);
+      });
+    }
 
     // Save implementation — reads from shared draft, updates view, calls onSave
     const saveImpl = async (): Promise<void> => {

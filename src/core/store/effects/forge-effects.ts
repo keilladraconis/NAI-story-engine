@@ -64,14 +64,12 @@ export function registerForgeEffects(
     const batchNameRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_BATCH_NAME_UI);
     const batchName = String(batchNameRaw || "").trim() || defaultName;
 
-    // Merge-on-match: if a batch with this name already exists, forge into it
+    // Merge-on-match: if a live batch with this name already exists, forge into it.
+    // Otherwise generate a new ID — the batch record is created at Cast time.
     const existingBatch = getState().world.batches.find(
       (b) => b.name.toLowerCase() === batchName.toLowerCase(),
     );
     const batchId = existingBatch?.id ?? api.v1.uuid();
-    if (!existingBatch) {
-      dispatch(batchCreated({ batch: { id: batchId, name: batchName, entityIds: [] } }));
-    }
 
     // Pre-populate the batch name input so the user sees the auto-derived name
     if (!String(batchNameRaw || "").trim()) {
@@ -102,8 +100,7 @@ export function registerForgeEffects(
 
   subscribeEffect(matchesAction(forgeStepCompleted), ({ payload }) => {
     const state = getState();
-    const batchExists = state.world.batches.some((b) => b.id === payload.batchId);
-    if (!batchExists || !state.world.forgeLoopActive) {
+    if (!state.world.forgeLoopActive) {
       dispatch(forgeLoopEnded());
       return;
     }
@@ -138,6 +135,16 @@ export function registerForgeEffects(
     if (draftEntities.length === 0) {
       api.v1.ui.toast("No draft entities to cast", { type: "info" });
       return;
+    }
+
+    // Create any batch records that were deferred from forge time
+    const batchNameRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_BATCH_NAME_UI);
+    const batchName = String(batchNameRaw || "").trim() || "Main";
+    const pendingBatchIds = [...new Set(draftEntities.map((e) => e.batchId))];
+    for (const batchId of pendingBatchIds) {
+      if (!state.world.batches.some((b) => b.id === batchId)) {
+        dispatch(batchCreated({ batch: { id: batchId, name: batchName, entityIds: [] } }));
+      }
     }
 
     // Pre-create lorebook categories for all entity types (avoid races)

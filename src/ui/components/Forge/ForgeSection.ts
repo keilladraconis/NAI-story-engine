@@ -2,11 +2,13 @@ import { defineComponent } from "nai-act";
 import { RootState, WorldEntity } from "../../../core/store/types";
 import {
   forgeRequested,
+  forgeClearRequested,
   castAllRequested,
   discardAllRequested,
 } from "../../../core/store/slices/world";
 import { IDS, STORAGE_KEYS } from "../../framework/ids";
 import { GenerationButton } from "../GenerationButton";
+import { ButtonWithConfirmation } from "../ButtonWithConfirmation";
 import { EntityCard } from "../EntityCard";
 
 const { column, row, text, button, collapsibleSection, multilineTextInput, textInput } = api.v1.ui.part;
@@ -30,10 +32,19 @@ export const ForgeSection = defineComponent<undefined, RootState>({
     const state = ctx.getState();
     const hasDraftEntities = state.world.entities.some((e) => e.lifecycle === "draft");
 
+    // ── Clear Forge (tucked upper-right) ───────────────────────────────────
+    const { part: clearBtnPart } = ctx.render(ButtonWithConfirmation, {
+      id: FG.CLEAR_BTN,
+      label: "Clear",
+      confirmLabel: "Clear forge?",
+      buttonStyle: { "font-size": "0.75em", opacity: "0.5", padding: "2px 8px" },
+      onConfirm: () => dispatch(forgeClearRequested()),
+    });
+
     // ── Forge intent ───────────────────────────────────────────────────────
     const intentInput = multilineTextInput({
       id: FG.INTENT_INPUT,
-      placeholder: "What should I forge next? Leave blank to forge from Brainstorm...",
+      placeholder: "What should the Forge build? Leave blank to draw from your Brainstorm conversation.",
       initialValue: "",
       storageKey: `story:${STORAGE_KEYS.FORGE_INTENT_UI}`,
       style: this.style?.("intentInput"),
@@ -65,7 +76,7 @@ export const ForgeSection = defineComponent<undefined, RootState>({
     // ── Batch name ─────────────────────────────────────────────────────────
     const batchNameInput = textInput({
       id: FG.BATCH_NAME,
-      placeholder: "Batch name (auto-generated)...",
+      placeholder: "Batch name (auto-named from intent)...",
       initialValue: "",
       storageKey: `story:${STORAGE_KEYS.FORGE_BATCH_NAME_UI}`,
       style: this.style?.("batchNameInput"),
@@ -123,6 +134,7 @@ export const ForgeSection = defineComponent<undefined, RootState>({
         column({
           style: { gap: "6px" },
           content: [
+            row({ style: { "justify-content": "flex-end" }, content: [clearBtnPart] }),
             intentInput,
             forgeBtnPart,
             ticker,

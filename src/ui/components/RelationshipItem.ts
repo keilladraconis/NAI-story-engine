@@ -87,6 +87,13 @@ export const RelationshipItem = defineComponent<RelationshipItemProps, RootState
       onSave,
       initialDisplay,
       placeholder: "OtherEntity: relationship description…",
+      liveSelector: (s) => {
+        const r = s.world.relationships.find((r) => r.id === props.relationshipId);
+        if (!r) return "";
+        const otherId = r.fromEntityId === props.entityId ? r.toEntityId : r.fromEntityId;
+        const other = s.world.entities.find((e) => e.id === otherId);
+        return other ? `${other.name}: ${r.description}` : r.description;
+      },
       extraControls: [
         button({
           id: R.DELETE_BTN,

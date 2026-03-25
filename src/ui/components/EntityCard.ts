@@ -15,7 +15,7 @@ import {
   entityEdited,
   entitySummaryUpdated,
   relationshipAdded,
-  entityCastRequested,
+  relationshipUpdated,
   entityDiscardRequested,
   entityDeleted,
 } from "../../core/store/slices/world";
@@ -80,7 +80,27 @@ export const EntityCard = defineComponent<EntityCardProps, RootState>({
     const onSave = (content: string) => {
       const parsed = parseNameSummary(content);
       if (parsed) {
+        const oldName = ctx.getState().world.entities.find((e) => e.id === props.entityId)?.name ?? "";
         dispatch(entityEdited({ entityId: props.entityId, name: parsed.name, summary: parsed.summary }));
+
+        // Propagate rename across all entity summaries and relationship descriptions
+        if (oldName && oldName !== parsed.name) {
+          const pattern = new RegExp(oldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+          const state = ctx.getState();
+          for (const entity of state.world.entities) {
+            if (entity.id === props.entityId) continue;
+            const updated = entity.summary.replace(pattern, parsed.name);
+            if (updated !== entity.summary) {
+              dispatch(entitySummaryUpdated({ entityId: entity.id, summary: updated }));
+            }
+          }
+          for (const rel of state.world.relationships) {
+            const updated = rel.description.replace(pattern, parsed.name);
+            if (updated !== rel.description) {
+              dispatch(relationshipUpdated({ relationshipId: rel.id, description: updated }));
+            }
+          }
+        }
       } else {
         dispatch(entitySummaryUpdated({ entityId: props.entityId, summary: content.trim() }));
       }
@@ -91,28 +111,10 @@ export const EntityCard = defineComponent<EntityCardProps, RootState>({
       return parsed ? parsed.summary : content.trim();
     };
 
-    // Reactively update summary view text when entity content changes in the store
-    const summaryViewId = `${E.ROOT}-summary-view`;
-    useSelector(
-      (s) => {
-        const e = s.world.entities.find((en) => en.id === props.entityId);
-        return e ? formatDisplay(`${e.name}: ${e.summary}`) : "";
-      },
-      (displayText) => {
-        const escaped = displayText.replace(/\n/g, "  \n").replace(/</g, "\\<");
-        api.v1.ui.updateParts([{ id: summaryViewId, text: escaped }]);
-      },
-    );
-
     // Action buttons are determined by props.lifecycle (fixed at mount time for
     // this instance) — never by reading state, which could lag behind bindList.
     const actionButtons: UIPart[] = props.lifecycle === "draft"
       ? [
-          button({
-            id: E.CAST_BTN,
-            iconId: "send",
-            callback: () => dispatch(entityCastRequested({ entityId: props.entityId })),
-          }),
           button({
             id: E.DISCARD_BTN,
             iconId: "trash",
@@ -142,6 +144,10 @@ export const EntityCard = defineComponent<EntityCardProps, RootState>({
       initialDisplay: summary,
       placeholder: "Name: Summary…",
       extraControls: actionButtons,
+      liveSelector: (s) => {
+        const e = s.world.entities.find((en) => en.id === props.entityId);
+        return e ? `${e.name}: ${e.summary}` : "";
+      },
     });
 
     // ── Outgoing/incoming links ──────────────────────────────────────────────

@@ -54,7 +54,7 @@ export const Input = defineComponent<{}, RootState>({
       content: [
         multilineTextInput({
           id: ids.INPUT,
-          placeholder: "Type an idea...",
+          placeholder: "Explore ideas here — then switch to Story Engine to Forge.",
           storageKey: `story:${STORAGE_KEYS.brainstormInputUI(ids.INPUT)}`,
           style: { "min-height": "60px", "max-height": "120px" },
           onSubmit: submit,
