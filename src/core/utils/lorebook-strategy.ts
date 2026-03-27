@@ -113,10 +113,15 @@ export const createLorebookContentFactory = (
       ? String((await api.v1.config.get(templateKey)) || "")
       : "";
 
-    // Item's short description from DULFS (for backward compat with old DULFS items)
-    const itemContent = String(
+    // Resolve entity early so its summary is available as item description fallback
+    const state = getState();
+    const entity = findEntityForEntry(state, entryId);
+
+    // Item's short description: DULFS storage (backward compat) or entity summary (v11)
+    const dulfsContent = String(
       (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(entryId))) || "",
     );
+    const itemContent = dulfsContent || entity?.summary || "";
 
     // Anchored assistant prefill
     const entryType = getEntryType(categoryName);
@@ -147,7 +152,6 @@ Setting: ${setting}
     }
 
     // v11 world context: live entities grouped by category
-    const state = getState();
     const worldContext = formatLiveWorldEntitiesContext(state);
     if (worldContext) {
       messages.push({
@@ -157,7 +161,6 @@ Setting: ${setting}
     }
 
     // Entity-specific relationships from v11 world slice
-    const entity = findEntityForEntry(state, entryId);
     const relContext = entity ? formatEntityRelationships(state, entity.id) : "";
     if (relContext) {
       messages.push({

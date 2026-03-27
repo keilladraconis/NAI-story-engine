@@ -5,8 +5,8 @@
  * category icon. Action buttons are rendered based on entity.lifecycle — no
  * callback injection through props (which risks staleness under updateParts).
  *
- *  draft  → Cast (send) + Discard (trash)
- *  live   → Reforge (rotate-ccw) + Regen (zap) + Delete (trash)
+ *  draft  → Discard (trash)
+ *  live   → Reforge (rotate-ccw) + Regen (zap) + Move (logout) + Delete (trash)
  */
 
 import { defineComponent } from "nai-act";
@@ -18,12 +18,15 @@ import {
   relationshipUpdated,
   entityDiscardRequested,
   entityDeleted,
+  entityReforgeRequested,
+  entityRegenRequested,
 } from "../../core/store/slices/world";
 import { openMoveModal } from "./MoveModal";
 import { FieldID } from "../../config/field-definitions";
 import { IDS } from "../framework/ids";
 import { EditableText } from "./EditableText";
 import { RelationshipItem } from "./RelationshipItem";
+import { GenerationIconButton } from "./GenerationButton";
 
 const { column, button, collapsibleSection, textInput } = api.v1.ui.part;
 
@@ -113,28 +116,54 @@ export const EntityCard = defineComponent<EntityCardProps, RootState>({
 
     // Action buttons are determined by props.lifecycle (fixed at mount time for
     // this instance) — never by reading state, which could lag behind bindList.
-    const actionButtons: UIPart[] = props.lifecycle === "draft"
-      ? [
-          button({
-            id: E.DISCARD_BTN,
-            iconId: "trash",
-            callback: () => dispatch(entityDiscardRequested({ entityId: props.entityId })),
-          }),
-        ]
-      : [
-          button({
-            id: E.MOVE_BTN,
-            iconId: "logout",
-            callback: () => {
-              void openMoveModal(props.entityId, { getState: ctx.getState, dispatch });
-            },
-          }),
-          button({
-            id: E.DELETE_BTN,
-            iconId: "trash",
-            callback: () => dispatch(entityDeleted({ entityId: props.entityId })),
-          }),
-        ];
+    let actionButtons: UIPart[];
+    if (props.lifecycle === "draft") {
+      actionButtons = [
+        button({
+          id: E.DISCARD_BTN,
+          iconId: "trash",
+          callback: () => dispatch(entityDiscardRequested({ entityId: props.entityId })),
+        }),
+      ];
+    } else {
+      const lorebookEntryId = entity?.lorebookEntryId ?? "";
+      const contentRequestId = `lb-entity-${props.entityId}-content`;
+      const keysRequestId = `lb-entity-${props.entityId}-keys`;
+
+      const { part: regenBtn } = ctx.render(GenerationIconButton, {
+        id: E.REGEN_BTN,
+        iconId: "zap",
+        requestIds: [contentRequestId, keysRequestId],
+        onGenerate: () => dispatch(entityRegenRequested({ entityId: props.entityId })),
+        contentChecker: lorebookEntryId
+          ? async () => {
+              const entry = await api.v1.lorebook.entry(lorebookEntryId);
+              return !!(entry?.text?.trim());
+            }
+          : undefined,
+      });
+
+      actionButtons = [
+        button({
+          id: E.REFORGE_BTN,
+          iconId: "rotate-ccw",
+          callback: () => dispatch(entityReforgeRequested({ entityId: props.entityId })),
+        }),
+        regenBtn,
+        button({
+          id: E.MOVE_BTN,
+          iconId: "logout",
+          callback: () => {
+            void openMoveModal(props.entityId, { getState: ctx.getState, dispatch });
+          },
+        }),
+        button({
+          id: E.DELETE_BTN,
+          iconId: "trash",
+          callback: () => dispatch(entityDeleted({ entityId: props.entityId })),
+        }),
+      ];
+    }
 
     const { part: summaryEditable } = ctx.render(EditableText, {
       id: `${E.ROOT}-summary`,

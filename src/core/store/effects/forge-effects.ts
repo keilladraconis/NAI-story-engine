@@ -28,11 +28,16 @@ import {
   batchReforged,
   entityReforged,
   entityReforgeRequested,
+  entityRegenRequested,
   batchReforgeRequested,
   generationSubmitted,
   requestQueued,
 } from "../index";
 import { buildForgeStrategy, FORGE_MAX_STEPS } from "../../utils/forge-strategy";
+import {
+  createLorebookContentFactory,
+  buildLorebookKeysPayload,
+} from "../../utils/lorebook-strategy";
 import { ensureCategory } from "./lorebook-sync";
 import { getConsolidatedBrainstorm } from "../../utils/context-builder";
 import { IDS, STORAGE_KEYS } from "../../../ui/framework/ids";
@@ -243,5 +248,36 @@ export function registerForgeEffects(
         api.v1.ui.updateParts([{ id: IDS.FORGE.BATCH_NAME, value: batch.name }]);
       }
     }
+  });
+
+  // ─── Entity Regen Requested → Queue content + keys generation for one entity ─
+
+  subscribeEffect(matchesAction(entityRegenRequested), async (action) => {
+    const { entityId } = action.payload;
+    const entity = getState().world.entities.find((e) => e.id === entityId);
+
+    if (!entity?.lorebookEntryId) {
+      api.v1.log(`[effects] entityRegenRequested: entity ${entityId} has no lorebook entry`);
+      return;
+    }
+
+    const { lorebookEntryId } = entity;
+    const contentRequestId = `lb-entity-${entityId}-content`;
+    const keysRequestId = `lb-entity-${entityId}-keys`;
+
+    // Content generation uses entity.summary (via createLorebookContentFactory) as the
+    // item description, so the EntityCard summary is preserved as the source of truth
+    // for the generated rich lorebook text. entity.summary in Redux is never touched.
+    const contentFactory = createLorebookContentFactory(getState, lorebookEntryId);
+    dispatch(generationSubmitted({
+      requestId: contentRequestId,
+      messageFactory: contentFactory,
+      params: { model: "glm-4-6", max_tokens: 1024 },
+      target: { type: "lorebookContent", entryId: lorebookEntryId },
+      prefillBehavior: "trim",
+    }));
+
+    const keysPayload = await buildLorebookKeysPayload(getState, lorebookEntryId, keysRequestId);
+    dispatch(generationSubmitted(keysPayload));
   });
 }

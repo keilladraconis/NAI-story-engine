@@ -181,15 +181,17 @@ This is the reorganization mechanism. Reforge entities, rename the batch, Cast i
 Entity rows are one line by default: name + short summary (engine-derived, read-only). Tapping a row expands a compact action bar underneath:
 
 ```
-│  Kael — exile prince, blade-sworn        │
-│  ┊  [⟲ Reforge] [⚡ Regen] [✕ Delete]    │
-│  Elena — spymaster, Kael's sister        │
-│  The Warden — immortal jailer            │
+│  Kael — exile prince, blade-sworn                    │
+│  ┊  [⟲ Reforge] [⚡ Regen] [↪ Move] [✕ Delete]      │
+│  Elena — spymaster, Kael's sister                    │
+│  The Warden — immortal jailer                        │
 ```
 
 One tap to expand, one tap to act, collapses when another row is tapped. No navigation to the lorebook required for lifecycle actions — critical for mobile where the Lorebook Extension is many taps away.
 
-The Lorebook Extension remains the surface for *deeper* per-entry work (relationships, refinement instructions, content preview, Bind/Unbind). But quick actions (Reforge, Regen, Delete) are accessible directly in the Story Engine panel.
+The Lorebook Extension remains the surface for *deeper* per-entry work (relationships, refinement instructions, content preview, Bind/Unbind). But quick actions (Reforge, Regen, Move, Delete) are accessible directly in the Story Engine panel.
+
+**Move** opens a modal to reassign the entity to a different batch directly — cleaner than the Reforge+rename+Cast flow for simple reorganization. Both paths work: Move for quick reassignment, Reforge when you want to regenerate in the context of a different batch.
 
 **5. Forge is intent-driven, not category-driven.**
 
@@ -317,10 +319,9 @@ Bound entries go directly to Live in an "Imported" batch. The engine doesn't inf
 ### Entity Reorganization
 
 1. User wants to move Lord Ashven from "Imported" to "Gilt Court's Inner Circle"
-2. Taps Lord Ashven in the "Imported" batch — action bar expands: `[⟲ Reforge] [⚡ Regen] [✕ Delete]`
-3. Clicks `[⟲ Reforge]` — Lord Ashven lifts into the Forge
-4. Renames batch to "Gilt Court's Inner Circle"
-5. Clicks `[⚡ Cast All]` — entity merges into the existing batch
+2. Taps Lord Ashven in the "Imported" batch — action bar expands: `[⟲ Reforge] [⚡ Regen] [↪ Move] [✕ Delete]`
+3. Clicks `[↪ Move]` — modal opens listing available batches
+4. Selects "Gilt Court's Inner Circle" — entity moves immediately, no regeneration needed
 
 ### Existing Story Adoption
 
