@@ -17,7 +17,11 @@
     "typeRoots": ["./external", "./node_modules/@types", "./node_modules"],
     "rewriteRelativeImportExtensions": true,
     "noImplicitAny": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "nai-simple-ui": ["./vendor/nai-simple-ui/src/index.ts"],
+      "nai-simple-ui/*": ["./vendor/nai-simple-ui/src/*"]
+    }
   },
   "include": ["src/**/*", "external/**/*", "lib/*", "tests/**/*"],
   "exclude": ["node_modules", "dist"]
