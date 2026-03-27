@@ -26,11 +26,11 @@ import { IDS, STORAGE_KEYS } from "../ui/framework/ids";
 
 // Phase 2: SUI brainstorm components
 import { BrainstormPane } from "./components/BrainstormPane";
+// Phase 3: SUI forge + foundation components
+import { ForgePane } from "./components/ForgePane";
 
 // nai-act components (unchanged — replaced panel by panel)
 import { Header } from "../ui/components/Sidebar/Header";
-import { NarrativeFoundation } from "../ui/components/Foundation/NarrativeFoundation";
-import { ForgeSection } from "../ui/components/Forge/ForgeSection";
 import { WorldBatchList } from "../ui/components/World/WorldBatchList";
 import { LorebookPanelContent } from "../ui/components/Lorebook/LorebookPanelContent";
 import { openBindModal } from "../ui/components/Bind/BindModal";
@@ -44,6 +44,7 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
 export class StoryEnginePlugin extends SuiPlugin {
   private _genX?: GenX;
   private _brainstormPane?: BrainstormPane;
+  private _forgePane?: ForgePane;
 
   protected requestPermissions(): void {
     api.v1.permissions.request(["storyEdit", "lorebookEdit", "documentEdit"]);
@@ -95,9 +96,10 @@ export class StoryEnginePlugin extends SuiPlugin {
     });
     const brainstormContent = await this._brainstormPane.build();
 
+    this._forgePane = new ForgePane({ id: "se-forge-pane" });
+    const forgePanePart = await this._forgePane.build();
+
     const { part: headerPart } = mount(Header, {}, store);
-    const { part: foundationPart } = mount(NarrativeFoundation, undefined, store);
-    const { part: forgePart } = mount(ForgeSection, undefined, store);
     const { part: batchListPart } = mount(WorldBatchList, undefined, store);
     const { part: lorebookPart } = mount(LorebookPanelContent, undefined, store);
 
@@ -117,8 +119,7 @@ export class StoryEnginePlugin extends SuiPlugin {
           style: { gap: "8px" },
           content: [
             headerPart,
-            foundationPart,
-            forgePart,
+            forgePanePart,
             batchListPart,
             row({
               id: "se-footer",
