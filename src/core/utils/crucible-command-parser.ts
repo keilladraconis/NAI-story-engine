@@ -114,7 +114,9 @@ export function parseCommands(text: string): ParsedCommand[] {
     }
 
     // [REVISE "Name"] or [REVISE TYPE "Name"]
-    const reviseMatch = line.match(/^\[REVISE\s+(?:[A-Z]+\s+)?"([^"]+)"\]/);
+    // Also accepts [DESCRIPTION "Name"] as an alias — GLM sometimes emits this
+    // when asked to update a character description.
+    const reviseMatch = line.match(/^\[(?:REVISE|DESCRIPTION)\s+(?:[A-Z]+\s+)?"([^"]+)"\]/);
     if (reviseMatch) {
       const name = reviseMatch[1].trim();
       const inline = line.slice(reviseMatch[0].length).trim();
@@ -188,7 +190,7 @@ function countContentLines(lines: string[], startIdx: number): number {
 
 /** Check if a line starts a new command. */
 function isCommandLine(line: string): boolean {
-  return /^\[(CREATE|REVISE|LINK|DELETE|CRITIQUE|DONE)\b/.test(line);
+  return /^\[(CREATE|REVISE|DESCRIPTION|LINK|DELETE|CRITIQUE|DONE)\b/.test(line);
 }
 
 // --- Executor ---

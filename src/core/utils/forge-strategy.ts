@@ -249,14 +249,16 @@ Each response emits exactly ONE command. Do not emit multiple commands.
 
 Command vocabulary:
   [CREATE <TYPE> "<Name>"]       — new world element (CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC)
-  [REVISE "<Name>"]              — update an existing draft element
+  [REVISE "<Name>"]              — rewrite the description text of an existing draft element
   [LINK "<Name>" → "<Name>"]     — relationship between two elements
   [DELETE "<Name>"]              — remove a draft element
   [CRITIQUE]                     — self-assessment; ends this forge pass
 
-After CREATE or REVISE, write a brief description (1–3 sentences) on the following lines.
+After CREATE or REVISE, write the description text (1–3 sentences) on the following lines.
 After LINK, write the relationship description on the following line.
 After [CRITIQUE], write 2–4 sentences: what works, what is missing, what to address next.
+
+There is no [DESCRIPTION] command. To update a character's description, use [REVISE "<Name>"].
 
 The ESTABLISHED WORLD section lists what already exists — do not recreate those elements.
 The prior command sequence shows what has been built this pass — continue it naturally.
