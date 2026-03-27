@@ -24,10 +24,10 @@ import {
 import { stateUpdated, requestActivated } from "../core/store/slices/runtime";
 import { IDS, STORAGE_KEYS } from "../ui/framework/ids";
 
-// nai-act components (unchanged)
-import { BrainstormHeader } from "../ui/components/brainstorm/BrainstormHeader";
-import { List } from "../ui/components/brainstorm/List";
-import { Input } from "../ui/components/brainstorm/Input";
+// Phase 2: SUI brainstorm components
+import { BrainstormPane } from "./components/BrainstormPane";
+
+// nai-act components (unchanged — replaced panel by panel)
 import { Header } from "../ui/components/Sidebar/Header";
 import { NarrativeFoundation } from "../ui/components/Foundation/NarrativeFoundation";
 import { ForgeSection } from "../ui/components/Forge/ForgeSection";
@@ -43,6 +43,7 @@ const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
 
 export class StoryEnginePlugin extends SuiPlugin {
   private _genX?: GenX;
+  private _brainstormPane?: BrainstormPane;
 
   protected requestPermissions(): void {
     api.v1.permissions.request(["storyEdit", "lorebookEdit", "documentEdit"]);
@@ -78,10 +79,22 @@ export class StoryEnginePlugin extends SuiPlugin {
    * compose() — Phase 0: mount nai-act components and register raw UIExtension panels.
    * Will be replaced panel-by-panel in later phases.
    */
+  private async _rebuildBrainstorm(): Promise<void> {
+    if (!this._brainstormPane) return;
+    const newContent = await this._brainstormPane.build();
+    await api.v1.ui.update([
+      { type: "sidebarPanel", id: "kse-brainstorm-sidebar", content: [newContent] } as unknown as Partial<UIExtension> & { id: string },
+    ]);
+  }
+
   protected async compose(): Promise<void> {
-    const { part: brainstormHeaderPart } = mount(BrainstormHeader, undefined, store);
-    const { part: listPart } = mount(List, undefined, store);
-    const { part: inputPart } = mount(Input, {}, store);
+    // Phase 2: Brainstorm panel — fully SUI
+    this._brainstormPane = new BrainstormPane({
+      id:        IDS.BRAINSTORM.ROOT,
+      onRebuild: () => { void this._rebuildBrainstorm(); },
+    });
+    const brainstormContent = await this._brainstormPane.build();
+
     const { part: headerPart } = mount(Header, {}, store);
     const { part: foundationPart } = mount(NarrativeFoundation, undefined, store);
     const { part: forgePart } = mount(ForgeSection, undefined, store);
@@ -89,16 +102,10 @@ export class StoryEnginePlugin extends SuiPlugin {
     const { part: lorebookPart } = mount(LorebookPanelContent, undefined, store);
 
     const brainstormPanel = sidebarPanel({
-      id: "kse-brainstorm-sidebar",
-      name: "Brainstorm",
+      id:     "kse-brainstorm-sidebar",
+      name:   "Brainstorm",
       iconId: "cloud-lightning",
-      content: [
-        column({
-          id: IDS.BRAINSTORM.ROOT,
-          style: { height: "100%", "justify-content": "space-between" },
-          content: [brainstormHeaderPart, listPart, inputPart],
-        }),
-      ],
+      content: [brainstormContent],
     });
 
     const storyEnginePanel = sidebarPanel({
