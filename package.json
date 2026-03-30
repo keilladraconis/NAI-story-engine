@@ -24,7 +24,6 @@
   },
   "devDependencies": {
     "@types/node": "^25.0.9",
-    "nai-act": "^0.3.0",
     "nai-gen-x": "^0.3.0",
     "nai-store": "^0.3.0",
     "nibs-cli": "^4.2.2",

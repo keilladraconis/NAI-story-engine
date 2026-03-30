@@ -27,7 +27,7 @@ import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import { SeEditableText } from "./SeEditableText";
 import { SeGenerationIconButton } from "./SeGenerationButton";
-import { openMoveModal } from "../../ui/components/MoveModal";
+import { openMoveModal } from "./MoveModal";
 import { buildSeRelationshipItem } from "./SeRelationshipItem";
 
 type SeEntityCardTheme = { default: { self: { style: object } } };

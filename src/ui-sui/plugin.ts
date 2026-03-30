@@ -1,7 +1,7 @@
 /**
- * StoryEnginePlugin — Phase 5.
+ * StoryEnginePlugin — Phase 6.
  *
- * Combines Story Engine + Brainstorm into one sidebarPanel via SuiTabBar.
+ * Fully nai-act free. All panels are SUI components.
  * All UIExtensions registered in a single api.v1.ui.register() call (NAI
  * requires this — multiple calls overwrite each other).
  *
@@ -16,7 +16,6 @@ import {
   SuiRow,
   SuiColumn,
 } from "nai-simple-ui";
-import { mount } from "nai-act";
 import { GenX } from "nai-gen-x";
 
 import {
@@ -33,17 +32,14 @@ import {
 import { stateUpdated, requestActivated } from "../core/store/slices/runtime";
 import { IDS, STORAGE_KEYS } from "../ui/framework/ids";
 
-// SUI components
 import { BrainstormPane } from "./components/BrainstormPane";
 import { ForgePane } from "./components/ForgePane";
 import { SeWorldBatchList } from "./components/SeWorldBatchList";
 import { SeHeaderBar } from "./components/SeHeaderBar";
-
-// nai-act components (not yet migrated)
-import { LorebookPanelContent } from "../ui/components/Lorebook/LorebookPanelContent";
-import { openBindModal } from "../ui/components/Bind/BindModal";
-import { openRelationshipsModal } from "../ui/components/Relationships/RelationshipsModal";
-import { JournalPanel } from "../ui/components/JournalPanel";
+import { SeLorebookPanel } from "./components/SeLorebookPanel";
+import { SeJournalPanel } from "./components/SeJournalPanel";
+import { openBindModal } from "./components/BindModal";
+import { openRelationshipsModal } from "./components/RelationshipsModal";
 import { loadJournal } from "../core/generation-journal";
 
 const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
@@ -105,17 +101,17 @@ export class StoryEnginePlugin extends SuiPlugin {
       children: [
         new SuiButton({
           id:       "se-footer-relationships",
-          callback: () => openRelationshipsModal({ getState: store.getState, dispatch: store.dispatch }),
+          callback: () => { void openRelationshipsModal({ getState: store.getState, dispatch: store.dispatch }); },
           theme:    { default: { self: { text: "Relationships", style: { flex: "1", "font-size": "0.8em" } } } },
         }),
         new SuiButton({
           id:       "se-footer-bind-new",
-          callback: () => openBindModal({ getState: store.getState, dispatch: store.dispatch }),
+          callback: () => { void openBindModal({ getState: store.getState, dispatch: store.dispatch }); },
           theme:    { default: { self: { text: "Bind New", style: { flex: "1", "font-size": "0.8em" } } } },
         }),
         new SuiButton({
           id:       "se-footer-rebind",
-          callback: () => openBindModal({ getState: store.getState, dispatch: store.dispatch }),
+          callback: () => { void openBindModal({ getState: store.getState, dispatch: store.dispatch }); },
           theme:    { default: { self: { text: "Rebind", style: { flex: "1", "font-size": "0.8em" } } } },
         }),
       ],
@@ -129,7 +125,7 @@ export class StoryEnginePlugin extends SuiPlugin {
     });
 
     // ── Tab bar — callbacks close over this._tabBar (safe: only called on click) ──
-    const tabEngine    = new SuiButton({ id: "se-tab-engine",    callback: () => { void this._tabBar?.switchTo(0); }, theme: { default: { self: { text: "Story Engine" } } } });
+    const tabEngine     = new SuiButton({ id: "se-tab-engine",     callback: () => { void this._tabBar?.switchTo(0); }, theme: { default: { self: { text: "Story Engine" } } } });
     const tabBrainstorm = new SuiButton({ id: "se-tab-brainstorm", callback: () => { void this._tabBar?.switchTo(1); }, theme: { default: { self: { text: "Brainstorm"   } } } });
 
     this._tabBar = new SuiTabBar({
@@ -140,11 +136,8 @@ export class StoryEnginePlugin extends SuiPlugin {
       storageMode: "story",
     });
 
-    // ── Build the tab bar ───────────────────────────────────────────────────
-    const tabBarPart = await this._tabBar.build();
-
-    // ── Lorebook panel (nai-act — not yet migrated) ─────────────────────────
-    const { part: lorebookPart } = mount(LorebookPanelContent, undefined, store);
+    const tabBarPart     = await this._tabBar.build();
+    const lorebookPart   = await new SeLorebookPanel({ id: IDS.LOREBOOK.PANEL }).build();
 
     // ── Register all extensions in one call ─────────────────────────────────
     const panels: UIExtension[] = [
@@ -166,7 +159,7 @@ export class StoryEnginePlugin extends SuiPlugin {
     if (journalEnabled) {
       api.v1.permissions.request(["clipboardWrite"]);
       await loadJournal();
-      const { part: journalPart } = mount(JournalPanel, undefined, store);
+      const journalPart = await new SeJournalPanel({ id: "kse-journal-root" }).build();
       panels.push(
         scriptPanel({
           id:      "kse-journal",

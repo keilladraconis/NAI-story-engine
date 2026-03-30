@@ -17,11 +17,11 @@ npm run test       # vitest run
 
 **Entry point:** `src/index.ts` — initializes GenX, registers store effects, loads persisted data, mounts UI extensions.
 
-**Three custom frameworks in `lib/` (treat as read-only):**
+**Custom frameworks (treat as read-only):**
 
-- `nai-store.ts` — Redux-like store with `createSlice`, `dispatch`, `useSelector`, `subscribeEffect`
-- `nai-act.ts` — Component framework with `describe()` (static structure) + `onMount()` (reactive subscriptions)
-- `gen-x.ts` — Generation queue engine with budget management and pub/sub state updates
+- `nai-store.ts` (in `lib/`) — Redux-like store with `createSlice`, `dispatch`, `useSelector`, `subscribeEffect`
+- `gen-x.ts` (in `lib/`) — Generation queue engine with budget management and pub/sub state updates
+- `nai-simple-ui` (in `vendor/`) — SUI component framework. `SuiComponent` subclasses own state, themes, and `compose()` logic. `StoreWatcher` bridges the nai-store to SUI.
 
 **State (`src/core/store/`):**
 
@@ -34,9 +34,9 @@ npm run test       # vitest run
 
 **Config:** `src/config/field-definitions.ts` — `FIELD_CONFIGS` array defines all field metadata, layouts, and generation prompts. Uses `FieldID` enum throughout.
 
-**UI (`src/ui/`):**
+**UI (`src/ui-sui/`):**
 
-- Components follow nai-act pattern: static `describe()` returns UIPart tree, `onMount()` sets up reactive subscriptions via `ctx.useSelector()`
+- All components are `SuiComponent` subclasses from `nai-simple-ui`. `compose()` returns a static UIPart tree; `StoreWatcher.watch()` drives reactive `updateParts()` calls.
 - Non-storageKey UI mutations use `api.v1.ui.updateParts()` — never re-render. storageKey-bound inputs are the exception: update them via storyStorage, not updateParts (see UI Input Patterns below).
 - Element IDs centralized in `src/ui/framework/ids.ts` with prefixes: `se-` (story engine), `se-bs-` (brainstorm), `kse-` (storage keys)
 - `src/core/utils/context-builder.ts` — Builds layered AI prompts from current state
@@ -76,21 +76,17 @@ npm run test       # vitest run
 - **`storageKey` inputs are owned by storyStorage — never use `updateParts` to set their value.** Read with `api.v1.storyStorage.get(key)`, write with `api.v1.storyStorage.set(key, value)`, clear with `api.v1.storyStorage.remove(key)`. The input reads from its storageKey automatically. Using `updateParts({ value })` on a storageKey-bound input is incorrect — the stored value and displayed value will diverge.
 - **`story:` prefix routing**: In a `storageKey` binding, `story:` is a routing directive the UI framework strips — `storageKey: "story:my-key"` persists under bare key `"my-key"` in storyStorage. `storyStorage.get("my-key")` reads the same slot; `storyStorage.get("story:my-key")` reads a literally different key and is always wrong. Never embed `story:` in storage key constants — add it only at the `storageKey` binding site. Pattern: constant = `"my-key"`, binding = `` `story:${MY_KEY}` ``, direct API = `storyStorage.get(MY_KEY)`. Use `storyStorage.remove(key)` to clear (not `set(key, null)`).
 
-**UI Rendering Rules (nai-act constraints — these cause recurrent bugs when violated):**
+**UI Rendering Rules (SUI + NAI constraints — these cause recurrent bugs when violated):**
 
-- **Parts are static objects.** A `UIPart` returned from `build()` is a frozen spec. If a container's `content` array is ever updated via `updateParts`, the NovelAI UI engine re-applies all child specs — overwriting any text/style previously set by direct `updateParts` calls to those children. There is no `appendPart`; updating a container always re-initializes its children.
+- **Parts are static objects.** A `UIPart` returned from `compose()` is a frozen spec. If a container's `content` array is ever updated via `updateParts`, the NovelAI UI engine re-applies all child specs — overwriting any text/style previously set by direct `updateParts` calls to those children. There is no `appendPart`; updating a container always re-initializes its children.
 
-- **`useSelector` and `bindPart` do NOT fire on mount.** They fire only on subsequent state changes. Always populate initial display values using `ctx.getState()` inside `build()`. Never rely on a subscription to set the first render's content.
+- **`StoreWatcher.watch()` does NOT fire on mount.** It fires only on subsequent state changes. Always populate initial display values synchronously inside `compose()` via `store.getState()`. Never rely on a watcher callback to set the first render's content.
 
-- **`initialDisplay` on `EditableText` is mandatory for correctness, not optional styling.** It must reflect current state at build time. Passing a prop value that may be stale (e.g., `message.content` when the message was just added with `content: ""`) will bake `"_No content._"` into the part spec permanently — and any future container rebuild will restore that blank state.
+- **`compose()` must call `this._watcher.dispose()` at its start** to tear down subscriptions from any prior build cycle, then re-register all watchers fresh.
 
-- **`bindPart` returns the initial mapped value — don't discard it silently.** Calling `ctx.bindPart(...)` as a statement means the initial text is never set in the part spec; it only updates on future state changes. Either spread the return value into the part definition, or set the initial text separately via `ctx.getState()`.
+- **Component root IDs must be unique per context, not just per entity.** If the same logical entity appears in two contexts (e.g., draft in ForgeSection, live in BatchSection), each context must produce a distinct root ID — e.g., `se-entity-draft-${id}` vs `se-entity-live-${id}`. The `IDS.entity(id, lifecycle)` factory enforces this: `lifecycle` is required with no default so TypeScript will catch any omission.
 
-- **`bindList` is safe for mutable-content items.** The framework (nai-act) correctly remounts all child components from current state on every structural change, and uses array-equality comparison so it only fires when key values actually change — not on every action. Just use `ctx.bindList` normally; it handles the rest.
-
-- **`useSelector` accepts an optional `equals` function** for custom comparison (e.g., array equality). Use it when the selector returns a new object/array reference on every call but you only want to fire on value changes.
-
-- **Component root IDs must be unique per context, not just per entity.** The framework identifies component instances by their root ID. If the same logical entity can appear in two different contexts (e.g., draft in ForgeSection, live in BatchSection), each context must produce a distinct root ID — e.g., `se-entity-draft-${id}` vs `se-entity-live-${id}`. Reusing the same ID across contexts causes the framework to treat a context switch as an in-place update, silently retaining stale callbacks from the previous context. The `IDS.entity(id, lifecycle)` factory enforces this: `lifecycle` is a required argument with no default so TypeScript will catch any omission.
+- **`SuiTabBar` reads `tab.options.callback` at compose time.** Tab button callbacks that call `tabBar.switchTo(i)` must use closures over `this._tabBar` (assigned before any click fires), not post-construction assignment to `options.callback` (which is `Readonly`).
 
 ## Key Constraints
 
