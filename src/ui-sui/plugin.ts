@@ -28,10 +28,11 @@ import { IDS, STORAGE_KEYS } from "../ui/framework/ids";
 import { BrainstormPane } from "./components/BrainstormPane";
 // Phase 3: SUI forge + foundation components
 import { ForgePane } from "./components/ForgePane";
+// Phase 4: SUI world batch list
+import { SeWorldBatchList } from "./components/SeWorldBatchList";
 
 // nai-act components (unchanged — replaced panel by panel)
 import { Header } from "../ui/components/Sidebar/Header";
-import { WorldBatchList } from "../ui/components/World/WorldBatchList";
 import { LorebookPanelContent } from "../ui/components/Lorebook/LorebookPanelContent";
 import { openBindModal } from "../ui/components/Bind/BindModal";
 import { openRelationshipsModal } from "../ui/components/Relationships/RelationshipsModal";
@@ -99,8 +100,10 @@ export class StoryEnginePlugin extends SuiPlugin {
     this._forgePane = new ForgePane({ id: "se-forge-pane" });
     const forgePanePart = await this._forgePane.build();
 
+    const worldBatchList = new SeWorldBatchList({ id: IDS.WORLD.BATCH_LIST });
+    const batchListPart = await worldBatchList.build();
+
     const { part: headerPart } = mount(Header, {}, store);
-    const { part: batchListPart } = mount(WorldBatchList, undefined, store);
     const { part: lorebookPart } = mount(LorebookPanelContent, undefined, store);
 
     const brainstormPanel = sidebarPanel({
