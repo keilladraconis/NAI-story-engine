@@ -1,14 +1,23 @@
 /**
- * StoryEnginePlugin — Phase 0 skeleton.
+ * StoryEnginePlugin — Phase 5.
  *
- * Wraps the existing initialization sequence in SuiPlugin's lifecycle.
- * UI is still entirely nai-act for now; panels are registered directly via
- * api.v1.ui.register(). Later phases will replace each panel with SUI components.
+ * Combines Story Engine + Brainstorm into one sidebarPanel via SuiTabBar.
+ * All UIExtensions registered in a single api.v1.ui.register() call (NAI
+ * requires this — multiple calls overwrite each other).
+ *
+ * Brainstorm rebuild: BrainstormPane.onRebuild → updateParts on the tab pane
+ * column (se-main-tab-bar.pane.1) — no full-panel re-registration needed.
  */
 
-import { SuiPlugin } from "nai-simple-ui";
-import { GenX } from "nai-gen-x";
+import {
+  SuiPlugin,
+  SuiTabBar,
+  SuiButton,
+  SuiRow,
+  SuiColumn,
+} from "nai-simple-ui";
 import { mount } from "nai-act";
+import { GenX } from "nai-gen-x";
 
 import {
   store,
@@ -24,37 +33,31 @@ import {
 import { stateUpdated, requestActivated } from "../core/store/slices/runtime";
 import { IDS, STORAGE_KEYS } from "../ui/framework/ids";
 
-// Phase 2: SUI brainstorm components
+// SUI components
 import { BrainstormPane } from "./components/BrainstormPane";
-// Phase 3: SUI forge + foundation components
 import { ForgePane } from "./components/ForgePane";
-// Phase 4: SUI world batch list
 import { SeWorldBatchList } from "./components/SeWorldBatchList";
+import { SeHeaderBar } from "./components/SeHeaderBar";
 
-// nai-act components (unchanged — replaced panel by panel)
-import { Header } from "../ui/components/Sidebar/Header";
+// nai-act components (not yet migrated)
 import { LorebookPanelContent } from "../ui/components/Lorebook/LorebookPanelContent";
 import { openBindModal } from "../ui/components/Bind/BindModal";
 import { openRelationshipsModal } from "../ui/components/Relationships/RelationshipsModal";
 import { JournalPanel } from "../ui/components/JournalPanel";
 import { loadJournal } from "../core/generation-journal";
 
-const { column, row, button } = api.v1.ui.part;
 const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
 
 export class StoryEnginePlugin extends SuiPlugin {
-  private _genX?: GenX;
+  private _genX?:           GenX;
   private _brainstormPane?: BrainstormPane;
-  private _forgePane?: ForgePane;
+  private _forgePane?:      ForgePane;
+  private _tabBar?:         SuiTabBar;
 
   protected requestPermissions(): void {
     api.v1.permissions.request(["storyEdit", "lorebookEdit", "documentEdit"]);
   }
 
-  /**
-   * Override build() to initialize GenX and store before compose() runs.
-   * SuiPlugin.build() calls hydrateState() + compose() — we prepend setup.
-   */
   override async build(): Promise<void> {
     this._genX = new GenX({
       onStateChange(genxState) {
@@ -77,90 +80,87 @@ export class StoryEnginePlugin extends SuiPlugin {
     await super.build();
   }
 
-  /**
-   * compose() — Phase 0: mount nai-act components and register raw UIExtension panels.
-   * Will be replaced panel-by-panel in later phases.
-   */
   private async _rebuildBrainstorm(): Promise<void> {
     if (!this._brainstormPane) return;
     const newContent = await this._brainstormPane.build();
-    await api.v1.ui.update([
-      { type: "sidebarPanel", id: "kse-brainstorm-sidebar", content: [newContent] } as unknown as Partial<UIExtension> & { id: string },
+    api.v1.ui.updateParts([
+      { id: "se-main-tab-bar.pane.1", content: [newContent] } as unknown as Partial<UIPart> & { id: string },
     ]);
   }
 
   protected async compose(): Promise<void> {
-    // Phase 2: Brainstorm panel — fully SUI
+    // ── Brainstorm pane ─────────────────────────────────────────────────────
     this._brainstormPane = new BrainstormPane({
       id:        IDS.BRAINSTORM.ROOT,
       onRebuild: () => { void this._rebuildBrainstorm(); },
     });
-    const brainstormContent = await this._brainstormPane.build();
 
-    this._forgePane = new ForgePane({ id: "se-forge-pane" });
-    const forgePanePart = await this._forgePane.build();
-
+    // ── Story Engine pane ───────────────────────────────────────────────────
+    const seHeaderBar    = new SeHeaderBar({ id: "kse-sidebar-header" });
+    this._forgePane      = new ForgePane({ id: "se-forge-pane" });
     const worldBatchList = new SeWorldBatchList({ id: IDS.WORLD.BATCH_LIST });
-    const batchListPart = await worldBatchList.build();
 
-    const { part: headerPart } = mount(Header, {}, store);
-    const { part: lorebookPart } = mount(LorebookPanelContent, undefined, store);
-
-    const brainstormPanel = sidebarPanel({
-      id:     "kse-brainstorm-sidebar",
-      name:   "Brainstorm",
-      iconId: "cloud-lightning",
-      content: [brainstormContent],
-    });
-
-    const storyEnginePanel = sidebarPanel({
-      id: "kse-sidebar",
-      name: "Story Engine",
-      iconId: "lightning",
-      content: [
-        column({
-          style: { gap: "8px" },
-          content: [
-            headerPart,
-            forgePanePart,
-            batchListPart,
-            row({
-              id: "se-footer",
-              style: { gap: "4px", "margin-top": "8px" },
-              content: [
-                button({
-                  id: "se-footer-relationships",
-                  text: "Relationships",
-                  style: { flex: "1", "font-size": "0.8em" },
-                  callback: () => openRelationshipsModal({ getState: store.getState, dispatch: store.dispatch }),
-                }),
-                button({
-                  id: "se-footer-bind-new",
-                  text: "Bind New",
-                  style: { flex: "1", "font-size": "0.8em" },
-                  callback: () => openBindModal({ getState: store.getState, dispatch: store.dispatch }),
-                }),
-                button({
-                  id: "se-footer-rebind",
-                  text: "Rebind",
-                  style: { flex: "1", "font-size": "0.8em" },
-                  callback: () => openBindModal({ getState: store.getState, dispatch: store.dispatch }),
-                }),
-              ],
-            }),
-          ],
+    const footer = new SuiRow({
+      id: "se-footer",
+      children: [
+        new SuiButton({
+          id:       "se-footer-relationships",
+          callback: () => openRelationshipsModal({ getState: store.getState, dispatch: store.dispatch }),
+          theme:    { default: { self: { text: "Relationships", style: { flex: "1", "font-size": "0.8em" } } } },
+        }),
+        new SuiButton({
+          id:       "se-footer-bind-new",
+          callback: () => openBindModal({ getState: store.getState, dispatch: store.dispatch }),
+          theme:    { default: { self: { text: "Bind New", style: { flex: "1", "font-size": "0.8em" } } } },
+        }),
+        new SuiButton({
+          id:       "se-footer-rebind",
+          callback: () => openBindModal({ getState: store.getState, dispatch: store.dispatch }),
+          theme:    { default: { self: { text: "Rebind", style: { flex: "1", "font-size": "0.8em" } } } },
         }),
       ],
+      theme: { default: { self: { style: { gap: "4px", "margin-top": "8px" } } } },
     });
 
-    const lorebookGenPanel = lorebookPanel({
-      id: IDS.LOREBOOK.PANEL,
-      name: "Story Engine",
-      iconId: "zap",
-      content: [lorebookPart],
+    const storyEnginePane = new SuiColumn({
+      id:       "se-story-engine-pane",
+      children: [seHeaderBar, this._forgePane, worldBatchList, footer],
+      theme:    { default: { self: { style: { gap: "8px" } } } },
     });
 
-    const panels: UIExtension[] = [brainstormPanel, storyEnginePanel, lorebookGenPanel];
+    // ── Tab bar — callbacks close over this._tabBar (safe: only called on click) ──
+    const tabEngine    = new SuiButton({ id: "se-tab-engine",    callback: () => { void this._tabBar?.switchTo(0); }, theme: { default: { self: { text: "Story Engine" } } } });
+    const tabBrainstorm = new SuiButton({ id: "se-tab-brainstorm", callback: () => { void this._tabBar?.switchTo(1); }, theme: { default: { self: { text: "Brainstorm"   } } } });
+
+    this._tabBar = new SuiTabBar({
+      id:          "se-main-tab-bar",
+      tabs:        [tabEngine, tabBrainstorm],
+      panes:       [storyEnginePane, this._brainstormPane],
+      storageKey:  "se-active-tab",
+      storageMode: "story",
+    });
+
+    // ── Build the tab bar ───────────────────────────────────────────────────
+    const tabBarPart = await this._tabBar.build();
+
+    // ── Lorebook panel (nai-act — not yet migrated) ─────────────────────────
+    const { part: lorebookPart } = mount(LorebookPanelContent, undefined, store);
+
+    // ── Register all extensions in one call ─────────────────────────────────
+    const panels: UIExtension[] = [
+      sidebarPanel({
+        id:      "kse-sidebar",
+        name:    "Story Engine",
+        iconId:  "lightning",
+        content: [tabBarPart],
+      }),
+      lorebookPanel({
+        id:      IDS.LOREBOOK.PANEL,
+        name:    "Story Engine",
+        iconId:  "zap",
+        content: [lorebookPart],
+      }),
+    ];
 
     const journalEnabled = await api.v1.config.get("generation_journal");
     if (journalEnabled) {
@@ -169,8 +169,8 @@ export class StoryEnginePlugin extends SuiPlugin {
       const { part: journalPart } = mount(JournalPanel, undefined, store);
       panels.push(
         scriptPanel({
-          id: "kse-journal",
-          name: "Generation Journal",
+          id:      "kse-journal",
+          name:    "Generation Journal",
           content: [journalPart],
         }),
       );
@@ -183,7 +183,7 @@ export class StoryEnginePlugin extends SuiPlugin {
     api.v1.hooks.register("onLorebookEntrySelected", async (params) => {
       store.dispatch(
         uiLorebookEntrySelected({
-          entryId: params.entryId || null,
+          entryId:    params.entryId || null,
           categoryId: params.categoryId || null,
         }),
       );
