@@ -31,6 +31,7 @@ import {
 } from "../../config/field-definitions";
 import { formatWorldState } from "./crucible-world-formatter";
 import { STORAGE_KEYS } from "../../ui/framework/ids";
+import { getModel } from "./config";
 // --- Helpers ---
 
 const getFieldContent = (state: RootState, id: string): string => {
@@ -477,7 +478,7 @@ export const createBrainstormFactory = (
 ): MessageFactory => {
   return async () => {
     const state = getState();
-    const model = "glm-4-6";
+    const model = await getModel();
     const systemPrompt = String(
       (await api.v1.config.get("system_prompt")) || "",
     );
@@ -569,7 +570,7 @@ export const createSummarizeFactory = (
   chatHistory: BrainstormMessage[],
 ): MessageFactory => {
   return async () => {
-    const model = "glm-4-6";
+    const model = await getModel();
     const systemPrompt = String(
       (await api.v1.config.get("system_prompt")) || "",
     );
@@ -608,7 +609,7 @@ export const createBrainstormTitleFactory = (
   chatHistory: BrainstormMessage[],
 ): MessageFactory => {
   return async () => {
-    const model = "glm-4-6";
+    const model = await getModel();
     const systemPrompt = String(
       (await api.v1.config.get("system_prompt")) || "",
     );
@@ -678,7 +679,7 @@ export const createCanonFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const model = "glm-4-6";
+    const model = await getModel();
     const prompt = String(
       (await api.v1.config.get("canon_generate_prompt")) || "",
     );
@@ -761,7 +762,7 @@ export const createDulfsListFactory = (
 ): MessageFactory => {
   return async () => {
     const state = getState();
-    const model = "glm-4-6";
+    const model = await getModel();
     const fieldConfig = FIELD_CONFIGS.find((f) => f.id === fieldId);
 
     const instruction =
@@ -825,7 +826,7 @@ export const createATTGFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const model = "glm-4-6";
+    const model = await getModel();
     const prompt = String(
       (await api.v1.config.get("attg_generate_prompt")) || "",
     );
@@ -875,7 +876,7 @@ export const createStyleFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const model = "glm-4-6";
+    const model = await getModel();
     const prompt = String(
       (await api.v1.config.get("style_generate_prompt")) || "",
     );
@@ -940,7 +941,7 @@ export const createBootstrapFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const model = "glm-4-6";
+    const model = await getModel();
 
     const prefix = await buildStoryEnginePrefix(getState);
 

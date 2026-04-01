@@ -48,6 +48,7 @@ import {
 } from "../../utils/lorebook-strategy";
 import { hashEntryPosition, getStoryIdSeed } from "../../utils/seeded-random";
 import { STORAGE_KEYS } from "../../../ui/framework/ids";
+import { getModel } from "../../utils/config";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper Functions
@@ -253,7 +254,7 @@ async function enableSyncForField(
     }
   } else if (fieldId === FieldID.Style) {
     // Enable the sync storage key
-    await api.v1.storyStorage.set(STORAGE_KEYS.SYNC_STYLE_AN, true);
+    await api.v1.storyStorage.set(STORAGE_KEYS.SYNC_STYLE_MEMORY, true);
     // Enable Style in state if not already enabled
     if (!getState().story.styleEnabled) {
       dispatch(styleToggled());
@@ -307,7 +308,7 @@ async function queueSegaLorebookContent(
     generationSubmitted({
       requestId: contentRequestId,
       messageFactory: contentFactory,
-      params: { model: "glm-4-6", max_tokens: 700 },
+      params: { model: await getModel(), max_tokens: 700 },
       target: { type: "lorebookContent", entryId: item.id },
       prefillBehavior: "trim",
     }),
@@ -338,7 +339,7 @@ async function queueSegaRelationalMapGeneration(
     generationSubmitted({
       requestId: mapRequestId,
       messageFactory: createLorebookRelationalMapFactory(getState, item.id),
-      params: { model: "glm-4-6", max_tokens: 256 },
+      params: { model: await getModel(), max_tokens: 256 },
       target: { type: "lorebookRelationalMap", entryId: item.id },
       prefillBehavior: "trim",
     }),

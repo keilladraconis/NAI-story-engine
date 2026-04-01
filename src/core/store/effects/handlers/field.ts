@@ -1,6 +1,6 @@
 import { FieldID } from "../../../../config/field-definitions";
 import { fieldUpdated } from "../../index";
-import { applyFieldFilters, attgForMemory } from "../../../utils/filters";
+import { applyFieldFilters, buildMemoryContent } from "../../../utils/filters";
 import {
   GenerationHandlers,
   FieldTarget,
@@ -48,18 +48,18 @@ export const fieldHandler: GenerationHandlers<FieldTarget> = {
       const inputId = `input-${ctx.target.fieldId}`;
       api.v1.ui.updateParts([{ id: inputId, value: filteredText }]);
 
-      // Trigger sync to Memory / Author's Note if enabled
+      // Trigger sync to Memory if enabled
       if (ctx.target.fieldId === FieldID.ATTG) {
         const syncEnabled = await api.v1.storyStorage.get(
           STORAGE_KEYS.SYNC_ATTG_MEMORY,
         );
         if (syncEnabled) {
-          await api.v1.memory.set(await attgForMemory(filteredText));
+          await api.v1.memory.set(await buildMemoryContent());
         }
       } else if (ctx.target.fieldId === FieldID.Style) {
-        const syncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_AN);
+        const syncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY);
         if (syncEnabled) {
-          await api.v1.an.set(filteredText);
+          await api.v1.memory.set(await buildMemoryContent());
         }
       }
     } else {

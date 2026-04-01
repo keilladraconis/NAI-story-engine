@@ -11,6 +11,7 @@ import {
 import { MessageFactory } from "nai-gen-x";
 import { buildCruciblePrefix } from "./context-builder";
 import { formatWorldState } from "./crucible-world-formatter";
+import { getModel } from "./config";
 
 /**
  * Creates a message factory for a build pass.
@@ -96,7 +97,7 @@ export const createBuildPassFactory = (
     return {
       messages,
       params: {
-        model: "glm-4-6",
+        model: await getModel(),
         max_tokens: 1024,
         temperature: 0.8,
         min_p: 0.05,

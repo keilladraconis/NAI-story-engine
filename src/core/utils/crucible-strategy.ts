@@ -11,6 +11,7 @@ import {
 } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildCruciblePrefix } from "./context-builder";
+import { getModel } from "./config";
 
 // --- Factory Functions ---
 
@@ -45,7 +46,7 @@ export const createCrucibleShapeFactory = (
     return {
       messages,
       params: {
-        model: "glm-4-6",
+        model: await getModel(),
         max_tokens: 128,
         temperature: 0.7,
         min_p: 0.05,
@@ -94,7 +95,7 @@ export const createCrucibleDirectionFactory = (
     return {
       messages,
       params: {
-        model: "glm-4-6",
+        model: await getModel(),
         max_tokens: 1024,
         temperature: 1.0,
         min_p: 0.05,
@@ -149,7 +150,7 @@ export const createCrucibleTensionFactory = (
     return {
       messages,
       params: {
-        model: "glm-4-6",
+        model: await getModel(),
         max_tokens: 1024,
         temperature: 1.0,
         min_p: 0.05,

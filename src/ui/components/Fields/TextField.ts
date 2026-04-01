@@ -25,7 +25,7 @@ import {
   registerActiveEditor,
   clearActiveEditor,
 } from "../../framework/editable-draft";
-import { attgForMemory } from "../../../core/utils/filters";
+import { buildMemoryContent } from "../../../core/utils/filters";
 
 export type TextFieldProps = FieldConfig;
 
@@ -161,25 +161,17 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
       useEffect(matchesAction(attgToggled), async (_action, { getState }) => {
         if (config.id !== FieldID.ATTG) return;
         if (getState().story.attgEnabled) {
-          const content = await api.v1.storyStorage.get(
-            STORAGE_KEYS.field(config.id),
-          );
-          if (content) {
-            await api.v1.memory.set(await attgForMemory(String(content)));
-          }
+          const mem = await buildMemoryContent();
+          if (mem) await api.v1.memory.set(mem);
         }
       });
 
-      // Effect: Sync Style to Author's Note when toggled on
+      // Effect: Sync Style to Memory when toggled on
       useEffect(matchesAction(styleToggled), async (_action, { getState }) => {
         if (config.id !== FieldID.Style) return;
         if (getState().story.styleEnabled) {
-          const content = await api.v1.storyStorage.get(
-            STORAGE_KEYS.field(config.id),
-          );
-          if (content) {
-            await api.v1.an.set(String(content));
-          }
+          const mem = await buildMemoryContent();
+          if (mem) await api.v1.memory.set(mem);
         }
       });
 
@@ -207,12 +199,12 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
           initialValue: "",
           storageKey: STORAGE_KEYS.fieldUI(config.id),
           style: this.style?.("textArea"),
-          onChange: async (value: string) => {
+          onChange: async (_value: string) => {
             const syncEnabled = await api.v1.storyStorage.get(
               STORAGE_KEYS.SYNC_ATTG_MEMORY,
             );
             if (syncEnabled) {
-              await api.v1.memory.set(await attgForMemory(value));
+              await api.v1.memory.set(await buildMemoryContent());
             }
           },
         });
@@ -223,11 +215,11 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
           initialValue: "",
           storageKey: STORAGE_KEYS.fieldUI(config.id),
           style: this.style?.("textArea"),
-          onChange: async (value: string) => {
+          onChange: async (_value: string) => {
             const syncEnabled =
-              await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_AN);
+              await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY);
             if (syncEnabled) {
-              await api.v1.an.set(value);
+              await api.v1.memory.set(await buildMemoryContent());
             }
           },
         });
@@ -261,7 +253,7 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
         );
       }
 
-      // Add sync checkbox for Style field (syncs to Author's Note)
+      // Add sync checkbox for Style field (syncs to Memory)
       if (config.id === FieldID.Style) {
         content.push(
           row({
@@ -270,8 +262,8 @@ export const TextField = defineComponent<TextFieldProps, RootState>({
               checkboxInput({
                 id: `checkbox-sync-${config.id}`,
                 initialValue: false,
-                storageKey: STORAGE_KEYS.SYNC_STYLE_AN_UI,
-                label: "Copy to Author's Note",
+                storageKey: STORAGE_KEYS.SYNC_STYLE_MEMORY_UI,
+                label: "Copy to Memory",
                 onChange: styleSyncToggled,
               }),
             ],

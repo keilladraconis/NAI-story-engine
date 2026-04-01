@@ -3,6 +3,7 @@ import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix, formatCrucibleElementsContext } from "./context-builder";
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 import { STORAGE_KEYS } from "../../ui/framework/ids";
+import { getModel } from "./config";
 
 // Category-to-template mapping
 const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
@@ -79,7 +80,7 @@ export const createLorebookContentFactory = (
     }
 
     const displayName = entry.displayName || "Unnamed Entry";
-    const model = "glm-4-6";
+    const model = await getModel();
     const basePrompt = String(
       (await api.v1.config.get("lorebook_generate_prompt")) || "",
     );
@@ -188,7 +189,7 @@ export const createLorebookRelationalMapFactory = (
     }
     const mapSoFar = mapSoFarParts.join("\n\n");
 
-    const model = "glm-4-6";
+    const model = await getModel();
     const prompt = String(
       (await api.v1.config.get("lorebook_relational_map_prompt")) || "",
     );
@@ -244,7 +245,7 @@ export const createLorebookKeysFactory = (
     const relationalMap = getState().runtime.sega.relationalMaps[entryId] ?? "";
     const entryText = relationalMap || (entry.text || "");
 
-    const model = "glm-4-6";
+    const model = await getModel();
     const prompt = String(
       (await api.v1.config.get("lorebook_keys_prompt")) || "",
     );
@@ -322,7 +323,7 @@ Type: ${entryType}
 Setting: ${setting}
 `;
 
-    const model = "glm-4-6";
+    const model = await getModel();
     const refinePrompt = String(
       (await api.v1.config.get("lorebook_refine_prompt")) || "",
     );
@@ -381,7 +382,7 @@ export const buildLorebookKeysPayload = async (
   return {
     requestId,
     messageFactory: createLorebookKeysFactory(getState, entryId),
-    params: { model: "glm-4-6", max_tokens: 256 },
+    params: { model: await getModel(), max_tokens: 256 },
     target: { type: "lorebookKeys", entryId },
     prefillBehavior: "keep",
     assistantPrefill: `REJECTED:\n`,

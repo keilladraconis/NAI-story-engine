@@ -26,8 +26,8 @@ export const STORAGE_KEYS = {
   // Sync toggles
   SYNC_ATTG_MEMORY: "kse-sync-attg-memory",
   SYNC_ATTG_MEMORY_UI: "story:kse-sync-attg-memory",
-  SYNC_STYLE_AN: "kse-sync-style-an",
-  SYNC_STYLE_AN_UI: "story:kse-sync-style-an",
+  SYNC_STYLE_MEMORY: "kse-sync-style-memory",
+  SYNC_STYLE_MEMORY_UI: "story:kse-sync-style-memory",
 
   // Field content & sections (dynamic by fieldId)
   field: (fieldId: string) => `kse-field-${fieldId}`,

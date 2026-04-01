@@ -22,6 +22,7 @@ import {
 import { FieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
 import { getHandler } from "./generation-handlers";
 import { recordEntry, JournalEntry } from "../../generation-journal";
+import { getModel } from "../../utils/config";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Private Helpers
@@ -268,14 +269,14 @@ export function registerGenerationEngineEffects(
           const result = await messageFactory();
           resolvedMessages = result.messages;
           if (result.params) Object.assign(apiParams, result.params);
-          const uncached = await api.v1.script.countUncachedInputTokens(result.messages, "glm-4-6");
+          const uncached = await api.v1.script.countUncachedInputTokens(result.messages, await getModel());
           pendingUncached = uncached;
           api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);
           return result;
         };
       } else if (messages) {
         resolvedMessages = messages;
-        const uncached = await api.v1.script.countUncachedInputTokens(messages, "glm-4-6");
+        const uncached = await api.v1.script.countUncachedInputTokens(messages, await getModel());
         pendingUncached = uncached;
         api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);
         messagesInput = messages;
