@@ -36,7 +36,7 @@ export type SeForgeSectionOptions =
 
 const FG = IDS.FORGE;
 
-const CAST_DISCARD_ROW_STYLE:    object = { gap: "4px", "margin-top": "4px" };
+const CAST_DISCARD_ROW_STYLE: object = { gap: "4px", "margin-top": "4px" };
 const CAST_DISCARD_HIDDEN_STYLE: object = { gap: "4px", "margin-top": "4px", display: "none" };
 
 export class SeForgeSection extends SuiComponent<
@@ -45,7 +45,7 @@ export class SeForgeSection extends SuiComponent<
   SeForgeSectionOptions,
   UIPartCollapsibleSection
 > {
-  private readonly _watcher:  StoreWatcher;
+  private readonly _watcher: StoreWatcher;
   private readonly _forgeBtn: SeGenerationButton;
   private readonly _clearBtn: SeConfirmButton;
 
@@ -58,16 +58,16 @@ export class SeForgeSection extends SuiComponent<
     this._watcher = new StoreWatcher();
 
     this._forgeBtn = new SeGenerationButton({
-      id:    FG.FORGE_BTN,
+      id: FG.FORGE_BTN,
       label: "Forge",
       onGenerate: () => { store.dispatch(forgeRequested()); },
       stateProjection: (s) => ({
-        loopActive:     s.world.forgeLoopActive,
-        activeForgeId:  s.runtime.activeRequest?.type === "forge"
+        loopActive: s.world.forgeLoopActive,
+        activeForgeId: s.runtime.activeRequest?.type === "forge"
           ? s.runtime.activeRequest.id
           : undefined,
       }),
-      requestIdFromProjection:  (p) => (p as { loopActive: boolean; activeForgeId?: string }).activeForgeId,
+      requestIdFromProjection: (p) => (p as { loopActive: boolean; activeForgeId?: string }).activeForgeId,
       isDisabledFromProjection: (p) => {
         const { loopActive, activeForgeId } = p as { loopActive: boolean; activeForgeId?: string };
         return loopActive && !activeForgeId;
@@ -75,11 +75,11 @@ export class SeForgeSection extends SuiComponent<
     });
 
     this._clearBtn = new SeConfirmButton({
-      id:           FG.CLEAR_BTN,
-      label:        "Clear",
+      id: FG.CLEAR_BTN,
+      label: "Clear",
       confirmLabel: "Clear forge?",
-      style:        { "font-size": "0.75em", opacity: "0.5", padding: "2px 8px" },
-      onConfirm:    async () => { store.dispatch(forgeClearRequested()); },
+      style: { "font-size": "0.75em", opacity: "0.5", padding: "2px 8px" },
+      onConfirm: async () => { store.dispatch(forgeClearRequested()); },
     });
   }
 
@@ -134,55 +134,55 @@ export class SeForgeSection extends SuiComponent<
     );
 
     const guidanceInput = multilineTextInput({
-      id:           FG.GUIDANCE_INPUT,
-      placeholder:  "What should the Forge build? Leave blank to draw from your Brainstorm conversation.",
+      id: FG.GUIDANCE_INPUT,
+      placeholder: "What should the Forge build? Leave blank to draw from your Brainstorm conversation.",
       initialValue: "",
-      storageKey:   `story:${STORAGE_KEYS.FORGE_GUIDANCE_UI}`,
-      style:        { "min-height": "5em", "font-size": "0.85em" },
+      storageKey: `story:${STORAGE_KEYS.FORGE_GUIDANCE_UI}`,
+      style: { "min-height": "5em", "font-size": "0.85em" },
     });
 
     const ticker = text({
-      id:    FG.TICKER,
-      text:  "",
+      id: FG.TICKER,
+      text: "",
       style: { "font-size": "0.75em", opacity: "0.5", "font-style": "italic", "min-height": "1em" },
     });
 
     const batchNameInput = textInput({
-      id:           FG.BATCH_NAME,
-      placeholder:  "Batch name (auto-named from intent)…",
+      id: FG.BATCH_NAME,
+      placeholder: "Batch name (auto-named from intent)…",
       initialValue: "",
-      storageKey:   `story:${STORAGE_KEYS.FORGE_BATCH_NAME_UI}`,
-      style:        { "font-size": "0.85em" },
+      storageKey: `story:${STORAGE_KEYS.FORGE_BATCH_NAME_UI}`,
+      style: { "font-size": "0.85em" },
     });
 
     const entityList = column({
-      id:      FG.ENTITY_LIST,
-      style:   { gap: "2px" },
+      id: FG.ENTITY_LIST,
+      style: { gap: "2px" },
       content: initialEntityParts,
     });
 
     const castDiscardRow = row({
-      id:      FG.CAST_DISCARD_ROW,
-      style:   hasDraftEntities ? CAST_DISCARD_ROW_STYLE : CAST_DISCARD_HIDDEN_STYLE,
+      id: FG.CAST_DISCARD_ROW,
+      style: hasDraftEntities ? CAST_DISCARD_ROW_STYLE : CAST_DISCARD_HIDDEN_STYLE,
       content: [
         button({
-          id:       FG.CAST_ALL_BTN,
-          text:     "→ Cast All",
-          style:    { flex: "1", "font-size": "0.85em" },
+          id: FG.CAST_ALL_BTN,
+          text: "→ Cast All",
+          style: { flex: "1", "font-size": "0.85em" },
           callback: () => { store.dispatch(castAllRequested()); },
         }),
         button({
-          id:       FG.DISCARD_ALL_BTN,
-          text:     "✕ Discard All",
-          style:    { flex: "1", "font-size": "0.85em" },
+          id: FG.DISCARD_ALL_BTN,
+          text: "✕ Discard All",
+          style: { flex: "1", "font-size": "0.85em" },
           callback: () => { store.dispatch(discardAllRequested()); },
         }),
       ],
     });
 
     return collapsibleSection({
-      id:         FG.SECTION,
-      title:      "Forge",
+      id: FG.SECTION,
+      title: "Forge",
       storageKey: `story:${STORAGE_KEYS.FORGE_SECTION_UI}`,
       content: [
         column({
