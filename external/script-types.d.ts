@@ -66,7 +66,7 @@ type DocumentSelection = {
  * Parameters for text generation requests.
  */
 type GenerationParams = {
-    /** Model identifier to use for generation (e.g., "glm-4-6") */
+    /** Model identifier to use for generation (e.g., "glm-4-6", "xialong-v1") */
     model: string
     /** Maximum number of tokens to generate */
     max_tokens?: number

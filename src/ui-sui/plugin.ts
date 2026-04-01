@@ -134,6 +134,7 @@ export class StoryEnginePlugin extends SuiPlugin {
       panes:       [storyEnginePane, this._brainstormPane],
       storageKey:  "se-active-tab",
       storageMode: "story",
+      theme:       { default: { self: { style: { height: "100%" } } } },
     });
 
     const tabBarPart     = await this._tabBar.build();

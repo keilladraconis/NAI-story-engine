@@ -72,6 +72,8 @@ export class BrainstormPane extends SuiComponent<
     // Reversed so that with flex-direction: column-reverse the newest message
     // sits at the visual bottom while the scroll stays pinned there.
     const messages = currentMessages(store.getState().brainstorm).slice().reverse();
+    const { column } = api.v1.ui.part;
+
     const messageParts = await Promise.all(
       messages.map(msg =>
         new SeMessage({ id: `se-bs-msg-${msg.id}`, message: msg }).build(),
@@ -83,23 +85,23 @@ export class BrainstormPane extends SuiComponent<
       this._input.build(),
     ]);
 
-    const { column } = api.v1.ui.part;
-
+    // Match the v10 layout: height 100% + space-between on root,
+    // flex 1 + overflow auto + column-reverse on the list.
     return column({
       id:    this.id,
-      style: { height: "100%", display: "flex", "flex-direction": "column" },
+      style: { height: "100%", "justify-content": "space-between" },
       content: [
         headerPart,
         column({
           id:    "se-bs-list",
           style: {
-            flex:             "1",
-            "overflow-y":     "auto",
-            gap:              "10px",
-            padding:          "8px",
-            "padding-bottom": "20px",
-            "flex-direction": "column-reverse",
+            flex:              1,
+            overflow:          "auto",
+            "flex-direction":  "column-reverse",
             "justify-content": "flex-start",
+            gap:               "10px",
+            padding:           "8px",
+            "padding-bottom":  "20px",
           },
           content: messageParts,
         }),
