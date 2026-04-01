@@ -4,6 +4,7 @@ import { buildStoryEnginePrefix } from "./context-builder";
 import { DulfsFieldID, FIELD_CONFIGS } from "../../config/field-definitions";
 import { STORAGE_KEYS } from "../../ui/framework/ids";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
+import { getModel } from "./config";
 
 // Category-to-template mapping
 const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
@@ -101,7 +102,7 @@ export const createLorebookContentFactory = (
     }
 
     const displayName = entry.displayName || "Unnamed Entry";
-    const model = "glm-4-6";
+    const model = await getModel();
     const basePrompt = String(
       (await api.v1.config.get("lorebook_generate_prompt")) || "",
     );
@@ -188,6 +189,7 @@ Setting: ${setting}
 };
 
 /**
+/**
  * Creates a message factory for lorebook keys generation.
  * Uses unified prefix + entry text + relationship context.
  * CRITICAL: Fetches entry.text at execution time for fresh content from preceding generation.
@@ -203,7 +205,7 @@ export const createLorebookKeysFactory = (
     }
 
     const entryText = entry.text || "";
-    const model = "glm-4-6";
+    const model = await getModel();
     const prompt = String(
       (await api.v1.config.get("lorebook_keys_prompt")) || "",
     );
@@ -290,7 +292,7 @@ Type: ${entryType}
 Setting: ${setting}
 `;
 
-    const model = "glm-4-6";
+    const model = await getModel();
     const refinePrompt = String(
       (await api.v1.config.get("lorebook_refine_prompt")) || "",
     );
@@ -352,7 +354,7 @@ export const buildLorebookKeysPayload = async (
   return {
     requestId,
     messageFactory: createLorebookKeysFactory(getState, entryId),
-    params: { model: "glm-4-6", max_tokens: 256 },
+    params: { model: await getModel(), max_tokens: 256 },
     target: { type: "lorebookKeys", entryId },
     prefillBehavior: "keep",
     assistantPrefill: `REJECTED:\n`,

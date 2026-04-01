@@ -66,13 +66,15 @@ export function applyFilter(filterName: FilterType, text: string): string {
 }
 
 /**
- * Appends `[ S:4 ]` to ATTG content for Erato compatibility mode.
- * This signals the model to write with higher quality.
+ * Builds the combined Memory content from ATTG and Style fields.
+ * Format: `[ ATTG ][ S: 4 ]\n[ STYLE ]`
+ * Either field may be empty — omitted sections are skipped.
  */
-export async function attgForMemory(content: string): Promise<string> {
-  const erato = (await api.v1.config.get("erato_compatibility")) || false;
-  if (erato && content.trim()) {
-    return `${content.trimEnd()}[ S:4 ]`;
-  }
-  return content;
+export async function buildMemoryContent(): Promise<string> {
+  const attg = String(await api.v1.storyStorage.get("kse-field-attg") || "");
+  const style = String(await api.v1.storyStorage.get("kse-field-style") || "");
+  const parts: string[] = [];
+  if (attg.trim()) parts.push(`${attg.trimEnd()}[ S: 4 ]`);
+  if (style.trim()) parts.push(style.trimEnd());
+  return parts.join("\n");
 }

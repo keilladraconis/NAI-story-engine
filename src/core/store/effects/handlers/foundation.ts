@@ -7,7 +7,7 @@ import {
 } from "../generation-handlers";
 import { IDS, STORAGE_KEYS } from "../../../../ui/framework/ids";
 import { escapeForMarkdown } from "../../../../ui/utils";
-import { attgForMemory } from "../../../../core/utils/filters";
+import { buildMemoryContent } from "../../../../core/utils/filters";
 
 type FoundationTarget = Extract<
   GenerationStrategy["target"],
@@ -120,16 +120,16 @@ export const foundationHandler: GenerationHandlers<FoundationTarget> = {
         ctx.dispatch(attgUpdated({ attg: text }));
         const attgSyncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_ATTG_MEMORY);
         if (attgSyncEnabled) {
-          await api.v1.memory.set(await attgForMemory(text));
+          await api.v1.memory.set(await buildMemoryContent());
         }
         break;
       }
       case "style": {
         await api.v1.storyStorage.set(FIELD_TO_STORAGE_KEY.style, text);
         ctx.dispatch(styleUpdated({ style: text }));
-        const styleSyncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_AN);
+        const styleSyncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY);
         if (styleSyncEnabled) {
-          await api.v1.an.set(text);
+          await api.v1.memory.set(await buildMemoryContent());
         }
         break;
       }

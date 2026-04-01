@@ -19,6 +19,7 @@
 
 import { RootState, GenerationStrategy } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
+import { getModel } from "./config";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
 import { FieldID, DulfsFieldID } from "../../config/field-definitions";
 import { TYPE_TO_FIELD } from "./crucible-command-parser";
@@ -208,7 +209,7 @@ export const createForgeFactory = (
     return {
       messages,
       params: {
-        model: "glm-4-6",
+        model: await getModel(),
         max_tokens: 256,
         temperature: 0.85,
         min_p: 0.05,

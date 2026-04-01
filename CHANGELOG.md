@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.4] - 2026-04-01
+
+### Added
+
+- **Xialong model support** — New "Model" config option lets you choose between GLM 4.6 and Xialong (`xialong-v1`). All generation calls now read from this config instead of hardcoding `glm-4-6`.
+
+### Changed
+
+- **Style syncs to Memory instead of Author's Note** — The Style field's "Copy to Author's Note" checkbox is now "Copy to Memory". When either ATTG or Style sync is enabled, Memory receives the combined format: `[ ATTG ][ S: 4 ]\n[ STYLE ]`.
+
 ## [0.10.3] - 2026-03-18
 
 ### Fixed

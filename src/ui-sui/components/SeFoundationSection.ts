@@ -5,7 +5,7 @@
  *   Shape  — textInput (name) + SeEditableText (description) + SeGenerationButton
  *   Intent — SeEditableText + SeGenerationButton
  *   ATTG   — multilineTextInput (storageKey) + SeGenerationButton + "Copy to Memory" checkbox
- *   Style  — multilineTextInput (storageKey) + SeGenerationButton + "Copy to Author's Note" checkbox
+ *   Style  — multilineTextInput (storageKey) + SeGenerationButton + "Copy to Memory" checkbox
  *
  * SeEditableText instances and SeGenerationButton instances are persistent
  * (created in the constructor). Reactive view updates are handled by:
@@ -28,7 +28,7 @@ import {
   styleGenerationRequested,
 } from "../../core/store/slices/foundation";
 import { STORAGE_KEYS } from "../../ui/framework/ids";
-import { attgForMemory } from "../../core/utils/filters";
+import { buildMemoryContent } from "../../core/utils/filters";
 import { SeGenerationButton } from "./SeGenerationButton";
 import { SeEditableText } from "./SeEditableText";
 
@@ -193,7 +193,7 @@ export class SeFoundationSection extends SuiComponent<
       onChange:    async (value: string) => {
         store.dispatch(attgUpdated({ attg: value }));
         const syncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_ATTG_MEMORY);
-        if (syncEnabled) await api.v1.memory.set(await attgForMemory(value));
+        if (syncEnabled) await api.v1.memory.set(await buildMemoryContent());
       },
     });
 
@@ -204,8 +204,7 @@ export class SeFoundationSection extends SuiComponent<
       label:        "Copy to Memory",
       onChange:     async (checked: boolean) => {
         if (checked) {
-          const value = String((await api.v1.storyStorage.get(STORAGE_KEYS.FOUNDATION_ATTG_UI)) || "");
-          await api.v1.memory.set(await attgForMemory(value));
+          await api.v1.memory.set(await buildMemoryContent());
         }
       },
     });
@@ -219,20 +218,19 @@ export class SeFoundationSection extends SuiComponent<
       style:        TEXTAREA_STYLE,
       onChange:     async (value: string) => {
         store.dispatch(styleUpdated({ style: value }));
-        const syncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_AN);
-        if (syncEnabled) await api.v1.an.set(value);
+        const syncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY);
+        if (syncEnabled) await api.v1.memory.set(await buildMemoryContent());
       },
     });
 
     const styleCheckbox = checkboxInput({
       id:           "se-fn-style-sync-checkbox",
       initialValue: false,
-      storageKey:   `story:${STORAGE_KEYS.SYNC_STYLE_AN_UI}`,
-      label:        "Copy to Author's Note",
+      storageKey:   `story:${STORAGE_KEYS.SYNC_STYLE_MEMORY_UI}`,
+      label:        "Copy to Memory",
       onChange:     async (checked: boolean) => {
         if (checked) {
-          const value = String((await api.v1.storyStorage.get(STORAGE_KEYS.FOUNDATION_STYLE_UI)) || "");
-          await api.v1.an.set(value);
+          await api.v1.memory.set(await buildMemoryContent());
         }
       },
     });

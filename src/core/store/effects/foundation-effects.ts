@@ -11,6 +11,7 @@
 
 import { Store, matchesAction } from "nai-store";
 import { RootState, AppDispatch, GenerationStrategy } from "../types";
+import { getModel } from "../../utils/config";
 import {
   shapeGenerationRequested,
   intentGenerationRequested,
@@ -52,7 +53,7 @@ const createShapeFactory = (getState: () => RootState): MessageFactory => async 
     { role: "assistant" as const, content: prefill },
   ];
 
-  return { messages, params: { model: "glm-4-6", max_tokens: 128, temperature: 0.7, min_p: 0.05, stop: ["</think>"] } };
+  return { messages, params: { model: await getModel(), max_tokens: 128, temperature: 0.7, min_p: 0.05, stop: ["</think>"] } };
 };
 
 /**
@@ -78,7 +79,7 @@ const createIntentFactory = (getState: () => RootState): MessageFactory => async
 
   messages.push({ role: "system" as const, content: intentPrompt });
 
-  return { messages, params: { model: "glm-4-6", max_tokens: 1024, temperature: 1.0, min_p: 0.05, stop: ["</think>"] } };
+  return { messages, params: { model: await getModel(), max_tokens: 1024, temperature: 1.0, min_p: 0.05, stop: ["</think>"] } };
 };
 
 /**
@@ -104,7 +105,7 @@ const createWorldStateFactory = (getState: () => RootState): MessageFactory => a
 
   messages.push({ role: "system" as const, content: worldStatePrompt });
 
-  return { messages, params: { model: "glm-4-6", max_tokens: 256, temperature: 0.85, min_p: 0.05, stop: ["</think>"] } };
+  return { messages, params: { model: await getModel(), max_tokens: 256, temperature: 0.85, min_p: 0.05, stop: ["</think>"] } };
 };
 
 /**
@@ -127,7 +128,7 @@ const createAttgFactory = (getState: () => RootState): MessageFactory => async (
 
   messages.push({ role: "system" as const, content: attgPrompt });
 
-  return { messages, params: { model: "glm-4-6", max_tokens: 64, temperature: 0.7, min_p: 0.05, stop: ["</think>"] } };
+  return { messages, params: { model: await getModel(), max_tokens: 64, temperature: 0.7, min_p: 0.05, stop: ["</think>"] } };
 };
 
 /**
@@ -150,7 +151,7 @@ const createStyleFactory = (getState: () => RootState): MessageFactory => async 
 
   messages.push({ role: "system" as const, content: stylePrompt });
 
-  return { messages, params: { model: "glm-4-6", max_tokens: 128, temperature: 0.7, min_p: 0.05, stop: ["</think>"] } };
+  return { messages, params: { model: await getModel(), max_tokens: 128, temperature: 0.7, min_p: 0.05, stop: ["</think>"] } };
 };
 
 /**
@@ -183,7 +184,7 @@ const createTensionFactory = (getState: () => RootState, tensionId: string): Mes
 
   messages.push({ role: "system" as const, content: tensionPrompt });
 
-  return { messages, params: { model: "glm-4-6", max_tokens: 128, temperature: 1.0, min_p: 0.05, stop: ["</think>"] } };
+  return { messages, params: { model: await getModel(), max_tokens: 128, temperature: 1.0, min_p: 0.05, stop: ["</think>"] } };
 };
 
 // ─── Strategy builders ────────────────────────────────────────────────────────

@@ -5,10 +5,10 @@ import {
   dulfsItemRemoved,
   entitySummaryUpdated,
 } from "../index";
-import { DulfsFieldID, FieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
+import { DulfsFieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
 import { STORAGE_KEYS } from "../../../ui/framework/ids";
 import { extractDulfsItemName } from "../../utils/context-builder";
-import { attgForMemory } from "../../utils/filters";
+import { buildMemoryContent } from "../../utils/filters";
 
 // Lorebook sync constants
 export const SE_CATEGORY_PREFIX = "SE: ";
@@ -145,13 +145,12 @@ export async function syncEratoCompatibility(
     await api.v1.lorebook.removeEntry(existingMarker.id);
   }
 
-  // Re-sync ATTG → Memory through attgForMemory (adds/removes [ S:4 ] as needed)
+  // Re-sync ATTG+Style → Memory (rebuilds combined content)
   const attgSyncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_ATTG_MEMORY);
-  if (attgSyncEnabled) {
-    const attgContent = String((await api.v1.storyStorage.get(STORAGE_KEYS.field(FieldID.ATTG))) || "");
-    if (attgContent) {
-      await api.v1.memory.set(await attgForMemory(attgContent));
-    }
+  const styleSyncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY);
+  if (attgSyncEnabled || styleSyncEnabled) {
+    const mem = await buildMemoryContent();
+    if (mem) await api.v1.memory.set(mem);
   }
 }
 
