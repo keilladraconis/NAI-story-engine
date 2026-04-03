@@ -9,6 +9,10 @@
 export const EDITABLE_DRAFT_RAW = "kse-editable-draft"; // for storyStorage.get/set
 export const EDITABLE_DRAFT_KEY = "kse-editable-draft"; // for multilineTextInput storageKey (add story: at binding site)
 
+// Edit pane draft keys (ContentWithTitle / SimpleContent)
+export const EDIT_PANE_TITLE   = "kse-edit-title";   // storyStorage.get/set + storageKey binding
+export const EDIT_PANE_CONTENT = "kse-edit-content";  // storyStorage.get/set + storageKey binding
+
 /**
  * Centralized storage key registry.
  * Raw keys are for `storyStorage.get/set` calls.
@@ -25,9 +29,7 @@ export const STORAGE_KEYS = {
 
   // Sync toggles
   SYNC_ATTG_MEMORY: "kse-sync-attg-memory",
-  SYNC_ATTG_MEMORY_UI: "kse-sync-attg-memory",
   SYNC_STYLE_MEMORY: "kse-sync-style-memory",
-  SYNC_STYLE_MEMORY_UI: "kse-sync-style-memory",
 
   // Field content & sections (dynamic by fieldId)
   field: (fieldId: string) => `kse-field-${fieldId}`,
@@ -42,9 +44,6 @@ export const STORAGE_KEYS = {
 
   // Foundation UI (v11)
   FOUNDATION_SECTION_UI: "se-foundation-section",
-  FOUNDATION_SHAPE_NAME_UI: "se-fn-shape-name",
-  FOUNDATION_ATTG_UI: "se-foundation-attg",
-  FOUNDATION_STYLE_UI: "se-foundation-style",
 
   // Forge UI (v11)
   FORGE_SECTION_UI: "se-forge-section",
@@ -62,8 +61,7 @@ export const STORAGE_KEYS = {
 export const IDS = {
   FOUNDATION: {
     SECTION: "se-fn-section",
-    SHAPE_NAME: "se-fn-shape-name",
-    SHAPE_TEXT: "se-fn-shape",
+    SHAPE_CARD: "se-fn-shape-card",
     SHAPE_BTN: "se-fn-shape-btn",
     INTENT_TEXT: "se-fn-intent",
     INTENT_BTN: "se-fn-intent-btn",
@@ -143,6 +141,14 @@ export const IDS = {
       ROOT: `se-bs-msg-${id}`,
       TEXT: `se-bs-msg-${id}-text`,
     }),
+  },
+  EDIT_PANE: {
+    ROOT:          "se-edit-pane",
+    BACK_BTN:      "se-edit-back",
+    LABEL:         "se-edit-label",
+    TITLE_INPUT:   "se-edit-title",
+    CONTENT_INPUT: "se-edit-content",
+    SAVE_BTN:      "se-edit-save",
   },
   LOREBOOK: {
     PANEL: "kse-lorebook-panel",

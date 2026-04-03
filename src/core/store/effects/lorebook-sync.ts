@@ -146,10 +146,10 @@ export async function syncEratoCompatibility(
   }
 
   // Re-sync ATTG+Style → Memory (rebuilds combined content)
-  const attgSyncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_ATTG_MEMORY);
-  const styleSyncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY);
-  if (attgSyncEnabled || styleSyncEnabled) {
-    const mem = await buildMemoryContent();
+  const attgSync = (await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_ATTG_MEMORY)) as { on?: boolean } | null;
+  const styleSync = (await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY)) as { on?: boolean } | null;
+  if (attgSync?.on || styleSync?.on) {
+    const mem = buildMemoryContent(getState);
     if (mem) await api.v1.memory.set(mem);
   }
 }

@@ -4,7 +4,7 @@
  * Message ordering (cache-stability first):
  *   1. system: forge_prompt
  *   2. assistant: [BRAINSTORM]        — stable, captured at loop start
- *   3. assistant: [STORY SHAPE]       — stable (foundation.shape + storyStorage name fallback)
+ *   3. assistant: [STORY SHAPE]       — stable (foundation.shape)
  *   4. assistant: [STORY INTENT]      — stable (foundation.intent — strategic/persistent)
  *   5. assistant: [FORGE GUIDANCE]     — stable (forge input — tactical/per-session)
  *   6. assistant: === ESTABLISHED WORLD === — semi-stable (changes on cast)
@@ -23,7 +23,6 @@ import { getModel } from "./config";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
 import { FieldID, DulfsFieldID } from "../../config/field-definitions";
 import { TYPE_TO_FIELD } from "./crucible-command-parser";
-import { STORAGE_KEYS } from "../../ui/framework/ids";
 
 const FIELD_TO_TYPE: Record<string, string> = Object.fromEntries(
   Object.entries(TYPE_TO_FIELD).map(([type, fieldId]) => [fieldId, type]),
@@ -153,17 +152,12 @@ export const createForgeFactory = (
       messages.push({ role: "assistant", content: `=== BRAINSTORM ===\n${brainstormContext}` });
     }
 
-    // 3. Story shape — stable; fall back to storyStorage name if description not yet saved
-    const shapeName = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.FOUNDATION_SHAPE_NAME_UI)) || "",
-    ).trim();
+    // 3. Story shape — stable
     if (foundation.shape) {
       messages.push({
         role: "assistant",
-        content: `=== STORY SHAPE ===\n${foundation.shape.name || shapeName}\n${foundation.shape.description}`,
+        content: `=== STORY SHAPE ===\n${foundation.shape.name}\n${foundation.shape.description}`,
       });
-    } else if (shapeName) {
-      messages.push({ role: "assistant", content: `=== STORY SHAPE ===\n${shapeName}` });
     }
 
     // 4. Foundation intent (strategic, persistent) — stable

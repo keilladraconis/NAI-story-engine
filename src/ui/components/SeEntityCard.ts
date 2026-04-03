@@ -1,17 +1,23 @@
 /**
- * SeEntityCard — SUI replacement for EntityCard.ts.
+ * SeEntityCard — SUI entity card using SuiCard header + SuiCollapsible content.
  *
  * Supports both "draft" and "live" lifecycle.
  *
- * Draft: editable name:summary + discard button in header extraControls.
- * Live:  editable name:summary + action row (reforge, regen icon, move, delete)
- *        + links collapsibleSection (reactive list via StoreWatcher).
+ * Header (SuiCard):
+ *   - icon: category icon
+ *   - label: entity name (clickable for live entities with lorebook entry)
+ *   - actions: edit button + lifecycle-specific buttons
  *
- * Name changes update the collapsibleSection title reactively.
- * Rename propagates across other entity summaries.
+ * Collapsible content:
+ *   - Summary text (reactive)
+ *   - Regen row + links collapsible (live only)
+ *
+ * Draft: edit + discard in actions; no labelCallback.
+ * Live:  edit + reforge + regen + move + delete in actions;
+ *        labelCallback opens SeLorebookContentPane.
  */
 
-import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
+import { SuiComponent, SuiButton, SuiCard, SuiCollapsible, SuiText, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
 import {
   entityEdited,
@@ -25,10 +31,34 @@ import {
 import type { Relationship } from "../../core/store/types";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
-import { SeEditableText } from "./SeEditableText";
+import { SeContentWithTitlePane, type EditPaneHost } from "./SeContentWithTitlePane";
+import { SeLorebookContentPane } from "./SeLorebookContentPane";
 import { SeGenerationIconButton } from "./SeGenerationButton";
 import { openMoveModal } from "./MoveModal";
 import { buildSeRelationshipItem } from "./SeRelationshipItem";
+
+// ── Local utility ──────────────────────────────────────────────────────────────
+
+/**
+ * Wraps a pre-built UIPartColumn as an AnySuiComponent so it can be used
+ * as a SuiCollapsible child alongside true SuiComponent instances.
+ */
+class SuiRawPart extends SuiComponent<
+  { default: { self: { style: object } } },
+  Record<string, never>,
+  SuiComponentOptions<{ default: { self: { style: object } } }, Record<string, never>>,
+  UIPartColumn
+> {
+  constructor(id: string, private readonly _part: UIPartColumn) {
+    super(
+      { id, state: {} as Record<string, never> },
+      { default: { self: { style: {} } } },
+    );
+  }
+  async compose(): Promise<UIPartColumn> { return this._part; }
+}
+
+// ── Constants ──────────────────────────────────────────────────────────────────
 
 type SeEntityCardTheme = { default: { self: { style: object } } };
 type SeEntityCardState = Record<string, never>;
@@ -36,6 +66,7 @@ type SeEntityCardState = Record<string, never>;
 export type SeEntityCardOptions = {
   entityId:  string;
   lifecycle: "draft" | "live";
+  editHost?: EditPaneHost;
 } & SuiComponentOptions<SeEntityCardTheme, SeEntityCardState>;
 
 const CATEGORY_ICON: Record<string, IconId> = {
@@ -47,14 +78,15 @@ const CATEGORY_ICON: Record<string, IconId> = {
   "topics":               "hash",
 };
 
+// ── Component ──────────────────────────────────────────────────────────────────
+
 export class SeEntityCard extends SuiComponent<
   SeEntityCardTheme,
   SeEntityCardState,
   SeEntityCardOptions,
-  UIPartCollapsibleSection
+  UIPartColumn
 > {
   private readonly _watcher:  StoreWatcher;
-  private readonly _editable: SeEditableText;
   private readonly _regenBtn: SeGenerationIconButton | null;
 
   constructor(options: SeEntityCardOptions) {
@@ -63,71 +95,13 @@ export class SeEntityCard extends SuiComponent<
       { default: { self: { style: {} } } },
     );
 
-    const { entityId, lifecycle } = options;
-    const E = IDS.entity(entityId, lifecycle);
-    const { button } = api.v1.ui.part;
-
     this._watcher = new StoreWatcher();
 
-    // ── Draft-only discard button (sync, safe in constructor) ──────────────
-    const draftExtraControls: UIPart[] = lifecycle === "draft"
-      ? [button({
-          id:       E.DISCARD_BTN,
-          iconId:   "trash" as IconId,
-          callback: () => { store.dispatch(entityDiscardRequested({ entityId })); },
-        })]
-      : [];
-
-    const parseNameSummary = (content: string): { name: string; summary: string } | null => {
-      const sep = content.indexOf(": ");
-      if (sep === -1) return null;
-      const parsedName = content.slice(0, sep).trim();
-      if (!parsedName || parsedName.length > 64) return null;
-      return { name: parsedName, summary: content.slice(sep + 2).trim() };
-    };
-
-    this._editable = new SeEditableText({
-      id:            `${E.ROOT}-summary`,
-      placeholder:   "Name: Summary…",
-      extraControls: draftExtraControls,
-      getContent: () => {
-        const e = store.getState().world.entities.find(en => en.id === entityId);
-        return e ? `${e.name}: ${e.summary}` : "";
-      },
-      formatDisplay: (content: string) => {
-        const parsed = parseNameSummary(content);
-        return parsed ? parsed.summary : content.trim();
-      },
-      liveSelector: (s) => {
-        const e = s.world.entities.find(en => en.id === entityId);
-        return e ? `${e.name}: ${e.summary}` : "";
-      },
-      onSave: (content: string) => {
-        const parsed = parseNameSummary(content);
-        if (parsed) {
-          const oldName = store.getState().world.entities.find(e => e.id === entityId)?.name ?? "";
-          store.dispatch(entityEdited({ entityId, name: parsed.name, summary: parsed.summary }));
-          if (oldName && oldName !== parsed.name) {
-            const pattern = new RegExp(oldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-            for (const entity of store.getState().world.entities) {
-              if (entity.id === entityId) continue;
-              const updated = entity.summary.replace(pattern, parsed.name);
-              if (updated !== entity.summary) {
-                store.dispatch(entitySummaryUpdated({ entityId: entity.id, summary: updated }));
-              }
-            }
-          }
-        } else {
-          store.dispatch(entitySummaryUpdated({ entityId, summary: content.trim() }));
-        }
-      },
-    });
-
-    // ── Live-only regen icon button (async build in compose) ───────────────
-    if (lifecycle === "live") {
+    if (options.lifecycle === "live") {
+      const { entityId } = options;
       this._regenBtn = new SeGenerationIconButton({
-        id:       E.REGEN_BTN,
-        iconId:   "zap" as IconId,
+        id:         IDS.entity(entityId, "live").REGEN_BTN,
+        iconId:     "zap" as IconId,
         requestIds: [
           `lb-entity-${entityId}-content`,
           `lb-entity-${entityId}-keys`,
@@ -138,6 +112,63 @@ export class SeEntityCard extends SuiComponent<
       this._regenBtn = null;
     }
   }
+
+  // ── Name/summary edit pane ─────────────────────────────────────────────────
+
+  private _openNameEdit(): void {
+    const { entityId, editHost } = this.options;
+    if (!editHost) return;
+    const entity = store.getState().world.entities.find(e => e.id === entityId);
+    if (!entity) return;
+
+    const pane = new SeContentWithTitlePane({
+      id:                 IDS.EDIT_PANE.ROOT,
+      title:              entity.name,
+      content:            entity.summary,
+      label:              "Edit Entity",
+      titleLabel:         "Name",
+      contentLabel:       "Summary",
+      titlePlaceholder:   "Entity name…",
+      contentPlaceholder: "Summary…",
+      onSave: (name, summary) => {
+        const trimmedName = name || entity.name;
+        const oldName = entity.name;
+        store.dispatch(entityEdited({ entityId, name: trimmedName, summary }));
+
+        if (oldName && oldName !== trimmedName) {
+          const pattern = new RegExp(oldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+          for (const other of store.getState().world.entities) {
+            if (other.id === entityId) continue;
+            const updated = other.summary.replace(pattern, trimmedName);
+            if (updated !== other.summary) {
+              store.dispatch(entitySummaryUpdated({ entityId: other.id, summary: updated }));
+            }
+          }
+        }
+        editHost.close();
+      },
+      onBack: () => { editHost.close(); },
+    });
+
+    editHost.open(pane);
+  }
+
+  // ── Lorebook content pane (live only) ──────────────────────────────────────
+
+  private _openLorebookPane(): void {
+    const { entityId, editHost } = this.options;
+    if (!editHost) return;
+    const entity = store.getState().world.entities.find(e => e.id === entityId);
+    if (!entity?.lorebookEntryId) return;
+
+    editHost.open(new SeLorebookContentPane({
+      id:       `${IDS.EDIT_PANE.ROOT}-lb`,
+      entityId,
+      editHost,
+    }));
+  }
+
+  // ── Links list rebuild ─────────────────────────────────────────────────────
 
   private async _rebuildLinksList(): Promise<void> {
     const { entityId, lifecycle } = this.options;
@@ -153,41 +184,83 @@ export class SeEntityCard extends SuiComponent<
     ]);
   }
 
-  async compose(): Promise<UIPartCollapsibleSection> {
+  // ── Compose ────────────────────────────────────────────────────────────────
+
+  async compose(): Promise<UIPartColumn> {
     const { entityId, lifecycle } = this.options;
     const E = IDS.entity(entityId, lifecycle);
 
     this._watcher.dispose();
 
-    // Reactively update section title when entity name changes
+    const entity  = store.getState().world.entities.find(e => e.id === entityId);
+    const name    = entity?.name ?? "";
+    const iconId  = entity?.categoryId ? CATEGORY_ICON[entity.categoryId] : undefined;
+    const cardId  = `${E.ROOT}.card`;
+    const summaryId = `${E.ROOT}-summary`;
+
+    // Reactively update card label when name changes
     this._watcher.watch(
       (s) => s.world.entities.find(e => e.id === entityId)?.name ?? "",
       (newName) => {
         api.v1.ui.updateParts([
-          { id: E.ROOT, title: newName } as unknown as Partial<UIPart> & { id: string },
+          { id: `${cardId}.label`, text: newName } as unknown as Partial<UIPart> & { id: string },
         ]);
       },
     );
 
-    const entity = store.getState().world.entities.find(e => e.id === entityId);
-    const name   = entity?.name ?? "";
-    const iconId = entity?.categoryId ? CATEGORY_ICON[entity.categoryId] : undefined;
+    // Reactively update summary text
+    this._watcher.watch(
+      (s) => s.world.entities.find(e => e.id === entityId)?.summary ?? "",
+      (summary) => {
+        api.v1.ui.updateParts([{ id: summaryId, text: summary }]);
+      },
+    );
 
-    const summaryPart = await this._editable.build();
-    const { collapsibleSection, column, row, button, textInput } = api.v1.ui.part;
+    const summaryText = new SuiText({
+      id:    summaryId,
+      theme: {
+        default: {
+          self: {
+            text:  entity?.summary ?? "",
+            style: { "font-size": "0.82em", opacity: "0.7", "white-space": "pre-wrap", "word-break": "break-word", "user-select": "text", padding: "2px 0 4px" },
+          },
+        },
+      },
+    });
 
-    // ── Draft layout ───────────────────────────────────────────────────────
+    const editBtn = new SuiButton({
+      id:       `${E.ROOT}-edit-btn`,
+      callback: () => { this._openNameEdit(); },
+      theme:    { default: { self: { iconId: "edit" as IconId } } },
+    });
+
+    // ── Draft layout ──────────────────────────────────────────────────────────
+
     if (lifecycle === "draft") {
-      return collapsibleSection({
-        id:               E.ROOT,
-        title:            name,
-        iconId,
-        initialCollapsed: false,
-        content: [column({ style: { gap: "4px" }, content: [summaryPart] })],
+      const discardBtn = new SuiButton({
+        id:       E.DISCARD_BTN,
+        callback: () => { store.dispatch(entityDiscardRequested({ entityId })); },
+        theme:    { default: { self: { iconId: "trash" as IconId } } },
       });
+
+      const card = new SuiCard({
+        id:      cardId,
+        label:   name,
+        icon:    iconId,
+        actions: [editBtn, discardBtn],
+      });
+
+      return new SuiCollapsible({
+        id:               E.ROOT,
+        header:           card,
+        children:         [summaryText],
+        initialCollapsed: false,
+        storageKey:       `${E.ROOT}.collapsed`,
+        storageMode:      "story",
+      }).build();
     }
 
-    // ── Live layout ────────────────────────────────────────────────────────
+    // ── Live layout ───────────────────────────────────────────────────────────
 
     // Rebuild links list when relationship IDs change
     this._watcher.watch(
@@ -198,33 +271,40 @@ export class SeEntityCard extends SuiComponent<
       (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
     );
 
-    const regenPart = await this._regenBtn!.build();
-
-    const actionRow = row({
-      style: { gap: "4px", "justify-content": "flex-end", "margin-top": "2px" },
-      content: [
-        button({
-          id:       E.REFORGE_BTN,
-          iconId:   "rotate-ccw" as IconId,
-          callback: () => { store.dispatch(entityReforgeRequested({ entityId })); },
-        }),
-        regenPart,
-        button({
-          id:       E.MOVE_BTN,
-          iconId:   "log-out" as IconId,
-          callback: () => {
-            void openMoveModal(entityId, { getState: store.getState, dispatch: store.dispatch });
-          },
-        }),
-        button({
-          id:       E.DELETE_BTN,
-          iconId:   "trash" as IconId,
-          callback: () => { store.dispatch(entityDeleted({ entityId })); },
-        }),
-      ],
+    const reforgeBtn = new SuiButton({
+      id:       E.REFORGE_BTN,
+      callback: () => { store.dispatch(entityReforgeRequested({ entityId })); },
+      theme:    { default: { self: { iconId: "rotate-ccw" as IconId } } },
     });
 
-    // Initial links list
+    const moveBtn = new SuiButton({
+      id:       E.MOVE_BTN,
+      callback: () => {
+        void openMoveModal(entityId, { getState: store.getState, dispatch: store.dispatch });
+      },
+      theme: { default: { self: { iconId: "log-out" as IconId } } },
+    });
+
+    const deleteBtn = new SuiButton({
+      id:       E.DELETE_BTN,
+      callback: () => { store.dispatch(entityDeleted({ entityId })); },
+      theme:    { default: { self: { iconId: "trash" as IconId } } },
+    });
+
+    const hasLorebookEntry = !!entity?.lorebookEntryId;
+
+    const card = new SuiCard({
+      id:            cardId,
+      label:         name,
+      icon:          iconId,
+      labelCallback: hasLorebookEntry ? () => { this._openLorebookPane(); } : undefined,
+      actions:       [editBtn, reforgeBtn, this._regenBtn!, moveBtn, deleteBtn],
+    });
+
+    // ── Links section (raw UIPart, bridged to SuiComponent) ───────────────────
+
+    const { button, textInput, column, collapsibleSection } = api.v1.ui.part;
+
     const relationships = store.getState().world.relationships.filter(
       r => r.fromEntityId === entityId || r.toEntityId === entityId,
     );
@@ -290,7 +370,7 @@ export class SeEntityCard extends SuiComponent<
       iconId:           "link" as IconId,
       initialCollapsed: true,
       storageKey:       `story:${E.LINKS_SECTION}`,
-      style:            { "margin-top": "2px" },
+      style:            { "margin-top": "4px" },
       content: [
         column({
           style:   { gap: "4px" },
@@ -303,17 +383,24 @@ export class SeEntityCard extends SuiComponent<
       ],
     });
 
-    return collapsibleSection({
-      id:               E.ROOT,
-      title:            name,
-      iconId,
-      initialCollapsed: false,
+    const contentCol = column({
+      id:    `${E.ROOT}-content`,
+      style: { gap: "4px", padding: "0 2px 4px" },
       content: [
-        column({
-          style:   { gap: "4px" },
-          content: [summaryPart, actionRow, linksSection],
-        }),
+        await summaryText.build(),
+        linksSection,
       ],
     });
+
+    const contentBridge = new SuiRawPart(`${E.ROOT}-content-bridge`, contentCol);
+
+    return new SuiCollapsible({
+      id:               E.ROOT,
+      header:           card,
+      children:         [contentBridge],
+      initialCollapsed: true,
+      storageKey:       `${E.ROOT}.collapsed`,
+      storageMode:      "story",
+    }).build();
   }
 }

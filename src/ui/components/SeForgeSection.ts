@@ -27,12 +27,14 @@ import { StoreWatcher } from "../store-watcher";
 import { SeGenerationButton } from "./SeGenerationButton";
 import { SeConfirmButton } from "./SeConfirmButton";
 import { SeEntityCard } from "./SeEntityCard";
+import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 type SeForgeSectionTheme = { default: { self: { style: object } } };
 type SeForgeSectionState = Record<string, never>;
 
-export type SeForgeSectionOptions =
-  SuiComponentOptions<SeForgeSectionTheme, SeForgeSectionState>;
+export type SeForgeSectionOptions = {
+  editHost: EditPaneHost;
+} & SuiComponentOptions<SeForgeSectionTheme, SeForgeSectionState>;
 
 const FG = IDS.FORGE;
 
@@ -84,10 +86,11 @@ export class SeForgeSection extends SuiComponent<
   }
 
   private async _rebuildEntityList(): Promise<void> {
+    const { editHost } = this.options;
     const entities = store.getState().world.entities.filter(e => e.lifecycle === "draft");
     const parts = await Promise.all(
       entities.map(e =>
-        new SeEntityCard({ id: IDS.entity(e.id, "draft").ROOT, entityId: e.id, lifecycle: "draft" }).build(),
+        new SeEntityCard({ id: IDS.entity(e.id, "draft").ROOT, entityId: e.id, lifecycle: "draft", editHost }).build(),
       ),
     );
     api.v1.ui.updateParts([
@@ -127,9 +130,10 @@ export class SeForgeSection extends SuiComponent<
     const draftEntities = state.world.entities.filter(e => e.lifecycle === "draft");
     const hasDraftEntities = draftEntities.length > 0;
 
+    const { editHost } = this.options;
     const initialEntityParts = await Promise.all(
       draftEntities.map(e =>
-        new SeEntityCard({ id: IDS.entity(e.id, "draft").ROOT, entityId: e.id, lifecycle: "draft" }).build(),
+        new SeEntityCard({ id: IDS.entity(e.id, "draft").ROOT, entityId: e.id, lifecycle: "draft", editHost }).build(),
       ),
     );
 

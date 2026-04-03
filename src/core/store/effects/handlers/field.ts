@@ -50,16 +50,14 @@ export const fieldHandler: GenerationHandlers<FieldTarget> = {
 
       // Trigger sync to Memory if enabled
       if (ctx.target.fieldId === FieldID.ATTG) {
-        const syncEnabled = await api.v1.storyStorage.get(
-          STORAGE_KEYS.SYNC_ATTG_MEMORY,
-        );
-        if (syncEnabled) {
-          await api.v1.memory.set(await buildMemoryContent());
+        const attgSync = (await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_ATTG_MEMORY)) as { on?: boolean } | null;
+        if (attgSync?.on) {
+          await api.v1.memory.set(buildMemoryContent(ctx.getState));
         }
       } else if (ctx.target.fieldId === FieldID.Style) {
-        const syncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY);
-        if (syncEnabled) {
-          await api.v1.memory.set(await buildMemoryContent());
+        const styleSync = (await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY)) as { on?: boolean } | null;
+        if (styleSync?.on) {
+          await api.v1.memory.set(buildMemoryContent(ctx.getState));
         }
       }
     } else {

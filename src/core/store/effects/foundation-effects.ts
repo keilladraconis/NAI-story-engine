@@ -25,27 +25,25 @@ import {
 } from "../index";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "../../utils/context-builder";
-import { STORAGE_KEYS } from "../../../ui/framework/ids";
 
 // ─── Factories ────────────────────────────────────────────────────────────────
 
 /**
  * Shape: reads brainstorm + setting + canon, excludes foundation entirely.
- * If the user has typed a name in the shape name input, it is injected as an
- * assistant prefill so the model only generates the structural description.
+ * If an existing shape name is in state, it is injected as an assistant prefill
+ * so the model only regenerates the structural description.
  * Otherwise the model invents both name and description freely.
  */
 const createShapeFactory = (getState: () => RootState): MessageFactory => async () => {
   const shapePrompt = String((await api.v1.config.get("crucible_shape_prompt")) || "");
-  const nameRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FOUNDATION_SHAPE_NAME_UI);
-  const prefillName = String(nameRaw || "").trim();
+  const existingName = getState().foundation.shape?.name ?? "";
 
   const prefix = await buildStoryEnginePrefix(getState, {
     excludeSections: ["foundation"],
   });
 
-  // If the user supplied a name, anchor the model to it; otherwise let it invent freely.
-  const prefill = prefillName ? `SHAPE: ${prefillName}\n\n` : "SHAPE: ";
+  // If there's an existing name, anchor the model to it; otherwise let it invent freely.
+  const prefill = existingName ? `SHAPE: ${existingName}\n\n` : "SHAPE: ";
 
   const messages: Message[] = [
     ...prefix,

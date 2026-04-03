@@ -66,15 +66,15 @@ export function applyFilter(filterName: FilterType, text: string): string {
 }
 
 /**
- * Builds the combined Memory content from ATTG and Style fields.
+ * Builds the combined Memory content from ATTG and Style foundation state.
+ * Wraps each in `[ ... ]` brackets for NAI Memory format.
  * Format: `[ ATTG ][ S: 4 ]\n[ STYLE ]`
  * Either field may be empty — omitted sections are skipped.
  */
-export async function buildMemoryContent(): Promise<string> {
-  const attg = String(await api.v1.storyStorage.get("kse-field-attg") || "");
-  const style = String(await api.v1.storyStorage.get("kse-field-style") || "");
+export function buildMemoryContent(getState: () => { foundation: { attg: string; style: string } }): string {
+  const { attg, style } = getState().foundation;
   const parts: string[] = [];
-  if (attg.trim()) parts.push(`${attg.trimEnd()}[ S: 4 ]`);
-  if (style.trim()) parts.push(style.trimEnd());
+  if (attg.trim()) parts.push(`[ ${attg.trim()} ][ S: 4 ]`);
+  if (style.trim()) parts.push(`[ ${style.trim()} ]`);
   return parts.join("\n");
 }

@@ -10,12 +10,14 @@ import { store } from "../../core/store";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import { SeBatchSection } from "./SeBatchSection";
+import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 type SeWorldBatchListTheme = { default: { self: { style: object } } };
 type SeWorldBatchListState = Record<string, never>;
 
-export type SeWorldBatchListOptions =
-  SuiComponentOptions<SeWorldBatchListTheme, SeWorldBatchListState>;
+export type SeWorldBatchListOptions = {
+  editHost?: EditPaneHost;
+} & SuiComponentOptions<SeWorldBatchListTheme, SeWorldBatchListState>;
 
 export class SeWorldBatchList extends SuiComponent<
   SeWorldBatchListTheme,
@@ -34,10 +36,11 @@ export class SeWorldBatchList extends SuiComponent<
   }
 
   private async _rebuildBatchList(): Promise<void> {
+    const { editHost } = this.options;
     const batches = store.getState().world.batches;
     const parts = await Promise.all(
       batches.map(b =>
-        new SeBatchSection({ id: IDS.WORLD.batch(b.id).SECTION, batchId: b.id }).build(),
+        new SeBatchSection({ id: IDS.WORLD.batch(b.id).SECTION, batchId: b.id, editHost }).build(),
       ),
     );
     api.v1.ui.updateParts([
@@ -54,10 +57,11 @@ export class SeWorldBatchList extends SuiComponent<
       (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
     );
 
+    const { editHost } = this.options;
     const batches = store.getState().world.batches;
     const batchParts = await Promise.all(
       batches.map(b =>
-        new SeBatchSection({ id: IDS.WORLD.batch(b.id).SECTION, batchId: b.id }).build(),
+        new SeBatchSection({ id: IDS.WORLD.batch(b.id).SECTION, batchId: b.id, editHost }).build(),
       ),
     );
 

@@ -7,6 +7,9 @@
  *
  * Brainstorm rebuild: BrainstormPane.onRebuild → updateParts on the tab pane
  * column (se-main-tab-bar.pane.1) — no full-panel re-registration needed.
+ *
+ * Edit pane: plugin-level editHost replaces the entire story engine tab pane
+ * content with a modal edit form. Save/Back restores the normal view.
  */
 
 import {
@@ -15,6 +18,7 @@ import {
   SuiButton,
   SuiRow,
   SuiColumn,
+  type AnySuiComponent,
 } from "nai-simple-ui";
 import { GenX } from "nai-gen-x";
 
@@ -31,6 +35,7 @@ import {
 } from "../core/store/effects/lorebook-sync";
 import { stateUpdated, requestActivated } from "../core/store/slices/runtime";
 import { IDS, STORAGE_KEYS } from "./framework/ids";
+import type { EditPaneHost } from "./components/SeContentWithTitlePane";
 
 import { BrainstormPane } from "./components/BrainstormPane";
 import { ForgePane } from "./components/ForgePane";
@@ -44,11 +49,26 @@ import { loadJournal } from "../core/generation-journal";
 
 const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
 
+/** ID of the story engine tab pane container (assigned by SuiTabBar). */
+const SE_TAB_PANE = "se-main-tab-bar.pane.0";
+
 export class StoryEnginePlugin extends SuiPlugin {
   private _genX?: GenX;
   private _brainstormPane?: BrainstormPane;
-  private _forgePane?: ForgePane;
   private _tabBar?: SuiTabBar;
+
+  // ── Story engine pane children (persistent for rebuild) ──
+  private _seHeaderBar?:    SeHeaderBar;
+  private _forgePane?:      ForgePane;
+  private _worldBatchList?: SeWorldBatchList;
+  private _footer?:         SuiRow;
+
+  // ── Edit pane hosting ──
+  private _editPane: AnySuiComponent | null = null;
+  readonly editHost: EditPaneHost = {
+    open:  (pane) => { this._editPane = pane;  void this._rebuildStoryEngine(); },
+    close: ()     => { this._editPane = null;  void this._rebuildStoryEngine(); },
+  };
 
   protected requestPermissions(): void {
     api.v1.permissions.request(["storyEdit", "lorebookEdit", "documentEdit"]);
@@ -76,6 +96,8 @@ export class StoryEnginePlugin extends SuiPlugin {
     await super.build();
   }
 
+  // ── Rebuild helpers ────────────────────────────────────────────
+
   private async _rebuildBrainstorm(): Promise<void> {
     if (!this._brainstormPane) return;
     const newContent = await this._brainstormPane.build();
@@ -83,6 +105,32 @@ export class StoryEnginePlugin extends SuiPlugin {
       { id: "se-main-tab-bar.pane.1", content: [newContent] } as unknown as Partial<UIPart> & { id: string },
     ]);
   }
+
+  private async _rebuildStoryEngine(): Promise<void> {
+    if (this._editPane) {
+      // Edit mode — replace entire tab pane with edit form
+      const editPart = await this._editPane.build();
+      api.v1.ui.updateParts([
+        { id: SE_TAB_PANE, content: [editPart] } as unknown as Partial<UIPart> & { id: string },
+      ]);
+    } else {
+      // Normal mode — rebuild full story engine column
+      const part = await this._buildStoryEnginePane();
+      api.v1.ui.updateParts([
+        { id: SE_TAB_PANE, content: [part] } as unknown as Partial<UIPart> & { id: string },
+      ]);
+    }
+  }
+
+  private async _buildStoryEnginePane(): Promise<UIPart> {
+    return await new SuiColumn({
+      id: "se-story-engine-pane",
+      children: [this._seHeaderBar!, this._forgePane!, this._worldBatchList!, this._footer!],
+      theme: { default: { self: { style: { gap: "8px" } } } },
+    }).build();
+  }
+
+  // ── Compose ────────────────────────────────────────────────────
 
   protected async compose(): Promise<void> {
     // ── Brainstorm pane ─────────────────────────────────────────────────────
@@ -92,11 +140,11 @@ export class StoryEnginePlugin extends SuiPlugin {
     });
 
     // ── Story Engine pane ───────────────────────────────────────────────────
-    const seHeaderBar = new SeHeaderBar({ id: "kse-sidebar-header" });
-    this._forgePane = new ForgePane({ id: "se-forge-pane" });
-    const worldBatchList = new SeWorldBatchList({ id: IDS.WORLD.BATCH_LIST });
+    this._seHeaderBar    = new SeHeaderBar({ id: "kse-sidebar-header" });
+    this._forgePane      = new ForgePane({ id: "se-forge-pane", editHost: this.editHost });
+    this._worldBatchList = new SeWorldBatchList({ id: IDS.WORLD.BATCH_LIST, editHost: this.editHost });
 
-    const footer = new SuiRow({
+    this._footer = new SuiRow({
       id: "se-footer",
       children: [
         new SuiButton({
@@ -120,7 +168,7 @@ export class StoryEnginePlugin extends SuiPlugin {
 
     const storyEnginePane = new SuiColumn({
       id: "se-story-engine-pane",
-      children: [seHeaderBar, this._forgePane, worldBatchList, footer],
+      children: [this._seHeaderBar, this._forgePane, this._worldBatchList, this._footer],
       theme: { default: { self: { style: { gap: "8px" } } } },
     });
 
@@ -134,7 +182,7 @@ export class StoryEnginePlugin extends SuiPlugin {
       panes: [storyEnginePane, this._brainstormPane],
       storageKey: "se-active-tab",
       storageMode: "story",
-      theme: { default: { self: { style: { height: "100%" } } } },
+      theme: { default: { self: { style: { height: "100%" } }, paneActive: { style: { overflow: "auto" } } } },
     });
 
     const tabBarPart = await this._tabBar.build();

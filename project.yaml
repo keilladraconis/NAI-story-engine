@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1775068274
+updatedAt: 1775219996
 config:
   - name: model
     prettyName: Model
@@ -466,17 +466,17 @@ config:
     type: string
     multiline: true
     default: |-
-      Generate a single ATTG block for this story.
-      CRITICAL: Output ONLY the block. No Markdown, no headers, no conversational filler, no extra text.
+      Generate a single ATTG line for this story.
+      CRITICAL: Output ONLY the line. No Markdown, no headers, no conversational filler, no extra text.
 
       EXAMPLE:
-      [ Author: Stephen King; Title: The Mist; Tags: horror, supernatural, small town; Genre: Horror ]
+      Author: Stephen King; Title: The Mist; Tags: horror, supernatural, small town; Genre: Horror
 
       INSTRUCTION:
-      - Complete the ATTG block: [ Author: [author]; Title: [title]; Tags: [comma-separated-tags]; Genre: [genre] ]
+      - Complete the ATTG line: Author: [author]; Title: [title]; Tags: [comma-separated-tags]; Genre: [genre]
       - Pick a well-known author that fits the story
       - DO NOT use any markdown bolding (**).
-      - OUTPUT ONLY THE BLOCK.
+      - OUTPUT ONLY THE LINE.
 
   - name: style_generate_prompt
     prettyName: Style Generate Prompt
@@ -484,17 +484,16 @@ config:
     type: string
     multiline: true
     default: |-
-      Generate a style guideline block for this story.
-      CRITICAL: Output ONLY the block. No Markdown, no conversational filler.
+      Generate a style guideline for this story.
+      CRITICAL: Output ONLY the guideline. No Markdown, no conversational filler.
 
       EXAMPLE:
-      [ Write in a style that conveys the following: hard-boiled noir, cynical narration, short punchy sentences, focus on sensory grit ]
+      Write in a style that conveys the following: hard-boiled noir, cynical narration, short punchy sentences, focus on sensory grit
 
       INSTRUCTION:
       - Write in a style that conveys the following: [concise style guidance limit 80 words]
-      - Format the output strictly as: [ Write in a style that conveys the following: ... ]
       - DO NOT use any markdown bolding (**).
-      - OUTPUT ONLY THE BLOCK.
+      - OUTPUT ONLY THE GUIDELINE.
   - name: lorebook_weaving_prompt
     prettyName: Lorebook Weaving Prompt
     description: Instruction for weaving cross-references into lorebook entries

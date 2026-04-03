@@ -8,45 +8,39 @@ import {
 import { IDS, STORAGE_KEYS } from "../../../../ui/framework/ids";
 import { escapeForMarkdown } from "../../../../ui/utils";
 import { buildMemoryContent } from "../../../../core/utils/filters";
+import { store } from "../../../../core/store";
 
 type FoundationTarget = Extract<
   GenerationStrategy["target"],
   { type: "foundation" }
 >;
 
-function viewIdForField(field: "shape" | "intent" | "worldState"): string {
-  switch (field) {
-    case "shape":      return `${IDS.FOUNDATION.SHAPE_TEXT}-view`;
-    case "intent":     return `${IDS.FOUNDATION.INTENT_TEXT}-view`;
-    case "worldState": return `${IDS.FOUNDATION.WORLD_STATE_TEXT}-view`;
-  }
-}
-
-const FIELD_TO_STORAGE_KEY = {
-  attg:  STORAGE_KEYS.FOUNDATION_ATTG_UI,
-  style: STORAGE_KEYS.FOUNDATION_STYLE_UI,
+/** Shape streaming updates the description text below the card. */
+const VIEW_IDS = {
+  shape:      "se-fn-shape-card-desc",
+  intent:     "se-fn-intent-card-desc",
+  attg:       "se-fn-attg-card-desc",
+  style:      "se-fn-style-card-desc",
+  worldState: `${IDS.FOUNDATION.WORLD_STATE_TEXT}-view`,
 } as const;
 
 /**
  * Parses shape generation output into { name, description }.
  *
  * Two cases:
- *  - User pre-filled a name → model only generated the description.
- *    Detected by reading the stored name input value at completion time.
- *    Output: { name: storedName, description: text }
+ *  - Existing shape name in state → model only generated the description.
+ *    Output: { name: existingName, description: text }
  *
- *  - User left name blank → model invented both.
+ *  - No existing shape → model invented both.
  *    Format: "Hero's Journey\n\nLean toward the moment of return..."
  *    Output: { name: firstLine, description: rest }
  */
-async function parseShape(text: string): Promise<ShapeData> {
-  const storedName = String(
-    (await api.v1.storyStorage.get(STORAGE_KEYS.FOUNDATION_SHAPE_NAME_UI)) || "",
-  ).trim();
+function parseShape(text: string): ShapeData {
+  const existingName = store.getState().foundation.shape?.name ?? "";
 
-  if (storedName) {
+  if (existingName) {
     // Name was pre-filled — entire output is the description
-    return { name: storedName, description: text.trim() };
+    return { name: existingName, description: text.trim() };
   }
 
   // Model invented name + description: first line is name, rest is description
@@ -76,21 +70,8 @@ export const tensionHandler: GenerationHandlers<TensionTarget> = {
 
 export const foundationHandler: GenerationHandlers<FoundationTarget> = {
   streaming(ctx: StreamingContext<FoundationTarget>, _newText: string): void {
-    switch (ctx.target.field) {
-      case "shape":
-      case "intent":
-      case "worldState": {
-        const viewId = viewIdForField(ctx.target.field);
-        api.v1.ui.updateParts([{ id: viewId, text: escapeForMarkdown(ctx.accumulatedText) }]);
-        break;
-      }
-      case "attg":
-        api.v1.ui.updateParts([{ id: IDS.FOUNDATION.ATTG_INPUT, value: ctx.accumulatedText }]);
-        break;
-      case "style":
-        api.v1.ui.updateParts([{ id: IDS.FOUNDATION.STYLE_INPUT, value: ctx.accumulatedText }]);
-        break;
-    }
+    const viewId = VIEW_IDS[ctx.target.field];
+    api.v1.ui.updateParts([{ id: viewId, text: escapeForMarkdown(ctx.accumulatedText) }]);
   },
 
   async completion(ctx: CompletionContext<FoundationTarget>): Promise<void> {
@@ -100,36 +81,31 @@ export const foundationHandler: GenerationHandlers<FoundationTarget> = {
 
     switch (ctx.target.field) {
       case "shape": {
-        const shape = await parseShape(text);
-        await api.v1.storyStorage.set(STORAGE_KEYS.FOUNDATION_SHAPE_NAME_UI, shape.name);
+        const shape = parseShape(text);
         ctx.dispatch(shapeUpdated({ shape }));
         break;
       }
       case "intent": {
         ctx.dispatch(intentUpdated({ intent: text }));
-        api.v1.ui.updateParts([{ id: `${IDS.FOUNDATION.INTENT_TEXT}-view`, text: escapeForMarkdown(text) }]);
         break;
       }
       case "worldState": {
         ctx.dispatch(worldStateUpdated({ worldState: text }));
-        api.v1.ui.updateParts([{ id: `${IDS.FOUNDATION.WORLD_STATE_TEXT}-view`, text: escapeForMarkdown(text) }]);
         break;
       }
       case "attg": {
-        await api.v1.storyStorage.set(FIELD_TO_STORAGE_KEY.attg, text);
         ctx.dispatch(attgUpdated({ attg: text }));
-        const attgSyncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_ATTG_MEMORY);
-        if (attgSyncEnabled) {
-          await api.v1.memory.set(await buildMemoryContent());
+        const attgSync = (await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_ATTG_MEMORY)) as { on?: boolean } | null;
+        if (attgSync?.on) {
+          await api.v1.memory.set(buildMemoryContent(store.getState));
         }
         break;
       }
       case "style": {
-        await api.v1.storyStorage.set(FIELD_TO_STORAGE_KEY.style, text);
         ctx.dispatch(styleUpdated({ style: text }));
-        const styleSyncEnabled = await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY);
-        if (styleSyncEnabled) {
-          await api.v1.memory.set(await buildMemoryContent());
+        const styleSync = (await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY)) as { on?: boolean } | null;
+        if (styleSync?.on) {
+          await api.v1.memory.set(buildMemoryContent(store.getState));
         }
         break;
       }

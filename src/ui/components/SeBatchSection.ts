@@ -14,12 +14,14 @@ import { batchReforgeRequested } from "../../core/store/slices/world";
 import { IDS, STORAGE_KEYS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import { SeEntityCard } from "./SeEntityCard";
+import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 type SeBatchSectionTheme = { default: { self: { style: object } } };
 type SeBatchSectionState = Record<string, never>;
 
 export type SeBatchSectionOptions = {
-  batchId: string;
+  batchId:   string;
+  editHost?: EditPaneHost;
 } & SuiComponentOptions<SeBatchSectionTheme, SeBatchSectionState>;
 
 export class SeBatchSection extends SuiComponent<
@@ -39,14 +41,14 @@ export class SeBatchSection extends SuiComponent<
   }
 
   private async _rebuildEntityList(): Promise<void> {
-    const { batchId } = this.options;
+    const { batchId, editHost } = this.options;
     const B = IDS.WORLD.batch(batchId);
     const entities = store.getState().world.entities.filter(
       e => e.batchId === batchId && e.lifecycle === "live",
     );
     const parts = await Promise.all(
       entities.map(e =>
-        new SeEntityCard({ id: IDS.entity(e.id, "live").ROOT, entityId: e.id, lifecycle: "live" }).build(),
+        new SeEntityCard({ id: IDS.entity(e.id, "live").ROOT, entityId: e.id, lifecycle: "live", editHost }).build(),
       ),
     );
     api.v1.ui.updateParts([
@@ -93,9 +95,10 @@ export class SeBatchSection extends SuiComponent<
     );
     const liveCount = liveEntities.length;
 
+    const { editHost } = this.options;
     const initialEntityParts = await Promise.all(
       liveEntities.map(e =>
-        new SeEntityCard({ id: IDS.entity(e.id, "live").ROOT, entityId: e.id, lifecycle: "live" }).build(),
+        new SeEntityCard({ id: IDS.entity(e.id, "live").ROOT, entityId: e.id, lifecycle: "live", editHost }).build(),
       ),
     );
 
