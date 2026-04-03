@@ -5,23 +5,20 @@
  *
  * Header (SuiCard):
  *   - icon: category icon
- *   - label: entity name (clickable for live entities with lorebook entry)
- *   - actions: edit button + lifecycle-specific buttons
+ *   - label: entity name — clickable on all cards, opens SeEntityEditPane
+ *   - actions: lifecycle-specific buttons (no edit button; title is the entry point)
  *
  * Collapsible content:
- *   - Summary text (reactive)
- *   - Regen row + links collapsible (live only)
+ *   - Draft: full summary text
+ *   - Live:  secondary actions (Move, Delete) + links section
  *
- * Draft: edit + discard in actions; no labelCallback.
- * Live:  edit + reforge + regen + move + delete in actions;
- *        labelCallback opens SeLorebookContentPane.
+ * Draft: discard in actions; labelCallback opens SeEntityEditPane.
+ * Live:  reforge + regen in actions; labelCallback opens SeEntityEditPane.
  */
 
-import { SuiComponent, SuiButton, SuiCard, SuiCollapsible, SuiText, type SuiComponentOptions } from "nai-simple-ui";
+import { SuiComponent, SuiButton, SuiCard, SuiCollapsible, SuiRow, SuiText, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
 import {
-  entityEdited,
-  entitySummaryUpdated,
   entityDiscardRequested,
   entityReforgeRequested,
   entityRegenRequested,
@@ -31,8 +28,8 @@ import {
 import type { Relationship } from "../../core/store/types";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
-import { SeContentWithTitlePane, type EditPaneHost } from "./SeContentWithTitlePane";
-import { SeLorebookContentPane } from "./SeLorebookContentPane";
+import type { EditPaneHost } from "./SeContentWithTitlePane";
+import { SeEntityEditPane } from "./SeEntityEditPane";
 import { SeGenerationIconButton } from "./SeGenerationButton";
 import { openMoveModal } from "./MoveModal";
 import { buildSeRelationshipItem } from "./SeRelationshipItem";
@@ -68,6 +65,48 @@ export type SeEntityCardOptions = {
   lifecycle: "draft" | "live";
   editHost?: EditPaneHost;
 } & SuiComponentOptions<SeEntityCardTheme, SeEntityCardState>;
+
+// Applied to every action button via SuiCard actions.base — strips platform button
+// chrome and sizes for finger taps without being wasteful of vertical space.
+const ACTION_BASE = {
+  background: "none",
+  border:     "none",
+  padding:    "6px 8px",
+  margin:     "0",
+  opacity:    "1",
+} as const;
+
+// Returns the first line of a summary, capped at 120 characters.
+function excerptSummary(summary: string): string {
+  const firstLine = summary.split("\n")[0] ?? "";
+  return firstLine.length > 120 ? firstLine.slice(0, 120) : firstLine;
+}
+
+// Shared card theme — unlocks action button chrome and styles sublabel for a compact display.
+const CARD_THEME = {
+  default: {
+    sublabel: {
+      style: {
+        background:   "none",
+        border:       "none",
+        padding:      "0 0 4px",
+        margin:       "0",
+        textAlign:    "left",
+        fontSize:     "0.72em",
+        cursor:       "default",
+        opacity:      "0.6",
+        fontWeight:   "normal",
+        fontStyle:    "normal",
+        overflow:     "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace:   "nowrap",
+      },
+    },
+    actions: {
+      base: ACTION_BASE,
+    },
+  },
+};
 
 const CATEGORY_ICON: Record<string, IconId> = {
   "dramat-personae":      "user",
@@ -113,57 +152,16 @@ export class SeEntityCard extends SuiComponent<
     }
   }
 
-  // ── Name/summary edit pane ─────────────────────────────────────────────────
+  // ── Unified entity edit pane ───────────────────────────────────────────────
 
-  private _openNameEdit(): void {
-    const { entityId, editHost } = this.options;
+  private _openEditPane(): void {
+    const { entityId, lifecycle, editHost } = this.options;
     if (!editHost) return;
-    const entity = store.getState().world.entities.find(e => e.id === entityId);
-    if (!entity) return;
 
-    const pane = new SeContentWithTitlePane({
-      id:                 IDS.EDIT_PANE.ROOT,
-      title:              entity.name,
-      content:            entity.summary,
-      label:              "Edit Entity",
-      titleLabel:         "Name",
-      contentLabel:       "Summary",
-      titlePlaceholder:   "Entity name…",
-      contentPlaceholder: "Summary…",
-      onSave: (name, summary) => {
-        const trimmedName = name || entity.name;
-        const oldName = entity.name;
-        store.dispatch(entityEdited({ entityId, name: trimmedName, summary }));
-
-        if (oldName && oldName !== trimmedName) {
-          const pattern = new RegExp(oldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-          for (const other of store.getState().world.entities) {
-            if (other.id === entityId) continue;
-            const updated = other.summary.replace(pattern, trimmedName);
-            if (updated !== other.summary) {
-              store.dispatch(entitySummaryUpdated({ entityId: other.id, summary: updated }));
-            }
-          }
-        }
-        editHost.close();
-      },
-      onBack: () => { editHost.close(); },
-    });
-
-    editHost.open(pane);
-  }
-
-  // ── Lorebook content pane (live only) ──────────────────────────────────────
-
-  private _openLorebookPane(): void {
-    const { entityId, editHost } = this.options;
-    if (!editHost) return;
-    const entity = store.getState().world.entities.find(e => e.id === entityId);
-    if (!entity?.lorebookEntryId) return;
-
-    editHost.open(new SeLorebookContentPane({
-      id:       `${IDS.EDIT_PANE.ROOT}-lb`,
+    editHost.open(new SeEntityEditPane({
+      id: IDS.EDIT_PANE.ROOT,
       entityId,
+      lifecycle,
       editHost,
     }));
   }
@@ -194,9 +192,10 @@ export class SeEntityCard extends SuiComponent<
 
     const entity  = store.getState().world.entities.find(e => e.id === entityId);
     const name    = entity?.name ?? "";
+    const summary = entity?.summary ?? "";
+    const excerpt = excerptSummary(summary);
     const iconId  = entity?.categoryId ? CATEGORY_ICON[entity.categoryId] : undefined;
     const cardId  = `${E.ROOT}.card`;
-    const summaryId = `${E.ROOT}-summary`;
 
     // Reactively update card label when name changes
     this._watcher.watch(
@@ -208,35 +207,41 @@ export class SeEntityCard extends SuiComponent<
       },
     );
 
-    // Reactively update summary text
+    // Reactively update card sublabel excerpt when summary changes
     this._watcher.watch(
-      (s) => s.world.entities.find(e => e.id === entityId)?.summary ?? "",
-      (summary) => {
-        api.v1.ui.updateParts([{ id: summaryId, text: summary }]);
+      (s) => excerptSummary(s.world.entities.find(e => e.id === entityId)?.summary ?? ""),
+      (newExcerpt) => {
+        api.v1.ui.updateParts([
+          { id: `${cardId}.sublabel`, text: newExcerpt } as unknown as Partial<UIPart> & { id: string },
+        ]);
       },
     );
-
-    const summaryText = new SuiText({
-      id:    summaryId,
-      theme: {
-        default: {
-          self: {
-            text:  entity?.summary ?? "",
-            style: { "font-size": "0.82em", opacity: "0.7", "white-space": "pre-wrap", "word-break": "break-word", "user-select": "text", padding: "2px 0 4px" },
-          },
-        },
-      },
-    });
-
-    const editBtn = new SuiButton({
-      id:       `${E.ROOT}-edit-btn`,
-      callback: () => { this._openNameEdit(); },
-      theme:    { default: { self: { iconId: "edit" as IconId } } },
-    });
 
     // ── Draft layout ──────────────────────────────────────────────────────────
 
     if (lifecycle === "draft") {
+      const summaryId = `${E.ROOT}-summary`;
+
+      // Reactively update full summary text in collapsible content
+      this._watcher.watch(
+        (s) => s.world.entities.find(e => e.id === entityId)?.summary ?? "",
+        (newSummary) => {
+          api.v1.ui.updateParts([{ id: summaryId, text: newSummary }]);
+        },
+      );
+
+      const summaryText = new SuiText({
+        id:    summaryId,
+        theme: {
+          default: {
+            self: {
+              text:  summary,
+              style: { "font-size": "0.82em", opacity: "0.7", "white-space": "pre-wrap", "word-break": "break-word", "user-select": "text", padding: "2px 0 4px" },
+            },
+          },
+        },
+      });
+
       const discardBtn = new SuiButton({
         id:       E.DISCARD_BTN,
         callback: () => { store.dispatch(entityDiscardRequested({ entityId })); },
@@ -244,10 +249,13 @@ export class SeEntityCard extends SuiComponent<
       });
 
       const card = new SuiCard({
-        id:      cardId,
-        label:   name,
-        icon:    iconId,
-        actions: [editBtn, discardBtn],
+        id:            cardId,
+        label:         name,
+        sublabel:      excerpt,
+        icon:          iconId,
+        labelCallback: () => { this._openEditPane(); },
+        actions:       [discardBtn],
+        theme:         CARD_THEME,
       });
 
       return new SuiCollapsible({
@@ -291,14 +299,36 @@ export class SeEntityCard extends SuiComponent<
       theme:    { default: { self: { iconId: "trash" as IconId } } },
     });
 
-    const hasLorebookEntry = !!entity?.lorebookEntryId;
-
     const card = new SuiCard({
       id:            cardId,
       label:         name,
+      sublabel:      excerpt,
       icon:          iconId,
-      labelCallback: hasLorebookEntry ? () => { this._openLorebookPane(); } : undefined,
-      actions:       [editBtn, reforgeBtn, this._regenBtn!, moveBtn, deleteBtn],
+      labelCallback: () => { this._openEditPane(); },
+      actions:       [reforgeBtn, this._regenBtn!],
+      theme:         CARD_THEME,
+    });
+
+    // ── Secondary actions row (Move, Delete) in collapsible ───────────────────
+
+    const secondaryActionsRow = new SuiRow({
+      id:       `${E.ROOT}-secondary-actions`,
+      children: [moveBtn, deleteBtn],
+      theme:    {
+        default: {
+          self: {
+            base:  ACTION_BASE,
+            style: {
+              display:      "flex",
+              alignItems:   "center",
+              gap:          "0",
+              padding:      "2px 0",
+              borderBottom: "1px solid rgba(255,255,255,0.06)",
+              marginBottom: "4px",
+            },
+          },
+        },
+      },
     });
 
     // ── Links section (raw UIPart, bridged to SuiComponent) ───────────────────
@@ -387,7 +417,7 @@ export class SeEntityCard extends SuiComponent<
       id:    `${E.ROOT}-content`,
       style: { gap: "4px", padding: "0 2px 4px" },
       content: [
-        await summaryText.build(),
+        await secondaryActionsRow.build(),
         linksSection,
       ],
     });
