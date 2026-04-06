@@ -22,7 +22,10 @@ import {
   forgeCritiqueReceived,
   forgeLoopEnded,
 } from "../../slices/world";
-import { parseCommands, CritiqueCommand } from "../../../utils/crucible-command-parser";
+import {
+  parseCommands,
+  CritiqueCommand,
+} from "../../../utils/crucible-command-parser";
 import { TYPE_TO_FIELD } from "../../../utils/crucible-command-parser";
 import { stripThinkingTags } from "../../../utils/tag-parser";
 import { FORGE_MAX_STEPS } from "../../../utils/forge-strategy";
@@ -50,9 +53,13 @@ function executeForgeCommands(
           api.v1.log(`[forge] CREATE rejected: no content for "${cmd.name}"`);
           break;
         }
-        const fieldId = TYPE_TO_FIELD[cmd.elementType] as DulfsFieldID | undefined;
+        const fieldId = TYPE_TO_FIELD[cmd.elementType] as
+          | DulfsFieldID
+          | undefined;
         if (!fieldId) {
-          api.v1.log(`[forge] CREATE: unknown type "${cmd.elementType}" for "${cmd.name}"`);
+          api.v1.log(
+            `[forge] CREATE: unknown type "${cmd.elementType}" for "${cmd.name}"`,
+          );
           break;
         }
 
@@ -90,17 +97,23 @@ function executeForgeCommands(
           api.v1.log(`[forge] REVISE: "${cmd.name}" not found`);
           break;
         }
-        dispatch(entitySummaryUpdated({ entityId: entity.id, summary: cmd.content }));
+        dispatch(
+          entitySummaryUpdated({ entityId: entity.id, summary: cmd.content }),
+        );
         api.v1.log(`[forge] REVISE "${cmd.name}"`);
         break;
       }
 
       case "DELETE": {
         const entity = getState().world.entities.find(
-          (e) => e.name.toLowerCase() === cmd.name.toLowerCase() && e.lifecycle === "draft",
+          (e) =>
+            e.name.toLowerCase() === cmd.name.toLowerCase() &&
+            e.lifecycle === "draft",
         );
         if (!entity) {
-          api.v1.log(`[forge] DELETE: "${cmd.name}" not found (or not a draft)`);
+          api.v1.log(
+            `[forge] DELETE: "${cmd.name}" not found (or not a draft)`,
+          );
           break;
         }
         dispatch(entityDeleted({ entityId: entity.id }));
@@ -116,7 +129,9 @@ function executeForgeCommands(
           (e) => e.name.toLowerCase() === cmd.toName.toLowerCase(),
         );
         if (!from || !to) {
-          api.v1.log(`[forge] LINK: one or both entities not found ("${cmd.fromName}" → "${cmd.toName}")`);
+          api.v1.log(
+            `[forge] LINK: one or both entities not found ("${cmd.fromName}" → "${cmd.toName}")`,
+          );
           break;
         }
 
@@ -128,8 +143,15 @@ function executeForgeCommands(
             (r.fromEntityId === to.id && r.toEntityId === from.id),
         );
         if (existing) {
-          dispatch(relationshipUpdated({ relationshipId: existing.id, description: cmd.description }));
-          api.v1.log(`[forge] LINK updated "${cmd.fromName}" → "${cmd.toName}"`);
+          dispatch(
+            relationshipUpdated({
+              relationshipId: existing.id,
+              description: cmd.description,
+            }),
+          );
+          api.v1.log(
+            `[forge] LINK updated "${cmd.fromName}" → "${cmd.toName}"`,
+          );
           break;
         }
 
@@ -160,12 +182,19 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
     const text = stripThinkingTags(ctx.accumulatedText);
 
     // Show command keywords as ticker during generation
-    const commandMatches = text.match(/\[(CREATE|REVISE|LINK|DELETE|CRITIQUE|DONE)\b[^\]]*\]/g);
-    const lastCommand = commandMatches ? commandMatches[commandMatches.length - 1] : "";
+    const commandMatches = text.match(
+      /\[(CREATE|REVISE|LINK|DELETE|CRITIQUE|DONE)\b[^\]]*\]/g,
+    );
+    const lastCommand = commandMatches
+      ? commandMatches[commandMatches.length - 1]
+      : "";
     const tail = lastCommand || text.replace(/\n+/g, " ").slice(-80);
 
     api.v1.ui.updateParts([
-      { id: IDS.FORGE.TICKER, text: `[${ctx.target.step}/${FORGE_MAX_STEPS}] ${tail}` },
+      {
+        id: IDS.FORGE.TICKER,
+        text: `[${ctx.target.step}/${FORGE_MAX_STEPS}] ${tail}`,
+      },
     ]);
   },
 
@@ -189,16 +218,30 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
     };
 
     if (commands.length === 0) {
-      api.v1.log("[forge] No valid commands found — consuming step and continuing");
+      api.v1.log(
+        "[forge] No valid commands found — consuming step and continuing",
+      );
       ctx.dispatch(forgeStepCompleted(stepPayload));
       return;
     }
 
-    executeForgeCommands(commands, ctx.target.batchId, ctx.getState, ctx.dispatch);
+    executeForgeCommands(
+      commands,
+      ctx.target.batchId,
+      ctx.getState,
+      ctx.dispatch,
+    );
 
-    const critique = commands.find((c): c is CritiqueCommand => c.kind === "CRITIQUE");
+    const critique = commands.find(
+      (c): c is CritiqueCommand => c.kind === "CRITIQUE",
+    );
     if (critique) {
-      ctx.dispatch(forgeCritiqueReceived({ batchId: ctx.target.batchId, critiqueText: critique.text }));
+      ctx.dispatch(
+        forgeCritiqueReceived({
+          batchId: ctx.target.batchId,
+          critiqueText: critique.text,
+        }),
+      );
       return;
     }
 

@@ -20,9 +20,16 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/checkbox-input.ts";
-import { type SuiCheckboxInputStateTheme, type SuiCheckboxInputTheme } from "./theme/checkbox-input.ts";
+import {
+  type SuiCheckboxInputStateTheme,
+  type SuiCheckboxInputTheme,
+} from "./theme/checkbox-input.ts";
 
 /** State shape for SuiCheckboxInput. disabled drives theme resolution in resolveTheme(). */
 export type SuiCheckboxInputState = {
@@ -32,7 +39,7 @@ export type SuiCheckboxInputState = {
 /** options carries data and behaviour only — disabled lives in state, visuals in theme. */
 export type SuiCheckboxInputOptions = {
   initialValue?: boolean;
-  onChange?:     (value: boolean) => void;
+  onChange?: (value: boolean) => void;
 } & SuiComponentOptions<SuiCheckboxInputTheme, SuiCheckboxInputState>;
 
 /**
@@ -40,8 +47,12 @@ export type SuiCheckboxInputOptions = {
  * label and style are resolved from theme via resolveTheme() based on this.state.disabled.
  * initialValue and onChange are passed directly from options.
  */
-export class SuiCheckboxInput extends SuiComponent<SuiCheckboxInputTheme, SuiCheckboxInputState, SuiCheckboxInputOptions, UIPartCheckboxInput> {
-
+export class SuiCheckboxInput extends SuiComponent<
+  SuiCheckboxInputTheme,
+  SuiCheckboxInputState,
+  SuiCheckboxInputOptions,
+  UIPartCheckboxInput
+> {
   constructor(options: SuiCheckboxInputOptions) {
     super(options, Theme.checkboxInput);
   }
@@ -62,13 +73,13 @@ export class SuiCheckboxInput extends SuiComponent<SuiCheckboxInputTheme, SuiChe
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:         "checkboxInput",
-      id:           this.id,
+      type: "checkboxInput",
+      id: this.id,
       initialValue: this.options.initialValue,
-      onChange:     this.options.onChange,
-      disabled:     this.state.disabled,
-      label:        t.self.label,
-      style:        this._composedStyle,
+      onChange: this.options.onChange,
+      disabled: this.state.disabled,
+      label: t.self.label,
+      style: this._composedStyle,
     };
   }
 }

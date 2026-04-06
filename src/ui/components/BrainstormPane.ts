@@ -36,8 +36,8 @@ export class BrainstormPane extends SuiComponent<
   UIPartColumn
 > {
   private readonly _watcher: StoreWatcher;
-  private readonly _header:  SeChatHeader;
-  private readonly _input:   SeBrainstormInput;
+  private readonly _header: SeChatHeader;
+  private readonly _input: SeBrainstormInput;
 
   constructor(options: BrainstormPaneOptions) {
     super(
@@ -45,8 +45,8 @@ export class BrainstormPane extends SuiComponent<
       { default: { self: { style: {} } } },
     );
     this._watcher = new StoreWatcher();
-    this._header  = new SeChatHeader({ id: "se-bs-header" });
-    this._input   = new SeBrainstormInput({ id: "se-bs-input-area" });
+    this._header = new SeChatHeader({ id: "se-bs-header" });
+    this._input = new SeBrainstormInput({ id: "se-bs-input-area" });
   }
 
   async compose(): Promise<UIPartColumn> {
@@ -58,10 +58,12 @@ export class BrainstormPane extends SuiComponent<
     // Trigger a full rebuild when the chat switches or the message list changes structurally
     this._watcher.watch(
       (s) => ({
-        chatIndex:  s.brainstorm.currentChatIndex,
-        messageIds: currentMessages(s.brainstorm).map(m => m.id),
+        chatIndex: s.brainstorm.currentChatIndex,
+        messageIds: currentMessages(s.brainstorm).map((m) => m.id),
       }),
-      () => { onRebuild(); },
+      () => {
+        onRebuild();
+      },
       (a, b) =>
         a.chatIndex === b.chatIndex &&
         a.messageIds.length === b.messageIds.length &&
@@ -71,11 +73,13 @@ export class BrainstormPane extends SuiComponent<
     // Build message bubbles for the current chat.
     // Reversed so that with flex-direction: column-reverse the newest message
     // sits at the visual bottom while the scroll stays pinned there.
-    const messages = currentMessages(store.getState().brainstorm).slice().reverse();
+    const messages = currentMessages(store.getState().brainstorm)
+      .slice()
+      .reverse();
     const { column } = api.v1.ui.part;
 
     const messageParts = await Promise.all(
-      messages.map(msg =>
+      messages.map((msg) =>
         new SeMessage({ id: `se-bs-msg-${msg.id}`, message: msg }).build(),
       ),
     );
@@ -88,20 +92,20 @@ export class BrainstormPane extends SuiComponent<
     // Match the v10 layout: height 100% + space-between on root,
     // flex 1 + overflow auto + column-reverse on the list.
     return column({
-      id:    this.id,
+      id: this.id,
       style: { height: "100%", "justify-content": "space-between" },
       content: [
         headerPart,
         column({
-          id:    "se-bs-list",
+          id: "se-bs-list",
           style: {
-            flex:              1,
-            overflow:          "auto",
-            "flex-direction":  "column-reverse",
+            flex: 1,
+            overflow: "auto",
+            "flex-direction": "column-reverse",
             "justify-content": "flex-start",
-            gap:               "10px",
-            padding:           "8px",
-            "padding-bottom":  "20px",
+            gap: "10px",
+            padding: "8px",
+            "padding-bottom": "20px",
           },
           content: messageParts,
         }),

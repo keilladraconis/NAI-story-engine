@@ -2,24 +2,29 @@
  * @file Theme for SuiCollapsible.
  */
 
-import { type PartialState, type SuiChildrenPartTheme, type SuiStylePartTheme, type ThemeOverride } from "../../base.ts";
+import {
+  type PartialState,
+  type SuiChildrenPartTheme,
+  type SuiStylePartTheme,
+  type ThemeOverride,
+} from "../../base.ts";
 import { type SuiButtonPartTheme } from "./button.ts";
 
 /** Resolved part map for a single SuiCollapsible state. */
 export type SuiCollapsibleStateTheme = {
-  self:            SuiStylePartTheme;
-  header:          SuiStylePartTheme;
-  headerContent:   SuiStylePartTheme;
-  chevron:         SuiButtonPartTheme;
-  chevronOpen:     SuiButtonPartTheme;
+  self: SuiStylePartTheme;
+  header: SuiStylePartTheme;
+  headerContent: SuiStylePartTheme;
+  chevron: SuiButtonPartTheme;
+  chevronOpen: SuiButtonPartTheme;
   chevronDisabled: SuiButtonPartTheme;
-  content:         SuiChildrenPartTheme;
-  contentVisible:  SuiChildrenPartTheme;
+  content: SuiChildrenPartTheme;
+  contentVisible: SuiChildrenPartTheme;
 };
 
 /** Theme for SuiCollapsible. Structure: <state>.<part>.<property>. */
 export type SuiCollapsibleTheme = {
-  default:   SuiCollapsibleStateTheme;
+  default: SuiCollapsibleStateTheme;
   disabled?: PartialState<SuiCollapsibleStateTheme>;
 };
 
@@ -34,50 +39,50 @@ export const collapsible = {
     header: {
       style: {
         alignItems: "center",
-        gap:        "0",
+        gap: "0",
       },
     },
     headerContent: {
       style: {
-        flex:     "1",
+        flex: "1",
         minWidth: "0",
-        padding:  "4px 0",
+        padding: "4px 0",
       },
     },
     chevron: {
       iconId: "chevron-right",
       style: {
         background: "none",
-        padding:    "12px 0 12px 4px",
-        margin:     "0",
+        padding: "12px 0 12px 4px",
+        margin: "0",
         flexShrink: "0",
-        alignSelf:  "flex-start",
-        fontSize:   "0.72em",
-        opacity:    "0.45",
+        alignSelf: "flex-start",
+        fontSize: "0.72em",
+        opacity: "0.45",
       },
     },
     chevronOpen: {
       iconId: "chevron-down",
       style: {
         background: "none",
-        padding:    "12px 0 12px 4px",
-        margin:     "0",
+        padding: "12px 0 12px 4px",
+        margin: "0",
         flexShrink: "0",
-        alignSelf:  "flex-start",
-        fontSize:   "0.72em",
-        opacity:    "0.75",
+        alignSelf: "flex-start",
+        fontSize: "0.72em",
+        opacity: "0.75",
       },
     },
     chevronDisabled: {
       iconId: "chevron-down",
       style: {
         background: "none",
-        padding:    "12px 0 12px 4px",
-        margin:     "0",
+        padding: "12px 0 12px 4px",
+        margin: "0",
         flexShrink: "0",
-        alignSelf:  "flex-start",
-        fontSize:   "0.72em",
-        opacity:    "0.25",
+        alignSelf: "flex-start",
+        fontSize: "0.72em",
+        opacity: "0.25",
       },
     },
     content: {
@@ -87,10 +92,10 @@ export const collapsible = {
     },
     contentVisible: {
       style: {
-        display:        "flex",
-        flexDirection:  "column",
-        background:     "rgba(255, 255, 255, 0.02)",
-        borderTop:      "1px solid rgba(255, 255, 255, 0.05)",
+        display: "flex",
+        flexDirection: "column",
+        background: "rgba(255, 255, 255, 0.02)",
+        borderTop: "1px solid rgba(255, 255, 255, 0.05)",
       },
     },
   },

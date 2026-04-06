@@ -16,7 +16,12 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type AnySuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type AnySuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/box.ts";
 import { type SuiBoxStateTheme, type SuiBoxTheme } from "./theme/box.ts";
 
@@ -30,8 +35,12 @@ export type SuiBoxOptions = {
  * children is passed directly from options as AnySuiComponent[]; compose() is called internally.
  * style override is resolved from theme via resolveTheme() on each compose() call.
  */
-export class SuiBox extends SuiComponent<SuiBoxTheme, Record<string, unknown>, SuiBoxOptions, UIPartBox> {
-
+export class SuiBox extends SuiComponent<
+  SuiBoxTheme,
+  Record<string, unknown>,
+  SuiBoxOptions,
+  UIPartBox
+> {
   constructor(options: SuiBoxOptions) {
     super(options, Theme.box);
   }
@@ -49,10 +58,13 @@ export class SuiBox extends SuiComponent<SuiBoxTheme, Record<string, unknown>, S
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:    "box",
-      id:      this.id,
-      content: await this.buildContent(this.options.children, SuiBase.listChildrenStyle(t.self)),
-      style:   this._composedStyle,
+      type: "box",
+      id: this.id,
+      content: await this.buildContent(
+        this.options.children,
+        SuiBase.listChildrenStyle(t.self),
+      ),
+      style: this._composedStyle,
     };
   }
 }

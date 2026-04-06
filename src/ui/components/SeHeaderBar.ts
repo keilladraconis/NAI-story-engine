@@ -11,7 +11,11 @@
  * Timer machinery uses api.v1.timers — no setTimeout, no DOM.
  */
 
-import { SuiComponent, SuiConfirmButton, type SuiComponentOptions } from "nai-simple-ui";
+import {
+  SuiComponent,
+  SuiConfirmButton,
+  type SuiComponentOptions,
+} from "nai-simple-ui";
 import { store } from "../../core/store";
 import { segaToggled } from "../../core/store/slices/runtime";
 import { uiUserPresenceConfirmed } from "../../core/store/slices/ui";
@@ -22,13 +26,26 @@ import { colors } from "../theme";
 type SeHeaderBarTheme = { default: { self: { style: object } } };
 type SeHeaderBarState = Record<string, never>;
 
-export type SeHeaderBarOptions = SuiComponentOptions<SeHeaderBarTheme, SeHeaderBarState>;
+export type SeHeaderBarOptions = SuiComponentOptions<
+  SeHeaderBarTheme,
+  SeHeaderBarState
+>;
 
-const BTN_STYLE      = { padding: "4px 8px", "font-size": "0.8em" };
-const STOP_STYLE     = { ...BTN_STYLE, color: "#ff9800" };
-const CONTINUE_STYLE = { ...BTN_STYLE, background: colors.header, color: colors.darkBackground };
-const STATUS_STYLE   = { flex: "1", "font-size": "0.8em", opacity: "0.8", overflow: "hidden", "white-space": "nowrap" };
-const WAIT_STYLE     = { flex: "1", "font-size": "0.8em", opacity: "0.8" };
+const BTN_STYLE = { padding: "4px 8px", "font-size": "0.8em" };
+const STOP_STYLE = { ...BTN_STYLE, color: "#ff9800" };
+const CONTINUE_STYLE = {
+  ...BTN_STYLE,
+  background: colors.header,
+  color: colors.darkBackground,
+};
+const STATUS_STYLE = {
+  flex: "1",
+  "font-size": "0.8em",
+  opacity: "0.8",
+  overflow: "hidden",
+  "white-space": "nowrap",
+};
+const WAIT_STYLE = { flex: "1", "font-size": "0.8em", opacity: "0.8" };
 
 export class SeHeaderBar extends SuiComponent<
   SeHeaderBarTheme,
@@ -36,12 +53,12 @@ export class SeHeaderBar extends SuiComponent<
   SeHeaderBarOptions,
   UIPartRow
 > {
-  private readonly _watcher:  StoreWatcher;
+  private readonly _watcher: StoreWatcher;
   private readonly _clearBtn: SuiConfirmButton;
 
   // Marquee state
-  private _marqueeRunning  = false;
-  private _marqueeText     = "";
+  private _marqueeRunning = false;
+  private _marqueeText = "";
   private _marqueePosition = 0;
 
   // Wait timer state
@@ -57,16 +74,26 @@ export class SeHeaderBar extends SuiComponent<
     this._watcher = new StoreWatcher();
 
     this._clearBtn = new SuiConfirmButton({
-      id:        "header-clear",
-      onConfirm: async () => { store.dispatch(storyCleared()); },
-      timeout:   4000,
+      id: "header-clear",
+      onConfirm: async () => {
+        store.dispatch(storyCleared());
+      },
+      timeout: 4000,
       theme: {
-        default: { self: { text: "Clear", style: { ...BTN_STYLE, opacity: "0.7" } } },
-        pending: { self: {
-          text:   "Clear?",
-          iconId: "alert-triangle" as IconId,
-          style:  { ...BTN_STYLE, color: colors.warning, "font-weight": "bold" },
-        }},
+        default: {
+          self: { text: "Clear", style: { ...BTN_STYLE, opacity: "0.7" } },
+        },
+        pending: {
+          self: {
+            text: "Clear?",
+            iconId: "alert-triangle" as IconId,
+            style: {
+              ...BTN_STYLE,
+              color: colors.warning,
+              "font-weight": "bold",
+            },
+          },
+        },
       },
     });
   }
@@ -79,12 +106,16 @@ export class SeHeaderBar extends SuiComponent<
 
     while (this._marqueeRunning && this._marqueeText) {
       const gapSize = Math.max(5, Math.ceil(this._marqueeText.length / 3));
-      const unit    = this._marqueeText + " ".repeat(gapSize);
+      const unit = this._marqueeText + " ".repeat(gapSize);
 
-      api.v1.ui.updateParts([{
-        id:   "header-sega-status",
-        text: unit.slice(this._marqueePosition) + unit.slice(0, this._marqueePosition),
-      }]);
+      api.v1.ui.updateParts([
+        {
+          id: "header-sega-status",
+          text:
+            unit.slice(this._marqueePosition) +
+            unit.slice(0, this._marqueePosition),
+        },
+      ]);
 
       const next = (this._marqueePosition + 1) % unit.length;
       await api.v1.timers.sleep(next === 0 ? PAUSE : SPEED);
@@ -95,9 +126,14 @@ export class SeHeaderBar extends SuiComponent<
   private _updateWaitTimer(endTime: number): void {
     if (!this._waitTimerActive) return;
     const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
-    api.v1.ui.updateParts([{ id: "header-wait-text", text: `Wait (${remaining}s)` }]);
+    api.v1.ui.updateParts([
+      { id: "header-wait-text", text: `Wait (${remaining}s)` },
+    ]);
     if (remaining > 0) {
-      void api.v1.timers.setTimeout(() => { this._updateWaitTimer(endTime); }, 1000)
+      void api.v1.timers
+        .setTimeout(() => {
+          this._updateWaitTimer(endTime);
+        }, 1000)
         .then((tid: number) => {
           if (this._waitTimerActive) this._waitTimerId = tid;
           else api.v1.timers.clearTimeout(tid);
@@ -111,32 +147,55 @@ export class SeHeaderBar extends SuiComponent<
     this._watcher.dispose();
     this._watcher.watch(
       (s) => ({
-        segaRunning:        s.runtime.segaRunning,
-        statusText:         s.runtime.sega.statusText,
-        genxStatus:         s.runtime.genx.status,
-        budgetWaitEndTime:  s.runtime.genx.budgetWaitEndTime,
+        segaRunning: s.runtime.segaRunning,
+        statusText: s.runtime.sega.statusText,
+        genxStatus: s.runtime.genx.status,
+        budgetWaitEndTime: s.runtime.genx.budgetWaitEndTime,
       }),
       ({ segaRunning, statusText, genxStatus, budgetWaitEndTime }) => {
         api.v1.ui.updateParts([
-          { id: "header-sega-start-btn", style: { ...BTN_STYLE, display: segaRunning ? "none" : "flex" } },
-          { id: "header-sega-stop-btn",  style: { ...STOP_STYLE, display: segaRunning ? "flex" : "none" } },
+          {
+            id: "header-sega-start-btn",
+            style: { ...BTN_STYLE, display: segaRunning ? "none" : "flex" },
+          },
+          {
+            id: "header-sega-stop-btn",
+            style: { ...STOP_STYLE, display: segaRunning ? "flex" : "none" },
+          },
         ]);
 
         const showContinue = genxStatus === "waiting_for_user";
-        const showWait     = genxStatus === "waiting_for_budget";
-        const showMarquee  = !showContinue && !showWait;
+        const showWait = genxStatus === "waiting_for_budget";
+        const showMarquee = !showContinue && !showWait;
 
         api.v1.ui.updateParts([
-          { id: "header-continue-btn",  style: { ...CONTINUE_STYLE, display: showContinue ? "flex" : "none" } },
-          { id: "header-wait-text",     style: { ...WAIT_STYLE,     display: showWait     ? "flex" : "none" } },
-          { id: "header-sega-status",   style: { ...STATUS_STYLE,   display: showMarquee  ? "block" : "none" } },
+          {
+            id: "header-continue-btn",
+            style: {
+              ...CONTINUE_STYLE,
+              display: showContinue ? "flex" : "none",
+            },
+          },
+          {
+            id: "header-wait-text",
+            style: { ...WAIT_STYLE, display: showWait ? "flex" : "none" },
+          },
+          {
+            id: "header-sega-status",
+            style: { ...STATUS_STYLE, display: showMarquee ? "block" : "none" },
+          },
         ]);
 
         if (showWait) {
           if (!this._waitTimerActive) {
             this._waitTimerActive = true;
             const endTime = budgetWaitEndTime || Date.now() + 60000;
-            api.v1.ui.updateParts([{ id: "header-wait-text", text: `Wait (${Math.max(0, Math.ceil((endTime - Date.now()) / 1000))}s)` }]);
+            api.v1.ui.updateParts([
+              {
+                id: "header-wait-text",
+                text: `Wait (${Math.max(0, Math.ceil((endTime - Date.now()) / 1000))}s)`,
+              },
+            ]);
             this._updateWaitTimer(endTime);
           }
         } else {
@@ -158,34 +217,67 @@ export class SeHeaderBar extends SuiComponent<
           }
         } else {
           this._marqueeRunning = false;
-          this._marqueeText    = "";
+          this._marqueeText = "";
           if (showMarquee) {
             api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
           }
         }
       },
       (a, b) =>
-        a.segaRunning       === b.segaRunning       &&
-        a.statusText        === b.statusText        &&
-        a.genxStatus        === b.genxStatus        &&
+        a.segaRunning === b.segaRunning &&
+        a.statusText === b.statusText &&
+        a.genxStatus === b.genxStatus &&
         a.budgetWaitEndTime === b.budgetWaitEndTime,
     );
 
     const clearPart = await this._clearBtn.build();
 
     return row({
-      id:    "kse-sidebar-header",
-      style: { "justify-content": "space-between", "margin-bottom": "8px", "align-items": "center", gap: "8px" },
+      id: "kse-sidebar-header",
+      style: {
+        "justify-content": "space-between",
+        "margin-bottom": "8px",
+        "align-items": "center",
+        gap: "8px",
+      },
       content: [
         row({
           content: [
-            button({ id: "header-sega-start-btn", text: "S.E.G.A.", iconId: "play-circle" as IconId, style: BTN_STYLE,  callback: () => { store.dispatch(segaToggled()); } }),
-            button({ id: "header-sega-stop-btn",  text: "S.E.G.A.", iconId: "fast-forward" as IconId, style: { ...STOP_STYLE, display: "none" }, callback: () => { store.dispatch(segaToggled()); } }),
+            button({
+              id: "header-sega-start-btn",
+              text: "S.E.G.A.",
+              iconId: "play-circle" as IconId,
+              style: BTN_STYLE,
+              callback: () => {
+                store.dispatch(segaToggled());
+              },
+            }),
+            button({
+              id: "header-sega-stop-btn",
+              text: "S.E.G.A.",
+              iconId: "fast-forward" as IconId,
+              style: { ...STOP_STYLE, display: "none" },
+              callback: () => {
+                store.dispatch(segaToggled());
+              },
+            }),
           ],
         }),
-        text({ id: "header-sega-status",  text: "", style: STATUS_STYLE }),
-        button({ id: "header-continue-btn", text: "Continue", iconId: "fast-forward" as IconId, style: { ...CONTINUE_STYLE, display: "none" }, callback: () => { store.dispatch(uiUserPresenceConfirmed()); } }),
-        text({ id: "header-wait-text",   text: "", style: { ...WAIT_STYLE, display: "none" } }),
+        text({ id: "header-sega-status", text: "", style: STATUS_STYLE }),
+        button({
+          id: "header-continue-btn",
+          text: "Continue",
+          iconId: "fast-forward" as IconId,
+          style: { ...CONTINUE_STYLE, display: "none" },
+          callback: () => {
+            store.dispatch(uiUserPresenceConfirmed());
+          },
+        }),
+        text({
+          id: "header-wait-text",
+          text: "",
+          style: { ...WAIT_STYLE, display: "none" },
+        }),
         clearPart,
       ],
     });

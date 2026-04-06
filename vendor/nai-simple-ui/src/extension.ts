@@ -30,7 +30,12 @@
  *   await panel.remove();
  */
 
-import { SuiBase, type SuiBaseOptions, type SuiTheme, type ThemeOverride } from "./base.ts";
+import {
+  SuiBase,
+  type SuiBaseOptions,
+  type SuiTheme,
+  type ThemeOverride,
+} from "./base.ts";
 
 // ============================================================
 // SuiExtension
@@ -46,17 +51,19 @@ import { SuiBase, type SuiBaseOptions, type SuiTheme, type ThemeOverride } from 
  * @template TOptions - Options type extending SuiBaseOptions.
  */
 export abstract class SuiExtension<
-  TType    extends UIExtension["type"],
-  TExt     extends UIExtension & { type: TType },
-  TTheme   extends SuiTheme                            = SuiTheme,
-  TState   extends Record<string, unknown>             = Record<string, unknown>,
-  TOptions extends SuiBaseOptions<TTheme, TState>      = SuiBaseOptions<TTheme, TState>,
+  TType extends UIExtension["type"],
+  TExt extends UIExtension & { type: TType },
+  TTheme extends SuiTheme = SuiTheme,
+  TState extends Record<string, unknown> = Record<string, unknown>,
+  TOptions extends SuiBaseOptions<TTheme, TState> = SuiBaseOptions<
+    TTheme,
+    TState
+  >,
 > extends SuiBase<TTheme, TState, TOptions> {
-
   // ── Private properties ────────────────────────────────────
 
-  private _type:          TType;
-  private _isRegistered:  boolean = false;
+  private _type: TType;
+  private _isRegistered: boolean = false;
 
   // ── Constructor ───────────────────────────────────────────
 
@@ -66,7 +73,11 @@ export abstract class SuiExtension<
    * @param baseTheme  Extension default theme. Merged with options.theme at construction.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(options: TOptions, type: TType, baseTheme?: ThemeOverride<TTheme> | TTheme) {
+  constructor(
+    options: TOptions,
+    type: TType,
+    baseTheme?: ThemeOverride<TTheme> | TTheme,
+  ) {
     super(options, baseTheme);
     this._type = type;
   }
@@ -106,9 +117,20 @@ export abstract class SuiExtension<
   async update(partial?: Partial<Omit<TExt, "type" | "id">>): Promise<void> {
     if (!this._isRegistered) return;
     if (partial !== undefined) {
-      await api.v1.ui.update([{ ...partial, id: this.id, type: this.type } as unknown as Partial<UIExtension> & { id: string }]);
+      await api.v1.ui.update([
+        {
+          ...partial,
+          id: this.id,
+          type: this.type,
+        } as unknown as Partial<UIExtension> & { id: string },
+      ]);
     } else {
-      await api.v1.ui.update([{ ...await this.build(), id: this.id } as unknown as Partial<UIExtension> & { id: string }]);
+      await api.v1.ui.update([
+        {
+          ...(await this.build()),
+          id: this.id,
+        } as unknown as Partial<UIExtension> & { id: string },
+      ]);
     }
   }
 

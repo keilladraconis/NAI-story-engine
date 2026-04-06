@@ -17,20 +17,23 @@ import { SuiExtension } from "../extension.ts";
 import type { SuiBaseOptions, SuiTheme } from "../base.ts";
 import type { AnySuiComponent } from "../component.ts";
 import * as Theme from "./theme/sidebar-panel.ts";
-import { type SuiSidebarPanelStateTheme, type SuiSidebarPanelTheme } from "./theme/sidebar-panel.ts";
+import {
+  type SuiSidebarPanelStateTheme,
+  type SuiSidebarPanelTheme,
+} from "./theme/sidebar-panel.ts";
 
 // ============================================================
 // Options
 // ============================================================
 
 export type SuiSidebarPanelOptions<
-  TTheme extends SuiTheme                = SuiSidebarPanelTheme,
+  TTheme extends SuiTheme = SuiSidebarPanelTheme,
   TState extends Record<string, unknown> = Record<string, unknown>,
 > = {
   /** Name displayed in the sidebar tab list. */
-  name:     string;
+  name: string;
   /** Icon displayed left of the name in the sidebar tab list. */
-  iconId?:  IconId;
+  iconId?: IconId;
   /** Components to render in the sidebar panel. Built at register/update time. */
   children: AnySuiComponent[];
 } & SuiBaseOptions<TTheme, TState>;
@@ -40,7 +43,7 @@ export type SuiSidebarPanelOptions<
 // ============================================================
 
 export class SuiSidebarPanel<
-  TTheme extends SuiTheme                = SuiSidebarPanelTheme,
+  TTheme extends SuiTheme = SuiSidebarPanelTheme,
   TState extends Record<string, unknown> = Record<string, unknown>,
 > extends SuiExtension<
   "sidebarPanel",
@@ -49,7 +52,10 @@ export class SuiSidebarPanel<
   TState,
   SuiSidebarPanelOptions<TTheme, TState>
 > {
-  constructor(options: SuiSidebarPanelOptions<TTheme, TState>, baseTheme = Theme.sidebarPanel as unknown as TTheme) {
+  constructor(
+    options: SuiSidebarPanelOptions<TTheme, TState>,
+    baseTheme = Theme.sidebarPanel as unknown as TTheme,
+  ) {
     super(options, "sidebarPanel", baseTheme);
   }
 
@@ -59,12 +65,15 @@ export class SuiSidebarPanel<
   }
 
   async compose(): Promise<UIExtensionSidebarPanel> {
-    const t       = this.resolveTheme();
-    const content = await this.buildContent(this.options.children, SuiBase.listChildrenStyle(t.self));
+    const t = this.resolveTheme();
+    const content = await this.buildContent(
+      this.options.children,
+      SuiBase.listChildrenStyle(t.self),
+    );
     return {
-      type:   this.type,
-      id:     this.id,
-      name:   this.options.name,
+      type: this.type,
+      id: this.id,
+      name: this.options.name,
       iconId: this.options.iconId,
       content,
     };

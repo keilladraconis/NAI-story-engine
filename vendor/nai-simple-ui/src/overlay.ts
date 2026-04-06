@@ -25,15 +25,22 @@
  *   }
  */
 
-import { SuiBase, type SuiBaseOptions, type SuiTheme, type ThemeOverride } from "./base.ts"; // ThemeOverride used in constructor signature
+import {
+  SuiBase,
+  type SuiBaseOptions,
+  type SuiTheme,
+  type ThemeOverride,
+} from "./base.ts"; // ThemeOverride used in constructor signature
 import { type AnySuiComponent } from "./component.ts";
 
 /** Handle returned by the native NAI overlay open call. Stored internally after open(). */
 export type SuiOverlayHandle = {
-  update:   (options: Partial<ModalOptions> | Partial<WindowOptions>) => Promise<void>;
-  close:    () => Promise<void>;
+  update: (
+    options: Partial<ModalOptions> | Partial<WindowOptions>,
+  ) => Promise<void>;
+  close: () => Promise<void>;
   isClosed: () => boolean;
-  closed:   Promise<void>;
+  closed: Promise<void>;
 };
 
 /**
@@ -43,8 +50,8 @@ export type SuiOverlayHandle = {
  * Per-item positional styles are carried by the theme's `self` part (SuiListTheme).
  */
 export type SuiOverlayOptions<
-  TTheme extends SuiTheme                        = SuiTheme,
-  TState extends Record<string, unknown>         = Record<string, unknown>,
+  TTheme extends SuiTheme = SuiTheme,
+  TState extends Record<string, unknown> = Record<string, unknown>,
 > = {
   children?: AnySuiComponent[];
 } & SuiBaseOptions<TTheme, TState>;
@@ -61,11 +68,13 @@ export type SuiOverlayPartialOptions<TOptions extends SuiOverlayOptions> =
  * @template TOptions - Options type extending SuiOverlayOptions.
  */
 export abstract class SuiOverlay<
-  TTheme   extends SuiTheme                              = SuiTheme,
-  TState   extends Record<string, unknown>               = Record<string, unknown>,
-  TOptions extends SuiOverlayOptions<TTheme, TState>     = SuiOverlayOptions<TTheme, TState>,
+  TTheme extends SuiTheme = SuiTheme,
+  TState extends Record<string, unknown> = Record<string, unknown>,
+  TOptions extends SuiOverlayOptions<TTheme, TState> = SuiOverlayOptions<
+    TTheme,
+    TState
+  >,
 > extends SuiBase<TTheme, TState, TOptions> {
-
   // ── Private properties ────────────────────────────────────
 
   private _handle: SuiOverlayHandle | undefined;
@@ -169,8 +178,19 @@ export abstract class SuiOverlay<
    * @internal Do not call directly — use open() or build() instead.
    */
   async compose(): Promise<UIPart[]> {
-    const t = this.resolveTheme() as { self?: { base?: object; itemFirst?: object; itemLast?: object; itemEven?: object; itemOdd?: object } };
-    return this.buildContent(this.options.children ?? [], t.self ? SuiBase.listChildrenStyle(t.self) : undefined);
+    const t = this.resolveTheme() as {
+      self?: {
+        base?: object;
+        itemFirst?: object;
+        itemLast?: object;
+        itemEven?: object;
+        itemOdd?: object;
+      };
+    };
+    return this.buildContent(
+      this.options.children ?? [],
+      t.self ? SuiBase.listChildrenStyle(t.self) : undefined,
+    );
   }
 
   /**
@@ -184,7 +204,9 @@ export abstract class SuiOverlay<
    *     await this.updateOverlay({ title: t.self.title });
    *   }
    */
-  protected async updateOverlay(fields: Partial<ModalOptions> | Partial<WindowOptions>): Promise<void> {
+  protected async updateOverlay(
+    fields: Partial<ModalOptions> | Partial<WindowOptions>,
+  ): Promise<void> {
     if (!this._handle) return;
     await this._handle.update(fields);
   }

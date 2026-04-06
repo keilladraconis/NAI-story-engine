@@ -7,7 +7,7 @@ import { type ThemeOverride } from "../../base.ts";
 export type SuiContextMenuButtonStateTheme = {
   self: {
     style?: object;
-    text?:  string;
+    text?: string;
   };
 };
 

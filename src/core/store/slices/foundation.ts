@@ -83,7 +83,8 @@ export const foundationSlice = createSlice({
     worldStateGenerationRequested: (state) => state,
     attgGenerationRequested: (state) => state,
     styleGenerationRequested: (state) => state,
-    tensionGenerationRequested: (state, _payload: { tensionId: string }) => state,
+    tensionGenerationRequested: (state, _payload: { tensionId: string }) =>
+      state,
   },
 });
 

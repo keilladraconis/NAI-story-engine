@@ -151,7 +151,8 @@ export interface StoryContextOptions {
 export const getStoryContextMessages = async (
   options: StoryContextOptions = {},
 ): Promise<Message[]> => {
-  const { includeLorebookEntries = true, contextLimitReduction = 4000 } = options;
+  const { includeLorebookEntries = true, contextLimitReduction = 4000 } =
+    options;
 
   try {
     const messages = await api.v1.buildContext({ contextLimitReduction });
@@ -202,7 +203,11 @@ export const getStoryContextMessages = async (
             // Walk through original content, tracking normalized position
             let normalizedPos = 0;
             let cutIndex = 0;
-            for (let j = 0; j < content.length && normalizedPos < normalizedPrefill.length; j++) {
+            for (
+              let j = 0;
+              j < content.length && normalizedPos < normalizedPrefill.length;
+              j++
+            ) {
               const char = content[j];
               // Skip extra newlines (those that get collapsed in normalization)
               if (char === "\n" && j > 0 && content[j - 1] === "\n") {
@@ -246,7 +251,16 @@ export const getStoryContextMessages = async (
  */
 export interface StoryEnginePrefixOptions {
   /** Snapshot sections to exclude (e.g., "canon" when generating canon) */
-  excludeSections?: Array<"canon" | "setting" | "attg" | "style" | "brainstorm" | "dulfs" | "storyText" | "foundation">;
+  excludeSections?: Array<
+    | "canon"
+    | "setting"
+    | "attg"
+    | "style"
+    | "brainstorm"
+    | "dulfs"
+    | "storyText"
+    | "foundation"
+  >;
 }
 
 export const buildStoryEnginePrefix = async (
@@ -257,9 +271,7 @@ export const buildStoryEnginePrefix = async (
   const excluded = new Set(options.excludeSections || []);
 
   // --- MSG 1: System prompt + weaving ---
-  const systemPrompt = String(
-    (await api.v1.config.get("system_prompt")) || "",
-  );
+  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
   const weavingPrompt = String(
     (await api.v1.config.get("lorebook_weaving_prompt")) || "",
   );
@@ -287,7 +299,8 @@ export const buildStoryEnginePrefix = async (
   if (!excluded.has("foundation")) {
     const { shape, intent, worldState, tensions } = state.foundation;
     const foundationParts: string[] = [];
-    if (shape) foundationParts.push(`Shape: ${shape.name}\n${shape.description}`);
+    if (shape)
+      foundationParts.push(`Shape: ${shape.name}\n${shape.description}`);
     if (intent) foundationParts.push(`Intent: ${intent}`);
     if (worldState) foundationParts.push(`World State: ${worldState}`);
     const activeTensions = tensions.filter((t) => !t.resolved);
@@ -296,7 +309,9 @@ export const buildStoryEnginePrefix = async (
       foundationParts.push(`Tensions:\n${tensionLines}`);
     }
     if (foundationParts.length > 0) {
-      stableSections.push(`[NARRATIVE FOUNDATION]\n${foundationParts.join("\n")}`);
+      stableSections.push(
+        `[NARRATIVE FOUNDATION]\n${foundationParts.join("\n")}`,
+      );
     }
   }
 
@@ -344,9 +359,7 @@ export const buildStoryEnginePrefix = async (
   }
 
   // --- Assemble prefix ---
-  const messages: Message[] = [
-    { role: "system", content: msg1Content },
-  ];
+  const messages: Message[] = [{ role: "system", content: msg1Content }];
 
   if (stableSections.length > 0) {
     messages.push({
@@ -410,9 +423,7 @@ export const buildCruciblePrefix = async (
   const systemPrompt = String(
     (await api.v1.config.get("crucible_system_prompt")) || "",
   );
-  const messages: Message[] = [
-    { role: "system", content: systemPrompt },
-  ];
+  const messages: Message[] = [{ role: "system", content: systemPrompt }];
 
   // --- MSG 2 (optional): Creative grounding ---
   const groundingSections: string[] = [];
@@ -491,7 +502,8 @@ export const createBrainstormFactory = (
     const systemPrompt = String(
       (await api.v1.config.get("system_prompt")) || "",
     );
-    const promptKey = mode === "critic" ? "brainstorm_critic_prompt" : "brainstorm_prompt";
+    const promptKey =
+      mode === "critic" ? "brainstorm_critic_prompt" : "brainstorm_prompt";
     const brainstormInstruction = String(
       (await api.v1.config.get(promptKey)) || "",
     );
@@ -547,7 +559,13 @@ export const createBrainstormFactory = (
 
     return {
       messages,
-      params: { model, max_tokens: 300, temperature: 0.95, min_p: 0.05, presence_penalty: 0.05 },
+      params: {
+        model,
+        max_tokens: 300,
+        temperature: 0.95,
+        min_p: 0.05,
+        presence_penalty: 0.05,
+      },
     };
   };
 };
@@ -698,9 +716,7 @@ export const createCanonFactory = (
       excludeSections: ["canon"],
     });
 
-    const messages: Message[] = [
-      ...prefix,
-    ];
+    const messages: Message[] = [...prefix];
 
     const state = getState();
 
@@ -740,7 +756,10 @@ export const createCanonFactory = (
         presence_penalty: 0.1,
         max_tokens: 900,
       },
-      contextPinning: { head: 1, tail: state.foundation?.intent || state.foundation?.shape ? 3 : 2 },
+      contextPinning: {
+        head: 1,
+        tail: state.foundation?.intent || state.foundation?.shape ? 3 : 2,
+      },
     };
   };
 };

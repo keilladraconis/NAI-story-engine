@@ -97,17 +97,17 @@ export type GenerationRequestStatus =
 export interface GenerationRequest {
   id: string;
   type:
-  | "field"
-  | "list"
-  | "brainstorm"
-  | "brainstormChatTitle"
-  | "lorebookContent"
-  | "lorebookKeys"
-  | "lorebookRefine"
-  | "bootstrap"
-  | "forge"
-  | "foundation"
-  | "tension";
+    | "field"
+    | "list"
+    | "brainstorm"
+    | "brainstormChatTitle"
+    | "lorebookContent"
+    | "lorebookKeys"
+    | "lorebookRefine"
+    | "bootstrap"
+    | "forge"
+    | "foundation"
+    | "tension";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -119,17 +119,26 @@ export interface GenerationStrategy {
   messageFactory?: MessageFactory; // JIT strategy builder
   params?: GenerationParams; // Optional if provided by factory
   target:
-  | { type: "brainstorm"; messageId: string }
-  | { type: "brainstormChatTitle"; chatIndex: number }
-  | { type: "field"; fieldId: string }
-  | { type: "list"; fieldId: string }
-  | { type: "lorebookContent"; entryId: string }
-  | { type: "lorebookKeys"; entryId: string }
-  | { type: "lorebookRefine"; entryId: string }
-  | { type: "bootstrap" }
-  | { type: "forge"; batchId: string; step: number; forgeGuidance: string; brainstormContext: string }
-  | { type: "foundation"; field: "shape" | "intent" | "worldState" | "attg" | "style" }
-  | { type: "tension"; tensionId: string };
+    | { type: "brainstorm"; messageId: string }
+    | { type: "brainstormChatTitle"; chatIndex: number }
+    | { type: "field"; fieldId: string }
+    | { type: "list"; fieldId: string }
+    | { type: "lorebookContent"; entryId: string }
+    | { type: "lorebookKeys"; entryId: string }
+    | { type: "lorebookRefine"; entryId: string }
+    | { type: "bootstrap" }
+    | {
+        type: "forge";
+        batchId: string;
+        step: number;
+        forgeGuidance: string;
+        brainstormContext: string;
+      }
+    | {
+        type: "foundation";
+        field: "shape" | "intent" | "worldState" | "attg" | "style";
+      }
+    | { type: "tension"; tensionId: string };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };
@@ -151,7 +160,7 @@ export type EntityLifecycle = "draft" | "live";
 
 export interface WorldBatch {
   id: string;
-  name: string;       // "Main", "Rusty Anchor Regulars", etc.
+  name: string; // "Main", "Rusty Anchor Regulars", etc.
   entityIds: string[]; // ordered
 }
 
@@ -182,7 +191,7 @@ export interface WorldState {
 // Foundation Types (v11)
 
 export interface ShapeData {
-  name: string;        // Short label — e.g. "Slice of Life", "Tragedy"
+  name: string; // Short label — e.g. "Slice of Life", "Tragedy"
   description: string; // Structural logic — what this shape leans toward
 }
 

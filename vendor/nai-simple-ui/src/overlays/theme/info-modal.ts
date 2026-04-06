@@ -8,15 +8,15 @@ import { type SuiTextPartTheme } from "../../components/theme/text.ts";
 
 /** Resolved part map for a single SuiInfoModal state. */
 export type SuiInfoModalStateTheme = {
-  self:    {
-    title?:            string;
-    size?:             "full" | "large" | "medium" | "small";
+  self: {
+    title?: string;
+    size?: "full" | "large" | "medium" | "small";
     hasMinimumHeight?: boolean;
-    fillWidth?:        boolean;
+    fillWidth?: boolean;
   };
   message: SuiTextPartTheme;
   dismiss: SuiButtonPartTheme;
-  body?:   SuiStylePartTheme;
+  body?: SuiStylePartTheme;
 };
 
 /** Theme for SuiInfoModal. Structure: <state>.<part>.<property>. */
@@ -32,21 +32,21 @@ export const infoModal = {
     },
     message: {
       style: {
-        padding:    "4px 0 12px",
-        fontSize:   "0.9em",
+        padding: "4px 0 12px",
+        fontSize: "0.9em",
         lineHeight: "1.5",
       },
     },
     dismiss: {
-      text:  "OK",
+      text: "OK",
       style: {
-        margin:  "0 0 20px",
+        margin: "0 0 20px",
         display: "block",
       },
     },
     body: {
       style: {
-        display:       "flex",
+        display: "flex",
         flexDirection: "column",
       },
     },

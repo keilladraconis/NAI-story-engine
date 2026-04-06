@@ -56,15 +56,21 @@ function formatEstablishedWorld(state: RootState): string {
     if (!group) continue;
     lines.push(`${FIELD_LABEL[fieldId]}:`);
     for (const e of group) {
-      lines.push(`  - ${e.name}${e.summary ? `: ${e.summary.slice(0, 120)}` : ""}`);
+      lines.push(
+        `  - ${e.name}${e.summary ? `: ${e.summary.slice(0, 120)}` : ""}`,
+      );
     }
   }
 
   if (state.world.relationships.length > 0) {
     lines.push("Relationships:");
     for (const rel of state.world.relationships) {
-      const from = state.world.entities.find((e) => e.id === rel.fromEntityId)?.name ?? rel.fromEntityId;
-      const to = state.world.entities.find((e) => e.id === rel.toEntityId)?.name ?? rel.toEntityId;
+      const from =
+        state.world.entities.find((e) => e.id === rel.fromEntityId)?.name ??
+        rel.fromEntityId;
+      const to =
+        state.world.entities.find((e) => e.id === rel.toEntityId)?.name ??
+        rel.toEntityId;
       lines.push(`  - ${from} → ${to}: ${rel.description}`);
     }
   }
@@ -82,7 +88,9 @@ function formatWorldState(state: RootState): string {
 
   const activeTensions = foundation.tensions.filter((t) => !t.resolved);
   if (activeTensions.length > 0) {
-    parts.push(`=== TENSIONS ===\n${activeTensions.map((t) => `- ${t.text}`).join("\n")}`);
+    parts.push(
+      `=== TENSIONS ===\n${activeTensions.map((t) => `- ${t.text}`).join("\n")}`,
+    );
   }
 
   return parts.join("\n");
@@ -110,7 +118,8 @@ function buildForgePassLog(state: RootState, batchId: string): string {
   }
 
   const batchRels = state.world.relationships.filter(
-    (r) => batchEntityIds.has(r.fromEntityId) && batchEntityIds.has(r.toEntityId),
+    (r) =>
+      batchEntityIds.has(r.fromEntityId) && batchEntityIds.has(r.toEntityId),
   );
   for (const rel of batchRels) {
     const from = batchEntities.find((e) => e.id === rel.fromEntityId)!;
@@ -149,7 +158,10 @@ export const createForgeFactory = (
 
     // 2. Brainstorm context — stable, captured at loop start
     if (brainstormContext) {
-      messages.push({ role: "assistant", content: `=== BRAINSTORM ===\n${brainstormContext}` });
+      messages.push({
+        role: "assistant",
+        content: `=== BRAINSTORM ===\n${brainstormContext}`,
+      });
     }
 
     // 3. Story shape — stable
@@ -162,12 +174,18 @@ export const createForgeFactory = (
 
     // 4. Foundation intent (strategic, persistent) — stable
     if (foundation.intent) {
-      messages.push({ role: "assistant", content: `=== STORY INTENT ===\n${foundation.intent}` });
+      messages.push({
+        role: "assistant",
+        content: `=== STORY INTENT ===\n${foundation.intent}`,
+      });
     }
 
     // 5. Forge intent (tactical, per-session) — stable
     if (forgeGuidance.trim()) {
-      messages.push({ role: "assistant", content: `=== FORGE GUIDANCE ===\n${forgeGuidance.trim()}` });
+      messages.push({
+        role: "assistant",
+        content: `=== FORGE GUIDANCE ===\n${forgeGuidance.trim()}`,
+      });
     }
 
     // 6. Established world (live entities) — semi-stable
@@ -183,9 +201,10 @@ export const createForgeFactory = (
     }
 
     // 8. User: step instruction
-    const stepNote = step === FORGE_MAX_STEPS - 1
-      ? `Step ${step} of ${FORGE_MAX_STEPS}. Consider closing with [CRITIQUE] if the draft is complete.`
-      : `Step ${step} of ${FORGE_MAX_STEPS}. Emit one command.`;
+    const stepNote =
+      step === FORGE_MAX_STEPS - 1
+        ? `Step ${step} of ${FORGE_MAX_STEPS}. Consider closing with [CRITIQUE] if the draft is complete.`
+        : `Step ${step} of ${FORGE_MAX_STEPS}. Emit one command.`;
     messages.push({ role: "user", content: stepNote });
 
     // 9. Prior command log + prefill primer — single assistant message.
@@ -225,7 +244,13 @@ export const buildForgeStrategy = (
   const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE" : "[";
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createForgeFactory(getState, batchId, step, forgeGuidance, brainstormContext ?? ""),
+    messageFactory: createForgeFactory(
+      getState,
+      batchId,
+      step,
+      forgeGuidance,
+      brainstormContext ?? "",
+    ),
     target: {
       type: "forge",
       batchId,

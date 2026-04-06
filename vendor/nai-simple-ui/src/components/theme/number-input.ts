@@ -10,7 +10,7 @@ export type SuiNumberInputStateTheme = {
 };
 
 export type SuiNumberInputTheme = {
-  default:   SuiNumberInputStateTheme;
+  default: SuiNumberInputStateTheme;
   disabled?: PartialState<SuiNumberInputStateTheme>;
 };
 

@@ -6,12 +6,12 @@ import { type ThemeOverride } from "../../base.ts";
 
 export type SuiSidebarPanelStateTheme = {
   self: {
-    style?:     object;
-    item?:      object;
+    style?: object;
+    item?: object;
     itemFirst?: object;
-    itemLast?:  object;
-    itemEven?:  object;
-    itemOdd?:   object;
+    itemLast?: object;
+    itemEven?: object;
+    itemOdd?: object;
   };
 };
 

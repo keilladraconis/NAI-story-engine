@@ -18,38 +18,38 @@ import { colors } from "../theme";
 
 export type SeConfirmButtonOptions = {
   /** Button label in default state. */
-  label:        string;
-  iconId?:      IconId;
+  label: string;
+  iconId?: IconId;
   /** Label shown in pending (confirm?) state. Defaults to "Confirm?". */
   confirmLabel?: string;
-  style?:       object;
-  onConfirm:    () => Promise<void>;
-  timeout?:     number;
-  id?:          string;
+  style?: object;
+  onConfirm: () => Promise<void>;
+  timeout?: number;
+  id?: string;
 };
 
 /** Thin Story Engine wrapper around SuiConfirmButton. */
 export class SeConfirmButton extends SuiConfirmButton {
   constructor(options: SeConfirmButtonOptions) {
     const suiOptions: SuiConfirmButtonOptions = {
-      id:        options.id,
+      id: options.id,
       onConfirm: options.onConfirm,
-      timeout:   options.timeout ?? 4000,
-      state:     { pending: false },
-      theme:     {
+      timeout: options.timeout ?? 4000,
+      state: { pending: false },
+      theme: {
         default: {
           self: {
-            text:   options.label,
+            text: options.label,
             iconId: options.iconId,
-            style:  options.style ?? {},
+            style: options.style ?? {},
           },
         },
         pending: {
           self: {
-            text:   options.confirmLabel ?? "Confirm?",
+            text: options.confirmLabel ?? "Confirm?",
             iconId: "alert-triangle" as IconId,
-            style:  {
-              color:       colors.warning,
+            style: {
+              color: colors.warning,
               "font-weight": "bold",
               ...(options.style ?? {}),
             },

@@ -25,8 +25,12 @@ export type SuiTextOptions = SuiComponentOptions<SuiTextTheme>;
  * Text in `{{curly braces}}` is processed as template storage keys unless `noTemplate` is true in theme.
  * Set `markdown` to true in theme to enable markdown rendering.
  */
-export class SuiText extends SuiComponent<SuiTextTheme, Record<string, unknown>, SuiTextOptions, UIPartText> {
-
+export class SuiText extends SuiComponent<
+  SuiTextTheme,
+  Record<string, unknown>,
+  SuiTextOptions,
+  UIPartText
+> {
   constructor(options: SuiTextOptions) {
     super(options, Theme.text);
   }
@@ -44,12 +48,12 @@ export class SuiText extends SuiComponent<SuiTextTheme, Record<string, unknown>,
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:       "text",
-      id:         this.id,
-      text:       t.self.text,
-      markdown:   t.self.markdown,
+      type: "text",
+      id: this.id,
+      text: t.self.text,
+      markdown: t.self.markdown,
       noTemplate: t.self.noTemplate,
-      style:      this._composedStyle,
+      style: this._composedStyle,
     };
   }
 }

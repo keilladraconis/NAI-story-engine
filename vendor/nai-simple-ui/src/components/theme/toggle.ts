@@ -5,8 +5,8 @@
 import { type PartialState, type ThemeOverride } from "../../base.ts";
 
 export type SuiTogglePartTheme = {
-  style?:  object;
-  text?:   string;
+  style?: object;
+  text?: string;
   iconId?: IconId;
 };
 
@@ -15,8 +15,8 @@ export type SuiToggleStateTheme = {
 };
 
 export type SuiToggleTheme = {
-  default:   SuiToggleStateTheme;
-  on?:       PartialState<SuiToggleStateTheme>;
+  default: SuiToggleStateTheme;
+  on?: PartialState<SuiToggleStateTheme>;
   disabled?: PartialState<SuiToggleStateTheme>;
 };
 
@@ -26,7 +26,7 @@ export const toggle = {
       iconId: "toggle-left",
       style: {
         background: "none",
-        opacity:    "0.45",
+        opacity: "0.45",
       },
     },
   },
@@ -34,7 +34,7 @@ export const toggle = {
     self: {
       iconId: "toggle-right",
       style: {
-        color:   "rgb(87, 178, 96)",
+        color: "rgb(87, 178, 96)",
         opacity: "1",
       },
     },

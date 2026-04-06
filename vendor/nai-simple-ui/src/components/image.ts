@@ -26,8 +26,12 @@ export type SuiImageOptions = SuiComponentOptions<SuiImageTheme>;
  * Image display component. Stateless — all visual treatment is theme-driven.
  * src, alt, height, width, and style are all resolved from theme via resolveTheme() on each compose() call.
  */
-export class SuiImage extends SuiComponent<SuiImageTheme, Record<string, unknown>, SuiImageOptions, UIPartImage> {
-
+export class SuiImage extends SuiComponent<
+  SuiImageTheme,
+  Record<string, unknown>,
+  SuiImageOptions,
+  UIPartImage
+> {
   constructor(options: SuiImageOptions) {
     super(options, Theme.image);
   }
@@ -45,13 +49,13 @@ export class SuiImage extends SuiComponent<SuiImageTheme, Record<string, unknown
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:   "image",
-      id:     this.id,
-      src:    t.self.src,
-      alt:    t.self.alt,
+      type: "image",
+      id: this.id,
+      src: t.self.src,
+      alt: t.self.alt,
       height: t.self.height,
-      width:  t.self.width,
-      style:  this._composedStyle,
+      width: t.self.width,
+      style: this._composedStyle,
     };
   }
 }

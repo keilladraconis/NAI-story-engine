@@ -15,10 +15,15 @@ import {
   relationshipUpdated,
 } from "../../../../src/core/store/slices/world";
 import { WorldState } from "../../../../src/core/store/types";
-import { FieldID, DulfsFieldID } from "../../../../src/config/field-definitions";
+import {
+  FieldID,
+  DulfsFieldID,
+} from "../../../../src/config/field-definitions";
 
-const reduce = (state: WorldState, action: { type: string; payload?: unknown }) =>
-  worldSlice.reducer(state, action as any);
+const reduce = (
+  state: WorldState,
+  action: { type: string; payload?: unknown },
+) => worldSlice.reducer(state, action as any);
 
 const makeState = (overrides: Partial<WorldState> = {}): WorldState => ({
   batches: [],
@@ -88,7 +93,11 @@ describe("entityCast", () => {
 
 describe("entityReforged", () => {
   it("sets lifecycle back to draft and clears lorebookEntryId", () => {
-    const live = { ...ENTITY, lifecycle: "live" as const, lorebookEntryId: "lb1" };
+    const live = {
+      ...ENTITY,
+      lifecycle: "live" as const,
+      lorebookEntryId: "lb1",
+    };
     const state = reduce(
       makeState({ entities: [live] }),
       entityReforged({ entityId: "e1" }),
@@ -100,7 +109,12 @@ describe("entityReforged", () => {
 
 describe("entityDeleted", () => {
   it("removes the entity and its relationships", () => {
-    const rel = { id: "r1", fromEntityId: "e1", toEntityId: "e2", description: "ally" };
+    const rel = {
+      id: "r1",
+      fromEntityId: "e1",
+      toEntityId: "e2",
+      description: "ally",
+    };
     const state = reduce(
       makeState({ entities: [ENTITY], relationships: [rel] }),
       entityDeleted({ entityId: "e1" }),
@@ -126,7 +140,11 @@ describe("entitySummaryUpdated", () => {
 
 describe("entityBound", () => {
   it("adds an entity directly in live state", () => {
-    const bound = { ...ENTITY, lifecycle: "live" as const, lorebookEntryId: "lb1" };
+    const bound = {
+      ...ENTITY,
+      lifecycle: "live" as const,
+      lorebookEntryId: "lb1",
+    };
     const state = reduce(makeState(), entityBound({ entity: bound }));
     expect(state.entities[0].lifecycle).toBe("live");
     expect(state.entities[0].lorebookEntryId).toBe("lb1");
@@ -135,7 +153,11 @@ describe("entityBound", () => {
 
 describe("entityUnbound", () => {
   it("removes the entity from world state", () => {
-    const live = { ...ENTITY, lifecycle: "live" as const, lorebookEntryId: "lb1" };
+    const live = {
+      ...ENTITY,
+      lifecycle: "live" as const,
+      lorebookEntryId: "lb1",
+    };
     const state = reduce(
       makeState({ entities: [live] }),
       entityUnbound({ entityId: "e1" }),
@@ -148,7 +170,12 @@ describe("entityUnbound", () => {
 // Relationships
 // ─────────────────────────────────────────────────────────────────────────────
 
-const REL = { id: "r1", fromEntityId: "e1", toEntityId: "e2", description: "ally" };
+const REL = {
+  id: "r1",
+  fromEntityId: "e1",
+  toEntityId: "e2",
+  description: "ally",
+};
 
 describe("relationshipAdded", () => {
   it("adds a relationship", () => {

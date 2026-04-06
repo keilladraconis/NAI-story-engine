@@ -33,7 +33,13 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type AnySuiComponent, type SuiComponentOptions, type SuiFilterResult } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type AnySuiComponent,
+  type SuiComponentOptions,
+  type SuiFilterResult,
+} from "../component.ts";
 import * as Theme from "./theme/card.ts";
 import { type SuiCardStateTheme, type SuiCardTheme } from "./theme/card.ts";
 import { SuiButton } from "./button.ts";
@@ -49,43 +55,47 @@ export type SuiCardState = {
 
 /** options carries data only — all visual properties live in theme. */
 export type SuiCardOptions = {
-  icon?:                IconId;
-  label:                string;
-  sublabel?:            string;
-  actions?:             AnySuiComponent[];
-  toggle?:              SuiToggle;
-  iconCallback?:        () => void;
-  labelCallback?:       () => void;
-  sublabelCallback?:    () => void;
+  icon?: IconId;
+  label: string;
+  sublabel?: string;
+  actions?: AnySuiComponent[];
+  toggle?: SuiToggle;
+  iconCallback?: () => void;
+  labelCallback?: () => void;
+  sublabelCallback?: () => void;
 } & SuiComponentOptions<SuiCardTheme, SuiCardState>;
 
 /**
  * Structured card with icon, label, sublabel, actions, and toggle.
  * Stateful (disabled). Icon, label, sublabel dim when disabled — toggle is unaffected.
  */
-export class SuiCard extends SuiComponent<SuiCardTheme, SuiCardState, SuiCardOptions, UIPartRow> {
-
+export class SuiCard extends SuiComponent<
+  SuiCardTheme,
+  SuiCardState,
+  SuiCardOptions,
+  UIPartRow
+> {
   constructor(options: SuiCardOptions) {
     super(options, Theme.card);
   }
 
   /** Stable IDs for this component's owned children. */
   override get ids(): {
-    self:     string;
-    icon:     string;
-    body:     string;
-    title:    string;
-    label:    string;
-    actions:  string;
+    self: string;
+    icon: string;
+    body: string;
+    title: string;
+    label: string;
+    actions: string;
     sublabel: string;
   } {
     return {
-      self:     this.id,
-      icon:     `${this.id}.icon`,
-      body:     `${this.id}.body`,
-      title:    `${this.id}.title`,
-      label:    `${this.id}.label`,
-      actions:  `${this.id}.actions`,
+      self: this.id,
+      icon: `${this.id}.icon`,
+      body: `${this.id}.body`,
+      title: `${this.id}.title`,
+      label: `${this.id}.label`,
+      actions: `${this.id}.actions`,
       sublabel: `${this.id}.sublabel`,
     };
   }
@@ -99,7 +109,9 @@ export class SuiCard extends SuiComponent<SuiCardTheme, SuiCardState, SuiCardOpt
       .filter((a): a is SuiButton => a instanceof SuiButton)
       .map((a) => a.resolveTheme().self.text)
       .filter(Boolean);
-    return [this.options.label, this.options.sublabel, ...actionTexts].filter(Boolean).join(" ");
+    return [this.options.label, this.options.sublabel, ...actionTexts]
+      .filter(Boolean)
+      .join(" ");
   }
 
   /**
@@ -107,9 +119,19 @@ export class SuiCard extends SuiComponent<SuiCardTheme, SuiCardState, SuiCardOpt
    * Child fields (actions, toggle) are interactive controls, not filterable structure.
    */
   override filter(query: string): SuiFilterResult {
-    const visible = query === "" || this.searchText.toLowerCase().includes(query);
-    const full    = { ...this._baseStyle, ...this._composedStyle, ...this._variantStyle };
-    return { visible, updates: [{ id: this.id, style: visible ? full : { ...full, display: "none" } }] };
+    const visible =
+      query === "" || this.searchText.toLowerCase().includes(query);
+    const full = {
+      ...this._baseStyle,
+      ...this._composedStyle,
+      ...this._variantStyle,
+    };
+    return {
+      visible,
+      updates: [
+        { id: this.id, style: visible ? full : { ...full, display: "none" } },
+      ],
+    };
   }
 
   /** Merges active state partials onto default. selected stacks first, disabled stacks on top. */
@@ -126,14 +148,18 @@ export class SuiCard extends SuiComponent<SuiCardTheme, SuiCardState, SuiCardOpt
    * Toggle is excluded — never dimmed.
    */
   override async onSync(): Promise<void> {
-    const t   = this.resolveTheme();
+    const t = this.resolveTheme();
     const ids = this.ids;
 
     const updates: { id: string; iconId?: IconId; style?: object }[] = [
       { id: ids.label, style: t.label.style },
     ];
     if (this.options.icon !== undefined) {
-      updates.push({ id: ids.icon, iconId: this.options.icon, style: t.icon.style });
+      updates.push({
+        id: ids.icon,
+        iconId: this.options.icon,
+        style: t.icon.style,
+      });
     }
     if (this.options.sublabel !== undefined) {
       updates.push({ id: ids.sublabel, style: t.sublabel.style });
@@ -147,29 +173,39 @@ export class SuiCard extends SuiComponent<SuiCardTheme, SuiCardState, SuiCardOpt
    * @returns {UIPartRow}
    */
   async compose(): Promise<UIPartRow> {
-    const t   = this.resolveTheme();
+    const t = this.resolveTheme();
     const ids = this.ids;
-    const { icon, label, sublabel, actions, toggle, iconCallback, labelCallback, sublabelCallback } = this.options;
+    const {
+      icon,
+      label,
+      sublabel,
+      actions,
+      toggle,
+      iconCallback,
+      labelCallback,
+      sublabelCallback,
+    } = this.options;
 
     // ── Icon ─────────────────────────────────────────────────
-    const iconBtn = icon !== undefined
-      ? new SuiButton({
-          id:       ids.icon,
-          callback: iconCallback,
-          state:    { disabled: !iconCallback },
-          theme: {
-            default:  { self: { ...t.icon, iconId: icon } },
-            disabled: { self: { ...t.icon, iconId: icon } },
-          },
-        })
-      : undefined;
+    const iconBtn =
+      icon !== undefined
+        ? new SuiButton({
+            id: ids.icon,
+            callback: iconCallback,
+            state: { disabled: !iconCallback },
+            theme: {
+              default: { self: { ...t.icon, iconId: icon } },
+              disabled: { self: { ...t.icon, iconId: icon } },
+            },
+          })
+        : undefined;
 
     // ── Label ─────────────────────────────────────────────────
     const labelBtn = new SuiButton({
-      id:       ids.label,
+      id: ids.label,
       callback: labelCallback,
       theme: {
-        default:  { self: { ...t.label, text: label } },
+        default: { self: { ...t.label, text: label } },
         disabled: { self: { ...t.label, text: label } },
       },
     });
@@ -177,43 +213,44 @@ export class SuiCard extends SuiComponent<SuiCardTheme, SuiCardState, SuiCardOpt
     // ── Actions row ───────────────────────────────────────────
     const actionsRow = actions?.length
       ? new SuiRow({
-          id:       ids.actions,
+          id: ids.actions,
           children: actions,
-          theme:    { default: { self: t.actions } },
+          theme: { default: { self: t.actions } },
         })
       : undefined;
 
     // ── Title row ─────────────────────────────────────────────
     const titleChildren: AnySuiComponent[] = [labelBtn];
     if (actionsRow) titleChildren.push(actionsRow);
-    if (toggle)     titleChildren.push(toggle);
+    if (toggle) titleChildren.push(toggle);
 
     const titleRow = new SuiRow({
-      id:       ids.title,
+      id: ids.title,
       children: titleChildren,
-      theme:    { default: { self: t.title } },
+      theme: { default: { self: t.title } },
     });
 
     // ── Sublabel ──────────────────────────────────────────────
-    const sublabelBtn = sublabel !== undefined
-      ? new SuiButton({
-          id:       ids.sublabel,
-          callback: sublabelCallback,
-          theme: {
-            default:  { self: { ...t.sublabel, text: sublabel } },
-            disabled: { self: { ...t.sublabel, text: sublabel } },
-          },
-        })
-      : undefined;
+    const sublabelBtn =
+      sublabel !== undefined
+        ? new SuiButton({
+            id: ids.sublabel,
+            callback: sublabelCallback,
+            theme: {
+              default: { self: { ...t.sublabel, text: sublabel } },
+              disabled: { self: { ...t.sublabel, text: sublabel } },
+            },
+          })
+        : undefined;
 
     // ── Body column ───────────────────────────────────────────
     const bodyChildren: AnySuiComponent[] = [titleRow];
     if (sublabelBtn) bodyChildren.push(sublabelBtn);
 
     const bodyCol = new SuiColumn({
-      id:       ids.body,
+      id: ids.body,
       children: bodyChildren,
-      theme:    { default: { self: t.body } },
+      theme: { default: { self: t.body } },
     });
 
     // ── Self row ──────────────────────────────────────────────
@@ -222,15 +259,18 @@ export class SuiCard extends SuiComponent<SuiCardTheme, SuiCardState, SuiCardOpt
     rowChildren.push(bodyCol);
 
     // Bake initial filter visibility into emitted style (from compose context)
-    const query   = this.composeContext?.initialQuery ?? "";
-    const visible = query === "" || this.searchText.toLowerCase().includes(query);
+    const query = this.composeContext?.initialQuery ?? "";
+    const visible =
+      query === "" || this.searchText.toLowerCase().includes(query);
     this._composedStyle = t.self.style ?? {};
-    const selfStyle = visible ? this._composedStyle : { ...this._composedStyle, display: "none" };
+    const selfStyle = visible
+      ? this._composedStyle
+      : { ...this._composedStyle, display: "none" };
 
     return await new SuiRow({
-      id:       this.id,
+      id: this.id,
       children: rowChildren,
-      theme:    { default: { self: { ...t.self, style: selfStyle } } },
+      theme: { default: { self: { ...t.self, style: selfStyle } } },
     }).build(this.composeContext);
   }
 }

@@ -6,7 +6,14 @@ import { storySlice, initialStoryState } from "./slices/story";
 import { crucibleSlice, initialCrucibleState } from "./slices/crucible";
 import { worldSlice, initialWorldState } from "./slices/world";
 import { foundationSlice, initialFoundationState } from "./slices/foundation";
-import { RootState, StoryState, BrainstormChat, CrucibleState, WorldState, FoundationState } from "./types";
+import {
+  RootState,
+  StoryState,
+  BrainstormChat,
+  CrucibleState,
+  WorldState,
+  FoundationState,
+} from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Persisted data loaded action
@@ -50,10 +57,18 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
     return {
       ...current,
       story: data.story
-        ? { ...initialStoryState, ...data.story, dulfs: { ...initialStoryState.dulfs, ...data.story?.dulfs } }
+        ? {
+            ...initialStoryState,
+            ...data.story,
+            dulfs: { ...initialStoryState.dulfs, ...data.story?.dulfs },
+          }
         : current.story,
       brainstorm: data.brainstorm?.chats
-        ? { ...current.brainstorm, chats: data.brainstorm.chats, currentChatIndex: data.brainstorm.currentChatIndex }
+        ? {
+            ...current.brainstorm,
+            chats: data.brainstorm.chats,
+            currentChatIndex: data.brainstorm.currentChatIndex,
+          }
         : current.brainstorm,
       crucible: data.crucible
         ? { ...initialCrucibleState, ...data.crucible }

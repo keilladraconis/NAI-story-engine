@@ -8,9 +8,9 @@ import { type SuiTextInputPartTheme } from "./text-input.ts";
 
 /** Resolved part map for a single SuiFilterPanel state. */
 export type SuiFilterPanelStateTheme = {
-  self:        SuiChildrenPartTheme;
+  self: SuiChildrenPartTheme;
   searchInput: SuiTextInputPartTheme;
-  list:        SuiChildrenPartTheme;
+  list: SuiChildrenPartTheme;
 };
 
 /** Theme for SuiFilterPanel. Structure: <state>.<part>.<property>. */
@@ -23,30 +23,30 @@ export const filterPanel = {
   default: {
     self: {
       style: {
-        flex:           "1",
-        overflow:       "hidden",
+        flex: "1",
+        overflow: "hidden",
         justifyContent: "flex-start",
-        border:         "1px solid rgba(255, 255, 255, 0.07)",
-        borderRadius:   "4px",
-        minHeight:      "200px",
+        border: "1px solid rgba(255, 255, 255, 0.07)",
+        borderRadius: "4px",
+        minHeight: "200px",
       },
     },
     searchInput: {
       placeholder: "Search...",
       style: {
-        background:   "rgba(0, 0, 0, 0.2)",
-        border:       "none",
+        background: "rgba(0, 0, 0, 0.2)",
+        border: "none",
         borderBottom: "1px solid rgba(255, 255, 255, 0.07)",
         borderRadius: "0",
-        margin:       "0",
+        margin: "0",
       },
     },
     list: {
       style: {
-        flex:           "1",
-        overflow:       "auto",
+        flex: "1",
+        overflow: "auto",
         justifyContent: "flex-start",
-        background:     "rgba(0, 0, 0, 0.1)",
+        background: "rgba(0, 0, 0, 0.1)",
       },
     },
   },

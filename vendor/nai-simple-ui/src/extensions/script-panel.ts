@@ -17,20 +17,23 @@ import { SuiExtension } from "../extension.ts";
 import type { SuiBaseOptions, SuiTheme } from "../base.ts";
 import type { AnySuiComponent } from "../component.ts";
 import * as Theme from "./theme/script-panel.ts";
-import { type SuiScriptPanelStateTheme, type SuiScriptPanelTheme } from "./theme/script-panel.ts";
+import {
+  type SuiScriptPanelStateTheme,
+  type SuiScriptPanelTheme,
+} from "./theme/script-panel.ts";
 
 // ============================================================
 // Options
 // ============================================================
 
 export type SuiScriptPanelOptions<
-  TTheme extends SuiTheme                = SuiScriptPanelTheme,
+  TTheme extends SuiTheme = SuiScriptPanelTheme,
   TState extends Record<string, unknown> = Record<string, unknown>,
 > = {
   /** Name displayed in the panel list. */
-  name:     string;
+  name: string;
   /** Icon displayed left of the name in the panel list. */
-  iconId?:  IconId;
+  iconId?: IconId;
   /** Components to render in the panel. Built at register/update time. */
   children: AnySuiComponent[];
 } & SuiBaseOptions<TTheme, TState>;
@@ -40,7 +43,7 @@ export type SuiScriptPanelOptions<
 // ============================================================
 
 export class SuiScriptPanel<
-  TTheme extends SuiTheme                = SuiScriptPanelTheme,
+  TTheme extends SuiTheme = SuiScriptPanelTheme,
   TState extends Record<string, unknown> = Record<string, unknown>,
 > extends SuiExtension<
   "scriptPanel",
@@ -49,7 +52,10 @@ export class SuiScriptPanel<
   TState,
   SuiScriptPanelOptions<TTheme, TState>
 > {
-  constructor(options: SuiScriptPanelOptions<TTheme, TState>, baseTheme = Theme.scriptPanel as unknown as TTheme) {
+  constructor(
+    options: SuiScriptPanelOptions<TTheme, TState>,
+    baseTheme = Theme.scriptPanel as unknown as TTheme,
+  ) {
     super(options, "scriptPanel", baseTheme);
   }
 
@@ -59,12 +65,15 @@ export class SuiScriptPanel<
   }
 
   async compose(): Promise<UIExtensionScriptPanel> {
-    const t       = this.resolveTheme();
-    const content = await this.buildContent(this.options.children, SuiBase.listChildrenStyle(t.self));
+    const t = this.resolveTheme();
+    const content = await this.buildContent(
+      this.options.children,
+      SuiBase.listChildrenStyle(t.self),
+    );
     return {
-      type:   this.type,
-      id:     this.id,
-      name:   this.options.name,
+      type: this.type,
+      id: this.id,
+      name: this.options.name,
       iconId: this.options.iconId,
       content,
     };

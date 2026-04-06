@@ -19,9 +19,16 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/button.ts";
-import { type SuiButtonStateTheme, type SuiButtonTheme } from "./theme/button.ts";
+import {
+  type SuiButtonStateTheme,
+  type SuiButtonTheme,
+} from "./theme/button.ts";
 
 /** State shape for SuiButton. disabled drives theme resolution in resolveTheme(). */
 export type SuiButtonState = {
@@ -30,7 +37,7 @@ export type SuiButtonState = {
 
 /** options carries callback and behaviour flags only — disabled lives in state, visuals in theme. */
 export type SuiButtonOptions = {
-  callback?:                     () => void;
+  callback?: () => void;
   disabledWhileCallbackRunning?: boolean;
 } & SuiComponentOptions<SuiButtonTheme, SuiButtonState>;
 
@@ -40,8 +47,12 @@ export type SuiButtonOptions = {
  * callback is wrapped to fire setState (notifying subscribers) before delegating to options.callback.
  * disabledWhileCallbackRunning is passed directly from options.
  */
-export class SuiButton extends SuiComponent<SuiButtonTheme, SuiButtonState, SuiButtonOptions, UIPartButton> {
-
+export class SuiButton extends SuiComponent<
+  SuiButtonTheme,
+  SuiButtonState,
+  SuiButtonOptions,
+  UIPartButton
+> {
   constructor(options: SuiButtonOptions) {
     super(options, Theme.button);
   }
@@ -68,14 +79,14 @@ export class SuiButton extends SuiComponent<SuiButtonTheme, SuiButtonState, SuiB
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:                         "button",
-      id:                           this.id,
-      callback:                     this.onClick.bind(this),
+      type: "button",
+      id: this.id,
+      callback: this.onClick.bind(this),
       disabledWhileCallbackRunning: this.options.disabledWhileCallbackRunning,
-      disabled:                     this.state.disabled,
-      text:                         t.self.text,
-      iconId:                       t.self.iconId,
-      style:                        this._composedStyle,
+      disabled: this.state.disabled,
+      text: t.self.text,
+      iconId: t.self.iconId,
+      style: this._composedStyle,
     };
   }
 }

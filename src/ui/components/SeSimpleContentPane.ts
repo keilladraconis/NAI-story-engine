@@ -18,19 +18,22 @@ type Theme = { default: { self: { style: object } } };
 type State = Record<string, never>;
 
 export type SeSimpleContentPaneOptions = {
-  content:             string;
-  contentLabel?:       string;
+  content: string;
+  contentLabel?: string;
   contentPlaceholder?: string;
-  label?:              string;
-  onSave:              (content: string) => void;
-  onBack:              () => void;
-  extraControls?:      UIPart[];
+  label?: string;
+  onSave: (content: string) => void;
+  onBack: () => void;
+  extraControls?: UIPart[];
 } & SuiComponentOptions<Theme, State>;
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export class SeSimpleContentPane extends SuiComponent<
-  Theme, State, SeSimpleContentPaneOptions, UIPartColumn
+  Theme,
+  State,
+  SeSimpleContentPaneOptions,
+  UIPartColumn
 > {
   constructor(options: SeSimpleContentPaneOptions) {
     super(
@@ -41,8 +44,13 @@ export class SeSimpleContentPane extends SuiComponent<
 
   async compose(): Promise<UIPartColumn> {
     const {
-      content, label, contentLabel, contentPlaceholder,
-      onSave, onBack, extraControls,
+      content,
+      label,
+      contentLabel,
+      contentPlaceholder,
+      onSave,
+      onBack,
+      extraControls,
     } = this.options;
 
     // Seed storyStorage so storageKey-bound input picks up initial value
@@ -53,19 +61,21 @@ export class SeSimpleContentPane extends SuiComponent<
     // ── Header row ─────────────────────────────────────────────
     const headerParts: UIPart[] = [
       button({
-        id:       `${this.id}-back`,
-        text:     "",
-        iconId:   "arrow-left" as IconId,
-        callback: () => { onBack(); },
+        id: `${this.id}-back`,
+        text: "",
+        iconId: "arrow-left" as IconId,
+        callback: () => {
+          onBack();
+        },
       }),
     ];
     if (label) {
       headerParts.push(
         text({
-          id:       `${this.id}-label`,
-          text:     `**${label}**`,
+          id: `${this.id}-label`,
+          text: `**${label}**`,
           markdown: true,
-          style:    { flex: "1", "font-size": "0.85em", "font-weight": "bold" },
+          style: { flex: "1", "font-size": "0.85em", "font-weight": "bold" },
         }),
       );
     }
@@ -73,21 +83,23 @@ export class SeSimpleContentPane extends SuiComponent<
 
     // ── Content input ──────────────────────────────────────────
     const contentInput = multilineTextInput({
-      id:           `${this.id}-input`,
+      id: `${this.id}-input`,
       initialValue: content,
-      placeholder:  contentPlaceholder ?? "Content…",
-      storageKey:   `story:${EDIT_PANE_CONTENT}`,
-      style:        { "min-height": "120px", "font-size": "0.85em", flex: "1" },
+      placeholder: contentPlaceholder ?? "Content…",
+      storageKey: `story:${EDIT_PANE_CONTENT}`,
+      style: { "min-height": "120px", "font-size": "0.85em", flex: "1" },
     });
 
     // ── Save button ────────────────────────────────────────────
     const saveBtn = button({
-      id:       `${this.id}-save`,
-      text:     "Save",
-      style:    { "align-self": "flex-end", padding: "4px 16px" },
+      id: `${this.id}-save`,
+      text: "Save",
+      style: { "align-self": "flex-end", padding: "4px 16px" },
       callback: () => {
         void (async () => {
-          const newContent = String((await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) ?? "");
+          const newContent = String(
+            (await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) ?? "",
+          );
           onSave(newContent.trim());
         })();
       },
@@ -96,7 +108,7 @@ export class SeSimpleContentPane extends SuiComponent<
     // ── Assemble ───────────────────────────────────────────────
     const parts: UIPart[] = [
       row({
-        style:   { "align-items": "center", gap: "4px", "margin-bottom": "4px" },
+        style: { "align-items": "center", gap: "4px", "margin-bottom": "4px" },
         content: headerParts,
       }),
     ];
@@ -108,8 +120,8 @@ export class SeSimpleContentPane extends SuiComponent<
     parts.push(saveBtn);
 
     return column({
-      id:      this.id,
-      style:   { gap: "6px", flex: "1" },
+      id: this.id,
+      style: { gap: "6px", flex: "1" },
       content: parts,
     });
   }

@@ -24,7 +24,7 @@ export class ForgePane extends SuiComponent<
   UIPartColumn
 > {
   private readonly _foundation: SeFoundationSection;
-  private readonly _forge:      SeForgeSection;
+  private readonly _forge: SeForgeSection;
 
   constructor(options: ForgePaneOptions) {
     super(
@@ -33,12 +33,12 @@ export class ForgePane extends SuiComponent<
     );
 
     this._foundation = new SeFoundationSection({
-      id:       "se-fn-section",
+      id: "se-fn-section",
       editHost: options.editHost,
     });
 
     this._forge = new SeForgeSection({
-      id:       "se-forge-section",
+      id: "se-forge-section",
       editHost: options.editHost,
     });
   }
@@ -52,8 +52,8 @@ export class ForgePane extends SuiComponent<
     const { column } = api.v1.ui.part;
 
     return column({
-      id:      this.id,
-      style:   {},
+      id: this.id,
+      style: {},
       content: [foundationPart, forgePart],
     });
   }

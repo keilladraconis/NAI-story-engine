@@ -18,7 +18,7 @@ export class StoreWatcher {
   }
 
   dispose(): void {
-    this._unsubs.forEach(fn => fn());
+    this._unsubs.forEach((fn) => fn());
     this._unsubs = [];
   }
 }

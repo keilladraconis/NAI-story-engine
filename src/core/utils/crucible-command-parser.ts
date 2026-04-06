@@ -116,7 +116,9 @@ export function parseCommands(text: string): ParsedCommand[] {
     // [REVISE "Name"] or [REVISE TYPE "Name"]
     // Also accepts [DESCRIPTION "Name"] as an alias — GLM sometimes emits this
     // when asked to update a character description.
-    const reviseMatch = line.match(/^\[(?:REVISE|DESCRIPTION)\s+(?:[A-Z]+\s+)?"([^"]+)"\]/);
+    const reviseMatch = line.match(
+      /^\[(?:REVISE|DESCRIPTION)\s+(?:[A-Z]+\s+)?"([^"]+)"\]/,
+    );
     if (reviseMatch) {
       const name = reviseMatch[1].trim();
       const inline = line.slice(reviseMatch[0].length).trim();
@@ -127,7 +129,9 @@ export function parseCommands(text: string): ParsedCommand[] {
     }
 
     // [LINK "Name" → "Name"] or [LINK "Name" -> "Name"]
-    const linkMatch = line.match(/^\[LINK\s+"([^"]+)"\s*(?:→|->)\s*"([^"]+)"\]/);
+    const linkMatch = line.match(
+      /^\[LINK\s+"([^"]+)"\s*(?:→|->)\s*"([^"]+)"\]/,
+    );
     if (linkMatch) {
       const fromName = linkMatch[1].trim();
       const toName = linkMatch[2].trim();
@@ -167,7 +171,11 @@ export function parseCommands(text: string): ParsedCommand[] {
 /** Collect non-command lines following a command as its content.
  *  `inline` captures any text on the same line as the command (after the `]`).
  */
-function collectContent(lines: string[], startIdx: number, inline = ""): string {
+function collectContent(
+  lines: string[],
+  startIdx: number,
+  inline = "",
+): string {
   const contentLines: string[] = [];
   if (inline) contentLines.push(inline);
   for (let i = startIdx; i < lines.length; i++) {
@@ -190,7 +198,9 @@ function countContentLines(lines: string[], startIdx: number): number {
 
 /** Check if a line starts a new command. */
 function isCommandLine(line: string): boolean {
-  return /^\[(CREATE|REVISE|DESCRIPTION|LINK|DELETE|CRITIQUE|DONE)\b/.test(line);
+  return /^\[(CREATE|REVISE|DESCRIPTION|LINK|DELETE|CRITIQUE|DONE)\b/.test(
+    line,
+  );
 }
 
 // --- Executor ---
@@ -217,7 +227,9 @@ export function executeCommands(
     switch (cmd.kind) {
       case "CREATE": {
         if (!VALID_TYPES.has(cmd.elementType)) {
-          log.push(`⚠ CREATE: unknown type "${cmd.elementType}" for "${cmd.name}"`);
+          log.push(
+            `⚠ CREATE: unknown type "${cmd.elementType}" for "${cmd.name}"`,
+          );
           break;
         }
         const fieldId = TYPE_TO_FIELD[cmd.elementType];
@@ -227,7 +239,9 @@ export function executeCommands(
           (e) => e.name.toLowerCase() === cmd.name.toLowerCase(),
         );
         if (existing) {
-          log.push(`⚠ CREATE rejected: "${cmd.name}" already exists as ${cmd.elementType}`);
+          log.push(
+            `⚠ CREATE rejected: "${cmd.name}" already exists as ${cmd.elementType}`,
+          );
           break;
         }
 
@@ -268,7 +282,9 @@ export function executeCommands(
         // Warn about unknown link endpoints — they surface in MISSING ELEMENTS on the next pass
         for (const name of [cmd.fromName, cmd.toName]) {
           if (!findElementByName(getState(), name)) {
-            log.push(`⚠ LINK: "${name}" not found — will appear in MISSING ELEMENTS next pass`);
+            log.push(
+              `⚠ LINK: "${name}" not found — will appear in MISSING ELEMENTS next pass`,
+            );
           }
         }
         const link: CrucibleLink = {
@@ -300,7 +316,10 @@ export function executeCommands(
 }
 
 /** Find an element by name (case-insensitive). */
-function findElementByName(state: RootState, name: string): CrucibleWorldElement | undefined {
+function findElementByName(
+  state: RootState,
+  name: string,
+): CrucibleWorldElement | undefined {
   return state.crucible.elements.find(
     (e) => e.name.toLowerCase() === name.toLowerCase(),
   );

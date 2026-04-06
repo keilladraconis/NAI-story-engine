@@ -23,6 +23,12 @@
       "nai-simple-ui/*": ["./vendor/nai-simple-ui/src/*"]
     }
   },
-  "include": ["src/**/*", "external/**/*", "lib/*", "tests/**/*", "vendor/**/*"],
+  "include": [
+    "src/**/*",
+    "external/**/*",
+    "lib/*",
+    "tests/**/*",
+    "vendor/**/*"
+  ],
   "exclude": ["node_modules", "dist"]
 }

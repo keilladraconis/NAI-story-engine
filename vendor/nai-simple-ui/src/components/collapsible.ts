@@ -30,9 +30,18 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type AnySuiComponent, type SuiComponentOptions, type SuiFilterResult } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type AnySuiComponent,
+  type SuiComponentOptions,
+  type SuiFilterResult,
+} from "../component.ts";
 import * as Theme from "./theme/collapsible.ts";
-import { type SuiCollapsibleStateTheme, type SuiCollapsibleTheme } from "./theme/collapsible.ts";
+import {
+  type SuiCollapsibleStateTheme,
+  type SuiCollapsibleTheme,
+} from "./theme/collapsible.ts";
 import { SuiButton } from "./button.ts";
 import { SuiCard } from "./card.ts";
 import { SuiColumn } from "./column.ts";
@@ -40,16 +49,16 @@ import { SuiRow } from "./row.ts";
 
 /** State shape for SuiCollapsible. collapsed and disabled drive resolveTheme() and onSync(). */
 export type SuiCollapsibleState = {
-  collapsed:  boolean;
-  disabled?:  boolean;
+  collapsed: boolean;
+  disabled?: boolean;
 };
 
 /** options carries data only — all visual properties live in theme. */
 export type SuiCollapsibleOptions = {
-  header:            AnySuiComponent;
-  children:          AnySuiComponent[];
+  header: AnySuiComponent;
+  children: AnySuiComponent[];
   initialCollapsed?: boolean;
-  onToggle?:         (collapsed: boolean) => void;
+  onToggle?: (collapsed: boolean) => void;
 } & SuiComponentOptions<SuiCollapsibleTheme, SuiCollapsibleState>;
 
 /**
@@ -60,26 +69,42 @@ export type SuiCollapsibleOptions = {
  * Toggling updates chevron icon/style and content wrapper visibility via updateParts().
  * When state.disabled is true, onChevronClick is a no-op and the chevron button is platform-disabled.
  */
-export class SuiCollapsible extends SuiComponent<SuiCollapsibleTheme, SuiCollapsibleState, SuiCollapsibleOptions, UIPartColumn> {
-
+export class SuiCollapsible extends SuiComponent<
+  SuiCollapsibleTheme,
+  SuiCollapsibleState,
+  SuiCollapsibleOptions,
+  UIPartColumn
+> {
   /** Collapsed state saved at the moment expandForSearch() was called. undefined = not in search mode. */
   private _savedCollapsed: boolean | undefined = undefined;
 
   constructor(options: SuiCollapsibleOptions) {
     super(
-      { ...options, state: { collapsed: options.initialCollapsed ?? true, ...options.state } },
+      {
+        ...options,
+        state: {
+          collapsed: options.initialCollapsed ?? true,
+          ...options.state,
+        },
+      },
       Theme.collapsible,
     );
   }
 
   /** Stable IDs for this component's owned children. */
-  override get ids(): { self: string; header: string; headerContent: string; chevron: string; content: string } {
+  override get ids(): {
+    self: string;
+    header: string;
+    headerContent: string;
+    chevron: string;
+    content: string;
+  } {
     return {
-      self:          this.id,
-      header:        `${this.id}.header`,
+      self: this.id,
+      header: `${this.id}.header`,
       headerContent: `${this.id}.header.content`,
-      chevron:       `${this.id}.chevron`,
-      content:       `${this.id}.content`,
+      chevron: `${this.id}.chevron`,
+      content: `${this.id}.content`,
     };
   }
 
@@ -140,14 +165,26 @@ export class SuiCollapsible extends SuiComponent<SuiCollapsibleTheme, SuiCollaps
    * Used by expandForSearch() and restoreFromSearch() to contribute to a batched call.
    */
   private _buildSyncUpdates(): (Partial<UIPart> & { id: string })[] {
-    const t         = this.resolveTheme();
-    const ids       = this.ids;
+    const t = this.resolveTheme();
+    const ids = this.ids;
     const collapsed = this.state.collapsed;
-    const disabled  = this.state.disabled ?? false;
-    const chevronPart = disabled ? t.chevronDisabled : collapsed ? t.chevron : t.chevronOpen;
+    const disabled = this.state.disabled ?? false;
+    const chevronPart = disabled
+      ? t.chevronDisabled
+      : collapsed
+        ? t.chevron
+        : t.chevronOpen;
     return [
-      { id: ids.content, style: collapsed ? t.content.style : t.contentVisible.style },
-      { id: ids.chevron, iconId: chevronPart.iconId, style: chevronPart.style, disabled: disabled || undefined },
+      {
+        id: ids.content,
+        style: collapsed ? t.content.style : t.contentVisible.style,
+      },
+      {
+        id: ids.chevron,
+        iconId: chevronPart.iconId,
+        style: chevronPart.style,
+        disabled: disabled || undefined,
+      },
     ];
   }
 
@@ -175,13 +212,21 @@ export class SuiCollapsible extends SuiComponent<SuiCollapsibleTheme, SuiCollaps
    * Header is not recursed — its searchText is already captured by this.searchText.
    */
   override filter(query: string): SuiFilterResult {
-    const childResults    = this.options.children.map(c => c.filter(query));
-    const anyChildVisible = childResults.some(r => r.visible);
-    const selfMatch       = query === "" || this.searchText.toLowerCase().includes(query);
-    const visible         = selfMatch || anyChildVisible;
-    const updates         = childResults.flatMap(r => r.updates);
-    const full = { ...this._baseStyle, ...this._composedStyle, ...this._variantStyle };
-    updates.push({ id: this.id, style: visible ? full : { ...full, display: "none" } });
+    const childResults = this.options.children.map((c) => c.filter(query));
+    const anyChildVisible = childResults.some((r) => r.visible);
+    const selfMatch =
+      query === "" || this.searchText.toLowerCase().includes(query);
+    const visible = selfMatch || anyChildVisible;
+    const updates = childResults.flatMap((r) => r.updates);
+    const full = {
+      ...this._baseStyle,
+      ...this._composedStyle,
+      ...this._variantStyle,
+    };
+    updates.push({
+      id: this.id,
+      style: visible ? full : { ...full, display: "none" },
+    });
     return { visible, updates };
   }
 
@@ -195,63 +240,66 @@ export class SuiCollapsible extends SuiComponent<SuiCollapsibleTheme, SuiCollaps
    * @returns {UIPartColumn}
    */
   async compose(): Promise<UIPartColumn> {
-    const t         = this.resolveTheme();
-    const ids       = this.ids;
+    const t = this.resolveTheme();
+    const ids = this.ids;
     const collapsed = this.state.collapsed;
-    const disabled  = this.state.disabled ?? false;
+    const disabled = this.state.disabled ?? false;
 
     const chevron = new SuiButton({
-      id:       ids.chevron,
+      id: ids.chevron,
       callback: this.onChevronClick.bind(this),
-      state:    { disabled },
+      state: { disabled },
       theme: {
-        default:  { self: collapsed ? t.chevron : t.chevronOpen },
+        default: { self: collapsed ? t.chevron : t.chevronOpen },
         disabled: { self: t.chevronDisabled },
       },
     });
-    const header = this.options.header instanceof SuiCard
-      ? new SuiCard({
-          iconCallback:     this.onChevronClick.bind(this),
-          labelCallback:    this.onChevronClick.bind(this),
-          sublabelCallback: this.onChevronClick.bind(this),
-          ...this.options.header.options,
-        })
-      : this.options.header;
+    const header =
+      this.options.header instanceof SuiCard
+        ? new SuiCard({
+            iconCallback: this.onChevronClick.bind(this),
+            labelCallback: this.onChevronClick.bind(this),
+            sublabelCallback: this.onChevronClick.bind(this),
+            ...this.options.header.options,
+          })
+        : this.options.header;
 
     const headerContentCol = new SuiColumn({
-      id:       ids.headerContent,
+      id: ids.headerContent,
       children: [header],
-      theme:    { default: { self: t.headerContent } },
+      theme: { default: { self: t.headerContent } },
     });
 
     const headerRow = new SuiRow({
-      id:       ids.header,
+      id: ids.header,
       children: [chevron, headerContentCol],
-      theme:    { default: { self: t.header } },
+      theme: { default: { self: t.header } },
     });
 
     const contentColumn = new SuiColumn({
-      id:       ids.content,
+      id: ids.content,
       children: this.options.children,
-      theme:    { default: { self: collapsed ? t.content : t.contentVisible } },
+      theme: { default: { self: collapsed ? t.content : t.contentVisible } },
     });
 
     // Build headerRow without context — the header is structural and must never be hidden by filtering.
     // Context is forwarded only to contentColumn so leaf cards bake initial visibility correctly.
-    const builtHeader  = await headerRow.build();
+    const builtHeader = await headerRow.build();
     const builtContent = await contentColumn.build(this.composeContext);
 
     // Bake initial filter visibility into emitted style (from compose context).
-    const query   = this.composeContext?.initialQuery ?? "";
+    const query = this.composeContext?.initialQuery ?? "";
     const visible = query === "" || this.filter(query).visible;
     this._composedStyle = t.self.style ?? {};
-    const selfStyle = visible ? this._composedStyle : { ...this._composedStyle, display: "none" };
+    const selfStyle = visible
+      ? this._composedStyle
+      : { ...this._composedStyle, display: "none" };
 
     return {
-      type:    "column",
-      id:      this.id,
+      type: "column",
+      id: this.id,
       content: [builtHeader, builtContent],
-      style:   selfStyle,
+      style: selfStyle,
     } as UIPartColumn;
   }
 }

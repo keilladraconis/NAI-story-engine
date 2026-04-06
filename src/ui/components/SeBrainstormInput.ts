@@ -18,8 +18,10 @@ import { SeConfirmButton } from "./SeConfirmButton";
 type SeBrainstormInputTheme = { default: { self: { style: object } } };
 type SeBrainstormInputState = Record<string, never>;
 
-export type SeBrainstormInputOptions =
-  SuiComponentOptions<SeBrainstormInputTheme, SeBrainstormInputState>;
+export type SeBrainstormInputOptions = SuiComponentOptions<
+  SeBrainstormInputTheme,
+  SeBrainstormInputState
+>;
 
 const INPUT_ID = "se-bs-input";
 
@@ -29,8 +31,8 @@ export class SeBrainstormInput extends SuiComponent<
   SeBrainstormInputOptions,
   UIPartColumn
 > {
-  private readonly _watcher:  StoreWatcher;
-  private readonly _sendBtn:  SeGenerationButton;
+  private readonly _watcher: StoreWatcher;
+  private readonly _sendBtn: SeGenerationButton;
   private readonly _clearBtn: SeConfirmButton;
 
   constructor(options: SeBrainstormInputOptions) {
@@ -38,26 +40,28 @@ export class SeBrainstormInput extends SuiComponent<
       { state: {} as SeBrainstormInputState, ...options },
       { default: { self: { style: {} } } },
     );
-    this._watcher  = new StoreWatcher();
-    this._sendBtn  = new SeGenerationButton({
-      id:                      "se-bs-send-btn",
-      label:                   "Send",
-      style:                   { flex: "0.7" },
-      generateAction:          uiBrainstormSubmitUserMessage(),
-      stateProjection:         (s) => {
+    this._watcher = new StoreWatcher();
+    this._sendBtn = new SeGenerationButton({
+      id: "se-bs-send-btn",
+      label: "Send",
+      style: { flex: "0.7" },
+      generateAction: uiBrainstormSubmitUserMessage(),
+      stateProjection: (s) => {
         if (s.runtime.activeRequest?.type === "brainstorm") {
           return s.runtime.activeRequest.id;
         }
-        return s.runtime.queue.find(r => r.type === "brainstorm")?.id;
+        return s.runtime.queue.find((r) => r.type === "brainstorm")?.id;
       },
       requestIdFromProjection: (p) => p as string | undefined,
     });
     this._clearBtn = new SeConfirmButton({
-      id:           "se-bs-input-btn-clear",
-      label:        "Clear",
+      id: "se-bs-input-btn-clear",
+      label: "Clear",
       confirmLabel: "Clear?",
-      style:        { flex: "0.3" },
-      onConfirm:    async () => { store.dispatch(messagesCleared()); },
+      style: { flex: "0.3" },
+      onConfirm: async () => {
+        store.dispatch(messagesCleared());
+      },
     });
   }
 
@@ -72,7 +76,10 @@ export class SeBrainstormInput extends SuiComponent<
         s.runtime.genx.status === "generating",
       (isGenerating) => {
         api.v1.ui.updateParts([
-          { id: INPUT_ID, disabled: isGenerating } as unknown as Partial<UIPart> & { id: string },
+          {
+            id: INPUT_ID,
+            disabled: isGenerating,
+          } as unknown as Partial<UIPart> & { id: string },
         ]);
       },
     );
@@ -85,18 +92,21 @@ export class SeBrainstormInput extends SuiComponent<
     const { column, row, multilineTextInput } = api.v1.ui.part;
 
     return column({
-      id:    this.id,
+      id: this.id,
       style: { padding: "8px", gap: "4px" },
       content: [
         multilineTextInput({
-          id:          INPUT_ID,
-          placeholder: "Explore ideas here — then switch to Story Engine to Forge.",
-          storageKey:  `story:${INPUT_ID}`,
-          style:       { "min-height": "60px", "max-height": "120px" },
-          onSubmit:    () => { store.dispatch(uiBrainstormSubmitUserMessage()); },
+          id: INPUT_ID,
+          placeholder:
+            "Explore ideas here — then switch to Story Engine to Forge.",
+          storageKey: `story:${INPUT_ID}`,
+          style: { "min-height": "60px", "max-height": "120px" },
+          onSubmit: () => {
+            store.dispatch(uiBrainstormSubmitUserMessage());
+          },
         }),
         row({
-          style:   { gap: "8px", "margin-top": "4px" },
+          style: { gap: "8px", "margin-top": "4px" },
           content: [clearPart, sendPart],
         }),
       ],

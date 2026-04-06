@@ -21,9 +21,16 @@
  *   })
  */
 
-import { SuiComponent, type AnySuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiComponent,
+  type AnySuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/tab-bar.ts";
-import { type SuiTabBarStateTheme, type SuiTabBarTheme } from "./theme/tab-bar.ts";
+import {
+  type SuiTabBarStateTheme,
+  type SuiTabBarTheme,
+} from "./theme/tab-bar.ts";
 import { SuiButton } from "./button.ts";
 import { SuiColumn } from "./column.ts";
 import { SuiRow } from "./row.ts";
@@ -35,12 +42,12 @@ export type SuiTabBarState = {
 
 /** options carries data only — all visual properties live in theme. */
 export type SuiTabBarOptions = {
-  tabs:           SuiButton[];
-  panes:          AnySuiComponent[];
-  actions?:       AnySuiComponent[];
-  overlay?:       AnySuiComponent;
-  initialTab?:    number;
-  backCallback?:  () => void;
+  tabs: SuiButton[];
+  panes: AnySuiComponent[];
+  actions?: AnySuiComponent[];
+  overlay?: AnySuiComponent;
+  initialTab?: number;
+  backCallback?: () => void;
 } & SuiComponentOptions<SuiTabBarTheme, SuiTabBarState>;
 
 /**
@@ -49,27 +56,43 @@ export type SuiTabBarOptions = {
  * Panes are wrapped in owned SuiColumn shells; inactive panes are hidden via display:none.
  * Optional actions are wrapped in a right-aligned row occupying remaining tab bar space.
  */
-export class SuiTabBar extends SuiComponent<SuiTabBarTheme, SuiTabBarState, SuiTabBarOptions, UIPartColumn> {
-
+export class SuiTabBar extends SuiComponent<
+  SuiTabBarTheme,
+  SuiTabBarState,
+  SuiTabBarOptions,
+  UIPartColumn
+> {
   private _overlayVisible = false;
 
   constructor(options: SuiTabBarOptions) {
     super(
-      { ...options, state: { activeTab: options.initialTab ?? 0, ...options.state } },
+      {
+        ...options,
+        state: { activeTab: options.initialTab ?? 0, ...options.state },
+      },
       Theme.tabBar,
     );
   }
 
   /** Stable IDs for this component's owned children. */
-  override get ids(): { self: string; tabBar: string; back: string; tabs: string; actions: string; content: string; panes: string[]; overlay: string } {
+  override get ids(): {
+    self: string;
+    tabBar: string;
+    back: string;
+    tabs: string;
+    actions: string;
+    content: string;
+    panes: string[];
+    overlay: string;
+  } {
     return {
-      self:    this.id,
-      tabBar:  `${this.id}.tabBar`,
-      back:    `${this.id}.back`,
-      tabs:    `${this.id}.tabs`,
+      self: this.id,
+      tabBar: `${this.id}.tabBar`,
+      back: `${this.id}.back`,
+      tabs: `${this.id}.tabs`,
       actions: `${this.id}.actions`,
       content: `${this.id}.content`,
-      panes:   this.options.panes.map((_, i) => `${this.id}.pane.${i}`),
+      panes: this.options.panes.map((_, i) => `${this.id}.pane.${i}`),
       overlay: `${this.id}.overlay`,
     };
   }
@@ -85,16 +108,16 @@ export class SuiTabBar extends SuiComponent<SuiTabBarTheme, SuiTabBarState, SuiT
    * When the overlay is active, all panes stay hidden regardless of activeTab.
    */
   override async onSync(): Promise<void> {
-    const t           = this.resolveTheme();
-    const ids         = this.ids;
-    const activeTab   = this.state.activeTab;
-    const overlayOn   = this._overlayVisible;
+    const t = this.resolveTheme();
+    const ids = this.ids;
+    const activeTab = this.state.activeTab;
+    const overlayOn = this._overlayVisible;
 
     const activeStyle = { ...t.tab.style, ...t.tabActive.style };
 
     const updates: { id: string; style?: object }[] = [
       ...this.options.tabs.map((tab, i) => ({
-        id:    tab.id,
+        id: tab.id,
         style: i === activeTab ? activeStyle : t.tab.style,
       })),
       ...ids.panes.map((id, i) => ({
@@ -131,12 +154,15 @@ export class SuiTabBar extends SuiComponent<SuiTabBarTheme, SuiTabBarState, SuiT
     if (!this.options.overlay) return;
     this._overlayVisible = visible;
 
-    const t         = this.resolveTheme();
-    const ids       = this.ids;
+    const t = this.resolveTheme();
+    const ids = this.ids;
     const activeTab = this.state.activeTab;
 
     const updates: { id: string; style?: object }[] = [
-      { id: ids.overlay, style: visible ? t.overlayActive.style : t.overlay.style },
+      {
+        id: ids.overlay,
+        style: visible ? t.overlayActive.style : t.overlay.style,
+      },
       ...ids.panes.map((id, i) => ({
         id,
         style: visible || i !== activeTab ? t.pane.style : t.paneActive.style,
@@ -151,8 +177,8 @@ export class SuiTabBar extends SuiComponent<SuiTabBarTheme, SuiTabBarState, SuiT
    * @returns {UIPartColumn}
    */
   async compose(): Promise<UIPartColumn> {
-    const t         = this.resolveTheme();
-    const ids       = this.ids;
+    const t = this.resolveTheme();
+    const ids = this.ids;
     const activeTab = this.state.activeTab;
 
     // Tab buttons — reconstruct each with active/inactive style baked in at compose time.
@@ -160,20 +186,34 @@ export class SuiTabBar extends SuiComponent<SuiTabBarTheme, SuiTabBarState, SuiT
     const tabButtons = this.options.tabs.map((tab, i) => {
       const isActive = i === activeTab;
       return new SuiButton({
-        id:       tab.id,
+        id: tab.id,
         callback: tab.options.callback,
         theme: {
-          default:  { self: { ...tab.theme.default.self, style: isActive ? { ...t.tab.style, ...t.tabActive.style } : t.tab.style } },
-          disabled: { self: { ...tab.theme.default.self, style: isActive ? { ...t.tab.style, ...t.tabActive.style } : t.tab.style } },
+          default: {
+            self: {
+              ...tab.theme.default.self,
+              style: isActive
+                ? { ...t.tab.style, ...t.tabActive.style }
+                : t.tab.style,
+            },
+          },
+          disabled: {
+            self: {
+              ...tab.theme.default.self,
+              style: isActive
+                ? { ...t.tab.style, ...t.tabActive.style }
+                : t.tab.style,
+            },
+          },
         },
       });
     });
 
     // Tab buttons row — wraps only the tab buttons; item positional styles from t.tabs.
     const tabsRow = new SuiRow({
-      id:       ids.tabs,
+      id: ids.tabs,
       children: tabButtons,
-      theme:    { default: { self: t.tabs } },
+      theme: { default: { self: t.tabs } },
     });
 
     const tabBarChildren: AnySuiComponent[] = [];
@@ -181,61 +221,67 @@ export class SuiTabBar extends SuiComponent<SuiTabBarTheme, SuiTabBarState, SuiT
     // Back button — prepended before tabs if backCallback is provided.
     if (this.options.backCallback) {
       const backCallback = this.options.backCallback;
-      tabBarChildren.push(new SuiButton({
-        id:       ids.back,
-        callback: backCallback,
-        theme: {
-          default: { self: { iconId: t.back.iconId, style: t.back.style } },
-        },
-      }));
+      tabBarChildren.push(
+        new SuiButton({
+          id: ids.back,
+          callback: backCallback,
+          theme: {
+            default: { self: { iconId: t.back.iconId, style: t.back.style } },
+          },
+        }),
+      );
     }
 
     tabBarChildren.push(tabsRow);
     if (this.options.actions?.length) {
-      tabBarChildren.push(new SuiRow({
-        id:       ids.actions,
-        children: this.options.actions,
-        theme:    { default: { self: t.actions } },
-      }));
+      tabBarChildren.push(
+        new SuiRow({
+          id: ids.actions,
+          children: this.options.actions,
+          theme: { default: { self: t.actions } },
+        }),
+      );
     }
 
     const tabBarRow = new SuiRow({
-      id:       ids.tabBar,
+      id: ids.tabBar,
       children: tabBarChildren,
-      theme:    { default: { self: t.tabBar } },
+      theme: { default: { self: t.tabBar } },
     });
 
     // Content area — each pane wrapped in an owned column shell.
     // When overlay is present, all panes start hidden; the overlay column is appended last.
-    const overlayOn   = this._overlayVisible;
+    const overlayOn = this._overlayVisible;
     const paneColumns = this.options.panes.map((pane, i) => {
       const isActive = !overlayOn && i === activeTab;
       return new SuiColumn({
-        id:       ids.panes[i],
+        id: ids.panes[i],
         children: [pane],
-        theme:    { default: { self: isActive ? t.paneActive : t.pane } },
+        theme: { default: { self: isActive ? t.paneActive : t.pane } },
       });
     });
 
     const contentChildren: AnySuiComponent[] = [...paneColumns];
     if (this.options.overlay) {
-      contentChildren.push(new SuiColumn({
-        id:       ids.overlay,
-        children: [this.options.overlay],
-        theme:    { default: { self: overlayOn ? t.overlayActive : t.overlay } },
-      }));
+      contentChildren.push(
+        new SuiColumn({
+          id: ids.overlay,
+          children: [this.options.overlay],
+          theme: { default: { self: overlayOn ? t.overlayActive : t.overlay } },
+        }),
+      );
     }
 
     const content = new SuiColumn({
-      id:       ids.content,
+      id: ids.content,
       children: contentChildren,
-      theme:    { default: { self: t.content } },
+      theme: { default: { self: t.content } },
     });
 
     const result = await new SuiColumn({
-      id:       this.id,
+      id: this.id,
       children: [tabBarRow, content],
-      theme:    { default: { self: t.self } },
+      theme: { default: { self: t.self } },
     }).build();
     this._composedStyle = t.self.style ?? {};
     return result;

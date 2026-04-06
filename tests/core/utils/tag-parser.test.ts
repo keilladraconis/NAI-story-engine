@@ -23,8 +23,11 @@ describe("parseTag", () => {
   });
 
   it("handles multiline content within a tag section", () => {
-    const text = "[PREREQ] The hero holds a dark secret\nIt drives the act 2 reveal\n[LOADBEARING] Key to tension";
-    expect(parseTag(text, "PREREQ")).toBe("The hero holds a dark secret\nIt drives the act 2 reveal");
+    const text =
+      "[PREREQ] The hero holds a dark secret\nIt drives the act 2 reveal\n[LOADBEARING] Key to tension";
+    expect(parseTag(text, "PREREQ")).toBe(
+      "The hero holds a dark secret\nIt drives the act 2 reveal",
+    );
   });
 
   it("returns null when tag is absent", () => {
@@ -54,7 +57,8 @@ describe("parseTag", () => {
 
 describe("parseTagAll", () => {
   it("returns all occurrences of a repeated tag", () => {
-    const text = "[PREREQ] First prereq\n[PREREQ] Second prereq\n[PREREQ] Third prereq";
+    const text =
+      "[PREREQ] First prereq\n[PREREQ] Second prereq\n[PREREQ] Third prereq";
     const results = parseTagAll(text, "PREREQ");
     expect(results).toEqual(["First prereq", "Second prereq", "Third prereq"]);
   });
@@ -81,7 +85,11 @@ describe("parseTagAll", () => {
 describe("splitSections", () => {
   it("splits on default +++ separator", () => {
     const text = "Section A\n+++\nSection B\n+++\nSection C";
-    expect(splitSections(text)).toEqual(["Section A", "Section B", "Section C"]);
+    expect(splitSections(text)).toEqual([
+      "Section A",
+      "Section B",
+      "Section C",
+    ]);
   });
 
   it("trims whitespace from each section", () => {

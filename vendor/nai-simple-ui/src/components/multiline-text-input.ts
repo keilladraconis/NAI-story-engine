@@ -20,9 +20,16 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/multiline-text-input.ts";
-import { type SuiMultilineTextInputStateTheme, type SuiMultilineTextInputTheme } from "./theme/multiline-text-input.ts";
+import {
+  type SuiMultilineTextInputStateTheme,
+  type SuiMultilineTextInputTheme,
+} from "./theme/multiline-text-input.ts";
 
 /** State shape for SuiMultilineTextInput. disabled drives theme resolution in resolveTheme(). */
 export type SuiMultilineTextInputState = {
@@ -34,8 +41,8 @@ export type SuiMultilineTextInputState = {
  */
 export type SuiMultilineTextInputOptions = {
   initialValue?: string;
-  onChange?:     (value: string) => void;
-  onSubmit?:     (value: string) => void;
+  onChange?: (value: string) => void;
+  onSubmit?: (value: string) => void;
 } & SuiComponentOptions<SuiMultilineTextInputTheme, SuiMultilineTextInputState>;
 
 /**
@@ -43,8 +50,12 @@ export type SuiMultilineTextInputOptions = {
  * label, placeholder, and style are resolved from theme via resolveTheme() based on this.state.disabled.
  * initialValue, onChange, and onSubmit are passed directly from options.
  */
-export class SuiMultilineTextInput extends SuiComponent<SuiMultilineTextInputTheme, SuiMultilineTextInputState, SuiMultilineTextInputOptions, UIPartMultilineTextInput> {
-
+export class SuiMultilineTextInput extends SuiComponent<
+  SuiMultilineTextInputTheme,
+  SuiMultilineTextInputState,
+  SuiMultilineTextInputOptions,
+  UIPartMultilineTextInput
+> {
   constructor(options: SuiMultilineTextInputOptions) {
     super(options, Theme.multilineTextInput);
   }
@@ -65,15 +76,15 @@ export class SuiMultilineTextInput extends SuiComponent<SuiMultilineTextInputThe
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:         "multilineTextInput",
-      id:           this.id,
+      type: "multilineTextInput",
+      id: this.id,
       initialValue: this.options.initialValue,
-      onChange:     this.options.onChange,
-      onSubmit:     this.options.onSubmit,
-      disabled:     this.state.disabled,
-      label:        t.self.label,
-      placeholder:  t.self.placeholder,
-      style:        this._composedStyle,
+      onChange: this.options.onChange,
+      onSubmit: this.options.onSubmit,
+      disabled: this.state.disabled,
+      label: t.self.label,
+      placeholder: t.self.placeholder,
+      style: this._composedStyle,
     };
   }
 }

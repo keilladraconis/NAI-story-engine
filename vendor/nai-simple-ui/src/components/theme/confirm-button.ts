@@ -10,7 +10,7 @@ export type SuiConfirmButtonStateTheme = {
 };
 
 export type SuiConfirmButtonTheme = {
-  default:  SuiConfirmButtonStateTheme;
+  default: SuiConfirmButtonStateTheme;
   pending?: PartialState<SuiConfirmButtonStateTheme>;
 };
 

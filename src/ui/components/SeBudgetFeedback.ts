@@ -21,7 +21,7 @@ import { colors } from "../theme";
 type ShowMode = "none" | "continue" | "wait";
 
 type SeBudgetFeedbackState = {
-  show:     ShowMode;
+  show: ShowMode;
   timerEnd: number;
 };
 
@@ -29,8 +29,10 @@ type SeBudgetFeedbackTheme = {
   default: { self: { style: object } };
 };
 
-export type SeBudgetFeedbackOptions =
-  SuiComponentOptions<SeBudgetFeedbackTheme, SeBudgetFeedbackState>;
+export type SeBudgetFeedbackOptions = SuiComponentOptions<
+  SeBudgetFeedbackTheme,
+  SeBudgetFeedbackState
+>;
 
 // ── SeBudgetFeedback ─────────────────────────────────────────────────────────
 
@@ -44,8 +46,12 @@ export class SeBudgetFeedback extends SuiComponent<
   private _timerGen = 0;
 
   // Child IDs
-  private get _continueId(): string { return `${this.id}-continue`; }
-  private get _waitId():     string { return `${this.id}-wait`; }
+  private get _continueId(): string {
+    return `${this.id}-continue`;
+  }
+  private get _waitId(): string {
+    return `${this.id}-wait`;
+  }
 
   constructor(options: SeBudgetFeedbackOptions) {
     super(
@@ -58,37 +64,54 @@ export class SeBudgetFeedback extends SuiComponent<
   async compose(): Promise<UIPartRow> {
     this._watcher.watch(
       (s) => ({
-        genxStatus:        s.runtime.genx.status,
+        genxStatus: s.runtime.genx.status,
         budgetWaitEndTime: s.runtime.genx.budgetWaitEndTime,
       }),
       async ({ genxStatus, budgetWaitEndTime }) => {
         let show: ShowMode = "none";
-        if (genxStatus === "waiting_for_user")   show = "continue";
+        if (genxStatus === "waiting_for_user") show = "continue";
         if (genxStatus === "waiting_for_budget") show = "wait";
         await this.setState({
           show,
-          timerEnd: budgetWaitEndTime ?? (Date.now() + 60000),
+          timerEnd: budgetWaitEndTime ?? Date.now() + 60000,
         });
       },
-      (a, b) => a.genxStatus === b.genxStatus && a.budgetWaitEndTime === b.budgetWaitEndTime,
+      (a, b) =>
+        a.genxStatus === b.genxStatus &&
+        a.budgetWaitEndTime === b.budgetWaitEndTime,
     );
 
     const { row, button, text } = api.v1.ui.part;
     return row({
-      id:    this.id,
+      id: this.id,
       style: { gap: "4px", "align-items": "center" },
       content: [
         button({
-          id:       this._continueId,
-          text:     "Continue",
-          iconId:   "fast-forward" as IconId,
-          style:    { display: "none", padding: "3px 8px", "font-size": "0.75em", background: colors.header, color: colors.darkBackground, "border-radius": "4px", "font-weight": "bold" },
-          callback: () => { store.dispatch(uiUserPresenceConfirmed()); },
+          id: this._continueId,
+          text: "Continue",
+          iconId: "fast-forward" as IconId,
+          style: {
+            display: "none",
+            padding: "3px 8px",
+            "font-size": "0.75em",
+            background: colors.header,
+            color: colors.darkBackground,
+            "border-radius": "4px",
+            "font-weight": "bold",
+          },
+          callback: () => {
+            store.dispatch(uiUserPresenceConfirmed());
+          },
         }),
         text({
-          id:    this._waitId,
-          text:  "",
-          style: { display: "none", "font-size": "0.75em", color: colors.paragraph, opacity: "0.7" },
+          id: this._waitId,
+          text: "",
+          style: {
+            display: "none",
+            "font-size": "0.75em",
+            color: colors.paragraph,
+            opacity: "0.7",
+          },
         }),
       ],
     });
@@ -98,12 +121,33 @@ export class SeBudgetFeedback extends SuiComponent<
     const { show, timerEnd } = this.state;
 
     api.v1.ui.updateParts([
-      { id: this._continueId, style: show === "continue"
-          ? { display: "block", padding: "3px 8px", "font-size": "0.75em", background: colors.header, color: colors.darkBackground, "border-radius": "4px", "font-weight": "bold" }
-          : { display: "none" } },
-      { id: this._waitId, style: show === "wait"
-          ? { display: "block", "font-size": "0.75em", color: colors.paragraph, opacity: "0.7" }
-          : { display: "none" } },
+      {
+        id: this._continueId,
+        style:
+          show === "continue"
+            ? {
+                display: "block",
+                padding: "3px 8px",
+                "font-size": "0.75em",
+                background: colors.header,
+                color: colors.darkBackground,
+                "border-radius": "4px",
+                "font-weight": "bold",
+              }
+            : { display: "none" },
+      },
+      {
+        id: this._waitId,
+        style:
+          show === "wait"
+            ? {
+                display: "block",
+                "font-size": "0.75em",
+                color: colors.paragraph,
+                opacity: "0.7",
+              }
+            : { display: "none" },
+      },
     ]);
 
     if (show === "wait") {

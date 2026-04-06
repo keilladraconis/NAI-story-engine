@@ -5,13 +5,13 @@
 import { type PartialState, type ThemeOverride } from "../../base.ts";
 
 export type SuiCodeEditorPartTheme = {
-  language?:                UIPartCodeEditor["language"];
-  height?:                  number | string;
-  lineNumbers?:             boolean;
-  wordWrap?:                boolean;
-  fontSize?:                number;
+  language?: UIPartCodeEditor["language"];
+  height?: number | string;
+  lineNumbers?: boolean;
+  wordWrap?: boolean;
+  fontSize?: number;
   diagnosticCodesToIgnore?: number[];
-  style?:                   object;
+  style?: object;
 };
 
 export type SuiCodeEditorStateTheme = {
@@ -19,7 +19,7 @@ export type SuiCodeEditorStateTheme = {
 };
 
 export type SuiCodeEditorTheme = {
-  default:   SuiCodeEditorStateTheme;
+  default: SuiCodeEditorStateTheme;
   readOnly?: PartialState<SuiCodeEditorStateTheme>;
 };
 

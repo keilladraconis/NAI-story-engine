@@ -21,9 +21,16 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/number-input.ts";
-import { type SuiNumberInputStateTheme, type SuiNumberInputTheme } from "./theme/number-input.ts";
+import {
+  type SuiNumberInputStateTheme,
+  type SuiNumberInputTheme,
+} from "./theme/number-input.ts";
 
 /** State shape for SuiNumberInput. disabled drives theme resolution in resolveTheme(). */
 export type SuiNumberInputState = {
@@ -35,8 +42,8 @@ export type SuiNumberInputState = {
  */
 export type SuiNumberInputOptions = {
   initialValue?: number;
-  onChange?:     (value: string) => void;
-  onSubmit?:     (value: string) => void;
+  onChange?: (value: string) => void;
+  onSubmit?: (value: string) => void;
 } & SuiComponentOptions<SuiNumberInputTheme, SuiNumberInputState>;
 
 /**
@@ -44,8 +51,12 @@ export type SuiNumberInputOptions = {
  * label, placeholder, and style are resolved from theme via resolveTheme() based on this.state.disabled.
  * initialValue, onChange, and onSubmit are passed directly from options.
  */
-export class SuiNumberInput extends SuiComponent<SuiNumberInputTheme, SuiNumberInputState, SuiNumberInputOptions, UIPartNumberInput> {
-
+export class SuiNumberInput extends SuiComponent<
+  SuiNumberInputTheme,
+  SuiNumberInputState,
+  SuiNumberInputOptions,
+  UIPartNumberInput
+> {
   constructor(options: SuiNumberInputOptions) {
     super(options, Theme.numberInput);
   }
@@ -66,15 +77,15 @@ export class SuiNumberInput extends SuiComponent<SuiNumberInputTheme, SuiNumberI
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:         "numberInput",
-      id:           this.id,
+      type: "numberInput",
+      id: this.id,
       initialValue: this.options.initialValue,
-      onChange:     this.options.onChange,
-      onSubmit:     this.options.onSubmit,
-      disabled:     this.state.disabled,
-      label:        t.self.label,
-      placeholder:  t.self.placeholder,
-      style:        this._composedStyle,
+      onChange: this.options.onChange,
+      onSubmit: this.options.onSubmit,
+      disabled: this.state.disabled,
+      label: t.self.label,
+      placeholder: t.self.placeholder,
+      style: this._composedStyle,
     };
   }
 }

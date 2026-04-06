@@ -32,7 +32,11 @@
  *   })
  */
 
-import { SuiOverlay, type SuiOverlayOptions, type SuiOverlayHandle } from "../overlay.ts";
+import {
+  SuiOverlay,
+  type SuiOverlayOptions,
+  type SuiOverlayHandle,
+} from "../overlay.ts";
 import { type AnySuiComponent } from "../component.ts";
 import * as Theme from "./theme/modal.ts";
 import { type SuiModalTheme, type SuiModalStateTheme } from "./theme/modal.ts";
@@ -48,8 +52,11 @@ export type SuiModalOptions = {
  * onSync() pushes updated theme values to the live overlay handle after every setState() call.
  * Override compose() in subclasses to build content dynamically.
  */
-export class SuiModal extends SuiOverlay<SuiModalTheme, Record<string, never>, SuiModalOptions> {
-
+export class SuiModal extends SuiOverlay<
+  SuiModalTheme,
+  Record<string, never>,
+  SuiModalOptions
+> {
   constructor(options: SuiModalOptions) {
     super(options, Theme.modal);
   }
@@ -66,21 +73,23 @@ export class SuiModal extends SuiOverlay<SuiModalTheme, Record<string, never>, S
   override async onSync(): Promise<void> {
     const t = this.resolveTheme();
     await this.updateOverlay({
-      title:            t.self.title,
-      size:             t.self.size,
+      title: t.self.title,
+      size: t.self.size,
       hasMinimumHeight: t.self.hasMinimumHeight,
-      fillWidth:        t.self.fillWidth,
+      fillWidth: t.self.fillWidth,
     });
   }
 
-  protected override async openOverlay(content: UIPart[]): Promise<SuiOverlayHandle> {
+  protected override async openOverlay(
+    content: UIPart[],
+  ): Promise<SuiOverlayHandle> {
     const t = this.resolveTheme();
     return api.v1.ui.modal.open({
-      id:               this.id,
-      title:            t.self.title,
-      size:             t.self.size,
+      id: this.id,
+      title: t.self.title,
+      size: t.self.size,
       hasMinimumHeight: t.self.hasMinimumHeight,
-      fillWidth:        t.self.fillWidth,
+      fillWidth: t.self.fillWidth,
       content,
     });
   }

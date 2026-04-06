@@ -5,8 +5,8 @@
 import { type PartialState, type ThemeOverride } from "../../base.ts";
 
 export type SuiButtonPartTheme = {
-  style?:  object;
-  text?:   string;
+  style?: object;
+  text?: string;
   iconId?: IconId;
 };
 
@@ -15,7 +15,7 @@ export type SuiButtonStateTheme = {
 };
 
 export type SuiButtonTheme = {
-  default:   SuiButtonStateTheme;
+  default: SuiButtonStateTheme;
   disabled?: PartialState<SuiButtonStateTheme>;
 };
 

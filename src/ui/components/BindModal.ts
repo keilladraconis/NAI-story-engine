@@ -29,31 +29,39 @@ const { row, text, button, checkboxInput } = api.v1.ui.part;
 // ── Styles ─────────────────────────────────────────────────────────────────
 
 const SECTION_HEADER = {
-  "font-weight":   "bold",
-  "font-size":     "14px",
+  "font-weight": "bold",
+  "font-size": "14px",
   "margin-bottom": "6px",
   "border-bottom": "1px solid rgba(255,255,255,0.1)",
   "padding-bottom": "4px",
 };
 
 const SUB_HEADER = {
-  "font-size":   "12px",
-  opacity:       "0.6",
-  "margin-top":  "8px",
+  "font-size": "12px",
+  opacity: "0.6",
+  "margin-top": "8px",
   "margin-bottom": "4px",
-  "font-style":  "italic",
+  "font-style": "italic",
 };
 
 const ENTRY_ROW = {
-  gap:             "8px",
-  "align-items":   "center",
-  padding:         "4px 0",
+  gap: "8px",
+  "align-items": "center",
+  padding: "4px 0",
   "border-bottom": "1px solid rgba(255,255,255,0.04)",
 };
 
-const CATEGORY_BTN = { "font-size": "12px", "flex-shrink": "0", padding: "2px 6px" };
-const ACTION_BTN   = { "font-size": "12px", "flex-shrink": "0", padding: "2px 8px" };
-const UNBIND_BTN   = { ...ACTION_BTN, opacity: "0.6" };
+const CATEGORY_BTN = {
+  "font-size": "12px",
+  "flex-shrink": "0",
+  padding: "2px 6px",
+};
+const ACTION_BTN = {
+  "font-size": "12px",
+  "flex-shrink": "0",
+  padding: "2px 8px",
+};
+const UNBIND_BTN = { ...ACTION_BTN, opacity: "0.6" };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -72,12 +80,12 @@ export interface BindModalCtx {
 
 export async function openBindModal(ctx: BindModalCtx): Promise<void> {
   let allEntries: LorebookEntry[] = [];
-  const selected   = new Set<string>();
+  const selected = new Set<string>();
   const categories = new Map<string, DulfsFieldID>();
 
   const modal = await api.v1.ui.modal.open({
-    title:   "Bind / Rebind",
-    size:    "large",
+    title: "Bind / Rebind",
+    size: "large",
     content: [text({ text: "Loading..." })],
   });
 
@@ -95,7 +103,9 @@ export async function openBindModal(ctx: BindModalCtx): Promise<void> {
 
     // ── Bind New ───────────────────────────────────────────────────────────
 
-    const unmanagedEntries = allEntries.filter((e) => !managedEntryIds.has(e.id));
+    const unmanagedEntries = allEntries.filter(
+      (e) => !managedEntryIds.has(e.id),
+    );
     for (const entry of unmanagedEntries) {
       if (!categories.has(entry.id)) {
         categories.set(entry.id, detectCategory(entry.text || ""));
@@ -108,7 +118,8 @@ export async function openBindModal(ctx: BindModalCtx): Promise<void> {
       (e) => e.lifecycle === "live" && e.lorebookEntryId,
     );
     const missingEntities: WorldEntity[] = [];
-    const driftedPairs: Array<{ entity: WorldEntity; entry: LorebookEntry }> = [];
+    const driftedPairs: Array<{ entity: WorldEntity; entry: LorebookEntry }> =
+      [];
 
     for (const entity of liveEntities) {
       const entry = allEntries.find((e) => e.id === entity.lorebookEntryId);
@@ -128,13 +139,13 @@ export async function openBindModal(ctx: BindModalCtx): Promise<void> {
     if (unmanagedEntries.length === 0) {
       content.push(
         text({
-          text:  "All lorebook entries are managed by Story Engine.",
+          text: "All lorebook entries are managed by Story Engine.",
           style: { opacity: "0.5", "font-size": "13px", padding: "4px 0" },
         }),
       );
     } else {
       for (const entry of unmanagedEntries) {
-        const catId   = categories.get(entry.id)!;
+        const catId = categories.get(entry.id)!;
         const entryId = entry.id;
         content.push(
           row({
@@ -142,15 +153,15 @@ export async function openBindModal(ctx: BindModalCtx): Promise<void> {
             content: [
               checkboxInput({
                 initialValue: selected.has(entryId),
-                label:        entry.displayName || "(unnamed)",
-                onChange:     (checked: boolean) => {
+                label: entry.displayName || "(unnamed)",
+                onChange: (checked: boolean) => {
                   if (checked) selected.add(entryId);
-                  else         selected.delete(entryId);
+                  else selected.delete(entryId);
                 },
               }),
               button({
-                text:     `${DULFS_CATEGORY_LABELS[catId]} ▶`,
-                style:    CATEGORY_BTN,
+                text: `${DULFS_CATEGORY_LABELS[catId]} ▶`,
+                style: CATEGORY_BTN,
                 callback: () => {
                   categories.set(entryId, cycleDulfsCategory(catId));
                   void rebuild();
@@ -163,17 +174,23 @@ export async function openBindModal(ctx: BindModalCtx): Promise<void> {
 
       content.push(
         button({
-          text:     `Bind Selected (${selected.size})`,
-          style:    { "margin-top": "10px" },
+          text: `Bind Selected (${selected.size})`,
+          style: { "margin-top": "10px" },
           callback: async () => {
             if (selected.size === 0) return;
 
             const currentState = ctx.getState();
-            let importedBatch  = currentState.world.batches.find((b) => b.name === "Imported");
+            let importedBatch = currentState.world.batches.find(
+              (b) => b.name === "Imported",
+            );
             let batchId: string;
             if (!importedBatch) {
               batchId = api.v1.uuid();
-              ctx.dispatch(batchCreated({ batch: { id: batchId, name: "Imported", entityIds: [] } }));
+              ctx.dispatch(
+                batchCreated({
+                  batch: { id: batchId, name: "Imported", entityIds: [] },
+                }),
+              );
             } else {
               batchId = importedBatch.id;
             }
@@ -182,24 +199,29 @@ export async function openBindModal(ctx: BindModalCtx): Promise<void> {
             for (const entryId of selected) {
               const entry = allEntries.find((e) => e.id === entryId);
               if (!entry) continue;
-              const catId = categories.get(entryId) ?? detectCategory(entry.text || "");
-              ctx.dispatch(entityBound({
-                entity: {
-                  id:             api.v1.uuid(),
-                  batchId,
-                  categoryId:     catId,
-                  lifecycle:      "live",
-                  lorebookEntryId: entryId,
-                  name:           entry.displayName || "Unknown",
-                  summary:        "",
-                },
-              }));
+              const catId =
+                categories.get(entryId) ?? detectCategory(entry.text || "");
+              ctx.dispatch(
+                entityBound({
+                  entity: {
+                    id: api.v1.uuid(),
+                    batchId,
+                    categoryId: catId,
+                    lifecycle: "live",
+                    lorebookEntryId: entryId,
+                    name: entry.displayName || "Unknown",
+                    summary: "",
+                  },
+                }),
+              );
               count++;
             }
 
             selected.clear();
             api.v1.ui.toast(
-              count > 0 ? `Bound ${count} entr${count === 1 ? "y" : "ies"}` : "Nothing selected",
+              count > 0
+                ? `Bound ${count} entr${count === 1 ? "y" : "ies"}`
+                : "Nothing selected",
               { type: count > 0 ? "success" : "warning" },
             );
             await rebuild();
@@ -210,11 +232,19 @@ export async function openBindModal(ctx: BindModalCtx): Promise<void> {
 
     if (missingEntities.length > 0 || driftedPairs.length > 0) {
       content.push(
-        text({ text: "Rebind", style: { ...SECTION_HEADER, "margin-top": "20px" } }),
+        text({
+          text: "Rebind",
+          style: { ...SECTION_HEADER, "margin-top": "20px" },
+        }),
       );
 
       if (missingEntities.length > 0) {
-        content.push(text({ text: "Missing (lorebook entry deleted):", style: SUB_HEADER }));
+        content.push(
+          text({
+            text: "Missing (lorebook entry deleted):",
+            style: SUB_HEADER,
+          }),
+        );
         for (const entity of missingEntities) {
           content.push(
             row({
@@ -222,26 +252,33 @@ export async function openBindModal(ctx: BindModalCtx): Promise<void> {
               content: [
                 text({ text: entity.name, style: { flex: "1" } }),
                 button({
-                  text:     "Recreate",
-                  style:    ACTION_BTN,
+                  text: "Recreate",
+                  style: ACTION_BTN,
                   callback: async () => {
                     const categoryId = await ensureCategory(entity.categoryId);
                     const newEntryId = await api.v1.lorebook.createEntry({
-                      id:          api.v1.uuid(),
+                      id: api.v1.uuid(),
                       displayName: entity.name,
-                      text:        "",
-                      keys:        [],
-                      category:    categoryId,
-                      enabled:     true,
+                      text: "",
+                      keys: [],
+                      category: categoryId,
+                      enabled: true,
                     });
-                    ctx.dispatch(entityCast({ entityId: entity.id, lorebookEntryId: newEntryId }));
-                    api.v1.ui.toast(`Recreated: ${entity.name}`, { type: "success" });
+                    ctx.dispatch(
+                      entityCast({
+                        entityId: entity.id,
+                        lorebookEntryId: newEntryId,
+                      }),
+                    );
+                    api.v1.ui.toast(`Recreated: ${entity.name}`, {
+                      type: "success",
+                    });
                     await rebuild();
                   },
                 }),
                 button({
-                  text:     "Unbind",
-                  style:    UNBIND_BTN,
+                  text: "Unbind",
+                  style: UNBIND_BTN,
                   callback: () => {
                     ctx.dispatch(entityUnbound({ entityId: entity.id }));
                     void rebuild();
@@ -255,7 +292,10 @@ export async function openBindModal(ctx: BindModalCtx): Promise<void> {
 
       if (driftedPairs.length > 0) {
         content.push(
-          text({ text: "Drifted (manually edited without SE header):", style: SUB_HEADER }),
+          text({
+            text: "Drifted (manually edited without SE header):",
+            style: SUB_HEADER,
+          }),
         );
         for (const { entity, entry } of driftedPairs) {
           content.push(
@@ -264,21 +304,29 @@ export async function openBindModal(ctx: BindModalCtx): Promise<void> {
               content: [
                 text({ text: entity.name, style: { flex: "1" } }),
                 button({
-                  text:     "Accept",
-                  style:    ACTION_BTN,
+                  text: "Accept",
+                  style: ACTION_BTN,
                   callback: async () => {
-                    const existing  = entry.text || "";
-                    const setting   = String((await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "");
-                    const typeLabel = DULFS_CATEGORY_LABELS[entity.categoryId] || "Entry";
-                    const header    = `Name: ${entity.name}\nType: ${typeLabel}\nSetting: ${setting}\n`;
-                    await api.v1.lorebook.updateEntry(entry.id, { text: header + existing });
-                    api.v1.ui.toast(`Accepted: ${entity.name}`, { type: "success" });
+                    const existing = entry.text || "";
+                    const setting = String(
+                      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) ||
+                        "",
+                    );
+                    const typeLabel =
+                      DULFS_CATEGORY_LABELS[entity.categoryId] || "Entry";
+                    const header = `Name: ${entity.name}\nType: ${typeLabel}\nSetting: ${setting}\n`;
+                    await api.v1.lorebook.updateEntry(entry.id, {
+                      text: header + existing,
+                    });
+                    api.v1.ui.toast(`Accepted: ${entity.name}`, {
+                      type: "success",
+                    });
                     await rebuild();
                   },
                 }),
                 button({
-                  text:     "Unbind",
-                  style:    UNBIND_BTN,
+                  text: "Unbind",
+                  style: UNBIND_BTN,
                   callback: () => {
                     ctx.dispatch(entityUnbound({ entityId: entity.id }));
                     void rebuild();

@@ -25,14 +25,21 @@
  */
 
 import { SuiBase } from "../base.ts";
-import { SuiOverlay, type SuiOverlayOptions, type SuiOverlayHandle } from "../overlay.ts";
+import {
+  SuiOverlay,
+  type SuiOverlayOptions,
+  type SuiOverlayHandle,
+} from "../overlay.ts";
 import { type AnySuiComponent } from "../component.ts";
 import { SuiButton } from "../components/button.ts";
 import { SuiText } from "../components/text.ts";
 import { SuiColumn } from "../components/column.ts";
 import { SuiRow } from "../components/row.ts";
 import * as Theme from "./theme/confirm-modal.ts";
-import { type SuiConfirmModalTheme, type SuiConfirmModalStateTheme } from "./theme/confirm-modal.ts";
+import {
+  type SuiConfirmModalTheme,
+  type SuiConfirmModalStateTheme,
+} from "./theme/confirm-modal.ts";
 
 /** State for SuiConfirmModal. confirmed is false until the confirm button is pressed. */
 export type SuiConfirmModalState = {
@@ -40,7 +47,10 @@ export type SuiConfirmModalState = {
 };
 
 /** Options for SuiConfirmModal. All presentational properties live in theme. */
-export type SuiConfirmModalOptions = Omit<SuiOverlayOptions<SuiConfirmModalTheme, SuiConfirmModalState>, "children"> & {
+export type SuiConfirmModalOptions = Omit<
+  SuiOverlayOptions<SuiConfirmModalTheme, SuiConfirmModalState>,
+  "children"
+> & {
   theme?: Partial<SuiConfirmModalTheme>;
 };
 
@@ -50,8 +60,11 @@ export type SuiConfirmModalOptions = Omit<SuiOverlayOptions<SuiConfirmModalTheme
  * Pressing cancel (or the native X) closes without mutating state.
  * Await open() to receive state on close.
  */
-export class SuiConfirmModal extends SuiOverlay<SuiConfirmModalTheme, SuiConfirmModalState, SuiConfirmModalOptions> {
-
+export class SuiConfirmModal extends SuiOverlay<
+  SuiConfirmModalTheme,
+  SuiConfirmModalState,
+  SuiConfirmModalOptions
+> {
   private _confirmTheme: SuiConfirmModalTheme;
 
   constructor(options: SuiConfirmModalOptions) {
@@ -71,14 +84,16 @@ export class SuiConfirmModal extends SuiOverlay<SuiConfirmModalTheme, SuiConfirm
     return this._confirmTheme.default;
   }
 
-  protected override async openOverlay(content: UIPart[]): Promise<SuiOverlayHandle> {
+  protected override async openOverlay(
+    content: UIPart[],
+  ): Promise<SuiOverlayHandle> {
     const t = this.resolveTheme();
     return api.v1.ui.modal.open({
-      id:               this.id,
-      title:            t.self.title,
-      size:             t.self.size,
+      id: this.id,
+      title: t.self.title,
+      size: t.self.size,
       hasMinimumHeight: t.self.hasMinimumHeight,
-      fillWidth:        t.self.fillWidth,
+      fillWidth: t.self.fillWidth,
       content,
     });
   }
@@ -89,21 +104,27 @@ export class SuiConfirmModal extends SuiOverlay<SuiConfirmModalTheme, SuiConfirm
    */
   override async compose(): Promise<UIPart[]> {
     const id = this.id;
-    const t  = this.resolveTheme();
+    const t = this.resolveTheme();
 
     const messageText = new SuiText({
-      id:    `${id}.message`,
-      theme: { default: { self: { ...t.message, markdown: t.message.markdown ?? true } } },
+      id: `${id}.message`,
+      theme: {
+        default: {
+          self: { ...t.message, markdown: t.message.markdown ?? true },
+        },
+      },
     });
 
     const cancelBtn = new SuiButton({
-      id:       `${id}.cancel`,
-      callback: async () => { await this.close(); },
-      theme:    { default: { self: t.cancel } },
+      id: `${id}.cancel`,
+      callback: async () => {
+        await this.close();
+      },
+      theme: { default: { self: t.cancel } },
     });
 
     const confirmBtn = new SuiButton({
-      id:       `${id}.confirm`,
+      id: `${id}.confirm`,
       callback: async () => {
         await this.setState({ confirmed: true });
         await this.close();
@@ -112,15 +133,17 @@ export class SuiConfirmModal extends SuiOverlay<SuiConfirmModalTheme, SuiConfirm
     });
 
     const actionsRow = new SuiRow({
-      id:       `${id}.actions`,
+      id: `${id}.actions`,
       children: [cancelBtn, confirmBtn] as AnySuiComponent[],
-      theme:    { default: { self: t.actions ?? {} } },
+      theme: { default: { self: t.actions ?? {} } },
     });
 
-    return this.buildContent([new SuiColumn({
-      id:       `${id}.body`,
-      children: [messageText, actionsRow] as AnySuiComponent[],
-      theme:    { default: { self: t.body ?? {} } },
-    })]);
+    return this.buildContent([
+      new SuiColumn({
+        id: `${id}.body`,
+        children: [messageText, actionsRow] as AnySuiComponent[],
+        theme: { default: { self: t.body ?? {} } },
+      }),
+    ]);
   }
 }

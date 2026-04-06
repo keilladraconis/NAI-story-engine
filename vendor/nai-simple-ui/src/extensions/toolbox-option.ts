@@ -19,26 +19,31 @@ import { SuiExtension } from "../extension.ts";
 import type { SuiBaseOptions, SuiTheme } from "../base.ts";
 import type { AnySuiComponent } from "../component.ts";
 import * as Theme from "./theme/toolbox-option.ts";
-import { type SuiToolboxOptionStateTheme, type SuiToolboxOptionTheme } from "./theme/toolbox-option.ts";
+import {
+  type SuiToolboxOptionStateTheme,
+  type SuiToolboxOptionTheme,
+} from "./theme/toolbox-option.ts";
 
 // ============================================================
 // Options
 // ============================================================
 
 export type SuiToolboxOptionOptions<
-  TTheme extends SuiTheme                = SuiToolboxOptionTheme,
+  TTheme extends SuiTheme = SuiToolboxOptionTheme,
   TState extends Record<string, unknown> = Record<string, unknown>,
 > = {
   /** Name displayed on the toolbox option's button. */
-  name:         string;
+  name: string;
   /** Description shown at the top of the toolbox menu when this option is selected. */
   description?: string;
   /** Icon displayed on the toolbox option's button. */
-  iconId?:      IconId;
+  iconId?: IconId;
   /** Called when the "Adjust" button is clicked. Receives the selection and its text. */
-  callback?:    ((_: { selection: DocumentSelection; text: string }) => void) | string;
+  callback?:
+    | ((_: { selection: DocumentSelection; text: string }) => void)
+    | string;
   /** Optional components rendered in the toolbox menu when this option is selected. */
-  children?:    AnySuiComponent[];
+  children?: AnySuiComponent[];
 } & SuiBaseOptions<TTheme, TState>;
 
 // ============================================================
@@ -46,7 +51,7 @@ export type SuiToolboxOptionOptions<
 // ============================================================
 
 export class SuiToolboxOption<
-  TTheme extends SuiTheme                = SuiToolboxOptionTheme,
+  TTheme extends SuiTheme = SuiToolboxOptionTheme,
   TState extends Record<string, unknown> = Record<string, unknown>,
 > extends SuiExtension<
   "toolboxOption",
@@ -55,7 +60,10 @@ export class SuiToolboxOption<
   TState,
   SuiToolboxOptionOptions<TTheme, TState>
 > {
-  constructor(options: SuiToolboxOptionOptions<TTheme, TState>, baseTheme = Theme.toolboxOption as unknown as TTheme) {
+  constructor(
+    options: SuiToolboxOptionOptions<TTheme, TState>,
+    baseTheme = Theme.toolboxOption as unknown as TTheme,
+  ) {
     super(options, "toolboxOption", baseTheme);
   }
 
@@ -65,18 +73,21 @@ export class SuiToolboxOption<
   }
 
   async compose(): Promise<UIExtensionToolboxOption> {
-    const t       = this.resolveTheme();
+    const t = this.resolveTheme();
     const content = this.options.children?.length
-      ? await this.buildContent(this.options.children, SuiBase.listChildrenStyle(t.self))
+      ? await this.buildContent(
+          this.options.children,
+          SuiBase.listChildrenStyle(t.self),
+        )
       : undefined;
 
     return {
-      type:        this.type,
-      id:          this.id,
-      name:        this.options.name,
+      type: this.type,
+      id: this.id,
+      name: this.options.name,
       description: this.options.description,
-      iconId:      this.options.iconId,
-      callback:    this.options.callback,
+      iconId: this.options.iconId,
+      callback: this.options.callback,
       content,
     };
   }

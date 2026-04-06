@@ -27,10 +27,17 @@
  *   })
  */
 
-import { SuiOverlay, type SuiOverlayOptions, type SuiOverlayHandle } from "../overlay.ts";
+import {
+  SuiOverlay,
+  type SuiOverlayOptions,
+  type SuiOverlayHandle,
+} from "../overlay.ts";
 import { type AnySuiComponent } from "../component.ts";
 import * as Theme from "./theme/window.ts";
-import { type SuiWindowTheme, type SuiWindowStateTheme } from "./theme/window.ts";
+import {
+  type SuiWindowTheme,
+  type SuiWindowStateTheme,
+} from "./theme/window.ts";
 
 /** options carries data only — all presentational properties live in theme. */
 export type SuiWindowOptions = {
@@ -43,8 +50,11 @@ export type SuiWindowOptions = {
  * onSync() pushes updated theme values to the live overlay handle after every setState() call.
  * Override compose() in subclasses to build content dynamically.
  */
-export class SuiWindow extends SuiOverlay<SuiWindowTheme, Record<string, never>, SuiWindowOptions> {
-
+export class SuiWindow extends SuiOverlay<
+  SuiWindowTheme,
+  Record<string, never>,
+  SuiWindowOptions
+> {
   constructor(options: SuiWindowOptions) {
     super(options, Theme.window_);
   }
@@ -61,33 +71,35 @@ export class SuiWindow extends SuiOverlay<SuiWindowTheme, Record<string, never>,
   override async onSync(): Promise<void> {
     const t = this.resolveTheme();
     await this.updateOverlay({
-      title:         t.self.title,
-      defaultWidth:  t.self.defaultWidth,
+      title: t.self.title,
+      defaultWidth: t.self.defaultWidth,
       defaultHeight: t.self.defaultHeight,
-      defaultX:      t.self.defaultX,
-      defaultY:      t.self.defaultY,
-      minWidth:      t.self.minWidth,
-      minHeight:     t.self.minHeight,
-      maxWidth:      t.self.maxWidth,
-      maxHeight:     t.self.maxHeight,
-      resizable:     t.self.resizable,
+      defaultX: t.self.defaultX,
+      defaultY: t.self.defaultY,
+      minWidth: t.self.minWidth,
+      minHeight: t.self.minHeight,
+      maxWidth: t.self.maxWidth,
+      maxHeight: t.self.maxHeight,
+      resizable: t.self.resizable,
     });
   }
 
-  protected override async openOverlay(content: UIPart[]): Promise<SuiOverlayHandle> {
+  protected override async openOverlay(
+    content: UIPart[],
+  ): Promise<SuiOverlayHandle> {
     const t = this.resolveTheme();
     return api.v1.ui.window.open({
-      id:            this.id,
-      title:         t.self.title,
-      defaultWidth:  t.self.defaultWidth,
+      id: this.id,
+      title: t.self.title,
+      defaultWidth: t.self.defaultWidth,
       defaultHeight: t.self.defaultHeight,
-      defaultX:      t.self.defaultX,
-      defaultY:      t.self.defaultY,
-      minWidth:      t.self.minWidth,
-      minHeight:     t.self.minHeight,
-      maxWidth:      t.self.maxWidth,
-      maxHeight:     t.self.maxHeight,
-      resizable:     t.self.resizable,
+      defaultX: t.self.defaultX,
+      defaultY: t.self.defaultY,
+      minWidth: t.self.minWidth,
+      minHeight: t.self.minHeight,
+      maxWidth: t.self.maxWidth,
+      maxHeight: t.self.maxHeight,
+      resizable: t.self.resizable,
       content,
     });
   }

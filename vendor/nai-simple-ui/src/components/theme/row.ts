@@ -5,9 +5,9 @@
 import { type SuiChildrenPartTheme, type ThemeOverride } from "../../base.ts";
 
 export type SuiRowPartTheme = SuiChildrenPartTheme & {
-  spacing?:   UIPartRow["spacing"];
+  spacing?: UIPartRow["spacing"];
   alignment?: UIPartRow["alignment"];
-  wrap?:      boolean;
+  wrap?: boolean;
 };
 
 export type SuiRowStateTheme = {

@@ -3,7 +3,9 @@ import { parseCommands } from "../../../src/core/utils/crucible-command-parser";
 
 describe("parseCommands", () => {
   it("parses a CREATE command with content", () => {
-    const commands = parseCommands(`[CREATE CHARACTER "Elara"]\nA disgraced knight.`);
+    const commands = parseCommands(
+      `[CREATE CHARACTER "Elara"]\nA disgraced knight.`,
+    );
     expect(commands).toHaveLength(1);
     expect(commands[0].kind).toBe("CREATE");
     if (commands[0].kind === "CREATE") {

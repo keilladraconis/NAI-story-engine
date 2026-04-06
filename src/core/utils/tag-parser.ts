@@ -7,29 +7,29 @@
 
 /** Emoji mapping for tagged text display. */
 const TAG_EMOJI: Record<string, string> = {
-  'CORE TENSION': '🔥',
-  'WORLD PREMISE': '🌍',
-  'NARRATIVE DIRECTION': '🧭',
-  TAGS: '🏷️',
-  TENSION: '🔥',
-  STAKES: '⚠️',
-  THEME: '💡',
-  'EMOTIONAL ARC': '💫',
-  'TERMINAL CONDITION': '🏁',
-  LOCATION: '📍',
-  CHARACTER: '👤',
-  FACTION: '🏴',
-  SYSTEM: '⚙️',
-  SITUATION: '⚡',
-  DESCRIPTION: '💬',
-  RELATIONSHIP: '🤝',
-  CREATE: '✨',
-  REVISE: '✏️',
-  LINK: '🔗',
-  DELETE: '🗑️',
-  CRITIQUE: '🔍',
-  DONE: '✅',
-}
+  "CORE TENSION": "🔥",
+  "WORLD PREMISE": "🌍",
+  "NARRATIVE DIRECTION": "🧭",
+  TAGS: "🏷️",
+  TENSION: "🔥",
+  STAKES: "⚠️",
+  THEME: "💡",
+  "EMOTIONAL ARC": "💫",
+  "TERMINAL CONDITION": "🏁",
+  LOCATION: "📍",
+  CHARACTER: "👤",
+  FACTION: "🏴",
+  SYSTEM: "⚙️",
+  SITUATION: "⚡",
+  DESCRIPTION: "💬",
+  RELATIONSHIP: "🤝",
+  CREATE: "✨",
+  REVISE: "✏️",
+  LINK: "🔗",
+  DELETE: "🗑️",
+  CRITIQUE: "🔍",
+  DONE: "✅",
+};
 
 /** Build reverse mapping: emoji → tag name. */
 const EMOJI_TO_TAG: Map<string, string> = new Map(
@@ -104,4 +104,3 @@ export function splitSections(text: string, sep = "+++"): string[] {
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
-

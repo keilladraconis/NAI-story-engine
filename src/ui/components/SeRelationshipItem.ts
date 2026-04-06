@@ -20,27 +20,32 @@ import { IDS } from "../../ui/framework/ids";
 import { SeEditableText } from "./SeEditableText";
 
 export async function buildSeRelationshipItem(
-  entityId:       string,
+  entityId: string,
   relationshipId: string,
-  lifecycle:      "draft" | "live",
+  lifecycle: "draft" | "live",
 ): Promise<UIPart> {
   const R = IDS.entity(entityId, lifecycle).rel(relationshipId);
   const { button } = api.v1.ui.part;
 
   const deleteBtn = button({
-    id:       R.DELETE_BTN,
-    iconId:   "trash" as IconId,
-    callback: () => { store.dispatch(relationshipRemoved({ relationshipId })); },
+    id: R.DELETE_BTN,
+    iconId: "trash" as IconId,
+    callback: () => {
+      store.dispatch(relationshipRemoved({ relationshipId }));
+    },
   });
 
   const state = store.getState();
-  const rel = state.world.relationships.find(r => r.id === relationshipId);
+  const rel = state.world.relationships.find((r) => r.id === relationshipId);
   const isFromInit = rel?.fromEntityId === entityId;
   const otherIdInit = isFromInit ? rel?.toEntityId : rel?.fromEntityId;
-  const otherNameInit = state.world.entities.find(e => e.id === otherIdInit)?.name ?? "?";
+  const otherNameInit =
+    state.world.entities.find((e) => e.id === otherIdInit)?.name ?? "?";
   const initialDisplay = `${otherNameInit}: ${rel?.description ?? ""}`;
 
-  const parseOtherDescription = (content: string): { otherName: string; description: string } | null => {
+  const parseOtherDescription = (
+    content: string,
+  ): { otherName: string; description: string } | null => {
     const sep = content.indexOf(": ");
     if (sep === -1) return null;
     const name = content.slice(0, sep).trim();
@@ -49,56 +54,75 @@ export async function buildSeRelationshipItem(
   };
 
   const editable = new SeEditableText({
-    id:            R.ROOT,
-    placeholder:   "OtherEntity: relationship description…",
+    id: R.ROOT,
+    placeholder: "OtherEntity: relationship description…",
     initialDisplay,
     extraControls: [deleteBtn],
 
     getContent: () => {
-      const r = store.getState().world.relationships.find(r => r.id === relationshipId);
+      const r = store
+        .getState()
+        .world.relationships.find((r) => r.id === relationshipId);
       if (!r) return initialDisplay;
       const sid = r.fromEntityId === entityId ? r.toEntityId : r.fromEntityId;
-      const other = store.getState().world.entities.find(e => e.id === sid);
+      const other = store.getState().world.entities.find((e) => e.id === sid);
       return other ? `${other.name}: ${r.description}` : r.description;
     },
 
     liveSelector: (s) => {
-      const r = s.world.relationships.find(r => r.id === relationshipId);
+      const r = s.world.relationships.find((r) => r.id === relationshipId);
       if (!r) return "";
       const sid = r.fromEntityId === entityId ? r.toEntityId : r.fromEntityId;
-      const other = s.world.entities.find(e => e.id === sid);
+      const other = s.world.entities.find((e) => e.id === sid);
       return other ? `${other.name}: ${r.description}` : r.description;
     },
 
     onSave: (content: string) => {
       const parsed = parseOtherDescription(content);
       if (!parsed) {
-        store.dispatch(relationshipUpdated({ relationshipId, description: content.trim() }));
+        store.dispatch(
+          relationshipUpdated({ relationshipId, description: content.trim() }),
+        );
         return;
       }
 
-      const currentRel = store.getState().world.relationships.find(r => r.id === relationshipId);
+      const currentRel = store
+        .getState()
+        .world.relationships.find((r) => r.id === relationshipId);
       if (!currentRel) return;
       const isFrom = currentRel.fromEntityId === entityId;
-      const currentOtherId = isFrom ? currentRel.toEntityId : currentRel.fromEntityId;
-      const currentOther = store.getState().world.entities.find(e => e.id === currentOtherId);
+      const currentOtherId = isFrom
+        ? currentRel.toEntityId
+        : currentRel.fromEntityId;
+      const currentOther = store
+        .getState()
+        .world.entities.find((e) => e.id === currentOtherId);
 
       if (parsed.otherName.toLowerCase() !== currentOther?.name.toLowerCase()) {
-        const newOther = store.getState().world.entities.find(
-          e => e.name.toLowerCase() === parsed.otherName.toLowerCase(),
-        );
+        const newOther = store
+          .getState()
+          .world.entities.find(
+            (e) => e.name.toLowerCase() === parsed.otherName.toLowerCase(),
+          );
         if (!newOther) return;
         store.dispatch(relationshipRemoved({ relationshipId }));
-        store.dispatch(relationshipAdded({
-          relationship: {
-            id:           api.v1.uuid(),
-            fromEntityId: isFrom ? entityId : newOther.id,
-            toEntityId:   isFrom ? newOther.id : entityId,
-            description:  parsed.description,
-          } satisfies Relationship,
-        }));
+        store.dispatch(
+          relationshipAdded({
+            relationship: {
+              id: api.v1.uuid(),
+              fromEntityId: isFrom ? entityId : newOther.id,
+              toEntityId: isFrom ? newOther.id : entityId,
+              description: parsed.description,
+            } satisfies Relationship,
+          }),
+        );
       } else {
-        store.dispatch(relationshipUpdated({ relationshipId, description: parsed.description }));
+        store.dispatch(
+          relationshipUpdated({
+            relationshipId,
+            description: parsed.description,
+          }),
+        );
       }
     },
   });

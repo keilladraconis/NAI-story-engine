@@ -1,10 +1,6 @@
 import { Store, matchesAction } from "nai-store";
 import { RootState, AppDispatch } from "../types";
-import {
-  dulfsItemAdded,
-  dulfsItemRemoved,
-  entitySummaryUpdated,
-} from "../index";
+import { dulfsItemAdded, dulfsItemRemoved } from "../index";
 import { DulfsFieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
 import { STORAGE_KEYS } from "../../../ui/framework/ids";
 import { extractDulfsItemName } from "../../utils/context-builder";
@@ -31,7 +27,9 @@ export async function migrateLorebookCategories(): Promise<void> {
     const newName = category.name && CATEGORY_RENAME_MAP[category.name];
     if (newName) {
       await api.v1.lorebook.updateCategory(category.id, { name: newName });
-      api.v1.log(`[lorebook] Renamed category "${category.name}" → "${newName}"`);
+      api.v1.log(
+        `[lorebook] Renamed category "${category.name}" → "${newName}"`,
+      );
     }
   }
 }
@@ -56,7 +54,9 @@ export async function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
 }
 
 // Helper: Find a category for a DULFS field (returns null if not found)
-export async function findCategory(fieldId: DulfsFieldID): Promise<string | null> {
+export async function findCategory(
+  fieldId: DulfsFieldID,
+): Promise<string | null> {
   const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
   const name = `${SE_CATEGORY_PREFIX}${config?.label || fieldId}`;
   const categories = await api.v1.lorebook.categories();
@@ -97,7 +97,9 @@ export async function syncEratoCompatibility(
   // Update categories
   for (const categoryId of categoryIds) {
     if (erato) {
-      await api.v1.lorebook.updateCategory(categoryId, { settings: { entryHeader: "" } });
+      await api.v1.lorebook.updateCategory(categoryId, {
+        settings: { entryHeader: "" },
+      });
     } else {
       await api.v1.lorebook.updateCategory(categoryId, {
         settings: { entryHeader: "----" },
@@ -146,77 +148,29 @@ export async function syncEratoCompatibility(
   }
 
   // Re-sync ATTG+Style → Memory (rebuilds combined content)
-  const attgSync = (await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_ATTG_MEMORY)) as { on?: boolean } | null;
-  const styleSync = (await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY)) as { on?: boolean } | null;
+  const attgSync = (await api.v1.storyStorage.get(
+    STORAGE_KEYS.SYNC_ATTG_MEMORY,
+  )) as { on?: boolean } | null;
+  const styleSync = (await api.v1.storyStorage.get(
+    STORAGE_KEYS.SYNC_STYLE_MEMORY,
+  )) as { on?: boolean } | null;
   if (attgSync?.on || styleSync?.on) {
     const mem = buildMemoryContent(getState);
     if (mem) await api.v1.memory.set(mem);
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Phase 7: Lorebook Sync — summary reconciliation
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Extract a short display summary from lorebook entry text. Skips the header block. */
-function extractEntitySummary(entryText: string): string {
-  const HEADER_PREFIXES = ["Name:", "Type:", "Setting:", "----", "***"];
-  const lines = entryText.split("\n");
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (HEADER_PREFIXES.some((p) => trimmed.startsWith(p))) continue;
-    return trimmed.length > 120 ? trimmed.slice(0, 117) + "..." : trimmed;
-  }
-  return "";
-}
-
 /**
- * Reconcile WorldEntity summaries against current lorebook entry content.
- * Called from onBeforeContextBuild (full pass) and onLorebookEntrySelected (single entry).
- */
-export async function reconcileEntitySummaries(
-  dispatch: AppDispatch,
-  getState: () => RootState,
-  singleEntryId?: string,
-): Promise<void> {
-  const state = getState();
-  const liveEntities = state.world.entities.filter(
-    (e) => e.lifecycle === "live" && e.lorebookEntryId,
-  );
-
-  if (liveEntities.length === 0) return;
-
-  const allEntries = singleEntryId ? null : await api.v1.lorebook.entries();
-
-  for (const entity of liveEntities) {
-    if (singleEntryId && entity.lorebookEntryId !== singleEntryId) continue;
-
-    const entry = singleEntryId
-      ? await api.v1.lorebook.entry(singleEntryId)
-      : allEntries!.find((e) => e.id === entity.lorebookEntryId);
-
-    if (!entry?.text) continue;
-
-    const newSummary = extractEntitySummary(entry.text);
-    if (newSummary !== entity.summary) {
-      dispatch(entitySummaryUpdated({ entityId: entity.id, summary: newSummary }));
-    }
-  }
-}
-
-/**
- * Register NovelAI API hooks for lorebook sync (Phase 7).
+ * Register NovelAI API hooks for lorebook sync.
  * Call from index.ts after store is ready.
  */
 export function registerLorebookSyncHooks(
-  dispatch: AppDispatch,
-  getState: () => RootState,
+  _dispatch: AppDispatch,
+  _getState: () => RootState,
 ): void {
-  // 7.1 — Reconcile summaries before every context build
-  api.v1.hooks.register("onBeforeContextBuild", async () => {
-    await reconcileEntitySummaries(dispatch, getState);
-  });
+  // No hooks currently registered.
+  // Entity summaries are owned exclusively by Story Engine and are never
+  // read back from or written to lorebook entry text.
 }
 
 export function registerLorebookSyncEffects(
@@ -225,25 +179,22 @@ export function registerLorebookSyncEffects(
   _getState: () => RootState,
 ): void {
   // Lorebook Sync: Item Added
-  subscribeEffect(
-    matchesAction(dulfsItemAdded),
-    async (action) => {
-      const { fieldId, item } = action.payload;
-      const content =
-        (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(item.id))) || "";
+  subscribeEffect(matchesAction(dulfsItemAdded), async (action) => {
+    const { fieldId, item } = action.payload;
+    const content =
+      (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(item.id))) || "";
 
-      const name = extractDulfsItemName(String(content), fieldId);
+    const name = extractDulfsItemName(String(content), fieldId);
 
-      const categoryId = await ensureCategory(fieldId);
-      await api.v1.lorebook.createEntry({
-        id: item.id,
-        category: categoryId,
-        displayName: name,
-        keys: [],
-        enabled: true,
-      });
-    },
-  );
+    const categoryId = await ensureCategory(fieldId);
+    await api.v1.lorebook.createEntry({
+      id: item.id,
+      category: categoryId,
+      displayName: name,
+      keys: [],
+      enabled: true,
+    });
+  });
 
   // Lorebook Sync: Item Removed
   subscribeEffect(matchesAction(dulfsItemRemoved), async (action) => {
@@ -260,5 +211,4 @@ export function registerLorebookSyncEffects(
       }
     }
   });
-
 }

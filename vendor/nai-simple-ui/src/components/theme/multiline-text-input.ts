@@ -10,7 +10,7 @@ export type SuiMultilineTextInputStateTheme = {
 };
 
 export type SuiMultilineTextInputTheme = {
-  default:   SuiMultilineTextInputStateTheme;
+  default: SuiMultilineTextInputStateTheme;
   disabled?: PartialState<SuiMultilineTextInputStateTheme>;
 };
 

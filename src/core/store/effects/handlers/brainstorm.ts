@@ -26,16 +26,22 @@ export const brainstormHandler: GenerationHandlers<BrainstormTarget> = {
   },
 };
 
-export const brainstormChatTitleHandler: GenerationHandlers<BrainstormChatTitleTarget> = {
-  streaming(_ctx: StreamingContext<BrainstormChatTitleTarget>, _newText: string): void {
-    // Title generation streams silently — no intermediate UI update needed
-  },
+export const brainstormChatTitleHandler: GenerationHandlers<BrainstormChatTitleTarget> =
+  {
+    streaming(
+      _ctx: StreamingContext<BrainstormChatTitleTarget>,
+      _newText: string,
+    ): void {
+      // Title generation streams silently — no intermediate UI update needed
+    },
 
-  async completion(ctx: CompletionContext<BrainstormChatTitleTarget>): Promise<void> {
-    if (!ctx.generationSucceeded) return;
-    const title = ctx.accumulatedText.trim().replace(/[.!?]+$/, "");
-    if (title) {
-      ctx.dispatch(chatRenamed({ index: ctx.target.chatIndex, title }));
-    }
-  },
-};
+    async completion(
+      ctx: CompletionContext<BrainstormChatTitleTarget>,
+    ): Promise<void> {
+      if (!ctx.generationSucceeded) return;
+      const title = ctx.accumulatedText.trim().replace(/[.!?]+$/, "");
+      if (title) {
+        ctx.dispatch(chatRenamed({ index: ctx.target.chatIndex, title }));
+      }
+    },
+  };

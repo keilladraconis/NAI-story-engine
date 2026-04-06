@@ -30,22 +30,22 @@ type SeEditableTextTheme = { default: { self: { style: object } } };
 
 export type SeEditableTextOptions = {
   /** Called on edit begin to retrieve current content. */
-  getContent:     () => string | Promise<string>;
-  placeholder?:   string;
+  getContent: () => string | Promise<string>;
+  placeholder?: string;
   /** Called after save with the new content string. */
-  onSave?:        (content: string) => void;
+  onSave?: (content: string) => void;
   /** Additional controls placed alongside Edit/Save buttons. */
   extraControls?: UIPart[];
   /** Bold label shown in the multiline header row. */
-  label?:         string;
+  label?: string;
   /** Initial view text (markdown) shown before any save. */
   initialDisplay?: string;
   /** Formatter applied to content before display (e.g. emoji tags). */
   formatDisplay?: (content: string) => string;
   /** When provided, a StoreWatcher subscription keeps view text live. */
-  liveSelector?:  (s: RootState) => string;
+  liveSelector?: (s: RootState) => string;
   /** Use single-line textInput in a compact row layout. Default: false. */
-  singleLine?:    boolean;
+  singleLine?: boolean;
 } & SuiComponentOptions<SeEditableTextTheme, SeEditableTextState>;
 
 // ── SeEditableText ────────────────────────────────────────────────────────────
@@ -58,10 +58,18 @@ export class SeEditableText extends SuiComponent<
 > {
   private readonly _watcher: StoreWatcher;
 
-  private get _viewId():    string { return `${this.id}-view`; }
-  private get _editId():    string { return `${this.id}-edit`; }
-  private get _editBtnId(): string { return `${this.id}-edit-btn`; }
-  private get _saveBtnId(): string { return `${this.id}-save-btn`; }
+  private get _viewId(): string {
+    return `${this.id}-view`;
+  }
+  private get _editId(): string {
+    return `${this.id}-edit`;
+  }
+  private get _editBtnId(): string {
+    return `${this.id}-edit-btn`;
+  }
+  private get _saveBtnId(): string {
+    return `${this.id}-save-btn`;
+  }
 
   constructor(options: SeEditableTextOptions) {
     super(
@@ -77,16 +85,14 @@ export class SeEditableText extends SuiComponent<
     if (liveSelector) {
       this._watcher.watch(liveSelector, (content) => {
         const formatted = formatDisplay ? formatDisplay(content) : content;
-        const escaped   = singleLine
+        const escaped = singleLine
           ? formatted
           : formatted.replace(/\n/g, "  \n").replace(/</g, "\\<");
         api.v1.ui.updateParts([{ id: this._viewId, text: escaped }]);
       });
     }
 
-    return singleLine
-      ? this._buildSingleLine()
-      : this._buildMultiline();
+    return singleLine ? this._buildSingleLine() : this._buildMultiline();
   }
 
   override async onSync(): Promise<void> {
@@ -95,15 +101,33 @@ export class SeEditableText extends SuiComponent<
 
     if (singleLine) {
       api.v1.ui.updateParts([
-        { id: this._viewId,    style: editing ? { display: "none" } : SL_STYLES.view },
-        { id: this._editId,    style: editing ? SL_STYLES.edit : SL_STYLES.editHidden },
-        { id: this._editBtnId, style: editing ? SL_STYLES.btnHidden : SL_STYLES.btn },
-        { id: this._saveBtnId, style: editing ? SL_STYLES.btn : SL_STYLES.btnHidden },
+        {
+          id: this._viewId,
+          style: editing ? { display: "none" } : SL_STYLES.view,
+        },
+        {
+          id: this._editId,
+          style: editing ? SL_STYLES.edit : SL_STYLES.editHidden,
+        },
+        {
+          id: this._editBtnId,
+          style: editing ? SL_STYLES.btnHidden : SL_STYLES.btn,
+        },
+        {
+          id: this._saveBtnId,
+          style: editing ? SL_STYLES.btn : SL_STYLES.btnHidden,
+        },
       ]);
     } else {
       api.v1.ui.updateParts([
-        { id: this._viewId,    style: editing ? { display: "none" } : ML_STYLES.view },
-        { id: this._editId,    style: editing ? ML_STYLES.edit : ML_STYLES.editHidden },
+        {
+          id: this._viewId,
+          style: editing ? { display: "none" } : ML_STYLES.view,
+        },
+        {
+          id: this._editId,
+          style: editing ? ML_STYLES.edit : ML_STYLES.editHidden,
+        },
         { id: this._editBtnId, style: editing ? { display: "none" } : {} },
         { id: this._saveBtnId, style: editing ? {} : { display: "none" } },
       ]);
@@ -113,12 +137,15 @@ export class SeEditableText extends SuiComponent<
         const content = String(
           (await api.v1.storyStorage.get(EDITABLE_DRAFT_RAW)) || "",
         );
-        const newlines    = (content.match(/\n/g) || []).length;
+        const newlines = (content.match(/\n/g) || []).length;
         const wrappedLines = Math.ceil(content.length / 50);
-        const lines       = Math.max(newlines + 1, wrappedLines, 4);
-        const height      = `${Math.min(lines * 18, 400)}px`;
+        const lines = Math.max(newlines + 1, wrappedLines, 4);
+        const height = `${Math.min(lines * 18, 400)}px`;
         api.v1.ui.updateParts([
-          { id: this._editId, style: { ...ML_STYLES.edit, "min-height": height } },
+          {
+            id: this._editId,
+            style: { ...ML_STYLES.edit, "min-height": height },
+          },
         ]);
       }
     }
@@ -138,7 +165,7 @@ export class SeEditableText extends SuiComponent<
     );
     const { formatDisplay, onSave, singleLine } = this.options;
     const displayText = formatDisplay ? formatDisplay(content) : content;
-    const escaped     = singleLine
+    const escaped = singleLine
       ? displayText
       : displayText.replace(/\n/g, "  \n").replace(/</g, "\\<");
     api.v1.ui.updateParts([{ id: this._viewId, text: escaped }]);
@@ -149,7 +176,8 @@ export class SeEditableText extends SuiComponent<
   // ── Builders ──────────────────────────────────────────────
 
   private _buildInitialViewText(): string | undefined {
-    const { getContent, formatDisplay, initialDisplay, singleLine } = this.options;
+    const { getContent, formatDisplay, initialDisplay, singleLine } =
+      this.options;
     if (formatDisplay) {
       const raw = getContent();
       if (typeof raw === "string") {
@@ -169,38 +197,44 @@ export class SeEditableText extends SuiComponent<
 
     const parts: UIPart[] = [
       text({
-        id:    this._viewId,
-        text:  viewText,
+        id: this._viewId,
+        text: viewText,
         style: SL_STYLES.view,
       }),
       textInput({
-        id:           this._editId,
+        id: this._editId,
         initialValue: "",
-        placeholder:  placeholder || "Edit...",
-        storageKey:   `story:${EDITABLE_DRAFT_KEY}`,
-        style:        SL_STYLES.editHidden,
-        onSubmit:     () => { void this._save(); },
+        placeholder: placeholder || "Edit...",
+        storageKey: `story:${EDITABLE_DRAFT_KEY}`,
+        style: SL_STYLES.editHidden,
+        onSubmit: () => {
+          void this._save();
+        },
       }),
       button({
-        id:       this._editBtnId,
-        text:     "",
-        iconId:   "edit" as IconId,
-        style:    SL_STYLES.btn,
-        callback: () => { void this._beginEdit(); },
+        id: this._editBtnId,
+        text: "",
+        iconId: "edit" as IconId,
+        style: SL_STYLES.btn,
+        callback: () => {
+          void this._beginEdit();
+        },
       }),
       button({
-        id:       this._saveBtnId,
-        text:     "",
-        iconId:   "save" as IconId,
-        style:    SL_STYLES.btnHidden,
-        callback: () => { void this._save(); },
+        id: this._saveBtnId,
+        text: "",
+        iconId: "save" as IconId,
+        style: SL_STYLES.btnHidden,
+        callback: () => {
+          void this._save();
+        },
       }),
     ];
 
     if (extraControls) parts.push(...extraControls);
 
     return row({
-      id:    this.id,
+      id: this.id,
       style: SL_STYLES.row,
       content: parts,
     });
@@ -216,53 +250,57 @@ export class SeEditableText extends SuiComponent<
     if (label) {
       headerContent.push(
         text({
-          id:       `${this.id}-label`,
-          text:     `**${label}**`,
+          id: `${this.id}-label`,
+          text: `**${label}**`,
           markdown: true,
-          style:    ML_STYLES.label,
+          style: ML_STYLES.label,
         }),
       );
     }
 
     headerContent.push(
       button({
-        id:       this._editBtnId,
-        text:     "",
-        iconId:   "edit" as IconId,
-        style:    {},
-        callback: () => { void this._beginEdit(); },
+        id: this._editBtnId,
+        text: "",
+        iconId: "edit" as IconId,
+        style: {},
+        callback: () => {
+          void this._beginEdit();
+        },
       }),
       button({
-        id:       this._saveBtnId,
-        text:     "",
-        iconId:   "save" as IconId,
-        style:    { display: "none" },
-        callback: () => { void this._save(); },
+        id: this._saveBtnId,
+        text: "",
+        iconId: "save" as IconId,
+        style: { display: "none" },
+        callback: () => {
+          void this._save();
+        },
       }),
     );
 
     if (extraControls) headerContent.push(...extraControls);
 
     return column({
-      id:    this.id,
+      id: this.id,
       style: { gap: "4px" },
       content: [
         row({
-          style:   label ? ML_STYLES.headerRowWithLabel : ML_STYLES.headerRow,
+          style: label ? ML_STYLES.headerRowWithLabel : ML_STYLES.headerRow,
           content: headerContent,
         }),
         text({
-          id:       this._viewId,
-          text:     viewText,
+          id: this._viewId,
+          text: viewText,
           markdown: true,
-          style:    ML_STYLES.view,
+          style: ML_STYLES.view,
         }),
         multilineTextInput({
-          id:           this._editId,
+          id: this._editId,
           initialValue: "",
-          placeholder:  placeholder || "Edit...",
-          storageKey:   `story:${EDITABLE_DRAFT_KEY}`,
-          style:        ML_STYLES.editHidden,
+          placeholder: placeholder || "Edit...",
+          storageKey: `story:${EDITABLE_DRAFT_KEY}`,
+          style: ML_STYLES.editHidden,
         }),
       ],
     });
@@ -272,19 +310,49 @@ export class SeEditableText extends SuiComponent<
 // ── Styles ───────────────────────────────────────────────────────────────────
 
 const ML_STYLES = {
-  view:               { "font-size": "0.85em", "white-space": "pre-wrap", "word-break": "break-word", "min-height": "2em", "user-select": "text" },
-  edit:               { "min-height": "80px", width: "100%", "font-size": "0.85em" },
-  editHidden:         { "min-height": "80px", width: "100%", "font-size": "0.85em", display: "none" },
-  headerRow:          { "justify-content": "flex-end", "align-items": "center", gap: "4px" },
-  headerRowWithLabel: { "justify-content": "space-between", "align-items": "center", gap: "4px" },
-  label:              { "font-size": "0.85em", "font-weight": "bold", opacity: "0.9", flex: "1" },
+  view: {
+    "font-size": "0.85em",
+    "white-space": "pre-wrap",
+    "word-break": "break-word",
+    "min-height": "2em",
+    "user-select": "text",
+  },
+  edit: { "min-height": "80px", width: "100%", "font-size": "0.85em" },
+  editHidden: {
+    "min-height": "80px",
+    width: "100%",
+    "font-size": "0.85em",
+    display: "none",
+  },
+  headerRow: {
+    "justify-content": "flex-end",
+    "align-items": "center",
+    gap: "4px",
+  },
+  headerRowWithLabel: {
+    "justify-content": "space-between",
+    "align-items": "center",
+    gap: "4px",
+  },
+  label: {
+    "font-size": "0.85em",
+    "font-weight": "bold",
+    opacity: "0.9",
+    flex: "1",
+  },
 } as const;
 
 const SL_STYLES = {
-  row:        { "align-items": "center", gap: "4px", flex: "1" },
-  view:       { "font-size": "0.85em", flex: "1", overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap" },
-  edit:       { flex: "1", "font-size": "0.85em" },
+  row: { "align-items": "center", gap: "4px", flex: "1" },
+  view: {
+    "font-size": "0.85em",
+    flex: "1",
+    overflow: "hidden",
+    "text-overflow": "ellipsis",
+    "white-space": "nowrap",
+  },
+  edit: { flex: "1", "font-size": "0.85em" },
   editHidden: { flex: "1", "font-size": "0.85em", display: "none" },
-  btn:        { "flex-shrink": "0", padding: "2px" },
-  btnHidden:  { "flex-shrink": "0", padding: "2px", display: "none" },
+  btn: { "flex-shrink": "0", padding: "2px" },
+  btnHidden: { "flex-shrink": "0", padding: "2px", display: "none" },
 } as const;

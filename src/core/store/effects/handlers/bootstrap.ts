@@ -21,11 +21,13 @@ function finalizeParagraph(text: string): void {
     await api.v1.document.appendParagraph({
       text,
       source: "instruction",
-      origin: [{
-        position: 0,
-        length: text.length,
-        data: "prompt",
-      }],
+      origin: [
+        {
+          position: 0,
+          length: text.length,
+          data: "prompt",
+        },
+      ],
     });
   });
 }
@@ -73,11 +75,13 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
       await api.v1.document.appendParagraph({
         text: remaining,
         source: "instruction",
-        origin: [{
-          position: 0,
-          length: remaining.length,
-          data: "prompt",
-        }],
+        origin: [
+          {
+            position: 0,
+            length: remaining.length,
+            data: "prompt",
+          },
+        ],
       });
     }
 

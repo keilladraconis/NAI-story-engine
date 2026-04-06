@@ -33,7 +33,8 @@ export function getJournalCount(): number {
 }
 
 export function formatJournal(): string {
-  if (journal.length === 0) return "# Generation Journal\n\nNo entries recorded.";
+  if (journal.length === 0)
+    return "# Generation Journal\n\nNo entries recorded.";
 
   const lines: string[] = ["# Generation Journal\n"];
 
@@ -72,7 +73,8 @@ export function formatJournal(): string {
   return lines.join("\n");
 }
 
-const SEGA_LABELS = /^(field:|list:|lb-content:|lb-relmap:|lb-keys:|lb-refine:|bootstrap)/;
+const SEGA_LABELS =
+  /^(field:|list:|lb-content:|lb-relmap:|lb-keys:|lb-refine:|bootstrap)/;
 
 export function formatDigest(): string {
   const sega = journal.filter((e) => SEGA_LABELS.test(e.label) && e.success);

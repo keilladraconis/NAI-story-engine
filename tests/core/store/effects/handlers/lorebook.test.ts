@@ -10,8 +10,13 @@ import {
 
 describe("parseLorebookKeys", () => {
   it("parses comma-separated keys from a KEYS: line", () => {
-    const text = "Some preamble\nKEYS: elara, silver court, the keep\nMore text";
-    expect(parseLorebookKeys(text)).toEqual(["elara", "silver court", "the keep"]);
+    const text =
+      "Some preamble\nKEYS: elara, silver court, the keep\nMore text";
+    expect(parseLorebookKeys(text)).toEqual([
+      "elara",
+      "silver court",
+      "the keep",
+    ]);
   });
 
   it("is case-insensitive for the KEYS: marker", () => {
@@ -70,7 +75,11 @@ describe("parseLorebookKeys", () => {
       "KEYS: elara, lady elara, the disgraced",
       "More content here.",
     ].join("\n");
-    expect(parseLorebookKeys(text)).toEqual(["elara", "lady elara", "the disgraced"]);
+    expect(parseLorebookKeys(text)).toEqual([
+      "elara",
+      "lady elara",
+      "the disgraced",
+    ]);
   });
 });
 
@@ -104,20 +113,32 @@ describe("validateKey via parseLorebookKeys", () => {
   });
 
   it("keeps regex that requires more than 3 chars to match", () => {
-    expect(parseLorebookKeys("KEYS: /caldera/, voss")).toEqual(["/caldera/", "voss"]);
+    expect(parseLorebookKeys("KEYS: /caldera/, voss")).toEqual([
+      "/caldera/",
+      "voss",
+    ]);
   });
 
   // Regex with flags
   it("accepts regex with /i flag", () => {
-    expect(parseLorebookKeys("KEYS: /caldera/i, voss")).toEqual(["/caldera/i", "voss"]);
+    expect(parseLorebookKeys("KEYS: /caldera/i, voss")).toEqual([
+      "/caldera/i",
+      "voss",
+    ]);
   });
 
   it("accepts regex with no flags (case-sensitive)", () => {
-    expect(parseLorebookKeys("KEYS: /caldera/, voss")).toEqual(["/caldera/", "voss"]);
+    expect(parseLorebookKeys("KEYS: /caldera/, voss")).toEqual([
+      "/caldera/",
+      "voss",
+    ]);
   });
 
   it("accepts regex with multiple valid flags", () => {
-    expect(parseLorebookKeys("KEYS: /vor(tex|tices)/im, voss")).toEqual(["/vor(tex|tices)/im", "voss"]);
+    expect(parseLorebookKeys("KEYS: /vor(tex|tices)/im, voss")).toEqual([
+      "/vor(tex|tices)/im",
+      "voss",
+    ]);
   });
 
   it("drops malformed regex with no closing slash", () => {
@@ -131,7 +152,10 @@ describe("validateKey via parseLorebookKeys", () => {
 
   // Compound & keys
   it("accepts compound & keys", () => {
-    expect(parseLorebookKeys("KEYS: mira & operating, voss")).toEqual(["mira & operating", "voss"]);
+    expect(parseLorebookKeys("KEYS: mira & operating, voss")).toEqual([
+      "mira & operating",
+      "voss",
+    ]);
   });
 
   it("drops compound key when any part is overbroad regex", () => {
@@ -139,7 +163,10 @@ describe("validateKey via parseLorebookKeys", () => {
   });
 
   it("accepts compound key with valid regex part", () => {
-    expect(parseLorebookKeys("KEYS: /caldera/i & voss, elara")).toEqual(["/caldera/i & voss", "elara"]);
+    expect(parseLorebookKeys("KEYS: /caldera/i & voss, elara")).toEqual([
+      "/caldera/i & voss",
+      "elara",
+    ]);
   });
 
   it("drops syntactically invalid regex", () => {
@@ -147,7 +174,10 @@ describe("validateKey via parseLorebookKeys", () => {
   });
 
   it("strips leading dash from keys", () => {
-    expect(parseLorebookKeys("KEYS: - elara, - voss")).toEqual(["elara", "voss"]);
+    expect(parseLorebookKeys("KEYS: - elara, - voss")).toEqual([
+      "elara",
+      "voss",
+    ]);
   });
 });
 
@@ -157,7 +187,10 @@ describe("validateKey via parseLorebookKeys", () => {
 
 describe("keysFromDisplayName", () => {
   it("splits a simple name into word tokens", () => {
-    expect(keysFromDisplayName("Elara Nightshade")).toEqual(["elara", "nightshade"]);
+    expect(keysFromDisplayName("Elara Nightshade")).toEqual([
+      "elara",
+      "nightshade",
+    ]);
   });
 
   it("lowercases all tokens", () => {
@@ -177,7 +210,10 @@ describe("keysFromDisplayName", () => {
   });
 
   it("handles extra whitespace", () => {
-    expect(keysFromDisplayName("  Elara  Nightshade  ")).toEqual(["elara", "nightshade"]);
+    expect(keysFromDisplayName("  Elara  Nightshade  ")).toEqual([
+      "elara",
+      "nightshade",
+    ]);
   });
 
   it("returns empty array for a blank display name", () => {

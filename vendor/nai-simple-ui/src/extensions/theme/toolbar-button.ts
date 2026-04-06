@@ -6,20 +6,20 @@ import { type ThemeOverride } from "../../base.ts";
 
 export type SuiToolbarButtonStateTheme = {
   self: {
-    text?:   string;
+    text?: string;
     iconId?: IconId;
   };
 };
 
 export type PartialSuiToolbarButtonStateTheme = {
   self?: {
-    text?:   string;
+    text?: string;
     iconId?: IconId;
   };
 };
 
 export type SuiToolbarButtonTheme = {
-  default:   SuiToolbarButtonStateTheme;
+  default: SuiToolbarButtonStateTheme;
   disabled?: PartialSuiToolbarButtonStateTheme;
 };
 

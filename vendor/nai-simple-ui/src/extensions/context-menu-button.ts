@@ -17,7 +17,10 @@
 import { SuiExtension } from "../extension.ts";
 import type { SuiBaseOptions } from "../base.ts";
 import * as Theme from "./theme/context-menu-button.ts";
-import { type SuiContextMenuButtonStateTheme, type SuiContextMenuButtonTheme } from "./theme/context-menu-button.ts";
+import {
+  type SuiContextMenuButtonStateTheme,
+  type SuiContextMenuButtonTheme,
+} from "./theme/context-menu-button.ts";
 
 // ============================================================
 // Options
@@ -56,9 +59,9 @@ export class SuiContextMenuButton extends SuiExtension<
   async compose(): Promise<UIExtensionContextMenuButton> {
     const t = this.resolveTheme();
     return {
-      type:     this.type,
-      id:       this.id,
-      text:     t.self.text ?? "",
+      type: this.type,
+      id: this.id,
+      text: t.self.text ?? "",
       callback: this.options.callback,
     };
   }

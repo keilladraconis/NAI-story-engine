@@ -2,22 +2,26 @@
  * @file Theme for SuiTabBar.
  */
 
-import { type SuiChildrenPartTheme, type SuiStylePartTheme, type ThemeOverride } from "../../base.ts";
+import {
+  type SuiChildrenPartTheme,
+  type SuiStylePartTheme,
+  type ThemeOverride,
+} from "../../base.ts";
 import { type SuiButtonPartTheme } from "./button.ts";
 
 /** Resolved part map for a single SuiTabBar state. */
 export type SuiTabBarStateTheme = {
-  self:          SuiStylePartTheme;
-  tabBar:        SuiStylePartTheme;
-  back:          SuiButtonPartTheme;
-  tab:           SuiStylePartTheme;
-  tabActive:     SuiStylePartTheme;
-  tabs:          SuiChildrenPartTheme;
-  actions:       SuiChildrenPartTheme;
-  content:       SuiChildrenPartTheme;
-  pane:          SuiStylePartTheme;
-  paneActive:    SuiStylePartTheme;
-  overlay:       SuiStylePartTheme;
+  self: SuiStylePartTheme;
+  tabBar: SuiStylePartTheme;
+  back: SuiButtonPartTheme;
+  tab: SuiStylePartTheme;
+  tabActive: SuiStylePartTheme;
+  tabs: SuiChildrenPartTheme;
+  actions: SuiChildrenPartTheme;
+  content: SuiChildrenPartTheme;
+  pane: SuiStylePartTheme;
+  paneActive: SuiStylePartTheme;
+  overlay: SuiStylePartTheme;
   overlayActive: SuiStylePartTheme;
 };
 
@@ -31,72 +35,72 @@ export const tabBar = {
   default: {
     self: {
       style: {
-        flex:           "1",
+        flex: "1",
         justifyContent: "flex-start",
-        overflow:       "hidden",
+        overflow: "hidden",
       },
     },
     tabBar: {
       style: {
         justifyContent: "flex-start",
-        alignItems:     "stretch",
-        gap:            "0",
-        border:         "1px solid rgba(255, 255, 255, 0.07)",
-        borderRadius:   "4px",
-        background:     "rgba(0, 0, 0, 0.2)",
-        minHeight:      "36px",
+        alignItems: "stretch",
+        gap: "0",
+        border: "1px solid rgba(255, 255, 255, 0.07)",
+        borderRadius: "4px",
+        background: "rgba(0, 0, 0, 0.2)",
+        minHeight: "36px",
       },
     },
     back: {
       iconId: "arrow-left" as IconId,
       style: {
-        padding:    "6px 8px",
-        margin:     "0",
-        fontSize:   "0.82em",
+        padding: "6px 8px",
+        margin: "0",
+        fontSize: "0.82em",
         fontWeight: "normal",
         background: "none",
-        border:     "1px solid transparent",
-        opacity:    "0.55",
+        border: "1px solid transparent",
+        opacity: "0.55",
       },
     },
     tab: {
       style: {
-        padding:    "6px 8px",
-        margin:     "0",
-        fontSize:   "0.82em",
+        padding: "6px 8px",
+        margin: "0",
+        fontSize: "0.82em",
         fontWeight: "normal",
         background: "none",
-        border:     "1px solid transparent",
-        opacity:    "0.55",
+        border: "1px solid transparent",
+        opacity: "0.55",
       },
     },
     tabActive: {
       style: {
         fontWeight: "bold",
         background: "rgba(87, 178, 96, 0.25)",
-        border:     "1px solid rgb(87, 178, 96)",
-        opacity:    "1",
+        border: "1px solid rgb(87, 178, 96)",
+        opacity: "1",
       },
     },
     tabs: {},
     actions: {
       style: {
-        flex:           "1",
+        flex: "1",
         justifyContent: "flex-end",
-        padding:        "0 4px 0 0",
+        padding: "0 4px 0 0",
       },
       base: {
         fontWeight: "normal",
-        padding:    "2px 6px",
-        margin:     "0",
-        border:     "none",
+        padding: "2px 6px",
+        margin: "0",
+        border: "none",
         background: "none",
-        opacity:    "0.35",
+        opacity: "0.35",
       },
     },
     content: {
       style: {
-        flex:     "1",
+        flex: "1",
         overflow: "auto",
       },
     },
@@ -107,8 +111,8 @@ export const tabBar = {
     },
     paneActive: {
       style: {
-        flex:           "1",
-        overflow:       "hidden",
+        flex: "1",
+        overflow: "hidden",
         justifyContent: "flex-start",
       },
     },
@@ -119,8 +123,8 @@ export const tabBar = {
     },
     overlayActive: {
       style: {
-        flex:           "1",
-        overflow:       "auto",
+        flex: "1",
+        overflow: "auto",
         justifyContent: "flex-start",
       },
     },

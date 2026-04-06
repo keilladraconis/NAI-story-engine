@@ -24,26 +24,27 @@ The root of every class in the library. Never instantiated directly.
 
 ### What it owns
 
-| Member | Description |
-|---|---|
-| `id` | Stable element ID. Falls back to `api.v1.uuid()` if omitted in options. |
-| `options` | Read-only view of construction-time options. |
-| `theme` | Fully merged theme (baseTheme + options.theme override). Immutable after construction. |
-| `state` | Current state object. Mutate via `setState()` only. |
-| `storageKey` | Key used for state persistence. Defaults to `sui.${id}`. |
-| `ids` | Map of stable IDs for this instance and any owned children. Base returns `{ self: id }`. |
-| `setState(next, applySync?)` | Mutates state, persists to storage, calls `onSync()`, notifies listeners. |
-| `subscribe(listener)` | Registers an async state-change listener. Returns an unsubscribe function. |
-| `resolveTheme()` | Collapses the state dimension of the theme. Default returns `this.theme.default`. Override in stateful components. |
-| `onSync()` | Called automatically by `setState()`. Override to push `updateParts()` calls without a full rebuild. |
-| `hydrateState()` | Reads persisted state from storage and assigns it to `_state`. Called by `build()`. |
-| `buildContent(children, childrenStyle?)` | Builds an array of `SuiComposable` children into `UIPart[]`, applying `childrenStyle` positional overrides. |
-| `mergeTheme(base, override)` | Static. 3-level deep-merge of a theme override onto a base theme. `style` is shallow-merged; all other properties are replaced. |
-| `mergePartTheme(base, ...overrides)` | Static. Merges one or more partial state themes onto a complete base state theme. Used inside `resolveTheme()`. |
+| Member                                   | Description                                                                                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                     | Stable element ID. Falls back to `api.v1.uuid()` if omitted in options.                                                         |
+| `options`                                | Read-only view of construction-time options.                                                                                    |
+| `theme`                                  | Fully merged theme (baseTheme + options.theme override). Immutable after construction.                                          |
+| `state`                                  | Current state object. Mutate via `setState()` only.                                                                             |
+| `storageKey`                             | Key used for state persistence. Defaults to `sui.${id}`.                                                                        |
+| `ids`                                    | Map of stable IDs for this instance and any owned children. Base returns `{ self: id }`.                                        |
+| `setState(next, applySync?)`             | Mutates state, persists to storage, calls `onSync()`, notifies listeners.                                                       |
+| `subscribe(listener)`                    | Registers an async state-change listener. Returns an unsubscribe function.                                                      |
+| `resolveTheme()`                         | Collapses the state dimension of the theme. Default returns `this.theme.default`. Override in stateful components.              |
+| `onSync()`                               | Called automatically by `setState()`. Override to push `updateParts()` calls without a full rebuild.                            |
+| `hydrateState()`                         | Reads persisted state from storage and assigns it to `_state`. Called by `build()`.                                             |
+| `buildContent(children, childrenStyle?)` | Builds an array of `SuiComposable` children into `UIPart[]`, applying `childrenStyle` positional overrides.                     |
+| `mergeTheme(base, override)`             | Static. 3-level deep-merge of a theme override onto a base theme. `style` is shallow-merged; all other properties are replaced. |
+| `mergePartTheme(base, ...overrides)`     | Static. Merges one or more partial state themes onto a complete base state theme. Used inside `resolveTheme()`.                 |
 
 ### `buildContent` and `SuiChildrenPartTheme`
 
 `buildContent(children, childrenStyle?)` is the canonical way to build child component arrays. It:
+
 1. Calls `build()` on each child, forwarding `SuiComposeContext` if present.
 2. Applies `childrenStyle` positional overrides on top of each child's root `UIPart` style.
 
@@ -53,19 +54,21 @@ The root of every class in the library. Never instantiated directly.
 
 ```ts
 type SuiChildrenPartTheme = {
-  style?:     object;   // applied to the wrapper container (SuiRow / SuiColumn / native UIPart)
-  base?:      object;   // default baseline applied to every child; child's own style wins over this
-  itemFirst?: object;   // merged on top of child's own style for the first child
-  itemLast?:  object;   // merged on top of child's own style for the last child
-  itemEven?:  object;   // merged on top of child's own style for even-indexed children (0, 2, 4…)
-  itemOdd?:   object;   // merged on top of child's own style for odd-indexed children (1, 3, 5…)
+  style?: object; // applied to the wrapper container (SuiRow / SuiColumn / native UIPart)
+  base?: object; // default baseline applied to every child; child's own style wins over this
+  itemFirst?: object; // merged on top of child's own style for the first child
+  itemLast?: object; // merged on top of child's own style for the last child
+  itemEven?: object; // merged on top of child's own style for even-indexed children (0, 2, 4…)
+  itemOdd?: object; // merged on top of child's own style for odd-indexed children (1, 3, 5…)
 };
 ```
 
 Merge order per child (highest specificity wins):
+
 ```
 base → child's own style → itemFirst/itemLast/itemEven/itemOdd
 ```
+
 `base` is a default baseline; child style overrides it. `itemFirst`/etc. are structural exceptions that always win.
 
 **`SuiBase.listChildrenStyle(part: SuiChildrenPartTheme)`** — protected static helper that extracts the positional overrides from a `SuiChildrenPartTheme` into the internal `SuiPositionalPartTheme` format ready to pass to `buildContent()`. Called inside `compose()` when constructing an owned wrapper row/column for a list zone. `SuiPositionalPartTheme` is library-internal and never appears in options or theme types.
@@ -153,6 +156,7 @@ override async onSync(): Promise<void> {
 ### Theme files
 
 Every component ships a `theme/` file alongside it containing:
+
 - `SuiXxxPartTheme` — the type for a single named part within a state (e.g. `SuiButtonPartTheme`). Core components always define one. Composite components reference child part types from sibling theme files rather than inlining shapes.
 - `SuiXxxStateTheme` — the fully-resolved part map for a single state (what `resolveTheme()` returns). Each part is typed using `SuiXxxPartTheme`, `SuiStylePartTheme`, or `SuiChildrenPartTheme`.
 - `SuiXxxTheme` — the top-level theme map: `{ default: SuiXxxStateTheme; disabled?: PartialState<SuiXxxStateTheme>; ... }`. Non-default states use `PartialState<SuiXxxStateTheme>` — derived automatically, never hand-rolled.
@@ -162,7 +166,10 @@ The component file imports its theme file as a namespace (for the constant) and 
 
 ```ts
 import * as Theme from "./theme/button.ts";
-import { type SuiButtonStateTheme, type SuiButtonTheme } from "./theme/button.ts";
+import {
+  type SuiButtonStateTheme,
+  type SuiButtonTheme,
+} from "./theme/button.ts";
 
 // constant passed to super() as the base theme:
 super(options, Theme.button);
@@ -268,16 +275,16 @@ open()  → build() + openOverlay(content)
 
 ### Lifecycle
 
-| Method | Description |
-|---|---|
-| `compose()` | Default: `buildContent(options.children, listChildrenStyle(t.self))`. Override to build content dynamically. |
-| `build()` | `hydrateState()` then `compose()`. Returns `UIPart[]`. |
-| `open()` | Calls `build()`, opens the overlay, awaits closure, then returns `TState`. Callers that don't need the result can discard it. |
-| `update(partial?)` | No arg: full rebuild. Partial: pushes scalar fields to the live handle without rebuilding. |
-| `updateOverlay(fields)` | Protected. Pushes fields directly to the live handle. Called from `onSync()`. |
-| `close()` | Programmatically closes the overlay. No-op if not open. |
-| `closed` | Promise that resolves when the overlay is dismissed. Prefer awaiting `open()` to get the state result on close; use `closed` directly only when you need to observe closure without having called `open()` yourself. |
-| `isOpen` | Whether the overlay is currently open. |
+| Method                  | Description                                                                                                                                                                                                          |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `compose()`             | Default: `buildContent(options.children, listChildrenStyle(t.self))`. Override to build content dynamically.                                                                                                         |
+| `build()`               | `hydrateState()` then `compose()`. Returns `UIPart[]`.                                                                                                                                                               |
+| `open()`                | Calls `build()`, opens the overlay, awaits closure, then returns `TState`. Callers that don't need the result can discard it.                                                                                        |
+| `update(partial?)`      | No arg: full rebuild. Partial: pushes scalar fields to the live handle without rebuilding.                                                                                                                           |
+| `updateOverlay(fields)` | Protected. Pushes fields directly to the live handle. Called from `onSync()`.                                                                                                                                        |
+| `close()`               | Programmatically closes the overlay. No-op if not open.                                                                                                                                                              |
+| `closed`                | Promise that resolves when the overlay is dismissed. Prefer awaiting `open()` to get the state result on close; use `closed` directly only when you need to observe closure without having called `open()` yourself. |
+| `isOpen`                | Whether the overlay is currently open.                                                                                                                                                                               |
 
 ### `SuiOverlayOptions`
 
@@ -317,23 +324,36 @@ build() → hydrateState() + compose() → TExt
 
 ### Lifecycle
 
-| Method | Description |
-|---|---|
-| `register()` | Calls `build()` then `api.v1.ui.register()`. No-op if already registered. |
+| Method             | Description                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `register()`       | Calls `build()` then `api.v1.ui.register()`. No-op if already registered.                                     |
 | `update(partial?)` | No arg: full rebuild. Partial: merges fields onto the registered extension in place. No-op if not registered. |
-| `remove()` | Calls `api.v1.ui.remove()` and resets the registration flag. |
-| `init` | `boolean` — whether currently registered. |
-| `type` | The `UIExtension` type literal (e.g. `"sidebarPanel"`). |
+| `remove()`         | Calls `api.v1.ui.remove()` and resets the registration flag.                                                  |
+| `init`             | `boolean` — whether currently registered.                                                                     |
+| `type`             | The `UIExtension` type literal (e.g. `"sidebarPanel"`).                                                       |
 
 ### Subclass pattern
 
 ```ts
-class SuiSidebarPanel extends SuiExtension<"sidebarPanel", UIExtensionSidebarPanel, TTheme, TState, TOptions> {
-  constructor(options) { super(options, "sidebarPanel", SUI_SIDEBAR_PANEL_THEME); }
-  resolveTheme(): SuiSidebarPanelStateTheme { return this.theme.default; }
+class SuiSidebarPanel extends SuiExtension<
+  "sidebarPanel",
+  UIExtensionSidebarPanel,
+  TTheme,
+  TState,
+  TOptions
+> {
+  constructor(options) {
+    super(options, "sidebarPanel", SUI_SIDEBAR_PANEL_THEME);
+  }
+  resolveTheme(): SuiSidebarPanelStateTheme {
+    return this.theme.default;
+  }
   async compose(): Promise<UIExtensionSidebarPanel> {
-    const t       = this.resolveTheme();
-    const content = await this.buildContent(this.options.children, SuiBase.listChildrenStyle(t.self));
+    const t = this.resolveTheme();
+    const content = await this.buildContent(
+      this.options.children,
+      SuiBase.listChildrenStyle(t.self),
+    );
     return { type: this.type, id: this.id, name: this.options.name, content };
   }
 }
@@ -352,15 +372,15 @@ build() → hydrateState() + compose()
 
 ### Lifecycle
 
-| Method | Description |
-|---|---|
-| `requestPermissions()` | Abstract, sync. Called first in `start()`, before any `await`. |
-| `compose()` | Abstract. Constructs and registers all `SuiExtension` instances. Save references to private fields for use in `registerHooks()`. |
-| `registerHooks()` | Abstract. Registers all `api.v1.hooks` callbacks. |
-| `build()` | Concrete. `hydrateState()` then `compose()`. |
-| `start()` | Orchestrates the full init sequence. |
-| `onVersionChange(isFirstLoad)` | Virtual. Called when script version changes. Base is a no-op. |
-| `metaKey` | Virtual getter. Returns the storage key for the version meta record. Override or return `undefined` to skip. |
+| Method                         | Description                                                                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `requestPermissions()`         | Abstract, sync. Called first in `start()`, before any `await`.                                                                   |
+| `compose()`                    | Abstract. Constructs and registers all `SuiExtension` instances. Save references to private fields for use in `registerHooks()`. |
+| `registerHooks()`              | Abstract. Registers all `api.v1.hooks` callbacks.                                                                                |
+| `build()`                      | Concrete. `hydrateState()` then `compose()`.                                                                                     |
+| `start()`                      | Orchestrates the full init sequence.                                                                                             |
+| `onVersionChange(isFirstLoad)` | Virtual. Called when script version changes. Base is a no-op.                                                                    |
+| `metaKey`                      | Virtual getter. Returns the storage key for the version meta record. Override or return `undefined` to skip.                     |
 
 ### Minimal subclass
 
@@ -391,13 +411,13 @@ new MyPlugin({ id: "my-plugin" }).start();
 
 State persistence is controlled by `storageMode` in options:
 
-| Mode | Backend | Scope |
-|---|---|---|
-| `"memory"` | In-memory only | Not persisted (default) |
-| `"story"` | `api.v1.storyStorage` | Per story |
-| `"global"` | `api.v1.storage` | Per script install |
-| `"history"` | `api.v1.historyStorage` | Per story; reverts on undo |
-| `"temp"` | `api.v1.tempStorage` | Per session; cleared on story close |
+| Mode        | Backend                 | Scope                               |
+| ----------- | ----------------------- | ----------------------------------- |
+| `"memory"`  | In-memory only          | Not persisted (default)             |
+| `"story"`   | `api.v1.storyStorage`   | Per story                           |
+| `"global"`  | `api.v1.storage`        | Per script install                  |
+| `"history"` | `api.v1.historyStorage` | Per story; reverts on undo          |
+| `"temp"`    | `api.v1.tempStorage`    | Per session; cleared on story close |
 
 `storageKey` defaults to `sui.${id}`. `hydrateState()` is called by `build()` before `compose()`. External callers can also call `hydrateState()` directly to pre-read a component's stored state before constructing dependent siblings.
 
@@ -421,45 +441,45 @@ State persistence is controlled by `storageMode` in options:
 
 ### Layout
 
-| Component | UIPart type | Description |
-|---|---|---|
-| `SuiColumn` | `column` | Vertical flex container. `children`. Item styles via `theme.default.self` (`SuiColumnPartTheme`). |
-| `SuiRow` | `row` | Horizontal flex container. `children`. Item styles via `theme.default.self` (`SuiRowPartTheme`). |
-| `SuiBox` | `box` | Generic box. `children`. Item styles via `theme.default.self`. |
-| `SuiContainer` | `container` | Scrollable container. `children`. Item styles via `theme.default.self`. |
+| Component      | UIPart type | Description                                                                                       |
+| -------------- | ----------- | ------------------------------------------------------------------------------------------------- |
+| `SuiColumn`    | `column`    | Vertical flex container. `children`. Item styles via `theme.default.self` (`SuiColumnPartTheme`). |
+| `SuiRow`       | `row`       | Horizontal flex container. `children`. Item styles via `theme.default.self` (`SuiRowPartTheme`).  |
+| `SuiBox`       | `box`       | Generic box. `children`. Item styles via `theme.default.self`.                                    |
+| `SuiContainer` | `container` | Scrollable container. `children`. Item styles via `theme.default.self`.                           |
 
 ### Composite layout
 
-| Component | UIPart type | Description |
-|---|---|---|
-| `SuiCard` | `row` | Structured card: icon, label, sublabel, actions row, toggle. Stateful (`disabled`, `selected`). `selected` stacks before `disabled` in `resolveTheme()`. Actions item styles via `theme.default.actions` (`SuiChildrenPartTheme`). |
-| `SuiCollapsible` | `column` | Header + collapsible content. Stateful (`collapsed`, `disabled`). Owns a chevron `SuiButton`. If header is `SuiCard`, its callbacks are auto-wired. |
-| `SuiCollapsibleSection` | `collapsibleSection` | Simplified collapsible with a label header. `children`. Item styles via `theme.default.self`. |
-| `SuiFilterPanel` | `column` | Two-zone: search input → scrollable list. Stateful (`query`). `children`. Item styles via `theme.default.list` (`SuiColumnPartTheme`). Optional `debounceDelay` (ms). Pair with `SuiActionBar` for footer actions. |
-| `SuiTabBar` | `column` | Tab bar + pane switcher. Stateful (`activeTab`). `tabs` (SuiButton[]), `panes`, `actions?`. Tab-button item styles via `theme.default.tabs` (`SuiChildrenPartTheme`). Action item styles via `theme.default.actions` (`SuiChildrenPartTheme`). Pane item styles via `theme.default.content` (`SuiChildrenPartTheme`). |
-| `SuiActionBar` | `row` | Horizontal action footer with optional `left` and `right` sub-rows. Stateless. Item styles via `theme.default.left` and `theme.default.right` (`SuiChildrenPartTheme`). Sub-rows only emitted when non-empty. |
-| `SuiSectionedList` | `column` | List of named sections (`sections`), each with its own `children`. Section shell item styles via `theme.default.section` (`SuiChildrenPartTheme`). Per-section item styles via `theme.default.children` (`SuiChildrenPartTheme`). |
+| Component               | UIPart type          | Description                                                                                                                                                                                                                                                                                                           |
+| ----------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SuiCard`               | `row`                | Structured card: icon, label, sublabel, actions row, toggle. Stateful (`disabled`, `selected`). `selected` stacks before `disabled` in `resolveTheme()`. Actions item styles via `theme.default.actions` (`SuiChildrenPartTheme`).                                                                                    |
+| `SuiCollapsible`        | `column`             | Header + collapsible content. Stateful (`collapsed`, `disabled`). Owns a chevron `SuiButton`. If header is `SuiCard`, its callbacks are auto-wired.                                                                                                                                                                   |
+| `SuiCollapsibleSection` | `collapsibleSection` | Simplified collapsible with a label header. `children`. Item styles via `theme.default.self`.                                                                                                                                                                                                                         |
+| `SuiFilterPanel`        | `column`             | Two-zone: search input → scrollable list. Stateful (`query`). `children`. Item styles via `theme.default.list` (`SuiColumnPartTheme`). Optional `debounceDelay` (ms). Pair with `SuiActionBar` for footer actions.                                                                                                    |
+| `SuiTabBar`             | `column`             | Tab bar + pane switcher. Stateful (`activeTab`). `tabs` (SuiButton[]), `panes`, `actions?`. Tab-button item styles via `theme.default.tabs` (`SuiChildrenPartTheme`). Action item styles via `theme.default.actions` (`SuiChildrenPartTheme`). Pane item styles via `theme.default.content` (`SuiChildrenPartTheme`). |
+| `SuiActionBar`          | `row`                | Horizontal action footer with optional `left` and `right` sub-rows. Stateless. Item styles via `theme.default.left` and `theme.default.right` (`SuiChildrenPartTheme`). Sub-rows only emitted when non-empty.                                                                                                         |
+| `SuiSectionedList`      | `column`             | List of named sections (`sections`), each with its own `children`. Section shell item styles via `theme.default.section` (`SuiChildrenPartTheme`). Per-section item styles via `theme.default.children` (`SuiChildrenPartTheme`).                                                                                     |
 
 ### Inputs
 
-| Component | UIPart type | Description |
-|---|---|---|
-| `SuiButton` | `button` | Clickable. `text`, `iconId`, `style` from theme. `callback` in options. Stateful (`disabled`). |
-| `SuiConfirmButton` | `button` | Two-step confirm button. First click primes; second click fires. Stateful (`pending`). |
-| `SuiToggle` | `toggle` | On/off toggle. Stateful (`on`). |
-| `SuiCheckboxInput` | `checkbox` | Checkbox. Stateful (`checked`, `disabled`). |
-| `SuiTextInput` | `textInput` | Single-line text input. `placeholder`, `style` from theme. `onChange` callback in options. |
-| `SuiMultilineTextInput` | `multilineTextInput` | Multi-line text area. `height` from theme. |
-| `SuiNumberInput` | `numberInput` | Numeric input. `min`, `max`, `step` from theme. |
-| `SuiSliderInput` | `sliderInput` | Range slider. `min`, `max`, `step` from theme. |
-| `SuiCodeEditor` | `codeEditor` | Code editor. `language`, `height` from theme. |
+| Component               | UIPart type          | Description                                                                                    |
+| ----------------------- | -------------------- | ---------------------------------------------------------------------------------------------- |
+| `SuiButton`             | `button`             | Clickable. `text`, `iconId`, `style` from theme. `callback` in options. Stateful (`disabled`). |
+| `SuiConfirmButton`      | `button`             | Two-step confirm button. First click primes; second click fires. Stateful (`pending`).         |
+| `SuiToggle`             | `toggle`             | On/off toggle. Stateful (`on`).                                                                |
+| `SuiCheckboxInput`      | `checkbox`           | Checkbox. Stateful (`checked`, `disabled`).                                                    |
+| `SuiTextInput`          | `textInput`          | Single-line text input. `placeholder`, `style` from theme. `onChange` callback in options.     |
+| `SuiMultilineTextInput` | `multilineTextInput` | Multi-line text area. `height` from theme.                                                     |
+| `SuiNumberInput`        | `numberInput`        | Numeric input. `min`, `max`, `step` from theme.                                                |
+| `SuiSliderInput`        | `sliderInput`        | Range slider. `min`, `max`, `step` from theme.                                                 |
+| `SuiCodeEditor`         | `codeEditor`         | Code editor. `language`, `height` from theme.                                                  |
 
 ### Display
 
-| Component | UIPart type | Description |
-|---|---|---|
-| `SuiText` | `text` | Static text. `text`, `style` from theme. |
-| `SuiImage` | `image` | Image display. `src`, `width`, `height` from theme. |
+| Component  | UIPart type | Description                                         |
+| ---------- | ----------- | --------------------------------------------------- |
+| `SuiText`  | `text`      | Static text. `text`, `style` from theme.            |
+| `SuiImage` | `image`     | Image display. `src`, `width`, `height` from theme. |
 
 ---
 
@@ -467,25 +487,25 @@ State persistence is controlled by `storageMode` in options:
 
 All extensions extend `SuiExtension` and follow the same `register()` / `update()` / `remove()` lifecycle.
 
-| Class | UIExtension type | Has content |
-|---|---|---|
-| `SuiSidebarPanel` | `sidebarPanel` | Yes — `children`. Item styles via `theme.default.self` (`SuiChildrenPartTheme`). |
-| `SuiScriptPanel` | `scriptPanel` | Yes — `children`. Item styles via `theme.default.self` (`SuiChildrenPartTheme`). |
-| `SuiLorebookPanel` | `lorebookPanel` | Yes — `children`. Item styles via `theme.default.self` (`SuiChildrenPartTheme`). |
-| `SuiToolboxOption` | `toolboxOption` | Optional — `children?`. Item styles via `theme.default.self` (`SuiChildrenPartTheme`). |
-| `SuiToolbarButton` | `toolbarButton` | No |
-| `SuiContextMenuButton` | `contextMenuButton` | No |
+| Class                  | UIExtension type    | Has content                                                                            |
+| ---------------------- | ------------------- | -------------------------------------------------------------------------------------- |
+| `SuiSidebarPanel`      | `sidebarPanel`      | Yes — `children`. Item styles via `theme.default.self` (`SuiChildrenPartTheme`).       |
+| `SuiScriptPanel`       | `scriptPanel`       | Yes — `children`. Item styles via `theme.default.self` (`SuiChildrenPartTheme`).       |
+| `SuiLorebookPanel`     | `lorebookPanel`     | Yes — `children`. Item styles via `theme.default.self` (`SuiChildrenPartTheme`).       |
+| `SuiToolboxOption`     | `toolboxOption`     | Optional — `children?`. Item styles via `theme.default.self` (`SuiChildrenPartTheme`). |
+| `SuiToolbarButton`     | `toolbarButton`     | No                                                                                     |
+| `SuiContextMenuButton` | `contextMenuButton` | No                                                                                     |
 
 ---
 
 ## Overlay Catalogue
 
-| Class | NAI API | Theme-driven properties |
-|---|---|---|
-| `SuiModal` | `api.v1.ui.modal.open()` | `self.title`, `self.size`, `self.hasMinimumHeight`, `self.fillWidth` |
-| `SuiInfoModal` | (subclasses `SuiModal`) | `self.title`, `self.size`, `message.text`, `message.markdown`, `message.style`, `dismiss.text`, `dismiss.style` |
-| `SuiConfirmModal` | (subclasses `SuiOverlay`) | `self.title`, `self.size`, `message.text`, `message.markdown`, `message.style`, `confirm.text/style`, `cancel.text/style` |
-| `SuiWindow` | `api.v1.ui.window.open()` | `self.title`, `self.defaultWidth`, `self.defaultHeight`, `self.defaultX`, `self.defaultY`, `self.minWidth`, `self.minHeight`, `self.maxWidth`, `self.maxHeight`, `self.resizable` |
+| Class             | NAI API                   | Theme-driven properties                                                                                                                                                           |
+| ----------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SuiModal`        | `api.v1.ui.modal.open()`  | `self.title`, `self.size`, `self.hasMinimumHeight`, `self.fillWidth`                                                                                                              |
+| `SuiInfoModal`    | (subclasses `SuiModal`)   | `self.title`, `self.size`, `message.text`, `message.markdown`, `message.style`, `dismiss.text`, `dismiss.style`                                                                   |
+| `SuiConfirmModal` | (subclasses `SuiOverlay`) | `self.title`, `self.size`, `message.text`, `message.markdown`, `message.style`, `confirm.text/style`, `cancel.text/style`                                                         |
+| `SuiWindow`       | `api.v1.ui.window.open()` | `self.title`, `self.defaultWidth`, `self.defaultHeight`, `self.defaultX`, `self.defaultY`, `self.minWidth`, `self.minHeight`, `self.maxWidth`, `self.maxHeight`, `self.resizable` |
 
 ### `SuiInfoModal`
 
@@ -496,8 +516,11 @@ Simple informational modal — title, markdown message, optional dismiss button.
 await new SuiInfoModal({
   theme: {
     default: {
-      self:    { title: "No Trigger Configured" },
-      message: { text: "**Entry** has no keys and is not Always On.", markdown: true },
+      self: { title: "No Trigger Configured" },
+      message: {
+        text: "**Entry** has no keys and is not Always On.",
+        markdown: true,
+      },
     },
   },
 }).open();

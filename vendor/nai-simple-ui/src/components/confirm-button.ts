@@ -23,9 +23,16 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/confirm-button.ts";
-import { type SuiConfirmButtonStateTheme, type SuiConfirmButtonTheme } from "./theme/confirm-button.ts";
+import {
+  type SuiConfirmButtonStateTheme,
+  type SuiConfirmButtonTheme,
+} from "./theme/confirm-button.ts";
 
 /** State shape for SuiConfirmButton. pending drives theme resolution and click behaviour. */
 export type SuiConfirmButtonState = {
@@ -34,23 +41,24 @@ export type SuiConfirmButtonState = {
 
 /** options carries behaviour only — pending lives in state, visuals in theme. */
 export type SuiConfirmButtonOptions = {
-  onConfirm:  () => Promise<void>;
-  timeout?:   number;
+  onConfirm: () => Promise<void>;
+  timeout?: number;
 } & SuiComponentOptions<SuiConfirmButtonTheme, SuiConfirmButtonState>;
 
 /**
  * Two-tap confirmation button. Stateful (pending).
  * First click → pending, starts timer. Second click → onConfirm(), reset. Timer → reset.
  */
-export class SuiConfirmButton extends SuiComponent<SuiConfirmButtonTheme, SuiConfirmButtonState, SuiConfirmButtonOptions, UIPartButton> {
-
+export class SuiConfirmButton extends SuiComponent<
+  SuiConfirmButtonTheme,
+  SuiConfirmButtonState,
+  SuiConfirmButtonOptions,
+  UIPartButton
+> {
   private _timer: number | undefined;
 
   constructor(options: SuiConfirmButtonOptions) {
-    super(
-      { state: { pending: false }, ...options },
-      Theme.confirmButton,
-    );
+    super({ state: { pending: false }, ...options }, Theme.confirmButton);
   }
 
   /** Merges active state partials onto default. pending stacks on top of default. */
@@ -68,12 +76,14 @@ export class SuiConfirmButton extends SuiComponent<SuiConfirmButtonTheme, SuiCon
   override async onSync(): Promise<void> {
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
-    await api.v1.ui.updateParts([{
-      id:     this.id,
-      text:   t.self.text,
-      iconId: t.self.iconId,
-      style:  this.visibleStyle(this._composedStyle),
-    }]);
+    await api.v1.ui.updateParts([
+      {
+        id: this.id,
+        text: t.self.text,
+        iconId: t.self.iconId,
+        style: this.visibleStyle(this._composedStyle),
+      },
+    ]);
   }
 
   private async _onClick(): Promise<void> {
@@ -101,13 +111,13 @@ export class SuiConfirmButton extends SuiComponent<SuiConfirmButtonTheme, SuiCon
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:                         "button",
-      id:                           this.id,
-      callback:                     this._onClick.bind(this),
+      type: "button",
+      id: this.id,
+      callback: this._onClick.bind(this),
       disabledWhileCallbackRunning: true,
-      text:                         t.self.text,
-      iconId:                       t.self.iconId,
-      style:                        this._composedStyle,
+      text: t.self.text,
+      iconId: t.self.iconId,
+      style: this._composedStyle,
     };
   }
 }

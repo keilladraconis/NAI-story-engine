@@ -20,9 +20,16 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/code-editor.ts";
-import { type SuiCodeEditorStateTheme, type SuiCodeEditorTheme } from "./theme/code-editor.ts";
+import {
+  type SuiCodeEditorStateTheme,
+  type SuiCodeEditorTheme,
+} from "./theme/code-editor.ts";
 
 /** State shape for SuiCodeEditor. readOnly drives theme resolution in resolveTheme(). */
 export type SuiCodeEditorState = {
@@ -34,7 +41,7 @@ export type SuiCodeEditorState = {
  */
 export type SuiCodeEditorOptions = {
   initialValue?: string;
-  onChange?:     (value: string) => void;
+  onChange?: (value: string) => void;
 } & SuiComponentOptions<SuiCodeEditorTheme, SuiCodeEditorState>;
 
 /**
@@ -43,8 +50,12 @@ export type SuiCodeEditorOptions = {
  * are resolved from theme via resolveTheme() based on this.state.readOnly.
  * initialValue and onChange are passed directly from options.
  */
-export class SuiCodeEditor extends SuiComponent<SuiCodeEditorTheme, SuiCodeEditorState, SuiCodeEditorOptions, UIPartCodeEditor> {
-
+export class SuiCodeEditor extends SuiComponent<
+  SuiCodeEditorTheme,
+  SuiCodeEditorState,
+  SuiCodeEditorOptions,
+  UIPartCodeEditor
+> {
   constructor(options: SuiCodeEditorOptions) {
     super(options, Theme.codeEditor);
   }
@@ -65,18 +76,18 @@ export class SuiCodeEditor extends SuiComponent<SuiCodeEditorTheme, SuiCodeEdito
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:                    "codeEditor",
-      id:                      this.id,
-      initialValue:            this.options.initialValue,
-      onChange:                this.options.onChange,
-      readOnly:                this.state.readOnly,
-      language:                t.self.language,
-      height:                  t.self.height,
-      lineNumbers:             t.self.lineNumbers,
-      wordWrap:                t.self.wordWrap,
-      fontSize:                t.self.fontSize,
+      type: "codeEditor",
+      id: this.id,
+      initialValue: this.options.initialValue,
+      onChange: this.options.onChange,
+      readOnly: this.state.readOnly,
+      language: t.self.language,
+      height: t.self.height,
+      lineNumbers: t.self.lineNumbers,
+      wordWrap: t.self.wordWrap,
+      fontSize: t.self.fontSize,
       diagnosticCodesToIgnore: t.self.diagnosticCodesToIgnore,
-      style:                   this._composedStyle,
+      style: this._composedStyle,
     };
   }
 }

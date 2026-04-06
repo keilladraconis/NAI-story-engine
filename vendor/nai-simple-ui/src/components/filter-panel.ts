@@ -34,10 +34,18 @@
  *   })
  */
 
-import { SuiComponent, type AnySuiComponent, type SuiComponentOptions, type SuiStorageMode } from "../component.ts";
+import {
+  SuiComponent,
+  type AnySuiComponent,
+  type SuiComponentOptions,
+  type SuiStorageMode,
+} from "../component.ts";
 
 /** Debounce using the NAI timer API (api.v1.timers) instead of setTimeout. */
-function naiDebounce<T extends (...args: any[]) => any>(fn: T, delay: number): (...args: Parameters<T>) => Promise<void> {
+function naiDebounce<T extends (...args: any[]) => any>(
+  fn: T,
+  delay: number,
+): (...args: Parameters<T>) => Promise<void> {
   let timer: number | undefined;
   return async (...args: Parameters<T>) => {
     if (timer !== undefined) await api.v1.timers.clearTimeout(timer);
@@ -45,7 +53,10 @@ function naiDebounce<T extends (...args: any[]) => any>(fn: T, delay: number): (
   };
 }
 import * as Theme from "./theme/filter-panel.ts";
-import { type SuiFilterPanelStateTheme, type SuiFilterPanelTheme } from "./theme/filter-panel.ts";
+import {
+  type SuiFilterPanelStateTheme,
+  type SuiFilterPanelTheme,
+} from "./theme/filter-panel.ts";
 import { SuiCollapsible } from "./collapsible.ts";
 import { SuiTextInput } from "./text-input.ts";
 import { SuiColumn } from "./column.ts";
@@ -57,11 +68,11 @@ export type SuiFilterPanelState = {
 
 /** options carries data only — all visual properties live in theme. */
 export type SuiFilterPanelOptions = {
-  children:            AnySuiComponent[];
-  searchStorageKey?:   string;
-  searchStorageMode?:  SuiStorageMode;
+  children: AnySuiComponent[];
+  searchStorageKey?: string;
+  searchStorageMode?: SuiStorageMode;
   /** Debounce delay in ms for the search onChange handler. Omit to disable debouncing. */
-  debounceDelay?:      number;
+  debounceDelay?: number;
 } & SuiComponentOptions<SuiFilterPanelTheme, SuiFilterPanelState>;
 
 /**
@@ -70,9 +81,12 @@ export type SuiFilterPanelOptions = {
  * compose time, before it is registered with the host — eliminating post-registration
  * updateParts() calls and the flicker they would cause.
  */
-function applyStyleUpdates(root: UIPart, updates: { id: string; style?: object }[]): void {
+function applyStyleUpdates(
+  root: UIPart,
+  updates: { id: string; style?: object }[],
+): void {
   if (updates.length === 0) return;
-  const map = new Map(updates.map(u => [u.id, u.style]));
+  const map = new Map(updates.map((u) => [u.id, u.style]));
   function walk(part: UIPart): void {
     const p = part as Record<string, unknown>;
     if (typeof p["id"] === "string" && map.has(p["id"] as string)) {
@@ -90,8 +104,12 @@ function applyStyleUpdates(root: UIPart, updates: { id: string; style?: object }
  * Pre-hydrates the stored query and injects it as SuiComposeContext so all children
  * (SuiCard, SuiCollapsible, etc.) bake initial visibility at compose time.
  */
-export class SuiFilterPanel extends SuiComponent<SuiFilterPanelTheme, SuiFilterPanelState, SuiFilterPanelOptions, UIPartColumn> {
-
+export class SuiFilterPanel extends SuiComponent<
+  SuiFilterPanelTheme,
+  SuiFilterPanelState,
+  SuiFilterPanelOptions,
+  UIPartColumn
+> {
   constructor(options: SuiFilterPanelOptions) {
     super(
       { ...options, state: { query: "", ...options.state } },
@@ -102,9 +120,9 @@ export class SuiFilterPanel extends SuiComponent<SuiFilterPanelTheme, SuiFilterP
   /** Stable IDs for this component's owned children. */
   override get ids(): { self: string; search: string; list: string } {
     return {
-      self:   this.id,
+      self: this.id,
       search: `${this.id}.search`,
-      list:   `${this.id}.list`,
+      list: `${this.id}.list`,
     };
   }
 
@@ -122,11 +140,20 @@ export class SuiFilterPanel extends SuiComponent<SuiFilterPanelTheme, SuiFilterP
     if (!searchStorageKey) return;
     let stored: unknown;
     switch (searchStorageMode ?? "memory") {
-      case "story":   stored = await api.v1.storyStorage.get(searchStorageKey);   break;
-      case "global":  stored = await api.v1.storage.get(searchStorageKey);        break;
-      case "history": stored = await api.v1.historyStorage.get(searchStorageKey); break;
-      case "temp":    stored = await api.v1.tempStorage.get(searchStorageKey);    break;
-      default: return;
+      case "story":
+        stored = await api.v1.storyStorage.get(searchStorageKey);
+        break;
+      case "global":
+        stored = await api.v1.storage.get(searchStorageKey);
+        break;
+      case "history":
+        stored = await api.v1.historyStorage.get(searchStorageKey);
+        break;
+      case "temp":
+        stored = await api.v1.tempStorage.get(searchStorageKey);
+        break;
+      default:
+        return;
     }
     if (typeof stored === "string") {
       await this.setState({ query: stored }, false);
@@ -140,10 +167,18 @@ export class SuiFilterPanel extends SuiComponent<SuiFilterPanelTheme, SuiFilterP
     const { searchStorageKey, searchStorageMode } = this.options;
     if (!searchStorageKey) return;
     switch (searchStorageMode ?? "memory") {
-      case "story":   await api.v1.storyStorage.set(searchStorageKey, query);   break;
-      case "global":  await api.v1.storage.set(searchStorageKey, query);        break;
-      case "history": await api.v1.historyStorage.set(searchStorageKey, query); break;
-      case "temp":    await api.v1.tempStorage.set(searchStorageKey, query);    break;
+      case "story":
+        await api.v1.storyStorage.set(searchStorageKey, query);
+        break;
+      case "global":
+        await api.v1.storage.set(searchStorageKey, query);
+        break;
+      case "history":
+        await api.v1.historyStorage.set(searchStorageKey, query);
+        break;
+      case "temp":
+        await api.v1.tempStorage.set(searchStorageKey, query);
+        break;
     }
   }
 
@@ -158,7 +193,7 @@ export class SuiFilterPanel extends SuiComponent<SuiFilterPanelTheme, SuiFilterP
    * @returns {UIPartColumn}
    */
   async compose(): Promise<UIPartColumn> {
-    const t   = this.resolveTheme();
+    const t = this.resolveTheme();
     const ids = this.ids;
     const { children, debounceDelay } = this.options;
 
@@ -170,22 +205,24 @@ export class SuiFilterPanel extends SuiComponent<SuiFilterPanelTheme, SuiFilterP
     // ── Collect SuiCollapsible children ───────────────────
     // Flat scan — only direct children. SuiFilterPanel only manages the collapsibles it owns.
 
-    const collapsibles = children.filter((c): c is SuiCollapsible => c instanceof SuiCollapsible);
+    const collapsibles = children.filter(
+      (c): c is SuiCollapsible => c instanceof SuiCollapsible,
+    );
 
     // ── Expand collapsibles if a query is already active ──
     // expandForSearch() is idempotent, so calling it here is always safe.
 
     if (initialQuery) {
-      await Promise.all(collapsibles.map(c => c.expandForSearch()));
+      await Promise.all(collapsibles.map((c) => c.expandForSearch()));
     }
 
     // ── List column (filter target) ───────────────────────
     // Build children with context so initialQuery propagates to all descendants.
 
     const listCol = new SuiColumn({
-      id:       ids.list,
+      id: ids.list,
       children,
-      theme:    { default: { self: t.list } },
+      theme: { default: { self: t.list } },
     });
 
     // ── Search text input ─────────────────────────────────
@@ -197,32 +234,37 @@ export class SuiFilterPanel extends SuiComponent<SuiFilterPanelTheme, SuiFilterP
       await this.setState({ query: value }, false);
       await this._persistQuery(value);
 
-      const query        = value.toLowerCase();
-      const prevQuery    = prev.toLowerCase();
+      const query = value.toLowerCase();
+      const prevQuery = prev.toLowerCase();
       const wasSearching = prevQuery !== "";
-      const isSearching  = query    !== "";
+      const isSearching = query !== "";
 
       let extraUpdates: (Partial<UIPart> & { id: string })[] = [];
       if (!wasSearching && isSearching) {
-        extraUpdates = (await Promise.all(collapsibles.map(c => c.expandForSearch()))).flat();
+        extraUpdates = (
+          await Promise.all(collapsibles.map((c) => c.expandForSearch()))
+        ).flat();
       } else if (wasSearching && !isSearching) {
-        extraUpdates = (await Promise.all(collapsibles.map(c => c.restoreFromSearch()))).flat();
+        extraUpdates = (
+          await Promise.all(collapsibles.map((c) => c.restoreFromSearch()))
+        ).flat();
       }
 
       const filterResult = listCol.filter(query);
-      const allUpdates   = [...extraUpdates, ...filterResult.updates];
+      const allUpdates = [...extraUpdates, ...filterResult.updates];
       if (allUpdates.length > 0) {
         await api.v1.ui.updateParts(allUpdates);
       }
     };
 
     const searchInput = new SuiTextInput({
-      id:           ids.search,
+      id: ids.search,
       initialValue: this.state.query,
-      theme:        { default: { self: t.searchInput } },
-      onChange: debounceDelay !== undefined
-        ? naiDebounce(onSearchChange, debounceDelay)
-        : onSearchChange,
+      theme: { default: { self: t.searchInput } },
+      onChange:
+        debounceDelay !== undefined
+          ? naiDebounce(onSearchChange, debounceDelay)
+          : onSearchChange,
     });
 
     // ── Outer column ──────────────────────────────────────
@@ -231,9 +273,9 @@ export class SuiFilterPanel extends SuiComponent<SuiFilterPanelTheme, SuiFilterP
     const ctx = initialQuery ? { initialQuery } : undefined;
 
     const result = await new SuiColumn({
-      id:       this.id,
+      id: this.id,
       children: [searchInput, listCol],
-      theme:    { default: { self: t.self } },
+      theme: { default: { self: t.self } },
     }).build(ctx);
 
     // ── Bake initial filter visibility into the built UIPart tree ──

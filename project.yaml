@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories with GLM
 memoryLimit: 8
-updatedAt: 1775481644
+updatedAt: 1775484000
 config:
   - name: model
     prettyName: Model
@@ -91,7 +91,8 @@ config:
 
   - name: brainstorm_critic_prompt
     prettyName: Brainstorm Critic Prompt
-    description: Persona prompt for the Critic brainstorm mode — tough, genre-aware
+    description:
+      Persona prompt for the Critic brainstorm mode — tough, genre-aware
       challenger.
     multiline: true
     type: string
@@ -178,7 +179,8 @@ config:
 
   - name: lorebook_generate_prompt
     prettyName: Lorebook Generate Prompt
-    description: Smart prompt for generating diverse Lorebook entries (Characters,
+    description:
+      Smart prompt for generating diverse Lorebook entries (Characters,
       Locations, Systems).
     type: string
     multiline: true

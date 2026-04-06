@@ -1,5 +1,8 @@
 import { RootState, GenerationStrategy, AppDispatch } from "../types";
-import { brainstormHandler, brainstormChatTitleHandler } from "./handlers/brainstorm";
+import {
+  brainstormHandler,
+  brainstormChatTitleHandler,
+} from "./handlers/brainstorm";
 import { bootstrapHandler } from "./handlers/bootstrap";
 import { fieldHandler } from "./handlers/field";
 import { listHandler } from "./handlers/list";

@@ -53,12 +53,7 @@ export interface FieldConfig {
   icon: IconId;
   linkedEntities?: string[];
   layout?: "default" | "list";
-  fieldType?:
-  | "canon"
-  | "brainstorm"
-  | "dulfs"
-  | "attg"
-  | "style";
+  fieldType?: "canon" | "brainstorm" | "dulfs" | "attg" | "style";
   generationInstruction?: string;
   listGenerationInstruction?: string;
   exampleFormat?: string;
@@ -72,7 +67,8 @@ export const FIELD_CONFIGS: FieldConfig[] = [
   {
     id: FieldID.Canon,
     label: "Canon",
-    description: "Bedrock facts: world, characters, themes, tone — the foundation for all generation",
+    description:
+      "Bedrock facts: world, characters, themes, tone — the foundation for all generation",
     placeholder: "The facts of your story world...",
     icon: "bookOpen",
     fieldType: "canon",
@@ -165,7 +161,8 @@ export const FIELD_CONFIGS: FieldConfig[] = [
   {
     id: FieldID.SituationalDynamics,
     label: "Narrative Vectors",
-    description: "Narrative vectors: tensions, pressures, and volatile situations",
+    description:
+      "Narrative vectors: tensions, pressures, and volatile situations",
     placeholder: "Directions of pressure, not predetermined outcomes...",
     icon: "activity",
     layout: "list",

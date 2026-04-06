@@ -16,9 +16,17 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type AnySuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type AnySuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/column.ts";
-import { type SuiColumnStateTheme, type SuiColumnTheme } from "./theme/column.ts";
+import {
+  type SuiColumnStateTheme,
+  type SuiColumnTheme,
+} from "./theme/column.ts";
 
 /** options carries only children — all visual and structural properties live in theme. */
 export type SuiColumnOptions = {
@@ -30,8 +38,12 @@ export type SuiColumnOptions = {
  * Layout (spacing, alignment, wrap) and style are resolved from theme via resolveTheme() on each compose() call.
  * children is passed directly from options as AnySuiComponent[]; compose() is called internally.
  */
-export class SuiColumn extends SuiComponent<SuiColumnTheme, Record<string, unknown>, SuiColumnOptions, UIPartColumn> {
-
+export class SuiColumn extends SuiComponent<
+  SuiColumnTheme,
+  Record<string, unknown>,
+  SuiColumnOptions,
+  UIPartColumn
+> {
   constructor(options: SuiColumnOptions) {
     super(options, Theme.column);
   }
@@ -49,16 +61,19 @@ export class SuiColumn extends SuiComponent<SuiColumnTheme, Record<string, unkno
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
 
-    const content = await this.buildContent(this.options.children, SuiBase.listChildrenStyle(t.self));
+    const content = await this.buildContent(
+      this.options.children,
+      SuiBase.listChildrenStyle(t.self),
+    );
 
     return {
-      type:      "column",
-      id:        this.id,
+      type: "column",
+      id: this.id,
       content,
-      style:     this._composedStyle,
-      spacing:   t.self.spacing,
+      style: this._composedStyle,
+      spacing: t.self.spacing,
       alignment: t.self.alignment,
-      wrap:      t.self.wrap,
+      wrap: t.self.wrap,
     };
   }
 }

@@ -5,11 +5,11 @@
 import { type ThemeOverride } from "../../base.ts";
 
 export type SuiImagePartTheme = {
-  src:     string;
-  alt?:    string;
+  src: string;
+  alt?: string;
   height?: number;
-  width?:  number;
-  style?:  object;
+  width?: number;
+  style?: object;
 };
 
 export type SuiImageStateTheme = {

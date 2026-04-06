@@ -18,13 +18,21 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type AnySuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type AnySuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/collapsible-section.ts";
-import { type SuiCollapsibleSectionStateTheme, type SuiCollapsibleSectionTheme } from "./theme/collapsible-section.ts";
+import {
+  type SuiCollapsibleSectionStateTheme,
+  type SuiCollapsibleSectionTheme,
+} from "./theme/collapsible-section.ts";
 
 /** options carries data only — all visual properties live in theme. */
 export type SuiCollapsibleSectionOptions = {
-  children:          AnySuiComponent[];
+  children: AnySuiComponent[];
   initialCollapsed?: boolean;
 } & SuiComponentOptions<SuiCollapsibleSectionTheme>;
 
@@ -33,8 +41,12 @@ export type SuiCollapsibleSectionOptions = {
  * title, iconId, and style are resolved from theme via resolveTheme() on each compose() call.
  * children and initialCollapsed are passed directly from options.
  */
-export class SuiCollapsibleSection extends SuiComponent<SuiCollapsibleSectionTheme, Record<string, unknown>, SuiCollapsibleSectionOptions, UIPartCollapsibleSection> {
-
+export class SuiCollapsibleSection extends SuiComponent<
+  SuiCollapsibleSectionTheme,
+  Record<string, unknown>,
+  SuiCollapsibleSectionOptions,
+  UIPartCollapsibleSection
+> {
   constructor(options: SuiCollapsibleSectionOptions) {
     super(options, Theme.collapsibleSection);
   }
@@ -52,13 +64,16 @@ export class SuiCollapsibleSection extends SuiComponent<SuiCollapsibleSectionThe
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:             "collapsibleSection",
-      id:               this.id,
-      content:          await this.buildContent(this.options.children, SuiBase.listChildrenStyle(t.content)),
+      type: "collapsibleSection",
+      id: this.id,
+      content: await this.buildContent(
+        this.options.children,
+        SuiBase.listChildrenStyle(t.content),
+      ),
       initialCollapsed: this.options.initialCollapsed,
-      title:            t.self.title ?? "",
-      iconId:           t.self.iconId,
-      style:            this._composedStyle,
+      title: t.self.title ?? "",
+      iconId: t.self.iconId,
+      style: this._composedStyle,
     };
   }
 }

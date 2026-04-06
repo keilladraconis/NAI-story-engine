@@ -14,7 +14,7 @@ export type SuiCheckboxInputStateTheme = {
 };
 
 export type SuiCheckboxInputTheme = {
-  default:   SuiCheckboxInputStateTheme;
+  default: SuiCheckboxInputStateTheme;
   disabled?: PartialState<SuiCheckboxInputStateTheme>;
 };
 

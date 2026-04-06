@@ -107,9 +107,7 @@ export const runtimeSlice = createSlice({
     // Mark a request as completed and clear from active/queue
     requestCompleted: (state, payload: { requestId: string }) => {
       const isActive = state.activeRequest?.id === payload.requestId;
-      const newQueue = state.queue.filter(
-        (r) => r.id !== payload.requestId,
-      );
+      const newQueue = state.queue.filter((r) => r.id !== payload.requestId);
 
       if (!isActive && newQueue.length === state.queue.length) {
         return state;
@@ -156,10 +154,7 @@ export const runtimeSlice = createSlice({
       sega: { ...state.sega, statusText: payload.statusText },
     }),
 
-    segaKeysCompleted: (
-      state,
-      payload: { entryId: string },
-    ) => ({
+    segaKeysCompleted: (state, payload: { entryId: string }) => ({
       ...state,
       sega: {
         ...state.sega,

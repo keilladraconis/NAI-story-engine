@@ -45,8 +45,10 @@ function formatEntityRelationships(state: RootState, entityId: string): string {
   if (rels.length === 0) return "";
 
   const lines = rels.map((r) => {
-    const fromName = state.world.entities.find((e) => e.id === r.fromEntityId)?.name || "";
-    const toName = state.world.entities.find((e) => e.id === r.toEntityId)?.name || "";
+    const fromName =
+      state.world.entities.find((e) => e.id === r.fromEntityId)?.name || "";
+    const toName =
+      state.world.entities.find((e) => e.id === r.toEntityId)?.name || "";
     return `- ${fromName} → ${toName}: ${r.description}`;
   });
   return lines.join("\n");
@@ -54,7 +56,9 @@ function formatEntityRelationships(state: RootState, entityId: string): string {
 
 /** Format live world entities as context, grouped by category. */
 function formatLiveWorldEntitiesContext(state: RootState): string {
-  const liveEntities = state.world.entities.filter((e) => e.lifecycle === "live");
+  const liveEntities = state.world.entities.filter(
+    (e) => e.lifecycle === "live",
+  );
   if (liveEntities.length === 0) return "";
 
   const groups = new Map<DulfsFieldID, typeof liveEntities>();
@@ -71,7 +75,9 @@ function formatLiveWorldEntitiesContext(state: RootState): string {
     const label = FIELD_CONFIGS.find((f) => f.id === fieldId)?.label || fieldId;
     lines.push(`${label}:`);
     for (const entity of fieldEntities) {
-      lines.push(`- ${entity.name}${entity.summary ? `: ${entity.summary.slice(0, 100)}` : ""}`);
+      lines.push(
+        `- ${entity.name}${entity.summary ? `: ${entity.summary.slice(0, 100)}` : ""}`,
+      );
     }
   }
   return lines.join("\n");
@@ -162,7 +168,9 @@ Setting: ${setting}
     }
 
     // Entity-specific relationships from v11 world slice
-    const relContext = entity ? formatEntityRelationships(state, entity.id) : "";
+    const relContext = entity
+      ? formatEntityRelationships(state, entity.id)
+      : "";
     if (relContext) {
       messages.push({
         role: "system",
@@ -182,7 +190,13 @@ Setting: ${setting}
       (template ? 1 : 0) + (worldContext ? 1 : 0) + (relContext ? 1 : 0) + 3;
     return {
       messages,
-      params: { model, max_tokens: 1024, temperature: 0.85, min_p: 0.05, frequency_penalty: 0.1 },
+      params: {
+        model,
+        max_tokens: 1024,
+        temperature: 0.85,
+        min_p: 0.05,
+        frequency_penalty: 0.1,
+      },
       contextPinning: { head: 1, tail: tailCount },
     };
   };
@@ -215,7 +229,9 @@ export const createLorebookKeysFactory = (
     // Build relationship context for this entry from v11 world slice
     const state = getState();
     const entity = findEntityForEntry(state, entryId);
-    const relContext = entity ? formatEntityRelationships(state, entity.id) : "";
+    const relContext = entity
+      ? formatEntityRelationships(state, entity.id)
+      : "";
 
     const contextContent = relContext
       ? `${entryText}\n\n${relContext}`
@@ -302,7 +318,9 @@ Setting: ${setting}
     // v11 world context
     const state = getState();
     const entity = findEntityForEntry(state, entryId);
-    const relContext = entity ? formatEntityRelationships(state, entity.id) : "";
+    const relContext = entity
+      ? formatEntityRelationships(state, entity.id)
+      : "";
 
     const messages: Message[] = [
       ...prefix,
@@ -329,7 +347,13 @@ Setting: ${setting}
 
     return {
       messages,
-      params: { model, max_tokens: 1024, temperature: 0.7, min_p: 0.05, frequency_penalty: 0.1 },
+      params: {
+        model,
+        max_tokens: 1024,
+        temperature: 0.7,
+        min_p: 0.05,
+        frequency_penalty: 0.1,
+      },
       contextPinning: { head: 1, tail: relContext ? 4 : 3 },
     };
   };

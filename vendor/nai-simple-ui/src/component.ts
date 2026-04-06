@@ -33,7 +33,14 @@ export {
   SuiBase,
 } from "./base.ts";
 
-import { SuiBase, type SuiBaseOptions, type SuiTheme, type ThemeOverride, type SuiComposeContext, type SuiFilterResult } from "./base.ts";
+import {
+  SuiBase,
+  type SuiBaseOptions,
+  type SuiTheme,
+  type ThemeOverride,
+  type SuiComposeContext,
+  type SuiFilterResult,
+} from "./base.ts";
 
 /**
  * Wildcard `SuiComponent` — use when holding a reference to a component
@@ -47,8 +54,8 @@ export type AnySuiComponent = SuiComponent<any, any, any, any>;
  * Kept as a named export for backward compatibility with component files.
  */
 export type SuiComponentOptions<
-  TTheme extends SuiTheme                        = SuiTheme,
-  TState extends Record<string, unknown>         = Record<string, unknown>,
+  TTheme extends SuiTheme = SuiTheme,
+  TState extends Record<string, unknown> = Record<string, unknown>,
 > = SuiBaseOptions<TTheme, TState>;
 
 /**
@@ -60,12 +67,14 @@ export type SuiComponentOptions<
  * @template TPart    - The specific UIPart type this component produces (e.g. `UIPartButton`).
  */
 export abstract class SuiComponent<
-  TTheme   extends SuiTheme                              = SuiTheme,
-  TState   extends Record<string, unknown>               = Record<string, unknown>,
-  TOptions extends SuiComponentOptions<TTheme, TState>   = SuiComponentOptions<TTheme, TState>,
-  TPart    extends { type: string } & UIPart             = { type: string } & UIPart,
+  TTheme extends SuiTheme = SuiTheme,
+  TState extends Record<string, unknown> = Record<string, unknown>,
+  TOptions extends SuiComponentOptions<TTheme, TState> = SuiComponentOptions<
+    TTheme,
+    TState
+  >,
+  TPart extends { type: string } & UIPart = { type: string } & UIPart,
 > extends SuiBase<TTheme, TState, TOptions> {
-
   // ── Properties ────────────────────────────────────────────
 
   /**
@@ -106,7 +115,7 @@ export abstract class SuiComponent<
   constructor(options: TOptions, baseTheme?: ThemeOverride<TTheme> | TTheme) {
     super(options, baseTheme);
     this._composedStyle = {};
-    this._visible       = options.initialVisible !== false;
+    this._visible = options.initialVisible !== false;
   }
 
   // ── Public action methods ─────────────────────────────────
@@ -121,7 +130,17 @@ export abstract class SuiComponent<
    */
   async hide(): Promise<void> {
     this._visible = false;
-    await api.v1.ui.updateParts([{ id: this.id, style: { ...this._baseStyle, ...this._composedStyle, ...this._variantStyle, display: "none" } }]);
+    await api.v1.ui.updateParts([
+      {
+        id: this.id,
+        style: {
+          ...this._baseStyle,
+          ...this._composedStyle,
+          ...this._variantStyle,
+          display: "none",
+        },
+      },
+    ]);
   }
 
   /**
@@ -132,7 +151,16 @@ export abstract class SuiComponent<
    */
   async show(): Promise<void> {
     this._visible = true;
-    await api.v1.ui.updateParts([{ id: this.id, style: { ...this._baseStyle, ...this._composedStyle, ...this._variantStyle } }]);
+    await api.v1.ui.updateParts([
+      {
+        id: this.id,
+        style: {
+          ...this._baseStyle,
+          ...this._composedStyle,
+          ...this._variantStyle,
+        },
+      },
+    ]);
   }
 
   /**
@@ -147,7 +175,11 @@ export abstract class SuiComponent<
    * accidentally make a hidden component reappear.
    */
   protected visibleStyle(style: object | undefined): object {
-    const full = { ...this._baseStyle, ...(style ?? {}), ...this._variantStyle };
+    const full = {
+      ...this._baseStyle,
+      ...(style ?? {}),
+      ...this._variantStyle,
+    };
     return this._visible ? full : { ...full, display: "none" };
   }
 
@@ -197,11 +229,18 @@ export abstract class SuiComponent<
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const children = optChildren as { filter(q: string): SuiFilterResult }[];
-    const results  = children.map(c => c.filter(query));
-    const visible  = query === "" || results.some(r => r.visible);
-    const updates  = results.flatMap(r => r.updates);
-    const full = { ...this._baseStyle, ...this._composedStyle, ...this._variantStyle };
-    updates.push({ id: this.id, style: visible ? full : { ...full, display: "none" } });
+    const results = children.map((c) => c.filter(query));
+    const visible = query === "" || results.some((r) => r.visible);
+    const updates = results.flatMap((r) => r.updates);
+    const full = {
+      ...this._baseStyle,
+      ...this._composedStyle,
+      ...this._variantStyle,
+    };
+    updates.push({
+      id: this.id,
+      style: visible ? full : { ...full, display: "none" },
+    });
     return { visible, updates };
   }
 

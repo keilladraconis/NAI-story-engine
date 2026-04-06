@@ -5,10 +5,10 @@
 import { type ThemeOverride } from "../../base.ts";
 
 export type SuiTextPartTheme = {
-  text?:       string;
-  markdown?:   boolean;
+  text?: string;
+  markdown?: boolean;
   noTemplate?: boolean;
-  style?:      object;
+  style?: object;
 };
 
 export type SuiTextStateTheme = {

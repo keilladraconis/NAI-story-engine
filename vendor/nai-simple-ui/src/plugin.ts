@@ -32,7 +32,7 @@
  *     }
  *
  *     protected async compose(): Promise<void> {
-  *       this._panel = new SuiSidebarPanel({ id: "my-panel", name: "My Plugin", children: [...] });
+ *       this._panel = new SuiSidebarPanel({ id: "my-panel", name: "My Plugin", children: [...] });
  *       await this._panel.register();
  *     }
  *
@@ -56,7 +56,7 @@ import { SuiBase, type SuiBaseOptions, type SuiTheme } from "./base.ts";
  * options carry only the SuiBase infrastructure (id, theme, state, storageKey, storageMode).
  */
 export type SuiPluginOptions<
-  TTheme extends SuiTheme                = SuiTheme,
+  TTheme extends SuiTheme = SuiTheme,
   TState extends Record<string, unknown> = Record<string, unknown>,
 > = SuiBaseOptions<TTheme, TState>;
 
@@ -72,11 +72,13 @@ export type SuiPluginOptions<
  * @template TOptions - Options type extending SuiPluginOptions.
  */
 export abstract class SuiPlugin<
-  TTheme   extends SuiTheme                            = SuiTheme,
-  TState   extends Record<string, unknown>             = Record<string, unknown>,
-  TOptions extends SuiPluginOptions<TTheme, TState>    = SuiPluginOptions<TTheme, TState>,
+  TTheme extends SuiTheme = SuiTheme,
+  TState extends Record<string, unknown> = Record<string, unknown>,
+  TOptions extends SuiPluginOptions<TTheme, TState> = SuiPluginOptions<
+    TTheme,
+    TState
+  >,
 > extends SuiBase<TTheme, TState, TOptions> {
-
   // ── Virtual ───────────────────────────────────────────────
 
   /**
@@ -162,7 +164,9 @@ export abstract class SuiPlugin<
     const key = this.metaKey;
     if (!key) return;
 
-    const stored      = await api.v1.storyStorage.get(key) as { version?: string } | undefined;
+    const stored = (await api.v1.storyStorage.get(key)) as
+      | { version?: string }
+      | undefined;
     const isFirstLoad = stored === undefined;
 
     if (stored?.version !== api.v1.script.version) {

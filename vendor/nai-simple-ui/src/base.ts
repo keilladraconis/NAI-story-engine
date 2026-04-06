@@ -74,11 +74,11 @@ export type SuiStorageMode = "memory" | "story" | "global" | "history" | "temp";
  *   base → child's own style → itemFirst/itemLast/itemEven/itemOdd
  */
 type SuiPositionalPartTheme = {
-  base?:      object;
+  base?: object;
   itemFirst?: object;
-  itemLast?:  object;
-  itemEven?:  object;
-  itemOdd?:   object;
+  itemLast?: object;
+  itemEven?: object;
+  itemOdd?: object;
 };
 
 /**
@@ -137,14 +137,14 @@ export type SuiComposable = { build(): Promise<any> };
  *                                                      Call show() to make it visible later. Defaults to true.
  */
 export type SuiBaseOptions<
-  TTheme extends SuiTheme                        = SuiTheme,
-  TState extends Record<string, unknown>         = Record<string, unknown>,
+  TTheme extends SuiTheme = SuiTheme,
+  TState extends Record<string, unknown> = Record<string, unknown>,
 > = {
-  id?:             string;
-  theme?:          ThemeOverride<TTheme>;
-  state?:          TState;
-  storageKey?:     string;
-  storageMode?:    SuiStorageMode;
+  id?: string;
+  theme?: ThemeOverride<TTheme>;
+  state?: TState;
+  storageKey?: string;
+  storageMode?: SuiStorageMode;
   initialVisible?: boolean;
 };
 
@@ -156,11 +156,13 @@ export type SuiBaseOptions<
  * @template TOptions - Options type extending SuiBaseOptions.
  */
 export abstract class SuiBase<
-  TTheme   extends SuiTheme                            = SuiTheme,
-  TState   extends Record<string, unknown>             = Record<string, unknown>,
-  TOptions extends SuiBaseOptions<TTheme, TState>      = SuiBaseOptions<TTheme, TState>,
+  TTheme extends SuiTheme = SuiTheme,
+  TState extends Record<string, unknown> = Record<string, unknown>,
+  TOptions extends SuiBaseOptions<TTheme, TState> = SuiBaseOptions<
+    TTheme,
+    TState
+  >,
 > {
-
   // ── Public properties ─────────────────────────────────────
 
   /**
@@ -182,12 +184,12 @@ export abstract class SuiBase<
 
   // ── Private properties ────────────────────────────────────
 
-  private _id:          string;
-  private _options:     TOptions;
-  private _state:       TState;
-  private _storageKey:  string;
+  private _id: string;
+  private _options: TOptions;
+  private _state: TState;
+  private _storageKey: string;
   private _storageMode: SuiStorageMode;
-  private _theme:       TTheme;
+  private _theme: TTheme;
   /**
    * Compose-time context injected by build(). Read by compose() implementations
    * via the protected `composeContext` getter.
@@ -203,12 +205,15 @@ export abstract class SuiBase<
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(options: TOptions, baseTheme?: ThemeOverride<TTheme> | TTheme) {
-    this._id          = options.id ?? api.v1.uuid();
-    this._options     = options;
-    this._state       = { ...((options.state ?? {}) as TState) };
-    this._storageKey  = options.storageKey ?? `sui.${this._id}`;
+    this._id = options.id ?? api.v1.uuid();
+    this._options = options;
+    this._state = { ...((options.state ?? {}) as TState) };
+    this._storageKey = options.storageKey ?? `sui.${this._id}`;
     this._storageMode = options.storageMode ?? "memory";
-    this._theme       = SuiBase.mergeTheme((baseTheme ?? {}) as TTheme, (options.theme ?? {}) as ThemeOverride<TTheme>);
+    this._theme = SuiBase.mergeTheme(
+      (baseTheme ?? {}) as TTheme,
+      (options.theme ?? {}) as ThemeOverride<TTheme>,
+    );
   }
 
   // ── Public getters ────────────────────────────────────────
@@ -266,15 +271,26 @@ export abstract class SuiBase<
    * @param applySync  Pass `false` to mutate state silently (e.g. hydrating from storage at startup).
    */
   async setState(next: TState, applySync: boolean = true): Promise<void> {
-    this._state   = next;
+    this._state = next;
 
     if (this._storageMode !== "memory") {
       switch (this._storageMode) {
-        case "story":   await api.v1.storyStorage.set(this._storageKey, this._state);   break;
-        case "global":  await api.v1.storage.set(this._storageKey, this._state);        break;
-        case "history": await api.v1.historyStorage.set(this._storageKey, this._state); break;
-        case "temp":    await api.v1.tempStorage.set(this._storageKey, this._state);    break;
-        default:        throw new Error(`[SuiBase] setState: unhandled storageMode "${this._storageMode}" for key "${this._storageKey}".`);
+        case "story":
+          await api.v1.storyStorage.set(this._storageKey, this._state);
+          break;
+        case "global":
+          await api.v1.storage.set(this._storageKey, this._state);
+          break;
+        case "history":
+          await api.v1.historyStorage.set(this._storageKey, this._state);
+          break;
+        case "temp":
+          await api.v1.tempStorage.set(this._storageKey, this._state);
+          break;
+        default:
+          throw new Error(
+            `[SuiBase] setState: unhandled storageMode "${this._storageMode}" for key "${this._storageKey}".`,
+          );
       }
     }
 
@@ -316,30 +332,47 @@ export abstract class SuiBase<
    * Merge order per item (highest specificity wins): base → child's own style → itemFirst/itemLast/itemEven/itemOdd.
    * `base` is a default baseline the child overrides; `itemFirst`/etc. are structural exceptions that always win.
    */
-  protected async buildContent(children: SuiComposable[], childrenStyle?: SuiPositionalPartTheme): Promise<UIPart[]> {
-    const s    = childrenStyle ?? {};
+  protected async buildContent(
+    children: SuiComposable[],
+    childrenStyle?: SuiPositionalPartTheme,
+  ): Promise<UIPart[]> {
+    const s = childrenStyle ?? {};
     const last = children.length - 1;
-    const ctx  = this._composeContext;
+    const ctx = this._composeContext;
 
     // Build all children in parallel — each child's build() is independent.
-    const parts = await Promise.all(children.map((child) =>
-      child instanceof SuiBase && ctx !== undefined
-        ? child._buildWithContext(ctx)
-        : child.build(),
+    const parts = (await Promise.all(
+      children.map((child) =>
+        child instanceof SuiBase && ctx !== undefined
+          ? child._buildWithContext(ctx)
+          : child.build(),
+      ),
     )) as UIPart[];
 
     return parts.map((part: UIPart, i: number) => {
-      const isFirst   = i === 0;
-      const isLast    = i === last;
-      const isEven    = i % 2 === 0;
-      const isOdd     = !isEven;
-      const variants: object = { ...(isFirst ? s.itemFirst : {}), ...(isLast ? s.itemLast : {}), ...(isEven ? s.itemEven : {}), ...(isOdd ? s.itemOdd : {}) };
+      const isFirst = i === 0;
+      const isLast = i === last;
+      const isEven = i % 2 === 0;
+      const isOdd = !isEven;
+      const variants: object = {
+        ...(isFirst ? s.itemFirst : {}),
+        ...(isLast ? s.itemLast : {}),
+        ...(isEven ? s.itemEven : {}),
+        ...(isOdd ? s.itemOdd : {}),
+      };
       const child = children[i];
       if (child instanceof SuiBase) {
-        child._baseStyle    = s.base    ?? {};
+        child._baseStyle = s.base ?? {};
         child._variantStyle = variants;
       }
-      return { ...part, style: { ...s.base, ...(part as { style?: object }).style, ...variants } } as UIPart;
+      return {
+        ...part,
+        style: {
+          ...s.base,
+          ...(part as { style?: object }).style,
+          ...variants,
+        },
+      } as UIPart;
     });
   }
 
@@ -353,10 +386,18 @@ export abstract class SuiBase<
     if (this._storageMode === "memory") return;
     let stored: unknown;
     switch (this._storageMode) {
-      case "story":   stored = await api.v1.storyStorage.get(this._storageKey);   break;
-      case "global":  stored = await api.v1.storage.get(this._storageKey);        break;
-      case "history": stored = await api.v1.historyStorage.get(this._storageKey); break;
-      case "temp":    stored = await api.v1.tempStorage.get(this._storageKey);    break;
+      case "story":
+        stored = await api.v1.storyStorage.get(this._storageKey);
+        break;
+      case "global":
+        stored = await api.v1.storage.get(this._storageKey);
+        break;
+      case "history":
+        stored = await api.v1.historyStorage.get(this._storageKey);
+        break;
+      case "temp":
+        stored = await api.v1.tempStorage.get(this._storageKey);
+        break;
     }
     if (stored != null) this._state = stored as TState;
   }
@@ -380,7 +421,7 @@ export abstract class SuiBase<
    *   }
    */
   static mergePartTheme<TState extends Record<string, Record<string, unknown>>>(
-    base:       TState,
+    base: TState,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...overrides: (Record<string, any> | undefined)[]
   ): TState {
@@ -389,14 +430,21 @@ export abstract class SuiBase<
       if (!override) continue;
       const next = { ...result } as Record<string, Record<string, unknown>>;
       for (const partKey of Object.keys(override)) {
-        const overridePart = override[partKey] as Record<string, unknown> | undefined;
+        const overridePart = override[partKey] as
+          | Record<string, unknown>
+          | undefined;
         if (!overridePart) continue;
         const basePart = (result[partKey] ?? {}) as Record<string, unknown>;
         next[partKey] = {
           ...basePart,
           ...overridePart,
           ...("style" in overridePart || "style" in basePart
-            ? { style: { ...(basePart.style as object | undefined), ...(overridePart.style as object | undefined) } }
+            ? {
+                style: {
+                  ...(basePart.style as object | undefined),
+                  ...(overridePart.style as object | undefined),
+                },
+              }
             : {}),
         };
       }
@@ -412,7 +460,10 @@ export abstract class SuiBase<
    * override win; absent keys keep their base value). This matches the behaviour of mergePartTheme.
    * Declared `static` so it can be called safely during construction before the instance is fully built.
    */
-  protected static mergeTheme<T extends SuiTheme>(base: T, override: ThemeOverride<T>): T {
+  protected static mergeTheme<T extends SuiTheme>(
+    base: T,
+    override: ThemeOverride<T>,
+  ): T {
     const result = { ...base };
     for (const state of Object.keys(override) as (keyof T & string)[]) {
       const overrideState = override[state];
@@ -426,7 +477,14 @@ export abstract class SuiBase<
           ...basePart,
           ...(overridePart as object),
           ...("style" in basePart || "style" in (overridePart as object)
-            ? { style: { ...(basePart.style as object | undefined), ...((overridePart as Record<string, unknown>).style as object | undefined) } }
+            ? {
+                style: {
+                  ...(basePart.style as object | undefined),
+                  ...((overridePart as Record<string, unknown>).style as
+                    | object
+                    | undefined),
+                },
+              }
             : {}),
         };
       }
@@ -439,13 +497,15 @@ export abstract class SuiBase<
    * ready to pass to `buildContent()`. Called in `compose()` when constructing the owned wrapper row/column
    * for a list zone.
    */
-  protected static listChildrenStyle(part: SuiChildrenPartTheme): SuiPositionalPartTheme {
+  protected static listChildrenStyle(
+    part: SuiChildrenPartTheme,
+  ): SuiPositionalPartTheme {
     return {
-      base:      part.base,
+      base: part.base,
       itemFirst: part.itemFirst,
-      itemLast:  part.itemLast,
-      itemEven:  part.itemEven,
-      itemOdd:   part.itemOdd,
+      itemLast: part.itemLast,
+      itemEven: part.itemEven,
+      itemOdd: part.itemOdd,
     };
   }
 

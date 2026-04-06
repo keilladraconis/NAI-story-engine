@@ -54,7 +54,10 @@ export const crucibleSlice = createSlice({
 
     // Shape generation
     updateShape: (state, payload: { name: string; instruction: string }) => {
-      return { ...state, shape: { name: payload.name, instruction: payload.instruction } };
+      return {
+        ...state,
+        shape: { name: payload.name, instruction: payload.instruction },
+      };
     },
 
     // Direction phase reducers
@@ -78,7 +81,10 @@ export const crucibleSlice = createSlice({
       };
     },
 
-    tensionTextUpdated: (state, payload: { tensionId: string; text: string }) => {
+    tensionTextUpdated: (
+      state,
+      payload: { tensionId: string; text: string },
+    ) => {
       return {
         ...state,
         tensions: state.tensions.map((t) =>
@@ -128,16 +134,21 @@ export const crucibleSlice = createSlice({
     },
 
     // Manual element editing (from review UI)
-    elementUpdated: (state, payload: { id: string; name?: string; content?: string }) => {
+    elementUpdated: (
+      state,
+      payload: { id: string; name?: string; content?: string },
+    ) => {
       return {
         ...state,
         elements: state.elements.map((e) =>
           e.id === payload.id
             ? {
-              ...e,
-              ...(payload.name !== undefined ? { name: payload.name } : {}),
-              ...(payload.content !== undefined ? { content: payload.content } : {}),
-            }
+                ...e,
+                ...(payload.name !== undefined ? { name: payload.name } : {}),
+                ...(payload.content !== undefined
+                  ? { content: payload.content }
+                  : {}),
+              }
             : e,
         ),
       };
@@ -168,14 +179,20 @@ export const crucibleSlice = createSlice({
     },
 
     // Build pass completed
-    buildPassCompleted: (state, payload: { passNumber: number; commandLog: string[]; guidance: string }) => {
+    buildPassCompleted: (
+      state,
+      payload: { passNumber: number; commandLog: string[]; guidance: string },
+    ) => {
       return {
         ...state,
-        passes: [...state.passes, {
-          passNumber: payload.passNumber,
-          commandLog: payload.commandLog,
-          guidance: payload.guidance,
-        }],
+        passes: [
+          ...state.passes,
+          {
+            passNumber: payload.passNumber,
+            commandLog: payload.commandLog,
+            guidance: payload.guidance,
+          },
+        ],
       };
     },
 

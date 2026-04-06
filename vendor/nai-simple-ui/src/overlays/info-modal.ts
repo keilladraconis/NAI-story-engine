@@ -29,7 +29,10 @@ import { SuiButton } from "../components/button.ts";
 import { SuiText } from "../components/text.ts";
 import { SuiColumn } from "../components/column.ts";
 import * as Theme from "./theme/info-modal.ts";
-import { type SuiInfoModalTheme, type SuiInfoModalStateTheme } from "./theme/info-modal.ts";
+import {
+  type SuiInfoModalTheme,
+  type SuiInfoModalStateTheme,
+} from "./theme/info-modal.ts";
 
 /** Options for SuiInfoModal. All presentational properties live in theme. */
 export type SuiInfoModalOptions = Omit<SuiModalOptions, "children"> & {
@@ -42,7 +45,6 @@ export type SuiInfoModalOptions = Omit<SuiModalOptions, "children"> & {
  * All visual and content properties (title, message text, dismiss label, styles) live in theme.
  */
 export class SuiInfoModal extends SuiModal {
-
   private _infoTheme: SuiInfoModalTheme;
 
   constructor(options: SuiInfoModalOptions) {
@@ -66,28 +68,38 @@ export class SuiInfoModal extends SuiModal {
    */
   override async compose(): Promise<UIPart[]> {
     const id = this.id;
-    const t  = this.resolveInfoTheme();
+    const t = this.resolveInfoTheme();
 
     const messageText = new SuiText({
-      id:    `${id}.message`,
-      theme: { default: { self: { ...t.message, markdown: t.message.markdown ?? true } } },
+      id: `${id}.message`,
+      theme: {
+        default: {
+          self: { ...t.message, markdown: t.message.markdown ?? true },
+        },
+      },
     });
 
     const children: AnySuiComponent[] = [messageText];
 
     if (t.dismiss.text) {
       const self = this;
-      children.push(new SuiButton({
-        id:       `${id}.dismiss`,
-        callback: async () => { await self.close(); },
-        theme:    { default: { self: t.dismiss } },
-      }));
+      children.push(
+        new SuiButton({
+          id: `${id}.dismiss`,
+          callback: async () => {
+            await self.close();
+          },
+          theme: { default: { self: t.dismiss } },
+        }),
+      );
     }
 
-    return this.buildContent([new SuiColumn({
-      id:       `${id}.body`,
-      children,
-      theme:    { default: { self: t.body ?? {} } },
-    })]);
+    return this.buildContent([
+      new SuiColumn({
+        id: `${id}.body`,
+        children,
+        theme: { default: { self: t.body ?? {} } },
+      }),
+    ]);
   }
 }

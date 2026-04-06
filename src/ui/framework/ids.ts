@@ -10,8 +10,8 @@ export const EDITABLE_DRAFT_RAW = "kse-editable-draft"; // for storyStorage.get/
 export const EDITABLE_DRAFT_KEY = "kse-editable-draft"; // for multilineTextInput storageKey (add story: at binding site)
 
 // Edit pane draft keys (ContentWithTitle / SimpleContent)
-export const EDIT_PANE_TITLE   = "kse-edit-title";   // storyStorage.get/set + storageKey binding
-export const EDIT_PANE_CONTENT = "kse-edit-content";  // storyStorage.get/set + storageKey binding
+export const EDIT_PANE_TITLE = "kse-edit-title"; // storyStorage.get/set + storageKey binding
+export const EDIT_PANE_CONTENT = "kse-edit-content"; // storyStorage.get/set + storageKey binding
 
 /**
  * Centralized storage key registry.
@@ -143,12 +143,12 @@ export const IDS = {
     }),
   },
   EDIT_PANE: {
-    ROOT:          "se-edit-pane",
-    BACK_BTN:      "se-edit-back",
-    LABEL:         "se-edit-label",
-    TITLE_INPUT:   "se-edit-title",
+    ROOT: "se-edit-pane",
+    BACK_BTN: "se-edit-back",
+    LABEL: "se-edit-label",
+    TITLE_INPUT: "se-edit-title",
     CONTENT_INPUT: "se-edit-content",
-    SAVE_BTN:      "se-edit-save",
+    SAVE_BTN: "se-edit-save",
   },
   LOREBOOK: {
     PANEL: "kse-lorebook-panel",

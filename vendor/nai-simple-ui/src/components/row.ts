@@ -16,7 +16,12 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type AnySuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type AnySuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/row.ts";
 import { type SuiRowStateTheme, type SuiRowTheme } from "./theme/row.ts";
 
@@ -30,8 +35,12 @@ export type SuiRowOptions = {
  * Layout (spacing, alignment, wrap) and style are resolved from theme via resolveTheme() on each compose() call.
  * children is passed directly from options as AnySuiComponent[]; compose() is called internally.
  */
-export class SuiRow extends SuiComponent<SuiRowTheme, Record<string, unknown>, SuiRowOptions, UIPartRow> {
-
+export class SuiRow extends SuiComponent<
+  SuiRowTheme,
+  Record<string, unknown>,
+  SuiRowOptions,
+  UIPartRow
+> {
   constructor(options: SuiRowOptions) {
     super(options, Theme.row);
   }
@@ -49,13 +58,16 @@ export class SuiRow extends SuiComponent<SuiRowTheme, Record<string, unknown>, S
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:      "row",
-      id:        this.id,
-      content:   await this.buildContent(this.options.children, SuiBase.listChildrenStyle(t.self)),
-      style:     this._composedStyle,
-      spacing:   t.self.spacing,
+      type: "row",
+      id: this.id,
+      content: await this.buildContent(
+        this.options.children,
+        SuiBase.listChildrenStyle(t.self),
+      ),
+      style: this._composedStyle,
+      spacing: t.self.spacing,
       alignment: t.self.alignment,
-      wrap:      t.self.wrap,
+      wrap: t.self.wrap,
     };
   }
 }

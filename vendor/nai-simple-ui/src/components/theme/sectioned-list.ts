@@ -7,9 +7,9 @@ import { type SuiTextPartTheme } from "./text.ts";
 
 /** Resolved part map for a single SuiSectionedList state. */
 export type SuiSectionedListStateTheme = {
-  self:     SuiChildrenPartTheme;
-  section:  SuiChildrenPartTheme;
-  header:   SuiTextPartTheme;
+  self: SuiChildrenPartTheme;
+  section: SuiChildrenPartTheme;
+  header: SuiTextPartTheme;
   children: SuiChildrenPartTheme;
 };
 
@@ -21,16 +21,16 @@ export type SuiSectionedListTheme = {
 /** Default SuiSectionedList theme — uppercase small-caps section headers, no background on sections. Override via options.theme. */
 export const sectionedList = {
   default: {
-    self:     {},
-    section:  {},
+    self: {},
+    section: {},
     header: {
       style: {
-        fontSize:      "0.72em",
-        fontWeight:    "bold",
+        fontSize: "0.72em",
+        fontWeight: "bold",
         letterSpacing: "0.06em",
-        opacity:       "0.65",
-        padding:       "12px 6px 0",
-        margin:        "0",
+        opacity: "0.65",
+        padding: "12px 6px 0",
+        margin: "0",
         textTransform: "uppercase",
       },
     },

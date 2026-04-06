@@ -1,5 +1,12 @@
 import { GenerationStrategy, ShapeData } from "../../types";
-import { shapeUpdated, intentUpdated, worldStateUpdated, tensionEdited, attgUpdated, styleUpdated } from "../../index";
+import {
+  shapeUpdated,
+  intentUpdated,
+  worldStateUpdated,
+  tensionEdited,
+  attgUpdated,
+  styleUpdated,
+} from "../../index";
 import {
   GenerationHandlers,
   StreamingContext,
@@ -17,10 +24,10 @@ type FoundationTarget = Extract<
 
 /** Shape streaming updates the description text below the card. */
 const VIEW_IDS = {
-  shape:      "se-fn-shape-card-desc",
-  intent:     "se-fn-intent-card-desc",
-  attg:       "se-fn-attg-card-desc",
-  style:      "se-fn-style-card-desc",
+  shape: "se-fn-shape-card-desc",
+  intent: "se-fn-intent-card-desc",
+  attg: "se-fn-attg-card-desc",
+  style: "se-fn-style-card-desc",
   worldState: `${IDS.FOUNDATION.WORLD_STATE_TEXT}-view`,
 } as const;
 
@@ -47,9 +54,13 @@ function parseShape(text: string): ShapeData {
   const lines = text.split("\n");
   const name = lines[0].trim();
   const blankIdx = lines.findIndex((l, i) => i > 0 && l.trim() === "");
-  const description = blankIdx > 0
-    ? lines.slice(blankIdx + 1).join("\n").trim()
-    : lines.slice(1).join("\n").trim();
+  const description =
+    blankIdx > 0
+      ? lines
+          .slice(blankIdx + 1)
+          .join("\n")
+          .trim()
+      : lines.slice(1).join("\n").trim();
 
   return { name, description: description || text.trim() };
 }
@@ -59,19 +70,28 @@ type TensionTarget = Extract<GenerationStrategy["target"], { type: "tension" }>;
 export const tensionHandler: GenerationHandlers<TensionTarget> = {
   streaming(ctx: StreamingContext<TensionTarget>, _newText: string): void {
     const viewId = `${IDS.FOUNDATION.tension(ctx.target.tensionId).TEXT}-view`;
-    api.v1.ui.updateParts([{ id: viewId, text: escapeForMarkdown(ctx.accumulatedText) }]);
+    api.v1.ui.updateParts([
+      { id: viewId, text: escapeForMarkdown(ctx.accumulatedText) },
+    ]);
   },
 
   async completion(ctx: CompletionContext<TensionTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
-    ctx.dispatch(tensionEdited({ tensionId: ctx.target.tensionId, text: ctx.accumulatedText.trim() }));
+    ctx.dispatch(
+      tensionEdited({
+        tensionId: ctx.target.tensionId,
+        text: ctx.accumulatedText.trim(),
+      }),
+    );
   },
 };
 
 export const foundationHandler: GenerationHandlers<FoundationTarget> = {
   streaming(ctx: StreamingContext<FoundationTarget>, _newText: string): void {
     const viewId = VIEW_IDS[ctx.target.field];
-    api.v1.ui.updateParts([{ id: viewId, text: escapeForMarkdown(ctx.accumulatedText) }]);
+    api.v1.ui.updateParts([
+      { id: viewId, text: escapeForMarkdown(ctx.accumulatedText) },
+    ]);
   },
 
   async completion(ctx: CompletionContext<FoundationTarget>): Promise<void> {
@@ -95,7 +115,9 @@ export const foundationHandler: GenerationHandlers<FoundationTarget> = {
       }
       case "attg": {
         ctx.dispatch(attgUpdated({ attg: text }));
-        const attgSync = (await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_ATTG_MEMORY)) as { on?: boolean } | null;
+        const attgSync = (await api.v1.storyStorage.get(
+          STORAGE_KEYS.SYNC_ATTG_MEMORY,
+        )) as { on?: boolean } | null;
         if (attgSync?.on) {
           await api.v1.memory.set(buildMemoryContent(store.getState));
         }
@@ -103,7 +125,9 @@ export const foundationHandler: GenerationHandlers<FoundationTarget> = {
       }
       case "style": {
         ctx.dispatch(styleUpdated({ style: text }));
-        const styleSync = (await api.v1.storyStorage.get(STORAGE_KEYS.SYNC_STYLE_MEMORY)) as { on?: boolean } | null;
+        const styleSync = (await api.v1.storyStorage.get(
+          STORAGE_KEYS.SYNC_STYLE_MEMORY,
+        )) as { on?: boolean } | null;
         if (styleSync?.on) {
           await api.v1.memory.set(buildMemoryContent(store.getState));
         }

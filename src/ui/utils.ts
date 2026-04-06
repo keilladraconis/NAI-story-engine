@@ -12,7 +12,9 @@ export function escapeForMarkdown(raw: string, fallback = ""): string {
  * Batch-update the display visibility of multiple UI parts.
  * Each entry is [id, visible]: visible=true → display:flex, false → display:none.
  */
-export function updateVisibility(updates: [id: string, visible: boolean][]): void {
+export function updateVisibility(
+  updates: [id: string, visible: boolean][],
+): void {
   api.v1.ui.updateParts(
     updates.map(([id, visible]) => ({
       id,

@@ -17,9 +17,17 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type AnySuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type AnySuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/container.ts";
-import { type SuiContainerStateTheme, type SuiContainerTheme } from "./theme/container.ts";
+import {
+  type SuiContainerStateTheme,
+  type SuiContainerTheme,
+} from "./theme/container.ts";
 
 /** options carries only children — all visual properties live in theme. */
 export type SuiContainerOptions = {
@@ -31,8 +39,12 @@ export type SuiContainerOptions = {
  * style is resolved from theme via resolveTheme() on each compose() call.
  * children is passed directly from options as AnySuiComponent[]; compose() is called internally.
  */
-export class SuiContainer extends SuiComponent<SuiContainerTheme, Record<string, unknown>, SuiContainerOptions, UIPartContainer> {
-
+export class SuiContainer extends SuiComponent<
+  SuiContainerTheme,
+  Record<string, unknown>,
+  SuiContainerOptions,
+  UIPartContainer
+> {
   constructor(options: SuiContainerOptions) {
     super(options, Theme.container);
   }
@@ -50,10 +62,13 @@ export class SuiContainer extends SuiComponent<SuiContainerTheme, Record<string,
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:    "container",
-      id:      this.id,
-      content: await this.buildContent(this.options.children, SuiBase.listChildrenStyle(t.self)),
-      style:   this._composedStyle,
+      type: "container",
+      id: this.id,
+      content: await this.buildContent(
+        this.options.children,
+        SuiBase.listChildrenStyle(t.self),
+      ),
+      style: this._composedStyle,
     };
   }
 }

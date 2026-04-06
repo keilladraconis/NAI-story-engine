@@ -107,7 +107,7 @@ The "Goals" step is redesigned as **Tensions** — structural pressures and irre
 
 #### Lorebook Keys
 
-- **`validateKey` overhaul** — Parses `/pattern/flags` format; supports `i`, `s`, `m`, `u` flags per NAI spec. Rejects malformed regex (no closing `/`). Handles `&` compound keys by splitting on ` & ` and validating each part recursively. Preserves original casing on regex keys.
+- **`validateKey` overhaul** — Parses `/pattern/flags` format; supports `i`, `s`, `m`, `u` flags per NAI spec. Rejects malformed regex (no closing `/`). Handles `&` compound keys by splitting on `&` and validating each part recursively. Preserves original casing on regex keys.
 - **Overbroad check extended** — 3-character test strings added: `"any"`, `"the"`, `"len"`, `"ion"`, `"ing"`, `"ers"`, `"for"`, `"are"`.
 - **Multi-line `KEYS:` format supported** — `parseLorebookKeys` now detects the multi-line format (header line + one key per subsequent bullet line) and collects correctly. Previously returned empty, leaving stub keys and triggering re-queue.
 - **Dash character class widened** — Strip pattern now matches en-dash, em-dash, and bullet characters (`\u2013`, `\u2014`, `\u2022`, `*`) in addition to ASCII hyphen.
@@ -199,7 +199,7 @@ The "Goals" step is redesigned as **Tensions** — structural pressures and irre
 
 #### Crucible — Generative Shape System
 
-Shape is no longer detected from a fixed list of six archetypes. The AI now *invents* a shape that fits your story material — any structural lens, including casual or slice-of-life forms that the old classifier ignored.
+Shape is no longer detected from a fixed list of six archetypes. The AI now _invents_ a shape that fits your story material — any structural lens, including casual or slice-of-life forms that the old classifier ignored.
 
 - **`ShapeSection`** — New collapsible panel section (above Direction) with a name input, an editable instruction textarea, and a GenerationButton. The shape name and instruction together form the structural context injected into Direction and Goal generation. Auto-expands when no shape is set.
 - **Generative shape prompt** (`crucible_shape_prompt`) — New config field. The prompt includes nine example shapes spanning the full tonal range (dramatic: Climactic Choice, Spiral Descent, Hero's Journey; casual: Intimate Moment, Slice of Life; plus more). GLM reads the brainstorm and invents the shape that fits, or names one directly if the brainstorm specifies it. Shape name can be pre-filled to constrain generation to just the instruction.
@@ -218,7 +218,7 @@ Shape is no longer detected from a fixed list of six archetypes. The AI now *inv
 - **Shape badge removed from Goals section** — Shape is now managed in ShapeSection; the purple badge in the Goals header is gone.
 - **Goals no longer clear shape** — `goalsCleared` resets goals only; shape is independent.
 - **Goals generated without placeholder text** — Goals are added to the list before generation completes without the `"_Generating..._"` stub, so the list layout doesn't shift.
-- **Direction prompt expanded** — Now instructs GLM to *extrapolate* when the brainstorm is sparse: invent implied occupations, social worlds, secondary figures, and latent tensions. Removed the "name a story architecture" instruction (that role now belongs to ShapeSection).
+- **Direction prompt expanded** — Now instructs GLM to _extrapolate_ when the brainstorm is sparse: invent implied occupations, social worlds, secondary figures, and latent tensions. Removed the "name a story architecture" instruction (that role now belongs to ShapeSection).
 - **Goals prompt simplified** — Shape context is now provided by ShapeSection; the goals prompt focuses on endpoint quality and format. `crucible_structural_goal_prompt` (the reframe step) removed — goals are shape-native directly.
 - **Prerequisites prompt** — Now explicitly includes social textures, background pressures, and existing relationships alongside structurally necessary elements.
 - **Elements prompt** — Now requests secondary characters, rivals, complicating figures, and background forces, not just direct prerequisite satisfiers.
@@ -327,7 +327,7 @@ The v7 constraint-solving architecture (solver → builder → director, 15+ cal
 
 #### Crucible — Reverse Scene Numbering
 
-- **Timeline-order scene labels** — Scene numbers now reflect story chronology: Scene 1 is the earliest (nearest origin), highest number is nearest the climax. Previously Scene 1 was the first *explored* scene (nearest climax), which was confusing. `sceneNumber(index, maxScenes)` now computes `maxScenes - index`.
+- **Timeline-order scene labels** — Scene numbers now reflect story chronology: Scene 1 is the earliest (nearest origin), highest number is nearest the climax. Previously Scene 1 was the first _explored_ scene (nearest climax), which was confusing. `sceneNumber(index, maxScenes)` now computes `maxScenes - index`.
 - **Scene budget stored on chain** — `CrucibleChain.sceneBudget` tracks the slider value, synced before each generation via new `sceneBudgetUpdated` action. UI components read this for label computation instead of making assumptions.
 - **`EditableText` label targetable** — The label `text()` part now receives an id (`${id}-label`), enabling reactive label updates from parent components (e.g. scene labels updating when budget changes).
 - **Chain prompt updated** — Scene numbering description in `crucible_chain_prompt` corrected to match reverse numbering: "Scene N is the first precursor to the climax, and Scene 1 is furthest back."
@@ -380,6 +380,7 @@ The headline feature of 0.7.0. Crucible turns brainstormed ideas into a populate
 #### New Config Prompts
 
 Five new configurable prompts in `project.yaml`:
+
 - `crucible_intent_prompt` — Direction distillation from brainstorm.
 - `crucible_goals_prompt` — Goal generation with starting constraints.
 - `crucible_chain_prompt` — Scene generation (lean solver) with constraint discipline.

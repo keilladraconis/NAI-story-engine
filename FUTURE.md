@@ -18,11 +18,11 @@ Three specific problems:
 
 ### Three Layers, One Engine
 
-| Layer | Purpose | Current home | v11 |
-|-------|---------|-------------|-----|
-| **Forge** | Creative generation — inventing entities, relationships, structural reasoning | Crucible | Always available |
-| **Realize** | Lorebook population, key generation | SEGA | Runs on Cast |
-| **Curate** | Context management during story writing | Doesn't exist | New |
+| Layer       | Purpose                                                                       | Current home  | v11              |
+| ----------- | ----------------------------------------------------------------------------- | ------------- | ---------------- |
+| **Forge**   | Creative generation — inventing entities, relationships, structural reasoning | Crucible      | Always available |
+| **Realize** | Lorebook population, key generation                                           | SEGA          | Runs on Cast     |
+| **Curate**  | Context management during story writing                                       | Doesn't exist | New              |
 
 Crucible isn't a separate product — it's the forge layer. SEGA isn't Story Engine's core — it's the realization layer. They unify into a single system.
 
@@ -43,6 +43,7 @@ Forge ──→ Draft ──→ Cast ──→ Live
 **Live:** Entities are in the lorebook with active keys, affecting story generation.
 
 **Reforge:** Pull Live entities back into the Forge for reshaping. Works at two levels:
+
 - **Batch-level:** The whole batch lifts into the Forge. User adds new intent, forge expands with awareness of existing members. On Cast, existing entities keep their lorebook bindings; new entities get SEGA realization.
 - **Entity-level** (via Lorebook Extension): A single entity lifts for revision. Returns to its original batch on Cast.
 
@@ -171,6 +172,7 @@ Forge (drafts) lives above World (committed). Draft entities are visible as the 
 **3. Batch naming controls organization.**
 
 The Forge has a `textInput` for the batch name (auto-generated, user-renamable). On Cast:
+
 - Name matches an existing batch → entities merge into that batch
 - New name → creates a new batch
 
@@ -189,13 +191,14 @@ Entity rows are one line by default: name + short summary (engine-derived, read-
 
 One tap to expand, one tap to act, collapses when another row is tapped. No navigation to the lorebook required for lifecycle actions — critical for mobile where the Lorebook Extension is many taps away.
 
-The Lorebook Extension remains the surface for *deeper* per-entry work (relationships, refinement instructions, content preview, Bind/Unbind). But quick actions (Reforge, Regen, Move, Delete) are accessible directly in the Story Engine panel.
+The Lorebook Extension remains the surface for _deeper_ per-entry work (relationships, refinement instructions, content preview, Bind/Unbind). But quick actions (Reforge, Regen, Move, Delete) are accessible directly in the Story Engine panel.
 
 **Move** opens a modal to reassign the entity to a different batch directly — cleaner than the Reforge+rename+Cast flow for simple reorganization. Both paths work: Move for quick reassignment, Reforge when you want to regenerate in the context of a different batch.
 
 **5. Forge is intent-driven, not category-driven.**
 
 One Forge section with a text input for what the user needs. The forge generates a coherent cluster across whatever categories are needed. Three entry points:
+
 - **Forge intent input** — type what you want, hit generate
 - **Forge from Brainstorm** — uses recent chat context as the intent
 - **Forge Around** (future) — expand the world around a specific entity
@@ -203,6 +206,7 @@ One Forge section with a text input for what the user needs. The forge generates
 **6. Narrative Foundation contains all meta-level context.**
 
 Everything that shapes generation but isn't a world entity:
+
 - **Shape** — dramatic structure (TRAGEDY, MYSTERY, etc.)
 - **Intent** — where the story is going (Direction successor)
 - **World State** — where the story is now (Canon successor)
@@ -214,19 +218,22 @@ One collapsible section. These inform the forge, context builder, and every gene
 **7. Tensions are meta-context with a simple lifecycle.**
 
 Two states: **active** and **resolved**. Three actions:
+
 - **Edit** `[✎]` — rewrite to reflect what's happened. That's escalation — no special mechanic.
 - **Resolve** `[✓]` — mark as addressed. Fades below a divider. No longer feeds context builder as active pressure. Informs the forge ("this was addressed, don't recreate it").
 - **Add** `[⚡]` — new tension, manually or AI-generated.
 
-This is retrospective, not predictive. The user tells the engine what's true *now*, not what should happen later.
+This is retrospective, not predictive. The user tells the engine what's true _now_, not what should happen later.
 
 **8. Relationships are on-demand, not persistent in the panel.**
 
 Surfaced in two places:
+
 - **Lorebook Extension** — per-entity editing (add, remove, modify)
 - **Relationships modal** — whole-web overview via `[Relationships]` button
 
 Relationships come from two sources:
+
 - **The forge** — BUILD/LINK commands produce relationships as part of holistic generation. They persist through Cast as structured data.
 - **The user** — manual add/edit via Lorebook Extension. Only source for bound (imported) entries.
 
@@ -273,6 +280,7 @@ No `onLorebookEntryChanged` hook exists. Story Engine reconciles lazily:
 ```
 
 **Category auto-detection:** Pattern-match the `Type:` line common in NovelAI lorebook entries:
+
 - `character`, `person`, `npc` → Characters
 - `location`, `place`, `city`, `region` → Locations
 - `faction`, `organization`, `group`, `guild` → Factions

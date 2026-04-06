@@ -39,82 +39,81 @@ const clearPrefillCache = (entryId: string): void => {
 };
 
 export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
-{
-  streaming(
-    ctx: StreamingContext<LorebookContentTarget>,
-    _newText: string,
-  ): void {
-    const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
-    if (ctx.target.entryId !== currentSelected) return;
+  {
+    streaming(
+      ctx: StreamingContext<LorebookContentTarget>,
+      _newText: string,
+    ): void {
+      const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
+      if (ctx.target.entryId !== currentSelected) return;
 
-    // Ensure prefill is being cached (fire-and-forget on first call)
-    ensurePrefillCached(ctx.target.entryId);
+      // Ensure prefill is being cached (fire-and-forget on first call)
+      ensurePrefillCached(ctx.target.entryId);
 
-    // Get cached prefill if available, prepend to streaming content
-    const prefill = getCachedPrefill(ctx.target.entryId) || "";
-    const displayContent = prefill + ctx.accumulatedText;
+      // Get cached prefill if available, prepend to streaming content
+      const prefill = getCachedPrefill(ctx.target.entryId) || "";
+      const displayContent = prefill + ctx.accumulatedText;
 
-    api.v1.storyStorage.set(IDS.LOREBOOK.CONTENT_DRAFT_RAW, displayContent);
-  },
+      api.v1.storyStorage.set(IDS.LOREBOOK.CONTENT_DRAFT_RAW, displayContent);
+    },
 
-  async completion(
-    ctx: CompletionContext<LorebookContentTarget>,
-  ): Promise<void> {
-    const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
-    const entryId = ctx.target.entryId;
+    async completion(
+      ctx: CompletionContext<LorebookContentTarget>,
+    ): Promise<void> {
+      const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
+      const entryId = ctx.target.entryId;
 
-    if (ctx.generationSucceeded && ctx.accumulatedText) {
-      // Get prefill from cache or rebuild it
-      let prefill = getCachedPrefill(entryId);
-      if (!prefill) {
-        prefill = await buildLorebookPrefill(entryId);
+      if (ctx.generationSucceeded && ctx.accumulatedText) {
+        // Get prefill from cache or rebuild it
+        let prefill = getCachedPrefill(entryId);
+        if (!prefill) {
+          prefill = await buildLorebookPrefill(entryId);
+        }
+
+        // Combine prefill + accumulated text for the full entry
+        const fullContent = prefill + ctx.accumulatedText;
+
+        // Erato compatibility: prepend separator if needed
+        const erato = (await api.v1.config.get("erato_compatibility")) || false;
+        const finalContent =
+          erato && !fullContent.startsWith("----\n")
+            ? "----\n" + fullContent
+            : fullContent;
+
+        // Update lorebook entry with generated content
+        await api.v1.lorebook.updateEntry(entryId, {
+          text: finalContent,
+        });
+
+        // Insert a stub key so the entry activates in story text immediately.
+        // displayName.toLowerCase() doubles as an unambiguous sentinel (single key
+        // matching the lorebook title) and as a useful plain-text activation key.
+        // Stage 7 (keys) replaces it with map-informed proper keys.
+        const lorebookEntry = await api.v1.lorebook.entry(entryId);
+        const stubKey = (lorebookEntry?.displayName || "").toLowerCase();
+        await api.v1.lorebook.updateEntry(entryId, { keys: [stubKey] });
+
+        // Update draft with full content if viewing this entry
+        if (entryId === currentSelected) {
+          await api.v1.storyStorage.set(
+            IDS.LOREBOOK.CONTENT_DRAFT_RAW,
+            finalContent,
+          );
+        }
+      } else {
+        // Cancelled or failed: restore draft to original content if viewing this entry
+        if (entryId === currentSelected) {
+          await api.v1.storyStorage.set(
+            IDS.LOREBOOK.CONTENT_DRAFT_RAW,
+            ctx.originalContent || "",
+          );
+        }
       }
 
-      // Combine prefill + accumulated text for the full entry
-      const fullContent = prefill + ctx.accumulatedText;
-
-      // Erato compatibility: prepend separator if needed
-      const erato =
-        (await api.v1.config.get("erato_compatibility")) || false;
-      const finalContent =
-        erato && !fullContent.startsWith("----\n")
-          ? "----\n" + fullContent
-          : fullContent;
-
-      // Update lorebook entry with generated content
-      await api.v1.lorebook.updateEntry(entryId, {
-        text: finalContent,
-      });
-
-      // Insert a stub key so the entry activates in story text immediately.
-      // displayName.toLowerCase() doubles as an unambiguous sentinel (single key
-      // matching the lorebook title) and as a useful plain-text activation key.
-      // Stage 7 (keys) replaces it with map-informed proper keys.
-      const lorebookEntry = await api.v1.lorebook.entry(entryId);
-      const stubKey = (lorebookEntry?.displayName || "").toLowerCase();
-      await api.v1.lorebook.updateEntry(entryId, { keys: [stubKey] });
-
-      // Update draft with full content if viewing this entry
-      if (entryId === currentSelected) {
-        await api.v1.storyStorage.set(
-          IDS.LOREBOOK.CONTENT_DRAFT_RAW,
-          finalContent,
-        );
-      }
-    } else {
-      // Cancelled or failed: restore draft to original content if viewing this entry
-      if (entryId === currentSelected) {
-        await api.v1.storyStorage.set(
-          IDS.LOREBOOK.CONTENT_DRAFT_RAW,
-          ctx.originalContent || "",
-        );
-      }
-    }
-
-    // Clear cache for this entry
-    clearPrefillCache(entryId);
-  },
-};
+      // Clear cache for this entry
+      clearPrefillCache(entryId);
+    },
+  };
 
 /**
  * Validate a single key — plain text passes through, regex keys are checked.
@@ -124,10 +123,13 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
 function validateKey(key: string): string | null {
   // Compound key (e.g. "elara & operating") — validate each part
   if (key.includes(" & ")) {
-    const parts = key.split(" & ").map(p => p.trim()).filter(Boolean);
+    const parts = key
+      .split(" & ")
+      .map((p) => p.trim())
+      .filter(Boolean);
     if (parts.length < 2) return null;
-    const validated = parts.map(p => validateKey(p));
-    if (validated.some(v => v === null)) return null;
+    const validated = parts.map((p) => validateKey(p));
+    if (validated.some((v) => v === null)) return null;
     return validated.join(" & ");
   }
 
@@ -145,10 +147,23 @@ function validateKey(key: string): string | null {
     const re = new RegExp(pattern, flags);
     // Reject overbroad patterns that match very short strings
     const shortStrings = [
-      "ab", "el", "th", "an", "in", "re", "st",
-      "any", "the", "len", "ion", "ing", "ers", "for", "are",
+      "ab",
+      "el",
+      "th",
+      "an",
+      "in",
+      "re",
+      "st",
+      "any",
+      "the",
+      "len",
+      "ion",
+      "ing",
+      "ers",
+      "for",
+      "are",
     ];
-    if (shortStrings.some(s => re.test(s))) {
+    if (shortStrings.some((s) => re.test(s))) {
       api.v1.log(`[lorebook-keys] dropping overbroad regex: ${key}`);
       return null;
     }
@@ -188,7 +203,9 @@ export function parseLorebookKeys(text: string): string[] | null {
       // Wider dash class: hyphen, en-dash, em-dash, bullet, asterisk
       const cleaned = k.trim().replace(/^[\-\u2013\u2014\u2022*]\s*/, "");
       // Don't lowercase regex keys — they control case sensitivity via /i flag
-      const normalized = cleaned.startsWith("/") ? cleaned : cleaned.toLowerCase();
+      const normalized = cleaned.startsWith("/")
+        ? cleaned
+        : cleaned.toLowerCase();
       return validateKey(normalized);
     })
     .filter((k): k is string => k !== null && k.length > 0 && k.length < 50);
@@ -206,7 +223,10 @@ export function keysFromDisplayName(displayName: string): string[] {
 }
 
 export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
-  streaming(_ctx: StreamingContext<LorebookKeysTarget>, _newText: string): void {
+  streaming(
+    _ctx: StreamingContext<LorebookKeysTarget>,
+    _newText: string,
+  ): void {
     // No streaming display for keys — raw LLM output is noisy mid-stream
   },
 
@@ -217,7 +237,9 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
       let keys = parseLorebookKeys(ctx.accumulatedText);
 
       if (!keys) {
-        api.v1.log(`[lorebook-keys] no KEYS: line found for ${ctx.target.entryId.slice(0, 8)} — falling back to display name`);
+        api.v1.log(
+          `[lorebook-keys] no KEYS: line found for ${ctx.target.entryId.slice(0, 8)} — falling back to display name`,
+        );
         const entry = await api.v1.lorebook.entry(ctx.target.entryId);
         keys = entry?.displayName ? keysFromDisplayName(entry.displayName) : [];
       }
@@ -237,7 +259,10 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
       for (const k of [...existing, ...keys]) {
         const lower = k.toLowerCase();
         if (lower === stubKey && keys.length > 0) continue;
-        if (!seen.has(lower)) { seen.add(lower); merged.push(k); }
+        if (!seen.has(lower)) {
+          seen.add(lower);
+          merged.push(k);
+        }
       }
 
       await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys: merged });
@@ -245,7 +270,10 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
       // Update draft with parsed keys if viewing this entry
       // (storageKey binding auto-updates UI)
       if (ctx.target.entryId === currentSelected) {
-        await api.v1.storyStorage.set(IDS.LOREBOOK.KEYS_DRAFT_RAW, keys.join(", "));
+        await api.v1.storyStorage.set(
+          IDS.LOREBOOK.KEYS_DRAFT_RAW,
+          keys.join(", "),
+        );
       }
     } else {
       // Cancelled or failed: restore draft to original keys if viewing this entry
@@ -295,8 +323,7 @@ export const lorebookRefineHandler: GenerationHandlers<LorebookRefineTarget> = {
       const fullContent = prefill + ctx.accumulatedText;
 
       // Erato compatibility: prepend separator if needed
-      const erato =
-        (await api.v1.config.get("erato_compatibility")) || false;
+      const erato = (await api.v1.config.get("erato_compatibility")) || false;
       const finalContent =
         erato && !fullContent.startsWith("----\n")
           ? "----\n" + fullContent

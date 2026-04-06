@@ -5,18 +5,18 @@
 import { type PartialState, type ThemeOverride } from "../../base.ts";
 
 export type SuiSliderInputPartTheme = {
-  min:              number;
-  max:              number;
-  label?:           string;
-  step?:            number;
-  preventDecimal?:  boolean;
-  uncapMin?:        boolean;
-  uncapMax?:        boolean;
-  prefix?:          string;
-  suffix?:          string;
-  changeDelay?:     number;
-  defaultValue?:    number;
-  style?:           object;
+  min: number;
+  max: number;
+  label?: string;
+  step?: number;
+  preventDecimal?: boolean;
+  uncapMin?: boolean;
+  uncapMax?: boolean;
+  prefix?: string;
+  suffix?: string;
+  changeDelay?: number;
+  defaultValue?: number;
+  style?: object;
 };
 
 export type SuiSliderInputStateTheme = {
@@ -24,7 +24,7 @@ export type SuiSliderInputStateTheme = {
 };
 
 export type SuiSliderInputTheme = {
-  default:   SuiSliderInputStateTheme;
+  default: SuiSliderInputStateTheme;
   disabled?: PartialState<SuiSliderInputStateTheme>;
 };
 

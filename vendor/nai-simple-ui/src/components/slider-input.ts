@@ -21,9 +21,16 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/slider-input.ts";
-import { type SuiSliderInputStateTheme, type SuiSliderInputTheme } from "./theme/slider-input.ts";
+import {
+  type SuiSliderInputStateTheme,
+  type SuiSliderInputTheme,
+} from "./theme/slider-input.ts";
 
 /** State shape for SuiSliderInput. disabled drives theme resolution in resolveTheme(). */
 export type SuiSliderInputState = {
@@ -35,7 +42,7 @@ export type SuiSliderInputState = {
  */
 export type SuiSliderInputOptions = {
   initialValue?: number;
-  onChange?:     (value: number) => void;
+  onChange?: (value: number) => void;
 } & SuiComponentOptions<SuiSliderInputTheme, SuiSliderInputState>;
 
 /**
@@ -44,8 +51,12 @@ export type SuiSliderInputOptions = {
  * and style are resolved from theme via resolveTheme() based on this.state.disabled.
  * initialValue and onChange are passed directly from options.
  */
-export class SuiSliderInput extends SuiComponent<SuiSliderInputTheme, SuiSliderInputState, SuiSliderInputOptions, UIPartSliderInput> {
-
+export class SuiSliderInput extends SuiComponent<
+  SuiSliderInputTheme,
+  SuiSliderInputState,
+  SuiSliderInputOptions,
+  UIPartSliderInput
+> {
   constructor(options: SuiSliderInputOptions) {
     super(options, Theme.sliderInput);
   }
@@ -66,23 +77,23 @@ export class SuiSliderInput extends SuiComponent<SuiSliderInputTheme, SuiSliderI
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:           "sliderInput",
-      id:             this.id,
-      initialValue:   this.options.initialValue,
-      onChange:       this.options.onChange,
-      disabled:       this.state.disabled,
-      min:            t.self.min,
-      max:            t.self.max,
-      label:          t.self.label,
-      step:           t.self.step,
+      type: "sliderInput",
+      id: this.id,
+      initialValue: this.options.initialValue,
+      onChange: this.options.onChange,
+      disabled: this.state.disabled,
+      min: t.self.min,
+      max: t.self.max,
+      label: t.self.label,
+      step: t.self.step,
       preventDecimal: t.self.preventDecimal,
-      uncapMin:       t.self.uncapMin,
-      uncapMax:       t.self.uncapMax,
-      prefix:         t.self.prefix,
-      suffix:         t.self.suffix,
-      changeDelay:    t.self.changeDelay,
-      defaultValue:   t.self.defaultValue,
-      style:          this._composedStyle,
+      uncapMin: t.self.uncapMin,
+      uncapMax: t.self.uncapMax,
+      prefix: t.self.prefix,
+      suffix: t.self.suffix,
+      changeDelay: t.self.changeDelay,
+      defaultValue: t.self.defaultValue,
+      style: this._composedStyle,
     };
   }
 }

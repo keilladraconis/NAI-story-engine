@@ -24,14 +24,31 @@ export type SeMessageOptions = {
 } & SuiComponentOptions<SeMessageTheme, SeMessageState>;
 
 const BUBBLE_STYLES = {
-  rootUser:      { width: "100%", "justify-content": "flex-end" },
+  rootUser: { width: "100%", "justify-content": "flex-end" },
   rootAssistant: { width: "100%", "justify-content": "flex-start" },
-  bubbleUser:    { padding: "10px", width: "85%", border: "none", "background-color": "rgba(64,156,255,0.2)",   "border-radius": "12px 12px 0 12px" },
-  bubbleAsst:    { padding: "10px", width: "85%", border: "none", "background-color": "rgba(255,255,255,0.05)", "border-radius": "12px 12px 12px 0" },
-  btn:           { padding: "4px" },
+  bubbleUser: {
+    padding: "10px",
+    width: "85%",
+    border: "none",
+    "background-color": "rgba(64,156,255,0.2)",
+    "border-radius": "12px 12px 0 12px",
+  },
+  bubbleAsst: {
+    padding: "10px",
+    width: "85%",
+    border: "none",
+    "background-color": "rgba(255,255,255,0.05)",
+    "border-radius": "12px 12px 12px 0",
+  },
+  btn: { padding: "4px" },
 } as const;
 
-export class SeMessage extends SuiComponent<SeMessageTheme, SeMessageState, SeMessageOptions, UIPartRow> {
+export class SeMessage extends SuiComponent<
+  SeMessageTheme,
+  SeMessageState,
+  SeMessageOptions,
+  UIPartRow
+> {
   /** Expose SeEditableText so BrainstormPane can call build() cleanly. */
   private readonly _editable: SeEditableText;
 
@@ -44,16 +61,35 @@ export class SeMessage extends SuiComponent<SeMessageTheme, SeMessageState, SeMe
     const isUser = message.role === "user";
 
     this._editable = new SeEditableText({
-      id:             `${options.id ?? `se-bs-msg-${message.id}`}-text`,
-      label:          isUser ? "You" : "Brainstorm",
-      placeholder:    "Edit message...",
-      getContent:     () => currentMessages(store.getState().brainstorm).find(m => m.id === message.id)?.content ?? message.content,
+      id: `${options.id ?? `se-bs-msg-${message.id}`}-text`,
+      label: isUser ? "You" : "Brainstorm",
+      placeholder: "Edit message...",
+      getContent: () =>
+        currentMessages(store.getState().brainstorm).find(
+          (m) => m.id === message.id,
+        )?.content ?? message.content,
       initialDisplay: message.content || undefined,
-      liveSelector:   (s) => currentMessages(s.brainstorm).find(m => m.id === message.id)?.content ?? message.content,
-      onSave:         (content) => store.dispatch(messageUpdated({ id: message.id, content })),
-      extraControls:  [
-        api.v1.ui.part.button({ id: `se-bs-msg-${message.id}-retry`,  iconId: "rotate-cw" as IconId, style: BUBBLE_STYLES.btn, callback: () => store.dispatch(uiBrainstormRetryGeneration({ messageId: message.id })) }),
-        api.v1.ui.part.button({ id: `se-bs-msg-${message.id}-delete`, iconId: "trash"     as IconId, style: BUBBLE_STYLES.btn, callback: () => store.dispatch(messageRemoved(message.id)) }),
+      liveSelector: (s) =>
+        currentMessages(s.brainstorm).find((m) => m.id === message.id)
+          ?.content ?? message.content,
+      onSave: (content) =>
+        store.dispatch(messageUpdated({ id: message.id, content })),
+      extraControls: [
+        api.v1.ui.part.button({
+          id: `se-bs-msg-${message.id}-retry`,
+          iconId: "rotate-cw" as IconId,
+          style: BUBBLE_STYLES.btn,
+          callback: () =>
+            store.dispatch(
+              uiBrainstormRetryGeneration({ messageId: message.id }),
+            ),
+        }),
+        api.v1.ui.part.button({
+          id: `se-bs-msg-${message.id}-delete`,
+          iconId: "trash" as IconId,
+          style: BUBBLE_STYLES.btn,
+          callback: () => store.dispatch(messageRemoved(message.id)),
+        }),
       ],
     });
   }
@@ -66,11 +102,11 @@ export class SeMessage extends SuiComponent<SeMessageTheme, SeMessageState, SeMe
     const editablePart = await this._editable.build();
 
     return row({
-      id:    this.id,
+      id: this.id,
       style: isUser ? BUBBLE_STYLES.rootUser : BUBBLE_STYLES.rootAssistant,
       content: [
         column({
-          style:   isUser ? BUBBLE_STYLES.bubbleUser : BUBBLE_STYLES.bubbleAsst,
+          style: isUser ? BUBBLE_STYLES.bubbleUser : BUBBLE_STYLES.bubbleAsst,
           content: [editablePart],
         }),
       ],

@@ -44,7 +44,9 @@ import { getModel } from "../../utils/config";
  * Find the next live entity that needs lorebook content generation.
  * Only considers entities with a lorebookEntryId and no entry text.
  */
-async function findEntityNeedingContent(state: RootState): Promise<WorldEntity | null> {
+async function findEntityNeedingContent(
+  state: RootState,
+): Promise<WorldEntity | null> {
   const liveEntities = state.world.entities.filter(
     (e) => e.lifecycle === "live" && e.lorebookEntryId,
   );
@@ -77,7 +79,9 @@ async function findEntityNeedingContent(state: RootState): Promise<WorldEntity |
  * Includes entities with no keys AND entities with only the stub key
  * (displayName.toLowerCase()) inserted by the content handler.
  */
-async function findEntityNeedingKeys(state: RootState): Promise<WorldEntity | null> {
+async function findEntityNeedingKeys(
+  state: RootState,
+): Promise<WorldEntity | null> {
   const liveEntities = state.world.entities.filter(
     (e) => e.lifecycle === "live" && e.lorebookEntryId,
   );
@@ -148,7 +152,11 @@ async function queueSegaLorebookKeys(
   dispatch(segaStatusUpdated({ statusText: `Keys: ${entity.name}` }));
   dispatch(segaRequestTracked({ requestId: keysRequestId }));
 
-  const keysPayload = await buildLorebookKeysPayload(getState, entryId, keysRequestId);
+  const keysPayload = await buildLorebookKeysPayload(
+    getState,
+    entryId,
+    keysRequestId,
+  );
   dispatch(generationSubmitted(keysPayload));
 }
 
@@ -202,7 +210,8 @@ async function scheduleNextSegaTask(
     return;
   }
 
-  const skipKeys = (await api.v1.config.get("sega_skip_lorebook_keys")) || false;
+  const skipKeys =
+    (await api.v1.config.get("sega_skip_lorebook_keys")) || false;
 
   // Stage 2: Keys
   if (!skipKeys) {
@@ -251,7 +260,9 @@ export function registerSegaEffects(
   subscribeEffect(matchesAction(forgeCastCompleted), async (_action) => {
     const state = getState();
     if (state.runtime.segaRunning) {
-      api.v1.log("[sega] forgeCastCompleted while SEGA running — scheduling next task");
+      api.v1.log(
+        "[sega] forgeCastCompleted while SEGA running — scheduling next task",
+      );
       await scheduleNextSegaTask(dispatch, getState);
       return;
     }
@@ -259,7 +270,9 @@ export function registerSegaEffects(
     // Auto-start SEGA if there are entities needing realization
     const needsContent = await findEntityNeedingContent(getState());
     if (needsContent) {
-      api.v1.log("[sega] forgeCastCompleted — auto-starting SEGA for new entities");
+      api.v1.log(
+        "[sega] forgeCastCompleted — auto-starting SEGA for new entities",
+      );
       dispatch(segaReset());
       dispatch(segaToggled()); // This sets segaRunning = true; the segaToggled effect above handles scheduling
     }
@@ -279,7 +292,9 @@ export function registerSegaEffects(
     const updated = getState();
     const remaining = updated.runtime.sega.activeRequestIds;
     if (remaining.length > 0) {
-      api.v1.log(`[sega] ${requestId} done, waiting for ${remaining.length} paired: ${remaining.join(", ")}`);
+      api.v1.log(
+        `[sega] ${requestId} done, waiting for ${remaining.length} paired: ${remaining.join(", ")}`,
+      );
       return;
     }
 
@@ -307,12 +322,16 @@ export function registerSegaEffects(
     const updated = getState();
     const remaining = updated.runtime.sega.activeRequestIds;
     if (remaining.length > 0) {
-      api.v1.log(`[sega] waiting for ${remaining.length} paired: ${remaining.join(", ")}`);
+      api.v1.log(
+        `[sega] waiting for ${remaining.length} paired: ${remaining.join(", ")}`,
+      );
       return;
     }
 
     if (updated.runtime.segaRunning) {
-      api.v1.log(`[sega] all paired complete after cancellation — scheduling next`);
+      api.v1.log(
+        `[sega] all paired complete after cancellation — scheduling next`,
+      );
       await api.v1.timers.sleep(100);
       await scheduleNextSegaTask(dispatch, getState);
     }

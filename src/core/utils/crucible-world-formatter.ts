@@ -3,8 +3,17 @@
  * and UI display during the build loop.
  */
 
-import { RootState, CrucibleState, CrucibleWorldElement, WORLD_ENTRY_CATEGORIES } from "../store/types";
-import { DulfsFieldID, FieldID, FIELD_CONFIGS } from "../../config/field-definitions";
+import {
+  RootState,
+  CrucibleState,
+  CrucibleWorldElement,
+  WORLD_ENTRY_CATEGORIES,
+} from "../store/types";
+import {
+  DulfsFieldID,
+  FieldID,
+  FIELD_CONFIGS,
+} from "../../config/field-definitions";
 
 /** Map World Entry field IDs to display labels (singular). */
 const FIELD_LABEL: Record<DulfsFieldID, string> = {
@@ -57,7 +66,9 @@ export function formatWorldState(state: CrucibleState): string {
       const label = FIELD_LABEL_PLURAL[fieldId] || fieldId;
       elementLines.push(`${label}:`);
       for (const el of fieldElements) {
-        const desc = el.content ? `: ${truncate(el.content, MAX_DESC_LENGTH)}` : " [unfilled]";
+        const desc = el.content
+          ? `: ${truncate(el.content, MAX_DESC_LENGTH)}`
+          : " [unfilled]";
         elementLines.push(`- ${el.name}${desc}`);
       }
     }
@@ -76,11 +87,15 @@ export function formatWorldState(state: CrucibleState): string {
 
   // Names referenced in links but lacking a world element — GLM must CREATE them
   if (state.links.length > 0) {
-    const elementNames = new Set(state.elements.map((e) => e.name.toLowerCase()));
+    const elementNames = new Set(
+      state.elements.map((e) => e.name.toLowerCase()),
+    );
     const missing = new Set<string>();
     for (const link of state.links) {
-      if (!elementNames.has(link.fromName.toLowerCase())) missing.add(link.fromName);
-      if (!elementNames.has(link.toName.toLowerCase())) missing.add(link.toName);
+      if (!elementNames.has(link.fromName.toLowerCase()))
+        missing.add(link.fromName);
+      if (!elementNames.has(link.toName.toLowerCase()))
+        missing.add(link.toName);
     }
     if (missing.size > 0) {
       const missingLines = ["[MISSING ELEMENTS]"];
@@ -111,13 +126,16 @@ export function formatWorldSummary(state: CrucibleState): string {
   for (const fieldId of WORLD_ENTRY_CATEGORIES) {
     const count = counts.get(fieldId);
     if (count) {
-      const label = count === 1 ? FIELD_LABEL[fieldId] : FIELD_LABEL_PLURAL[fieldId];
+      const label =
+        count === 1 ? FIELD_LABEL[fieldId] : FIELD_LABEL_PLURAL[fieldId];
       parts.push(`${count} ${label}`);
     }
   }
 
   if (state.links.length > 0) {
-    parts.push(`${state.links.length} ${state.links.length === 1 ? "Link" : "Links"}`);
+    parts.push(
+      `${state.links.length} ${state.links.length === 1 ? "Link" : "Links"}`,
+    );
   }
 
   return parts.join(", ") || "Empty world";

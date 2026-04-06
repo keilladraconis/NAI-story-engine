@@ -66,7 +66,7 @@ npm run test       # vitest run
 - No singletons/globals — prefer dependency injection wired in `src/index.ts`.
 - Be bold, don't worry about data migration or supporting legacy patterns as we iterate.
 - Adhere to the KISS Principle.
-- Follow the Boyscout Rule. 
+- Follow the Boyscout Rule.
 
 **UI Input Patterns:**
 

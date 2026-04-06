@@ -29,8 +29,8 @@ export type SeGenButtonVariant = "button" | "icon";
 type Mode = "gen" | "queue" | "cancel" | "continue" | "wait" | "disabled";
 
 type SeGenButtonState = {
-  mode:       Mode;
-  timerEnd:   number;   // epoch ms — 0 when not in wait mode
+  mode: Mode;
+  timerEnd: number; // epoch ms — 0 when not in wait mode
   hasContent: boolean;
 };
 
@@ -40,30 +40,30 @@ type SeGenButtonTheme = {
 
 export type SeGenerationButtonOptions = {
   /** Static request ID — tracks one queued/active request. */
-  requestId?:               string;
+  requestId?: string;
   /** Multiple IDs to track (ANY active = cancel mode). */
-  requestIds?:              string[];
+  requestIds?: string[];
   /** Selector for dynamic requestId resolution / disabled state. */
-  stateProjection?:         (s: RootState) => unknown;
+  stateProjection?: (s: RootState) => unknown;
   requestIdFromProjection?: (p: unknown) => string | undefined;
-  isDisabledFromProjection?:(p: unknown) => boolean;
+  isDisabledFromProjection?: (p: unknown) => boolean;
   /** Action dispatched on generate (for field/foundation buttons). */
-  generateAction?:          { type: string; payload?: unknown };
+  generateAction?: { type: string; payload?: unknown };
   /** Callback alternative to generateAction. */
-  onGenerate?:              () => void;
-  label?:                   string;
-  variant?:                 SeGenButtonVariant;
-  iconId?:                  IconId;
+  onGenerate?: () => void;
+  label?: string;
+  variant?: SeGenButtonVariant;
+  iconId?: IconId;
   /** Custom cancel handler — defaults to uiRequestCancellation(). */
-  onCancel?:                () => void;
+  onCancel?: () => void;
   /** Custom continue handler — defaults to uiUserPresenceConfirmed(). */
-  onContinue?:              () => void;
+  onContinue?: () => void;
   /** Initial hasContent value for icon idle styling. */
-  hasContent?:              boolean;
+  hasContent?: boolean;
   /** Async check called on mount and on each switch to idle (icon variant). */
-  contentChecker?:          () => Promise<boolean>;
+  contentChecker?: () => Promise<boolean>;
   /** Style applied to the button row wrapper (button variant only). */
-  style?:                   object;
+  style?: object;
 } & SuiComponentOptions<SeGenButtonTheme, SeGenButtonState>;
 
 // ── Styles ──────────────────────────────────────────────────────────────────
@@ -71,55 +71,103 @@ export type SeGenerationButtonOptions = {
 const BTN_BASE: object = { width: "100%", "font-weight": "bold" };
 
 const BTN_STYLES = {
-  gen:      BTN_BASE,
+  gen: BTN_BASE,
   disabled: { ...BTN_BASE, opacity: "0.5", cursor: "not-allowed" },
-  queue:    { ...BTN_BASE, "background-color": colors.darkBackground, color: colors.paragraph, cursor: "pointer" },
-  cancel:   { ...BTN_BASE, background: colors.warning, color: colors.darkBackground },
-  continue: { ...BTN_BASE, background: colors.header, color: colors.darkBackground },
-  wait:     { ...BTN_BASE, "background-color": colors.darkBackground, color: colors.paragraph },
+  queue: {
+    ...BTN_BASE,
+    "background-color": colors.darkBackground,
+    color: colors.paragraph,
+    cursor: "pointer",
+  },
+  cancel: {
+    ...BTN_BASE,
+    background: colors.warning,
+    color: colors.darkBackground,
+  },
+  continue: {
+    ...BTN_BASE,
+    background: colors.header,
+    color: colors.darkBackground,
+  },
+  wait: {
+    ...BTN_BASE,
+    "background-color": colors.darkBackground,
+    color: colors.paragraph,
+  },
 } as const;
 
 const ICON_STYLES = {
-  idle:          { width: "24px", padding: "4px", opacity: "0.3", cursor: "pointer" },
-  idleWithContent:{ width: "24px", padding: "4px", opacity: "1", cursor: "pointer", color: "rgb(144,238,144)" },
-  queued:        { width: "24px", padding: "4px", opacity: "1", cursor: "pointer", color: colors.header },
-  cancel:        { width: "24px", padding: "4px", opacity: "1", cursor: "pointer", color: colors.warning },
-  continue:      { width: "24px", padding: "4px", opacity: "1", cursor: "pointer", color: colors.header },
-  wait:          { width: "24px", padding: "4px", opacity: "0.6", cursor: "pointer", color: colors.header },
+  idle: { padding: "4px", opacity: "0.3", cursor: "pointer" },
+  idleWithContent: {
+    padding: "4px",
+    opacity: "1",
+    cursor: "pointer",
+    color: "rgb(144,238,144)",
+  },
+  queued: {
+    padding: "4px",
+    opacity: "1",
+    cursor: "pointer",
+    color: colors.header,
+  },
+  cancel: {
+    padding: "4px",
+    opacity: "1",
+    cursor: "pointer",
+    color: colors.warning,
+  },
+  continue: {
+    padding: "4px",
+    opacity: "1",
+    cursor: "pointer",
+    color: colors.header,
+  },
+  wait: {
+    padding: "4px",
+    opacity: "0.6",
+    cursor: "pointer",
+    color: colors.header,
+  },
 } as const;
 
 // ── Mode computation (pure) ──────────────────────────────────────────────────
 
 type RuntimeSlice = {
-  activeRequestId:   string | undefined;
-  queueIds:          string[];
-  genxStatus:        string;
+  activeRequestId: string | undefined;
+  queueIds: string[];
+  genxStatus: string;
   budgetWaitEndTime: number | undefined;
-  customProjection:  unknown;
+  customProjection: unknown;
 };
 
-function selectSlice(s: RootState, opts: SeGenerationButtonOptions): RuntimeSlice {
+function selectSlice(
+  s: RootState,
+  opts: SeGenerationButtonOptions,
+): RuntimeSlice {
   return {
-    activeRequestId:   s.runtime.activeRequest?.id,
-    queueIds:          s.runtime.queue.map(q => q.id),
-    genxStatus:        s.runtime.genx.status,
+    activeRequestId: s.runtime.activeRequest?.id,
+    queueIds: s.runtime.queue.map((q) => q.id),
+    genxStatus: s.runtime.genx.status,
     budgetWaitEndTime: s.runtime.genx.budgetWaitEndTime,
-    customProjection:  opts.stateProjection?.(s),
+    customProjection: opts.stateProjection?.(s),
   };
 }
 
 function sliceEquals(a: RuntimeSlice, b: RuntimeSlice): boolean {
   return (
-    a.activeRequestId   === b.activeRequestId &&
-    a.genxStatus        === b.genxStatus &&
+    a.activeRequestId === b.activeRequestId &&
+    a.genxStatus === b.genxStatus &&
     a.budgetWaitEndTime === b.budgetWaitEndTime &&
-    a.queueIds.length   === b.queueIds.length &&
+    a.queueIds.length === b.queueIds.length &&
     a.queueIds.every((id, i) => id === b.queueIds[i]) &&
     JSON.stringify(a.customProjection) === JSON.stringify(b.customProjection)
   );
 }
 
-function computeMode(opts: SeGenerationButtonOptions, slice: RuntimeSlice): Mode {
+function computeMode(
+  opts: SeGenerationButtonOptions,
+  slice: RuntimeSlice,
+): Mode {
   const { activeRequestId, queueIds, genxStatus, customProjection } = slice;
   const hasProjection = !!opts.stateProjection;
 
@@ -133,12 +181,12 @@ function computeMode(opts: SeGenerationButtonOptions, slice: RuntimeSlice): Mode
   const allIds: string[] = opts.requestIds ?? (resolvedId ? [resolvedId] : []);
 
   if (allIds.length > 0) {
-    const isProcessing = allIds.some(id => id === activeRequestId);
-    const isQueued     = allIds.some(id => queueIds.includes(id));
+    const isProcessing = allIds.some((id) => id === activeRequestId);
+    const isQueued = allIds.some((id) => queueIds.includes(id));
 
-    if (isQueued)     return "queue";
+    if (isQueued) return "queue";
     if (isProcessing) {
-      if (genxStatus === "waiting_for_user")   return "continue";
+      if (genxStatus === "waiting_for_user") return "continue";
       if (genxStatus === "waiting_for_budget") return "wait";
       return "cancel";
     }
@@ -147,8 +195,8 @@ function computeMode(opts: SeGenerationButtonOptions, slice: RuntimeSlice): Mode
 
   // Global fallback — only for buttons without a custom projection
   if (!hasProjection && genxStatus !== "idle") {
-    if (genxStatus === "queued")             return "queue";
-    if (genxStatus === "waiting_for_user")   return "continue";
+    if (genxStatus === "queued") return "queue";
+    if (genxStatus === "waiting_for_user") return "continue";
     if (genxStatus === "waiting_for_budget") return "wait";
     return "cancel";
   }
@@ -169,12 +217,12 @@ export class SeGenerationButton extends SuiComponent<
 
   constructor(options: SeGenerationButtonOptions) {
     const initSlice = selectSlice(store.getState(), options);
-    const initMode  = computeMode(options, initSlice);
+    const initMode = computeMode(options, initSlice);
     super(
       {
         state: {
-          mode:       initMode,
-          timerEnd:   initSlice.budgetWaitEndTime ?? 0,
+          mode: initMode,
+          timerEnd: initSlice.budgetWaitEndTime ?? 0,
           hasContent: options.hasContent ?? false,
         },
         ...options,
@@ -189,7 +237,7 @@ export class SeGenerationButton extends SuiComponent<
   async compose(): Promise<UIPartButton | UIPartRow> {
     // Content check for icon variant
     if (this.options.variant === "icon" && this.options.contentChecker) {
-      this.options.contentChecker().then(has => {
+      this.options.contentChecker().then((has) => {
         void this.setState({ ...this.state, hasContent: has });
       });
     }
@@ -202,7 +250,7 @@ export class SeGenerationButton extends SuiComponent<
         if (mode === this.state.mode && mode !== "wait") return;
         await this.setState({
           mode,
-          timerEnd:   slice.budgetWaitEndTime ?? (Date.now() + 60000),
+          timerEnd: slice.budgetWaitEndTime ?? Date.now() + 60000,
           hasContent: this.state.hasContent,
         });
       },
@@ -230,8 +278,12 @@ export class SeGenerationButton extends SuiComponent<
     }
 
     // Re-check content when returning to gen (icon variant)
-    if (mode === "gen" && this.options.variant === "icon" && this.options.contentChecker) {
-      this.options.contentChecker().then(has => {
+    if (
+      mode === "gen" &&
+      this.options.variant === "icon" &&
+      this.options.contentChecker
+    ) {
+      this.options.contentChecker().then((has) => {
         if (this.state.mode === "gen") {
           void this.setState({ ...this.state, hasContent: has });
         }
@@ -242,14 +294,17 @@ export class SeGenerationButton extends SuiComponent<
   // ── Actions ───────────────────────────────────────────────
 
   private _generate(): void {
-    if (this.options.generateAction) store.dispatch(this.options.generateAction);
+    if (this.options.generateAction)
+      store.dispatch(this.options.generateAction);
     this.options.onGenerate?.();
   }
 
   private _cancel(): void {
     const { requestIds, requestId, onCancel } = this.options;
     if (requestIds && requestIds.length > 0) {
-      requestIds.forEach(id => store.dispatch(uiCancelRequest({ requestId: id })));
+      requestIds.forEach((id) =>
+        store.dispatch(uiCancelRequest({ requestId: id })),
+      );
     } else if (requestId) {
       store.dispatch(uiCancelRequest({ requestId }));
     } else if (onCancel) {
@@ -265,7 +320,9 @@ export class SeGenerationButton extends SuiComponent<
     }
     const { requestIds } = this.options;
     if (requestIds && requestIds.length > 0) {
-      requestIds.forEach(id => store.dispatch(uiCancelRequest({ requestId: id })));
+      requestIds.forEach((id) =>
+        store.dispatch(uiCancelRequest({ requestId: id })),
+      );
     }
   }
 
@@ -273,13 +330,15 @@ export class SeGenerationButton extends SuiComponent<
     this._stopTimer();
     if (this.options.variant === "icon") {
       const { iconId } = this.options;
-      api.v1.ui.updateParts([{
-        id:       this.id,
-        iconId,
-        text:     undefined,
-        style:    ICON_STYLES.idle,
-        callback: () => this._generate(),
-      }]);
+      api.v1.ui.updateParts([
+        {
+          id: this.id,
+          iconId,
+          text: undefined,
+          style: ICON_STYLES.idle,
+          callback: () => this._generate(),
+        },
+      ]);
     } else {
       this._syncButton("gen");
     }
@@ -297,12 +356,15 @@ export class SeGenerationButton extends SuiComponent<
   // ── Icon variant ──────────────────────────────────────────
 
   private _buildIconPart(): UIPartButton {
-    const { iconId, hasContent } = { ...this.options, hasContent: this.state.hasContent };
+    const { iconId, hasContent } = {
+      ...this.options,
+      hasContent: this.state.hasContent,
+    };
     return {
-      type:     "button",
-      id:       this.id,
+      type: "button",
+      id: this.id,
       iconId,
-      style:    hasContent ? ICON_STYLES.idleWithContent : ICON_STYLES.idle,
+      style: hasContent ? ICON_STYLES.idleWithContent : ICON_STYLES.idle,
       callback: () => this._generate(),
     };
   }
@@ -312,40 +374,48 @@ export class SeGenerationButton extends SuiComponent<
     switch (mode) {
       case "gen":
       case "disabled":
-        api.v1.ui.updateParts([{
-          id:       this.id,
-          iconId,
-          text:     undefined,
-          style:    hasContent ? ICON_STYLES.idleWithContent : ICON_STYLES.idle,
-          callback: mode === "disabled" ? undefined : () => this._generate(),
-        }]);
+        api.v1.ui.updateParts([
+          {
+            id: this.id,
+            iconId,
+            text: undefined,
+            style: hasContent ? ICON_STYLES.idleWithContent : ICON_STYLES.idle,
+            callback: mode === "disabled" ? undefined : () => this._generate(),
+          },
+        ]);
         break;
       case "queue":
-        api.v1.ui.updateParts([{
-          id:       this.id,
-          iconId:   "clock" as IconId,
-          text:     undefined,
-          style:    ICON_STYLES.queued,
-          callback: () => this._cancel(),
-        }]);
+        api.v1.ui.updateParts([
+          {
+            id: this.id,
+            iconId: "clock" as IconId,
+            text: undefined,
+            style: ICON_STYLES.queued,
+            callback: () => this._cancel(),
+          },
+        ]);
         break;
       case "cancel":
-        api.v1.ui.updateParts([{
-          id:       this.id,
-          iconId:   "x" as IconId,
-          text:     undefined,
-          style:    ICON_STYLES.cancel,
-          callback: () => this._cancelActive(),
-        }]);
+        api.v1.ui.updateParts([
+          {
+            id: this.id,
+            iconId: "x" as IconId,
+            text: undefined,
+            style: ICON_STYLES.cancel,
+            callback: () => this._cancelActive(),
+          },
+        ]);
         break;
       case "continue":
-        api.v1.ui.updateParts([{
-          id:       this.id,
-          iconId:   "fast-forward" as IconId,
-          text:     undefined,
-          style:    ICON_STYLES.continue,
-          callback: () => this._continue(),
-        }]);
+        api.v1.ui.updateParts([
+          {
+            id: this.id,
+            iconId: "fast-forward" as IconId,
+            text: undefined,
+            style: ICON_STYLES.continue,
+            callback: () => this._continue(),
+          },
+        ]);
         break;
       case "wait":
         // Timer will drive display updates via _updateTimerDisplay
@@ -360,14 +430,40 @@ export class SeGenerationButton extends SuiComponent<
     const { button, row } = api.v1.ui.part;
 
     return row({
-      id:    this.id,
+      id: this.id,
       style: { gap: "4px", alignItems: "center", ...style },
       content: [
-        button({ id: `${this.id}-gen`,      text: `${iconId ? "" : "⚡"} ${label}`, iconId, style: { ...BTN_STYLES.gen, display: "block" }, callback: () => this._generate() }),
-        button({ id: `${this.id}-queue`,    text: label ? "⏳ Queued"    : "⏳",     style: { ...BTN_STYLES.queue,    display: "none" },  callback: () => this._cancel() }),
-        button({ id: `${this.id}-cancel`,   text: label ? "🚫 Cancel"   : "🚫",     style: { ...BTN_STYLES.cancel,   display: "none" },  callback: () => this._cancelActive() }),
-        button({ id: `${this.id}-continue`, text: label ? "⚠️ Continue" : "⚠️",    style: { ...BTN_STYLES.continue, display: "none" },  callback: () => this._continue() }),
-        button({ id: `${this.id}-wait`,     text: label ? "⏳ Wait"     : "⏳",     style: { ...BTN_STYLES.wait,     display: "none" },  callback: () => this._cancelWait() }),
+        button({
+          id: `${this.id}-gen`,
+          text: `${iconId ? "" : "⚡"} ${label}`,
+          iconId,
+          style: { ...BTN_STYLES.gen, display: "block" },
+          callback: () => this._generate(),
+        }),
+        button({
+          id: `${this.id}-queue`,
+          text: label ? "⏳ Queued" : "⏳",
+          style: { ...BTN_STYLES.queue, display: "none" },
+          callback: () => this._cancel(),
+        }),
+        button({
+          id: `${this.id}-cancel`,
+          text: label ? "🚫 Cancel" : "🚫",
+          style: { ...BTN_STYLES.cancel, display: "none" },
+          callback: () => this._cancelActive(),
+        }),
+        button({
+          id: `${this.id}-continue`,
+          text: label ? "⚠️ Continue" : "⚠️",
+          style: { ...BTN_STYLES.continue, display: "none" },
+          callback: () => this._continue(),
+        }),
+        button({
+          id: `${this.id}-wait`,
+          text: label ? "⏳ Wait" : "⏳",
+          style: { ...BTN_STYLES.wait, display: "none" },
+          callback: () => this._cancelWait(),
+        }),
       ],
     });
   }
@@ -375,11 +471,46 @@ export class SeGenerationButton extends SuiComponent<
   private _syncButton(mode: Mode): void {
     const showGen = mode === "gen" || mode === "disabled";
     api.v1.ui.updateParts([
-      { id: `${this.id}-gen`,      style: { ...BTN_STYLES[showGen ? "gen" : "disabled"], display: showGen ? "block" : "none" },  callback: () => this._generate() },
-      { id: `${this.id}-queue`,    style: { ...BTN_STYLES.queue,    display: mode === "queue"    ? "block" : "none" }, callback: () => this._cancel() },
-      { id: `${this.id}-cancel`,   style: { ...BTN_STYLES.cancel,   display: mode === "cancel"   ? "block" : "none" }, callback: () => this._cancelActive() },
-      { id: `${this.id}-continue`, style: { ...BTN_STYLES.continue, display: mode === "continue" ? "block" : "none" }, callback: () => this._continue() },
-      { id: `${this.id}-wait`,     style: { ...BTN_STYLES.wait,     display: mode === "wait"     ? "block" : "none" }, callback: () => this._cancelWait() },
+      {
+        id: `${this.id}-gen`,
+        style: {
+          ...BTN_STYLES[showGen ? "gen" : "disabled"],
+          display: showGen ? "block" : "none",
+        },
+        callback: () => this._generate(),
+      },
+      {
+        id: `${this.id}-queue`,
+        style: {
+          ...BTN_STYLES.queue,
+          display: mode === "queue" ? "block" : "none",
+        },
+        callback: () => this._cancel(),
+      },
+      {
+        id: `${this.id}-cancel`,
+        style: {
+          ...BTN_STYLES.cancel,
+          display: mode === "cancel" ? "block" : "none",
+        },
+        callback: () => this._cancelActive(),
+      },
+      {
+        id: `${this.id}-continue`,
+        style: {
+          ...BTN_STYLES.continue,
+          display: mode === "continue" ? "block" : "none",
+        },
+        callback: () => this._continue(),
+      },
+      {
+        id: `${this.id}-wait`,
+        style: {
+          ...BTN_STYLES.wait,
+          display: mode === "wait" ? "block" : "none",
+        },
+        callback: () => this._cancelWait(),
+      },
     ]);
   }
 
@@ -391,7 +522,7 @@ export class SeGenerationButton extends SuiComponent<
   }
 
   private _stopTimer(): void {
-    this._timerGen++;  // invalidates all in-flight ticks
+    this._timerGen++; // invalidates all in-flight ticks
   }
 
   private _tickTimer(gen: number, endTime: number): void {
@@ -405,26 +536,33 @@ export class SeGenerationButton extends SuiComponent<
 
   private _updateTimerDisplay(remaining: number): void {
     if (this.options.variant === "icon") {
-      api.v1.ui.updateParts([{
-        id:       this.id,
-        text:     `${remaining}`,
-        iconId:   undefined,
-        style:    ICON_STYLES.wait,
-        callback: () => this._cancelWait(),
-      }]);
+      api.v1.ui.updateParts([
+        {
+          id: this.id,
+          text: `${remaining}`,
+          iconId: undefined,
+          style: ICON_STYLES.wait,
+          callback: () => this._cancelWait(),
+        },
+      ]);
     } else {
       const label = this.options.label ?? "";
-      api.v1.ui.updateParts([{
-        id:   `${this.id}-wait`,
-        text: label ? `⏳ Wait (${remaining}s)` : `⏳ (${remaining}s)`,
-      }]);
+      api.v1.ui.updateParts([
+        {
+          id: `${this.id}-wait`,
+          text: label ? `⏳ Wait (${remaining}s)` : `⏳ (${remaining}s)`,
+        },
+      ]);
     }
   }
 }
 
 // ── Convenience re-export for icon variant ───────────────────────────────────
 
-export type SeGenerationIconButtonOptions = Omit<SeGenerationButtonOptions, "variant" | "label">;
+export type SeGenerationIconButtonOptions = Omit<
+  SeGenerationButtonOptions,
+  "variant" | "label"
+>;
 
 export class SeGenerationIconButton extends SeGenerationButton {
   constructor(options: SeGenerationIconButtonOptions) {

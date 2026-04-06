@@ -39,7 +39,11 @@ export type SeForgeSectionOptions = {
 const FG = IDS.FORGE;
 
 const CAST_DISCARD_ROW_STYLE: object = { gap: "4px", "margin-top": "4px" };
-const CAST_DISCARD_HIDDEN_STYLE: object = { gap: "4px", "margin-top": "4px", display: "none" };
+const CAST_DISCARD_HIDDEN_STYLE: object = {
+  gap: "4px",
+  "margin-top": "4px",
+  display: "none",
+};
 
 export class SeForgeSection extends SuiComponent<
   SeForgeSectionTheme,
@@ -62,16 +66,23 @@ export class SeForgeSection extends SuiComponent<
     this._forgeBtn = new SeGenerationButton({
       id: FG.FORGE_BTN,
       label: "Forge",
-      onGenerate: () => { store.dispatch(forgeRequested()); },
+      onGenerate: () => {
+        store.dispatch(forgeRequested());
+      },
       stateProjection: (s) => ({
         loopActive: s.world.forgeLoopActive,
-        activeForgeId: s.runtime.activeRequest?.type === "forge"
-          ? s.runtime.activeRequest.id
-          : undefined,
+        activeForgeId:
+          s.runtime.activeRequest?.type === "forge"
+            ? s.runtime.activeRequest.id
+            : undefined,
       }),
-      requestIdFromProjection: (p) => (p as { loopActive: boolean; activeForgeId?: string }).activeForgeId,
+      requestIdFromProjection: (p) =>
+        (p as { loopActive: boolean; activeForgeId?: string }).activeForgeId,
       isDisabledFromProjection: (p) => {
-        const { loopActive, activeForgeId } = p as { loopActive: boolean; activeForgeId?: string };
+        const { loopActive, activeForgeId } = p as {
+          loopActive: boolean;
+          activeForgeId?: string;
+        };
         return loopActive && !activeForgeId;
       },
     });
@@ -81,41 +92,70 @@ export class SeForgeSection extends SuiComponent<
       label: "Clear",
       confirmLabel: "Clear forge?",
       style: { "font-size": "0.75em", opacity: "0.5", padding: "2px 8px" },
-      onConfirm: async () => { store.dispatch(forgeClearRequested()); },
+      onConfirm: async () => {
+        store.dispatch(forgeClearRequested());
+      },
     });
   }
 
   private async _rebuildEntityList(): Promise<void> {
     const { editHost } = this.options;
-    const entities = store.getState().world.entities.filter(e => e.lifecycle === "draft");
+    const entities = store
+      .getState()
+      .world.entities.filter((e) => e.lifecycle === "draft");
     const parts = await Promise.all(
-      entities.map(e =>
-        new SeEntityCard({ id: IDS.entity(e.id, "draft").ROOT, entityId: e.id, lifecycle: "draft", editHost }).build(),
+      entities.map((e) =>
+        new SeEntityCard({
+          id: IDS.entity(e.id, "draft").ROOT,
+          entityId: e.id,
+          lifecycle: "draft",
+          editHost,
+        }).build(),
       ),
     );
     api.v1.ui.updateParts([
-      { id: FG.ENTITY_LIST, content: parts } as unknown as Partial<UIPart> & { id: string },
+      { id: FG.ENTITY_LIST, content: parts } as unknown as Partial<UIPart> & {
+        id: string;
+      },
     ]);
   }
 
   async compose(): Promise<UIPartCollapsibleSection> {
-    const { column, row, text, button, collapsibleSection, multilineTextInput, textInput } = api.v1.ui.part;
+    const {
+      column,
+      row,
+      text,
+      button,
+      collapsibleSection,
+      multilineTextInput,
+      textInput,
+    } = api.v1.ui.part;
 
     this._watcher.dispose();
 
     // Rebuild entity list when draft entity IDs change
     this._watcher.watch(
-      (s) => s.world.entities.filter(e => e.lifecycle === "draft").map(e => e.id),
-      () => { void this._rebuildEntityList(); },
+      (s) =>
+        s.world.entities
+          .filter((e) => e.lifecycle === "draft")
+          .map((e) => e.id),
+      () => {
+        void this._rebuildEntityList();
+      },
       (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
     );
 
     // Toggle cast/discard row visibility
     this._watcher.watch(
-      (s) => s.world.entities.some(e => e.lifecycle === "draft"),
+      (s) => s.world.entities.some((e) => e.lifecycle === "draft"),
       (hasDraft) => {
         api.v1.ui.updateParts([
-          { id: FG.CAST_DISCARD_ROW, style: hasDraft ? CAST_DISCARD_ROW_STYLE : CAST_DISCARD_HIDDEN_STYLE } as unknown as Partial<UIPart> & { id: string },
+          {
+            id: FG.CAST_DISCARD_ROW,
+            style: hasDraft
+              ? CAST_DISCARD_ROW_STYLE
+              : CAST_DISCARD_HIDDEN_STYLE,
+          } as unknown as Partial<UIPart> & { id: string },
         ]);
       },
     );
@@ -127,19 +167,27 @@ export class SeForgeSection extends SuiComponent<
 
     // Build initial entity list
     const state = store.getState();
-    const draftEntities = state.world.entities.filter(e => e.lifecycle === "draft");
+    const draftEntities = state.world.entities.filter(
+      (e) => e.lifecycle === "draft",
+    );
     const hasDraftEntities = draftEntities.length > 0;
 
     const { editHost } = this.options;
     const initialEntityParts = await Promise.all(
-      draftEntities.map(e =>
-        new SeEntityCard({ id: IDS.entity(e.id, "draft").ROOT, entityId: e.id, lifecycle: "draft", editHost }).build(),
+      draftEntities.map((e) =>
+        new SeEntityCard({
+          id: IDS.entity(e.id, "draft").ROOT,
+          entityId: e.id,
+          lifecycle: "draft",
+          editHost,
+        }).build(),
       ),
     );
 
     const guidanceInput = multilineTextInput({
       id: FG.GUIDANCE_INPUT,
-      placeholder: "What should the Forge build? Leave blank to draw from your Brainstorm conversation.",
+      placeholder:
+        "What should the Forge build? Leave blank to draw from your Brainstorm conversation.",
       initialValue: "",
       storageKey: `story:${STORAGE_KEYS.FORGE_GUIDANCE_UI}`,
       style: { "min-height": "5em", "font-size": "0.85em" },
@@ -148,7 +196,12 @@ export class SeForgeSection extends SuiComponent<
     const ticker = text({
       id: FG.TICKER,
       text: "",
-      style: { "font-size": "0.75em", opacity: "0.5", "font-style": "italic", "min-height": "1em" },
+      style: {
+        "font-size": "0.75em",
+        opacity: "0.5",
+        "font-style": "italic",
+        "min-height": "1em",
+      },
     });
 
     const batchNameInput = textInput({
@@ -167,19 +220,25 @@ export class SeForgeSection extends SuiComponent<
 
     const castDiscardRow = row({
       id: FG.CAST_DISCARD_ROW,
-      style: hasDraftEntities ? CAST_DISCARD_ROW_STYLE : CAST_DISCARD_HIDDEN_STYLE,
+      style: hasDraftEntities
+        ? CAST_DISCARD_ROW_STYLE
+        : CAST_DISCARD_HIDDEN_STYLE,
       content: [
         button({
           id: FG.CAST_ALL_BTN,
           text: "→ Cast All",
           style: { flex: "1", "font-size": "0.85em" },
-          callback: () => { store.dispatch(castAllRequested()); },
+          callback: () => {
+            store.dispatch(castAllRequested());
+          },
         }),
         button({
           id: FG.DISCARD_ALL_BTN,
           text: "✕ Discard All",
           style: { flex: "1", "font-size": "0.85em" },
-          callback: () => { store.dispatch(discardAllRequested()); },
+          callback: () => {
+            store.dispatch(discardAllRequested());
+          },
         }),
       ],
     });
@@ -192,11 +251,19 @@ export class SeForgeSection extends SuiComponent<
         column({
           style: { gap: "6px" },
           content: [
-            row({ style: { "justify-content": "flex-end" }, content: [clearBtnPart] }),
+            row({
+              style: { "justify-content": "flex-end" },
+              content: [clearBtnPart],
+            }),
             guidanceInput,
             forgeBtnPart,
             ticker,
-            text({ style: { "border-top": "1px solid rgba(128,128,128,0.2)", margin: "6px 0" } }),
+            text({
+              style: {
+                "border-top": "1px solid rgba(128,128,128,0.2)",
+                margin: "6px 0",
+              },
+            }),
             batchNameInput,
             entityList,
             castDiscardRow,

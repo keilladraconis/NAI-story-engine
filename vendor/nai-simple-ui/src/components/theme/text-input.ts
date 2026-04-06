@@ -5,9 +5,9 @@
 import { type PartialState, type ThemeOverride } from "../../base.ts";
 
 export type SuiTextInputPartTheme = {
-  label?:       string;
+  label?: string;
   placeholder?: string;
-  style?:       object;
+  style?: object;
 };
 
 export type SuiTextInputStateTheme = {
@@ -15,7 +15,7 @@ export type SuiTextInputStateTheme = {
 };
 
 export type SuiTextInputTheme = {
-  default:   SuiTextInputStateTheme;
+  default: SuiTextInputStateTheme;
   disabled?: PartialState<SuiTextInputStateTheme>;
 };
 

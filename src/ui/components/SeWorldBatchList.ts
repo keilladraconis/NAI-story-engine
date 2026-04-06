@@ -39,12 +39,19 @@ export class SeWorldBatchList extends SuiComponent<
     const { editHost } = this.options;
     const batches = store.getState().world.batches;
     const parts = await Promise.all(
-      batches.map(b =>
-        new SeBatchSection({ id: IDS.WORLD.batch(b.id).SECTION, batchId: b.id, editHost }).build(),
+      batches.map((b) =>
+        new SeBatchSection({
+          id: IDS.WORLD.batch(b.id).SECTION,
+          batchId: b.id,
+          editHost,
+        }).build(),
       ),
     );
     api.v1.ui.updateParts([
-      { id: IDS.WORLD.BATCH_LIST, content: parts } as unknown as Partial<UIPart> & { id: string },
+      {
+        id: IDS.WORLD.BATCH_LIST,
+        content: parts,
+      } as unknown as Partial<UIPart> & { id: string },
     ]);
   }
 
@@ -52,24 +59,30 @@ export class SeWorldBatchList extends SuiComponent<
     this._watcher.dispose();
 
     this._watcher.watch(
-      (s) => s.world.batches.map(b => b.id),
-      () => { void this._rebuildBatchList(); },
+      (s) => s.world.batches.map((b) => b.id),
+      () => {
+        void this._rebuildBatchList();
+      },
       (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
     );
 
     const { editHost } = this.options;
     const batches = store.getState().world.batches;
     const batchParts = await Promise.all(
-      batches.map(b =>
-        new SeBatchSection({ id: IDS.WORLD.batch(b.id).SECTION, batchId: b.id, editHost }).build(),
+      batches.map((b) =>
+        new SeBatchSection({
+          id: IDS.WORLD.batch(b.id).SECTION,
+          batchId: b.id,
+          editHost,
+        }).build(),
       ),
     );
 
     const { column } = api.v1.ui.part;
 
     return column({
-      id:      IDS.WORLD.BATCH_LIST,
-      style:   { gap: "8px" },
+      id: IDS.WORLD.BATCH_LIST,
+      style: { gap: "8px" },
       content: batchParts,
     });
   }

@@ -34,7 +34,10 @@ import {
   generationSubmitted,
   requestQueued,
 } from "../index";
-import { buildForgeStrategy, FORGE_MAX_STEPS } from "../../utils/forge-strategy";
+import {
+  buildForgeStrategy,
+  FORGE_MAX_STEPS,
+} from "../../utils/forge-strategy";
 import {
   createLorebookContentFactory,
   buildLorebookKeysPayload,
@@ -53,43 +56,74 @@ export function registerForgeEffects(
   // Creates batch, starts the loop at step 1.
 
   subscribeEffect(matchesAction(forgeRequested), async () => {
-    const guidanceRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_GUIDANCE_UI);
+    const guidanceRaw = await api.v1.storyStorage.get(
+      STORAGE_KEYS.FORGE_GUIDANCE_UI,
+    );
     const forgeGuidance = String(guidanceRaw || "").trim();
 
-    const brainstormContext = forgeGuidance ? "" : getConsolidatedBrainstorm(getState());
+    const brainstormContext = forgeGuidance
+      ? ""
+      : getConsolidatedBrainstorm(getState());
     if (!forgeGuidance && !brainstormContext) {
-      api.v1.ui.toast("Add forge guidance or run a brainstorm first", { type: "info" });
+      api.v1.ui.toast("Add forge guidance or run a brainstorm first", {
+        type: "info",
+      });
       return;
     }
 
     // Auto-default: "Main" for the very first forge; first 4 guidance words for subsequent
     const noBatches = getState().world.batches.length === 0;
-    const guidanceWords = forgeGuidance.trim().split(/\s+/).slice(0, 4).join(" ");
-    const defaultName = noBatches ? "Main" : (guidanceWords || "New Batch");
+    const guidanceWords = forgeGuidance
+      .trim()
+      .split(/\s+/)
+      .slice(0, 4)
+      .join(" ");
+    const defaultName = noBatches ? "Main" : guidanceWords || "New Batch";
 
-    const batchNameRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_BATCH_NAME_UI);
+    const batchNameRaw = await api.v1.storyStorage.get(
+      STORAGE_KEYS.FORGE_BATCH_NAME_UI,
+    );
     const batchName = String(batchNameRaw || "").trim() || defaultName;
 
     // If draft entities already exist, append to their batch (user hasn't cast yet).
     // Otherwise merge-on-match against live batches (reforge scenario), or mint a new ID.
     // Batch records for fresh drafts are deferred to Cast time.
-    const existingDraftBatchId = getState().world.entities
-      .find((e) => e.lifecycle === "draft")?.batchId ?? null;
+    const existingDraftBatchId =
+      getState().world.entities.find((e) => e.lifecycle === "draft")?.batchId ??
+      null;
     const existingLiveBatch = !existingDraftBatchId
-      ? getState().world.batches.find((b) => b.name.toLowerCase() === batchName.toLowerCase())
+      ? getState().world.batches.find(
+          (b) => b.name.toLowerCase() === batchName.toLowerCase(),
+        )
       : null;
-    const batchId = existingDraftBatchId ?? existingLiveBatch?.id ?? api.v1.uuid();
+    const batchId =
+      existingDraftBatchId ?? existingLiveBatch?.id ?? api.v1.uuid();
 
     // Pre-populate the batch name input so the user sees the auto-derived name
     if (!String(batchNameRaw || "").trim()) {
-      await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_BATCH_NAME_UI, batchName);
+      await api.v1.storyStorage.set(
+        STORAGE_KEYS.FORGE_BATCH_NAME_UI,
+        batchName,
+      );
       api.v1.ui.updateParts([{ id: IDS.FORGE.BATCH_NAME, value: batchName }]);
     }
 
     dispatch(forgeLoopStarted());
 
-    const strategy = buildForgeStrategy(getState, batchId, 1, forgeGuidance, brainstormContext);
-    dispatch(requestQueued({ id: strategy.requestId, type: "forge", targetId: batchId }));
+    const strategy = buildForgeStrategy(
+      getState,
+      batchId,
+      1,
+      forgeGuidance,
+      brainstormContext,
+    );
+    dispatch(
+      requestQueued({
+        id: strategy.requestId,
+        type: "forge",
+        targetId: batchId,
+      }),
+    );
     dispatch(generationSubmitted(strategy));
   });
 
@@ -120,8 +154,20 @@ export function registerForgeEffects(
       return;
     }
 
-    const strategy = buildForgeStrategy(getState, payload.batchId, nextStep, payload.forgeGuidance, payload.brainstormContext);
-    dispatch(requestQueued({ id: strategy.requestId, type: "forge", targetId: payload.batchId }));
+    const strategy = buildForgeStrategy(
+      getState,
+      payload.batchId,
+      nextStep,
+      payload.forgeGuidance,
+      payload.brainstormContext,
+    );
+    dispatch(
+      requestQueued({
+        id: strategy.requestId,
+        type: "forge",
+        targetId: payload.batchId,
+      }),
+    );
     dispatch(generationSubmitted(strategy));
   });
 
@@ -129,91 +175,119 @@ export function registerForgeEffects(
 
   subscribeEffect(matchesAction(forgeCritiqueReceived), async ({ payload }) => {
     if (payload.critiqueText) {
-      await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_GUIDANCE_UI, payload.critiqueText);
-      api.v1.ui.updateParts([{ id: IDS.FORGE.GUIDANCE_INPUT, value: payload.critiqueText }]);
+      await api.v1.storyStorage.set(
+        STORAGE_KEYS.FORGE_GUIDANCE_UI,
+        payload.critiqueText,
+      );
+      api.v1.ui.updateParts([
+        { id: IDS.FORGE.GUIDANCE_INPUT, value: payload.critiqueText },
+      ]);
     }
     dispatch(forgeLoopEnded());
   });
 
   // ─── Cast All Requested ───────────────────────────────────────────────────
 
-  subscribeEffect(matchesAction(castAllRequested), async (_action, { getState: getLatest }) => {
-    const state = getLatest();
-    const draftEntities = state.world.entities.filter((e) => e.lifecycle === "draft");
-
-    if (draftEntities.length === 0) {
-      api.v1.ui.toast("No draft entities to cast", { type: "info" });
-      return;
-    }
-
-    // Create any batch records that were deferred from forge time
-    const batchNameRaw = await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_BATCH_NAME_UI);
-    const batchName = String(batchNameRaw || "").trim() || "Main";
-    const pendingBatchIds = [...new Set(draftEntities.map((e) => e.batchId))];
-    for (const batchId of pendingBatchIds) {
-      if (!state.world.batches.some((b) => b.id === batchId)) {
-        dispatch(batchCreated({ batch: { id: batchId, name: batchName, entityIds: [] } }));
-      }
-    }
-
-    // Pre-create lorebook categories for all category types needed (avoid per-entity races)
-    const uniqueCategoryIds = [...new Set(draftEntities.map((e) => e.categoryId))];
-    const categoryIdMap = new Map<string, string>();
-    for (const catFieldId of uniqueCategoryIds) {
-      categoryIdMap.set(catFieldId, await ensureCategory(catFieldId));
-    }
-
-    // Fetch all existing lorebook entries once for name-matching
-    const allEntries = await api.v1.lorebook.entries();
-    // IDs of entries already bound to live entities — never re-bind these
-    const managedEntryIds = new Set(
-      state.world.entities
-        .filter((e) => e.lifecycle === "live" && e.lorebookEntryId)
-        .map((e) => e.lorebookEntryId as string),
-    );
-
-    // Cast each entity: bind to existing entry by name, or create new in SE category
-    let count = 0;
-    for (const entity of draftEntities) {
-      const nameLower = entity.name.toLowerCase();
-      const existing = allEntries.find(
-        (e) => !managedEntryIds.has(e.id) && (e.displayName ?? "").toLowerCase() === nameLower,
+  subscribeEffect(
+    matchesAction(castAllRequested),
+    async (_action, { getState: getLatest }) => {
+      const state = getLatest();
+      const draftEntities = state.world.entities.filter(
+        (e) => e.lifecycle === "draft",
       );
 
-      let lorebookEntryId: string;
-      if (existing) {
-        lorebookEntryId = existing.id;
-        managedEntryIds.add(lorebookEntryId); // prevent double-binding within this batch
-        api.v1.log(`[forge] Cast "${entity.name}" → bound to existing entry ${lorebookEntryId}`);
-      } else {
-        const categoryId = categoryIdMap.get(entity.categoryId) ?? await ensureCategory(entity.categoryId);
-        lorebookEntryId = await api.v1.lorebook.createEntry({
-          id: api.v1.uuid(),
-          displayName: entity.name,
-          text: entity.summary ? `${entity.name}: ${entity.summary}` : entity.name,
-          keys: [],
-          enabled: true,
-          category: categoryId,
-        });
-        api.v1.log(`[forge] Cast "${entity.name}" → created new entry ${lorebookEntryId}`);
+      if (draftEntities.length === 0) {
+        api.v1.ui.toast("No draft entities to cast", { type: "info" });
+        return;
       }
 
-      dispatch(entityCast({ entityId: entity.id, lorebookEntryId }));
-      count++;
-    }
+      // Create any batch records that were deferred from forge time
+      const batchNameRaw = await api.v1.storyStorage.get(
+        STORAGE_KEYS.FORGE_BATCH_NAME_UI,
+      );
+      const batchName = String(batchNameRaw || "").trim() || "Main";
+      const pendingBatchIds = [...new Set(draftEntities.map((e) => e.batchId))];
+      for (const batchId of pendingBatchIds) {
+        if (!state.world.batches.some((b) => b.id === batchId)) {
+          dispatch(
+            batchCreated({
+              batch: { id: batchId, name: batchName, entityIds: [] },
+            }),
+          );
+        }
+      }
 
-    dispatch(forgeCastCompleted());
-    api.v1.log(`[forge] Cast ${count} entities to lorebook`);
-    api.v1.ui.toast(`${count} ${count === 1 ? "entity" : "entities"} cast`, { type: "success" });
+      // Pre-create lorebook categories for all category types needed (avoid per-entity races)
+      const uniqueCategoryIds = [
+        ...new Set(draftEntities.map((e) => e.categoryId)),
+      ];
+      const categoryIdMap = new Map<string, string>();
+      for (const catFieldId of uniqueCategoryIds) {
+        categoryIdMap.set(catFieldId, await ensureCategory(catFieldId));
+      }
 
-    // Clear forge intent and batch name inputs
-    await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_GUIDANCE_UI, "");
-    await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_BATCH_NAME_UI, "");
-    api.v1.ui.updateParts([
-      { id: IDS.FORGE.GUIDANCE_INPUT, value: "" },
-      { id: IDS.FORGE.BATCH_NAME, value: "" },
-    ]);
-  });
+      // Fetch all existing lorebook entries once for name-matching
+      const allEntries = await api.v1.lorebook.entries();
+      // IDs of entries already bound to live entities — never re-bind these
+      const managedEntryIds = new Set(
+        state.world.entities
+          .filter((e) => e.lifecycle === "live" && e.lorebookEntryId)
+          .map((e) => e.lorebookEntryId as string),
+      );
+
+      // Cast each entity: bind to existing entry by name, or create new in SE category
+      let count = 0;
+      for (const entity of draftEntities) {
+        const nameLower = entity.name.toLowerCase();
+        const existing = allEntries.find(
+          (e) =>
+            !managedEntryIds.has(e.id) &&
+            (e.displayName ?? "").toLowerCase() === nameLower,
+        );
+
+        let lorebookEntryId: string;
+        if (existing) {
+          lorebookEntryId = existing.id;
+          managedEntryIds.add(lorebookEntryId); // prevent double-binding within this batch
+          api.v1.log(
+            `[forge] Cast "${entity.name}" → bound to existing entry ${lorebookEntryId}`,
+          );
+        } else {
+          const categoryId =
+            categoryIdMap.get(entity.categoryId) ??
+            (await ensureCategory(entity.categoryId));
+          lorebookEntryId = await api.v1.lorebook.createEntry({
+            id: api.v1.uuid(),
+            displayName: entity.name,
+            text: "",
+            keys: [],
+            enabled: true,
+            category: categoryId,
+          });
+          api.v1.log(
+            `[forge] Cast "${entity.name}" → created new entry ${lorebookEntryId}`,
+          );
+        }
+
+        dispatch(entityCast({ entityId: entity.id, lorebookEntryId }));
+        count++;
+      }
+
+      dispatch(forgeCastCompleted());
+      api.v1.log(`[forge] Cast ${count} entities to lorebook`);
+      api.v1.ui.toast(`${count} ${count === 1 ? "entity" : "entities"} cast`, {
+        type: "success",
+      });
+
+      // Clear forge intent and batch name inputs
+      await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_GUIDANCE_UI, "");
+      await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_BATCH_NAME_UI, "");
+      api.v1.ui.updateParts([
+        { id: IDS.FORGE.GUIDANCE_INPUT, value: "" },
+        { id: IDS.FORGE.BATCH_NAME, value: "" },
+      ]);
+    },
+  );
 
   // ─── Batch Reforge Requested → Set entities to draft, pre-fill batch name ─
 
@@ -227,7 +301,10 @@ export function registerForgeEffects(
 
     // UI: pre-fill batch name input
     if (batch) {
-      await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_BATCH_NAME_UI, batch.name);
+      await api.v1.storyStorage.set(
+        STORAGE_KEYS.FORGE_BATCH_NAME_UI,
+        batch.name,
+      );
       api.v1.ui.updateParts([{ id: IDS.FORGE.BATCH_NAME, value: batch.name }]);
     }
   });
@@ -253,24 +330,30 @@ export function registerForgeEffects(
     );
     const nameLower = entity.name.toLowerCase();
     const existing = allEntries.find(
-      (e) => !managedEntryIds.has(e.id) && (e.displayName ?? "").toLowerCase() === nameLower,
+      (e) =>
+        !managedEntryIds.has(e.id) &&
+        (e.displayName ?? "").toLowerCase() === nameLower,
     );
 
     let lorebookEntryId: string;
     if (existing) {
       lorebookEntryId = existing.id;
-      api.v1.log(`[forge] Cast "${entity.name}" → bound to existing entry ${lorebookEntryId}`);
+      api.v1.log(
+        `[forge] Cast "${entity.name}" → bound to existing entry ${lorebookEntryId}`,
+      );
     } else {
       const categoryId = await ensureCategory(entity.categoryId);
       lorebookEntryId = await api.v1.lorebook.createEntry({
         id: api.v1.uuid(),
         displayName: entity.name,
-        text: entity.summary ? `${entity.name}: ${entity.summary}` : entity.name,
+        text: "",
         keys: [],
         enabled: true,
         category: categoryId,
       });
-      api.v1.log(`[forge] Cast "${entity.name}" → created new entry ${lorebookEntryId}`);
+      api.v1.log(
+        `[forge] Cast "${entity.name}" → created new entry ${lorebookEntryId}`,
+      );
     }
 
     dispatch(entityCast({ entityId: entity.id, lorebookEntryId }));
@@ -291,8 +374,13 @@ export function registerForgeEffects(
     if (entity) {
       const batch = state.world.batches.find((b) => b.id === entity.batchId);
       if (batch) {
-        await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_BATCH_NAME_UI, batch.name);
-        api.v1.ui.updateParts([{ id: IDS.FORGE.BATCH_NAME, value: batch.name }]);
+        await api.v1.storyStorage.set(
+          STORAGE_KEYS.FORGE_BATCH_NAME_UI,
+          batch.name,
+        );
+        api.v1.ui.updateParts([
+          { id: IDS.FORGE.BATCH_NAME, value: batch.name },
+        ]);
       }
     }
   });
@@ -304,7 +392,9 @@ export function registerForgeEffects(
     const entity = getState().world.entities.find((e) => e.id === entityId);
 
     if (!entity?.lorebookEntryId) {
-      api.v1.log(`[effects] entityRegenRequested: entity ${entityId} has no lorebook entry`);
+      api.v1.log(
+        `[effects] entityRegenRequested: entity ${entityId} has no lorebook entry`,
+      );
       return;
     }
 
@@ -315,16 +405,25 @@ export function registerForgeEffects(
     // Content generation uses entity.summary (via createLorebookContentFactory) as the
     // item description, so the EntityCard summary is preserved as the source of truth
     // for the generated rich lorebook text. entity.summary in Redux is never touched.
-    const contentFactory = createLorebookContentFactory(getState, lorebookEntryId);
-    dispatch(generationSubmitted({
-      requestId: contentRequestId,
-      messageFactory: contentFactory,
-      params: { model: await getModel(), max_tokens: 1024 },
-      target: { type: "lorebookContent", entryId: lorebookEntryId },
-      prefillBehavior: "trim",
-    }));
+    const contentFactory = createLorebookContentFactory(
+      getState,
+      lorebookEntryId,
+    );
+    dispatch(
+      generationSubmitted({
+        requestId: contentRequestId,
+        messageFactory: contentFactory,
+        params: { model: await getModel(), max_tokens: 1024 },
+        target: { type: "lorebookContent", entryId: lorebookEntryId },
+        prefillBehavior: "trim",
+      }),
+    );
 
-    const keysPayload = await buildLorebookKeysPayload(getState, lorebookEntryId, keysRequestId);
+    const keysPayload = await buildLorebookKeysPayload(
+      getState,
+      lorebookEntryId,
+      keysRequestId,
+    );
     dispatch(generationSubmitted(keysPayload));
   });
 }

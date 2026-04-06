@@ -12,7 +12,13 @@
  * ATTG/Style have a SuiToggle (radio icon) for syncing to Memory.
  */
 
-import { SuiComponent, SuiCard, SuiButton, SuiToggle, type SuiComponentOptions } from "nai-simple-ui";
+import {
+  SuiComponent,
+  SuiCard,
+  SuiButton,
+  SuiToggle,
+  type SuiComponentOptions,
+} from "nai-simple-ui";
 import { store } from "../../core/store";
 import {
   shapeUpdated,
@@ -28,7 +34,10 @@ import { STORAGE_KEYS, IDS } from "../framework/ids";
 import { buildMemoryContent } from "../../core/utils/filters";
 import { StoreWatcher } from "../store-watcher";
 import { SeGenerationIconButton } from "./SeGenerationButton";
-import { SeContentWithTitlePane, type EditPaneHost } from "./SeContentWithTitlePane";
+import {
+  SeContentWithTitlePane,
+  type EditPaneHost,
+} from "./SeContentWithTitlePane";
 import { SeSimpleContentPane } from "./SeSimpleContentPane";
 
 type SeFoundationSectionTheme = { default: { self: { style: object } } };
@@ -41,21 +50,21 @@ export type SeFoundationSectionOptions = {
 // ── IDs ─────────────────────────────────────────────────────────────────────
 
 const FN = {
-  SECTION:       "se-fn-section",
-  SHAPE_CARD:    "se-fn-shape-card",
-  SHAPE_EDIT:    "se-fn-shape-edit",
-  SHAPE_BTN:     "se-fn-shape-btn",
-  INTENT_CARD:   "se-fn-intent-card",
-  INTENT_EDIT:   "se-fn-intent-edit",
-  INTENT_BTN:    "se-fn-intent-btn",
-  ATTG_CARD:     "se-fn-attg-card",
-  ATTG_EDIT:     "se-fn-attg-edit",
-  ATTG_BTN:      "se-fn-attg-btn",
-  ATTG_SYNC:     "se-fn-attg-sync",
-  STYLE_CARD:    "se-fn-style-card",
-  STYLE_EDIT:    "se-fn-style-edit",
-  STYLE_BTN:     "se-fn-style-btn",
-  STYLE_SYNC:    "se-fn-style-sync",
+  SECTION: "se-fn-section",
+  SHAPE_CARD: "se-fn-shape-card",
+  SHAPE_EDIT: "se-fn-shape-edit",
+  SHAPE_BTN: "se-fn-shape-btn",
+  INTENT_CARD: "se-fn-intent-card",
+  INTENT_EDIT: "se-fn-intent-edit",
+  INTENT_BTN: "se-fn-intent-btn",
+  ATTG_CARD: "se-fn-attg-card",
+  ATTG_EDIT: "se-fn-attg-edit",
+  ATTG_BTN: "se-fn-attg-btn",
+  ATTG_SYNC: "se-fn-attg-sync",
+  STYLE_CARD: "se-fn-style-card",
+  STYLE_EDIT: "se-fn-style-edit",
+  STYLE_BTN: "se-fn-style-btn",
+  STYLE_SYNC: "se-fn-style-sync",
 } as const;
 
 const escapeDisplay = (raw: string): string =>
@@ -65,10 +74,14 @@ const escapeDisplay = (raw: string): string =>
 
 function foundationProjection(targetId: "shape" | "intent" | "attg" | "style") {
   return (s: ReturnType<typeof store.getState>) => {
-    const queued = s.runtime.queue.find(r => r.type === "foundation" && r.targetId === targetId);
-    const active = s.runtime.activeRequest?.type === "foundation" && s.runtime.activeRequest.targetId === targetId
-      ? s.runtime.activeRequest
-      : null;
+    const queued = s.runtime.queue.find(
+      (r) => r.type === "foundation" && r.targetId === targetId,
+    );
+    const active =
+      s.runtime.activeRequest?.type === "foundation" &&
+      s.runtime.activeRequest.targetId === targetId
+        ? s.runtime.activeRequest
+        : null;
     return queued?.id ?? active?.id;
   };
 }
@@ -77,22 +90,29 @@ function foundationProjection(targetId: "shape" | "intent" | "attg" | "style") {
 
 const CARD_THEME = {
   default: {
-    self:    { style: {} },
-    label:   { style: { fontWeight: "bold", fontSize: "0.85em", padding: "2px 0", cursor: "pointer" } },
+    self: { style: {} },
+    label: {
+      style: {
+        fontWeight: "bold",
+        fontSize: "0.85em",
+        padding: "2px 0",
+        cursor: "pointer",
+      },
+    },
     actions: {
       style: { gap: "2px" },
-      base:  { padding: "2px", background: "none", opacity: "1" },
+      base: { padding: "2px", background: "none", opacity: "1" },
     },
   },
 } as const;
 
 const CONTENT_TEXT_STYLE = {
-  "font-size":   "0.85em",
-  opacity:       "0.85",
+  "font-size": "0.85em",
+  opacity: "0.85",
   "white-space": "pre-wrap",
-  "word-break":  "break-word",
+  "word-break": "break-word",
   "user-select": "text",
-  padding:       "0 0 4px",
+  padding: "0 0 4px",
 } as const;
 
 /** Toggle theme: toggle icon, grey off / green on. Matches simple-context entry cards. */
@@ -100,13 +120,13 @@ const SYNC_TOGGLE_THEME = {
   default: {
     self: {
       iconId: "toggle-left" as IconId,
-      style:  { padding: "2px", background: "none", opacity: "0.45" },
+      style: { padding: "2px", background: "none", opacity: "0.45" },
     },
   },
   on: {
     self: {
       iconId: "toggle-right" as IconId,
-      style:  { color: "rgb(87, 178, 96)", opacity: "1" },
+      style: { color: "rgb(87, 178, 96)", opacity: "1" },
     },
   },
 } as const;
@@ -119,17 +139,17 @@ export class SeFoundationSection extends SuiComponent<
   SeFoundationSectionOptions,
   UIPartCollapsibleSection
 > {
-  private readonly _watcher:        StoreWatcher;
-  private readonly _shapeEditBtn:   SuiButton;
-  private readonly _shapeBtnGen:    SeGenerationIconButton;
-  private readonly _intentEditBtn:  SuiButton;
-  private readonly _intentBtnGen:   SeGenerationIconButton;
-  private readonly _attgEditBtn:    SuiButton;
-  private readonly _attgBtnGen:     SeGenerationIconButton;
+  private readonly _watcher: StoreWatcher;
+  private readonly _shapeEditBtn: SuiButton;
+  private readonly _shapeBtnGen: SeGenerationIconButton;
+  private readonly _intentEditBtn: SuiButton;
+  private readonly _intentBtnGen: SeGenerationIconButton;
+  private readonly _attgEditBtn: SuiButton;
+  private readonly _attgBtnGen: SeGenerationIconButton;
   private readonly _attgSyncToggle: SuiToggle;
-  private readonly _styleEditBtn:   SuiButton;
-  private readonly _styleBtnGen:    SeGenerationIconButton;
-  private readonly _styleSyncToggle:SuiToggle;
+  private readonly _styleEditBtn: SuiButton;
+  private readonly _styleBtnGen: SeGenerationIconButton;
+  private readonly _styleSyncToggle: SuiToggle;
 
   constructor(options: SeFoundationSectionOptions) {
     super(
@@ -141,76 +161,96 @@ export class SeFoundationSection extends SuiComponent<
 
     this._shapeEditBtn = new SuiButton({
       id: FN.SHAPE_EDIT,
-      callback: () => { this._openShapeEdit(); },
+      callback: () => {
+        this._openShapeEdit();
+      },
       theme: { default: { self: { iconId: "edit" as IconId } } },
     });
 
     this._shapeBtnGen = new SeGenerationIconButton({
-      id:                      FN.SHAPE_BTN,
-      iconId:                  "zap" as IconId,
-      onGenerate:              () => { store.dispatch(shapeGenerationRequested()); },
-      stateProjection:         foundationProjection("shape"),
+      id: FN.SHAPE_BTN,
+      iconId: "zap" as IconId,
+      onGenerate: () => {
+        store.dispatch(shapeGenerationRequested());
+      },
+      stateProjection: foundationProjection("shape"),
       requestIdFromProjection: (p) => p as string | undefined,
     });
 
     this._intentEditBtn = new SuiButton({
       id: FN.INTENT_EDIT,
-      callback: () => { this._openIntentEdit(); },
+      callback: () => {
+        this._openIntentEdit();
+      },
       theme: { default: { self: { iconId: "edit" as IconId } } },
     });
 
     this._intentBtnGen = new SeGenerationIconButton({
-      id:                      FN.INTENT_BTN,
-      iconId:                  "zap" as IconId,
-      onGenerate:              () => { store.dispatch(intentGenerationRequested()); },
-      stateProjection:         foundationProjection("intent"),
+      id: FN.INTENT_BTN,
+      iconId: "zap" as IconId,
+      onGenerate: () => {
+        store.dispatch(intentGenerationRequested());
+      },
+      stateProjection: foundationProjection("intent"),
       requestIdFromProjection: (p) => p as string | undefined,
     });
 
     this._attgEditBtn = new SuiButton({
       id: FN.ATTG_EDIT,
-      callback: () => { this._openAttgEdit(); },
+      callback: () => {
+        this._openAttgEdit();
+      },
       theme: { default: { self: { iconId: "edit" as IconId } } },
     });
 
     this._attgBtnGen = new SeGenerationIconButton({
-      id:                      FN.ATTG_BTN,
-      iconId:                  "zap" as IconId,
-      onGenerate:              () => { store.dispatch(attgGenerationRequested()); },
-      stateProjection:         foundationProjection("attg"),
+      id: FN.ATTG_BTN,
+      iconId: "zap" as IconId,
+      onGenerate: () => {
+        store.dispatch(attgGenerationRequested());
+      },
+      stateProjection: foundationProjection("attg"),
       requestIdFromProjection: (p) => p as string | undefined,
     });
 
     this._attgSyncToggle = new SuiToggle({
-      id:          FN.ATTG_SYNC,
-      state:       { on: false },
-      storageKey:  STORAGE_KEYS.SYNC_ATTG_MEMORY,
+      id: FN.ATTG_SYNC,
+      state: { on: false },
+      storageKey: STORAGE_KEYS.SYNC_ATTG_MEMORY,
       storageMode: "story",
-      theme:       SYNC_TOGGLE_THEME,
-      callback:    () => { void this._syncMemory(); },
+      theme: SYNC_TOGGLE_THEME,
+      callback: () => {
+        void this._syncMemory();
+      },
     });
 
     this._styleEditBtn = new SuiButton({
       id: FN.STYLE_EDIT,
-      callback: () => { this._openStyleEdit(); },
+      callback: () => {
+        this._openStyleEdit();
+      },
       theme: { default: { self: { iconId: "edit" as IconId } } },
     });
 
     this._styleBtnGen = new SeGenerationIconButton({
-      id:                      FN.STYLE_BTN,
-      iconId:                  "zap" as IconId,
-      onGenerate:              () => { store.dispatch(styleGenerationRequested()); },
-      stateProjection:         foundationProjection("style"),
+      id: FN.STYLE_BTN,
+      iconId: "zap" as IconId,
+      onGenerate: () => {
+        store.dispatch(styleGenerationRequested());
+      },
+      stateProjection: foundationProjection("style"),
       requestIdFromProjection: (p) => p as string | undefined,
     });
 
     this._styleSyncToggle = new SuiToggle({
-      id:          FN.STYLE_SYNC,
-      state:       { on: false },
-      storageKey:  STORAGE_KEYS.SYNC_STYLE_MEMORY,
+      id: FN.STYLE_SYNC,
+      state: { on: false },
+      storageKey: STORAGE_KEYS.SYNC_STYLE_MEMORY,
       storageMode: "story",
-      theme:       SYNC_TOGGLE_THEME,
-      callback:    () => { void this._syncMemory(); },
+      theme: SYNC_TOGGLE_THEME,
+      callback: () => {
+        void this._syncMemory();
+      },
     });
   }
 
@@ -221,21 +261,26 @@ export class SeFoundationSection extends SuiComponent<
     const shape = store.getState().foundation.shape;
 
     const pane = new SeContentWithTitlePane({
-      id:                 IDS.EDIT_PANE.ROOT,
-      title:              shape?.name ?? "",
-      content:            shape?.description ?? "",
-      label:              "Edit Shape",
-      titlePlaceholder:   "e.g. Slice of Life, Tragedy, Heist…",
-      contentPlaceholder: "Shape description — what structural moments this story leans toward.",
-      titleLabel:         "Name",
-      contentLabel:       "Description",
+      id: IDS.EDIT_PANE.ROOT,
+      title: shape?.name ?? "",
+      content: shape?.description ?? "",
+      label: "Edit Shape",
+      titlePlaceholder: "e.g. Slice of Life, Tragedy, Heist…",
+      contentPlaceholder:
+        "Shape description — what structural moments this story leans toward.",
+      titleLabel: "Name",
+      contentLabel: "Description",
       onSave: (name, description) => {
-        store.dispatch(shapeUpdated({
-          shape: description ? { name: name || "STORY", description } : null,
-        }));
+        store.dispatch(
+          shapeUpdated({
+            shape: description ? { name: name || "STORY", description } : null,
+          }),
+        );
         editHost.close();
       },
-      onBack: () => { editHost.close(); },
+      onBack: () => {
+        editHost.close();
+      },
     });
 
     editHost.open(pane);
@@ -248,15 +293,18 @@ export class SeFoundationSection extends SuiComponent<
     const intent = store.getState().foundation.intent;
 
     const pane = new SeSimpleContentPane({
-      id:                 IDS.EDIT_PANE.ROOT,
-      content:            intent,
-      label:              "Edit Intent",
-      contentPlaceholder: "What is this story about? What do you want to explore?",
+      id: IDS.EDIT_PANE.ROOT,
+      content: intent,
+      label: "Edit Intent",
+      contentPlaceholder:
+        "What is this story about? What do you want to explore?",
       onSave: (content) => {
         store.dispatch(intentUpdated({ intent: content }));
         editHost.close();
       },
-      onBack: () => { editHost.close(); },
+      onBack: () => {
+        editHost.close();
+      },
     });
 
     editHost.open(pane);
@@ -269,16 +317,18 @@ export class SeFoundationSection extends SuiComponent<
     const attg = store.getState().foundation.attg;
 
     const pane = new SeSimpleContentPane({
-      id:                 IDS.EDIT_PANE.ROOT,
-      content:            attg,
-      label:              "Edit ATTG",
+      id: IDS.EDIT_PANE.ROOT,
+      content: attg,
+      label: "Edit ATTG",
       contentPlaceholder: "Author, Title, Tags, Genre…",
       onSave: (content) => {
         store.dispatch(attgUpdated({ attg: content }));
         void this._syncMemory();
         editHost.close();
       },
-      onBack: () => { editHost.close(); },
+      onBack: () => {
+        editHost.close();
+      },
     });
 
     editHost.open(pane);
@@ -291,16 +341,18 @@ export class SeFoundationSection extends SuiComponent<
     const style = store.getState().foundation.style;
 
     const pane = new SeSimpleContentPane({
-      id:                 IDS.EDIT_PANE.ROOT,
-      content:            style,
-      label:              "Edit Style",
+      id: IDS.EDIT_PANE.ROOT,
+      content: style,
+      label: "Edit Style",
       contentPlaceholder: "Writing style, tone, prose directives…",
       onSave: (content) => {
         store.dispatch(styleUpdated({ style: content }));
         void this._syncMemory();
         editHost.close();
       },
-      onBack: () => { editHost.close(); },
+      onBack: () => {
+        editHost.close();
+      },
     });
 
     editHost.open(pane);
@@ -309,7 +361,7 @@ export class SeFoundationSection extends SuiComponent<
   // ── Memory sync helper ────────────────────────────────────────
 
   private async _syncMemory(): Promise<void> {
-    const attgOn  = this._attgSyncToggle.state.on;
+    const attgOn = this._attgSyncToggle.state.on;
     const styleOn = this._styleSyncToggle.state.on;
     if (attgOn || styleOn) {
       await api.v1.memory.set(buildMemoryContent(store.getState));
@@ -326,11 +378,13 @@ export class SeFoundationSection extends SuiComponent<
     const shapeDescId = `${FN.SHAPE_CARD}-desc`;
 
     const shapeCard = new SuiCard({
-      id:            FN.SHAPE_CARD,
-      label:         shape?.name || "Shape",
-      labelCallback: () => { this._openShapeEdit(); },
-      actions:       [this._shapeEditBtn, this._shapeBtnGen],
-      theme:         CARD_THEME,
+      id: FN.SHAPE_CARD,
+      label: shape?.name || "Shape",
+      labelCallback: () => {
+        this._openShapeEdit();
+      },
+      actions: [this._shapeEditBtn, this._shapeBtnGen],
+      theme: CARD_THEME,
     });
 
     this._watcher.watch(
@@ -338,7 +392,7 @@ export class SeFoundationSection extends SuiComponent<
       (s) => {
         api.v1.ui.updateParts([
           { id: `${FN.SHAPE_CARD}.label`, text: s?.name || "Shape" },
-          { id: shapeDescId,              text: s?.description || "No shape defined" },
+          { id: shapeDescId, text: s?.description || "No shape defined" },
         ]);
       },
     );
@@ -348,18 +402,23 @@ export class SeFoundationSection extends SuiComponent<
     const intentDescId = `${FN.INTENT_CARD}-desc`;
 
     const intentCard = new SuiCard({
-      id:            FN.INTENT_CARD,
-      label:         "Intent",
-      labelCallback: () => { this._openIntentEdit(); },
-      actions:       [this._intentEditBtn, this._intentBtnGen],
-      theme:         CARD_THEME,
+      id: FN.INTENT_CARD,
+      label: "Intent",
+      labelCallback: () => {
+        this._openIntentEdit();
+      },
+      actions: [this._intentEditBtn, this._intentBtnGen],
+      theme: CARD_THEME,
     });
 
     this._watcher.watch(
       (s) => s.foundation.intent,
       (value) => {
         api.v1.ui.updateParts([
-          { id: intentDescId, text: escapeDisplay(value) || "No intent defined" },
+          {
+            id: intentDescId,
+            text: escapeDisplay(value) || "No intent defined",
+          },
         ]);
       },
     );
@@ -369,11 +428,13 @@ export class SeFoundationSection extends SuiComponent<
     const attgDescId = `${FN.ATTG_CARD}-desc`;
 
     const attgCard = new SuiCard({
-      id:            FN.ATTG_CARD,
-      label:         "ATTG",
-      labelCallback: () => { this._openAttgEdit(); },
-      actions:       [this._attgSyncToggle, this._attgEditBtn, this._attgBtnGen],
-      theme:         CARD_THEME,
+      id: FN.ATTG_CARD,
+      label: "ATTG",
+      labelCallback: () => {
+        this._openAttgEdit();
+      },
+      actions: [this._attgSyncToggle, this._attgEditBtn, this._attgBtnGen],
+      theme: CARD_THEME,
     });
 
     this._watcher.watch(
@@ -390,11 +451,13 @@ export class SeFoundationSection extends SuiComponent<
     const styleDescId = `${FN.STYLE_CARD}-desc`;
 
     const styleCard = new SuiCard({
-      id:            FN.STYLE_CARD,
-      label:         "Style",
-      labelCallback: () => { this._openStyleEdit(); },
-      actions:       [this._styleSyncToggle, this._styleEditBtn, this._styleBtnGen],
-      theme:         CARD_THEME,
+      id: FN.STYLE_CARD,
+      label: "Style",
+      labelCallback: () => {
+        this._openStyleEdit();
+      },
+      actions: [this._styleSyncToggle, this._styleEditBtn, this._styleBtnGen],
+      theme: CARD_THEME,
     });
 
     this._watcher.watch(
@@ -407,18 +470,19 @@ export class SeFoundationSection extends SuiComponent<
     );
 
     // ── Build child parts ──────────────────────────────────────
-    const [shapeCardPart, intentCardPart, attgCardPart, styleCardPart] = await Promise.all([
-      shapeCard.build(),
-      intentCard.build(),
-      attgCard.build(),
-      styleCard.build(),
-    ]);
+    const [shapeCardPart, intentCardPart, attgCardPart, styleCardPart] =
+      await Promise.all([
+        shapeCard.build(),
+        intentCard.build(),
+        attgCard.build(),
+        styleCard.build(),
+      ]);
 
     const { column, text, collapsibleSection } = api.v1.ui.part;
 
     return collapsibleSection({
-      id:         this.id,
-      title:      "Narrative Foundation",
+      id: this.id,
+      title: "Narrative Foundation",
       storageKey: `story:${STORAGE_KEYS.FOUNDATION_SECTION_UI}`,
       content: [
         column({
@@ -430,8 +494,8 @@ export class SeFoundationSection extends SuiComponent<
               content: [
                 shapeCardPart,
                 text({
-                  id:    shapeDescId,
-                  text:  shape?.description || "No shape defined",
+                  id: shapeDescId,
+                  text: shape?.description || "No shape defined",
                   style: CONTENT_TEXT_STYLE,
                 }),
               ],
@@ -442,8 +506,8 @@ export class SeFoundationSection extends SuiComponent<
               content: [
                 intentCardPart,
                 text({
-                  id:    intentDescId,
-                  text:  escapeDisplay(intent) || "No intent defined",
+                  id: intentDescId,
+                  text: escapeDisplay(intent) || "No intent defined",
                   style: CONTENT_TEXT_STYLE,
                 }),
               ],
@@ -454,8 +518,8 @@ export class SeFoundationSection extends SuiComponent<
               content: [
                 attgCardPart,
                 text({
-                  id:    attgDescId,
-                  text:  escapeDisplay(attg) || "No ATTG defined",
+                  id: attgDescId,
+                  text: escapeDisplay(attg) || "No ATTG defined",
                   style: CONTENT_TEXT_STYLE,
                 }),
               ],
@@ -466,8 +530,8 @@ export class SeFoundationSection extends SuiComponent<
               content: [
                 styleCardPart,
                 text({
-                  id:    styleDescId,
-                  text:  escapeDisplay(style) || "No style defined",
+                  id: styleDescId,
+                  text: escapeDisplay(style) || "No style defined",
                   style: CONTENT_TEXT_STYLE,
                 }),
               ],

@@ -19,14 +19,21 @@
  *   })
  */
 
-import { SuiComponent, type AnySuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiComponent,
+  type AnySuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/action-bar.ts";
-import { type SuiActionBarStateTheme, type SuiActionBarTheme } from "./theme/action-bar.ts";
+import {
+  type SuiActionBarStateTheme,
+  type SuiActionBarTheme,
+} from "./theme/action-bar.ts";
 import { SuiRow } from "./row.ts";
 
 /** options carries data only — all visual properties live in theme. */
 export type SuiActionBarOptions = {
-  left?:  AnySuiComponent[];
+  left?: AnySuiComponent[];
   right?: AnySuiComponent[];
 } & SuiComponentOptions<SuiActionBarTheme>;
 
@@ -35,8 +42,12 @@ export type SuiActionBarOptions = {
  * Sub-rows are only included when they have items.
  * Stateless — resolveTheme() always returns theme.default.
  */
-export class SuiActionBar extends SuiComponent<SuiActionBarTheme, Record<string, unknown>, SuiActionBarOptions, UIPartRow> {
-
+export class SuiActionBar extends SuiComponent<
+  SuiActionBarTheme,
+  Record<string, unknown>,
+  SuiActionBarOptions,
+  UIPartRow
+> {
   constructor(options: SuiActionBarOptions) {
     super(options, Theme.actionBar);
   }
@@ -44,8 +55,8 @@ export class SuiActionBar extends SuiComponent<SuiActionBarTheme, Record<string,
   /** Stable IDs for this component's owned children. */
   override get ids(): { self: string; left: string; right: string } {
     return {
-      self:  this.id,
-      left:  `${this.id}.left`,
+      self: this.id,
+      left: `${this.id}.left`,
       right: `${this.id}.right`,
     };
   }
@@ -61,33 +72,37 @@ export class SuiActionBar extends SuiComponent<SuiActionBarTheme, Record<string,
    * @returns {UIPartRow}
    */
   async compose(): Promise<UIPartRow> {
-    const t        = this.resolveTheme();
-    const ids      = this.ids;
-    const hasLeft  = (this.options.left?.length  ?? 0) > 0;
+    const t = this.resolveTheme();
+    const ids = this.ids;
+    const hasLeft = (this.options.left?.length ?? 0) > 0;
     const hasRight = (this.options.right?.length ?? 0) > 0;
 
     const innerChildren: AnySuiComponent[] = [];
 
     if (hasLeft) {
-      innerChildren.push(new SuiRow({
-        id:       ids.left,
-        children: this.options.left!,
-        theme:    { default: { self: t.left } },
-      }));
+      innerChildren.push(
+        new SuiRow({
+          id: ids.left,
+          children: this.options.left!,
+          theme: { default: { self: t.left } },
+        }),
+      );
     }
 
     if (hasRight) {
-      innerChildren.push(new SuiRow({
-        id:       ids.right,
-        children: this.options.right!,
-        theme:    { default: { self: t.right } },
-      }));
+      innerChildren.push(
+        new SuiRow({
+          id: ids.right,
+          children: this.options.right!,
+          theme: { default: { self: t.right } },
+        }),
+      );
     }
 
     return await new SuiRow({
-      id:       this.id,
+      id: this.id,
       children: innerChildren,
-      theme:    { default: { self: t.self } },
+      theme: { default: { self: t.self } },
     }).build();
   }
 }

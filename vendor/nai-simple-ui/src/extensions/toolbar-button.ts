@@ -20,7 +20,10 @@ import { SuiBase } from "../base.ts";
 import { SuiExtension } from "../extension.ts";
 import type { SuiBaseOptions } from "../base.ts";
 import * as Theme from "./theme/toolbar-button.ts";
-import { type SuiToolbarButtonStateTheme, type SuiToolbarButtonTheme } from "./theme/toolbar-button.ts";
+import {
+  type SuiToolbarButtonStateTheme,
+  type SuiToolbarButtonTheme,
+} from "./theme/toolbar-button.ts";
 
 // ============================================================
 // State
@@ -40,7 +43,7 @@ export type SuiToolbarButtonOptions = {
   /** Whether the button should be disabled while the callback is running. */
   disabledWhileCallbackRunning?: boolean;
   /** Called when the button is clicked. */
-  callback?:                     () => void;
+  callback?: () => void;
 } & SuiBaseOptions<SuiToolbarButtonTheme, SuiToolbarButtonState>;
 
 // ============================================================
@@ -77,23 +80,25 @@ export class SuiToolbarButton extends SuiExtension<
    */
   override async onSync(): Promise<void> {
     const t = this.resolveTheme();
-    await api.v1.ui.updateParts([{
-      id:     this.id,
-      text:   t.self.text,
-      iconId: t.self.iconId,
-    }]);
+    await api.v1.ui.updateParts([
+      {
+        id: this.id,
+        text: t.self.text,
+        iconId: t.self.iconId,
+      },
+    ]);
   }
 
   async compose(): Promise<UIExtensionToolbarButton> {
     const t = this.resolveTheme();
     return {
-      type:                         this.type,
-      id:                           this.id,
-      text:                         t.self.text,
-      iconId:                       t.self.iconId,
-      disabled:                     this.state.disabled,
+      type: this.type,
+      id: this.id,
+      text: t.self.text,
+      iconId: t.self.iconId,
+      disabled: this.state.disabled,
       disabledWhileCallbackRunning: this.options.disabledWhileCallbackRunning,
-      callback:                     this.options.callback,
+      callback: this.options.callback,
     };
   }
 }

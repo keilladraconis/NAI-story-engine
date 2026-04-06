@@ -1,5 +1,11 @@
 import { createSlice } from "nai-store";
-import { WorldState, WorldBatch, WorldEntity, Relationship, EntityLifecycle } from "../types";
+import {
+  WorldState,
+  WorldBatch,
+  WorldEntity,
+  Relationship,
+  EntityLifecycle,
+} from "../types";
 import { DulfsFieldID } from "../../../config/field-definitions";
 
 export const initialWorldState: WorldState = {
@@ -19,11 +25,18 @@ export const worldSlice = createSlice({
       entities: [...state.entities, payload.entity],
     }),
 
-    entityCast: (state, payload: { entityId: string; lorebookEntryId: string }) => ({
+    entityCast: (
+      state,
+      payload: { entityId: string; lorebookEntryId: string },
+    ) => ({
       ...state,
       entities: state.entities.map((e) =>
         e.id === payload.entityId
-          ? { ...e, lifecycle: "live" as EntityLifecycle, lorebookEntryId: payload.lorebookEntryId }
+          ? {
+              ...e,
+              lifecycle: "live" as EntityLifecycle,
+              lorebookEntryId: payload.lorebookEntryId,
+            }
           : e,
       ),
     }),
@@ -32,7 +45,11 @@ export const worldSlice = createSlice({
       ...state,
       entities: state.entities.map((e) =>
         e.id === payload.entityId
-          ? { ...e, lifecycle: "draft" as EntityLifecycle, lorebookEntryId: undefined }
+          ? {
+              ...e,
+              lifecycle: "draft" as EntityLifecycle,
+              lorebookEntryId: undefined,
+            }
           : e,
       ),
     }),
@@ -41,28 +58,43 @@ export const worldSlice = createSlice({
       ...state,
       entities: state.entities.filter((e) => e.id !== payload.entityId),
       relationships: state.relationships.filter(
-        (r) => r.fromEntityId !== payload.entityId && r.toEntityId !== payload.entityId,
+        (r) =>
+          r.fromEntityId !== payload.entityId &&
+          r.toEntityId !== payload.entityId,
       ),
     }),
 
-    entitySummaryUpdated: (state, payload: { entityId: string; summary: string }) => ({
+    entitySummaryUpdated: (
+      state,
+      payload: { entityId: string; summary: string },
+    ) => ({
       ...state,
       entities: state.entities.map((e) =>
         e.id === payload.entityId ? { ...e, summary: payload.summary } : e,
       ),
     }),
 
-    entityEdited: (state, payload: { entityId: string; name: string; summary: string }) => ({
+    entityEdited: (
+      state,
+      payload: { entityId: string; name: string; summary: string },
+    ) => ({
       ...state,
       entities: state.entities.map((e) =>
-        e.id === payload.entityId ? { ...e, name: payload.name, summary: payload.summary } : e,
+        e.id === payload.entityId
+          ? { ...e, name: payload.name, summary: payload.summary }
+          : e,
       ),
     }),
 
-    entityCategoryChanged: (state, payload: { entityId: string; categoryId: DulfsFieldID }) => ({
+    entityCategoryChanged: (
+      state,
+      payload: { entityId: string; categoryId: DulfsFieldID },
+    ) => ({
       ...state,
       entities: state.entities.map((e) =>
-        e.id === payload.entityId ? { ...e, categoryId: payload.categoryId } : e,
+        e.id === payload.entityId
+          ? { ...e, categoryId: payload.categoryId }
+          : e,
       ),
     }),
 
@@ -94,7 +126,11 @@ export const worldSlice = createSlice({
       ...state,
       entities: state.entities.map((e) =>
         e.batchId === payload.batchId
-          ? { ...e, lifecycle: "draft" as EntityLifecycle, lorebookEntryId: undefined }
+          ? {
+              ...e,
+              lifecycle: "draft" as EntityLifecycle,
+              lorebookEntryId: undefined,
+            }
           : e,
       ),
     }),
@@ -107,7 +143,9 @@ export const worldSlice = createSlice({
 
     relationshipRemoved: (state, payload: { relationshipId: string }) => ({
       ...state,
-      relationships: state.relationships.filter((r) => r.id !== payload.relationshipId),
+      relationships: state.relationships.filter(
+        (r) => r.id !== payload.relationshipId,
+      ),
     }),
 
     relationshipUpdated: (
@@ -116,7 +154,9 @@ export const worldSlice = createSlice({
     ) => ({
       ...state,
       relationships: state.relationships.map((r) =>
-        r.id === payload.relationshipId ? { ...r, description: payload.description } : r,
+        r.id === payload.relationshipId
+          ? { ...r, description: payload.description }
+          : r,
       ),
     }),
 
@@ -127,9 +167,17 @@ export const worldSlice = createSlice({
 
     forgeStepCompleted: (
       state,
-      _payload: { batchId: string; step: number; forgeGuidance: string; brainstormContext: string },
+      _payload: {
+        batchId: string;
+        step: number;
+        forgeGuidance: string;
+        brainstormContext: string;
+      },
     ) => state,
-    forgeCritiqueReceived: (state, _payload: { batchId: string; critiqueText: string }) => state,
+    forgeCritiqueReceived: (
+      state,
+      _payload: { batchId: string; critiqueText: string },
+    ) => state,
 
     // Signal actions — Phase 2 effects handle the actual work
     forgeClearRequested: (state) => state,
@@ -144,10 +192,15 @@ export const worldSlice = createSlice({
     // Immediate state reducers (Phase 2 adds lorebook-side effects for these)
     entityCastRequested: (state, _payload: { entityId: string }) => state,
 
-    entityMoved: (state, payload: { entityId: string; targetBatchId: string }) => ({
+    entityMoved: (
+      state,
+      payload: { entityId: string; targetBatchId: string },
+    ) => ({
       ...state,
       entities: state.entities.map((e) =>
-        e.id === payload.entityId ? { ...e, batchId: payload.targetBatchId } : e,
+        e.id === payload.entityId
+          ? { ...e, batchId: payload.targetBatchId }
+          : e,
       ),
     }),
 

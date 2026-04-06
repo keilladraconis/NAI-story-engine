@@ -19,19 +19,26 @@
  *   })
  */
 
-import { SuiBase, SuiComponent, type SuiComponentOptions } from "../component.ts";
+import {
+  SuiBase,
+  SuiComponent,
+  type SuiComponentOptions,
+} from "../component.ts";
 import * as Theme from "./theme/toggle.ts";
-import { type SuiToggleStateTheme, type SuiToggleTheme } from "./theme/toggle.ts";
+import {
+  type SuiToggleStateTheme,
+  type SuiToggleTheme,
+} from "./theme/toggle.ts";
 
 /** State shape for SuiToggle. on and disabled drive theme resolution in resolveTheme(). */
 export type SuiToggleState = {
-  on:        boolean;
+  on: boolean;
   disabled?: boolean;
 };
 
 /** options carries callback and behaviour flags only — on and disabled live in state, visuals in theme. */
 export type SuiToggleOptions = {
-  callback?:                     () => void;
+  callback?: () => void;
   disabledWhileCallbackRunning?: boolean;
 } & SuiComponentOptions<SuiToggleTheme, SuiToggleState>;
 
@@ -40,8 +47,12 @@ export type SuiToggleOptions = {
  * Flips state.on on each click, then fires options.callback if supplied.
  * text, iconId, and style are resolved from theme via resolveTheme() based on this.state.
  */
-export class SuiToggle extends SuiComponent<SuiToggleTheme, SuiToggleState, SuiToggleOptions, UIPartButton> {
-
+export class SuiToggle extends SuiComponent<
+  SuiToggleTheme,
+  SuiToggleState,
+  SuiToggleOptions,
+  UIPartButton
+> {
   constructor(options: SuiToggleOptions) {
     super(options, Theme.toggle);
   }
@@ -50,7 +61,7 @@ export class SuiToggle extends SuiComponent<SuiToggleTheme, SuiToggleState, SuiT
   resolveTheme(): SuiToggleStateTheme {
     return SuiBase.mergePartTheme(
       this.theme.default,
-      this.state.on       ? this.theme.on       : undefined,
+      this.state.on ? this.theme.on : undefined,
       this.state.disabled ? this.theme.disabled : undefined,
     );
   }
@@ -59,12 +70,14 @@ export class SuiToggle extends SuiComponent<SuiToggleTheme, SuiToggleState, SuiT
   override async onSync(): Promise<void> {
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
-    await api.v1.ui.updateParts([{
-      id:     this.id,
-      text:   t.self.text,
-      iconId: t.self.iconId,
-      style:  this.visibleStyle(this._composedStyle),
-    }]);
+    await api.v1.ui.updateParts([
+      {
+        id: this.id,
+        text: t.self.text,
+        iconId: t.self.iconId,
+        style: this.visibleStyle(this._composedStyle),
+      },
+    ]);
   }
 
   /** Flips state.on then fires options.callback. */
@@ -81,14 +94,14 @@ export class SuiToggle extends SuiComponent<SuiToggleTheme, SuiToggleState, SuiT
     const t = this.resolveTheme();
     this._composedStyle = t.self.style ?? {};
     return {
-      type:                         "button",
-      id:                           this.id,
-      callback:                     this.onClick.bind(this),
+      type: "button",
+      id: this.id,
+      callback: this.onClick.bind(this),
       disabledWhileCallbackRunning: this.options.disabledWhileCallbackRunning,
-      disabled:                     this.state.disabled,
-      text:                         t.self.text,
-      iconId:                       t.self.iconId,
-      style:                        this._composedStyle,
+      disabled: this.state.disabled,
+      text: t.self.text,
+      iconId: t.self.iconId,
+      style: this._composedStyle,
     };
   }
 }

@@ -14,14 +14,17 @@ const { row, text, button, textInput } = api.v1.ui.part;
 const MOVE_INPUT_KEY = "se-move-modal-batch";
 
 const STEPPER_BTN = { padding: "4px 10px", "flex-shrink": "0" };
-const ACTION_BTN  = { padding: "4px 12px" };
+const ACTION_BTN = { padding: "4px 12px" };
 
 export interface MoveModalCtx {
   getState: () => RootState;
   dispatch: AppDispatch;
 }
 
-export async function openMoveModal(entityId: string, ctx: MoveModalCtx): Promise<void> {
+export async function openMoveModal(
+  entityId: string,
+  ctx: MoveModalCtx,
+): Promise<void> {
   const entity = ctx.getState().world.entities.find((e) => e.id === entityId);
   if (!entity) return;
 
@@ -34,8 +37,8 @@ export async function openMoveModal(entityId: string, ctx: MoveModalCtx): Promis
   await api.v1.storyStorage.set(MOVE_INPUT_KEY, currentBatchName);
 
   const modal = await api.v1.ui.modal.open({
-    title:   `Move: ${entity.name}`,
-    size:    "small",
+    title: `Move: ${entity.name}`,
+    size: "small",
     content: [text({ text: "Loading..." })],
   });
 
@@ -43,41 +46,49 @@ export async function openMoveModal(entityId: string, ctx: MoveModalCtx): Promis
     if (modal.isClosed()) return;
 
     const currentBatches = ctx.getState().world.batches;
-    const cycleName      = currentBatches[cycleIndex]?.name ?? "";
+    const cycleName = currentBatches[cycleIndex]?.name ?? "";
 
     const content: UIPart[] = [
       row({
         style: { gap: "6px", "align-items": "center", "margin-bottom": "10px" },
         content: [
           button({
-            id:       "se-move-modal-prev",
-            iconId:   "chevron-left",
-            style:    STEPPER_BTN,
+            id: "se-move-modal-prev",
+            iconId: "chevron-left",
+            style: STEPPER_BTN,
             callback: () => {
               if (currentBatches.length === 0) return;
-              cycleIndex = (cycleIndex - 1 + currentBatches.length) % currentBatches.length;
+              cycleIndex =
+                (cycleIndex - 1 + currentBatches.length) %
+                currentBatches.length;
               void (async () => {
-                await api.v1.storyStorage.set(MOVE_INPUT_KEY, currentBatches[cycleIndex]?.name ?? "");
+                await api.v1.storyStorage.set(
+                  MOVE_INPUT_KEY,
+                  currentBatches[cycleIndex]?.name ?? "",
+                );
                 await rebuild();
               })();
             },
           }),
           textInput({
-            id:           "se-move-modal-input",
-            storageKey:   `story:${MOVE_INPUT_KEY}`,
+            id: "se-move-modal-input",
+            storageKey: `story:${MOVE_INPUT_KEY}`,
             initialValue: cycleName,
-            placeholder:  "Batch name…",
-            style:        { flex: "1" },
+            placeholder: "Batch name…",
+            style: { flex: "1" },
           }),
           button({
-            id:       "se-move-modal-next",
-            iconId:   "chevron-right",
-            style:    STEPPER_BTN,
+            id: "se-move-modal-next",
+            iconId: "chevron-right",
+            style: STEPPER_BTN,
             callback: () => {
               if (currentBatches.length === 0) return;
               cycleIndex = (cycleIndex + 1) % currentBatches.length;
               void (async () => {
-                await api.v1.storyStorage.set(MOVE_INPUT_KEY, currentBatches[cycleIndex]?.name ?? "");
+                await api.v1.storyStorage.set(
+                  MOVE_INPUT_KEY,
+                  currentBatches[cycleIndex]?.name ?? "",
+                );
                 await rebuild();
               })();
             },
@@ -88,9 +99,9 @@ export async function openMoveModal(entityId: string, ctx: MoveModalCtx): Promis
         style: { gap: "8px", "justify-content": "flex-end" },
         content: [
           button({
-            id:       "se-move-modal-move",
-            text:     "Move",
-            style:    ACTION_BTN,
+            id: "se-move-modal-move",
+            text: "Move",
+            style: ACTION_BTN,
             callback: () => {
               void (async () => {
                 const targetName = String(
@@ -98,9 +109,13 @@ export async function openMoveModal(entityId: string, ctx: MoveModalCtx): Promis
                 ).trim();
                 if (!targetName) return;
 
-                const state       = ctx.getState();
-                const sourceBatch = state.world.batches.find((b) => b.id === entity!.batchId);
-                if (targetName.toLowerCase() === sourceBatch?.name.toLowerCase()) {
+                const state = ctx.getState();
+                const sourceBatch = state.world.batches.find(
+                  (b) => b.id === entity!.batchId,
+                );
+                if (
+                  targetName.toLowerCase() === sourceBatch?.name.toLowerCase()
+                ) {
                   modal.close();
                   return;
                 }
@@ -110,22 +125,38 @@ export async function openMoveModal(entityId: string, ctx: MoveModalCtx): Promis
                 );
                 if (!targetBatch) {
                   const newBatchId = api.v1.uuid();
-                  ctx.dispatch(batchCreated({ batch: { id: newBatchId, name: targetName, entityIds: [] } }));
-                  targetBatch = { id: newBatchId, name: targetName, entityIds: [] };
+                  ctx.dispatch(
+                    batchCreated({
+                      batch: {
+                        id: newBatchId,
+                        name: targetName,
+                        entityIds: [],
+                      },
+                    }),
+                  );
+                  targetBatch = {
+                    id: newBatchId,
+                    name: targetName,
+                    entityIds: [],
+                  };
                 }
 
-                ctx.dispatch(entityMoved({ entityId, targetBatchId: targetBatch.id }));
+                ctx.dispatch(
+                  entityMoved({ entityId, targetBatchId: targetBatch.id }),
+                );
                 await api.v1.storyStorage.remove(MOVE_INPUT_KEY);
                 modal.close();
               })();
             },
           }),
           button({
-            id:       "se-move-modal-cancel",
-            text:     "Cancel",
-            style:    ACTION_BTN,
+            id: "se-move-modal-cancel",
+            text: "Cancel",
+            style: ACTION_BTN,
             callback: () => {
-              void api.v1.storyStorage.remove(MOVE_INPUT_KEY).then(() => modal.close());
+              void api.v1.storyStorage
+                .remove(MOVE_INPUT_KEY)
+                .then(() => modal.close());
             },
           }),
         ],
@@ -137,5 +168,7 @@ export async function openMoveModal(entityId: string, ctx: MoveModalCtx): Promis
 
   await rebuild();
 
-  modal.closed.then(() => { void api.v1.storyStorage.remove(MOVE_INPUT_KEY); });
+  modal.closed.then(() => {
+    void api.v1.storyStorage.remove(MOVE_INPUT_KEY);
+  });
 }

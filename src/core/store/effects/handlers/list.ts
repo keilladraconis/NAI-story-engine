@@ -48,7 +48,10 @@ export const listHandler: GenerationHandlers<ListTarget> = {
           const itemId = api.v1.uuid();
 
           // Store full content in storyStorage (name extraction happens in effects.ts)
-          await api.v1.storyStorage.set(STORAGE_KEYS.dulfsItem(itemId), content);
+          await api.v1.storyStorage.set(
+            STORAGE_KEYS.dulfsItem(itemId),
+            content,
+          );
 
           // Dispatch item - lorebook sync (with parsed name) happens in effects.ts
           ctx.dispatch(

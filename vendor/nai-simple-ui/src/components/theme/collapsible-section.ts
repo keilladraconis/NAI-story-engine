@@ -6,13 +6,13 @@ import { type SuiChildrenPartTheme, type ThemeOverride } from "../../base.ts";
 
 /** Display properties for the collapsible section header. */
 export type SuiCollapsibleSectionPartTheme = {
-  title?:  string;
+  title?: string;
   iconId?: IconId;
-  style?:  object;
+  style?: object;
 };
 
 export type SuiCollapsibleSectionStateTheme = {
-  self:    SuiCollapsibleSectionPartTheme;
+  self: SuiCollapsibleSectionPartTheme;
   content: SuiChildrenPartTheme;
 };
 
@@ -22,7 +22,7 @@ export type SuiCollapsibleSectionTheme = {
 
 export const collapsibleSection = {
   default: {
-    self:    {},
+    self: {},
     content: {},
   },
 } satisfies ThemeOverride<SuiCollapsibleSectionTheme>;
