@@ -1,7 +1,7 @@
 /**
  * SeJournalPanel — SUI replacement for JournalPanel (nai-act).
  *
- * Displays journal entry count + three action buttons.
+ * Displays journal entry count + action buttons.
  * Count updates reactively via StoreWatcher on activeRequest changes.
  */
 
@@ -9,6 +9,7 @@ import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import {
   formatJournal,
   formatDigest,
+  formatForgeDigest,
   clearJournal,
   getJournalCount,
 } from "../../core/generation-journal";
@@ -26,7 +27,7 @@ const COUNT_ID = "kse-journal-count";
 
 const S = {
   root: { padding: "8px", gap: "8px" },
-  row: { gap: "8px", "align-items": "center" },
+  row: { gap: "8px", "align-items": "center", "flex-wrap": "wrap" },
   count: { "font-size": "0.85em", opacity: "0.8", flex: "1" },
   btn: { padding: "4px 8px", "font-size": "0.8em" },
 };
@@ -87,7 +88,7 @@ export class SeJournalPanel extends SuiComponent<
             }),
             button({
               id: "kse-journal-digest-btn",
-              text: "SEGA Digest",
+              text: "SEGA",
               iconId: "clipboard" as IconId,
               style: S.btn,
               callback: async () => {
@@ -98,12 +99,24 @@ export class SeJournalPanel extends SuiComponent<
               },
             }),
             button({
+              id: "kse-journal-forge-digest-btn",
+              text: "Forge",
+              iconId: "clipboard" as IconId,
+              style: S.btn,
+              callback: async () => {
+                await api.v1.clipboard.writeText(formatForgeDigest());
+                api.v1.ui.toast("Forge digest copied to clipboard", {
+                  type: "success",
+                });
+              },
+            }),
+            button({
               id: "kse-journal-clear-btn",
               text: "Clear",
               iconId: "trash-2" as IconId,
               style: S.btn,
-              callback: async () => {
-                await clearJournal();
+              callback: () => {
+                clearJournal();
                 api.v1.ui.updateParts([
                   { id: COUNT_ID, text: "0 entries recorded" },
                 ]);

@@ -518,18 +518,19 @@ Cover: the dominant mood or atmosphere, ongoing conflicts or tensions, power dyn
 
 export const FORGE_PROMPT = `You are a world-building assistant operating in a step-by-step forge loop.
 
-Each response emits exactly ONE command. Do not emit multiple commands.
+Each response emits exactly ONE command.
 
 Command vocabulary:
-  [CREATE <TYPE> "<Name>"]       — new world element (CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC)
-  [REVISE "<Name>"]              — rewrite the description text of an existing draft element
-  [DELETE "<Name>"]              — remove a draft element
-  [CRITIQUE]                     — self-assessment; ends this forge pass
+  [CREATE <TYPE> "<Name>" | description 1–3 sentences]   — new world element (CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC)
+  [REVISE "<Name>" | updated description 1–3 sentences]  — rewrite an existing draft element
+  [DELETE "<Name>"]                                       — remove a draft element
+  [CRITIQUE]                                             — self-assessment; ends this forge pass
 
-After CREATE or REVISE, write the description text (1–3 sentences) on the following lines.
-After [CRITIQUE], write 2–4 sentences: what works, what is missing, what to address next.
+For CREATE and REVISE, write the description inline after the | separator, before the closing ].
+After [CRITIQUE], write 2–4 sentences on the following lines: what works, what is missing, what to address next.
 
-There is no [DESCRIPTION] command. To update a character's description, use [REVISE "<Name>"].
+EXAMPLE:
+[CREATE CHARACTER "Mira Voss" | A surgeon operating out of a black-market bay who owes a debt she cannot repay. Her cold bedside manner hides genuine grief for the patients she could not save.]
 
 The ESTABLISHED WORLD section lists what already exists — do not recreate those elements.
 The prior command sequence shows what has been built this pass — continue it naturally.

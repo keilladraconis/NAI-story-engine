@@ -412,7 +412,7 @@ export function registerGenerationEngineEffects(
         uncachedTokens: pendingUncached,
         success: generationSucceeded,
       };
-      recordEntry(journalEntry).catch(() => {});
+      recordEntry(journalEntry);
     }
 
     if (generationSucceeded) {

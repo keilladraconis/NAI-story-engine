@@ -98,9 +98,8 @@ function buildForgePassLog(state: RootState): string {
   const lines: string[] = [];
   for (const entity of draftEntities) {
     const type = FIELD_TO_TYPE[entity.categoryId] ?? "CHARACTER";
-    lines.push(`[CREATE ${type} "${entity.name}"]`);
-    if (entity.summary) lines.push(entity.summary);
-    lines.push("");
+    const desc = entity.summary ? ` | ${entity.summary}` : "";
+    lines.push(`[CREATE ${type} "${entity.name}"${desc}]`);
   }
 
   return lines.join("\n").trim();

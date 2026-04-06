@@ -280,7 +280,7 @@ export class StoryEnginePlugin extends SuiPlugin {
     const journalEnabled = await api.v1.config.get("generation_journal");
     if (journalEnabled) {
       api.v1.permissions.request(["clipboardWrite"]);
-      await loadJournal();
+      loadJournal();
       const journalPart = await new SeJournalPanel({
         id: "kse-journal-root",
       }).build();

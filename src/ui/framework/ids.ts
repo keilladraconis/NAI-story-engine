@@ -21,7 +21,6 @@ export const EDIT_PANE_CONTENT = "kse-edit-content"; // storyStorage.get/set + s
 export const STORAGE_KEYS = {
   // Core persistence
   PERSIST: "kse-persist",
-  JOURNAL: "kse-gen-journal",
 
   // Setting (Crucible reads this too)
   SETTING: "kse-setting",

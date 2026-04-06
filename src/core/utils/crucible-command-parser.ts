@@ -101,7 +101,21 @@ export function parseCommands(text: string): ParsedCommand[] {
       continue;
     }
 
-    // [CREATE TYPE "Name"]
+    // [CREATE TYPE "Name" | inline description] — forge inline format
+    const createInline = line.match(
+      /^\[CREATE\s+([A-Z]+)\s+"([^"]+)"\s*\|\s*(.+?)\]?\s*$/,
+    );
+    if (createInline) {
+      commands.push({
+        kind: "CREATE",
+        elementType: createInline[1],
+        name: createInline[2].trim(),
+        content: createInline[3].trim(),
+      });
+      continue;
+    }
+
+    // [CREATE TYPE "Name"] — classic multi-line format (Crucible)
     const createMatch = line.match(/^\[CREATE\s+([A-Z]+)\s+"([^"]+)"\]/);
     if (createMatch) {
       const elementType = createMatch[1];
@@ -113,7 +127,21 @@ export function parseCommands(text: string): ParsedCommand[] {
       continue;
     }
 
-    // [REVISE "Name"] or [REVISE TYPE "Name"]
+    // [REVISE "Name" | inline description] — forge inline format
+    // Also handles [REVISE TYPE "Name" | desc]
+    const reviseInline = line.match(
+      /^\[(?:REVISE|DESCRIPTION)\s+(?:[A-Z]+\s+)?"([^"]+)"\s*\|\s*(.+?)\]?\s*$/,
+    );
+    if (reviseInline) {
+      commands.push({
+        kind: "REVISE",
+        name: reviseInline[1].trim(),
+        content: reviseInline[2].trim(),
+      });
+      continue;
+    }
+
+    // [REVISE "Name"] or [REVISE TYPE "Name"] — classic multi-line format
     // Also accepts [DESCRIPTION "Name"] as an alias — GLM sometimes emits this
     // when asked to update a character description.
     const reviseMatch = line.match(
