@@ -156,22 +156,48 @@ export function registerForgeEffects(
       }
     }
 
-    // Pre-create lorebook categories for all entity types (avoid races)
+    // Pre-create lorebook categories for all category types needed (avoid per-entity races)
     const uniqueCategoryIds = [...new Set(draftEntities.map((e) => e.categoryId))];
-    for (const categoryId of uniqueCategoryIds) {
-      await ensureCategory(categoryId);
+    const categoryIdMap = new Map<string, string>();
+    for (const catFieldId of uniqueCategoryIds) {
+      categoryIdMap.set(catFieldId, await ensureCategory(catFieldId));
     }
 
-    // Create lorebook entries and cast each entity
+    // Fetch all existing lorebook entries once for name-matching
+    const allEntries = await api.v1.lorebook.entries();
+    // IDs of entries already bound to live entities — never re-bind these
+    const managedEntryIds = new Set(
+      state.world.entities
+        .filter((e) => e.lifecycle === "live" && e.lorebookEntryId)
+        .map((e) => e.lorebookEntryId as string),
+    );
+
+    // Cast each entity: bind to existing entry by name, or create new in SE category
     let count = 0;
     for (const entity of draftEntities) {
-      const lorebookEntryId = await api.v1.lorebook.createEntry({
-        id: api.v1.uuid(),
-        displayName: entity.name,
-        text: entity.summary ? `${entity.name}: ${entity.summary}` : entity.name,
-        keys: [],
-        enabled: true,
-      });
+      const nameLower = entity.name.toLowerCase();
+      const existing = allEntries.find(
+        (e) => !managedEntryIds.has(e.id) && (e.displayName ?? "").toLowerCase() === nameLower,
+      );
+
+      let lorebookEntryId: string;
+      if (existing) {
+        lorebookEntryId = existing.id;
+        managedEntryIds.add(lorebookEntryId); // prevent double-binding within this batch
+        api.v1.log(`[forge] Cast "${entity.name}" → bound to existing entry ${lorebookEntryId}`);
+      } else {
+        const categoryId = categoryIdMap.get(entity.categoryId) ?? await ensureCategory(entity.categoryId);
+        lorebookEntryId = await api.v1.lorebook.createEntry({
+          id: api.v1.uuid(),
+          displayName: entity.name,
+          text: entity.summary ? `${entity.name}: ${entity.summary}` : entity.name,
+          keys: [],
+          enabled: true,
+          category: categoryId,
+        });
+        api.v1.log(`[forge] Cast "${entity.name}" → created new entry ${lorebookEntryId}`);
+      }
+
       dispatch(entityCast({ entityId: entity.id, lorebookEntryId }));
       count++;
     }
@@ -218,15 +244,35 @@ export function registerForgeEffects(
       return;
     }
 
-    await ensureCategory(entity.categoryId);
+    // Try to bind to an existing lorebook entry with the same name
+    const allEntries = await api.v1.lorebook.entries();
+    const managedEntryIds = new Set(
+      state.world.entities
+        .filter((e) => e.lifecycle === "live" && e.lorebookEntryId)
+        .map((e) => e.lorebookEntryId as string),
+    );
+    const nameLower = entity.name.toLowerCase();
+    const existing = allEntries.find(
+      (e) => !managedEntryIds.has(e.id) && (e.displayName ?? "").toLowerCase() === nameLower,
+    );
 
-    const lorebookEntryId = await api.v1.lorebook.createEntry({
-      id: api.v1.uuid(),
-      displayName: entity.name,
-      text: entity.summary ? `${entity.name}: ${entity.summary}` : entity.name,
-      keys: [],
-      enabled: true,
-    });
+    let lorebookEntryId: string;
+    if (existing) {
+      lorebookEntryId = existing.id;
+      api.v1.log(`[forge] Cast "${entity.name}" → bound to existing entry ${lorebookEntryId}`);
+    } else {
+      const categoryId = await ensureCategory(entity.categoryId);
+      lorebookEntryId = await api.v1.lorebook.createEntry({
+        id: api.v1.uuid(),
+        displayName: entity.name,
+        text: entity.summary ? `${entity.name}: ${entity.summary}` : entity.name,
+        keys: [],
+        enabled: true,
+        category: categoryId,
+      });
+      api.v1.log(`[forge] Cast "${entity.name}" → created new entry ${lorebookEntryId}`);
+    }
+
     dispatch(entityCast({ entityId: entity.id, lorebookEntryId }));
     api.v1.ui.toast(`${entity.name} cast`, { type: "success" });
   });
