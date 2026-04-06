@@ -1,6 +1,6 @@
 /**
  * Forge Handler — Parses and executes structured commands from GLM's forge output,
- * dispatching results to the world slice (entityForged, relationshipAdded, etc.).
+ * dispatching results to the world slice (entityForged, etc.).
  * Drives the atomic forge loop by dispatching step/critique/done signals.
  */
 
@@ -10,14 +10,12 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import { GenerationStrategy } from "../../types";
-import { WorldEntity, Relationship } from "../../types";
+import { WorldEntity } from "../../types";
 import { DulfsFieldID } from "../../../../config/field-definitions";
 import {
   entityForged,
   entitySummaryUpdated,
   entityDeleted,
-  relationshipAdded,
-  relationshipUpdated,
   forgeStepCompleted,
   forgeCritiqueReceived,
   forgeLoopEnded,
@@ -38,11 +36,9 @@ type ForgeTarget = Extract<GenerationStrategy["target"], { type: "forge" }>;
  * CREATE → entityForged (draft)
  * REVISE → entitySummaryUpdated
  * DELETE → entityDeleted
- * LINK → relationshipAdded
  */
 function executeForgeCommands(
   commands: ReturnType<typeof parseCommands>,
-  batchId: string,
   getState: () => import("../../types").RootState,
   dispatch: import("../../types").AppDispatch,
 ): void {
@@ -74,7 +70,6 @@ function executeForgeCommands(
 
         const entity: WorldEntity = {
           id: api.v1.uuid(),
-          batchId,
           categoryId: fieldId,
           lifecycle: "draft",
           name: cmd.name,
@@ -121,51 +116,6 @@ function executeForgeCommands(
         break;
       }
 
-      case "LINK": {
-        const from = getState().world.entities.find(
-          (e) => e.name.toLowerCase() === cmd.fromName.toLowerCase(),
-        );
-        const to = getState().world.entities.find(
-          (e) => e.name.toLowerCase() === cmd.toName.toLowerCase(),
-        );
-        if (!from || !to) {
-          api.v1.log(
-            `[forge] LINK: one or both entities not found ("${cmd.fromName}" → "${cmd.toName}")`,
-          );
-          break;
-        }
-
-        // Update existing relationship rather than duplicating — check both
-        // directions since the model may emit A→B and B→A as separate commands.
-        const existing = getState().world.relationships.find(
-          (r) =>
-            (r.fromEntityId === from.id && r.toEntityId === to.id) ||
-            (r.fromEntityId === to.id && r.toEntityId === from.id),
-        );
-        if (existing) {
-          dispatch(
-            relationshipUpdated({
-              relationshipId: existing.id,
-              description: cmd.description,
-            }),
-          );
-          api.v1.log(
-            `[forge] LINK updated "${cmd.fromName}" → "${cmd.toName}"`,
-          );
-          break;
-        }
-
-        const relationship: Relationship = {
-          id: api.v1.uuid(),
-          fromEntityId: from.id,
-          toEntityId: to.id,
-          description: cmd.description,
-        };
-        dispatch(relationshipAdded({ relationship }));
-        api.v1.log(`[forge] LINK "${cmd.fromName}" → "${cmd.toName}"`);
-        break;
-      }
-
       case "DONE":
         api.v1.log("[forge] DONE");
         break;
@@ -183,7 +133,7 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
 
     // Show command keywords as ticker during generation
     const commandMatches = text.match(
-      /\[(CREATE|REVISE|LINK|DELETE|CRITIQUE|DONE)\b[^\]]*\]/g,
+      /\[(CREATE|REVISE|DELETE|CRITIQUE|DONE)\b[^\]]*\]/g,
     );
     const lastCommand = commandMatches
       ? commandMatches[commandMatches.length - 1]
@@ -211,7 +161,6 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
     const commands = parseCommands(text);
 
     const stepPayload = {
-      batchId: ctx.target.batchId,
       step: ctx.target.step,
       forgeGuidance: ctx.target.forgeGuidance,
       brainstormContext: ctx.target.brainstormContext,
@@ -225,12 +174,7 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
       return;
     }
 
-    executeForgeCommands(
-      commands,
-      ctx.target.batchId,
-      ctx.getState,
-      ctx.dispatch,
-    );
+    executeForgeCommands(commands, ctx.getState, ctx.dispatch);
 
     const critique = commands.find(
       (c): c is CritiqueCommand => c.kind === "CRITIQUE",
@@ -238,7 +182,6 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
     if (critique) {
       ctx.dispatch(
         forgeCritiqueReceived({
-          batchId: ctx.target.batchId,
           critiqueText: critique.text,
         }),
       );

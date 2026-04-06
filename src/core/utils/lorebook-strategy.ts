@@ -5,16 +5,13 @@ import { DulfsFieldID, FIELD_CONFIGS } from "../../config/field-definitions";
 import { STORAGE_KEYS } from "../../ui/framework/ids";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
 import { getModel } from "./config";
+import {
+  LOREBOOK_GENERATE_PROMPT,
+  LOREBOOK_KEYS_PROMPT,
+  LOREBOOK_REFINE_PROMPT,
+  CATEGORY_TEMPLATES,
+} from "./prompts";
 
-// Category-to-template mapping
-const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
-  "SE: Characters": "lorebook_template_character",
-  "SE: Systems": "lorebook_template_system",
-  "SE: Locations": "lorebook_template_location",
-  "SE: Factions": "lorebook_template_faction",
-  "SE: Narrative Vectors": "lorebook_template_dynamic",
-  "SE: Topics": "lorebook_template_topic",
-};
 
 // Category-to-type mapping for anchored prefills
 export const CATEGORY_TO_TYPE: Record<string, string> = {
@@ -37,21 +34,13 @@ function findEntityForEntry(state: RootState, entryId: string) {
   return state.world.entities.find((e) => e.lorebookEntryId === entryId);
 }
 
-/** Format the relationships of a specific entity as context text. */
-function formatEntityRelationships(state: RootState, entityId: string): string {
-  const rels = state.world.relationships.filter(
-    (r) => r.fromEntityId === entityId || r.toEntityId === entityId,
+/** Format the Threads (groups) an entity belongs to as context text. */
+function formatEntityGroups(state: RootState, entityId: string): string {
+  const groups = state.world.groups.filter((g) =>
+    g.entityIds.includes(entityId),
   );
-  if (rels.length === 0) return "";
-
-  const lines = rels.map((r) => {
-    const fromName =
-      state.world.entities.find((e) => e.id === r.fromEntityId)?.name || "";
-    const toName =
-      state.world.entities.find((e) => e.id === r.toEntityId)?.name || "";
-    return `- ${fromName} → ${toName}: ${r.description}`;
-  });
-  return lines.join("\n");
+  if (groups.length === 0) return "";
+  return groups.map((g) => `- ${g.title}: ${g.summary}`).join("\n");
 }
 
 /** Format live world entities as context, grouped by category. */
@@ -109,16 +98,10 @@ export const createLorebookContentFactory = (
 
     const displayName = entry.displayName || "Unnamed Entry";
     const model = await getModel();
-    const basePrompt = String(
-      (await api.v1.config.get("lorebook_generate_prompt")) || "",
-    );
-    const prompt = basePrompt.replace("[itemName]", displayName);
+    const prompt = LOREBOOK_GENERATE_PROMPT.replace("[itemName]", displayName);
 
     // Get template based on category
-    const templateKey = CATEGORY_TEMPLATE_MAP[categoryName];
-    const template = templateKey
-      ? String((await api.v1.config.get(templateKey)) || "")
-      : "";
+    const template = CATEGORY_TEMPLATES[categoryName] || "";
 
     // Resolve entity early so its summary is available as item description fallback
     const state = getState();
@@ -167,14 +150,14 @@ Setting: ${setting}
       });
     }
 
-    // Entity-specific relationships from v11 world slice
-    const relContext = entity
-      ? formatEntityRelationships(state, entity.id)
+    // Thread (group) context for this entity
+    const groupContext = entity
+      ? formatEntityGroups(state, entity.id)
       : "";
-    if (relContext) {
+    if (groupContext) {
       messages.push({
         role: "system",
-        content: `[RELATIONSHIPS]\n${relContext}`,
+        content: `[GROUPS]\n${groupContext}`,
       });
     }
 
@@ -187,7 +170,7 @@ Setting: ${setting}
     );
 
     const tailCount =
-      (template ? 1 : 0) + (worldContext ? 1 : 0) + (relContext ? 1 : 0) + 3;
+      (template ? 1 : 0) + (worldContext ? 1 : 0) + (groupContext ? 1 : 0) + 3;
     return {
       messages,
       params: {
@@ -220,21 +203,19 @@ export const createLorebookKeysFactory = (
 
     const entryText = entry.text || "";
     const model = await getModel();
-    const prompt = String(
-      (await api.v1.config.get("lorebook_keys_prompt")) || "",
-    );
+    const prompt = LOREBOOK_KEYS_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState);
 
-    // Build relationship context for this entry from v11 world slice
+    // Thread (group) context for this entry
     const state = getState();
     const entity = findEntityForEntry(state, entryId);
-    const relContext = entity
-      ? formatEntityRelationships(state, entity.id)
+    const groupContext = entity
+      ? formatEntityGroups(state, entity.id)
       : "";
 
-    const contextContent = relContext
-      ? `${entryText}\n\n${relContext}`
+    const contextContent = groupContext
+      ? `${entryText}\n\n${groupContext}`
       : entryText;
 
     const messages: Message[] = [
@@ -297,10 +278,7 @@ export const createLorebookRefineFactory = (
     );
 
     // Get template based on category
-    const templateKey = CATEGORY_TEMPLATE_MAP[categoryName];
-    const template = templateKey
-      ? String((await api.v1.config.get(templateKey)) || "")
-      : "";
+    const template = CATEGORY_TEMPLATES[categoryName] || "";
 
     // Anchored assistant prefill
     const prefillContent = `Name: ${displayName}
@@ -309,17 +287,15 @@ Setting: ${setting}
 `;
 
     const model = await getModel();
-    const refinePrompt = String(
-      (await api.v1.config.get("lorebook_refine_prompt")) || "",
-    );
+    const refinePrompt = LOREBOOK_REFINE_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState);
 
-    // v11 world context
+    // Thread (group) context
     const state = getState();
     const entity = findEntityForEntry(state, entryId);
-    const relContext = entity
-      ? formatEntityRelationships(state, entity.id)
+    const groupContext = entity
+      ? formatEntityGroups(state, entity.id)
       : "";
 
     const messages: Message[] = [
@@ -330,10 +306,10 @@ Setting: ${setting}
       },
     ];
 
-    if (relContext) {
+    if (groupContext) {
       messages.push({
         role: "system",
-        content: `[RELATIONSHIPS]\n${relContext}`,
+        content: `[GROUPS]\n${groupContext}`,
       });
     }
 
@@ -354,7 +330,7 @@ Setting: ${setting}
         min_p: 0.05,
         frequency_penalty: 0.1,
       },
-      contextPinning: { head: 1, tail: relContext ? 4 : 3 },
+      contextPinning: { head: 1, tail: groupContext ? 4 : 3 },
     };
   };
 };

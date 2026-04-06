@@ -12,7 +12,7 @@
 
 import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
-import { entityBound, batchCreated } from "../../core/store/slices/world";
+import { entityBound } from "../../core/store/slices/world";
 import {
   detectCategory,
   cycleDulfsCategory,
@@ -167,33 +167,12 @@ export class SeLorebookPanel extends SuiComponent<
                     const entryId = this._currentEntryId;
                     if (!entryId) return;
 
-                    const state = store.getState();
-                    let importedBatch = state.world.batches.find(
-                      (b) => b.name === "Imported",
-                    );
-                    let batchId: string;
-                    if (!importedBatch) {
-                      batchId = api.v1.uuid();
-                      store.dispatch(
-                        batchCreated({
-                          batch: {
-                            id: batchId,
-                            name: "Imported",
-                            entityIds: [],
-                          },
-                        }),
-                      );
-                    } else {
-                      batchId = importedBatch.id;
-                    }
-
                     const entry = await api.v1.lorebook.entry(entryId);
                     const name = entry?.displayName || "Unknown";
                     store.dispatch(
                       entityBound({
                         entity: {
                           id: api.v1.uuid(),
-                          batchId,
                           categoryId: this._currentCategoryId,
                           lifecycle: "live",
                           lorebookEntryId: entryId,

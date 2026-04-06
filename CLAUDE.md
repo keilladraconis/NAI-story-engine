@@ -27,7 +27,7 @@ npm run test       # vitest run
 **State (`src/core/store/`):**
 
 - `slices/story.ts` — Field contents and World Entry items (DULFS)
-- `slices/world.ts` — `WorldEntity` records, batches, relationships, forge loop flag
+- `slices/world.ts` — `WorldEntity` records, `WorldGroup` (Threads), forge loop flag
 - `slices/brainstorm.ts` — Chat messages
 - `slices/foundation.ts` — Shape, intent, ATTG, style fields
 - `slices/ui.ts` — Edit modes, lorebook selection state
@@ -45,22 +45,20 @@ npm run test       # vitest run
 
 **Entity system (`src/ui/components/SeEntityCard.ts`, `SeEntityEditPane.ts`):**
 
-- `WorldEntity` has `id`, `batchId`, `categoryId` (`DulfsFieldID`), `lifecycle` (`"draft" | "live"`), optional `lorebookEntryId`, `name`, and `summary`.
+- `WorldEntity` has `id`, `categoryId` (`DulfsFieldID`), `lifecycle` (`"draft" | "live"`), optional `lorebookEntryId`, `name`, and `summary`.
 - **Entity summary** is a Story Engine–internal field. It is stored only in Redux, editable only in `SeEntityEditPane`, and **never synchronized with or derived from lorebook entry text**. The lorebook entry text is a separate field populated by generation.
 - **Draft entities** have no lorebook entry. Their card shows name + summary; edit pane allows name/summary/category editing.
 - **Live entities** have a lorebook entry (`lorebookEntryId`). Their edit pane additionally shows lorebook content and keys with generation buttons. Lorebook content/keys are **only flushed to the lorebook API on Save** — not on every keystroke.
 - **Cast**: `castAllRequested` / `entityCastRequested` effects first look for an existing unmanaged lorebook entry with a matching `displayName` (case-insensitive) and bind to it. If none found, a new entry is created in the appropriate `SE: <Category>` lorebook category with empty text (summary is not seeded into lorebook).
 - **Category**: `entityCategoryChanged` action updates `entity.categoryId`. `SeEntityEditPane` shows a category picker (SuiActionBar) for draft entities.
 
-**Prompts:** Configurable via `project.yaml` config fields (system prompt, brainstorm, world snapshot, lorebook generation, ATTG, style, etc.).
+**Prompts:** All generation prompts are hard-coded constants in `src/core/utils/prompts.ts`. They are **not** configurable via `project.yaml`. `project.yaml` contains only non-prompt settings (model, feature flags).
 
-**Prompt configuration policy — prompts belong in `project.yaml`, not in code.** NovelAI exposes `project.yaml` config fields as a user-editable settings panel. Generation prompts must live there so users can tune them without touching the script. The rule:
+**Prompt policy — prompts live in `src/core/utils/prompts.ts`, not in code files and not in `project.yaml`.**
 
-- Every generation prompt (system identity, shape, intent, world state, forge, lorebook, ATTG, style, brainstorm, etc.) must be a `type: string, multiline: true` config field in `project.yaml` with a solid default.
-- Read at JIT time via `api.v1.config.get("field_name")` inside the message factory — never at module load time.
-- **Never hardcode a prompt as a string literal in a strategy or effect file.** If you find a hardcoded prompt, move it to `project.yaml`. Fallback to `""` is acceptable; the prompt author is responsible for providing a non-empty default in the yaml.
-- Before adding a new config field, check whether an existing field already covers the use case. Prompts often survive feature renames (e.g. `crucible_shape_prompt` is still the right key for Foundation shape generation). Duplicate config fields that say the same thing are worse than reusing a slightly-misnamed one.
-- Config field names use `snake_case`. `prettyName` is what the user sees. `description` explains what the field controls and any formatting constraints the model must respect.
+- Every generation prompt is an exported string constant in `prompts.ts`. Import and use directly — no `api.v1.config.get()` for prompt fields.
+- `project.yaml` is for runtime settings only: `model`, `sega_skip_*`, `generation_journal`, `erato_compatibility`, `story_engine_debug`. Do not add prompt fields there.
+- When adding a new prompt, add it to `prompts.ts` as a named export.
 
 **Generation pipeline:**
 

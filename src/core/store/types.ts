@@ -129,7 +129,6 @@ export interface GenerationStrategy {
     | { type: "bootstrap" }
     | {
         type: "forge";
-        batchId: string;
         step: number;
         forgeGuidance: string;
         brainstormContext: string;
@@ -158,22 +157,16 @@ export interface RuntimeState {
 
 export type EntityLifecycle = "draft" | "live";
 
-export interface WorldBatch {
+export interface WorldGroup {
   id: string;
-  name: string; // "Main", "Rusty Anchor Regulars", etc.
-  entityIds: string[]; // ordered
-}
-
-export interface Relationship {
-  id: string;
-  fromEntityId: string;
-  toEntityId: string;
-  description: string;
+  title: string; // display name — e.g. "Thieves' Guild Inner Circle"
+  summary: string; // narrative description — fed into [GROUPS] generation context
+  entityIds: string[];
+  lorebookEntryId?: string; // optional: group summary synced as a lorebook entry
 }
 
 export interface WorldEntity {
   id: string;
-  batchId: string;
   categoryId: DulfsFieldID; // Character, Location, etc. — metadata
   lifecycle: EntityLifecycle;
   lorebookEntryId?: string; // set on Cast, cleared on Reforge
@@ -182,9 +175,8 @@ export interface WorldEntity {
 }
 
 export interface WorldState {
-  batches: WorldBatch[];
+  groups: WorldGroup[];
   entities: WorldEntity[];
-  relationships: Relationship[];
   forgeLoopActive: boolean;
 }
 

@@ -32,6 +32,17 @@ import {
 import { formatWorldState } from "./crucible-world-formatter";
 import { STORAGE_KEYS } from "../../ui/framework/ids";
 import { getModel } from "./config";
+import {
+  SYSTEM_PROMPT,
+  LOREBOOK_WEAVING_PROMPT,
+  CRUCIBLE_SYSTEM_PROMPT,
+  BRAINSTORM_PROMPT,
+  BRAINSTORM_CRITIC_PROMPT,
+  BRAINSTORM_SUMMARIZE_PROMPT,
+  CANON_GENERATE_PROMPT,
+  ATTG_GENERATE_PROMPT,
+  STYLE_GENERATE_PROMPT,
+} from "./prompts";
 // --- Helpers ---
 
 const getFieldContent = (state: RootState, id: string): string => {
@@ -271,10 +282,8 @@ export const buildStoryEnginePrefix = async (
   const excluded = new Set(options.excludeSections || []);
 
   // --- MSG 1: System prompt + weaving ---
-  const systemPrompt = String((await api.v1.config.get("system_prompt")) || "");
-  const weavingPrompt = String(
-    (await api.v1.config.get("lorebook_weaving_prompt")) || "",
-  );
+  const systemPrompt = SYSTEM_PROMPT;
+  const weavingPrompt = LOREBOOK_WEAVING_PROMPT;
   const msg1Content = weavingPrompt
     ? `${systemPrompt}\n\n${weavingPrompt}`
     : systemPrompt;
@@ -420,9 +429,7 @@ export const buildCruciblePrefix = async (
   const state = getState();
 
   // --- MSG 1: Crucible system identity ---
-  const systemPrompt = String(
-    (await api.v1.config.get("crucible_system_prompt")) || "",
-  );
+  const systemPrompt = CRUCIBLE_SYSTEM_PROMPT;
   const messages: Message[] = [{ role: "system", content: systemPrompt }];
 
   // --- MSG 2 (optional): Creative grounding ---
@@ -499,18 +506,12 @@ export const createBrainstormFactory = (
   return async () => {
     const state = getState();
     const model = await getModel();
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
-    const promptKey =
-      mode === "critic" ? "brainstorm_critic_prompt" : "brainstorm_prompt";
-    const brainstormInstruction = String(
-      (await api.v1.config.get(promptKey)) || "",
-    );
+    const brainstormInstruction =
+      mode === "critic" ? BRAINSTORM_CRITIC_PROMPT : BRAINSTORM_PROMPT;
 
     const systemMsg: Message = {
       role: "system",
-      content: `${systemPrompt}\n\nYou are now in brainstorming mode. ${brainstormInstruction}\n\nRespond naturally without echoing mode indicators or tags.`,
+      content: `${SYSTEM_PROMPT}\n\nYou are now in brainstorming mode. ${brainstormInstruction}\n\nRespond naturally without echoing mode indicators or tags.`,
     };
 
     const messages: Message[] = [systemMsg];
@@ -598,16 +599,10 @@ export const createSummarizeFactory = (
 ): MessageFactory => {
   return async () => {
     const model = await getModel();
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
-    const summarizeInstruction = String(
-      (await api.v1.config.get("brainstorm_summarize_prompt")) || "",
-    );
 
     const systemMsg: Message = {
       role: "system",
-      content: `${systemPrompt}\n\n${summarizeInstruction}`,
+      content: `${SYSTEM_PROMPT}\n\n${BRAINSTORM_SUMMARIZE_PROMPT}`,
     };
 
     const messages: Message[] = [systemMsg];
@@ -637,9 +632,6 @@ export const createBrainstormTitleFactory = (
 ): MessageFactory => {
   return async () => {
     const model = await getModel();
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
 
     const chatText = chatHistory
       .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
@@ -648,7 +640,7 @@ export const createBrainstormTitleFactory = (
     const messages: Message[] = [
       {
         role: "system",
-        content: `${systemPrompt}\n\nYou are a creative assistant. Given a brainstorm conversation, output a short evocative title (3–6 words) that captures the core theme or subject. Output ONLY the title — no punctuation at the end, no quotes, no explanation.`,
+        content: `${SYSTEM_PROMPT}\n\nYou are a creative assistant. Given a brainstorm conversation, output a short evocative title (3–6 words) that captures the core theme or subject. Output ONLY the title — no punctuation at the end, no quotes, no explanation.`,
       },
       {
         role: "user",
@@ -707,9 +699,7 @@ export const createCanonFactory = (
 ): MessageFactory => {
   return async () => {
     const model = await getModel();
-    const prompt = String(
-      (await api.v1.config.get("canon_generate_prompt")) || "",
-    );
+    const prompt = CANON_GENERATE_PROMPT;
 
     // Exclude canon (generating it — prevents self-reference)
     const prefix = await buildStoryEnginePrefix(getState, {
@@ -854,9 +844,7 @@ export const createATTGFactory = (
 ): MessageFactory => {
   return async () => {
     const model = await getModel();
-    const prompt = String(
-      (await api.v1.config.get("attg_generate_prompt")) || "",
-    );
+    const prompt = ATTG_GENERATE_PROMPT;
 
     // Exclude ATTG (generating it)
     const prefix = await buildStoryEnginePrefix(getState, {
@@ -904,9 +892,7 @@ export const createStyleFactory = (
 ): MessageFactory => {
   return async () => {
     const model = await getModel();
-    const prompt = String(
-      (await api.v1.config.get("style_generate_prompt")) || "",
-    );
+    const prompt = STYLE_GENERATE_PROMPT;
 
     // Exclude style (generating it)
     const prefix = await buildStoryEnginePrefix(getState, {

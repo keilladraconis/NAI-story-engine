@@ -62,7 +62,7 @@ function targetToQueueEntry(target: GenerationStrategy["target"]): {
     case "bootstrap":
       return { type: "bootstrap", targetId: "" };
     case "forge":
-      return { type: "forge", targetId: target.batchId };
+      return { type: "forge", targetId: `forge:${target.step}` };
     case "foundation":
       return { type: "foundation", targetId: target.field };
   }
@@ -183,7 +183,7 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
     case "bootstrap":
       return "bootstrap";
     case "forge":
-      return `forge:${target.batchId.slice(0, 8)}`;
+      return `forge:${target.step}`;
     case "brainstormChatTitle":
       return `brainstorm-title:${target.chatIndex}`;
     case "foundation":

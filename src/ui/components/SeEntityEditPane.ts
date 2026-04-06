@@ -278,7 +278,7 @@ export class SeEntityEditPane extends SuiComponent<
     const { column, row, text, button, textInput, multilineTextInput } =
       api.v1.ui.part;
 
-    // ── Category bar (draft only) ─────────────────────────────────────────────
+    // ── Category bar ─────────────────────────────────────────────────────────
 
     const currentCategory = entity?.categoryId ?? "";
 
@@ -295,9 +295,7 @@ export class SeEntityEditPane extends SuiComponent<
       );
     };
 
-    const categoryBar =
-      lifecycle === "draft"
-        ? new SuiActionBar({
+    const categoryBar = new SuiActionBar({
             id: `${this.id}-category-bar`,
             left: CATEGORIES.map(
               (cat) =>
@@ -325,8 +323,7 @@ export class SeEntityEditPane extends SuiComponent<
                 left: { style: { "flex-wrap": "wrap" } },
               },
             },
-          })
-        : null;
+        });
 
     const parts: UIPart[] = [
       // ── Header ─────────────────────────────────────────────────────────────
@@ -357,7 +354,7 @@ export class SeEntityEditPane extends SuiComponent<
       }),
 
       // ── Category bar ───────────────────────────────────────────────────────
-      ...(categoryBar ? [await categoryBar.build()] : []),
+      await categoryBar.build(),
 
       // ── Name ───────────────────────────────────────────────────────────────
       textInput({

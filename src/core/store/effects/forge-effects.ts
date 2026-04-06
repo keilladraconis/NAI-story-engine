@@ -2,11 +2,11 @@
  * Forge Effects — Side effects for the Forge system.
  *
  * Handles:
- *  - forgeRequested → create batch, start loop (step 1)
+ *  - forgeRequested → start loop at step 1
  *  - forgeStepCompleted → schedule next step
  *  - forgeCritiqueReceived → write critique to FORGE_GUIDANCE field, end loop
  *  - castAllRequested → create lorebook entries, move entities to live
- *  - batchReforged / entityReforged → pre-fill batch name input in UI
+ *  - groupReforgeRequested → revert all group members to draft
  */
 
 import { Store, matchesAction } from "nai-store";
@@ -23,14 +23,11 @@ import {
   worldCleared,
   castAllRequested,
   forgeCastCompleted,
-  batchCreated,
   entityCast,
   entityCastRequested,
-  batchReforged,
-  entityReforged,
-  entityReforgeRequested,
+  groupReforged,
+  groupReforgeRequested,
   entityRegenRequested,
-  batchReforgeRequested,
   generationSubmitted,
   requestQueued,
 } from "../index";
@@ -53,7 +50,6 @@ export function registerForgeEffects(
   _genX: GenX,
 ): void {
   // ─── Forge Requested ──────────────────────────────────────────────────────
-  // Creates batch, starts the loop at step 1.
 
   subscribeEffect(matchesAction(forgeRequested), async () => {
     const guidanceRaw = await api.v1.storyStorage.get(
@@ -71,57 +67,14 @@ export function registerForgeEffects(
       return;
     }
 
-    // Auto-default: "Main" for the very first forge; first 4 guidance words for subsequent
-    const noBatches = getState().world.batches.length === 0;
-    const guidanceWords = forgeGuidance
-      .trim()
-      .split(/\s+/)
-      .slice(0, 4)
-      .join(" ");
-    const defaultName = noBatches ? "Main" : guidanceWords || "New Batch";
-
-    const batchNameRaw = await api.v1.storyStorage.get(
-      STORAGE_KEYS.FORGE_BATCH_NAME_UI,
-    );
-    const batchName = String(batchNameRaw || "").trim() || defaultName;
-
-    // If draft entities already exist, append to their batch (user hasn't cast yet).
-    // Otherwise merge-on-match against live batches (reforge scenario), or mint a new ID.
-    // Batch records for fresh drafts are deferred to Cast time.
-    const existingDraftBatchId =
-      getState().world.entities.find((e) => e.lifecycle === "draft")?.batchId ??
-      null;
-    const existingLiveBatch = !existingDraftBatchId
-      ? getState().world.batches.find(
-          (b) => b.name.toLowerCase() === batchName.toLowerCase(),
-        )
-      : null;
-    const batchId =
-      existingDraftBatchId ?? existingLiveBatch?.id ?? api.v1.uuid();
-
-    // Pre-populate the batch name input so the user sees the auto-derived name
-    if (!String(batchNameRaw || "").trim()) {
-      await api.v1.storyStorage.set(
-        STORAGE_KEYS.FORGE_BATCH_NAME_UI,
-        batchName,
-      );
-      api.v1.ui.updateParts([{ id: IDS.FORGE.BATCH_NAME, value: batchName }]);
-    }
-
     dispatch(forgeLoopStarted());
 
-    const strategy = buildForgeStrategy(
-      getState,
-      batchId,
-      1,
-      forgeGuidance,
-      brainstormContext,
-    );
+    const strategy = buildForgeStrategy(getState, 1, forgeGuidance, brainstormContext);
     dispatch(
       requestQueued({
         id: strategy.requestId,
         type: "forge",
-        targetId: batchId,
+        targetId: strategy.requestId,
       }),
     );
     dispatch(generationSubmitted(strategy));
@@ -132,10 +85,8 @@ export function registerForgeEffects(
   subscribeEffect(matchesAction(forgeClearRequested), async () => {
     dispatch(worldCleared());
     await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_GUIDANCE_UI, "");
-    await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_BATCH_NAME_UI, "");
     api.v1.ui.updateParts([
       { id: IDS.FORGE.GUIDANCE_INPUT, value: "" },
-      { id: IDS.FORGE.BATCH_NAME, value: "" },
     ]);
   });
 
@@ -156,7 +107,6 @@ export function registerForgeEffects(
 
     const strategy = buildForgeStrategy(
       getState,
-      payload.batchId,
       nextStep,
       payload.forgeGuidance,
       payload.brainstormContext,
@@ -165,13 +115,13 @@ export function registerForgeEffects(
       requestQueued({
         id: strategy.requestId,
         type: "forge",
-        targetId: payload.batchId,
+        targetId: strategy.requestId,
       }),
     );
     dispatch(generationSubmitted(strategy));
   });
 
-  // ─── Forge Critique Received → write to FORGE_INTENT field, end loop ──────
+  // ─── Forge Critique Received → write to FORGE_GUIDANCE field, end loop ───
 
   subscribeEffect(matchesAction(forgeCritiqueReceived), async ({ payload }) => {
     if (payload.critiqueText) {
@@ -199,22 +149,6 @@ export function registerForgeEffects(
       if (draftEntities.length === 0) {
         api.v1.ui.toast("No draft entities to cast", { type: "info" });
         return;
-      }
-
-      // Create any batch records that were deferred from forge time
-      const batchNameRaw = await api.v1.storyStorage.get(
-        STORAGE_KEYS.FORGE_BATCH_NAME_UI,
-      );
-      const batchName = String(batchNameRaw || "").trim() || "Main";
-      const pendingBatchIds = [...new Set(draftEntities.map((e) => e.batchId))];
-      for (const batchId of pendingBatchIds) {
-        if (!state.world.batches.some((b) => b.id === batchId)) {
-          dispatch(
-            batchCreated({
-              batch: { id: batchId, name: batchName, entityIds: [] },
-            }),
-          );
-        }
       }
 
       // Pre-create lorebook categories for all category types needed (avoid per-entity races)
@@ -248,7 +182,7 @@ export function registerForgeEffects(
         let lorebookEntryId: string;
         if (existing) {
           lorebookEntryId = existing.id;
-          managedEntryIds.add(lorebookEntryId); // prevent double-binding within this batch
+          managedEntryIds.add(lorebookEntryId);
           api.v1.log(
             `[forge] Cast "${entity.name}" → bound to existing entry ${lorebookEntryId}`,
           );
@@ -279,37 +213,21 @@ export function registerForgeEffects(
         type: "success",
       });
 
-      // Clear forge intent and batch name inputs
+      // Clear forge guidance input
       await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_GUIDANCE_UI, "");
-      await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_BATCH_NAME_UI, "");
       api.v1.ui.updateParts([
         { id: IDS.FORGE.GUIDANCE_INPUT, value: "" },
-        { id: IDS.FORGE.BATCH_NAME, value: "" },
       ]);
     },
   );
 
-  // ─── Batch Reforge Requested → Set entities to draft, pre-fill batch name ─
+  // ─── Group Reforge Requested → revert all member entities to draft ────────
 
-  subscribeEffect(matchesAction(batchReforgeRequested), async (action) => {
-    const { batchId } = action.payload;
-    const state = getState();
-    const batch = state.world.batches.find((b) => b.id === batchId);
-
-    // State change: move all entities in this batch to draft
-    dispatch(batchReforged({ batchId }));
-
-    // UI: pre-fill batch name input
-    if (batch) {
-      await api.v1.storyStorage.set(
-        STORAGE_KEYS.FORGE_BATCH_NAME_UI,
-        batch.name,
-      );
-      api.v1.ui.updateParts([{ id: IDS.FORGE.BATCH_NAME, value: batch.name }]);
-    }
+  subscribeEffect(matchesAction(groupReforgeRequested), (action) => {
+    dispatch(groupReforged({ groupId: action.payload.groupId }));
   });
 
-  // ─── Entity Cast Requested → Cast a single draft entity to lorebook ─────────
+  // ─── Entity Cast Requested → Cast a single draft entity to lorebook ───────
 
   subscribeEffect(matchesAction(entityCastRequested), async (action) => {
     const { entityId } = action.payload;
@@ -321,7 +239,6 @@ export function registerForgeEffects(
       return;
     }
 
-    // Try to bind to an existing lorebook entry with the same name
     const allEntries = await api.v1.lorebook.entries();
     const managedEntryIds = new Set(
       state.world.entities
@@ -360,32 +277,7 @@ export function registerForgeEffects(
     api.v1.ui.toast(`${entity.name} cast`, { type: "success" });
   });
 
-  // ─── Entity Reforge Requested → Set entity to draft, pre-fill batch name ──
-
-  subscribeEffect(matchesAction(entityReforgeRequested), async (action) => {
-    const { entityId } = action.payload;
-    const state = getState();
-    const entity = state.world.entities.find((e) => e.id === entityId);
-
-    // State change: move entity to draft, clear lorebookEntryId
-    dispatch(entityReforged({ entityId }));
-
-    // UI: pre-fill batch name input with entity's original batch
-    if (entity) {
-      const batch = state.world.batches.find((b) => b.id === entity.batchId);
-      if (batch) {
-        await api.v1.storyStorage.set(
-          STORAGE_KEYS.FORGE_BATCH_NAME_UI,
-          batch.name,
-        );
-        api.v1.ui.updateParts([
-          { id: IDS.FORGE.BATCH_NAME, value: batch.name },
-        ]);
-      }
-    }
-  });
-
-  // ─── Entity Regen Requested → Queue content + keys generation for one entity ─
+  // ─── Entity Regen Requested → Queue content + keys generation ─────────────
 
   subscribeEffect(matchesAction(entityRegenRequested), async (action) => {
     const { entityId } = action.payload;
@@ -402,9 +294,6 @@ export function registerForgeEffects(
     const contentRequestId = `lb-entity-${entityId}-content`;
     const keysRequestId = `lb-entity-${entityId}-keys`;
 
-    // Content generation uses entity.summary (via createLorebookContentFactory) as the
-    // item description, so the EntityCard summary is preserved as the source of truth
-    // for the generated rich lorebook text. entity.summary in Redux is never touched.
     const contentFactory = createLorebookContentFactory(
       getState,
       lorebookEntryId,

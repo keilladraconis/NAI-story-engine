@@ -9,11 +9,11 @@
  *   - actions: lifecycle-specific buttons (no edit button; title is the entry point)
  *
  * Collapsible content:
- *   - Draft: full summary text
- *   - Live:  secondary actions (Move, Delete) + links section
+ *   - Draft: full summary text + discard button
+ *   - Live:  summary text + delete button
  *
  * Draft: discard in actions; labelCallback opens SeEntityEditPane.
- * Live:  reforge + regen in actions; labelCallback opens SeEntityEditPane.
+ * Live:  regen in actions; labelCallback opens SeEntityEditPane.
  */
 
 import {
@@ -28,48 +28,14 @@ import {
 import { store } from "../../core/store";
 import {
   entityDiscardRequested,
-  entityReforgeRequested,
   entityRegenRequested,
   entityDeleted,
-  relationshipAdded,
 } from "../../core/store/slices/world";
-import type { Relationship } from "../../core/store/types";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 import { SeEntityEditPane } from "./SeEntityEditPane";
 import { SeGenerationIconButton } from "./SeGenerationButton";
-import { openMoveModal } from "./MoveModal";
-import { buildSeRelationshipItem } from "./SeRelationshipItem";
-
-// ── Local utility ──────────────────────────────────────────────────────────────
-
-/**
- * Wraps a pre-built UIPartColumn as an AnySuiComponent so it can be used
- * as a SuiCollapsible child alongside true SuiComponent instances.
- */
-class SuiRawPart extends SuiComponent<
-  { default: { self: { style: object } } },
-  Record<string, never>,
-  SuiComponentOptions<
-    { default: { self: { style: object } } },
-    Record<string, never>
-  >,
-  UIPartColumn
-> {
-  constructor(
-    id: string,
-    private readonly _part: UIPartColumn,
-  ) {
-    super(
-      { id, state: {} as Record<string, never> },
-      { default: { self: { style: {} } } },
-    );
-  }
-  async compose(): Promise<UIPartColumn> {
-    return this._part;
-  }
-}
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -82,8 +48,6 @@ export type SeEntityCardOptions = {
   editHost?: EditPaneHost;
 } & SuiComponentOptions<SeEntityCardTheme, SeEntityCardState>;
 
-// Applied to every action button via SuiCard actions.base — strips platform button
-// chrome and sizes for finger taps without being wasteful of vertical space.
 const ACTION_BASE = {
   background: "none",
   border: "none",
@@ -92,7 +56,6 @@ const ACTION_BASE = {
   opacity: "1",
 } as const;
 
-// Shared card theme — unlocks action button chrome.
 const CARD_THEME = {
   default: {
     actions: {
@@ -147,8 +110,6 @@ export class SeEntityCard extends SuiComponent<
     }
   }
 
-  // ── Unified entity edit pane ───────────────────────────────────────────────
-
   private _openEditPane(): void {
     const { entityId, lifecycle, editHost } = this.options;
     if (!editHost) return;
@@ -162,30 +123,6 @@ export class SeEntityCard extends SuiComponent<
       }),
     );
   }
-
-  // ── Links list rebuild ─────────────────────────────────────────────────────
-
-  private async _rebuildLinksList(): Promise<void> {
-    const { entityId, lifecycle } = this.options;
-    const E = IDS.entity(entityId, lifecycle);
-    const relationships = store
-      .getState()
-      .world.relationships.filter(
-        (r) => r.fromEntityId === entityId || r.toEntityId === entityId,
-      );
-    const parts = await Promise.all(
-      relationships.map((r) =>
-        buildSeRelationshipItem(entityId, r.id, lifecycle),
-      ),
-    );
-    api.v1.ui.updateParts([
-      { id: E.LINKS_LIST, content: parts } as unknown as Partial<UIPart> & {
-        id: string;
-      },
-    ]);
-  }
-
-  // ── Compose ────────────────────────────────────────────────────────────────
 
   async compose(): Promise<UIPartColumn> {
     const { entityId, lifecycle } = this.options;
@@ -237,7 +174,6 @@ export class SeEntityCard extends SuiComponent<
     if (lifecycle === "draft") {
       const summaryId = `${E.ROOT}-summary`;
 
-      // Reactively update full summary text in collapsible content
       this._watcher.watch(
         (s) => s.world.entities.find((e) => e.id === entityId)?.summary ?? "",
         (newSummary) => {
@@ -295,39 +231,6 @@ export class SeEntityCard extends SuiComponent<
 
     // ── Live layout ───────────────────────────────────────────────────────────
 
-    // Rebuild links list when relationship IDs change
-    this._watcher.watch(
-      (s) =>
-        s.world.relationships
-          .filter(
-            (r) => r.fromEntityId === entityId || r.toEntityId === entityId,
-          )
-          .map((r) => r.id),
-      () => {
-        void this._rebuildLinksList();
-      },
-      (a, b) => a.length === b.length && a.every((id, i) => id === b[i]),
-    );
-
-    const reforgeBtn = new SuiButton({
-      id: E.REFORGE_BTN,
-      callback: () => {
-        store.dispatch(entityReforgeRequested({ entityId }));
-      },
-      theme: { default: { self: { iconId: "rotate-ccw" as IconId } } },
-    });
-
-    const moveBtn = new SuiButton({
-      id: E.MOVE_BTN,
-      callback: () => {
-        void openMoveModal(entityId, {
-          getState: store.getState,
-          dispatch: store.dispatch,
-        });
-      },
-      theme: { default: { self: { iconId: "log-out" as IconId } } },
-    });
-
     const deleteBtn = new SuiButton({
       id: E.DELETE_BTN,
       callback: () => {
@@ -343,11 +246,9 @@ export class SeEntityCard extends SuiComponent<
       labelCallback: () => {
         this._openEditPane();
       },
-      actions: [reforgeBtn, this._regenBtn!],
+      actions: [this._regenBtn!, deleteBtn],
       theme: CARD_THEME,
     });
-
-    // ── Summary text for live collapsible ─────────────────────────────────────
 
     const summaryId = `${E.ROOT}-summary`;
 
@@ -377,11 +278,9 @@ export class SeEntityCard extends SuiComponent<
       },
     });
 
-    // ── Secondary actions row (Move, Delete) in collapsible ───────────────────
-
     const secondaryActionsRow = new SuiRow({
       id: `${E.ROOT}-secondary-actions`,
-      children: [moveBtn, deleteBtn],
+      children: [deleteBtn],
       theme: {
         default: {
           self: {
@@ -399,121 +298,10 @@ export class SeEntityCard extends SuiComponent<
       },
     });
 
-    // ── Links section (raw UIPart, bridged to SuiComponent) ───────────────────
-
-    const { button, textInput, column, collapsibleSection } = api.v1.ui.part;
-
-    const relationships = store
-      .getState()
-      .world.relationships.filter(
-        (r) => r.fromEntityId === entityId || r.toEntityId === entityId,
-      );
-    const initialLinkParts = await Promise.all(
-      relationships.map((r) =>
-        buildSeRelationshipItem(entityId, r.id, lifecycle),
-      ),
-    );
-
-    const addLinkBtn = button({
-      id: E.ADD_LINK_BTN,
-      text: "+ Link",
-      style: { "font-size": "0.8em", "align-self": "flex-start" },
-      callback: () => {
-        api.v1.ui.updateParts([
-          {
-            id: E.NEW_LINK_INPUT,
-            style: { display: "flex", width: "100%", "font-size": "0.85em" },
-          } as unknown as Partial<UIPart> & { id: string },
-        ]);
-      },
-    });
-
-    const newLinkInput = textInput({
-      id: E.NEW_LINK_INPUT,
-      placeholder: "EntityB: relationship description…",
-      initialValue: "",
-      storageKey: `story:${E.NEW_LINK_KEY}`,
-      style: { display: "none", width: "100%", "font-size": "0.85em" },
-      onSubmit: () => {
-        void (async () => {
-          const value = String(
-            (await api.v1.storyStorage.get(E.NEW_LINK_KEY)) || "",
-          ).trim();
-          const sep = value.indexOf(": ");
-          const targetName = sep > 0 ? value.slice(0, sep).trim() : "";
-          const description = sep > 0 ? value.slice(sep + 2).trim() : "";
-          const targetEntity = targetName
-            ? store
-                .getState()
-                .world.entities.find(
-                  (e) => e.name.toLowerCase() === targetName.toLowerCase(),
-                )
-            : undefined;
-          if (targetEntity && description) {
-            store.dispatch(
-              relationshipAdded({
-                relationship: {
-                  id: api.v1.uuid(),
-                  fromEntityId: entityId,
-                  toEntityId: targetEntity.id,
-                  description,
-                } satisfies Relationship,
-              }),
-            );
-          }
-          await api.v1.storyStorage.remove(E.NEW_LINK_KEY);
-          api.v1.ui.updateParts([
-            {
-              id: E.NEW_LINK_INPUT,
-              style: { display: "none", width: "100%", "font-size": "0.85em" },
-            } as unknown as Partial<UIPart> & { id: string },
-          ]);
-        })();
-      },
-    });
-
-    const linksSection = collapsibleSection({
-      id: E.LINKS_SECTION,
-      title: "Links",
-      iconId: "link" as IconId,
-      initialCollapsed: true,
-      storageKey: `story:${E.LINKS_SECTION}`,
-      style: { "margin-top": "4px" },
-      content: [
-        column({
-          style: { gap: "4px" },
-          content: [
-            addLinkBtn,
-            newLinkInput,
-            column({
-              id: E.LINKS_LIST,
-              style: { gap: "2px" },
-              content: initialLinkParts,
-            }),
-          ],
-        }),
-      ],
-    });
-
-    const contentCol = column({
-      id: `${E.ROOT}-content`,
-      style: { gap: "4px", padding: "0 2px 4px" },
-      content: [
-        await summaryText.build(),
-        await secondaryActionsRow.build(),
-        linksSection,
-      ],
-    });
-
-    const contentBridge = new SuiRawPart(
-      `${E.ROOT}-content-bridge`,
-      contentCol,
-    );
-
     return new SuiCollapsible({
       id: E.ROOT,
       header: card,
-      children: [contentBridge],
+      children: [summaryText, secondaryActionsRow],
       initialCollapsed: true,
       storageKey: `${E.ROOT}.collapsed`,
       storageMode: "story",

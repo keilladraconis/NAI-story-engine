@@ -14,7 +14,6 @@ import {
   entityBound,
   entityUnbound,
   entityCast,
-  batchCreated,
 } from "../../core/store/slices/world";
 import { ensureCategory } from "../../core/store/effects/lorebook-sync";
 import {
@@ -179,22 +178,6 @@ export async function openBindModal(ctx: BindModalCtx): Promise<void> {
           callback: async () => {
             if (selected.size === 0) return;
 
-            const currentState = ctx.getState();
-            let importedBatch = currentState.world.batches.find(
-              (b) => b.name === "Imported",
-            );
-            let batchId: string;
-            if (!importedBatch) {
-              batchId = api.v1.uuid();
-              ctx.dispatch(
-                batchCreated({
-                  batch: { id: batchId, name: "Imported", entityIds: [] },
-                }),
-              );
-            } else {
-              batchId = importedBatch.id;
-            }
-
             let count = 0;
             for (const entryId of selected) {
               const entry = allEntries.find((e) => e.id === entryId);
@@ -205,7 +188,6 @@ export async function openBindModal(ctx: BindModalCtx): Promise<void> {
                 entityBound({
                   entity: {
                     id: api.v1.uuid(),
-                    batchId,
                     categoryId: catId,
                     lifecycle: "live",
                     lorebookEntryId: entryId,

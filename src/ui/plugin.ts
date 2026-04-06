@@ -41,12 +41,11 @@ import type { EditPaneHost } from "./components/SeContentWithTitlePane";
 
 import { BrainstormPane } from "./components/BrainstormPane";
 import { ForgePane } from "./components/ForgePane";
-import { SeWorldBatchList } from "./components/SeWorldBatchList";
+import { SeThreadList } from "./components/SeThreadList";
 import { SeHeaderBar } from "./components/SeHeaderBar";
 import { SeLorebookPanel } from "./components/SeLorebookPanel";
 import { SeJournalPanel } from "./components/SeJournalPanel";
 import { openBindModal } from "./components/BindModal";
-import { openRelationshipsModal } from "./components/RelationshipsModal";
 import { loadJournal } from "../core/generation-journal";
 
 const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
@@ -62,7 +61,7 @@ export class StoryEnginePlugin extends SuiPlugin {
   // ── Story engine pane children (persistent for rebuild) ──
   private _seHeaderBar?: SeHeaderBar;
   private _forgePane?: ForgePane;
-  private _worldBatchList?: SeWorldBatchList;
+  private _threadList?: SeThreadList;
   private _footer?: SuiRow;
 
   // ── Edit pane hosting ──
@@ -144,7 +143,7 @@ export class StoryEnginePlugin extends SuiPlugin {
       children: [
         this._seHeaderBar!,
         this._forgePane!,
-        this._worldBatchList!,
+        this._threadList!,
         this._footer!,
       ],
       theme: { default: { self: { style: { gap: "8px" } } } },
@@ -168,31 +167,14 @@ export class StoryEnginePlugin extends SuiPlugin {
       id: "se-forge-pane",
       editHost: this.editHost,
     });
-    this._worldBatchList = new SeWorldBatchList({
-      id: IDS.WORLD.BATCH_LIST,
+    this._threadList = new SeThreadList({
+      id: IDS.WORLD.THREAD_LIST,
       editHost: this.editHost,
     });
 
     this._footer = new SuiRow({
       id: "se-footer",
       children: [
-        new SuiButton({
-          id: "se-footer-relationships",
-          callback: () => {
-            void openRelationshipsModal({
-              getState: store.getState,
-              dispatch: store.dispatch,
-            });
-          },
-          theme: {
-            default: {
-              self: {
-                text: "Relationships",
-                style: { flex: "1", "font-size": "0.8em" },
-              },
-            },
-          },
-        }),
         new SuiButton({
           id: "se-footer-bind-new",
           callback: () => {
@@ -238,7 +220,7 @@ export class StoryEnginePlugin extends SuiPlugin {
       children: [
         this._seHeaderBar,
         this._forgePane,
-        this._worldBatchList,
+        this._threadList,
         this._footer,
       ],
       theme: { default: { self: { style: { gap: "8px" } } } },

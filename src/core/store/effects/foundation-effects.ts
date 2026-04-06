@@ -25,6 +25,14 @@ import {
 } from "../index";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "../../utils/context-builder";
+import {
+  CRUCIBLE_SHAPE_PROMPT,
+  CRUCIBLE_INTENT_PROMPT,
+  FOUNDATION_WORLD_STATE_PROMPT,
+  ATTG_GENERATE_PROMPT,
+  STYLE_GENERATE_PROMPT,
+  CRUCIBLE_TENSIONS_PROMPT,
+} from "../../utils/prompts";
 
 // ─── Factories ────────────────────────────────────────────────────────────────
 
@@ -37,9 +45,7 @@ import { buildStoryEnginePrefix } from "../../utils/context-builder";
 const createShapeFactory =
   (getState: () => RootState): MessageFactory =>
   async () => {
-    const shapePrompt = String(
-      (await api.v1.config.get("crucible_shape_prompt")) || "",
-    );
+    const shapePrompt = CRUCIBLE_SHAPE_PROMPT;
     const existingName = getState().foundation.shape?.name ?? "";
 
     const prefix = await buildStoryEnginePrefix(getState, {
@@ -74,9 +80,7 @@ const createShapeFactory =
 const createIntentFactory =
   (getState: () => RootState): MessageFactory =>
   async () => {
-    const intentPrompt = String(
-      (await api.v1.config.get("crucible_intent_prompt")) || "",
-    );
+    const intentPrompt = CRUCIBLE_INTENT_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState, {
       excludeSections: ["foundation"],
@@ -113,9 +117,7 @@ const createIntentFactory =
 const createWorldStateFactory =
   (getState: () => RootState): MessageFactory =>
   async () => {
-    const worldStatePrompt = String(
-      (await api.v1.config.get("foundation_world_state_prompt")) || "",
-    );
+    const worldStatePrompt = FOUNDATION_WORLD_STATE_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState, {
       excludeSections: ["foundation"],
@@ -151,9 +153,7 @@ const createWorldStateFactory =
 const createAttgFactory =
   (getState: () => RootState): MessageFactory =>
   async () => {
-    const attgPrompt = String(
-      (await api.v1.config.get("attg_generate_prompt")) || "",
-    );
+    const attgPrompt = ATTG_GENERATE_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState, {
       excludeSections: ["foundation"],
@@ -189,9 +189,7 @@ const createAttgFactory =
 const createStyleFactory =
   (getState: () => RootState): MessageFactory =>
   async () => {
-    const stylePrompt = String(
-      (await api.v1.config.get("style_generate_prompt")) || "",
-    );
+    const stylePrompt = STYLE_GENERATE_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState, {
       excludeSections: ["foundation"],
@@ -228,9 +226,7 @@ const createStyleFactory =
 const createTensionFactory =
   (getState: () => RootState, tensionId: string): MessageFactory =>
   async () => {
-    const tensionPrompt = String(
-      (await api.v1.config.get("crucible_tensions_prompt")) || "",
-    );
+    const tensionPrompt = CRUCIBLE_TENSIONS_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState, {
       excludeSections: ["foundation"],

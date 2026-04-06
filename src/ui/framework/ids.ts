@@ -48,14 +48,9 @@ export const STORAGE_KEYS = {
   // Forge UI (v11)
   FORGE_SECTION_UI: "se-forge-section",
   FORGE_GUIDANCE_UI: "se-forge-guidance",
-  FORGE_BATCH_NAME_UI: "se-forge-batch-name",
 
-  // Lorebook relationship add form
-  REL_FORM_DESC: "lb-rel-form-desc",
-  REL_FORM_DESC_UI: "lb-rel-form-desc",
-
-  // World batch UI (v11) — dynamic by batchId
-  worldBatchSectionUI: (batchId: string) => `se-world-batch-${batchId}`,
+  // World Thread (group) UI — dynamic by groupId
+  worldGroupSectionUI: (groupId: string) => `se-world-group-${groupId}`,
 };
 
 export const IDS = {
@@ -87,26 +82,14 @@ export const IDS = {
     ROOT: `se-entity-${lifecycle}-${id}`,
     CAST_BTN: `se-entity-${lifecycle}-${id}-cast`,
     DISCARD_BTN: `se-entity-${lifecycle}-${id}-discard`,
-    REFORGE_BTN: `se-entity-${lifecycle}-${id}-reforge`,
     REGEN_BTN: `se-entity-${lifecycle}-${id}-regen`,
-    MOVE_BTN: `se-entity-${lifecycle}-${id}-move`,
     DELETE_BTN: `se-entity-${lifecycle}-${id}-delete`,
-    LINKS_SECTION: `se-entity-${lifecycle}-${id}-links`,
-    LINKS_LIST: `se-entity-${lifecycle}-${id}-links-list`,
-    ADD_LINK_BTN: `se-entity-${lifecycle}-${id}-add-link`,
-    NEW_LINK_INPUT: `se-entity-${lifecycle}-${id}-new-link-input`,
-    NEW_LINK_KEY: `se-entity-new-link-${lifecycle}-${id}`,
-    rel: (relId: string) => ({
-      ROOT: `se-entity-${lifecycle}-${id}-rel-${relId}`,
-      DELETE_BTN: `se-entity-${lifecycle}-${id}-rel-${relId}-del`,
-    }),
   }),
   FORGE: {
     SECTION: "se-forge-section",
     GUIDANCE_INPUT: "se-forge-guidance",
     FORGE_BTN: "se-forge-btn",
     BRAINSTORM_BTN: "se-forge-brainstorm-btn",
-    BATCH_NAME: "se-forge-batch-name",
     ENTITY_LIST: "se-forge-entity-list",
     TICKER: "se-forge-ticker",
     CAST_ALL_BTN: "se-forge-cast-all",
@@ -115,12 +98,15 @@ export const IDS = {
     CAST_DISCARD_ROW: "se-forge-cast-discard-row",
   },
   WORLD: {
-    BATCH_LIST: "se-world-batch-list",
-    batch: (id: string) => ({
-      SECTION: `se-world-batch-${id}`,
-      ENTITY_LIST: `se-world-batch-${id}-entities`,
-      REFORGE_BTN: `se-world-batch-${id}-reforge`,
-      RENAME_INPUT: `se-world-batch-${id}-rename`,
+    THREAD_LIST: "se-world-thread-list",
+    thread: (id: string) => ({
+      SECTION: `se-world-thread-${id}`,
+      TITLE_INPUT: `se-world-thread-${id}-title`,
+      SUMMARY_INPUT: `se-world-thread-${id}-summary`,
+      ENTITY_LIST: `se-world-thread-${id}-entities`,
+      REFORGE_BTN: `se-world-thread-${id}-reforge`,
+      DELETE_BTN: `se-world-thread-${id}-delete`,
+      LOREBOOK_BTN: `se-world-thread-${id}-lorebook`,
     }),
   },
   BRAINSTORM: {
@@ -165,18 +151,7 @@ export const IDS = {
     REFINE_BTN: "lb-refine-btn",
     REFINE_INSTRUCTIONS_INPUT: "lb-refine-instructions",
 
-    // Relationship section (managed view)
-    RELATIONSHIPS_SECTION: "lb-rels-section",
-    RELATIONSHIPS_LIST: "lb-rels-list",
-    ADD_REL_BTN: "lb-add-rel-btn",
-    REL_FORM: "lb-rel-form",
-    REL_FORM_TARGET_BTN: "lb-rel-form-target",
-    REL_FORM_DESC: "lb-rel-form-desc",
-    REL_FORM_ADD_BTN: "lb-rel-form-add",
-    REL_FORM_CANCEL_BTN: "lb-rel-form-cancel",
-
     // Action buttons (managed view)
-    REFORGE_ENTITY_BTN: "lb-reforge-entity-btn",
     UNBIND_BTN: "lb-unbind-btn",
 
     // Bind view (unmanaged)
@@ -198,10 +173,5 @@ export const IDS = {
       REFINE_REQ: `lb-item-${entryId}-refine`,
     }),
 
-    // Per-relationship IDs
-    relationship: (relId: string) => ({
-      ROOT: `lb-rel-${relId}`,
-      DELETE_BTN: `lb-rel-${relId}-del`,
-    }),
   },
 };

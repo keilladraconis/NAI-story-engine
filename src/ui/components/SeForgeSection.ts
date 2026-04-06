@@ -6,7 +6,6 @@
  *   - Guidance multilineTextInput (storageKey)
  *   - Forge SeGenerationButton
  *   - Ticker text (updated by generation handlers)
- *   - Batch name textInput (storageKey)
  *   - Draft entity list column (rebuilt via StoreWatcher when entity IDs change)
  *   - Cast All / Discard All row (visibility toggled via StoreWatcher)
  *
@@ -128,7 +127,6 @@ export class SeForgeSection extends SuiComponent<
       button,
       collapsibleSection,
       multilineTextInput,
-      textInput,
     } = api.v1.ui.part;
 
     this._watcher.dispose();
@@ -204,14 +202,6 @@ export class SeForgeSection extends SuiComponent<
       },
     });
 
-    const batchNameInput = textInput({
-      id: FG.BATCH_NAME,
-      placeholder: "Batch name (auto-named from intent)…",
-      initialValue: "",
-      storageKey: `story:${STORAGE_KEYS.FORGE_BATCH_NAME_UI}`,
-      style: { "font-size": "0.85em" },
-    });
-
     const entityList = column({
       id: FG.ENTITY_LIST,
       style: { gap: "2px" },
@@ -264,7 +254,6 @@ export class SeForgeSection extends SuiComponent<
                 margin: "6px 0",
               },
             }),
-            batchNameInput,
             entityList,
             castDiscardRow,
           ],

@@ -1,17 +1,10 @@
 import { createSlice } from "nai-store";
-import {
-  WorldState,
-  WorldBatch,
-  WorldEntity,
-  Relationship,
-  EntityLifecycle,
-} from "../types";
+import { WorldState, WorldGroup, WorldEntity, EntityLifecycle } from "../types";
 import { DulfsFieldID } from "../../../config/field-definitions";
 
 export const initialWorldState: WorldState = {
-  batches: [],
+  groups: [],
   entities: [],
-  relationships: [],
   forgeLoopActive: false,
 };
 
@@ -57,11 +50,10 @@ export const worldSlice = createSlice({
     entityDeleted: (state, payload: { entityId: string }) => ({
       ...state,
       entities: state.entities.filter((e) => e.id !== payload.entityId),
-      relationships: state.relationships.filter(
-        (r) =>
-          r.fromEntityId !== payload.entityId &&
-          r.toEntityId !== payload.entityId,
-      ),
+      groups: state.groups.map((g) => ({
+        ...g,
+        entityIds: g.entityIds.filter((id) => id !== payload.entityId),
+      })),
     }),
 
     entitySummaryUpdated: (
@@ -109,56 +101,81 @@ export const worldSlice = createSlice({
       entities: state.entities.filter((e) => e.id !== payload.entityId),
     }),
 
-    // Batch management
-    batchCreated: (state, payload: { batch: WorldBatch }) => ({
+    // Group (Thread) management
+    groupCreated: (state, payload: { group: WorldGroup }) => ({
       ...state,
-      batches: [...state.batches, payload.batch],
+      groups: [...state.groups, payload.group],
     }),
 
-    batchRenamed: (state, payload: { batchId: string; name: string }) => ({
+    groupDeleted: (state, payload: { groupId: string }) => ({
       ...state,
-      batches: state.batches.map((b) =>
-        b.id === payload.batchId ? { ...b, name: payload.name } : b,
+      groups: state.groups.filter((g) => g.id !== payload.groupId),
+    }),
+
+    groupRenamed: (state, payload: { groupId: string; title: string }) => ({
+      ...state,
+      groups: state.groups.map((g) =>
+        g.id === payload.groupId ? { ...g, title: payload.title } : g,
       ),
     }),
 
-    batchReforged: (state, payload: { batchId: string }) => ({
-      ...state,
-      entities: state.entities.map((e) =>
-        e.batchId === payload.batchId
-          ? {
-              ...e,
-              lifecycle: "draft" as EntityLifecycle,
-              lorebookEntryId: undefined,
-            }
-          : e,
-      ),
-    }),
-
-    // Relationship management
-    relationshipAdded: (state, payload: { relationship: Relationship }) => ({
-      ...state,
-      relationships: [...state.relationships, payload.relationship],
-    }),
-
-    relationshipRemoved: (state, payload: { relationshipId: string }) => ({
-      ...state,
-      relationships: state.relationships.filter(
-        (r) => r.id !== payload.relationshipId,
-      ),
-    }),
-
-    relationshipUpdated: (
+    groupSummaryUpdated: (
       state,
-      payload: { relationshipId: string; description: string },
+      payload: { groupId: string; summary: string },
     ) => ({
       ...state,
-      relationships: state.relationships.map((r) =>
-        r.id === payload.relationshipId
-          ? { ...r, description: payload.description }
-          : r,
+      groups: state.groups.map((g) =>
+        g.id === payload.groupId ? { ...g, summary: payload.summary } : g,
       ),
     }),
+
+    entityGroupToggled: (
+      state,
+      payload: { groupId: string; entityId: string },
+    ) => ({
+      ...state,
+      groups: state.groups.map((g) => {
+        if (g.id !== payload.groupId) return g;
+        const isMember = g.entityIds.includes(payload.entityId);
+        return {
+          ...g,
+          entityIds: isMember
+            ? g.entityIds.filter((id) => id !== payload.entityId)
+            : [...g.entityIds, payload.entityId],
+        };
+      }),
+    }),
+
+    groupLorebookEntrySet: (
+      state,
+      payload: { groupId: string; entryId: string | undefined },
+    ) => ({
+      ...state,
+      groups: state.groups.map((g) =>
+        g.id === payload.groupId
+          ? { ...g, lorebookEntryId: payload.entryId }
+          : g,
+      ),
+    }),
+
+    // Reforge all member entities in a group
+    groupReforged: (state, payload: { groupId: string }) => {
+      const group = state.groups.find((g) => g.id === payload.groupId);
+      if (!group) return state;
+      const memberSet = new Set(group.entityIds);
+      return {
+        ...state,
+        entities: state.entities.map((e) =>
+          memberSet.has(e.id)
+            ? {
+                ...e,
+                lifecycle: "draft" as EntityLifecycle,
+                lorebookEntryId: undefined,
+              }
+            : e,
+        ),
+      };
+    },
 
     worldCleared: () => initialWorldState,
 
@@ -168,7 +185,6 @@ export const worldSlice = createSlice({
     forgeStepCompleted: (
       state,
       _payload: {
-        batchId: string;
         step: number;
         forgeGuidance: string;
         brainstormContext: string;
@@ -176,7 +192,7 @@ export const worldSlice = createSlice({
     ) => state,
     forgeCritiqueReceived: (
       state,
-      _payload: { batchId: string; critiqueText: string },
+      _payload: { critiqueText: string },
     ) => state,
 
     // Signal actions — Phase 2 effects handle the actual work
@@ -186,23 +202,10 @@ export const worldSlice = createSlice({
     castAllRequested: (state) => state,
     forgeCastCompleted: (state) => state,
     entityRegenRequested: (state, _payload: { entityId: string }) => state,
-    entityReforgeRequested: (state, _payload: { entityId: string }) => state,
-    batchReforgeRequested: (state, _payload: { batchId: string }) => state,
+    groupReforgeRequested: (state, _payload: { groupId: string }) => state,
 
     // Immediate state reducers (Phase 2 adds lorebook-side effects for these)
     entityCastRequested: (state, _payload: { entityId: string }) => state,
-
-    entityMoved: (
-      state,
-      payload: { entityId: string; targetBatchId: string },
-    ) => ({
-      ...state,
-      entities: state.entities.map((e) =>
-        e.id === payload.entityId
-          ? { ...e, batchId: payload.targetBatchId }
-          : e,
-      ),
-    }),
 
     entityDiscardRequested: (state, payload: { entityId: string }) => ({
       ...state,
@@ -227,12 +230,13 @@ export const {
   entityCategoryChanged,
   entityBound,
   entityUnbound,
-  batchCreated,
-  batchRenamed,
-  batchReforged,
-  relationshipAdded,
-  relationshipRemoved,
-  relationshipUpdated,
+  groupCreated,
+  groupDeleted,
+  groupRenamed,
+  groupSummaryUpdated,
+  entityGroupToggled,
+  groupLorebookEntrySet,
+  groupReforged,
   forgeLoopStarted,
   forgeLoopEnded,
   forgeStepCompleted,
@@ -243,9 +247,7 @@ export const {
   castAllRequested,
   forgeCastCompleted,
   entityRegenRequested,
-  entityReforgeRequested,
-  batchReforgeRequested,
-  entityMoved,
+  groupReforgeRequested,
   entityCastRequested,
   entityDiscardRequested,
   discardAllRequested,

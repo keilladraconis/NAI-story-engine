@@ -8,11 +8,12 @@ import {
   entitySummaryUpdated,
   entityBound,
   entityUnbound,
-  batchCreated,
-  batchRenamed,
-  relationshipAdded,
-  relationshipRemoved,
-  relationshipUpdated,
+  groupCreated,
+  groupDeleted,
+  groupRenamed,
+  groupSummaryUpdated,
+  entityGroupToggled,
+  groupReforged,
 } from "../../../../src/core/store/slices/world";
 import { WorldState } from "../../../../src/core/store/types";
 import {
@@ -26,42 +27,93 @@ const reduce = (
 ) => worldSlice.reducer(state, action as any);
 
 const makeState = (overrides: Partial<WorldState> = {}): WorldState => ({
-  batches: [],
+  groups: [],
   entities: [],
-  relationships: [],
   forgeLoopActive: false,
   ...overrides,
 });
 
-const BATCH = { id: "b1", name: "Main", entityIds: [] };
 const ENTITY = {
   id: "e1",
-  batchId: "b1",
   categoryId: FieldID.DramatisPersonae as DulfsFieldID,
   lifecycle: "draft" as const,
   name: "Elara",
   summary: "",
 };
 
+const GROUP = { id: "g1", title: "Main Circle", summary: "Core cast", entityIds: [] };
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Batch actions
+// Group (Thread) actions
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("batchCreated", () => {
-  it("adds a batch", () => {
-    const state = reduce(makeState(), batchCreated({ batch: BATCH }));
-    expect(state.batches).toHaveLength(1);
-    expect(state.batches[0].name).toBe("Main");
+describe("groupCreated", () => {
+  it("adds a group", () => {
+    const state = reduce(makeState(), groupCreated({ group: GROUP }));
+    expect(state.groups).toHaveLength(1);
+    expect(state.groups[0].title).toBe("Main Circle");
   });
 });
 
-describe("batchRenamed", () => {
-  it("renames a batch by id", () => {
+describe("groupDeleted", () => {
+  it("removes a group by id", () => {
     const state = reduce(
-      makeState({ batches: [BATCH] }),
-      batchRenamed({ batchId: "b1", name: "Chapter One" }),
+      makeState({ groups: [GROUP] }),
+      groupDeleted({ groupId: "g1" }),
     );
-    expect(state.batches[0].name).toBe("Chapter One");
+    expect(state.groups).toHaveLength(0);
+  });
+});
+
+describe("groupRenamed", () => {
+  it("renames a group by id", () => {
+    const state = reduce(
+      makeState({ groups: [GROUP] }),
+      groupRenamed({ groupId: "g1", title: "Inner Ring" }),
+    );
+    expect(state.groups[0].title).toBe("Inner Ring");
+  });
+});
+
+describe("groupSummaryUpdated", () => {
+  it("updates the group summary", () => {
+    const state = reduce(
+      makeState({ groups: [GROUP] }),
+      groupSummaryUpdated({ groupId: "g1", summary: "Bound by oaths" }),
+    );
+    expect(state.groups[0].summary).toBe("Bound by oaths");
+  });
+});
+
+describe("entityGroupToggled", () => {
+  it("adds entity to group when not a member", () => {
+    const state = reduce(
+      makeState({ groups: [GROUP] }),
+      entityGroupToggled({ groupId: "g1", entityId: "e1" }),
+    );
+    expect(state.groups[0].entityIds).toContain("e1");
+  });
+
+  it("removes entity from group when already a member", () => {
+    const groupWithMember = { ...GROUP, entityIds: ["e1"] };
+    const state = reduce(
+      makeState({ groups: [groupWithMember] }),
+      entityGroupToggled({ groupId: "g1", entityId: "e1" }),
+    );
+    expect(state.groups[0].entityIds).not.toContain("e1");
+  });
+});
+
+describe("groupReforged", () => {
+  it("reverts all member entities to draft and clears lorebookEntryId", () => {
+    const live = { ...ENTITY, id: "e1", lifecycle: "live" as const, lorebookEntryId: "lb1" };
+    const groupWithMember = { ...GROUP, entityIds: ["e1"] };
+    const state = reduce(
+      makeState({ groups: [groupWithMember], entities: [live] }),
+      groupReforged({ groupId: "g1" }),
+    );
+    expect(state.entities[0].lifecycle).toBe("draft");
+    expect(state.entities[0].lorebookEntryId).toBeUndefined();
   });
 });
 
@@ -71,10 +123,7 @@ describe("batchRenamed", () => {
 
 describe("entityForged", () => {
   it("adds a draft entity", () => {
-    const state = reduce(
-      makeState({ batches: [BATCH] }),
-      entityForged({ entity: ENTITY }),
-    );
+    const state = reduce(makeState(), entityForged({ entity: ENTITY }));
     expect(state.entities).toHaveLength(1);
     expect(state.entities[0].lifecycle).toBe("draft");
   });
@@ -108,19 +157,14 @@ describe("entityReforged", () => {
 });
 
 describe("entityDeleted", () => {
-  it("removes the entity and its relationships", () => {
-    const rel = {
-      id: "r1",
-      fromEntityId: "e1",
-      toEntityId: "e2",
-      description: "ally",
-    };
+  it("removes the entity and cleans up group membership", () => {
+    const groupWithMember = { ...GROUP, entityIds: ["e1"] };
     const state = reduce(
-      makeState({ entities: [ENTITY], relationships: [rel] }),
+      makeState({ entities: [ENTITY], groups: [groupWithMember] }),
       entityDeleted({ entityId: "e1" }),
     );
     expect(state.entities).toHaveLength(0);
-    expect(state.relationships).toHaveLength(0);
+    expect(state.groups[0].entityIds).toHaveLength(0);
   });
 });
 
@@ -163,44 +207,5 @@ describe("entityUnbound", () => {
       entityUnbound({ entityId: "e1" }),
     );
     expect(state.entities).toHaveLength(0);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Relationships
-// ─────────────────────────────────────────────────────────────────────────────
-
-const REL = {
-  id: "r1",
-  fromEntityId: "e1",
-  toEntityId: "e2",
-  description: "ally",
-};
-
-describe("relationshipAdded", () => {
-  it("adds a relationship", () => {
-    const state = reduce(makeState(), relationshipAdded({ relationship: REL }));
-    expect(state.relationships).toHaveLength(1);
-    expect(state.relationships[0].description).toBe("ally");
-  });
-});
-
-describe("relationshipUpdated", () => {
-  it("updates the description", () => {
-    const state = reduce(
-      makeState({ relationships: [REL] }),
-      relationshipUpdated({ relationshipId: "r1", description: "rival" }),
-    );
-    expect(state.relationships[0].description).toBe("rival");
-  });
-});
-
-describe("relationshipRemoved", () => {
-  it("removes the relationship by id", () => {
-    const state = reduce(
-      makeState({ relationships: [REL] }),
-      relationshipRemoved({ relationshipId: "r1" }),
-    );
-    expect(state.relationships).toHaveLength(0);
   });
 });

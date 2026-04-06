@@ -23,6 +23,7 @@ import { getModel } from "./config";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
 import { FieldID, DulfsFieldID } from "../../config/field-definitions";
 import { TYPE_TO_FIELD } from "./crucible-command-parser";
+import { FORGE_PROMPT } from "./prompts";
 
 const FIELD_TO_TYPE: Record<string, string> = Object.fromEntries(
   Object.entries(TYPE_TO_FIELD).map(([type, fieldId]) => [fieldId, type]),
@@ -62,19 +63,6 @@ function formatEstablishedWorld(state: RootState): string {
     }
   }
 
-  if (state.world.relationships.length > 0) {
-    lines.push("Relationships:");
-    for (const rel of state.world.relationships) {
-      const from =
-        state.world.entities.find((e) => e.id === rel.fromEntityId)?.name ??
-        rel.fromEntityId;
-      const to =
-        state.world.entities.find((e) => e.id === rel.toEntityId)?.name ??
-        rel.toEntityId;
-      lines.push(`  - ${from} → ${to}: ${rel.description}`);
-    }
-  }
-
   return lines.join("\n");
 }
 
@@ -97,35 +85,21 @@ function formatWorldState(state: RootState): string {
 }
 
 /**
- * Synthesizes the prior-step command log from successfully parsed entities
- * and relationships in state. Only correct-syntax commands appear — bad GLM
- * output that failed to parse never enters context.
+ * Synthesizes the prior-step command log from all current draft entities.
+ * Only correct-syntax commands appear — bad GLM output that failed to parse
+ * never enters context.
  */
-function buildForgePassLog(state: RootState, batchId: string): string {
-  const batchEntities = state.world.entities.filter(
-    (e) => e.batchId === batchId && e.lifecycle === "draft",
+function buildForgePassLog(state: RootState): string {
+  const draftEntities = state.world.entities.filter(
+    (e) => e.lifecycle === "draft",
   );
-  if (batchEntities.length === 0) return "";
+  if (draftEntities.length === 0) return "";
 
-  const batchEntityIds = new Set(batchEntities.map((e) => e.id));
   const lines: string[] = [];
-
-  for (const entity of batchEntities) {
+  for (const entity of draftEntities) {
     const type = FIELD_TO_TYPE[entity.categoryId] ?? "CHARACTER";
     lines.push(`[CREATE ${type} "${entity.name}"]`);
     if (entity.summary) lines.push(entity.summary);
-    lines.push("");
-  }
-
-  const batchRels = state.world.relationships.filter(
-    (r) =>
-      batchEntityIds.has(r.fromEntityId) && batchEntityIds.has(r.toEntityId),
-  );
-  for (const rel of batchRels) {
-    const from = batchEntities.find((e) => e.id === rel.fromEntityId)!;
-    const to = batchEntities.find((e) => e.id === rel.toEntityId)!;
-    lines.push(`[LINK "${from.name}" → "${to.name}"]`);
-    if (rel.description) lines.push(rel.description);
     lines.push("");
   }
 
@@ -138,14 +112,13 @@ function buildForgePassLog(state: RootState, batchId: string): string {
  */
 export const createForgeFactory = (
   getState: () => RootState,
-  batchId: string,
   step: number,
   forgeGuidance: string,
   brainstormContext: string,
 ): MessageFactory => {
   return async () => {
     const systemPrompt = String(
-      (await api.v1.config.get("forge_prompt")) || DEFAULT_FORGE_PROMPT,
+      FORGE_PROMPT,
     );
 
     const state = getState();
@@ -214,7 +187,7 @@ export const createForgeFactory = (
     //    rather than the full command (e.g. "[CREATE..."). The strategy's
     //    assistantPrefill then prepends "[" client-side to accumulatedText,
     //    giving the handler a fully-formed "[CREATE CHARACTER ...]" to parse.
-    const passLog = buildForgePassLog(state, batchId);
+    const passLog = buildForgePassLog(state);
     const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE" : "[";
     const assistantContent = passLog ? `${passLog}\n${prefill}` : prefill;
     messages.push({ role: "assistant", content: assistantContent });
@@ -236,7 +209,6 @@ export const createForgeFactory = (
  */
 export const buildForgeStrategy = (
   getState: () => RootState,
-  batchId: string,
   step: number,
   forgeGuidance: string,
   brainstormContext?: string,
@@ -246,14 +218,12 @@ export const buildForgeStrategy = (
     requestId: api.v1.uuid(),
     messageFactory: createForgeFactory(
       getState,
-      batchId,
       step,
       forgeGuidance,
       brainstormContext ?? "",
     ),
     target: {
       type: "forge",
-      batchId,
       step,
       forgeGuidance,
       brainstormContext: brainstormContext ?? "",
@@ -263,23 +233,3 @@ export const buildForgeStrategy = (
   };
 };
 
-export const DEFAULT_FORGE_PROMPT = `You are a world-building assistant operating in a step-by-step forge loop.
-
-Each response emits exactly ONE command. Do not emit multiple commands.
-
-Command vocabulary:
-  [CREATE <TYPE> "<Name>"]       — new world element (CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC)
-  [REVISE "<Name>"]              — rewrite the description text of an existing draft element
-  [LINK "<Name>" → "<Name>"]     — relationship between two elements
-  [DELETE "<Name>"]              — remove a draft element
-  [CRITIQUE]                     — self-assessment; ends this forge pass
-
-After CREATE or REVISE, write the description text (1–3 sentences) on the following lines.
-After LINK, write the relationship description on the following line.
-After [CRITIQUE], write 2–4 sentences: what works, what is missing, what to address next.
-
-There is no [DESCRIPTION] command. To update a character's description, use [REVISE "<Name>"].
-
-The ESTABLISHED WORLD section lists what already exists — do not recreate those elements.
-The prior command sequence shows what has been built this pass — continue it naturally.
-When the draft feels complete, emit [CRITIQUE] to end the pass.`;
