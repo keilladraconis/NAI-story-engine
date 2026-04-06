@@ -10,7 +10,7 @@ NAI Story Engine is a NovelAI script (.naiscript) that guides structured worldbu
 
 ```
 npm run build      # nibs build → dist/NAI-story-engine.naiscript
-npm run format     # prettier -w . 
+npm run format     # prettier -w .
 npm run test       # vitest run
 ```
 
@@ -26,14 +26,15 @@ npm run test       # vitest run
 
 **State (`src/core/store/`):**
 
-- `slices/story.ts` — Field contents and World Entry items
+- `slices/story.ts` — Field contents and World Entry items (DULFS)
+- `slices/world.ts` — `WorldEntity` records, batches, relationships, forge loop flag
 - `slices/brainstorm.ts` — Chat messages
-- `slices/ui.ts` — Edit modes, temporary inputs
+- `slices/foundation.ts` — Shape, intent, ATTG, style fields
+- `slices/ui.ts` — Edit modes, lorebook selection state
 - `slices/runtime.ts` — Generation queue status, GenX state
-- `effects.ts` — Side effects triggered by state changes
 - Data persisted via `api.v1.storyStorage` under key `"kse-persist"`
 
-**Config:** `src/config/field-definitions.ts` — `FIELD_CONFIGS` array defines all field metadata, layouts, and generation prompts. Uses `FieldID` enum throughout.
+**Config:** `src/config/field-definitions.ts` — `FIELD_CONFIGS` array defines all field metadata, layouts, and generation prompts. Uses `FieldID` enum and `DulfsFieldID` union type throughout.
 
 **UI (`src/ui/`):**
 
@@ -41,6 +42,15 @@ npm run test       # vitest run
 - Non-storageKey UI mutations use `api.v1.ui.updateParts()` — never re-render. storageKey-bound inputs are the exception: update them via storyStorage, not updateParts (see UI Input Patterns below).
 - Element IDs centralized in `src/ui/framework/ids.ts` with prefixes: `se-` (story engine), `se-bs-` (brainstorm), `kse-` (storage keys)
 - `src/core/utils/context-builder.ts` — Builds layered AI prompts from current state
+
+**Entity system (`src/ui/components/SeEntityCard.ts`, `SeEntityEditPane.ts`):**
+
+- `WorldEntity` has `id`, `batchId`, `categoryId` (`DulfsFieldID`), `lifecycle` (`"draft" | "live"`), optional `lorebookEntryId`, `name`, and `summary`.
+- **Entity summary** is a Story Engine–internal field. It is stored only in Redux, editable only in `SeEntityEditPane`, and **never synchronized with or derived from lorebook entry text**. The lorebook entry text is a separate field populated by generation.
+- **Draft entities** have no lorebook entry. Their card shows name + summary; edit pane allows name/summary/category editing.
+- **Live entities** have a lorebook entry (`lorebookEntryId`). Their edit pane additionally shows lorebook content and keys with generation buttons. Lorebook content/keys are **only flushed to the lorebook API on Save** — not on every keystroke.
+- **Cast**: `castAllRequested` / `entityCastRequested` effects first look for an existing unmanaged lorebook entry with a matching `displayName` (case-insensitive) and bind to it. If none found, a new entry is created in the appropriate `SE: <Category>` lorebook category with empty text (summary is not seeded into lorebook).
+- **Category**: `entityCategoryChanged` action updates `entity.categoryId`. `SeEntityEditPane` shows a category picker (SuiActionBar) for draft entities.
 
 **Prompts:** Configurable via `project.yaml` config fields (system prompt, brainstorm, world snapshot, lorebook generation, ATTG, style, etc.).
 
@@ -57,7 +67,7 @@ npm run test       # vitest run
 - Context is layered: System → Setting → Story Prompt → World Snapshot → Volatile Data
 - World Entries use two-phase generation: Phase 1 generates a list of names, Phase 2 generates detailed content per item
 - S.E.G.A. (Story Engine Generate All) fills blank fields using round-robin queueing across categories
-- Lorebook Sync is bidirectional between World Entry items and NovelAI Lorebook entries; manual NAI edits are protected
+- Lorebook sync (`src/core/store/effects/lorebook-sync.ts`) manages SE-category creation and DULFS item→lorebook binding. It does **not** sync entity summaries in either direction — summaries are SE-internal only.
 
 ## Coding Guidelines
 
@@ -72,8 +82,9 @@ npm run test       # vitest run
 **UI Input Patterns:**
 
 - Prefer `storageKey` on inputs for automatic persistence — avoid manual onChange handlers for simple state sync.
-- Exception: Use `onChange` callbacks alongside `storageKey` when syncing to non-UIPart targets (e.g., `api.v1.an.set()`, `api.v1.memory.set()`). See ATTG/Style fields in `TextField.ts` for example.
-- **Never dispatch actions in `onChange` callbacks.** The reducer overhead is too high for keystroke-frequency events. Direct API calls are acceptable in `onChange` when syncing to external APIs (e.g., `api.v1.lorebook.updateEntry()`). See `ListItem.ts` for example.
+- Exception: Use `onChange` callbacks alongside `storageKey` when syncing to non-UIPart targets (e.g., `api.v1.an.set()`, `api.v1.memory.set()`).
+- **Never dispatch actions in `onChange` callbacks.** The reducer overhead is too high for keystroke-frequency events.
+- **Do not call `api.v1.lorebook.updateEntry()` in `onChange`.** Lorebook writes happen at explicit commit points (e.g., clicking Save in an edit pane), not on every keystroke. `SeEntityEditPane` is the canonical example: content/keys draft in storyStorage, flushed to lorebook only on Save.
 - **`storageKey` inputs are owned by storyStorage — never use `updateParts` to set their value.** Read with `api.v1.storyStorage.get(key)`, write with `api.v1.storyStorage.set(key, value)`, clear with `api.v1.storyStorage.remove(key)`. The input reads from its storageKey automatically. Using `updateParts({ value })` on a storageKey-bound input is incorrect — the stored value and displayed value will diverge.
 - **`story:` prefix routing**: In a `storageKey` binding, `story:` is a routing directive the UI framework strips — `storageKey: "story:my-key"` persists under bare key `"my-key"` in storyStorage. `storyStorage.get("my-key")` reads the same slot; `storyStorage.get("story:my-key")` reads a literally different key and is always wrong. Never embed `story:` in storage key constants — add it only at the `storageKey` binding site. Pattern: constant = `"my-key"`, binding = `` `story:${MY_KEY}` ``, direct API = `storyStorage.get(MY_KEY)`. Use `storyStorage.remove(key)` to clear (not `set(key, null)`).
 
@@ -89,10 +100,11 @@ npm run test       # vitest run
 
 - **`SuiTabBar` reads `tab.options.callback` at compose time.** Tab button callbacks that call `tabBar.switchTo(i)` must use closures over `this._tabBar` (assigned before any click fires), not post-construction assignment to `options.callback` (which is `Readonly`).
 
+- **`updateParts` replaces style wholesale.** When a SUI component like `SuiActionBar` bakes a `base` style onto its children at build time, a subsequent `updateParts` call must include ALL desired CSS properties — not just the changed ones. Use camelCase property names (`fontWeight`, `fontSize`) to match what `SuiActionBar` emits; mixing kebab-case into the same object causes divergence before vs. after interaction.
+
 ## Key Constraints
 
 - **No DOM:** Runs in QuickJS web worker. No `setTimeout` (use `api.v1.timers`), no `console.log` (use `api.v1.log()`).
 - **NovelAI API:** Generation via `api.v1.generate()`, storage via `api.v1.storyStorage`, UI via `api.v1.ui`, config via `api.v1.config`.
 - **Strict TypeScript:** `noImplicitAny`, `noUnusedLocals`, `noUnusedParameters` enabled.
-- Existing docs: `external/` (framework READMEs).
-- Code reviews: `CODEREVIEW.md`.
+- API types: `external/script-types.d.ts` — the authoritative NovelAI API surface.

@@ -7,8 +7,8 @@
  * Opened via labelCallback on the entity card (title click).
  * Replaces the combination of SeContentWithTitlePane + SeLorebookContentPane for entities.
  *
- * Lorebook content/keys auto-save on change via api.v1.lorebook.updateEntry().
- * Name/summary are committed on Save.
+ * All fields (name, summary, lorebook content, keys) are committed on Save.
+ * Lorebook content/keys are held in storyStorage draft slots until Save; not written on keystroke.
  */
 
 import {

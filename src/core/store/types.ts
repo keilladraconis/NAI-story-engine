@@ -178,7 +178,7 @@ export interface WorldEntity {
   lifecycle: EntityLifecycle;
   lorebookEntryId?: string; // set on Cast, cleared on Reforge
   name: string;
-  summary: string; // engine-derived, read-only display
+  summary: string; // SE-internal only — editable in SeEntityEditPane, never synced to lorebook
 }
 
 export interface WorldState {
