@@ -47,7 +47,7 @@ export class SeConfirmButton extends SuiConfirmButton {
         pending: {
           self: {
             text: options.confirmLabel ?? "Confirm?",
-            iconId: "alert-triangle" as IconId,
+            iconId: "alertTriangle" as IconId,
             style: {
               color: colors.warning,
               "font-weight": "bold",

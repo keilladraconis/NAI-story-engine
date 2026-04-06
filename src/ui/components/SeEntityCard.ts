@@ -21,7 +21,6 @@ import {
   SuiButton,
   SuiCard,
   SuiCollapsible,
-  SuiRow,
   SuiText,
   type SuiComponentOptions,
 } from "nai-simple-ui";
@@ -29,7 +28,6 @@ import { store } from "../../core/store";
 import {
   entityDiscardRequested,
   entityRegenRequested,
-  entityDeleted,
 } from "../../core/store/slices/world";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
@@ -231,14 +229,6 @@ export class SeEntityCard extends SuiComponent<
 
     // ── Live layout ───────────────────────────────────────────────────────────
 
-    const deleteBtn = new SuiButton({
-      id: E.DELETE_BTN,
-      callback: () => {
-        store.dispatch(entityDeleted({ entityId }));
-      },
-      theme: { default: { self: { iconId: "trash" as IconId } } },
-    });
-
     const card = new SuiCard({
       id: cardId,
       label: name,
@@ -246,7 +236,7 @@ export class SeEntityCard extends SuiComponent<
       labelCallback: () => {
         this._openEditPane();
       },
-      actions: [this._regenBtn!, deleteBtn],
+      actions: [this._regenBtn!],
       theme: CARD_THEME,
     });
 
@@ -278,30 +268,10 @@ export class SeEntityCard extends SuiComponent<
       },
     });
 
-    const secondaryActionsRow = new SuiRow({
-      id: `${E.ROOT}-secondary-actions`,
-      children: [deleteBtn],
-      theme: {
-        default: {
-          self: {
-            base: ACTION_BASE,
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: "0",
-              padding: "2px 0",
-              borderBottom: "1px solid rgba(255,255,255,0.06)",
-              marginBottom: "4px",
-            },
-          },
-        },
-      },
-    });
-
     return new SuiCollapsible({
       id: E.ROOT,
       header: card,
-      children: [summaryText, secondaryActionsRow],
+      children: [summaryText],
       initialCollapsed: true,
       storageKey: `${E.ROOT}.collapsed`,
       storageMode: "story",

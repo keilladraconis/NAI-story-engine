@@ -70,6 +70,13 @@ export interface CritiqueCommand {
   text: string;
 }
 
+export interface ThreadCommand {
+  kind: "THREAD";
+  title: string;
+  memberNames: string[];
+  description: string;
+}
+
 export interface DoneCommand {
   kind: "DONE";
 }
@@ -79,6 +86,7 @@ export type ParsedCommand =
   | ReviseCommand
   | LinkCommand
   | DeleteCommand
+  | ThreadCommand
   | CritiqueCommand
   | DoneCommand;
 
@@ -177,13 +185,29 @@ export function parseCommands(text: string): ParsedCommand[] {
       continue;
     }
 
-    // [CRITIQUE]
-    const critiqueMatch = line.match(/^\[CRITIQUE\]/);
+    // [THREAD "Title" | "Name1", "Name2" | optional description]
+    const threadMatch = line.match(/^\[THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^\]]+?)\]?\s*$/) ??
+                        line.match(/^\[THREAD\s+"([^"]+)"\s*\|([^|]+?)\]?\s*$/);
+    if (threadMatch) {
+      const title = threadMatch[1].trim();
+      const membersRaw = threadMatch[2];
+      const description = (threadMatch[3] ?? "").trim();
+      const memberNames: string[] = [];
+      const nameRe = /"([^"]+)"/g;
+      let m: RegExpExecArray | null;
+      while ((m = nameRe.exec(membersRaw)) !== null) {
+        memberNames.push(m[1].trim());
+      }
+      if (memberNames.length > 0) {
+        commands.push({ kind: "THREAD", title, memberNames, description });
+      }
+      continue;
+    }
+
+    // [CRITIQUE | 2-4 sentences of self-assessment]
+    const critiqueMatch = line.match(/^\[CRITIQUE\s*\|\s*(.+?)\]?\s*$/);
     if (critiqueMatch) {
-      const inline = line.slice(critiqueMatch[0].length).trim();
-      const content = collectContent(lines, i + 1, inline);
-      i += countContentLines(lines, i + 1);
-      commands.push({ kind: "CRITIQUE", text: content });
+      commands.push({ kind: "CRITIQUE", text: critiqueMatch[1].trim() });
       continue;
     }
 
@@ -226,7 +250,7 @@ function countContentLines(lines: string[], startIdx: number): number {
 
 /** Check if a line starts a new command. */
 function isCommandLine(line: string): boolean {
-  return /^\[(CREATE|REVISE|DESCRIPTION|LINK|DELETE|CRITIQUE|DONE)\b/.test(
+  return /^\[(CREATE|REVISE|DESCRIPTION|LINK|DELETE|THREAD|CRITIQUE|DONE)\b/.test(
     line,
   );
 }

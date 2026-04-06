@@ -85,7 +85,7 @@ function formatWorldState(state: RootState): string {
 }
 
 /**
- * Synthesizes the prior-step command log from all current draft entities.
+ * Synthesizes the prior-step command log from all current draft entities and groups.
  * Only correct-syntax commands appear — bad GLM output that failed to parse
  * never enters context.
  */
@@ -93,13 +93,23 @@ function buildForgePassLog(state: RootState): string {
   const draftEntities = state.world.entities.filter(
     (e) => e.lifecycle === "draft",
   );
-  if (draftEntities.length === 0) return "";
 
   const lines: string[] = [];
   for (const entity of draftEntities) {
     const type = FIELD_TO_TYPE[entity.categoryId] ?? "CHARACTER";
     const desc = entity.summary ? ` | ${entity.summary}` : "";
     lines.push(`[CREATE ${type} "${entity.name}"${desc}]`);
+  }
+
+  // Include existing threads so the model doesn't recreate them
+  for (const group of state.world.groups) {
+    const memberNames = group.entityIds
+      .map((id) => state.world.entities.find((e) => e.id === id)?.name)
+      .filter((name): name is string => name !== undefined);
+    if (memberNames.length < 2) continue;
+    const membersStr = memberNames.map((n) => `"${n}"`).join(", ");
+    const descPart = group.summary ? ` | ${group.summary}` : "";
+    lines.push(`[THREAD "${group.title}" | ${membersStr}${descPart}]`);
   }
 
   return lines.join("\n").trim();
@@ -187,7 +197,7 @@ export const createForgeFactory = (
     //    assistantPrefill then prepends "[" client-side to accumulatedText,
     //    giving the handler a fully-formed "[CREATE CHARACTER ...]" to parse.
     const passLog = buildForgePassLog(state);
-    const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE" : "[";
+    const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE |" : "[";
     const assistantContent = passLog ? `${passLog}\n${prefill}` : prefill;
     messages.push({ role: "assistant", content: assistantContent });
 
@@ -212,7 +222,7 @@ export const buildForgeStrategy = (
   forgeGuidance: string,
   brainstormContext?: string,
 ): GenerationStrategy => {
-  const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE" : "[";
+  const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE |" : "[";
   return {
     requestId: api.v1.uuid(),
     messageFactory: createForgeFactory(

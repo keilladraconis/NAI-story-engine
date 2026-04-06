@@ -16,10 +16,12 @@ import {
   entityForged,
   entitySummaryUpdated,
   entityDeleted,
+  groupCreated,
   forgeStepCompleted,
   forgeCritiqueReceived,
   forgeLoopEnded,
 } from "../../slices/world";
+import { WorldGroup } from "../../types";
 import {
   parseCommands,
   CritiqueCommand,
@@ -116,6 +118,42 @@ function executeForgeCommands(
         break;
       }
 
+      case "THREAD": {
+        const existingGroup = getState().world.groups.find(
+          (g) => g.title.toLowerCase() === cmd.title.toLowerCase(),
+        );
+        if (existingGroup) {
+          api.v1.log(`[forge] THREAD rejected: "${cmd.title}" already exists`);
+          break;
+        }
+        const entities = getState().world.entities;
+        const memberIds = cmd.memberNames
+          .map(
+            (name) =>
+              entities.find(
+                (e) => e.name.toLowerCase() === name.toLowerCase(),
+              )?.id,
+          )
+          .filter((id): id is string => id !== undefined);
+        if (memberIds.length < 2) {
+          api.v1.log(
+            `[forge] THREAD "${cmd.title}": needs at least 2 valid members, got ${memberIds.length}`,
+          );
+          break;
+        }
+        const group: WorldGroup = {
+          id: api.v1.uuid(),
+          title: cmd.title,
+          summary: cmd.description,
+          entityIds: memberIds,
+        };
+        dispatch(groupCreated({ group }));
+        api.v1.log(
+          `[forge] THREAD "${cmd.title}" with ${memberIds.length} members`,
+        );
+        break;
+      }
+
       case "DONE":
         api.v1.log("[forge] DONE");
         break;
@@ -133,7 +171,7 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
 
     // Show command keywords as ticker during generation
     const commandMatches = text.match(
-      /\[(CREATE|REVISE|DELETE|CRITIQUE|DONE)\b[^\]]*\]/g,
+      /\[(CREATE|REVISE|DELETE|THREAD|CRITIQUE|DONE)\b[^\]]*\]/g,
     );
     const lastCommand = commandMatches
       ? commandMatches[commandMatches.length - 1]

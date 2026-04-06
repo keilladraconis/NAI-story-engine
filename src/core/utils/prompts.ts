@@ -521,16 +521,18 @@ export const FORGE_PROMPT = `You are a world-building assistant operating in a s
 Each response emits exactly ONE command.
 
 Command vocabulary:
-  [CREATE <TYPE> "<Name>" | description 1–3 sentences]   — new world element (CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC)
-  [REVISE "<Name>" | updated description 1–3 sentences]  — rewrite an existing draft element
-  [DELETE "<Name>"]                                       — remove a draft element
-  [CRITIQUE]                                             — self-assessment; ends this forge pass
+  [CREATE <TYPE> "<Name>" | description 1–3 sentences]                        — new world element (CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC)
+  [REVISE "<Name>" | updated description 1–3 sentences]                       — rewrite an existing draft element
+  [DELETE "<Name>"]                                                            — remove a draft element
+  [THREAD "<Title>" | "Name1", "Name2" | 1-sentence description]              — group 2–4 elements with a genuine shared dynamic into a thread
+  [CRITIQUE | 2–4 sentences: what works, what is missing, what to address next]  — self-assessment; ends this forge pass
 
-For CREATE and REVISE, write the description inline after the | separator, before the closing ].
-After [CRITIQUE], write 2–4 sentences on the following lines: what works, what is missing, what to address next.
+For all commands, write content inline after the | separator, before the closing ].
+For THREAD, list only the members who share a direct structural bond — not every element tangentially related. Create at most one or two threads per pass, and only after the relevant elements exist.
 
 EXAMPLE:
 [CREATE CHARACTER "Mira Voss" | A surgeon operating out of a black-market bay who owes a debt she cannot repay. Her cold bedside manner hides genuine grief for the patients she could not save.]
+[THREAD "Black-Market Bay" | "Mira Voss", "The Debt" | The economic trap that keeps Mira operating outside the law.]
 
 The ESTABLISHED WORLD section lists what already exists — do not recreate those elements.
 The prior command sequence shows what has been built this pass — continue it naturally.

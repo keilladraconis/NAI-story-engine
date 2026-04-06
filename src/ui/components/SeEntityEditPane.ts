@@ -28,6 +28,7 @@ import {
   entityCategoryChanged,
   entitySummaryUpdated,
   entityUnbound,
+  entityDeleted,
 } from "../../core/store/slices/world";
 import {
   IDS,
@@ -36,6 +37,7 @@ import {
 } from "../../ui/framework/ids";
 import { FieldID, DulfsFieldID } from "../../config/field-definitions";
 import { SeGenerationIconButton } from "./SeGenerationButton";
+import { SeConfirmButton } from "./SeConfirmButton";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 // ── Category definitions ──────────────────────────────────────────────────────
@@ -85,17 +87,17 @@ const S = {
   container: { gap: "6px", flex: "1", "justify-content": "flex-start" },
   header: { "align-items": "center", gap: "4px", "margin-bottom": "4px" },
   headerName: { flex: "1", "font-size": "0.95em", "font-weight": "bold" },
-  colLabel: { "font-size": "0.8em", "font-weight": "bold", opacity: "0.7" },
+  colLabel: { "font-size": "0.8em", "font-weight": "bold" },
   rowLabel: {
     "font-size": "0.8em",
     "font-weight": "bold",
-    opacity: "0.7",
     flex: "1",
   },
   sectionRow: { "align-items": "center", gap: "4px" },
   nameInput: { "font-size": "0.85em", "flex-shrink": "0" },
   summaryInput: { height: "80px", "font-size": "0.85em", flex: "none" },
   saveBtn: { padding: "4px 12px", "flex-shrink": "0" },
+  deleteBtn: { padding: "4px 8px", "flex-shrink": "0" },
   lbDivider: {
     "margin-top": "8px",
     "border-top": "1px solid rgba(255,255,255,0.08)",
@@ -109,7 +111,6 @@ const S = {
     "align-self": "flex-start",
     "font-size": "0.85em",
     padding: "4px 8px",
-    opacity: "0.6",
   },
 } as const;
 
@@ -296,34 +297,52 @@ export class SeEntityEditPane extends SuiComponent<
     };
 
     const categoryBar = new SuiActionBar({
-            id: `${this.id}-category-bar`,
-            left: CATEGORIES.map(
-              (cat) =>
-                new SuiButton({
-                  id: `${this.id}-cat-${cat.id}`,
-                  callback: () => {
-                    _setCategory(cat.id as DulfsFieldID);
-                  },
-                  theme: {
-                    default: {
-                      self: {
-                        iconId: cat.icon as IconId,
-                        text: cat.label,
-                        style:
-                          cat.id === currentCategory
-                            ? CAT_STYLE_SELECTED
-                            : CAT_STYLE_DEFAULT,
-                      },
-                    },
-                  },
-                }),
-            ),
+      id: `${this.id}-category-bar`,
+      left: CATEGORIES.map(
+        (cat) =>
+          new SuiButton({
+            id: `${this.id}-cat-${cat.id}`,
+            callback: () => {
+              _setCategory(cat.id as DulfsFieldID);
+            },
             theme: {
               default: {
-                left: { style: { "flex-wrap": "wrap" } },
+                self: {
+                  iconId: cat.icon as IconId,
+                  text: cat.label,
+                  style:
+                    cat.id === currentCategory
+                      ? CAT_STYLE_SELECTED
+                      : CAT_STYLE_DEFAULT,
+                },
               },
             },
-        });
+          }),
+      ),
+      theme: {
+        default: {
+          left: { style: { "flex-wrap": "wrap" } },
+        },
+      },
+    });
+
+    const deleteConfirmBtn =
+      lifecycle === "live"
+        ? new SeConfirmButton({
+          id: EP.DELETE_BTN,
+          label: "Delete",
+          iconId: "trash" as IconId,
+          confirmLabel: "Delete entity?",
+          style: S.deleteBtn,
+          onConfirm: async () => {
+            store.dispatch(entityDeleted({ entityId }));
+            _close();
+          },
+        })
+        : null;
+    const deleteConfirmPart = deleteConfirmBtn
+      ? await deleteConfirmBtn.build()
+      : null;
 
     const parts: UIPart[] = [
       // ── Header ─────────────────────────────────────────────────────────────
@@ -342,6 +361,7 @@ export class SeEntityEditPane extends SuiComponent<
             markdown: true,
             style: S.headerName,
           }),
+          ...(deleteConfirmPart ? [deleteConfirmPart] : []),
           button({
             id: EP.SAVE_BTN,
             text: "Save",

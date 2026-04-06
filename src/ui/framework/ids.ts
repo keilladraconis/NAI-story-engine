@@ -53,6 +53,9 @@ export const STORAGE_KEYS = {
 
   // World Thread (group) UI — dynamic by groupId
   worldGroupSectionUI: (groupId: string) => `se-world-group-${groupId}`,
+
+  // Threads collapsible section
+  THREADS_SECTION_UI: "se-world-threads-section",
 };
 
 export const IDS = {
@@ -103,6 +106,7 @@ export const IDS = {
     SECTION: "se-world-section",
     ENTITY_LIST: "se-world-entity-list",
     THREAD_LIST: "se-world-thread-list",
+    THREADS_SECTION: "se-world-threads-section",
     thread: (id: string) => ({
       SECTION: `se-world-thread-${id}`,
       TITLE_INPUT: `se-world-thread-${id}-title`,
@@ -139,6 +143,7 @@ export const IDS = {
     TITLE_INPUT: "se-edit-title",
     CONTENT_INPUT: "se-edit-content",
     SAVE_BTN: "se-edit-save",
+    DELETE_BTN: "se-edit-delete",
   },
   LOREBOOK: {
     PANEL: "kse-lorebook-panel",
