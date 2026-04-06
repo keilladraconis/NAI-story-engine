@@ -1,5 +1,6 @@
 import { createSlice } from "nai-store";
 import { WorldState, WorldBatch, WorldEntity, Relationship, EntityLifecycle } from "../types";
+import { DulfsFieldID } from "../../../config/field-definitions";
 
 export const initialWorldState: WorldState = {
   batches: [],
@@ -55,6 +56,13 @@ export const worldSlice = createSlice({
       ...state,
       entities: state.entities.map((e) =>
         e.id === payload.entityId ? { ...e, name: payload.name, summary: payload.summary } : e,
+      ),
+    }),
+
+    entityCategoryChanged: (state, payload: { entityId: string; categoryId: DulfsFieldID }) => ({
+      ...state,
+      entities: state.entities.map((e) =>
+        e.id === payload.entityId ? { ...e, categoryId: payload.categoryId } : e,
       ),
     }),
 
@@ -163,6 +171,7 @@ export const {
   entityDeleted,
   entitySummaryUpdated,
   entityEdited,
+  entityCategoryChanged,
   entityBound,
   entityUnbound,
   batchCreated,

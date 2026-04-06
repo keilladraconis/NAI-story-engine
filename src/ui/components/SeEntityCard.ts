@@ -76,32 +76,9 @@ const ACTION_BASE = {
   opacity:    "1",
 } as const;
 
-// Returns the first line of a summary, capped at 120 characters.
-function excerptSummary(summary: string): string {
-  const firstLine = summary.split("\n")[0] ?? "";
-  return firstLine.length > 120 ? firstLine.slice(0, 120) : firstLine;
-}
-
-// Shared card theme — unlocks action button chrome and styles sublabel for a compact display.
+// Shared card theme — unlocks action button chrome.
 const CARD_THEME = {
   default: {
-    sublabel: {
-      style: {
-        background:   "none",
-        border:       "none",
-        padding:      "0 0 4px",
-        margin:       "0",
-        textAlign:    "left",
-        fontSize:     "0.72em",
-        cursor:       "default",
-        opacity:      "0.6",
-        fontWeight:   "normal",
-        fontStyle:    "normal",
-        overflow:     "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace:   "nowrap",
-      },
-    },
     actions: {
       base: ACTION_BASE,
     },
@@ -109,12 +86,12 @@ const CARD_THEME = {
 };
 
 const CATEGORY_ICON: Record<string, IconId> = {
-  "dramat-personae":      "user",
-  "universe-systems":     "cpu",
-  "locations":            "map-pin",
-  "factions":             "shield",
-  "situational-dynamics": "activity",
-  "topics":               "hash",
+  "dramatisPersonae":    "user",
+  "universeSystems":     "cpu",
+  "locations":           "map-pin",
+  "factions":            "shield",
+  "situationalDynamics": "activity",
+  "topics":              "hash",
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -193,7 +170,6 @@ export class SeEntityCard extends SuiComponent<
     const entity  = store.getState().world.entities.find(e => e.id === entityId);
     const name    = entity?.name ?? "";
     const summary = entity?.summary ?? "";
-    const excerpt = excerptSummary(summary);
     const iconId  = entity?.categoryId ? CATEGORY_ICON[entity.categoryId] : undefined;
     const cardId  = `${E.ROOT}.card`;
 
@@ -207,13 +183,16 @@ export class SeEntityCard extends SuiComponent<
       },
     );
 
-    // Reactively update card sublabel excerpt when summary changes
+    // Reactively update card icon when category changes
     this._watcher.watch(
-      (s) => excerptSummary(s.world.entities.find(e => e.id === entityId)?.summary ?? ""),
-      (newExcerpt) => {
-        api.v1.ui.updateParts([
-          { id: `${cardId}.sublabel`, text: newExcerpt } as unknown as Partial<UIPart> & { id: string },
-        ]);
+      (s) => s.world.entities.find(e => e.id === entityId)?.categoryId ?? "",
+      (newCategoryId) => {
+        const newIconId = CATEGORY_ICON[newCategoryId];
+        if (newIconId) {
+          api.v1.ui.updateParts([
+            { id: `${cardId}.icon`, iconId: newIconId } as unknown as Partial<UIPart> & { id: string },
+          ]);
+        }
       },
     );
 
@@ -251,7 +230,6 @@ export class SeEntityCard extends SuiComponent<
       const card = new SuiCard({
         id:            cardId,
         label:         name,
-        sublabel:      excerpt,
         icon:          iconId,
         labelCallback: () => { this._openEditPane(); },
         actions:       [discardBtn],
@@ -302,11 +280,33 @@ export class SeEntityCard extends SuiComponent<
     const card = new SuiCard({
       id:            cardId,
       label:         name,
-      sublabel:      excerpt,
       icon:          iconId,
       labelCallback: () => { this._openEditPane(); },
       actions:       [reforgeBtn, this._regenBtn!],
       theme:         CARD_THEME,
+    });
+
+    // ── Summary text for live collapsible ─────────────────────────────────────
+
+    const summaryId = `${E.ROOT}-summary`;
+
+    this._watcher.watch(
+      (s) => s.world.entities.find(e => e.id === entityId)?.summary ?? "",
+      (newSummary) => {
+        api.v1.ui.updateParts([{ id: summaryId, text: newSummary }]);
+      },
+    );
+
+    const summaryText = new SuiText({
+      id:    summaryId,
+      theme: {
+        default: {
+          self: {
+            text:  summary,
+            style: { "font-size": "0.82em", opacity: "0.7", "white-space": "pre-wrap", "word-break": "break-word", "user-select": "text", padding: "2px 0 4px" },
+          },
+        },
+      },
     });
 
     // ── Secondary actions row (Move, Delete) in collapsible ───────────────────
@@ -417,6 +417,7 @@ export class SeEntityCard extends SuiComponent<
       id:    `${E.ROOT}-content`,
       style: { gap: "4px", padding: "0 2px 4px" },
       content: [
+        await summaryText.build(),
         await secondaryActionsRow.build(),
         linksSection,
       ],

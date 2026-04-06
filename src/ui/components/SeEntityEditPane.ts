@@ -11,7 +11,7 @@
  * Name/summary are committed on Save.
  */
 
-import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
+import { SuiActionBar, SuiButton, SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
 import {
   uiLorebookEntrySelected,
@@ -20,12 +20,37 @@ import {
 } from "../../core/store/slices/ui";
 import {
   entityEdited,
+  entityCategoryChanged,
   entitySummaryUpdated,
   entityUnbound,
 } from "../../core/store/slices/world";
 import { IDS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../../ui/framework/ids";
+import { FieldID, DulfsFieldID } from "../../config/field-definitions";
 import { SeGenerationIconButton } from "./SeGenerationButton";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
+
+// ── Category definitions ──────────────────────────────────────────────────────
+
+const CATEGORIES = [
+  { id: FieldID.DramatisPersonae,    label: "Characters", icon: "user"     },
+  { id: FieldID.UniverseSystems,     label: "Systems",    icon: "cpu"      },
+  { id: FieldID.Locations,           label: "Locations",  icon: "map-pin"  },
+  { id: FieldID.Factions,            label: "Factions",   icon: "shield"   },
+  { id: FieldID.SituationalDynamics, label: "Vectors",    icon: "activity" },
+  { id: FieldID.Topics,              label: "Topics",     icon: "hash"     },
+] as const;
+
+// Full style objects so updateParts doesn't drop the base padding/font-size set by SuiActionBar.
+const CAT_BTN_BASE = {
+  fontWeight: "normal",
+  fontSize:   "0.775rem",
+  padding:    "4px 8px",
+  margin:     "0",
+  gap:        "4px",
+  border:     "none",
+};
+const CAT_STYLE_DEFAULT  = { ...CAT_BTN_BASE, opacity: "0.4",  background: "none" };
+const CAT_STYLE_SELECTED = { ...CAT_BTN_BASE, opacity: "1",    background: "rgba(144, 238, 144, 0.15)", borderRadius: "3px" };
 
 type Theme = { default: { self: { style: object } } };
 type State = Record<string, never>;
@@ -39,14 +64,15 @@ export type SeEntityEditPaneOptions = {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const S = {
-  container:    { gap: "6px", flex: "1" },
+  container:    { gap: "6px", flex: "1", "justify-content": "flex-start" },
   header:       { "align-items": "center", gap: "4px", "margin-bottom": "4px" },
   headerName:   { flex: "1", "font-size": "0.95em", "font-weight": "bold" },
-  sectionLabel: { "font-size": "0.8em", "font-weight": "bold", opacity: "0.7", flex: "1" },
+  colLabel:     { "font-size": "0.8em", "font-weight": "bold", opacity: "0.7" },
+  rowLabel:     { "font-size": "0.8em", "font-weight": "bold", opacity: "0.7", flex: "1" },
   sectionRow:   { "align-items": "center", gap: "4px" },
-  nameInput:    { "font-size": "0.85em" },
-  summaryInput: { "min-height": "80px", "font-size": "0.85em", flex: "1" },
-  saveBtn:      { "align-self": "flex-end", padding: "4px 16px" },
+  nameInput:    { "font-size": "0.85em", "flex-shrink": "0" },
+  summaryInput: { height: "80px", "font-size": "0.85em", flex: "none" },
+  saveBtn:      { padding: "4px 12px", "flex-shrink": "0" },
   lbDivider:    { "margin-top": "8px", "border-top": "1px solid rgba(255,255,255,0.08)", "padding-top": "8px" },
   contentInput: { "font-size": "13px", flex: "auto" },
   keysRow:      { "align-items": "center", gap: "4px", "margin-top": "4px" },
@@ -170,6 +196,44 @@ export class SeEntityEditPane extends SuiComponent<
 
     const { column, row, text, button, textInput, multilineTextInput } = api.v1.ui.part;
 
+    // ── Category bar (draft only) ─────────────────────────────────────────────
+
+    const currentCategory = entity?.categoryId ?? "";
+
+    const _setCategory = (newCategoryId: DulfsFieldID): void => {
+      store.dispatch(entityCategoryChanged({ entityId, categoryId: newCategoryId }));
+      api.v1.ui.updateParts(
+        CATEGORIES.map(cat => ({
+          id:    `${this.id}-cat-${cat.id}`,
+          style: cat.id === newCategoryId ? CAT_STYLE_SELECTED : CAT_STYLE_DEFAULT,
+        })) as Array<Partial<UIPart> & { id: string }>,
+      );
+    };
+
+    const categoryBar = lifecycle === "draft"
+      ? new SuiActionBar({
+          id:    `${this.id}-category-bar`,
+          left:  CATEGORIES.map(cat => new SuiButton({
+            id:       `${this.id}-cat-${cat.id}`,
+            callback: () => { _setCategory(cat.id as DulfsFieldID); },
+            theme:    {
+              default: {
+                self: {
+                  iconId: cat.icon as IconId,
+                  text:   cat.label,
+                  style:  cat.id === currentCategory ? CAT_STYLE_SELECTED : CAT_STYLE_DEFAULT,
+                },
+              },
+            },
+          })),
+          theme: {
+            default: {
+              left: { style: { "flex-wrap": "wrap" } },
+            },
+          },
+        })
+      : null;
+
     const parts: UIPart[] = [
 
       // ── Header ─────────────────────────────────────────────────────────────
@@ -186,11 +250,19 @@ export class SeEntityEditPane extends SuiComponent<
             markdown: true,
             style:    S.headerName,
           }),
+          button({
+            id:       EP.SAVE_BTN,
+            text:     "Save",
+            style:    S.saveBtn,
+            callback: () => { _save(); },
+          }),
         ],
       }),
 
+      // ── Category bar ───────────────────────────────────────────────────────
+      ...(categoryBar ? [await categoryBar.build()] : []),
+
       // ── Name ───────────────────────────────────────────────────────────────
-      text({ text: "Name", style: S.sectionLabel }),
       textInput({
         id:           EP.TITLE_INPUT,
         initialValue: entity?.name ?? "",
@@ -200,21 +272,13 @@ export class SeEntityEditPane extends SuiComponent<
       }),
 
       // ── Summary ────────────────────────────────────────────────────────────
-      text({ text: "Summary", style: S.sectionLabel }),
+      text({ text: "Summary", style: S.colLabel }),
       multilineTextInput({
         id:           EP.CONTENT_INPUT,
         initialValue: entity?.summary ?? "",
         placeholder:  "Brief description of this entity…",
         storageKey:   `story:${EDIT_PANE_CONTENT}`,
         style:        S.summaryInput,
-      }),
-
-      // ── Save ───────────────────────────────────────────────────────────────
-      button({
-        id:       EP.SAVE_BTN,
-        text:     "Save",
-        style:    S.saveBtn,
-        callback: () => { _save(); },
       }),
     ];
 
@@ -234,7 +298,7 @@ export class SeEntityEditPane extends SuiComponent<
         row({
           style:   S.sectionRow,
           content: [
-            text({ text: "Content", style: S.sectionLabel }),
+            text({ text: "Content", style: S.rowLabel }),
             contentGenPart,
           ],
         }),
@@ -258,7 +322,7 @@ export class SeEntityEditPane extends SuiComponent<
         row({
           style:   S.keysRow,
           content: [
-            text({ text: "Keys", style: S.sectionLabel }),
+            text({ text: "Keys", style: S.rowLabel }),
             textInput({
               id:           L.KEYS_INPUT,
               initialValue: "",
