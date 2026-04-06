@@ -10,6 +10,7 @@ NAI Story Engine is a NovelAI script (.naiscript) that guides structured worldbu
 
 ```
 npm run build      # nibs build → dist/NAI-story-engine.naiscript
+npm run format     # prettier -w . 
 npm run test       # vitest run
 ```
 
