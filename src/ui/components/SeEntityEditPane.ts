@@ -190,6 +190,16 @@ export class SeEntityEditPane extends SuiComponent<
           }
         }
 
+        // Flush lorebook content and keys on save (not on each keystroke)
+        if (lifecycle === "live" && entryId) {
+          const rawContent = String((await api.v1.storyStorage.get(L.CONTENT_DRAFT_RAW)) ?? "");
+          const erato = (await api.v1.config.get("erato_compatibility")) || false;
+          const content = erato && !rawContent.startsWith("----\n") ? "----\n" + rawContent : rawContent;
+          const rawKeys = String((await api.v1.storyStorage.get(L.KEYS_DRAFT_RAW)) ?? "");
+          const keys = rawKeys.split(",").map(k => k.trim()).filter(k => k.length > 0);
+          await api.v1.lorebook.updateEntry(entryId, { text: content, keys });
+        }
+
         _close();
       })();
     };
@@ -303,19 +313,13 @@ export class SeEntityEditPane extends SuiComponent<
           ],
         }),
 
-        // Content textarea — auto-saves to lorebook on change
+        // Content textarea — flushed to lorebook on Save
         multilineTextInput({
           id:           L.CONTENT_INPUT,
           initialValue: "",
           placeholder:  "Lorebook content…",
           storageKey:   `story:${L.CONTENT_DRAFT_KEY}`,
           style:        S.contentInput,
-          onChange:     async (value: string) => {
-            if (!entryId) return;
-            const erato = (await api.v1.config.get("erato_compatibility")) || false;
-            const withHeader = erato && !value.startsWith("----\n") ? "----\n" + value : value;
-            await api.v1.lorebook.updateEntry(entryId, { text: withHeader });
-          },
         }),
 
         // Keys row: label + input + gen icon button
@@ -329,11 +333,6 @@ export class SeEntityEditPane extends SuiComponent<
               placeholder:  "comma, separated, keys",
               storageKey:   `story:${L.KEYS_DRAFT_KEY}`,
               style:        S.keysInput,
-              onChange:     async (value: string) => {
-                if (!entryId) return;
-                const keys = value.split(",").map(k => k.trim()).filter(k => k.length > 0);
-                await api.v1.lorebook.updateEntry(entryId, { keys });
-              },
             }),
             keysGenPart,
           ],
