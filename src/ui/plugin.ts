@@ -41,7 +41,6 @@ import type { EditPaneHost } from "./components/SeContentWithTitlePane";
 
 import { BrainstormPane } from "./components/BrainstormPane";
 import { ForgePane } from "./components/ForgePane";
-import { SeThreadList } from "./components/SeThreadList";
 import { SeHeaderBar } from "./components/SeHeaderBar";
 import { SeLorebookPanel } from "./components/SeLorebookPanel";
 import { SeJournalPanel } from "./components/SeJournalPanel";
@@ -61,7 +60,6 @@ export class StoryEnginePlugin extends SuiPlugin {
   // ── Story engine pane children (persistent for rebuild) ──
   private _seHeaderBar?: SeHeaderBar;
   private _forgePane?: ForgePane;
-  private _threadList?: SeThreadList;
   private _footer?: SuiRow;
 
   // ── Edit pane hosting ──
@@ -143,7 +141,6 @@ export class StoryEnginePlugin extends SuiPlugin {
       children: [
         this._seHeaderBar!,
         this._forgePane!,
-        this._threadList!,
         this._footer!,
       ],
       theme: { default: { self: { style: { gap: "8px" } } } },
@@ -165,10 +162,6 @@ export class StoryEnginePlugin extends SuiPlugin {
     this._seHeaderBar = new SeHeaderBar({ id: "kse-sidebar-header" });
     this._forgePane = new ForgePane({
       id: "se-forge-pane",
-      editHost: this.editHost,
-    });
-    this._threadList = new SeThreadList({
-      id: IDS.WORLD.THREAD_LIST,
       editHost: this.editHost,
     });
 
@@ -220,7 +213,6 @@ export class StoryEnginePlugin extends SuiPlugin {
       children: [
         this._seHeaderBar,
         this._forgePane,
-        this._threadList,
         this._footer,
       ],
       theme: { default: { self: { style: { gap: "8px" } } } },

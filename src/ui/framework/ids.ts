@@ -48,6 +48,9 @@ export const STORAGE_KEYS = {
   FORGE_SECTION_UI: "se-forge-section",
   FORGE_GUIDANCE_UI: "se-forge-guidance",
 
+  // World section UI
+  WORLD_SECTION_UI: "se-world-section",
+
   // World Thread (group) UI — dynamic by groupId
   worldGroupSectionUI: (groupId: string) => `se-world-group-${groupId}`,
 };
@@ -97,6 +100,8 @@ export const IDS = {
     CAST_DISCARD_ROW: "se-forge-cast-discard-row",
   },
   WORLD: {
+    SECTION: "se-world-section",
+    ENTITY_LIST: "se-world-entity-list",
     THREAD_LIST: "se-world-thread-list",
     thread: (id: string) => ({
       SECTION: `se-world-thread-${id}`,

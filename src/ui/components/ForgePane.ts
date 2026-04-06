@@ -8,6 +8,7 @@
 import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { SeFoundationSection } from "./SeFoundationSection";
 import { SeForgeSection } from "./SeForgeSection";
+import { SeWorldSection } from "./SeWorldSection";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 type ForgePaneTheme = { default: { self: { style: object } } };
@@ -25,6 +26,7 @@ export class ForgePane extends SuiComponent<
 > {
   private readonly _foundation: SeFoundationSection;
   private readonly _forge: SeForgeSection;
+  private readonly _world: SeWorldSection;
 
   constructor(options: ForgePaneOptions) {
     super(
@@ -41,12 +43,18 @@ export class ForgePane extends SuiComponent<
       id: "se-forge-section",
       editHost: options.editHost,
     });
+
+    this._world = new SeWorldSection({
+      id: "se-world-section",
+      editHost: options.editHost,
+    });
   }
 
   async compose(): Promise<UIPartColumn> {
-    const [foundationPart, forgePart] = await Promise.all([
+    const [foundationPart, forgePart, worldPart] = await Promise.all([
       this._foundation.build(),
       this._forge.build(),
+      this._world.build(),
     ]);
 
     const { column } = api.v1.ui.part;
@@ -54,7 +62,7 @@ export class ForgePane extends SuiComponent<
     return column({
       id: this.id,
       style: {},
-      content: [foundationPart, forgePart],
+      content: [foundationPart, forgePart, worldPart],
     });
   }
 }
