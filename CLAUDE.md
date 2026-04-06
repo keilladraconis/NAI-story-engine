@@ -35,7 +35,7 @@ npm run test       # vitest run
 
 **Config:** `src/config/field-definitions.ts` — `FIELD_CONFIGS` array defines all field metadata, layouts, and generation prompts. Uses `FieldID` enum throughout.
 
-**UI (`src/ui-sui/`):**
+**UI (`src/ui/`):**
 
 - All components are `SuiComponent` subclasses from `nai-simple-ui`. `compose()` returns a static UIPart tree; `StoreWatcher.watch()` drives reactive `updateParts()` calls.
 - Non-storageKey UI mutations use `api.v1.ui.updateParts()` — never re-render. storageKey-bound inputs are the exception: update them via storyStorage, not updateParts (see UI Input Patterns below).
