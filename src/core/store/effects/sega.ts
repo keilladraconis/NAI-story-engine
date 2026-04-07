@@ -5,8 +5,7 @@
  *   1. Lorebook Content (generate entry text)
  *   2. Lorebook Keys (generate activation keys)
  *
- * Triggered automatically after Cast (forgeCastCompleted) and on-demand
- * via the SEGA toggle button.
+ * Triggered on-demand via the SEGA toggle button.
  *
  * Works on Live entities with lorebookEntryIds (v11 world slice).
  * Dependency on ATTG/Style/Canon/Bootstrap removed — those are now
@@ -27,7 +26,6 @@ import {
   requestCompleted,
   requestCancelled,
 } from "../slices/runtime";
-import { forgeCastCompleted } from "../slices/world";
 import { generationSubmitted } from "../slices/ui";
 import {
   createLorebookContentFactory,
@@ -253,28 +251,6 @@ export function registerSegaEffects(
       // SEGA was just turned OFF
       cancelAllSegaTasks(getState, genX, dispatch);
       dispatch(segaReset());
-    }
-  });
-
-  // Effect 2: Auto-trigger SEGA after Cast
-  subscribeEffect(matchesAction(forgeCastCompleted), async (_action) => {
-    const state = getState();
-    if (state.runtime.segaRunning) {
-      api.v1.log(
-        "[sega] forgeCastCompleted while SEGA running — scheduling next task",
-      );
-      await scheduleNextSegaTask(dispatch, getState);
-      return;
-    }
-
-    // Auto-start SEGA if there are entities needing realization
-    const needsContent = await findEntityNeedingContent(getState());
-    if (needsContent) {
-      api.v1.log(
-        "[sega] forgeCastCompleted — auto-starting SEGA for new entities",
-      );
-      dispatch(segaReset());
-      dispatch(segaToggled()); // This sets segaRunning = true; the segaToggled effect above handles scheduling
     }
   });
 

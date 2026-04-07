@@ -1,14 +1,15 @@
 import { RootState } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "./context-builder";
-import { DulfsFieldID, FIELD_CONFIGS } from "../../config/field-definitions";
-import { STORAGE_KEYS } from "../../ui/framework/ids";
+import { DulfsFieldID, FieldID, FIELD_CONFIGS } from "../../config/field-definitions";
+import { STORAGE_KEYS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../../ui/framework/ids";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
 import { getModel } from "./config";
 import {
   LOREBOOK_GENERATE_PROMPT,
   LOREBOOK_KEYS_PROMPT,
   LOREBOOK_REFINE_PROMPT,
+  LOREBOOK_WEAVING_PROMPT,
   CATEGORY_TEMPLATES,
 } from "./prompts";
 
@@ -76,7 +77,14 @@ function formatLiveWorldEntitiesContext(state: RootState): string {
 
 /**
  * Creates a message factory for lorebook content generation.
- * Uses unified prefix (excludes self) + volatile tail with content-specific instruction.
+ *
+ * Message structure:
+ *   MSG 1 (system): Archivist instructions (LOREBOOK_GENERATE_PROMPT)
+ *   MSG 2 (system): Story background — foundation, canon, setting, ATTG, style
+ *   MSG 3 (system): Category template (varies per entry type)
+ *   MSG 4 (system): World context — live entities + weaving prompt + thread groups
+ *   MSG 5 (user):   Entity summary (immediate context before prefill)
+ *   MSG 6 (asst):   Name / Type / Setting prefill (anchors output format)
  */
 export const createLorebookContentFactory = (
   getState: () => RootState,
@@ -88,89 +96,92 @@ export const createLorebookContentFactory = (
       throw new Error(`Lorebook entry not found: ${entryId}`);
     }
 
-    // Get category name
+    // Resolve category name for template + type label
     let categoryName = "";
     if (entry.category) {
       const categories = await api.v1.lorebook.categories();
-      const category = categories.find((c) => c.id === entry.category);
-      categoryName = category?.name || "";
+      const cat = categories.find((c) => c.id === entry.category);
+      categoryName = cat?.name || "";
     }
 
-    const displayName = entry.displayName || "Unnamed Entry";
     const model = await getModel();
-    const prompt = LOREBOOK_GENERATE_PROMPT.replace("[itemName]", displayName);
-
-    // Get template based on category
+    const entryType = getEntryType(categoryName);
     const template = CATEGORY_TEMPLATES[categoryName] || "";
 
-    // Resolve entity early so its summary is available as item description fallback
     const state = getState();
     const entity = findEntityForEntry(state, entryId);
 
-    // Item's short description: DULFS storage (backward compat) or entity summary (v11)
+    // Pull name and summary from live input fields first — user may have typed
+    // without saving. Fall back to persisted values.
+    const liveName = String(
+      (await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "",
+    ).trim();
+    const displayName = liveName || entry.displayName || entity?.name || "Unnamed Entry";
+
+    const liveSummary = String(
+      (await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) || "",
+    ).trim();
     const dulfsContent = String(
       (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(entryId))) || "",
     );
-    const itemContent = dulfsContent || entity?.summary || "";
+    const itemSummary = liveSummary || dulfsContent || entity?.summary || "";
 
-    // Anchored assistant prefill
-    const entryType = getEntryType(categoryName);
-    const setting = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
-    );
-    const assistantPrefill = `Name: ${displayName}
-Type: ${entryType}
-Setting: ${setting}
-`;
-
-    const prefix = await buildStoryEnginePrefix(getState);
-
+    // --- MSG 1: Archivist instructions ---
     const messages: Message[] = [
-      ...prefix,
       {
         role: "system",
-        content: `[LOREBOOK ENTRY GENERATION]\n${prompt}`,
+        content: LOREBOOK_GENERATE_PROMPT.replace("[itemName]", displayName),
       },
     ];
 
-    // Template after stable prefix (varies per category)
-    if (template) {
-      messages.push({
-        role: "system",
-        content: `TEMPLATE:\n${template}`,
-      });
+    // --- MSG 2: Story background ---
+    const { foundation } = state;
+    const backgroundParts: string[] = [];
+    if (foundation.attg) backgroundParts.push(`[ATTG]\n${foundation.attg}`);
+    if (foundation.style) backgroundParts.push(`[STYLE]\n${foundation.style}`);
+    if (foundation.shape || foundation.intent || foundation.worldState) {
+      const fp: string[] = [];
+      if (foundation.shape) fp.push(`Shape: ${foundation.shape.name}\n${foundation.shape.description}`);
+      if (foundation.intent) fp.push(`Intent: ${foundation.intent}`);
+      if (foundation.worldState) fp.push(`World State: ${foundation.worldState}`);
+      backgroundParts.push(`[NARRATIVE FOUNDATION]\n${fp.join("\n")}`);
     }
-
-    // v11 world context: live entities grouped by category
-    const worldContext = formatLiveWorldEntitiesContext(state);
-    if (worldContext) {
-      messages.push({
-        role: "system",
-        content: `[WORLD STRUCTURE]\n${worldContext}`,
-      });
-    }
-
-    // Thread (group) context for this entity
-    const groupContext = entity
-      ? formatEntityGroups(state, entity.id)
-      : "";
-    if (groupContext) {
-      messages.push({
-        role: "system",
-        content: `[GROUPS]\n${groupContext}`,
-      });
-    }
-
-    messages.push(
-      {
-        role: "user",
-        content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}`,
-      },
-      { role: "assistant", content: assistantPrefill },
+    const canon = state.story.fields[FieldID.Canon]?.content || "";
+    if (canon) backgroundParts.push(`[CANON]\n${canon}`);
+    const setting = String(
+      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
     );
+    if (setting) backgroundParts.push(`[SETTING]\n${setting}`);
+    if (backgroundParts.length > 0) {
+      messages.push({ role: "system", content: backgroundParts.join("\n\n") });
+    }
 
-    const tailCount =
-      (template ? 1 : 0) + (worldContext ? 1 : 0) + (groupContext ? 1 : 0) + 3;
+    // --- MSG 3: Category template ---
+    if (template) {
+      messages.push({ role: "system", content: `TEMPLATE:\n${template}` });
+    }
+
+    // --- MSG 4: World context + weaving ---
+    const worldContext = formatLiveWorldEntitiesContext(state);
+    const groupContext = entity ? formatEntityGroups(state, entity.id) : "";
+    const worldParts: string[] = [];
+    if (worldContext) worldParts.push(`[WORLD]\n${worldContext}`);
+    if (groupContext) worldParts.push(`[GROUPS]\n${groupContext}`);
+    if (LOREBOOK_WEAVING_PROMPT) worldParts.push(LOREBOOK_WEAVING_PROMPT);
+    if (worldParts.length > 0) {
+      messages.push({ role: "system", content: worldParts.join("\n\n") });
+    }
+
+    // --- MSG 5: Entity summary (right before prefill) ---
+    messages.push({
+      role: "user",
+      content: itemSummary || `Generate a lorebook entry for: ${displayName}`,
+    });
+
+    // --- MSG 6: Anchored prefill ---
+    const assistantPrefill = `Name: ${displayName}\nType: ${entryType}\nSetting: ${setting || "original"}\n`;
+    messages.push({ role: "assistant", content: assistantPrefill });
+
     return {
       messages,
       params: {
@@ -180,7 +191,7 @@ Setting: ${setting}
         min_p: 0.05,
         frequency_penalty: 0.1,
       },
-      contextPinning: { head: 1, tail: tailCount },
+      contextPinning: { head: 1, tail: 3 },
     };
   };
 };

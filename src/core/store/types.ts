@@ -107,7 +107,9 @@ export interface GenerationRequest {
     | "bootstrap"
     | "forge"
     | "foundation"
-    | "tension";
+    | "tension"
+    | "entitySummary"
+    | "threadSummary";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -137,7 +139,9 @@ export interface GenerationStrategy {
         type: "foundation";
         field: "shape" | "intent" | "worldState" | "attg" | "style";
       }
-    | { type: "tension"; tensionId: string };
+    | { type: "tension"; tensionId: string }
+    | { type: "entitySummary"; entityId: string }
+    | { type: "threadSummary"; groupId: string };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };

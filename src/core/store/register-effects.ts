@@ -10,6 +10,7 @@ import { registerAutosaveEffects } from "./effects/autosave";
 import { registerForgeEffects } from "./effects/forge-effects";
 import { registerFoundationEffects } from "./effects/foundation-effects";
 import { registerStoryEffects } from "./effects/story-effects";
+import { registerSummaryGenerationEffects } from "./effects/summary-generation";
 
 export { syncEratoCompatibility } from "./effects/lorebook-sync";
 
@@ -24,4 +25,5 @@ export function registerEffects(store: Store<RootState>, genX: GenX): void {
   registerAutosaveEffects(subscribeEffect, getState);
   registerForgeEffects(subscribeEffect, dispatch, getState, genX);
   registerFoundationEffects(subscribeEffect, dispatch, getState);
+  registerSummaryGenerationEffects(subscribeEffect, dispatch, getState);
 }

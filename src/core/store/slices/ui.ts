@@ -81,6 +81,15 @@ export const uiSlice = createSlice({
     // Lorebook refinement (modify existing entry with instructions)
     uiLorebookRefineRequested: (state, _payload: { requestId: string }) =>
       state,
+    // Summary generation intents
+    uiEntitySummaryGenerationRequested: (
+      state,
+      _payload: { entityId: string; requestId: string },
+    ) => state,
+    uiThreadSummaryGenerationRequested: (
+      state,
+      _payload: { groupId: string; requestId: string },
+    ) => state,
   },
 });
 
@@ -101,4 +110,6 @@ export const {
   uiLorebookKeysGenerationRequested,
   uiLorebookItemGenerationRequested,
   uiLorebookRefineRequested,
+  uiEntitySummaryGenerationRequested,
+  uiThreadSummaryGenerationRequested,
 } = uiSlice.actions;

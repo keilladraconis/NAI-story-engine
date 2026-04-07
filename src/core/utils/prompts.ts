@@ -516,6 +516,18 @@ export const FOUNDATION_WORLD_STATE_PROMPT = `Describe the current state of the 
 Cover: the dominant mood or atmosphere, ongoing conflicts or tensions, power dynamics, and what is visibly in flux.
 3-5 sentences. Output only the world state description — no preamble.`;
 
+export const ENTITY_SUMMARY_PROMPT = `Write a 1–3 sentence internal description of this world entity.
+
+The summary is a Story Engine–internal field used for context and forge generation — not a lorebook entry.
+Focus on: who/what the entity is, their essential nature or role, and the hook that makes them narratively useful.
+Be specific and concrete. Avoid generic adjectives. Output only the summary — no preamble, no labels.`;
+
+export const THREAD_SUMMARY_PROMPT = `Write a 1–2 sentence description of this thread's narrative dynamic.
+
+A thread groups world entities that share a direct structural bond — a conflict, alliance, dependency, or shared situation.
+Describe what connects these entities and the tension or energy that dynamic creates.
+Output only the summary — no preamble, no labels.`;
+
 export const FORGE_PROMPT = `You are a world-building assistant operating in a step-by-step forge loop.
 
 Each response emits exactly ONE command.

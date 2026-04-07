@@ -25,12 +25,14 @@ import {
   groupRenamed,
   groupSummaryUpdated,
   entityGroupToggled,
-} from "../../core/store/slices/world";
+  uiThreadSummaryGenerationRequested,
+} from "../../core/store";
 import { WORLD_ENTRY_CATEGORIES } from "../../core/store/types";
 import type { WorldEntity, WorldGroup } from "../../core/store/types";
 import type { DulfsFieldID } from "../../config/field-definitions";
 import { IDS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../../ui/framework/ids";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
+import { SeGenerationIconButton } from "./SeGenerationButton";
 
 type Theme = { default: { self: { style: object } } };
 type State = Record<string, never>;
@@ -106,11 +108,30 @@ export class SeThreadEditPane extends SuiComponent<
   SeThreadEditPaneOptions,
   UIPartColumn
 > {
+  private readonly _summaryBtn: SeGenerationIconButton;
+
   constructor(options: SeThreadEditPaneOptions) {
     super(
       { state: {} as State, ...options },
       { default: { self: { style: {} } } },
     );
+
+    const { groupId } = options;
+    const summaryRequestId = `se-thread-summary-${groupId}`;
+    const hasSummary = !!(
+      store.getState().world.groups.find((g) => g.id === groupId)?.summary
+    );
+    this._summaryBtn = new SeGenerationIconButton({
+      id: `${options.id}-thread-summary-gen`,
+      iconId: "zap" as IconId,
+      requestId: summaryRequestId,
+      hasContent: hasSummary,
+      onGenerate: () => {
+        store.dispatch(
+          uiThreadSummaryGenerationRequested({ groupId, requestId: summaryRequestId }),
+        );
+      },
+    });
   }
 
   async compose(): Promise<UIPartColumn> {
@@ -191,6 +212,13 @@ export class SeThreadEditPane extends SuiComponent<
         }),
 
         // Summary
+        row({
+          style: { "align-items": "center", gap: "4px" },
+          content: [
+            text({ text: "Summary", style: { ...S.membersLabel, flex: "1" } }),
+            await this._summaryBtn.build(),
+          ],
+        }),
         multilineTextInput({
           id: EP.CONTENT_INPUT,
           initialValue: summary,

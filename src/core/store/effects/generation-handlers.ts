@@ -13,6 +13,7 @@ import {
 } from "./handlers/lorebook";
 import { forgeHandler } from "./handlers/forge";
 import { foundationHandler, tensionHandler } from "./handlers/foundation";
+import { entitySummaryHandler, threadSummaryHandler } from "./handlers/summary";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -62,6 +63,14 @@ export type TensionTarget = Extract<
   GenerationStrategy["target"],
   { type: "tension" }
 >;
+export type EntitySummaryTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "entitySummary" }
+>;
+export type ThreadSummaryTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "threadSummary" }
+>;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
   target: T;
@@ -105,6 +114,8 @@ export const GENERATION_HANDLERS: {
   forge: GenerationHandlers<ForgeTarget>;
   foundation: GenerationHandlers<FoundationTarget>;
   tension: GenerationHandlers<TensionTarget>;
+  entitySummary: GenerationHandlers<EntitySummaryTarget>;
+  threadSummary: GenerationHandlers<ThreadSummaryTarget>;
 } = {
   brainstorm: brainstormHandler,
   brainstormChatTitle: brainstormChatTitleHandler,
@@ -117,6 +128,8 @@ export const GENERATION_HANDLERS: {
   forge: forgeHandler,
   foundation: foundationHandler,
   tension: tensionHandler,
+  entitySummary: entitySummaryHandler,
+  threadSummary: threadSummaryHandler,
 };
 
 export function getHandler(

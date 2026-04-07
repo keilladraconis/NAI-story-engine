@@ -1,13 +1,13 @@
 /**
- * SeThreadItem — thread card in the Threads list.
+ * SeThreadItem — thread card in the World section.
  *
  * Header (SuiCard):
- *   - icon: git-branch
+ *   - icon: layers
  *   - label: thread title — clickable, opens SeThreadEditPane
  *   - actions: lorebook toggle, reforge, delete
  *
  * Content (expanded):
- *   - Member entity names as a compact text line
+ *   - SeEntityCard for each member entity
  *
  * Lorebook toggle:
  *   - ON  → creates "SE: Threads" lorebook entry with synthetic content
@@ -20,7 +20,6 @@ import {
   SuiButton,
   SuiCard,
   SuiCollapsible,
-  SuiText,
   SuiToggle,
   type SuiComponentOptions,
 } from "nai-simple-ui";
@@ -34,6 +33,7 @@ import type { WorldEntity, WorldGroup } from "../../core/store/types";
 import { IDS, STORAGE_KEYS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
+import { SeEntityCard } from "./SeEntityCard";
 import { SeThreadEditPane } from "./SeThreadEditPane";
 
 type SeThreadItemTheme = { default: { self: { style: object } } };
@@ -76,7 +76,7 @@ function buildThreadLorebookContent(
     .filter((e): e is WorldEntity => e !== undefined);
   const lines: string[] = [group.title, "Type: thread"];
   if (group.summary) lines.push(group.summary);
-  lines.push("Related:")
+  lines.push("Related:");
   for (const entity of members) {
     lines.push(`- ${entity.name}`);
   }
@@ -132,18 +132,29 @@ export class SeThreadItem extends SuiComponent<
     await api.v1.lorebook.updateEntry(group.lorebookEntryId, { text: content });
   }
 
-  private _rebuildMemberText(): void {
-    const { groupId } = this.options;
+  private async _rebuildMemberCards(): Promise<void> {
+    const { groupId, editHost } = this.options;
     const T = IDS.WORLD.thread(groupId);
     const state = store.getState();
     const group = state.world.groups.find((g) => g.id === groupId);
-    const names = (group?.entityIds ?? [])
-      .map((id) => state.world.entities.find((e) => e.id === id)?.name)
-      .filter((n): n is string => n !== undefined);
+
+    const cards = await Promise.all(
+      (group?.entityIds ?? []).map((entityId) => {
+        const entity = state.world.entities.find((e) => e.id === entityId);
+        const lifecycle = entity?.lifecycle ?? "live";
+        return new SeEntityCard({
+          id: IDS.entity(entityId, lifecycle).ROOT,
+          entityId,
+          lifecycle,
+          editHost,
+        }).build();
+      }),
+    );
+
     api.v1.ui.updateParts([
       {
         id: T.ENTITY_LIST,
-        text: names.length > 0 ? names.join(", ") : "No members yet",
+        content: cards,
       } as unknown as Partial<UIPart> & { id: string },
     ]);
   }
@@ -159,10 +170,6 @@ export class SeThreadItem extends SuiComponent<
     const title = group?.title ?? "";
     const hasLorebook = !!group?.lorebookEntryId;
 
-    const memberNames = (group?.entityIds ?? [])
-      .map((id) => state.world.entities.find((e) => e.id === id)?.name)
-      .filter((n): n is string => n !== undefined);
-
     // Reactively update card label when title changes
     this._watcher.watch(
       (s) => s.world.groups.find((g) => g.id === groupId)?.title ?? "",
@@ -176,17 +183,21 @@ export class SeThreadItem extends SuiComponent<
       },
     );
 
-    // Reactively update member text when membership changes
+    // Reactively rebuild member cards when membership or entity data changes
     this._watcher.watch(
       (s) => {
         const g = s.world.groups.find((x) => x.id === groupId);
         return JSON.stringify({
-          ids: s.world.entities.map((e) => e.id),
           members: g?.entityIds ?? [],
+          entities: s.world.entities.map((e) => ({
+            id: e.id,
+            lifecycle: e.lifecycle,
+            name: e.name,
+          })),
         });
       },
       () => {
-        this._rebuildMemberText();
+        void this._rebuildMemberCards();
       },
     );
 
@@ -246,23 +257,54 @@ export class SeThreadItem extends SuiComponent<
       theme: { default: { actions: { base: ACTION_BASE } } },
     });
 
-    const memberText = new SuiText({
+    // Build initial member cards
+    const initialCards = await Promise.all(
+      (group?.entityIds ?? []).map((entityId) => {
+        const entity = state.world.entities.find((e) => e.id === entityId);
+        const lifecycle = entity?.lifecycle ?? "live";
+        return new SeEntityCard({
+          id: IDS.entity(entityId, lifecycle).ROOT,
+          entityId,
+          lifecycle,
+          editHost,
+        }).build();
+      }),
+    );
+
+    const { column } = api.v1.ui.part;
+    const membersCol = column({
       id: T.ENTITY_LIST,
-      theme: {
-        default: {
-          self: {
-            text:
-              memberNames.length > 0 ? memberNames.join(", ") : "No members yet",
-            style: { "font-size": "0.85em", opacity: "0.6" },
-          },
-        },
-      },
+      style: { gap: "2px" },
+      content: initialCards,
     });
+
+    class RawBridge extends SuiComponent<
+      { default: { self: { style: object } } },
+      Record<string, never>,
+      SuiComponentOptions<
+        { default: { self: { style: object } } },
+        Record<string, never>
+      >,
+      UIPartColumn
+    > {
+      constructor(private readonly _col: UIPartColumn) {
+        super(
+          {
+            id: `${T.SECTION}-bridge`,
+            state: {} as Record<string, never>,
+          },
+          { default: { self: { style: {} } } },
+        );
+      }
+      async compose(): Promise<UIPartColumn> {
+        return this._col;
+      }
+    }
 
     return new SuiCollapsible({
       id: T.SECTION,
       header: headerCard,
-      children: [memberText],
+      children: [new RawBridge(membersCol)],
       initialCollapsed: true,
       storageKey: `story:${STORAGE_KEYS.worldGroupSectionUI(groupId)}`,
       storageMode: "story",

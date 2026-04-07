@@ -22,6 +22,7 @@ import {
   uiLorebookEntrySelected,
   uiLorebookContentGenerationRequested,
   uiLorebookKeysGenerationRequested,
+  uiEntitySummaryGenerationRequested,
 } from "../../core/store/slices/ui";
 import {
   entityEdited,
@@ -122,6 +123,7 @@ export class SeEntityEditPane extends SuiComponent<
   SeEntityEditPaneOptions,
   UIPartColumn
 > {
+  private readonly _summaryBtn: SeGenerationIconButton;
   private readonly _contentBtn: SeGenerationIconButton | null;
   private readonly _keysBtn: SeGenerationIconButton | null;
 
@@ -130,6 +132,23 @@ export class SeEntityEditPane extends SuiComponent<
       { state: {} as State, ...options },
       { default: { self: { style: {} } } },
     );
+
+    const { entityId } = options;
+    const summaryRequestId = `se-entity-summary-${entityId}`;
+    const hasSummary = !!(
+      store.getState().world.entities.find((e) => e.id === entityId)?.summary
+    );
+    this._summaryBtn = new SeGenerationIconButton({
+      id: `${options.id}-summary-gen`,
+      iconId: "zap" as IconId,
+      requestId: summaryRequestId,
+      hasContent: hasSummary,
+      onGenerate: () => {
+        store.dispatch(
+          uiEntitySummaryGenerationRequested({ entityId, requestId: summaryRequestId }),
+        );
+      },
+    });
 
     if (options.lifecycle === "live") {
       const entity = store
@@ -249,6 +268,13 @@ export class SeEntityEditPane extends SuiComponent<
               );
             }
           }
+        }
+
+        // Sync lorebook entry display name with entity name
+        if (lifecycle === "live" && entryId) {
+          await api.v1.lorebook.updateEntry(entryId, {
+            displayName: trimmedName,
+          });
         }
 
         // Flush lorebook content and keys on save (not on each keystroke)
@@ -386,7 +412,13 @@ export class SeEntityEditPane extends SuiComponent<
       }),
 
       // ── Summary ────────────────────────────────────────────────────────────
-      text({ text: "Summary", style: S.colLabel }),
+      row({
+        style: S.sectionRow,
+        content: [
+          text({ text: "Summary", style: S.rowLabel }),
+          await this._summaryBtn.build(),
+        ],
+      }),
       multilineTextInput({
         id: EP.CONTENT_INPUT,
         initialValue: entity?.summary ?? "",

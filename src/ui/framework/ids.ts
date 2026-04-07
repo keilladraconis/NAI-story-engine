@@ -104,9 +104,7 @@ export const IDS = {
   },
   WORLD: {
     SECTION: "se-world-section",
-    ENTITY_LIST: "se-world-entity-list",
-    THREAD_LIST: "se-world-thread-list",
-    THREADS_SECTION: "se-world-threads-section",
+    BODY: "se-world-body",
     thread: (id: string) => ({
       SECTION: `se-world-thread-${id}`,
       TITLE_INPUT: `se-world-thread-${id}-title`,
