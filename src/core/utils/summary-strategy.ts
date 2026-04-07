@@ -12,7 +12,11 @@ import { MessageFactory } from "nai-gen-x";
 import { RootState } from "../store/types";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
-import { ENTITY_SUMMARY_PROMPT, THREAD_SUMMARY_PROMPT } from "./prompts";
+import {
+  ENTITY_SUMMARY_PROMPT,
+  ENTITY_SUMMARY_FROM_LOREBOOK_PROMPT,
+  THREAD_SUMMARY_PROMPT,
+} from "./prompts";
 import { getModel } from "./config";
 import { EDIT_PANE_TITLE } from "../../ui/framework/ids";
 
@@ -109,6 +113,43 @@ export function createEntitySummaryFactory(
         model: await getModel(),
         max_tokens: 150,
         temperature: 0.9,
+        min_p: 0.05,
+      },
+    };
+  };
+}
+
+export function createEntitySummaryFromLorebookFactory(
+  getState: () => RootState,
+  entityId: string,
+): MessageFactory {
+  return async () => {
+    const state = getState();
+    const entity = state.world.entities.find((e) => e.id === entityId);
+    if (!entity?.lorebookEntryId) {
+      return {
+        messages: [],
+        params: { model: await getModel(), max_tokens: 150 },
+      };
+    }
+
+    const entry = await api.v1.lorebook.entry(entity.lorebookEntryId);
+    const entryText = entry?.text?.trim() ?? "";
+
+    const messages: Message[] = [
+      { role: "system", content: ENTITY_SUMMARY_FROM_LOREBOOK_PROMPT },
+      {
+        role: "user",
+        content: `Name: ${entity.name}\n\n${entryText}`,
+      },
+    ];
+
+    return {
+      messages,
+      params: {
+        model: await getModel(),
+        max_tokens: 150,
+        temperature: 0.8,
         min_p: 0.05,
       },
     };

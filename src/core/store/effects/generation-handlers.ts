@@ -13,7 +13,11 @@ import {
 } from "./handlers/lorebook";
 import { forgeHandler } from "./handlers/forge";
 import { foundationHandler, tensionHandler } from "./handlers/foundation";
-import { entitySummaryHandler, threadSummaryHandler } from "./handlers/summary";
+import {
+  entitySummaryHandler,
+  entitySummaryBindHandler,
+  threadSummaryHandler,
+} from "./handlers/summary";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -67,6 +71,10 @@ export type EntitySummaryTarget = Extract<
   GenerationStrategy["target"],
   { type: "entitySummary" }
 >;
+export type EntitySummaryBindTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "entitySummaryBind" }
+>;
 export type ThreadSummaryTarget = Extract<
   GenerationStrategy["target"],
   { type: "threadSummary" }
@@ -115,6 +123,7 @@ export const GENERATION_HANDLERS: {
   foundation: GenerationHandlers<FoundationTarget>;
   tension: GenerationHandlers<TensionTarget>;
   entitySummary: GenerationHandlers<EntitySummaryTarget>;
+  entitySummaryBind: GenerationHandlers<EntitySummaryBindTarget>;
   threadSummary: GenerationHandlers<ThreadSummaryTarget>;
 } = {
   brainstorm: brainstormHandler,
@@ -129,6 +138,7 @@ export const GENERATION_HANDLERS: {
   foundation: foundationHandler,
   tension: tensionHandler,
   entitySummary: entitySummaryHandler,
+  entitySummaryBind: entitySummaryBindHandler,
   threadSummary: threadSummaryHandler,
 };
 

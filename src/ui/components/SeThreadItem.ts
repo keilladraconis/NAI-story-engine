@@ -54,6 +54,42 @@ const ACTION_BASE = {
 
 const THREADS_LOREBOOK_CATEGORY = "SE: Threads";
 
+const LORE_BORDER_GREEN = {
+  "border-left": "3px solid rgb(144,238,144)",
+  "padding-left": "4px",
+} as const;
+const LORE_BORDER_YELLOW = {
+  "border-left": "3px solid rgb(245,243,194)",
+  "padding-left": "4px",
+} as const;
+
+async function computeThreadLoreStatus(
+  groupId: string,
+): Promise<"none" | "some" | "all"> {
+  const state = store.getState();
+  const group = state.world.groups.find((g) => g.id === groupId);
+  const liveMembers = (group?.entityIds ?? [])
+    .map((id) => state.world.entities.find((e) => e.id === id))
+    .filter(
+      (e): e is WorldEntity => e !== undefined && e.lifecycle === "live",
+    );
+
+  if (liveMembers.length === 0) return "none";
+
+  const loreChecks = await Promise.all(
+    liveMembers.map(async (entity) => {
+      if (!entity.lorebookEntryId) return false;
+      const entry = await api.v1.lorebook.entry(entity.lorebookEntryId);
+      return !!(entry?.text && entry?.keys && entry.keys.length > 0);
+    }),
+  );
+
+  const loredCount = loreChecks.filter(Boolean).length;
+  if (loredCount === 0) return "none";
+  if (loredCount === liveMembers.length) return "all";
+  return "some";
+}
+
 async function ensureThreadsCategory(): Promise<string> {
   const categories = await api.v1.lorebook.categories();
   const existing = categories.find((c) => c.name === THREADS_LOREBOOK_CATEGORY);
@@ -183,17 +219,48 @@ export class SeThreadItem extends SuiComponent<
       },
     );
 
-    // Reactively rebuild member cards when membership or entity data changes
+    // Compute initial thread lore status for border
+    const initialLoreStatus = await computeThreadLoreStatus(groupId);
+    const initialBorderStyle =
+      initialLoreStatus === "all"
+        ? LORE_BORDER_GREEN
+        : initialLoreStatus === "some"
+          ? LORE_BORDER_YELLOW
+          : {};
+
+    // Reactively update thread border when SEGA requests change
+    this._watcher.watch(
+      (s) => s.runtime.sega.activeRequestIds,
+      async () => {
+        const status = await computeThreadLoreStatus(groupId);
+        const borderStyle =
+          status === "all"
+            ? LORE_BORDER_GREEN
+            : status === "some"
+              ? LORE_BORDER_YELLOW
+              : {};
+        api.v1.ui.updateParts([
+          {
+            id: T.SECTION,
+            style: borderStyle,
+          } as unknown as Partial<UIPart> & { id: string },
+        ]);
+      },
+      (a, b) => a === b, // reference equality — new array only when SEGA state changes
+    );
+
+    // Reactively rebuild member cards when THIS group's membership or member data changes.
+    // Only serialize member entities (not all entities) to avoid O(n) work on every dispatch.
     this._watcher.watch(
       (s) => {
         const g = s.world.groups.find((x) => x.id === groupId);
+        const memberIds = g?.entityIds ?? [];
         return JSON.stringify({
-          members: g?.entityIds ?? [],
-          entities: s.world.entities.map((e) => ({
-            id: e.id,
-            lifecycle: e.lifecycle,
-            name: e.name,
-          })),
+          members: memberIds,
+          entities: memberIds.map((id) => {
+            const e = s.world.entities.find((x) => x.id === id);
+            return e ? { id: e.id, lifecycle: e.lifecycle, name: e.name } : null;
+          }),
         });
       },
       () => {
@@ -201,20 +268,14 @@ export class SeThreadItem extends SuiComponent<
       },
     );
 
-    // Re-sync lorebook content when title/summary/members change (if enabled)
+    // Re-sync lorebook content when this group's title/summary/members change (if enabled).
+    // Use group reference equality — Redux returns a new object only when it changes.
     this._watcher.watch(
-      (s) => {
-        const g = s.world.groups.find((x) => x.id === groupId);
-        if (!g?.lorebookEntryId) return null;
-        return JSON.stringify({
-          title: g.title,
-          summary: g.summary,
-          members: g.entityIds,
-        });
+      (s) => s.world.groups.find((x) => x.id === groupId) ?? null,
+      (group) => {
+        if (group?.lorebookEntryId) void this._syncLorebook();
       },
-      () => {
-        void this._syncLorebook();
-      },
+      (a, b) => a === b, // reference equality
     );
 
     const lorebookToggle = new SuiToggle({
@@ -301,13 +362,19 @@ export class SeThreadItem extends SuiComponent<
       }
     }
 
-    return new SuiCollapsible({
-      id: T.SECTION,
+    const collapsible = await new SuiCollapsible({
+      id: `${T.SECTION}-c`,
       header: headerCard,
       children: [new RawBridge(membersCol)],
       initialCollapsed: true,
       storageKey: `story:${STORAGE_KEYS.worldGroupSectionUI(groupId)}`,
       storageMode: "story",
     }).build();
+
+    return column({
+      id: T.SECTION,
+      style: initialBorderStyle,
+      content: [collapsible],
+    });
   }
 }

@@ -28,7 +28,6 @@ import {
   entityEdited,
   entityCategoryChanged,
   entitySummaryUpdated,
-  entityUnbound,
   entityDeleted,
 } from "../../core/store/slices/world";
 import {
@@ -106,13 +105,11 @@ const S = {
   },
   contentInput: { "font-size": "13px", flex: "auto" },
   keysRow: { "align-items": "center", gap: "4px", "margin-top": "4px" },
-  keysInput: { "font-size": "12px", flex: "1" },
-  unbindBtn: {
-    "margin-top": "12px",
-    "align-self": "flex-start",
-    "font-size": "0.85em",
-    padding: "4px 8px",
+  keysRowLabel: {
+    "font-size": "0.8em",
+    "font-weight": "bold",
   },
+  keysInput: { "font-size": "12px", flex: "1" },
 } as const;
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -461,7 +458,7 @@ export class SeEntityEditPane extends SuiComponent<
         row({
           style: S.keysRow,
           content: [
-            text({ text: "Keys", style: S.rowLabel }),
+            text({ text: "Keys", style: S.keysRowLabel }),
             textInput({
               id: L.KEYS_INPUT,
               initialValue: "",
@@ -474,26 +471,6 @@ export class SeEntityEditPane extends SuiComponent<
         }),
       );
 
-      // Unbind (destructive — at the bottom)
-      if (entryId) {
-        parts.push(
-          button({
-            id: L.UNBIND_BTN,
-            text: "✕ Unbind from Story Engine",
-            style: S.unbindBtn,
-            callback: () => {
-              const e = store
-                .getState()
-                .world.entities.find((x) => x.id === entityId);
-              if (e) {
-                store.dispatch(entityUnbound({ entityId }));
-                api.v1.ui.toast(`Unbound: ${e.name}`, { type: "success" });
-              }
-              _close();
-            },
-          }),
-        );
-      }
     }
 
     return column({

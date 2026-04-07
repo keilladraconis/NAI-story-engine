@@ -4,9 +4,11 @@ import {
   generationSubmitted,
   uiEntitySummaryGenerationRequested,
   uiThreadSummaryGenerationRequested,
+  entityBound,
 } from "../index";
 import {
   createEntitySummaryFactory,
+  createEntitySummaryFromLorebookFactory,
   createThreadSummaryFactory,
 } from "../../utils/summary-strategy";
 import { getModel } from "../../utils/config";
@@ -31,6 +33,26 @@ export function registerSummaryGenerationEffects(
       );
     },
   );
+
+  subscribeEffect(matchesAction(entityBound), async (action) => {
+    const { entity } = action.payload;
+    if (!entity.lorebookEntryId) return;
+
+    const entry = await api.v1.lorebook.entry(entity.lorebookEntryId);
+    const entryText = entry?.text?.trim() ?? "";
+    if (!entryText) return;
+
+    const requestId = `entity-summary-bind-${entity.id}`;
+    dispatch(
+      generationSubmitted({
+        requestId,
+        messageFactory: createEntitySummaryFromLorebookFactory(getState, entity.id),
+        params: { model: await getModel(), max_tokens: 150, temperature: 0.8, min_p: 0.05 },
+        target: { type: "entitySummaryBind", entityId: entity.id },
+        prefillBehavior: "trim",
+      }),
+    );
+  });
 
   subscribeEffect(
     matchesAction(uiThreadSummaryGenerationRequested),

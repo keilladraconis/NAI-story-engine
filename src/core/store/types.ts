@@ -109,6 +109,7 @@ export interface GenerationRequest {
     | "foundation"
     | "tension"
     | "entitySummary"
+    | "entitySummaryBind"
     | "threadSummary";
   targetId: string;
   status: GenerationRequestStatus;
@@ -141,6 +142,7 @@ export interface GenerationStrategy {
       }
     | { type: "tension"; tensionId: string }
     | { type: "entitySummary"; entityId: string }
+    | { type: "entitySummaryBind"; entityId: string }
     | { type: "threadSummary"; groupId: string };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;

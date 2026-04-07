@@ -16,7 +16,6 @@ import {
   SuiPlugin,
   SuiTabBar,
   SuiButton,
-  SuiRow,
   SuiColumn,
   type AnySuiComponent,
 } from "nai-simple-ui";
@@ -44,7 +43,6 @@ import { ForgePane } from "./components/ForgePane";
 import { SeHeaderBar } from "./components/SeHeaderBar";
 import { SeLorebookPanel } from "./components/SeLorebookPanel";
 import { SeJournalPanel } from "./components/SeJournalPanel";
-import { openBindModal } from "./components/BindModal";
 import { loadJournal } from "../core/generation-journal";
 
 const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
@@ -60,7 +58,6 @@ export class StoryEnginePlugin extends SuiPlugin {
   // ── Story engine pane children (persistent for rebuild) ──
   private _seHeaderBar?: SeHeaderBar;
   private _forgePane?: ForgePane;
-  private _footer?: SuiRow;
 
   // ── Edit pane hosting ──
   private _editPane: AnySuiComponent | null = null;
@@ -141,7 +138,6 @@ export class StoryEnginePlugin extends SuiPlugin {
       children: [
         this._seHeaderBar!,
         this._forgePane!,
-        this._footer!,
       ],
       theme: { default: { self: { style: { gap: "8px" } } } },
     }).build();
@@ -165,55 +161,11 @@ export class StoryEnginePlugin extends SuiPlugin {
       editHost: this.editHost,
     });
 
-    this._footer = new SuiRow({
-      id: "se-footer",
-      children: [
-        new SuiButton({
-          id: "se-footer-bind-new",
-          callback: () => {
-            void openBindModal({
-              getState: store.getState,
-              dispatch: store.dispatch,
-            });
-          },
-          theme: {
-            default: {
-              self: {
-                text: "Bind New",
-                style: { flex: "1", "font-size": "0.8em" },
-              },
-            },
-          },
-        }),
-        new SuiButton({
-          id: "se-footer-rebind",
-          callback: () => {
-            void openBindModal({
-              getState: store.getState,
-              dispatch: store.dispatch,
-            });
-          },
-          theme: {
-            default: {
-              self: {
-                text: "Rebind",
-                style: { flex: "1", "font-size": "0.8em" },
-              },
-            },
-          },
-        }),
-      ],
-      theme: {
-        default: { self: { style: { gap: "4px", "margin-top": "8px" } } },
-      },
-    });
-
     const storyEnginePane = new SuiColumn({
       id: "se-story-engine-pane",
       children: [
         this._seHeaderBar,
         this._forgePane,
-        this._footer,
       ],
       theme: { default: { self: { style: { gap: "8px" } } } },
     });

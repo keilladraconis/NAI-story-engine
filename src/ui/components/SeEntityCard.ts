@@ -102,6 +102,15 @@ export class SeEntityCard extends SuiComponent<
         onGenerate: () => {
           store.dispatch(entityRegenRequested({ entityId }));
         },
+        contentChecker: async () => {
+          const e = store
+            .getState()
+            .world.entities.find((x) => x.id === entityId);
+          const eid = e?.lorebookEntryId;
+          if (!eid) return false;
+          const entry = await api.v1.lorebook.entry(eid);
+          return !!(entry?.text && entry?.keys && entry.keys.length > 0);
+        },
       });
     } else {
       this._regenBtn = null;
@@ -137,48 +146,36 @@ export class SeEntityCard extends SuiComponent<
       ? CATEGORY_ICON[entity.categoryId]
       : undefined;
     const cardId = `${E.ROOT}.card`;
+    const summaryId = `${E.ROOT}-summary`;
 
-    // Reactively update card label when name changes
+    // Reactively update card label, icon, and summary when entity data changes.
+    // Single watcher (one find per dispatch) instead of three separate ones.
     this._watcher.watch(
-      (s) => s.world.entities.find((e) => e.id === entityId)?.name ?? "",
-      (newName) => {
-        api.v1.ui.updateParts([
-          {
-            id: `${cardId}.label`,
-            text: newName,
-          } as unknown as Partial<UIPart> & { id: string },
-        ]);
+      (s) => {
+        const e = s.world.entities.find((x) => x.id === entityId);
+        return {
+          name: e?.name ?? "",
+          categoryId: e?.categoryId ?? "",
+          summary: e?.summary ?? "",
+        };
       },
-    );
-
-    // Reactively update card icon when category changes
-    this._watcher.watch(
-      (s) => s.world.entities.find((e) => e.id === entityId)?.categoryId ?? "",
-      (newCategoryId) => {
-        const newIconId = CATEGORY_ICON[newCategoryId];
+      ({ name, categoryId, summary: newSummary }) => {
+        const parts: Array<Partial<UIPart> & { id: string }> = [
+          { id: `${cardId}.label`, text: name } as unknown as Partial<UIPart> & { id: string },
+          { id: summaryId, text: newSummary } as unknown as Partial<UIPart> & { id: string },
+        ];
+        const newIconId = CATEGORY_ICON[categoryId];
         if (newIconId) {
-          api.v1.ui.updateParts([
-            {
-              id: `${cardId}.icon`,
-              iconId: newIconId,
-            } as unknown as Partial<UIPart> & { id: string },
-          ]);
+          parts.push({ id: `${cardId}.icon`, iconId: newIconId } as unknown as Partial<UIPart> & { id: string });
         }
+        api.v1.ui.updateParts(parts as unknown as (Partial<UIPart> & { id: string })[]);
       },
+      (a, b) => a.name === b.name && a.categoryId === b.categoryId && a.summary === b.summary,
     );
 
     // ── Draft layout ──────────────────────────────────────────────────────────
 
     if (lifecycle === "draft") {
-      const summaryId = `${E.ROOT}-summary`;
-
-      this._watcher.watch(
-        (s) => s.world.entities.find((e) => e.id === entityId)?.summary ?? "",
-        (newSummary) => {
-          api.v1.ui.updateParts([{ id: summaryId, text: newSummary }]);
-        },
-      );
-
       const summaryText = new SuiText({
         id: summaryId,
         theme: {
@@ -229,6 +226,56 @@ export class SeEntityCard extends SuiComponent<
 
     // ── Live layout ───────────────────────────────────────────────────────────
 
+    // Check lorebook completeness for initial border style
+    const entryId = entity?.lorebookEntryId ?? "";
+    let hasLore = false;
+    if (entryId) {
+      const lbEntry = await api.v1.lorebook.entry(entryId);
+      hasLore = !!(lbEntry?.text && lbEntry?.keys && lbEntry.keys.length > 0);
+    }
+
+    const LORE_BORDER = {
+      "border-left": "3px solid rgb(144,238,144)",
+      "padding-left": "4px",
+    } as const;
+
+    // Reactively update border when entity's lorebook requests complete
+    const contentReqId = `lb-entity-${entityId}-content`;
+    const keysReqId = `lb-entity-${entityId}-keys`;
+    this._watcher.watch(
+      (s) => {
+        const activeId = s.runtime.activeRequest?.id;
+        return (
+          activeId === contentReqId ||
+          activeId === keysReqId ||
+          s.runtime.sega.activeRequestIds.includes(contentReqId) ||
+          s.runtime.sega.activeRequestIds.includes(keysReqId) ||
+          s.runtime.queue.some((q) => q.id === contentReqId || q.id === keysReqId)
+        );
+      },
+      async (isActive) => {
+        if (!isActive) {
+          const e = store
+            .getState()
+            .world.entities.find((x) => x.id === entityId);
+          const eid = e?.lorebookEntryId;
+          if (!eid) return;
+          const lbEntry = await api.v1.lorebook.entry(eid);
+          const nowHasLore = !!(
+            lbEntry?.text &&
+            lbEntry?.keys &&
+            lbEntry.keys.length > 0
+          );
+          api.v1.ui.updateParts([
+            {
+              id: E.ROOT,
+              style: nowHasLore ? LORE_BORDER : {},
+            } as unknown as Partial<UIPart> & { id: string },
+          ]);
+        }
+      },
+    );
+
     const card = new SuiCard({
       id: cardId,
       label: name,
@@ -239,15 +286,6 @@ export class SeEntityCard extends SuiComponent<
       actions: [this._regenBtn!],
       theme: CARD_THEME,
     });
-
-    const summaryId = `${E.ROOT}-summary`;
-
-    this._watcher.watch(
-      (s) => s.world.entities.find((e) => e.id === entityId)?.summary ?? "",
-      (newSummary) => {
-        api.v1.ui.updateParts([{ id: summaryId, text: newSummary }]);
-      },
-    );
 
     const summaryText = new SuiText({
       id: summaryId,
@@ -268,13 +306,20 @@ export class SeEntityCard extends SuiComponent<
       },
     });
 
-    return new SuiCollapsible({
-      id: E.ROOT,
+    const { column } = api.v1.ui.part;
+    const collapsible = await new SuiCollapsible({
+      id: `${E.ROOT}-c`,
       header: card,
       children: [summaryText],
       initialCollapsed: true,
       storageKey: `${E.ROOT}.collapsed`,
       storageMode: "story",
     }).build();
+
+    return column({
+      id: E.ROOT,
+      style: hasLore ? LORE_BORDER : {},
+      content: [collapsible],
+    });
   }
 }

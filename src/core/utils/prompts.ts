@@ -516,6 +516,11 @@ export const FOUNDATION_WORLD_STATE_PROMPT = `Describe the current state of the 
 Cover: the dominant mood or atmosphere, ongoing conflicts or tensions, power dynamics, and what is visibly in flux.
 3-5 sentences. Output only the world state description — no preamble.`;
 
+export const ENTITY_SUMMARY_FROM_LOREBOOK_PROMPT = `Write a 1–3 sentence internal summary of this world entity based on its lorebook entry.
+
+The summary is a Story Engine–internal field — not a lorebook entry. Distill the entity's essential nature, role, and the narrative hook that makes them useful.
+Be specific and concrete. Avoid generic adjectives. Output only the summary — no preamble, no labels.`;
+
 export const ENTITY_SUMMARY_PROMPT = `Write a 1–3 sentence internal description of this world entity.
 
 The summary is a Story Engine–internal field used for context and forge generation — not a lorebook entry.

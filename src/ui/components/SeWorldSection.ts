@@ -31,6 +31,7 @@ import { SeEntityCard } from "./SeEntityCard";
 import { SeEntityEditPane } from "./SeEntityEditPane";
 import { SeThreadEditPane } from "./SeThreadEditPane";
 import { SeThreadItem } from "./SeThreadItem";
+import { SeBindSection } from "./SeBindSection";
 
 type SeWorldSectionTheme = { default: { self: { style: object } } };
 type SeWorldSectionState = Record<string, never>;
@@ -188,11 +189,24 @@ export class SeWorldSection extends SuiComponent<
       theme: { default: { self: { iconId: "layers" as IconId } } },
     });
 
+    const bindExistingBtn = new SuiButton({
+      id: `${IDS.WORLD.SECTION}-bind-btn`,
+      callback: () => {
+        editHost.open(
+          new SeBindSection({
+            id: IDS.BIND.SECTION,
+            editHost,
+          }),
+        );
+      },
+      theme: { default: { self: { iconId: "link" as IconId } } },
+    });
+
     const headerCard = new SuiCard({
       id: `${IDS.WORLD.SECTION}.card`,
       label: "World",
       icon: "globe" as IconId,
-      actions: [addEntityBtn, addThreadBtn],
+      actions: [bindExistingBtn, addEntityBtn, addThreadBtn],
       theme: { default: { actions: { base: ACTION_BASE } } },
     });
 
