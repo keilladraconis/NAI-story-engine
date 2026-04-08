@@ -14,15 +14,30 @@
  */
 
 import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
+import { createSelector } from "nai-store";
 import { store } from "../../core/store";
 import { currentMessages } from "../../core/store/slices/brainstorm";
 import { StoreWatcher } from "../store-watcher";
+import type { RootState } from "../../core/store/types";
 import { SeChatHeader } from "./SeChatHeader";
 import { SeBrainstormInput } from "./SeBrainstormInput";
 import { SeMessage } from "./SeMessage";
 
 type BrainstormPaneTheme = { default: { self: { style: object } } };
 type BrainstormPaneState = Record<string, never>;
+
+// Memoized: only recomputes when brainstorm slice reference changes
+const selectBrainstormStructure = createSelector<
+  RootState,
+  [ReturnType<(s: RootState) => RootState["brainstorm"]>],
+  { chatIndex: number; messageIds: string[] }
+>(
+  [(s: RootState) => s.brainstorm],
+  (brainstorm) => ({
+    chatIndex: brainstorm.currentChatIndex,
+    messageIds: currentMessages(brainstorm).map((m) => m.id),
+  }),
+);
 
 export type BrainstormPaneOptions = {
   /** Called when structural changes require a full panel rebuild. */
@@ -55,19 +70,18 @@ export class BrainstormPane extends SuiComponent<
     // Reset subscriptions to avoid duplicates on rebuild
     this._watcher.dispose();
 
-    // Trigger a full rebuild when the chat switches or the message list changes structurally
+    // Trigger a full rebuild when the chat switches or the message list changes structurally.
+    // selectBrainstormStructure is memoized: returns same object ref when brainstorm slice
+    // hasn't changed, so the watcher skips the equality check entirely on most dispatches.
     this._watcher.watch(
-      (s) => ({
-        chatIndex: s.brainstorm.currentChatIndex,
-        messageIds: currentMessages(s.brainstorm).map((m) => m.id),
-      }),
+      selectBrainstormStructure,
       () => {
         onRebuild();
       },
       (a, b) =>
         a.chatIndex === b.chatIndex &&
         a.messageIds.length === b.messageIds.length &&
-        a.messageIds.every((id, i) => id === b.messageIds[i]),
+        a.messageIds.every((id: string, i: number) => id === b.messageIds[i]),
     );
 
     // Build message bubbles for the current chat.

@@ -133,7 +133,7 @@ export class SeEntityEditPane extends SuiComponent<
     const { entityId } = options;
     const summaryRequestId = `se-entity-summary-${entityId}`;
     const hasSummary = !!(
-      store.getState().world.entities.find((e) => e.id === entityId)?.summary
+      store.getState().world.entitiesById[entityId]?.summary
     );
     this._summaryBtn = new SeGenerationIconButton({
       id: `${options.id}-summary-gen`,
@@ -148,9 +148,7 @@ export class SeEntityEditPane extends SuiComponent<
     });
 
     if (options.lifecycle === "live") {
-      const entity = store
-        .getState()
-        .world.entities.find((e) => e.id === options.entityId);
+      const entity = store.getState().world.entitiesById[options.entityId];
       const entryId = entity?.lorebookEntryId ?? "";
 
       this._contentBtn = new SeGenerationIconButton({
@@ -204,7 +202,7 @@ export class SeEntityEditPane extends SuiComponent<
     const EP = IDS.EDIT_PANE;
 
     const state = store.getState();
-    const entity = state.world.entities.find((e) => e.id === entityId);
+    const entity = state.world.entitiesById[entityId];
     const entryId = entity?.lorebookEntryId ?? "";
 
     // Wire streaming updates so generation handlers can push to this pane
@@ -256,7 +254,7 @@ export class SeEntityEditPane extends SuiComponent<
             oldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
             "gi",
           );
-          for (const other of store.getState().world.entities) {
+          for (const other of Object.values(store.getState().world.entitiesById)) {
             if (other.id === entityId) continue;
             const updated = other.summary.replace(pattern, trimmedName);
             if (updated !== other.summary) {

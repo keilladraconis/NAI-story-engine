@@ -30,7 +30,7 @@ const FIELD_LABEL: Record<DulfsFieldID, string> = {
 };
 
 function formatLiveEntities(state: RootState): string {
-  const live = state.world.entities.filter((e) => e.lifecycle === "live");
+  const live = Object.values(state.world.entitiesById).filter((e) => e.lifecycle === "live");
   if (live.length === 0) return "";
 
   const groups = new Map<DulfsFieldID, typeof live>();
@@ -60,7 +60,7 @@ export function createEntitySummaryFactory(
 ): MessageFactory {
   return async () => {
     const state = getState();
-    const entity = state.world.entities.find((e) => e.id === entityId);
+    const entity = state.world.entitiesById[entityId];
     const { foundation } = state;
 
     const messages: Message[] = [];
@@ -125,7 +125,7 @@ export function createEntitySummaryFromLorebookFactory(
 ): MessageFactory {
   return async () => {
     const state = getState();
-    const entity = state.world.entities.find((e) => e.id === entityId);
+    const entity = state.world.entitiesById[entityId];
     if (!entity?.lorebookEntryId) {
       return {
         messages: [],
@@ -184,7 +184,7 @@ export function createThreadSummaryFactory(
     }
 
     const members = (group?.entityIds ?? [])
-      .map((id) => state.world.entities.find((e) => e.id === id))
+      .map((id) => state.world.entitiesById[id])
       .filter((e): e is NonNullable<typeof e> => e !== undefined);
 
     const memberLines = members

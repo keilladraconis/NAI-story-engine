@@ -28,7 +28,8 @@ const reduce = (
 
 const makeState = (overrides: Partial<WorldState> = {}): WorldState => ({
   groups: [],
-  entities: [],
+  entitiesById: {},
+  entityIds: [],
   forgeLoopActive: false,
   ...overrides,
 });
@@ -109,11 +110,11 @@ describe("groupReforged", () => {
     const live = { ...ENTITY, id: "e1", lifecycle: "live" as const, lorebookEntryId: "lb1" };
     const groupWithMember = { ...GROUP, entityIds: ["e1"] };
     const state = reduce(
-      makeState({ groups: [groupWithMember], entities: [live] }),
+      makeState({ groups: [groupWithMember], entitiesById: { e1: live }, entityIds: ["e1"] }),
       groupReforged({ groupId: "g1" }),
     );
-    expect(state.entities[0].lifecycle).toBe("draft");
-    expect(state.entities[0].lorebookEntryId).toBeUndefined();
+    expect(state.entitiesById["e1"].lifecycle).toBe("draft");
+    expect(state.entitiesById["e1"].lorebookEntryId).toBeUndefined();
   });
 });
 
@@ -124,19 +125,19 @@ describe("groupReforged", () => {
 describe("entityForged", () => {
   it("adds a draft entity", () => {
     const state = reduce(makeState(), entityForged({ entity: ENTITY }));
-    expect(state.entities).toHaveLength(1);
-    expect(state.entities[0].lifecycle).toBe("draft");
+    expect(state.entityIds).toHaveLength(1);
+    expect(state.entitiesById["e1"].lifecycle).toBe("draft");
   });
 });
 
 describe("entityCast", () => {
   it("sets lifecycle to live and records lorebookEntryId", () => {
     const state = reduce(
-      makeState({ entities: [ENTITY] }),
+      makeState({ entitiesById: { e1: ENTITY }, entityIds: ["e1"] }),
       entityCast({ entityId: "e1", lorebookEntryId: "lb1" }),
     );
-    expect(state.entities[0].lifecycle).toBe("live");
-    expect(state.entities[0].lorebookEntryId).toBe("lb1");
+    expect(state.entitiesById["e1"].lifecycle).toBe("live");
+    expect(state.entitiesById["e1"].lorebookEntryId).toBe("lb1");
   });
 });
 
@@ -148,11 +149,11 @@ describe("entityReforged", () => {
       lorebookEntryId: "lb1",
     };
     const state = reduce(
-      makeState({ entities: [live] }),
+      makeState({ entitiesById: { e1: live }, entityIds: ["e1"] }),
       entityReforged({ entityId: "e1" }),
     );
-    expect(state.entities[0].lifecycle).toBe("draft");
-    expect(state.entities[0].lorebookEntryId).toBeUndefined();
+    expect(state.entitiesById["e1"].lifecycle).toBe("draft");
+    expect(state.entitiesById["e1"].lorebookEntryId).toBeUndefined();
   });
 });
 
@@ -160,10 +161,11 @@ describe("entityDeleted", () => {
   it("removes the entity and cleans up group membership", () => {
     const groupWithMember = { ...GROUP, entityIds: ["e1"] };
     const state = reduce(
-      makeState({ entities: [ENTITY], groups: [groupWithMember] }),
+      makeState({ entitiesById: { e1: ENTITY }, entityIds: ["e1"], groups: [groupWithMember] }),
       entityDeleted({ entityId: "e1" }),
     );
-    expect(state.entities).toHaveLength(0);
+    expect(state.entityIds).toHaveLength(0);
+    expect(state.entitiesById["e1"]).toBeUndefined();
     expect(state.groups[0].entityIds).toHaveLength(0);
   });
 });
@@ -171,10 +173,10 @@ describe("entityDeleted", () => {
 describe("entitySummaryUpdated", () => {
   it("updates the summary of a live entity", () => {
     const state = reduce(
-      makeState({ entities: [ENTITY] }),
+      makeState({ entitiesById: { e1: ENTITY }, entityIds: ["e1"] }),
       entitySummaryUpdated({ entityId: "e1", summary: "A disgraced knight." }),
     );
-    expect(state.entities[0].summary).toBe("A disgraced knight.");
+    expect(state.entitiesById["e1"].summary).toBe("A disgraced knight.");
   });
 });
 
@@ -190,8 +192,8 @@ describe("entityBound", () => {
       lorebookEntryId: "lb1",
     };
     const state = reduce(makeState(), entityBound({ entity: bound }));
-    expect(state.entities[0].lifecycle).toBe("live");
-    expect(state.entities[0].lorebookEntryId).toBe("lb1");
+    expect(state.entitiesById["e1"].lifecycle).toBe("live");
+    expect(state.entitiesById["e1"].lorebookEntryId).toBe("lb1");
   });
 });
 
@@ -203,9 +205,10 @@ describe("entityUnbound", () => {
       lorebookEntryId: "lb1",
     };
     const state = reduce(
-      makeState({ entities: [live] }),
+      makeState({ entitiesById: { e1: live }, entityIds: ["e1"] }),
       entityUnbound({ entityId: "e1" }),
     );
-    expect(state.entities).toHaveLength(0);
+    expect(state.entityIds).toHaveLength(0);
+    expect(state.entitiesById["e1"]).toBeUndefined();
   });
 });

@@ -12,6 +12,7 @@ import {
   BrainstormChat,
   CrucibleState,
   WorldState,
+  WorldEntity,
   FoundationState,
 } from "./types";
 
@@ -34,6 +35,32 @@ export const persistedDataLoaded = (data: PersistedData) => ({
   payload: data,
 });
 persistedDataLoaded.type = PERSISTED_DATA_LOADED;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// World state migration (v11 entities[] → v12 entitiesById/entityIds)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function migrateWorldState(raw: WorldState | (Record<string, unknown> & { entities?: WorldEntity[] })): WorldState {
+  // v12+ format: already has entitiesById
+  if ("entitiesById" in raw && raw.entitiesById) {
+    return { ...initialWorldState, ...(raw as WorldState), forgeLoopActive: false };
+  }
+  // v11 format: has entities array — convert
+  const entities = (raw as { entities?: WorldEntity[] }).entities ?? [];
+  const entitiesById: Record<string, WorldEntity> = {};
+  const entityIds: string[] = [];
+  for (const e of entities) {
+    entitiesById[e.id] = e;
+    entityIds.push(e.id);
+  }
+  return {
+    ...initialWorldState,
+    groups: (raw as { groups?: WorldState["groups"] }).groups ?? [],
+    entitiesById,
+    entityIds,
+    forgeLoopActive: false,
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root reducer with persist/loaded interception
@@ -74,7 +101,7 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
         ? { ...initialCrucibleState, ...data.crucible }
         : current.crucible,
       world: data.world
-        ? { ...initialWorldState, ...data.world, forgeLoopActive: false }
+        ? migrateWorldState(data.world as WorldState)
         : current.world,
       foundation: data.foundation
         ? { ...initialFoundationState, ...data.foundation }

@@ -4,7 +4,8 @@ import { DulfsFieldID } from "../../../config/field-definitions";
 
 export const initialWorldState: WorldState = {
   groups: [],
-  entities: [],
+  entitiesById: {},
+  entityIds: [],
   forgeLoopActive: false,
 };
 
@@ -15,91 +16,150 @@ export const worldSlice = createSlice({
     // Entity lifecycle
     entityForged: (state, payload: { entity: WorldEntity }) => ({
       ...state,
-      entities: [...state.entities, payload.entity],
+      entitiesById: {
+        ...state.entitiesById,
+        [payload.entity.id]: payload.entity,
+      },
+      entityIds: [...state.entityIds, payload.entity.id],
     }),
 
     entityCast: (
       state,
       payload: { entityId: string; lorebookEntryId: string },
-    ) => ({
-      ...state,
-      entities: state.entities.map((e) =>
-        e.id === payload.entityId
-          ? {
-              ...e,
-              lifecycle: "live" as EntityLifecycle,
-              lorebookEntryId: payload.lorebookEntryId,
-            }
-          : e,
-      ),
-    }),
+    ) => {
+      const entity = state.entitiesById[payload.entityId];
+      if (!entity) return state;
+      return {
+        ...state,
+        entitiesById: {
+          ...state.entitiesById,
+          [payload.entityId]: {
+            ...entity,
+            lifecycle: "live" as EntityLifecycle,
+            lorebookEntryId: payload.lorebookEntryId,
+          },
+        },
+      };
+    },
 
-    entityReforged: (state, payload: { entityId: string }) => ({
-      ...state,
-      entities: state.entities.map((e) =>
-        e.id === payload.entityId
-          ? {
-              ...e,
-              lifecycle: "draft" as EntityLifecycle,
-              lorebookEntryId: undefined,
-            }
-          : e,
-      ),
-    }),
+    // Batch cast: single dispatch for N entities
+    entitiesCastBatch: (
+      state,
+      payload: Array<{ entityId: string; lorebookEntryId: string }>,
+    ) => {
+      const updates: Record<string, WorldEntity> = {};
+      for (const { entityId, lorebookEntryId } of payload) {
+        const entity = state.entitiesById[entityId];
+        if (entity) {
+          updates[entityId] = {
+            ...entity,
+            lifecycle: "live" as EntityLifecycle,
+            lorebookEntryId,
+          };
+        }
+      }
+      return {
+        ...state,
+        entitiesById: { ...state.entitiesById, ...updates },
+      };
+    },
 
-    entityDeleted: (state, payload: { entityId: string }) => ({
-      ...state,
-      entities: state.entities.filter((e) => e.id !== payload.entityId),
-      groups: state.groups.map((g) => ({
-        ...g,
-        entityIds: g.entityIds.filter((id) => id !== payload.entityId),
-      })),
-    }),
+    entityReforged: (state, payload: { entityId: string }) => {
+      const entity = state.entitiesById[payload.entityId];
+      if (!entity) return state;
+      return {
+        ...state,
+        entitiesById: {
+          ...state.entitiesById,
+          [payload.entityId]: {
+            ...entity,
+            lifecycle: "draft" as EntityLifecycle,
+            lorebookEntryId: undefined,
+          },
+        },
+      };
+    },
+
+    entityDeleted: (state, payload: { entityId: string }) => {
+      const { [payload.entityId]: _, ...rest } = state.entitiesById;
+      return {
+        ...state,
+        entitiesById: rest,
+        entityIds: state.entityIds.filter((id) => id !== payload.entityId),
+        groups: state.groups.map((g) => ({
+          ...g,
+          entityIds: g.entityIds.filter((id) => id !== payload.entityId),
+        })),
+      };
+    },
 
     entitySummaryUpdated: (
       state,
       payload: { entityId: string; summary: string },
-    ) => ({
-      ...state,
-      entities: state.entities.map((e) =>
-        e.id === payload.entityId ? { ...e, summary: payload.summary } : e,
-      ),
-    }),
+    ) => {
+      const entity = state.entitiesById[payload.entityId];
+      if (!entity) return state;
+      return {
+        ...state,
+        entitiesById: {
+          ...state.entitiesById,
+          [payload.entityId]: { ...entity, summary: payload.summary },
+        },
+      };
+    },
 
     entityEdited: (
       state,
       payload: { entityId: string; name: string; summary: string },
-    ) => ({
-      ...state,
-      entities: state.entities.map((e) =>
-        e.id === payload.entityId
-          ? { ...e, name: payload.name, summary: payload.summary }
-          : e,
-      ),
-    }),
+    ) => {
+      const entity = state.entitiesById[payload.entityId];
+      if (!entity) return state;
+      return {
+        ...state,
+        entitiesById: {
+          ...state.entitiesById,
+          [payload.entityId]: {
+            ...entity,
+            name: payload.name,
+            summary: payload.summary,
+          },
+        },
+      };
+    },
 
     entityCategoryChanged: (
       state,
       payload: { entityId: string; categoryId: DulfsFieldID },
-    ) => ({
-      ...state,
-      entities: state.entities.map((e) =>
-        e.id === payload.entityId
-          ? { ...e, categoryId: payload.categoryId }
-          : e,
-      ),
-    }),
+    ) => {
+      const entity = state.entitiesById[payload.entityId];
+      if (!entity) return state;
+      return {
+        ...state,
+        entitiesById: {
+          ...state.entitiesById,
+          [payload.entityId]: { ...entity, categoryId: payload.categoryId },
+        },
+      };
+    },
 
     // Bind/Unbind (adopt existing lorebook entries)
     entityBound: (state, payload: { entity: WorldEntity }) => ({
       ...state,
-      entities: [...state.entities, payload.entity],
+      entitiesById: {
+        ...state.entitiesById,
+        [payload.entity.id]: payload.entity,
+      },
+      entityIds: [...state.entityIds, payload.entity.id],
     }),
 
-    entityUnbound: (state, payload: { entityId: string }) => ({
-      ...state,
-      entities: state.entities.filter((e) => e.id !== payload.entityId),
-    }),
+    entityUnbound: (state, payload: { entityId: string }) => {
+      const { [payload.entityId]: _, ...rest } = state.entitiesById;
+      return {
+        ...state,
+        entitiesById: rest,
+        entityIds: state.entityIds.filter((id) => id !== payload.entityId),
+      };
+    },
 
     // Group (Thread) management
     groupCreated: (state, payload: { group: WorldGroup }) => ({
@@ -162,18 +222,20 @@ export const worldSlice = createSlice({
     groupReforged: (state, payload: { groupId: string }) => {
       const group = state.groups.find((g) => g.id === payload.groupId);
       if (!group) return state;
-      const memberSet = new Set(group.entityIds);
+      const updates: Record<string, WorldEntity> = {};
+      for (const id of group.entityIds) {
+        const entity = state.entitiesById[id];
+        if (entity) {
+          updates[id] = {
+            ...entity,
+            lifecycle: "draft" as EntityLifecycle,
+            lorebookEntryId: undefined,
+          };
+        }
+      }
       return {
         ...state,
-        entities: state.entities.map((e) =>
-          memberSet.has(e.id)
-            ? {
-                ...e,
-                lifecycle: "draft" as EntityLifecycle,
-                lorebookEntryId: undefined,
-              }
-            : e,
-        ),
+        entitiesById: { ...state.entitiesById, ...updates },
       };
     },
 
@@ -207,15 +269,31 @@ export const worldSlice = createSlice({
     // Immediate state reducers (Phase 2 adds lorebook-side effects for these)
     entityCastRequested: (state, _payload: { entityId: string }) => state,
 
-    entityDiscardRequested: (state, payload: { entityId: string }) => ({
-      ...state,
-      entities: state.entities.filter((e) => e.id !== payload.entityId),
-    }),
+    entityDiscardRequested: (state, payload: { entityId: string }) => {
+      const { [payload.entityId]: _, ...rest } = state.entitiesById;
+      return {
+        ...state,
+        entitiesById: rest,
+        entityIds: state.entityIds.filter((id) => id !== payload.entityId),
+      };
+    },
 
-    discardAllRequested: (state) => ({
-      ...state,
-      entities: state.entities.filter((e) => e.lifecycle !== "draft"),
-    }),
+    discardAllRequested: (state) => {
+      const kept: Record<string, WorldEntity> = {};
+      const keptIds: string[] = [];
+      for (const id of state.entityIds) {
+        const e = state.entitiesById[id];
+        if (e && e.lifecycle !== "draft") {
+          kept[id] = e;
+          keptIds.push(id);
+        }
+      }
+      return {
+        ...state,
+        entitiesById: kept,
+        entityIds: keptIds,
+      };
+    },
   },
 });
 
@@ -223,6 +301,7 @@ export const {
   worldCleared,
   entityForged,
   entityCast,
+  entitiesCastBatch,
   entityReforged,
   entityDeleted,
   entitySummaryUpdated,

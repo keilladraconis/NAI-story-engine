@@ -41,7 +41,7 @@ const FIELD_LABEL: Record<DulfsFieldID, string> = {
 };
 
 function formatEstablishedWorld(state: RootState): string {
-  const live = state.world.entities.filter((e) => e.lifecycle === "live");
+  const live = Object.values(state.world.entitiesById).filter((e) => e.lifecycle === "live");
   if (live.length === 0) return "";
 
   const groups = new Map<DulfsFieldID, typeof live>();
@@ -90,7 +90,7 @@ function formatWorldState(state: RootState): string {
  * never enters context.
  */
 function buildForgePassLog(state: RootState): string {
-  const draftEntities = state.world.entities.filter(
+  const draftEntities = Object.values(state.world.entitiesById).filter(
     (e) => e.lifecycle === "draft",
   );
 
@@ -104,7 +104,7 @@ function buildForgePassLog(state: RootState): string {
   // Include existing threads so the model doesn't recreate them
   for (const group of state.world.groups) {
     const memberNames = group.entityIds
-      .map((id) => state.world.entities.find((e) => e.id === id)?.name)
+      .map((id) => state.world.entitiesById[id]?.name)
       .filter((name): name is string => name !== undefined);
     if (memberNames.length < 2) continue;
     const membersStr = memberNames.map((n) => `"${n}"`).join(", ");

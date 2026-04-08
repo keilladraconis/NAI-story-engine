@@ -124,10 +124,10 @@ export class SeBindSection extends SuiComponent<
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
   private _managedEntryIds(): Set<string> {
+    const { entitiesById } = store.getState().world;
     return new Set(
-      store
-        .getState()
-        .world.entities.map((e) => e.lorebookEntryId)
+      Object.values(entitiesById)
+        .map((e) => e.lorebookEntryId)
         .filter((id): id is string => !!id),
     );
   }

@@ -62,7 +62,7 @@ function executeForgeCommands(
         }
 
         // Dedup: skip if name already exists in world entities (case-insensitive)
-        const existing = getState().world.entities.find(
+        const existing = Object.values(getState().world.entitiesById).find(
           (e) => e.name.toLowerCase() === cmd.name.toLowerCase(),
         );
         if (existing) {
@@ -87,7 +87,7 @@ function executeForgeCommands(
           api.v1.log(`[forge] REVISE rejected: no content for "${cmd.name}"`);
           break;
         }
-        const entity = getState().world.entities.find(
+        const entity = Object.values(getState().world.entitiesById).find(
           (e) => e.name.toLowerCase() === cmd.name.toLowerCase(),
         );
         if (!entity) {
@@ -102,7 +102,7 @@ function executeForgeCommands(
       }
 
       case "DELETE": {
-        const entity = getState().world.entities.find(
+        const entity = Object.values(getState().world.entitiesById).find(
           (e) =>
             e.name.toLowerCase() === cmd.name.toLowerCase() &&
             e.lifecycle === "draft",
@@ -126,11 +126,11 @@ function executeForgeCommands(
           api.v1.log(`[forge] THREAD rejected: "${cmd.title}" already exists`);
           break;
         }
-        const entities = getState().world.entities;
+        const entitiesArr = Object.values(getState().world.entitiesById);
         const memberIds = cmd.memberNames
           .map(
             (name) =>
-              entities.find(
+              entitiesArr.find(
                 (e) => e.name.toLowerCase() === name.toLowerCase(),
               )?.id,
           )

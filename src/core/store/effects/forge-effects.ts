@@ -24,6 +24,7 @@ import {
   castAllRequested,
   forgeCastCompleted,
   entityCast,
+  entitiesCastBatch,
   entityCastRequested,
   groupReforged,
   groupReforgeRequested,
@@ -142,7 +143,7 @@ export function registerForgeEffects(
     matchesAction(castAllRequested),
     async (_action, { getState: getLatest }) => {
       const state = getLatest();
-      const draftEntities = state.world.entities.filter(
+      const draftEntities = Object.values(state.world.entitiesById).filter(
         (e) => e.lifecycle === "draft",
       );
 
@@ -164,13 +165,13 @@ export function registerForgeEffects(
       const allEntries = await api.v1.lorebook.entries();
       // IDs of entries already bound to live entities — never re-bind these
       const managedEntryIds = new Set(
-        state.world.entities
+        Object.values(state.world.entitiesById)
           .filter((e) => e.lifecycle === "live" && e.lorebookEntryId)
           .map((e) => e.lorebookEntryId as string),
       );
 
       // Cast each entity: bind to existing entry by name, or create new in SE category
-      let count = 0;
+      const castPairs: Array<{ entityId: string; lorebookEntryId: string }> = [];
       for (const entity of draftEntities) {
         const nameLower = entity.name.toLowerCase();
         const existing = allEntries.find(
@@ -203,9 +204,10 @@ export function registerForgeEffects(
           );
         }
 
-        dispatch(entityCast({ entityId: entity.id, lorebookEntryId }));
-        count++;
+        castPairs.push({ entityId: entity.id, lorebookEntryId });
       }
+      dispatch(entitiesCastBatch(castPairs));
+      const count = castPairs.length;
 
       dispatch(forgeCastCompleted());
       api.v1.log(`[forge] Cast ${count} entities to lorebook`);
@@ -232,7 +234,7 @@ export function registerForgeEffects(
   subscribeEffect(matchesAction(entityCastRequested), async (action) => {
     const { entityId } = action.payload;
     const state = getState();
-    const entity = state.world.entities.find((e) => e.id === entityId);
+    const entity = state.world.entitiesById[entityId];
 
     if (!entity || entity.lifecycle !== "draft") {
       api.v1.ui.toast("Entity is not a draft", { type: "info" });
@@ -241,7 +243,7 @@ export function registerForgeEffects(
 
     const allEntries = await api.v1.lorebook.entries();
     const managedEntryIds = new Set(
-      state.world.entities
+      Object.values(state.world.entitiesById)
         .filter((e) => e.lifecycle === "live" && e.lorebookEntryId)
         .map((e) => e.lorebookEntryId as string),
     );
@@ -281,7 +283,7 @@ export function registerForgeEffects(
 
   subscribeEffect(matchesAction(entityRegenRequested), async (action) => {
     const { entityId } = action.payload;
-    const entity = getState().world.entities.find((e) => e.id === entityId);
+    const entity = getState().world.entitiesById[entityId];
 
     if (!entity?.lorebookEntryId) {
       api.v1.log(

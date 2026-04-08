@@ -82,7 +82,7 @@ export class SeWorldSection extends SuiComponent<
       ),
     );
 
-    const looseEntities = state.world.entities.filter(
+    const looseEntities = Object.values(state.world.entitiesById).filter(
       (e) => e.lifecycle === "live" && !threadedEntityIds.has(e.id),
     );
 
@@ -113,18 +113,18 @@ export class SeWorldSection extends SuiComponent<
 
     const state = store.getState();
 
-    // Memoized: skip all serialization when entities and groups refs are stable.
-    let _wsEntitiesRef = state.world.entities;
+    // Memoized: skip all serialization when entitiesById and groups refs are stable.
+    let _wsEntitiesRef = state.world.entitiesById;
     let _wsGroupsRef = state.world.groups;
     let _wsCache = "";
     this._watcher.watch(
       (s) => {
-        if (s.world.entities === _wsEntitiesRef && s.world.groups === _wsGroupsRef) {
+        if (s.world.entitiesById === _wsEntitiesRef && s.world.groups === _wsGroupsRef) {
           return _wsCache;
         }
-        _wsEntitiesRef = s.world.entities;
+        _wsEntitiesRef = s.world.entitiesById;
         _wsGroupsRef = s.world.groups;
-        const liveIds = s.world.entities
+        const liveIds = Object.values(s.world.entitiesById)
           .filter((e) => e.lifecycle === "live")
           .map((e) => e.id);
         const groupSnapshot = s.world.groups.map((g) => ({
@@ -234,7 +234,7 @@ export class SeWorldSection extends SuiComponent<
       ),
     );
 
-    const looseEntities = state.world.entities.filter(
+    const looseEntities = Object.values(state.world.entitiesById).filter(
       (e) => e.lifecycle === "live" && !threadedEntityIds.has(e.id),
     );
 

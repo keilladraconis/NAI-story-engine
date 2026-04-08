@@ -144,6 +144,34 @@ export const runtimeSlice = createSlice({
       },
     }),
 
+    // Batch untrack multiple SEGA request IDs in one dispatch
+    segaBulkUntracked: (state, payload: { requestIds: string[] }) => {
+      const removeSet = new Set(payload.requestIds);
+      return {
+        ...state,
+        sega: {
+          ...state.sega,
+          activeRequestIds: state.sega.activeRequestIds.filter(
+            (id) => !removeSet.has(id),
+          ),
+        },
+      };
+    },
+
+    // Batch complete multiple requests in one dispatch
+    requestsBulkCompleted: (state, payload: { requestIds: string[] }) => {
+      const removeSet = new Set(payload.requestIds);
+      const isActive =
+        state.activeRequest !== null && removeSet.has(state.activeRequest.id);
+      const newQueue = state.queue.filter((r) => !removeSet.has(r.id));
+      if (!isActive && newQueue.length === state.queue.length) return state;
+      return {
+        ...state,
+        activeRequest: isActive ? null : state.activeRequest,
+        queue: newQueue,
+      };
+    },
+
     segaReset: (state) => ({
       ...state,
       sega: initialSegaState,
@@ -180,6 +208,8 @@ export const {
   segaStageSet,
   segaRequestTracked,
   segaRequestUntracked,
+  segaBulkUntracked,
+  requestsBulkCompleted,
   segaReset,
   segaStatusUpdated,
   segaKeysCompleted,

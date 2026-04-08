@@ -182,7 +182,8 @@ export interface WorldEntity {
 
 export interface WorldState {
   groups: WorldGroup[];
-  entities: WorldEntity[];
+  entitiesById: Record<string, WorldEntity>;
+  entityIds: string[];
   forgeLoopActive: boolean;
 }
 

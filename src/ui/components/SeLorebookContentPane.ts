@@ -78,9 +78,7 @@ export class SeLorebookContentPane extends SuiComponent<
     this._watcher = new StoreWatcher();
 
     const { entityId } = options;
-    const entity = store
-      .getState()
-      .world.entities.find((e) => e.id === entityId);
+    const entity = store.getState().world.entitiesById[entityId];
     const entryId = entity?.lorebookEntryId ?? "";
 
     this._contentBtn = new SeGenerationButton({
@@ -133,7 +131,7 @@ export class SeLorebookContentPane extends SuiComponent<
     this._watcher.dispose();
 
     const state = store.getState();
-    const entity = state.world.entities.find((e) => e.id === entityId);
+    const entity = state.world.entitiesById[entityId];
     const entryId = entity?.lorebookEntryId ?? "";
 
     if (entryId) {
@@ -266,9 +264,7 @@ export class SeLorebookContentPane extends SuiComponent<
               text: "✕ Unbind",
               style: S.unbindBtn,
               callback: () => {
-                const e = store
-                  .getState()
-                  .world.entities.find((x) => x.id === entityId);
+                const e = store.getState().world.entitiesById[entityId];
                 if (e) {
                   store.dispatch(entityUnbound({ entityId }));
                   api.v1.ui.toast(`Unbound: ${e.name}`, { type: "success" });

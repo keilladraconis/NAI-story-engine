@@ -83,7 +83,7 @@ export class SeLorebookPanel extends SuiComponent<
       (s) => {
         const entryId = s.ui.lorebook.selectedEntryId;
         const isManaged = entryId
-          ? s.world.entities.some((e) => e.lorebookEntryId === entryId)
+          ? Object.values(s.world.entitiesById).some((e) => e.lorebookEntryId === entryId)
           : false;
         return { entryId, isManaged };
       },

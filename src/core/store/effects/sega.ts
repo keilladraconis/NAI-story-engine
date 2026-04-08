@@ -20,6 +20,8 @@ import {
   segaStageSet,
   segaRequestTracked,
   segaRequestUntracked,
+  segaBulkUntracked,
+  requestsBulkCompleted,
   segaReset,
   segaStatusUpdated,
   stateUpdated,
@@ -45,7 +47,7 @@ import { getModel } from "../../utils/config";
 async function findEntityNeedingContent(
   state: RootState,
 ): Promise<WorldEntity | null> {
-  const liveEntities = state.world.entities.filter(
+  const liveEntities = Object.values(state.world.entitiesById).filter(
     (e) => e.lifecycle === "live" && e.lorebookEntryId,
   );
 
@@ -80,7 +82,7 @@ async function findEntityNeedingContent(
 async function findEntityNeedingKeys(
   state: RootState,
 ): Promise<WorldEntity | null> {
-  const liveEntities = state.world.entities.filter(
+  const liveEntities = Object.values(state.world.entitiesById).filter(
     (e) => e.lifecycle === "live" && e.lorebookEntryId,
   );
 
@@ -179,13 +181,8 @@ function cancelAllSegaTasks(
     dispatch(stateUpdated({ genxState: { status: "idle", queueLength: 0 } }));
   }
 
-  for (const requestId of activeRequestIds) {
-    dispatch(segaRequestUntracked({ requestId }));
-  }
-
-  for (const requestId of activeRequestIds) {
-    dispatch(requestCompleted({ requestId }));
-  }
+  dispatch(segaBulkUntracked({ requestIds: activeRequestIds }));
+  dispatch(requestsBulkCompleted({ requestIds: activeRequestIds }));
 }
 
 /**

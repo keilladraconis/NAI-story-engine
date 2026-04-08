@@ -99,9 +99,9 @@ export class SeForgeSection extends SuiComponent<
 
   private async _rebuildEntityList(): Promise<void> {
     const { editHost } = this.options;
-    const entities = store
-      .getState()
-      .world.entities.filter((e) => e.lifecycle === "draft");
+    const entities = Object.values(store.getState().world.entitiesById).filter(
+      (e) => e.lifecycle === "draft",
+    );
     const parts = await Promise.all(
       entities.map((e) =>
         new SeEntityCard({
@@ -134,7 +134,7 @@ export class SeForgeSection extends SuiComponent<
     // Rebuild entity list when draft entity IDs change
     this._watcher.watch(
       (s) =>
-        s.world.entities
+        Object.values(s.world.entitiesById)
           .filter((e) => e.lifecycle === "draft")
           .map((e) => e.id),
       () => {
@@ -145,7 +145,7 @@ export class SeForgeSection extends SuiComponent<
 
     // Toggle cast/discard row visibility
     this._watcher.watch(
-      (s) => s.world.entities.some((e) => e.lifecycle === "draft"),
+      (s) => Object.values(s.world.entitiesById).some((e) => e.lifecycle === "draft"),
       (hasDraft) => {
         api.v1.ui.updateParts([
           {
@@ -165,7 +165,7 @@ export class SeForgeSection extends SuiComponent<
 
     // Build initial entity list
     const state = store.getState();
-    const draftEntities = state.world.entities.filter(
+    const draftEntities = Object.values(state.world.entitiesById).filter(
       (e) => e.lifecycle === "draft",
     );
     const hasDraftEntities = draftEntities.length > 0;

@@ -168,7 +168,7 @@ export class SeThreadEditPane extends SuiComponent<
       `${this.id}-entities`,
       groupId,
       group ?? { id: groupId, title: "", summary: "", entityIds: [] },
-      state.world.entities,
+      Object.values(state.world.entitiesById),
     ).build();
 
     return column({

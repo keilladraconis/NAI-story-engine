@@ -69,7 +69,7 @@ async function computeThreadLoreStatus(
   const state = store.getState();
   const group = state.world.groups.find((g) => g.id === groupId);
   const liveMembers = (group?.entityIds ?? [])
-    .map((id) => state.world.entities.find((e) => e.id === id))
+    .map((id) => state.world.entitiesById[id])
     .filter(
       (e): e is WorldEntity => e !== undefined && e.lifecycle === "live",
     );
@@ -146,7 +146,7 @@ export class SeThreadItem extends SuiComponent<
       store.dispatch(groupLorebookEntrySet({ groupId, entryId: undefined }));
     } else {
       const categoryId = await ensureThreadsCategory();
-      const content = buildThreadLorebookContent(group, state.world.entities);
+      const content = buildThreadLorebookContent(group, Object.values(state.world.entitiesById));
       const entryId = await api.v1.lorebook.createEntry({
         id: api.v1.uuid(),
         displayName: group.title || "Unnamed Thread",
@@ -164,7 +164,7 @@ export class SeThreadItem extends SuiComponent<
     const state = store.getState();
     const group = state.world.groups.find((g) => g.id === groupId);
     if (!group?.lorebookEntryId) return;
-    const content = buildThreadLorebookContent(group, state.world.entities);
+    const content = buildThreadLorebookContent(group, Object.values(state.world.entitiesById));
     await api.v1.lorebook.updateEntry(group.lorebookEntryId, { text: content });
   }
 
@@ -176,7 +176,7 @@ export class SeThreadItem extends SuiComponent<
 
     const cards = await Promise.all(
       (group?.entityIds ?? []).map((entityId) => {
-        const entity = state.world.entities.find((e) => e.id === entityId);
+        const entity = state.world.entitiesById[entityId];
         const lifecycle = entity?.lifecycle ?? "live";
         return new SeEntityCard({
           id: IDS.entity(entityId, lifecycle).ROOT,
@@ -258,23 +258,23 @@ export class SeThreadItem extends SuiComponent<
     );
 
     // Reactively rebuild member cards when THIS group's membership or member data changes.
-    // Memoized: skip all work when both groups and entities refs are stable (streaming).
+    // Memoized: skip all work when both groups and entitiesById refs are stable (streaming).
     let _memberGroupsRef = state.world.groups;
-    let _memberEntitiesRef = state.world.entities;
+    let _memberEntitiesRef = state.world.entitiesById;
     let _memberCache = "";
     this._watcher.watch(
       (s) => {
-        if (s.world.groups === _memberGroupsRef && s.world.entities === _memberEntitiesRef) {
+        if (s.world.groups === _memberGroupsRef && s.world.entitiesById === _memberEntitiesRef) {
           return _memberCache;
         }
         _memberGroupsRef = s.world.groups;
-        _memberEntitiesRef = s.world.entities;
+        _memberEntitiesRef = s.world.entitiesById;
         const g = s.world.groups.find((x) => x.id === groupId);
         const memberIds = g?.entityIds ?? [];
         _memberCache = JSON.stringify({
           members: memberIds,
           entities: memberIds.map((id) => {
-            const e = s.world.entities.find((x) => x.id === id);
+            const e = s.world.entitiesById[id];
             return e ? { id: e.id, lifecycle: e.lifecycle, name: e.name } : null;
           }),
         });
@@ -345,7 +345,7 @@ export class SeThreadItem extends SuiComponent<
     // Build initial member cards
     const initialCards = await Promise.all(
       (group?.entityIds ?? []).map((entityId) => {
-        const entity = state.world.entities.find((e) => e.id === entityId);
+        const entity = state.world.entitiesById[entityId];
         const lifecycle = entity?.lifecycle ?? "live";
         return new SeEntityCard({
           id: IDS.entity(entityId, lifecycle).ROOT,

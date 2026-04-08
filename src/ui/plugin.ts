@@ -8,16 +8,16 @@
  * Brainstorm rebuild: BrainstormPane.onRebuild → updateParts on the tab pane
  * column (se-main-tab-bar.pane.1) — no full-panel re-registration needed.
  *
- * Edit pane: plugin-level editHost replaces the entire story engine tab pane
- * content with a modal edit form. Save/Back restores the normal view.
+ * Edit pane: plugin-level editHost swaps se-edit-slot content and toggles
+ * se-main-content visibility — no full pane rebuild on open/close.
  */
 
 import {
   SuiPlugin,
   SuiTabBar,
   SuiButton,
-  SuiColumn,
-  type AnySuiComponent,
+  SuiComponent,
+  type SuiComponentOptions,
 } from "nai-simple-ui";
 import { GenX } from "nai-gen-x";
 
@@ -47,8 +47,6 @@ import { loadJournal } from "../core/generation-journal";
 
 const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
 
-/** ID of the story engine tab pane container (assigned by SuiTabBar). */
-const SE_TAB_PANE = "se-main-tab-bar.pane.0";
 
 export class StoryEnginePlugin extends SuiPlugin {
   private _genX?: GenX;
@@ -60,15 +58,21 @@ export class StoryEnginePlugin extends SuiPlugin {
   private _forgePane?: ForgePane;
 
   // ── Edit pane hosting ──
-  private _editPane: AnySuiComponent | null = null;
   readonly editHost: EditPaneHost = {
     open: (pane) => {
-      this._editPane = pane;
-      void this._rebuildStoryEngine();
+      void (async () => {
+        const editPart = await pane.build();
+        api.v1.ui.updateParts([
+          { id: "se-edit-slot", content: [editPart] } as unknown as Partial<UIPart> & { id: string },
+          { id: "se-main-content", style: { display: "none" } } as unknown as Partial<UIPart> & { id: string },
+        ]);
+      })();
     },
     close: () => {
-      this._editPane = null;
-      void this._rebuildStoryEngine();
+      api.v1.ui.updateParts([
+        { id: "se-edit-slot", content: [] } as unknown as Partial<UIPart> & { id: string },
+        { id: "se-main-content", style: {} } as unknown as Partial<UIPart> & { id: string },
+      ]);
     },
   };
 
@@ -77,9 +81,18 @@ export class StoryEnginePlugin extends SuiPlugin {
   }
 
   override async build(): Promise<void> {
+    let _lastGenxStatus = "idle";
+    let _lastGenxQueueLength = 0;
     this._genX = new GenX({
       onStateChange(genxState) {
-        store.dispatch(stateUpdated({ genxState }));
+        if (
+          genxState.status !== _lastGenxStatus ||
+          genxState.queueLength !== _lastGenxQueueLength
+        ) {
+          _lastGenxStatus = genxState.status;
+          _lastGenxQueueLength = genxState.queueLength;
+          store.dispatch(stateUpdated({ genxState }));
+        }
       },
       onTaskStarted(taskId) {
         store.dispatch(requestActivated({ requestId: taskId }));
@@ -111,36 +124,31 @@ export class StoryEnginePlugin extends SuiPlugin {
     ]);
   }
 
-  private async _rebuildStoryEngine(): Promise<void> {
-    if (this._editPane) {
-      // Edit mode — replace entire tab pane with edit form
-      const editPart = await this._editPane.build();
-      api.v1.ui.updateParts([
-        {
-          id: SE_TAB_PANE,
-          content: [editPart],
-        } as unknown as Partial<UIPart> & { id: string },
-      ]);
-    } else {
-      // Normal mode — rebuild full story engine column
-      const part = await this._buildStoryEnginePane();
-      api.v1.ui.updateParts([
-        { id: SE_TAB_PANE, content: [part] } as unknown as Partial<UIPart> & {
-          id: string;
-        },
-      ]);
-    }
-  }
+  private async _buildStoryEnginePane(): Promise<UIPartColumn> {
+    const { column } = api.v1.ui.part;
 
-  private async _buildStoryEnginePane(): Promise<UIPart> {
-    return await new SuiColumn({
+    const [headerPart, forgePart] = await Promise.all([
+      this._seHeaderBar!.build(),
+      this._forgePane!.build(),
+    ]);
+
+    const mainContent = column({
+      id: "se-main-content",
+      style: { gap: "8px" },
+      content: [headerPart, forgePart],
+    });
+
+    const editSlot = column({
+      id: "se-edit-slot",
+      style: {},
+      content: [],
+    });
+
+    return column({
       id: "se-story-engine-pane",
-      children: [
-        this._seHeaderBar!,
-        this._forgePane!,
-      ],
-      theme: { default: { self: { style: { gap: "8px" } } } },
-    }).build();
+      style: {},
+      content: [editSlot, mainContent],
+    });
   }
 
   // ── Compose ────────────────────────────────────────────────────
@@ -161,14 +169,29 @@ export class StoryEnginePlugin extends SuiPlugin {
       editHost: this.editHost,
     });
 
-    const storyEnginePane = new SuiColumn({
-      id: "se-story-engine-pane",
-      children: [
-        this._seHeaderBar,
-        this._forgePane,
-      ],
-      theme: { default: { self: { style: { gap: "8px" } } } },
-    });
+    // Build the slot structure once — se-edit-slot + se-main-content.
+    // editHost.open/close target these IDs directly via updateParts (no rebuild).
+    const storyEnginePart = await this._buildStoryEnginePane();
+
+    // Adapter so SuiTabBar receives a SuiComponent (calls build() on it).
+    class StoryEngineSlot extends SuiComponent<
+      { default: { self: { style: object } } },
+      Record<string, never>,
+      SuiComponentOptions<{ default: { self: { style: object } } }, Record<string, never>>,
+      UIPartColumn
+    > {
+      constructor(private readonly _col: UIPartColumn) {
+        super(
+          { id: "se-story-engine-slot", state: {} as Record<string, never> },
+          { default: { self: { style: {} } } },
+        );
+      }
+      async compose(): Promise<UIPartColumn> {
+        return this._col;
+      }
+    }
+
+    const storyEnginePane = new StoryEngineSlot(storyEnginePart);
 
     // ── Tab bar — callbacks close over this._tabBar (safe: only called on click) ──
     const tabEngine = new SuiButton({

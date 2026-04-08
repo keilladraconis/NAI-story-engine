@@ -32,7 +32,7 @@ const getEntryType = (categoryName: string): string => {
 
 /** Find the WorldEntity associated with a lorebook entry ID, if any. */
 function findEntityForEntry(state: RootState, entryId: string) {
-  return state.world.entities.find((e) => e.lorebookEntryId === entryId);
+  return Object.values(state.world.entitiesById).find((e) => e.lorebookEntryId === entryId);
 }
 
 /** Format the Threads (groups) an entity belongs to as context text. */
@@ -46,7 +46,7 @@ function formatEntityGroups(state: RootState, entityId: string): string {
 
 /** Format live world entities as context, grouped by category. */
 function formatLiveWorldEntitiesContext(state: RootState): string {
-  const liveEntities = state.world.entities.filter(
+  const liveEntities = Object.values(state.world.entitiesById).filter(
     (e) => e.lifecycle === "live",
   );
   if (liveEntities.length === 0) return "";

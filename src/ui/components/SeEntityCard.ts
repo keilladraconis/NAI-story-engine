@@ -103,9 +103,7 @@ export class SeEntityCard extends SuiComponent<
           store.dispatch(entityRegenRequested({ entityId }));
         },
         contentChecker: async () => {
-          const e = store
-            .getState()
-            .world.entities.find((x) => x.id === entityId);
+          const e = store.getState().world.entitiesById[entityId];
           const eid = e?.lorebookEntryId;
           if (!eid) return false;
           const entry = await api.v1.lorebook.entry(eid);
@@ -137,9 +135,7 @@ export class SeEntityCard extends SuiComponent<
 
     this._watcher.dispose();
 
-    const entity = store
-      .getState()
-      .world.entities.find((e) => e.id === entityId);
+    const entity = store.getState().world.entitiesById[entityId];
     const name = entity?.name ?? "";
     const summary = entity?.summary ?? "";
     const iconId = entity?.categoryId
@@ -149,21 +145,16 @@ export class SeEntityCard extends SuiComponent<
     const summaryId = `${E.ROOT}-summary`;
 
     // Reactively update card label, icon, and summary when entity data changes.
-    // Memoized: skip .find() when entities array ref is stable (e.g. during streaming).
+    // Memoized: direct lookup by ID — reference-stable when this entity is unmodified.
     type EntitySlice = { name: string; categoryId: string; summary: string };
-    let _entitiesRef = store.getState().world.entities;
-    let _entityCache: EntitySlice = { name, categoryId: entity?.categoryId ?? "", summary };
     this._watcher.watch(
       (s): EntitySlice => {
-        if (s.world.entities === _entitiesRef) return _entityCache;
-        _entitiesRef = s.world.entities;
-        const e = s.world.entities.find((x) => x.id === entityId);
-        _entityCache = {
+        const e = s.world.entitiesById[entityId];
+        return {
           name: e?.name ?? "",
           categoryId: e?.categoryId ?? "",
           summary: e?.summary ?? "",
         };
-        return _entityCache;
       },
       ({ name: newName, categoryId, summary: newSummary }) => {
         const parts: Array<Partial<UIPart> & { id: string }> = [
@@ -276,9 +267,7 @@ export class SeEntityCard extends SuiComponent<
       },
       async (isActive) => {
         if (!isActive) {
-          const e = store
-            .getState()
-            .world.entities.find((x) => x.id === entityId);
+          const e = store.getState().world.entitiesById[entityId];
           const eid = e?.lorebookEntryId;
           if (!eid) return;
           const lbEntry = await api.v1.lorebook.entry(eid);
