@@ -149,19 +149,25 @@ export class SeEntityCard extends SuiComponent<
     const summaryId = `${E.ROOT}-summary`;
 
     // Reactively update card label, icon, and summary when entity data changes.
-    // Single watcher (one find per dispatch) instead of three separate ones.
+    // Memoized: skip .find() when entities array ref is stable (e.g. during streaming).
+    type EntitySlice = { name: string; categoryId: string; summary: string };
+    let _entitiesRef = store.getState().world.entities;
+    let _entityCache: EntitySlice = { name, categoryId: entity?.categoryId ?? "", summary };
     this._watcher.watch(
-      (s) => {
+      (s): EntitySlice => {
+        if (s.world.entities === _entitiesRef) return _entityCache;
+        _entitiesRef = s.world.entities;
         const e = s.world.entities.find((x) => x.id === entityId);
-        return {
+        _entityCache = {
           name: e?.name ?? "",
           categoryId: e?.categoryId ?? "",
           summary: e?.summary ?? "",
         };
+        return _entityCache;
       },
-      ({ name, categoryId, summary: newSummary }) => {
+      ({ name: newName, categoryId, summary: newSummary }) => {
         const parts: Array<Partial<UIPart> & { id: string }> = [
-          { id: `${cardId}.label`, text: name } as unknown as Partial<UIPart> & { id: string },
+          { id: `${cardId}.label`, text: newName } as unknown as Partial<UIPart> & { id: string },
           { id: summaryId, text: newSummary } as unknown as Partial<UIPart> & { id: string },
         ];
         const newIconId = CATEGORY_ICON[categoryId];
@@ -239,19 +245,34 @@ export class SeEntityCard extends SuiComponent<
       "padding-left": "4px",
     } as const;
 
-    // Reactively update border when entity's lorebook requests complete
+    // Reactively update border when entity's lorebook requests complete.
+    // Memoized: skip work when activeRequest, queue, and sega refs are stable.
     const contentReqId = `lb-entity-${entityId}-content`;
     const keysReqId = `lb-entity-${entityId}-keys`;
+    let _activeReqRef = store.getState().runtime.activeRequest;
+    let _queueRef = store.getState().runtime.queue;
+    let _segaRef = store.getState().runtime.sega.activeRequestIds;
+    let _loreCache = false;
     this._watcher.watch(
-      (s) => {
+      (s): boolean => {
+        if (
+          s.runtime.activeRequest === _activeReqRef &&
+          s.runtime.queue === _queueRef &&
+          s.runtime.sega.activeRequestIds === _segaRef
+        ) {
+          return _loreCache;
+        }
+        _activeReqRef = s.runtime.activeRequest;
+        _queueRef = s.runtime.queue;
+        _segaRef = s.runtime.sega.activeRequestIds;
         const activeId = s.runtime.activeRequest?.id;
-        return (
+        _loreCache =
           activeId === contentReqId ||
           activeId === keysReqId ||
           s.runtime.sega.activeRequestIds.includes(contentReqId) ||
           s.runtime.sega.activeRequestIds.includes(keysReqId) ||
-          s.runtime.queue.some((q) => q.id === contentReqId || q.id === keysReqId)
-        );
+          s.runtime.queue.some((q) => q.id === contentReqId || q.id === keysReqId);
+        return _loreCache;
       },
       async (isActive) => {
         if (!isActive) {

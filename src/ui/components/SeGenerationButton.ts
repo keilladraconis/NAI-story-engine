@@ -132,44 +132,67 @@ const ICON_STYLES = {
 
 // ── Mode computation (pure) ──────────────────────────────────────────────────
 
-type RuntimeSlice = {
-  activeRequestId: string | undefined;
-  queueIds: string[];
-  genxStatus: string;
-  budgetWaitEndTime: number | undefined;
-  customProjection: unknown;
-};
+type ModeSlice = { mode: Mode; timerEnd: number };
 
-function selectSlice(
-  s: RootState,
-  opts: SeGenerationButtonOptions,
-): RuntimeSlice {
-  return {
-    activeRequestId: s.runtime.activeRequest?.id,
-    queueIds: s.runtime.queue.map((q) => q.id),
-    genxStatus: s.runtime.genx.status,
-    budgetWaitEndTime: s.runtime.genx.budgetWaitEndTime,
-    customProjection: opts.stateProjection?.(s),
+/** Build a memoized selector that returns a cached {mode, timerEnd} when the
+ *  specific runtime fields it reads haven't changed by reference. During
+ *  streaming only genx internals change — queue, activeRequest, sega, and
+ *  projection references stay stable, so all ~35 instances short-circuit. */
+function buildModeSelector(opts: SeGenerationButtonOptions) {
+  let _activeId: string | undefined;
+  let _queue: RootState["runtime"]["queue"];
+  let _genxStatus: string;
+  let _timerEnd: number;
+  let _projection: unknown;
+  let _cache: ModeSlice = { mode: "gen", timerEnd: 0 };
+
+  // seed with current state
+  const s0 = store.getState();
+  _activeId = s0.runtime.activeRequest?.id;
+  _queue = s0.runtime.queue;
+  _genxStatus = s0.runtime.genx.status;
+  _timerEnd = s0.runtime.genx.budgetWaitEndTime ?? 0;
+  _projection = opts.stateProjection?.(s0);
+  _cache = { mode: computeMode(opts, s0), timerEnd: _timerEnd };
+
+  return (s: RootState): ModeSlice => {
+    const activeId = s.runtime.activeRequest?.id;
+    const queue = s.runtime.queue;
+    const genxStatus = s.runtime.genx.status;
+    const timerEnd = s.runtime.genx.budgetWaitEndTime ?? 0;
+    const projection = opts.stateProjection?.(s);
+
+    if (
+      activeId === _activeId &&
+      queue === _queue &&
+      genxStatus === _genxStatus &&
+      timerEnd === _timerEnd &&
+      projection === _projection
+    ) {
+      return _cache;
+    }
+
+    _activeId = activeId;
+    _queue = queue;
+    _genxStatus = genxStatus;
+    _timerEnd = timerEnd;
+    _projection = projection;
+
+    const mode = computeMode(opts, s);
+    if (mode === _cache.mode && timerEnd === _cache.timerEnd) return _cache;
+    _cache = { mode, timerEnd };
+    return _cache;
   };
-}
-
-function sliceEquals(a: RuntimeSlice, b: RuntimeSlice): boolean {
-  return (
-    a.activeRequestId === b.activeRequestId &&
-    a.genxStatus === b.genxStatus &&
-    a.budgetWaitEndTime === b.budgetWaitEndTime &&
-    a.queueIds.length === b.queueIds.length &&
-    a.queueIds.every((id, i) => id === b.queueIds[i]) &&
-    JSON.stringify(a.customProjection) === JSON.stringify(b.customProjection)
-  );
 }
 
 function computeMode(
   opts: SeGenerationButtonOptions,
-  slice: RuntimeSlice,
+  s: RootState,
 ): Mode {
-  const { activeRequestId, queueIds, genxStatus, customProjection } = slice;
+  const activeRequestId = s.runtime.activeRequest?.id;
+  const genxStatus = s.runtime.genx.status;
   const hasProjection = !!opts.stateProjection;
+  const customProjection = opts.stateProjection?.(s);
 
   const resolvedId = opts.requestIdFromProjection
     ? opts.requestIdFromProjection(customProjection)
@@ -182,7 +205,9 @@ function computeMode(
 
   if (allIds.length > 0) {
     const isProcessing = allIds.some((id) => id === activeRequestId);
-    const isQueued = allIds.some((id) => queueIds.includes(id));
+    const isQueued = allIds.some((id) =>
+      s.runtime.queue.some((q) => q.id === id),
+    );
 
     if (isQueued) return "queue";
     if (isProcessing) {
@@ -213,16 +238,17 @@ export class SeGenerationButton extends SuiComponent<
   UIPartButton | UIPartRow
 > {
   private readonly _watcher: StoreWatcher;
+  private readonly _modeSelector: (s: RootState) => ModeSlice;
   private _timerGen = 0;
 
   constructor(options: SeGenerationButtonOptions) {
-    const initSlice = selectSlice(store.getState(), options);
-    const initMode = computeMode(options, initSlice);
+    const s0 = store.getState();
+    const initMode = computeMode(options, s0);
     super(
       {
         state: {
           mode: initMode,
-          timerEnd: initSlice.budgetWaitEndTime ?? 0,
+          timerEnd: s0.runtime.genx.budgetWaitEndTime ?? 0,
           hasContent: options.hasContent ?? false,
         },
         ...options,
@@ -230,6 +256,7 @@ export class SeGenerationButton extends SuiComponent<
       { default: { self: { style: {} } } },
     );
     this._watcher = new StoreWatcher();
+    this._modeSelector = buildModeSelector(options);
   }
 
   // ── Lifecycle ─────────────────────────────────────────────
@@ -242,19 +269,18 @@ export class SeGenerationButton extends SuiComponent<
       });
     }
 
-    // Subscribe to store
+    // Subscribe to store — memoized selector short-circuits during streaming
     this._watcher.watch(
-      (s) => selectSlice(s, this.options),
-      async (slice) => {
-        const mode = computeMode(this.options, slice);
+      this._modeSelector,
+      async ({ mode, timerEnd }) => {
         if (mode === this.state.mode && mode !== "wait") return;
         await this.setState({
           mode,
-          timerEnd: slice.budgetWaitEndTime ?? Date.now() + 60000,
+          timerEnd: timerEnd || Date.now() + 60000,
           hasContent: this.state.hasContent,
         });
       },
-      sliceEquals,
+      (a, b) => a === b, // reference equality — buildModeSelector returns cached object when unchanged
     );
 
     return this.options.variant === "icon"

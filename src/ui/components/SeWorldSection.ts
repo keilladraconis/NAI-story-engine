@@ -113,8 +113,17 @@ export class SeWorldSection extends SuiComponent<
 
     const state = store.getState();
 
+    // Memoized: skip all serialization when entities and groups refs are stable.
+    let _wsEntitiesRef = state.world.entities;
+    let _wsGroupsRef = state.world.groups;
+    let _wsCache = "";
     this._watcher.watch(
       (s) => {
+        if (s.world.entities === _wsEntitiesRef && s.world.groups === _wsGroupsRef) {
+          return _wsCache;
+        }
+        _wsEntitiesRef = s.world.entities;
+        _wsGroupsRef = s.world.groups;
         const liveIds = s.world.entities
           .filter((e) => e.lifecycle === "live")
           .map((e) => e.id);
@@ -122,7 +131,8 @@ export class SeWorldSection extends SuiComponent<
           id: g.id,
           members: [...g.entityIds],
         }));
-        return JSON.stringify({ liveIds, groupSnapshot });
+        _wsCache = JSON.stringify({ liveIds, groupSnapshot });
+        return _wsCache;
       },
       () => {
         void this._rebuildBody();

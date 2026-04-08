@@ -206,9 +206,17 @@ export class SeThreadItem extends SuiComponent<
     const title = group?.title ?? "";
     const hasLorebook = !!group?.lorebookEntryId;
 
-    // Reactively update card label when title changes
+    // Reactively update card label when title changes.
+    // Memoized: skip .find() when groups ref is stable.
+    let _groupsRef = state.world.groups;
+    let _titleCache = title;
     this._watcher.watch(
-      (s) => s.world.groups.find((g) => g.id === groupId)?.title ?? "",
+      (s) => {
+        if (s.world.groups === _groupsRef) return _titleCache;
+        _groupsRef = s.world.groups;
+        _titleCache = s.world.groups.find((g) => g.id === groupId)?.title ?? "";
+        return _titleCache;
+      },
       (newTitle) => {
         api.v1.ui.updateParts([
           {
@@ -250,18 +258,27 @@ export class SeThreadItem extends SuiComponent<
     );
 
     // Reactively rebuild member cards when THIS group's membership or member data changes.
-    // Only serialize member entities (not all entities) to avoid O(n) work on every dispatch.
+    // Memoized: skip all work when both groups and entities refs are stable (streaming).
+    let _memberGroupsRef = state.world.groups;
+    let _memberEntitiesRef = state.world.entities;
+    let _memberCache = "";
     this._watcher.watch(
       (s) => {
+        if (s.world.groups === _memberGroupsRef && s.world.entities === _memberEntitiesRef) {
+          return _memberCache;
+        }
+        _memberGroupsRef = s.world.groups;
+        _memberEntitiesRef = s.world.entities;
         const g = s.world.groups.find((x) => x.id === groupId);
         const memberIds = g?.entityIds ?? [];
-        return JSON.stringify({
+        _memberCache = JSON.stringify({
           members: memberIds,
           entities: memberIds.map((id) => {
             const e = s.world.entities.find((x) => x.id === id);
             return e ? { id: e.id, lifecycle: e.lifecycle, name: e.name } : null;
           }),
         });
+        return _memberCache;
       },
       () => {
         void this._rebuildMemberCards();
@@ -269,11 +286,18 @@ export class SeThreadItem extends SuiComponent<
     );
 
     // Re-sync lorebook content when this group's title/summary/members change (if enabled).
-    // Use group reference equality — Redux returns a new object only when it changes.
+    // Memoized: skip .find() when groups ref is stable.
+    let _loreGroupsRef = state.world.groups;
+    let _loreGroupCache = group ?? null;
     this._watcher.watch(
-      (s) => s.world.groups.find((x) => x.id === groupId) ?? null,
-      (group) => {
-        if (group?.lorebookEntryId) void this._syncLorebook();
+      (s) => {
+        if (s.world.groups === _loreGroupsRef) return _loreGroupCache;
+        _loreGroupsRef = s.world.groups;
+        _loreGroupCache = s.world.groups.find((x) => x.id === groupId) ?? null;
+        return _loreGroupCache;
+      },
+      (g) => {
+        if (g?.lorebookEntryId) void this._syncLorebook();
       },
       (a, b) => a === b, // reference equality
     );
