@@ -31,6 +31,7 @@ import {
   entityRegenRequested,
   generationSubmitted,
   requestQueued,
+  uiEntitySummaryGenerationRequested,
 } from "../index";
 import {
   buildForgeStrategy,
@@ -279,7 +280,7 @@ export function registerForgeEffects(
     api.v1.ui.toast(`${entity.name} cast`, { type: "success" });
   });
 
-  // ─── Entity Regen Requested → Queue content + keys generation ─────────────
+  // ─── Entity Regen Requested → Queue only missing fields ───────────────────
 
   subscribeEffect(matchesAction(entityRegenRequested), async (action) => {
     const { entityId } = action.payload;
@@ -293,28 +294,35 @@ export function registerForgeEffects(
     }
 
     const { lorebookEntryId } = entity;
-    const contentRequestId = `lb-entity-${entityId}-content`;
-    const keysRequestId = `lb-entity-${entityId}-keys`;
+    const entry = await api.v1.lorebook.entry(lorebookEntryId);
+    const hasSummary = !!entity.summary;
+    const hasContent = !!entry?.text;
+    const hasKeys = !!(entry?.keys && entry.keys.length > 0);
 
-    const contentFactory = createLorebookContentFactory(
-      getState,
-      lorebookEntryId,
-    );
-    dispatch(
-      generationSubmitted({
-        requestId: contentRequestId,
-        messageFactory: contentFactory,
-        params: { model: await getModel(), max_tokens: 1024 },
-        target: { type: "lorebookContent", entryId: lorebookEntryId },
-        prefillBehavior: "trim",
-      }),
-    );
+    if (!hasSummary) {
+      const summaryRequestId = `se-entity-summary-${entityId}`;
+      dispatch(requestQueued({ id: summaryRequestId, type: "entitySummary", targetId: entityId }));
+      dispatch(uiEntitySummaryGenerationRequested({ entityId, requestId: summaryRequestId }));
+    }
 
-    const keysPayload = await buildLorebookKeysPayload(
-      getState,
-      lorebookEntryId,
-      keysRequestId,
-    );
-    dispatch(generationSubmitted(keysPayload));
+    if (!hasContent) {
+      const contentRequestId = `lb-entity-${entityId}-content`;
+      const contentFactory = createLorebookContentFactory(getState, lorebookEntryId);
+      dispatch(
+        generationSubmitted({
+          requestId: contentRequestId,
+          messageFactory: contentFactory,
+          params: { model: await getModel(), max_tokens: 1024 },
+          target: { type: "lorebookContent", entryId: lorebookEntryId },
+          prefillBehavior: "trim",
+        }),
+      );
+    }
+
+    if (!hasKeys) {
+      const keysRequestId = `lb-entity-${entityId}-keys`;
+      const keysPayload = await buildLorebookKeysPayload(getState, lorebookEntryId, keysRequestId);
+      dispatch(generationSubmitted(keysPayload));
+    }
   });
 }

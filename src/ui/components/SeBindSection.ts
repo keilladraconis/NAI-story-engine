@@ -282,7 +282,7 @@ export class SeBindSection extends SuiComponent<
 
     return column({
       id: this.id,
-      style: { gap: "4px" },
+      style: { gap: "4px", "justify-content": "flex-start" },
       content: [
         // Header: back + title + bind all
         row({
@@ -321,7 +321,7 @@ export class SeBindSection extends SuiComponent<
                   `Bound ${unmanaged.length} ${unmanaged.length === 1 ? "entry" : "entries"}`,
                   { type: "success" },
                 );
-                this._rebuildBody();
+                editHost.close();
               },
             }),
           ],

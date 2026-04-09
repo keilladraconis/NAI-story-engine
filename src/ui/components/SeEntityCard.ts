@@ -31,6 +31,7 @@ import {
 } from "../../core/store/slices/world";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
+import { colors } from "../theme";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 import { SeEntityEditPane } from "./SeEntityEditPane";
 import { SeGenerationIconButton } from "./SeGenerationButton";
@@ -91,23 +92,50 @@ export class SeEntityCard extends SuiComponent<
     this._watcher = new StoreWatcher();
 
     if (options.lifecycle === "live") {
-      const { entityId } = options;
+      const { entityId, editHost } = options;
       this._regenBtn = new SeGenerationIconButton({
         id: IDS.entity(entityId, "live").REGEN_BTN,
         iconId: "zap" as IconId,
         requestIds: [
+          `se-entity-summary-${entityId}`,
+          `entity-summary-bind-${entityId}`,
           `lb-entity-${entityId}-content`,
           `lb-entity-${entityId}-keys`,
         ],
         onGenerate: () => {
-          store.dispatch(entityRegenRequested({ entityId }));
+          void (async () => {
+            const e = store.getState().world.entitiesById[entityId];
+            const eid = e?.lorebookEntryId;
+            if (!eid) return;
+            const entry = await api.v1.lorebook.entry(eid);
+            const allComplete =
+              !!e.summary &&
+              !!entry?.text &&
+              !!(entry?.keys && entry.keys.length > 0);
+            if (allComplete) {
+              editHost?.open(
+                new SeEntityEditPane({
+                  id: IDS.EDIT_PANE.ROOT,
+                  entityId,
+                  lifecycle: "live",
+                  editHost: editHost!,
+                }),
+              );
+            } else {
+              store.dispatch(entityRegenRequested({ entityId }));
+            }
+          })();
         },
         contentChecker: async () => {
           const e = store.getState().world.entitiesById[entityId];
           const eid = e?.lorebookEntryId;
           if (!eid) return false;
           const entry = await api.v1.lorebook.entry(eid);
-          return !!(entry?.text && entry?.keys && entry.keys.length > 0);
+          return (
+            !!e.summary &&
+            !!entry?.text &&
+            !!(entry?.keys && entry.keys.length > 0)
+          );
         },
       });
     } else {
@@ -170,130 +198,44 @@ export class SeEntityCard extends SuiComponent<
       (a, b) => a.name === b.name && a.categoryId === b.categoryId && a.summary === b.summary,
     );
 
-    // ── Draft layout ──────────────────────────────────────────────────────────
+    // ── Border constants (shared across draft and live) ───────────────────────
 
-    if (lifecycle === "draft") {
-      const summaryText = new SuiText({
-        id: summaryId,
-        theme: {
-          default: {
-            self: {
-              text: summary,
-              style: {
-                "font-size": "0.82em",
-                opacity: "0.7",
-                "white-space": "pre-wrap",
-                "word-break": "break-word",
-                "user-select": "text",
-                padding: "2px 0 4px",
-              },
-            },
-          },
-        },
-      });
-
-      const discardBtn = new SuiButton({
-        id: E.DISCARD_BTN,
-        callback: () => {
-          store.dispatch(entityDiscardRequested({ entityId }));
-        },
-        theme: { default: { self: { iconId: "trash" as IconId } } },
-      });
-
-      const card = new SuiCard({
-        id: cardId,
-        label: name,
-        icon: iconId,
-        labelCallback: () => {
-          this._openEditPane();
-        },
-        actions: [discardBtn],
-        theme: CARD_THEME,
-      });
-
-      return new SuiCollapsible({
-        id: E.ROOT,
-        header: card,
-        children: [summaryText],
-        initialCollapsed: false,
-      }).build();
-    }
-
-    // ── Live layout ───────────────────────────────────────────────────────────
-
-    // Check lorebook completeness for initial border style
-    const entryId = entity?.lorebookEntryId ?? "";
-    let hasLore = false;
-    if (entryId) {
-      const lbEntry = await api.v1.lorebook.entry(entryId);
-      hasLore = !!(lbEntry?.text && lbEntry?.keys && lbEntry.keys.length > 0);
-    }
-
-    const LORE_BORDER = {
-      "border-left": "3px solid rgb(144,238,144)",
+    const INCOMPLETE_BORDER = {
+      "border-left": "2px solid rgba(128,128,128,0.4)",
+      "border-radius": "2px",
+      "padding-left": "4px",
+    } as const;
+    const COMPLETE_BORDER = {
+      "border-left": "2px solid rgb(144,238,144)",
+      "border-radius": "2px",
+      "padding-left": "4px",
+    } as const;
+    const PENDING_BORDER = {
+      "border-left": `2px solid ${colors.pending}`,
+      "border-radius": "2px",
       "padding-left": "4px",
     } as const;
 
-    // Reactively update border when entity's lorebook requests complete.
-    // Memoized: skip work when activeRequest, queue, and sega refs are stable.
-    const contentReqId = `lb-entity-${entityId}-content`;
-    const keysReqId = `lb-entity-${entityId}-keys`;
+    // ── Pending detection (shared across draft and live) ──────────────────────
+
+    const pendingIds = new Set([
+      `se-entity-summary-${entityId}`,
+      `entity-summary-bind-${entityId}`,
+      `lb-entity-${entityId}-content`,
+      `lb-entity-${entityId}-keys`,
+    ]);
+
+    const _isPending = (s: { runtime: { activeRequest: { id: string } | null; queue: Array<{ id: string }>; sega: { activeRequestIds: string[] } } }): boolean =>
+      pendingIds.has(s.runtime.activeRequest?.id ?? "") ||
+      s.runtime.sega.activeRequestIds.some((id) => pendingIds.has(id)) ||
+      s.runtime.queue.some((q) => pendingIds.has(q.id));
+
     let _activeReqRef = store.getState().runtime.activeRequest;
     let _queueRef = store.getState().runtime.queue;
     let _segaRef = store.getState().runtime.sega.activeRequestIds;
-    let _loreCache = false;
-    this._watcher.watch(
-      (s): boolean => {
-        if (
-          s.runtime.activeRequest === _activeReqRef &&
-          s.runtime.queue === _queueRef &&
-          s.runtime.sega.activeRequestIds === _segaRef
-        ) {
-          return _loreCache;
-        }
-        _activeReqRef = s.runtime.activeRequest;
-        _queueRef = s.runtime.queue;
-        _segaRef = s.runtime.sega.activeRequestIds;
-        const activeId = s.runtime.activeRequest?.id;
-        _loreCache =
-          activeId === contentReqId ||
-          activeId === keysReqId ||
-          s.runtime.sega.activeRequestIds.includes(contentReqId) ||
-          s.runtime.sega.activeRequestIds.includes(keysReqId) ||
-          s.runtime.queue.some((q) => q.id === contentReqId || q.id === keysReqId);
-        return _loreCache;
-      },
-      async (isActive) => {
-        if (!isActive) {
-          const e = store.getState().world.entitiesById[entityId];
-          const eid = e?.lorebookEntryId;
-          if (!eid) return;
-          const lbEntry = await api.v1.lorebook.entry(eid);
-          const nowHasLore = !!(
-            lbEntry?.text &&
-            lbEntry?.keys &&
-            lbEntry.keys.length > 0
-          );
-          api.v1.ui.updateParts([
-            {
-              id: E.ROOT,
-              style: nowHasLore ? LORE_BORDER : {},
-            } as unknown as Partial<UIPart> & { id: string },
-          ]);
-        }
-      },
-    );
+    let _pendingCache = _isPending(store.getState());
 
-    const card = new SuiCard({
-      id: cardId,
-      label: name,
-      icon: iconId,
-      labelCallback: () => {
-        this._openEditPane();
-      },
-      actions: [this._regenBtn!],
-      theme: CARD_THEME,
-    });
+    // ── Summary text (shared) ─────────────────────────────────────────────────
 
     const summaryText = new SuiText({
       id: summaryId,
@@ -315,6 +257,122 @@ export class SeEntityCard extends SuiComponent<
     });
 
     const { column } = api.v1.ui.part;
+
+    // ── Draft layout ──────────────────────────────────────────────────────────
+
+    if (lifecycle === "draft") {
+      const discardBtn = new SuiButton({
+        id: E.DISCARD_BTN,
+        callback: () => {
+          store.dispatch(entityDiscardRequested({ entityId }));
+        },
+        theme: { default: { self: { iconId: "trash" as IconId } } },
+      });
+
+      const card = new SuiCard({
+        id: cardId,
+        label: name,
+        icon: iconId,
+        labelCallback: () => {
+          this._openEditPane();
+        },
+        actions: [discardBtn],
+        theme: CARD_THEME,
+      });
+
+      // Border watcher: yellow while pending, green when summary present, grey otherwise.
+      this._watcher.watch(
+        (s): boolean => {
+          if (
+            s.runtime.activeRequest === _activeReqRef &&
+            s.runtime.queue === _queueRef &&
+            s.runtime.sega.activeRequestIds === _segaRef
+          ) return _pendingCache;
+          _activeReqRef = s.runtime.activeRequest;
+          _queueRef = s.runtime.queue;
+          _segaRef = s.runtime.sega.activeRequestIds;
+          _pendingCache = _isPending(s);
+          return _pendingCache;
+        },
+        (isPending) => {
+          const borderStyle = isPending
+            ? PENDING_BORDER
+            : store.getState().world.entitiesById[entityId]?.summary
+              ? COMPLETE_BORDER
+              : INCOMPLETE_BORDER;
+          api.v1.ui.updateParts([
+            { id: E.ROOT, style: borderStyle } as unknown as Partial<UIPart> & { id: string },
+          ]);
+        },
+      );
+
+      const collapsible = await new SuiCollapsible({
+        id: `${E.ROOT}-c`,
+        header: card,
+        children: [summaryText],
+        initialCollapsed: false,
+      }).build();
+
+      const draftInitialStyle = _pendingCache ? PENDING_BORDER : summary ? COMPLETE_BORDER : INCOMPLETE_BORDER;
+      return column({ id: E.ROOT, style: draftInitialStyle, content: [collapsible] });
+    }
+
+    // ── Live layout ───────────────────────────────────────────────────────────
+
+    // Check completeness for initial border style: summary + lore content + keys.
+    const entryId = entity?.lorebookEntryId ?? "";
+    let hasLore = false;
+    if (entryId) {
+      const lbEntry = await api.v1.lorebook.entry(entryId);
+      hasLore = !!(lbEntry?.text && lbEntry?.keys && lbEntry.keys.length > 0);
+    }
+    const isComplete = !!summary && hasLore;
+
+    // Border watcher: yellow while pending, green when fully complete, grey otherwise.
+    this._watcher.watch(
+      (s): boolean => {
+        if (
+          s.runtime.activeRequest === _activeReqRef &&
+          s.runtime.queue === _queueRef &&
+          s.runtime.sega.activeRequestIds === _segaRef
+        ) return _pendingCache;
+        _activeReqRef = s.runtime.activeRequest;
+        _queueRef = s.runtime.queue;
+        _segaRef = s.runtime.sega.activeRequestIds;
+        _pendingCache = _isPending(s);
+        return _pendingCache;
+      },
+      async (isPending) => {
+        if (isPending) {
+          api.v1.ui.updateParts([
+            { id: E.ROOT, style: PENDING_BORDER } as unknown as Partial<UIPart> & { id: string },
+          ]);
+        } else {
+          const e = store.getState().world.entitiesById[entityId];
+          const eid = e?.lorebookEntryId;
+          let nowComplete = false;
+          if (eid) {
+            const lbEntry = await api.v1.lorebook.entry(eid);
+            nowComplete = !!e?.summary && !!(lbEntry?.text && lbEntry?.keys && lbEntry.keys.length > 0);
+          }
+          api.v1.ui.updateParts([
+            { id: E.ROOT, style: nowComplete ? COMPLETE_BORDER : INCOMPLETE_BORDER } as unknown as Partial<UIPart> & { id: string },
+          ]);
+        }
+      },
+    );
+
+    const card = new SuiCard({
+      id: cardId,
+      label: name,
+      icon: iconId,
+      labelCallback: () => {
+        this._openEditPane();
+      },
+      actions: [this._regenBtn!],
+      theme: CARD_THEME,
+    });
+
     const collapsible = await new SuiCollapsible({
       id: `${E.ROOT}-c`,
       header: card,
@@ -322,10 +380,7 @@ export class SeEntityCard extends SuiComponent<
       initialCollapsed: true,
     }).build();
 
-    return column({
-      id: E.ROOT,
-      style: hasLore ? LORE_BORDER : {},
-      content: [collapsible],
-    });
+    const liveInitialStyle = _pendingCache ? PENDING_BORDER : isComplete ? COMPLETE_BORDER : INCOMPLETE_BORDER;
+    return column({ id: E.ROOT, style: liveInitialStyle, content: [collapsible] });
   }
 }

@@ -23,6 +23,8 @@ import {
   uiLorebookContentGenerationRequested,
   uiLorebookKeysGenerationRequested,
   uiEntitySummaryGenerationRequested,
+  uiEditableActivate,
+  uiEditableDeactivate,
 } from "../../core/store/slices/ui";
 import {
   entityEdited,
@@ -205,6 +207,10 @@ export class SeEntityEditPane extends SuiComponent<
     const entity = state.world.entitiesById[entityId];
     const entryId = entity?.lorebookEntryId ?? "";
 
+    // Register this entity as the active edit target so background generation
+    // handlers know to stage output rather than save directly.
+    store.dispatch(uiEditableActivate({ id: entityId }));
+
     // Wire streaming updates so generation handlers can push to this pane
     if (lifecycle === "live" && entryId) {
       store.dispatch(uiLorebookEntrySelected({ entryId, categoryId: null }));
@@ -231,6 +237,7 @@ export class SeEntityEditPane extends SuiComponent<
     }
 
     const _close = (): void => {
+      store.dispatch(uiEditableDeactivate());
       if (lifecycle === "live") {
         store.dispatch(
           uiLorebookEntrySelected({ entryId: null, categoryId: null }),

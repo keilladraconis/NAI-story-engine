@@ -140,14 +140,14 @@ export class StoryEnginePlugin extends SuiPlugin {
 
     const editSlot = column({
       id: "se-edit-slot",
-      style: {},
+      style: { flex: "1" },
       content: [],
     });
 
     return column({
       id: "se-story-engine-pane",
-      style: {},
-      content: [editSlot, mainContent],
+      style: { flex: "1" },
+      content: [mainContent, editSlot],
     });
   }
 

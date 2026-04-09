@@ -27,10 +27,15 @@ export const entitySummaryHandler: GenerationHandlers<EntitySummaryTarget> = {
 
   async completion(ctx: CompletionContext<EntitySummaryTarget>): Promise<void> {
     if (ctx.generationSucceeded && ctx.accumulatedText) {
-      await api.v1.storyStorage.set(
-        EDIT_PANE_CONTENT,
-        ctx.accumulatedText.trim(),
-      );
+      const trimmed = ctx.accumulatedText.trim();
+      const editPaneOpen = ctx.getState().ui.activeEditId === ctx.target.entityId;
+      if (editPaneOpen) {
+        // Edit pane is open: stage in storyStorage for the user to review and save.
+        await api.v1.storyStorage.set(EDIT_PANE_CONTENT, trimmed);
+      } else {
+        // Background generation: save directly to Redux.
+        ctx.dispatch(entitySummaryUpdated({ entityId: ctx.target.entityId, summary: trimmed }));
+      }
     }
   },
 };

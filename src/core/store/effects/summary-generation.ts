@@ -5,6 +5,7 @@ import {
   uiEntitySummaryGenerationRequested,
   uiThreadSummaryGenerationRequested,
   entityBound,
+  requestQueued,
 } from "../index";
 import {
   createEntitySummaryFactory,
@@ -43,6 +44,7 @@ export function registerSummaryGenerationEffects(
     if (!entryText) return;
 
     const requestId = `entity-summary-bind-${entity.id}`;
+    dispatch(requestQueued({ id: requestId, type: "entitySummaryBind", targetId: entity.id }));
     dispatch(
       generationSubmitted({
         requestId,

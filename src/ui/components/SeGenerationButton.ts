@@ -96,34 +96,43 @@ const BTN_STYLES = {
   },
 } as const;
 
+// Base must include all properties that SuiCard.actions bakes at compose time
+// so that updateParts (which replaces style wholesale) stays size-stable.
+const ICON_BASE = {
+  background: "none",
+  border: "none",
+  padding: "6px 8px",
+  margin: "0",
+} as const;
+
 const ICON_STYLES = {
-  idle: { padding: "4px", opacity: "0.3", cursor: "pointer" },
+  idle: { ...ICON_BASE, opacity: "0.3", cursor: "pointer" },
   idleWithContent: {
-    padding: "4px",
+    ...ICON_BASE,
     opacity: "1",
     cursor: "pointer",
     color: "rgb(144,238,144)",
   },
   queued: {
-    padding: "4px",
+    ...ICON_BASE,
     opacity: "1",
     cursor: "pointer",
-    color: colors.header,
+    color: colors.pending,
   },
   cancel: {
-    padding: "4px",
+    ...ICON_BASE,
     opacity: "1",
     cursor: "pointer",
     color: colors.warning,
   },
   continue: {
-    padding: "4px",
+    ...ICON_BASE,
     opacity: "1",
     cursor: "pointer",
     color: colors.header,
   },
   wait: {
-    padding: "4px",
+    ...ICON_BASE,
     opacity: "0.6",
     cursor: "pointer",
     color: colors.header,
@@ -264,11 +273,16 @@ export class SeGenerationButton extends SuiComponent<
   // ── Lifecycle ─────────────────────────────────────────────
 
   async compose(): Promise<UIPartButton | UIPartRow> {
-    // Content check for icon variant
+    // Await content check before building so the correct state is baked into
+    // the initial part — updateParts after compose() returns is too late
+    // (part ID not yet registered in the NAI UI engine).
     if (this.options.variant === "icon" && this.options.contentChecker) {
-      this.options.contentChecker().then((has) => {
-        void this.setState({ ...this.state, hasContent: has });
-      });
+      const has = await this.options.contentChecker();
+      if (has !== this.state.hasContent) {
+        // Update state before _buildIconPart reads it; onSync fires but
+        // updateParts on the unregistered ID is a harmless no-op at this point.
+        await this.setState({ ...this.state, hasContent: has });
+      }
     }
 
     // Subscribe to store — memoized selector short-circuits during streaming

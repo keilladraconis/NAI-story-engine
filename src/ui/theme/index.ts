@@ -19,4 +19,5 @@ export const colors = {
   statusGenerating: "#ff9800",
   statusQueued: "rgb(245,243,194)",
   statusComplete: "rgba(255,255,255,0.8)",
+  pending: "rgb(234,179,8)",
 } as const;
