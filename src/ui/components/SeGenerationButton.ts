@@ -240,6 +240,7 @@ export class SeGenerationButton extends SuiComponent<
   private readonly _watcher: StoreWatcher;
   private readonly _modeSelector: (s: RootState) => ModeSlice;
   private _timerGen = 0;
+  private _prevMode: Mode;
 
   constructor(options: SeGenerationButtonOptions) {
     const s0 = store.getState();
@@ -257,6 +258,7 @@ export class SeGenerationButton extends SuiComponent<
     );
     this._watcher = new StoreWatcher();
     this._modeSelector = buildModeSelector(options);
+    this._prevMode = initMode;
   }
 
   // ── Lifecycle ─────────────────────────────────────────────
@@ -290,6 +292,8 @@ export class SeGenerationButton extends SuiComponent<
 
   override async onSync(): Promise<void> {
     const { mode, timerEnd, hasContent } = this.state;
+    const transitionedToGen = mode === "gen" && this._prevMode !== "gen";
+    this._prevMode = mode;
 
     if (this.options.variant === "icon") {
       this._syncIcon(mode, hasContent);
@@ -303,9 +307,10 @@ export class SeGenerationButton extends SuiComponent<
       this._stopTimer();
     }
 
-    // Re-check content when returning to gen (icon variant)
+    // Re-check content only when transitioning back to gen after a generation.
+    // Never call on every sync — that creates an infinite loop via setState → onSync.
     if (
-      mode === "gen" &&
+      transitionedToGen &&
       this.options.variant === "icon" &&
       this.options.contentChecker
     ) {
