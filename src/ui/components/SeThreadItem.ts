@@ -30,7 +30,7 @@ import {
   groupReforgeRequested,
 } from "../../core/store/slices/world";
 import type { WorldEntity, WorldGroup } from "../../core/store/types";
-import { IDS, STORAGE_KEYS } from "../../ui/framework/ids";
+import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 import { SeEntityCard } from "./SeEntityCard";
@@ -391,8 +391,6 @@ export class SeThreadItem extends SuiComponent<
       header: headerCard,
       children: [new RawBridge(membersCol)],
       initialCollapsed: true,
-      storageKey: `story:${STORAGE_KEYS.worldGroupSectionUI(groupId)}`,
-      storageMode: "story",
     }).build();
 
     return column({

@@ -23,7 +23,7 @@ import {
 import { store } from "../../core/store";
 import { groupCreated, entityForged } from "../../core/store/slices/world";
 import { FieldID } from "../../config/field-definitions";
-import { IDS, STORAGE_KEYS } from "../../ui/framework/ids";
+import { IDS } from "../../ui/framework/ids";
 import { ensureCategory } from "../../core/store/effects/lorebook-sync";
 import { StoreWatcher } from "../store-watcher";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
@@ -283,8 +283,6 @@ export class SeWorldSection extends SuiComponent<
       header: headerCard,
       children: [new RawBridge(bodyCol)],
       initialCollapsed: false,
-      storageKey: `story:${STORAGE_KEYS.WORLD_SECTION_UI}`,
-      storageMode: "story",
     }).build();
   }
 }

@@ -236,7 +236,6 @@ export class SeForgeSection extends SuiComponent<
     return collapsibleSection({
       id: FG.SECTION,
       title: "Forge",
-      storageKey: `story:${STORAGE_KEYS.FORGE_SECTION_UI}`,
       content: [
         column({
           style: { gap: "6px" },

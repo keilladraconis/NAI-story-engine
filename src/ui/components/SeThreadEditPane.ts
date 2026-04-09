@@ -143,10 +143,6 @@ export class SeThreadEditPane extends SuiComponent<
     const title = group?.title ?? "";
     const summary = group?.summary ?? "";
 
-    // Seed storage keys so storageKey-bound inputs pick up current values
-    await api.v1.storyStorage.set(EDIT_PANE_TITLE, title);
-    await api.v1.storyStorage.set(EDIT_PANE_CONTENT, summary);
-
     const _save = (): void => {
       void (async () => {
         const newTitle = String(
@@ -164,12 +160,18 @@ export class SeThreadEditPane extends SuiComponent<
     const { column, row, text, button, textInput, multilineTextInput } =
       api.v1.ui.part;
 
-    const entitySectionsPart = await buildEntitySections(
-      `${this.id}-entities`,
-      groupId,
-      group ?? { id: groupId, title: "", summary: "", entityIds: [] },
-      Object.values(state.world.entitiesById),
-    ).build();
+    // Seed storage keys, build entity list, and build summary button in parallel
+    const [, , entitySectionsPart, summaryBtnPart] = await Promise.all([
+      api.v1.storyStorage.set(EDIT_PANE_TITLE, title),
+      api.v1.storyStorage.set(EDIT_PANE_CONTENT, summary),
+      buildEntitySections(
+        `${this.id}-entities`,
+        groupId,
+        group ?? { id: groupId, title: "", summary: "", entityIds: [] },
+        Object.values(state.world.entitiesById),
+      ).build(),
+      this._summaryBtn.build(),
+    ]);
 
     return column({
       id: this.id,
@@ -216,7 +218,7 @@ export class SeThreadEditPane extends SuiComponent<
           style: { "align-items": "center", gap: "4px" },
           content: [
             text({ text: "Summary", style: { ...S.membersLabel, flex: "1" } }),
-            await this._summaryBtn.build(),
+            summaryBtnPart,
           ],
         }),
         multilineTextInput({

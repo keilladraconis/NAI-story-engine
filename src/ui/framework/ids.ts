@@ -41,21 +41,8 @@ export const STORAGE_KEYS = {
 
   brainstormInputUI: (inputId: string) => inputId,
 
-  // Foundation UI (v11)
-  FOUNDATION_SECTION_UI: "se-foundation-section",
-
-  // Forge UI (v11)
-  FORGE_SECTION_UI: "se-forge-section",
+  // Forge UI
   FORGE_GUIDANCE_UI: "se-forge-guidance",
-
-  // World section UI
-  WORLD_SECTION_UI: "se-world-section",
-
-  // World Thread (group) UI — dynamic by groupId
-  worldGroupSectionUI: (groupId: string) => `se-world-group-${groupId}`,
-
-  // Threads collapsible section
-  THREADS_SECTION_UI: "se-world-threads-section",
 };
 
 export const IDS = {

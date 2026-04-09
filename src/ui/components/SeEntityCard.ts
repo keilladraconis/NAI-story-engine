@@ -216,8 +216,6 @@ export class SeEntityCard extends SuiComponent<
         header: card,
         children: [summaryText],
         initialCollapsed: false,
-        storageKey: `${E.ROOT}.collapsed`,
-        storageMode: "story",
       }).build();
     }
 
@@ -322,8 +320,6 @@ export class SeEntityCard extends SuiComponent<
       header: card,
       children: [summaryText],
       initialCollapsed: true,
-      storageKey: `${E.ROOT}.collapsed`,
-      storageMode: "story",
     }).build();
 
     return column({

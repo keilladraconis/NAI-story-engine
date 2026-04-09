@@ -483,7 +483,6 @@ export class SeFoundationSection extends SuiComponent<
     return collapsibleSection({
       id: this.id,
       title: "Narrative Foundation",
-      storageKey: `story:${STORAGE_KEYS.FOUNDATION_SECTION_UI}`,
       content: [
         column({
           style: { gap: "8px" },

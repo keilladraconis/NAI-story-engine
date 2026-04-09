@@ -210,18 +210,24 @@ export class SeEntityEditPane extends SuiComponent<
       store.dispatch(uiLorebookEntrySelected({ entryId, categoryId: null }));
     }
 
-    // Seed name/summary storage so storageKey-bound inputs pick up current values
-    await api.v1.storyStorage.set(EDIT_PANE_TITLE, entity?.name ?? "");
-    await api.v1.storyStorage.set(EDIT_PANE_CONTENT, entity?.summary ?? "");
+    // Seed name/summary and fetch lorebook entry in parallel
+    const [entry] = await Promise.all([
+      lifecycle === "live" && entryId ? api.v1.lorebook.entry(entryId) : Promise.resolve(null),
+      api.v1.storyStorage.set(EDIT_PANE_TITLE, entity?.name ?? ""),
+      api.v1.storyStorage.set(EDIT_PANE_CONTENT, entity?.summary ?? ""),
+    ]);
 
-    // Seed lorebook drafts from current entry
-    if (lifecycle === "live" && entryId) {
-      const entry = await api.v1.lorebook.entry(entryId);
-      await api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, entry?.text ?? "");
-      await api.v1.storyStorage.set(
-        L.KEYS_DRAFT_RAW,
-        entry?.keys?.join(", ") ?? "",
-      );
+    // Seed lorebook drafts (depends on entry fetch above)
+    if (lifecycle === "live" && entryId && entry) {
+      await Promise.all([
+        api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, entry.text ?? ""),
+        api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, entry.keys?.join(", ") ?? ""),
+      ]);
+    } else if (lifecycle === "live" && entryId) {
+      await Promise.all([
+        api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, ""),
+        api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, ""),
+      ]);
     }
 
     const _close = (): void => {
@@ -361,9 +367,16 @@ export class SeEntityEditPane extends SuiComponent<
           },
         })
         : null;
-    const deleteConfirmPart = deleteConfirmBtn
-      ? await deleteConfirmBtn.build()
-      : null;
+
+    // Build all components in parallel
+    const [categoryBarPart, summaryBtnPart, deleteConfirmPart, contentGenPart, keysGenPart] =
+      await Promise.all([
+        categoryBar.build(),
+        this._summaryBtn.build(),
+        deleteConfirmBtn?.build() ?? Promise.resolve(null),
+        this._contentBtn?.build() ?? Promise.resolve(null),
+        this._keysBtn?.build() ?? Promise.resolve(null),
+      ]);
 
     const parts: UIPart[] = [
       // ── Header ─────────────────────────────────────────────────────────────
@@ -395,7 +408,7 @@ export class SeEntityEditPane extends SuiComponent<
       }),
 
       // ── Category bar ───────────────────────────────────────────────────────
-      await categoryBar.build(),
+      categoryBarPart,
 
       // ── Name ───────────────────────────────────────────────────────────────
       textInput({
@@ -411,7 +424,7 @@ export class SeEntityEditPane extends SuiComponent<
         style: S.sectionRow,
         content: [
           text({ text: "Summary", style: S.rowLabel }),
-          await this._summaryBtn.build(),
+          summaryBtnPart,
         ],
       }),
       multilineTextInput({
@@ -424,11 +437,7 @@ export class SeEntityEditPane extends SuiComponent<
     ];
 
     // ── Lorebook section (live only) ──────────────────────────────────────────
-    if (lifecycle === "live" && this._contentBtn && this._keysBtn) {
-      const [contentGenPart, keysGenPart] = await Promise.all([
-        this._contentBtn.build(),
-        this._keysBtn.build(),
-      ]);
+    if (lifecycle === "live" && contentGenPart && keysGenPart) {
 
       parts.push(
         // Divider
