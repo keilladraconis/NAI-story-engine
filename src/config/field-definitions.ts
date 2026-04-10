@@ -97,9 +97,9 @@ export const FIELD_CONFIGS: FieldConfig[] = [
       "List only character names. Start with the protagonist, then supporting characters.",
     listExampleFormat: "- Kael\n- Elena\n- The Iron Warden",
     generationInstruction:
-      "One line per character: name, demographics, core motivation, and one behavioral tell. Be terse.",
+      "One line per character: name, demographics, two visuals (one visible across the room, one noticed up close), and one behavioral tell. Be terse.",
     exampleFormat:
-      "Name (Gender, Age, Role): Motivation. Behavioral tell.\nExample: Kael (Male, 34, Smuggler): Paying off a life debt. Rubs a coin when calculating odds.",
+      "Name (Gender, Age, Role): Visual across the room. Visual up close. Behavioral tell.\nExample: Kael (Male, 34, Smuggler): Lean build, always angled toward the exit. Faded knife scar across the back of one hand. Rubs a coin when calculating odds.",
     filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*([\s\S]+)$/,
   },

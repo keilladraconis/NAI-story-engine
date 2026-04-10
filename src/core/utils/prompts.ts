@@ -106,9 +106,15 @@ Generate a structured Lorebook Entry for "[itemName]".
 attributes, then dense prose. Follow the template for this entry type.
 
 **Content Directives:**
-- **Characters:** Appearance a camera would capture, personality
-  through behavior not adjectives, and the internal conflict that
-  makes them volatile. Include a defining quote in Personality.
+- **Characters:** Appearance a camera would capture — specific
+  physical details, not impressions. Personality through observable
+  behavior, not adjective labels. Banned: abstract qualities
+  (commanding presence, quiet intensity, nervous energy), sensation
+  metaphors (heat pooled, pulse quickened), dead metaphors (moves
+  like a predator), feature catalogs (hair → eyes → body in
+  sequence). Include a defining quote that reveals through what
+  they notice or how they speak, not what they believe about
+  themselves.
 - **General:** Every sentence must earn its tokens — focus on what
   creates narrative potential, not encyclopedic detail.
 - **Template placeholders:** Fill ALL bracketed placeholders (e.g. [number], [gender], [role]) with concrete values. Infer from world context when explicitly stated; when not stated, make a reasonable creative choice that fits the character and setting. Never leave bracket placeholders in the output.
@@ -118,7 +124,7 @@ attributes, then dense prose. Follow the template for this entry type.
 
 **Container Discipline (STRICT):**
 - **Characters:** ONLY internal/solitary data (Appearance, Personality, History, internal Conflict). Never name another character to define a dynamic — that belongs in a Narrative Vector.
-- **Locations:** ONLY sensory/spatial/atmosphere data. No recurring events, schedules, or complex mechanics — those belong in Systems. Character-specific goals belong in Motive lines.
+- **Locations:** Sensory anchor (Atmosphere), functional reality (Description — what naturally happens here), and dramatic potential (Hook — what could happen here that couldn't elsewhere). No recurring events, schedules, or complex mechanics — those belong in Systems. Character-specific goals belong in Motive lines.
 - **Narrative Vectors:** Active pressure ONLY — the dynamic between actors in a specific situation. No deep history of the relationship, no outcomes or predictions.
 - **Systems:** Mechanical rules ONLY — laws, universal behaviors, and their immediate effects. No specific events, narrative dynamics, or character histories.
 - **Topics:** What characters discuss — per-actor positions on a subject. No narrative resolution.
@@ -135,8 +141,8 @@ export const LOREBOOK_TEMPLATE_CHARACTER = `[Entry Name]
 Type: Character
 Setting: original
 Age: [number] | Gender: [gender] | Occupation: [role]
-Appearance: [What a stranger notices first — build, coloring, distinguishing features, how they carry themselves. 2-3 sentences.]
-Personality: [How they behave under pressure, what they want, what they hide. Weave in a defining quote. 2-3 sentences.]
+Appearance: [What a camera would capture: one thing visible across the room, one thing noticed up close, how they move through or occupy space. No feature lists. 2-3 sentences.]
+Personality: [Observable behavior under pressure — what they do, not what they are. No personality adjectives. Include a defining quote: it must reveal character through what they notice or how they speak, not through self-explanation. 2-3 sentences.]
 History: [The core events that shaped who they are today. 2-3 sentences.]
 Conflict: [Optional. The internal tension driving this character's choices — the duality within them alone. One sentence naming the conflict, one naming its origin. No other characters, no relationship dynamics, no outcomes.]`;
 
@@ -144,8 +150,9 @@ export const LOREBOOK_TEMPLATE_LOCATION = `[Entry Name]
 Type: Location
 Setting: original
 Region: [where this sits in the world]
-Atmosphere: [Sensory snapshot — what you see, hear, smell on arrival. 2-3 sentences.]
-Description: [What this place is, how it shapes those within it, and what makes it a site of conflict or opportunity. 3-5 sentences.]
+Atmosphere: [What hits you first when you enter — the one or two sensory details that define this space. 1-2 sentences.]
+Description: [What naturally happens here; what this place is for and how it shapes the people in it. 2-3 sentences.]
+Hook: [What could happen here that couldn't happen elsewhere — the dramatic potential specific to this space. 1 sentence.]
 History: [Optional. How this place came to exist and what shaped its current form. 2-3 sentences.]
 Culture: [Optional. How people behave here, what the unwritten rules are, what makes this place distinct. 2-3 sentences.]`;
 
@@ -169,8 +176,8 @@ Type: Narrative Vector
 Setting: original
 Scope: [Local / Regional / Global]
 Actors:
-- [Character]: [Their role in this dynamic and why they are in tension with the other actor(s).]
-- [Character]: [Their role in this dynamic and why they are in tension with the other actor(s).]
+- [Character]: [What they legitimately need here — and what their position or secret makes impossible.]
+- [Character]: [What they legitimately need here — and what their position or secret makes impossible.]
 Description: [The nature of the dynamic and the pressure it creates. Setup only — no outcomes, no resolved emotions, no predictions. 3-5 sentences.]`;
 
 export const LOREBOOK_TEMPLATE_TOPIC = `[Entry Name]
@@ -373,7 +380,7 @@ Weave these connections naturally into the entry to create a cohesive world.
 
 **Container Boundaries:**
 - Character entries: internal/solitary data only — never name another character to define a dynamic
-- Location entries: sensory/spatial/atmosphere only — no events or mechanics
+- Location entries: sensory anchor + functional reality + dramatic potential (Atmosphere/Description/Hook) — no recurring events, schedules, or mechanics
 - Narrative Vectors: active pressure only — no deep history or outcomes
 - Systems: mechanical rules only — no events or character histories
 - Topics: what characters discuss — per-actor positions, no resolution
@@ -502,6 +509,12 @@ RULES:
 - ZERO GENERIC DESCRIPTORS. "Brave warrior" is generic. "Former
   soldier who can't stop protecting people even when they don't
   want protection" changes scenes.
+- CHARACTER descriptions: two physical details (one visible across
+  the room, one noticed up close) and one behavioral tell — a verb,
+  not an adjective. No abstract qualities, no named emotions.
+- LOCATION descriptions: sensory anchor (what hits you first) +
+  functional reality (what naturally happens here) + dramatic
+  potential (what could happen here that couldn't elsewhere).
 - End every pass with [CRITIQUE] and [DONE].
 
 - Do not restate or paraphrase the Direction. Every element you
@@ -546,8 +559,9 @@ For all commands, write content inline after the | separator, before the closing
 For THREAD, list only the members who share a direct structural bond — not every element tangentially related. Create at most one or two threads per pass, and only after the relevant elements exist.
 
 EXAMPLE:
-[CREATE CHARACTER "Mira Voss" | A surgeon operating out of a black-market bay who owes a debt she cannot repay. Her cold bedside manner hides genuine grief for the patients she could not save.]
-[THREAD "Black-Market Bay" | "Mira Voss", "The Debt" | The economic trap that keeps Mira operating outside the law.]
+[CREATE CHARACTER "Mira Voss" | Gloves on before she's through the door, eyes on the work not the patient. Scar tissue along the left thumb from a clamp that slipped. Runs a debt she can only service by taking jobs she can't refuse.]
+[CREATE LOCATION "The Sunken Arcade" | Reeks of salt water and old smoke — the flood line is still visible three meters up the wall. Smugglers use it because the exits outnumber the entrances and no one asks questions. The only place in the district where someone with the wrong face can broker a deal with someone from the right side of the city.]
+[THREAD "Black-Market Bay" | "Mira Voss", "The Sunken Arcade" | The physical space that makes Mira's work possible and visible to the wrong people.]
 
 The ESTABLISHED WORLD section lists what already exists — do not recreate those elements.
 The prior command sequence shows what has been built this pass — continue it naturally.
