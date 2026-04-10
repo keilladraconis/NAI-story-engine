@@ -346,7 +346,8 @@ EXAMPLE:
 Author: Stephen King; Title: The Mist; Tags: horror, supernatural, small town; Genre: Horror
 
 INSTRUCTION:
-- Complete the ATTG line: Author: [author]; Title: [title]; Tags: [comma-separated-tags]; Genre: [genre]
+- Complete the ATTG line: [ Author: [author]; Title: [title]; Tags: [comma-separated-tags]; Genre: [genre] ][ S: [number rating 1-5] ]
+- You must enclose the ATTG line in spaced "[ ... ]" brackets.
 - Pick a well-known author that fits the story
 - DO NOT use any markdown bolding (**).
 - OUTPUT ONLY THE LINE.`;
@@ -403,10 +404,7 @@ sensibility, emotional register), the supporting cast and background
 forces that make the world feel inhabited, and the core dramatic
 opposition that drives everything. If a story shape is established
 above, let its structural logic inform the trajectory — not an
-ending, a direction toward that kind of moment.
-
-End with a single [TAGS] line: 3-8 short labels for genre, tone,
-motifs, or thematic markers.`;
+ending, a direction toward that kind of moment.`;
 
 export const CRUCIBLE_SHAPE_PROMPT = `You are a story architect. Given the story material below, invent the narrative shape this story is leaning toward.
 

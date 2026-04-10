@@ -14,7 +14,7 @@ import {
 } from "nai-simple-ui";
 import { store } from "../../core/store";
 import { entityBound, entitiesBoundBatch } from "../../core/store/slices/world";
-import { attgUpdated, styleUpdated, attgSyncSet, styleSyncSet } from "../../core/store/slices/foundation";
+import { attgUpdated, styleUpdated, attgSyncSet, styleSyncSet, shapeGenerationRequested, intentGenerationRequested } from "../../core/store/slices/foundation";
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 import {
   detectCategory,
@@ -141,6 +141,7 @@ function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + "…" : s;
 }
 
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export class SeImportWizard extends SuiComponent<
@@ -235,6 +236,29 @@ export class SeImportWizard extends SuiComponent<
         }),
       );
     }
+
+    // Generate Shape + Intent from story context (always shown)
+    parts.push(
+      row({
+        id: IDS.IMPORT.ANALYZE_ROW,
+        style: S.importRow,
+        content: [
+          text({ text: "Story → Shape + Intent", style: S.importLabel }),
+          text({ text: "", style: S.importPreview }),
+          api.v1.ui.part.button({
+            id: IDS.IMPORT.ANALYZE_BTN,
+            text: "Shape",
+            style: S.importBtn,
+            callback: () => { store.dispatch(shapeGenerationRequested()); },
+          }),
+          api.v1.ui.part.button({
+            text: "Intent",
+            style: S.importBtn,
+            callback: () => { store.dispatch(intentGenerationRequested()); },
+          }),
+        ],
+      }),
+    );
 
     return parts;
   }
@@ -382,8 +406,6 @@ export class SeImportWizard extends SuiComponent<
     }
 
     const foundationParts = this._buildFoundationSection(memText, anText);
-    const hasFoundation = foundationParts.length > 0;
-    const hasLorebook = this._unmanagedEntries().length > 0;
 
     const headerRow = row({
       style: S.header,
@@ -393,66 +415,52 @@ export class SeImportWizard extends SuiComponent<
           callback: () => { editHost.close(); },
         }),
         text({ text: "**Import Existing Content**", markdown: true, style: S.title }),
-        ...(!hasFoundation && !hasLorebook ? [] : [
-          button({
-            id: IDS.IMPORT.BIND_ALL_BTN,
-            text: "Bind All",
-            style: S.bindAllBtn,
-            callback: () => {
-              const unmanaged = this._unmanagedEntries();
-              if (unmanaged.length > 0) {
-                const entities = unmanaged.map((entry) => ({
-                  id: api.v1.uuid(),
-                  categoryId:
-                    this._dulfsMap.get(entry.id) ??
-                    detectCategory(entry.text ?? ""),
-                  lifecycle: "live" as const,
-                  lorebookEntryId: entry.id,
-                  name: entry.displayName || "Unknown",
-                  summary: "",
-                }));
-                store.dispatch(entitiesBoundBatch(entities));
-                api.v1.ui.toast(
-                  `Bound ${entities.length} ${entities.length === 1 ? "entry" : "entries"}`,
-                  { type: "success" },
-                );
-              }
-              editHost.close();
-            },
-          }),
-        ]),
+        button({
+          id: IDS.IMPORT.BIND_ALL_BTN,
+          text: "Import All",
+          style: S.bindAllBtn,
+          callback: () => {
+            // ATTG + Style
+            if (memText.trim()) {
+              store.dispatch(attgUpdated({ attg: memText }));
+              store.dispatch(attgSyncSet({ enabled: true }));
+              void api.v1.memory.set(memText);
+            }
+            if (anText.trim()) {
+              store.dispatch(styleUpdated({ style: anText }));
+              store.dispatch(styleSyncSet({ enabled: true }));
+            }
+            // Lorebook entities
+            const unmanaged = this._unmanagedEntries();
+            if (unmanaged.length > 0) {
+              const entities = unmanaged.map((entry) => ({
+                id: api.v1.uuid(),
+                categoryId:
+                  this._dulfsMap.get(entry.id) ??
+                  detectCategory(entry.text ?? ""),
+                lifecycle: "live" as const,
+                lorebookEntryId: entry.id,
+                name: entry.displayName || "Unknown",
+                summary: "",
+              }));
+              store.dispatch(entitiesBoundBatch(entities));
+            }
+            // Shape + Intent from story context
+            store.dispatch(shapeGenerationRequested());
+            store.dispatch(intentGenerationRequested());
+            editHost.close();
+          },
+        }),
       ],
     });
-
-    if (!hasFoundation && !hasLorebook) {
-      return column({
-        id: this.id,
-        style: { gap: "4px", "justify-content": "flex-start", flex: "1" },
-        content: [
-          row({
-            style: S.header,
-            content: [
-              button({
-                iconId: "arrow-left" as IconId,
-                callback: () => { editHost.close(); },
-              }),
-              text({ text: "**Import Existing Content**", markdown: true, style: S.title }),
-            ],
-          }),
-          text({ text: "Nothing to import. All lorebook content is already managed by Story Engine.", style: S.empty }),
-        ],
-      });
-    }
 
     return column({
       id: this.id,
       style: { gap: "4px", "justify-content": "flex-start", flex: "1" },
       content: [
         headerRow,
-        ...(hasFoundation ? [
-          text({ text: "Foundation Fields", style: S.sectionLabel }),
-          ...foundationParts,
-        ] : []),
+        text({ text: "Foundation Fields", style: S.sectionLabel }),
+        ...foundationParts,
         text({ text: "Lorebook Entries", style: S.sectionLabel }),
         column({
           id: IDS.IMPORT.BODY,

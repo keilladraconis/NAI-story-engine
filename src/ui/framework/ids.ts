@@ -118,6 +118,8 @@ export const IDS = {
     ATTG_BTN: "se-import-attg-btn",
     STYLE_ROW: "se-import-style-row",
     STYLE_BTN: "se-import-style-btn",
+    ANALYZE_ROW: "se-import-analyze-row",
+    ANALYZE_BTN: "se-import-analyze-btn",
     BIND_ALL_BTN: "se-import-bind-all-btn",
     BODY: "se-import-body",
     entry: (entryId: string) => ({

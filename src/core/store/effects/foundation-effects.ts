@@ -48,15 +48,17 @@ const createShapeFactory =
     const shapePrompt = CRUCIBLE_SHAPE_PROMPT;
     const existingName = getState().foundation.shape?.name ?? "";
 
-    const prefix = await buildStoryEnginePrefix(getState, {
-      excludeSections: ["foundation"],
-    });
+    const [prefix, storyContext] = await Promise.all([
+      buildStoryEnginePrefix(getState, { excludeSections: ["foundation"] }),
+      api.v1.buildContext({ suppressScriptHooks: "self" }),
+    ]);
 
     // If there's an existing name, anchor the model to it; otherwise let it invent freely.
     const prefill = existingName ? `SHAPE: ${existingName}\n\n` : "SHAPE: ";
 
     const messages: Message[] = [
       ...prefix,
+      ...storyContext.slice(1), // drop NAI's story-writing system prompt
       { role: "system" as const, content: shapePrompt },
       { role: "assistant" as const, content: prefill },
     ];
@@ -82,11 +84,15 @@ const createIntentFactory =
   async () => {
     const intentPrompt = CRUCIBLE_INTENT_PROMPT;
 
-    const prefix = await buildStoryEnginePrefix(getState, {
-      excludeSections: ["foundation"],
-    });
+    const [prefix, storyContext] = await Promise.all([
+      buildStoryEnginePrefix(getState, { excludeSections: ["foundation"] }),
+      api.v1.buildContext({ suppressScriptHooks: "self" }),
+    ]);
 
-    const messages: Message[] = [...prefix];
+    const messages: Message[] = [
+      ...prefix,
+      ...storyContext.slice(1), // drop NAI's story-writing system prompt
+    ];
 
     const shape = getState().foundation.shape;
     if (shape) {
