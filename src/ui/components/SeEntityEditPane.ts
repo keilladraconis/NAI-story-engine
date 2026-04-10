@@ -112,6 +112,19 @@ const S = {
     "font-weight": "bold",
   },
   keysInput: { "font-size": "12px", flex: "1" },
+  alwaysOnOn: {
+    "font-size": "11px",
+    "flex-shrink": "0",
+    padding: "2px 6px",
+    color: "rgb(144,238,144)",
+    opacity: "1",
+  },
+  alwaysOnOff: {
+    "font-size": "11px",
+    "flex-shrink": "0",
+    padding: "2px 6px",
+    opacity: "0.35",
+  },
 } as const;
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -224,7 +237,9 @@ export class SeEntityEditPane extends SuiComponent<
     ]);
 
     // Seed lorebook drafts (depends on entry fetch above)
+    let _alwaysOnDraft = false;
     if (lifecycle === "live" && entryId && entry) {
+      _alwaysOnDraft = entry.forceActivation ?? false;
       await Promise.all([
         api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, entry.text ?? ""),
         api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, entry.keys?.join(", ") ?? ""),
@@ -285,7 +300,7 @@ export class SeEntityEditPane extends SuiComponent<
           });
         }
 
-        // Flush lorebook content and keys on save (not on each keystroke)
+        // Flush lorebook content, keys, and forceActivation on save (not on each keystroke)
         if (lifecycle === "live" && entryId) {
           const rawContent = String(
             (await api.v1.storyStorage.get(L.CONTENT_DRAFT_RAW)) ?? "",
@@ -303,7 +318,11 @@ export class SeEntityEditPane extends SuiComponent<
             .split(",")
             .map((k) => k.trim())
             .filter((k) => k.length > 0);
-          await api.v1.lorebook.updateEntry(entryId, { text: content, keys });
+          await api.v1.lorebook.updateEntry(entryId, {
+            text: content,
+            keys,
+            forceActivation: _alwaysOnDraft,
+          });
         }
 
         _close();
@@ -468,7 +487,7 @@ export class SeEntityEditPane extends SuiComponent<
           style: S.contentInput,
         }),
 
-        // Keys row: label + input + gen icon button
+        // Keys row: label + input + gen icon button + always-on toggle
         row({
           style: S.keysRow,
           content: [
@@ -481,6 +500,18 @@ export class SeEntityEditPane extends SuiComponent<
               style: S.keysInput,
             }),
             keysGenPart,
+            button({
+              id: L.ALWAYS_ON_TOGGLE,
+              text: "Always On",
+              style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
+              callback: () => {
+                _alwaysOnDraft = !_alwaysOnDraft;
+                api.v1.ui.updateParts([{
+                  id: L.ALWAYS_ON_TOGGLE,
+                  style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
+                } as unknown as Partial<UIPart> & { id: string }]);
+              },
+            }),
           ],
         }),
       );

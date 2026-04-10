@@ -81,15 +81,26 @@ export class SeContentWithTitlePane extends SuiComponent<
     const { column, row, text, textInput, multilineTextInput, button } =
       api.v1.ui.part;
 
+    // ── Save callback ──────────────────────────────────────────
+    const doSave = () => {
+      void (async () => {
+        const newTitle = String(
+          (await api.v1.storyStorage.get(EDIT_PANE_TITLE)) ?? "",
+        );
+        const newContent = String(
+          (await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) ?? "",
+        );
+        onSave(newTitle.trim(), newContent.trim());
+      })();
+    };
+
     // ── Header row ─────────────────────────────────────────────
     const headerParts: UIPart[] = [
       button({
         id: EP.BACK_BTN,
         text: "",
         iconId: "arrow-left" as IconId,
-        callback: () => {
-          onBack();
-        },
+        callback: () => { onBack(); },
       }),
     ];
     if (label) {
@@ -103,6 +114,14 @@ export class SeContentWithTitlePane extends SuiComponent<
       );
     }
     if (extraControls) headerParts.push(...extraControls);
+    headerParts.push(
+      button({
+        id: EP.SAVE_BTN,
+        text: "Save",
+        style: { padding: "4px 16px" },
+        callback: doSave,
+      }),
+    );
 
     // ── Title input ────────────────────────────────────────────
     const titleInput = textInput({
@@ -120,24 +139,6 @@ export class SeContentWithTitlePane extends SuiComponent<
       placeholder: contentPlaceholder ?? "Content…",
       storageKey: `story:${EDIT_PANE_CONTENT}`,
       style: { "min-height": "120px", "font-size": "0.85em", flex: "1" },
-    });
-
-    // ── Save button ────────────────────────────────────────────
-    const saveBtn = button({
-      id: EP.SAVE_BTN,
-      text: "Save",
-      style: { "align-self": "flex-end", padding: "4px 16px" },
-      callback: () => {
-        void (async () => {
-          const newTitle = String(
-            (await api.v1.storyStorage.get(EDIT_PANE_TITLE)) ?? "",
-          );
-          const newContent = String(
-            (await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) ?? "",
-          );
-          onSave(newTitle.trim(), newContent.trim());
-        })();
-      },
     });
 
     // ── Assemble ───────────────────────────────────────────────
@@ -162,7 +163,6 @@ export class SeContentWithTitlePane extends SuiComponent<
       parts.push(text({ text: contentLabel, style: LABEL_STYLE }));
     }
     parts.push(contentInput);
-    parts.push(saveBtn);
 
     return column({
       id: this.id,

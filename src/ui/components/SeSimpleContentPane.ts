@@ -58,15 +58,23 @@ export class SeSimpleContentPane extends SuiComponent<
 
     const { column, row, text, multilineTextInput, button } = api.v1.ui.part;
 
+    // ── Save callback ──────────────────────────────────────────
+    const doSave = () => {
+      void (async () => {
+        const newContent = String(
+          (await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) ?? "",
+        );
+        onSave(newContent.trim());
+      })();
+    };
+
     // ── Header row ─────────────────────────────────────────────
     const headerParts: UIPart[] = [
       button({
         id: `${this.id}-back`,
         text: "",
         iconId: "arrow-left" as IconId,
-        callback: () => {
-          onBack();
-        },
+        callback: () => { onBack(); },
       }),
     ];
     if (label) {
@@ -80,6 +88,14 @@ export class SeSimpleContentPane extends SuiComponent<
       );
     }
     if (extraControls) headerParts.push(...extraControls);
+    headerParts.push(
+      button({
+        id: `${this.id}-save`,
+        text: "Save",
+        style: { padding: "4px 16px" },
+        callback: doSave,
+      }),
+    );
 
     // ── Content input ──────────────────────────────────────────
     const contentInput = multilineTextInput({
@@ -88,21 +104,6 @@ export class SeSimpleContentPane extends SuiComponent<
       placeholder: contentPlaceholder ?? "Content…",
       storageKey: `story:${EDIT_PANE_CONTENT}`,
       style: { "min-height": "120px", "font-size": "0.85em", flex: "1" },
-    });
-
-    // ── Save button ────────────────────────────────────────────
-    const saveBtn = button({
-      id: `${this.id}-save`,
-      text: "Save",
-      style: { "align-self": "flex-end", padding: "4px 16px" },
-      callback: () => {
-        void (async () => {
-          const newContent = String(
-            (await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) ?? "",
-          );
-          onSave(newContent.trim());
-        })();
-      },
     });
 
     // ── Assemble ───────────────────────────────────────────────
@@ -117,7 +118,6 @@ export class SeSimpleContentPane extends SuiComponent<
       parts.push(text({ text: contentLabel, style: LABEL_STYLE }));
     }
     parts.push(contentInput);
-    parts.push(saveBtn);
 
     return column({
       id: this.id,

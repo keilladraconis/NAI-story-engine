@@ -75,6 +75,16 @@ export const foundationSlice = createSlice({
       styleSyncEnabled: !state.styleSyncEnabled,
     }),
 
+    attgSyncSet: (state, payload: { enabled: boolean }) => ({
+      ...state,
+      attgSyncEnabled: payload.enabled,
+    }),
+
+    styleSyncSet: (state, payload: { enabled: boolean }) => ({
+      ...state,
+      styleSyncEnabled: payload.enabled,
+    }),
+
     foundationCleared: () => initialFoundationState,
 
     // Signal actions — Phase 2/3 effects handle generation
@@ -101,6 +111,8 @@ export const {
   styleUpdated,
   attgSyncToggled,
   styleSyncToggled,
+  attgSyncSet,
+  styleSyncSet,
   shapeGenerationRequested,
   intentGenerationRequested,
   worldStateGenerationRequested,

@@ -4,7 +4,6 @@ import { dulfsItemAdded, dulfsItemRemoved } from "../index";
 import { DulfsFieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
 import { STORAGE_KEYS } from "../../../ui/framework/ids";
 import { extractDulfsItemName } from "../../utils/context-builder";
-import { buildMemoryContent } from "../../utils/filters";
 
 // Lorebook sync constants
 export const SE_CATEGORY_PREFIX = "SE: ";
@@ -147,17 +146,10 @@ export async function syncEratoCompatibility(
     await api.v1.lorebook.removeEntry(existingMarker.id);
   }
 
-  // Re-sync ATTG+Style → Memory (rebuilds combined content)
-  const attgSync = (await api.v1.storyStorage.get(
-    STORAGE_KEYS.SYNC_ATTG_MEMORY,
-  )) as { on?: boolean } | null;
-  const styleSync = (await api.v1.storyStorage.get(
-    STORAGE_KEYS.SYNC_STYLE_MEMORY,
-  )) as { on?: boolean } | null;
-  if (attgSync?.on || styleSync?.on) {
-    const mem = buildMemoryContent(getState);
-    if (mem) await api.v1.memory.set(mem);
-  }
+  // Re-sync ATTG → Memory, Style → A/N if enabled
+  const { attg, style, attgSyncEnabled, styleSyncEnabled } = getState().foundation;
+  if (attgSyncEnabled && attg.trim()) await api.v1.memory.set(attg.trim());
+  if (styleSyncEnabled && style.trim()) await api.v1.an.set(style.trim());
 }
 
 /**

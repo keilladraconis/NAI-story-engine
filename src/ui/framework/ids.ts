@@ -112,6 +112,20 @@ export const IDS = {
       BIND_BTN: `se-bind-entry-bind-${entryId}`,
     }),
   },
+  IMPORT: {
+    WIZARD: "se-import-wizard",
+    ATTG_ROW: "se-import-attg-row",
+    ATTG_BTN: "se-import-attg-btn",
+    STYLE_ROW: "se-import-style-row",
+    STYLE_BTN: "se-import-style-btn",
+    BIND_ALL_BTN: "se-import-bind-all-btn",
+    BODY: "se-import-body",
+    entry: (entryId: string) => ({
+      ROW: `se-import-entry-${entryId}`,
+      CAT_BTN: `se-import-entry-cat-${entryId}`,
+      BIND_BTN: `se-import-entry-bind-${entryId}`,
+    }),
+  },
   BRAINSTORM: {
     ROOT: "se-bs-root",
     LIST: "se-bs-list",
@@ -169,6 +183,9 @@ export const IDS = {
     CONTENT_DRAFT_KEY: "lb-draft-content",
     KEYS_DRAFT_KEY: "lb-draft-keys",
     REFINE_INSTRUCTIONS_KEY: "lb-refine-instructions",
+
+    // Always On toggle (edit pane)
+    ALWAYS_ON_TOGGLE: "lb-always-on-toggle",
 
     // Entry-specific IDs (for synchronization with LorebookIconButton)
     entry: (entryId: string) => ({

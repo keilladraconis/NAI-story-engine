@@ -43,6 +43,7 @@ import { ForgePane } from "./components/ForgePane";
 import { SeHeaderBar } from "./components/SeHeaderBar";
 import { SeLorebookPanel } from "./components/SeLorebookPanel";
 import { SeJournalPanel } from "./components/SeJournalPanel";
+import { SeImportWizard } from "./components/SeImportWizard";
 import { loadJournal } from "../core/generation-journal";
 
 const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
@@ -109,6 +110,30 @@ export class StoryEnginePlugin extends SuiPlugin {
     registerLorebookSyncHooks(store.dispatch, store.getState);
 
     await super.build();
+
+    // Auto-trigger import wizard only when SE has no content at all
+    const { entityIds } = store.getState().world;
+    const { attg, style } = store.getState().foundation;
+    const hasSeContent = entityIds.length > 0 || attg.trim() !== "" || style.trim() !== "";
+    if (!hasSeContent) {
+      const [entries, categories, memText, anText] = await Promise.all([
+        api.v1.lorebook.entries(),
+        api.v1.lorebook.categories(),
+        api.v1.memory.get(),
+        api.v1.an.get(),
+      ]);
+      const seCategories = new Set(
+        categories.filter((c) => (c.name ?? "").startsWith("SE:")).map((c) => c.id),
+      );
+      const unmanagedCount = entries.filter(
+        (e) => !e.category || !seCategories.has(e.category),
+      ).length;
+      if (unmanagedCount > 0 || memText.trim() || anText.trim()) {
+        this.editHost.open(
+          new SeImportWizard({ id: IDS.IMPORT.WIZARD, editHost: this.editHost }),
+        );
+      }
+    }
   }
 
   // ── Rebuild helpers ────────────────────────────────────────────
@@ -163,7 +188,7 @@ export class StoryEnginePlugin extends SuiPlugin {
     });
 
     // ── Story Engine pane ───────────────────────────────────────────────────
-    this._seHeaderBar = new SeHeaderBar({ id: "kse-sidebar-header" });
+    this._seHeaderBar = new SeHeaderBar({ id: "kse-sidebar-header", editHost: this.editHost });
     this._forgePane = new ForgePane({
       id: "se-forge-pane",
       editHost: this.editHost,

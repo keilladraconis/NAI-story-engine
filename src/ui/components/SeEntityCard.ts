@@ -108,10 +108,8 @@ export class SeEntityCard extends SuiComponent<
             const eid = e?.lorebookEntryId;
             if (!eid) return;
             const entry = await api.v1.lorebook.entry(eid);
-            const allComplete =
-              !!e.summary &&
-              !!entry?.text &&
-              !!(entry?.keys && entry.keys.length > 0);
+            const keysOk = entry?.forceActivation || !!(entry?.keys && entry.keys.length > 0);
+            const allComplete = !!e.summary && !!entry?.text && keysOk;
             if (allComplete) {
               editHost?.open(
                 new SeEntityEditPane({
@@ -131,11 +129,8 @@ export class SeEntityCard extends SuiComponent<
           const eid = e?.lorebookEntryId;
           if (!eid) return false;
           const entry = await api.v1.lorebook.entry(eid);
-          return (
-            !!e.summary &&
-            !!entry?.text &&
-            !!(entry?.keys && entry.keys.length > 0)
-          );
+          const keysOk = entry?.forceActivation || !!(entry?.keys && entry.keys.length > 0);
+          return !!e.summary && !!entry?.text && keysOk;
         },
       });
     } else {
@@ -319,12 +314,13 @@ export class SeEntityCard extends SuiComponent<
 
     // ── Live layout ───────────────────────────────────────────────────────────
 
-    // Check completeness for initial border style: summary + lore content + keys.
+    // Check completeness for initial border style: summary + lore content + (keys or always-on).
     const entryId = entity?.lorebookEntryId ?? "";
     let hasLore = false;
     if (entryId) {
       const lbEntry = await api.v1.lorebook.entry(entryId);
-      hasLore = !!(lbEntry?.text && lbEntry?.keys && lbEntry.keys.length > 0);
+      const keysOk = lbEntry?.forceActivation || !!(lbEntry?.keys && lbEntry.keys.length > 0);
+      hasLore = !!(lbEntry?.text && keysOk);
     }
     const isComplete = !!summary && hasLore;
 
@@ -353,7 +349,8 @@ export class SeEntityCard extends SuiComponent<
           let nowComplete = false;
           if (eid) {
             const lbEntry = await api.v1.lorebook.entry(eid);
-            nowComplete = !!e?.summary && !!(lbEntry?.text && lbEntry?.keys && lbEntry.keys.length > 0);
+            const keysOk = lbEntry?.forceActivation || !!(lbEntry?.keys && lbEntry.keys.length > 0);
+            nowComplete = !!e?.summary && !!(lbEntry?.text && keysOk);
           }
           api.v1.ui.updateParts([
             { id: E.ROOT, style: nowComplete ? COMPLETE_BORDER : INCOMPLETE_BORDER } as unknown as Partial<UIPart> & { id: string },

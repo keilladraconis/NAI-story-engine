@@ -1,6 +1,6 @@
 import { FieldID } from "../../../../config/field-definitions";
 import { fieldUpdated } from "../../index";
-import { applyFieldFilters, buildMemoryContent } from "../../../utils/filters";
+import { applyFieldFilters } from "../../../utils/filters";
 import {
   GenerationHandlers,
   FieldTarget,
@@ -48,20 +48,14 @@ export const fieldHandler: GenerationHandlers<FieldTarget> = {
       const inputId = `input-${ctx.target.fieldId}`;
       api.v1.ui.updateParts([{ id: inputId, value: filteredText }]);
 
-      // Trigger sync to Memory if enabled
+      // Trigger sync to Memory / A/N if enabled
       if (ctx.target.fieldId === FieldID.ATTG) {
-        const attgSync = (await api.v1.storyStorage.get(
-          STORAGE_KEYS.SYNC_ATTG_MEMORY,
-        )) as { on?: boolean } | null;
-        if (attgSync?.on) {
-          await api.v1.memory.set(buildMemoryContent(ctx.getState));
+        if (ctx.getState().foundation.attgSyncEnabled) {
+          await api.v1.memory.set(filteredText);
         }
       } else if (ctx.target.fieldId === FieldID.Style) {
-        const styleSync = (await api.v1.storyStorage.get(
-          STORAGE_KEYS.SYNC_STYLE_MEMORY,
-        )) as { on?: boolean } | null;
-        if (styleSync?.on) {
-          await api.v1.memory.set(buildMemoryContent(ctx.getState));
+        if (ctx.getState().foundation.styleSyncEnabled) {
+          await api.v1.an.set(filteredText);
         }
       }
     } else {

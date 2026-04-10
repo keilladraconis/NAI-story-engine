@@ -1,14 +1,11 @@
 /**
- * SeBindSection — full-pane "Bind Existing Lorebooks" panel.
+ * SeImportWizard — single-pane import wizard.
  *
- * Opened via editHost (replaces the main story engine pane content).
- * Triggered by the chain-link icon button in the World section header.
+ * Combines foundation field import (Memory → ATTG, A/N → Style) with
+ * lorebook binding (same logic as SeBindSection).
  *
- * Lists all unmanaged lorebook entries grouped by their lorebook category.
- * Each entry card has a DULFS category cycle button and a single-click Bind button.
- * "Bind All" button sits at the top right of the panel header.
- *
- * Entries in SE-managed categories ("SE: *") are excluded.
+ * Auto-triggered at startup when no SE entities exist but external content
+ * is detected. Also accessible via the "Import" button in SeHeaderBar.
  */
 
 import {
@@ -17,6 +14,7 @@ import {
 } from "nai-simple-ui";
 import { store } from "../../core/store";
 import { entityBound, entitiesBoundBatch } from "../../core/store/slices/world";
+import { attgUpdated, styleUpdated, attgSyncSet, styleSyncSet } from "../../core/store/slices/foundation";
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 import {
   detectCategory,
@@ -27,11 +25,11 @@ import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type SeBindSectionTheme = { default: { self: { style: object } } };
-type SeBindSectionState = Record<string, never>;
-export type SeBindSectionOptions = {
+type SeImportWizardTheme = { default: { self: { style: object } } };
+type SeImportWizardState = Record<string, never>;
+export type SeImportWizardOptions = {
   editHost: EditPaneHost;
-} & SuiComponentOptions<SeBindSectionTheme, SeBindSectionState>;
+} & SuiComponentOptions<SeImportWizardTheme, SeImportWizardState>;
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
@@ -45,6 +43,41 @@ const S = {
     flex: "1",
     "font-weight": "bold",
     "font-size": "14px",
+  },
+  sectionLabel: {
+    "font-size": "11px",
+    "font-weight": "bold",
+    opacity: "0.5",
+    "text-transform": "uppercase",
+    "letter-spacing": "0.05em",
+    "margin-top": "8px",
+    "margin-bottom": "4px",
+  },
+  importRow: {
+    gap: "6px",
+    "align-items": "center",
+    padding: "6px 0",
+    "border-bottom": "1px solid rgba(255,255,255,0.04)",
+  },
+  importLabel: {
+    "flex-shrink": "0",
+    "font-size": "12px",
+    "font-weight": "bold",
+    opacity: "0.8",
+    "min-width": "80px",
+  },
+  importPreview: {
+    flex: "1",
+    "font-size": "11px",
+    opacity: "0.5",
+    overflow: "hidden",
+    "white-space": "nowrap",
+    "text-overflow": "ellipsis",
+  },
+  importBtn: {
+    "font-size": "11px",
+    "flex-shrink": "0",
+    padding: "2px 7px",
   },
   bindAllBtn: {
     "font-size": "12px",
@@ -102,21 +135,28 @@ const DULFS_SHORT: Record<DulfsFieldID, string> = {
   [FieldID.Topics]: "Topic",
 };
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function truncate(s: string, n: number): string {
+  return s.length > n ? s.slice(0, n) + "…" : s;
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export class SeBindSection extends SuiComponent<
-  SeBindSectionTheme,
-  SeBindSectionState,
-  SeBindSectionOptions,
+export class SeImportWizard extends SuiComponent<
+  SeImportWizardTheme,
+  SeImportWizardState,
+  SeImportWizardOptions,
   UIPartColumn
 > {
   private _entries: LorebookEntry[] = [];
   private _categoryNames: Map<string, string> = new Map();
   private _dulfsMap: Map<string, DulfsFieldID> = new Map();
 
-  constructor(options: SeBindSectionOptions) {
+
+  constructor(options: SeImportWizardOptions) {
     super(
-      { state: {} as SeBindSectionState, ...options },
+      { state: {} as SeImportWizardState, ...options },
       { default: { self: { style: {} } } },
     );
   }
@@ -137,9 +177,71 @@ export class SeBindSection extends SuiComponent<
     return this._entries.filter((e) => !managed.has(e.id));
   }
 
-  // ── Body ────────────────────────────────────────────────────────────────────
+  // ── Foundation section ───────────────────────────────────────────────────────
 
-  private _buildBody(): UIPart[] {
+  private _buildFoundationSection(memText: string, anText: string): UIPart[] {
+    const { row, text } = api.v1.ui.part;
+    const parts: UIPart[] = [];
+
+    if (memText.trim()) {
+      parts.push(
+        row({
+          id: IDS.IMPORT.ATTG_ROW,
+          style: S.importRow,
+          content: [
+            text({ text: "Memory → ATTG", style: S.importLabel }),
+            text({ text: truncate(memText, 60), style: S.importPreview }),
+            api.v1.ui.part.button({
+              id: IDS.IMPORT.ATTG_BTN,
+              text: "Import",
+              style: S.importBtn,
+              callback: () => {
+                store.dispatch(attgUpdated({ attg: memText }));
+                store.dispatch(attgSyncSet({ enabled: true }));
+                void api.v1.memory.set(memText);
+                api.v1.ui.updateParts([
+                  { id: IDS.IMPORT.ATTG_ROW, style: { ...S.importRow, opacity: "0.4" } } as unknown as Partial<UIPart> & { id: string },
+                  { id: IDS.IMPORT.ATTG_BTN, text: "Imported ✓" } as unknown as Partial<UIPart> & { id: string },
+                ]);
+              },
+            }),
+          ],
+        }),
+      );
+    }
+
+    if (anText.trim()) {
+      parts.push(
+        row({
+          id: IDS.IMPORT.STYLE_ROW,
+          style: S.importRow,
+          content: [
+            text({ text: "A/N → Style", style: S.importLabel }),
+            text({ text: truncate(anText, 60), style: S.importPreview }),
+            api.v1.ui.part.button({
+              id: IDS.IMPORT.STYLE_BTN,
+              text: "Import",
+              style: S.importBtn,
+              callback: () => {
+                store.dispatch(styleUpdated({ style: anText }));
+                store.dispatch(styleSyncSet({ enabled: true }));
+                api.v1.ui.updateParts([
+                  { id: IDS.IMPORT.STYLE_ROW, style: { ...S.importRow, opacity: "0.4" } } as unknown as Partial<UIPart> & { id: string },
+                  { id: IDS.IMPORT.STYLE_BTN, text: "Imported ✓" } as unknown as Partial<UIPart> & { id: string },
+                ]);
+              },
+            }),
+          ],
+        }),
+      );
+    }
+
+    return parts;
+  }
+
+  // ── Lorebook body ────────────────────────────────────────────────────────────
+
+  private _buildLorebookBody(): UIPart[] {
     const { row, text } = api.v1.ui.part;
     const unmanaged = this._unmanagedEntries();
 
@@ -185,7 +287,7 @@ export class SeBindSection extends SuiComponent<
         const entryId = entry.id;
         const catId =
           this._dulfsMap.get(entryId) ?? detectCategory(entry.text ?? "");
-        const ids = IDS.BIND.entry(entryId);
+        const ids = IDS.IMPORT.entry(entryId);
 
         parts.push(
           row({
@@ -199,7 +301,7 @@ export class SeBindSection extends SuiComponent<
                 style: S.catBtn,
                 callback: () => {
                   this._dulfsMap.set(entryId, cycleDulfsCategory(catId));
-                  void this._rebuildBody();
+                  this._rebuildLorebookBody();
                 },
               }),
               api.v1.ui.part.button({
@@ -223,7 +325,7 @@ export class SeBindSection extends SuiComponent<
                     `Bound: ${entry.displayName || "entry"}`,
                     { type: "success" },
                   );
-                  this._rebuildBody();
+                  this._rebuildLorebookBody();
                 },
               }),
             ],
@@ -235,11 +337,11 @@ export class SeBindSection extends SuiComponent<
     return parts;
   }
 
-  private _rebuildBody(): void {
+  private _rebuildLorebookBody(): void {
     api.v1.ui.updateParts([
       {
-        id: IDS.BIND.BODY,
-        content: this._buildBody(),
+        id: IDS.IMPORT.BODY,
+        content: this._buildLorebookBody(),
       } as unknown as Partial<UIPart> & { id: string },
     ]);
   }
@@ -250,13 +352,14 @@ export class SeBindSection extends SuiComponent<
     const { column, row, text, button } = api.v1.ui.part;
     const { editHost } = this.options;
 
-    // Fetch lorebook data
-    const [entries, categories] = await Promise.all([
+    const [entries, categories, memText, anText] = await Promise.all([
       api.v1.lorebook.entries(),
       api.v1.lorebook.categories(),
+      api.v1.memory.get(),
+      api.v1.an.get(),
     ]);
 
-    // Build category name map; mark SE-managed categories for exclusion
+    // Build category map; identify SE-managed categories to exclude
     const seCategories = new Set(
       categories
         .filter((c) => (c.name ?? "").startsWith("SE:"))
@@ -268,38 +371,36 @@ export class SeBindSection extends SuiComponent<
         .map((c) => [c.id, c.name ?? c.id]),
     );
 
-    // Exclude entries in SE categories
     this._entries = entries.filter(
       (e) => !e.category || !seCategories.has(e.category),
     );
 
-    // Seed DULFS map for entries not yet assigned
     for (const entry of this._entries) {
       if (!this._dulfsMap.has(entry.id)) {
         this._dulfsMap.set(entry.id, detectCategory(entry.text ?? ""));
       }
     }
 
-    return column({
-      id: this.id,
-      style: { gap: "4px", "justify-content": "flex-start" },
+    const foundationParts = this._buildFoundationSection(memText, anText);
+    const hasFoundation = foundationParts.length > 0;
+    const hasLorebook = this._unmanagedEntries().length > 0;
+
+    const headerRow = row({
+      style: S.header,
       content: [
-        // Header: back + title + bind all
-        row({
-          style: S.header,
-          content: [
-            button({
-              iconId: "arrow-left" as IconId,
-              callback: () => { editHost.close(); },
-            }),
-            text({ text: "**Bind Existing Lorebooks**", markdown: true, style: S.title }),
-            button({
-              id: IDS.BIND.BIND_ALL_BTN,
-              text: "Bind All",
-              style: S.bindAllBtn,
-              callback: () => {
-                const unmanaged = this._unmanagedEntries();
-                if (unmanaged.length === 0) return;
+        button({
+          iconId: "arrow-left" as IconId,
+          callback: () => { editHost.close(); },
+        }),
+        text({ text: "**Import Existing Content**", markdown: true, style: S.title }),
+        ...(!hasFoundation && !hasLorebook ? [] : [
+          button({
+            id: IDS.IMPORT.BIND_ALL_BTN,
+            text: "Bind All",
+            style: S.bindAllBtn,
+            callback: () => {
+              const unmanaged = this._unmanagedEntries();
+              if (unmanaged.length > 0) {
                 const entities = unmanaged.map((entry) => ({
                   id: api.v1.uuid(),
                   categoryId:
@@ -315,16 +416,48 @@ export class SeBindSection extends SuiComponent<
                   `Bound ${entities.length} ${entities.length === 1 ? "entry" : "entries"}`,
                   { type: "success" },
                 );
-                editHost.close();
-              },
-            }),
-          ],
-        }),
-        // Body: grouped entry list
+              }
+              editHost.close();
+            },
+          }),
+        ]),
+      ],
+    });
+
+    if (!hasFoundation && !hasLorebook) {
+      return column({
+        id: this.id,
+        style: { gap: "4px", "justify-content": "flex-start", flex: "1" },
+        content: [
+          row({
+            style: S.header,
+            content: [
+              button({
+                iconId: "arrow-left" as IconId,
+                callback: () => { editHost.close(); },
+              }),
+              text({ text: "**Import Existing Content**", markdown: true, style: S.title }),
+            ],
+          }),
+          text({ text: "Nothing to import. All lorebook content is already managed by Story Engine.", style: S.empty }),
+        ],
+      });
+    }
+
+    return column({
+      id: this.id,
+      style: { gap: "4px", "justify-content": "flex-start", flex: "1" },
+      content: [
+        headerRow,
+        ...(hasFoundation ? [
+          text({ text: "Foundation Fields", style: S.sectionLabel }),
+          ...foundationParts,
+        ] : []),
+        text({ text: "Lorebook Entries", style: S.sectionLabel }),
         column({
-          id: IDS.BIND.BODY,
+          id: IDS.IMPORT.BODY,
           style: { gap: "2px" },
-          content: this._buildBody(),
+          content: this._buildLorebookBody(),
         }),
       ],
     });

@@ -62,19 +62,3 @@ export function applyFilter(filterName: FilterType, text: string): string {
   const filterFn = FILTER_FUNCTIONS[filterName];
   return filterFn ? filterFn(text) : text;
 }
-
-/**
- * Builds the combined Memory content from ATTG and Style foundation state.
- * Wraps each in `[ ... ]` brackets for NAI Memory format.
- * Format: `[ ATTG ][ S: 4 ]\n[ STYLE ]`
- * Either field may be empty — omitted sections are skipped.
- */
-export function buildMemoryContent(
-  getState: () => { foundation: { attg: string; style: string } },
-): string {
-  const { attg, style } = getState().foundation;
-  const parts: string[] = [];
-  if (attg.trim()) parts.push(`[ ${attg.trim()} ][ S: 4 ]`);
-  if (style.trim()) parts.push(`[ ${style.trim()} ]`);
-  return parts.join("\n");
-}

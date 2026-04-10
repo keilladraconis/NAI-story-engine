@@ -12,9 +12,8 @@ import {
   StreamingContext,
   CompletionContext,
 } from "../generation-handlers";
-import { IDS, STORAGE_KEYS } from "../../../../ui/framework/ids";
+import { IDS } from "../../../../ui/framework/ids";
 import { escapeForMarkdown } from "../../../../ui/utils";
-import { buildMemoryContent } from "../../../../core/utils/filters";
 import { store } from "../../../../core/store";
 
 type FoundationTarget = Extract<
@@ -115,21 +114,15 @@ export const foundationHandler: GenerationHandlers<FoundationTarget> = {
       }
       case "attg": {
         ctx.dispatch(attgUpdated({ attg: text }));
-        const attgSync = (await api.v1.storyStorage.get(
-          STORAGE_KEYS.SYNC_ATTG_MEMORY,
-        )) as { on?: boolean } | null;
-        if (attgSync?.on) {
-          await api.v1.memory.set(buildMemoryContent(store.getState));
+        if (store.getState().foundation.attgSyncEnabled) {
+          await api.v1.memory.set(text.trim());
         }
         break;
       }
       case "style": {
         ctx.dispatch(styleUpdated({ style: text }));
-        const styleSync = (await api.v1.storyStorage.get(
-          STORAGE_KEYS.SYNC_STYLE_MEMORY,
-        )) as { on?: boolean } | null;
-        if (styleSync?.on) {
-          await api.v1.memory.set(buildMemoryContent(store.getState));
+        if (store.getState().foundation.styleSyncEnabled) {
+          await api.v1.an.set(text.trim());
         }
         break;
       }

@@ -22,14 +22,16 @@ import { uiUserPresenceConfirmed } from "../../core/store/slices/ui";
 import { storyCleared } from "../../core/store/slices/story";
 import { StoreWatcher } from "../store-watcher";
 import { colors } from "../theme";
+import { IDS } from "../framework/ids";
+import { SeImportWizard } from "./SeImportWizard";
+import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 type SeHeaderBarTheme = { default: { self: { style: object } } };
 type SeHeaderBarState = Record<string, never>;
 
-export type SeHeaderBarOptions = SuiComponentOptions<
-  SeHeaderBarTheme,
-  SeHeaderBarState
->;
+export type SeHeaderBarOptions = {
+  editHost: EditPaneHost;
+} & SuiComponentOptions<SeHeaderBarTheme, SeHeaderBarState>;
 
 const BTN_STYLE = { padding: "4px 8px", "font-size": "0.8em" };
 const STOP_STYLE = { ...BTN_STYLE, color: "#ff9800" };
@@ -86,7 +88,7 @@ export class SeHeaderBar extends SuiComponent<
         pending: {
           self: {
             text: "Clear?",
-            iconId: "alert-triangle" as IconId,
+            iconId: "alertTriangle" as IconId,
             style: {
               ...BTN_STYLE,
               color: colors.warning,
@@ -277,6 +279,17 @@ export class SeHeaderBar extends SuiComponent<
           id: "header-wait-text",
           text: "",
           style: { ...WAIT_STYLE, display: "none" },
+        }),
+        button({
+          id: "header-import-btn",
+          text: "Import",
+          iconId: "download" as IconId,
+          style: { ...BTN_STYLE, opacity: "0.7" },
+          callback: () => {
+            this.options.editHost.open(
+              new SeImportWizard({ id: IDS.IMPORT.WIZARD, editHost: this.options.editHost }),
+            );
+          },
         }),
         clearPart,
       ],

@@ -152,6 +152,21 @@ export const worldSlice = createSlice({
       entityIds: [...state.entityIds, payload.entity.id],
     }),
 
+    // Batch bind: single dispatch for N entities — prevents N concurrent _rebuildBody() races
+    entitiesBoundBatch: (state, payload: WorldEntity[]) => {
+      const newById: Record<string, WorldEntity> = {};
+      const newIds: string[] = [];
+      for (const entity of payload) {
+        newById[entity.id] = entity;
+        newIds.push(entity.id);
+      }
+      return {
+        ...state,
+        entitiesById: { ...state.entitiesById, ...newById },
+        entityIds: [...state.entityIds, ...newIds],
+      };
+    },
+
     entityUnbound: (state, payload: { entityId: string }) => {
       const { [payload.entityId]: _, ...rest } = state.entitiesById;
       return {
@@ -308,6 +323,7 @@ export const {
   entityEdited,
   entityCategoryChanged,
   entityBound,
+  entitiesBoundBatch,
   entityUnbound,
   groupCreated,
   groupDeleted,

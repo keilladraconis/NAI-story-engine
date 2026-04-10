@@ -25,13 +25,14 @@ import {
   intentUpdated,
   attgUpdated,
   styleUpdated,
+  attgSyncToggled,
+  styleSyncToggled,
   shapeGenerationRequested,
   intentGenerationRequested,
   attgGenerationRequested,
   styleGenerationRequested,
 } from "../../core/store/slices/foundation";
-import { STORAGE_KEYS, IDS } from "../framework/ids";
-import { buildMemoryContent } from "../../core/utils/filters";
+import { IDS } from "../framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import { SeGenerationIconButton } from "./SeGenerationButton";
 import {
@@ -215,12 +216,10 @@ export class SeFoundationSection extends SuiComponent<
 
     this._attgSyncToggle = new SuiToggle({
       id: FN.ATTG_SYNC,
-      state: { on: false },
-      storageKey: STORAGE_KEYS.SYNC_ATTG_MEMORY,
-      storageMode: "story",
+      state: { on: store.getState().foundation.attgSyncEnabled },
       theme: SYNC_TOGGLE_THEME,
       callback: () => {
-        void this._syncMemory();
+        store.dispatch(attgSyncToggled());
       },
     });
 
@@ -244,12 +243,10 @@ export class SeFoundationSection extends SuiComponent<
 
     this._styleSyncToggle = new SuiToggle({
       id: FN.STYLE_SYNC,
-      state: { on: false },
-      storageKey: STORAGE_KEYS.SYNC_STYLE_MEMORY,
-      storageMode: "story",
+      state: { on: store.getState().foundation.styleSyncEnabled },
       theme: SYNC_TOGGLE_THEME,
       callback: () => {
-        void this._syncMemory();
+        store.dispatch(styleSyncToggled());
       },
     });
   }
@@ -361,11 +358,9 @@ export class SeFoundationSection extends SuiComponent<
   // ── Memory sync helper ────────────────────────────────────────
 
   private async _syncMemory(): Promise<void> {
-    const attgOn = this._attgSyncToggle.state.on;
-    const styleOn = this._styleSyncToggle.state.on;
-    if (attgOn || styleOn) {
-      await api.v1.memory.set(buildMemoryContent(store.getState));
-    }
+    const { attg, style, attgSyncEnabled, styleSyncEnabled } = store.getState().foundation;
+    if (attgSyncEnabled) await api.v1.memory.set(attg.trim());
+    if (styleSyncEnabled) await api.v1.an.set(style.trim());
   }
 
   // ── Compose ────────────────────────────────────────────────────
@@ -429,7 +424,7 @@ export class SeFoundationSection extends SuiComponent<
 
     const attgCard = new SuiCard({
       id: FN.ATTG_CARD,
-      label: "ATTG",
+      label: "ATTG (Memory)",
       labelCallback: () => {
         this._openAttgEdit();
       },
@@ -452,7 +447,7 @@ export class SeFoundationSection extends SuiComponent<
 
     const styleCard = new SuiCard({
       id: FN.STYLE_CARD,
-      label: "Style",
+      label: "Style (Author's Note)",
       labelCallback: () => {
         this._openStyleEdit();
       },
@@ -466,6 +461,27 @@ export class SeFoundationSection extends SuiComponent<
         api.v1.ui.updateParts([
           { id: styleDescId, text: escapeDisplay(value) || "No style defined" },
         ]);
+      },
+    );
+
+    // ── Sync toggle state watchers (Redux → SuiToggle visual) ──
+    this._watcher.watch(
+      (s) => s.foundation.attgSyncEnabled,
+      (on) => {
+        if (this._attgSyncToggle.state.on !== on) {
+          void this._attgSyncToggle.setState({ on });
+        }
+        if (on) void this._syncMemory();
+      },
+    );
+
+    this._watcher.watch(
+      (s) => s.foundation.styleSyncEnabled,
+      (on) => {
+        if (this._styleSyncToggle.state.on !== on) {
+          void this._styleSyncToggle.setState({ on });
+        }
+        if (on) void this._syncMemory();
       },
     );
 

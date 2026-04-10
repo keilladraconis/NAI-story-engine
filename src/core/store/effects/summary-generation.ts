@@ -5,6 +5,7 @@ import {
   uiEntitySummaryGenerationRequested,
   uiThreadSummaryGenerationRequested,
   entityBound,
+  entitiesBoundBatch,
   requestQueued,
 } from "../index";
 import {
@@ -54,6 +55,29 @@ export function registerSummaryGenerationEffects(
         prefillBehavior: "trim",
       }),
     );
+  });
+
+  subscribeEffect(matchesAction(entitiesBoundBatch), async (action) => {
+    const model = await getModel();
+    for (const entity of action.payload) {
+      if (!entity.lorebookEntryId) continue;
+
+      const entry = await api.v1.lorebook.entry(entity.lorebookEntryId);
+      const entryText = entry?.text?.trim() ?? "";
+      if (!entryText) continue;
+
+      const requestId = `entity-summary-bind-${entity.id}`;
+      dispatch(requestQueued({ id: requestId, type: "entitySummaryBind", targetId: entity.id }));
+      dispatch(
+        generationSubmitted({
+          requestId,
+          messageFactory: createEntitySummaryFromLorebookFactory(getState, entity.id),
+          params: { model, max_tokens: 150, temperature: 0.8, min_p: 0.05 },
+          target: { type: "entitySummaryBind", entityId: entity.id },
+          prefillBehavior: "trim",
+        }),
+      );
+    }
   });
 
   subscribeEffect(
