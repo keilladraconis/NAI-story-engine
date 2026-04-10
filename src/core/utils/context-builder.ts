@@ -31,7 +31,7 @@ import {
 } from "../../config/field-definitions";
 import { formatWorldState } from "./crucible-world-formatter";
 import { STORAGE_KEYS } from "../../ui/framework/ids";
-import { getModel } from "./config";
+import { buildModelParams, appendXialongStyleMessage } from "./config";
 import {
   SYSTEM_PROMPT,
   LOREBOOK_WEAVING_PROMPT,
@@ -42,6 +42,7 @@ import {
   CANON_GENERATE_PROMPT,
   ATTG_GENERATE_PROMPT,
   STYLE_GENERATE_PROMPT,
+  XIALONG_STYLE,
 } from "./prompts";
 // --- Helpers ---
 
@@ -78,6 +79,61 @@ export const extractDulfsItemName = (
   }
   return content.trim();
 };
+
+/**
+ * Build a context-aware Xialong [ Style: ] guidance block for Style field generation.
+ * Derives narrative style tags from shape, intent, and shape description — actual
+ * writing-style descriptors (slow-burn, visceral, methodical) rather than role tags.
+ */
+export function buildXialongNarrativeStyleBlock(state: RootState): string {
+  const tags: string[] = [];
+  const { shape, intent } = state.foundation ?? {};
+
+  // Shape name as primary style indicator
+  if (shape?.name) {
+    const shapeName = shape.name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, "")
+      .replace(/\s+/g, "-")
+      .slice(0, 30);
+    if (shapeName) tags.push(shapeName);
+  }
+
+  // Derive additional tags from intent + shape description
+  const context = [intent ?? "", shape?.description ?? ""]
+    .join(" ")
+    .toLowerCase();
+
+  const markers: [RegExp, string][] = [
+    [/slow.burn|deliberate|unhurried|gradual|patient/, "slow-burn"],
+    [/methodical|structured|systematic|meticul/, "methodical"],
+    [/subtle|understated|implied|nuanced/, "subtle"],
+    [/dark|grim|bleak|harsh|brutal/, "dark"],
+    [/trauma|ptsd|grief|loss|wound|scar/, "raw"],
+    [/sensory|visceral|body|flesh|taste|smell|touch/, "sensory"],
+    [/psycholog|mental|interior|introspect/, "psychological"],
+    [/intimate|personal|close|private/, "intimate"],
+    [/lyric|poetic|prose-poem/, "lyrical"],
+    [/epic|grand|sweep|vast|myth/, "expansive"],
+    [/tense|thriller|suspense/, "tense"],
+    [/comedy|humor|wit|irony|satir/, "sardonic"],
+    [/romance|longing|desire|passion|eros/, "yearning"],
+    [/horror|terror|dread|uncanny/, "dread"],
+    [/action|kinetic|fast.pac|violent|combat/, "kinetic"],
+    [/fragment|non.linear|discontinu|elliptic/, "fragmentary"],
+  ];
+
+  for (const [pattern, tag] of markers) {
+    if (pattern.test(context) && !tags.includes(tag)) {
+      tags.push(tag);
+      if (tags.length >= 4) break;
+    }
+  }
+
+  if (tags.length === 0) tags.push("literary", "considered");
+
+  return `[ Style: ${tags.join(", ")} ]`;
+}
 
 /**
  * Gets existing World Entry item content for a field, joined with newlines.
@@ -505,7 +561,6 @@ export const createBrainstormFactory = (
 ): MessageFactory => {
   return async () => {
     const state = getState();
-    const model = await getModel();
     const brainstormInstruction =
       mode === "critic" ? BRAINSTORM_CRITIC_PROMPT : BRAINSTORM_PROMPT;
 
@@ -558,15 +613,21 @@ export const createBrainstormFactory = (
 
     messages.push(...historyMessages);
 
+    // Style block as the final message before model responds — signals chat mode
+    // to prevent Xialong from switching into story-writing mode.
+    await appendXialongStyleMessage(
+      messages,
+      mode === "critic" ? XIALONG_STYLE.brainstormCritic : XIALONG_STYLE.brainstorm,
+    );
+
     return {
       messages,
-      params: {
-        model,
+      params: await buildModelParams({
         max_tokens: 300,
         temperature: 0.95,
         min_p: 0.05,
         presence_penalty: 0.05,
-      },
+      }),
     };
   };
 };
@@ -598,8 +659,6 @@ export const createSummarizeFactory = (
   chatHistory: BrainstormMessage[],
 ): MessageFactory => {
   return async () => {
-    const model = await getModel();
-
     const systemMsg: Message = {
       role: "system",
       content: `${SYSTEM_PROMPT}\n\n${BRAINSTORM_SUMMARIZE_PROMPT}`,
@@ -618,7 +677,7 @@ export const createSummarizeFactory = (
 
     return {
       messages,
-      params: { model, max_tokens: 1024, temperature: 0.5, min_p: 0.05 },
+      params: await buildModelParams({ max_tokens: 1024, temperature: 0.5, min_p: 0.05 }),
     };
   };
 };
@@ -631,8 +690,6 @@ export const createBrainstormTitleFactory = (
   chatHistory: BrainstormMessage[],
 ): MessageFactory => {
   return async () => {
-    const model = await getModel();
-
     const chatText = chatHistory
       .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
       .join("\n");
@@ -650,7 +707,7 @@ export const createBrainstormTitleFactory = (
 
     return {
       messages,
-      params: { model, max_tokens: 20, temperature: 0.8, min_p: 0.05 },
+      params: await buildModelParams({ max_tokens: 20, temperature: 0.8, min_p: 0.05 }),
     };
   };
 };
@@ -698,7 +755,6 @@ export const createCanonFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const model = await getModel();
     const prompt = CANON_GENERATE_PROMPT;
 
     // Exclude canon (generating it — prevents self-reference)
@@ -726,26 +782,22 @@ export const createCanonFactory = (
       });
     }
 
-    messages.push(
-      {
-        role: "system",
-        content: `[CANON GENERATION]\n${prompt}`,
-      },
-      {
-        role: "assistant",
-        content: "**World:**",
-      },
-    );
+    messages.push({
+      role: "system",
+      content: `[CANON GENERATION]\n${prompt}`,
+    });
+
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.canon);
+    messages.push({ role: "assistant", content: "**World:**" });
 
     return {
       messages,
-      params: {
-        model,
+      params: await buildModelParams({
         temperature: 0.9,
         min_p: 0.05,
         presence_penalty: 0.1,
         max_tokens: 900,
-      },
+      }),
       contextPinning: {
         head: 1,
         tail: state.foundation?.intent || state.foundation?.shape ? 3 : 2,
@@ -779,7 +831,6 @@ export const createDulfsListFactory = (
 ): MessageFactory => {
   return async () => {
     const state = getState();
-    const model = await getModel();
     const fieldConfig = FIELD_CONFIGS.find((f) => f.id === fieldId);
 
     const instruction =
@@ -809,12 +860,14 @@ export const createDulfsListFactory = (
         role: "user",
         content: existingContext.trim() || "Generate items.",
       },
-      { role: "assistant", content: "-" },
     ];
+
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.dulfsList);
+    messages.push({ role: "assistant", content: "-" });
 
     return {
       messages,
-      params: { model, max_tokens: 350, temperature: 0.8, min_p: 0.1 },
+      params: await buildModelParams({ max_tokens: 350, temperature: 0.8, min_p: 0.1 }),
       contextPinning: { head: 1, tail: 3 },
     };
   };
@@ -843,7 +896,6 @@ export const createATTGFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const model = await getModel();
     const prompt = ATTG_GENERATE_PROMPT;
 
     // Exclude ATTG (generating it)
@@ -857,12 +909,14 @@ export const createATTGFactory = (
         role: "system",
         content: `[ATTG GENERATION]\n${prompt}`,
       },
-      { role: "assistant", content: "[" },
     ];
+
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.attg);
+    messages.push({ role: "assistant", content: "[" });
 
     return {
       messages,
-      params: { model, max_tokens: 128, temperature: 0.7, min_p: 0.05 },
+      params: await buildModelParams({ max_tokens: 128, temperature: 0.7, min_p: 0.05 }),
       contextPinning: { head: 1, tail: 2 },
     };
   };
@@ -891,7 +945,6 @@ export const createStyleFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const model = await getModel();
     const prompt = STYLE_GENERATE_PROMPT;
 
     // Exclude style (generating it)
@@ -905,12 +958,14 @@ export const createStyleFactory = (
         role: "system",
         content: `[STYLE GENERATION]\n${prompt}`,
       },
-      { role: "assistant", content: "[" },
     ];
+
+    await appendXialongStyleMessage(messages, buildXialongNarrativeStyleBlock(getState()));
+    messages.push({ role: "assistant", content: "[" });
 
     return {
       messages,
-      params: { model, max_tokens: 128, temperature: 0.8, min_p: 0.05 },
+      params: await buildModelParams({ max_tokens: 128, temperature: 0.8, min_p: 0.05 }),
       contextPinning: { head: 1, tail: 2 },
     };
   };
@@ -954,8 +1009,6 @@ export const createBootstrapFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const model = await getModel();
-
     const prefix = await buildStoryEnginePrefix(getState);
 
     const bootstrapTask = `You are a creative writing assistant specializing in story openings.
@@ -993,21 +1046,19 @@ IMPORTANT: Do NOT use hash/pound signs in your output. Use bracketed labels like
         role: "user",
         content: "Generate a self-contained opening scene instruction.",
       },
-      {
-        role: "assistant",
-        content: "[SCENE OPENING]\nTechnique:",
-      },
     ];
+
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.bootstrap);
+    messages.push({ role: "assistant", content: "[SCENE OPENING]\nTechnique:" });
 
     return {
       messages,
-      params: {
-        model,
+      params: await buildModelParams({
         max_tokens: 1024,
         temperature: 0.85,
         min_p: 0.05,
         presence_penalty: 0.1,
-      },
+      }),
       contextPinning: { head: 1, tail: 3 },
     };
   };

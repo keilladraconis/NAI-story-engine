@@ -13,7 +13,7 @@ import {
   createEntitySummaryFromLorebookFactory,
   createThreadSummaryFactory,
 } from "../../utils/summary-strategy";
-import { getModel } from "../../utils/config";
+import { buildModelParams } from "../../utils/config";
 
 export function registerSummaryGenerationEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
@@ -28,7 +28,7 @@ export function registerSummaryGenerationEffects(
         generationSubmitted({
           requestId,
           messageFactory: createEntitySummaryFactory(getState, entityId),
-          params: { model: await getModel(), max_tokens: 150, temperature: 0.9, min_p: 0.05 },
+          params: await buildModelParams({ max_tokens: 150, temperature: 0.9, min_p: 0.05 }),
           target: { type: "entitySummary", entityId },
           prefillBehavior: "trim",
         }),
@@ -50,7 +50,7 @@ export function registerSummaryGenerationEffects(
       generationSubmitted({
         requestId,
         messageFactory: createEntitySummaryFromLorebookFactory(getState, entity.id),
-        params: { model: await getModel(), max_tokens: 150, temperature: 0.8, min_p: 0.05 },
+        params: await buildModelParams({ max_tokens: 150, temperature: 0.8, min_p: 0.05 }),
         target: { type: "entitySummaryBind", entityId: entity.id },
         prefillBehavior: "trim",
       }),
@@ -58,7 +58,6 @@ export function registerSummaryGenerationEffects(
   });
 
   subscribeEffect(matchesAction(entitiesBoundBatch), async (action) => {
-    const model = await getModel();
     for (const entity of action.payload) {
       if (!entity.lorebookEntryId) continue;
 
@@ -72,7 +71,7 @@ export function registerSummaryGenerationEffects(
         generationSubmitted({
           requestId,
           messageFactory: createEntitySummaryFromLorebookFactory(getState, entity.id),
-          params: { model, max_tokens: 150, temperature: 0.8, min_p: 0.05 },
+          params: await buildModelParams({ max_tokens: 150, temperature: 0.8, min_p: 0.05 }),
           target: { type: "entitySummaryBind", entityId: entity.id },
           prefillBehavior: "trim",
         }),
@@ -88,7 +87,7 @@ export function registerSummaryGenerationEffects(
         generationSubmitted({
           requestId,
           messageFactory: createThreadSummaryFactory(getState, groupId),
-          params: { model: await getModel(), max_tokens: 100, temperature: 0.9, min_p: 0.05 },
+          params: await buildModelParams({ max_tokens: 100, temperature: 0.9, min_p: 0.05 }),
           target: { type: "threadSummary", groupId },
           prefillBehavior: "trim",
         }),

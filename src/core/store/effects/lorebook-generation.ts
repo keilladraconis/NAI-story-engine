@@ -14,7 +14,7 @@ import {
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
 import { IDS } from "../../../ui/framework/ids";
-import { getModel } from "../../utils/config";
+import { buildModelParams } from "../../utils/config";
 
 export function registerLorebookGenerationEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
@@ -44,7 +44,7 @@ export function registerLorebookGenerationEffects(
         generationSubmitted({
           requestId,
           messageFactory,
-          params: { model: await getModel(), max_tokens: 512 },
+          params: await buildModelParams({ max_tokens: 512 }),
           target: { type: "lorebookContent", entryId: selectedEntryId },
           prefillBehavior: "trim",
         }),
@@ -99,7 +99,7 @@ export function registerLorebookGenerationEffects(
         generationSubmitted({
           requestId: contentRequestId,
           messageFactory: contentFactory,
-          params: { model: await getModel(), max_tokens: 512 },
+          params: await buildModelParams({ max_tokens: 512 }),
           target: { type: "lorebookContent", entryId },
           prefillBehavior: "trim",
         }),
@@ -139,7 +139,7 @@ export function registerLorebookGenerationEffects(
       generationSubmitted({
         requestId,
         messageFactory,
-        params: { model: await getModel(), max_tokens: 700 },
+        params: await buildModelParams({ max_tokens: 700 }),
         target: { type: "lorebookRefine", entryId: selectedEntryId },
         prefillBehavior: "trim",
         continuation: { maxCalls: 3 },

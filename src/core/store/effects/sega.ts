@@ -34,7 +34,7 @@ import {
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
 import { hashEntryPosition, getStoryIdSeed } from "../../utils/seeded-random";
-import { getModel } from "../../utils/config";
+import { buildModelParams } from "../../utils/config";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper Functions
@@ -131,7 +131,7 @@ async function queueSegaLorebookContent(
     generationSubmitted({
       requestId: contentRequestId,
       messageFactory: contentFactory,
-      params: { model: await getModel(), max_tokens: 1024 },
+      params: await buildModelParams({ max_tokens: 1024 }),
       target: { type: "lorebookContent", entryId },
       prefillBehavior: "trim",
     }),

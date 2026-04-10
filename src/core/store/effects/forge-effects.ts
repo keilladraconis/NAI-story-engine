@@ -11,7 +11,7 @@
 
 import { Store, matchesAction } from "nai-store";
 import { RootState, AppDispatch } from "../types";
-import { getModel } from "../../utils/config";
+import { buildModelParams } from "../../utils/config";
 import { GenX } from "nai-gen-x";
 import {
   forgeRequested,
@@ -312,7 +312,7 @@ export function registerForgeEffects(
         generationSubmitted({
           requestId: contentRequestId,
           messageFactory: contentFactory,
-          params: { model: await getModel(), max_tokens: 1024 },
+          params: await buildModelParams({ max_tokens: 1024 }),
           target: { type: "lorebookContent", entryId: lorebookEntryId },
           prefillBehavior: "trim",
         }),

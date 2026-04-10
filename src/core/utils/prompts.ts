@@ -552,3 +552,27 @@ EXAMPLE:
 The ESTABLISHED WORLD section lists what already exists — do not recreate those elements.
 The prior command sequence shows what has been built this pass — continue it naturally.
 When the draft feels complete, emit [CRITIQUE] to end the pass.`;
+
+/**
+ * Per-strategy style guidance blocks for Xialong v1.
+ * Injected as a user message immediately before assistant prefill to signal
+ * the desired writing voice for each task type.
+ */
+export const XIALONG_STYLE = {
+  lorebookContent:      "[ Style: archivist, world-builder, detail-oriented, lore ]",
+  lorebookKeys:         "[ Style: analyst, precise, semantic-indexer ]",
+  lorebookRefine:       "[ Style: editor, discerning, revise ]",
+  canon:                "[ Style: narrator, factual, world-builder ]",
+  attg:                 "[ Style: critic, genre-savvy, metadata ]",
+  style:                "[ Style: literary-critic, prose-analyst ]",
+  bootstrap:            "[ Style: author, evocative, scene-setter ]",
+  brainstorm:           "[ Style: chat, creative-partner, brainstorm ]",
+  brainstormCritic:     "[ Style: chat, critic, analytical, brainstorm ]",
+  dulfsList:            "[ Style: world-builder, inventive, catalog ]",
+  forge:                "[ Style: world-builder, systematic, architect ]",
+  foundationShape:      "[ Style: architect, visionary, dramatic ]",
+  foundationIntent:     "[ Style: author, intentional, purposeful ]",
+  foundationWorldState: "[ Style: narrator, situational, grounded ]",
+  foundationTension:    "[ Style: dramatist, tense, stakes-driven ]",
+  summary:              "[ Style: archivist, concise, insightful ]",
+} as const;

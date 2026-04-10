@@ -4,13 +4,19 @@ import { buildStoryEnginePrefix } from "./context-builder";
 import { DulfsFieldID, FieldID, FIELD_CONFIGS } from "../../config/field-definitions";
 import { STORAGE_KEYS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../../ui/framework/ids";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
-import { getModel } from "./config";
+import {
+  buildModelParams,
+  appendXialongStyleMessage,
+  isXialongMode,
+  XIALONG_LOREBOOK_STOPS,
+} from "./config";
 import {
   LOREBOOK_GENERATE_PROMPT,
   LOREBOOK_KEYS_PROMPT,
   LOREBOOK_REFINE_PROMPT,
   LOREBOOK_WEAVING_PROMPT,
   CATEGORY_TEMPLATES,
+  XIALONG_STYLE,
 } from "./prompts";
 
 
@@ -104,7 +110,6 @@ export const createLorebookContentFactory = (
       categoryName = cat?.name || "";
     }
 
-    const model = await getModel();
     const entryType = getEntryType(categoryName);
     const template = CATEGORY_TEMPLATES[categoryName] || "";
 
@@ -178,20 +183,24 @@ export const createLorebookContentFactory = (
       content: itemSummary || `Generate a lorebook entry for: ${displayName}`,
     });
 
-    // --- MSG 6: Anchored prefill ---
+    // --- MSG 6 (Xialong only): Style guidance ---
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.lorebookContent);
+
+    // --- MSG 7: Anchored prefill ---
     const assistantPrefill = `Name: ${displayName}\nType: ${entryType}\nSetting: ${setting || "original"}\n`;
     messages.push({ role: "assistant", content: assistantPrefill });
 
+    const xialong = await isXialongMode();
     return {
       messages,
-      params: {
-        model,
+      params: await buildModelParams({
         max_tokens: 1024,
         temperature: 0.85,
         min_p: 0.05,
         frequency_penalty: 0.1,
-      },
-      contextPinning: { head: 1, tail: 3 },
+      }),
+      ...(xialong ? { stop: XIALONG_LOREBOOK_STOPS } : {}),
+      contextPinning: { head: 1, tail: xialong ? 4 : 3 },
     };
   };
 };
@@ -213,7 +222,6 @@ export const createLorebookKeysFactory = (
     }
 
     const entryText = entry.text || "";
-    const model = await getModel();
     const prompt = LOREBOOK_KEYS_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState);
@@ -239,18 +247,19 @@ export const createLorebookKeysFactory = (
         role: "user",
         content: `ENTRY:\n\n${contextContent}`,
       },
-      { role: "assistant", content: `REJECTED:\n` },
     ];
+
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.lorebookKeys);
+    messages.push({ role: "assistant", content: `REJECTED:\n` });
 
     return {
       messages,
-      params: {
-        model,
+      params: await buildModelParams({
         max_tokens: 256,
         temperature: 0.8,
         min_p: 0.1,
         stop: ["\n---"],
-      },
+      }),
       contextPinning: { head: 1, tail: 3 },
     };
   };
@@ -297,7 +306,6 @@ Type: ${entryType}
 Setting: ${setting}
 `;
 
-    const model = await getModel();
     const refinePrompt = LOREBOOK_REFINE_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState);
@@ -324,23 +332,22 @@ Setting: ${setting}
       });
     }
 
-    messages.push(
-      {
-        role: "user",
-        content: `CURRENT ENTRY:\n${currentContent}\n\nMODIFICATION INSTRUCTIONS:\n${instructions}`,
-      },
-      { role: "assistant", content: prefillContent },
-    );
+    messages.push({
+      role: "user",
+      content: `CURRENT ENTRY:\n${currentContent}\n\nMODIFICATION INSTRUCTIONS:\n${instructions}`,
+    });
+
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.lorebookRefine);
+    messages.push({ role: "assistant", content: prefillContent });
 
     return {
       messages,
-      params: {
-        model,
+      params: await buildModelParams({
         max_tokens: 1024,
         temperature: 0.7,
         min_p: 0.05,
         frequency_penalty: 0.1,
-      },
+      }),
       contextPinning: { head: 1, tail: groupContext ? 4 : 3 },
     };
   };
@@ -357,7 +364,7 @@ export const buildLorebookKeysPayload = async (
 ): Promise<{
   requestId: string;
   messageFactory: MessageFactory;
-  params: { model: string; max_tokens: number };
+  params: GenerationParams;
   target: { type: "lorebookKeys"; entryId: string };
   prefillBehavior: "keep";
   assistantPrefill: string;
@@ -365,7 +372,7 @@ export const buildLorebookKeysPayload = async (
   return {
     requestId,
     messageFactory: createLorebookKeysFactory(getState, entryId),
-    params: { model: await getModel(), max_tokens: 256 },
+    params: await buildModelParams({ max_tokens: 256 }),
     target: { type: "lorebookKeys", entryId },
     prefillBehavior: "keep",
     assistantPrefill: `REJECTED:\n`,

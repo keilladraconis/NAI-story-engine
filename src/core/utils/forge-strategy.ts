@@ -19,7 +19,8 @@
 
 import { RootState, GenerationStrategy } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
-import { getModel } from "./config";
+import { buildModelParams, appendXialongStyleMessage } from "./config";
+import { XIALONG_STYLE } from "./prompts";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
 import { FieldID, DulfsFieldID } from "../../config/field-definitions";
 import { TYPE_TO_FIELD } from "./crucible-command-parser";
@@ -192,23 +193,23 @@ export const createForgeFactory = (
     // 9. Prior command log + prefill primer — single assistant message.
     //    Combining the pass log and prefill "[" into one message avoids
     //    consecutive assistant turns. The prefill "[" MUST be in the messages
-    //    array sent to GLM so GLM generates the continuation (e.g. "CREATE...")
+    //    array sent to the model so it generates the continuation (e.g. "CREATE...")
     //    rather than the full command (e.g. "[CREATE..."). The strategy's
     //    assistantPrefill then prepends "[" client-side to accumulatedText,
     //    giving the handler a fully-formed "[CREATE CHARACTER ...]" to parse.
     const passLog = buildForgePassLog(state);
     const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE |" : "[";
     const assistantContent = passLog ? `${passLog}\n${prefill}` : prefill;
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.forge);
     messages.push({ role: "assistant", content: assistantContent });
 
     return {
       messages,
-      params: {
-        model: await getModel(),
+      params: await buildModelParams({
         max_tokens: 256,
         temperature: 0.85,
         min_p: 0.05,
-      },
+      }),
     };
   };
 };

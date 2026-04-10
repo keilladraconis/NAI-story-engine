@@ -11,7 +11,7 @@
 
 import { Store, matchesAction } from "nai-store";
 import { RootState, AppDispatch, GenerationStrategy } from "../types";
-import { getModel } from "../../utils/config";
+import { buildModelParams, appendXialongStyleMessage } from "../../utils/config";
 import {
   shapeGenerationRequested,
   intentGenerationRequested,
@@ -24,7 +24,7 @@ import {
   requestQueued,
 } from "../index";
 import { MessageFactory } from "nai-gen-x";
-import { buildStoryEnginePrefix } from "../../utils/context-builder";
+import { buildStoryEnginePrefix, buildXialongNarrativeStyleBlock } from "../../utils/context-builder";
 import {
   CRUCIBLE_SHAPE_PROMPT,
   CRUCIBLE_INTENT_PROMPT,
@@ -32,6 +32,7 @@ import {
   ATTG_GENERATE_PROMPT,
   STYLE_GENERATE_PROMPT,
   CRUCIBLE_TENSIONS_PROMPT,
+  XIALONG_STYLE,
 } from "../../utils/prompts";
 
 // ─── Factories ────────────────────────────────────────────────────────────────
@@ -60,18 +61,19 @@ const createShapeFactory =
       ...prefix,
       ...storyContext.slice(1), // drop NAI's story-writing system prompt
       { role: "system" as const, content: shapePrompt },
-      { role: "assistant" as const, content: prefill },
     ];
+
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.foundationShape);
+    messages.push({ role: "assistant" as const, content: prefill });
 
     return {
       messages,
-      params: {
-        model: await getModel(),
+      params: await buildModelParams({
         max_tokens: 128,
         temperature: 0.7,
         min_p: 0.05,
         stop: ["</think>"],
-      },
+      }),
     };
   };
 
@@ -103,16 +105,16 @@ const createIntentFactory =
     }
 
     messages.push({ role: "system" as const, content: intentPrompt });
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.foundationIntent);
 
     return {
       messages,
-      params: {
-        model: await getModel(),
+      params: await buildModelParams({
         max_tokens: 1024,
         temperature: 1.0,
         min_p: 0.05,
         stop: ["</think>"],
-      },
+      }),
     };
   };
 
@@ -140,16 +142,16 @@ const createWorldStateFactory =
     }
 
     messages.push({ role: "system" as const, content: worldStatePrompt });
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.foundationWorldState);
 
     return {
       messages,
-      params: {
-        model: await getModel(),
+      params: await buildModelParams({
         max_tokens: 256,
         temperature: 0.85,
         min_p: 0.05,
         stop: ["</think>"],
-      },
+      }),
     };
   };
 
@@ -176,16 +178,16 @@ const createAttgFactory =
     }
 
     messages.push({ role: "system" as const, content: attgPrompt });
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.attg);
 
     return {
       messages,
-      params: {
-        model: await getModel(),
+      params: await buildModelParams({
         max_tokens: 64,
         temperature: 0.7,
         min_p: 0.05,
         stop: ["</think>"],
-      },
+      }),
     };
   };
 
@@ -212,16 +214,16 @@ const createStyleFactory =
     }
 
     messages.push({ role: "system" as const, content: stylePrompt });
+    await appendXialongStyleMessage(messages, buildXialongNarrativeStyleBlock(getState()));
 
     return {
       messages,
-      params: {
-        model: await getModel(),
+      params: await buildModelParams({
         max_tokens: 128,
         temperature: 0.7,
         min_p: 0.05,
         stop: ["</think>"],
-      },
+      }),
     };
   };
 
@@ -260,16 +262,16 @@ const createTensionFactory =
     }
 
     messages.push({ role: "system" as const, content: tensionPrompt });
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.foundationTension);
 
     return {
       messages,
-      params: {
-        model: await getModel(),
+      params: await buildModelParams({
         max_tokens: 128,
         temperature: 1.0,
         min_p: 0.05,
         stop: ["</think>"],
-      },
+      }),
     };
   };
 

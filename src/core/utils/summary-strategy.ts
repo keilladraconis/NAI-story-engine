@@ -16,8 +16,9 @@ import {
   ENTITY_SUMMARY_PROMPT,
   ENTITY_SUMMARY_FROM_LOREBOOK_PROMPT,
   THREAD_SUMMARY_PROMPT,
+  XIALONG_STYLE,
 } from "./prompts";
-import { getModel } from "./config";
+import { buildModelParams, appendXialongStyleMessage } from "./config";
 import { EDIT_PANE_TITLE } from "../../ui/framework/ids";
 
 const FIELD_LABEL: Record<DulfsFieldID, string> = {
@@ -106,15 +107,15 @@ export function createEntitySummaryFactory(
     const userContent = `Generate a summary for ${nameLabel} (${categoryLabel}).`;
 
     messages.push({ role: "user", content: userContent });
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.summary);
 
     return {
       messages,
-      params: {
-        model: await getModel(),
+      params: await buildModelParams({
         max_tokens: 150,
         temperature: 0.9,
         min_p: 0.05,
-      },
+      }),
     };
   };
 }
@@ -129,7 +130,7 @@ export function createEntitySummaryFromLorebookFactory(
     if (!entity?.lorebookEntryId) {
       return {
         messages: [],
-        params: { model: await getModel(), max_tokens: 150 },
+        params: await buildModelParams({ max_tokens: 150 }),
       };
     }
 
@@ -144,14 +145,15 @@ export function createEntitySummaryFromLorebookFactory(
       },
     ];
 
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.summary);
+
     return {
       messages,
-      params: {
-        model: await getModel(),
+      params: await buildModelParams({
         max_tokens: 150,
         temperature: 0.8,
         min_p: 0.05,
-      },
+      }),
     };
   };
 }
@@ -203,15 +205,15 @@ export function createThreadSummaryFactory(
     userLines.push("Generate a summary describing this thread's dynamic.");
 
     messages.push({ role: "user", content: userLines.join("\n") });
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.summary);
 
     return {
       messages,
-      params: {
-        model: await getModel(),
+      params: await buildModelParams({
         max_tokens: 100,
         temperature: 0.9,
         min_p: 0.05,
-      },
+      }),
     };
   };
 }
