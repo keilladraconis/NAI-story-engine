@@ -2,7 +2,7 @@
  * SeImportWizard — single-pane import wizard.
  *
  * Combines foundation field import (Memory → ATTG, A/N → Style) with
- * lorebook binding (same logic as SeBindSection).
+ * lorebook binding and foundation generation (Shape, Intent).
  *
  * Auto-triggered at startup when no SE entities exist but external content
  * is detected. Also accessible via the "Import" button in SeHeaderBar.
@@ -416,7 +416,7 @@ export class SeImportWizard extends SuiComponent<
         }),
         text({ text: "**Import Existing Content**", markdown: true, style: S.title }),
         button({
-          id: IDS.IMPORT.BIND_ALL_BTN,
+          id: IDS.IMPORT.IMPORT_ALL_BTN,
           text: "Import All",
           style: S.bindAllBtn,
           callback: () => {

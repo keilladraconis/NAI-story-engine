@@ -111,11 +111,10 @@ export class StoryEnginePlugin extends SuiPlugin {
 
     await super.build();
 
-    // Auto-trigger import wizard only when SE has no content at all
-    const { entityIds } = store.getState().world;
+    // Auto-trigger import wizard when foundation fields are unpopulated
     const { attg, style } = store.getState().foundation;
-    const hasSeContent = entityIds.length > 0 || attg.trim() !== "" || style.trim() !== "";
-    if (!hasSeContent) {
+    const hasFoundationContent = attg.trim() !== "" || style.trim() !== "";
+    if (!hasFoundationContent) {
       const [entries, categories, memText, anText] = await Promise.all([
         api.v1.lorebook.entries(),
         api.v1.lorebook.categories(),

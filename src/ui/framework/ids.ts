@@ -102,16 +102,6 @@ export const IDS = {
       LOREBOOK_BTN: `se-world-thread-${id}-lorebook`,
     }),
   },
-  BIND: {
-    SECTION: "se-bind-section",
-    BODY: "se-bind-body",
-    BIND_ALL_BTN: "se-bind-all-btn",
-    entry: (entryId: string) => ({
-      ROW: `se-bind-entry-${entryId}`,
-      CAT_BTN: `se-bind-entry-cat-${entryId}`,
-      BIND_BTN: `se-bind-entry-bind-${entryId}`,
-    }),
-  },
   IMPORT: {
     WIZARD: "se-import-wizard",
     ATTG_ROW: "se-import-attg-row",
@@ -120,7 +110,7 @@ export const IDS = {
     STYLE_BTN: "se-import-style-btn",
     ANALYZE_ROW: "se-import-analyze-row",
     ANALYZE_BTN: "se-import-analyze-btn",
-    BIND_ALL_BTN: "se-import-bind-all-btn",
+    IMPORT_ALL_BTN: "se-import-all-btn",
     BODY: "se-import-body",
     entry: (entryId: string) => ({
       ROW: `se-import-entry-${entryId}`,
