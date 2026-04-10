@@ -135,6 +135,7 @@ export interface GenerationStrategy {
         step: number;
         forgeGuidance: string;
         brainstormContext: string;
+        preForgeEntityIds: string[];
       }
     | {
         type: "foundation";
@@ -159,9 +160,7 @@ export interface RuntimeState {
   budgetTimeRemaining: number;
 }
 
-// World Types (v11)
-
-export type EntityLifecycle = "draft" | "live";
+// World Types (v13)
 
 export interface WorldGroup {
   id: string;
@@ -174,8 +173,7 @@ export interface WorldGroup {
 export interface WorldEntity {
   id: string;
   categoryId: DulfsFieldID; // Character, Location, etc. — metadata
-  lifecycle: EntityLifecycle;
-  lorebookEntryId?: string; // set on Cast, cleared on Reforge
+  lorebookEntryId?: string; // lorebook entry created on forge
   name: string;
   summary: string; // SE-internal only — editable in SeEntityEditPane, never synced to lorebook
 }

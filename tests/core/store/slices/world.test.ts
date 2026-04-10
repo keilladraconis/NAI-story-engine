@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   worldSlice,
   entityForged,
-  entityCast,
-  entityReforged,
   entityDeleted,
   entitySummaryUpdated,
   entityBound,
@@ -13,7 +11,6 @@ import {
   groupRenamed,
   groupSummaryUpdated,
   entityGroupToggled,
-  groupReforged,
 } from "../../../../src/core/store/slices/world";
 import { WorldState } from "../../../../src/core/store/types";
 import {
@@ -37,7 +34,6 @@ const makeState = (overrides: Partial<WorldState> = {}): WorldState => ({
 const ENTITY = {
   id: "e1",
   categoryId: FieldID.DramatisPersonae as DulfsFieldID,
-  lifecycle: "draft" as const,
   name: "Elara",
   summary: "",
 };
@@ -105,55 +101,16 @@ describe("entityGroupToggled", () => {
   });
 });
 
-describe("groupReforged", () => {
-  it("reverts all member entities to draft and clears lorebookEntryId", () => {
-    const live = { ...ENTITY, id: "e1", lifecycle: "live" as const, lorebookEntryId: "lb1" };
-    const groupWithMember = { ...GROUP, entityIds: ["e1"] };
-    const state = reduce(
-      makeState({ groups: [groupWithMember], entitiesById: { e1: live }, entityIds: ["e1"] }),
-      groupReforged({ groupId: "g1" }),
-    );
-    expect(state.entitiesById["e1"].lifecycle).toBe("draft");
-    expect(state.entitiesById["e1"].lorebookEntryId).toBeUndefined();
-  });
-});
-
 // ─────────────────────────────────────────────────────────────────────────────
-// Entity lifecycle
+// Entity actions
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("entityForged", () => {
-  it("adds a draft entity", () => {
-    const state = reduce(makeState(), entityForged({ entity: ENTITY }));
+  it("adds an entity with a lorebook entry", () => {
+    const entity = { ...ENTITY, lorebookEntryId: "lb1" };
+    const state = reduce(makeState(), entityForged({ entity }));
     expect(state.entityIds).toHaveLength(1);
-    expect(state.entitiesById["e1"].lifecycle).toBe("draft");
-  });
-});
-
-describe("entityCast", () => {
-  it("sets lifecycle to live and records lorebookEntryId", () => {
-    const state = reduce(
-      makeState({ entitiesById: { e1: ENTITY }, entityIds: ["e1"] }),
-      entityCast({ entityId: "e1", lorebookEntryId: "lb1" }),
-    );
-    expect(state.entitiesById["e1"].lifecycle).toBe("live");
     expect(state.entitiesById["e1"].lorebookEntryId).toBe("lb1");
-  });
-});
-
-describe("entityReforged", () => {
-  it("sets lifecycle back to draft and clears lorebookEntryId", () => {
-    const live = {
-      ...ENTITY,
-      lifecycle: "live" as const,
-      lorebookEntryId: "lb1",
-    };
-    const state = reduce(
-      makeState({ entitiesById: { e1: live }, entityIds: ["e1"] }),
-      entityReforged({ entityId: "e1" }),
-    );
-    expect(state.entitiesById["e1"].lifecycle).toBe("draft");
-    expect(state.entitiesById["e1"].lorebookEntryId).toBeUndefined();
   });
 });
 
@@ -171,7 +128,7 @@ describe("entityDeleted", () => {
 });
 
 describe("entitySummaryUpdated", () => {
-  it("updates the summary of a live entity", () => {
+  it("updates the summary of an entity", () => {
     const state = reduce(
       makeState({ entitiesById: { e1: ENTITY }, entityIds: ["e1"] }),
       entitySummaryUpdated({ entityId: "e1", summary: "A disgraced knight." }),
@@ -185,27 +142,18 @@ describe("entitySummaryUpdated", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("entityBound", () => {
-  it("adds an entity directly in live state", () => {
-    const bound = {
-      ...ENTITY,
-      lifecycle: "live" as const,
-      lorebookEntryId: "lb1",
-    };
+  it("adds an entity with a lorebook entry", () => {
+    const bound = { ...ENTITY, lorebookEntryId: "lb1" };
     const state = reduce(makeState(), entityBound({ entity: bound }));
-    expect(state.entitiesById["e1"].lifecycle).toBe("live");
     expect(state.entitiesById["e1"].lorebookEntryId).toBe("lb1");
   });
 });
 
 describe("entityUnbound", () => {
   it("removes the entity from world state", () => {
-    const live = {
-      ...ENTITY,
-      lifecycle: "live" as const,
-      lorebookEntryId: "lb1",
-    };
+    const entity = { ...ENTITY, lorebookEntryId: "lb1" };
     const state = reduce(
-      makeState({ entitiesById: { e1: live }, entityIds: ["e1"] }),
+      makeState({ entitiesById: { e1: entity }, entityIds: ["e1"] }),
       entityUnbound({ entityId: "e1" }),
     );
     expect(state.entityIds).toHaveLength(0);

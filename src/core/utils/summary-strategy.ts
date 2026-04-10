@@ -31,7 +31,7 @@ const FIELD_LABEL: Record<DulfsFieldID, string> = {
 };
 
 function formatLiveEntities(state: RootState): string {
-  const live = Object.values(state.world.entitiesById).filter((e) => e.lifecycle === "live");
+  const live = Object.values(state.world.entitiesById);
   if (live.length === 0) return "";
 
   const groups = new Map<DulfsFieldID, typeof live>();

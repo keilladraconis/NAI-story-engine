@@ -5,13 +5,11 @@
  *  - forgeRequested → start loop at step 1
  *  - forgeStepCompleted → schedule next step
  *  - forgeCritiqueReceived → write critique to FORGE_GUIDANCE field, end loop
- *  - castAllRequested → create lorebook entries, move entities to live
- *  - groupReforgeRequested → revert all group members to draft
+ *  - entityDeleted → remove lorebook entry if present
  */
 
 import { Store, matchesAction } from "nai-store";
 import { RootState, AppDispatch } from "../types";
-import { buildModelParams } from "../../utils/config";
 import { GenX } from "nai-gen-x";
 import {
   forgeRequested,
@@ -20,14 +18,7 @@ import {
   forgeLoopEnded,
   forgeStepCompleted,
   forgeCritiqueReceived,
-  worldCleared,
-  castAllRequested,
-  forgeCastCompleted,
-  entityCast,
-  entitiesCastBatch,
-  entityCastRequested,
-  groupReforged,
-  groupReforgeRequested,
+  entityDeleted,
   entityRegenRequested,
   generationSubmitted,
   requestQueued,
@@ -41,7 +32,7 @@ import {
   createLorebookContentFactory,
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
-import { ensureCategory } from "./lorebook-sync";
+import { buildModelParams } from "../../utils/config";
 import { getConsolidatedBrainstorm } from "../../utils/context-builder";
 import { IDS, STORAGE_KEYS } from "../../../ui/framework/ids";
 
@@ -69,9 +60,13 @@ export function registerForgeEffects(
       return;
     }
 
+    // Capture entity IDs that exist before this forge session —
+    // used to distinguish ESTABLISHED WORLD from this session's pass log.
+    const preForgeEntityIds = Object.keys(getState().world.entitiesById);
+
     dispatch(forgeLoopStarted());
 
-    const strategy = buildForgeStrategy(getState, 1, forgeGuidance, brainstormContext);
+    const strategy = buildForgeStrategy(getState, 1, forgeGuidance, brainstormContext, preForgeEntityIds);
     dispatch(
       requestQueued({
         id: strategy.requestId,
@@ -82,10 +77,9 @@ export function registerForgeEffects(
     dispatch(generationSubmitted(strategy));
   });
 
-  // ─── Forge Clear Requested → discard all drafts + clear inputs ───────────
+  // ─── Forge Clear Requested → clear guidance input ─────────────────────────
 
   subscribeEffect(matchesAction(forgeClearRequested), async () => {
-    dispatch(worldCleared());
     await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_GUIDANCE_UI, "");
     api.v1.ui.updateParts([
       { id: IDS.FORGE.GUIDANCE_INPUT, value: "" },
@@ -112,6 +106,7 @@ export function registerForgeEffects(
       nextStep,
       payload.forgeGuidance,
       payload.brainstormContext,
+      payload.preForgeEntityIds,
     );
     dispatch(
       requestQueued({
@@ -138,146 +133,14 @@ export function registerForgeEffects(
     dispatch(forgeLoopEnded());
   });
 
-  // ─── Cast All Requested ───────────────────────────────────────────────────
+  // ─── Entity Deleted → remove lorebook entry if present ───────────────────
 
-  subscribeEffect(
-    matchesAction(castAllRequested),
-    async (_action, { getState: getLatest }) => {
-      const state = getLatest();
-      const draftEntities = Object.values(state.world.entitiesById).filter(
-        (e) => e.lifecycle === "draft",
-      );
-
-      if (draftEntities.length === 0) {
-        api.v1.ui.toast("No draft entities to cast", { type: "info" });
-        return;
-      }
-
-      // Pre-create lorebook categories for all category types needed (avoid per-entity races)
-      const uniqueCategoryIds = [
-        ...new Set(draftEntities.map((e) => e.categoryId)),
-      ];
-      const categoryIdMap = new Map<string, string>();
-      for (const catFieldId of uniqueCategoryIds) {
-        categoryIdMap.set(catFieldId, await ensureCategory(catFieldId));
-      }
-
-      // Fetch all existing lorebook entries once for name-matching
-      const allEntries = await api.v1.lorebook.entries();
-      // IDs of entries already bound to live entities — never re-bind these
-      const managedEntryIds = new Set(
-        Object.values(state.world.entitiesById)
-          .filter((e) => e.lifecycle === "live" && e.lorebookEntryId)
-          .map((e) => e.lorebookEntryId as string),
-      );
-
-      // Cast each entity: bind to existing entry by name, or create new in SE category
-      const castPairs: Array<{ entityId: string; lorebookEntryId: string }> = [];
-      for (const entity of draftEntities) {
-        const nameLower = entity.name.toLowerCase();
-        const existing = allEntries.find(
-          (e) =>
-            !managedEntryIds.has(e.id) &&
-            (e.displayName ?? "").toLowerCase() === nameLower,
-        );
-
-        let lorebookEntryId: string;
-        if (existing) {
-          lorebookEntryId = existing.id;
-          managedEntryIds.add(lorebookEntryId);
-          api.v1.log(
-            `[forge] Cast "${entity.name}" → bound to existing entry ${lorebookEntryId}`,
-          );
-        } else {
-          const categoryId =
-            categoryIdMap.get(entity.categoryId) ??
-            (await ensureCategory(entity.categoryId));
-          lorebookEntryId = await api.v1.lorebook.createEntry({
-            id: api.v1.uuid(),
-            displayName: entity.name,
-            text: "",
-            keys: [],
-            enabled: true,
-            category: categoryId,
-          });
-          api.v1.log(
-            `[forge] Cast "${entity.name}" → created new entry ${lorebookEntryId}`,
-          );
-        }
-
-        castPairs.push({ entityId: entity.id, lorebookEntryId });
-      }
-      dispatch(entitiesCastBatch(castPairs));
-      const count = castPairs.length;
-
-      dispatch(forgeCastCompleted());
-      api.v1.log(`[forge] Cast ${count} entities to lorebook`);
-      api.v1.ui.toast(`${count} ${count === 1 ? "entity" : "entities"} cast`, {
-        type: "success",
-      });
-
-      // Clear forge guidance input
-      await api.v1.storyStorage.set(STORAGE_KEYS.FORGE_GUIDANCE_UI, "");
-      api.v1.ui.updateParts([
-        { id: IDS.FORGE.GUIDANCE_INPUT, value: "" },
-      ]);
-    },
-  );
-
-  // ─── Group Reforge Requested → revert all member entities to draft ────────
-
-  subscribeEffect(matchesAction(groupReforgeRequested), (action) => {
-    dispatch(groupReforged({ groupId: action.payload.groupId }));
-  });
-
-  // ─── Entity Cast Requested → Cast a single draft entity to lorebook ───────
-
-  subscribeEffect(matchesAction(entityCastRequested), async (action) => {
-    const { entityId } = action.payload;
-    const state = getState();
-    const entity = state.world.entitiesById[entityId];
-
-    if (!entity || entity.lifecycle !== "draft") {
-      api.v1.ui.toast("Entity is not a draft", { type: "info" });
-      return;
+  subscribeEffect(matchesAction(entityDeleted), async (action) => {
+    const { lorebookEntryId } = action.payload;
+    if (lorebookEntryId) {
+      await api.v1.lorebook.removeEntry(lorebookEntryId);
+      api.v1.log(`[forge] entityDeleted: removed lorebook entry ${lorebookEntryId}`);
     }
-
-    const allEntries = await api.v1.lorebook.entries();
-    const managedEntryIds = new Set(
-      Object.values(state.world.entitiesById)
-        .filter((e) => e.lifecycle === "live" && e.lorebookEntryId)
-        .map((e) => e.lorebookEntryId as string),
-    );
-    const nameLower = entity.name.toLowerCase();
-    const existing = allEntries.find(
-      (e) =>
-        !managedEntryIds.has(e.id) &&
-        (e.displayName ?? "").toLowerCase() === nameLower,
-    );
-
-    let lorebookEntryId: string;
-    if (existing) {
-      lorebookEntryId = existing.id;
-      api.v1.log(
-        `[forge] Cast "${entity.name}" → bound to existing entry ${lorebookEntryId}`,
-      );
-    } else {
-      const categoryId = await ensureCategory(entity.categoryId);
-      lorebookEntryId = await api.v1.lorebook.createEntry({
-        id: api.v1.uuid(),
-        displayName: entity.name,
-        text: "",
-        keys: [],
-        enabled: true,
-        category: categoryId,
-      });
-      api.v1.log(
-        `[forge] Cast "${entity.name}" → created new entry ${lorebookEntryId}`,
-      );
-    }
-
-    dispatch(entityCast({ entityId: entity.id, lorebookEntryId }));
-    api.v1.ui.toast(`${entity.name} cast`, { type: "success" });
   });
 
   // ─── Entity Regen Requested → Queue only missing fields ───────────────────

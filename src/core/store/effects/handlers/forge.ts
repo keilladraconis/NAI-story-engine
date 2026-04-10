@@ -10,7 +10,6 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import { GenerationStrategy } from "../../types";
-import { WorldEntity } from "../../types";
 import { DulfsFieldID } from "../../../../config/field-definitions";
 import {
   entityForged,
@@ -21,7 +20,8 @@ import {
   forgeCritiqueReceived,
   forgeLoopEnded,
 } from "../../slices/world";
-import { WorldGroup } from "../../types";
+import { WorldEntity, WorldGroup } from "../../types";
+import { ensureCategory } from "../lorebook-sync";
 import {
   parseCommands,
   CritiqueCommand,
@@ -35,15 +35,16 @@ type ForgeTarget = Extract<GenerationStrategy["target"], { type: "forge" }>;
 
 /**
  * Executes forge commands against the world slice.
- * CREATE → entityForged (draft)
- * REVISE → entitySummaryUpdated
- * DELETE → entityDeleted
+ * CREATE → lorebook entry + entityForged (live immediately)
+ * REVISE → entitySummaryUpdated (works on any entity)
+ * DELETE → removes lorebook entry + entityDeleted
+ * THREAD → groupCreated
  */
-function executeForgeCommands(
+async function executeForgeCommands(
   commands: ReturnType<typeof parseCommands>,
   getState: () => import("../../types").RootState,
   dispatch: import("../../types").AppDispatch,
-): void {
+): Promise<void> {
   for (const cmd of commands) {
     switch (cmd.kind) {
       case "CREATE": {
@@ -70,15 +71,25 @@ function executeForgeCommands(
           break;
         }
 
+        const categoryId = await ensureCategory(fieldId);
+        const lorebookEntryId = await api.v1.lorebook.createEntry({
+          id: api.v1.uuid(),
+          displayName: cmd.name,
+          text: "",
+          keys: [],
+          enabled: true,
+          category: categoryId,
+        });
+
         const entity: WorldEntity = {
           id: api.v1.uuid(),
           categoryId: fieldId,
-          lifecycle: "draft",
+          lorebookEntryId,
           name: cmd.name,
           summary: cmd.content,
         };
         dispatch(entityForged({ entity }));
-        api.v1.log(`[forge] CREATE ${cmd.elementType} "${cmd.name}"`);
+        api.v1.log(`[forge] CREATE ${cmd.elementType} "${cmd.name}" → ${lorebookEntryId}`);
         break;
       }
 
@@ -103,17 +114,16 @@ function executeForgeCommands(
 
       case "DELETE": {
         const entity = Object.values(getState().world.entitiesById).find(
-          (e) =>
-            e.name.toLowerCase() === cmd.name.toLowerCase() &&
-            e.lifecycle === "draft",
+          (e) => e.name.toLowerCase() === cmd.name.toLowerCase(),
         );
         if (!entity) {
-          api.v1.log(
-            `[forge] DELETE: "${cmd.name}" not found (or not a draft)`,
-          );
+          api.v1.log(`[forge] DELETE: "${cmd.name}" not found`);
           break;
         }
-        dispatch(entityDeleted({ entityId: entity.id }));
+        if (entity.lorebookEntryId) {
+          await api.v1.lorebook.removeEntry(entity.lorebookEntryId);
+        }
+        dispatch(entityDeleted({ entityId: entity.id, lorebookEntryId: undefined }));
         api.v1.log(`[forge] DELETE "${cmd.name}"`);
         break;
       }
@@ -202,6 +212,7 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
       step: ctx.target.step,
       forgeGuidance: ctx.target.forgeGuidance,
       brainstormContext: ctx.target.brainstormContext,
+      preForgeEntityIds: ctx.target.preForgeEntityIds,
     };
 
     if (commands.length === 0) {
@@ -212,7 +223,7 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
       return;
     }
 
-    executeForgeCommands(commands, ctx.getState, ctx.dispatch);
+    await executeForgeCommands(commands, ctx.getState, ctx.dispatch);
 
     const critique = commands.find(
       (c): c is CritiqueCommand => c.kind === "CRITIQUE",

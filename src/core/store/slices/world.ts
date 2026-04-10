@@ -1,5 +1,5 @@
 import { createSlice } from "nai-store";
-import { WorldState, WorldGroup, WorldEntity, EntityLifecycle } from "../types";
+import { WorldState, WorldGroup, WorldEntity } from "../types";
 import { DulfsFieldID } from "../../../config/field-definitions";
 
 export const initialWorldState: WorldState = {
@@ -13,7 +13,6 @@ export const worldSlice = createSlice({
   name: "world",
   initialState: initialWorldState,
   reducers: {
-    // Entity lifecycle
     entityForged: (state, payload: { entity: WorldEntity }) => ({
       ...state,
       entitiesById: {
@@ -23,64 +22,7 @@ export const worldSlice = createSlice({
       entityIds: [...state.entityIds, payload.entity.id],
     }),
 
-    entityCast: (
-      state,
-      payload: { entityId: string; lorebookEntryId: string },
-    ) => {
-      const entity = state.entitiesById[payload.entityId];
-      if (!entity) return state;
-      return {
-        ...state,
-        entitiesById: {
-          ...state.entitiesById,
-          [payload.entityId]: {
-            ...entity,
-            lifecycle: "live" as EntityLifecycle,
-            lorebookEntryId: payload.lorebookEntryId,
-          },
-        },
-      };
-    },
-
-    // Batch cast: single dispatch for N entities
-    entitiesCastBatch: (
-      state,
-      payload: Array<{ entityId: string; lorebookEntryId: string }>,
-    ) => {
-      const updates: Record<string, WorldEntity> = {};
-      for (const { entityId, lorebookEntryId } of payload) {
-        const entity = state.entitiesById[entityId];
-        if (entity) {
-          updates[entityId] = {
-            ...entity,
-            lifecycle: "live" as EntityLifecycle,
-            lorebookEntryId,
-          };
-        }
-      }
-      return {
-        ...state,
-        entitiesById: { ...state.entitiesById, ...updates },
-      };
-    },
-
-    entityReforged: (state, payload: { entityId: string }) => {
-      const entity = state.entitiesById[payload.entityId];
-      if (!entity) return state;
-      return {
-        ...state,
-        entitiesById: {
-          ...state.entitiesById,
-          [payload.entityId]: {
-            ...entity,
-            lifecycle: "draft" as EntityLifecycle,
-            lorebookEntryId: undefined,
-          },
-        },
-      };
-    },
-
-    entityDeleted: (state, payload: { entityId: string }) => {
+    entityDeleted: (state, payload: { entityId: string; lorebookEntryId?: string }) => {
       const { [payload.entityId]: _, ...rest } = state.entitiesById;
       return {
         ...state,
@@ -233,27 +175,6 @@ export const worldSlice = createSlice({
       ),
     }),
 
-    // Reforge all member entities in a group
-    groupReforged: (state, payload: { groupId: string }) => {
-      const group = state.groups.find((g) => g.id === payload.groupId);
-      if (!group) return state;
-      const updates: Record<string, WorldEntity> = {};
-      for (const id of group.entityIds) {
-        const entity = state.entitiesById[id];
-        if (entity) {
-          updates[id] = {
-            ...entity,
-            lifecycle: "draft" as EntityLifecycle,
-            lorebookEntryId: undefined,
-          };
-        }
-      }
-      return {
-        ...state,
-        entitiesById: { ...state.entitiesById, ...updates },
-      };
-    },
-
     worldCleared: () => initialWorldState,
 
     forgeLoopStarted: (state) => ({ ...state, forgeLoopActive: true }),
@@ -265,6 +186,7 @@ export const worldSlice = createSlice({
         step: number;
         forgeGuidance: string;
         brainstormContext: string;
+        preForgeEntityIds: string[];
       },
     ) => state,
     forgeCritiqueReceived: (
@@ -272,52 +194,17 @@ export const worldSlice = createSlice({
       _payload: { critiqueText: string },
     ) => state,
 
-    // Signal actions — Phase 2 effects handle the actual work
+    // Signal actions — effects handle the actual work
     forgeClearRequested: (state) => state,
     forgeRequested: (state) => state,
     forgeFromBrainstormRequested: (state) => state,
-    castAllRequested: (state) => state,
-    forgeCastCompleted: (state) => state,
     entityRegenRequested: (state, _payload: { entityId: string }) => state,
-    groupReforgeRequested: (state, _payload: { groupId: string }) => state,
-
-    // Immediate state reducers (Phase 2 adds lorebook-side effects for these)
-    entityCastRequested: (state, _payload: { entityId: string }) => state,
-
-    entityDiscardRequested: (state, payload: { entityId: string }) => {
-      const { [payload.entityId]: _, ...rest } = state.entitiesById;
-      return {
-        ...state,
-        entitiesById: rest,
-        entityIds: state.entityIds.filter((id) => id !== payload.entityId),
-      };
-    },
-
-    discardAllRequested: (state) => {
-      const kept: Record<string, WorldEntity> = {};
-      const keptIds: string[] = [];
-      for (const id of state.entityIds) {
-        const e = state.entitiesById[id];
-        if (e && e.lifecycle !== "draft") {
-          kept[id] = e;
-          keptIds.push(id);
-        }
-      }
-      return {
-        ...state,
-        entitiesById: kept,
-        entityIds: keptIds,
-      };
-    },
   },
 });
 
 export const {
   worldCleared,
   entityForged,
-  entityCast,
-  entitiesCastBatch,
-  entityReforged,
   entityDeleted,
   entitySummaryUpdated,
   entityEdited,
@@ -331,7 +218,6 @@ export const {
   groupSummaryUpdated,
   entityGroupToggled,
   groupLorebookEntrySet,
-  groupReforged,
   forgeLoopStarted,
   forgeLoopEnded,
   forgeStepCompleted,
@@ -339,11 +225,5 @@ export const {
   forgeClearRequested,
   forgeRequested,
   forgeFromBrainstormRequested,
-  castAllRequested,
-  forgeCastCompleted,
   entityRegenRequested,
-  groupReforgeRequested,
-  entityCastRequested,
-  entityDiscardRequested,
-  discardAllRequested,
 } = worldSlice.actions;

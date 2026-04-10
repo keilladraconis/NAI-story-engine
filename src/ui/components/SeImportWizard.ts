@@ -338,7 +338,6 @@ export class SeImportWizard extends SuiComponent<
                       entity: {
                         id: api.v1.uuid(),
                         categoryId: catId,
-                        lifecycle: "live",
                         lorebookEntryId: entryId,
                         name: entry.displayName || "Unknown",
                         summary: "",
@@ -438,7 +437,6 @@ export class SeImportWizard extends SuiComponent<
                 categoryId:
                   this._dulfsMap.get(entry.id) ??
                   detectCategory(entry.text ?? ""),
-                lifecycle: "live" as const,
                 lorebookEntryId: entry.id,
                 name: entry.displayName || "Unknown",
                 summary: "",

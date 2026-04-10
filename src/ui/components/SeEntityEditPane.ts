@@ -1,14 +1,9 @@
 /**
- * SeEntityEditPane — Unified entity editing panel.
+ * SeEntityEditPane — entity editing panel.
  *
- * Draft entities: name + summary editing only.
- * Live entities:  name + summary + lorebook content + keys (icon gen buttons).
- *
- * Opened via labelCallback on the entity card (title click).
- * Replaces the combination of SeContentWithTitlePane + SeLorebookContentPane for entities.
- *
- * All fields (name, summary, lorebook content, keys) are committed on Save.
- * Lorebook content/keys are held in storyStorage draft slots until Save; not written on keystroke.
+ * Shows: name + summary + lorebook content + keys (icon gen buttons).
+ * All fields committed on Save. Lorebook content/keys held in storyStorage
+ * draft slots until Save; not written on keystroke.
  */
 
 import {
@@ -79,7 +74,6 @@ type State = Record<string, never>;
 
 export type SeEntityEditPaneOptions = {
   entityId: string;
-  lifecycle: "draft" | "live";
   editHost: EditPaneHost;
 } & SuiComponentOptions<Theme, State>;
 
@@ -136,8 +130,8 @@ export class SeEntityEditPane extends SuiComponent<
   UIPartColumn
 > {
   private readonly _summaryBtn: SeGenerationIconButton;
-  private readonly _contentBtn: SeGenerationIconButton | null;
-  private readonly _keysBtn: SeGenerationIconButton | null;
+  private readonly _contentBtn: SeGenerationIconButton;
+  private readonly _keysBtn: SeGenerationIconButton;
 
   constructor(options: SeEntityEditPaneOptions) {
     super(
@@ -147,9 +141,7 @@ export class SeEntityEditPane extends SuiComponent<
 
     const { entityId } = options;
     const summaryRequestId = `se-entity-summary-${entityId}`;
-    const hasSummary = !!(
-      store.getState().world.entitiesById[entityId]?.summary
-    );
+    const hasSummary = !!(store.getState().world.entitiesById[entityId]?.summary);
     this._summaryBtn = new SeGenerationIconButton({
       id: `${options.id}-summary-gen`,
       iconId: "zap" as IconId,
@@ -162,57 +154,50 @@ export class SeEntityEditPane extends SuiComponent<
       },
     });
 
-    if (options.lifecycle === "live") {
-      const entity = store.getState().world.entitiesById[options.entityId];
-      const entryId = entity?.lorebookEntryId ?? "";
+    const entity = store.getState().world.entitiesById[entityId];
+    const entryId = entity?.lorebookEntryId ?? "";
 
-      this._contentBtn = new SeGenerationIconButton({
-        id: IDS.LOREBOOK.GEN_CONTENT_BTN,
-        iconId: "zap" as IconId,
-        requestId: entryId
-          ? IDS.LOREBOOK.entry(entryId).CONTENT_REQ
-          : undefined,
-        onGenerate: () => {
-          if (!entryId) return;
-          store.dispatch(
-            uiLorebookContentGenerationRequested({
-              requestId: IDS.LOREBOOK.entry(entryId).CONTENT_REQ,
-            }),
-          );
-        },
-        contentChecker: async () => {
-          if (!entryId) return false;
-          const entry = await api.v1.lorebook.entry(entryId);
-          return !!entry?.text;
-        },
-      });
+    this._contentBtn = new SeGenerationIconButton({
+      id: IDS.LOREBOOK.GEN_CONTENT_BTN,
+      iconId: "zap" as IconId,
+      requestId: entryId ? IDS.LOREBOOK.entry(entryId).CONTENT_REQ : undefined,
+      onGenerate: () => {
+        if (!entryId) return;
+        store.dispatch(
+          uiLorebookContentGenerationRequested({
+            requestId: IDS.LOREBOOK.entry(entryId).CONTENT_REQ,
+          }),
+        );
+      },
+      contentChecker: async () => {
+        if (!entryId) return false;
+        const entry = await api.v1.lorebook.entry(entryId);
+        return !!entry?.text;
+      },
+    });
 
-      this._keysBtn = new SeGenerationIconButton({
-        id: IDS.LOREBOOK.GEN_KEYS_BTN,
-        iconId: "key" as IconId,
-        requestId: entryId ? IDS.LOREBOOK.entry(entryId).KEYS_REQ : undefined,
-        onGenerate: () => {
-          if (!entryId) return;
-          store.dispatch(
-            uiLorebookKeysGenerationRequested({
-              requestId: IDS.LOREBOOK.entry(entryId).KEYS_REQ,
-            }),
-          );
-        },
-        contentChecker: async () => {
-          if (!entryId) return false;
-          const entry = await api.v1.lorebook.entry(entryId);
-          return !!(entry?.keys && entry.keys.length > 0);
-        },
-      });
-    } else {
-      this._contentBtn = null;
-      this._keysBtn = null;
-    }
+    this._keysBtn = new SeGenerationIconButton({
+      id: IDS.LOREBOOK.GEN_KEYS_BTN,
+      iconId: "key" as IconId,
+      requestId: entryId ? IDS.LOREBOOK.entry(entryId).KEYS_REQ : undefined,
+      onGenerate: () => {
+        if (!entryId) return;
+        store.dispatch(
+          uiLorebookKeysGenerationRequested({
+            requestId: IDS.LOREBOOK.entry(entryId).KEYS_REQ,
+          }),
+        );
+      },
+      contentChecker: async () => {
+        if (!entryId) return false;
+        const entry = await api.v1.lorebook.entry(entryId);
+        return !!(entry?.keys && entry.keys.length > 0);
+      },
+    });
   }
 
   async compose(): Promise<UIPartColumn> {
-    const { entityId, lifecycle, editHost } = this.options;
+    const { entityId, editHost } = this.options;
     const L = IDS.LOREBOOK;
     const EP = IDS.EDIT_PANE;
 
@@ -220,31 +205,26 @@ export class SeEntityEditPane extends SuiComponent<
     const entity = state.world.entitiesById[entityId];
     const entryId = entity?.lorebookEntryId ?? "";
 
-    // Register this entity as the active edit target so background generation
-    // handlers know to stage output rather than save directly.
     store.dispatch(uiEditableActivate({ id: entityId }));
 
-    // Wire streaming updates so generation handlers can push to this pane
-    if (lifecycle === "live" && entryId) {
+    if (entryId) {
       store.dispatch(uiLorebookEntrySelected({ entryId, categoryId: null }));
     }
 
-    // Seed name/summary and fetch lorebook entry in parallel
     const [entry] = await Promise.all([
-      lifecycle === "live" && entryId ? api.v1.lorebook.entry(entryId) : Promise.resolve(null),
+      entryId ? api.v1.lorebook.entry(entryId) : Promise.resolve(null),
       api.v1.storyStorage.set(EDIT_PANE_TITLE, entity?.name ?? ""),
       api.v1.storyStorage.set(EDIT_PANE_CONTENT, entity?.summary ?? ""),
     ]);
 
-    // Seed lorebook drafts (depends on entry fetch above)
     let _alwaysOnDraft = false;
-    if (lifecycle === "live" && entryId && entry) {
+    if (entryId && entry) {
       _alwaysOnDraft = entry.forceActivation ?? false;
       await Promise.all([
         api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, entry.text ?? ""),
         api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, entry.keys?.join(", ") ?? ""),
       ]);
-    } else if (lifecycle === "live" && entryId) {
+    } else if (entryId) {
       await Promise.all([
         api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, ""),
         api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, ""),
@@ -253,11 +233,7 @@ export class SeEntityEditPane extends SuiComponent<
 
     const _close = (): void => {
       store.dispatch(uiEditableDeactivate());
-      if (lifecycle === "live") {
-        store.dispatch(
-          uiLorebookEntrySelected({ entryId: null, categoryId: null }),
-        );
-      }
+      store.dispatch(uiLorebookEntrySelected({ entryId: null, categoryId: null }));
       editHost.close();
     };
 
@@ -293,20 +269,13 @@ export class SeEntityEditPane extends SuiComponent<
           }
         }
 
-        // Sync lorebook entry display name with entity name
-        if (lifecycle === "live" && entryId) {
-          await api.v1.lorebook.updateEntry(entryId, {
-            displayName: trimmedName,
-          });
-        }
+        if (entryId) {
+          await api.v1.lorebook.updateEntry(entryId, { displayName: trimmedName });
 
-        // Flush lorebook content, keys, and forceActivation on save (not on each keystroke)
-        if (lifecycle === "live" && entryId) {
           const rawContent = String(
             (await api.v1.storyStorage.get(L.CONTENT_DRAFT_RAW)) ?? "",
           );
-          const erato =
-            (await api.v1.config.get("erato_compatibility")) || false;
+          const erato = (await api.v1.config.get("erato_compatibility")) || false;
           const content =
             erato && !rawContent.startsWith("----\n")
               ? "----\n" + rawContent
@@ -379,29 +348,25 @@ export class SeEntityEditPane extends SuiComponent<
       },
     });
 
-    const deleteConfirmBtn =
-      lifecycle === "live"
-        ? new SeConfirmButton({
-          id: EP.DELETE_BTN,
-          label: "Delete",
-          iconId: "trash" as IconId,
-          confirmLabel: "Delete entity?",
-          style: S.deleteBtn,
-          onConfirm: async () => {
-            store.dispatch(entityDeleted({ entityId }));
-            _close();
-          },
-        })
-        : null;
+    const deleteConfirmBtn = new SeConfirmButton({
+      id: EP.DELETE_BTN,
+      label: "Delete",
+      iconId: "trash" as IconId,
+      confirmLabel: "Delete entity?",
+      style: S.deleteBtn,
+      onConfirm: async () => {
+        store.dispatch(entityDeleted({ entityId, lorebookEntryId: entryId || undefined }));
+        _close();
+      },
+    });
 
-    // Build all components in parallel
     const [categoryBarPart, summaryBtnPart, deleteConfirmPart, contentGenPart, keysGenPart] =
       await Promise.all([
         categoryBar.build(),
         this._summaryBtn.build(),
-        deleteConfirmBtn?.build() ?? Promise.resolve(null),
-        this._contentBtn?.build() ?? Promise.resolve(null),
-        this._keysBtn?.build() ?? Promise.resolve(null),
+        deleteConfirmBtn.build(),
+        this._contentBtn.build(),
+        this._keysBtn.build(),
       ]);
 
     const parts: UIPart[] = [
@@ -421,7 +386,7 @@ export class SeEntityEditPane extends SuiComponent<
             markdown: true,
             style: S.headerName,
           }),
-          ...(deleteConfirmPart ? [deleteConfirmPart] : []),
+          deleteConfirmPart,
           button({
             id: EP.SAVE_BTN,
             text: "Save",
@@ -460,63 +425,52 @@ export class SeEntityEditPane extends SuiComponent<
         storageKey: `story:${EDIT_PANE_CONTENT}`,
         style: S.summaryInput,
       }),
+
+      // ── Lorebook section ───────────────────────────────────────────────────
+      text({ text: "", style: S.lbDivider }),
+
+      row({
+        style: S.sectionRow,
+        content: [
+          text({ text: "Content", style: S.rowLabel }),
+          contentGenPart,
+        ],
+      }),
+      multilineTextInput({
+        id: L.CONTENT_INPUT,
+        initialValue: "",
+        placeholder: "Lorebook content…",
+        storageKey: `story:${L.CONTENT_DRAFT_KEY}`,
+        style: S.contentInput,
+      }),
+
+      row({
+        style: S.keysRow,
+        content: [
+          text({ text: "Keys", style: S.keysRowLabel }),
+          textInput({
+            id: L.KEYS_INPUT,
+            initialValue: "",
+            placeholder: "comma, separated, keys",
+            storageKey: `story:${L.KEYS_DRAFT_KEY}`,
+            style: S.keysInput,
+          }),
+          keysGenPart,
+          button({
+            id: L.ALWAYS_ON_TOGGLE,
+            text: "Always On",
+            style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
+            callback: () => {
+              _alwaysOnDraft = !_alwaysOnDraft;
+              api.v1.ui.updateParts([{
+                id: L.ALWAYS_ON_TOGGLE,
+                style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
+              } as unknown as Partial<UIPart> & { id: string }]);
+            },
+          }),
+        ],
+      }),
     ];
-
-    // ── Lorebook section (live only) ──────────────────────────────────────────
-    if (lifecycle === "live" && contentGenPart && keysGenPart) {
-
-      parts.push(
-        // Divider
-        text({ text: "", style: S.lbDivider }),
-
-        // Content header row: label + gen icon button
-        row({
-          style: S.sectionRow,
-          content: [
-            text({ text: "Content", style: S.rowLabel }),
-            contentGenPart,
-          ],
-        }),
-
-        // Content textarea — flushed to lorebook on Save
-        multilineTextInput({
-          id: L.CONTENT_INPUT,
-          initialValue: "",
-          placeholder: "Lorebook content…",
-          storageKey: `story:${L.CONTENT_DRAFT_KEY}`,
-          style: S.contentInput,
-        }),
-
-        // Keys row: label + input + gen icon button + always-on toggle
-        row({
-          style: S.keysRow,
-          content: [
-            text({ text: "Keys", style: S.keysRowLabel }),
-            textInput({
-              id: L.KEYS_INPUT,
-              initialValue: "",
-              placeholder: "comma, separated, keys",
-              storageKey: `story:${L.KEYS_DRAFT_KEY}`,
-              style: S.keysInput,
-            }),
-            keysGenPart,
-            button({
-              id: L.ALWAYS_ON_TOGGLE,
-              text: "Always On",
-              style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
-              callback: () => {
-                _alwaysOnDraft = !_alwaysOnDraft;
-                api.v1.ui.updateParts([{
-                  id: L.ALWAYS_ON_TOGGLE,
-                  style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
-                } as unknown as Partial<UIPart> & { id: string }]);
-              },
-            }),
-          ],
-        }),
-      );
-
-    }
 
     return column({
       id: this.id,

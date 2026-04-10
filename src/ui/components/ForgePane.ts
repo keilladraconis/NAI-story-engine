@@ -41,7 +41,6 @@ export class ForgePane extends SuiComponent<
 
     this._forge = new SeForgeSection({
       id: "se-forge-section",
-      editHost: options.editHost,
     });
 
     this._world = new SeWorldSection({

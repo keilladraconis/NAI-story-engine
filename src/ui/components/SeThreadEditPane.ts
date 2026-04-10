@@ -69,7 +69,6 @@ function buildEntitySections(
     if (!bucket) return [];
     const children = bucket.map((entity) => {
       const isMember = group.entityIds.includes(entity.id);
-      const isDraft = entity.lifecycle === "draft";
       const toggle = new SuiToggle({
         id: `${listId}-${entity.id}-toggle`,
         state: { on: isMember },
@@ -79,7 +78,7 @@ function buildEntitySections(
       });
       return new SuiCard({
         id: `${listId}-${entity.id}`,
-        label: isDraft ? `${entity.name} (draft)` : entity.name,
+        label: entity.name,
         actions: [toggle],
       });
     });

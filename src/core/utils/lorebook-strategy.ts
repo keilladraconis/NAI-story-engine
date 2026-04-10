@@ -52,9 +52,7 @@ function formatEntityGroups(state: RootState, entityId: string): string {
 
 /** Format live world entities as context, grouped by category. */
 function formatLiveWorldEntitiesContext(state: RootState): string {
-  const liveEntities = Object.values(state.world.entitiesById).filter(
-    (e) => e.lifecycle === "live",
-  );
+  const liveEntities = Object.values(state.world.entitiesById);
   if (liveEntities.length === 0) return "";
 
   const groups = new Map<DulfsFieldID, typeof liveEntities>();

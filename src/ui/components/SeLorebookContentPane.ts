@@ -189,11 +189,6 @@ export class SeLorebookContentPane extends SuiComponent<
               markdown: true,
               style: S.entryName,
             }),
-            text({
-              id: L.LIFECYCLE_BADGE,
-              text: entity ? `[${entity.lifecycle}]` : "",
-              style: S.lifecycleBadge,
-            }),
           ],
         }),
 

@@ -174,7 +174,6 @@ export class SeLorebookPanel extends SuiComponent<
                         entity: {
                           id: api.v1.uuid(),
                           categoryId: this._currentCategoryId,
-                          lifecycle: "live",
                           lorebookEntryId: entryId,
                           name,
                           summary: "",

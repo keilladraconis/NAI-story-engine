@@ -41,12 +41,12 @@ const FIELD_LABEL: Record<DulfsFieldID, string> = {
   [FieldID.Topics]: "Topics",
 };
 
-function formatEstablishedWorld(state: RootState): string {
-  const live = Object.values(state.world.entitiesById).filter((e) => e.lifecycle === "live");
-  if (live.length === 0) return "";
+function formatEstablishedWorld(state: RootState, preForgeEntityIds: Set<string>): string {
+  const established = Object.values(state.world.entitiesById).filter((e) => preForgeEntityIds.has(e.id));
+  if (established.length === 0) return "";
 
-  const groups = new Map<DulfsFieldID, typeof live>();
-  for (const e of live) {
+  const groups = new Map<DulfsFieldID, typeof established>();
+  for (const e of established) {
     const list = groups.get(e.categoryId) ?? [];
     list.push(e);
     groups.set(e.categoryId, list);
@@ -86,17 +86,18 @@ function formatWorldState(state: RootState): string {
 }
 
 /**
- * Synthesizes the prior-step command log from all current draft entities and groups.
+ * Synthesizes the prior-step command log from entities created THIS forge session
+ * (i.e., not in preForgeEntityIds) and existing threads.
  * Only correct-syntax commands appear — bad GLM output that failed to parse
  * never enters context.
  */
-function buildForgePassLog(state: RootState): string {
-  const draftEntities = Object.values(state.world.entitiesById).filter(
-    (e) => e.lifecycle === "draft",
+function buildForgePassLog(state: RootState, preForgeEntityIds: Set<string>): string {
+  const sessionEntities = Object.values(state.world.entitiesById).filter(
+    (e) => !preForgeEntityIds.has(e.id),
   );
 
   const lines: string[] = [];
-  for (const entity of draftEntities) {
+  for (const entity of sessionEntities) {
     const type = FIELD_TO_TYPE[entity.categoryId] ?? "CHARACTER";
     const desc = entity.summary ? ` | ${entity.summary}` : "";
     lines.push(`[CREATE ${type} "${entity.name}"${desc}]`);
@@ -119,17 +120,20 @@ function buildForgePassLog(state: RootState): string {
 /**
  * Message factory for one step of the forge loop.
  * All state is read JIT so the synthesized pass log is always current.
+ * preForgeEntityIds: entity IDs that existed before this forge session started —
+ *   these appear in ESTABLISHED WORLD, not in the pass log.
  */
 export const createForgeFactory = (
   getState: () => RootState,
   step: number,
   forgeGuidance: string,
   brainstormContext: string,
+  preForgeEntityIds: string[],
 ): MessageFactory => {
+  const preForgeSet = new Set(preForgeEntityIds);
+
   return async () => {
-    const systemPrompt = String(
-      FORGE_PROMPT,
-    );
+    const systemPrompt = String(FORGE_PROMPT);
 
     const state = getState();
     const { foundation } = state;
@@ -171,8 +175,8 @@ export const createForgeFactory = (
       });
     }
 
-    // 6. Established world (live entities) — semi-stable
-    const establishedWorld = formatEstablishedWorld(state);
+    // 6. Established world (entities that existed before this forge session) — semi-stable
+    const establishedWorld = formatEstablishedWorld(state, preForgeSet);
     if (establishedWorld) {
       messages.push({ role: "assistant", content: establishedWorld });
     }
@@ -191,13 +195,7 @@ export const createForgeFactory = (
     messages.push({ role: "user", content: stepNote });
 
     // 9. Prior command log + prefill primer — single assistant message.
-    //    Combining the pass log and prefill "[" into one message avoids
-    //    consecutive assistant turns. The prefill "[" MUST be in the messages
-    //    array sent to the model so it generates the continuation (e.g. "CREATE...")
-    //    rather than the full command (e.g. "[CREATE..."). The strategy's
-    //    assistantPrefill then prepends "[" client-side to accumulatedText,
-    //    giving the handler a fully-formed "[CREATE CHARACTER ...]" to parse.
-    const passLog = buildForgePassLog(state);
+    const passLog = buildForgePassLog(state, preForgeSet);
     const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE |" : "[";
     const assistantContent = passLog ? `${passLog}\n${prefill}` : prefill;
     await appendXialongStyleMessage(messages, XIALONG_STYLE.forge);
@@ -221,7 +219,8 @@ export const buildForgeStrategy = (
   getState: () => RootState,
   step: number,
   forgeGuidance: string,
-  brainstormContext?: string,
+  brainstormContext: string,
+  preForgeEntityIds: string[],
 ): GenerationStrategy => {
   const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE |" : "[";
   return {
@@ -230,13 +229,15 @@ export const buildForgeStrategy = (
       getState,
       step,
       forgeGuidance,
-      brainstormContext ?? "",
+      brainstormContext,
+      preForgeEntityIds,
     ),
     target: {
       type: "forge",
       step,
       forgeGuidance,
-      brainstormContext: brainstormContext ?? "",
+      brainstormContext,
+      preForgeEntityIds,
     },
     prefillBehavior: "keep",
     assistantPrefill: prefill,

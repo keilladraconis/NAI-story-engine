@@ -82,15 +82,14 @@ export class SeWorldSection extends SuiComponent<
     );
 
     const looseEntities = Object.values(state.world.entitiesById).filter(
-      (e) => e.lifecycle === "live" && !threadedEntityIds.has(e.id),
+      (e) => !threadedEntityIds.has(e.id),
     );
 
     const looseParts = await Promise.all(
       looseEntities.map((e) =>
         new SeEntityCard({
-          id: IDS.entity(e.id, "live").ROOT,
+          id: IDS.entity(e.id).ROOT,
           entityId: e.id,
-          lifecycle: "live",
           editHost,
         }).build(),
       ),
@@ -124,7 +123,6 @@ export class SeWorldSection extends SuiComponent<
         _wsEntitiesRef = s.world.entitiesById;
         _wsGroupsRef = s.world.groups;
         const liveIds = Object.values(s.world.entitiesById)
-          .filter((e) => e.lifecycle === "live")
           .map((e) => e.id);
         const groupSnapshot = s.world.groups.map((g) => ({
           id: g.id,
@@ -158,7 +156,6 @@ export class SeWorldSection extends SuiComponent<
               entity: {
                 id: entityId,
                 categoryId: FieldID.DramatisPersonae,
-                lifecycle: "live",
                 lorebookEntryId,
                 name: "",
                 summary: "",
@@ -169,7 +166,6 @@ export class SeWorldSection extends SuiComponent<
             new SeEntityEditPane({
               id: IDS.EDIT_PANE.ROOT,
               entityId,
-              lifecycle: "live",
               editHost,
             }),
           );
@@ -221,15 +217,14 @@ export class SeWorldSection extends SuiComponent<
     );
 
     const looseEntities = Object.values(state.world.entitiesById).filter(
-      (e) => e.lifecycle === "live" && !threadedEntityIds.has(e.id),
+      (e) => !threadedEntityIds.has(e.id),
     );
 
     const initialLooseParts = await Promise.all(
       looseEntities.map((e) =>
         new SeEntityCard({
-          id: IDS.entity(e.id, "live").ROOT,
+          id: IDS.entity(e.id).ROOT,
           entityId: e.id,
-          lifecycle: "live",
           editHost,
         }).build(),
       ),

@@ -67,27 +67,18 @@ export const IDS = {
       DELETE_BTN: `se-fn-tension-${id}-del`,
     }),
   },
-  // Entity IDs — qualified by lifecycle so draft/live instances are distinct parts.
-  // This prevents the framework from conflating a live EntityCard with a reforged
-  // (now-draft) one that shares the same entityId.
-  entity: (id: string, lifecycle: "draft" | "live") => ({
-    ROOT: `se-entity-${lifecycle}-${id}`,
-    CAST_BTN: `se-entity-${lifecycle}-${id}-cast`,
-    DISCARD_BTN: `se-entity-${lifecycle}-${id}-discard`,
-    REGEN_BTN: `se-entity-${lifecycle}-${id}-regen`,
-    DELETE_BTN: `se-entity-${lifecycle}-${id}-delete`,
+  entity: (id: string) => ({
+    ROOT: `se-entity-${id}`,
+    REGEN_BTN: `se-entity-${id}-regen`,
+    DELETE_BTN: `se-entity-${id}-delete`,
   }),
   FORGE: {
     SECTION: "se-forge-section",
     GUIDANCE_INPUT: "se-forge-guidance",
     FORGE_BTN: "se-forge-btn",
     BRAINSTORM_BTN: "se-forge-brainstorm-btn",
-    ENTITY_LIST: "se-forge-entity-list",
     TICKER: "se-forge-ticker",
-    CAST_ALL_BTN: "se-forge-cast-all",
-    DISCARD_ALL_BTN: "se-forge-discard-all",
     CLEAR_BTN: "se-forge-clear-btn",
-    CAST_DISCARD_ROW: "se-forge-cast-discard-row",
   },
   WORLD: {
     SECTION: "se-world-section",
@@ -97,7 +88,6 @@ export const IDS = {
       TITLE_INPUT: `se-world-thread-${id}-title`,
       SUMMARY_INPUT: `se-world-thread-${id}-summary`,
       ENTITY_LIST: `se-world-thread-${id}-entities`,
-      REFORGE_BTN: `se-world-thread-${id}-reforge`,
       DELETE_BTN: `se-world-thread-${id}-delete`,
       LOREBOOK_BTN: `se-world-thread-${id}-lorebook`,
     }),

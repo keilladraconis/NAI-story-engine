@@ -48,7 +48,7 @@ async function findEntityNeedingContent(
   state: RootState,
 ): Promise<WorldEntity | null> {
   const liveEntities = Object.values(state.world.entitiesById).filter(
-    (e) => e.lifecycle === "live" && e.lorebookEntryId,
+    (e) => e.lorebookEntryId,
   );
 
   const needsContent: WorldEntity[] = [];
@@ -83,7 +83,7 @@ async function findEntityNeedingKeys(
   state: RootState,
 ): Promise<WorldEntity | null> {
   const liveEntities = Object.values(state.world.entitiesById).filter(
-    (e) => e.lifecycle === "live" && e.lorebookEntryId,
+    (e) => e.lorebookEntryId,
   );
 
   const needsKeys: WorldEntity[] = [];

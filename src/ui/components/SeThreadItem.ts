@@ -27,7 +27,6 @@ import { store } from "../../core/store";
 import {
   groupDeleted,
   groupLorebookEntrySet,
-  groupReforgeRequested,
 } from "../../core/store/slices/world";
 import type { WorldEntity, WorldGroup } from "../../core/store/types";
 import { IDS } from "../../ui/framework/ids";
@@ -70,9 +69,7 @@ async function computeThreadLoreStatus(
   const group = state.world.groups.find((g) => g.id === groupId);
   const liveMembers = (group?.entityIds ?? [])
     .map((id) => state.world.entitiesById[id])
-    .filter(
-      (e): e is WorldEntity => e !== undefined && e.lifecycle === "live",
-    );
+    .filter((e): e is WorldEntity => e !== undefined);
 
   if (liveMembers.length === 0) return "none";
 
@@ -175,16 +172,13 @@ export class SeThreadItem extends SuiComponent<
     const group = state.world.groups.find((g) => g.id === groupId);
 
     const cards = await Promise.all(
-      (group?.entityIds ?? []).map((entityId) => {
-        const entity = state.world.entitiesById[entityId];
-        const lifecycle = entity?.lifecycle ?? "live";
-        return new SeEntityCard({
-          id: IDS.entity(entityId, lifecycle).ROOT,
+      (group?.entityIds ?? []).map((entityId) =>
+        new SeEntityCard({
+          id: IDS.entity(entityId).ROOT,
           entityId,
-          lifecycle,
           editHost,
-        }).build();
-      }),
+        }).build(),
+      ),
     );
 
     api.v1.ui.updateParts([
@@ -275,7 +269,7 @@ export class SeThreadItem extends SuiComponent<
           members: memberIds,
           entities: memberIds.map((id) => {
             const e = s.world.entitiesById[id];
-            return e ? { id: e.id, lifecycle: e.lifecycle, name: e.name } : null;
+            return e ? { id: e.id, name: e.name } : null;
           }),
         });
         return _memberCache;
@@ -309,14 +303,6 @@ export class SeThreadItem extends SuiComponent<
       callback: () => this._handleLorebookToggle(),
     });
 
-    const reforgeBtn = new SuiButton({
-      id: T.REFORGE_BTN,
-      callback: () => {
-        store.dispatch(groupReforgeRequested({ groupId }));
-      },
-      theme: { default: { self: { iconId: "rotate-ccw" as IconId } } },
-    });
-
     const deleteBtn = new SuiButton({
       id: T.DELETE_BTN,
       callback: () => {
@@ -338,22 +324,19 @@ export class SeThreadItem extends SuiComponent<
           }),
         );
       },
-      actions: [lorebookToggle, reforgeBtn, deleteBtn],
+      actions: [lorebookToggle, deleteBtn],
       theme: { default: { actions: { base: ACTION_BASE } } },
     });
 
     // Build initial member cards
     const initialCards = await Promise.all(
-      (group?.entityIds ?? []).map((entityId) => {
-        const entity = state.world.entitiesById[entityId];
-        const lifecycle = entity?.lifecycle ?? "live";
-        return new SeEntityCard({
-          id: IDS.entity(entityId, lifecycle).ROOT,
+      (group?.entityIds ?? []).map((entityId) =>
+        new SeEntityCard({
+          id: IDS.entity(entityId).ROOT,
           entityId,
-          lifecycle,
           editHost,
-        }).build();
-      }),
+        }).build(),
+      ),
     );
 
     const { column } = api.v1.ui.part;
