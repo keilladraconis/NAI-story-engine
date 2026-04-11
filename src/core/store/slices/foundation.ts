@@ -1,11 +1,12 @@
 import { createSlice } from "nai-store";
-import { FoundationState, ShapeData, Tension } from "../types";
+import { FoundationState, ShapeData, IntensityData, ContractData } from "../types";
 
 export const initialFoundationState: FoundationState = {
   shape: null,
   intent: "",
   worldState: "",
-  tensions: [],
+  intensity: null,
+  contract: null,
   attg: "",
   style: "",
   attgSyncEnabled: false,
@@ -31,28 +32,14 @@ export const foundationSlice = createSlice({
       worldState: payload.worldState,
     }),
 
-    tensionAdded: (state, payload: { tension: Tension }) => ({
+    intensityUpdated: (state, payload: { intensity: IntensityData | null }) => ({
       ...state,
-      tensions: [...state.tensions, payload.tension],
+      intensity: payload.intensity,
     }),
 
-    tensionEdited: (state, payload: { tensionId: string; text: string }) => ({
+    contractUpdated: (state, payload: { contract: ContractData | null }) => ({
       ...state,
-      tensions: state.tensions.map((t) =>
-        t.id === payload.tensionId ? { ...t, text: payload.text } : t,
-      ),
-    }),
-
-    tensionResolved: (state, payload: { tensionId: string }) => ({
-      ...state,
-      tensions: state.tensions.map((t) =>
-        t.id === payload.tensionId ? { ...t, resolved: true } : t,
-      ),
-    }),
-
-    tensionDeleted: (state, payload: { tensionId: string }) => ({
-      ...state,
-      tensions: state.tensions.filter((t) => t.id !== payload.tensionId),
+      contract: payload.contract,
     }),
 
     attgUpdated: (state, payload: { attg: string }) => ({
@@ -91,10 +78,9 @@ export const foundationSlice = createSlice({
     shapeGenerationRequested: (state) => state,
     intentGenerationRequested: (state) => state,
     worldStateGenerationRequested: (state) => state,
+    contractGenerationRequested: (state) => state,
     attgGenerationRequested: (state) => state,
     styleGenerationRequested: (state) => state,
-    tensionGenerationRequested: (state, _payload: { tensionId: string }) =>
-      state,
   },
 });
 
@@ -103,10 +89,8 @@ export const {
   shapeUpdated,
   intentUpdated,
   worldStateUpdated,
-  tensionAdded,
-  tensionEdited,
-  tensionResolved,
-  tensionDeleted,
+  intensityUpdated,
+  contractUpdated,
   attgUpdated,
   styleUpdated,
   attgSyncToggled,
@@ -116,7 +100,7 @@ export const {
   shapeGenerationRequested,
   intentGenerationRequested,
   worldStateGenerationRequested,
+  contractGenerationRequested,
   attgGenerationRequested,
   styleGenerationRequested,
-  tensionGenerationRequested,
 } = foundationSlice.actions;

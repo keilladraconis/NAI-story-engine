@@ -1,9 +1,9 @@
-import { GenerationStrategy, ShapeData } from "../../types";
+import { GenerationStrategy, ShapeData, ContractData } from "../../types";
 import {
   shapeUpdated,
   intentUpdated,
   worldStateUpdated,
-  tensionEdited,
+  contractUpdated,
   attgUpdated,
   styleUpdated,
 } from "../../index";
@@ -25,6 +25,7 @@ type FoundationTarget = Extract<
 const VIEW_IDS = {
   shape: "se-fn-shape-card-desc",
   intent: "se-fn-intent-card-desc",
+  contract: "se-fn-contract-card-desc",
   attg: "se-fn-attg-card-desc",
   style: "se-fn-style-card-desc",
   worldState: `${IDS.FOUNDATION.WORLD_STATE_TEXT}-view`,
@@ -64,26 +65,20 @@ function parseShape(text: string): ShapeData {
   return { name, description: description || text.trim() };
 }
 
-type TensionTarget = Extract<GenerationStrategy["target"], { type: "tension" }>;
-
-export const tensionHandler: GenerationHandlers<TensionTarget> = {
-  streaming(ctx: StreamingContext<TensionTarget>, _newText: string): void {
-    const viewId = `${IDS.FOUNDATION.tension(ctx.target.tensionId).TEXT}-view`;
-    api.v1.ui.updateParts([
-      { id: viewId, text: escapeForMarkdown(ctx.accumulatedText) },
-    ]);
-  },
-
-  async completion(ctx: CompletionContext<TensionTarget>): Promise<void> {
-    if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
-    ctx.dispatch(
-      tensionEdited({
-        tensionId: ctx.target.tensionId,
-        text: ctx.accumulatedText.trim(),
-      }),
-    );
-  },
-};
+/**
+ * Parses contract generation output into { required, prohibited, emphasis }.
+ * Format: "REQUIRED: ...\nPROHIBITED: ...\nEMPHASIS: ..."
+ */
+function parseContract(text: string): ContractData {
+  const requiredMatch = text.match(/^REQUIRED:\s*(.+)$/m);
+  const prohibitedMatch = text.match(/^PROHIBITED:\s*(.+)$/m);
+  const emphasisMatch = text.match(/^EMPHASIS:\s*(.+)$/m);
+  return {
+    required: requiredMatch?.[1]?.trim() || "",
+    prohibited: prohibitedMatch?.[1]?.trim() || "",
+    emphasis: emphasisMatch?.[1]?.trim() || "",
+  };
+}
 
 export const foundationHandler: GenerationHandlers<FoundationTarget> = {
   streaming(ctx: StreamingContext<FoundationTarget>, _newText: string): void {
@@ -110,6 +105,11 @@ export const foundationHandler: GenerationHandlers<FoundationTarget> = {
       }
       case "worldState": {
         ctx.dispatch(worldStateUpdated({ worldState: text }));
+        break;
+      }
+      case "contract": {
+        const contract = parseContract(text);
+        ctx.dispatch(contractUpdated({ contract }));
         break;
       }
       case "attg": {

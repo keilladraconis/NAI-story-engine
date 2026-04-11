@@ -1,7 +1,7 @@
 import { RootState } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "./context-builder";
-import { DulfsFieldID, FieldID, FIELD_CONFIGS } from "../../config/field-definitions";
+import { DulfsFieldID, FIELD_CONFIGS } from "../../config/field-definitions";
 import { STORAGE_KEYS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../../ui/framework/ids";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
 import {
@@ -149,8 +149,6 @@ export const createLorebookContentFactory = (
       if (foundation.worldState) fp.push(`World State: ${foundation.worldState}`);
       backgroundParts.push(`[NARRATIVE FOUNDATION]\n${fp.join("\n")}`);
     }
-    const canon = state.story.fields[FieldID.Canon]?.content || "";
-    if (canon) backgroundParts.push(`[CANON]\n${canon}`);
     const setting = String(
       (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
     );

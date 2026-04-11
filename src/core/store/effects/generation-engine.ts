@@ -18,7 +18,6 @@ import {
   requestCompleted,
 } from "../index";
 import {
-  buildCanonStrategy,
   buildATTGStrategy,
   buildStyleStrategy,
   buildDulfsListStrategy,
@@ -65,6 +64,12 @@ function targetToQueueEntry(target: GenerationStrategy["target"]): {
       return { type: "forge", targetId: `forge:${target.step}` };
     case "foundation":
       return { type: "foundation", targetId: target.field };
+    case "entitySummary":
+      return { type: "entitySummary", targetId: target.entityId };
+    case "entitySummaryBind":
+      return { type: "entitySummaryBind", targetId: target.entityId };
+    case "threadSummary":
+      return { type: "threadSummary", targetId: target.groupId };
   }
   // Unreachable — satisfies noImplicitReturns for exhaustive switch
   throw new Error(`Unhandled target type: ${(target as any).type}`);
@@ -188,8 +193,12 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `brainstorm-title:${target.chatIndex}`;
     case "foundation":
       return `foundation:${target.field}`;
-    case "tension":
-      return `tension:${target.tensionId.slice(0, 8)}`;
+    case "entitySummary":
+      return `entity-summary:${target.entityId.slice(0, 8)}`;
+    case "entitySummaryBind":
+      return `entity-summary-bind:${target.entityId.slice(0, 8)}`;
+    case "threadSummary":
+      return `thread-summary:${target.groupId.slice(0, 8)}`;
   }
 }
 
@@ -226,9 +235,7 @@ export function registerGenerationEngineEffects(
       }
 
       let strategy;
-      if (targetId === FieldID.Canon) {
-        strategy = buildCanonStrategy(getState, targetId);
-      } else if (targetId === FieldID.ATTG) {
+      if (targetId === FieldID.ATTG) {
         strategy = buildATTGStrategy(getState);
       } else if (targetId === FieldID.Style) {
         strategy = buildStyleStrategy(getState);

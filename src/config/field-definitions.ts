@@ -1,5 +1,4 @@
 export enum FieldID {
-  Canon = "canon",
   Brainstorm = "brainstorm",
   DramatisPersonae = "dramatisPersonae",
   UniverseSystems = "universeSystems",
@@ -20,7 +19,6 @@ export type DulfsFieldID =
   | FieldID.Topics;
 
 export type TextFieldID =
-  | FieldID.Canon
   | FieldID.Brainstorm
   | FieldID.ATTG
   | FieldID.Style;
@@ -38,7 +36,6 @@ export function isDulfsField(id: string): id is DulfsFieldID {
 
 export function isTextField(id: string): id is TextFieldID {
   return [
-    FieldID.Canon,
     FieldID.Brainstorm,
     FieldID.ATTG,
     FieldID.Style,
@@ -64,18 +61,6 @@ export interface FieldConfig {
 }
 
 export const FIELD_CONFIGS: FieldConfig[] = [
-  {
-    id: FieldID.Canon,
-    label: "Canon",
-    description:
-      "Bedrock facts: world, characters, themes, tone — the foundation for all generation",
-    placeholder: "The facts of your story world...",
-    icon: "bookOpen",
-    fieldType: "canon",
-    generationInstruction:
-      "Distill the story's bedrock: world facts, character starting states, thematic tensions, and tonal identity.",
-    filters: ["scrubBrackets"],
-  },
   {
     id: FieldID.Brainstorm,
     label: "Brainstorm",

@@ -68,36 +68,6 @@ REQUIRED — write only declarative present-tense facts:
 
 If something was proposed then revised, write only the final version. If nothing was settled in a category, omit that section entirely.`;
 
-export const CANON_GENERATE_PROMPT = `You are the **Archivist of Canon**.
-Distill the story's bedrock — the immutable foundation that all worldbuilding and generation builds upon.
-Target: ~200-300 words of dense, essential facts.
-
-Canon answers: "What is TRUE about this world before the story moves?"
-
-Use bold labels for each section. Write dense prose within each — no bullet lists, no key-value pairs.
-
-**World:** Setting facts, time period, technology/magic level, social structures, governing rules or constraints.
-
-**Characters:** Who exists, where they are, starting relationships and active tensions between them.
-
-**Structure:** If [NARRATIVE SHAPE — REQUIRED] is provided above, you MUST use exactly that shape name — do not substitute another. Explain how it applies to this specific story. If no shape is provided, choose the architecture that best fits:
-- *Three-Sphere* — Three interconnected domains (e.g. Industry + Crime + Politics) whose overlaps create dilemmas
-- *Powder Keg* — Multiple forces in unstable equilibrium; any small change cascades
-- *Pressure Cooker* — Confined setting forcing characters with incompatible needs into proximity
-- *Web of Obligations* — Characters bound by debts, secrets, duties; pulling one thread moves everyone
-- *Frontier* — Story at the boundary between known/unknown, old/new; the boundary itself generates conflict
-- *Intimate Power* — Characters connected by desire and separated by power imbalance, hierarchy, or taboo; social roles and proximity make avoidance impossible
-Name the shape/architecture, then describe the specific spheres, forces, or tensions it creates in THIS world.
-
-**Tone:** Genre sensibility, atmosphere, and thematic currents to explore.
-
-**Canon must NOT contain:**
-- Plot events, story beats, or narrative trajectory — story emerges from play
-- Character arcs, predictions, or "what will happen"
-- Lorebook-style entries (Name/Type/Setting blocks)
-- Brainstorm speculation not yet established as fact
-
-When finished, STOP. Do not continue into other generation tasks.`;
 
 export const LOREBOOK_GENERATE_PROMPT = `You are the **Archivist**.
 Generate a structured Lorebook Entry for "[itemName]".
@@ -447,29 +417,20 @@ Respond with a shape name on the first line, then a blank line, then 2-4 sentenc
 
 CRITICAL: The description must be structural logic — the kind of moment the story leans toward and the forces that govern it. Not a plot summary, not a story pitch, not a list of events. If a shape name is already provided, describe the structural logic of THAT shape as it applies to the story material. Do not anchor to specific characters or plot events.`;
 
-export const CRUCIBLE_TENSIONS_PROMPT = `Generate one NARRATIVE TENSION — a force, relationship, or contradiction
-that is active at the story's beginning and creates pressure.
 
-A tension is NOT an endpoint or a goal. It is a condition that
-exists and generates narrative energy. It describes what pulls in
-opposing directions, what cannot coexist peacefully, what is
-unstable and demanding resolution.
+export const CONTRACT_GENERATE_PROMPT = `You are drafting the Story Contract for this story — the implicit agreement with the reader about what kind of story this is.
 
-GOOD TENSIONS:
-- "An apprentice's blind loyalty to a mentor whose methods have grown increasingly ruthless"
-- "A city's prosperity built on a resource that is slowly poisoning its poorest district"
-- "Two childhood friends now leading opposing factions, each convinced the other betrayed first"
+The contract has three components:
+- Required: what this story MUST deliver (genre promises, tonal commitments, what readers signed up for)
+- Prohibited: what this story must NEVER do (tone-breakers, genre violations, things that would feel like betrayal)
+- Emphasis: the specific texture and elements that make this story distinctively itself
 
-BAD TENSIONS:
-- "The hero discovers the truth" — that's an endpoint, not a tension
-- "There is conflict" — too vague, no specific opposing forces
-- "Everything is fine" — no tension at all
+Output exactly three labeled lines:
+REQUIRED: [comma-separated list — 3-5 items]
+PROHIBITED: [comma-separated list — 3-5 items]
+EMPHASIS: [comma-separated list — 3-5 items]
 
-Surface pressures that are implied by the scenario but not yet named —
-resource costs, social fault lines, hidden dependencies, ticking
-clocks the characters haven't noticed. Do not restate existing tensions.
-
-Output only the tension — 1-2 sentences of plain prose, no labels, no preamble.`;
+Be specific to THIS story's material. No generic filler.`;
 
 export const CRUCIBLE_BUILD_PASS_PROMPT = `You are building a world for interactive storytelling. Use the
 DIRECTION, TENSIONS, and current WORLD STATE above as context.
@@ -576,7 +537,6 @@ export const XIALONG_STYLE = {
   lorebookContent:      "[ Style: archivist, world-builder, detail-oriented, lore ]",
   lorebookKeys:         "[ Style: analyst, precise, semantic-indexer ]",
   lorebookRefine:       "[ Style: editor, discerning, revise ]",
-  canon:                "[ Style: narrator, factual, world-builder ]",
   attg:                 "[ Style: critic, genre-savvy, metadata ]",
   style:                "[ Style: literary-critic, prose-analyst ]",
   bootstrap:            "[ Style: author, evocative, scene-setter ]",
@@ -587,6 +547,6 @@ export const XIALONG_STYLE = {
   foundationShape:      "[ Style: architect, visionary, dramatic ]",
   foundationIntent:     "[ Style: author, intentional, purposeful ]",
   foundationWorldState: "[ Style: narrator, situational, grounded ]",
-  foundationTension:    "[ Style: dramatist, tense, stakes-driven ]",
+  foundationContract:   "[ Style: critic, genre-aware, contractual ]",
   summary:              "[ Style: archivist, concise, insightful ]",
 } as const;

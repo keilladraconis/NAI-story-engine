@@ -16,6 +16,7 @@ import {
   SuiComponent,
   SuiCard,
   SuiButton,
+  SuiActionBar,
   SuiToggle,
   type SuiComponentOptions,
 } from "nai-simple-ui";
@@ -23,12 +24,15 @@ import { store } from "../../core/store";
 import {
   shapeUpdated,
   intentUpdated,
+  intensityUpdated,
+  contractUpdated,
   attgUpdated,
   styleUpdated,
   attgSyncToggled,
   styleSyncToggled,
   shapeGenerationRequested,
   intentGenerationRequested,
+  contractGenerationRequested,
   attgGenerationRequested,
   styleGenerationRequested,
 } from "../../core/store/slices/foundation";
@@ -58,6 +62,10 @@ const FN = {
   INTENT_CARD: "se-fn-intent-card",
   INTENT_EDIT: "se-fn-intent-edit",
   INTENT_BTN: "se-fn-intent-btn",
+  INTENSITY_CARD: "se-fn-intensity-card",
+  CONTRACT_CARD: "se-fn-contract-card",
+  CONTRACT_EDIT: "se-fn-contract-edit",
+  CONTRACT_BTN: "se-fn-contract-btn",
   ATTG_CARD: "se-fn-attg-card",
   ATTG_EDIT: "se-fn-attg-edit",
   ATTG_BTN: "se-fn-attg-btn",
@@ -73,7 +81,7 @@ const escapeDisplay = (raw: string): string =>
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function foundationProjection(targetId: "shape" | "intent" | "attg" | "style") {
+function foundationProjection(targetId: "shape" | "intent" | "contract" | "attg" | "style") {
   return (s: ReturnType<typeof store.getState>) => {
     const queued = s.runtime.queue.find(
       (r) => r.type === "foundation" && r.targetId === targetId,
@@ -116,6 +124,27 @@ const CONTENT_TEXT_STYLE = {
   padding: "0 0 4px",
 } as const;
 
+// ── Intensity levels ────────────────────────────────────────────────────────
+
+const INTENSITY_LEVELS = [
+  { level: "Cozy",      description: "Safe, warm, low stakes — threats are social or emotional, no one is in real danger." },
+  { level: "Grounded",  description: "Real-world friction and consequences; setbacks matter but survival is assumed." },
+  { level: "Gritty",    description: "Serious harm is possible; moral compromise is common; comfort is earned, not given." },
+  { level: "Noir",      description: "No clean exits; moral corruption is systemic; characters pay real prices for their choices." },
+  { level: "Nightmare", description: "High lethality, psychological extremity; no guaranteed safety for anyone." },
+] as const;
+
+const INTENSITY_BTN_BASE = {
+  fontWeight: "normal",
+  fontSize: "0.775rem",
+  padding: "3px 8px",
+  margin: "0",
+  gap: "4px",
+  border: "none",
+};
+const INTENSITY_STYLE_DEFAULT = { ...INTENSITY_BTN_BASE, opacity: "0.4", background: "none" };
+const INTENSITY_STYLE_SELECTED = { ...INTENSITY_BTN_BASE, opacity: "1", background: "rgba(144, 238, 144, 0.15)", borderRadius: "3px" };
+
 /** Toggle theme: toggle icon, grey off / green on. Matches simple-context entry cards. */
 const SYNC_TOGGLE_THEME = {
   default: {
@@ -145,6 +174,8 @@ export class SeFoundationSection extends SuiComponent<
   private readonly _shapeBtnGen: SeGenerationIconButton;
   private readonly _intentEditBtn: SuiButton;
   private readonly _intentBtnGen: SeGenerationIconButton;
+  private readonly _contractEditBtn: SuiButton;
+  private readonly _contractBtnGen: SeGenerationIconButton;
   private readonly _attgEditBtn: SuiButton;
   private readonly _attgBtnGen: SeGenerationIconButton;
   private readonly _attgSyncToggle: SuiToggle;
@@ -193,6 +224,24 @@ export class SeFoundationSection extends SuiComponent<
         store.dispatch(intentGenerationRequested());
       },
       stateProjection: foundationProjection("intent"),
+      requestIdFromProjection: (p) => p as string | undefined,
+    });
+
+    this._contractEditBtn = new SuiButton({
+      id: FN.CONTRACT_EDIT,
+      callback: () => {
+        this._openContractEdit();
+      },
+      theme: { default: { self: { iconId: "edit" as IconId } } },
+    });
+
+    this._contractBtnGen = new SeGenerationIconButton({
+      id: FN.CONTRACT_BTN,
+      iconId: "zap" as IconId,
+      onGenerate: () => {
+        store.dispatch(contractGenerationRequested());
+      },
+      stateProjection: foundationProjection("contract"),
       requestIdFromProjection: (p) => p as string | undefined,
     });
 
@@ -297,6 +346,40 @@ export class SeFoundationSection extends SuiComponent<
         "What is this story about? What do you want to explore?",
       onSave: (content) => {
         store.dispatch(intentUpdated({ intent: content }));
+        editHost.close();
+      },
+      onBack: () => {
+        editHost.close();
+      },
+    });
+
+    editHost.open(pane);
+  }
+
+  // ── Contract edit pane ────────────────────────────────────────
+
+  private _openContractEdit(): void {
+    const { editHost } = this.options;
+    const contract = store.getState().foundation.contract;
+
+    const existing = contract
+      ? `REQUIRED: ${contract.required}\nPROHIBITED: ${contract.prohibited}\nEMPHASIS: ${contract.emphasis}`
+      : "";
+
+    const pane = new SeSimpleContentPane({
+      id: IDS.EDIT_PANE.ROOT,
+      content: existing,
+      label: "Edit Story Contract",
+      contentPlaceholder: "REQUIRED: ...\nPROHIBITED: ...\nEMPHASIS: ...",
+      onSave: (content) => {
+        if (!content.trim()) {
+          store.dispatch(contractUpdated({ contract: null }));
+        } else {
+          const req = content.match(/^REQUIRED:\s*(.+)$/m)?.[1]?.trim() || "";
+          const proh = content.match(/^PROHIBITED:\s*(.+)$/m)?.[1]?.trim() || "";
+          const emph = content.match(/^EMPHASIS:\s*(.+)$/m)?.[1]?.trim() || "";
+          store.dispatch(contractUpdated({ contract: { required: req, prohibited: proh, emphasis: emph } }));
+        }
         editHost.close();
       },
       onBack: () => {
@@ -418,6 +501,88 @@ export class SeFoundationSection extends SuiComponent<
       },
     );
 
+    // ── Intensity card + level picker + description text ────
+    const intensity = store.getState().foundation.intensity;
+    const intensityDescId = `${FN.INTENSITY_CARD}-desc`;
+    const currentLevel = intensity?.level ?? "";
+
+    const intensityCard = new SuiCard({
+      id: FN.INTENSITY_CARD,
+      label: currentLevel || "Intensity",
+      theme: CARD_THEME,
+    });
+
+    const _setLevel = (level: string, description: string): void => {
+      store.dispatch(intensityUpdated({ intensity: { level, description } }));
+      api.v1.ui.updateParts(
+        INTENSITY_LEVELS.map((il) => ({
+          id: `${FN.INTENSITY_CARD}-lvl-${il.level.toLowerCase()}`,
+          style: il.level === level ? INTENSITY_STYLE_SELECTED : INTENSITY_STYLE_DEFAULT,
+        })) as Array<Partial<UIPart> & { id: string }>,
+      );
+    };
+
+    const intensityBar = new SuiActionBar({
+      id: `${FN.INTENSITY_CARD}-bar`,
+      left: INTENSITY_LEVELS.map(
+        (il) =>
+          new SuiButton({
+            id: `${FN.INTENSITY_CARD}-lvl-${il.level.toLowerCase()}`,
+            callback: () => { _setLevel(il.level, il.description); },
+            theme: {
+              default: {
+                self: {
+                  text: il.level,
+                  style: il.level === currentLevel ? INTENSITY_STYLE_SELECTED : INTENSITY_STYLE_DEFAULT,
+                },
+              },
+            },
+          }),
+      ),
+      theme: { default: { left: { style: { "flex-wrap": "wrap" } } } },
+    });
+
+    this._watcher.watch(
+      (s) => s.foundation.intensity,
+      (value) => {
+        const lvl = value?.level ?? "";
+        api.v1.ui.updateParts([
+          { id: `${FN.INTENSITY_CARD}.label`, text: lvl || "Intensity" },
+          { id: intensityDescId, text: escapeDisplay(value?.description || "") || "No intensity defined" },
+          ...INTENSITY_LEVELS.map((il) => ({
+            id: `${FN.INTENSITY_CARD}-lvl-${il.level.toLowerCase()}`,
+            style: il.level === lvl ? INTENSITY_STYLE_SELECTED : INTENSITY_STYLE_DEFAULT,
+          })),
+        ] as Array<Partial<UIPart> & { id: string }>);
+      },
+    );
+
+    // ── Contract card + description text ─────────────────────
+    const contract = store.getState().foundation.contract;
+    const contractDescId = `${FN.CONTRACT_CARD}-desc`;
+
+    const contractCard = new SuiCard({
+      id: FN.CONTRACT_CARD,
+      label: "Story Contract",
+      labelCallback: () => {
+        this._openContractEdit();
+      },
+      actions: [this._contractEditBtn, this._contractBtnGen],
+      theme: CARD_THEME,
+    });
+
+    this._watcher.watch(
+      (s) => s.foundation.contract,
+      (value) => {
+        const text = value
+          ? `Required: ${value.required}\nProhibited: ${value.prohibited}\nEmphasis: ${value.emphasis}`
+          : "";
+        api.v1.ui.updateParts([
+          { id: contractDescId, text: escapeDisplay(text) || "No contract defined" },
+        ]);
+      },
+    );
+
     // ── ATTG card + description text ────────────────────────
     const attg = store.getState().foundation.attg;
     const attgDescId = `${FN.ATTG_CARD}-desc`;
@@ -486,10 +651,13 @@ export class SeFoundationSection extends SuiComponent<
     );
 
     // ── Build child parts ──────────────────────────────────────
-    const [shapeCardPart, intentCardPart, attgCardPart, styleCardPart] =
+    const [shapeCardPart, intentCardPart, intensityCardPart, intensityBarPart, contractCardPart, attgCardPart, styleCardPart] =
       await Promise.all([
         shapeCard.build(),
         intentCard.build(),
+        intensityCard.build(),
+        intensityBar.build(),
+        contractCard.build(),
         attgCard.build(),
         styleCard.build(),
       ]);
@@ -523,6 +691,33 @@ export class SeFoundationSection extends SuiComponent<
                 text({
                   id: intentDescId,
                   text: escapeDisplay(intent) || "No intent defined",
+                  style: CONTENT_TEXT_STYLE,
+                }),
+              ],
+            }),
+            // Intensity — card header + level picker + description text
+            column({
+              style: { gap: "2px" },
+              content: [
+                intensityCardPart,
+                intensityBarPart,
+                text({
+                  id: intensityDescId,
+                  text: escapeDisplay(intensity?.description || "") || "No intensity defined",
+                  style: CONTENT_TEXT_STYLE,
+                }),
+              ],
+            }),
+            // Contract — card header + content text below
+            column({
+              style: { gap: "2px" },
+              content: [
+                contractCardPart,
+                text({
+                  id: contractDescId,
+                  text: contract
+                    ? escapeDisplay(`Required: ${contract.required}\nProhibited: ${contract.prohibited}\nEmphasis: ${contract.emphasis}`)
+                    : "No contract defined",
                   style: CONTENT_TEXT_STYLE,
                 }),
               ],

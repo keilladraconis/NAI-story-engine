@@ -75,13 +75,6 @@ function formatWorldState(state: RootState): string {
     parts.push(`=== WORLD STATE ===\n${foundation.worldState}`);
   }
 
-  const activeTensions = foundation.tensions.filter((t) => !t.resolved);
-  if (activeTensions.length > 0) {
-    parts.push(
-      `=== TENSIONS ===\n${activeTensions.map((t) => `- ${t.text}`).join("\n")}`,
-    );
-  }
-
   return parts.join("\n");
 }
 

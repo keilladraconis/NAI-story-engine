@@ -12,7 +12,7 @@ import {
   lorebookRefineHandler,
 } from "./handlers/lorebook";
 import { forgeHandler } from "./handlers/forge";
-import { foundationHandler, tensionHandler } from "./handlers/foundation";
+import { foundationHandler } from "./handlers/foundation";
 import {
   entitySummaryHandler,
   entitySummaryBindHandler,
@@ -62,10 +62,6 @@ export type ForgeTarget = Extract<
 export type FoundationTarget = Extract<
   GenerationStrategy["target"],
   { type: "foundation" }
->;
-export type TensionTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "tension" }
 >;
 export type EntitySummaryTarget = Extract<
   GenerationStrategy["target"],
@@ -121,7 +117,6 @@ export const GENERATION_HANDLERS: {
   lorebookRefine: GenerationHandlers<LorebookRefineTarget>;
   forge: GenerationHandlers<ForgeTarget>;
   foundation: GenerationHandlers<FoundationTarget>;
-  tension: GenerationHandlers<TensionTarget>;
   entitySummary: GenerationHandlers<EntitySummaryTarget>;
   entitySummaryBind: GenerationHandlers<EntitySummaryBindTarget>;
   threadSummary: GenerationHandlers<ThreadSummaryTarget>;
@@ -136,7 +131,6 @@ export const GENERATION_HANDLERS: {
   lorebookRefine: lorebookRefineHandler,
   forge: forgeHandler,
   foundation: foundationHandler,
-  tension: tensionHandler,
   entitySummary: entitySummaryHandler,
   entitySummaryBind: entitySummaryBindHandler,
   threadSummary: threadSummaryHandler,

@@ -107,7 +107,6 @@ export interface GenerationRequest {
     | "bootstrap"
     | "forge"
     | "foundation"
-    | "tension"
     | "entitySummary"
     | "entitySummaryBind"
     | "threadSummary";
@@ -139,9 +138,8 @@ export interface GenerationStrategy {
       }
     | {
         type: "foundation";
-        field: "shape" | "intent" | "worldState" | "attg" | "style";
+        field: "shape" | "intent" | "worldState" | "attg" | "style" | "contract";
       }
-    | { type: "tension"; tensionId: string }
     | { type: "entitySummary"; entityId: string }
     | { type: "entitySummaryBind"; entityId: string }
     | { type: "threadSummary"; groupId: string };
@@ -192,17 +190,23 @@ export interface ShapeData {
   description: string; // Structural logic — what this shape leans toward
 }
 
-export interface Tension {
-  id: string;
-  text: string;
-  resolved: boolean;
+export interface IntensityData {
+  level: string; // Short label — e.g. "Grounded", "Noir", "Cozy"
+  description: string; // What this level means for this story concretely
+}
+
+export interface ContractData {
+  required: string; // What this story MUST deliver
+  prohibited: string; // What this story must NEVER do
+  emphasis: string; // The specific texture that makes this story itself
 }
 
 export interface FoundationState {
   shape: ShapeData | null;
   intent: string;
   worldState: string;
-  tensions: Tension[];
+  intensity: IntensityData | null;
+  contract: ContractData | null;
   attg: string;
   style: string;
   attgSyncEnabled: boolean;

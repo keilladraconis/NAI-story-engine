@@ -16,10 +16,9 @@ import {
   shapeGenerationRequested,
   intentGenerationRequested,
   worldStateGenerationRequested,
+  contractGenerationRequested,
   attgGenerationRequested,
   styleGenerationRequested,
-  tensionAdded,
-  tensionGenerationRequested,
   generationSubmitted,
   requestQueued,
 } from "../index";
@@ -29,9 +28,9 @@ import {
   CRUCIBLE_SHAPE_PROMPT,
   CRUCIBLE_INTENT_PROMPT,
   FOUNDATION_WORLD_STATE_PROMPT,
+  CONTRACT_GENERATE_PROMPT,
   ATTG_GENERATE_PROMPT,
   STYLE_GENERATE_PROMPT,
-  CRUCIBLE_TENSIONS_PROMPT,
   XIALONG_STYLE,
 } from "../../utils/prompts";
 
@@ -228,47 +227,36 @@ const createStyleFactory =
   };
 
 /**
- * Tension: reads full foundation context (shape, intent, world state, existing tensions).
- * Generates a single new tension as plain prose.
+ * Contract: reads full foundation context, generates REQUIRED + PROHIBITED + EMPHASIS.
  */
-const createTensionFactory =
-  (getState: () => RootState, tensionId: string): MessageFactory =>
+const createContractFactory =
+  (getState: () => RootState): MessageFactory =>
   async () => {
-    const tensionPrompt = CRUCIBLE_TENSIONS_PROMPT;
-
     const prefix = await buildStoryEnginePrefix(getState, {
       excludeSections: ["foundation"],
     });
 
     const messages: Message[] = [...prefix];
 
-    const { shape, intent, worldState, tensions } = getState().foundation;
+    const { shape, intent, worldState, intensity } = getState().foundation;
     const anchors: string[] = [];
     if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
     if (intent) anchors.push(`Intent: ${intent}`);
     if (worldState) anchors.push(`World State: ${worldState}`);
-
-    const existingTensions = tensions.filter(
-      (t) => !t.resolved && t.id !== tensionId && t.text,
-    );
-    if (existingTensions.length > 0) {
-      anchors.push(
-        `Existing Tensions:\n${existingTensions.map((t) => `- ${t.text}`).join("\n")}`,
-      );
-    }
+    if (intensity) anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
 
     if (anchors.length > 0) {
-      messages.push({ role: "system" as const, content: anchors.join("\n\n") });
+      messages.push({ role: "system" as const, content: anchors.join("\n") });
     }
 
-    messages.push({ role: "system" as const, content: tensionPrompt });
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.foundationTension);
+    messages.push({ role: "system" as const, content: CONTRACT_GENERATE_PROMPT });
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.foundationContract);
 
     return {
       messages,
       params: await buildModelParams({
         max_tokens: 128,
-        temperature: 1.0,
+        temperature: 0.7,
         min_p: 0.05,
         stop: ["</think>"],
       }),
@@ -279,12 +267,13 @@ const createTensionFactory =
 
 function buildFoundationStrategy(
   getState: () => RootState,
-  field: "shape" | "intent" | "worldState" | "attg" | "style",
+  field: "shape" | "intent" | "worldState" | "contract" | "attg" | "style",
 ): GenerationStrategy {
   const factoryMap = {
     shape: createShapeFactory,
     intent: createIntentFactory,
     worldState: createWorldStateFactory,
+    contract: createContractFactory,
     attg: createAttgFactory,
     style: createStyleFactory,
   };
@@ -299,24 +288,13 @@ function buildFoundationStrategy(
 
 // ─── Effect registration ──────────────────────────────────────────────────────
 
-function submitTensionGeneration(
+function submitFoundation(
   dispatch: AppDispatch,
   getState: () => RootState,
-  tensionId: string,
+  field: "shape" | "intent" | "worldState" | "contract" | "attg" | "style",
 ): void {
-  const strategy: GenerationStrategy = {
-    requestId: api.v1.uuid(),
-    messageFactory: createTensionFactory(getState, tensionId),
-    target: { type: "tension", tensionId },
-    prefillBehavior: "trim",
-  };
-  dispatch(
-    requestQueued({
-      id: strategy.requestId,
-      type: "tension",
-      targetId: tensionId,
-    }),
-  );
+  const strategy = buildFoundationStrategy(getState, field);
+  dispatch(requestQueued({ id: strategy.requestId, type: "foundation", targetId: field }));
   dispatch(generationSubmitted(strategy));
 }
 
@@ -326,70 +304,26 @@ export function registerFoundationEffects(
   getState: () => RootState,
 ): void {
   subscribeEffect(matchesAction(shapeGenerationRequested), () => {
-    const strategy = buildFoundationStrategy(getState, "shape");
-    dispatch(
-      requestQueued({
-        id: strategy.requestId,
-        type: "foundation",
-        targetId: "shape",
-      }),
-    );
-    dispatch(generationSubmitted(strategy));
+    submitFoundation(dispatch, getState, "shape");
   });
 
   subscribeEffect(matchesAction(intentGenerationRequested), () => {
-    const strategy = buildFoundationStrategy(getState, "intent");
-    dispatch(
-      requestQueued({
-        id: strategy.requestId,
-        type: "foundation",
-        targetId: "intent",
-      }),
-    );
-    dispatch(generationSubmitted(strategy));
+    submitFoundation(dispatch, getState, "intent");
   });
 
   subscribeEffect(matchesAction(worldStateGenerationRequested), () => {
-    const strategy = buildFoundationStrategy(getState, "worldState");
-    dispatch(
-      requestQueued({
-        id: strategy.requestId,
-        type: "foundation",
-        targetId: "worldState",
-      }),
-    );
-    dispatch(generationSubmitted(strategy));
+    submitFoundation(dispatch, getState, "worldState");
   });
 
-  subscribeEffect(matchesAction(tensionAdded), (action) => {
-    submitTensionGeneration(dispatch, getState, action.payload.tension.id);
-  });
-
-  subscribeEffect(matchesAction(tensionGenerationRequested), (action) => {
-    submitTensionGeneration(dispatch, getState, action.payload.tensionId);
+  subscribeEffect(matchesAction(contractGenerationRequested), () => {
+    submitFoundation(dispatch, getState, "contract");
   });
 
   subscribeEffect(matchesAction(attgGenerationRequested), () => {
-    const strategy = buildFoundationStrategy(getState, "attg");
-    dispatch(
-      requestQueued({
-        id: strategy.requestId,
-        type: "foundation",
-        targetId: "attg",
-      }),
-    );
-    dispatch(generationSubmitted(strategy));
+    submitFoundation(dispatch, getState, "attg");
   });
 
   subscribeEffect(matchesAction(styleGenerationRequested), () => {
-    const strategy = buildFoundationStrategy(getState, "style");
-    dispatch(
-      requestQueued({
-        id: strategy.requestId,
-        type: "foundation",
-        targetId: "style",
-      }),
-    );
-    dispatch(generationSubmitted(strategy));
+    submitFoundation(dispatch, getState, "style");
   });
 }

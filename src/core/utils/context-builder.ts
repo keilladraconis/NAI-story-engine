@@ -39,16 +39,12 @@ import {
   BRAINSTORM_PROMPT,
   BRAINSTORM_CRITIC_PROMPT,
   BRAINSTORM_SUMMARIZE_PROMPT,
-  CANON_GENERATE_PROMPT,
   ATTG_GENERATE_PROMPT,
   STYLE_GENERATE_PROMPT,
   XIALONG_STYLE,
 } from "./prompts";
 // --- Helpers ---
 
-const getFieldContent = (state: RootState, id: string): string => {
-  return state.story.fields[id]?.content || "";
-};
 
 const getBrainstormHistory = (state: RootState): BrainstormMessage[] => {
   return currentMessages(state.brainstorm) || [];
@@ -317,9 +313,8 @@ export const getStoryContextMessages = async (
  * (strategy-specific instructions, prefill, etc.).
  */
 export interface StoryEnginePrefixOptions {
-  /** Snapshot sections to exclude (e.g., "canon" when generating canon) */
+  /** Snapshot sections to exclude (e.g., "foundation" when generating foundation fields) */
   excludeSections?: Array<
-    | "canon"
     | "setting"
     | "attg"
     | "style"
@@ -360,18 +355,23 @@ export const buildStoryEnginePrefix = async (
     if (style) stableSections.push(`[STYLE]\n${style}`);
   }
 
-  // Foundation context (shape, intent, worldState, active tensions)
+  // Foundation context (shape, intent, worldState, intensity, contract)
   if (!excluded.has("foundation")) {
-    const { shape, intent, worldState, tensions } = state.foundation;
+    const { shape, intent, worldState, intensity, contract } = state.foundation;
     const foundationParts: string[] = [];
     if (shape)
       foundationParts.push(`Shape: ${shape.name}\n${shape.description}`);
     if (intent) foundationParts.push(`Intent: ${intent}`);
     if (worldState) foundationParts.push(`World State: ${worldState}`);
-    const activeTensions = tensions.filter((t) => !t.resolved);
-    if (activeTensions.length > 0) {
-      const tensionLines = activeTensions.map((t) => `- ${t.text}`).join("\n");
-      foundationParts.push(`Tensions:\n${tensionLines}`);
+    if (intensity)
+      foundationParts.push(`Intensity: ${intensity.level} — ${intensity.description}`);
+    if (contract) {
+      const contractLines = [
+        `Required: ${contract.required}`,
+        `Prohibited: ${contract.prohibited}`,
+        `Emphasis: ${contract.emphasis}`,
+      ].join("\n");
+      foundationParts.push(`Story Contract:\n${contractLines}`);
     }
     if (foundationParts.length > 0) {
       stableSections.push(
@@ -392,12 +392,6 @@ export const buildStoryEnginePrefix = async (
   if (!excluded.has("brainstorm")) {
     const brainstorm = getConsolidatedBrainstorm(state);
     if (brainstorm) stableSections.push(`[BRAINSTORM]\n${brainstorm}`);
-  }
-
-  // Canon (synthesis — last so it can reference all above sections)
-  if (!excluded.has("canon")) {
-    const canon = getFieldContent(state, FieldID.Canon);
-    if (canon) stableSections.push(`[CANON]\n${canon}`);
   }
 
   // --- MSG 3: World Entry items (GROWS during list stage, stable during lorebook) ---
@@ -501,8 +495,6 @@ export const buildCruciblePrefix = async (
     );
     if (setting) groundingSections.push(`[SETTING]\n${setting}`);
 
-    const canon = getFieldContent(state, FieldID.Canon);
-    if (canon) groundingSections.push(`[CANON]\n${canon}`);
   }
 
   if (options.includeBrainstorm) {
@@ -573,7 +565,6 @@ export const createBrainstormFactory = (
     const storyContext = await getStoryContextMessages();
     messages.push(...storyContext);
 
-    const canon = getFieldContent(state, FieldID.Canon);
     const setting = String(
       (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
     );
@@ -581,10 +572,6 @@ export const createBrainstormFactory = (
     let contextBlock = "Here is the current state of the story:\n";
     let hasContext = false;
 
-    if (canon) {
-      contextBlock += `CANON:\n${canon}\n\n`;
-      hasContext = true;
-    }
     if (setting) {
       contextBlock += `SETTING:\n${setting}\n\n`;
       hasContext = true;
@@ -744,80 +731,6 @@ export const buildSummarizeStrategy = (
     },
     prefillBehavior: "keep",
     continuation: { maxCalls: 3 },
-  };
-};
-
-/**
- * Creates a message factory for Canon generation.
- * Uses unified prefix + volatile tail with canon-specific instruction.
- */
-export const createCanonFactory = (
-  getState: () => RootState,
-): MessageFactory => {
-  return async () => {
-    const prompt = CANON_GENERATE_PROMPT;
-
-    // Exclude canon (generating it — prevents self-reference)
-    const prefix = await buildStoryEnginePrefix(getState, {
-      excludeSections: ["canon"],
-    });
-
-    const messages: Message[] = [...prefix];
-
-    const state = getState();
-
-    // Inject Intent as the authoritative creative source if available.
-    if (state.foundation?.intent) {
-      messages.push({
-        role: "system",
-        content: `[INTENT — AUTHORITATIVE]\nThe following Intent is the definitive creative reference for this story. It supersedes any earlier brainstorm exchanges on all character details, world facts, and framing.\n\n${state.foundation.intent}`,
-      });
-    }
-
-    // Inject shape — required for Structure section
-    if (state.foundation?.shape) {
-      messages.push({
-        role: "system",
-        content: `[NARRATIVE SHAPE — REQUIRED]\nThis story uses the narrative shape "${state.foundation.shape.name}": ${state.foundation.shape.description}`,
-      });
-    }
-
-    messages.push({
-      role: "system",
-      content: `[CANON GENERATION]\n${prompt}`,
-    });
-
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.canon);
-    messages.push({ role: "assistant", content: "**World:**" });
-
-    return {
-      messages,
-      params: await buildModelParams({
-        temperature: 0.9,
-        min_p: 0.05,
-        presence_penalty: 0.1,
-        max_tokens: 900,
-      }),
-      contextPinning: {
-        head: 1,
-        tail: state.foundation?.intent || state.foundation?.shape ? 3 : 2,
-      },
-    };
-  };
-};
-
-/**
- * Builds a Canon generation strategy using JIT factory pattern.
- */
-export const buildCanonStrategy = (
-  getState: () => RootState,
-  fieldId: FieldID,
-): GenerationStrategy => {
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory: createCanonFactory(getState),
-    target: { type: "field", fieldId },
-    prefillBehavior: "trim",
   };
 };
 
