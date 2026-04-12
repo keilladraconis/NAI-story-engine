@@ -118,7 +118,10 @@ export class SeForgeSection extends SuiComponent<
               content: [clearBtnPart],
             }),
             guidanceInput,
-            forgeBtnPart,
+            row({
+              style: { gap: "6px" },
+              content: [forgeBtnPart],
+            }),
             ticker,
           ],
         }),

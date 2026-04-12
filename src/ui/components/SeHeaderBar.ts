@@ -17,7 +17,6 @@ import {
   type SuiComponentOptions,
 } from "nai-simple-ui";
 import { store } from "../../core/store";
-import { segaToggled } from "../../core/store/slices/runtime";
 import { uiUserPresenceConfirmed } from "../../core/store/slices/ui";
 import { storyCleared } from "../../core/store/slices/story";
 import { StoreWatcher } from "../store-watcher";
@@ -34,7 +33,6 @@ export type SeHeaderBarOptions = {
 } & SuiComponentOptions<SeHeaderBarTheme, SeHeaderBarState>;
 
 const BTN_STYLE = { padding: "4px 8px", "font-size": "0.8em" };
-const STOP_STYLE = { ...BTN_STYLE, color: "#ff9800" };
 const CONTINUE_STYLE = {
   ...BTN_STYLE,
   background: colors.header,
@@ -149,23 +147,11 @@ export class SeHeaderBar extends SuiComponent<
     this._watcher.dispose();
     this._watcher.watch(
       (s) => ({
-        segaRunning: s.runtime.segaRunning,
         statusText: s.runtime.sega.statusText,
         genxStatus: s.runtime.genx.status,
         budgetWaitEndTime: s.runtime.genx.budgetWaitEndTime,
       }),
-      ({ segaRunning, statusText, genxStatus, budgetWaitEndTime }) => {
-        api.v1.ui.updateParts([
-          {
-            id: "header-sega-start-btn",
-            style: { ...BTN_STYLE, display: segaRunning ? "none" : "flex" },
-          },
-          {
-            id: "header-sega-stop-btn",
-            style: { ...STOP_STYLE, display: segaRunning ? "flex" : "none" },
-          },
-        ]);
-
+      ({ statusText, genxStatus, budgetWaitEndTime }) => {
         const showContinue = genxStatus === "waiting_for_user";
         const showWait = genxStatus === "waiting_for_budget";
         const showMarquee = !showContinue && !showWait;
@@ -226,7 +212,6 @@ export class SeHeaderBar extends SuiComponent<
         }
       },
       (a, b) =>
-        a.segaRunning === b.segaRunning &&
         a.statusText === b.statusText &&
         a.genxStatus === b.genxStatus &&
         a.budgetWaitEndTime === b.budgetWaitEndTime,
@@ -243,28 +228,6 @@ export class SeHeaderBar extends SuiComponent<
         gap: "8px",
       },
       content: [
-        row({
-          content: [
-            button({
-              id: "header-sega-start-btn",
-              text: "S.E.G.A.",
-              iconId: "play-circle" as IconId,
-              style: BTN_STYLE,
-              callback: () => {
-                store.dispatch(segaToggled());
-              },
-            }),
-            button({
-              id: "header-sega-stop-btn",
-              text: "S.E.G.A.",
-              iconId: "fast-forward" as IconId,
-              style: { ...STOP_STYLE, display: "none" },
-              callback: () => {
-                store.dispatch(segaToggled());
-              },
-            }),
-          ],
-        }),
         text({ id: "header-sega-status", text: "", style: STATUS_STYLE }),
         button({
           id: "header-continue-btn",

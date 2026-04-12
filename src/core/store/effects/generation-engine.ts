@@ -20,10 +20,9 @@ import {
 import {
   buildATTGStrategy,
   buildStyleStrategy,
-  buildDulfsListStrategy,
   buildBootstrapStrategy,
 } from "../../utils/context-builder";
-import { FieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
+import { FieldID } from "../../../config/field-definitions";
 import { getHandler } from "./generation-handlers";
 import { recordEntry, JournalEntry } from "../../generation-journal";
 import { getModel } from "../../utils/config";
@@ -248,10 +247,6 @@ export function registerGenerationEngineEffects(
 
       strategy.requestId = requestId;
       dispatch(generationSubmitted(strategy));
-    } else if (type === "list") {
-      const strategy = buildDulfsListStrategy(getState, targetId);
-      strategy.requestId = requestId;
-      dispatch(generationSubmitted(strategy));
     } else if (type === "bootstrap") {
       const strategy = buildBootstrapStrategy(getState, requestId);
       dispatch(generationSubmitted(strategy));
@@ -439,11 +434,7 @@ export function registerGenerationEngineEffects(
 
     // Toast notifications for Story Engine generations
     if (generationSucceeded) {
-      if (target.type === "list") {
-        const fieldConfig = FIELD_CONFIGS.find((c) => c.id === target.fieldId);
-        const label = fieldConfig?.label || "Items";
-        api.v1.ui.toast(`${label} generated`, { type: "success" });
-      } else if (target.type === "lorebookContent") {
+      if (target.type === "lorebookContent") {
         const entry = await api.v1.lorebook.entry(target.entryId);
         const name = entry?.displayName || "Entry";
         api.v1.ui.toast(`Lorebook: ${name}`, { type: "success" });

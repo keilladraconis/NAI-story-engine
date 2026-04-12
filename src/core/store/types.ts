@@ -35,14 +35,8 @@ export interface StoryField {
   data?: Record<string, unknown>;
 }
 
-export interface DulfsItem {
-  id: string;
-  fieldId: DulfsFieldID;
-}
-
 export interface StoryState {
   fields: Record<string, StoryField>;
-  dulfs: Record<DulfsFieldID, DulfsItem[]>;
   attgEnabled: boolean;
   styleEnabled: boolean;
 }
@@ -132,6 +126,7 @@ export interface GenerationStrategy {
     | {
         type: "forge";
         step: number;
+        phase: "sketch" | "expand" | "weave";
         forgeGuidance: string;
         brainstormContext: string;
         preForgeEntityIds: string[];

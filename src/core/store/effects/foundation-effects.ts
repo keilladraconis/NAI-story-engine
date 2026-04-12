@@ -46,7 +46,8 @@ const createShapeFactory =
   (getState: () => RootState): MessageFactory =>
   async () => {
     const shapePrompt = CRUCIBLE_SHAPE_PROMPT;
-    const existingName = getState().foundation.shape?.name ?? "";
+    const { shape: existingShape, intensity } = getState().foundation;
+    const existingName = existingShape?.name ?? "";
 
     const [prefix, storyContext] = await Promise.all([
       buildStoryEnginePrefix(getState, { excludeSections: ["foundation"] }),
@@ -59,8 +60,16 @@ const createShapeFactory =
     const messages: Message[] = [
       ...prefix,
       ...storyContext.slice(1), // drop NAI's story-writing system prompt
-      { role: "system" as const, content: shapePrompt },
     ];
+
+    if (intensity) {
+      messages.push({
+        role: "system" as const,
+        content: `Intensity: ${intensity.level} — ${intensity.description}`,
+      });
+    }
+
+    messages.push({ role: "system" as const, content: shapePrompt });
 
     await appendXialongStyleMessage(messages, XIALONG_STYLE.foundationShape);
     messages.push({ role: "assistant" as const, content: prefill });
@@ -95,7 +104,13 @@ const createIntentFactory =
       ...storyContext.slice(1), // drop NAI's story-writing system prompt
     ];
 
-    const shape = getState().foundation.shape;
+    const { shape, intensity } = getState().foundation;
+    if (intensity) {
+      messages.push({
+        role: "system" as const,
+        content: `Intensity: ${intensity.level} — ${intensity.description}`,
+      });
+    }
     if (shape) {
       messages.push({
         role: "system" as const,
@@ -132,8 +147,9 @@ const createWorldStateFactory =
 
     const messages: Message[] = [...prefix];
 
-    const { shape, intent } = getState().foundation;
+    const { shape, intent, intensity } = getState().foundation;
     const anchors: string[] = [];
+    if (intensity) anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
     if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
     if (intent) anchors.push(`Intent: ${intent}`);
     if (anchors.length > 0) {
@@ -167,8 +183,9 @@ const createAttgFactory =
     });
     const messages: Message[] = [...prefix];
 
-    const { shape, intent, worldState } = getState().foundation;
+    const { shape, intent, worldState, intensity } = getState().foundation;
     const anchors: string[] = [];
+    if (intensity) anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
     if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
     if (intent) anchors.push(`Intent: ${intent}`);
     if (worldState) anchors.push(`World State: ${worldState}`);
@@ -203,8 +220,9 @@ const createStyleFactory =
     });
     const messages: Message[] = [...prefix];
 
-    const { shape, intent, worldState } = getState().foundation;
+    const { shape, intent, worldState, intensity } = getState().foundation;
     const anchors: string[] = [];
+    if (intensity) anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
     if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
     if (intent) anchors.push(`Intent: ${intent}`);
     if (worldState) anchors.push(`World State: ${worldState}`);

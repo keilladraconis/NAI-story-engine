@@ -35,10 +35,6 @@ export const STORAGE_KEYS = {
   fieldUI: (fieldId: string) => `kse-field-${fieldId}`,
   sectionUI: (fieldId: string) => `kse-section-${fieldId}`,
 
-  // DULFS list items (dynamic by itemId)
-  dulfsItem: (itemId: string) => `dulfs-item-${itemId}`,
-  dulfsItemUI: (itemId: string) => `dulfs-item-${itemId}`,
-
   brainstormInputUI: (inputId: string) => inputId,
 
   // Forge UI

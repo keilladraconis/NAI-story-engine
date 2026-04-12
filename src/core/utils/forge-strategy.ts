@@ -32,6 +32,51 @@ const FIELD_TO_TYPE: Record<string, string> = Object.fromEntries(
 
 export const FORGE_MAX_STEPS = 12;
 
+export type ForgePhase = "sketch" | "expand" | "weave";
+
+interface PhaseConfig {
+  name: ForgePhase;
+  startStep: number;
+  endStep: number;
+  instruction: string;
+  maxTokens: number;
+  temperature: number;
+}
+
+const PHASES: PhaseConfig[] = [
+  {
+    name: "sketch",
+    startStep: 1,
+    endStep: 4,
+    maxTokens: 512,
+    temperature: 0.90,
+    instruction:
+      "Sketch phase — populate the world. Emit multiple CREATE commands per response. Prioritize breadth: characters, locations, situations, systems. One sentence per element. Do not THREAD or REVISE yet.",
+  },
+  {
+    name: "expand",
+    startStep: 5,
+    endStep: 8,
+    maxTokens: 256,
+    temperature: 0.85,
+    instruction:
+      "Expand phase — deepen and refine. REVISE thin descriptions to 2–3 sentences. CREATE elements you notice are missing. DELETE redundant or overlapping elements. No THREADs yet.",
+  },
+  {
+    name: "weave",
+    startStep: 9,
+    endStep: 12,
+    maxTokens: 384,
+    temperature: 0.80,
+    instruction:
+      "Weave phase — discover connections. THREAD elements that share genuine structural bonds. CREATE SITUATION entries for collision points — where one character's goal threatens another's position, where knowledge is distributed unevenly, where resource dependencies force impossible loyalties. Focus on opposing goods, not good vs evil.",
+  },
+];
+
+export function getPhaseForStep(step: number): PhaseConfig {
+  return PHASES.find((p) => step >= p.startStep && step <= p.endStep) ?? PHASES[PHASES.length - 1];
+}
+
 const FIELD_LABEL: Record<DulfsFieldID, string> = {
   [FieldID.DramatisPersonae]: "Characters",
   [FieldID.UniverseSystems]: "Systems",
@@ -180,16 +225,21 @@ export const createForgeFactory = (
       messages.push({ role: "assistant", content: worldStateText });
     }
 
-    // 8. User: step instruction
-    const stepNote =
-      step === FORGE_MAX_STEPS - 1
-        ? `Step ${step} of ${FORGE_MAX_STEPS}. Consider closing with [CRITIQUE] if the draft is complete.`
-        : `Step ${step} of ${FORGE_MAX_STEPS}. Emit one command.`;
+    // 8. User: phase-aware step instruction
+    const phase = getPhaseForStep(step);
+    const phaseStep = step - phase.startStep + 1;
+    const phaseSteps = phase.endStep - phase.startStep + 1;
+    const isLastStep = step >= FORGE_MAX_STEPS;
+    const isLastPhaseStep = step === phase.endStep;
+    const closingNote = isLastStep || isLastPhaseStep
+      ? " Consider closing with [CRITIQUE | assessment] if the draft feels complete."
+      : "";
+    const stepNote = `${phase.instruction} (${phase.name} ${phaseStep}/${phaseSteps})${closingNote}`;
     messages.push({ role: "user", content: stepNote });
 
     // 9. Prior command log + prefill primer — single assistant message.
     const passLog = buildForgePassLog(state, preForgeSet);
-    const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE |" : "[";
+    const prefill = isLastStep ? "[CRITIQUE |" : "[";
     const assistantContent = passLog ? `${passLog}\n${prefill}` : prefill;
     await appendXialongStyleMessage(messages, XIALONG_STYLE.forge);
     messages.push({ role: "assistant", content: assistantContent });
@@ -197,8 +247,8 @@ export const createForgeFactory = (
     return {
       messages,
       params: await buildModelParams({
-        max_tokens: 256,
-        temperature: 0.85,
+        max_tokens: phase.maxTokens,
+        temperature: phase.temperature,
         min_p: 0.05,
       }),
     };
@@ -228,6 +278,7 @@ export const buildForgeStrategy = (
     target: {
       type: "forge",
       step,
+      phase: getPhaseForStep(step).name,
       forgeGuidance,
       brainstormContext,
       preForgeEntityIds,

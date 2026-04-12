@@ -94,8 +94,7 @@ Former rivals turned reluctant allies.`;
   });
 
   it("parses a CRITIQUE command", () => {
-    const text = `[CRITIQUE]
-The world lacks factions. All characters are individuals without institutional backing.`;
+    const text = `[CRITIQUE | The world lacks factions. All characters are individuals without institutional backing.]`;
 
     const commands = parseCommands(text);
     expect(commands).toHaveLength(1);
@@ -118,8 +117,7 @@ A disgraced knight.
 A ruined fortress.
 [LINK "Elara" → "The Shattered Keep"]
 Born here.
-[CRITIQUE]
-Missing factions.
+[CRITIQUE | Missing factions.]
 [DONE]`;
 
     const commands = parseCommands(text);

@@ -124,10 +124,7 @@ export const createLorebookContentFactory = (
     const liveSummary = String(
       (await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) || "",
     ).trim();
-    const dulfsContent = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(entryId))) || "",
-    );
-    const itemSummary = liveSummary || dulfsContent || entity?.summary || "";
+    const itemSummary = liveSummary || entity?.summary || "";
 
     // --- MSG 1: Archivist instructions ---
     const messages: Message[] = [

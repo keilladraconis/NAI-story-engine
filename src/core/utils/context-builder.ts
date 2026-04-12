@@ -54,7 +54,7 @@ const getBrainstormHistory = (state: RootState): BrainstormMessage[] => {
  * Extracts the name portion from a World Entry item content using field-specific parsing.
  * Falls back to raw content if no regex match.
  */
-export const extractDulfsItemName = (
+export const extractEntityName = (
   content: string,
   fieldId: string,
 ): string => {
@@ -132,31 +132,27 @@ export function buildXialongNarrativeStyleBlock(state: RootState): string {
 }
 
 /**
- * Gets existing World Entry item content for a field, joined with newlines.
- * Items are returned in creation order (array index order) for stable context.
- * Returns empty string if no items exist.
+ * Gets existing WorldEntity summaries for a field, joined with newlines.
+ * Returns empty string if no entities exist for the given field.
  */
-export const getExistingDulfsItems = async (
+export const getExistingEntityItems = (
   state: RootState,
   fieldId: DulfsFieldID,
-): Promise<string> => {
-  const items = state.story.dulfs[fieldId] || [];
-  if (items.length === 0) return "";
-
-  const contents: string[] = [];
-  for (const item of items) {
-    const content = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(item.id))) || "",
-    );
-    if (content) contents.push(content);
-  }
-  return contents.join("\n");
+): string => {
+  const entities = Object.values(state.world.entitiesById).filter(
+    (e) => e.categoryId === fieldId,
+  );
+  if (entities.length === 0) return "";
+  return entities
+    .filter((e) => e.summary)
+    .map((e) => e.summary)
+    .join("\n");
 };
 
 /**
  * All World Entry field IDs for iteration.
  */
-const ALL_DULFS_FIELDS: DulfsFieldID[] = [
+const ALL_ENTITY_FIELDS: DulfsFieldID[] = [
   FieldID.DramatisPersonae,
   FieldID.UniverseSystems,
   FieldID.Locations,
@@ -166,16 +162,15 @@ const ALL_DULFS_FIELDS: DulfsFieldID[] = [
 ];
 
 /**
- * Gets all World Entry items across all fields, grouped by category label.
- * Categories are in fixed order (DP → US → Loc → Fac → SD).
- * Items within each category are in creation order (stable).
+ * Gets all WorldEntity summaries grouped by category label.
+ * Categories are in fixed order (DP → US → Loc → Fac → SD → Topics).
  * Returns formatted string for context injection.
  */
-export const getAllDulfsContext = async (state: RootState): Promise<string> => {
+export const getAllWorldEntityContext = (state: RootState): string => {
   const sections: string[] = [];
 
-  for (const fieldId of ALL_DULFS_FIELDS) {
-    const items = await getExistingDulfsItems(state, fieldId);
+  for (const fieldId of ALL_ENTITY_FIELDS) {
+    const items = getExistingEntityItems(state, fieldId);
     if (items) {
       const config = FIELD_CONFIGS.find((f) => f.id === fieldId);
       const label = config?.label || fieldId;
@@ -319,7 +314,7 @@ export interface StoryEnginePrefixOptions {
     | "attg"
     | "style"
     | "brainstorm"
-    | "dulfs"
+    | "worldEntities"
     | "storyText"
     | "foundation"
   >;
@@ -394,12 +389,12 @@ export const buildStoryEnginePrefix = async (
     if (brainstorm) stableSections.push(`[BRAINSTORM]\n${brainstorm}`);
   }
 
-  // --- MSG 3: World Entry items (GROWS during list stage, stable during lorebook) ---
+  // --- MSG 3: World Entities (GROWS during list stage, stable during lorebook) ---
   // Separate message so growth doesn't invalidate MSG 2's cached tokens.
-  let dulfsContent = "";
-  if (!excluded.has("dulfs")) {
-    const dulfsContext = await getAllDulfsContext(state);
-    if (dulfsContext) dulfsContent = `[WORLD ENTRIES]\n${dulfsContext}`;
+  let worldEntityContent = "";
+  if (!excluded.has("worldEntities")) {
+    const entityContext = getAllWorldEntityContext(state);
+    if (entityContext) worldEntityContent = `[WORLD ENTRIES]\n${entityContext}`;
   }
 
   // --- MSG 4: Story text (VOLATILE — at end of prefix) ---
@@ -427,10 +422,10 @@ export const buildStoryEnginePrefix = async (
     });
   }
 
-  if (dulfsContent) {
+  if (worldEntityContent) {
     messages.push({
       role: "system",
-      content: dulfsContent,
+      content: worldEntityContent,
     });
   }
 
@@ -456,7 +451,7 @@ export interface CruciblePrefixOptions {
   /** Include the crucible direction/intent text */
   includeDirection?: boolean;
   /** Include World Entry items (for chain, builder) */
-  includeDulfs?: boolean;
+  includeWorldEntities?: boolean;
   /** Include Setting + Canon if available (for intent derivation) */
   includeStoryState?: boolean;
   /** Include accepted tensions as [TENSIONS] section */
@@ -526,13 +521,13 @@ export const buildCruciblePrefix = async (
     }
   }
 
-  // --- MSG 3 (optional): World Entry items ---
-  if (options.includeDulfs) {
-    const dulfsContext = await getAllDulfsContext(state);
-    if (dulfsContext) {
+  // --- MSG 3 (optional): World Entities ---
+  if (options.includeWorldEntities) {
+    const entityContext = getAllWorldEntityContext(state);
+    if (entityContext) {
       messages.push({
         role: "system",
-        content: `[WORLD ENTRIES]\n${dulfsContext}`,
+        content: `[WORLD ENTRIES]\n${entityContext}`,
       });
     }
   }
@@ -734,72 +729,6 @@ export const buildSummarizeStrategy = (
   };
 };
 
-/**
- * Creates a message factory for World Entry list generation.
- * Uses unified prefix + volatile tail with list-specific instruction.
- */
-export const createDulfsListFactory = (
-  getState: () => RootState,
-  fieldId: string,
-): MessageFactory => {
-  return async () => {
-    const state = getState();
-    const fieldConfig = FIELD_CONFIGS.find((f) => f.id === fieldId);
-
-    const instruction =
-      fieldConfig?.listGenerationInstruction ||
-      fieldConfig?.generationInstruction ||
-      "";
-    const exampleFormat = fieldConfig?.exampleFormat || "";
-
-    // Get existing items in full format to avoid duplicates
-    const existingItems = await getExistingDulfsItems(
-      state,
-      fieldId as DulfsFieldID,
-    );
-    const existingContext = existingItems
-      ? `\n\n[EXISTING ${fieldConfig?.label?.toUpperCase() || "ITEMS"}]\n${existingItems}\n\nDo not repeat any of the above characters/items.`
-      : "";
-
-    const prefix = await buildStoryEnginePrefix(getState);
-
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: `[LIST GENERATION]\n${instruction}\n\nOutput a bulleted list. Each item is ONE LINE — name and a terse summary clause. No prose, no atmosphere, no history.\nFormat:\n${exampleFormat}`,
-      },
-      {
-        role: "user",
-        content: existingContext.trim() || "Generate items.",
-      },
-    ];
-
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.dulfsList);
-    messages.push({ role: "assistant", content: "-" });
-
-    return {
-      messages,
-      params: await buildModelParams({ max_tokens: 350, temperature: 0.8, min_p: 0.1 }),
-      contextPinning: { head: 1, tail: 3 },
-    };
-  };
-};
-
-/**
- * Builds a World Entry list generation strategy using JIT factory pattern.
- */
-export const buildDulfsListStrategy = (
-  getState: () => RootState,
-  fieldId: string,
-): GenerationStrategy => {
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory: createDulfsListFactory(getState, fieldId),
-    target: { type: "list", fieldId },
-    prefillBehavior: "trim",
-  };
-};
 
 /**
  * Creates a message factory for ATTG generation.

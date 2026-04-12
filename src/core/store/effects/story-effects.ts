@@ -20,7 +20,6 @@ export function registerStoryEffects(
       /^kse-sync-/,
       /^kse-section-/,
       /^draft-/,
-      /^dulfs-item-/,
       /^se-bs-input$/,
       /^cr-/,
       /^lb-/,

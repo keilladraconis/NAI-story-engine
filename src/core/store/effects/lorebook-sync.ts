@@ -1,9 +1,6 @@
-import { Store, matchesAction } from "nai-store";
+import { Store } from "nai-store";
 import { RootState, AppDispatch } from "../types";
-import { dulfsItemAdded, dulfsItemRemoved } from "../index";
 import { DulfsFieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
-import { STORAGE_KEYS } from "../../../ui/framework/ids";
-import { extractDulfsItemName } from "../../utils/context-builder";
 
 // Lorebook sync constants
 export const SE_CATEGORY_PREFIX = "SE: ";
@@ -33,7 +30,7 @@ export async function migrateLorebookCategories(): Promise<void> {
   }
 }
 
-// Helper: Find or create a category for a DULFS field
+// Helper: Find or create a category for a field
 export async function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
   const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
   const name = `${SE_CATEGORY_PREFIX}${config?.label || fieldId}`;
@@ -52,7 +49,7 @@ export async function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
   });
 }
 
-// Helper: Find a category for a DULFS field (returns null if not found)
+// Helper: Find a category for a field (returns null if not found)
 export async function findCategory(
   fieldId: DulfsFieldID,
 ): Promise<string | null> {
@@ -64,24 +61,17 @@ export async function findCategory(
 
 /**
  * Sync lorebook entries and categories when erato_compatibility is toggled.
- * - Erato ON: clear entryHeader from categories, prepend "----\n" to entry text
- * - Erato OFF: set entryHeader on categories, strip "----\n" from entry text
+ * Reads managed entry IDs from WorldEntities (via lorebookEntryId).
  */
 export async function syncEratoCompatibility(
   getState: () => RootState,
 ): Promise<void> {
   const erato = (await api.v1.config.get("erato_compatibility")) || false;
-  const dulfs = getState().story.dulfs;
 
-  // Collect managed entry IDs from DULFS state
+  // Collect managed entry IDs from WorldEntities
   const entryIds: string[] = [];
-  for (const fieldId in dulfs) {
-    const items = dulfs[fieldId as DulfsFieldID];
-    if (items) {
-      for (const item of items) {
-        entryIds.push(item.id);
-      }
-    }
+  for (const entity of Object.values(getState().world.entitiesById)) {
+    if (entity.lorebookEntryId) entryIds.push(entity.lorebookEntryId);
   }
 
   // Gather unique category IDs from managed entries
@@ -166,41 +156,10 @@ export function registerLorebookSyncHooks(
 }
 
 export function registerLorebookSyncEffects(
-  subscribeEffect: Store<RootState>["subscribeEffect"],
+  _subscribeEffect: Store<RootState>["subscribeEffect"],
   _dispatch: AppDispatch,
   _getState: () => RootState,
 ): void {
-  // Lorebook Sync: Item Added
-  subscribeEffect(matchesAction(dulfsItemAdded), async (action) => {
-    const { fieldId, item } = action.payload;
-    const content =
-      (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(item.id))) || "";
-
-    const name = extractDulfsItemName(String(content), fieldId);
-
-    const categoryId = await ensureCategory(fieldId);
-    await api.v1.lorebook.createEntry({
-      id: item.id,
-      category: categoryId,
-      displayName: name,
-      keys: [],
-      enabled: true,
-    });
-  });
-
-  // Lorebook Sync: Item Removed
-  subscribeEffect(matchesAction(dulfsItemRemoved), async (action) => {
-    const { fieldId, itemId } = action.payload;
-
-    await api.v1.lorebook.removeEntry(itemId);
-    await api.v1.storyStorage.set(STORAGE_KEYS.dulfsItem(itemId), null);
-
-    const categoryId = await findCategory(fieldId);
-    if (categoryId) {
-      const entries = await api.v1.lorebook.entries(categoryId);
-      if (entries.length === 0) {
-        await api.v1.lorebook.removeCategory(categoryId);
-      }
-    }
-  });
+  // Lorebook sync for world entities is handled directly by the list handler
+  // and forge handler at creation time. No subscribeEffect needed.
 }

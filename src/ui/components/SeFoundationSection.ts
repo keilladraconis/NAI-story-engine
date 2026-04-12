@@ -671,6 +671,19 @@ export class SeFoundationSection extends SuiComponent<
         column({
           style: { gap: "8px" },
           content: [
+            // Intensity — card header + level picker + description text (first: sets the register)
+            column({
+              style: { gap: "2px" },
+              content: [
+                intensityCardPart,
+                intensityBarPart,
+                text({
+                  id: intensityDescId,
+                  text: escapeDisplay(intensity?.description || "") || "No intensity defined",
+                  style: CONTENT_TEXT_STYLE,
+                }),
+              ],
+            }),
             // Shape — card header + description text below
             column({
               style: { gap: "2px" },
@@ -691,19 +704,6 @@ export class SeFoundationSection extends SuiComponent<
                 text({
                   id: intentDescId,
                   text: escapeDisplay(intent) || "No intent defined",
-                  style: CONTENT_TEXT_STYLE,
-                }),
-              ],
-            }),
-            // Intensity — card header + level picker + description text
-            column({
-              style: { gap: "2px" },
-              content: [
-                intensityCardPart,
-                intensityBarPart,
-                text({
-                  id: intensityDescId,
-                  text: escapeDisplay(intensity?.description || "") || "No intensity defined",
                   style: CONTENT_TEXT_STYLE,
                 }),
               ],

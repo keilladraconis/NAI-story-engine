@@ -28,7 +28,7 @@ import {
 } from "../../../utils/crucible-command-parser";
 import { TYPE_TO_FIELD } from "../../../utils/crucible-command-parser";
 import { stripThinkingTags } from "../../../utils/tag-parser";
-import { FORGE_MAX_STEPS } from "../../../utils/forge-strategy";
+import { getPhaseForStep } from "../../../utils/forge-strategy";
 import { IDS } from "../../../../ui/framework/ids";
 
 type ForgeTarget = Extract<GenerationStrategy["target"], { type: "forge" }>;
@@ -187,11 +187,14 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
       ? commandMatches[commandMatches.length - 1]
       : "";
     const tail = lastCommand || text.replace(/\n+/g, " ").slice(-80);
+    const phase = getPhaseForStep(ctx.target.step);
+    const phaseStep = ctx.target.step - phase.startStep + 1;
+    const phaseSteps = phase.endStep - phase.startStep + 1;
 
     api.v1.ui.updateParts([
       {
         id: IDS.FORGE.TICKER,
-        text: `[${ctx.target.step}/${FORGE_MAX_STEPS}] ${tail}`,
+        text: `[${phase.name} ${phaseStep}/${phaseSteps}] ${tail}`,
       },
     ]);
   },

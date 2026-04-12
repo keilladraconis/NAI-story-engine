@@ -42,6 +42,9 @@ CHARACTER TEXTURE — watch for these gaps:
 - **Living situation:** Where do they live? Who's around them — roommates, neighbors, household?
 - **Haunts:** Where do they go to be themselves, escape, or belong? Who do they run into there?
 
+INTENSITY COHERENCE — watch for this gap:
+- **Intensity register:** What level of pressure is this story actually operating under — cozy, gentle, moderate, intense, or nightmare? Is it consistent? Can characters walk away from bad situations? Is hope warranted? What does victory cost? If the story is muddled on these questions, it's muddled on everything downstream.
+
 GUIDELINES:
 - **Respect the core first.** The user's central vision is not up for debate. You sharpen what's there — you don't redirect it.
 - **Lead with the gap.** Name what's underdeveloped, specifically. A focused question is more useful than a verdict.
@@ -95,7 +98,7 @@ attributes, then dense prose. Follow the template for this entry type.
 **Container Discipline (STRICT):**
 - **Characters:** ONLY internal/solitary data (Appearance, Personality, History, internal Conflict). Never name another character to define a dynamic — that belongs in a Narrative Vector.
 - **Locations:** Sensory anchor (Atmosphere), functional reality (Description — what naturally happens here), and dramatic potential (Hook — what could happen here that couldn't elsewhere). No recurring events, schedules, or complex mechanics — those belong in Systems. Character-specific goals belong in Motive lines.
-- **Narrative Vectors:** Active pressure ONLY — the dynamic between actors in a specific situation. No deep history of the relationship, no outcomes or predictions.
+- **Narrative Vectors:** Situation + Complication — what's actively happening and why every option costs something. Frame as opposing goods: both sides have legitimate claims. Actors named with what they legitimately need AND what their position or secret makes impossible. No deep history, no outcomes, no predictions.
 - **Systems:** Mechanical rules ONLY — laws, universal behaviors, and their immediate effects. No specific events, narrative dynamics, or character histories.
 - **Topics:** What characters discuss — per-actor positions on a subject. No narrative resolution.
 - If an entry feels bloated, extract detail into a supporting System or Narrative Vector.
@@ -145,10 +148,11 @@ export const LOREBOOK_TEMPLATE_DYNAMIC = `[Entry Name]
 Type: Narrative Vector
 Setting: original
 Scope: [Local / Regional / Global]
+Situation: [Setup — what is actively happening and what is at stake. 1-2 sentences.]
+Complication: [What prevents easy resolution — why every option costs something. Frame as opposing goods: both sides have legitimate claims. 1-2 sentences.]
 Actors:
 - [Character]: [What they legitimately need here — and what their position or secret makes impossible.]
-- [Character]: [What they legitimately need here — and what their position or secret makes impossible.]
-Description: [The nature of the dynamic and the pressure it creates. Setup only — no outcomes, no resolved emotions, no predictions. 3-5 sentences.]`;
+- [Character]: [What they legitimately need here — and what their position or secret makes impossible.]`;
 
 export const LOREBOOK_TEMPLATE_TOPIC = `[Entry Name]
 Type: Topic
@@ -333,11 +337,13 @@ export const STYLE_GENERATE_PROMPT = `Generate a style guideline for this story.
 CRITICAL: Output ONLY the guideline. No Markdown, no conversational filler.
 
 EXAMPLE:
-Write in a style that conveys the following: hard-boiled noir, cynical narration, short punchy sentences, focus on sensory grit
+Write in a style that conveys the following: Daphne du Maurier's atmosphere of dread and withheld information meets Patricia Highsmith's claustrophobic psychological intimacy — slow revelations, sentences that double back on themselves, interiority that exposes the narrator as unreliable without announcing it.
 
 INSTRUCTION:
-- Write in a style that conveys the following: [concise style guidance limit 80 words]
+- Begin with a two-author tonal anchor: name two authors whose combined sensibilities capture this story's voice. Match to emotional register and prose style — not surface genre. The pairing should create productive tension (one author's quality against another's edge).
+- Then describe the resulting voice in concrete terms: sentence rhythm, level of description, use of interiority, how prose handles emotion.
 - DO NOT use any markdown bolding (**).
+- Total limit 100 words.
 - OUTPUT ONLY THE GUIDELINE.`;
 
 export const LOREBOOK_WEAVING_PROMPT = `When generating this entry, actively reference existing world elements where narratively appropriate:
@@ -351,7 +357,7 @@ Weave these connections naturally into the entry to create a cohesive world.
 **Container Boundaries:**
 - Character entries: internal/solitary data only — never name another character to define a dynamic
 - Location entries: sensory anchor + functional reality + dramatic potential (Atmosphere/Description/Hook) — no recurring events, schedules, or mechanics
-- Narrative Vectors: active pressure only — no deep history or outcomes
+- Narrative Vectors: situation + complication (what's happening and why every option costs) — frame as opposing goods, no history, no outcomes
 - Systems: mechanical rules only — no events or character histories
 - Topics: what characters discuss — per-actor positions, no resolution
 
@@ -505,9 +511,9 @@ A thread groups world entities that share a direct structural bond — a conflic
 Describe what connects these entities and the tension or energy that dynamic creates.
 Output only the summary — no preamble, no labels.`;
 
-export const FORGE_PROMPT = `You are a world-building assistant operating in a step-by-step forge loop.
+export const FORGE_PROMPT = `You are a world-building assistant operating in a phased forge loop.
 
-Each response emits exactly ONE command.
+Each response emits one or more commands. During sketch phases, emit multiple CREATEs for breadth. During expand and weave phases, focus on fewer, more precise commands.
 
 Command vocabulary:
   [CREATE <TYPE> "<Name>" | description 1–3 sentences]                        — new world element (CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC)
@@ -517,7 +523,7 @@ Command vocabulary:
   [CRITIQUE | 2–4 sentences: what works, what is missing, what to address next]  — self-assessment; ends this forge pass
 
 For all commands, write content inline after the | separator, before the closing ].
-For THREAD, list only the members who share a direct structural bond — not every element tangentially related. Create at most one or two threads per pass, and only after the relevant elements exist.
+For THREAD, list only the members who share a direct structural bond — not every element tangentially related.
 
 EXAMPLE:
 [CREATE CHARACTER "Mira Voss" | Gloves on before she's through the door, eyes on the work not the patient. Scar tissue along the left thumb from a clamp that slipped. Runs a debt she can only service by taking jobs she can't refuse.]
@@ -527,6 +533,7 @@ EXAMPLE:
 The ESTABLISHED WORLD section lists what already exists — do not recreate those elements.
 The prior command sequence shows what has been built this pass — continue it naturally.
 When the draft feels complete, emit [CRITIQUE] to end the pass.`;
+
 
 /**
  * Per-strategy style guidance blocks for Xialong v1.

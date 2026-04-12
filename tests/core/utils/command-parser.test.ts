@@ -45,7 +45,7 @@ describe("parseCommands", () => {
   });
 
   it("parses a CRITIQUE block", () => {
-    const commands = parseCommands(`[CRITIQUE]\nNeeds more factions.`);
+    const commands = parseCommands(`[CRITIQUE | Needs more factions.]`);
     expect(commands).toHaveLength(1);
     expect(commands[0].kind).toBe("CRITIQUE");
     if (commands[0].kind === "CRITIQUE") {
@@ -60,8 +60,7 @@ A knight.
 A fortress.
 [LINK "Elara" → "Keep"]
 Home.
-[CRITIQUE]
-Missing factions.
+[CRITIQUE | Missing factions.]
 [DONE]`;
     const commands = parseCommands(text);
     const kinds = commands.map((c) => c.kind);

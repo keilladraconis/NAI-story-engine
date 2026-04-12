@@ -1,6 +1,8 @@
 import { DulfsFieldID } from "../../../../config/field-definitions";
-import { STORAGE_KEYS } from "../../../../ui/framework/ids";
-import { dulfsItemAdded } from "../../index";
+import { WorldEntity } from "../../types";
+import { entityForged } from "../../slices/world";
+import { ensureCategory } from "../lorebook-sync";
+import { extractEntityName } from "../../../utils/context-builder";
 import {
   GenerationHandlers,
   ListTarget,
@@ -33,36 +35,48 @@ export const listHandler: GenerationHandlers<ListTarget> = {
   async completion(ctx: CompletionContext<ListTarget>): Promise<void> {
     if (!ctx.accumulatedText) return;
 
-    // Parse generated list and create DULFS items with full content
+    const fieldId = ctx.target.fieldId as DulfsFieldID;
+
+    // Parse generated list and create WorldEntities with lorebook entries
     const lines = ctx.accumulatedText.split("\n").filter((l) => l.trim());
     for (const line of lines) {
       // Strip markdown FIRST (before bullet stripping eats markdown asterisks)
       const cleanLine = stripMarkdown(line);
       // Strip bullets, numbers, dashes, and extract full content
-      // Note: * removed from character class since markdown is already stripped
       const match = cleanLine.match(/^[\s\-+•\d.)\]]*(.+)$/);
       if (match) {
-        const content = match[1].trim().replace(/^[:\-–—]\s*/, ""); // Strip leading colons/dashes only
+        const content = match[1].trim().replace(/^[:\-–—]\s*/, "");
 
         if (content) {
-          const itemId = api.v1.uuid();
+          const name = extractEntityName(content, fieldId);
 
-          // Store full content in storyStorage (name extraction happens in effects.ts)
-          await api.v1.storyStorage.set(
-            STORAGE_KEYS.dulfsItem(itemId),
-            content,
+          // Dedup: skip if name already exists (case-insensitive)
+          const existing = Object.values(ctx.getState().world.entitiesById).find(
+            (e) => e.name.toLowerCase() === name.toLowerCase() && e.categoryId === fieldId,
           );
+          if (existing) {
+            api.v1.log(`[list] Skipped duplicate: "${name}"`);
+            continue;
+          }
 
-          // Dispatch item - lorebook sync (with parsed name) happens in effects.ts
-          ctx.dispatch(
-            dulfsItemAdded({
-              fieldId: ctx.target.fieldId as DulfsFieldID,
-              item: {
-                id: itemId,
-                fieldId: ctx.target.fieldId as DulfsFieldID,
-              },
-            }),
-          );
+          const categoryId = await ensureCategory(fieldId);
+          const lorebookEntryId = await api.v1.lorebook.createEntry({
+            id: api.v1.uuid(),
+            displayName: name,
+            text: "",
+            keys: [],
+            enabled: true,
+            category: categoryId,
+          });
+
+          const entity: WorldEntity = {
+            id: api.v1.uuid(),
+            categoryId: fieldId,
+            lorebookEntryId,
+            name,
+            summary: content,
+          };
+          ctx.dispatch(entityForged({ entity }));
         }
       }
     }

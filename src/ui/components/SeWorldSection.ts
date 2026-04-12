@@ -22,6 +22,7 @@ import {
 } from "nai-simple-ui";
 import { store } from "../../core/store";
 import { groupCreated, entityForged } from "../../core/store/slices/world";
+import { segaToggled } from "../../core/store/slices/runtime";
 import { FieldID } from "../../config/field-definitions";
 import { IDS } from "../../ui/framework/ids";
 import { ensureCategory } from "../../core/store/effects/lorebook-sync";
@@ -194,11 +195,39 @@ export class SeWorldSection extends SuiComponent<
       theme: { default: { self: { iconId: "layers" as IconId } } },
     });
 
+    const segaStartBtn = new SuiButton({
+      id: `${IDS.WORLD.SECTION}-sega-start-btn`,
+      callback: () => { store.dispatch(segaToggled()); },
+      theme: { default: { self: { text: "S.E.G.A.", iconId: "play-circle" as IconId } } },
+    });
+
+    const segaStopBtn = new SuiButton({
+      id: `${IDS.WORLD.SECTION}-sega-stop-btn`,
+      callback: () => { store.dispatch(segaToggled()); },
+      theme: { default: { self: { text: "S.E.G.A.", iconId: "fast-forward" as IconId, style: { display: "none", color: "#ff9800" } } } },
+    });
+
+    this._watcher.watch(
+      (s) => s.runtime.segaRunning,
+      (segaRunning) => {
+        api.v1.ui.updateParts([
+          {
+            id: `${IDS.WORLD.SECTION}-sega-start-btn`,
+            style: { ...ACTION_BASE, display: segaRunning ? "none" : "flex" },
+          },
+          {
+            id: `${IDS.WORLD.SECTION}-sega-stop-btn`,
+            style: { ...ACTION_BASE, color: "#ff9800", display: segaRunning ? "flex" : "none" },
+          },
+        ]);
+      },
+    );
+
     const headerCard = new SuiCard({
       id: `${IDS.WORLD.SECTION}.card`,
       label: "World",
       icon: "globe" as IconId,
-      actions: [addEntityBtn, addThreadBtn],
+      actions: [segaStartBtn, segaStopBtn, addEntityBtn, addThreadBtn],
       theme: { default: { actions: { base: ACTION_BASE } } },
     });
 
