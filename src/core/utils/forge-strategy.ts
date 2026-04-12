@@ -230,9 +230,8 @@ export const createForgeFactory = (
     const phaseStep = step - phase.startStep + 1;
     const phaseSteps = phase.endStep - phase.startStep + 1;
     const isLastStep = step >= FORGE_MAX_STEPS;
-    const isLastPhaseStep = step === phase.endStep;
-    const closingNote = isLastStep || isLastPhaseStep
-      ? " Consider closing with [CRITIQUE | assessment] if the draft feels complete."
+    const closingNote = isLastStep
+      ? " End with a final [CRITIQUE | overall assessment of the draft]."
       : "";
     const stepNote = `${phase.instruction} (${phase.name} ${phaseStep}/${phaseSteps})${closingNote}`;
     messages.push({ role: "user", content: stepNote });

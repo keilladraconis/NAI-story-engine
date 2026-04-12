@@ -28,7 +28,7 @@ import {
 } from "../../../utils/crucible-command-parser";
 import { TYPE_TO_FIELD } from "../../../utils/crucible-command-parser";
 import { stripThinkingTags } from "../../../utils/tag-parser";
-import { getPhaseForStep } from "../../../utils/forge-strategy";
+import { getPhaseForStep, FORGE_MAX_STEPS } from "../../../utils/forge-strategy";
 import { IDS } from "../../../../ui/framework/ids";
 
 type ForgeTarget = Extract<GenerationStrategy["target"], { type: "forge" }>;
@@ -228,23 +228,28 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
 
     await executeForgeCommands(commands, ctx.getState, ctx.dispatch);
 
-    const critique = commands.find(
-      (c): c is CritiqueCommand => c.kind === "CRITIQUE",
-    );
-    if (critique) {
-      ctx.dispatch(
-        forgeCritiqueReceived({
-          critiqueText: critique.text,
-        }),
-      );
-      return;
-    }
-
+    // DONE is a hard stop at any step (emergency exit, not prompted)
     if (commands.some((c) => c.kind === "DONE")) {
       ctx.dispatch(forgeLoopEnded());
       return;
     }
 
+    const isLastStep = ctx.target.step >= FORGE_MAX_STEPS;
+    const critique = commands.find(
+      (c): c is CritiqueCommand => c.kind === "CRITIQUE",
+    );
+
+    if (isLastStep) {
+      // Final step: write critique to guidance field and end loop
+      ctx.dispatch(
+        forgeCritiqueReceived({
+          critiqueText: critique?.text ?? "",
+        }),
+      );
+      return;
+    }
+
+    // Mid-loop critique is already logged in executeForgeCommands — just continue
     ctx.dispatch(forgeStepCompleted(stepPayload));
   },
 };

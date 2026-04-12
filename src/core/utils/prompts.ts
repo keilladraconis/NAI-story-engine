@@ -520,7 +520,7 @@ Command vocabulary:
   [REVISE "<Name>" | updated description 1–3 sentences]                       — rewrite an existing draft element
   [DELETE "<Name>"]                                                            — remove a draft element
   [THREAD "<Title>" | "Name1", "Name2" | 1-sentence description]              — group 2–4 elements with a genuine shared dynamic into a thread
-  [CRITIQUE | 2–4 sentences: what works, what is missing, what to address next]  — self-assessment; ends this forge pass
+  [CRITIQUE | 2–4 sentences: what is working, what is still missing, what to address next]  — running self-assessment; include one per step
 
 For all commands, write content inline after the | separator, before the closing ].
 For THREAD, list only the members who share a direct structural bond — not every element tangentially related.
@@ -529,10 +529,10 @@ EXAMPLE:
 [CREATE CHARACTER "Mira Voss" | Gloves on before she's through the door, eyes on the work not the patient. Scar tissue along the left thumb from a clamp that slipped. Runs a debt she can only service by taking jobs she can't refuse.]
 [CREATE LOCATION "The Sunken Arcade" | Reeks of salt water and old smoke — the flood line is still visible three meters up the wall. Smugglers use it because the exits outnumber the entrances and no one asks questions. The only place in the district where someone with the wrong face can broker a deal with someone from the right side of the city.]
 [THREAD "Black-Market Bay" | "Mira Voss", "The Sunken Arcade" | The physical space that makes Mira's work possible and visible to the wrong people.]
+[CRITIQUE | The cast has friction but the locations are generic containers — they need to be sites of specific pressure, not just backdrop. The arcade works; the hospital does not yet.]
 
 The ESTABLISHED WORLD section lists what already exists — do not recreate those elements.
-The prior command sequence shows what has been built this pass — continue it naturally.
-When the draft feels complete, emit [CRITIQUE] to end the pass.`;
+The prior command sequence shows what has been built this pass — continue it naturally.`;
 
 
 /**
