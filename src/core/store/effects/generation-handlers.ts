@@ -17,6 +17,7 @@ import {
   entitySummaryBindHandler,
   threadSummaryHandler,
 } from "./handlers/summary";
+import { bootstrapHandler } from "./handlers/bootstrap";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -70,6 +71,10 @@ export type ThreadSummaryTarget = Extract<
   GenerationStrategy["target"],
   { type: "threadSummary" }
 >;
+export type BootstrapTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "bootstrap" }
+>;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
   target: T;
@@ -114,6 +119,7 @@ export const GENERATION_HANDLERS: {
   entitySummary: GenerationHandlers<EntitySummaryTarget>;
   entitySummaryBind: GenerationHandlers<EntitySummaryBindTarget>;
   threadSummary: GenerationHandlers<ThreadSummaryTarget>;
+  bootstrap: GenerationHandlers<BootstrapTarget>;
 } = {
   brainstorm: brainstormHandler,
   brainstormChatTitle: brainstormChatTitleHandler,
@@ -127,6 +133,7 @@ export const GENERATION_HANDLERS: {
   entitySummary: entitySummaryHandler,
   entitySummaryBind: entitySummaryBindHandler,
   threadSummary: threadSummaryHandler,
+  bootstrap: bootstrapHandler,
 };
 
 export function getHandler(

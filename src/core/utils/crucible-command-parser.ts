@@ -104,14 +104,14 @@ export function parseCommands(text: string): ParsedCommand[] {
     const line = lines[i].trim();
 
     // [DONE]
-    if (line === "[DONE]") {
+    if (/^\[\s*DONE\s*\]$/.test(line)) {
       commands.push({ kind: "DONE" });
       continue;
     }
 
     // [CREATE TYPE "Name" | inline description] — forge inline format
     const createInline = line.match(
-      /^\[CREATE\s+([A-Z]+)\s+"([^"]+)"\s*\|\s*(.+?)\]?\s*$/,
+      /^\[\s*CREATE\s+([A-Z]+)\s+"([^"]+)"\s*\|\s*(.+?)\]?\s*$/,
     );
     if (createInline) {
       commands.push({
@@ -124,7 +124,7 @@ export function parseCommands(text: string): ParsedCommand[] {
     }
 
     // [CREATE TYPE "Name"] — classic multi-line format (Crucible)
-    const createMatch = line.match(/^\[CREATE\s+([A-Z]+)\s+"([^"]+)"\]/);
+    const createMatch = line.match(/^\[\s*CREATE\s+([A-Z]+)\s+"([^"]+)"\]/);
     if (createMatch) {
       const elementType = createMatch[1];
       const name = createMatch[2].trim();
@@ -138,7 +138,7 @@ export function parseCommands(text: string): ParsedCommand[] {
     // [REVISE "Name" | inline description] — forge inline format
     // Also handles [REVISE TYPE "Name" | desc]
     const reviseInline = line.match(
-      /^\[(?:REVISE|DESCRIPTION)\s+(?:[A-Z]+\s+)?"([^"]+)"\s*\|\s*(.+?)\]?\s*$/,
+      /^\[\s*(?:REVISE|DESCRIPTION)\s+(?:[A-Z]+\s+)?"([^"]+)"\s*\|\s*(.+?)\]?\s*$/,
     );
     if (reviseInline) {
       commands.push({
@@ -153,7 +153,7 @@ export function parseCommands(text: string): ParsedCommand[] {
     // Also accepts [DESCRIPTION "Name"] as an alias — GLM sometimes emits this
     // when asked to update a character description.
     const reviseMatch = line.match(
-      /^\[(?:REVISE|DESCRIPTION)\s+(?:[A-Z]+\s+)?"([^"]+)"\]/,
+      /^\[\s*(?:REVISE|DESCRIPTION)\s+(?:[A-Z]+\s+)?"([^"]+)"\]/,
     );
     if (reviseMatch) {
       const name = reviseMatch[1].trim();
@@ -166,7 +166,7 @@ export function parseCommands(text: string): ParsedCommand[] {
 
     // [LINK "Name" → "Name"] or [LINK "Name" -> "Name"]
     const linkMatch = line.match(
-      /^\[LINK\s+"([^"]+)"\s*(?:→|->)\s*"([^"]+)"\]/,
+      /^\[\s*LINK\s+"([^"]+)"\s*(?:→|->)\s*"([^"]+)"\]/,
     );
     if (linkMatch) {
       const fromName = linkMatch[1].trim();
@@ -179,15 +179,15 @@ export function parseCommands(text: string): ParsedCommand[] {
     }
 
     // [DELETE "Name"]
-    const deleteMatch = line.match(/^\[DELETE\s+"([^"]+)"\]/);
+    const deleteMatch = line.match(/^\[\s*DELETE\s+"([^"]+)"\]/);
     if (deleteMatch) {
       commands.push({ kind: "DELETE", name: deleteMatch[1].trim() });
       continue;
     }
 
     // [THREAD "Title" | "Name1", "Name2" | optional description]
-    const threadMatch = line.match(/^\[THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^\]]+?)\]?\s*$/) ??
-                        line.match(/^\[THREAD\s+"([^"]+)"\s*\|([^|]+?)\]?\s*$/);
+    const threadMatch = line.match(/^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^\]]+?)\]?\s*$/) ??
+                        line.match(/^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\]?\s*$/);
     if (threadMatch) {
       const title = threadMatch[1].trim();
       const membersRaw = threadMatch[2];
@@ -205,14 +205,14 @@ export function parseCommands(text: string): ParsedCommand[] {
     }
 
     // [CRITIQUE | 2-4 sentences of self-assessment]
-    const critiqueMatch = line.match(/^\[CRITIQUE\s*\|\s*(.+?)\]?\s*$/);
+    const critiqueMatch = line.match(/^\[\s*CRITIQUE\s*\|\s*(.+?)\]?\s*$/);
     if (critiqueMatch) {
       commands.push({ kind: "CRITIQUE", text: critiqueMatch[1].trim() });
       continue;
     }
 
     // Warn about unrecognized command-like lines
-    if (line.startsWith("[") && line.includes("]")) {
+    if (/^\[\s*[A-Z]/.test(line) && line.includes("]")) {
       api.v1.log(`[crucible-parser] unrecognized command: ${line}`);
     }
   }
@@ -250,7 +250,7 @@ function countContentLines(lines: string[], startIdx: number): number {
 
 /** Check if a line starts a new command. */
 function isCommandLine(line: string): boolean {
-  return /^\[(CREATE|REVISE|DESCRIPTION|LINK|DELETE|THREAD|CRITIQUE|DONE)\b/.test(
+  return /^\[\s*(CREATE|REVISE|DESCRIPTION|LINK|DELETE|THREAD|CRITIQUE|DONE)\b/.test(
     line,
   );
 }

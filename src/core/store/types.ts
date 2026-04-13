@@ -102,7 +102,8 @@ export interface GenerationRequest {
     | "foundation"
     | "entitySummary"
     | "entitySummaryBind"
-    | "threadSummary";
+    | "threadSummary"
+    | "bootstrap";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -135,7 +136,8 @@ export interface GenerationStrategy {
       }
     | { type: "entitySummary"; entityId: string }
     | { type: "entitySummaryBind"; entityId: string }
-    | { type: "threadSummary"; groupId: string };
+    | { type: "threadSummary"; groupId: string }
+    | { type: "bootstrap" };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };

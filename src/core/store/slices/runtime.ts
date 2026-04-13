@@ -192,6 +192,8 @@ export const runtimeSlice = createSlice({
         },
       },
     }),
+
+    bootstrapRequested: (state) => state,
   },
 });
 
@@ -213,4 +215,5 @@ export const {
   segaReset,
   segaStatusUpdated,
   segaKeysCompleted,
+  bootstrapRequested,
 } = runtimeSlice.actions;

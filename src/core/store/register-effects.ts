@@ -11,6 +11,7 @@ import { registerForgeEffects } from "./effects/forge-effects";
 import { registerFoundationEffects } from "./effects/foundation-effects";
 import { registerStoryEffects } from "./effects/story-effects";
 import { registerSummaryGenerationEffects } from "./effects/summary-generation";
+import { registerBootstrapEffects } from "./effects/bootstrap-effects";
 
 export { syncEratoCompatibility } from "./effects/lorebook-sync";
 
@@ -26,4 +27,5 @@ export function registerEffects(store: Store<RootState>, genX: GenX): void {
   registerForgeEffects(subscribeEffect, dispatch, getState, genX);
   registerFoundationEffects(subscribeEffect, dispatch, getState);
   registerSummaryGenerationEffects(subscribeEffect, dispatch, getState);
+  registerBootstrapEffects(subscribeEffect, dispatch, getState);
 }

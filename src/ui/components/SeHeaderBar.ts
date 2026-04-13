@@ -19,6 +19,7 @@ import {
 import { store } from "../../core/store";
 import { uiUserPresenceConfirmed } from "../../core/store/slices/ui";
 import { storyCleared } from "../../core/store/slices/story";
+import { bootstrapRequested } from "../../core/store/slices/runtime";
 import { StoreWatcher } from "../store-watcher";
 import { colors } from "../theme";
 import { IDS } from "../framework/ids";
@@ -64,6 +65,9 @@ export class SeHeaderBar extends SuiComponent<
   // Wait timer state
   private _waitTimerActive = false;
   private _waitTimerId: number | undefined;
+
+  // Bootstrap state
+  private _documentHasContent = false;
 
   constructor(options: SeHeaderBarOptions) {
     super(
@@ -145,13 +149,21 @@ export class SeHeaderBar extends SuiComponent<
     const { row, text, button } = api.v1.ui.part;
 
     this._watcher.dispose();
+
+    // Check document emptiness once on compose
+    const sectionIds = await api.v1.document.sectionIds();
+    this._documentHasContent = sectionIds.length > 0;
+
     this._watcher.watch(
       (s) => ({
         statusText: s.runtime.sega.statusText,
         genxStatus: s.runtime.genx.status,
         budgetWaitEndTime: s.runtime.genx.budgetWaitEndTime,
+        bootstrapActive:
+          s.runtime.activeRequest?.type === "bootstrap" ||
+          s.runtime.queue.some((r) => r.type === "bootstrap"),
       }),
-      ({ statusText, genxStatus, budgetWaitEndTime }) => {
+      ({ statusText, genxStatus, budgetWaitEndTime, bootstrapActive }) => {
         const showContinue = genxStatus === "waiting_for_user";
         const showWait = genxStatus === "waiting_for_budget";
         const showMarquee = !showContinue && !showWait;
@@ -210,11 +222,26 @@ export class SeHeaderBar extends SuiComponent<
             api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
           }
         }
+
+        // Bootstrap button: hide when generating or document has content
+        const showBootstrap = !this._documentHasContent && !bootstrapActive;
+        api.v1.ui.updateParts([
+          {
+            id: "header-bootstrap-btn",
+            style: {
+              ...BTN_STYLE,
+              opacity: "0.7",
+              display: showBootstrap ? "flex" : "none",
+            },
+            text: bootstrapActive ? "Bootstrap..." : "Bootstrap",
+          },
+        ]);
       },
       (a, b) =>
         a.statusText === b.statusText &&
         a.genxStatus === b.genxStatus &&
-        a.budgetWaitEndTime === b.budgetWaitEndTime,
+        a.budgetWaitEndTime === b.budgetWaitEndTime &&
+        a.bootstrapActive === b.bootstrapActive,
     );
 
     const clearPart = await this._clearBtn.build();
@@ -242,6 +269,18 @@ export class SeHeaderBar extends SuiComponent<
           id: "header-wait-text",
           text: "",
           style: { ...WAIT_STYLE, display: "none" },
+        }),
+        button({
+          id: "header-bootstrap-btn",
+          text: "Bootstrap",
+          style: {
+            ...BTN_STYLE,
+            opacity: "0.7",
+            display: this._documentHasContent ? "none" : "flex",
+          },
+          callback: () => {
+            store.dispatch(bootstrapRequested());
+          },
         }),
         button({
           id: "header-import-btn",

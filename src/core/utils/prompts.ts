@@ -555,4 +555,27 @@ export const XIALONG_STYLE = {
   foundationWorldState: "[ Style: narrator, situational, grounded ]",
   foundationContract:   "[ Style: critic, genre-aware, contractual ]",
   summary:              "[ Style: archivist, concise, insightful ]",
+  bootstrap:            "[ Style: novelist; cold-open; sensory-grounding; forward-momentum ]",
 } as const;
+
+export const BOOTSTRAP_PROMPT = `Write the opening of this story — 1 to 3 paragraphs of prose that drop the reader directly into the world.
+
+ARCHITECTURE:
+- Paragraph 1: Sensory grounding. Establish *where* through concrete sensory detail — what it looks, sounds, smells like. Not "it was busy" but what busy *is* here. The reader's first breath should be the air of this place.
+- Paragraph 2: The protagonist's immediate situation. Not their backstory — their *now*. What are they doing, what are they facing, what's at stake in the next few minutes?
+- Paragraph 3 (if needed): Introduce another character or let the tension develop. Physical detail first, then what they *do* — behavior reveals character. End in motion: a decision, an interaction about to happen, a moment of change.
+
+COLD START:
+Begin mid-action or mid-thought. Not "The city was bustling" but "Sarah's phone had eleven missed calls. She turned it off and kept walking." Start with something specific, concrete, *already happening*.
+
+HARD CONSTRAINTS:
+- No backstory dumps — make them care about the present first
+- No abstract character descriptions — show what they *do*, not what they *are*
+- No passive weather — weather only if it affects action
+- No premise explanation — show the world through character interaction
+- No "It was" or "There was" constructions — start with something specific
+- Do NOT resolve the conflict — end at a moment of decision or potential, not conclusion
+- One location. 2–4 characters maximum. 1–2 situations seeded, not resolved.
+
+OUTPUT: prose only. No headers, no labels, no commentary. Just the opening paragraphs.`;
+

@@ -66,6 +66,8 @@ function targetToQueueEntry(target: GenerationStrategy["target"]): {
       return { type: "entitySummaryBind", targetId: target.entityId };
     case "threadSummary":
       return { type: "threadSummary", targetId: target.groupId };
+    case "bootstrap":
+      return { type: "bootstrap", targetId: "bootstrap" };
   }
   // Unreachable — satisfies noImplicitReturns for exhaustive switch
   throw new Error(`Unhandled target type: ${(target as any).type}`);
@@ -193,6 +195,8 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `entity-summary-bind:${target.entityId.slice(0, 8)}`;
     case "threadSummary":
       return `thread-summary:${target.groupId.slice(0, 8)}`;
+    case "bootstrap":
+      return "bootstrap";
   }
 }
 
@@ -438,6 +442,8 @@ export function registerGenerationEngineEffects(
         const entry = await api.v1.lorebook.entry(target.entryId);
         const name = entry?.displayName || "Entry";
         api.v1.ui.toast(`Refined: ${name}`, { type: "success" });
+      } else if (target.type === "bootstrap") {
+        api.v1.ui.toast("Story opener generated", { type: "success" });
       }
     }
   });
