@@ -128,13 +128,7 @@ export const IDS = {
     DELETE_BTN: "se-edit-delete",
   },
   LOREBOOK: {
-    PANEL: "kse-lorebook-panel",
-    CONTAINER: "lb-container",
-    EMPTY_STATE: "lb-empty-state",
-    NOT_MANAGED: "lb-not-managed",
-    MAIN_CONTENT: "lb-main-content",
     ENTRY_NAME: "lb-entry-name",
-    LIFECYCLE_BADGE: "lb-lifecycle-badge",
     CONTENT_INPUT: "lb-content-input",
     KEYS_INPUT: "lb-keys-input",
     GEN_CONTENT_BTN: "lb-gen-content-btn",
@@ -144,10 +138,6 @@ export const IDS = {
 
     // Action buttons (managed view)
     UNBIND_BTN: "lb-unbind-btn",
-
-    // Bind view (unmanaged)
-    BIND_BTN: "lb-bind-btn",
-    CATEGORY_BTN: "lb-category-btn",
 
     // Storage keys for streaming drafts (same key used for both storyStorage and storageKey binding)
     CONTENT_DRAFT_RAW: "lb-draft-content",

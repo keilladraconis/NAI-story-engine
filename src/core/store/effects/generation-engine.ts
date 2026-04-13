@@ -20,7 +20,6 @@ import {
 import {
   buildATTGStrategy,
   buildStyleStrategy,
-  buildBootstrapStrategy,
 } from "../../utils/context-builder";
 import { FieldID } from "../../../config/field-definitions";
 import { getHandler } from "./generation-handlers";
@@ -57,8 +56,6 @@ function targetToQueueEntry(target: GenerationStrategy["target"]): {
       return { type: "lorebookKeys", targetId: target.entryId };
     case "lorebookRefine":
       return { type: "lorebookRefine", targetId: target.entryId };
-    case "bootstrap":
-      return { type: "bootstrap", targetId: "" };
     case "forge":
       return { type: "forge", targetId: `forge:${target.step}` };
     case "foundation":
@@ -184,8 +181,6 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `lb-keys:${target.entryId.slice(0, 8)}`;
     case "lorebookRefine":
       return `lb-refine:${target.entryId.slice(0, 8)}`;
-    case "bootstrap":
-      return "bootstrap";
     case "forge":
       return `forge:${target.step}`;
     case "brainstormChatTitle":
@@ -246,9 +241,6 @@ export function registerGenerationEngineEffects(
       }
 
       strategy.requestId = requestId;
-      dispatch(generationSubmitted(strategy));
-    } else if (type === "bootstrap") {
-      const strategy = buildBootstrapStrategy(getState, requestId);
       dispatch(generationSubmitted(strategy));
     }
   });

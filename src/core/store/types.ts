@@ -98,7 +98,6 @@ export interface GenerationRequest {
     | "lorebookContent"
     | "lorebookKeys"
     | "lorebookRefine"
-    | "bootstrap"
     | "forge"
     | "foundation"
     | "entitySummary"
@@ -122,7 +121,6 @@ export interface GenerationStrategy {
     | { type: "lorebookContent"; entryId: string }
     | { type: "lorebookKeys"; entryId: string }
     | { type: "lorebookRefine"; entryId: string }
-    | { type: "bootstrap" }
     | {
         type: "forge";
         step: number;

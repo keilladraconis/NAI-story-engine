@@ -1,46 +1,54 @@
 # Story Engine
 
-**Story Engine** is a structured worldbuilding system for **NovelAI**. It guides you from a raw idea to a fully populated story scenario through a four-step pipeline: brainstorm → Crucible → SEGA → write.
+**Story Engine** is a structured worldbuilding system for **NovelAI**. It guides you from a raw idea to a fully populated story scenario through a four-step pipeline: brainstorm → Foundation → Forge → write.
 
 ## Key Features
 
 ### Brainstorm
 
-A dedicated sidebar panel for freeform idea conversation with the AI. Supports multiple named sessions, a summarize button to compress long chats into dense material, and Co/Crit mode toggle for different AI personas.
+A dedicated tab for freeform idea conversation with the AI. Supports multiple named sessions, a summarize button to compress long chats into dense material, and Co/Crit mode toggle (cowriter vs. critic persona).
 
-### Crucible — Command-Driven World Generator
+### Foundation
 
-Crucible derives your world from structural tensions. Give it a shape and a direction; it identifies the pressures at the core of your story, then builds a world around them through an iterative command loop.
+Sets the structural and tonal anchors for your story before worldbuilding begins:
 
-1. **Shape** — AI reads your brainstorm and invents the structural lens your story is leaning toward — any shape, from Climactic Choice to Slice of Life. Edit the name and instruction directly, or generate and refine.
-2. **Direction** — AI distills your brainstorm (informed by the shape) into a dense creative anchor: characters, world, tone, tensions, supporting cast.
-3. **Tensions** — AI identifies the structural pressures and irresolvable conflicts at the heart of the scenario. Accept the ones worth building.
-4. **Build World** — GLM runs a command loop, emitting `CREATE`, `REVISE`, `LINK`, and `DELETE` commands to build world elements (characters, locations, factions, systems, narrative vectors, topics) that embody the tensions. Each pass ends with a self-`CRITIQUE`; you can add guidance and run another pass to extend or refine.
-5. **Merge** — Edit elements and merge them into DULFS fields and lorebook.
+- **Intensity** — Tonality register: Cozy, Grounded, Gritty, Noir, or Nightmare.
+- **Shape** — AI reads your brainstorm and invents a structural lens: the kind of moment your story is building toward. Edit or generate.
+- **Intent** — A plain statement of what this story is exploring.
+- **Story Contract** — Three directives: REQUIRED, PROHIBITED, EMPHASIS.
+- **ATTG** — Author/Title/Tags/Genre block, synced to Memory.
+- **Style** — Prose style guidelines, synced to Author's Note.
+
+### Forge
+
+Iterative world element generation. The Forge reads your Foundation and Brainstorm, then builds characters, locations, factions, systems, dynamics, and topics through a guidance-driven loop. Provide optional guidance each pass to steer what gets built.
+
+### World
+
+The world inventory produced by the Forge. Entities are organized by category and can be grouped into **Threads** — named clusters of related entities that provide relational context for generation and optionally sync a summary to the lorebook.
 
 ### S.E.G.A. (Story Engine Generate All)
 
-One-button scenario completion. Runs through: ATTG & Style → Canon → Bootstrap → Lorebook. Each stage can also be run individually.
+One-button lorebook completion. Runs two stages:
 
-- **ATTG & Style** — Author/Title/Tags/Genre syncs to Memory; Style Guidelines syncs to Author's Note.
-- **Canon** — Authoritative world summary synthesized from your Crucible elements.
-- **Bootstrap** — Generates an opening scene instruction into the document if it's empty.
-- **Lorebook** — Content generation → relational maps → keys generation (map-informed, with reconciliation pass for complex entries).
+1. **Lorebook Content** — Generates detailed entry text for every world entity.
+2. **Lorebook Keys** — Generates activation keys for each entry.
 
-### DULFS & Lorebook Sync
+Each stage can also be triggered individually from an entity's edit pane.
 
-Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics, and Topics. Every DULFS entry is bidirectionally synced with the NovelAI Lorebook — edits in either direction are reflected immediately.
+### Entity Edit Pane
 
-### Lorebook Panel
-
-Generate content, keys, and refinements for any lorebook entry directly from the Lorebook view. Natural language refinements: "make her taller," "add a rivalry with the Silver Court."
+Click any entity to open its edit pane:
+- Edit name, summary, and category (draft entities)
+- View and regenerate lorebook content and keys (live entities)
+- Refine entries with natural language: _"make her taller," "add a rivalry with the Silver Court"_
 
 ## Installation
 
 1. **Download** the latest `.naiscript` file from the [Releases](https://github.com/your-repo/releases) page.
 2. **Create a new story** in NovelAI for this script.
 3. **Open the Script Editor** in NovelAI, import the `.naiscript` file.
-4. **Enable the script.** The Brainstorm, Crucible, and Story Engine panels will appear.
+4. **Enable the script.** The Story Engine panel will appear in the sidebar.
 
 For the full workflow walkthrough, see `WALKTHROUGH.md`.
 

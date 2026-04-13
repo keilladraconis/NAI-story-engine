@@ -24,7 +24,6 @@ import { GenX } from "nai-gen-x";
 import {
   store,
   persistedDataLoaded,
-  uiLorebookEntrySelected,
 } from "../core/store";
 import {
   registerEffects,
@@ -41,12 +40,11 @@ import type { EditPaneHost } from "./components/SeContentWithTitlePane";
 import { BrainstormPane } from "./components/BrainstormPane";
 import { ForgePane } from "./components/ForgePane";
 import { SeHeaderBar } from "./components/SeHeaderBar";
-import { SeLorebookPanel } from "./components/SeLorebookPanel";
 import { SeJournalPanel } from "./components/SeJournalPanel";
 import { SeImportWizard } from "./components/SeImportWizard";
 import { loadJournal } from "../core/generation-journal";
 
-const { sidebarPanel, lorebookPanel, scriptPanel } = api.v1.ui.extension;
+const { sidebarPanel, scriptPanel } = api.v1.ui.extension;
 
 
 export class StoryEnginePlugin extends SuiPlugin {
@@ -248,9 +246,6 @@ export class StoryEnginePlugin extends SuiPlugin {
     });
 
     const tabBarPart = await this._tabBar.build();
-    const lorebookPart = await new SeLorebookPanel({
-      id: IDS.LOREBOOK.PANEL,
-    }).build();
 
     // ── Register all extensions in one call ─────────────────────────────────
     const panels: UIExtension[] = [
@@ -259,12 +254,6 @@ export class StoryEnginePlugin extends SuiPlugin {
         name: "Story Engine",
         iconId: "lightning",
         content: [tabBarPart],
-      }),
-      lorebookPanel({
-        id: IDS.LOREBOOK.PANEL,
-        name: "Story Engine",
-        iconId: "zap",
-        content: [lorebookPart],
       }),
     ];
 
@@ -288,13 +277,6 @@ export class StoryEnginePlugin extends SuiPlugin {
   }
 
   protected async registerHooks(): Promise<void> {
-    api.v1.hooks.register("onLorebookEntrySelected", async (params) => {
-      store.dispatch(
-        uiLorebookEntrySelected({
-          entryId: params.entryId || null,
-          categoryId: params.categoryId || null,
-        }),
-      );
-    });
+    // No hooks currently required.
   }
 }

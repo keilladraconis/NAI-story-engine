@@ -1,13 +1,13 @@
-# Walkthrough — Story Engine 0.10
+# Walkthrough — Story Engine
 
-The fastest way to go from "I have an idea" to "I'm writing a story" in NovelAI. Four panels, four steps, one flow.
+The fastest way to go from "I have an idea" to "I'm writing a story" in NovelAI. Two panels, four steps, one flow.
 
 ---
 
 ## Before You Start
 
 - Install Story Engine in a **new story** (fresh scenario recommended).
-- You'll see three sidebar panels: **Brainstorm**, **Crucible**, and **Story Engine** — plus a **Story Engine** panel in the Lorebook view.
+- You'll see one sidebar panel: **Story Engine** — which contains two tabs: **Story Engine** (Foundation, Forge, World) and **Brainstorm**.
 
 ---
 
@@ -25,135 +25,162 @@ This is where your story begins — a freeform conversation with the AI about wh
    - _"A space station where the AI running life support has started making art"_
    - _"Two rival chefs in 1920s Paris, one of them is secretly a spy"_
 3. The AI responds with ideas, questions, and suggestions. Bounce ideas back and forth.
-4. Don't worry about structure — just get your ideas flowing. The messier the brainstorm, the more material Crucible has to work with.
+4. Don't worry about structure — just get your ideas flowing. The messier the brainstorm, the more material the Forge has to work with.
 
 **When to move on:** When you feel like you've described the _kind_ of story you want to tell — characters, world, tone, conflicts. You don't need a complete outline, just enough creative raw material.
 
 **Tips:**
 
-- The **Co / Crit** buttons in the header switch the AI between cowriter mode (generative, adds ideas) and critic mode (interrogates your assumptions). Critic mode is most useful mid-brainstorm — surface gaps, push back on thin ideas, then switch back to Cowriter to develop them. **Avoid ending on a Critic message before heading to Crucible:** if the last message is a Critic question asking for a plot catalyst or a "missing spark," that framing propagates into Shape, Direction, and the build pass CRITIQUEs. Let the brainstorm end on generative material.
-- If the chat is getting long, click **Sum** to collapse it into a dense summary before heading to Crucible.
+- The **Co / Crit** buttons in the header switch the AI between cowriter mode (generative, adds ideas) and critic mode (interrogates your assumptions). Critic mode is most useful mid-brainstorm — surface gaps, push back on thin ideas, then switch back to Cowriter to develop them. **Avoid ending on a Critic message before moving to Foundation/Forge:** if the last message is a Critic question, that framing can propagate into downstream generation.
+- If the chat is getting long, click **Sum** to collapse it into a dense summary.
 - Use the **folder icon** to manage multiple named sessions — useful for keeping separate story ideas organized.
 
 ---
 
-## Step 2: Crucible
+## Step 2: Foundation
 
-> _Panel: Crucible_
+> _Panel: Story Engine → Foundation section_
 
-Crucible turns your brainstorm into a populated world. It works by first identifying the structural shape of your story, then generating dramatic tensions, then building world elements through an iterative command-driven process.
-
-### Setting
-
-At the top of the Crucible panel, set the **Setting** field before generating anything. Type the universe or leave it as "Original" for an original world. This value flows into the lorebook entry headers (e.g. `Setting: Star Wars`) and the Crucible context so generated world elements are grounded in the right universe.
-
-### 2a. Shape
+Foundation turns the raw energy of your brainstorm into a set of structural anchors: the tone, the shape, the intent, and the contract of your story.
 
 **What to do:**
 
-1. Switch to the **Crucible** panel.
-2. Open the **Story Shape** section (it auto-expands when no shape is set).
-3. Optionally type a shape name — _Slice of Life_, _Hero's Journey_, _Rivals_, whatever feels right. Or leave it blank and let the AI invent one.
-4. Click **Generate**. The AI reads your brainstorm and invents a structural lens: a short description of what kind of moment this story is building toward.
-5. Read the instruction. Edit the name or the instruction if something's off. This context flows into everything downstream.
+1. Switch to the **Story Engine** panel. The **Foundation** section is at the top.
+2. Work through each field:
 
-**What's a shape?** Not a genre — a structural logic. _"Lean toward scenes of ordinary continuity — the texture of how these specific people inhabit their world"_ is a shape (Slice of Life). _"Lean toward the moment after which the protagonist cannot be what they were"_ is a shape (Threshold Crossing). The AI can invent any shape, not just the ones on a list.
+### Intensity
 
-**Tip:** You can skip this section entirely. Shape is optional — Direction and Tensions work fine without it. But setting a shape first produces more focused results.
+Sets the tonality register of your story. Choose from:
 
-### 2b. Direction
+| Level | Description |
+|-------|-------------|
+| **Cozy** | Safe, warm, low stakes |
+| **Grounded** | Realistic, everyday tension |
+| **Gritty** | Harsh, morally complex |
+| **Noir** | Cynical, dark, fatalistic |
+| **Nightmare** | Extreme, disturbing, no mercy |
 
-**What to do:**
+Pick the level that matches the emotional register you want. This flows into generation downstream.
 
-1. Click **Generate** next to "Direction."
-2. Watch the AI distill your brainstorm into a dense creative summary — characters (names, appearances, personalities), world, tone, supporting cast, dramatic tensions, and thematic tags. If your brainstorm is sparse, it extrapolates: inventing implied occupations, secondary figures, and latent pressures.
-3. Read it. If something's off, click **Edit** and adjust. This text is the sole creative anchor for everything downstream — make sure it captures your vision.
+### Shape
 
-**Tip:** If you didn't brainstorm (or want to start fresh), you can write the Direction yourself. Just describe your story in a few paragraphs.
+A structural lens — what kind of moment your story is building toward. Click **Generate** and the AI reads your brainstorm to invent one. Examples:
+- _"Lean toward scenes of ordinary continuity — the texture of how these specific people inhabit their world"_ (Slice of Life)
+- _"Lean toward the moment after which the protagonist cannot be what they were"_ (Threshold Crossing)
 
-### 2c. Tensions
+Edit the name or description if something's off. You can also type a shape name before generating — the AI will write only the instruction, which is faster.
 
-**What to do:**
+**Tip:** Shape is optional but focuses everything downstream. Even typing a name like "Heist" before generating helps.
 
-1. Click **Generate Tensions**. The AI generates dramatic tensions — concrete pressures, conflicts, and endpoints the story could build toward, shaped by your structural lens.
-2. Generate more as needed. Each tension approaches your story from a different angle.
-3. Toggle acceptance with the **check / X button** on each tension card. Green check = included in world build. Red X = excluded. Delete is only available when a tension is excluded — this prevents accidental removal of tensions you've accepted.
+### Intent
 
-**What makes a good tension:** Something concrete enough to decompose into world requirements. _"The colony ship arrives but the crew discovers it's already inhabited"_ is good. _"Everything changes"_ is too vague.
+A plain statement of what this story is exploring. Click **Generate** or write it yourself: _"What is this story about? What do you want to explore?"_ Keep it honest — this anchors the AI's interpretation of ambiguous choices later.
 
-### 2d. Build World
+### Story Contract
 
-**What to do:**
+Three directives that define the rules of your story:
 
-1. Click **Build World** (below the Tensions section). The view switches to the Build World interface.
-2. The AI runs a **build pass** — it reads the accepted tensions and generates world elements using structured commands: CREATE, REVISE, LINK, DELETE, and CRITIQUE. Each command produces a character, location, faction, system, narrative vector, or topic.
-3. Watch the **World Elements** and **Relationships** sections populate as elements are created and linked together. A **Command Log** shows the raw operations.
-4. If the AI produces a **self-critique** (shown in an amber box), it's flagging something it thinks is weak or missing.
-5. Type **guidance** in the text box (e.g., "more factions," "Mira is too generic") and click **Next Pass** to run another round. Each pass can create new elements, revise existing ones, or delete weak ones.
-6. Run as many passes as you want until the world feels right.
+- **REQUIRED** — What the story must have (e.g., "morally grey protagonists," "no magic systems")
+- **PROHIBITED** — What the story must never do (e.g., "no redemption arcs," "no comic relief")
+- **EMPHASIS** — What to foreground (e.g., "atmosphere over plot," "character interiority")
 
-**Editing elements:** Every element is editable inline — click to edit, change the name or content. Delete with the trash icon. Relationships can be deleted individually too.
+Click **Generate** for a suggestion based on your brainstorm, or write your own.
 
-**When you're done:** Click **Merge to Story Engine** to push all elements into the World Entry fields and lorebook. A confirmation prompt ("Populate World Entry fields?") prevents accidental merges.
+### ATTG & Style
 
-**What you get:** A world inventory derived through narrative logic and iterative refinement — not enumerated from a checklist.
+- **ATTG (Memory)** — Author, Title, Tags, Genre block. Syncs to Memory. Generate or write manually.
+- **Style (Author's Note)** — Style guidelines for prose tone. Syncs to Author's Note.
+
+These can also be generated later as part of S.E.G.A.
 
 ---
 
-## Step 3: Story Engine (S.E.G.A.)
+## Step 3: Forge
 
-> _Panel: Story Engine_
+> _Panel: Story Engine → Forge section_
 
-SEGA — Story Engine Generate All — takes your world and generates everything needed for a complete scenario.
+The Forge builds your world. It reads your Foundation and Brainstorm, then generates world elements — characters, locations, factions, systems, dynamics, topics — through an iterative, guidance-driven loop.
 
 **What to do:**
 
-1. Switch to the **Story Engine** panel.
-2. Click the **S.E.G.A.** button.
-3. SEGA runs automatically through its stages:
-   - **ATTG & Style** — Generates Author/Title/Tags/Genre (syncs to Memory) and Style Guidelines (syncs to Author's Note).
-   - **Canon** — Synthesizes an authoritative summary of your world from all the elements Crucible produced.
-   - **Bootstrap** — If your document is empty, writes an opening scene instruction directly into the document.
-   - **Lorebook** — Generates detailed content for every lorebook entry, then builds relational maps, and finally produces activation keys informed by those maps.
+1. Scroll to the **Forge** section in the Story Engine panel.
+2. Optionally type **guidance** in the text field — what should the Forge build? You can leave it blank and it will draw from your Brainstorm conversation.
+   - Examples: _"Focus on the rival factions"_, _"Give me a mentor figure and a corrupt official"_, _"More locations"_
+3. Click **Forge**. Watch as the AI generates world elements.
+4. Type new guidance and click **Forge** again to refine, add, or redirect. Run as many passes as you want.
 
-**That's it.** One button. You can watch the status marquee as it works through each stage.
+**Viewing results:** Generated elements appear in the **World** section below, organized by category and optionally grouped into Threads.
 
-**Prefer control?** You can generate any field individually instead of running SEGA. Each field has its own Generate button. SEGA is just the "do everything" option.
+**When you're done:** When your world feels populated enough to start writing.
 
 ---
 
-## Step 4: Write
+## Step 4: World
+
+> _Panel: Story Engine → World section_
+
+The World section is your world inventory — every entity the Forge created, plus any you add manually.
+
+### Entities
+
+Each entity card shows:
+- Category icon (character, system, location, faction, dynamic, topic)
+- Name (click to edit in the edit pane)
+- Summary (SE-internal description)
+
+From the edit pane you can also view and edit lorebook content and keys (once an entity has been cast to the lorebook).
+
+**Adding entities manually:** Click **+** in the World section header to create a new entity.
+
+### Threads
+
+Threads are named groups of related entities — a faction and its key members, a location cluster, a relationship web. They help organize your world and can optionally sync a summary to the lorebook as a group entry.
+
+- Click the **Layers** icon in the World section header to create a new Thread.
+- Click a Thread title to edit its name and summary.
+- Toggle lorebook sync per Thread with the lorebook icon.
+
+### Running S.E.G.A.
+
+Once your world is built, click **S.E.G.A.** in the World section header. It runs two stages automatically:
+
+1. **Lorebook Content** — Generates detailed entry text for every world entity.
+2. **Lorebook Keys** — Generates activation keys for each entry so they fire correctly in story text.
+
+Watch the status updates as it works through your entities. You can also regenerate content or keys for any individual entity from its edit pane — S.E.G.A. is just the "do everything" option.
+
+---
+
+## Step 5: Write
 
 Your scenario is ready:
 
 - **Lorebook** is populated with detailed entries and activation keys.
-- **Memory** has your ATTG block.
-- **Author's Note** has your Style Guidelines.
-- **Document** has an opening scene instruction (from Bootstrap).
+- **Memory** has your ATTG block (if generated in Foundation).
+- **Author's Note** has your Style Guidelines (if generated in Foundation).
 
-Start writing, or click Generate in the editor to let the AI continue from the bootstrapped opening. Your lorebook entries will activate as relevant characters, locations, and concepts appear in the text.
+Start writing in the document. Lorebook entries activate as relevant characters, locations, and concepts appear in the text.
 
 ---
 
 ## Quick Reference
 
-| Panel            | What it does                             | Key action                                         |
-| ---------------- | ---------------------------------------- | -------------------------------------------------- |
-| **Brainstorm**   | Freeform idea conversation               | Chat, summarize, manage sessions                   |
-| **Crucible**     | World generation from dramatic reasoning | Shape → Direction → Tensions → Build World → Merge |
-| **Story Engine** | Scenario completion                      | S.E.G.A. button                                    |
-| **Lorebook**     | Entry editing, refinement, keys          | Generate/Refine per entry                          |
+| Tab / Section   | What it does                            | Key action                                         |
+| --------------- | --------------------------------------- | -------------------------------------------------- |
+| **Brainstorm**  | Freeform idea conversation              | Chat, summarize, manage sessions                   |
+| **Foundation**  | Tone, shape, intent, contract, metadata | Set Intensity → Shape → Intent → Contract → ATTG/Style |
+| **Forge**       | World element generation                | Enter guidance → Forge (repeat)                    |
+| **World**       | World inventory, threads, S.E.G.A.      | Review entities → Run S.E.G.A.                     |
 
 ---
 
 ## Tips
 
-- **Iterate, don't restart.** If SEGA's Canon or ATTG isn't quite right, regenerate just that field. You don't need to re-run everything.
-- **Run multiple build passes.** Each pass can refine, add, or remove elements. Use guidance to steer the AI ("add a rival faction," "this character needs a secret"). More passes = richer, more interconnected world.
-- **Edit the Direction freely.** It's the single source of truth for Crucible. A small tweak there changes everything downstream.
-- **Shape is optional but useful.** You can skip it entirely — Direction and Tensions work without it. But setting a shape first (even just typing a name like "Slice of Life") gives Tension generation a clearer structural target.
-- **Name your shape before generating.** If you type a name in the Shape name field before clicking Generate, the AI generates only the instruction — faster than blank-name generation. Note: the description should be structural logic (what kind of moment this shape leans toward), not a plot summary. If the output reads like a story pitch or references specific characters, edit it toward the abstract structural principle.
-- **Summarize long brainstorms.** Before heading to Crucible, click **Sum** to compress a sprawling chat into dense material the Direction generator can work with.
-- **The Lorebook panel** (in Lorebook view) lets you refine individual entries with natural language — "make her taller," "add a connection to the Silver Court," "rewrite this as more ominous."
-- **Set the Setting field first.** It's at the top of the Crucible panel. If your story is set in an existing universe (Star Wars, Lord of the Rings), type it before generating anything. Defaults to "Original" for original worlds.
-- **Unnamed protagonists and lorebook collision.** If your protagonist has no personal name (e.g., "the physician," "the captain"), their lorebook entry will have a `name is: generic, collision risk: high` flag in its relational map output. A generic key like `physician` will fire on any medical reference in the story text, not just scenes about that character. Before you start writing, open the lorebook entry and add a personal name — then regenerate its keys so the activation is specific.
+- **Iterate, don't restart.** If S.E.G.A.'s Canon or ATTG isn't right, regenerate just that field.
+- **Run multiple Forge passes.** Each pass can add, refine, or redirect. Use guidance to steer: _"add a rival faction," "this character needs a secret."_
+- **Intensity sets the emotional register.** It flows into all downstream generation — pick it before generating Shape or running the Forge.
+- **Shape is optional but useful.** Even typing a name like "Slice of Life" before generating gives the Forge and S.E.G.A. a clearer structural target.
+- **Summarize long brainstorms.** Click **Sum** before moving to Foundation/Forge to compress a sprawling chat into dense material.
+- **The Lorebook panel** (in Lorebook view) lets you refine individual entries with natural language — _"make her taller," "add a connection to the Silver Court," "rewrite this as more ominous."_
+- **Threads for organization.** Group related entities into a Thread to give generation a relational context and to optionally surface a group-level lorebook entry.
+- **Unnamed protagonists and lorebook collision.** If your protagonist has no personal name (e.g., "the physician," "the captain"), their lorebook entry may have high collision risk. Before you start writing, open the entity edit pane and add a personal name — then regenerate its keys so activation is specific.

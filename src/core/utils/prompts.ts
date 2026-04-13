@@ -546,7 +546,6 @@ export const XIALONG_STYLE = {
   lorebookRefine:       "[ Style: editor, discerning, revise ]",
   attg:                 "[ Style: critic, genre-savvy, metadata ]",
   style:                "[ Style: literary-critic, prose-analyst ]",
-  bootstrap:            "[ Style: author, evocative, scene-setter ]",
   brainstorm:           "[ Style: chat, creative-partner, brainstorm ]",
   brainstormCritic:     "[ Style: chat, critic, analytical, brainstorm ]",
   dulfsList:            "[ Style: world-builder, inventive, catalog ]",

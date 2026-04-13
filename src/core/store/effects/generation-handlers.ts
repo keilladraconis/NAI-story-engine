@@ -3,7 +3,6 @@ import {
   brainstormHandler,
   brainstormChatTitleHandler,
 } from "./handlers/brainstorm";
-import { bootstrapHandler } from "./handlers/bootstrap";
 import { fieldHandler } from "./handlers/field";
 import { listHandler } from "./handlers/list";
 import {
@@ -50,10 +49,6 @@ export type LorebookKeysTarget = Extract<
 export type LorebookRefineTarget = Extract<
   GenerationStrategy["target"],
   { type: "lorebookRefine" }
->;
-export type BootstrapTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "bootstrap" }
 >;
 export type ForgeTarget = Extract<
   GenerationStrategy["target"],
@@ -109,7 +104,6 @@ export interface GenerationHandlers<T = GenerationStrategy["target"]> {
 export const GENERATION_HANDLERS: {
   brainstorm: GenerationHandlers<BrainstormTarget>;
   brainstormChatTitle: GenerationHandlers<BrainstormChatTitleTarget>;
-  bootstrap: GenerationHandlers<BootstrapTarget>;
   field: GenerationHandlers<FieldTarget>;
   list: GenerationHandlers<ListTarget>;
   lorebookContent: GenerationHandlers<LorebookContentTarget>;
@@ -123,7 +117,6 @@ export const GENERATION_HANDLERS: {
 } = {
   brainstorm: brainstormHandler,
   brainstormChatTitle: brainstormChatTitleHandler,
-  bootstrap: bootstrapHandler,
   field: fieldHandler,
   list: listHandler,
   lorebookContent: lorebookContentHandler,
