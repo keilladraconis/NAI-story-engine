@@ -254,7 +254,7 @@ export const createLorebookKeysFactory = (
         max_tokens: 256,
         temperature: 0.8,
         min_p: 0.1,
-        stop: ["\n---"],
+        stop: ["\n---", "\n***", "\n⁂", "[ Style", "</think>"],
       }),
       contextPinning: { head: 1, tail: 3 },
     };

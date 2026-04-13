@@ -99,17 +99,16 @@ export function formatDigest(): string {
     lines.push(header);
 
     if (entry.label.startsWith("lb-content:")) {
-      // Show full lorebook text: prefill + response
+      // Show full lorebook text: prefill + stripped response
       const prefillMsg = [...entry.messages]
         .reverse()
         .find((m) => m.role === "assistant");
       const prefill = prefillMsg?.content ?? "";
-      lines.push(prefill + entry.response);
+      lines.push(prefill + stripThinkingTags(entry.response));
     } else if (entry.label.startsWith("lb-keys:")) {
-      // Show full keys response — let the reader see what was generated
-      lines.push(entry.response);
+      lines.push(stripThinkingTags(entry.response));
     } else {
-      lines.push(entry.response);
+      lines.push(stripThinkingTags(entry.response));
     }
 
     lines.push("");
