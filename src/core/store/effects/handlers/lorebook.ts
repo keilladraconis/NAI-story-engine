@@ -10,6 +10,7 @@ import {
 import { buildLorebookPrefill } from "../../../utils/lorebook-strategy";
 import { LOREBOOK_CHAIN_STOPS, trimStopTail } from "../../../utils/config";
 import { segaKeysCompleted } from "../../slices/runtime";
+import { stripThinkingTags } from "../../../utils/tag-parser";
 
 // Cache for prefills during streaming (cleared on completion)
 const prefillCache = new Map<string, string>();
@@ -72,7 +73,10 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
         }
 
         // Combine prefill + accumulated text for the full entry
-        const cleaned = trimStopTail(ctx.accumulatedText, LOREBOOK_CHAIN_STOPS);
+        const cleaned = trimStopTail(
+          stripThinkingTags(ctx.accumulatedText),
+          LOREBOOK_CHAIN_STOPS,
+        );
         const fullContent = prefill + cleaned;
 
         // Erato compatibility: prepend separator if needed
@@ -236,7 +240,7 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
     const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
 
     if (ctx.generationSucceeded && ctx.accumulatedText) {
-      let keys = parseLorebookKeys(ctx.accumulatedText);
+      let keys = parseLorebookKeys(stripThinkingTags(ctx.accumulatedText));
 
       if (!keys) {
         api.v1.log(
@@ -322,7 +326,10 @@ export const lorebookRefineHandler: GenerationHandlers<LorebookRefineTarget> = {
       }
 
       // Combine prefill + accumulated text for the full entry
-      const cleaned = trimStopTail(ctx.accumulatedText, LOREBOOK_CHAIN_STOPS);
+      const cleaned = trimStopTail(
+        stripThinkingTags(ctx.accumulatedText),
+        LOREBOOK_CHAIN_STOPS,
+      );
       const fullContent = prefill + cleaned;
 
       // Erato compatibility: prepend separator if needed

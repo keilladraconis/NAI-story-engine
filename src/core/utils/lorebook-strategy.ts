@@ -114,16 +114,19 @@ export const createLorebookContentFactory = (
     const state = getState();
     const entity = findEntityForEntry(state, entryId);
 
-    // Pull name and summary from live input fields first — user may have typed
-    // without saving. Fall back to persisted values.
-    const liveName = String(
-      (await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "",
-    ).trim();
+    // Pull name and summary from live input fields only when this entry is
+    // currently open in the edit pane — avoids contaminating SEGA batch
+    // generation with stale data from whatever entity was last edited.
+    const isCurrentlySelected = state.ui.lorebook.selectedEntryId === entryId;
+
+    const liveName = isCurrentlySelected
+      ? String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "").trim()
+      : "";
     const displayName = liveName || entry.displayName || entity?.name || "Unnamed Entry";
 
-    const liveSummary = String(
-      (await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) || "",
-    ).trim();
+    const liveSummary = isCurrentlySelected
+      ? String((await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) || "").trim()
+      : "";
     const itemSummary = liveSummary || entity?.summary || "";
 
     // --- MSG 1: Archivist instructions ---
