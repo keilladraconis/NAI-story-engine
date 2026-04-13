@@ -70,6 +70,21 @@ export function formatJournal(): string {
 const SEGA_LABELS =
   /^(field:|list:|lb-content:|lb-relmap:|lb-keys:|lb-refine:|bootstrap)/;
 
+/**
+ * Extract the entity name from the assistant prefill message, if present.
+ * Lorebook content/keys factories end with an assistant prefill:
+ *   "Name: Elspeth Wren\nType: Character\nSetting: ..."
+ * Returns the name portion, or null if not found.
+ */
+function extractEntityName(
+  messages: { role: string; content?: string }[],
+): string | null {
+  const prefill = [...messages].reverse().find((m) => m.role === "assistant");
+  if (!prefill?.content) return null;
+  const match = prefill.content.match(/^Name:\s*(.+)/m);
+  return match?.[1]?.trim() ?? null;
+}
+
 export function formatDigest(): string {
   const sega = journal.filter((e) => SEGA_LABELS.test(e.label) && e.success);
   if (sega.length === 0) return "# SEGA Digest\n\nNo SEGA entries recorded.";
@@ -77,16 +92,21 @@ export function formatDigest(): string {
   const lines: string[] = ["# SEGA Digest\n"];
 
   for (const entry of sega) {
-    lines.push(`## ${entry.label}`);
+    const entityName = extractEntityName(entry.messages);
+    const header = entityName
+      ? `## ${entry.label} — ${entityName}`
+      : `## ${entry.label}`;
+    lines.push(header);
 
-    if (entry.label.startsWith("lb-keys:")) {
-      const keysMatch = entry.response.match(/KEYS:\s*(.+)/);
-      if (keysMatch) {
-        lines.push(keysMatch[1].trim());
-      } else {
-        lines.push(entry.response);
-      }
-    } else if (entry.label.startsWith("lb-relmap:")) {
+    if (entry.label.startsWith("lb-content:")) {
+      // Show full lorebook text: prefill + response
+      const prefillMsg = [...entry.messages]
+        .reverse()
+        .find((m) => m.role === "assistant");
+      const prefill = prefillMsg?.content ?? "";
+      lines.push(prefill + entry.response);
+    } else if (entry.label.startsWith("lb-keys:")) {
+      // Show full keys response — let the reader see what was generated
       lines.push(entry.response);
     } else {
       lines.push(entry.response);

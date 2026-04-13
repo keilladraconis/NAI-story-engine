@@ -319,7 +319,7 @@ export class SeFoundationSection extends SuiComponent<
       onSave: (name, description) => {
         store.dispatch(
           shapeUpdated({
-            shape: description ? { name: name || "STORY", description } : null,
+            shape: (name || description) ? { name: name || "STORY", description } : null,
           }),
         );
         editHost.close();

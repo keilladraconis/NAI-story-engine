@@ -1,4 +1,5 @@
 import { GenerationStrategy, ShapeData, ContractData } from "../../types";
+import { stripThinkingTags } from "../../../utils/tag-parser";
 import {
   shapeUpdated,
   intentUpdated,
@@ -91,7 +92,7 @@ export const foundationHandler: GenerationHandlers<FoundationTarget> = {
   async completion(ctx: CompletionContext<FoundationTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
-    const text = ctx.accumulatedText.trim();
+    const text = stripThinkingTags(ctx.accumulatedText).trim();
 
     switch (ctx.target.field) {
       case "shape": {

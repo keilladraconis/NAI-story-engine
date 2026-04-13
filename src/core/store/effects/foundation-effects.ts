@@ -273,7 +273,7 @@ const createContractFactory =
     return {
       messages,
       params: await buildModelParams({
-        max_tokens: 128,
+        max_tokens: 400,
         temperature: 0.7,
         min_p: 0.05,
         stop: ["</think>"],
