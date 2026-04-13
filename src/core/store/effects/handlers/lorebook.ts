@@ -8,6 +8,7 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import { buildLorebookPrefill } from "../../../utils/lorebook-strategy";
+import { LOREBOOK_CHAIN_STOPS, trimStopTail } from "../../../utils/config";
 import { segaKeysCompleted } from "../../slices/runtime";
 
 // Cache for prefills during streaming (cleared on completion)
@@ -71,7 +72,8 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
         }
 
         // Combine prefill + accumulated text for the full entry
-        const fullContent = prefill + ctx.accumulatedText;
+        const cleaned = trimStopTail(ctx.accumulatedText, LOREBOOK_CHAIN_STOPS);
+        const fullContent = prefill + cleaned;
 
         // Erato compatibility: prepend separator if needed
         const erato = (await api.v1.config.get("erato_compatibility")) || false;
@@ -320,7 +322,8 @@ export const lorebookRefineHandler: GenerationHandlers<LorebookRefineTarget> = {
       }
 
       // Combine prefill + accumulated text for the full entry
-      const fullContent = prefill + ctx.accumulatedText;
+      const cleaned = trimStopTail(ctx.accumulatedText, LOREBOOK_CHAIN_STOPS);
+      const fullContent = prefill + cleaned;
 
       // Erato compatibility: prepend separator if needed
       const erato = (await api.v1.config.get("erato_compatibility")) || false;

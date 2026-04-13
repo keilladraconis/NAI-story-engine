@@ -8,7 +8,7 @@ import {
   buildModelParams,
   appendXialongStyleMessage,
   isXialongMode,
-  XIALONG_LOREBOOK_STOPS,
+  LOREBOOK_CHAIN_STOPS,
 } from "./config";
 import {
   LOREBOOK_GENERATE_PROMPT,
@@ -191,8 +191,8 @@ export const createLorebookContentFactory = (
         temperature: 0.85,
         min_p: 0.05,
         frequency_penalty: 0.1,
+        stop: LOREBOOK_CHAIN_STOPS,
       }),
-      ...(xialong ? { stop: XIALONG_LOREBOOK_STOPS } : {}),
       contextPinning: { head: 1, tail: xialong ? 4 : 3 },
     };
   };
@@ -340,6 +340,7 @@ Setting: ${setting}
         temperature: 0.7,
         min_p: 0.05,
         frequency_penalty: 0.1,
+        stop: LOREBOOK_CHAIN_STOPS,
       }),
       contextPinning: { head: 1, tail: groupContext ? 4 : 3 },
     };

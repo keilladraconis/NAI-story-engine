@@ -17,7 +17,11 @@ import {
   type SuiComponentOptions,
 } from "nai-simple-ui";
 import { store } from "../../core/store";
-import { uiUserPresenceConfirmed } from "../../core/store/slices/ui";
+import {
+  uiCancelRequest,
+  uiRequestCancellation,
+  uiUserPresenceConfirmed,
+} from "../../core/store";
 import { storyCleared } from "../../core/store/slices/story";
 import { bootstrapRequested } from "../../core/store/slices/runtime";
 import { StoreWatcher } from "../store-watcher";
@@ -40,13 +44,16 @@ const CONTINUE_STYLE = {
   color: colors.darkBackground,
 };
 const STATUS_STYLE = {
-  flex: "1",
   "font-size": "0.8em",
   opacity: "0.8",
   overflow: "hidden",
   "white-space": "nowrap",
 };
-const WAIT_STYLE = { flex: "1", "font-size": "0.8em", opacity: "0.8" };
+const WAIT_STYLE = { "font-size": "0.8em", opacity: "0.8" };
+
+const COL_LEFT = { flex: "1", "min-width": "0", overflow: "hidden", display: "flex", "align-items": "center" };
+const COL_CENTER = { flex: "1", display: "flex", "justify-content": "center", "align-items": "center" };
+const COL_RIGHT = { flex: "1", display: "flex", "justify-content": "flex-end", "align-items": "center", gap: "8px" };
 
 export class SeHeaderBar extends SuiComponent<
   SeHeaderBarTheme,
@@ -68,6 +75,7 @@ export class SeHeaderBar extends SuiComponent<
 
   // Bootstrap state
   private _documentHasContent = false;
+  private _bootstrapTimerGen = 0;
 
   constructor(options: SeHeaderBarOptions) {
     super(
@@ -127,6 +135,20 @@ export class SeHeaderBar extends SuiComponent<
     }
   }
 
+  private _tickBootstrapTimer(gen: number, endTime: number): void {
+    if (gen !== this._bootstrapTimerGen) return;
+    const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+    api.v1.ui.updateParts([{
+      id: "header-bootstrap-btn",
+      text: `Wait (${remaining}s)`,
+      style: { ...BTN_STYLE, opacity: "0.7", display: "flex" },
+      callback: () => { store.dispatch(uiRequestCancellation()); },
+    }]);
+    if (remaining > 0) {
+      void api.v1.timers.setTimeout(() => this._tickBootstrapTimer(gen, endTime), 1000);
+    }
+  }
+
   private _updateWaitTimer(endTime: number): void {
     if (!this._waitTimerActive) return;
     const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
@@ -159,11 +181,8 @@ export class SeHeaderBar extends SuiComponent<
         statusText: s.runtime.sega.statusText,
         genxStatus: s.runtime.genx.status,
         budgetWaitEndTime: s.runtime.genx.budgetWaitEndTime,
-        bootstrapActive:
-          s.runtime.activeRequest?.type === "bootstrap" ||
-          s.runtime.queue.some((r) => r.type === "bootstrap"),
       }),
-      ({ statusText, genxStatus, budgetWaitEndTime, bootstrapActive }) => {
+      ({ statusText, genxStatus, budgetWaitEndTime }) => {
         const showContinue = genxStatus === "waiting_for_user";
         const showWait = genxStatus === "waiting_for_budget";
         const showMarquee = !showContinue && !showWait;
@@ -222,78 +241,133 @@ export class SeHeaderBar extends SuiComponent<
             api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
           }
         }
-
-        // Bootstrap button: hide when generating or document has content
-        const showBootstrap = !this._documentHasContent && !bootstrapActive;
-        api.v1.ui.updateParts([
-          {
-            id: "header-bootstrap-btn",
-            style: {
-              ...BTN_STYLE,
-              opacity: "0.7",
-              display: showBootstrap ? "flex" : "none",
-            },
-            text: bootstrapActive ? "Bootstrap..." : "Bootstrap",
-          },
-        ]);
       },
       (a, b) =>
         a.statusText === b.statusText &&
         a.genxStatus === b.genxStatus &&
-        a.budgetWaitEndTime === b.budgetWaitEndTime &&
-        a.bootstrapActive === b.bootstrapActive,
+        a.budgetWaitEndTime === b.budgetWaitEndTime,
     );
 
     const clearPart = await this._clearBtn.build();
 
+    // Bootstrap button state machine — single button that mutates in place
+    this._watcher.watch(
+      (s) => {
+        const queued = s.runtime.queue.find((r) => r.type === "bootstrap");
+        const isActive = s.runtime.activeRequest?.type === "bootstrap";
+        const genxStatus = isActive ? s.runtime.genx.status : "idle";
+        return {
+          queuedId: queued?.id as string | undefined,
+          isActive,
+          genxStatus,
+          budgetWaitEndTime: s.runtime.genx.budgetWaitEndTime ?? 0,
+        };
+      },
+      ({ queuedId, isActive, genxStatus, budgetWaitEndTime }) => {
+        this._bootstrapTimerGen++;
+        if (queuedId) {
+          api.v1.ui.updateParts([{
+            id: "header-bootstrap-btn",
+            text: "Bootstrap",
+            style: { ...BTN_STYLE, opacity: "0.4", display: "flex" },
+            callback: () => { store.dispatch(uiCancelRequest({ requestId: queuedId })); },
+          }]);
+        } else if (isActive && genxStatus === "waiting_for_user") {
+          api.v1.ui.updateParts([{
+            id: "header-bootstrap-btn",
+            text: "Continue",
+            style: { ...BTN_STYLE, color: colors.header, opacity: "1", display: "flex" },
+            callback: () => { store.dispatch(uiUserPresenceConfirmed()); },
+          }]);
+        } else if (isActive && genxStatus === "waiting_for_budget") {
+          const gen = ++this._bootstrapTimerGen;
+          this._tickBootstrapTimer(gen, budgetWaitEndTime || Date.now() + 60000);
+        } else if (isActive) {
+          api.v1.ui.updateParts([{
+            id: "header-bootstrap-btn",
+            text: "Cancel",
+            style: { ...BTN_STYLE, color: colors.warning, opacity: "1", display: "flex" },
+            callback: () => { store.dispatch(uiRequestCancellation()); },
+          }]);
+        } else {
+          api.v1.ui.updateParts([{
+            id: "header-bootstrap-btn",
+            text: "Bootstrap",
+            style: { ...BTN_STYLE, opacity: "0.7", display: this._documentHasContent ? "none" : "flex" },
+            callback: () => { store.dispatch(bootstrapRequested()); },
+          }]);
+        }
+      },
+      (a, b) =>
+        a.queuedId === b.queuedId &&
+        a.isActive === b.isActive &&
+        a.genxStatus === b.genxStatus &&
+        a.budgetWaitEndTime === b.budgetWaitEndTime,
+    );
+
     return row({
       id: "kse-sidebar-header",
       style: {
-        "justify-content": "space-between",
         "margin-bottom": "8px",
         "align-items": "center",
-        gap: "8px",
+        display: "flex",
       },
       content: [
-        text({ id: "header-sega-status", text: "", style: STATUS_STYLE }),
-        button({
-          id: "header-continue-btn",
-          text: "Continue",
-          iconId: "fast-forward" as IconId,
-          style: { ...CONTINUE_STYLE, display: "none" },
-          callback: () => {
-            store.dispatch(uiUserPresenceConfirmed());
-          },
+        row({
+          id: "header-left",
+          style: COL_LEFT,
+          content: [
+            text({ id: "header-sega-status", text: "", style: STATUS_STYLE }),
+          ],
         }),
-        text({
-          id: "header-wait-text",
-          text: "",
-          style: { ...WAIT_STYLE, display: "none" },
+        row({
+          id: "header-center",
+          style: COL_CENTER,
+          content: [
+            button({
+              id: "header-continue-btn",
+              text: "Continue",
+              iconId: "fast-forward" as IconId,
+              style: { ...CONTINUE_STYLE, display: "none" },
+              callback: () => {
+                store.dispatch(uiUserPresenceConfirmed());
+              },
+            }),
+            text({
+              id: "header-wait-text",
+              text: "",
+              style: { ...WAIT_STYLE, display: "none" },
+            }),
+          ],
         }),
-        button({
-          id: "header-bootstrap-btn",
-          text: "Bootstrap",
-          style: {
-            ...BTN_STYLE,
-            opacity: "0.7",
-            display: this._documentHasContent ? "none" : "flex",
-          },
-          callback: () => {
-            store.dispatch(bootstrapRequested());
-          },
+        row({
+          id: "header-right",
+          style: COL_RIGHT,
+          content: [
+            button({
+              id: "header-bootstrap-btn",
+              text: "Bootstrap",
+              style: {
+                ...BTN_STYLE,
+                opacity: "0.7",
+                display: this._documentHasContent ? "none" : "flex",
+              },
+              callback: () => { store.dispatch(bootstrapRequested()); },
+            }),
+            button({
+              id: "header-import-btn",
+              text: "Import",
+              iconId: "download" as IconId,
+              style: { ...BTN_STYLE, opacity: "0.7" },
+              callback: () => {
+                this.options.editHost.open(
+                  new SeImportWizard({ id: IDS.IMPORT.WIZARD, editHost: this.options.editHost }),
+                );
+              },
+            }),
+            clearPart,
+          ],
         }),
-        button({
-          id: "header-import-btn",
-          text: "Import",
-          iconId: "download" as IconId,
-          style: { ...BTN_STYLE, opacity: "0.7" },
-          callback: () => {
-            this.options.editHost.open(
-              new SeImportWizard({ id: IDS.IMPORT.WIZARD, editHost: this.options.editHost }),
-            );
-          },
-        }),
-        clearPart,
       ],
     });
   }

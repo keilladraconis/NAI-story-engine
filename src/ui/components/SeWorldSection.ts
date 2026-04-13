@@ -18,10 +18,11 @@ import {
   SuiButton,
   SuiCard,
   SuiCollapsible,
+  SuiConfirmButton,
   type SuiComponentOptions,
 } from "nai-simple-ui";
 import { store } from "../../core/store";
-import { groupCreated, entityForged } from "../../core/store/slices/world";
+import { groupCreated, entityForged, worldCleared } from "../../core/store/slices/world";
 import { segaToggled } from "../../core/store/slices/runtime";
 import { FieldID } from "../../config/field-definitions";
 import { IDS } from "../../ui/framework/ids";
@@ -55,6 +56,7 @@ export class SeWorldSection extends SuiComponent<
   UIPartColumn
 > {
   private readonly _watcher: StoreWatcher;
+  private readonly _clearBtn: SuiConfirmButton;
 
   constructor(options: SeWorldSectionOptions) {
     super(
@@ -62,6 +64,30 @@ export class SeWorldSection extends SuiComponent<
       { default: { self: { style: {} } } },
     );
     this._watcher = new StoreWatcher();
+    this._clearBtn = new SuiConfirmButton({
+      id: `${IDS.WORLD.SECTION}-clear-btn`,
+      onConfirm: async () => {
+        const entities = Object.values(store.getState().world.entitiesById);
+        await Promise.all(
+          entities
+            .filter((e) => e.lorebookEntryId)
+            .map((e) => api.v1.lorebook.removeEntry(e.lorebookEntryId!)),
+        );
+        store.dispatch(worldCleared());
+      },
+      timeout: 4000,
+      theme: {
+        default: {
+          self: { iconId: "trash-2" as IconId, style: { ...ACTION_BASE, opacity: "0.6" } },
+        },
+        pending: {
+          self: {
+            iconId: "alertTriangle" as IconId,
+            style: { ...ACTION_BASE, color: "#ff5252", opacity: "1" },
+          },
+        },
+      },
+    });
   }
 
   private async _rebuildBody(): Promise<void> {
@@ -227,7 +253,7 @@ export class SeWorldSection extends SuiComponent<
       id: `${IDS.WORLD.SECTION}.card`,
       label: "World",
       icon: "globe" as IconId,
-      actions: [segaStartBtn, segaStopBtn, addEntityBtn, addThreadBtn],
+      actions: [segaStartBtn, segaStopBtn, addEntityBtn, addThreadBtn, this._clearBtn],
       theme: { default: { actions: { base: ACTION_BASE } } },
     });
 

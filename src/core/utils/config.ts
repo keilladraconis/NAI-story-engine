@@ -1,7 +1,32 @@
 const GLM_MODEL = "glm-4-6";
 const XIALONG_MODEL = "xialong-v1";
 
-export const XIALONG_LOREBOOK_STOPS = ["\n\n***", "\n\n[ Chapter", "\n\n[Chapter"];
+// Stop sequences applied to all lorebook content/refine generation to prevent
+// the model from chaining multiple entries in a single response.
+export const LOREBOOK_CHAIN_STOPS = [
+  "\nName:",       // new entry header
+  "\n---",         // markdown HR (GLM common separator)
+  "\n***",         // markdown HR (asterisk variant)
+  "\n[ Chapter",   // chapter / section header
+  "\n[Chapter",
+];
+
+/**
+ * Trim any full or partial stop sequence from the tail of generated text.
+ * When a stop fires mid-token the fragment lands in accumulatedText — this
+ * removes it. Only trims prefixes of length >= 2 to avoid eating lone newlines.
+ */
+export function trimStopTail(text: string, stops: string[]): string {
+  for (const stop of stops) {
+    for (let len = stop.length; len >= 2; len--) {
+      const prefix = stop.slice(0, len);
+      if (text.endsWith(prefix)) {
+        return text.slice(0, text.length - prefix.length);
+      }
+    }
+  }
+  return text;
+}
 
 export async function isXialongMode(): Promise<boolean> {
   return Boolean(await api.v1.config.get("xialong_mode"));

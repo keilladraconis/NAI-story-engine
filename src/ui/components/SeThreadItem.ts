@@ -150,6 +150,7 @@ export class SeThreadItem extends SuiComponent<
         text: content,
         keys: group.title ? [group.title.toLowerCase()] : [],
         enabled: true,
+        forceActivation: true,
         category: categoryId,
       });
       store.dispatch(groupLorebookEntrySet({ groupId, entryId }));
