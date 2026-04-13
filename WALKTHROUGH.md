@@ -163,6 +163,51 @@ Start writing in the document. Lorebook entries activate as relevant characters,
 
 ---
 
+---
+
+## Using Story Engine with an Existing Story
+
+Story Engine is designed to work with stories that already have lorebook entries, Memory, and Author's Note content — not just fresh starts.
+
+### Lorebook Persistence
+
+**Lorebooks are never destroyed by Story Engine.** Removing the script, resetting the engine, or clearing all entities does not touch the NovelAI lorebook. Your entries are always safe. What Story Engine adds is a management layer: binding entries as typed entities, generating content and keys for them, and organizing them into threads. That layer can be removed or rebuilt at any time without affecting the underlying lorebook data.
+
+### The Import Wizard
+
+When you open Story Engine in a story that already has lorebook entries, Memory content, or Author's Note text — and no Story Engine entities have been set up yet — the Import Wizard opens automatically. You can also open it at any time via the **Import** button in the panel header.
+
+The wizard has two sections:
+
+**Foundation Fields**
+
+| Row | What it does |
+|-----|-------------|
+| **Memory → ATTG** | Imports existing Memory text into the Foundation ATTG field and enables sync. |
+| **A/N → Style** | Imports existing Author's Note text into the Foundation Style field and enables sync. |
+| **Story → Shape + Intent** | Reads your existing story content — lorebook, Memory, document — and generates a Shape and Intent to anchor the Foundation for this story. |
+
+**Lorebook Entries**
+
+All unmanaged lorebook entries are listed, grouped by category. For each entry:
+- The category is auto-detected from the entry text (Character, Location, Faction, etc.). Click the category label to cycle through options.
+- Click **⚡ Bind** to register the entry as a Story Engine entity. The existing lorebook text is preserved exactly — binding doesn't modify the entry, it just makes it visible and manageable in the World section.
+
+### Import All
+
+The **Import All** button in the wizard header does everything in one click:
+
+1. Imports Memory → ATTG (if Memory has content)
+2. Imports Author's Note → Style (if A/N has content)
+3. Binds all unmanaged lorebook entries as entities, using the auto-detected category for each
+4. Triggers Shape and Intent generation from your existing story context
+
+This is the recommended starting point when adding Story Engine to an existing story. After Import All, your World section will be populated with all your existing lorebook entries as entities, your Foundation fields will reflect your existing metadata, and Shape/Intent will be generated to anchor generation to your story's actual structure.
+
+From there you can run S.E.G.A. to regenerate lorebook content and keys with Story Engine's prompts, use the Forge to add new world elements, or use the entity edit panes to refine individual entries.
+
+---
+
 ## Quick Reference
 
 | Tab / Section   | What it does                            | Key action                                         |

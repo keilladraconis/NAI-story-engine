@@ -36,6 +36,17 @@ One-button lorebook completion. Runs two stages:
 
 Each stage can also be triggered individually from an entity's edit pane.
 
+### Import Wizard
+
+For stories that already have lorebook entries, Memory, or Author's Note content. Opens automatically on first load when existing content is detected; also accessible via the **Import** button in the panel header.
+
+- **Memory → ATTG** and **A/N → Style** — one-click import of existing story metadata into Foundation fields.
+- **Story → Shape + Intent** — generates Foundation anchors by reading your existing story context (lorebook, Memory, document).
+- **Per-entry binding** — lists all unmanaged lorebook entries with auto-detected category; click Bind to register as a Story Engine entity without touching the entry text.
+- **Import All** — imports all of the above in one click, then triggers Shape and Intent generation.
+
+**Lorebook entries are never destroyed by Story Engine.** Removing the script or clearing entities does not affect the lorebook. Binding is a lightweight management layer that can be rebuilt at any time.
+
 ### Entity Edit Pane
 
 Click any entity to open its edit pane:
