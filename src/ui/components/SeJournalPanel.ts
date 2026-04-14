@@ -10,6 +10,7 @@ import {
   formatJournal,
   formatDigest,
   formatForgeDigest,
+  formatBootstrapDigest,
   clearJournal,
   getJournalCount,
 } from "../../core/generation-journal";
@@ -94,6 +95,18 @@ export class SeJournalPanel extends SuiComponent<
               callback: async () => {
                 await api.v1.clipboard.writeText(formatDigest());
                 api.v1.ui.toast("SEGA digest copied to clipboard", {
+                  type: "success",
+                });
+              },
+            }),
+            button({
+              id: "kse-journal-bootstrap-digest-btn",
+              text: "Bootstrap",
+              iconId: "clipboard" as IconId,
+              style: S.btn,
+              callback: async () => {
+                await api.v1.clipboard.writeText(formatBootstrapDigest());
+                api.v1.ui.toast("Bootstrap digest copied to clipboard", {
                   type: "success",
                 });
               },

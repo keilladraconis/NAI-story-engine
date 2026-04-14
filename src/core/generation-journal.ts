@@ -119,6 +119,68 @@ export function formatDigest(): string {
 }
 
 /**
+ * Bootstrap digest — shows context (lorebook entries + instruction) and response
+ * for each phase, so prompt changes can be evaluated against what the model saw.
+ * Skips the stable SE prefix messages; shows lorebook entries, foundation anchors,
+ * the instruction message, and the response.
+ */
+export function formatBootstrapDigest(): string {
+  const entries = journal.filter(
+    (e) => e.label === "bootstrap" || e.label.startsWith("bootstrap-continue:"),
+  );
+  if (entries.length === 0)
+    return "# Bootstrap Digest\n\nNo bootstrap entries recorded.";
+
+  const lines: string[] = [`# Bootstrap Digest (${entries.length} phases)\n`];
+
+  for (const entry of entries) {
+    const phase =
+      entry.label === "bootstrap"
+        ? "Phase 1"
+        : `Phase 2 — iteration ${entry.label.split(":")[1]}`;
+    lines.push(`## ${phase} — ${entry.success ? "ok" : "FAILED"}`);
+
+    const paramParts: string[] = [];
+    for (const [k, v] of Object.entries(entry.params)) {
+      if (k === "taskId") continue;
+      paramParts.push(`${k}=${JSON.stringify(v)}`);
+    }
+    lines.push(`**Params:** ${paramParts.join(", ")}  **Uncached:** ${entry.uncachedTokens}`);
+    lines.push("");
+
+    // Show only the contextually interesting messages:
+    // - Foundation anchors (start with Intensity: / Shape: / Intent: / World State: / Story Contract:)
+    // - Bootstrap instruction (contains "Write" or "Continue directly")
+    // - Style hint (contains "[ Style:")
+    // - Short system messages ≤ 600 chars (lorebook entries, world state snippets)
+    // Skip: long SE prefix messages and story text (too large, not useful per-run)
+    const ANCHOR_PREFIX = /^(Intensity:|Shape:|Intent:|World State:|Story Contract:)/;
+    const INSTRUCTION_CONTENT = /Write the opening|Continue directly/;
+    const STYLE_HINT = /\[ Style:/;
+
+    for (const msg of entry.messages) {
+      const content = msg.content ?? "";
+      const keep =
+        ANCHOR_PREFIX.test(content) ||
+        INSTRUCTION_CONTENT.test(content) ||
+        STYLE_HINT.test(content) ||
+        (msg.role === "system" && content.length <= 600);
+      if (!keep) continue;
+      lines.push(`[${msg.role.toUpperCase()}]`);
+      lines.push(content || "(empty)");
+      lines.push("");
+    }
+
+    lines.push("### Response");
+    lines.push(stripThinkingTags(entry.response).trim() || "(empty)");
+    lines.push("");
+    lines.push("---\n");
+  }
+
+  return lines.join("\n");
+}
+
+/**
  * Forge diagnostic digest — shows the raw/stripped response and what the
  * command parser extracted for each forge step. Use this to diagnose
  * "no content" rejections, multi-command responses, and think-tag leakage.

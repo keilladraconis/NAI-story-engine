@@ -555,40 +555,34 @@ export const XIALONG_STYLE = {
   foundationWorldState: "[ Style: narrator, situational, grounded ]",
   foundationContract:   "[ Style: critic, genre-aware, contractual ]",
   summary:              "[ Style: archivist, concise, insightful ]",
-  bootstrap:            "[ Style: novelist; cold-open; sensory-grounding; forward-momentum ]",
+  bootstrap:            "[ Style: novelist; cold-open; observed-not-named; no-absolutes; forward-momentum ]",
+  bootstrapContinue:    "[ Style: novelist; continuation; behavior-not-quality; no-absolutes; forward-momentum ]",
 } as const;
 
-export const BOOTSTRAP_PROMPT = `Write the opening of this story. Typically 4–6 paragraphs.
+export const BOOTSTRAP_P1_PROMPT = `Write the opening paragraph of this story.
 
-PARAGRAPH ARCHITECTURE:
-- P1: Sensory grounding. One or two sentences. Concrete, specific — what this place sounds, smells, feels like. Not a named quality ("it was oppressive") but the physical evidence of it.
-- P2: Protagonist's position. Where are they in this space, and what is happening to them *right now*? No history — only the next few minutes. What's at stake immediately?
-- P3–P4: Other characters enter through the protagonist's observation. One character per paragraph. In order: (1) what hits you from across the room — build, posture, something specific; (2) one behavioral tell — a single action that reveals without naming; (3) where they are relative to the protagonist. Never name their emotional state.
-- P5–P6: The situation develops. Tension accumulates. The prose style announces itself here — rhythm, level of interiority, how description moves.
-- Final paragraph: End in motion. A decision unmade, an exchange beginning, something changing. Never a conclusion. Never a resolution.
+First sentence: protagonist as subject, already inside the location — mid-action, not approaching.
+One location only. No character introductions. No dialogue. No backstory.
+Sensory grounding: what this space sounds, smells, feels like through what the protagonist physically encounters.
+End mid-thought or mid-action. Do not resolve or conclude.
 
-COLD START:
-The first sentence must have the protagonist or a specific object as its subject — already inside an action, not approaching one.
-Good: "The door opened before she knocked." / "Three candles. One already guttered."
-Bad: "My arrival at the estate coincided with the fog." / "The house stood at the end of the lane." / "It was the kind of evening that..."
+Prose only.`;
 
-CHARACTER INTRODUCTION PATTERN:
-When someone enters: physical first (what you see before they speak), then behavior (one specific thing they do — a gesture, a habit, a choice), then their position in the space. This order is not optional.
-Never: abstract qualities ("a commanding presence"), named states ("her expression unreadable"), hedged impressions ("seemed nervous").
+export const BOOTSTRAP_CONTINUE_PROMPT = `Continue directly from the last sentence of the story. Same scene, same moment. Write one paragraph only.
 
-PROHIBITED PATTERNS — do not write any of these:
-- Named emotions: "she felt afraid" / "unease settled over her" / "he was furious"
-- Internal sensation: "pulse quickened" / "breath hitched" / "a chill ran through" / "heat pooled"
-- Thematic narration: stating what the scene is *about* in the narration ("the rational tools I'd brought to this irrational place")
-- Appositives: [action], [possessive] [noun] — "she turned, her eyes hard" / "he spoke, his voice low"
-- Abstract movement: "fluid grace" / "predatory stillness" / "she moved like..."
-- Backstory in any form
-- Weather as atmosphere rather than obstacle: fog exists only if it limits action or perception, not to set mood
+Prohibited:
+- Named emotions: "she felt afraid" / "unease settled over her"
+- Internal sensation: "pulse quickened" / "breath hitched" / "heat pooled"
+- Thematic narration: stating what the scene means ("the rational tools I'd brought to this irrational place")
+- Appositives and absolute phrases — noun + participle or adjective hanging after any clause: "she said, her hand moving" / "he turned, his eyes fixed on the door" / "she stepped forward, her voice low" / "the movement subtle yet deliberate" / "his hair falling across his forehead"
+- Editorial interpretation: "as if they heard it constantly" / "too controlled for a child his age" / "something darker beneath the surface"
+- Abstract qualities: "commanding presence" / "fluid grace" / "unnerving stillness"
+- Backstory
+- Scene transitions: no ***, ---, or any break marker; no time jumps; no shift to a different location or moment
+- Resolution — end in motion, never in conclusion
+- POV violations: in first person, "I failed to notice" is impossible
 
-CONSTRAINTS:
-- One location. Stay there.
-- 2–4 characters maximum, each properly introduced.
-- 1–2 situations seeded, neither resolved.
+Characters introduced: physical detail first, then one behavioral tell, then spatial position.
 
-OUTPUT: prose only. No headers, no labels, no commentary.`;
+Prose only.`;
 

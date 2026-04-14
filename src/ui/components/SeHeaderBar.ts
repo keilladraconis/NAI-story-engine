@@ -74,7 +74,6 @@ export class SeHeaderBar extends SuiComponent<
   private _waitTimerId: number | undefined;
 
   // Bootstrap state
-  private _documentHasContent = false;
   private _bootstrapTimerGen = 0;
 
   constructor(options: SeHeaderBarOptions) {
@@ -172,10 +171,6 @@ export class SeHeaderBar extends SuiComponent<
 
     this._watcher.dispose();
 
-    // Check document emptiness once on compose
-    const sectionIds = await api.v1.document.sectionIds();
-    this._documentHasContent = sectionIds.length > 0;
-
     this._watcher.watch(
       (s) => ({
         statusText: s.runtime.sega.statusText,
@@ -253,8 +248,12 @@ export class SeHeaderBar extends SuiComponent<
     // Bootstrap button state machine — single button that mutates in place
     this._watcher.watch(
       (s) => {
-        const queued = s.runtime.queue.find((r) => r.type === "bootstrap");
-        const isActive = s.runtime.activeRequest?.type === "bootstrap";
+        const queued = s.runtime.queue.find(
+          (r) => r.type === "bootstrap" || r.type === "bootstrapContinue",
+        );
+        const isActive =
+          s.runtime.activeRequest?.type === "bootstrap" ||
+          s.runtime.activeRequest?.type === "bootstrapContinue";
         const genxStatus = isActive ? s.runtime.genx.status : "idle";
         return {
           queuedId: queued?.id as string | undefined,
@@ -293,7 +292,7 @@ export class SeHeaderBar extends SuiComponent<
           api.v1.ui.updateParts([{
             id: "header-bootstrap-btn",
             text: "Bootstrap",
-            style: { ...BTN_STYLE, opacity: "0.7", display: this._documentHasContent ? "none" : "flex" },
+            style: { ...BTN_STYLE, opacity: "0.7", display: "flex" },
             callback: () => { store.dispatch(bootstrapRequested()); },
           }]);
         }
@@ -347,11 +346,7 @@ export class SeHeaderBar extends SuiComponent<
             button({
               id: "header-bootstrap-btn",
               text: "Bootstrap",
-              style: {
-                ...BTN_STYLE,
-                opacity: "0.7",
-                display: this._documentHasContent ? "none" : "flex",
-              },
+              style: { ...BTN_STYLE, opacity: "0.7", display: "flex" },
               callback: () => { store.dispatch(bootstrapRequested()); },
             }),
             button({

@@ -197,6 +197,8 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `thread-summary:${target.groupId.slice(0, 8)}`;
     case "bootstrap":
       return "bootstrap";
+    case "bootstrapContinue":
+      return `bootstrap-continue:${target.iteration}`;
   }
 }
 
