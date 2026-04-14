@@ -5,6 +5,7 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import { stripThinkingTags } from "../../../utils/tag-parser";
+import { trimStopTail } from "../../../utils/config";
 import { buildBootstrapContinueStrategy } from "../bootstrap-effects";
 import { generationSubmitted, requestQueued } from "../../index";
 
@@ -13,12 +14,31 @@ type BootstrapContinueTarget = Extract<GenerationStrategy["target"], { type: "bo
 
 const MAX_CONTINUE_ITERATIONS = 5; // iterations 0–4 → 5 continuation paragraphs
 
+// When true, the next Phase 2 iteration should join the last document section inline
+// rather than starting a new paragraph. Set when a generation ends mid-sentence
+// (max_tokens fired before a natural \n\n boundary). Reset on completion or failure.
+let continueInline = false;
+
 function parseParagraphs(text: string): string[] {
   return stripThinkingTags(text)
     .trim()
     .split(/\n\n+/)
     .map((p) => p.trim())
     .filter((p) => p.length > 0 && !/^[\*\-#=~\s]+$/.test(p));
+}
+
+/** True when text ended at a natural sentence/scene boundary (not mid-sentence max_tokens cut). */
+function endsAtBoundary(text: string): boolean {
+  return /[.!?…]["']?$/.test(text) || text.endsWith("***") || text.endsWith("---") || text.endsWith("⁂");
+}
+
+/** Join text onto the last document section without creating a new paragraph. */
+async function joinToLastSection(text: string): Promise<void> {
+  const ids = await api.v1.document.sectionIds();
+  const lastId = ids[ids.length - 1];
+  const results = await api.v1.document.scan(undefined, { from: lastId });
+  const lastText = results[0].section.text;
+  await api.v1.document.updateParagraph(lastId, { text: lastText + " " + text });
 }
 
 // ─── Phase 1 handler ─────────────────────────────────────────────────────────
@@ -42,6 +62,8 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
     const paragraph = parseParagraphs(ctx.accumulatedText)[0];
     if (paragraph) {
       await api.v1.document.appendParagraph({ text: paragraph });
+      // If Phase 1 ended mid-sentence, Phase 2 iter 0 must join inline.
+      continueInline = !endsAtBoundary(paragraph);
     }
 
     // Chain into phase 2
@@ -63,22 +85,28 @@ export const bootstrapContinueHandler: GenerationHandlers<BootstrapContinueTarge
 
   async completion(ctx: CompletionContext<BootstrapContinueTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) {
+      continueInline = false;
       api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
       return;
     }
 
-    const text = stripThinkingTags(ctx.accumulatedText).trim();
+    const text = trimStopTail(
+      stripThinkingTags(ctx.accumulatedText),
+      ["\n***", "\n---", "\n⁂", "\n[ "],
+    ).trim();
     if (text) {
-      if (ctx.target.iteration === 0) {
-        // Iter 0 continues Phase 1's paragraph — space-join to prevent word-concatenation.
-        await api.v1.document.append(" " + text);
+      if (continueInline) {
+        // Previous generation ended mid-sentence — join onto its section inline.
+        await joinToLastSection(text);
       } else {
         await api.v1.document.appendParagraph({ text });
       }
+      continueInline = !endsAtBoundary(text);
     }
 
     const maxReached = ctx.target.iteration >= MAX_CONTINUE_ITERATIONS - 1;
     if (maxReached) {
+      continueInline = false;
       api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
       return;
     }
