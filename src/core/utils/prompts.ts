@@ -558,24 +558,37 @@ export const XIALONG_STYLE = {
   bootstrap:            "[ Style: novelist; cold-open; sensory-grounding; forward-momentum ]",
 } as const;
 
-export const BOOTSTRAP_PROMPT = `Write the opening of this story — 1 to 3 paragraphs of prose that drop the reader directly into the world.
+export const BOOTSTRAP_PROMPT = `Write the opening of this story. Typically 4–6 paragraphs.
 
-ARCHITECTURE:
-- Paragraph 1: Sensory grounding. Establish *where* through concrete sensory detail — what it looks, sounds, smells like. Not "it was busy" but what busy *is* here. The reader's first breath should be the air of this place.
-- Paragraph 2: The protagonist's immediate situation. Not their backstory — their *now*. What are they doing, what are they facing, what's at stake in the next few minutes?
-- Paragraph 3 (if needed): Introduce another character or let the tension develop. Physical detail first, then what they *do* — behavior reveals character. End in motion: a decision, an interaction about to happen, a moment of change.
+PARAGRAPH ARCHITECTURE:
+- P1: Sensory grounding. One or two sentences. Concrete, specific — what this place sounds, smells, feels like. Not a named quality ("it was oppressive") but the physical evidence of it.
+- P2: Protagonist's position. Where are they in this space, and what is happening to them *right now*? No history — only the next few minutes. What's at stake immediately?
+- P3–P4: Other characters enter through the protagonist's observation. One character per paragraph. In order: (1) what hits you from across the room — build, posture, something specific; (2) one behavioral tell — a single action that reveals without naming; (3) where they are relative to the protagonist. Never name their emotional state.
+- P5–P6: The situation develops. Tension accumulates. The prose style announces itself here — rhythm, level of interiority, how description moves.
+- Final paragraph: End in motion. A decision unmade, an exchange beginning, something changing. Never a conclusion. Never a resolution.
 
 COLD START:
-Begin mid-action or mid-thought. Not "The city was bustling" but "Sarah's phone had eleven missed calls. She turned it off and kept walking." Start with something specific, concrete, *already happening*.
+The first sentence must have the protagonist or a specific object as its subject — already inside an action, not approaching one.
+Good: "The door opened before she knocked." / "Three candles. One already guttered."
+Bad: "My arrival at the estate coincided with the fog." / "The house stood at the end of the lane." / "It was the kind of evening that..."
 
-HARD CONSTRAINTS:
-- No backstory dumps — make them care about the present first
-- No abstract character descriptions — show what they *do*, not what they *are*
-- No passive weather — weather only if it affects action
-- No premise explanation — show the world through character interaction
-- No "It was" or "There was" constructions — start with something specific
-- Do NOT resolve the conflict — end at a moment of decision or potential, not conclusion
-- One location. 2–4 characters maximum. 1–2 situations seeded, not resolved.
+CHARACTER INTRODUCTION PATTERN:
+When someone enters: physical first (what you see before they speak), then behavior (one specific thing they do — a gesture, a habit, a choice), then their position in the space. This order is not optional.
+Never: abstract qualities ("a commanding presence"), named states ("her expression unreadable"), hedged impressions ("seemed nervous").
 
-OUTPUT: prose only. No headers, no labels, no commentary. Just the opening paragraphs.`;
+PROHIBITED PATTERNS — do not write any of these:
+- Named emotions: "she felt afraid" / "unease settled over her" / "he was furious"
+- Internal sensation: "pulse quickened" / "breath hitched" / "a chill ran through" / "heat pooled"
+- Thematic narration: stating what the scene is *about* in the narration ("the rational tools I'd brought to this irrational place")
+- Appositives: [action], [possessive] [noun] — "she turned, her eyes hard" / "he spoke, his voice low"
+- Abstract movement: "fluid grace" / "predatory stillness" / "she moved like..."
+- Backstory in any form
+- Weather as atmosphere rather than obstacle: fog exists only if it limits action or perception, not to set mood
+
+CONSTRAINTS:
+- One location. Stay there.
+- 2–4 characters maximum, each properly introduced.
+- 1–2 situations seeded, neither resolved.
+
+OUTPUT: prose only. No headers, no labels, no commentary.`;
 
