@@ -69,7 +69,7 @@ export const bootstrapContinueHandler: GenerationHandlers<BootstrapContinueTarge
 
     const text = stripThinkingTags(ctx.accumulatedText).trim();
     if (text) {
-      await api.v1.document.append("\n\n" + text);
+      await api.v1.document.append(text);
     }
 
     const maxReached = ctx.target.iteration >= MAX_CONTINUE_ITERATIONS - 1;
