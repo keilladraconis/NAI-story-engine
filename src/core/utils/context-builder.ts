@@ -564,11 +564,44 @@ export const createBrainstormFactory = (
       (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
     );
 
+    const { shape, intent, worldState, intensity, contract } = state.foundation;
+    const entities = state.world.entityIds
+      .map((id) => state.world.entitiesById[id])
+      .filter((e) => e?.summary);
+
     let contextBlock = "Here is the current state of the story:\n";
     let hasContext = false;
 
     if (setting) {
       contextBlock += `SETTING:\n${setting}\n\n`;
+      hasContext = true;
+    }
+    if (intensity) {
+      contextBlock += `INTENSITY: ${intensity.level} — ${intensity.description}\n\n`;
+      hasContext = true;
+    }
+    if (shape) {
+      contextBlock += `SHAPE: ${shape.name}: ${shape.description}\n\n`;
+      hasContext = true;
+    }
+    if (intent) {
+      contextBlock += `INTENT:\n${intent}\n\n`;
+      hasContext = true;
+    }
+    if (worldState) {
+      contextBlock += `WORLD STATE:\n${worldState}\n\n`;
+      hasContext = true;
+    }
+    if (contract) {
+      contextBlock += `STORY CONTRACT:\nRequired: ${contract.required}\nProhibited: ${contract.prohibited}\nEmphasis: ${contract.emphasis}\n\n`;
+      hasContext = true;
+    }
+    if (entities.length > 0) {
+      contextBlock += `CHARACTERS & ENTITIES:\n`;
+      for (const e of entities) {
+        contextBlock += `- ${e.name} (${e.categoryId}): ${e.summary}\n`;
+      }
+      contextBlock += "\n";
       hasContext = true;
     }
 
@@ -579,8 +612,7 @@ export const createBrainstormFactory = (
       });
       messages.push({
         role: "assistant",
-        content:
-          "Understood. I have the full story context in mind. Let's jam.",
+        content: "Understood. I have the full story context in mind. Ready.",
       });
     }
 
@@ -605,7 +637,7 @@ export const createBrainstormFactory = (
     return {
       messages,
       params: await buildModelParams({
-        max_tokens: 300,
+        max_tokens: 400,
         temperature: 0.95,
         min_p: 0.05,
         presence_penalty: 0.05,
