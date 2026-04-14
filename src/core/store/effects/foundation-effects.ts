@@ -26,7 +26,7 @@ import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix, buildXialongNarrativeStyleBlock } from "../../utils/context-builder";
 import {
   CRUCIBLE_SHAPE_PROMPT,
-  CRUCIBLE_INTENT_PROMPT,
+  FOUNDATION_INTENT_PROMPT,
   FOUNDATION_WORLD_STATE_PROMPT,
   CONTRACT_GENERATE_PROMPT,
   ATTG_GENERATE_PROMPT,
@@ -92,7 +92,7 @@ const createShapeFactory =
 const createIntentFactory =
   (getState: () => RootState): MessageFactory =>
   async () => {
-    const intentPrompt = CRUCIBLE_INTENT_PROMPT;
+    const intentPrompt = FOUNDATION_INTENT_PROMPT;
 
     const [prefix, storyContext] = await Promise.all([
       buildStoryEnginePrefix(getState, { excludeSections: ["foundation"] }),
@@ -124,10 +124,10 @@ const createIntentFactory =
     return {
       messages,
       params: await buildModelParams({
-        max_tokens: 1024,
+        max_tokens: 80,
         temperature: 1.0,
         min_p: 0.05,
-        stop: ["</think>"],
+        stop: ["</think>", "\n"],
       }),
     };
   };
@@ -236,10 +236,10 @@ const createStyleFactory =
     return {
       messages,
       params: await buildModelParams({
-        max_tokens: 128,
+        max_tokens: 300,
         temperature: 0.7,
         min_p: 0.05,
-        stop: ["</think>"],
+        stop: ["</think>", "\n***", "\n---", "\n[ S", "\n[ Style"],
       }),
     };
   };

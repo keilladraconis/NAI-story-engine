@@ -18,7 +18,7 @@ const createBootstrapP1Factory =
   (getState: () => RootState): MessageFactory =>
   async () => {
     const prefix = await buildStoryEnginePrefix(getState, {
-      excludeSections: ["worldEntities", "storyText", "brainstorm"],
+      excludeSections: ["worldEntities", "storyText"],
     });
 
     const messages: Message[] = [...prefix];
@@ -63,7 +63,7 @@ const createBootstrapContinueFactory =
   (getState: () => RootState): MessageFactory =>
   async () => {
     const [prefix, storyContext] = await Promise.all([
-      buildStoryEnginePrefix(getState, { excludeSections: ["storyText"] }),
+      buildStoryEnginePrefix(getState, { excludeSections: ["storyText", "brainstorm"] }),
       api.v1.buildContext({ suppressScriptHooks: "self" }),
     ]);
 
@@ -96,7 +96,7 @@ const createBootstrapContinueFactory =
         max_tokens: 384,
         temperature: 1.0,
         min_p: 0.05,
-        stop: ["</think>", "\n***", "\n---", "\n⁂", "\n[ "],
+        stop: ["</think>", "\n\n", "\n***", "\n---", "\n⁂", "\n[ "],
       }),
     };
   };

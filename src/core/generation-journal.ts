@@ -251,6 +251,11 @@ export function formatForgeDigest(): string {
             case "CRITIQUE":
               lines.push(`  ✓ CRITIQUE (${cmd.text.length} chars)`);
               break;
+            case "THREAD":
+              lines.push(
+                `  ✓ THREAD "${cmd.title}" [${cmd.memberNames.join(", ")}]${cmd.description ? ` — ${cmd.description}` : ""}`,
+              );
+              break;
             case "DONE":
               lines.push("  ✓ DONE");
               break;

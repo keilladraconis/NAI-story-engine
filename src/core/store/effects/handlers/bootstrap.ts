@@ -69,7 +69,12 @@ export const bootstrapContinueHandler: GenerationHandlers<BootstrapContinueTarge
 
     const text = stripThinkingTags(ctx.accumulatedText).trim();
     if (text) {
-      await api.v1.document.append(text);
+      if (ctx.target.iteration === 0) {
+        // Iter 0 continues Phase 1's paragraph — space-join to prevent word-concatenation.
+        await api.v1.document.append(" " + text);
+      } else {
+        await api.v1.document.appendParagraph({ text });
+      }
     }
 
     const maxReached = ctx.target.iteration >= MAX_CONTINUE_ITERATIONS - 1;

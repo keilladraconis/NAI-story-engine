@@ -69,7 +69,7 @@ const PHASES: PhaseConfig[] = [
     maxTokens: 384,
     temperature: 0.80,
     instruction:
-      "Weave phase — discover connections. THREAD elements that share genuine structural bonds. CREATE SITUATION entries for collision points — where one character's goal threatens another's position, where knowledge is distributed unevenly, where resource dependencies force impossible loyalties. Focus on opposing goods, not good vs evil.",
+      "Weave phase — discover connections. THREAD elements that share genuine structural bonds. CREATE SITUATION entries for collision points — where one character's goal threatens another's position, where knowledge is distributed unevenly, where resource dependencies force impossible loyalties. Focus on opposing goods, not good vs evil. When the world feels complete and all meaningful connections are made, emit [DONE] to end the loop early.",
   },
 ];
 

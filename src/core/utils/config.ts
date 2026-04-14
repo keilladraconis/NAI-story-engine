@@ -9,6 +9,8 @@ export const LOREBOOK_CHAIN_STOPS = [
   "\n***",         // markdown HR (asterisk variant)
   "\n[ Chapter",   // chapter / section header
   "\n[Chapter",
+  "\n[ Style",     // Xialong style token — switches model to prose/story mode
+  "</think>",      // thinking tag leak
 ];
 
 /**
