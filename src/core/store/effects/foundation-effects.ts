@@ -199,10 +199,10 @@ const createAttgFactory =
     return {
       messages,
       params: await buildModelParams({
-        max_tokens: 64,
+        max_tokens: 128,
         temperature: 0.7,
         min_p: 0.05,
-        stop: ["</think>"],
+        stop: ["</think>", "\n"],
       }),
     };
   };
