@@ -1,0 +1,71 @@
+name: Pre-Release (Dev Build)
+
+on:
+  push:
+    branches:
+      - "v*-*"
+    paths:
+      - "src/**"
+      - "lib/**"
+      - "external/**"
+      - "project.yaml"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-prerelease:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Read version from project.yaml
+        run: echo "VERSION=$(grep "^version:" project.yaml | awk '{print $2}')" >> $GITHUB_ENV
+
+      - name: Determine next dev number
+        id: dev_num
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LAST_N=$(git ls-remote --tags origin \
+            | awk '{print $2}' \
+            | sed 's|refs/tags/||' \
+            | grep -E "^v${VERSION}-dev\.[0-9]+$" \
+            | sed "s|^v${VERSION}-dev\.||" \
+            | sort -n \
+            | tail -n1)
+          if [ -z "$LAST_N" ]; then
+            NEXT_N=1
+          else
+            NEXT_N=$((LAST_N + 1))
+          fi
+          FULL_VERSION="${VERSION}-dev.${NEXT_N}"
+          echo "FULL_VERSION=${FULL_VERSION}" >> $GITHUB_ENV
+          echo "Next pre-release: v${FULL_VERSION}"
+
+      - run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Create Pre-Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mv dist/NAI-story-engine.naiscript "dist/NAI-story-engine-v${FULL_VERSION}.naiscript"
+          gh release create "v${FULL_VERSION}" \
+            "dist/NAI-story-engine-v${FULL_VERSION}.naiscript" \
+            --title "Pre-release v${FULL_VERSION}" \
+            --prerelease \
+            --generate-notes \
+            --target "${{ github.sha }}"
