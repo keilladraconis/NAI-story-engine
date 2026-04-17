@@ -72,6 +72,7 @@ export class SeEntityCard extends SuiComponent<
 > {
   private readonly _watcher: StoreWatcher;
   private readonly _regenBtn: SeGenerationIconButton;
+  private _collapsible: SuiCollapsible | null = null;
 
   constructor(options: SeEntityCardOptions) {
     super(
@@ -285,12 +286,27 @@ export class SeEntityCard extends SuiComponent<
       theme: CARD_THEME,
     });
 
-    const collapsible = await new SuiCollapsible({
+    this._collapsible = new SuiCollapsible({
       id: `${E.ROOT}-c`,
       header: card,
       children: [summaryText],
-      initialCollapsed: true,
-    }).build();
+      initialCollapsed: false,
+    });
+    const collapsible = await this._collapsible.build();
+
+    // Reactively expand/collapse when the world-level toggle fires.
+    const _self = this;
+    this._watcher.watch(
+      (s) => s.ui.worldExpanded,
+      (expanded) => {
+        if (expanded !== null && _self._collapsible) {
+          void _self._collapsible.setState({
+            ..._self._collapsible.state,
+            collapsed: !expanded,
+          });
+        }
+      },
+    );
 
     const initialStyle = _pendingCache ? PENDING_BORDER : isComplete ? COMPLETE_BORDER : INCOMPLETE_BORDER;
     return column({ id: E.ROOT, style: initialStyle, content: [collapsible] });

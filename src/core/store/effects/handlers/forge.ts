@@ -14,6 +14,7 @@ import { DulfsFieldID } from "../../../../config/field-definitions";
 import {
   entityForged,
   entitySummaryUpdated,
+  entityEdited,
   entityDeleted,
   groupCreated,
   forgeStepCompleted,
@@ -37,7 +38,8 @@ type ForgeTarget = Extract<GenerationStrategy["target"], { type: "forge" }>;
  * Executes forge commands against the world slice.
  * CREATE → lorebook entry + entityForged (live immediately)
  * REVISE → entitySummaryUpdated (works on any entity)
- * DELETE → removes lorebook entry + entityDeleted
+ * DELETE → entityDeleted (lorebook entry preserved)
+ * RENAME → entityEdited + lorebook displayName update
  * THREAD → groupCreated
  */
 async function executeForgeCommands(
@@ -120,11 +122,8 @@ async function executeForgeCommands(
           api.v1.log(`[forge] DELETE: "${cmd.name}" not found`);
           break;
         }
-        if (entity.lorebookEntryId) {
-          await api.v1.lorebook.removeEntry(entity.lorebookEntryId);
-        }
-        dispatch(entityDeleted({ entityId: entity.id, lorebookEntryId: undefined }));
-        api.v1.log(`[forge] DELETE "${cmd.name}"`);
+        dispatch(entityDeleted({ entityId: entity.id }));
+        api.v1.log(`[forge] DELETE "${cmd.name}" (lorebook entry preserved)`);
         break;
       }
 
@@ -164,6 +163,32 @@ async function executeForgeCommands(
         break;
       }
 
+      case "RENAME": {
+        const entity = Object.values(getState().world.entitiesById).find(
+          (e) => e.name.toLowerCase() === cmd.oldName.toLowerCase(),
+        );
+        if (!entity) {
+          api.v1.log(`[forge] RENAME: "${cmd.oldName}" not found`);
+          break;
+        }
+        if (!cmd.newName.trim()) {
+          api.v1.log(`[forge] RENAME rejected: empty new name for "${cmd.oldName}"`);
+          break;
+        }
+        dispatch(entityEdited({ entityId: entity.id, name: cmd.newName, summary: entity.summary ?? "" }));
+        if (entity.lorebookEntryId) {
+          const entry = await api.v1.lorebook.entry(entity.lorebookEntryId);
+          if (entry) {
+            await api.v1.lorebook.updateEntry(entity.lorebookEntryId, {
+              ...entry,
+              displayName: cmd.newName,
+            });
+          }
+        }
+        api.v1.log(`[forge] RENAME "${cmd.oldName}" → "${cmd.newName}"`);
+        break;
+      }
+
       case "DONE":
         api.v1.log("[forge] DONE");
         break;
@@ -181,7 +206,7 @@ export const forgeHandler: GenerationHandlers<ForgeTarget> = {
 
     // Show command keywords as ticker during generation
     const commandMatches = text.match(
-      /\[(CREATE|REVISE|DELETE|THREAD|CRITIQUE|DONE)\b[^\]]*\]/g,
+      /\[(CREATE|REVISE|DELETE|RENAME|THREAD|CRITIQUE|DONE)\b[^\]]*\]/g,
     );
     const lastCommand = commandMatches
       ? commandMatches[commandMatches.length - 1]

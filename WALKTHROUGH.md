@@ -139,7 +139,7 @@ Threads are named groups of related entities — a faction and its key members, 
 - Click the **Layers** icon in the World section header to create a new Thread.
 - Click a Thread title to edit its name and summary.
 - Toggle lorebook sync per Thread with the lorebook icon.
-- Click the **trash** icon in the World section header to clear all entities and threads. A second click is required to confirm. Lorebook entries for live entities are removed along with the entities themselves.
+- Click the **trash** icon in the World section header to clear all entities and threads. A second click is required to confirm. Lorebook entries are **preserved** — clearing only detaches entities from Story Engine management. You can re-import them at any time via the Import Wizard.
 
 ### Running S.E.G.A.
 

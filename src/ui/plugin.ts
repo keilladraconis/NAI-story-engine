@@ -126,6 +126,8 @@ export class StoryEnginePlugin extends SuiPlugin {
         (e) => !e.category || !seCategories.has(e.category),
       ).length;
       if (unmanagedCount > 0 || memText.trim() || anText.trim()) {
+        // Switch to Story Engine tab so the import wizard is visible
+        await this._tabBar?.switchTo(1);
         this.editHost.open(
           new SeImportWizard({ id: IDS.IMPORT.WIZARD, editHost: this.editHost }),
         );
@@ -140,7 +142,7 @@ export class StoryEnginePlugin extends SuiPlugin {
     const newContent = await this._brainstormPane.build();
     api.v1.ui.updateParts([
       {
-        id: "se-main-tab-bar.pane.1",
+        id: "se-main-tab-bar.pane.0",
         content: [newContent],
       } as unknown as Partial<UIPart> & { id: string },
     ]);
@@ -216,25 +218,25 @@ export class StoryEnginePlugin extends SuiPlugin {
     const storyEnginePane = new StoryEngineSlot(storyEnginePart);
 
     // ── Tab bar — callbacks close over this._tabBar (safe: only called on click) ──
-    const tabEngine = new SuiButton({
-      id: "se-tab-engine",
-      callback: () => {
-        void this._tabBar?.switchTo(0);
-      },
-      theme: { default: { self: { text: "Story Engine" } } },
-    });
     const tabBrainstorm = new SuiButton({
       id: "se-tab-brainstorm",
       callback: () => {
-        void this._tabBar?.switchTo(1);
+        void this._tabBar?.switchTo(0);
       },
       theme: { default: { self: { text: "Brainstorm" } } },
+    });
+    const tabEngine = new SuiButton({
+      id: "se-tab-engine",
+      callback: () => {
+        void this._tabBar?.switchTo(1);
+      },
+      theme: { default: { self: { text: "Story Engine" } } },
     });
 
     this._tabBar = new SuiTabBar({
       id: "se-main-tab-bar",
-      tabs: [tabEngine, tabBrainstorm],
-      panes: [storyEnginePane, this._brainstormPane],
+      tabs: [tabBrainstorm, tabEngine],
+      panes: [this._brainstormPane, storyEnginePane],
       storageKey: "se-active-tab",
       storageMode: "story",
       theme: {

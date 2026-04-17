@@ -205,6 +205,25 @@ export const createForgeFactory = (
       });
     }
 
+    // 4b. Story contract + intensity — stable, hard constraints for generation
+    {
+      const parts: string[] = [];
+      if (foundation.intensity) {
+        parts.push(`Intensity: ${foundation.intensity.level} — ${foundation.intensity.description}`);
+      }
+      if (foundation.contract) {
+        parts.push(
+          `Required: ${foundation.contract.required}\nProhibited: ${foundation.contract.prohibited}\nEmphasis: ${foundation.contract.emphasis}`,
+        );
+      }
+      if (parts.length > 0) {
+        messages.push({
+          role: "assistant",
+          content: `=== STORY CONTRACT ===\n${parts.join("\n")}`,
+        });
+      }
+    }
+
     // 5. Forge intent (tactical, per-session) — stable
     if (forgeGuidance.trim()) {
       messages.push({

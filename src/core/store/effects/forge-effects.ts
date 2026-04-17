@@ -5,7 +5,7 @@
  *  - forgeRequested → start loop at step 1
  *  - forgeStepCompleted → schedule next step
  *  - forgeCritiqueReceived → write critique to FORGE_GUIDANCE field, end loop
- *  - entityDeleted → remove lorebook entry if present
+ *  - entityDeleted → no-op (lorebook entry preserved)
  */
 
 import { Store, matchesAction } from "nai-store";
@@ -133,14 +133,12 @@ export function registerForgeEffects(
     dispatch(forgeLoopEnded());
   });
 
-  // ─── Entity Deleted → remove lorebook entry if present ───────────────────
-
-  subscribeEffect(matchesAction(entityDeleted), async (action) => {
-    const { lorebookEntryId } = action.payload;
-    if (lorebookEntryId) {
-      await api.v1.lorebook.removeEntry(lorebookEntryId);
-      api.v1.log(`[forge] entityDeleted: removed lorebook entry ${lorebookEntryId}`);
-    }
+  // ─── Entity Deleted → unbind only, never destroy the lorebook entry ─────────
+  // Story Engine integrates but never destroys. Removing an entity from the
+  // world only detaches it from SE management — the underlying lorebook entry
+  // is preserved so the user can re-import or continue using it independently.
+  subscribeEffect(matchesAction(entityDeleted), (_action) => {
+    // intentionally no-op: lorebook entry is left intact
   });
 
   // ─── Entity Regen Requested → Queue only missing fields ───────────────────

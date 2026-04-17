@@ -22,7 +22,7 @@ export const worldSlice = createSlice({
       entityIds: [...state.entityIds, payload.entity.id],
     }),
 
-    entityDeleted: (state, payload: { entityId: string; lorebookEntryId?: string }) => {
+    entityDeleted: (state, payload: { entityId: string }) => {
       const { [payload.entityId]: _, ...rest } = state.entitiesById;
       return {
         ...state,

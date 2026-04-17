@@ -24,6 +24,7 @@ import {
 import { store } from "../../core/store";
 import { groupCreated, entityForged, worldCleared } from "../../core/store/slices/world";
 import { segaToggled } from "../../core/store/slices/runtime";
+import { worldExpansionSet } from "../../core/store/slices/ui";
 import { FieldID } from "../../config/field-definitions";
 import { IDS } from "../../ui/framework/ids";
 import { ensureCategory } from "../../core/store/effects/lorebook-sync";
@@ -67,12 +68,9 @@ export class SeWorldSection extends SuiComponent<
     this._clearBtn = new SuiConfirmButton({
       id: `${IDS.WORLD.SECTION}-clear-btn`,
       onConfirm: async () => {
-        const entities = Object.values(store.getState().world.entitiesById);
-        await Promise.all(
-          entities
-            .filter((e) => e.lorebookEntryId)
-            .map((e) => api.v1.lorebook.removeEntry(e.lorebookEntryId!)),
-        );
+        // Lorebook entries are intentionally preserved — removing all entities
+        // only detaches them from SE management. The user can re-import via
+        // the Import Wizard to restore SE bindings without losing lorebook data.
         store.dispatch(worldCleared());
       },
       timeout: 4000,
@@ -249,11 +247,41 @@ export class SeWorldSection extends SuiComponent<
       },
     );
 
+    const expandCollapseId = `${IDS.WORLD.SECTION}-expand-btn`;
+    const currentlyExpanded = state.ui.worldExpanded ?? true;
+    const expandCollapseBtn = new SuiButton({
+      id: expandCollapseId,
+      callback: () => {
+        const next = !(store.getState().ui.worldExpanded ?? true);
+        store.dispatch(worldExpansionSet({ expanded: next }));
+      },
+      theme: {
+        default: {
+          self: {
+            iconId: (currentlyExpanded ? "minimize-2" : "maximize-2") as IconId,
+            style: { ...ACTION_BASE, opacity: "0.6" },
+          },
+        },
+      },
+    });
+
+    this._watcher.watch(
+      (s) => s.ui.worldExpanded ?? true,
+      (expanded) => {
+        api.v1.ui.updateParts([
+          {
+            id: expandCollapseId,
+            iconId: (expanded ? "minimize-2" : "maximize-2") as IconId,
+          } as unknown as Partial<UIPart> & { id: string },
+        ]);
+      },
+    );
+
     const headerCard = new SuiCard({
       id: `${IDS.WORLD.SECTION}.card`,
       label: "World",
       icon: "globe" as IconId,
-      actions: [segaStartBtn, segaStopBtn, addEntityBtn, addThreadBtn, this._clearBtn],
+      actions: [segaStartBtn, segaStopBtn, expandCollapseBtn, addEntityBtn, addThreadBtn, this._clearBtn],
       theme: { default: { actions: { base: ACTION_BASE } } },
     });
 

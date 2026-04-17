@@ -420,6 +420,10 @@ SHAPE: Intimate Moment
 
 Lean toward a scene so specific to these particular people that it becomes unrepeatable — not because something changes, but because it captures exactly what this shared existence is.
 
+SHAPE: Threshold Crossing
+
+Lean toward the moment after which the protagonist cannot be what they were. The endpoint is not triumph or defeat but the irreversibility itself — a choice made or an action taken (including inaction) that closes off a prior self. The forces governing the structure are the before and after of that crossing.
+
 SHAPE: Slice of Life
 
 Lean toward scenes of ordinary continuity — the texture of how these specific people inhabit their world, not what disrupts or changes it. The story ends not because something resolves but because the window is fully inhabited.
@@ -525,6 +529,7 @@ Each response emits one or more commands. During sketch phases, emit multiple CR
 Command vocabulary:
   [CREATE <TYPE> "<Name>" | description 1–3 sentences]                        — new world element (CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC)
   [REVISE "<Name>" | updated description 1–3 sentences]                       — rewrite an existing draft element
+  [RENAME "<OldName>" → "<NewName>"]                                          — rename an existing element (also updates its lorebook entry)
   [DELETE "<Name>"]                                                            — remove a draft element
   [THREAD "<Title>" | "Name1", "Name2" | 1-sentence description]              — group 2–4 elements with a genuine shared dynamic into a thread
   [CRITIQUE | 2–4 sentences: what is working, what is still missing, what to address next]  — running self-assessment; include one per step

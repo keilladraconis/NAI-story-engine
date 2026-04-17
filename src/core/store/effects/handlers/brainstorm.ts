@@ -1,5 +1,6 @@
 import { IDS } from "../../../../ui/framework/ids";
 import { messageUpdated, chatRenamed } from "../../index";
+import { stripThinkingTags } from "../../../utils/tag-parser";
 import {
   GenerationHandlers,
   BrainstormTarget,
@@ -19,7 +20,7 @@ export const brainstormHandler: GenerationHandlers<BrainstormTarget> = {
       ctx.dispatch(
         messageUpdated({
           id: ctx.target.messageId,
-          content: ctx.accumulatedText,
+          content: stripThinkingTags(ctx.accumulatedText),
         }),
       );
     }

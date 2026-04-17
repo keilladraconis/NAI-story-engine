@@ -355,7 +355,7 @@ export class SeEntityEditPane extends SuiComponent<
       confirmLabel: "Delete entity?",
       style: S.deleteBtn,
       onConfirm: async () => {
-        store.dispatch(entityDeleted({ entityId, lorebookEntryId: entryId || undefined }));
+        store.dispatch(entityDeleted({ entityId }));
         _close();
       },
     });

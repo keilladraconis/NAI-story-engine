@@ -73,6 +73,7 @@ export interface UIState {
     input: string;
   };
   lorebook: LorebookUIState;
+  worldExpanded: boolean | null;
 }
 
 export type GenerationStatus =

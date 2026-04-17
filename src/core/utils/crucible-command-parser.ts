@@ -77,6 +77,12 @@ export interface ThreadCommand {
   description: string;
 }
 
+export interface RenameCommand {
+  kind: "RENAME";
+  oldName: string;
+  newName: string;
+}
+
 export interface DoneCommand {
   kind: "DONE";
 }
@@ -86,6 +92,7 @@ export type ParsedCommand =
   | ReviseCommand
   | LinkCommand
   | DeleteCommand
+  | RenameCommand
   | ThreadCommand
   | CritiqueCommand
   | DoneCommand;
@@ -185,6 +192,19 @@ export function parseCommands(text: string): ParsedCommand[] {
       continue;
     }
 
+    // [RENAME "OldName" → "NewName"] or [RENAME "OldName" -> "NewName"]
+    const renameMatch = line.match(
+      /^\[\s*RENAME\s+"([^"]+)"\s*(?:→|->)\s*"([^"]+)"\]/,
+    );
+    if (renameMatch) {
+      commands.push({
+        kind: "RENAME",
+        oldName: renameMatch[1].trim(),
+        newName: renameMatch[2].trim(),
+      });
+      continue;
+    }
+
     // [THREAD "Title" | "Name1", "Name2" | optional description]
     const threadMatch = line.match(/^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^\]]+?)\]?\s*$/) ??
                         line.match(/^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\]?\s*$/);
@@ -250,7 +270,7 @@ function countContentLines(lines: string[], startIdx: number): number {
 
 /** Check if a line starts a new command. */
 function isCommandLine(line: string): boolean {
-  return /^\[\s*(CREATE|REVISE|DESCRIPTION|LINK|DELETE|THREAD|CRITIQUE|DONE)\b/.test(
+  return /^\[\s*(CREATE|REVISE|DESCRIPTION|LINK|DELETE|RENAME|THREAD|CRITIQUE|DONE)\b/.test(
     line,
   );
 }

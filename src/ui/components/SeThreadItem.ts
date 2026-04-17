@@ -123,6 +123,7 @@ export class SeThreadItem extends SuiComponent<
   UIPartColumn
 > {
   private readonly _watcher: StoreWatcher;
+  private _collapsible: SuiCollapsible | null = null;
 
   constructor(options: SeThreadItemOptions) {
     super(
@@ -370,12 +371,27 @@ export class SeThreadItem extends SuiComponent<
       }
     }
 
-    const collapsible = await new SuiCollapsible({
+    this._collapsible = new SuiCollapsible({
       id: `${T.SECTION}-c`,
       header: headerCard,
       children: [new RawBridge(membersCol)],
-      initialCollapsed: true,
-    }).build();
+      initialCollapsed: false,
+    });
+    const collapsible = await this._collapsible.build();
+
+    // Reactively expand/collapse when the world-level toggle fires.
+    const _self = this;
+    this._watcher.watch(
+      (s) => s.ui.worldExpanded,
+      (expanded) => {
+        if (expanded !== null && _self._collapsible) {
+          void _self._collapsible.setState({
+            ..._self._collapsible.state,
+            collapsed: !expanded,
+          });
+        }
+      },
+    );
 
     return column({
       id: T.SECTION,
