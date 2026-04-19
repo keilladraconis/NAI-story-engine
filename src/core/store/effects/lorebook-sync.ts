@@ -83,17 +83,15 @@ export async function syncEratoCompatibility(
     }
   }
 
-  // Update categories
+  // Update categories (skip when already at the desired value to avoid
+  // bumping the story's modifiedAt on every plugin load).
+  const desiredHeader = erato ? "" : "----";
   for (const categoryId of categoryIds) {
-    if (erato) {
-      await api.v1.lorebook.updateCategory(categoryId, {
-        settings: { entryHeader: "" },
-      });
-    } else {
-      await api.v1.lorebook.updateCategory(categoryId, {
-        settings: { entryHeader: "----" },
-      });
-    }
+    const category = await api.v1.lorebook.category(categoryId);
+    if (category?.settings?.entryHeader === desiredHeader) continue;
+    await api.v1.lorebook.updateCategory(categoryId, {
+      settings: { entryHeader: desiredHeader },
+    });
   }
 
   // Update entry text
@@ -136,10 +134,23 @@ export async function syncEratoCompatibility(
     await api.v1.lorebook.removeEntry(existingMarker.id);
   }
 
-  // Re-sync ATTG → Memory, Style → A/N if enabled
+  // Re-sync ATTG → Memory, Style → A/N if enabled. Skip when the current
+  // value already matches to avoid bumping the story's modifiedAt on load.
   const { attg, style, attgSyncEnabled, styleSyncEnabled } = getState().foundation;
-  if (attgSyncEnabled && attg.trim()) await api.v1.memory.set(attg.trim());
-  if (styleSyncEnabled && style.trim()) await api.v1.an.set(style.trim());
+  if (attgSyncEnabled) {
+    const trimmed = attg.trim();
+    if (trimmed) {
+      const current = await api.v1.memory.get();
+      if (current !== trimmed) await api.v1.memory.set(trimmed);
+    }
+  }
+  if (styleSyncEnabled) {
+    const trimmed = style.trim();
+    if (trimmed) {
+      const current = await api.v1.an.get();
+      if (current !== trimmed) await api.v1.an.set(trimmed);
+    }
+  }
 }
 
 /**
