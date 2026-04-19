@@ -48,6 +48,7 @@ const createBootstrapP1Factory =
         max_tokens: 384,
         temperature: 1.0,
         min_p: 0.05,
+        frequency_penalty: 0.15,
         stop: ["</think>"],
       }),
     };
@@ -96,6 +97,7 @@ const createBootstrapContinueFactory =
         max_tokens: 384,
         temperature: 1.0,
         min_p: 0.05,
+        frequency_penalty: 0.15,
         stop: ["</think>", "\n***", "\n---", "\n⁂", "\n[ "],
       }),
     };

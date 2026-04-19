@@ -567,8 +567,8 @@ export const XIALONG_STYLE = {
   foundationWorldState: "[ Style: narrator, situational, grounded ]",
   foundationContract: "[ Style: critic, genre-aware, contractual ]",
   summary: "[ Style: archivist, concise, insightful ]",
-  bootstrap: "[ Style: novelist; cold-open; observed-not-named; no-absolutes; forward-momentum ]",
-  bootstrapContinue: "[ Style: novelist; continuation; behavior-not-quality; no-absolutes; forward-momentum ]",
+  bootstrap: "[ Style: novelist; cold-open; observed-not-named; no-participle-stacks; no-absolutes; forward-momentum ]",
+  bootstrapContinue: "[ Style: novelist; continuation; behavior-not-quality; no-participle-stacks; no-absolutes; forward-momentum ]",
 } as const;
 
 export const BOOTSTRAP_P1_PROMPT = `Write the opening passage of this story.
@@ -578,29 +578,35 @@ One location only. No character introductions. No dialogue. No backstory.
 Sensory grounding: what this space sounds, smells, feels like through what the protagonist physically encounters.
 End mid-thought or mid-action. Do not resolve or conclude.
 
+Prohibited:
+- Appositives and absolute phrases — noun + participle or adjective trailing a clause: "she stepped forward, her voice low" / "he turned, his hand tightening on the rail" / "the movement subtle yet deliberate" / "his hair falling across his forehead"
+- Named emotions: "she felt afraid" / "unease settled over her"
+- Internal sensation metaphors: "pulse quickened" / "breath hitched" / "heat pooled" / "her chest tightened"
+- Abstract qualities: "commanding presence" / "fluid grace" / "unnerving stillness"
+- Editorial interpretation or thematic narration — stating what the scene means or implies
+
 Use natural paragraphing — break on shifts of beat, focus, or action. Blank line between paragraphs.
 
 Prose only.`;
 
 export const BOOTSTRAP_CONTINUE_PROMPT = `Continue directly from the last sentence of the story. Do not advance time, change location, or begin a new scene — stay inside the exact moment where the text ended.
 
-Use natural paragraphing — break on new speakers, shifts in action, or distinct beats. Blank line between paragraphs. Dialogue gets its own paragraph.
-
 Prohibited:
+- Appositives and absolute phrases — noun + participle or adjective trailing any clause: "she said, her hand moving" / "he turned, his eyes fixed on the door" / "she stepped forward, her voice low" / "the movement subtle yet deliberate" / "his hair falling across his forehead"
 - Named emotions: "she felt afraid" / "unease settled over her"
-- Internal sensation: "pulse quickened" / "breath hitched" / "heat pooled"
-- Thematic narration: stating what the scene means ("the rational tools I'd brought to this irrational place")
-- Appositives and absolute phrases — noun + participle or adjective hanging after any clause: "she said, her hand moving" / "he turned, his eyes fixed on the door" / "she stepped forward, her voice low" / "the movement subtle yet deliberate" / "his hair falling across his forehead"
-- Editorial interpretation: "as if they heard it constantly" / "too controlled for a child his age" / "something darker beneath the surface"
+- Internal sensation metaphors: "pulse quickened" / "breath hitched" / "heat pooled" / "chest tightened"
 - Abstract qualities: "commanding presence" / "fluid grace" / "unnerving stillness"
-- Backstory
+- Editorial interpretation: "as if they heard it constantly" / "too controlled for a child his age" / "something darker beneath the surface"
+- Thematic narration or payoff language — stating what the scene means: "the rational tools I'd brought to this irrational place" / "she finally understood" / "something had shifted" / "not just X but Y" / "the true work of"
+- Story-level arc conclusions: no character arriving at an insight, lesson, or turning point. This is an opening, not an ending.
+- Resolution — end in motion, never in conclusion. No closing image that implies finality.
 - Scene transitions: no ***, ---, or any break marker; no time jumps; no shift to a different location or moment
-- Resolution — end in motion, never in conclusion
-- Story-level arc conclusions: no character arriving at an insight, lesson, or turning point; this is an opening, not an ending
-- Thematic payoff language: "she finally understood" / "something had shifted" / "she felt the first stirrings of" / "not just X but Y" / "the true work of"
+- Backstory dumps
 - POV violations: in first person, "I failed to notice" is impossible
 
 Characters introduced: physical detail first, then one behavioral tell, then spatial position.
+
+Use natural paragraphing — break on new speakers, shifts in action, or distinct beats. Blank line between paragraphs. Dialogue gets its own paragraph.
 
 Prose only.`;
 
