@@ -24,7 +24,40 @@ function parseParagraphs(text: string): string[] {
     .trim()
     .split(/\n\n+/)
     .map((p) => p.trim())
-    .filter((p) => p.length > 0 && !/^[\*\-#=~\s]+$/.test(p));
+    .filter((p) => p.length > 0 && !/^[\*\-#=~\s]+$/.test(p))
+    .flatMap(chunkParagraph);
+}
+
+// xialong-v1 tends to emit dense wall-of-text prose regardless of prompting.
+// Chunk long paragraphs into ~3-sentence groups and split on dialogue boundaries
+// so the document has visible paragraphing — which also seeds subsequent
+// iterations' context with paragraphing precedent the model will imitate.
+function splitIntoSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?…]["')\]]?)\s+(?=[A-Z"'(\[—])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function chunkParagraph(paragraph: string): string[] {
+  const sentences = splitIntoSentences(paragraph);
+  if (sentences.length <= 3) return [paragraph];
+
+  const result: string[] = [];
+  let current: string[] = [];
+  for (const sentence of sentences) {
+    const startsWithQuote = /^["“”]/.test(sentence);
+    // Break before a dialogue sentence once we have ≥2 non-dialogue sentences,
+    // or at 3 sentences regardless — keeps narrative runs tight and gives
+    // dialogue its own paragraph.
+    if (current.length >= 2 && (startsWithQuote || current.length >= 3)) {
+      result.push(current.join(" "));
+      current = [];
+    }
+    current.push(sentence);
+  }
+  if (current.length > 0) result.push(current.join(" "));
+  return result;
 }
 
 /** True when text ended at a natural sentence/scene boundary (not mid-sentence max_tokens cut). */
@@ -40,6 +73,20 @@ async function joinToLastSection(text: string): Promise<void> {
   const lastText = results[0].section.text;
   await api.v1.document.updateParagraph(lastId, { text: lastText + " " + text });
 }
+
+/** True if the document's final section is already a scene break marker. */
+async function lastSectionIsBreak(): Promise<boolean> {
+  const ids = await api.v1.document.sectionIds();
+  if (ids.length === 0) return false;
+  const results = await api.v1.document.scan(undefined, { from: ids[ids.length - 1] });
+  return /^(\*\*\*|---|⁂)\s*$/.test(results[0].section.text.trim());
+}
+
+// Phrases that open a time-skipped scene. If an iteration begins with one of
+// these, the model has silently time-jumped and we insert a scene break before
+// the prose so the document reads correctly.
+const TIME_SKIP_RE =
+  /^\s*(?:(?:\w+\s+)?(?:years?|months?|weeks?|days?|hours?|decades?|minutes?)\s+(?:later|after|passed|had passed|ago|went by)|(?:Later|Afterward|Afterwards|Eventually|Meanwhile|Subsequently|Much later|Years later|Months later|Weeks later|Days later)[,.\s]|By the time|The (?:next|following) (?:day|week|month|year|morning|afternoon|evening))/i;
 
 // ─── Phase 1 handler ─────────────────────────────────────────────────────────
 
@@ -59,11 +106,13 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
       return;
     }
 
-    const paragraph = parseParagraphs(ctx.accumulatedText)[0];
-    if (paragraph) {
-      await api.v1.document.appendParagraph({ text: paragraph });
+    const chunks = parseParagraphs(ctx.accumulatedText);
+    for (const chunk of chunks) {
+      await api.v1.document.appendParagraph({ text: chunk });
+    }
+    if (chunks.length > 0) {
       // If Phase 1 ended mid-sentence, Phase 2 iter 0 must join inline.
-      continueInline = !endsAtBoundary(paragraph);
+      continueInline = !endsAtBoundary(chunks[chunks.length - 1]);
     }
 
     // Chain into phase 2
@@ -90,18 +139,42 @@ export const bootstrapContinueHandler: GenerationHandlers<BootstrapContinueTarge
       return;
     }
 
-    const text = trimStopTail(
-      stripThinkingTags(ctx.accumulatedText),
-      ["\n***", "\n---", "\n⁂", "\n[ "],
-    ).trim();
-    if (text) {
-      if (continueInline) {
-        // Previous generation ended mid-sentence — join onto its section inline.
-        await joinToLastSection(text);
+    const stripped = stripThinkingTags(ctx.accumulatedText);
+    // The model emitted an explicit scene break — preserve it.
+    const endsOnSceneBreak = /\n\s*(?:\*\*\*|---|⁂)\s*$/.test(stripped);
+
+    const cleaned = trimStopTail(stripped, ["\n***", "\n---", "\n⁂", "\n[ "]);
+    const paragraphs = parseParagraphs(cleaned);
+
+    // The model silently time-skipped without a marker — insert one.
+    const needsLeadingBreak =
+      paragraphs.length > 0 &&
+      !continueInline &&
+      TIME_SKIP_RE.test(paragraphs[0]) &&
+      !(await lastSectionIsBreak());
+    if (needsLeadingBreak) {
+      await api.v1.document.appendParagraph({ text: "***" });
+    }
+
+    if (paragraphs.length > 0) {
+      const [first, ...rest] = paragraphs;
+      if (continueInline && !needsLeadingBreak) {
+        await joinToLastSection(first);
       } else {
-        await api.v1.document.appendParagraph({ text });
+        await api.v1.document.appendParagraph({ text: first });
       }
-      continueInline = !endsAtBoundary(text);
+      for (const p of rest) {
+        await api.v1.document.appendParagraph({ text: p });
+      }
+    }
+
+    if (endsOnSceneBreak) {
+      if (!(await lastSectionIsBreak())) {
+        await api.v1.document.appendParagraph({ text: "***" });
+      }
+      continueInline = false;
+    } else if (paragraphs.length > 0) {
+      continueInline = !endsAtBoundary(paragraphs[paragraphs.length - 1]);
     }
 
     const maxReached = ctx.target.iteration >= MAX_CONTINUE_ITERATIONS - 1;

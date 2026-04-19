@@ -571,16 +571,20 @@ export const XIALONG_STYLE = {
   bootstrapContinue: "[ Style: novelist; continuation; behavior-not-quality; no-absolutes; forward-momentum ]",
 } as const;
 
-export const BOOTSTRAP_P1_PROMPT = `Write the opening paragraph of this story.
+export const BOOTSTRAP_P1_PROMPT = `Write the opening passage of this story.
 
 First sentence: protagonist as subject, already inside the location — mid-action, not approaching.
 One location only. No character introductions. No dialogue. No backstory.
 Sensory grounding: what this space sounds, smells, feels like through what the protagonist physically encounters.
 End mid-thought or mid-action. Do not resolve or conclude.
 
+Use natural paragraphing — break on shifts of beat, focus, or action. Blank line between paragraphs.
+
 Prose only.`;
 
-export const BOOTSTRAP_CONTINUE_PROMPT = `Continue directly from the last sentence of the story. One paragraph. Do not advance time, change location, or begin a new scene — stay inside the exact moment where the text ended.
+export const BOOTSTRAP_CONTINUE_PROMPT = `Continue directly from the last sentence of the story. Do not advance time, change location, or begin a new scene — stay inside the exact moment where the text ended.
+
+Use natural paragraphing — break on new speakers, shifts in action, or distinct beats. Blank line between paragraphs. Dialogue gets its own paragraph.
 
 Prohibited:
 - Named emotions: "she felt afraid" / "unease settled over her"

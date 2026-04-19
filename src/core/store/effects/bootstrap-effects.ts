@@ -96,7 +96,7 @@ const createBootstrapContinueFactory =
         max_tokens: 384,
         temperature: 1.0,
         min_p: 0.05,
-        stop: ["</think>", "\n\n", "\n***", "\n---", "\n⁂", "\n[ "],
+        stop: ["</think>", "\n***", "\n---", "\n⁂", "\n[ "],
       }),
     };
   };
