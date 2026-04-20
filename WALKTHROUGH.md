@@ -99,19 +99,28 @@ These can also be generated later as part of S.E.G.A.
 
 > _Panel: Story Engine → Forge section_
 
-The Forge builds your world. It reads your Foundation and Brainstorm, then generates world elements — characters, locations, factions, systems, dynamics, topics — through an iterative, guidance-driven loop.
+The Forge builds your world. It reads your Foundation and Brainstorm, then generates world elements — characters, locations, factions, systems, dynamics, topics — through an intent-driven, 12-step phased loop.
+
+**The three phases:**
+
+| Phase      | Steps | What it does                                                                  |
+| ---------- | ----- | ----------------------------------------------------------------------------- |
+| **Sketch** | 1–4   | Populate breadth: characters, locations, situations, systems in broad strokes |
+| **Expand** | 5–8   | Deepen thin entries, add noticeable gaps, cut overlap                         |
+| **Weave**  | 9–12  | Thread structural bonds, spin up situation entries at collision points        |
+
+The Forge can emit `[DONE]` during Weave to end early once the world feels complete.
 
 **What to do:**
 
 1. Scroll to the **Forge** section in the Story Engine panel.
-2. Optionally type **guidance** in the text field — what should the Forge build? You can leave it blank and it will draw from your Brainstorm conversation.
+2. Optionally type **guidance** in the text field — what should the Forge build? You can leave it blank and it will draw from your Brainstorm (use **Sum** on the Brainstorm tab first if your chat is long — the summary is what the Forge reads).
    - Examples: _"Focus on the rival factions"_, _"Give me a mentor figure and a corrupt official"_, _"More locations"_
-3. Click **Forge**. Watch as the AI generates world elements.
-4. Type new guidance and click **Forge** again to refine, add, or redirect. Run as many passes as you want.
+3. Click **Forge**. Watch as the AI runs through the phased loop, generating world elements.
 
 **Viewing results:** Generated elements appear in the **World** section below, organized by category and optionally grouped into Threads.
 
-**When you're done:** When your world feels populated enough to start writing.
+**When you're done:** When the Forge signals `[DONE]` or you stop it manually — your world is ready for S.E.G.A.
 
 ---
 
@@ -152,13 +161,29 @@ Watch the status updates as it works through your entities. You can also regener
 
 ---
 
-## Step 5: Write
+## Step 5: Bootstrap (optional)
+
+> _Panel: Story Engine → header **Bootstrap** button_
+
+If the document is empty and you'd like Story Engine to write the opening for you, click **Bootstrap** in the panel header. Bootstrap runs a two-phase generation:
+
+1. **Phase 1** — Writes the opening passage, grounded in your Shape, Intent, and Brainstorm. The protagonist is already inside the scene, mid-action; no introductions, dialogue, or backstory dumps.
+2. **Phase 2** — Continues directly from the last sentence, streaming paragraph by paragraph into the document. Keep clicking **Continue** to advance the opening as far as you'd like.
+
+Prompts are tuned to avoid tell-don't-show antipatterns — named emotions, participle-stack appositives, thematic narration, and premature resolutions. Each paragraph lands as a single undo-history entry, so the document stays editable.
+
+If you'd rather write the opening yourself, skip this step.
+
+---
+
+## Step 6: Write
 
 Your scenario is ready:
 
 - **Lorebook** is populated with detailed entries and activation keys.
 - **Memory** has your ATTG block (if generated in Foundation).
 - **Author's Note** has your Style Guidelines (if generated in Foundation).
+- **Document** has your opening passage (if you used Bootstrap).
 
 Start writing in the document. Lorebook entries activate as relevant characters, locations, and concepts appear in the text.
 
@@ -215,18 +240,30 @@ From there you can run S.E.G.A. to regenerate lorebook content and keys with Sto
 | --------------- | --------------------------------------- | -------------------------------------------------- |
 | **Brainstorm**  | Freeform idea conversation              | Chat, summarize, manage sessions                   |
 | **Foundation**  | Tone, shape, intent, contract, metadata | Set Intensity → Shape → Intent → Contract → ATTG/Style |
-| **Forge**       | World element generation                | Enter guidance → Forge (repeat)                    |
+| **Forge**       | World element generation                | Enter guidance → Forge (runs sketch/expand/weave)  |
 | **World**       | World inventory, threads, S.E.G.A.      | Review entities → Run S.E.G.A.                     |
+| **Bootstrap**   | Cold-open writer (header button)        | Click Bootstrap, then Continue for more paragraphs |
 
 ---
 
 ## Tips
 
-- **Iterate, don't restart.** If S.E.G.A.'s Canon or ATTG isn't right, regenerate just that field.
-- **Run multiple Forge passes.** Each pass can add, refine, or redirect. Use guidance to steer: _"add a rival faction," "this character needs a secret."_
+- **Iterate, don't restart.** If a Foundation field or S.E.G.A.-generated lorebook entry isn't right, regenerate just that field or entry from its own button — no need to start over.
+- **Re-run the Forge with new guidance.** Each run walks the full sketch → expand → weave loop and builds on the existing world rather than recreating it. Use guidance to steer subsequent runs: _"add a rival faction," "this character needs a secret."_
 - **Intensity sets the emotional register.** It flows into all downstream generation — pick it before generating Shape or running the Forge.
 - **Shape is optional but useful.** Even typing a name like "Slice of Life" before generating gives the Forge and S.E.G.A. a clearer structural target.
 - **Summarize long brainstorms.** Click **Sum** before moving to Foundation/Forge to compress a sprawling chat into dense material.
 - **The Lorebook panel** (in Lorebook view) lets you refine individual entries with natural language — _"make her taller," "add a connection to the Silver Court," "rewrite this as more ominous."_
 - **Threads for organization.** Group related entities into a Thread to give generation a relational context and to optionally surface a group-level lorebook entry.
 - **Unnamed protagonists and lorebook collision.** If your protagonist has no personal name (e.g., "the physician," "the captain"), their lorebook entry may have high collision risk. Before you start writing, open the entity edit pane and add a personal name — then regenerate its keys so activation is specific.
+
+---
+
+## Upgrading from 0.10.x
+
+If you're coming from a 0.10.x Story Engine, two Foundation fields are gone:
+
+- **Direction** — superseded by **Brainstorm's summary mode**. Summarize your Brainstorm chat with the **Sum** button and the Forge will read that directly; you no longer need to maintain Direction and Brainstorm as two parallel sources of story framing.
+- **Canon** — removed with no direct replacement. Its job is now covered by **Story Contract** (REQUIRED / PROHIBITED / EMPHASIS) in Foundation and by per-entity summaries in the World section; together they produce the same anchor points without the separate field.
+
+The Forge itself is also new: instead of a per-pass command menu it now runs the phased sketch → expand → weave loop described in Step 3. See `CHANGELOG.md` for the full 0.11.0 notes.

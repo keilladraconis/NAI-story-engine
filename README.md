@@ -1,6 +1,8 @@
 # Story Engine
 
-**Story Engine** is a structured worldbuilding system for **NovelAI**. It guides you from a raw idea to a fully populated story scenario through a four-step pipeline: brainstorm → Foundation → Forge → write.
+**Story Engine** is a structured worldbuilding system for **NovelAI**. It guides you from a raw idea to a fully populated story scenario through a four-step pipeline: brainstorm → Foundation → Forge → write. An optional **Bootstrap** generator can also write the opening passage of your story directly into the document when you're ready to begin.
+
+The UI is built on **`nai-simple-ui`**, the component framework from OnepunchVAM's **Simple Context** — with thanks for the foundation.
 
 ## Key Features
 
@@ -21,7 +23,17 @@ Sets the structural and tonal anchors for your story before worldbuilding begins
 
 ### Forge
 
-Iterative world element generation. The Forge reads your Foundation and Brainstorm, then builds characters, locations, factions, systems, dynamics, and topics through a guidance-driven loop. Provide optional guidance each pass to steer what gets built.
+Intent-driven world element generation. The Forge reads your Foundation and Brainstorm, then builds characters, locations, factions, systems, dynamics, and topics through a 12-step phased loop:
+
+- **Sketch** (steps 1–4) — breadth-first population of elements in broad strokes.
+- **Expand** (steps 5–8) — deepen thin entries, add noticeable gaps, cut overlap.
+- **Weave** (steps 9–12) — thread structural bonds and spin up situation entries at collision points.
+
+Provide optional guidance up front to steer what gets built; the model can end early once the world feels complete.
+
+### Bootstrap
+
+One-button **cold-open writer** in the panel header. Runs a two-phase generation that writes the first passages of your story directly into the document — grounded in your Shape, Intent, and Brainstorm, with prompts tuned to avoid named emotions, participle-stack appositives, and thematic narration. Phase 2 streams paragraph by paragraph so the document undo history stays clean.
 
 ### World
 
@@ -70,6 +82,15 @@ npm install
 npm run build    # Outputs to dist/NAI-story-engine.naiscript
 npm run test     # Run tests
 ```
+
+## Upgrading from 0.10.x
+
+Two Foundation fields from the old Crucible flow are gone:
+
+- **Direction** — superseded by **Brainstorm's summary mode**. Summarize your Brainstorm chat (the **Sum** button) and the Forge reads that directly; you no longer need to maintain Direction and Brainstorm as parallel sources of framing.
+- **Canon** — removed with no direct replacement. Its job is now covered by **Story Contract** (REQUIRED / PROHIBITED / EMPHASIS) in Foundation plus the per-entity summaries in the World section.
+
+See `CHANGELOG.md` for the full 0.11.0 notes.
 
 ## License
 
