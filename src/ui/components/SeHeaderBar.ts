@@ -172,14 +172,25 @@ export class SeHeaderBar extends SuiComponent<
     this._watcher.dispose();
 
     this._watcher.watch(
-      (s) => ({
-        statusText: s.runtime.sega.statusText,
-        genxStatus: s.runtime.genx.status,
-        budgetWaitEndTime: s.runtime.genx.budgetWaitEndTime,
-      }),
-      ({ statusText, genxStatus, budgetWaitEndTime }) => {
-        const showContinue = genxStatus === "waiting_for_user";
-        const showWait = genxStatus === "waiting_for_budget";
+      (s) => {
+        const activeType = s.runtime.activeRequest?.type;
+        const bootstrapActive =
+          activeType === "bootstrap" || activeType === "bootstrapContinue";
+        return {
+          statusText: s.runtime.sega.statusText,
+          genxStatus: s.runtime.genx.status,
+          budgetWaitEndTime: s.runtime.genx.budgetWaitEndTime,
+          bootstrapActive,
+        };
+      },
+      ({ statusText, genxStatus, budgetWaitEndTime, bootstrapActive }) => {
+        // Bootstrap flows surface Continue/Wait on the right-column bootstrap
+        // button itself. Suppress the center duplicates so mobile layouts
+        // don't wrap into an overlapping row.
+        const showContinue =
+          genxStatus === "waiting_for_user" && !bootstrapActive;
+        const showWait =
+          genxStatus === "waiting_for_budget" && !bootstrapActive;
         const showMarquee = !showContinue && !showWait;
 
         api.v1.ui.updateParts([
@@ -240,7 +251,8 @@ export class SeHeaderBar extends SuiComponent<
       (a, b) =>
         a.statusText === b.statusText &&
         a.genxStatus === b.genxStatus &&
-        a.budgetWaitEndTime === b.budgetWaitEndTime,
+        a.budgetWaitEndTime === b.budgetWaitEndTime &&
+        a.bootstrapActive === b.bootstrapActive,
     );
 
     const clearPart = await this._clearBtn.build();
