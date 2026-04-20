@@ -1,30 +1,21 @@
 /**
- * Crucible Command Parser — Parses and executes structured commands emitted by GLM
- * during the build loop.
+ * Forge Command Parser — Parses structured commands emitted by the Forge loop.
  *
  * Command vocabulary:
- *   [CREATE <TYPE> "<Name>"]       — new world element
- *   [REVISE "<Name>"]              — update existing element (content follows on next lines)
- *   [LINK "<Name>" → "<Name>"]     — explicit relationship
- *   [DELETE "<Name>"]              — remove element
- *   [CRITIQUE]                     — self-assessment (content follows on next lines)
- *   [DONE]                         — signal pass complete
+ *   [CREATE <TYPE> "<Name>" | description]        — new world element
+ *   [REVISE "<Name>" | description]               — update existing element
+ *   [RENAME "<Old>" → "<New>"]                    — rename an element
+ *   [DELETE "<Name>"]                             — remove element
+ *   [THREAD "<Title>" | "<A>", "<B>" | desc]      — group related elements
+ *   [CRITIQUE | text]                             — running self-assessment
+ *   [DONE]                                        — signal pass complete
+ *
+ *   [LINK "<From>" → "<To>"]                      — legacy Crucible link (still parsed for back-compat)
+ *
+ * This file only parses; execution lives with the caller (see forge handler).
  */
 
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
-import {
-  RootState,
-  AppDispatch,
-  CrucibleWorldElement,
-  CrucibleLink,
-} from "../store/types";
-import {
-  elementCreated,
-  elementRevised,
-  elementDeleted,
-  linkCreated,
-  critiqueSet,
-} from "../store/slices/crucible";
 
 /** Map command type names to World Entry field IDs. */
 export const TYPE_TO_FIELD: Record<string, DulfsFieldID> = {
@@ -35,8 +26,6 @@ export const TYPE_TO_FIELD: Record<string, DulfsFieldID> = {
   SITUATION: FieldID.SituationalDynamics,
   TOPIC: FieldID.Topics,
 };
-
-const VALID_TYPES = new Set(Object.keys(TYPE_TO_FIELD));
 
 // --- Parsed Command Types ---
 
@@ -272,127 +261,5 @@ function countContentLines(lines: string[], startIdx: number): number {
 function isCommandLine(line: string): boolean {
   return /^\[\s*(CREATE|REVISE|DESCRIPTION|LINK|DELETE|RENAME|THREAD|CRITIQUE|DONE)\b/.test(
     line,
-  );
-}
-
-// --- Executor ---
-
-export interface ExecuteResult {
-  commandLog: string[];
-  critique: string | null;
-}
-
-/**
- * Executes parsed commands against state.
- * CREATE with existing name → rejected (noted in log).
- * REVISE/DELETE with unknown name → skipped (noted in log).
- */
-export function executeCommands(
-  commands: ParsedCommand[],
-  getState: () => RootState,
-  dispatch: AppDispatch,
-): ExecuteResult {
-  const log: string[] = [];
-  let critique: string | null = null;
-
-  for (const cmd of commands) {
-    switch (cmd.kind) {
-      case "CREATE": {
-        if (!VALID_TYPES.has(cmd.elementType)) {
-          log.push(
-            `⚠ CREATE: unknown type "${cmd.elementType}" for "${cmd.name}"`,
-          );
-          break;
-        }
-        const fieldId = TYPE_TO_FIELD[cmd.elementType];
-
-        // Hard dedup: reject if name already exists (case-insensitive)
-        const existing = getState().crucible.elements.find(
-          (e) => e.name.toLowerCase() === cmd.name.toLowerCase(),
-        );
-        if (existing) {
-          log.push(
-            `⚠ CREATE rejected: "${cmd.name}" already exists as ${cmd.elementType}`,
-          );
-          break;
-        }
-
-        const element: CrucibleWorldElement = {
-          id: api.v1.uuid(),
-          fieldId,
-          name: cmd.name,
-          content: cmd.content,
-        };
-        dispatch(elementCreated({ element }));
-        log.push(`✓ CREATE ${cmd.elementType} "${cmd.name}"`);
-        break;
-      }
-
-      case "REVISE": {
-        const el = findElementByName(getState(), cmd.name);
-        if (!el) {
-          log.push(`⚠ REVISE: "${cmd.name}" not found`);
-          break;
-        }
-        dispatch(elementRevised({ id: el.id, content: cmd.content }));
-        log.push(`✓ REVISE "${cmd.name}"`);
-        break;
-      }
-
-      case "DELETE": {
-        const el = findElementByName(getState(), cmd.name);
-        if (!el) {
-          log.push(`⚠ DELETE: "${cmd.name}" not found`);
-          break;
-        }
-        dispatch(elementDeleted({ id: el.id }));
-        log.push(`✓ DELETE "${cmd.name}"`);
-        break;
-      }
-
-      case "LINK": {
-        // Warn about unknown link endpoints — they surface in MISSING ELEMENTS on the next pass
-        for (const name of [cmd.fromName, cmd.toName]) {
-          if (!findElementByName(getState(), name)) {
-            log.push(
-              `⚠ LINK: "${name}" not found — will appear in MISSING ELEMENTS next pass`,
-            );
-          }
-        }
-        const link: CrucibleLink = {
-          id: api.v1.uuid(),
-          fromName: cmd.fromName,
-          toName: cmd.toName,
-          description: cmd.description,
-        };
-        dispatch(linkCreated({ link }));
-        log.push(`✓ LINK "${cmd.fromName}" → "${cmd.toName}"`);
-        break;
-      }
-
-      case "CRITIQUE": {
-        critique = cmd.text;
-        dispatch(critiqueSet({ critique: cmd.text }));
-        log.push("✓ CRITIQUE recorded");
-        break;
-      }
-
-      case "DONE": {
-        log.push("✓ DONE");
-        break;
-      }
-    }
-  }
-
-  return { commandLog: log, critique };
-}
-
-/** Find an element by name (case-insensitive). */
-function findElementByName(
-  state: RootState,
-  name: string,
-): CrucibleWorldElement | undefined {
-  return state.crucible.elements.find(
-    (e) => e.name.toLowerCase() === name.toLowerCase(),
   );
 }

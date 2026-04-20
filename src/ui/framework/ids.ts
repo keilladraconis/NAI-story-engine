@@ -1,7 +1,6 @@
 // ─── storyStorage key conventions ────────────────────────────────────────────
 // "story:" prefix  — UI/layout state persisted automatically by NAI's storageKey
 //                    binding on inputs/collapsibles; NOT managed by reset effects.
-// "cr-"    prefix  — Crucible content managed manually; cleared by crucibleReset.
 // (no prefix)      — Misc keys accessed directly via storyStorage.get/set.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -22,7 +21,7 @@ export const STORAGE_KEYS = {
   // Core persistence
   PERSIST: "kse-persist",
 
-  // Setting (Crucible reads this too)
+  // Setting
   SETTING: "kse-setting",
   SETTING_UI: "kse-setting",
 

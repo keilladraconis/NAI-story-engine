@@ -394,8 +394,6 @@ export const FOUNDATION_INTENT_PROMPT = `Write one sentence — the story's logl
 
 One sentence. No preamble.`;
 
-export const CRUCIBLE_SYSTEM_PROMPT = `You are a story structure architect working within the Crucible system — a procedural world generator. Given narrative tensions and creative direction, you build richly inhabited worlds for interactive storytelling. Every element must be load-bearing — if it could be removed without weakening the story, it shouldn't exist. You communicate through structured commands that the harness parses and executes.`;
-
 export const CRUCIBLE_SHAPE_PROMPT = `You are a story architect. Given the story material below, invent the narrative shape this story is leaning toward.
 
 A shape is a structural lens — not a genre, not a plot, but the kind of moment the story is building toward and the structural logic that governs its endpoint.
@@ -448,58 +446,6 @@ PROHIBITED: [comma-separated list — 3-5 items]
 EMPHASIS: [comma-separated list — 3-5 items]
 
 Be specific to THIS story's material. No generic filler.`;
-
-export const CRUCIBLE_BUILD_PASS_PROMPT = `You are building a world for interactive storytelling. Use the
-DIRECTION, TENSIONS, and current WORLD STATE above as context.
-
-Emit structured commands to populate and refine the world.
-Available commands:
-
-[CREATE TYPE "Name"]
-Description of the element — 2-3 sentences, zero generics.
-Every trait must change what the element does in a scene.
-
-[REVISE "Name"]
-Updated description replacing the previous one.
-
-[LINK "Name" → "Name"]
-What connects them — structural relationship, not mere proximity.
-
-[DELETE "Name"]
-(Use sparingly — only for elements that weaken the world.)
-
-[CRITIQUE]
-Self-assessment: what's missing, what's weak, what's disconnected.
-Assess the world as built — do not describe story beats, plot
-sequences, or narrative trajectory.
-
-[DONE]
-Signal that this pass is complete.
-
-RULES:
-- Each element name must be UNIQUE. CREATE with an existing name
-  will be rejected. Use REVISE to update existing elements.
-- REVISE any element shown as [unfilled]. CREATE any element listed under
-  [MISSING ELEMENTS] using the correct TYPE for what it actually is.
-- Element types: CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC
-- Every CHARACTER should have relationships to other elements.
-- Aim for a diverse mix of element types — not all characters.
-- ZERO GENERIC DESCRIPTORS. "Brave warrior" is generic. "Former
-  soldier who can't stop protecting people even when they don't
-  want protection" changes scenes.
-- CHARACTER descriptions: two physical details (one visible across
-  the room, one noticed up close) and one behavioral tell — a verb,
-  not an adjective. No abstract qualities, no named emotions.
-- LOCATION descriptions: sensory anchor (what hits you first) +
-  functional reality (what naturally happens here) + dramatic
-  potential (what could happen here that couldn't elsewhere).
-- End every pass with [CRITIQUE] and [DONE].
-
-- Do not restate or paraphrase the Direction. Every element you
-  CREATE must add information not already present in the Direction
-  or existing World State.
-
-Output commands directly — no preamble, no explanation.`;
 
 export const FOUNDATION_WORLD_STATE_PROMPT = `Describe the current state of the world at the story's opening.
 Cover: the dominant mood or atmosphere, ongoing conflicts or tensions, power dynamics, and what is visibly in flux.

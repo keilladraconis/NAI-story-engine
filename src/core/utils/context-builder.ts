@@ -29,13 +29,11 @@ import {
   FIELD_CONFIGS,
   DulfsFieldID,
 } from "../../config/field-definitions";
-import { formatWorldState } from "./crucible-world-formatter";
 import { STORAGE_KEYS } from "../../ui/framework/ids";
 import { buildModelParams, appendXialongStyleMessage } from "./config";
 import {
   SYSTEM_PROMPT,
   LOREBOOK_WEAVING_PROMPT,
-  CRUCIBLE_SYSTEM_PROMPT,
   BRAINSTORM_PROMPT,
   BRAINSTORM_CRITIC_PROMPT,
   BRAINSTORM_SUMMARIZE_PROMPT,
@@ -434,102 +432,6 @@ export const buildStoryEnginePrefix = async (
       role: "system",
       content: storyTextContent,
     });
-  }
-
-  return messages;
-};
-
-// --- Crucible Prefix ---
-
-/**
- * Options for buildCruciblePrefix — isolated context for all Crucible factories.
- * Crucible uses its own system identity and only includes what each factory needs.
- */
-export interface CruciblePrefixOptions {
-  /** Include brainstorm history (for intent derivation) */
-  includeBrainstorm?: boolean;
-  /** Include the crucible direction/intent text */
-  includeDirection?: boolean;
-  /** Include World Entry items (for chain, builder) */
-  includeWorldEntities?: boolean;
-  /** Include Setting + Canon if available (for intent derivation) */
-  includeStoryState?: boolean;
-  /** Include accepted tensions as [TENSIONS] section */
-  includeTensions?: boolean;
-  /** Include formatted crucible world state (elements, links, critique) */
-  includeWorldState?: boolean;
-}
-
-/**
- * Builds a focused message prefix for Crucible generation strategies.
- * Unlike buildStoryEnginePrefix, this uses a hardcoded structural identity
- * and only includes context relevant to the specific Crucible phase.
- *
- * NO lorebook weaving. NO story text. NO ATTG. NO Style.
- */
-export const buildCruciblePrefix = async (
-  getState: () => RootState,
-  options: CruciblePrefixOptions = {},
-): Promise<Message[]> => {
-  const state = getState();
-
-  // --- MSG 1: Crucible system identity ---
-  const systemPrompt = CRUCIBLE_SYSTEM_PROMPT;
-  const messages: Message[] = [{ role: "system", content: systemPrompt }];
-
-  // --- MSG 2 (optional): Creative grounding ---
-  const groundingSections: string[] = [];
-
-  if (options.includeDirection && state.crucible.direction) {
-    groundingSections.push(`[DIRECTION]\n${state.crucible.direction}`);
-  }
-
-  if (options.includeStoryState) {
-    const setting = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
-    );
-    if (setting) groundingSections.push(`[SETTING]\n${setting}`);
-
-  }
-
-  if (options.includeBrainstorm) {
-    const brainstorm = getConsolidatedBrainstorm(state);
-    if (brainstorm) groundingSections.push(`[BRAINSTORM]\n${brainstorm}`);
-  }
-
-  // Tensions
-  if (options.includeTensions) {
-    const accepted = state.crucible.tensions.filter((t) => t.accepted);
-    if (accepted.length > 0) {
-      const tensionLines = accepted.map((t) => `- ${t.text}`).join("\n");
-      groundingSections.push(`[TENSIONS]\n${tensionLines}`);
-    }
-  }
-
-  if (groundingSections.length > 0) {
-    messages.push({
-      role: "system",
-      content: groundingSections.join("\n\n"),
-    });
-  }
-
-  // --- Optional: Crucible world state (elements, links, critique) ---
-  if (options.includeWorldState) {
-    const worldState = formatWorldState(state.crucible);
-    if (worldState) {
-      messages.push({ role: "system", content: worldState });
-    }
-  }
-
-  // --- MSG 3 (optional): World Entities ---
-  if (options.includeWorldEntities) {
-    const entityContext = getAllWorldEntityContext(state);
-    if (entityContext) {
-      messages.push({
-        role: "system",
-        content: `[WORLD ENTRIES]\n${entityContext}`,
-      });
-    }
   }
 
   return messages;

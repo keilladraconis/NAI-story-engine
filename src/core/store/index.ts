@@ -3,14 +3,12 @@ import { brainstormSlice } from "./slices/brainstorm";
 import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
 import { storySlice, initialStoryState } from "./slices/story";
-import { crucibleSlice, initialCrucibleState } from "./slices/crucible";
 import { worldSlice, initialWorldState } from "./slices/world";
 import { foundationSlice, initialFoundationState } from "./slices/foundation";
 import {
   RootState,
   StoryState,
   BrainstormChat,
-  CrucibleState,
   WorldState,
   WorldEntity,
   FoundationState,
@@ -23,7 +21,6 @@ import {
 interface PersistedData {
   story?: StoryState;
   brainstorm?: { chats: BrainstormChat[]; currentChatIndex: number };
-  crucible?: CrucibleState;
   world?: WorldState;
   foundation?: FoundationState;
 }
@@ -71,7 +68,6 @@ const sliceReducer = combineReducers({
   brainstorm: brainstormSlice.reducer,
   ui: uiSlice.reducer,
   runtime: runtimeSlice.reducer,
-  crucible: crucibleSlice.reducer,
   world: worldSlice.reducer,
   foundation: foundationSlice.reducer,
 });
@@ -93,9 +89,6 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
             currentChatIndex: data.brainstorm.currentChatIndex,
           }
         : current.brainstorm,
-      crucible: data.crucible
-        ? { ...initialCrucibleState, ...data.crucible }
-        : current.crucible,
       world: data.world
         ? migrateWorldState(data.world as WorldState)
         : current.world,
@@ -119,6 +112,5 @@ export * from "./slices/brainstorm";
 export * from "./slices/ui";
 export * from "./slices/runtime";
 export * from "./slices/story";
-export * from "./slices/crucible";
 export * from "./slices/world";
 export * from "./slices/foundation";
