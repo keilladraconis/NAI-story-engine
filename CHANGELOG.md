@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0] - 2026-04-20
+
+### Added
+
+- **UI rewrite on `nai-simple-ui` (SUI)** — The entire UI layer has been rebuilt on the `nai-simple-ui` component framework, vendored from OnepunchVAM's **Simple Context** (with thanks). `SuiComponent` subclasses now own state, theming, and `compose()` logic; `StoreWatcher` bridges the Redux-like store to SUI. This replaces the per-section UIPart builders used through 0.10.x and is the foundation for every section, pane, card, and modal in the sidebar.
+
+- **Bootstrap** — New cold-open writer wired to a button in the panel header. Two-phase generation writes directly into the document: Phase 1 produces an opening passage grounded in Shape, Intent, and Brainstorm; Phase 2 continues paragraph by paragraph, finalizing at each `\n\n` boundary so undo history stays clean. Prompts enforce in-the-moment sensory grounding and block common tell-don't-show antipatterns — named emotions, participle/appositive stacks, internal-sensation metaphors, thematic narration, and scene-closing resolutions.
+
+- **Phased Forge** — The Forge now runs a 12-step, guidance-driven loop in three phases. **Sketch** (steps 1–4) populates breadth: characters, locations, situations, systems. **Expand** (5–8) deepens and prunes — REVISE thin elements, CREATE noticeable gaps, DELETE overlap. **Weave** (9–12) THREADs structural bonds and CREATEs SITUATION entries at collision points. Per-phase temperature and token budgets; the model can emit `[DONE]` in weave to end early. Replaces the 0.10.x Crucible command loop.
+
+- **Prerelease CI workflow** — `.github/workflows/prerelease.yml` publishes development builds from `v*-*` branches.
+
+### Changed
+
+- **Forge is intent-driven, not command-menu driven.** The command log is still used internally to prevent rework, but Forge now reads Foundation + Brainstorm + optional guidance and runs the phased loop to completion — no per-pass command controls to juggle.
+
+- **ATTG and Brainstorm refinements** — ATTG prompt tightened; Brainstorm summary and critic flows polished based on 0.10.x feedback.
+
+- **Load-time sync reduced** — Script startup does less synchronous work before the UI mounts.
+
+### Removed
+
+- **"Direction" field removed.** Direction — and the other summary/synopsis fields that lived in the old Crucible flow — has been superseded by **Brainstorm's summary mode**. Summarizing a Brainstorm chat now produces the dense material the Forge reads, so there's a single source of story framing rather than two fields maintained in parallel.
+
+- **"Canon" field removed.** Canon has no direct replacement — it turned out to be extraneous in the new design. The role it played (fixed facts the story must honor) is covered today by **Story Contract** (REQUIRED / PROHIBITED / EMPHASIS) in Foundation and by entity summaries in the World section; those arrive at the same outcome with less overhead.
+
 ## [0.10.4] - 2026-04-01
 
 ### Added

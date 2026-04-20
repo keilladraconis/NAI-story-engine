@@ -211,54 +211,11 @@ export interface FoundationState {
   styleSyncEnabled: boolean;
 }
 
-// Crucible Types
-
-export type CruciblePhase = "direction" | "tensions" | "building";
-
-export interface CrucibleTension {
-  id: string;
-  text: string;
-  accepted: boolean;
-}
-
-export interface CrucibleLink {
-  id: string;
-  fromName: string;
-  toName: string;
-  description: string;
-}
-
-export interface CrucibleBuildPass {
-  passNumber: number;
-  commandLog: string[];
-  guidance: string;
-}
-
-export interface CrucibleWorldElement {
-  id: string;
-  fieldId: DulfsFieldID;
-  name: string;
-  content: string;
-}
-
-export interface CrucibleState {
-  phase: CruciblePhase;
-  direction: string | null;
-  shape: { name: string; instruction: string } | null;
-  cast: boolean;
-  tensions: CrucibleTension[];
-  elements: CrucibleWorldElement[];
-  links: CrucibleLink[];
-  passes: CrucibleBuildPass[];
-  activeCritique: string | null;
-}
-
 export interface RootState {
   story: StoryState;
   brainstorm: BrainstormState;
   ui: UIState;
   runtime: RuntimeState;
-  crucible: CrucibleState;
   world: WorldState;
   foundation: FoundationState;
 }

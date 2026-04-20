@@ -15,7 +15,6 @@ export function registerAutosaveEffects(
     (action) =>
       action.type.startsWith("story/") ||
       action.type.startsWith("brainstorm/") ||
-      action.type.startsWith("crucible/") ||
       action.type.startsWith("world/") ||
       action.type.startsWith("foundation/"),
     () => {
@@ -34,7 +33,6 @@ export function registerAutosaveEffects(
           const persistData = {
             story: state.story,
             brainstorm: state.brainstorm,
-            crucible: state.crucible,
             world: state.world,
             foundation: state.foundation,
           };
