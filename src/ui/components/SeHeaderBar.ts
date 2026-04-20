@@ -51,9 +51,14 @@ const STATUS_STYLE = {
 };
 const WAIT_STYLE = { "font-size": "0.8em", opacity: "0.8" };
 
+// Every column needs `min-width: 0` so flex:1 can shrink past the intrinsic
+// content width on narrow viewports. Without it, the buttons in CENTER/RIGHT
+// force the row over its parent's width and — combined with the row's default
+// wrap — cause the center Continue to drop beneath the right-column bootstrap
+// button on mobile.
 const COL_LEFT = { flex: "1", "min-width": "0", overflow: "hidden", display: "flex", "align-items": "center" };
-const COL_CENTER = { flex: "1", display: "flex", "justify-content": "center", "align-items": "center" };
-const COL_RIGHT = { flex: "1", display: "flex", "justify-content": "flex-end", "align-items": "center", gap: "8px" };
+const COL_CENTER = { flex: "1", "min-width": "0", display: "flex", "justify-content": "center", "align-items": "center" };
+const COL_RIGHT = { flex: "1", "min-width": "0", display: "flex", "justify-content": "flex-end", "align-items": "center", gap: "8px", "flex-wrap": "wrap" };
 
 export class SeHeaderBar extends SuiComponent<
   SeHeaderBarTheme,
@@ -318,10 +323,12 @@ export class SeHeaderBar extends SuiComponent<
 
     return row({
       id: "kse-sidebar-header",
+      wrap: false,
       style: {
         "margin-bottom": "8px",
         "align-items": "center",
         display: "flex",
+        "flex-wrap": "nowrap",
       },
       content: [
         row({
