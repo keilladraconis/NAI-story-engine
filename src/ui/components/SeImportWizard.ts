@@ -178,6 +178,22 @@ export class SeImportWizard extends SuiComponent<
     return this._entries.filter((e) => !managed.has(e.id));
   }
 
+  private async _loadLorebook(): Promise<void> {
+    const [entries, categories] = await Promise.all([
+      api.v1.lorebook.entries(),
+      api.v1.lorebook.categories(),
+    ]);
+    this._categoryNames = new Map(
+      categories.map((c) => [c.id, c.name ?? c.id]),
+    );
+    this._entries = entries;
+    for (const entry of this._entries) {
+      if (!this._dulfsMap.has(entry.id)) {
+        this._dulfsMap.set(entry.id, detectCategory(entry.text ?? ""));
+      }
+    }
+  }
+
   // ── Foundation section ───────────────────────────────────────────────────────
 
   private _buildFoundationSection(memText: string, anText: string): UIPart[] {
@@ -272,7 +288,9 @@ export class SeImportWizard extends SuiComponent<
     if (unmanaged.length === 0) {
       return [
         text({
-          text: "All lorebook entries are managed by Story Engine.",
+          text: this._entries.length === 0
+            ? "No lorebook entries found. Click Refresh after adding entries."
+            : "All lorebook entries are already bound to Story Engine entities.",
           style: S.empty,
         }),
       ];
@@ -375,34 +393,12 @@ export class SeImportWizard extends SuiComponent<
     const { column, row, text, button } = api.v1.ui.part;
     const { editHost } = this.options;
 
-    const [entries, categories, memText, anText] = await Promise.all([
-      api.v1.lorebook.entries(),
-      api.v1.lorebook.categories(),
+    const [memText, anText] = await Promise.all([
       api.v1.memory.get(),
       api.v1.an.get(),
     ]);
 
-    // Build category map; identify SE-managed categories to exclude
-    const seCategories = new Set(
-      categories
-        .filter((c) => (c.name ?? "").startsWith("SE:"))
-        .map((c) => c.id),
-    );
-    this._categoryNames = new Map(
-      categories
-        .filter((c) => !seCategories.has(c.id))
-        .map((c) => [c.id, c.name ?? c.id]),
-    );
-
-    this._entries = entries.filter(
-      (e) => !e.category || !seCategories.has(e.category),
-    );
-
-    for (const entry of this._entries) {
-      if (!this._dulfsMap.has(entry.id)) {
-        this._dulfsMap.set(entry.id, detectCategory(entry.text ?? ""));
-      }
-    }
+    await this._loadLorebook();
 
     const foundationParts = this._buildFoundationSection(memText, anText);
 
@@ -414,6 +410,17 @@ export class SeImportWizard extends SuiComponent<
           callback: () => { editHost.close(); },
         }),
         text({ text: "**Import Existing Content**", markdown: true, style: S.title }),
+        button({
+          iconId: "refresh" as IconId,
+          style: S.importBtn,
+          callback: () => {
+            void (async () => {
+              await this._loadLorebook();
+              this._rebuildLorebookBody();
+              api.v1.ui.toast("Lorebook refreshed", { type: "info" });
+            })();
+          },
+        }),
         button({
           id: IDS.IMPORT.IMPORT_ALL_BTN,
           text: "Import All",
