@@ -1,19 +1,24 @@
 import { RootState } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
-import { buildStoryEnginePrefix, formatCrucibleElementsContext } from "./context-builder";
-import { DulfsFieldID, FieldID } from "../../config/field-definitions";
-import { STORAGE_KEYS } from "../../ui/framework/ids";
-import { getModel } from "./config";
+import { buildStoryEnginePrefix } from "./context-builder";
+import { DulfsFieldID, FIELD_CONFIGS } from "../../config/field-definitions";
+import { STORAGE_KEYS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../../ui/framework/ids";
+import { WORLD_ENTRY_CATEGORIES } from "../store/types";
+import {
+  buildModelParams,
+  appendXialongStyleMessage,
+  isXialongMode,
+  LOREBOOK_CHAIN_STOPS,
+} from "./config";
+import {
+  LOREBOOK_GENERATE_PROMPT,
+  LOREBOOK_KEYS_PROMPT,
+  LOREBOOK_REFINE_PROMPT,
+  LOREBOOK_WEAVING_PROMPT,
+  CATEGORY_TEMPLATES,
+  XIALONG_STYLE,
+} from "./prompts";
 
-// Category-to-template mapping
-const CATEGORY_TEMPLATE_MAP: Record<string, string> = {
-  "SE: Characters": "lorebook_template_character",
-  "SE: Systems": "lorebook_template_system",
-  "SE: Locations": "lorebook_template_location",
-  "SE: Factions": "lorebook_template_faction",
-  "SE: Narrative Vectors": "lorebook_template_dynamic",
-  "SE: Topics": "lorebook_template_topic",
-};
 
 // Category-to-type mapping for anchored prefills
 export const CATEGORY_TO_TYPE: Record<string, string> = {
@@ -29,37 +34,61 @@ const getEntryType = (categoryName: string): string => {
   return CATEGORY_TO_TYPE[categoryName] || "Entry";
 };
 
-/**
- * Dependency order for relational map generation.
- * Characters are self-contained; locations/systems/factions/dynamics benefit
- * from character context when building MAP SO FAR.
- */
-export const MAP_DEPENDENCY_ORDER: DulfsFieldID[] = [
-  FieldID.DramatisPersonae,
-  FieldID.Locations,
-  FieldID.UniverseSystems,
-  FieldID.Factions,
-  FieldID.Topics,
-  FieldID.SituationalDynamics,
-];
+// --- v11 World Context Helpers ---
 
-/**
- * Returns true if a relational map entry needs reconciliation:
- * no related characters identified AND collision risk is high.
- * These entries benefit from a second pass with the complete map as context.
- */
-export function parseNeedsReconciliation(mapText: string): boolean {
-  const charLine = mapText.match(/- related characters:\s*(.*)/i)?.[1]?.trim() ?? "";
-  const riskLine = mapText.match(/- collision risk:\s*(.*)/i)?.[1]?.trim() ?? "";
-  const noChars = !charLine || /^(none|n\/a|—|-)$/i.test(charLine);
-  return noChars && /high/i.test(riskLine);
+/** Find the WorldEntity associated with a lorebook entry ID, if any. */
+function findEntityForEntry(state: RootState, entryId: string) {
+  return Object.values(state.world.entitiesById).find((e) => e.lorebookEntryId === entryId);
+}
+
+/** Format the Threads (groups) an entity belongs to as context text. */
+function formatEntityGroups(state: RootState, entityId: string): string {
+  const groups = state.world.groups.filter((g) =>
+    g.entityIds.includes(entityId),
+  );
+  if (groups.length === 0) return "";
+  return groups.map((g) => `- ${g.title}: ${g.summary}`).join("\n");
+}
+
+/** Format live world entities as context, grouped by category. */
+function formatLiveWorldEntitiesContext(state: RootState): string {
+  const liveEntities = Object.values(state.world.entitiesById);
+  if (liveEntities.length === 0) return "";
+
+  const groups = new Map<DulfsFieldID, typeof liveEntities>();
+  for (const entity of liveEntities) {
+    const list = groups.get(entity.categoryId) || [];
+    list.push(entity);
+    groups.set(entity.categoryId, list);
+  }
+
+  const lines: string[] = [];
+  for (const fieldId of WORLD_ENTRY_CATEGORIES) {
+    const fieldEntities = groups.get(fieldId);
+    if (!fieldEntities) continue;
+    const label = FIELD_CONFIGS.find((f) => f.id === fieldId)?.label || fieldId;
+    lines.push(`${label}:`);
+    for (const entity of fieldEntities) {
+      lines.push(
+        `- ${entity.name}${entity.summary ? `: ${entity.summary.slice(0, 100)}` : ""}`,
+      );
+    }
+  }
+  return lines.join("\n");
 }
 
 // --- Factory Builders for JIT Strategy Building ---
 
 /**
  * Creates a message factory for lorebook content generation.
- * Uses unified prefix (excludes self) + volatile tail with content-specific instruction.
+ *
+ * Message structure:
+ *   MSG 1 (system): Archivist instructions (LOREBOOK_GENERATE_PROMPT)
+ *   MSG 2 (system): Story background — foundation, canon, setting, ATTG, style
+ *   MSG 3 (system): Category template (varies per entry type)
+ *   MSG 4 (system): World context — live entities + weaving prompt + thread groups
+ *   MSG 5 (user):   Entity summary (immediate context before prefill)
+ *   MSG 6 (asst):   Name / Type / Setting prefill (anchors output format)
  */
 export const createLorebookContentFactory = (
   getState: () => RootState,
@@ -71,163 +100,111 @@ export const createLorebookContentFactory = (
       throw new Error(`Lorebook entry not found: ${entryId}`);
     }
 
-    // Get category name
+    // Resolve category name for template + type label
     let categoryName = "";
     if (entry.category) {
       const categories = await api.v1.lorebook.categories();
-      const category = categories.find((c) => c.id === entry.category);
-      categoryName = category?.name || "";
+      const cat = categories.find((c) => c.id === entry.category);
+      categoryName = cat?.name || "";
     }
 
-    const displayName = entry.displayName || "Unnamed Entry";
-    const model = await getModel();
-    const basePrompt = String(
-      (await api.v1.config.get("lorebook_generate_prompt")) || "",
-    );
-    const prompt = basePrompt.replace("[itemName]", displayName);
-
-    // Get template based on category
-    const templateKey = CATEGORY_TEMPLATE_MAP[categoryName];
-    const template = templateKey
-      ? String((await api.v1.config.get(templateKey)) || "")
-      : "";
-
-    // Item's short description from DULFS
-    const itemContent = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(entryId))) || "",
-    );
-
-    // Anchored assistant prefill
     const entryType = getEntryType(categoryName);
+    const template = CATEGORY_TEMPLATES[categoryName] || "";
+
+    const state = getState();
+    const entity = findEntityForEntry(state, entryId);
+
+    // Pull name and summary from live input fields only when this entry is
+    // currently open in the edit pane — avoids contaminating SEGA batch
+    // generation with stale data from whatever entity was last edited.
+    const isCurrentlySelected = state.ui.lorebook.selectedEntryId === entryId;
+
+    const liveName = isCurrentlySelected
+      ? String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "").trim()
+      : "";
+    const displayName = liveName || entry.displayName || entity?.name || "Unnamed Entry";
+
+    const liveSummary = isCurrentlySelected
+      ? String((await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) || "").trim()
+      : "";
+    const itemSummary = liveSummary || entity?.summary || "";
+
+    // --- MSG 1: Archivist instructions ---
+    const messages: Message[] = [
+      {
+        role: "system",
+        content: LOREBOOK_GENERATE_PROMPT.replace("[itemName]", displayName),
+      },
+    ];
+
+    // --- MSG 2: Story background ---
+    const { foundation } = state;
+    const backgroundParts: string[] = [];
+    if (foundation.attg) backgroundParts.push(`[ATTG]\n${foundation.attg}`);
+    if (foundation.style) backgroundParts.push(`[STYLE]\n${foundation.style}`);
+    if (foundation.shape || foundation.intent || foundation.worldState) {
+      const fp: string[] = [];
+      if (foundation.shape) fp.push(`Shape: ${foundation.shape.name}\n${foundation.shape.description}`);
+      if (foundation.intent) fp.push(`Intent: ${foundation.intent}`);
+      if (foundation.worldState) fp.push(`World State: ${foundation.worldState}`);
+      backgroundParts.push(`[NARRATIVE FOUNDATION]\n${fp.join("\n")}`);
+    }
     const setting = String(
       (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
     );
-    const assistantPrefill = `Name: ${displayName}
-Type: ${entryType}
-Setting: ${setting}
-`;
+    if (setting) backgroundParts.push(`[SETTING]\n${setting}`);
+    if (backgroundParts.length > 0) {
+      messages.push({ role: "system", content: backgroundParts.join("\n\n") });
+    }
 
-    const prefix = await buildStoryEnginePrefix(getState);
-
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: `[LOREBOOK ENTRY GENERATION]\n${prompt}`,
-      },
-    ];
-
-    // Template after stable prefix (varies per category)
+    // --- MSG 3: Category template ---
     if (template) {
-      messages.push({
-        role: "system",
-        content: `TEMPLATE:\n${template}`,
-      });
+      messages.push({ role: "system", content: `TEMPLATE:\n${template}` });
     }
 
-    const crucibleContext = formatCrucibleElementsContext(getState());
-    if (crucibleContext) {
-      messages.push({
-        role: "system",
-        content: `[WORLD STRUCTURE]\n${crucibleContext}`,
-      });
+    // --- MSG 4: World context + weaving ---
+    const worldContext = formatLiveWorldEntitiesContext(state);
+    const groupContext = entity ? formatEntityGroups(state, entity.id) : "";
+    const worldParts: string[] = [];
+    if (worldContext) worldParts.push(`[WORLD]\n${worldContext}`);
+    if (groupContext) worldParts.push(`[GROUPS]\n${groupContext}`);
+    if (LOREBOOK_WEAVING_PROMPT) worldParts.push(LOREBOOK_WEAVING_PROMPT);
+    if (worldParts.length > 0) {
+      messages.push({ role: "system", content: worldParts.join("\n\n") });
     }
 
-    messages.push(
-      {
-        role: "user",
-        content: `Generate a lorebook entry for: ${displayName}\n\nITEM DESCRIPTION:\n${itemContent}`,
-      },
-      { role: "assistant", content: assistantPrefill },
-    );
+    // --- MSG 5: Entity summary (right before prefill) ---
+    messages.push({
+      role: "user",
+      content: itemSummary || `Generate a lorebook entry for: ${displayName}`,
+    });
 
-    const tailCount = template ? (crucibleContext ? 5 : 4) : (crucibleContext ? 4 : 3);
+    // --- MSG 6 (Xialong only): Style guidance ---
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.lorebookContent);
+
+    // --- MSG 7: Anchored prefill ---
+    const assistantPrefill = `Name: ${displayName}\nType: ${entryType}\nSetting: ${setting || "original"}\n`;
+    messages.push({ role: "assistant", content: assistantPrefill });
+
+    const xialong = await isXialongMode();
     return {
       messages,
-      params: { model, max_tokens: 1024, temperature: 0.85, min_p: 0.05, frequency_penalty: 0.1 },
-      contextPinning: { head: 1, tail: tailCount },
+      params: await buildModelParams({
+        max_tokens: 1024,
+        temperature: 0.85,
+        min_p: 0.05,
+        frequency_penalty: 0.1,
+        stop: LOREBOOK_CHAIN_STOPS,
+      }),
+      contextPinning: { head: 1, tail: xialong ? 4 : 3 },
     };
   };
 };
 
 /**
- * Creates a message factory for lorebook relational map generation.
- * Reads MAP SO FAR from state at JIT time, enabling incremental cross-entry inference.
- * Characters → Locations → Systems → Factions → Dynamics (MAP_DEPENDENCY_ORDER).
- */
-export const createLorebookRelationalMapFactory = (
-  getState: () => RootState,
-  entryId: string,
-): MessageFactory => {
-  return async () => {
-    const entry = await api.v1.lorebook.entry(entryId);
-    if (!entry) {
-      throw new Error(`Lorebook entry not found: ${entryId}`);
-    }
-
-    let categoryName = "";
-    if (entry.category) {
-      const categories = await api.v1.lorebook.categories();
-      const category = categories.find((c) => c.id === entry.category);
-      categoryName = category?.name || "";
-    }
-
-    const displayName = entry.displayName || "Unnamed Entry";
-    const entryType = getEntryType(categoryName);
-    const entryText = entry.text || "";
-
-    // Build MAP SO FAR: all maps in dependency order, excluding this entry
-    const state = getState();
-    const mapSoFarParts: string[] = [];
-    for (const fieldId of MAP_DEPENDENCY_ORDER) {
-      const items = state.story.dulfs[fieldId] || [];
-      for (const item of items) {
-        if (item.id === entryId) continue;
-        const mapText = state.runtime.sega.relationalMaps[item.id];
-        if (mapText) mapSoFarParts.push(mapText);
-      }
-    }
-    const mapSoFar = mapSoFarParts.join("\n\n");
-
-    const model = await getModel();
-    const prompt = String(
-      (await api.v1.config.get("lorebook_relational_map_prompt")) || "",
-    );
-
-    const prefix = await buildStoryEnginePrefix(getState);
-
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: `[LOREBOOK RELATIONAL MAP]\n${prompt}`,
-      },
-      {
-        role: "user",
-        content: `MAP SO FAR:\n${mapSoFar || "(none yet)"}\n\n---\n\nENTRY:\n${entryText}`,
-      },
-      {
-        role: "assistant",
-        content: `${displayName} [${entryType}]\n  - primary locations:`,
-      },
-    ];
-
-    return {
-      messages,
-      params: {
-        model,
-        max_tokens: 256,
-        temperature: 0.5,
-        stop: ["\n\n---", "\n\n\n"],
-      },
-      contextPinning: { head: 1, tail: 3 },
-    };
-  };
-};
-
 /**
  * Creates a message factory for lorebook keys generation.
- * Uses unified prefix (excludes self) + volatile tail with keys-specific instruction.
+ * Uses unified prefix + entry text + relationship context.
  * CRITICAL: Fetches entry.text at execution time for fresh content from preceding generation.
  */
 export const createLorebookKeysFactory = (
@@ -240,17 +217,21 @@ export const createLorebookKeysFactory = (
       throw new Error(`Lorebook entry not found: ${entryId}`);
     }
 
-    // Prefer relational map over raw prose — falls back to prose when running
-    // outside SEGA or after SEGA reset.
-    const relationalMap = getState().runtime.sega.relationalMaps[entryId] ?? "";
-    const entryText = relationalMap || (entry.text || "");
-
-    const model = await getModel();
-    const prompt = String(
-      (await api.v1.config.get("lorebook_keys_prompt")) || "",
-    );
+    const entryText = entry.text || "";
+    const prompt = LOREBOOK_KEYS_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState);
+
+    // Thread (group) context for this entry
+    const state = getState();
+    const entity = findEntityForEntry(state, entryId);
+    const groupContext = entity
+      ? formatEntityGroups(state, entity.id)
+      : "";
+
+    const contextContent = groupContext
+      ? `${entryText}\n\n${groupContext}`
+      : entryText;
 
     const messages: Message[] = [
       ...prefix,
@@ -260,20 +241,21 @@ export const createLorebookKeysFactory = (
       },
       {
         role: "user",
-        content: `ENTRY:\n\n${entryText}`,
+        content: `ENTRY:\n\n${contextContent}`,
       },
-      { role: "assistant", content: `REJECTED:\n` },
     ];
+
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.lorebookKeys);
+    messages.push({ role: "assistant", content: `REJECTED:\n` });
 
     return {
       messages,
-      params: {
-        model,
+      params: await buildModelParams({
         max_tokens: 256,
         temperature: 0.8,
         min_p: 0.1,
-        stop: ["\n---"],
-      },
+        stop: ["\n---", "\n***", "\n⁂", "[ Style", "</think>"],
+      }),
       contextPinning: { head: 1, tail: 3 },
     };
   };
@@ -312,10 +294,7 @@ export const createLorebookRefineFactory = (
     );
 
     // Get template based on category
-    const templateKey = CATEGORY_TEMPLATE_MAP[categoryName];
-    const template = templateKey
-      ? String((await api.v1.config.get(templateKey)) || "")
-      : "";
+    const template = CATEGORY_TEMPLATES[categoryName] || "";
 
     // Anchored assistant prefill
     const prefillContent = `Name: ${displayName}
@@ -323,14 +302,16 @@ Type: ${entryType}
 Setting: ${setting}
 `;
 
-    const model = await getModel();
-    const refinePrompt = String(
-      (await api.v1.config.get("lorebook_refine_prompt")) || "",
-    );
+    const refinePrompt = LOREBOOK_REFINE_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState);
 
-    const crucibleContext = formatCrucibleElementsContext(getState());
+    // Thread (group) context
+    const state = getState();
+    const entity = findEntityForEntry(state, entryId);
+    const groupContext = entity
+      ? formatEntityGroups(state, entity.id)
+      : "";
 
     const messages: Message[] = [
       ...prefix,
@@ -340,25 +321,31 @@ Setting: ${setting}
       },
     ];
 
-    if (crucibleContext) {
+    if (groupContext) {
       messages.push({
         role: "system",
-        content: `[WORLD STRUCTURE]\n${crucibleContext}`,
+        content: `[GROUPS]\n${groupContext}`,
       });
     }
 
-    messages.push(
-      {
-        role: "user",
-        content: `CURRENT ENTRY:\n${currentContent}\n\nMODIFICATION INSTRUCTIONS:\n${instructions}`,
-      },
-      { role: "assistant", content: prefillContent },
-    );
+    messages.push({
+      role: "user",
+      content: `CURRENT ENTRY:\n${currentContent}\n\nMODIFICATION INSTRUCTIONS:\n${instructions}`,
+    });
+
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.lorebookRefine);
+    messages.push({ role: "assistant", content: prefillContent });
 
     return {
       messages,
-      params: { model, max_tokens: 1024, temperature: 0.7, min_p: 0.05, frequency_penalty: 0.1 },
-      contextPinning: { head: 1, tail: crucibleContext ? 4 : 3 },
+      params: await buildModelParams({
+        max_tokens: 1024,
+        temperature: 0.7,
+        min_p: 0.05,
+        frequency_penalty: 0.1,
+        stop: LOREBOOK_CHAIN_STOPS,
+      }),
+      contextPinning: { head: 1, tail: groupContext ? 4 : 3 },
     };
   };
 };
@@ -374,7 +361,7 @@ export const buildLorebookKeysPayload = async (
 ): Promise<{
   requestId: string;
   messageFactory: MessageFactory;
-  params: { model: string; max_tokens: number };
+  params: GenerationParams;
   target: { type: "lorebookKeys"; entryId: string };
   prefillBehavior: "keep";
   assistantPrefill: string;
@@ -382,7 +369,7 @@ export const buildLorebookKeysPayload = async (
   return {
     requestId,
     messageFactory: createLorebookKeysFactory(getState, entryId),
-    params: { model: await getModel(), max_tokens: 256 },
+    params: await buildModelParams({ max_tokens: 256 }),
     target: { type: "lorebookKeys", entryId },
     prefillBehavior: "keep",
     assistantPrefill: `REJECTED:\n`,

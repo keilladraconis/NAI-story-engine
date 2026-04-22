@@ -1,0 +1,308 @@
+/**
+ * Forge Strategy — Intent-driven world element generation.
+ *
+ * Message ordering (cache-stability first):
+ *   1. system: forge_prompt
+ *   2. assistant: [BRAINSTORM]        — stable, captured at loop start
+ *   3. assistant: [STORY SHAPE]       — stable (foundation.shape)
+ *   4. assistant: [STORY INTENT]      — stable (foundation.intent — strategic/persistent)
+ *   5. assistant: [FORGE GUIDANCE]     — stable (forge input — tactical/per-session)
+ *   6. assistant: === ESTABLISHED WORLD === — semi-stable (changes on cast)
+ *   7. assistant: === WORLD STATE ===       — volatile (recent narrative changes)
+ *   8. user: step instruction
+ *   9. assistant: prior command log — grows each step; primed with trailing [
+ *
+ * The prior command log is the key context mechanism: GLM sees its own prior
+ * output verbatim and naturally continues the command sequence, preventing
+ * recreation of already-forged elements without any extra dedup logic.
+ */
+
+import { RootState, GenerationStrategy } from "../store/types";
+import { MessageFactory } from "nai-gen-x";
+import { buildModelParams, appendXialongStyleMessage } from "./config";
+import { XIALONG_STYLE } from "./prompts";
+import { WORLD_ENTRY_CATEGORIES } from "../store/types";
+import { FieldID, DulfsFieldID } from "../../config/field-definitions";
+import { TYPE_TO_FIELD } from "./crucible-command-parser";
+import { FORGE_PROMPT } from "./prompts";
+
+const FIELD_TO_TYPE: Record<string, string> = Object.fromEntries(
+  Object.entries(TYPE_TO_FIELD).map(([type, fieldId]) => [fieldId, type]),
+);
+
+export const FORGE_MAX_STEPS = 12;
+
+export type ForgePhase = "sketch" | "expand" | "weave";
+
+interface PhaseConfig {
+  name: ForgePhase;
+  startStep: number;
+  endStep: number;
+  instruction: string;
+  maxTokens: number;
+  temperature: number;
+}
+
+const PHASES: PhaseConfig[] = [
+  {
+    name: "sketch",
+    startStep: 1,
+    endStep: 4,
+    maxTokens: 512,
+    temperature: 0.90,
+    instruction:
+      "Sketch phase — populate the world. Emit multiple CREATE commands per response. Prioritize breadth: characters, locations, situations, systems. One sentence per element. Do not THREAD or REVISE yet.",
+  },
+  {
+    name: "expand",
+    startStep: 5,
+    endStep: 8,
+    maxTokens: 256,
+    temperature: 0.85,
+    instruction:
+      "Expand phase — deepen and refine. REVISE thin descriptions to 2–3 sentences. CREATE elements you notice are missing. DELETE redundant or overlapping elements. No THREADs yet.",
+  },
+  {
+    name: "weave",
+    startStep: 9,
+    endStep: 12,
+    maxTokens: 384,
+    temperature: 0.80,
+    instruction:
+      "Weave phase — discover connections. THREAD elements that share genuine structural bonds. CREATE SITUATION entries for collision points — where one character's goal threatens another's position, where knowledge is distributed unevenly, where resource dependencies force impossible loyalties. Focus on opposing goods, not good vs evil. When the world feels complete and all meaningful connections are made, emit [DONE] to end the loop early.",
+  },
+];
+
+export function getPhaseForStep(step: number): PhaseConfig {
+  return PHASES.find((p) => step >= p.startStep && step <= p.endStep) ?? PHASES[PHASES.length - 1];
+}
+
+const FIELD_LABEL: Record<DulfsFieldID, string> = {
+  [FieldID.DramatisPersonae]: "Characters",
+  [FieldID.UniverseSystems]: "Systems",
+  [FieldID.Locations]: "Locations",
+  [FieldID.Factions]: "Factions",
+  [FieldID.SituationalDynamics]: "Situations",
+  [FieldID.Topics]: "Topics",
+};
+
+function formatEstablishedWorld(state: RootState, preForgeEntityIds: Set<string>): string {
+  const established = Object.values(state.world.entitiesById).filter((e) => preForgeEntityIds.has(e.id));
+  if (established.length === 0) return "";
+
+  const groups = new Map<DulfsFieldID, typeof established>();
+  for (const e of established) {
+    const list = groups.get(e.categoryId) ?? [];
+    list.push(e);
+    groups.set(e.categoryId, list);
+  }
+
+  const lines: string[] = ["=== ESTABLISHED WORLD ==="];
+  for (const fieldId of WORLD_ENTRY_CATEGORIES) {
+    const group = groups.get(fieldId);
+    if (!group) continue;
+    lines.push(`${FIELD_LABEL[fieldId]}:`);
+    for (const e of group) {
+      lines.push(
+        `  - ${e.name}${e.summary ? `: ${e.summary.slice(0, 120)}` : ""}`,
+      );
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function formatWorldState(state: RootState): string {
+  const { foundation } = state;
+  const parts: string[] = [];
+
+  if (foundation.worldState) {
+    parts.push(`=== WORLD STATE ===\n${foundation.worldState}`);
+  }
+
+  return parts.join("\n");
+}
+
+/**
+ * Synthesizes the prior-step command log from entities created THIS forge session
+ * (i.e., not in preForgeEntityIds) and existing threads.
+ * Only correct-syntax commands appear — bad GLM output that failed to parse
+ * never enters context.
+ */
+function buildForgePassLog(state: RootState, preForgeEntityIds: Set<string>): string {
+  const sessionEntities = Object.values(state.world.entitiesById).filter(
+    (e) => !preForgeEntityIds.has(e.id),
+  );
+
+  const lines: string[] = [];
+  for (const entity of sessionEntities) {
+    const type = FIELD_TO_TYPE[entity.categoryId] ?? "CHARACTER";
+    const desc = entity.summary ? ` | ${entity.summary}` : "";
+    lines.push(`[CREATE ${type} "${entity.name}"${desc}]`);
+  }
+
+  // Include existing threads so the model doesn't recreate them
+  for (const group of state.world.groups) {
+    const memberNames = group.entityIds
+      .map((id) => state.world.entitiesById[id]?.name)
+      .filter((name): name is string => name !== undefined);
+    if (memberNames.length < 2) continue;
+    const membersStr = memberNames.map((n) => `"${n}"`).join(", ");
+    const descPart = group.summary ? ` | ${group.summary}` : "";
+    lines.push(`[THREAD "${group.title}" | ${membersStr}${descPart}]`);
+  }
+
+  return lines.join("\n").trim();
+}
+
+/**
+ * Message factory for one step of the forge loop.
+ * All state is read JIT so the synthesized pass log is always current.
+ * preForgeEntityIds: entity IDs that existed before this forge session started —
+ *   these appear in ESTABLISHED WORLD, not in the pass log.
+ */
+export const createForgeFactory = (
+  getState: () => RootState,
+  step: number,
+  forgeGuidance: string,
+  brainstormContext: string,
+  preForgeEntityIds: string[],
+): MessageFactory => {
+  const preForgeSet = new Set(preForgeEntityIds);
+
+  return async () => {
+    const systemPrompt = String(FORGE_PROMPT);
+
+    const state = getState();
+    const { foundation } = state;
+
+    const messages: Message[] = [];
+
+    // 1. System prompt
+    messages.push({ role: "system", content: systemPrompt });
+
+    // 2. Brainstorm context — stable, captured at loop start
+    if (brainstormContext) {
+      messages.push({
+        role: "assistant",
+        content: `=== BRAINSTORM ===\n${brainstormContext}`,
+      });
+    }
+
+    // 3. Story shape — stable
+    if (foundation.shape) {
+      messages.push({
+        role: "assistant",
+        content: `=== STORY SHAPE ===\n${foundation.shape.name}\n${foundation.shape.description}`,
+      });
+    }
+
+    // 4. Foundation intent (strategic, persistent) — stable
+    if (foundation.intent) {
+      messages.push({
+        role: "assistant",
+        content: `=== STORY INTENT ===\n${foundation.intent}`,
+      });
+    }
+
+    // 4b. Story contract + intensity — stable, hard constraints for generation
+    {
+      const parts: string[] = [];
+      if (foundation.intensity) {
+        parts.push(`Intensity: ${foundation.intensity.level} — ${foundation.intensity.description}`);
+      }
+      if (foundation.contract) {
+        parts.push(
+          `Required: ${foundation.contract.required}\nProhibited: ${foundation.contract.prohibited}\nEmphasis: ${foundation.contract.emphasis}`,
+        );
+      }
+      if (parts.length > 0) {
+        messages.push({
+          role: "assistant",
+          content: `=== STORY CONTRACT ===\n${parts.join("\n")}`,
+        });
+      }
+    }
+
+    // 5. Forge intent (tactical, per-session) — stable
+    if (forgeGuidance.trim()) {
+      messages.push({
+        role: "assistant",
+        content: `=== FORGE GUIDANCE ===\n${forgeGuidance.trim()}`,
+      });
+    }
+
+    // 6. Established world (entities that existed before this forge session) — semi-stable
+    const establishedWorld = formatEstablishedWorld(state, preForgeSet);
+    if (establishedWorld) {
+      messages.push({ role: "assistant", content: establishedWorld });
+    }
+
+    // 7. World state + tensions — volatile (recent narrative changes)
+    const worldStateText = formatWorldState(state);
+    if (worldStateText) {
+      messages.push({ role: "assistant", content: worldStateText });
+    }
+
+    // 8. User: phase-aware step instruction
+    const phase = getPhaseForStep(step);
+    const phaseStep = step - phase.startStep + 1;
+    const phaseSteps = phase.endStep - phase.startStep + 1;
+    const isLastStep = step >= FORGE_MAX_STEPS;
+    const closingNote = isLastStep
+      ? " End with a final [CRITIQUE | overall assessment of the draft]."
+      : "";
+    const stepNote = `${phase.instruction} (${phase.name} ${phaseStep}/${phaseSteps})${closingNote}`;
+    messages.push({ role: "user", content: stepNote });
+
+    // 9. Prior command log + prefill primer — single assistant message.
+    const passLog = buildForgePassLog(state, preForgeSet);
+    const prefill = isLastStep ? "[CRITIQUE |" : "[";
+    const assistantContent = passLog ? `${passLog}\n${prefill}` : prefill;
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.forge);
+    messages.push({ role: "assistant", content: assistantContent });
+
+    return {
+      messages,
+      params: await buildModelParams({
+        max_tokens: phase.maxTokens,
+        temperature: phase.temperature,
+        min_p: 0.05,
+      }),
+    };
+  };
+};
+
+/**
+ * Builds a GenerationStrategy for one step of the forge loop.
+ */
+export const buildForgeStrategy = (
+  getState: () => RootState,
+  step: number,
+  forgeGuidance: string,
+  brainstormContext: string,
+  preForgeEntityIds: string[],
+): GenerationStrategy => {
+  const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE |" : "[";
+  return {
+    requestId: api.v1.uuid(),
+    messageFactory: createForgeFactory(
+      getState,
+      step,
+      forgeGuidance,
+      brainstormContext,
+      preForgeEntityIds,
+    ),
+    target: {
+      type: "forge",
+      step,
+      phase: getPhaseForStep(step).name,
+      forgeGuidance,
+      brainstormContext,
+      preForgeEntityIds,
+    },
+    prefillBehavior: "keep",
+    assistantPrefill: prefill,
+  };
+};
+

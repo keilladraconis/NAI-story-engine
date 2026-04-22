@@ -1,5 +1,10 @@
 import { createSlice } from "nai-store";
-import { BrainstormState, BrainstormMessage, BrainstormChat, BrainstormMode } from "../types";
+import {
+  BrainstormState,
+  BrainstormMessage,
+  BrainstormChat,
+  BrainstormMode,
+} from "../types";
 
 function makeChat(index: number): BrainstormChat {
   return {
@@ -111,7 +116,8 @@ export const brainstormSlice = createSlice({
       };
     },
     chatRenamed: (state, payload: { index: number; title: string }) => {
-      if (payload.index < 0 || payload.index >= state.chats.length) return state;
+      if (payload.index < 0 || payload.index >= state.chats.length)
+        return state;
       return {
         ...state,
         chats: state.chats.map((chat, i) =>

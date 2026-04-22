@@ -14,7 +14,7 @@ import {
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
 import { IDS } from "../../../ui/framework/ids";
-import { getModel } from "../../utils/config";
+import { buildModelParams } from "../../utils/config";
 
 export function registerLorebookGenerationEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
@@ -44,7 +44,7 @@ export function registerLorebookGenerationEffects(
         generationSubmitted({
           requestId,
           messageFactory,
-          params: { model: await getModel(), max_tokens: 512 },
+          params: await buildModelParams({ max_tokens: 512 }),
           target: { type: "lorebookContent", entryId: selectedEntryId },
           prefillBehavior: "trim",
         }),
@@ -64,7 +64,11 @@ export function registerLorebookGenerationEffects(
         return;
       }
 
-      const keysPayload = await buildLorebookKeysPayload(getState, selectedEntryId, requestId);
+      const keysPayload = await buildLorebookKeysPayload(
+        getState,
+        selectedEntryId,
+        requestId,
+      );
       dispatch(generationSubmitted(keysPayload));
     },
   );
@@ -95,50 +99,51 @@ export function registerLorebookGenerationEffects(
         generationSubmitted({
           requestId: contentRequestId,
           messageFactory: contentFactory,
-          params: { model: await getModel(), max_tokens: 512 },
+          params: await buildModelParams({ max_tokens: 512 }),
           target: { type: "lorebookContent", entryId },
           prefillBehavior: "trim",
         }),
       );
 
-      const keysPayload = await buildLorebookKeysPayload(getState, entryId, keysRequestId);
+      const keysPayload = await buildLorebookKeysPayload(
+        getState,
+        entryId,
+        keysRequestId,
+      );
       dispatch(generationSubmitted(keysPayload));
     },
   );
 
   // Intent: Lorebook Refine
-  subscribeEffect(
-    matchesAction(uiLorebookRefineRequested),
-    async (action) => {
-      const { requestId } = action.payload;
-      const { selectedEntryId } = getState().ui.lorebook;
+  subscribeEffect(matchesAction(uiLorebookRefineRequested), async (action) => {
+    const { requestId } = action.payload;
+    const { selectedEntryId } = getState().ui.lorebook;
 
-      if (!selectedEntryId) {
-        api.v1.log("[effects] No lorebook entry selected for refinement");
-        return;
-      }
+    if (!selectedEntryId) {
+      api.v1.log("[effects] No lorebook entry selected for refinement");
+      return;
+    }
 
-      const getInstructions = async () =>
-        String(
-          (await api.v1.storyStorage.get(IDS.LOREBOOK.REFINE_INSTRUCTIONS_RAW)) ||
+    const getInstructions = async () =>
+      String(
+        (await api.v1.storyStorage.get(IDS.LOREBOOK.REFINE_INSTRUCTIONS_RAW)) ||
           "",
-        );
-      const messageFactory = createLorebookRefineFactory(
-        getState,
-        selectedEntryId,
-        getInstructions,
       );
+    const messageFactory = createLorebookRefineFactory(
+      getState,
+      selectedEntryId,
+      getInstructions,
+    );
 
-      dispatch(
-        generationSubmitted({
-          requestId,
-          messageFactory,
-          params: { model: await getModel(), max_tokens: 700 },
-          target: { type: "lorebookRefine", entryId: selectedEntryId },
-          prefillBehavior: "trim",
-          continuation: { maxCalls: 3 },
-        }),
-      );
-    },
-  );
+    dispatch(
+      generationSubmitted({
+        requestId,
+        messageFactory,
+        params: await buildModelParams({ max_tokens: 700 }),
+        target: { type: "lorebookRefine", entryId: selectedEntryId },
+        prefillBehavior: "trim",
+        continuation: { maxCalls: 3 },
+      }),
+    );
+  });
 }

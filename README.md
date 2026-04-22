@@ -1,46 +1,77 @@
 # Story Engine
 
-**Story Engine** is a structured worldbuilding system for **NovelAI**. It guides you from a raw idea to a fully populated story scenario through a four-step pipeline: brainstorm → Crucible → SEGA → write.
+**Story Engine** is a structured worldbuilding system for **NovelAI**. It guides you from a raw idea to a fully populated story scenario through a four-step pipeline: brainstorm → Foundation → Forge → write. An optional **Bootstrap** generator can also write the opening passage of your story directly into the document when you're ready to begin.
+
+The UI is built on **`nai-simple-ui`**, the component framework from OnepunchVAM's **Simple Context** — with thanks for the foundation.
 
 ## Key Features
 
 ### Brainstorm
 
-A dedicated sidebar panel for freeform idea conversation with the AI. Supports multiple named sessions, a summarize button to compress long chats into dense material, and Co/Crit mode toggle for different AI personas.
+A dedicated tab for freeform idea conversation with the AI. Supports multiple named sessions, a summarize button to compress long chats into dense material, and Co/Crit mode toggle (cowriter vs. critic persona).
 
-### Crucible — Command-Driven World Generator
+### Foundation
 
-Crucible derives your world from structural tensions. Give it a shape and a direction; it identifies the pressures at the core of your story, then builds a world around them through an iterative command loop.
+Sets the structural and tonal anchors for your story before worldbuilding begins:
 
-1. **Shape** — AI reads your brainstorm and invents the structural lens your story is leaning toward — any shape, from Climactic Choice to Slice of Life. Edit the name and instruction directly, or generate and refine.
-2. **Direction** — AI distills your brainstorm (informed by the shape) into a dense creative anchor: characters, world, tone, tensions, supporting cast.
-3. **Tensions** — AI identifies the structural pressures and irresolvable conflicts at the heart of the scenario. Accept the ones worth building.
-4. **Build World** — GLM runs a command loop, emitting `CREATE`, `REVISE`, `LINK`, and `DELETE` commands to build world elements (characters, locations, factions, systems, narrative vectors, topics) that embody the tensions. Each pass ends with a self-`CRITIQUE`; you can add guidance and run another pass to extend or refine.
-5. **Merge** — Edit elements and merge them into DULFS fields and lorebook.
+- **Intensity** — Tonality register: Cozy, Grounded, Gritty, Noir, or Nightmare.
+- **Shape** — AI reads your brainstorm and invents a structural lens: the kind of moment your story is building toward. Edit or generate.
+- **Intent** — A plain statement of what this story is exploring.
+- **Story Contract** — Three directives: REQUIRED, PROHIBITED, EMPHASIS.
+- **ATTG** — Author/Title/Tags/Genre block, synced to Memory.
+- **Style** — Prose style guidelines, synced to Author's Note.
+
+### Forge
+
+Intent-driven world element generation. The Forge reads your Foundation and Brainstorm, then builds characters, locations, factions, systems, dynamics, and topics through a 12-step phased loop:
+
+- **Sketch** (steps 1–4) — breadth-first population of elements in broad strokes.
+- **Expand** (steps 5–8) — deepen thin entries, add noticeable gaps, cut overlap.
+- **Weave** (steps 9–12) — thread structural bonds and spin up situation entries at collision points.
+
+Provide optional guidance up front to steer what gets built; the model can end early once the world feels complete.
+
+### Bootstrap
+
+One-button **cold-open writer** in the panel header. Runs a two-phase generation that writes the first passages of your story directly into the document — grounded in your Shape, Intent, and Brainstorm, with prompts tuned to avoid named emotions, participle-stack appositives, and thematic narration. Phase 2 streams paragraph by paragraph so the document undo history stays clean.
+
+### World
+
+The world inventory produced by the Forge. Entities are organized by category and can be grouped into **Threads** — named clusters of related entities that provide relational context for generation and optionally sync a summary to the lorebook.
 
 ### S.E.G.A. (Story Engine Generate All)
 
-One-button scenario completion. Runs through: ATTG & Style → Canon → Bootstrap → Lorebook. Each stage can also be run individually.
+One-button lorebook completion. Runs two stages:
 
-- **ATTG & Style** — Author/Title/Tags/Genre syncs to Memory; Style Guidelines syncs to Author's Note.
-- **Canon** — Authoritative world summary synthesized from your Crucible elements.
-- **Bootstrap** — Generates an opening scene instruction into the document if it's empty.
-- **Lorebook** — Content generation → relational maps → keys generation (map-informed, with reconciliation pass for complex entries).
+1. **Lorebook Content** — Generates detailed entry text for every world entity.
+2. **Lorebook Keys** — Generates activation keys for each entry.
 
-### DULFS & Lorebook Sync
+Each stage can also be triggered individually from an entity's edit pane.
 
-Dramatis Personae, Universe Systems, Locations, Factions, Situational Dynamics, and Topics. Every DULFS entry is bidirectionally synced with the NovelAI Lorebook — edits in either direction are reflected immediately.
+### Import Wizard
 
-### Lorebook Panel
+For stories that already have lorebook entries, Memory, or Author's Note content. Opens automatically on first load when existing content is detected; also accessible via the **Import** button in the panel header.
 
-Generate content, keys, and refinements for any lorebook entry directly from the Lorebook view. Natural language refinements: "make her taller," "add a rivalry with the Silver Court."
+- **Memory → ATTG** and **A/N → Style** — one-click import of existing story metadata into Foundation fields.
+- **Story → Shape + Intent** — generates Foundation anchors by reading your existing story context (lorebook, Memory, document).
+- **Per-entry binding** — lists all unmanaged lorebook entries with auto-detected category; click Bind to register as a Story Engine entity without touching the entry text.
+- **Import All** — imports all of the above in one click, then triggers Shape and Intent generation.
+
+**Lorebook entries are never destroyed by Story Engine.** Removing the script or clearing entities does not affect the lorebook. Binding is a lightweight management layer that can be rebuilt at any time.
+
+### Entity Edit Pane
+
+Click any entity to open its edit pane:
+- Edit name, summary, and category (draft entities)
+- View and regenerate lorebook content and keys (live entities)
+- Refine entries with natural language: _"make her taller," "add a rivalry with the Silver Court"_
 
 ## Installation
 
 1. **Download** the latest `.naiscript` file from the [Releases](https://github.com/your-repo/releases) page.
 2. **Create a new story** in NovelAI for this script.
 3. **Open the Script Editor** in NovelAI, import the `.naiscript` file.
-4. **Enable the script.** The Brainstorm, Crucible, and Story Engine panels will appear.
+4. **Enable the script.** The Story Engine panel will appear in the sidebar.
 
 For the full workflow walkthrough, see `WALKTHROUGH.md`.
 
@@ -51,6 +82,15 @@ npm install
 npm run build    # Outputs to dist/NAI-story-engine.naiscript
 npm run test     # Run tests
 ```
+
+## Upgrading from 0.10.x
+
+Two Foundation fields from the old Crucible flow are gone:
+
+- **Direction** — superseded by **Brainstorm's summary mode**. Summarize your Brainstorm chat (the **Sum** button) and the Forge reads that directly; you no longer need to maintain Direction and Brainstorm as parallel sources of framing.
+- **Canon** — removed with no direct replacement. Its job is now covered by **Story Contract** (REQUIRED / PROHIBITED / EMPHASIS) in Foundation plus the per-entity summaries in the World section.
+
+See `CHANGELOG.md` for the full 0.11.0 notes.
 
 ## License
 

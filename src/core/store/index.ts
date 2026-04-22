@@ -3,8 +3,16 @@ import { brainstormSlice } from "./slices/brainstorm";
 import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
 import { storySlice, initialStoryState } from "./slices/story";
-import { crucibleSlice, initialCrucibleState } from "./slices/crucible";
-import { RootState, StoryState, BrainstormChat, CrucibleState } from "./types";
+import { worldSlice, initialWorldState } from "./slices/world";
+import { foundationSlice, initialFoundationState } from "./slices/foundation";
+import {
+  RootState,
+  StoryState,
+  BrainstormChat,
+  WorldState,
+  WorldEntity,
+  FoundationState,
+} from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Persisted data loaded action
@@ -13,7 +21,8 @@ import { RootState, StoryState, BrainstormChat, CrucibleState } from "./types";
 interface PersistedData {
   story?: StoryState;
   brainstorm?: { chats: BrainstormChat[]; currentChatIndex: number };
-  crucible?: CrucibleState;
+  world?: WorldState;
+  foundation?: FoundationState;
 }
 
 const PERSISTED_DATA_LOADED = "persist/loaded";
@@ -25,6 +34,32 @@ export const persistedDataLoaded = (data: PersistedData) => ({
 persistedDataLoaded.type = PERSISTED_DATA_LOADED;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// World state migration (v11 entities[] → v12 entitiesById/entityIds)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function migrateWorldState(raw: WorldState | (Record<string, unknown> & { entities?: WorldEntity[] })): WorldState {
+  // v12+ format: already has entitiesById
+  if ("entitiesById" in raw && raw.entitiesById) {
+    return { ...initialWorldState, ...(raw as WorldState), forgeLoopActive: false };
+  }
+  // v11 format: has entities array — convert
+  const entities = (raw as { entities?: WorldEntity[] }).entities ?? [];
+  const entitiesById: Record<string, WorldEntity> = {};
+  const entityIds: string[] = [];
+  for (const e of entities) {
+    entitiesById[e.id] = e;
+    entityIds.push(e.id);
+  }
+  return {
+    ...initialWorldState,
+    groups: (raw as { groups?: WorldState["groups"] }).groups ?? [],
+    entitiesById,
+    entityIds,
+    forgeLoopActive: false,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Root reducer with persist/loaded interception
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -33,7 +68,8 @@ const sliceReducer = combineReducers({
   brainstorm: brainstormSlice.reducer,
   ui: uiSlice.reducer,
   runtime: runtimeSlice.reducer,
-  crucible: crucibleSlice.reducer,
+  world: worldSlice.reducer,
+  foundation: foundationSlice.reducer,
 });
 
 function rootReducer(state: RootState | undefined, action: Action): RootState {
@@ -44,14 +80,21 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
     return {
       ...current,
       story: data.story
-        ? { ...initialStoryState, ...data.story, dulfs: { ...initialStoryState.dulfs, ...data.story?.dulfs } }
+        ? { ...initialStoryState, ...data.story }
         : current.story,
       brainstorm: data.brainstorm?.chats
-        ? { ...current.brainstorm, chats: data.brainstorm.chats, currentChatIndex: data.brainstorm.currentChatIndex }
+        ? {
+            ...current.brainstorm,
+            chats: data.brainstorm.chats,
+            currentChatIndex: data.brainstorm.currentChatIndex,
+          }
         : current.brainstorm,
-      crucible: data.crucible
-        ? { ...initialCrucibleState, ...data.crucible }
-        : current.crucible,
+      world: data.world
+        ? migrateWorldState(data.world as WorldState)
+        : current.world,
+      foundation: data.foundation
+        ? { ...initialFoundationState, ...data.foundation }
+        : current.foundation,
     };
   }
 
@@ -69,4 +112,5 @@ export * from "./slices/brainstorm";
 export * from "./slices/ui";
 export * from "./slices/runtime";
 export * from "./slices/story";
-export * from "./slices/crucible";
+export * from "./slices/world";
+export * from "./slices/foundation";

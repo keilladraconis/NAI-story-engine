@@ -1,21 +1,9 @@
 import { createSlice } from "nai-store";
-import { StoryState, DulfsItem } from "../types";
-import {
-  FIELD_CONFIGS,
-  FieldID,
-  DulfsFieldID,
-} from "../../../config/field-definitions";
+import { StoryState } from "../types";
+import { FIELD_CONFIGS } from "../../../config/field-definitions";
 
 export const initialStoryState: StoryState = {
   fields: {},
-  dulfs: {
-    [FieldID.DramatisPersonae]: [],
-    [FieldID.UniverseSystems]: [],
-    [FieldID.Locations]: [],
-    [FieldID.Factions]: [],
-    [FieldID.SituationalDynamics]: [],
-    [FieldID.Topics]: [],
-  } as Record<DulfsFieldID, DulfsItem[]>,
   attgEnabled: false,
   styleEnabled: false,
 };
@@ -59,35 +47,6 @@ export const storySlice = createSlice({
         },
       };
     },
-    // World Entries
-    dulfsItemAdded: (
-      state,
-      payload: { fieldId: DulfsFieldID; item: DulfsItem },
-    ) => {
-      const { fieldId, item } = payload;
-      const list = state.dulfs[fieldId] || [];
-      return {
-        ...state,
-        dulfs: {
-          ...state.dulfs,
-          [fieldId]: [...list, item],
-        },
-      };
-    },
-    dulfsItemRemoved: (
-      state,
-      payload: { fieldId: DulfsFieldID; itemId: string },
-    ) => {
-      const { fieldId, itemId } = payload;
-      const list = state.dulfs[fieldId] || [];
-      return {
-        ...state,
-        dulfs: {
-          ...state.dulfs,
-          [fieldId]: list.filter((item) => item.id !== itemId),
-        },
-      };
-    },
     attgToggled: (state) => ({
       ...state,
       attgEnabled: !state.attgEnabled,
@@ -102,8 +61,6 @@ export const storySlice = createSlice({
 export const {
   storyCleared,
   fieldUpdated,
-  dulfsItemAdded,
-  dulfsItemRemoved,
   attgToggled,
   styleToggled,
 } = storySlice.actions;

@@ -27,9 +27,7 @@ function scrubMarkdown(text: string): string {
  * Normalizes quote characters to standard ASCII quotes.
  */
 function normalizeQuotes(text: string): string {
-  return text
-    .replace(/[""]/g, '"')
-    .replace(/['']/g, "'");
+  return text.replace(/[""]/g, '"').replace(/['']/g, "'");
 }
 
 const FILTER_FUNCTIONS: Record<FilterType, (text: string) => string> = {
@@ -63,18 +61,4 @@ export function applyFieldFilters(fieldId: string, text: string): string {
 export function applyFilter(filterName: FilterType, text: string): string {
   const filterFn = FILTER_FUNCTIONS[filterName];
   return filterFn ? filterFn(text) : text;
-}
-
-/**
- * Builds the combined Memory content from ATTG and Style fields.
- * Format: `[ ATTG ][ S: 4 ]\n[ STYLE ]`
- * Either field may be empty — omitted sections are skipped.
- */
-export async function buildMemoryContent(): Promise<string> {
-  const attg = String(await api.v1.storyStorage.get("kse-field-attg") || "");
-  const style = String(await api.v1.storyStorage.get("kse-field-style") || "");
-  const parts: string[] = [];
-  if (attg.trim()) parts.push(`${attg.trimEnd()}[ S: 4 ]`);
-  if (style.trim()) parts.push(style.trimEnd());
-  return parts.join("\n");
 }

@@ -44,7 +44,10 @@ export const createSeededRandom = (seed: number): (() => number) => {
  * @param entryId - Lorebook entry ID
  * @returns Unsigned 32-bit hash for sorting
  */
-export const hashEntryPosition = (storyIdSeed: number, entryId: string): number => {
+export const hashEntryPosition = (
+  storyIdSeed: number,
+  entryId: string,
+): number => {
   return hashString(`${storyIdSeed}:${entryId}`);
 };
 
@@ -64,4 +67,3 @@ export const getStoryIdSeed = async (): Promise<number> => {
   // Fallback seed - still deterministic within session
   return 42;
 };
-

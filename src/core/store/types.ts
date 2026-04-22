@@ -9,12 +9,7 @@ export type AppDispatch = (action: Action) => void;
 // SEGA Types
 export type SegaStage =
   | "idle"
-  | "canon"
-  | "attgStyle"
-  | "bootstrap"
   | "lorebookContent"
-  | "lorebookRelationalMap"
-  | "lorebookRelationalMapReconcile"
   | "lorebookKeys"
   | "completed";
 
@@ -22,8 +17,6 @@ export interface SegaState {
   stage: SegaStage;
   statusText: string; // Current status for UI display
   activeRequestIds: string[]; // Track SEGA-initiated requests for cancellation
-  relationalMaps: Record<string, string>; // entryId → map text, ephemeral (cleared on reset)
-  relmapsCompleted: Record<string, boolean>; // entryId → true when relmap generated (cleared on reset)
   keysCompleted: Record<string, boolean>; // entryId → true when keys generated (cleared on reset)
 }
 
@@ -42,14 +35,8 @@ export interface StoryField {
   data?: Record<string, unknown>;
 }
 
-export interface DulfsItem {
-  id: string;
-  fieldId: DulfsFieldID;
-}
-
 export interface StoryState {
   fields: Record<string, StoryField>;
-  dulfs: Record<DulfsFieldID, DulfsItem[]>;
   attgEnabled: boolean;
   styleEnabled: boolean;
 }
@@ -86,6 +73,7 @@ export interface UIState {
     input: string;
   };
   lorebook: LorebookUIState;
+  worldExpanded: boolean | null;
 }
 
 export type GenerationStatus =
@@ -104,19 +92,20 @@ export type GenerationRequestStatus =
 export interface GenerationRequest {
   id: string;
   type:
-  | "field"
-  | "list"
-  | "brainstorm"
-  | "brainstormChatTitle"
-  | "lorebookContent"
-  | "lorebookRelationalMap"
-  | "lorebookKeys"
-  | "lorebookRefine"
-  | "bootstrap"
-  | "crucibleDirection"
-  | "crucibleShape"
-  | "crucibleTension"
-  | "crucibleBuildPass";
+    | "field"
+    | "list"
+    | "brainstorm"
+    | "brainstormChatTitle"
+    | "lorebookContent"
+    | "lorebookKeys"
+    | "lorebookRefine"
+    | "forge"
+    | "foundation"
+    | "entitySummary"
+    | "entitySummaryBind"
+    | "threadSummary"
+    | "bootstrap"
+    | "bootstrapContinue";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -128,19 +117,30 @@ export interface GenerationStrategy {
   messageFactory?: MessageFactory; // JIT strategy builder
   params?: GenerationParams; // Optional if provided by factory
   target:
-  | { type: "brainstorm"; messageId: string }
-  | { type: "brainstormChatTitle"; chatIndex: number }
-  | { type: "field"; fieldId: string }
-  | { type: "list"; fieldId: string }
-  | { type: "lorebookContent"; entryId: string }
-  | { type: "lorebookRelationalMap"; entryId: string }
-  | { type: "lorebookKeys"; entryId: string }
-  | { type: "lorebookRefine"; entryId: string }
-  | { type: "bootstrap" }
-  | { type: "crucibleDirection" }
-  | { type: "crucibleShape"; prefillName?: string }
-  | { type: "crucibleTension" }
-  | { type: "crucibleBuildPass"; passNumber: number };
+    | { type: "brainstorm"; messageId: string }
+    | { type: "brainstormChatTitle"; chatIndex: number }
+    | { type: "field"; fieldId: string }
+    | { type: "list"; fieldId: string }
+    | { type: "lorebookContent"; entryId: string }
+    | { type: "lorebookKeys"; entryId: string }
+    | { type: "lorebookRefine"; entryId: string }
+    | {
+        type: "forge";
+        step: number;
+        phase: "sketch" | "expand" | "weave";
+        forgeGuidance: string;
+        brainstormContext: string;
+        preForgeEntityIds: string[];
+      }
+    | {
+        type: "foundation";
+        field: "shape" | "intent" | "worldState" | "attg" | "style" | "contract";
+      }
+    | { type: "entitySummary"; entityId: string }
+    | { type: "entitySummaryBind"; entityId: string }
+    | { type: "threadSummary"; groupId: string }
+    | { type: "bootstrap" }
+    | { type: "bootstrapContinue"; iteration: number };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };
@@ -156,46 +156,59 @@ export interface RuntimeState {
   budgetTimeRemaining: number;
 }
 
-// Crucible Types
+// World Types (v13)
 
-export type CruciblePhase = "direction" | "tensions" | "building";
-
-export interface CrucibleTension {
+export interface WorldGroup {
   id: string;
-  text: string;
-  accepted: boolean;
+  title: string; // display name — e.g. "Thieves' Guild Inner Circle"
+  summary: string; // narrative description — fed into [GROUPS] generation context
+  entityIds: string[];
+  lorebookEntryId?: string; // optional: group summary synced as a lorebook entry
 }
 
-export interface CrucibleLink {
+export interface WorldEntity {
   id: string;
-  fromName: string;
-  toName: string;
-  description: string;
-}
-
-export interface CrucibleBuildPass {
-  passNumber: number;
-  commandLog: string[];
-  guidance: string;
-}
-
-export interface CrucibleWorldElement {
-  id: string;
-  fieldId: DulfsFieldID;
+  categoryId: DulfsFieldID; // Character, Location, etc. — metadata
+  lorebookEntryId?: string; // lorebook entry created on forge
   name: string;
-  content: string;
+  summary: string; // SE-internal only — editable in SeEntityEditPane, never synced to lorebook
 }
 
-export interface CrucibleState {
-  phase: CruciblePhase;
-  direction: string | null;
-  shape: { name: string; instruction: string } | null;
-  merged: boolean;
-  tensions: CrucibleTension[];
-  elements: CrucibleWorldElement[];
-  links: CrucibleLink[];
-  passes: CrucibleBuildPass[];
-  activeCritique: string | null;
+export interface WorldState {
+  groups: WorldGroup[];
+  entitiesById: Record<string, WorldEntity>;
+  entityIds: string[];
+  forgeLoopActive: boolean;
+}
+
+// Foundation Types (v11)
+
+export interface ShapeData {
+  name: string; // Short label — e.g. "Slice of Life", "Tragedy"
+  description: string; // Structural logic — what this shape leans toward
+}
+
+export interface IntensityData {
+  level: string; // Short label — e.g. "Grounded", "Noir", "Cozy"
+  description: string; // What this level means for this story concretely
+}
+
+export interface ContractData {
+  required: string; // What this story MUST deliver
+  prohibited: string; // What this story must NEVER do
+  emphasis: string; // The specific texture that makes this story itself
+}
+
+export interface FoundationState {
+  shape: ShapeData | null;
+  intent: string;
+  worldState: string;
+  intensity: IntensityData | null;
+  contract: ContractData | null;
+  attg: string;
+  style: string;
+  attgSyncEnabled: boolean;
+  styleSyncEnabled: boolean;
 }
 
 export interface RootState {
@@ -203,5 +216,6 @@ export interface RootState {
   brainstorm: BrainstormState;
   ui: UIState;
   runtime: RuntimeState;
-  crucible: CrucibleState;
+  world: WorldState;
+  foundation: FoundationState;
 }

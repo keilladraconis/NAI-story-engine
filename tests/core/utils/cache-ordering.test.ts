@@ -14,7 +14,9 @@ const makeEntryIds = (n: number): string[] =>
 
 /** Sort entry IDs by hash position (mirrors lorebook-context.ts logic) */
 const hashSort = (ids: string[], seed: number): string[] =>
-  [...ids].sort((a, b) => hashEntryPosition(seed, a) - hashEntryPosition(seed, b));
+  [...ids].sort(
+    (a, b) => hashEntryPosition(seed, a) - hashEntryPosition(seed, b),
+  );
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tests
@@ -53,7 +55,9 @@ describe("Cache Ordering Strategy", () => {
       const sortedWithNew = hashSort(withNew, SEED);
 
       // Remove the new entry from the result to get original-only ordering
-      const sortedOriginalOnly = sortedWithNew.filter((id) => id !== "entry-NEW");
+      const sortedOriginalOnly = sortedWithNew.filter(
+        (id) => id !== "entry-NEW",
+      );
 
       // The relative order of original entries must be identical
       expect(sortedOriginalOnly).toEqual(sorted);

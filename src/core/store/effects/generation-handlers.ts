@@ -1,20 +1,23 @@
 import { RootState, GenerationStrategy, AppDispatch } from "../types";
-import { brainstormHandler, brainstormChatTitleHandler } from "./handlers/brainstorm";
-import { bootstrapHandler } from "./handlers/bootstrap";
+import {
+  brainstormHandler,
+  brainstormChatTitleHandler,
+} from "./handlers/brainstorm";
 import { fieldHandler } from "./handlers/field";
 import { listHandler } from "./handlers/list";
 import {
   lorebookContentHandler,
-  lorebookRelationalMapHandler,
   lorebookKeysHandler,
   lorebookRefineHandler,
 } from "./handlers/lorebook";
+import { forgeHandler } from "./handlers/forge";
+import { foundationHandler } from "./handlers/foundation";
 import {
-  crucibleDirectionHandler,
-  crucibleShapeHandler,
-  crucibleTensionHandler,
-} from "./handlers/crucible";
-import { crucibleBuildPassHandler } from "./handlers/crucible-build";
+  entitySummaryHandler,
+  entitySummaryBindHandler,
+  threadSummaryHandler,
+} from "./handlers/summary";
+import { bootstrapHandler, bootstrapContinueHandler } from "./handlers/bootstrap";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -40,10 +43,6 @@ export type LorebookContentTarget = Extract<
   GenerationStrategy["target"],
   { type: "lorebookContent" }
 >;
-export type LorebookRelationalMapTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "lorebookRelationalMap" }
->;
 export type LorebookKeysTarget = Extract<
   GenerationStrategy["target"],
   { type: "lorebookKeys" }
@@ -52,25 +51,33 @@ export type LorebookRefineTarget = Extract<
   GenerationStrategy["target"],
   { type: "lorebookRefine" }
 >;
+export type ForgeTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "forge" }
+>;
+export type FoundationTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "foundation" }
+>;
+export type EntitySummaryTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "entitySummary" }
+>;
+export type EntitySummaryBindTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "entitySummaryBind" }
+>;
+export type ThreadSummaryTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "threadSummary" }
+>;
 export type BootstrapTarget = Extract<
   GenerationStrategy["target"],
   { type: "bootstrap" }
 >;
-export type CrucibleDirectionTarget = Extract<
+export type BootstrapContinueTarget = Extract<
   GenerationStrategy["target"],
-  { type: "crucibleDirection" }
->;
-export type CrucibleShapeTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "crucibleShape" }
->;
-export type CrucibleTensionTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "crucibleTension" }
->;
-export type CrucibleBuildPassTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "crucibleBuildPass" }
+  { type: "bootstrapContinue" }
 >;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
@@ -106,31 +113,33 @@ export interface GenerationHandlers<T = GenerationStrategy["target"]> {
 export const GENERATION_HANDLERS: {
   brainstorm: GenerationHandlers<BrainstormTarget>;
   brainstormChatTitle: GenerationHandlers<BrainstormChatTitleTarget>;
-  bootstrap: GenerationHandlers<BootstrapTarget>;
   field: GenerationHandlers<FieldTarget>;
   list: GenerationHandlers<ListTarget>;
   lorebookContent: GenerationHandlers<LorebookContentTarget>;
-  lorebookRelationalMap: GenerationHandlers<LorebookRelationalMapTarget>;
   lorebookKeys: GenerationHandlers<LorebookKeysTarget>;
   lorebookRefine: GenerationHandlers<LorebookRefineTarget>;
-  crucibleDirection: GenerationHandlers<CrucibleDirectionTarget>;
-  crucibleShape: GenerationHandlers<CrucibleShapeTarget>;
-  crucibleTension: GenerationHandlers<CrucibleTensionTarget>;
-  crucibleBuildPass: GenerationHandlers<CrucibleBuildPassTarget>;
+  forge: GenerationHandlers<ForgeTarget>;
+  foundation: GenerationHandlers<FoundationTarget>;
+  entitySummary: GenerationHandlers<EntitySummaryTarget>;
+  entitySummaryBind: GenerationHandlers<EntitySummaryBindTarget>;
+  threadSummary: GenerationHandlers<ThreadSummaryTarget>;
+  bootstrap: GenerationHandlers<BootstrapTarget>;
+  bootstrapContinue: GenerationHandlers<BootstrapContinueTarget>;
 } = {
   brainstorm: brainstormHandler,
   brainstormChatTitle: brainstormChatTitleHandler,
-  bootstrap: bootstrapHandler,
   field: fieldHandler,
   list: listHandler,
   lorebookContent: lorebookContentHandler,
-  lorebookRelationalMap: lorebookRelationalMapHandler,
   lorebookKeys: lorebookKeysHandler,
   lorebookRefine: lorebookRefineHandler,
-  crucibleDirection: crucibleDirectionHandler,
-  crucibleShape: crucibleShapeHandler,
-  crucibleTension: crucibleTensionHandler,
-  crucibleBuildPass: crucibleBuildPassHandler,
+  forge: forgeHandler,
+  foundation: foundationHandler,
+  entitySummary: entitySummaryHandler,
+  entitySummaryBind: entitySummaryBindHandler,
+  threadSummary: threadSummaryHandler,
+  bootstrap: bootstrapHandler,
+  bootstrapContinue: bootstrapContinueHandler,
 };
 
 export function getHandler(

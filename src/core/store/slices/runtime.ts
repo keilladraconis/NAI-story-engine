@@ -11,8 +11,6 @@ const initialSegaState: SegaState = {
   stage: "idle",
   statusText: "",
   activeRequestIds: [],
-  relationalMaps: {},
-  relmapsCompleted: {},
   keysCompleted: {},
 };
 
@@ -109,9 +107,7 @@ export const runtimeSlice = createSlice({
     // Mark a request as completed and clear from active/queue
     requestCompleted: (state, payload: { requestId: string }) => {
       const isActive = state.activeRequest?.id === payload.requestId;
-      const newQueue = state.queue.filter(
-        (r) => r.id !== payload.requestId,
-      );
+      const newQueue = state.queue.filter((r) => r.id !== payload.requestId);
 
       if (!isActive && newQueue.length === state.queue.length) {
         return state;
@@ -148,6 +144,34 @@ export const runtimeSlice = createSlice({
       },
     }),
 
+    // Batch untrack multiple SEGA request IDs in one dispatch
+    segaBulkUntracked: (state, payload: { requestIds: string[] }) => {
+      const removeSet = new Set(payload.requestIds);
+      return {
+        ...state,
+        sega: {
+          ...state.sega,
+          activeRequestIds: state.sega.activeRequestIds.filter(
+            (id) => !removeSet.has(id),
+          ),
+        },
+      };
+    },
+
+    // Batch complete multiple requests in one dispatch
+    requestsBulkCompleted: (state, payload: { requestIds: string[] }) => {
+      const removeSet = new Set(payload.requestIds);
+      const isActive =
+        state.activeRequest !== null && removeSet.has(state.activeRequest.id);
+      const newQueue = state.queue.filter((r) => !removeSet.has(r.id));
+      if (!isActive && newQueue.length === state.queue.length) return state;
+      return {
+        ...state,
+        activeRequest: isActive ? null : state.activeRequest,
+        queue: newQueue,
+      };
+    },
+
     segaReset: (state) => ({
       ...state,
       sega: initialSegaState,
@@ -158,38 +182,7 @@ export const runtimeSlice = createSlice({
       sega: { ...state.sega, statusText: payload.statusText },
     }),
 
-    segaRelationalMapStored: (
-      state,
-      payload: { entryId: string; mapText: string },
-    ) => ({
-      ...state,
-      sega: {
-        ...state.sega,
-        relationalMaps: {
-          ...state.sega.relationalMaps,
-          [payload.entryId]: payload.mapText,
-        },
-      },
-    }),
-
-    segaRelmapsCompleted: (
-      state,
-      payload: { entryId: string },
-    ) => ({
-      ...state,
-      sega: {
-        ...state.sega,
-        relmapsCompleted: {
-          ...state.sega.relmapsCompleted,
-          [payload.entryId]: true,
-        },
-      },
-    }),
-
-    segaKeysCompleted: (
-      state,
-      payload: { entryId: string },
-    ) => ({
+    segaKeysCompleted: (state, payload: { entryId: string }) => ({
       ...state,
       sega: {
         ...state.sega,
@@ -199,6 +192,8 @@ export const runtimeSlice = createSlice({
         },
       },
     }),
+
+    bootstrapRequested: (state) => state,
   },
 });
 
@@ -215,9 +210,10 @@ export const {
   segaStageSet,
   segaRequestTracked,
   segaRequestUntracked,
+  segaBulkUntracked,
+  requestsBulkCompleted,
   segaReset,
   segaStatusUpdated,
-  segaRelationalMapStored,
-  segaRelmapsCompleted,
   segaKeysCompleted,
+  bootstrapRequested,
 } = runtimeSlice.actions;

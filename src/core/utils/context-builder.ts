@@ -29,14 +29,20 @@ import {
   FIELD_CONFIGS,
   DulfsFieldID,
 } from "../../config/field-definitions";
-import { formatWorldState } from "./crucible-world-formatter";
 import { STORAGE_KEYS } from "../../ui/framework/ids";
-import { getModel } from "./config";
+import { buildModelParams, appendXialongStyleMessage } from "./config";
+import {
+  SYSTEM_PROMPT,
+  LOREBOOK_WEAVING_PROMPT,
+  BRAINSTORM_PROMPT,
+  BRAINSTORM_CRITIC_PROMPT,
+  BRAINSTORM_SUMMARIZE_PROMPT,
+  ATTG_GENERATE_PROMPT,
+  STYLE_GENERATE_PROMPT,
+  XIALONG_STYLE,
+} from "./prompts";
 // --- Helpers ---
 
-const getFieldContent = (state: RootState, id: string): string => {
-  return state.story.fields[id]?.content || "";
-};
 
 const getBrainstormHistory = (state: RootState): BrainstormMessage[] => {
   return currentMessages(state.brainstorm) || [];
@@ -46,7 +52,7 @@ const getBrainstormHistory = (state: RootState): BrainstormMessage[] => {
  * Extracts the name portion from a World Entry item content using field-specific parsing.
  * Falls back to raw content if no regex match.
  */
-export const extractDulfsItemName = (
+export const extractEntityName = (
   content: string,
   fieldId: string,
 ): string => {
@@ -69,31 +75,82 @@ export const extractDulfsItemName = (
 };
 
 /**
- * Gets existing World Entry item content for a field, joined with newlines.
- * Items are returned in creation order (array index order) for stable context.
- * Returns empty string if no items exist.
+ * Build a context-aware Xialong [ Style: ] guidance block for Style field generation.
+ * Derives narrative style tags from shape, intent, and shape description — actual
+ * writing-style descriptors (slow-burn, visceral, methodical) rather than role tags.
  */
-export const getExistingDulfsItems = async (
+export function buildXialongNarrativeStyleBlock(state: RootState): string {
+  const tags: string[] = [];
+  const { shape, intent } = state.foundation ?? {};
+
+  // Shape name as primary style indicator
+  if (shape?.name) {
+    const shapeName = shape.name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, "")
+      .replace(/\s+/g, "-")
+      .slice(0, 30);
+    if (shapeName) tags.push(shapeName);
+  }
+
+  // Derive additional tags from intent + shape description
+  const context = [intent ?? "", shape?.description ?? ""]
+    .join(" ")
+    .toLowerCase();
+
+  const markers: [RegExp, string][] = [
+    [/slow.burn|deliberate|unhurried|gradual|patient/, "slow-burn"],
+    [/methodical|structured|systematic|meticul/, "methodical"],
+    [/subtle|understated|implied|nuanced/, "subtle"],
+    [/dark|grim|bleak|harsh|brutal/, "dark"],
+    [/trauma|ptsd|grief|loss|wound|scar/, "raw"],
+    [/sensory|visceral|body|flesh|taste|smell|touch/, "sensory"],
+    [/psycholog|mental|interior|introspect/, "psychological"],
+    [/intimate|personal|close|private/, "intimate"],
+    [/lyric|poetic|prose-poem/, "lyrical"],
+    [/epic|grand|sweep|vast|myth/, "expansive"],
+    [/tense|thriller|suspense/, "tense"],
+    [/comedy|humor|wit|irony|satir/, "sardonic"],
+    [/romance|longing|desire|passion|eros/, "yearning"],
+    [/horror|terror|dread|uncanny/, "dread"],
+    [/action|kinetic|fast.pac|violent|combat/, "kinetic"],
+    [/fragment|non.linear|discontinu|elliptic/, "fragmentary"],
+  ];
+
+  for (const [pattern, tag] of markers) {
+    if (pattern.test(context) && !tags.includes(tag)) {
+      tags.push(tag);
+      if (tags.length >= 4) break;
+    }
+  }
+
+  if (tags.length === 0) tags.push("literary", "considered");
+
+  return `[ Style: ${tags.join(", ")} ]`;
+}
+
+/**
+ * Gets existing WorldEntity summaries for a field, joined with newlines.
+ * Returns empty string if no entities exist for the given field.
+ */
+export const getExistingEntityItems = (
   state: RootState,
   fieldId: DulfsFieldID,
-): Promise<string> => {
-  const items = state.story.dulfs[fieldId] || [];
-  if (items.length === 0) return "";
-
-  const contents: string[] = [];
-  for (const item of items) {
-    const content = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.dulfsItem(item.id))) || "",
-    );
-    if (content) contents.push(content);
-  }
-  return contents.join("\n");
+): string => {
+  const entities = Object.values(state.world.entitiesById).filter(
+    (e) => e.categoryId === fieldId,
+  );
+  if (entities.length === 0) return "";
+  return entities
+    .filter((e) => e.summary)
+    .map((e) => e.summary)
+    .join("\n");
 };
 
 /**
  * All World Entry field IDs for iteration.
  */
-const ALL_DULFS_FIELDS: DulfsFieldID[] = [
+const ALL_ENTITY_FIELDS: DulfsFieldID[] = [
   FieldID.DramatisPersonae,
   FieldID.UniverseSystems,
   FieldID.Locations,
@@ -103,16 +160,15 @@ const ALL_DULFS_FIELDS: DulfsFieldID[] = [
 ];
 
 /**
- * Gets all World Entry items across all fields, grouped by category label.
- * Categories are in fixed order (DP → US → Loc → Fac → SD).
- * Items within each category are in creation order (stable).
+ * Gets all WorldEntity summaries grouped by category label.
+ * Categories are in fixed order (DP → US → Loc → Fac → SD → Topics).
  * Returns formatted string for context injection.
  */
-export const getAllDulfsContext = async (state: RootState): Promise<string> => {
+export const getAllWorldEntityContext = (state: RootState): string => {
   const sections: string[] = [];
 
-  for (const fieldId of ALL_DULFS_FIELDS) {
-    const items = await getExistingDulfsItems(state, fieldId);
+  for (const fieldId of ALL_ENTITY_FIELDS) {
+    const items = getExistingEntityItems(state, fieldId);
     if (items) {
       const config = FIELD_CONFIGS.find((f) => f.id === fieldId);
       const label = config?.label || fieldId;
@@ -151,7 +207,8 @@ export interface StoryContextOptions {
 export const getStoryContextMessages = async (
   options: StoryContextOptions = {},
 ): Promise<Message[]> => {
-  const { includeLorebookEntries = true, contextLimitReduction = 4000 } = options;
+  const { includeLorebookEntries = true, contextLimitReduction = 4000 } =
+    options;
 
   try {
     const messages = await api.v1.buildContext({ contextLimitReduction });
@@ -202,7 +259,11 @@ export const getStoryContextMessages = async (
             // Walk through original content, tracking normalized position
             let normalizedPos = 0;
             let cutIndex = 0;
-            for (let j = 0; j < content.length && normalizedPos < normalizedPrefill.length; j++) {
+            for (
+              let j = 0;
+              j < content.length && normalizedPos < normalizedPrefill.length;
+              j++
+            ) {
               const char = content[j];
               // Skip extra newlines (those that get collapsed in normalization)
               if (char === "\n" && j > 0 && content[j - 1] === "\n") {
@@ -245,8 +306,16 @@ export const getStoryContextMessages = async (
  * (strategy-specific instructions, prefill, etc.).
  */
 export interface StoryEnginePrefixOptions {
-  /** Snapshot sections to exclude (e.g., "canon" when generating canon) */
-  excludeSections?: Array<"canon" | "setting" | "attg" | "style" | "brainstorm" | "dulfs" | "storyText">;
+  /** Snapshot sections to exclude (e.g., "foundation" when generating foundation fields) */
+  excludeSections?: Array<
+    | "setting"
+    | "attg"
+    | "style"
+    | "brainstorm"
+    | "worldEntities"
+    | "storyText"
+    | "foundation"
+  >;
 }
 
 export const buildStoryEnginePrefix = async (
@@ -257,35 +326,51 @@ export const buildStoryEnginePrefix = async (
   const excluded = new Set(options.excludeSections || []);
 
   // --- MSG 1: System prompt + weaving ---
-  const systemPrompt = String(
-    (await api.v1.config.get("system_prompt")) || "",
-  );
-  const weavingPrompt = String(
-    (await api.v1.config.get("lorebook_weaving_prompt")) || "",
-  );
+  const systemPrompt = SYSTEM_PROMPT;
+  const weavingPrompt = LOREBOOK_WEAVING_PROMPT;
   const msg1Content = weavingPrompt
     ? `${systemPrompt}\n\n${weavingPrompt}`
     : systemPrompt;
 
   // --- MSG 2: Story state snapshot (STABLE sections) ---
-  // Order matches generation pipeline: ATTG/Style first (tone anchors),
-  // then setting/brainstorm (foundational), then canon last (synthesis).
+  // Order: Foundation (tone/intent anchors), then setting/brainstorm, then canon.
   const stableSections: string[] = [];
 
-  // ATTG
+  // ATTG — read from v11 foundation state (populated via NarrativeFoundation onChange)
   if (!excluded.has("attg")) {
-    const attg = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.field(FieldID.ATTG))) || "",
-    );
+    const attg = state.foundation.attg;
     if (attg) stableSections.push(`[ATTG]\n${attg}`);
   }
 
-  // Style
+  // Style — read from v11 foundation state
   if (!excluded.has("style")) {
-    const style = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.field(FieldID.Style))) || "",
-    );
+    const style = state.foundation.style;
     if (style) stableSections.push(`[STYLE]\n${style}`);
+  }
+
+  // Foundation context (shape, intent, worldState, intensity, contract)
+  if (!excluded.has("foundation")) {
+    const { shape, intent, worldState, intensity, contract } = state.foundation;
+    const foundationParts: string[] = [];
+    if (shape)
+      foundationParts.push(`Shape: ${shape.name}\n${shape.description}`);
+    if (intent) foundationParts.push(`Intent: ${intent}`);
+    if (worldState) foundationParts.push(`World State: ${worldState}`);
+    if (intensity)
+      foundationParts.push(`Intensity: ${intensity.level} — ${intensity.description}`);
+    if (contract) {
+      const contractLines = [
+        `Required: ${contract.required}`,
+        `Prohibited: ${contract.prohibited}`,
+        `Emphasis: ${contract.emphasis}`,
+      ].join("\n");
+      foundationParts.push(`Story Contract:\n${contractLines}`);
+    }
+    if (foundationParts.length > 0) {
+      stableSections.push(
+        `[NARRATIVE FOUNDATION]\n${foundationParts.join("\n")}`,
+      );
+    }
   }
 
   // Setting
@@ -302,18 +387,12 @@ export const buildStoryEnginePrefix = async (
     if (brainstorm) stableSections.push(`[BRAINSTORM]\n${brainstorm}`);
   }
 
-  // Canon (synthesis — last so it can reference all above sections)
-  if (!excluded.has("canon")) {
-    const canon = getFieldContent(state, FieldID.Canon);
-    if (canon) stableSections.push(`[CANON]\n${canon}`);
-  }
-
-  // --- MSG 3: World Entry items (GROWS during list stage, stable during lorebook) ---
+  // --- MSG 3: World Entities (GROWS during list stage, stable during lorebook) ---
   // Separate message so growth doesn't invalidate MSG 2's cached tokens.
-  let dulfsContent = "";
-  if (!excluded.has("dulfs")) {
-    const dulfsContext = await getAllDulfsContext(state);
-    if (dulfsContext) dulfsContent = `[WORLD ENTRIES]\n${dulfsContext}`;
+  let worldEntityContent = "";
+  if (!excluded.has("worldEntities")) {
+    const entityContext = getAllWorldEntityContext(state);
+    if (entityContext) worldEntityContent = `[WORLD ENTRIES]\n${entityContext}`;
   }
 
   // --- MSG 4: Story text (VOLATILE — at end of prefix) ---
@@ -332,9 +411,7 @@ export const buildStoryEnginePrefix = async (
   }
 
   // --- Assemble prefix ---
-  const messages: Message[] = [
-    { role: "system", content: msg1Content },
-  ];
+  const messages: Message[] = [{ role: "system", content: msg1Content }];
 
   if (stableSections.length > 0) {
     messages.push({
@@ -343,10 +420,10 @@ export const buildStoryEnginePrefix = async (
     });
   }
 
-  if (dulfsContent) {
+  if (worldEntityContent) {
     messages.push({
       role: "system",
-      content: dulfsContent,
+      content: worldEntityContent,
     });
   }
 
@@ -355,111 +432,6 @@ export const buildStoryEnginePrefix = async (
       role: "system",
       content: storyTextContent,
     });
-  }
-
-  return messages;
-};
-
-// --- Crucible Prefix ---
-
-// Re-export from new location for backward compatibility
-export { formatCrucibleElementsContext } from "./crucible-world-formatter";
-
-/**
- * Options for buildCruciblePrefix — isolated context for all Crucible factories.
- * Crucible uses its own system identity and only includes what each factory needs.
- */
-export interface CruciblePrefixOptions {
-  /** Include brainstorm history (for intent derivation) */
-  includeBrainstorm?: boolean;
-  /** Include the crucible direction/intent text */
-  includeDirection?: boolean;
-  /** Include World Entry items (for chain, builder) */
-  includeDulfs?: boolean;
-  /** Include Setting + Canon if available (for intent derivation) */
-  includeStoryState?: boolean;
-  /** Include accepted tensions as [TENSIONS] section */
-  includeTensions?: boolean;
-  /** Include formatted crucible world state (elements, links, critique) */
-  includeWorldState?: boolean;
-}
-
-/**
- * Builds a focused message prefix for Crucible generation strategies.
- * Unlike buildStoryEnginePrefix, this uses a hardcoded structural identity
- * and only includes context relevant to the specific Crucible phase.
- *
- * NO lorebook weaving. NO story text. NO ATTG. NO Style.
- */
-export const buildCruciblePrefix = async (
-  getState: () => RootState,
-  options: CruciblePrefixOptions = {},
-): Promise<Message[]> => {
-  const state = getState();
-
-  // --- MSG 1: Crucible system identity ---
-  const systemPrompt = String(
-    (await api.v1.config.get("crucible_system_prompt")) || "",
-  );
-  const messages: Message[] = [
-    { role: "system", content: systemPrompt },
-  ];
-
-  // --- MSG 2 (optional): Creative grounding ---
-  const groundingSections: string[] = [];
-
-  if (options.includeDirection && state.crucible.direction) {
-    groundingSections.push(`[DIRECTION]\n${state.crucible.direction}`);
-  }
-
-  if (options.includeStoryState) {
-    const setting = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
-    );
-    if (setting) groundingSections.push(`[SETTING]\n${setting}`);
-
-    const canon = getFieldContent(state, FieldID.Canon);
-    if (canon) groundingSections.push(`[CANON]\n${canon}`);
-  }
-
-  if (options.includeBrainstorm) {
-    const brainstorm = getConsolidatedBrainstorm(state);
-    if (brainstorm) groundingSections.push(`[BRAINSTORM]\n${brainstorm}`);
-  }
-
-  // Tensions
-  if (options.includeTensions) {
-    const accepted = state.crucible.tensions.filter((t) => t.accepted);
-    if (accepted.length > 0) {
-      const tensionLines = accepted.map((t) => `- ${t.text}`).join("\n");
-      groundingSections.push(`[TENSIONS]\n${tensionLines}`);
-    }
-  }
-
-  if (groundingSections.length > 0) {
-    messages.push({
-      role: "system",
-      content: groundingSections.join("\n\n"),
-    });
-  }
-
-  // --- Optional: Crucible world state (elements, links, critique) ---
-  if (options.includeWorldState) {
-    const worldState = formatWorldState(state.crucible);
-    if (worldState) {
-      messages.push({ role: "system", content: worldState });
-    }
-  }
-
-  // --- MSG 3 (optional): World Entry items ---
-  if (options.includeDulfs) {
-    const dulfsContext = await getAllDulfsContext(state);
-    if (dulfsContext) {
-      messages.push({
-        role: "system",
-        content: `[WORLD ENTRIES]\n${dulfsContext}`,
-      });
-    }
   }
 
   return messages;
@@ -478,38 +450,60 @@ export const createBrainstormFactory = (
 ): MessageFactory => {
   return async () => {
     const state = getState();
-    const model = await getModel();
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
-    const promptKey = mode === "critic" ? "brainstorm_critic_prompt" : "brainstorm_prompt";
-    const brainstormInstruction = String(
-      (await api.v1.config.get(promptKey)) || "",
-    );
+    const brainstormInstruction =
+      mode === "critic" ? BRAINSTORM_CRITIC_PROMPT : BRAINSTORM_PROMPT;
 
     const systemMsg: Message = {
       role: "system",
-      content: `${systemPrompt}\n\nYou are now in brainstorming mode. ${brainstormInstruction}\n\nRespond naturally without echoing mode indicators or tags.`,
+      content: `${SYSTEM_PROMPT}\n\nYou are now in brainstorming mode. ${brainstormInstruction}\n\nRespond naturally without echoing mode indicators or tags.`,
     };
 
     const messages: Message[] = [systemMsg];
     const storyContext = await getStoryContextMessages();
     messages.push(...storyContext);
 
-    const canon = getFieldContent(state, FieldID.Canon);
     const setting = String(
       (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
     );
 
+    const { shape, intent, worldState, intensity, contract } = state.foundation;
+    const entities = state.world.entityIds
+      .map((id) => state.world.entitiesById[id])
+      .filter((e) => e?.summary);
+
     let contextBlock = "Here is the current state of the story:\n";
     let hasContext = false;
 
-    if (canon) {
-      contextBlock += `CANON:\n${canon}\n\n`;
-      hasContext = true;
-    }
     if (setting) {
       contextBlock += `SETTING:\n${setting}\n\n`;
+      hasContext = true;
+    }
+    if (intensity) {
+      contextBlock += `INTENSITY: ${intensity.level} — ${intensity.description}\n\n`;
+      hasContext = true;
+    }
+    if (shape) {
+      contextBlock += `SHAPE: ${shape.name}: ${shape.description}\n\n`;
+      hasContext = true;
+    }
+    if (intent) {
+      contextBlock += `INTENT:\n${intent}\n\n`;
+      hasContext = true;
+    }
+    if (worldState) {
+      contextBlock += `WORLD STATE:\n${worldState}\n\n`;
+      hasContext = true;
+    }
+    if (contract) {
+      contextBlock += `STORY CONTRACT:\nRequired: ${contract.required}\nProhibited: ${contract.prohibited}\nEmphasis: ${contract.emphasis}\n\n`;
+      hasContext = true;
+    }
+    if (entities.length > 0) {
+      contextBlock += `CHARACTERS & ENTITIES:\n`;
+      for (const e of entities) {
+        contextBlock += `- ${e.name} (${e.categoryId}): ${e.summary}\n`;
+      }
+      contextBlock += "\n";
       hasContext = true;
     }
 
@@ -520,8 +514,7 @@ export const createBrainstormFactory = (
       });
       messages.push({
         role: "assistant",
-        content:
-          "Understood. I have the full story context in mind. Let's jam.",
+        content: "Understood. I have the full story context in mind. Ready.",
       });
     }
 
@@ -536,9 +529,21 @@ export const createBrainstormFactory = (
 
     messages.push(...historyMessages);
 
+    // Style block as the final message before model responds — signals chat mode
+    // to prevent Xialong from switching into story-writing mode.
+    await appendXialongStyleMessage(
+      messages,
+      mode === "critic" ? XIALONG_STYLE.brainstormCritic : XIALONG_STYLE.brainstorm,
+    );
+
     return {
       messages,
-      params: { model, max_tokens: 300, temperature: 0.95, min_p: 0.05, presence_penalty: 0.05 },
+      params: await buildModelParams({
+        max_tokens: 400,
+        temperature: 0.95,
+        min_p: 0.05,
+        presence_penalty: 0.05,
+      }),
     };
   };
 };
@@ -570,17 +575,9 @@ export const createSummarizeFactory = (
   chatHistory: BrainstormMessage[],
 ): MessageFactory => {
   return async () => {
-    const model = await getModel();
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
-    const summarizeInstruction = String(
-      (await api.v1.config.get("brainstorm_summarize_prompt")) || "",
-    );
-
     const systemMsg: Message = {
       role: "system",
-      content: `${systemPrompt}\n\n${summarizeInstruction}`,
+      content: `${SYSTEM_PROMPT}\n\n${BRAINSTORM_SUMMARIZE_PROMPT}`,
     };
 
     const messages: Message[] = [systemMsg];
@@ -596,7 +593,7 @@ export const createSummarizeFactory = (
 
     return {
       messages,
-      params: { model, max_tokens: 1024, temperature: 0.5, min_p: 0.05 },
+      params: await buildModelParams({ max_tokens: 1024, temperature: 0.5, min_p: 0.05 }),
     };
   };
 };
@@ -609,11 +606,6 @@ export const createBrainstormTitleFactory = (
   chatHistory: BrainstormMessage[],
 ): MessageFactory => {
   return async () => {
-    const model = await getModel();
-    const systemPrompt = String(
-      (await api.v1.config.get("system_prompt")) || "",
-    );
-
     const chatText = chatHistory
       .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
       .join("\n");
@@ -621,7 +613,7 @@ export const createBrainstormTitleFactory = (
     const messages: Message[] = [
       {
         role: "system",
-        content: `${systemPrompt}\n\nYou are a creative assistant. Given a brainstorm conversation, output a short evocative title (3–6 words) that captures the core theme or subject. Output ONLY the title — no punctuation at the end, no quotes, no explanation.`,
+        content: `${SYSTEM_PROMPT}\n\nYou are a creative assistant. Given a brainstorm conversation, output a short evocative title (3–6 words) that captures the core theme or subject. Output ONLY the title — no punctuation at the end, no quotes, no explanation.`,
       },
       {
         role: "user",
@@ -631,7 +623,7 @@ export const createBrainstormTitleFactory = (
 
     return {
       messages,
-      params: { model, max_tokens: 20, temperature: 0.8, min_p: 0.05 },
+      params: await buildModelParams({ max_tokens: 20, temperature: 0.8, min_p: 0.05 }),
     };
   };
 };
@@ -671,152 +663,6 @@ export const buildSummarizeStrategy = (
   };
 };
 
-/**
- * Creates a message factory for Canon generation.
- * Uses unified prefix + volatile tail with canon-specific instruction.
- */
-export const createCanonFactory = (
-  getState: () => RootState,
-): MessageFactory => {
-  return async () => {
-    const model = await getModel();
-    const prompt = String(
-      (await api.v1.config.get("canon_generate_prompt")) || "",
-    );
-
-    // Exclude canon (generating it — prevents self-reference)
-    const prefix = await buildStoryEnginePrefix(getState, {
-      excludeSections: ["canon"],
-    });
-
-    const messages: Message[] = [
-      ...prefix,
-    ];
-
-    const state = getState();
-
-    // Inject Crucible Direction as the authoritative creative source.
-    // It supersedes the brainstorm for character details, framing, and world facts.
-    if (state.crucible?.direction) {
-      messages.push({
-        role: "system",
-        content: `[DIRECTION — AUTHORITATIVE]\nThe following Direction is the definitive creative reference for this story. It supersedes any earlier brainstorm exchanges on all character details, world facts, and framing.\n\n${state.crucible.direction}`,
-      });
-    }
-
-    // Inject Crucible shape — required for Structure section
-    if (state.crucible?.shape) {
-      messages.push({
-        role: "system",
-        content: `[NARRATIVE SHAPE — REQUIRED]\nThis story uses the narrative shape "${state.crucible.shape.name}": ${state.crucible.shape.instruction}`,
-      });
-    }
-
-    messages.push(
-      {
-        role: "system",
-        content: `[CANON GENERATION]\n${prompt}`,
-      },
-      {
-        role: "assistant",
-        content: "**World:**",
-      },
-    );
-
-    return {
-      messages,
-      params: {
-        model,
-        temperature: 0.9,
-        min_p: 0.05,
-        presence_penalty: 0.1,
-        max_tokens: 900,
-      },
-      contextPinning: { head: 1, tail: state.crucible?.direction || state.crucible?.shape ? 3 : 2 },
-    };
-  };
-};
-
-/**
- * Builds a Canon generation strategy using JIT factory pattern.
- */
-export const buildCanonStrategy = (
-  getState: () => RootState,
-  fieldId: FieldID,
-): GenerationStrategy => {
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory: createCanonFactory(getState),
-    target: { type: "field", fieldId },
-    prefillBehavior: "trim",
-  };
-};
-
-/**
- * Creates a message factory for World Entry list generation.
- * Uses unified prefix + volatile tail with list-specific instruction.
- */
-export const createDulfsListFactory = (
-  getState: () => RootState,
-  fieldId: string,
-): MessageFactory => {
-  return async () => {
-    const state = getState();
-    const model = await getModel();
-    const fieldConfig = FIELD_CONFIGS.find((f) => f.id === fieldId);
-
-    const instruction =
-      fieldConfig?.listGenerationInstruction ||
-      fieldConfig?.generationInstruction ||
-      "";
-    const exampleFormat = fieldConfig?.exampleFormat || "";
-
-    // Get existing items in full format to avoid duplicates
-    const existingItems = await getExistingDulfsItems(
-      state,
-      fieldId as DulfsFieldID,
-    );
-    const existingContext = existingItems
-      ? `\n\n[EXISTING ${fieldConfig?.label?.toUpperCase() || "ITEMS"}]\n${existingItems}\n\nDo not repeat any of the above characters/items.`
-      : "";
-
-    const prefix = await buildStoryEnginePrefix(getState);
-
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: `[LIST GENERATION]\n${instruction}\n\nOutput a bulleted list. Each item is ONE LINE — name and a terse summary clause. No prose, no atmosphere, no history.\nFormat:\n${exampleFormat}`,
-      },
-      {
-        role: "user",
-        content: existingContext.trim() || "Generate items.",
-      },
-      { role: "assistant", content: "-" },
-    ];
-
-    return {
-      messages,
-      params: { model, max_tokens: 350, temperature: 0.8, min_p: 0.1 },
-      contextPinning: { head: 1, tail: 3 },
-    };
-  };
-};
-
-/**
- * Builds a World Entry list generation strategy using JIT factory pattern.
- */
-export const buildDulfsListStrategy = (
-  getState: () => RootState,
-  fieldId: string,
-): GenerationStrategy => {
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory: createDulfsListFactory(getState, fieldId),
-    target: { type: "list", fieldId },
-    prefillBehavior: "trim",
-  };
-};
 
 /**
  * Creates a message factory for ATTG generation.
@@ -826,10 +672,7 @@ export const createATTGFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const model = await getModel();
-    const prompt = String(
-      (await api.v1.config.get("attg_generate_prompt")) || "",
-    );
+    const prompt = ATTG_GENERATE_PROMPT;
 
     // Exclude ATTG (generating it)
     const prefix = await buildStoryEnginePrefix(getState, {
@@ -842,12 +685,14 @@ export const createATTGFactory = (
         role: "system",
         content: `[ATTG GENERATION]\n${prompt}`,
       },
-      { role: "assistant", content: "[" },
     ];
+
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.attg);
+    messages.push({ role: "assistant", content: "[" });
 
     return {
       messages,
-      params: { model, max_tokens: 128, temperature: 0.7, min_p: 0.05 },
+      params: await buildModelParams({ max_tokens: 128, temperature: 0.7, min_p: 0.05 }),
       contextPinning: { head: 1, tail: 2 },
     };
   };
@@ -876,10 +721,7 @@ export const createStyleFactory = (
   getState: () => RootState,
 ): MessageFactory => {
   return async () => {
-    const model = await getModel();
-    const prompt = String(
-      (await api.v1.config.get("style_generate_prompt")) || "",
-    );
+    const prompt = STYLE_GENERATE_PROMPT;
 
     // Exclude style (generating it)
     const prefix = await buildStoryEnginePrefix(getState, {
@@ -892,12 +734,14 @@ export const createStyleFactory = (
         role: "system",
         content: `[STYLE GENERATION]\n${prompt}`,
       },
-      { role: "assistant", content: "[" },
     ];
+
+    await appendXialongStyleMessage(messages, buildXialongNarrativeStyleBlock(getState()));
+    messages.push({ role: "assistant", content: "[" });
 
     return {
       messages,
-      params: { model, max_tokens: 128, temperature: 0.8, min_p: 0.05 },
+      params: await buildModelParams({ max_tokens: 128, temperature: 0.8, min_p: 0.05 }),
       contextPinning: { head: 1, tail: 2 },
     };
   };
@@ -918,100 +762,3 @@ export const buildStyleStrategy = (
   };
 };
 
-/**
- * Story opening techniques for GLM to select from.
- */
-const STORY_OPENING_TECHNIQUES = `[STORY OPENING TECHNIQUES]
-- In Media Res: Begin mid-action, context revealed through unfolding events
-- Inciting Incident: The catalyst that disrupts the status quo
-- Character-Driven: Open with character revealing personality through action
-- Atmospheric/Tone: Establish mood, voice, and setting atmosphere first
-- Mystery Hook: Open with an intriguing question or anomaly
-- Dramatic Irony: Reader knows something the characters don't
-- Sensory Immersion: World-building through vivid sensory detail
-- Dialogue Hook: Open with compelling conversation that reveals stakes
-- Thematic Statement: Encapsulate the core theme in the opening
-- Frame Narrative: Narrator reflecting on events to come`;
-
-/**
- * Creates a message factory for Bootstrap generation.
- * Uses unified prefix + volatile tail with bootstrap-specific task instruction.
- */
-export const createBootstrapFactory = (
-  getState: () => RootState,
-): MessageFactory => {
-  return async () => {
-    const model = await getModel();
-
-    const prefix = await buildStoryEnginePrefix(getState);
-
-    const bootstrapTask = `You are a creative writing assistant specializing in story openings.
-
-${STORY_OPENING_TECHNIQUES}
-
-[TASK]
-Analyze the story state provided above.
-Select 1-2 appropriate opening techniques based on the story's nature.
-
-Generate a SELF-CONTAINED instruction block that includes:
-
-1. [BACKGROUND] (inline context the story LLM needs):
-   - World/setting essentials (era, tone, key rules)
-   - POV character with key traits, motivation, and appearance
-   - Any factions, locations, or world systems relevant to the opening scene
-
-2. [SCENE INSTRUCTION] (imperative voice directives):
-   - Where and when the scene begins
-   - What tension or narrative vector to pursue
-   - Concrete sensory details or action beats to open with
-   - What the POV character is doing/feeling
-
-The instruction must work STANDALONE. The story LLM may not have detailed lorebook entries yet - include all necessary context within the instruction itself.
-
-IMPORTANT: Do NOT use hash/pound signs in your output. Use bracketed labels like [SECTION] instead of markdown headers.`;
-
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: bootstrapTask,
-      },
-      {
-        role: "user",
-        content: "Generate a self-contained opening scene instruction.",
-      },
-      {
-        role: "assistant",
-        content: "[SCENE OPENING]\nTechnique:",
-      },
-    ];
-
-    return {
-      messages,
-      params: {
-        model,
-        max_tokens: 1024,
-        temperature: 0.85,
-        min_p: 0.05,
-        presence_penalty: 0.1,
-      },
-      contextPinning: { head: 1, tail: 3 },
-    };
-  };
-};
-
-/**
- * Builds a Bootstrap generation strategy using JIT factory pattern.
- */
-export const buildBootstrapStrategy = (
-  getState: () => RootState,
-  requestId: string,
-): GenerationStrategy => {
-  return {
-    requestId,
-    messageFactory: createBootstrapFactory(getState),
-    target: { type: "bootstrap" },
-    prefillBehavior: "keep",
-    assistantPrefill: "[SCENE OPENING]\nTechnique:",
-  };
-};

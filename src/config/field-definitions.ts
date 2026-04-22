@@ -1,5 +1,4 @@
 export enum FieldID {
-  Canon = "canon",
   Brainstorm = "brainstorm",
   DramatisPersonae = "dramatisPersonae",
   UniverseSystems = "universeSystems",
@@ -20,7 +19,6 @@ export type DulfsFieldID =
   | FieldID.Topics;
 
 export type TextFieldID =
-  | FieldID.Canon
   | FieldID.Brainstorm
   | FieldID.ATTG
   | FieldID.Style;
@@ -38,7 +36,6 @@ export function isDulfsField(id: string): id is DulfsFieldID {
 
 export function isTextField(id: string): id is TextFieldID {
   return [
-    FieldID.Canon,
     FieldID.Brainstorm,
     FieldID.ATTG,
     FieldID.Style,
@@ -53,12 +50,7 @@ export interface FieldConfig {
   icon: IconId;
   linkedEntities?: string[];
   layout?: "default" | "list";
-  fieldType?:
-  | "canon"
-  | "brainstorm"
-  | "dulfs"
-  | "attg"
-  | "style";
+  fieldType?: "canon" | "brainstorm" | "world" | "attg" | "style";
   generationInstruction?: string;
   listGenerationInstruction?: string;
   exampleFormat?: string;
@@ -69,17 +61,6 @@ export interface FieldConfig {
 }
 
 export const FIELD_CONFIGS: FieldConfig[] = [
-  {
-    id: FieldID.Canon,
-    label: "Canon",
-    description: "Bedrock facts: world, characters, themes, tone — the foundation for all generation",
-    placeholder: "The facts of your story world...",
-    icon: "bookOpen",
-    fieldType: "canon",
-    generationInstruction:
-      "Distill the story's bedrock: world facts, character starting states, thematic tensions, and tonal identity.",
-    filters: ["scrubBrackets"],
-  },
   {
     id: FieldID.Brainstorm,
     label: "Brainstorm",
@@ -96,14 +77,14 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Character names, descriptions, motivations...",
     icon: "user",
     layout: "list",
-    fieldType: "dulfs",
+    fieldType: "world",
     listGenerationInstruction:
       "List only character names. Start with the protagonist, then supporting characters.",
     listExampleFormat: "- Kael\n- Elena\n- The Iron Warden",
     generationInstruction:
-      "One line per character: name, demographics, core motivation, and one behavioral tell. Be terse.",
+      "One line per character: name, demographics, two visuals (one visible across the room, one noticed up close), and one behavioral tell. Be terse.",
     exampleFormat:
-      "Name (Gender, Age, Role): Motivation. Behavioral tell.\nExample: Kael (Male, 34, Smuggler): Paying off a life debt. Rubs a coin when calculating odds.",
+      "Name (Gender, Age, Role): Visual across the room. Visual up close. Behavioral tell.\nExample: Kael (Male, 34, Smuggler): Lean build, always angled toward the exit. Faded knife scar across the back of one hand. Rubs a coin when calculating odds.",
     filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:(]+)\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\):\s*([\s\S]+)$/,
   },
@@ -114,7 +95,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "How this world works - magic, physics, laws...",
     icon: "settings" as IconId,
     layout: "list",
-    fieldType: "dulfs",
+    fieldType: "world",
     listGenerationInstruction:
       "List only system/mechanic names. Focus on fundamental world rules.",
     listExampleFormat:
@@ -133,7 +114,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Settings, landmarks, environments...",
     icon: "map-pin" as IconId,
     layout: "list",
-    fieldType: "dulfs",
+    fieldType: "world",
     listGenerationInstruction:
       "List only location names. Include places relevant to the story.",
     listExampleFormat:
@@ -152,7 +133,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Factions, guilds, political parties...",
     icon: "users",
     layout: "list",
-    fieldType: "dulfs",
+    fieldType: "world",
     listGenerationInstruction: "List only faction/organization names.",
     listExampleFormat: "- The Iron Pact\n- House Meridian\n- The Unbound",
     generationInstruction:
@@ -165,19 +146,20 @@ export const FIELD_CONFIGS: FieldConfig[] = [
   {
     id: FieldID.SituationalDynamics,
     label: "Narrative Vectors",
-    description: "Narrative vectors: tensions, pressures, and volatile situations",
+    description:
+      "Narrative vectors: tensions, pressures, and volatile situations",
     placeholder: "Directions of pressure, not predetermined outcomes...",
     icon: "activity",
     layout: "list",
-    fieldType: "dulfs",
+    fieldType: "world",
     listGenerationInstruction:
       "List only narrative vector titles—tensions, pressures, or volatile situations (NOT plot events or outcomes).",
     listExampleFormat:
       "- The Succession Crisis\n- Border Tensions\n- The Missing Heir",
     generationInstruction:
-      "One line per vector: name and competing pressures. Actors and stakes only, no outcomes.",
+      "One line per vector: name, setup, and complication. Frame as opposing goods — both sides have legitimate claims. No outcomes.",
     exampleFormat:
-      "Vector Name: Competing pressures and actors.\nExample: The Succession Crisis: Three legitimate heirs; military, merchants, and clergy each back different candidates.",
+      "Vector Name: Setup that creates pressure; complication that prevents easy resolution.\nExample: The Succession Crisis: Three legitimate heirs compete for the throne; military, merchants, and clergy each back a different candidate, making any resolution a betrayal of two factions.",
     filters: ["scrubBrackets", "scrubMarkdown"],
     parsingRegex: /^([^:]+):\s*([\s\S]+)$/,
   },
@@ -188,7 +170,7 @@ export const FIELD_CONFIGS: FieldConfig[] = [
     placeholder: "Conversations, debates, rumors...",
     icon: "message-circle" as IconId,
     layout: "list",
-    fieldType: "dulfs",
+    fieldType: "world",
     listGenerationInstruction:
       "List only topic names. Focus on what characters actually discuss, debate, or gossip about.",
     listExampleFormat:

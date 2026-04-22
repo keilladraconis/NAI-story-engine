@@ -12,7 +12,8 @@ A disgraced knight seeking redemption through service to the very people she wro
       kind: "CREATE",
       elementType: "CHARACTER",
       name: "Elara",
-      content: "A disgraced knight seeking redemption through service to the very people she wronged.",
+      content:
+        "A disgraced knight seeking redemption through service to the very people she wronged.",
     });
   });
 
@@ -31,7 +32,14 @@ A ruined fortress at the edge of the realm.`;
   });
 
   it("parses all valid element types", () => {
-    const types = ["CHARACTER", "LOCATION", "FACTION", "SYSTEM", "SITUATION", "TOPIC"];
+    const types = [
+      "CHARACTER",
+      "LOCATION",
+      "FACTION",
+      "SYSTEM",
+      "SITUATION",
+      "TOPIC",
+    ];
     for (const type of types) {
       const text = `[CREATE ${type} "Test"]
 Content for ${type}.`;
@@ -86,14 +94,13 @@ Former rivals turned reluctant allies.`;
   });
 
   it("parses a CRITIQUE command", () => {
-    const text = `[CRITIQUE]
-The world lacks factions. All characters are individuals without institutional backing.`;
+    const text = `[CRITIQUE | The world lacks factions. All characters are individuals without institutional backing.]`;
 
     const commands = parseCommands(text);
     expect(commands).toHaveLength(1);
     expect(commands[0]).toEqual({
       kind: "CRITIQUE",
-      content: "The world lacks factions. All characters are individuals without institutional backing.",
+      text: "The world lacks factions. All characters are individuals without institutional backing.",
     });
   });
 
@@ -110,14 +117,17 @@ A disgraced knight.
 A ruined fortress.
 [LINK "Elara" → "The Shattered Keep"]
 Born here.
-[CRITIQUE]
-Missing factions.
+[CRITIQUE | Missing factions.]
 [DONE]`;
 
     const commands = parseCommands(text);
     expect(commands).toHaveLength(5);
     expect(commands.map((c) => c.kind)).toEqual([
-      "CREATE", "CREATE", "LINK", "CRITIQUE", "DONE",
+      "CREATE",
+      "CREATE",
+      "LINK",
+      "CRITIQUE",
+      "DONE",
     ]);
   });
 

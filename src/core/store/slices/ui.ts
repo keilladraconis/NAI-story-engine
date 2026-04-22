@@ -13,6 +13,7 @@ export const initialUIState: UIState = {
     input: "",
   },
   lorebook: initialLorebookState,
+  worldExpanded: null,
 };
 
 export const uiSlice = createSlice({
@@ -81,12 +82,27 @@ export const uiSlice = createSlice({
     // Lorebook refinement (modify existing entry with instructions)
     uiLorebookRefineRequested: (state, _payload: { requestId: string }) =>
       state,
+    // World expand/collapse all
+    worldExpansionSet: (state, payload: { expanded: boolean }) => ({
+      ...state,
+      worldExpanded: payload.expanded,
+    }),
+    // Summary generation intents
+    uiEntitySummaryGenerationRequested: (
+      state,
+      _payload: { entityId: string; requestId: string },
+    ) => state,
+    uiThreadSummaryGenerationRequested: (
+      state,
+      _payload: { groupId: string; requestId: string },
+    ) => state,
   },
 });
 
 export const {
   uiInputChanged,
   setBrainstormInput,
+  worldExpansionSet,
   uiRequestCancellation,
   uiUserPresenceConfirmed,
   uiBrainstormSubmitUserMessage,
@@ -101,4 +117,6 @@ export const {
   uiLorebookKeysGenerationRequested,
   uiLorebookItemGenerationRequested,
   uiLorebookRefineRequested,
+  uiEntitySummaryGenerationRequested,
+  uiThreadSummaryGenerationRequested,
 } = uiSlice.actions;
