@@ -17,6 +17,19 @@ Screenshots of the panel state, any error toasts, and the exact guidance you typ
 
 ---
 
+## Your setup
+
+Some bugs only show up on certain subscription tiers, models, or with Xialong Mode on or off. Please include all four of these in every report:
+
+- **NovelAI subscription tier** — Scroll, Tablet, or Opus.
+- **Storyteller / story model activated in NovelAI** — whichever model you have selected for story generation (e.g. Erato, Kayra, etc.). This is separate from the model Story Engine uses for its own generation.
+- **Xialong Mode** — is it **on** or **off** in Story Engine's script config? When Xialong Mode is on, all Story Engine generation goes through Xialong v1 (Opus-only). When it's off, everything goes through GLM 4.6. Bugs frequently behave differently between the two paths, so this matters.
+- **Story Engine version** — visible in `project.yaml` or on the script in NovelAI's script editor.
+
+One sentence is enough: _"Opus tier, Erato selected for the story, Xialong Mode on, Story Engine 0.11.0."_
+
+---
+
 ## Send the story file
 
 **Attach or DM your story file to @keilla-draconis.** This is the most important part of a report.
@@ -95,8 +108,8 @@ Before hitting send on your report:
 
 - [ ] Described what you were doing, expected, and saw
 - [ ] Attached or DMed the `.story` file to @keilla-draconis
+- [ ] Listed your setup: subscription tier (Scroll / Tablet / Opus), activated story model, Xialong Mode on/off, Story Engine version
 - [ ] If it's a generation-quality issue: enabled the Journal, reproduced, and copied the relevant digest (Full / SEGA / Bootstrap / Forge) into the report
-- [ ] Noted the Story Engine version (from `project.yaml` or the script header in NovelAI)
 - [ ] Turned the Journal back off if you're not actively capturing more
 
 Thanks for the help — every good report makes the next release better.
