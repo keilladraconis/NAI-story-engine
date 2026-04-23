@@ -1,6 +1,7 @@
-import { Store } from "nai-store";
+import { Store, matchesAction } from "nai-store";
 import { RootState, AppDispatch } from "../types";
 import { DulfsFieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
+import { entityCategoryChanged } from "../slices/world";
 
 // Lorebook sync constants
 export const SE_CATEGORY_PREFIX = "SE: ";
@@ -167,10 +168,24 @@ export function registerLorebookSyncHooks(
 }
 
 export function registerLorebookSyncEffects(
-  _subscribeEffect: Store<RootState>["subscribeEffect"],
+  subscribeEffect: Store<RootState>["subscribeEffect"],
   _dispatch: AppDispatch,
-  _getState: () => RootState,
+  getState: () => RootState,
 ): void {
-  // Lorebook sync for world entities is handled directly by the list handler
-  // and forge handler at creation time. No subscribeEffect needed.
+  // When the user changes an entity's type in the edit pane, move its lorebook
+  // entry to the matching "SE: <Category>" so generation, SEGA, and every other
+  // `entry.category` consumer reflect the current selection.
+  subscribeEffect(matchesAction(entityCategoryChanged), async (action) => {
+    const { entityId, categoryId } = action.payload;
+    const entity = getState().world.entitiesById[entityId];
+    if (!entity?.lorebookEntryId) return;
+
+    const targetCategoryId = await ensureCategory(categoryId);
+    const entry = await api.v1.lorebook.entry(entity.lorebookEntryId);
+    if (!entry || entry.category === targetCategoryId) return;
+
+    await api.v1.lorebook.updateEntry(entity.lorebookEntryId, {
+      category: targetCategoryId,
+    });
+  });
 }

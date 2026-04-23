@@ -11,6 +11,7 @@ import { buildLorebookPrefill } from "../../../utils/lorebook-strategy";
 import { LOREBOOK_CHAIN_STOPS, trimStopTail } from "../../../utils/config";
 import { segaKeysCompleted } from "../../slices/runtime";
 import { stripThinkingTags } from "../../../utils/tag-parser";
+import { RootState } from "../../types";
 
 // Cache for prefills during streaming (cleared on completion)
 const prefillCache = new Map<string, string>();
@@ -26,9 +27,12 @@ const getCachedPrefill = (entryId: string): string | null => {
 /**
  * Ensure prefill is cached for an entry (call early in streaming).
  */
-const ensurePrefillCached = async (entryId: string): Promise<void> => {
+const ensurePrefillCached = async (
+  getState: () => RootState,
+  entryId: string,
+): Promise<void> => {
   if (!prefillCache.has(entryId)) {
-    const prefill = await buildLorebookPrefill(entryId);
+    const prefill = await buildLorebookPrefill(getState, entryId);
     prefillCache.set(entryId, prefill);
   }
 };
@@ -50,7 +54,7 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
       if (ctx.target.entryId !== currentSelected) return;
 
       // Ensure prefill is being cached (fire-and-forget on first call)
-      ensurePrefillCached(ctx.target.entryId);
+      ensurePrefillCached(ctx.getState, ctx.target.entryId);
 
       // Get cached prefill if available, prepend to streaming content
       const prefill = getCachedPrefill(ctx.target.entryId) || "";
@@ -69,7 +73,7 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
         // Get prefill from cache or rebuild it
         let prefill = getCachedPrefill(entryId);
         if (!prefill) {
-          prefill = await buildLorebookPrefill(entryId);
+          prefill = await buildLorebookPrefill(ctx.getState, entryId);
         }
 
         // Combine prefill + accumulated text for the full entry
@@ -303,7 +307,7 @@ export const lorebookRefineHandler: GenerationHandlers<LorebookRefineTarget> = {
     if (ctx.target.entryId !== currentSelected) return;
 
     // Ensure prefill is being cached (fire-and-forget on first call)
-    ensurePrefillCached(ctx.target.entryId);
+    ensurePrefillCached(ctx.getState, ctx.target.entryId);
 
     // Get cached prefill if available, prepend to streaming content
     const prefill = getCachedPrefill(ctx.target.entryId) || "";
@@ -322,7 +326,7 @@ export const lorebookRefineHandler: GenerationHandlers<LorebookRefineTarget> = {
       // Get prefill from cache or rebuild it
       let prefill = getCachedPrefill(entryId);
       if (!prefill) {
-        prefill = await buildLorebookPrefill(entryId);
+        prefill = await buildLorebookPrefill(ctx.getState, entryId);
       }
 
       // Combine prefill + accumulated text for the full entry
