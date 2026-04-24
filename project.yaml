@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories
 memoryLimit: 8
-updatedAt: 1777019793
+updatedAt: 1777047924
 config:
   - name: xialong_mode
     prettyName: Xialong Mode

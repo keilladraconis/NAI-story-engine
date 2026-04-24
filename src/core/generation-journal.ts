@@ -72,16 +72,17 @@ const SEGA_LABELS =
 
 /**
  * Extract the entity name from the assistant prefill message, if present.
- * Lorebook content/keys factories end with an assistant prefill:
- *   "Name: Elspeth Wren\nType: Character\nSetting: ..."
- * Returns the name portion, or null if not found.
+ * Lorebook content/keys factories end with an assistant prefill whose first
+ * line is the bare entity name, followed by "Type:" on the next line:
+ *   "Elspeth Wren\nType: Character\nSetting: ..."
+ * Returns the first line when a "Type:" line follows, or null otherwise.
  */
 function extractEntityName(
   messages: { role: string; content?: string }[],
 ): string | null {
   const prefill = [...messages].reverse().find((m) => m.role === "assistant");
   if (!prefill?.content) return null;
-  const match = prefill.content.match(/^Name:\s*(.+)/m);
+  const match = prefill.content.match(/^(.+)\n\s*Type:/);
   return match?.[1]?.trim() ?? null;
 }
 
