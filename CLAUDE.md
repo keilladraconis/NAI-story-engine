@@ -78,10 +78,9 @@ npm run test       # vitest run
 - Be bold, don't worry about data migration or supporting legacy patterns as we iterate.
 - Adhere to the KISS Principle.
 - Follow the Boyscout Rule.
-- Bump `project.yaml` `version` at most once per pull request. Subsequent commits on the same branch should not bump it again. Scale the bump to the change:
-  - **Major** — architecture or data-model changes (e.g. new slice, persisted schema change, generation pipeline restructure).
-  - **Minor** — quality and accessibility improvements (e.g. prompt tuning, UX polish, new non-structural features).
-  - **Patch** — bug fixes.
+- Bump `project.yaml` `version` at most once per pull request. Subsequent commits on the same branch should not bump it again. **Story Engine is in alpha**, so the major version is locked at `0` — `1.0` is reserved for Beta and `2.0` for the production release. That shifts the standard semver rungs down one:
+  - **Minor** — the "major"-scale changes (architecture, data model, persisted schema, generation pipeline restructure). These would normally be major bumps, but bump minor while the major is pinned at 0.
+  - **Patch** — everything else: quality and accessibility improvements, prompt tuning, UX polish, new non-structural features, and bug fixes. Normally these would split across minor and patch; under the alpha lock they all go to patch.
 - Keep `CHANGELOG.md` in step with the in-progress version on every commit that changes user-visible behavior. On the first commit that bumps the version, add a new section for it at the top of the file under the existing Keep-a-Changelog layout (`### Added / Changed / Fixed / Removed`). On subsequent commits to the same PR, trim or refine that section — merge duplicates, drop entries that were reverted, and rewrite bullets as the user-facing story sharpens. The goal is a final changelog entry that reads like a release note, not a commit log.
 
 **UI Input Patterns:**
