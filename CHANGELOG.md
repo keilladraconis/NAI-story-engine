@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- **"+ Add Entity" no longer pre-creates a lorebook entry.** The lorebook entry is only created when you hit Save on the edit pane, so cancelling out of a new entity doesn't leave an orphan entry in your lorebook. The Content / Keys / Always-On section is hidden on draft entities and appears after the first save.
+- **"+ Add Entity" no longer pre-creates a lorebook entry.** The lorebook entry is only created when you hit Save on the edit pane, so cancelling out of a new entity doesn't leave an orphan entry in your lorebook. You can still author the full lorebook body — content, keys, and Always On — while the entity is a draft; Save promotes it and persists everything at once. (Only the Generate icon buttons next to Content and Keys wait until after the first save, since they stream into a live entry.)
 - **Changing an entity's category moves its lorebook entry to the matching `SE:` category.** The two layers no longer drift apart after a type reassignment.
 
 ## [0.11.0] - 2026-04-20

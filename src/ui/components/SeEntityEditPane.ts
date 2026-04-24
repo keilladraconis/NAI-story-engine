@@ -226,7 +226,9 @@ export class SeEntityEditPane extends SuiComponent<
         api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, entry.text ?? ""),
         api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, entry.keys?.join(", ") ?? ""),
       ]);
-    } else if (entryId) {
+    } else {
+      // Draft entity (or live with no entry yet on the API side) — clear any
+      // stale draft content from a prior session so a fresh draft starts empty.
       await Promise.all([
         api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, ""),
         api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, ""),
@@ -296,19 +298,37 @@ export class SeEntityEditPane extends SuiComponent<
           });
         } else {
           // Draft → live: create a lorebook entry in the entity's current
-          // category and bind it. Content/keys stay empty; the user
-          // generates them after re-opening the (now live) entity.
+          // category and populate it with whatever content/keys/always-on
+          // the user typed while the entity was still a draft.
           const current = store.getState().world.entitiesById[entityId];
           const categoryId = current
             ? await ensureCategory(current.categoryId)
             : undefined;
+
+          const rawContent = String(
+            (await api.v1.storyStorage.get(L.CONTENT_DRAFT_RAW)) ?? "",
+          );
+          const erato = (await api.v1.config.get("erato_compatibility")) || false;
+          const content =
+            rawContent && erato && !rawContent.startsWith("----\n")
+              ? "----\n" + rawContent
+              : rawContent;
+          const rawKeys = String(
+            (await api.v1.storyStorage.get(L.KEYS_DRAFT_RAW)) ?? "",
+          );
+          const keys = rawKeys
+            .split(",")
+            .map((k) => k.trim())
+            .filter((k) => k.length > 0);
+
           const newEntryId = api.v1.uuid();
           await api.v1.lorebook.createEntry({
             id: newEntryId,
             displayName: trimmedName,
-            text: "",
-            keys: [],
+            text: content,
+            keys,
             enabled: true,
+            forceActivation: _alwaysOnDraft,
             category: categoryId,
           });
           store.dispatch(
@@ -396,6 +416,49 @@ export class SeEntityEditPane extends SuiComponent<
         isLive ? this._keysBtn.build() : Promise.resolve(null),
       ]);
 
+    // Content/Keys rows shed the Generate icon button on draft entities —
+    // generation streams into a live lorebook entry, so it can't run until
+    // the user saves. The textareas, Keys field, and Always On toggle stay
+    // visible so users can write the entry by hand and persist it on Save.
+    const contentRow = isLive && contentGenPart
+      ? row({
+          style: S.sectionRow,
+          content: [
+            text({ text: "Content", style: S.rowLabel }),
+            contentGenPart,
+          ],
+        })
+      : row({
+          style: S.sectionRow,
+          content: [text({ text: "Content", style: S.rowLabel })],
+        });
+
+    const keysRowContent: UIPart[] = [
+      text({ text: "Keys", style: S.keysRowLabel }),
+      textInput({
+        id: L.KEYS_INPUT,
+        initialValue: "",
+        placeholder: "comma, separated, keys",
+        storageKey: `story:${L.KEYS_DRAFT_KEY}`,
+        style: S.keysInput,
+      }),
+    ];
+    if (isLive && keysGenPart) keysRowContent.push(keysGenPart);
+    keysRowContent.push(
+      button({
+        id: L.ALWAYS_ON_TOGGLE,
+        text: "Always On",
+        style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
+        callback: () => {
+          _alwaysOnDraft = !_alwaysOnDraft;
+          api.v1.ui.updateParts([{
+            id: L.ALWAYS_ON_TOGGLE,
+            style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
+          } as unknown as Partial<UIPart> & { id: string }]);
+        },
+      }),
+    );
+
     const parts: UIPart[] = [
       // ── Header ─────────────────────────────────────────────────────────────
       row({
@@ -452,57 +515,22 @@ export class SeEntityEditPane extends SuiComponent<
         storageKey: `story:${EDIT_PANE_CONTENT}`,
         style: S.summaryInput,
       }),
+
+      // ── Lorebook section ───────────────────────────────────────────────────
+      text({ text: "", style: S.lbDivider }),
+      contentRow,
+      multilineTextInput({
+        id: L.CONTENT_INPUT,
+        initialValue: "",
+        placeholder: "Lorebook content…",
+        storageKey: `story:${L.CONTENT_DRAFT_KEY}`,
+        style: S.contentInput,
+      }),
+      row({
+        style: S.keysRow,
+        content: keysRowContent,
+      }),
     ];
-
-    // Lorebook section only appears for live entities. Drafts have no entry
-    // yet — it's created on Save and the section becomes available on re-open.
-    if (isLive && contentGenPart && keysGenPart) {
-      parts.push(
-        text({ text: "", style: S.lbDivider }),
-
-        row({
-          style: S.sectionRow,
-          content: [
-            text({ text: "Content", style: S.rowLabel }),
-            contentGenPart,
-          ],
-        }),
-        multilineTextInput({
-          id: L.CONTENT_INPUT,
-          initialValue: "",
-          placeholder: "Lorebook content…",
-          storageKey: `story:${L.CONTENT_DRAFT_KEY}`,
-          style: S.contentInput,
-        }),
-
-        row({
-          style: S.keysRow,
-          content: [
-            text({ text: "Keys", style: S.keysRowLabel }),
-            textInput({
-              id: L.KEYS_INPUT,
-              initialValue: "",
-              placeholder: "comma, separated, keys",
-              storageKey: `story:${L.KEYS_DRAFT_KEY}`,
-              style: S.keysInput,
-            }),
-            keysGenPart,
-            button({
-              id: L.ALWAYS_ON_TOGGLE,
-              text: "Always On",
-              style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
-              callback: () => {
-                _alwaysOnDraft = !_alwaysOnDraft;
-                api.v1.ui.updateParts([{
-                  id: L.ALWAYS_ON_TOGGLE,
-                  style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
-                } as unknown as Partial<UIPart> & { id: string }]);
-              },
-            }),
-          ],
-        }),
-      );
-    }
 
     return column({
       id: this.id,
