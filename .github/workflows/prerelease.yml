@@ -12,6 +12,15 @@ on:
       - "package.json"
       - "package-lock.json"
       - "tsconfig.json"
+  pull_request:
+    paths:
+      - "src/**"
+      - "lib/**"
+      - "external/**"
+      - "project.yaml"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
   workflow_dispatch:
 
 permissions:
@@ -19,10 +28,15 @@ permissions:
 
 jobs:
   build-and-prerelease:
+    # Fork PRs can't create tags/releases in the base repo and must not run with
+    # `contents: write` against untrusted code.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -37,6 +51,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Filter is scoped to v${VERSION}-dev.N, so the counter resets to 1
+          # whenever project.yaml's version changes.
           LAST_N=$(git ls-remote --tags origin \
             | awk '{print $2}' \
             | sed 's|refs/tags/||' \
@@ -68,4 +84,4 @@ jobs:
             --title "Pre-release v${FULL_VERSION}" \
             --prerelease \
             --generate-notes \
-            --target "${{ github.sha }}"
+            --target "${{ github.event.pull_request.head.sha || github.sha }}"
