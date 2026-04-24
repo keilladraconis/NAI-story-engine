@@ -76,6 +76,7 @@ npm run test       # vitest run
 - Be bold, don't worry about data migration or supporting legacy patterns as we iterate.
 - Adhere to the KISS Principle.
 - Follow the Boyscout Rule.
+- Bump `project.yaml` `version` at most once per pull request. Subsequent commits on the same branch should not bump it again.
 
 **UI Input Patterns:**
 
