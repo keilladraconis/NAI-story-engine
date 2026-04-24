@@ -2,12 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.2] - 2026-04-24
+
+### Fixed
+
+- **Lorebook entries now open with the bare entity name on the first line**, matching the per-category templates (`[Entry Name]` / `Type: …` / `Setting: …`). The prefill previously prepended a redundant `Name:` label that didn't match the template, causing the model to drift into a freeform header instead of following the template.
+
 ## [0.11.1] - 2026-04-24
 
 ### Fixed
 
 - **Lorebook generation now respects the entity's selected type and typed name.** Previously a new world entity would generate as a Character regardless of the category picked in the edit pane, and the saved entry would be headed `Name: Unnamed Entry` if the user hadn't hit Save first. Name/category resolution now follows a **DRAFT > LOREBOOK > STATE** hierarchy, and the prefill written to the saved entry matches what was sent to the model.
-- **Lorebook entries now open with the bare entity name on the first line**, matching the per-category templates (`[Entry Name]` / `Type: …` / `Setting: …`). The prefill previously prepended a redundant `Name:` label that didn't match the template, causing the model to drift into a freeform header instead of following the template.
 
 ### Changed
 
