@@ -1,0 +1,33 @@
+name: Cleanup Pre-Releases
+
+on:
+  schedule:
+    # 03:00 UTC daily
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete all but the latest pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mapfile -t TAGS < <(gh release list --limit 1000 \
+            --json tagName,isPrerelease,createdAt \
+            --jq 'map(select(.isPrerelease)) | sort_by(.createdAt) | reverse | .[].tagName')
+          if [ "${#TAGS[@]}" -le 1 ]; then
+            echo "Nothing to clean (${#TAGS[@]} prerelease(s) present)."
+            exit 0
+          fi
+          echo "Keeping latest prerelease: ${TAGS[0]}"
+          for tag in "${TAGS[@]:1}"; do
+            echo "Deleting $tag"
+            gh release delete "$tag" --yes --cleanup-tag
+          done
