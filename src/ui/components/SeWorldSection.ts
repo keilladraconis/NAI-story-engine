@@ -27,7 +27,6 @@ import { segaToggled } from "../../core/store/slices/runtime";
 import { worldExpansionSet } from "../../core/store/slices/ui";
 import { FieldID } from "../../config/field-definitions";
 import { IDS } from "../../ui/framework/ids";
-import { ensureCategory } from "../../core/store/effects/lorebook-sync";
 import { StoreWatcher } from "../store-watcher";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 import { SeEntityCard } from "./SeEntityCard";
@@ -164,37 +163,24 @@ export class SeWorldSection extends SuiComponent<
     const addEntityBtn = new SuiButton({
       id: `${IDS.WORLD.SECTION}-add-entity-btn`,
       callback: () => {
-        void (async () => {
-          const entityId = api.v1.uuid();
-          const lorebookEntryId = api.v1.uuid();
-          const categoryId = await ensureCategory(FieldID.DramatisPersonae);
-          await api.v1.lorebook.createEntry({
-            id: lorebookEntryId,
-            displayName: "",
-            text: "",
-            keys: [],
-            enabled: true,
-            category: categoryId,
-          });
-          store.dispatch(
-            entityForged({
-              entity: {
-                id: entityId,
-                categoryId: FieldID.DramatisPersonae,
-                lorebookEntryId,
-                name: "",
-                summary: "",
-              },
-            }),
-          );
-          editHost.open(
-            new SeEntityEditPane({
-              id: IDS.EDIT_PANE.ROOT,
-              entityId,
-              editHost,
-            }),
-          );
-        })();
+        const entityId = api.v1.uuid();
+        store.dispatch(
+          entityForged({
+            entity: {
+              id: entityId,
+              categoryId: FieldID.DramatisPersonae,
+              name: "",
+              summary: "",
+            },
+          }),
+        );
+        editHost.open(
+          new SeEntityEditPane({
+            id: IDS.EDIT_PANE.ROOT,
+            entityId,
+            editHost,
+          }),
+        );
       },
       theme: { default: { self: { iconId: "plus" as IconId } } },
     });

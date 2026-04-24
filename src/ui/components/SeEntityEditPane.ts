@@ -24,9 +24,11 @@ import {
 import {
   entityEdited,
   entityCategoryChanged,
+  entityLorebookEntryBound,
   entitySummaryUpdated,
   entityDeleted,
 } from "../../core/store/slices/world";
+import { ensureCategory } from "../../core/store/effects/lorebook-sync";
 import {
   IDS,
   EDIT_PANE_TITLE,
@@ -292,6 +294,29 @@ export class SeEntityEditPane extends SuiComponent<
             keys,
             forceActivation: _alwaysOnDraft,
           });
+        } else {
+          // Draft → live: create a lorebook entry in the entity's current
+          // category and bind it. Content/keys stay empty; the user
+          // generates them after re-opening the (now live) entity.
+          const current = store.getState().world.entitiesById[entityId];
+          const categoryId = current
+            ? await ensureCategory(current.categoryId)
+            : undefined;
+          const newEntryId = api.v1.uuid();
+          await api.v1.lorebook.createEntry({
+            id: newEntryId,
+            displayName: trimmedName,
+            text: "",
+            keys: [],
+            enabled: true,
+            category: categoryId,
+          });
+          store.dispatch(
+            entityLorebookEntryBound({
+              entityId,
+              lorebookEntryId: newEntryId,
+            }),
+          );
         }
 
         _close();
@@ -360,13 +385,15 @@ export class SeEntityEditPane extends SuiComponent<
       },
     });
 
+    const isLive = !!entryId;
+
     const [categoryBarPart, summaryBtnPart, deleteConfirmPart, contentGenPart, keysGenPart] =
       await Promise.all([
         categoryBar.build(),
         this._summaryBtn.build(),
         deleteConfirmBtn.build(),
-        this._contentBtn.build(),
-        this._keysBtn.build(),
+        isLive ? this._contentBtn.build() : Promise.resolve(null),
+        isLive ? this._keysBtn.build() : Promise.resolve(null),
       ]);
 
     const parts: UIPart[] = [
@@ -425,52 +452,57 @@ export class SeEntityEditPane extends SuiComponent<
         storageKey: `story:${EDIT_PANE_CONTENT}`,
         style: S.summaryInput,
       }),
-
-      // ── Lorebook section ───────────────────────────────────────────────────
-      text({ text: "", style: S.lbDivider }),
-
-      row({
-        style: S.sectionRow,
-        content: [
-          text({ text: "Content", style: S.rowLabel }),
-          contentGenPart,
-        ],
-      }),
-      multilineTextInput({
-        id: L.CONTENT_INPUT,
-        initialValue: "",
-        placeholder: "Lorebook content…",
-        storageKey: `story:${L.CONTENT_DRAFT_KEY}`,
-        style: S.contentInput,
-      }),
-
-      row({
-        style: S.keysRow,
-        content: [
-          text({ text: "Keys", style: S.keysRowLabel }),
-          textInput({
-            id: L.KEYS_INPUT,
-            initialValue: "",
-            placeholder: "comma, separated, keys",
-            storageKey: `story:${L.KEYS_DRAFT_KEY}`,
-            style: S.keysInput,
-          }),
-          keysGenPart,
-          button({
-            id: L.ALWAYS_ON_TOGGLE,
-            text: "Always On",
-            style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
-            callback: () => {
-              _alwaysOnDraft = !_alwaysOnDraft;
-              api.v1.ui.updateParts([{
-                id: L.ALWAYS_ON_TOGGLE,
-                style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
-              } as unknown as Partial<UIPart> & { id: string }]);
-            },
-          }),
-        ],
-      }),
     ];
+
+    // Lorebook section only appears for live entities. Drafts have no entry
+    // yet — it's created on Save and the section becomes available on re-open.
+    if (isLive && contentGenPart && keysGenPart) {
+      parts.push(
+        text({ text: "", style: S.lbDivider }),
+
+        row({
+          style: S.sectionRow,
+          content: [
+            text({ text: "Content", style: S.rowLabel }),
+            contentGenPart,
+          ],
+        }),
+        multilineTextInput({
+          id: L.CONTENT_INPUT,
+          initialValue: "",
+          placeholder: "Lorebook content…",
+          storageKey: `story:${L.CONTENT_DRAFT_KEY}`,
+          style: S.contentInput,
+        }),
+
+        row({
+          style: S.keysRow,
+          content: [
+            text({ text: "Keys", style: S.keysRowLabel }),
+            textInput({
+              id: L.KEYS_INPUT,
+              initialValue: "",
+              placeholder: "comma, separated, keys",
+              storageKey: `story:${L.KEYS_DRAFT_KEY}`,
+              style: S.keysInput,
+            }),
+            keysGenPart,
+            button({
+              id: L.ALWAYS_ON_TOGGLE,
+              text: "Always On",
+              style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
+              callback: () => {
+                _alwaysOnDraft = !_alwaysOnDraft;
+                api.v1.ui.updateParts([{
+                  id: L.ALWAYS_ON_TOGGLE,
+                  style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
+                } as unknown as Partial<UIPart> & { id: string }]);
+              },
+            }),
+          ],
+        }),
+      );
+    }
 
     return column({
       id: this.id,

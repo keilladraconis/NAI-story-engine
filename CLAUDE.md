@@ -47,10 +47,11 @@ npm run test       # vitest run
 
 - `WorldEntity` has `id`, `categoryId` (`DulfsFieldID`), `lifecycle` (`"draft" | "live"`), optional `lorebookEntryId`, `name`, and `summary`.
 - **Entity summary** is a Story Engine–internal field. It is stored only in Redux, editable only in `SeEntityEditPane`, and **never synchronized with or derived from lorebook entry text**. The lorebook entry text is a separate field populated by generation.
-- **Draft entities** have no lorebook entry. Their card shows name + summary; edit pane allows name/summary/category editing.
+- **Draft entities** have no lorebook entry. Their card shows name + summary; edit pane allows name/summary/category editing only. The "+ Add Entity" button creates a draft — **no lorebook entry is created until the user hits Save**, so cancelling out leaves no orphaned lorebook entries behind.
 - **Live entities** have a lorebook entry (`lorebookEntryId`). Their edit pane additionally shows lorebook content and keys with generation buttons. Lorebook content/keys are **only flushed to the lorebook API on Save** — not on every keystroke.
+- **Draft → live promotion:** Saving a draft entity creates a lorebook entry in the entity's current category (via `ensureCategory(entity.categoryId)`) with the draft name as `displayName` and empty text/keys. The entry id is attached via `entityLorebookEntryBound`. Content and keys are generated after re-opening the now-live entity.
 - **Cast**: `castAllRequested` / `entityCastRequested` effects first look for an existing unmanaged lorebook entry with a matching `displayName` (case-insensitive) and bind to it. If none found, a new entry is created in the appropriate `SE: <Category>` lorebook category with empty text (summary is not seeded into lorebook).
-- **Category**: `entityCategoryChanged` action updates `entity.categoryId`. `SeEntityEditPane` shows a category picker (SuiActionBar) for draft entities.
+- **Category**: `entityCategoryChanged` action updates `entity.categoryId`, and the `registerLorebookSyncEffects` subscription moves the bound lorebook entry to the matching `SE: <Category>` so `entry.category` stays in agreement with the UI selection. `SeEntityEditPane` shows a category picker (SuiActionBar) for all entities.
 
 **Prompts:** All generation prompts are hard-coded constants in `src/core/utils/prompts.ts`. They are **not** configurable via `project.yaml`. `project.yaml` contains only non-prompt settings (model, feature flags).
 
@@ -66,6 +67,7 @@ npm run test       # vitest run
 - World Entries use two-phase generation: Phase 1 generates a list of names, Phase 2 generates detailed content per item
 - S.E.G.A. (Story Engine Generate All) fills blank fields using round-robin queueing across categories
 - Lorebook sync (`src/core/store/effects/lorebook-sync.ts`) manages SE-category creation and DULFS item→lorebook binding. It does **not** sync entity summaries in either direction — summaries are SE-internal only.
+- **Information hierarchy for lorebook generation: DRAFT > LOREBOOK > STATE.** When resolving name, category, or any other field for a generation prompt, prefer in-pane draft values (storyStorage slots like `EDIT_PANE_TITLE`) first, then the lorebook API entry (so imported/user-edited lorebooks override whatever Redux thinks), and only then fall back to Redux world state. `resolveDisplayName` / `resolveCategoryName` in `src/core/utils/lorebook-strategy.ts` are the canonical implementations.
 
 ## Coding Guidelines
 
