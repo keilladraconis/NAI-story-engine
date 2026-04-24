@@ -64,6 +64,25 @@ async function resolveCategoryName(
   return "";
 }
 
+/**
+ * Resolve the display name for a lorebook entry. Prefers the unsaved draft
+ * in the edit pane (storyStorage EDIT_PANE_TITLE) when this entry is the one
+ * currently open, so generation reflects what the user typed even before
+ * they click Save. Falls back to the persisted names.
+ */
+async function resolveDisplayName(
+  state: RootState,
+  entryId: string,
+  entryDisplayName: string | undefined,
+): Promise<string> {
+  const entity = findEntityForEntry(state, entryId);
+  const isCurrentlySelected = state.ui.lorebook.selectedEntryId === entryId;
+  const liveName = isCurrentlySelected
+    ? String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "").trim()
+    : "";
+  return liveName || entryDisplayName || entity?.name || "Unnamed Entry";
+}
+
 /** Format the Threads (groups) an entity belongs to as context text. */
 function formatEntityGroups(state: RootState, entityId: string): string {
   const groups = state.world.groups.filter((g) =>
@@ -135,13 +154,8 @@ export const createLorebookContentFactory = (
     // Pull name and summary from live input fields only when this entry is
     // currently open in the edit pane — avoids contaminating SEGA batch
     // generation with stale data from whatever entity was last edited.
+    const displayName = await resolveDisplayName(state, entryId, entry.displayName);
     const isCurrentlySelected = state.ui.lorebook.selectedEntryId === entryId;
-
-    const liveName = isCurrentlySelected
-      ? String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "").trim()
-      : "";
-    const displayName = liveName || entry.displayName || entity?.name || "Unnamed Entry";
-
     const liveSummary = isCurrentlySelected
       ? String((await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) || "").trim()
       : "";
@@ -294,12 +308,12 @@ export const createLorebookRefineFactory = (
       throw new Error(`Lorebook entry not found: ${entryId}`);
     }
 
-    const displayName = entry.displayName || "Unnamed Entry";
-    const currentContent = entry.text || "";
-    const instructions = await getInstructions();
-
     const state = getState();
     const entity = findEntityForEntry(state, entryId);
+
+    const displayName = await resolveDisplayName(state, entryId, entry.displayName);
+    const currentContent = entry.text || "";
+    const instructions = await getInstructions();
 
     // Get category name (prefers Redux entity.categoryId) for type + template
     const categoryName = await resolveCategoryName(state, entryId, entry.category);
@@ -398,13 +412,9 @@ export const buildLorebookPrefill = async (
   const entry = await api.v1.lorebook.entry(entryId);
   if (!entry) return "";
 
-  const displayName = entry.displayName || "Unnamed Entry";
-
-  const categoryName = await resolveCategoryName(
-    getState(),
-    entryId,
-    entry.category,
-  );
+  const state = getState();
+  const displayName = await resolveDisplayName(state, entryId, entry.displayName);
+  const categoryName = await resolveCategoryName(state, entryId, entry.category);
   const entryType = getEntryType(categoryName);
   const setting = String(
     (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
