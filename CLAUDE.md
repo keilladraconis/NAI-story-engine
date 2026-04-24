@@ -83,6 +83,8 @@ npm run test       # vitest run
   - **Patch** — everything else: quality and accessibility improvements, prompt tuning, UX polish, new non-structural features, and bug fixes. Normally these would split across minor and patch; under the alpha lock they all go to patch.
 - Keep `CHANGELOG.md` in step with the in-progress version on every commit that changes user-visible behavior. On the first commit that bumps the version, add a new section for it at the top of the file under the existing Keep-a-Changelog layout (`### Added / Changed / Fixed / Removed`). On subsequent commits to the same PR, trim or refine that section — merge duplicates, drop entries that were reverted, and rewrite bullets as the user-facing story sharpens. The goal is a final changelog entry that reads like a release note, not a commit log.
 
+**DRY in the UI (don't branch render paths on entity state):** Avoid duplicating component construction or splitting `compose()` into "draft vs live" / "empty vs filled" / "isFoo vs isBar" render branches. Each branch is another stale-closure surface and another place to forget when a new field is added. Prefer one render path that always builds every part, and let the parts adapt themselves: `stateProjection`/`requestIdFromProjection` on a `SeGenerationIconButton` so the same button works for drafts and live entities; helpers like `_ensureLiveEntryId` so callers (Save, Generate Content, Generate Keys) don't each reimplement the promote logic. When a callsite genuinely needs different behavior, push the difference into the leaf — never fork the row/column scaffolding above it.
+
 **UI Input Patterns:**
 
 - Prefer `storageKey` on inputs for automatic persistence — avoid manual onChange handlers for simple state sync.
