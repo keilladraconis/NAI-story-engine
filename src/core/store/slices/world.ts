@@ -84,6 +84,26 @@ export const worldSlice = createSlice({
       };
     },
 
+    // Attach a freshly-created lorebook entry to an existing draft entity,
+    // promoting it to "live" without touching other fields.
+    entityLorebookEntryBound: (
+      state,
+      payload: { entityId: string; lorebookEntryId: string },
+    ) => {
+      const entity = state.entitiesById[payload.entityId];
+      if (!entity) return state;
+      return {
+        ...state,
+        entitiesById: {
+          ...state.entitiesById,
+          [payload.entityId]: {
+            ...entity,
+            lorebookEntryId: payload.lorebookEntryId,
+          },
+        },
+      };
+    },
+
     // Bind/Unbind (adopt existing lorebook entries)
     entityBound: (state, payload: { entity: WorldEntity }) => ({
       ...state,
@@ -209,6 +229,7 @@ export const {
   entitySummaryUpdated,
   entityEdited,
   entityCategoryChanged,
+  entityLorebookEntryBound,
   entityBound,
   entitiesBoundBatch,
   entityUnbound,

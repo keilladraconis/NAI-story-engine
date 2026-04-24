@@ -41,6 +41,51 @@ function findEntityForEntry(state: RootState, entryId: string) {
   return Object.values(state.world.entitiesById).find((e) => e.lorebookEntryId === entryId);
 }
 
+/**
+ * Resolve the lorebook category name ("SE: <Label>") driving template + type
+ * selection. Category is a Story Engine concept stored on the entity; the
+ * lorebook entry's own category is just where it lives in the user's
+ * lorebook (they may reorganize imported/long-running entries however they
+ * want, and we don't move those). So: for managed entities, trust
+ * `entity.categoryId`. For unmanaged entries (no SE entity bound), fall
+ * back to `entry.category` as the only available signal.
+ */
+async function resolveCategoryName(
+  state: RootState,
+  entryId: string,
+  entryCategoryId: string | null | undefined,
+): Promise<string> {
+  const entity = findEntityForEntry(state, entryId);
+  if (entity) {
+    const label = FIELD_CONFIGS.find((c) => c.id === entity.categoryId)?.label;
+    if (label) return `SE: ${label}`;
+  }
+  if (entryCategoryId) {
+    const categories = await api.v1.lorebook.categories();
+    return categories.find((c) => c.id === entryCategoryId)?.name || "";
+  }
+  return "";
+}
+
+/**
+ * Resolve the display name for a lorebook entry. Prefers the unsaved draft
+ * in the edit pane (storyStorage EDIT_PANE_TITLE) when this entry is the one
+ * currently open, so generation reflects what the user typed even before
+ * they click Save. Falls back to the persisted names.
+ */
+async function resolveDisplayName(
+  state: RootState,
+  entryId: string,
+  entryDisplayName: string | undefined,
+): Promise<string> {
+  const entity = findEntityForEntry(state, entryId);
+  const isCurrentlySelected = state.ui.lorebook.selectedEntryId === entryId;
+  const liveName = isCurrentlySelected
+    ? String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "").trim()
+    : "";
+  return liveName || entryDisplayName || entity?.name || "Unnamed Entry";
+}
+
 /** Format the Threads (groups) an entity belongs to as context text. */
 function formatEntityGroups(state: RootState, entityId: string): string {
   const groups = state.world.groups.filter((g) =>
@@ -100,30 +145,20 @@ export const createLorebookContentFactory = (
       throw new Error(`Lorebook entry not found: ${entryId}`);
     }
 
-    // Resolve category name for template + type label
-    let categoryName = "";
-    if (entry.category) {
-      const categories = await api.v1.lorebook.categories();
-      const cat = categories.find((c) => c.id === entry.category);
-      categoryName = cat?.name || "";
-    }
-
-    const entryType = getEntryType(categoryName);
-    const template = CATEGORY_TEMPLATES[categoryName] || "";
-
     const state = getState();
     const entity = findEntityForEntry(state, entryId);
+
+    // Resolve category from Redux first so the template follows the user's
+    // current type selection even when the lorebook entry hasn't been moved.
+    const categoryName = await resolveCategoryName(state, entryId, entry.category);
+    const entryType = getEntryType(categoryName);
+    const template = CATEGORY_TEMPLATES[categoryName] || "";
 
     // Pull name and summary from live input fields only when this entry is
     // currently open in the edit pane — avoids contaminating SEGA batch
     // generation with stale data from whatever entity was last edited.
+    const displayName = await resolveDisplayName(state, entryId, entry.displayName);
     const isCurrentlySelected = state.ui.lorebook.selectedEntryId === entryId;
-
-    const liveName = isCurrentlySelected
-      ? String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "").trim()
-      : "";
-    const displayName = liveName || entry.displayName || entity?.name || "Unnamed Entry";
-
     const liveSummary = isCurrentlySelected
       ? String((await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) || "").trim()
       : "";
@@ -276,18 +311,15 @@ export const createLorebookRefineFactory = (
       throw new Error(`Lorebook entry not found: ${entryId}`);
     }
 
-    const displayName = entry.displayName || "Unnamed Entry";
+    const state = getState();
+    const entity = findEntityForEntry(state, entryId);
+
+    const displayName = await resolveDisplayName(state, entryId, entry.displayName);
     const currentContent = entry.text || "";
     const instructions = await getInstructions();
 
-    // Get category name for type and template
-    let categoryName = "";
-    if (entry.category) {
-      const categories = await api.v1.lorebook.categories();
-      const category = categories.find((c) => c.id === entry.category);
-      categoryName = category?.name || "";
-    }
-
+    // Get category name (prefers Redux entity.categoryId) for type + template
+    const categoryName = await resolveCategoryName(state, entryId, entry.category);
     const entryType = getEntryType(categoryName);
     const setting = String(
       (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
@@ -305,10 +337,6 @@ Setting: ${setting}
     const refinePrompt = LOREBOOK_REFINE_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState);
-
-    // Thread (group) context
-    const state = getState();
-    const entity = findEntityForEntry(state, entryId);
     const groupContext = entity
       ? formatEntityGroups(state, entity.id)
       : "";
@@ -381,21 +409,15 @@ export const buildLorebookKeysPayload = async (
  * Used by handlers to prepend to generated content.
  */
 export const buildLorebookPrefill = async (
+  getState: () => RootState,
   entryId: string,
 ): Promise<string> => {
   const entry = await api.v1.lorebook.entry(entryId);
   if (!entry) return "";
 
-  const displayName = entry.displayName || "Unnamed Entry";
-
-  // Get category name for type
-  let categoryName = "";
-  if (entry.category) {
-    const categories = await api.v1.lorebook.categories();
-    const category = categories.find((c) => c.id === entry.category);
-    categoryName = category?.name || "";
-  }
-
+  const state = getState();
+  const displayName = await resolveDisplayName(state, entryId, entry.displayName);
+  const categoryName = await resolveCategoryName(state, entryId, entry.category);
   const entryType = getEntryType(categoryName);
   const setting = String(
     (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",

@@ -24,9 +24,12 @@ import {
 import {
   entityEdited,
   entityCategoryChanged,
+  entityLorebookEntryBound,
   entitySummaryUpdated,
   entityDeleted,
 } from "../../core/store/slices/world";
+import { ensureCategory } from "../../core/store/effects/lorebook-sync";
+import type { RootState } from "../../core/store/types";
 import {
   IDS,
   EDIT_PANE_TITLE,
@@ -80,7 +83,14 @@ export type SeEntityEditPaneOptions = {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const S = {
-  container: { gap: "6px", flex: "1", "justify-content": "flex-start" },
+  container: {
+    gap: "6px",
+    flex: "1",
+    "justify-content": "flex-start",
+    // Mobile bezels can clip the bottom row (Keys + Always On) on some
+    // devices; reserve a safe area below the last input.
+    "padding-bottom": "32px",
+  },
   header: { "align-items": "center", gap: "4px", "margin-bottom": "4px" },
   headerName: { flex: "1", "font-size": "0.95em", "font-weight": "bold" },
   colLabel: { "font-size": "0.8em", "font-weight": "bold" },
@@ -133,6 +143,45 @@ export class SeEntityEditPane extends SuiComponent<
   private readonly _contentBtn: SeGenerationIconButton;
   private readonly _keysBtn: SeGenerationIconButton;
 
+  /**
+   * Resolve (or create + bind) the lorebook entry for this entity. Idempotent:
+   * returns the existing entryId for live entities, lazily promotes drafts on
+   * first call. Used by Save and by the Content/Keys Generate buttons so a
+   * single creation path covers every branch and no caller has to special-case
+   * "draft vs live".
+   */
+  private async _ensureLiveEntryId(entityId: string): Promise<string | undefined> {
+    const existing = store.getState().world.entitiesById[entityId]?.lorebookEntryId;
+    if (existing) return existing;
+
+    const current = store.getState().world.entitiesById[entityId];
+    if (!current) return undefined;
+
+    const draftName =
+      String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) ?? "").trim() ||
+      current.name ||
+      "";
+    const categoryId = await ensureCategory(current.categoryId);
+    const newEntryId = api.v1.uuid();
+    await api.v1.lorebook.createEntry({
+      id: newEntryId,
+      displayName: draftName,
+      text: "",
+      keys: [],
+      enabled: true,
+      category: categoryId,
+    });
+    store.dispatch(
+      entityLorebookEntryBound({ entityId, lorebookEntryId: newEntryId }),
+    );
+    // Mark the new entry as the active selection so the streaming handler
+    // recognizes it and routes generated text into the open pane.
+    store.dispatch(
+      uiLorebookEntrySelected({ entryId: newEntryId, categoryId: null }),
+    );
+    return newEntryId;
+  }
+
   constructor(options: SeEntityEditPaneOptions) {
     super(
       { state: {} as State, ...options },
@@ -154,24 +203,34 @@ export class SeEntityEditPane extends SuiComponent<
       },
     });
 
-    const entity = store.getState().world.entitiesById[entityId];
-    const entryId = entity?.lorebookEntryId ?? "";
+    // Content/Keys buttons resolve their tracked requestId from current
+    // world state, so the watcher reacts the moment a draft entity is
+    // promoted (lorebookEntryId becomes set) — same wiring works for drafts
+    // and for live entities, no construction-time entryId needed.
+    const lorebookEntryProjection = (s: RootState) =>
+      s.world.entitiesById[entityId]?.lorebookEntryId;
 
     this._contentBtn = new SeGenerationIconButton({
       id: IDS.LOREBOOK.GEN_CONTENT_BTN,
       iconId: "zap" as IconId,
-      requestId: entryId ? IDS.LOREBOOK.entry(entryId).CONTENT_REQ : undefined,
+      stateProjection: lorebookEntryProjection,
+      requestIdFromProjection: (id) =>
+        id ? IDS.LOREBOOK.entry(id as string).CONTENT_REQ : undefined,
       onGenerate: () => {
-        if (!entryId) return;
-        store.dispatch(
-          uiLorebookContentGenerationRequested({
-            requestId: IDS.LOREBOOK.entry(entryId).CONTENT_REQ,
-          }),
-        );
+        void (async () => {
+          const liveId = await this._ensureLiveEntryId(entityId);
+          if (!liveId) return;
+          store.dispatch(
+            uiLorebookContentGenerationRequested({
+              requestId: IDS.LOREBOOK.entry(liveId).CONTENT_REQ,
+            }),
+          );
+        })();
       },
       contentChecker: async () => {
-        if (!entryId) return false;
-        const entry = await api.v1.lorebook.entry(entryId);
+        const id = store.getState().world.entitiesById[entityId]?.lorebookEntryId;
+        if (!id) return false;
+        const entry = await api.v1.lorebook.entry(id);
         return !!entry?.text;
       },
     });
@@ -179,18 +238,24 @@ export class SeEntityEditPane extends SuiComponent<
     this._keysBtn = new SeGenerationIconButton({
       id: IDS.LOREBOOK.GEN_KEYS_BTN,
       iconId: "key" as IconId,
-      requestId: entryId ? IDS.LOREBOOK.entry(entryId).KEYS_REQ : undefined,
+      stateProjection: lorebookEntryProjection,
+      requestIdFromProjection: (id) =>
+        id ? IDS.LOREBOOK.entry(id as string).KEYS_REQ : undefined,
       onGenerate: () => {
-        if (!entryId) return;
-        store.dispatch(
-          uiLorebookKeysGenerationRequested({
-            requestId: IDS.LOREBOOK.entry(entryId).KEYS_REQ,
-          }),
-        );
+        void (async () => {
+          const liveId = await this._ensureLiveEntryId(entityId);
+          if (!liveId) return;
+          store.dispatch(
+            uiLorebookKeysGenerationRequested({
+              requestId: IDS.LOREBOOK.entry(liveId).KEYS_REQ,
+            }),
+          );
+        })();
       },
       contentChecker: async () => {
-        if (!entryId) return false;
-        const entry = await api.v1.lorebook.entry(entryId);
+        const id = store.getState().world.entitiesById[entityId]?.lorebookEntryId;
+        if (!id) return false;
+        const entry = await api.v1.lorebook.entry(id);
         return !!(entry?.keys && entry.keys.length > 0);
       },
     });
@@ -224,7 +289,9 @@ export class SeEntityEditPane extends SuiComponent<
         api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, entry.text ?? ""),
         api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, entry.keys?.join(", ") ?? ""),
       ]);
-    } else if (entryId) {
+    } else {
+      // Draft entity (or live with no entry yet on the API side) — clear any
+      // stale draft content from a prior session so a fresh draft starts empty.
       await Promise.all([
         api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, ""),
         api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, ""),
@@ -269,15 +336,17 @@ export class SeEntityEditPane extends SuiComponent<
           }
         }
 
-        if (entryId) {
-          await api.v1.lorebook.updateEntry(entryId, { displayName: trimmedName });
-
+        // Single flush path for both branches: promote draft → live if needed,
+        // then write the in-pane draft (name, content, keys, alwaysOn) to the
+        // lorebook entry. Avoids duplicating create-vs-update content logic.
+        const liveEntryId = await this._ensureLiveEntryId(entityId);
+        if (liveEntryId) {
           const rawContent = String(
             (await api.v1.storyStorage.get(L.CONTENT_DRAFT_RAW)) ?? "",
           );
           const erato = (await api.v1.config.get("erato_compatibility")) || false;
           const content =
-            erato && !rawContent.startsWith("----\n")
+            rawContent && erato && !rawContent.startsWith("----\n")
               ? "----\n" + rawContent
               : rawContent;
           const rawKeys = String(
@@ -287,7 +356,8 @@ export class SeEntityEditPane extends SuiComponent<
             .split(",")
             .map((k) => k.trim())
             .filter((k) => k.length > 0);
-          await api.v1.lorebook.updateEntry(entryId, {
+          await api.v1.lorebook.updateEntry(liveEntryId, {
+            displayName: trimmedName,
             text: content,
             keys,
             forceActivation: _alwaysOnDraft,
@@ -427,8 +497,9 @@ export class SeEntityEditPane extends SuiComponent<
       }),
 
       // ── Lorebook section ───────────────────────────────────────────────────
+      // Single render path for drafts and live entities — Generate buttons
+      // self-promote drafts on click, so no isLive branching here.
       text({ text: "", style: S.lbDivider }),
-
       row({
         style: S.sectionRow,
         content: [
@@ -443,7 +514,6 @@ export class SeEntityEditPane extends SuiComponent<
         storageKey: `story:${L.CONTENT_DRAFT_KEY}`,
         style: S.contentInput,
       }),
-
       row({
         style: S.keysRow,
         content: [

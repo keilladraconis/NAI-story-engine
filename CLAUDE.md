@@ -47,10 +47,11 @@ npm run test       # vitest run
 
 - `WorldEntity` has `id`, `categoryId` (`DulfsFieldID`), `lifecycle` (`"draft" | "live"`), optional `lorebookEntryId`, `name`, and `summary`.
 - **Entity summary** is a Story Engine–internal field. It is stored only in Redux, editable only in `SeEntityEditPane`, and **never synchronized with or derived from lorebook entry text**. The lorebook entry text is a separate field populated by generation.
-- **Draft entities** have no lorebook entry. Their card shows name + summary; edit pane allows name/summary/category editing.
-- **Live entities** have a lorebook entry (`lorebookEntryId`). Their edit pane additionally shows lorebook content and keys with generation buttons. Lorebook content/keys are **only flushed to the lorebook API on Save** — not on every keystroke.
+- **Draft entities** have no lorebook entry. The "+ Add Entity" button creates a draft — **no lorebook entry is created until the user hits Save**, so cancelling out leaves no orphaned lorebook entries behind. The edit pane still exposes every field (name, summary, category, lorebook content, keys, Always On) so users can author the full entry by hand before promoting it; only the Generate icon buttons for content/keys are hidden, since those stream into a live lorebook entry that doesn't exist yet.
+- **Live entities** have a lorebook entry (`lorebookEntryId`). Their edit pane additionally shows the Generate icon buttons next to Content and Keys. Lorebook content/keys are **only flushed to the lorebook API on Save** — not on every keystroke.
+- **Draft → live promotion:** Saving a draft entity creates a lorebook entry in the entity's current category (via `ensureCategory(entity.categoryId)`) and persists the draft name, lorebook content, keys, and Always On state that were entered in the pane. The entry id is attached via `entityLorebookEntryBound`.
 - **Cast**: `castAllRequested` / `entityCastRequested` effects first look for an existing unmanaged lorebook entry with a matching `displayName` (case-insensitive) and bind to it. If none found, a new entry is created in the appropriate `SE: <Category>` lorebook category with empty text (summary is not seeded into lorebook).
-- **Category**: `entityCategoryChanged` action updates `entity.categoryId`. `SeEntityEditPane` shows a category picker (SuiActionBar) for draft entities.
+- **Category**: `entity.categoryId` is a Story Engine concept — it drives sidebar organization, template selection, and the prefill `Type:` line. It is **independent of the lorebook entry's own category**: the lorebook category is where the entry lives in the user's lorebook, only assigned at creation time (`SeEntityEditPane` on save; cast/forge effects at bind time). Users commonly reorganize imported or long-running entries in their lorebook for their own preferences; Story Engine does **not** chase those moves, and `entityCategoryChanged` only updates Redux — it does not rewrite `entry.category`. `SeEntityEditPane` shows a category picker (SuiActionBar) for all entities.
 
 **Prompts:** All generation prompts are hard-coded constants in `src/core/utils/prompts.ts`. They are **not** configurable via `project.yaml`. `project.yaml` contains only non-prompt settings (model, feature flags).
 
@@ -66,6 +67,7 @@ npm run test       # vitest run
 - World Entries use two-phase generation: Phase 1 generates a list of names, Phase 2 generates detailed content per item
 - S.E.G.A. (Story Engine Generate All) fills blank fields using round-robin queueing across categories
 - Lorebook sync (`src/core/store/effects/lorebook-sync.ts`) manages SE-category creation and DULFS item→lorebook binding. It does **not** sync entity summaries in either direction — summaries are SE-internal only.
+- **Information hierarchy for lorebook generation: DRAFT > LOREBOOK > STATE** for the fields that actually have all three layers (notably `displayName`): prefer in-pane draft values (storyStorage slots like `EDIT_PANE_TITLE`) first, then the lorebook API entry (so imported/user-edited lorebooks override whatever Redux thinks), and only then fall back to Redux world state. **Category is a deliberate exception** — it's an SE-side classification, so managed entities resolve through `entity.categoryId` and only unmanaged entries fall back to `entry.category`. `resolveDisplayName` / `resolveCategoryName` in `src/core/utils/lorebook-strategy.ts` are the canonical implementations.
 
 ## Coding Guidelines
 
@@ -76,6 +78,12 @@ npm run test       # vitest run
 - Be bold, don't worry about data migration or supporting legacy patterns as we iterate.
 - Adhere to the KISS Principle.
 - Follow the Boyscout Rule.
+- Bump `project.yaml` `version` at most once per pull request. Subsequent commits on the same branch should not bump it again. **Story Engine is in alpha**, so the major version is locked at `0` — `1.0` is reserved for Beta and `2.0` for the production release. That shifts the standard semver rungs down one:
+  - **Minor** — the "major"-scale changes (architecture, data model, persisted schema, generation pipeline restructure). These would normally be major bumps, but bump minor while the major is pinned at 0.
+  - **Patch** — everything else: quality and accessibility improvements, prompt tuning, UX polish, new non-structural features, and bug fixes. Normally these would split across minor and patch; under the alpha lock they all go to patch.
+- Keep `CHANGELOG.md` in step with the in-progress version on every commit that changes user-visible behavior. On the first commit that bumps the version, add a new section for it at the top of the file under the existing Keep-a-Changelog layout (`### Added / Changed / Fixed / Removed`). On subsequent commits to the same PR, trim or refine that section — merge duplicates, drop entries that were reverted, and rewrite bullets as the user-facing story sharpens. The goal is a final changelog entry that reads like a release note, not a commit log.
+
+**DRY in the UI (don't branch render paths on entity state):** Avoid duplicating component construction or splitting `compose()` into "draft vs live" / "empty vs filled" / "isFoo vs isBar" render branches. Each branch is another stale-closure surface and another place to forget when a new field is added. Prefer one render path that always builds every part, and let the parts adapt themselves: `stateProjection`/`requestIdFromProjection` on a `SeGenerationIconButton` so the same button works for drafts and live entities; helpers like `_ensureLiveEntryId` so callers (Save, Generate Content, Generate Keys) don't each reimplement the promote logic. When a callsite genuinely needs different behavior, push the difference into the leaf — never fork the row/column scaffolding above it.
 
 **UI Input Patterns:**
 

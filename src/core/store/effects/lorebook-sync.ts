@@ -171,6 +171,11 @@ export function registerLorebookSyncEffects(
   _dispatch: AppDispatch,
   _getState: () => RootState,
 ): void {
-  // Lorebook sync for world entities is handled directly by the list handler
-  // and forge handler at creation time. No subscribeEffect needed.
+  // Entity categorization is a Story Engine concept — `entity.categoryId`
+  // drives template selection and organization inside the sidebar — and is
+  // intentionally independent of where the lorebook entry lives in the
+  // user's lorebook. Users may reorganize imported or long-running entries
+  // however they want; we don't shuffle them around when the SE category
+  // changes. The lorebook category is only assigned at creation time
+  // (`SeEntityEditPane` on save, cast/forge effects at bind time).
 }
