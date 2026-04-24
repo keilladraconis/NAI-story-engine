@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.1] - 2026-04-24
+
+### Fixed
+
+- **Lorebook generation now respects the entity's selected type and typed name.** Previously a new world entity would generate as a Character regardless of the category picked in the edit pane, and the saved entry would be headed `Name: Unnamed Entry` if the user hadn't hit Save first. Name/category resolution now follows a **DRAFT > LOREBOOK > STATE** hierarchy, and the prefill written to the saved entry matches what was sent to the model.
+
+### Changed
+
+- **"+ Add Entity" no longer pre-creates a lorebook entry.** The lorebook entry is only created when you hit Save on the edit pane, so cancelling out of a new entity doesn't leave an orphan entry in your lorebook. The Content / Keys / Always-On section is hidden on draft entities and appears after the first save.
+- **Changing an entity's category moves its lorebook entry to the matching `SE:` category.** The two layers no longer drift apart after a type reassignment.
+
 ## [0.11.0] - 2026-04-20
 
 ### Added

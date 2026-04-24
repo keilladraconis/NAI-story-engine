@@ -82,6 +82,7 @@ npm run test       # vitest run
   - **Major** — architecture or data-model changes (e.g. new slice, persisted schema change, generation pipeline restructure).
   - **Minor** — quality and accessibility improvements (e.g. prompt tuning, UX polish, new non-structural features).
   - **Patch** — bug fixes.
+- Keep `CHANGELOG.md` in step with the in-progress version on every commit that changes user-visible behavior. On the first commit that bumps the version, add a new section for it at the top of the file under the existing Keep-a-Changelog layout (`### Added / Changed / Fixed / Removed`). On subsequent commits to the same PR, trim or refine that section — merge duplicates, drop entries that were reverted, and rewrite bullets as the user-facing story sharpens. The goal is a final changelog entry that reads like a release note, not a commit log.
 
 **UI Input Patterns:**
 
