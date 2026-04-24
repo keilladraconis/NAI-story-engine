@@ -43,27 +43,26 @@ function findEntityForEntry(state: RootState, entryId: string) {
 
 /**
  * Resolve the lorebook category name ("SE: <Label>") driving template + type
- * selection. Follows the DRAFT > LOREBOOK > STATE hierarchy: the entry's
- * actual category on the lorebook API wins when present (so imported
- * lorebooks override whatever Redux thinks), falling back to the entity's
- * `categoryId` for entries that are missing or mid-migration. Entity-side
- * category changes are propagated to `entry.category` by the
- * entityCategoryChanged sync effect, so both layers stay in agreement.
+ * selection. Category is a Story Engine concept stored on the entity; the
+ * lorebook entry's own category is just where it lives in the user's
+ * lorebook (they may reorganize imported/long-running entries however they
+ * want, and we don't move those). So: for managed entities, trust
+ * `entity.categoryId`. For unmanaged entries (no SE entity bound), fall
+ * back to `entry.category` as the only available signal.
  */
 async function resolveCategoryName(
   state: RootState,
   entryId: string,
   entryCategoryId: string | null | undefined,
 ): Promise<string> {
-  if (entryCategoryId) {
-    const categories = await api.v1.lorebook.categories();
-    const byId = categories.find((c) => c.id === entryCategoryId)?.name;
-    if (byId) return byId;
-  }
   const entity = findEntityForEntry(state, entryId);
   if (entity) {
     const label = FIELD_CONFIGS.find((c) => c.id === entity.categoryId)?.label;
     if (label) return `SE: ${label}`;
+  }
+  if (entryCategoryId) {
+    const categories = await api.v1.lorebook.categories();
+    return categories.find((c) => c.id === entryCategoryId)?.name || "";
   }
   return "";
 }

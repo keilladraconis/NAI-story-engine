@@ -1,7 +1,6 @@
-import { Store, matchesAction } from "nai-store";
+import { Store } from "nai-store";
 import { RootState, AppDispatch } from "../types";
 import { DulfsFieldID, FIELD_CONFIGS } from "../../../config/field-definitions";
-import { entityCategoryChanged } from "../slices/world";
 
 // Lorebook sync constants
 export const SE_CATEGORY_PREFIX = "SE: ";
@@ -168,24 +167,15 @@ export function registerLorebookSyncHooks(
 }
 
 export function registerLorebookSyncEffects(
-  subscribeEffect: Store<RootState>["subscribeEffect"],
+  _subscribeEffect: Store<RootState>["subscribeEffect"],
   _dispatch: AppDispatch,
-  getState: () => RootState,
+  _getState: () => RootState,
 ): void {
-  // When the user changes an entity's type in the edit pane, move its lorebook
-  // entry to the matching "SE: <Category>" so generation, SEGA, and every other
-  // `entry.category` consumer reflect the current selection.
-  subscribeEffect(matchesAction(entityCategoryChanged), async (action) => {
-    const { entityId, categoryId } = action.payload;
-    const entity = getState().world.entitiesById[entityId];
-    if (!entity?.lorebookEntryId) return;
-
-    const targetCategoryId = await ensureCategory(categoryId);
-    const entry = await api.v1.lorebook.entry(entity.lorebookEntryId);
-    if (!entry || entry.category === targetCategoryId) return;
-
-    await api.v1.lorebook.updateEntry(entity.lorebookEntryId, {
-      category: targetCategoryId,
-    });
-  });
+  // Entity categorization is a Story Engine concept — `entity.categoryId`
+  // drives template selection and organization inside the sidebar — and is
+  // intentionally independent of where the lorebook entry lives in the
+  // user's lorebook. Users may reorganize imported or long-running entries
+  // however they want; we don't shuffle them around when the SE category
+  // changes. The lorebook category is only assigned at creation time
+  // (`SeEntityEditPane` on save, cast/forge effects at bind time).
 }
