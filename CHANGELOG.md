@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.2] - 2026-04-24
+
+### Fixed
+
+- **Lorebook entries now open with the bare entity name on the first line**, matching the per-category templates (`[Entry Name]` / `Type: …` / `Setting: …`). The prefill previously prepended a redundant `Name:` label that didn't match the template, causing the model to drift into a freeform header instead of following the template.
+
 ## [0.11.1] - 2026-04-24
 
 ### Fixed

@@ -218,7 +218,7 @@ export const createLorebookContentFactory = (
     await appendXialongStyleMessage(messages, XIALONG_STYLE.lorebookContent);
 
     // --- MSG 7: Anchored prefill ---
-    const assistantPrefill = `Name: ${displayName}\nType: ${entryType}\nSetting: ${setting || "original"}\n`;
+    const assistantPrefill = `${displayName}\nType: ${entryType}\nSetting: ${setting || "original"}\n`;
     messages.push({ role: "assistant", content: assistantPrefill });
 
     const xialong = await isXialongMode();
@@ -329,7 +329,7 @@ export const createLorebookRefineFactory = (
     const template = CATEGORY_TEMPLATES[categoryName] || "";
 
     // Anchored assistant prefill
-    const prefillContent = `Name: ${displayName}
+    const prefillContent = `${displayName}
 Type: ${entryType}
 Setting: ${setting}
 `;
@@ -423,7 +423,7 @@ export const buildLorebookPrefill = async (
     (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
   );
 
-  return `Name: ${displayName}
+  return `${displayName}
 Type: ${entryType}
 Setting: ${setting}
 `;
