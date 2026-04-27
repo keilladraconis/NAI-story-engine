@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.3] - 2026-04-27
+
+### Fixed
+
+- **Forge now reliably creates world entries for elements described in the Brainstorm.** The forge prompt previously only described how to treat the `=== ESTABLISHED WORLD ===` section, leaving the model to infer how to handle `=== BRAINSTORM ===`. With declarative-present-tense brainstorm summaries, GLM 4.6 in particular tended to read the brainstorm as existing world and only reference its elements in other entries instead of CREATEing them. The system prompt now explicitly identifies the brainstorm as source material to extract elements from, while keeping the established-world guard so re-Forges and in-progress stories don't recreate entities that already exist.
+
 ## [0.11.2] - 2026-04-24
 
 ### Fixed
