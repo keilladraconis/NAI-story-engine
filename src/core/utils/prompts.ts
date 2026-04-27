@@ -489,7 +489,8 @@ EXAMPLE:
 [THREAD "Black-Market Bay" | "Mira Voss", "The Sunken Arcade" | The physical space that makes Mira's work possible and visible to the wrong people.]
 [CRITIQUE | The cast has friction but the locations are generic containers — they need to be sites of specific pressure, not just backdrop. The arcade works; the hospital does not yet.]
 
-The ESTABLISHED WORLD section lists what already exists — do not recreate those elements.
+The === BRAINSTORM === section is source material — extract characters, locations, factions, systems, situations, and topics from it and CREATE them as world elements.
+The === ESTABLISHED WORLD === section lists elements that already exist — do not recreate those elements, even if the brainstorm describes them.
 The prior command sequence shows what has been built this pass — continue it naturally.`;
 
 
