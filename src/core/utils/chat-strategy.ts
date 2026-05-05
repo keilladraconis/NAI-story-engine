@@ -54,7 +54,8 @@ export function buildChatStrategy(
   return {
     requestId: `chat-${chat.id}-${assistantMessageId}`,
     messageFactory: async () => {
-      const prefix = await buildStoryEnginePrefix(getState);
+      // excludeChat: we'll inject the chat's own transcript below
+      const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true });
       const system: Message = {
         role: "system",
         content: spec.systemPromptFor(chat, ctx),

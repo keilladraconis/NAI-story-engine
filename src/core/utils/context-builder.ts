@@ -22,8 +22,10 @@ import {
   BrainstormMode,
   GenerationStrategy,
 } from "../store/types";
-import type { RefineContext } from "../chat-types/types";
+import type { RefineContext, SpecCtx } from "../chat-types/types";
 import { currentMessages } from "../store/slices/brainstorm";
+import { activeSavedChat } from "../store/slices/chat";
+import { getChatTypeSpec } from "../chat-types";
 import { MessageFactory } from "nai-gen-x";
 import {
   FieldID,
@@ -318,6 +320,8 @@ export interface StoryEnginePrefixOptions {
     | "storyText"
     | "foundation"
   >;
+  /** Skip chat-transcript injection. Set by chat-strategy so it doesn't double-inject the active chat. */
+  excludeChat?: boolean;
 }
 
 export const buildStoryEnginePrefix = async (
@@ -383,10 +387,21 @@ export const buildStoryEnginePrefix = async (
     if (setting) stableSections.push(`[SETTING]\n${setting}`);
   }
 
-  // Brainstorm (consolidated)
-  if (!excluded.has("brainstorm")) {
-    const brainstorm = getConsolidatedBrainstorm(state);
-    if (brainstorm) stableSections.push(`[BRAINSTORM]\n${brainstorm}`);
+  // Active chat transcript (chat-slice driven, with brainstorm-slice fallback during transition).
+  // The active chat's spec.contextSlice() decides which messages contribute to the prefix.
+  if (!excluded.has("brainstorm") && !options.excludeChat) {
+    const active = activeSavedChat(state.chat);
+    let chatText = "";
+    if (active) {
+      const ctx: SpecCtx = { getState, dispatch: () => {} };
+      const messages = getChatTypeSpec(active.type).contextSlice(active, ctx);
+      chatText = messages
+        .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+        .join("\n");
+    } else {
+      chatText = getConsolidatedBrainstorm(state);
+    }
+    if (chatText) stableSections.push(`[BRAINSTORM]\n${chatText}`);
   }
 
   // --- MSG 3: World Entities (GROWS during list stage, stable during lorebook) ---
