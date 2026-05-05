@@ -22,6 +22,7 @@ import {
   BrainstormMode,
   GenerationStrategy,
 } from "../store/types";
+import type { RefineContext } from "../chat-types/types";
 import { currentMessages } from "../store/slices/brainstorm";
 import { MessageFactory } from "nai-gen-x";
 import {
@@ -703,6 +704,7 @@ export const createATTGFactory = (
  */
 export const buildATTGStrategy = (
   getState: () => RootState,
+  _opts?: { refineContext?: RefineContext },
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
@@ -752,6 +754,7 @@ export const createStyleFactory = (
  */
 export const buildStyleStrategy = (
   getState: () => RootState,
+  _opts?: { refineContext?: RefineContext },
 ): GenerationStrategy => {
   return {
     requestId: api.v1.uuid(),
