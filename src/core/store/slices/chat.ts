@@ -126,6 +126,19 @@ export const chatSlice = createSlice({
       };
     },
 
+    refineMessageReplaced: (state, payload: { id: string; content: string }) => {
+      if (!state.refineChat) return state;
+      return {
+        ...state,
+        refineChat: {
+          ...state.refineChat,
+          messages: state.refineChat.messages.map((m) =>
+            m.id === payload.id ? { ...m, content: payload.content } : m,
+          ),
+        },
+      };
+    },
+
     refineCandidateMarked: (state, payload: { messageId: string }) => {
       if (!state.refineChat) return state;
       return {
@@ -157,6 +170,7 @@ export const {
   refineChatCleared,
   refineMessageAdded,
   refineMessageAppended,
+  refineMessageReplaced,
   refineCandidateMarked,
 } = chatSlice.actions;
 

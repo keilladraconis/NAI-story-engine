@@ -129,6 +129,7 @@ export {
   refineChatCleared,
   refineMessageAdded,
   refineMessageAppended,
+  refineMessageReplaced,
   refineCandidateMarked,
 } from "./slices/chat";
 export type { ChatSliceState } from "./slices/chat";

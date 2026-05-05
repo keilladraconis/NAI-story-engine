@@ -18,6 +18,7 @@ import {
   threadSummaryHandler,
 } from "./handlers/summary";
 import { bootstrapHandler, bootstrapContinueHandler } from "./handlers/bootstrap";
+import { chatHandler, chatRefineHandler } from "./handlers/chat";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -150,23 +151,8 @@ export const GENERATION_HANDLERS: {
   threadSummary: threadSummaryHandler,
   bootstrap: bootstrapHandler,
   bootstrapContinue: bootstrapContinueHandler,
-  // Stubs — implemented in Tasks 13-15 (chat-effects.ts, chat handlers)
-  chat: {
-    streaming: () => {
-      throw new Error("chat handler not yet implemented (Task 15)");
-    },
-    completion: async () => {
-      throw new Error("chat handler not yet implemented (Task 15)");
-    },
-  },
-  chatRefine: {
-    streaming: () => {
-      throw new Error("chatRefine handler not yet implemented (Task 15)");
-    },
-    completion: async () => {
-      throw new Error("chatRefine handler not yet implemented (Task 15)");
-    },
-  },
+  chat: chatHandler,
+  chatRefine: chatRefineHandler,
 };
 
 export function getHandler(
