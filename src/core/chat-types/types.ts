@@ -43,7 +43,6 @@ export interface HeaderControl {
   id: string;
   /** Tag identifying which header control this is, so ChatHeader knows how to render. */
   kind: "subModeToggle" | "summarizeButton" | "sessionsButton" | "label";
-  payload?: Record<string, unknown>;
 }
 
 export interface SpecCtx {
