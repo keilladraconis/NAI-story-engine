@@ -96,6 +96,8 @@ export interface GenerationRequest {
     | "list"
     | "brainstorm"
     | "brainstormChatTitle"
+    | "chat"
+    | "chatRefine"
     | "lorebookContent"
     | "lorebookKeys"
     | "lorebookRefine"
@@ -119,6 +121,8 @@ export interface GenerationStrategy {
   target:
     | { type: "brainstorm"; messageId: string }
     | { type: "brainstormChatTitle"; chatIndex: number }
+    | { type: "chat"; chatId: string; messageId: string }
+    | { type: "chatRefine"; messageId: string; fieldId: string }
     | { type: "field"; fieldId: string }
     | { type: "list"; fieldId: string }
     | { type: "lorebookContent"; entryId: string }

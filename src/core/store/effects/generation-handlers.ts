@@ -79,6 +79,14 @@ export type BootstrapContinueTarget = Extract<
   GenerationStrategy["target"],
   { type: "bootstrapContinue" }
 >;
+export type ChatTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "chat" }
+>;
+export type ChatRefineTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "chatRefine" }
+>;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
   target: T;
@@ -125,6 +133,8 @@ export const GENERATION_HANDLERS: {
   threadSummary: GenerationHandlers<ThreadSummaryTarget>;
   bootstrap: GenerationHandlers<BootstrapTarget>;
   bootstrapContinue: GenerationHandlers<BootstrapContinueTarget>;
+  chat: GenerationHandlers<ChatTarget>;
+  chatRefine: GenerationHandlers<ChatRefineTarget>;
 } = {
   brainstorm: brainstormHandler,
   brainstormChatTitle: brainstormChatTitleHandler,
@@ -140,6 +150,23 @@ export const GENERATION_HANDLERS: {
   threadSummary: threadSummaryHandler,
   bootstrap: bootstrapHandler,
   bootstrapContinue: bootstrapContinueHandler,
+  // Stubs — implemented in Tasks 13-15 (chat-effects.ts, chat handlers)
+  chat: {
+    streaming: () => {
+      throw new Error("chat handler not yet implemented (Task 15)");
+    },
+    completion: async () => {
+      throw new Error("chat handler not yet implemented (Task 15)");
+    },
+  },
+  chatRefine: {
+    streaming: () => {
+      throw new Error("chatRefine handler not yet implemented (Task 15)");
+    },
+    completion: async () => {
+      throw new Error("chatRefine handler not yet implemented (Task 15)");
+    },
+  },
 };
 
 export function getHandler(

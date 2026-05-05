@@ -38,6 +38,26 @@ export const uiSlice = createSlice({
     uiBrainstormRetryGeneration: (state, _payload: { messageId: string }) =>
       state,
     uiBrainstormSummarize: (state) => state,
+    // Chat user intents
+    uiChatSubmitUserMessage: (state, _payload: { chatId: string }) => state,
+    uiChatRetryGeneration: (
+      state,
+      _payload: { chatId: string; messageId: string },
+    ) => state,
+    uiChatSummarizeRequested: (
+      state,
+      _payload: {
+        seed:
+          | { kind: "fromChat"; sourceChatId: string }
+          | { kind: "fromStoryText"; sourceText: string };
+      },
+    ) => state,
+    uiChatRefineRequested: (
+      state,
+      _payload: { fieldId: string; sourceText: string },
+    ) => state,
+    uiChatRefineCommitted: (state) => state,
+    uiChatRefineDiscarded: (state) => state,
     // Internal: Submit generation to GenX (not a user intent)
     generationSubmitted: (state, _strategy: any) => state,
     uiCancelRequest: (state, _payload: { requestId: string }) => state,
@@ -108,6 +128,12 @@ export const {
   uiBrainstormSubmitUserMessage,
   uiBrainstormRetryGeneration,
   uiBrainstormSummarize,
+  uiChatSubmitUserMessage,
+  uiChatRetryGeneration,
+  uiChatSummarizeRequested,
+  uiChatRefineRequested,
+  uiChatRefineCommitted,
+  uiChatRefineDiscarded,
   generationSubmitted,
   uiCancelRequest,
   uiEditableActivate,

@@ -199,6 +199,10 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return "bootstrap";
     case "bootstrapContinue":
       return `bootstrap-continue:${target.iteration}`;
+    case "chat":
+      return `chat:${target.messageId}`;
+    case "chatRefine":
+      return `chat-refine:${target.fieldId}`;
   }
 }
 
