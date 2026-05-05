@@ -214,6 +214,7 @@ export interface FoundationState {
 export interface RootState {
   story: StoryState;
   brainstorm: BrainstormState;
+  chat: import("./slices/chat").ChatSliceState;
   ui: UIState;
   runtime: RuntimeState;
   world: WorldState;
