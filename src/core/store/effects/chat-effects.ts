@@ -172,10 +172,10 @@ export function registerChatEffects(
     async (_action, { getState: latest }) => {
       const refine = latest().chat.refineChat;
       if (!refine?.refineTarget) return;
-      const lastCandidate = [...refine.messages]
-        .reverse()
-        .find((m) => m.role === "assistant" && m.content.trim().length > 0);
-      if (!lastCandidate) return;
+      const hasCandidate = refine.messages.some(
+        (m) => m.role === "assistant" && m.content.trim().length > 0,
+      );
+      if (!hasCandidate) return;
       const spec = getChatTypeSpec("refine");
       spec.onCommit?.(refine, { getState: latest, dispatch });
       dispatch(refineChatCleared());

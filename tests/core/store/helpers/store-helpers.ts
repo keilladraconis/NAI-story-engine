@@ -1,7 +1,14 @@
 import { createStore, combineReducers } from "nai-store";
-import { chatSlice } from "../../../../src/core/store/slices/chat";
+import { chatSlice, type ChatSliceState } from "../../../../src/core/store/slices/chat";
 import { uiSlice } from "../../../../src/core/store/slices/ui";
 import { runtimeSlice } from "../../../../src/core/store/slices/runtime";
+import type { UIState, RuntimeState } from "../../../../src/core/store/types";
+
+export interface TestRootState {
+  chat: ChatSliceState;
+  ui: UIState;
+  runtime: RuntimeState;
+}
 
 export const rootReducerForTest = combineReducers({
   chat: chatSlice.reducer,
@@ -10,5 +17,5 @@ export const rootReducerForTest = combineReducers({
 });
 
 export function makeTestStore() {
-  return createStore(rootReducerForTest as any, false);
+  return createStore<TestRootState>(rootReducerForTest, false);
 }
