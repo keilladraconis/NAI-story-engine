@@ -20,7 +20,7 @@ import {
 // Persisted data loaded action
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface PersistedData {
+export interface PersistedData {
   story?: StoryState;
   brainstorm?: { chats: BrainstormChat[]; currentChatIndex: number };
   chat?: ChatSliceState;

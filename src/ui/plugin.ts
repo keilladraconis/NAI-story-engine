@@ -107,10 +107,7 @@ export class StoryEnginePlugin extends SuiPlugin {
       await api.v1.storyStorage.set(STORAGE_KEYS.PERSIST, migrated.data);
       api.v1.ui.toast("Brainstorm chats migrated to new chat system.", { type: "info" });
     }
-    if (persisted || migrated.touched)
-      store.dispatch(
-        persistedDataLoaded(migrated.data as Parameters<typeof persistedDataLoaded>[0]),
-      );
+    if (persisted) store.dispatch(persistedDataLoaded(migrated.data));
 
     await migrateLorebookCategories();
     await syncEratoCompatibility(store.getState);
