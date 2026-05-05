@@ -33,6 +33,7 @@ import {
   migrateLorebookCategories,
   registerLorebookSyncHooks,
 } from "../core/store/effects/lorebook-sync";
+import { migrateBrainstormToChat } from "../core/store/migrations/brainstorm-to-chat";
 import { stateUpdated, requestActivated } from "../core/store/slices/runtime";
 import { IDS, STORAGE_KEYS } from "./framework/ids";
 import type { EditPaneHost } from "./components/SeContentWithTitlePane";
@@ -101,7 +102,15 @@ export class StoryEnginePlugin extends SuiPlugin {
     registerEffects(store, this._genX);
 
     const persisted = await api.v1.storyStorage.get(STORAGE_KEYS.PERSIST);
-    if (persisted) store.dispatch(persistedDataLoaded(persisted));
+    const migrated = migrateBrainstormToChat(persisted ?? {});
+    if (migrated.touched) {
+      await api.v1.storyStorage.set(STORAGE_KEYS.PERSIST, migrated.data);
+      api.v1.ui.toast("Brainstorm chats migrated to new chat system.", { type: "info" });
+    }
+    if (persisted || migrated.touched)
+      store.dispatch(
+        persistedDataLoaded(migrated.data as Parameters<typeof persistedDataLoaded>[0]),
+      );
 
     await migrateLorebookCategories();
     await syncEratoCompatibility(store.getState);
