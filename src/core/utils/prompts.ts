@@ -92,6 +92,8 @@ REQUIRED — write only declarative present-tense facts:
 
 If something was proposed then revised, write only the final version. If nothing was settled in a category, omit that section entirely.`;
 
+export const STORY_TEXT_SUMMARIZE_PROMPT = `Read the story text below and produce dense declarative present-tense notes capturing setting, characters, situations, and unresolved tensions. Output the notes only — no preamble, no headers.`;
+
 
 export const LOREBOOK_GENERATE_PROMPT = `You are the **Archivist**.
 Generate a structured Lorebook Entry for "[itemName]".
