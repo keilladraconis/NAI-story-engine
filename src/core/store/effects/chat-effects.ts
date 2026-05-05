@@ -8,7 +8,9 @@ import {
   uiChatRefineCommitted,
   uiChatRefineDiscarded,
   uiCancelRequest,
+  generationSubmitted,
 } from "../slices/ui";
+import { requestQueued } from "../slices/runtime";
 import {
   chatCreated,
   messageAdded,
@@ -18,6 +20,8 @@ import {
 } from "../slices/chat";
 import { getChatTypeSpec } from "../../chat-types";
 import type { Chat } from "../../chat-types/types";
+import { buildChatStrategy } from "../../utils/chat-strategy";
+import { buildModelParams } from "../../utils/config";
 import { flushActiveEditor } from "../../../ui/framework/editable-draft";
 import { IDS } from "../../../ui/framework/ids";
 
@@ -26,12 +30,21 @@ function findChat(state: RootState, id: string): Chat | undefined {
 }
 
 async function submitChatGeneration(
-  _state: RootState,
-  _dispatch: AppDispatch,
-  _chat: Chat,
-  _assistantId: string,
+  state: RootState,
+  dispatch: AppDispatch,
+  chat: Chat,
+  assistantId: string,
 ): Promise<void> {
-  // Strategy assembly will be added in Task 14.
+  const strategy = buildChatStrategy(() => state, chat, assistantId);
+  const params = await buildModelParams({ max_tokens: 1024, temperature: 1.0 });
+  dispatch(
+    requestQueued({
+      id: strategy.requestId,
+      type: chat.type === "refine" ? "chatRefine" : "chat",
+      targetId: assistantId,
+    }),
+  );
+  dispatch(generationSubmitted({ ...strategy, params }));
 }
 
 export function registerChatEffects(
