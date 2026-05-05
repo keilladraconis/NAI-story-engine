@@ -30,12 +30,12 @@ function findChat(state: RootState, id: string): Chat | undefined {
 }
 
 async function submitChatGeneration(
-  state: RootState,
+  getState: () => RootState,
   dispatch: AppDispatch,
   chat: Chat,
   assistantId: string,
 ): Promise<void> {
-  const strategy = buildChatStrategy(() => state, chat, assistantId);
+  const strategy = buildChatStrategy(getState, chat, assistantId);
   const params = await buildModelParams({ max_tokens: 1024, temperature: 1.0 });
   dispatch(
     requestQueued({
@@ -80,7 +80,7 @@ export function registerChatEffects(
           message: { id: assistantId, role: "assistant", content: "" },
         }),
       );
-      await submitChatGeneration(latest(), dispatch, chat, assistantId);
+      await submitChatGeneration(latest, dispatch, chat, assistantId);
     },
   );
 
@@ -99,7 +99,7 @@ export function registerChatEffects(
           message: { id: assistantId, role: "assistant", content: "" },
         }),
       );
-      await submitChatGeneration(latest(), dispatch, chat, assistantId);
+      await submitChatGeneration(latest, dispatch, chat, assistantId);
     },
   );
 
@@ -127,7 +127,7 @@ export function registerChatEffects(
           message: { id: assistantId, role: "assistant", content: "" },
         }),
       );
-      await submitChatGeneration(latest(), dispatch, newChat, assistantId);
+      await submitChatGeneration(latest, dispatch, newChat, assistantId);
     },
   );
 
