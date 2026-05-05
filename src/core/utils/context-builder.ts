@@ -42,6 +42,7 @@ import {
   STYLE_GENERATE_PROMPT,
   XIALONG_STYLE,
 } from "./prompts";
+import { buildRefineTail } from "./refine-strategy";
 // --- Helpers ---
 
 
@@ -704,11 +705,22 @@ export const createATTGFactory = (
  */
 export const buildATTGStrategy = (
   getState: () => RootState,
-  _opts?: { refineContext?: RefineContext },
+  opts?: { refineContext?: RefineContext },
 ): GenerationStrategy => {
+  const baseFactory = createATTGFactory(getState);
+  const refineContext = opts?.refineContext;
+  const messageFactory: MessageFactory = refineContext
+    ? async () => {
+        const base = await baseFactory();
+        return {
+          ...base,
+          messages: [...base.messages, ...buildRefineTail(refineContext)],
+        };
+      }
+    : baseFactory;
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createATTGFactory(getState),
+    messageFactory,
     target: { type: "field", fieldId: FieldID.ATTG },
     prefillBehavior: "keep",
     assistantPrefill: "[",
@@ -754,11 +766,22 @@ export const createStyleFactory = (
  */
 export const buildStyleStrategy = (
   getState: () => RootState,
-  _opts?: { refineContext?: RefineContext },
+  opts?: { refineContext?: RefineContext },
 ): GenerationStrategy => {
+  const baseFactory = createStyleFactory(getState);
+  const refineContext = opts?.refineContext;
+  const messageFactory: MessageFactory = refineContext
+    ? async () => {
+        const base = await baseFactory();
+        return {
+          ...base,
+          messages: [...base.messages, ...buildRefineTail(refineContext)],
+        };
+      }
+    : baseFactory;
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createStyleFactory(getState),
+    messageFactory,
     target: { type: "field", fieldId: FieldID.Style },
     prefillBehavior: "keep",
     assistantPrefill: "[",
