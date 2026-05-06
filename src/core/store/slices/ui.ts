@@ -9,9 +9,6 @@ const initialLorebookState: LorebookUIState = {
 export const initialUIState: UIState = {
   activeEditId: null,
   inputs: {},
-  brainstorm: {
-    input: "",
-  },
   lorebook: initialLorebookState,
   worldExpanded: null,
 };
@@ -27,17 +24,9 @@ export const uiSlice = createSlice({
         [payload.id]: payload.value,
       },
     }),
-    setBrainstormInput: (state, input: string) => ({
-      ...state,
-      brainstorm: { ...state.brainstorm, input },
-    }),
     // Intents (handled by Effects)
     uiRequestCancellation: (state) => state,
     uiUserPresenceConfirmed: (state) => state,
-    uiBrainstormSubmitUserMessage: (state) => state,
-    uiBrainstormRetryGeneration: (state, _payload: { messageId: string }) =>
-      state,
-    uiBrainstormSummarize: (state) => state,
     // Chat user intents
     uiChatSubmitUserMessage: (state, _payload: { chatId: string }) => state,
     uiChatRetryGeneration: (
@@ -99,9 +88,6 @@ export const uiSlice = createSlice({
         keysRequestId: string;
       },
     ) => state,
-    // Lorebook refinement (modify existing entry with instructions)
-    uiLorebookRefineRequested: (state, _payload: { requestId: string }) =>
-      state,
     // World expand/collapse all
     worldExpansionSet: (state, payload: { expanded: boolean }) => ({
       ...state,
@@ -121,13 +107,9 @@ export const uiSlice = createSlice({
 
 export const {
   uiInputChanged,
-  setBrainstormInput,
   worldExpansionSet,
   uiRequestCancellation,
   uiUserPresenceConfirmed,
-  uiBrainstormSubmitUserMessage,
-  uiBrainstormRetryGeneration,
-  uiBrainstormSummarize,
   uiChatSubmitUserMessage,
   uiChatRetryGeneration,
   uiChatSummarizeRequested,
@@ -142,7 +124,6 @@ export const {
   uiLorebookContentGenerationRequested,
   uiLorebookKeysGenerationRequested,
   uiLorebookItemGenerationRequested,
-  uiLorebookRefineRequested,
   uiEntitySummaryGenerationRequested,
   uiThreadSummaryGenerationRequested,
 } = uiSlice.actions;

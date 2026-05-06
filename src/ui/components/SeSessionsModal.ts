@@ -1,28 +1,27 @@
 /**
- * openSeSessionsModal — Brainstorm sessions list modal.
+ * openSeSessionsModal — chat sessions list modal.
  *
- * Opens a small modal listing all chat sessions. Each row shows the title
- * with a load button (switches to that session) and a delete button.
- * Rebuilds modal content after each delete. Phase 2: titles are read-only;
- * rename support can be added in a later phase.
+ * Opens a small modal listing all chats from the chat slice. Each row shows
+ * the title with a load button (switches to that chat) and a delete button.
+ * Rebuilds modal content after each delete.
  */
 
 import { store } from "../../core/store";
-import { chatDeleted, chatSwitched } from "../../core/store/slices/brainstorm";
+import { chatDeleted, chatSwitched } from "../../core/store/slices/chat";
 
 export async function openSeSessionsModal(): Promise<void> {
   const modal = await api.v1.ui.modal.open({
-    title: "Brainstorm Sessions",
+    title: "Chat Sessions",
     size: "small",
     content: [],
   });
 
   function buildContent(): UIPart[] {
-    const { chats, currentChatIndex } = store.getState().brainstorm;
+    const { chats, activeChatId } = store.getState().chat;
     const { column, row, text, button } = api.v1.ui.part;
 
     const sessionRows = chats.map((chat, index) => {
-      const isCurrent = index === currentChatIndex;
+      const isCurrent = chat.id === activeChatId;
       const canDelete = chats.length > 1;
       const rowId = `se-bs-session-${index}`;
 
@@ -32,7 +31,7 @@ export async function openSeSessionsModal(): Promise<void> {
           iconId: "folder" as IconId,
           style: { width: "24px", padding: "4px" },
           callback: () => {
-            store.dispatch(chatSwitched(index));
+            store.dispatch(chatSwitched({ id: chat.id }));
             void modal.close();
           },
         }),
@@ -45,7 +44,7 @@ export async function openSeSessionsModal(): Promise<void> {
             iconId: "trash" as IconId,
             style: { width: "24px", padding: "4px", opacity: "0.5" },
             callback: () => {
-              store.dispatch(chatDeleted(index));
+              store.dispatch(chatDeleted({ id: chat.id }));
               void modal.update({ content: buildContent() });
             },
           }),

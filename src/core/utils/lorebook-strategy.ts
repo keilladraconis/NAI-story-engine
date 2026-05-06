@@ -15,7 +15,6 @@ import {
 import {
   LOREBOOK_GENERATE_PROMPT,
   LOREBOOK_KEYS_PROMPT,
-  LOREBOOK_REFINE_PROMPT,
   LOREBOOK_WEAVING_PROMPT,
   CATEGORY_TEMPLATES,
   XIALONG_STYLE,
@@ -294,88 +293,6 @@ export const createLorebookKeysFactory = (
         stop: ["\n---", "\n***", "\n⁂", "[ Style", "</think>"],
       }),
       contextPinning: { head: 1, tail: 3 },
-    };
-  };
-};
-
-/**
- * Creates a message factory for lorebook entry refinement.
- * Uses unified prefix (excludes self) + volatile tail with refine-specific instruction.
- */
-export const createLorebookRefineFactory = (
-  getState: () => RootState,
-  entryId: string,
-  getInstructions: () => Promise<string>,
-): MessageFactory => {
-  return async () => {
-    const entry = await api.v1.lorebook.entry(entryId);
-    if (!entry) {
-      throw new Error(`Lorebook entry not found: ${entryId}`);
-    }
-
-    const state = getState();
-    const entity = findEntityForEntry(state, entryId);
-
-    const displayName = await resolveDisplayName(state, entryId, entry.displayName);
-    const currentContent = entry.text || "";
-    const instructions = await getInstructions();
-
-    // Get category name (prefers Redux entity.categoryId) for type + template
-    const categoryName = await resolveCategoryName(state, entryId, entry.category);
-    const entryType = getEntryType(categoryName);
-    const setting = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
-    );
-
-    // Get template based on category
-    const template = CATEGORY_TEMPLATES[categoryName] || "";
-
-    // Anchored assistant prefill
-    const prefillContent = `${displayName}
-Type: ${entryType}
-Setting: ${setting}
-`;
-
-    const refinePrompt = LOREBOOK_REFINE_PROMPT;
-
-    const prefix = await buildStoryEnginePrefix(getState);
-    const groupContext = entity
-      ? formatEntityGroups(state, entity.id)
-      : "";
-
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: `[LOREBOOK ENTRY REFINEMENT]\n${refinePrompt}${template ? `\n\nTEMPLATE:\n${template}` : ""}`,
-      },
-    ];
-
-    if (groupContext) {
-      messages.push({
-        role: "system",
-        content: `[GROUPS]\n${groupContext}`,
-      });
-    }
-
-    messages.push({
-      role: "user",
-      content: `CURRENT ENTRY:\n${currentContent}\n\nMODIFICATION INSTRUCTIONS:\n${instructions}`,
-    });
-
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.lorebookRefine);
-    messages.push({ role: "assistant", content: prefillContent });
-
-    return {
-      messages,
-      params: await buildModelParams({
-        max_tokens: 1024,
-        temperature: 0.7,
-        min_p: 0.05,
-        frequency_penalty: 0.1,
-        stop: LOREBOOK_CHAIN_STOPS,
-      }),
-      contextPinning: { head: 1, tail: groupContext ? 4 : 3 },
     };
   };
 };

@@ -1,6 +1,5 @@
 /**
  * ChatPanel — Top-level chat panel that hosts a chat (header, messages, input, optional commit bar).
- * Replaces BrainstormPane (mount swap happens in Task 22).
  *
  * Visible chat resolution: refineChat takes precedence; else activeSavedChat.
  * Watches chat identity, refine flag, and message-id sequence; recomposes (via onRebuild
@@ -85,11 +84,8 @@ export class ChatPanel extends SuiComponent<
       messages.map((msg) =>
         new SeMessage({
           id: `se-bs-msg-${msg.id}`,
-          message: {
-            id: msg.id,
-            role: msg.role,
-            content: msg.content,
-          },
+          chatId: v.id,
+          message: msg,
         }).build(),
       ),
     );

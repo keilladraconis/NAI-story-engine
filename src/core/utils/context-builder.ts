@@ -13,17 +13,12 @@
  *   MSG 5+ : strategy-specific instructions                   [VOLATILE]
  *   LAST   : assistant prefill                                [VOLATILE]
  *
- * Brainstorm mode is excluded — it uses chat-based context (createBrainstormFactory).
+ * Chat-driven generation lives in chat-strategy.ts and consults the active
+ * chat-type spec for its own context slice.
  */
 
-import {
-  RootState,
-  BrainstormMessage,
-  BrainstormMode,
-  GenerationStrategy,
-} from "../store/types";
+import { RootState, GenerationStrategy } from "../store/types";
 import type { RefineContext, SpecCtx } from "../chat-types/types";
-import { currentMessages } from "../store/slices/brainstorm";
 import { activeSavedChat } from "../store/slices/chat";
 import { getChatTypeSpec } from "../chat-types";
 import { MessageFactory } from "nai-gen-x";
@@ -37,20 +32,12 @@ import { buildModelParams, appendXialongStyleMessage } from "./config";
 import {
   SYSTEM_PROMPT,
   LOREBOOK_WEAVING_PROMPT,
-  BRAINSTORM_PROMPT,
-  BRAINSTORM_CRITIC_PROMPT,
-  BRAINSTORM_SUMMARIZE_PROMPT,
   ATTG_GENERATE_PROMPT,
   STYLE_GENERATE_PROMPT,
   XIALONG_STYLE,
 } from "./prompts";
 import { buildRefineTail } from "./refine-strategy";
 // --- Helpers ---
-
-
-const getBrainstormHistory = (state: RootState): BrainstormMessage[] => {
-  return currentMessages(state.brainstorm) || [];
-};
 
 /**
  * Extracts the name portion from a World Entry item content using field-specific parsing.
@@ -183,14 +170,17 @@ export const getAllWorldEntityContext = (state: RootState): string => {
   return sections.join("\n\n");
 };
 
-export const getConsolidatedBrainstorm = (state: RootState): string => {
-  const history = getBrainstormHistory(state);
-  if (history.length > 0) {
-    return history
-      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-      .join("\n");
-  }
-  return "";
+/**
+ * Returns the active saved chat's transcript joined as plain text, suitable
+ * for forge guidance fallback or other context consumers that don't want the
+ * full prefix scaffolding. Empty string when no active chat is available.
+ */
+export const getActiveChatTranscript = (state: RootState): string => {
+  const active = activeSavedChat(state.chat);
+  if (!active) return "";
+  return active.messages
+    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+    .join("\n");
 };
 
 /**
@@ -387,21 +377,18 @@ export const buildStoryEnginePrefix = async (
     if (setting) stableSections.push(`[SETTING]\n${setting}`);
   }
 
-  // Active chat transcript (chat-slice driven, with brainstorm-slice fallback during transition).
-  // The active chat's spec.contextSlice() decides which messages contribute to the prefix.
+  // Active chat transcript — the active chat's spec.contextSlice() decides
+  // which messages contribute to the prefix.
   if (!excluded.has("brainstorm") && !options.excludeChat) {
     const active = activeSavedChat(state.chat);
-    let chatText = "";
     if (active) {
       const ctx: SpecCtx = { getState, dispatch: () => {} };
       const messages = getChatTypeSpec(active.type).contextSlice(active, ctx);
-      chatText = messages
+      const chatText = messages
         .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
         .join("\n");
-    } else {
-      chatText = getConsolidatedBrainstorm(state);
+      if (chatText) stableSections.push(`[BRAINSTORM]\n${chatText}`);
     }
-    if (chatText) stableSections.push(`[BRAINSTORM]\n${chatText}`);
   }
 
   // --- MSG 3: World Entities (GROWS during list stage, stable during lorebook) ---
@@ -455,231 +442,6 @@ export const buildStoryEnginePrefix = async (
 };
 
 // --- Strategy Factories ---
-
-/**
- * Creates a message factory for brainstorm generation.
- * The factory defers data fetching until execution time.
- * Mode selects the persona prompt: cowriter (default) or critic.
- */
-export const createBrainstormFactory = (
-  getState: () => RootState,
-  mode?: BrainstormMode,
-): MessageFactory => {
-  return async () => {
-    const state = getState();
-    const brainstormInstruction =
-      mode === "critic" ? BRAINSTORM_CRITIC_PROMPT : BRAINSTORM_PROMPT;
-
-    const systemMsg: Message = {
-      role: "system",
-      content: `${SYSTEM_PROMPT}\n\nYou are now in brainstorming mode. ${brainstormInstruction}\n\nRespond naturally without echoing mode indicators or tags.`,
-    };
-
-    const messages: Message[] = [systemMsg];
-    const storyContext = await getStoryContextMessages();
-    messages.push(...storyContext);
-
-    const setting = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
-    );
-
-    const { shape, intent, worldState, intensity, contract } = state.foundation;
-    const entities = state.world.entityIds
-      .map((id) => state.world.entitiesById[id])
-      .filter((e) => e?.summary);
-
-    let contextBlock = "Here is the current state of the story:\n";
-    let hasContext = false;
-
-    if (setting) {
-      contextBlock += `SETTING:\n${setting}\n\n`;
-      hasContext = true;
-    }
-    if (intensity) {
-      contextBlock += `INTENSITY: ${intensity.level} — ${intensity.description}\n\n`;
-      hasContext = true;
-    }
-    if (shape) {
-      contextBlock += `SHAPE: ${shape.name}: ${shape.description}\n\n`;
-      hasContext = true;
-    }
-    if (intent) {
-      contextBlock += `INTENT:\n${intent}\n\n`;
-      hasContext = true;
-    }
-    if (worldState) {
-      contextBlock += `WORLD STATE:\n${worldState}\n\n`;
-      hasContext = true;
-    }
-    if (contract) {
-      contextBlock += `STORY CONTRACT:\nRequired: ${contract.required}\nProhibited: ${contract.prohibited}\nEmphasis: ${contract.emphasis}\n\n`;
-      hasContext = true;
-    }
-    if (entities.length > 0) {
-      contextBlock += `CHARACTERS & ENTITIES:\n`;
-      for (const e of entities) {
-        contextBlock += `- ${e.name} (${e.categoryId}): ${e.summary}\n`;
-      }
-      contextBlock += "\n";
-      hasContext = true;
-    }
-
-    if (hasContext) {
-      messages.push({
-        role: "user",
-        content: `${contextBlock}Let's brainstorm based on this context.`,
-      });
-      messages.push({
-        role: "assistant",
-        content: "Understood. I have the full story context in mind. Ready.",
-      });
-    }
-
-    const history = getBrainstormHistory(state);
-    const cleanHistory = history.filter(
-      (m) => !(m.role === "assistant" && !m.content.trim()),
-    );
-    const historyMessages: Message[] = cleanHistory.map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
-
-    messages.push(...historyMessages);
-
-    // Style block as the final message before model responds — signals chat mode
-    // to prevent Xialong from switching into story-writing mode.
-    await appendXialongStyleMessage(
-      messages,
-      mode === "critic" ? XIALONG_STYLE.brainstormCritic : XIALONG_STYLE.brainstorm,
-    );
-
-    return {
-      messages,
-      params: await buildModelParams({
-        max_tokens: 400,
-        temperature: 0.95,
-        min_p: 0.05,
-        presence_penalty: 0.05,
-      }),
-    };
-  };
-};
-
-/**
- * Builds a brainstorm generation strategy using JIT factory pattern.
- */
-export const buildBrainstormStrategy = (
-  getState: () => RootState,
-  messageId: string,
-  mode?: BrainstormMode,
-): GenerationStrategy => {
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory: createBrainstormFactory(getState, mode),
-    target: {
-      type: "brainstorm",
-      messageId,
-    },
-    prefillBehavior: "keep",
-  };
-};
-
-/**
- * Creates a message factory for summarize generation.
- * Captures chat history at creation time (before messages are cleared).
- */
-export const createSummarizeFactory = (
-  chatHistory: BrainstormMessage[],
-): MessageFactory => {
-  return async () => {
-    const systemMsg: Message = {
-      role: "system",
-      content: `${SYSTEM_PROMPT}\n\n${BRAINSTORM_SUMMARIZE_PROMPT}`,
-    };
-
-    const messages: Message[] = [systemMsg];
-
-    // Replay the captured chat history
-    const chatText = chatHistory
-      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-      .join("\n");
-    messages.push({
-      role: "user",
-      content: `Brainstorm transcript:\n\n${chatText}\n\nStart your response with the "## World" section.`,
-    });
-
-    return {
-      messages,
-      params: await buildModelParams({ max_tokens: 1024, temperature: 0.5, min_p: 0.05 }),
-    };
-  };
-};
-
-/**
- * Creates a message factory for brainstorm chat title generation.
- * Captures chat history at creation time and produces a short evocative title.
- */
-export const createBrainstormTitleFactory = (
-  chatHistory: BrainstormMessage[],
-): MessageFactory => {
-  return async () => {
-    const chatText = chatHistory
-      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-      .join("\n");
-
-    const messages: Message[] = [
-      {
-        role: "system",
-        content: `${SYSTEM_PROMPT}\n\nYou are a creative assistant. Given a brainstorm conversation, output a short evocative title (3–6 words) that captures the core theme or subject. Output ONLY the title — no punctuation at the end, no quotes, no explanation.`,
-      },
-      {
-        role: "user",
-        content: `Brainstorm conversation:\n\n${chatText}\n\nGenerate a short title for this conversation.`,
-      },
-    ];
-
-    return {
-      messages,
-      params: await buildModelParams({ max_tokens: 20, temperature: 0.8, min_p: 0.05 }),
-    };
-  };
-};
-
-/**
- * Builds a brainstorm chat title generation strategy.
- * On completion, dispatches chatRenamed for the given chat index.
- */
-export const buildBrainstormTitleStrategy = (
-  chatIndex: number,
-  chatHistory: BrainstormMessage[],
-): GenerationStrategy => {
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory: createBrainstormTitleFactory(chatHistory),
-    target: { type: "brainstormChatTitle", chatIndex },
-    prefillBehavior: "trim",
-  };
-};
-
-/**
- * Builds a summarize generation strategy.
- */
-export const buildSummarizeStrategy = (
-  messageId: string,
-  chatHistory: BrainstormMessage[],
-): GenerationStrategy => {
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory: createSummarizeFactory(chatHistory),
-    target: {
-      type: "brainstorm",
-      messageId,
-    },
-    prefillBehavior: "keep",
-    continuation: { maxCalls: 3 },
-  };
-};
-
 
 /**
  * Creates a message factory for ATTG generation.

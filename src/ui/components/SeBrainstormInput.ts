@@ -1,16 +1,15 @@
 /**
- * SeBrainstormInput — SUI replacement for brainstorm/Input.ts
+ * SeBrainstormInput — multiline input + send/clear controls for the chat panel.
  *
- * Multiline textarea + SeGenerationButton (send) + SeConfirmButton (clear).
- * Textarea is disabled while a brainstorm generation is active.
+ * Sends to the active chat from the chat slice. When `chat.refineChat` is set,
+ * sends to the refine chat instead. Disabled while a chat / chatRefine
+ * generation is active.
  */
 
 import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
-import {
-  messagesCleared,
-  uiBrainstormSubmitUserMessage,
-} from "../../core/store";
+import { uiChatSubmitUserMessage } from "../../core/store";
+import { messageRemoved } from "../../core/store/slices/chat";
 import { StoreWatcher } from "../store-watcher";
 import { SeGenerationButton } from "./SeGenerationButton";
 import { SeConfirmButton } from "./SeConfirmButton";
@@ -24,6 +23,18 @@ export type SeBrainstormInputOptions = SuiComponentOptions<
 >;
 
 const INPUT_ID = "se-bs-input";
+
+/** Resolve the chat id the input should write to: refineChat takes precedence. */
+function targetChatId(): string | null {
+  const s = store.getState();
+  return s.chat.refineChat?.id ?? s.chat.activeChatId;
+}
+
+function dispatchSubmit(): void {
+  const chatId = targetChatId();
+  if (!chatId) return;
+  store.dispatch(uiChatSubmitUserMessage({ chatId }));
+}
 
 export class SeBrainstormInput extends SuiComponent<
   SeBrainstormInputTheme,
@@ -45,12 +56,15 @@ export class SeBrainstormInput extends SuiComponent<
       id: "se-bs-send-btn",
       label: "Send",
       style: { flex: "0.7" },
-      generateAction: uiBrainstormSubmitUserMessage(),
+      onGenerate: () => dispatchSubmit(),
       stateProjection: (s) => {
-        if (s.runtime.activeRequest?.type === "brainstorm") {
-          return s.runtime.activeRequest.id;
+        const t = s.runtime.activeRequest?.type;
+        if (t === "chat" || t === "chatRefine") {
+          return s.runtime.activeRequest!.id;
         }
-        return s.runtime.queue.find((r) => r.type === "brainstorm")?.id;
+        return s.runtime.queue.find(
+          (r) => r.type === "chat" || r.type === "chatRefine",
+        )?.id;
       },
       requestIdFromProjection: (p) => p as string | undefined,
     });
@@ -60,7 +74,17 @@ export class SeBrainstormInput extends SuiComponent<
       confirmLabel: "Clear?",
       style: { flex: "0.3" },
       onConfirm: async () => {
-        store.dispatch(messagesCleared());
+        const s = store.getState();
+        const chat =
+          s.chat.refineChat ??
+          s.chat.chats.find((c) => c.id === s.chat.activeChatId) ??
+          null;
+        if (!chat) return;
+        // Clear messages by removing each one — chat slice has no bulk reset action.
+        const ids = chat.messages.map((m) => m.id);
+        for (const id of ids) {
+          store.dispatch(messageRemoved({ chatId: chat.id, id }));
+        }
       },
     });
   }
@@ -69,11 +93,15 @@ export class SeBrainstormInput extends SuiComponent<
     // Dispose previous subscriptions to avoid duplicates on rebuild
     this._watcher.dispose();
 
-    // Keep textarea disabled while brainstorm is generating
+    // Keep textarea disabled while a chat-driven generation is active
     this._watcher.watch(
-      (s) =>
-        s.runtime.activeRequest?.type === "brainstorm" &&
-        s.runtime.genx.status === "generating",
+      (s) => {
+        const t = s.runtime.activeRequest?.type;
+        return (
+          (t === "chat" || t === "chatRefine") &&
+          s.runtime.genx.status === "generating"
+        );
+      },
       (isGenerating) => {
         api.v1.ui.updateParts([
           {
@@ -102,7 +130,7 @@ export class SeBrainstormInput extends SuiComponent<
           storageKey: `story:${INPUT_ID}`,
           style: { "min-height": "60px", "max-height": "120px" },
           onSubmit: () => {
-            store.dispatch(uiBrainstormSubmitUserMessage());
+            dispatchSubmit();
           },
         }),
         row({

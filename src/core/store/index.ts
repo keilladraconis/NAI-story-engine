@@ -1,5 +1,4 @@
 import { createStore, combineReducers, Action } from "nai-store";
-import { brainstormSlice } from "./slices/brainstorm";
 import { chatSlice } from "./slices/chat";
 import type { ChatSliceState } from "./slices/chat";
 import { uiSlice } from "./slices/ui";
@@ -10,7 +9,6 @@ import { foundationSlice, initialFoundationState } from "./slices/foundation";
 import {
   RootState,
   StoryState,
-  BrainstormChat,
   WorldState,
   WorldEntity,
   FoundationState,
@@ -22,7 +20,6 @@ import {
 
 export interface PersistedData {
   story?: StoryState;
-  brainstorm?: { chats: BrainstormChat[]; currentChatIndex: number };
   chat?: ChatSliceState;
   world?: WorldState;
   foundation?: FoundationState;
@@ -68,7 +65,6 @@ function migrateWorldState(raw: WorldState | (Record<string, unknown> & { entiti
 
 const sliceReducer = combineReducers({
   story: storySlice.reducer,
-  brainstorm: brainstormSlice.reducer,
   chat: chatSlice.reducer,
   ui: uiSlice.reducer,
   runtime: runtimeSlice.reducer,
@@ -86,13 +82,6 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
       story: data.story
         ? { ...initialStoryState, ...data.story }
         : current.story,
-      brainstorm: data.brainstorm?.chats
-        ? {
-            ...current.brainstorm,
-            chats: data.brainstorm.chats,
-            currentChatIndex: data.brainstorm.currentChatIndex,
-          }
-        : current.brainstorm,
       chat: data.chat ?? current.chat,
       world: data.world
         ? migrateWorldState(data.world as WorldState)
@@ -112,27 +101,8 @@ export const store = createStore<RootState>(rootReducer, debug);
 
 // Export types
 export * from "./types";
-// Export actions
-export * from "./slices/brainstorm";
-// Chat slice: export only names that don't conflict with brainstorm slice.
-// The conflicting action names (chatCreated, chatDeleted, chatRenamed,
-// chatSwitched, messageAdded, messageAppended, messageRemoved, messageUpdated)
-// will be resolved when the brainstorm slice is removed in Task 25.
-export {
-  chatSlice,
-  chatSliceReducer,
-  initialChatState,
-  activeSavedChat,
-  subModeChanged,
-  messagesPrunedAfter,
-  refineChatOpened,
-  refineChatCleared,
-  refineMessageAdded,
-  refineMessageAppended,
-  refineMessageReplaced,
-  refineCandidateMarked,
-} from "./slices/chat";
-export type { ChatSliceState } from "./slices/chat";
+// Chat slice exports — full surface, no longer competing with the legacy brainstorm slice.
+export * from "./slices/chat";
 export * from "./slices/ui";
 export * from "./slices/runtime";
 export * from "./slices/story";

@@ -5,7 +5,6 @@ import {
   GenerationRequest,
   AppDispatch,
 } from "../types";
-import { currentMessages } from "../slices/brainstorm";
 import { GenX, MessageFactory } from "nai-gen-x";
 import {
   uiGenerationRequested,
@@ -39,13 +38,10 @@ function targetToQueueEntry(target: GenerationStrategy["target"]): {
   targetId: string;
 } {
   switch (target.type) {
-    case "brainstorm":
-      return { type: "brainstorm", targetId: target.messageId };
-    case "brainstormChatTitle":
-      return {
-        type: "brainstormChatTitle",
-        targetId: String(target.chatIndex),
-      };
+    case "chat":
+      return { type: "chat", targetId: target.messageId };
+    case "chatRefine":
+      return { type: "chatRefine", targetId: target.messageId };
     case "field":
       return { type: "field", targetId: target.fieldId };
     case "list":
@@ -54,8 +50,6 @@ function targetToQueueEntry(target: GenerationStrategy["target"]): {
       return { type: "lorebookContent", targetId: target.entryId };
     case "lorebookKeys":
       return { type: "lorebookKeys", targetId: target.entryId };
-    case "lorebookRefine":
-      return { type: "lorebookRefine", targetId: target.entryId };
     case "forge":
       return { type: "forge", targetId: `forge:${target.step}` };
     case "foundation":
@@ -68,6 +62,8 @@ function targetToQueueEntry(target: GenerationStrategy["target"]): {
       return { type: "threadSummary", targetId: target.groupId };
     case "bootstrap":
       return { type: "bootstrap", targetId: "bootstrap" };
+    case "bootstrapContinue":
+      return { type: "bootstrapContinue", targetId: String(target.iteration) };
   }
   // Unreachable — satisfies noImplicitReturns for exhaustive switch
   throw new Error(`Unhandled target type: ${(target as any).type}`);
@@ -86,10 +82,9 @@ function resolvePrefill(
 
   const state = getState();
 
-  if (target.type === "brainstorm") {
-    const message = currentMessages(state.brainstorm).find(
-      (m) => m.id === target.messageId,
-    );
+  if (target.type === "chat") {
+    const chat = state.chat.chats.find((c) => c.id === target.chatId);
+    const message = chat?.messages.find((m) => m.id === target.messageId);
     return message?.content || "";
   }
 
@@ -125,8 +120,7 @@ function queueLorebookRequestIfNeeded(
 ): void {
   if (
     target.type !== "lorebookContent" &&
-    target.type !== "lorebookKeys" &&
-    target.type !== "lorebookRefine"
+    target.type !== "lorebookKeys"
   ) {
     return;
   }
@@ -153,8 +147,7 @@ async function captureRollbackState(
 ): Promise<{ content: string; keys: string }> {
   if (
     target.type !== "lorebookContent" &&
-    target.type !== "lorebookKeys" &&
-    target.type !== "lorebookRefine"
+    target.type !== "lorebookKeys"
   ) {
     return { content: "", keys: "" };
   }
@@ -175,18 +168,12 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `field:${target.fieldId}`;
     case "list":
       return `list:${target.fieldId}`;
-    case "brainstorm":
-      return `brainstorm:${target.messageId}`;
     case "lorebookContent":
       return `lb-content:${target.entryId.slice(0, 8)}`;
     case "lorebookKeys":
       return `lb-keys:${target.entryId.slice(0, 8)}`;
-    case "lorebookRefine":
-      return `lb-refine:${target.entryId.slice(0, 8)}`;
     case "forge":
       return `forge:${target.step}`;
-    case "brainstormChatTitle":
-      return `brainstorm-title:${target.chatIndex}`;
     case "foundation":
       return `foundation:${target.field}`;
     case "entitySummary":
@@ -444,10 +431,6 @@ export function registerGenerationEngineEffects(
         const entry = await api.v1.lorebook.entry(target.entryId);
         const name = entry?.displayName || "Entry";
         api.v1.ui.toast(`Keys: ${name}`, { type: "success" });
-      } else if (target.type === "lorebookRefine") {
-        const entry = await api.v1.lorebook.entry(target.entryId);
-        const name = entry?.displayName || "Entry";
-        api.v1.ui.toast(`Refined: ${name}`, { type: "success" });
       } else if (target.type === "bootstrap") {
         api.v1.ui.toast("Story opener generated", { type: "success" });
       }

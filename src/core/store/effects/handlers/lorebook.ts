@@ -3,7 +3,6 @@ import {
   GenerationHandlers,
   LorebookContentTarget,
   LorebookKeysTarget,
-  LorebookRefineTarget,
   StreamingContext,
   CompletionContext,
 } from "../generation-handlers";
@@ -298,77 +297,3 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
   },
 };
 
-export const lorebookRefineHandler: GenerationHandlers<LorebookRefineTarget> = {
-  streaming(
-    ctx: StreamingContext<LorebookRefineTarget>,
-    _newText: string,
-  ): void {
-    const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
-    if (ctx.target.entryId !== currentSelected) return;
-
-    // Ensure prefill is being cached (fire-and-forget on first call)
-    ensurePrefillCached(ctx.getState, ctx.target.entryId);
-
-    // Get cached prefill if available, prepend to streaming content
-    const prefill = getCachedPrefill(ctx.target.entryId) || "";
-    const displayContent = prefill + ctx.accumulatedText;
-
-    api.v1.storyStorage.set(IDS.LOREBOOK.CONTENT_DRAFT_RAW, displayContent);
-  },
-
-  async completion(
-    ctx: CompletionContext<LorebookRefineTarget>,
-  ): Promise<void> {
-    const currentSelected = ctx.getState().ui.lorebook.selectedEntryId;
-    const entryId = ctx.target.entryId;
-
-    if (ctx.generationSucceeded && ctx.accumulatedText) {
-      // Get prefill from cache or rebuild it
-      let prefill = getCachedPrefill(entryId);
-      if (!prefill) {
-        prefill = await buildLorebookPrefill(ctx.getState, entryId);
-      }
-
-      // Combine prefill + accumulated text for the full entry
-      const cleaned = trimStopTail(
-        stripThinkingTags(ctx.accumulatedText),
-        LOREBOOK_CHAIN_STOPS,
-      );
-      const fullContent = prefill + cleaned;
-
-      // Erato compatibility: prepend separator if needed
-      const erato = (await api.v1.config.get("erato_compatibility")) || false;
-      const finalContent =
-        erato && !fullContent.startsWith("----\n")
-          ? "----\n" + fullContent
-          : fullContent;
-
-      // Update lorebook entry with refined content
-      await api.v1.lorebook.updateEntry(entryId, {
-        text: finalContent,
-      });
-
-      // Update draft with full content if viewing this entry
-      if (entryId === currentSelected) {
-        await api.v1.storyStorage.set(
-          IDS.LOREBOOK.CONTENT_DRAFT_RAW,
-          finalContent,
-        );
-      }
-
-      // Clear instructions on success
-      await api.v1.storyStorage.set(IDS.LOREBOOK.REFINE_INSTRUCTIONS_RAW, "");
-    } else {
-      // Cancelled or failed: restore draft to original content if viewing this entry
-      if (entryId === currentSelected) {
-        await api.v1.storyStorage.set(
-          IDS.LOREBOOK.CONTENT_DRAFT_RAW,
-          ctx.originalContent || "",
-        );
-      }
-    }
-
-    // Clear cache for this entry
-    clearPrefillCache(entryId);
-  },
-};

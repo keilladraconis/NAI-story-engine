@@ -4,25 +4,14 @@ import type { RootState } from "../../../src/core/store/types";
 import type { Chat } from "../../../src/core/chat-types/types";
 
 const ACTIVE_PROBE = "PROBE_TOKEN_42";
-const FALLBACK_PROBE = "FALLBACK_PROBE_99";
 
 function makeState(
   options: {
     activeChat?: Chat;
-    brainstormContent?: string;
   } = {},
 ): RootState {
   const chats = options.activeChat ? [options.activeChat] : [];
   const activeChatId = options.activeChat ? options.activeChat.id : null;
-
-  const brainstormChat = {
-    id: "b1",
-    title: "Brainstorm",
-    messages: options.brainstormContent
-      ? [{ role: "user" as const, content: options.brainstormContent }]
-      : [],
-    mode: "cowriter" as const,
-  };
 
   return {
     story: { fields: {}, attgEnabled: false, styleEnabled: false },
@@ -45,10 +34,6 @@ function makeState(
     },
     runtime: {} as any,
     ui: {} as any,
-    brainstorm: {
-      chats: [brainstormChat],
-      currentChatIndex: 0,
-    },
     chat: {
       chats,
       activeChatId,
@@ -75,13 +60,12 @@ describe("buildStoryEnginePrefix chat injection", () => {
     expect(concat).toContain("[BRAINSTORM]");
   });
 
-  it("falls back to brainstorm slice when chat slice has no active chat", async () => {
-    const getState = () => makeState({ brainstormContent: FALLBACK_PROBE });
+  it("omits the chat block entirely when no chat is active", async () => {
+    const getState = () => makeState();
 
     const prefix = await buildStoryEnginePrefix(getState);
     const concat = prefix.map((m) => m.content).join("\n");
-    expect(concat).toContain(FALLBACK_PROBE);
-    expect(concat).toContain("[BRAINSTORM]");
+    expect(concat).not.toContain("[BRAINSTORM]");
   });
 
   it("excludeChat suppresses chat injection entirely (active chat path)", async () => {
@@ -93,13 +77,11 @@ describe("buildStoryEnginePrefix chat injection", () => {
       messages: [{ id: "u", role: "user", content: ACTIVE_PROBE }],
       seed: { kind: "blank" },
     };
-    const getState = () =>
-      makeState({ activeChat: chat, brainstormContent: FALLBACK_PROBE });
+    const getState = () => makeState({ activeChat: chat });
 
     const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true });
     const concat = prefix.map((m) => m.content).join("\n");
     expect(concat).not.toContain(ACTIVE_PROBE);
-    expect(concat).not.toContain(FALLBACK_PROBE);
     expect(concat).not.toContain("[BRAINSTORM]");
   });
 

@@ -25,7 +25,8 @@ describe("migrateBrainstormToChat", () => {
     };
     const result = migrateBrainstormToChat(v11);
     expect(result.touched).toBe(true);
-    expect(result.data.brainstorm).toBeUndefined();
+    // After migration, the legacy `brainstorm` slot should not be present.
+    expect((result.data as { brainstorm?: unknown }).brainstorm).toBeUndefined();
     expect(result.data.chat).toBeDefined();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const chat = result.data.chat!;
