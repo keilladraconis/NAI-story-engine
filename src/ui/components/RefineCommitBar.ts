@@ -61,15 +61,14 @@ export class RefineCommitBar extends SuiComponent<
         button({
           id: `${this.id}-commit`,
           text: "Commit",
+          disabled: !this.state.commitEnabled,
           style: {
             flex: "1",
             "font-weight": "bold",
             opacity: this.state.commitEnabled ? "1" : "0.5",
             cursor: this.state.commitEnabled ? "pointer" : "default",
           },
-          callback: this.state.commitEnabled
-            ? () => store.dispatch(uiChatRefineCommitted())
-            : () => {},
+          callback: () => store.dispatch(uiChatRefineCommitted()),
         }),
         button({
           id: `${this.id}-discard`,
@@ -85,15 +84,13 @@ export class RefineCommitBar extends SuiComponent<
     api.v1.ui.updateParts([
       {
         id: `${this.id}-commit`,
+        disabled: !this.state.commitEnabled,
         style: {
           flex: "1",
           "font-weight": "bold",
           opacity: this.state.commitEnabled ? "1" : "0.5",
           cursor: this.state.commitEnabled ? "pointer" : "default",
         },
-        callback: this.state.commitEnabled
-          ? () => store.dispatch(uiChatRefineCommitted())
-          : () => {},
       },
     ]);
   }
