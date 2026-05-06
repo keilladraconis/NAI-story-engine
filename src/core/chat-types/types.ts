@@ -43,7 +43,12 @@ export interface RefineContext {
 export interface HeaderControl {
   id: string;
   /** Tag identifying which header control this is, so ChatHeader knows how to render. */
-  kind: "subModeToggle" | "summarizeButton" | "sessionsButton" | "label";
+  kind:
+    | "subModeToggle"
+    | "summarizeButton"
+    | "sessionsButton"
+    | "newChatButton"
+    | "label";
 }
 
 export interface SpecCtx {

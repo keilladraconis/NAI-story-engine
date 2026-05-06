@@ -64,7 +64,7 @@ export class SeMessage extends SuiComponent<
 
     this._editable = new SeEditableText({
       id: `${options.id ?? `se-bs-msg-${message.id}`}-text`,
-      label: isUser ? "You" : "Brainstorm",
+      label: isUser ? "You" : "Assistant",
       placeholder: "Edit message...",
       getContent: () => {
         const s = store.getState();

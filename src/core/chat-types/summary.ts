@@ -65,8 +65,8 @@ export const summarySpec: ChatTypeSpec = {
 
   headerControls(_chat: Chat, _ctx: SpecCtx) {
     return [
+      { id: "new", kind: "newChatButton" },
       { id: "sessions", kind: "sessionsButton" },
-      { id: "source-label", kind: "label" },
     ];
   },
 };

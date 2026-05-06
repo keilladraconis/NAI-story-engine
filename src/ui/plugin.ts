@@ -233,7 +233,7 @@ export class StoryEnginePlugin extends SuiPlugin {
       callback: () => {
         void this._tabBar?.switchTo(0);
       },
-      theme: { default: { self: { text: "Brainstorm" } } },
+      theme: { default: { self: { text: "Chat" } } },
     });
     const tabEngine = new SuiButton({
       id: "se-tab-engine",

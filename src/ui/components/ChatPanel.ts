@@ -79,7 +79,12 @@ export class ChatPanel extends SuiComponent<
       return column({ id: this.id, content: [] });
     }
 
-    const messages = v.messages.slice().reverse();
+    // System messages carry transcript snapshots / setup context for the LLM
+    // (e.g., summary chat seed). They are not user-visible turns — hide them.
+    const messages = v.messages
+      .filter((m) => m.role !== "system")
+      .slice()
+      .reverse();
     const messageParts = await Promise.all(
       messages.map((msg) =>
         new SeMessage({

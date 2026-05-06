@@ -30,9 +30,10 @@ export const brainstormSpec: ChatTypeSpec<BrainstormSubMode> = {
 
   headerControls(_chat: Chat, _ctx: SpecCtx) {
     return [
-      { id: "sessions", kind: "sessionsButton" },
       { id: "sub-mode", kind: "subModeToggle" },
       { id: "summarize", kind: "summarizeButton" },
+      { id: "new", kind: "newChatButton" },
+      { id: "sessions", kind: "sessionsButton" },
     ];
   },
 };
