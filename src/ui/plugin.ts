@@ -5,8 +5,8 @@
  * All UIExtensions registered in a single api.v1.ui.register() call (NAI
  * requires this — multiple calls overwrite each other).
  *
- * Brainstorm rebuild: BrainstormPane.onRebuild → updateParts on the tab pane
- * column (se-main-tab-bar.pane.1) — no full-panel re-registration needed.
+ * Chat rebuild: ChatPanel.onRebuild → updateParts on the tab pane
+ * column (se-main-tab-bar.pane.0) — no full-panel re-registration needed.
  *
  * Edit pane: plugin-level editHost swaps se-edit-slot content and toggles
  * se-main-content visibility — no full pane rebuild on open/close.
@@ -38,7 +38,8 @@ import { stateUpdated, requestActivated } from "../core/store/slices/runtime";
 import { IDS, STORAGE_KEYS } from "./framework/ids";
 import type { EditPaneHost } from "./components/SeContentWithTitlePane";
 
-import { BrainstormPane } from "./components/BrainstormPane";
+import { ChatPanel } from "./components/ChatPanel";
+import { openSeSessionsModal } from "./components/SeSessionsModal";
 import { ForgePane } from "./components/ForgePane";
 import { SeHeaderBar } from "./components/SeHeaderBar";
 import { SeJournalPanel } from "./components/SeJournalPanel";
@@ -50,7 +51,7 @@ const { sidebarPanel, scriptPanel } = api.v1.ui.extension;
 
 export class StoryEnginePlugin extends SuiPlugin {
   private _genX?: GenX;
-  private _brainstormPane?: BrainstormPane;
+  private _chatPanel?: ChatPanel;
   private _tabBar?: SuiTabBar;
 
   // ── Story engine pane children (persistent for rebuild) ──
@@ -143,9 +144,9 @@ export class StoryEnginePlugin extends SuiPlugin {
 
   // ── Rebuild helpers ────────────────────────────────────────────
 
-  private async _rebuildBrainstorm(): Promise<void> {
-    if (!this._brainstormPane) return;
-    const newContent = await this._brainstormPane.build();
+  private async _rebuildChat(): Promise<void> {
+    if (!this._chatPanel) return;
+    const newContent = await this._chatPanel.build();
     api.v1.ui.updateParts([
       {
         id: "se-main-tab-bar.pane.0",
@@ -184,11 +185,14 @@ export class StoryEnginePlugin extends SuiPlugin {
   // ── Compose ────────────────────────────────────────────────────
 
   protected async compose(): Promise<void> {
-    // ── Brainstorm pane ─────────────────────────────────────────────────────
-    this._brainstormPane = new BrainstormPane({
+    // ── Chat pane ───────────────────────────────────────────────────────────
+    this._chatPanel = new ChatPanel({
       id: IDS.BRAINSTORM.ROOT,
       onRebuild: () => {
-        void this._rebuildBrainstorm();
+        void this._rebuildChat();
+      },
+      onOpenSessions: () => {
+        void openSeSessionsModal();
       },
     });
 
@@ -242,7 +246,7 @@ export class StoryEnginePlugin extends SuiPlugin {
     this._tabBar = new SuiTabBar({
       id: "se-main-tab-bar",
       tabs: [tabBrainstorm, tabEngine],
-      panes: [this._brainstormPane, storyEnginePane],
+      panes: [this._chatPanel, storyEnginePane],
       storageKey: "se-active-tab",
       storageMode: "story",
       theme: {
@@ -282,6 +286,19 @@ export class StoryEnginePlugin extends SuiPlugin {
     }
 
     await api.v1.ui.register(panels);
+
+    // Auto-open trigger when refine chat opens. No sidebar-open API exists in
+    // the script API, so we just log — user click is the only reliable path.
+    let lastRefineId: string | null = null;
+    store.subscribeSelector(
+      (state) => state.chat.refineChat?.id ?? null,
+      (id) => {
+        if (id && id !== lastRefineId) {
+          api.v1.log("[chat] refine chat opened — sidebar-open API unavailable; user must click sidebar");
+        }
+        lastRefineId = id;
+      },
+    );
   }
 
   protected async registerHooks(): Promise<void> {
