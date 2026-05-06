@@ -13,6 +13,7 @@ import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
 import { uiChatRefineRequested } from "../../core/store/slices/ui";
 import { SeGenerationIconButton } from "./SeGenerationButton";
+import type { RootState } from "../../core/store/types";
 
 type Theme = { default: { self: { style: object } } };
 type State = Record<string, never>;
@@ -26,6 +27,10 @@ export type SeGenRefinePairOptions = {
   refineSourceText: () => string;
   hasContent?: boolean;
   contentChecker?: () => Promise<boolean>;
+  /** Pass-through to SeGenerationIconButton for dynamic request ID resolution. */
+  stateProjection?: (s: RootState) => unknown;
+  /** Pass-through to SeGenerationIconButton for extracting ID from projection. */
+  requestIdFromProjection?: (p: unknown) => string | undefined;
 } & SuiComponentOptions<Theme, State>;
 
 export class SeGenRefinePair extends SuiComponent<
@@ -49,6 +54,8 @@ export class SeGenRefinePair extends SuiComponent<
       onGenerate: options.onGenerate,
       hasContent: options.hasContent,
       contentChecker: options.contentChecker,
+      stateProjection: options.stateProjection,
+      requestIdFromProjection: options.requestIdFromProjection,
     });
   }
 

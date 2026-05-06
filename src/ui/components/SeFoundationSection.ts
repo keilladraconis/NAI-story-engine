@@ -39,6 +39,7 @@ import {
 import { IDS } from "../framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import { SeGenerationIconButton } from "./SeGenerationButton";
+import { SeGenRefinePair } from "./SeGenRefinePair";
 import {
   SeContentWithTitlePane,
   type EditPaneHost,
@@ -177,10 +178,10 @@ export class SeFoundationSection extends SuiComponent<
   private readonly _contractEditBtn: SuiButton;
   private readonly _contractBtnGen: SeGenerationIconButton;
   private readonly _attgEditBtn: SuiButton;
-  private readonly _attgBtnGen: SeGenerationIconButton;
+  private readonly _attgBtnGen: SeGenRefinePair;
   private readonly _attgSyncToggle: SuiToggle;
   private readonly _styleEditBtn: SuiButton;
-  private readonly _styleBtnGen: SeGenerationIconButton;
+  private readonly _styleBtnGen: SeGenRefinePair;
   private readonly _styleSyncToggle: SuiToggle;
 
   constructor(options: SeFoundationSectionOptions) {
@@ -253,12 +254,13 @@ export class SeFoundationSection extends SuiComponent<
       theme: { default: { self: { iconId: "edit" as IconId } } },
     });
 
-    this._attgBtnGen = new SeGenerationIconButton({
+    this._attgBtnGen = new SeGenRefinePair({
       id: FN.ATTG_BTN,
-      iconId: "zap" as IconId,
+      fieldId: "attg",
       onGenerate: () => {
         store.dispatch(attgGenerationRequested());
       },
+      refineSourceText: () => store.getState().foundation.attg ?? "",
       stateProjection: foundationProjection("attg"),
       requestIdFromProjection: (p) => p as string | undefined,
     });
@@ -280,12 +282,13 @@ export class SeFoundationSection extends SuiComponent<
       theme: { default: { self: { iconId: "edit" as IconId } } },
     });
 
-    this._styleBtnGen = new SeGenerationIconButton({
+    this._styleBtnGen = new SeGenRefinePair({
       id: FN.STYLE_BTN,
-      iconId: "zap" as IconId,
+      fieldId: "style",
       onGenerate: () => {
         store.dispatch(styleGenerationRequested());
       },
+      refineSourceText: () => store.getState().foundation.style ?? "",
       stateProjection: foundationProjection("style"),
       requestIdFromProjection: (p) => p as string | undefined,
     });
