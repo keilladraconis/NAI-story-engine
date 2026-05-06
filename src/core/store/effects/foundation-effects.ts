@@ -33,6 +33,8 @@ import {
   STYLE_GENERATE_PROMPT,
   XIALONG_STYLE,
 } from "../../utils/prompts";
+import type { RefineContext } from "../../chat-types/types";
+import { buildRefineTail } from "../../utils/refine-strategy";
 
 // ─── Factories ────────────────────────────────────────────────────────────────
 
@@ -300,6 +302,48 @@ function buildFoundationStrategy(
     requestId: api.v1.uuid(),
     messageFactory: factoryMap[field](getState),
     target: { type: "foundation", field },
+    prefillBehavior: "trim",
+  };
+}
+
+// ─── Refine strategy builders ────────────────────────────────────────────────
+
+export function buildIntentStrategy(
+  getState: () => RootState,
+  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
+): GenerationStrategy {
+  const baseFactory = createIntentFactory(getState);
+  const refineContext = opts?.refineContext;
+  const messageFactory: MessageFactory = refineContext
+    ? async () => {
+        const base = await baseFactory();
+        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
+      }
+    : baseFactory;
+  return {
+    requestId: opts?.requestId ?? api.v1.uuid(),
+    messageFactory,
+    target: { type: "foundation", field: "intent" },
+    prefillBehavior: "trim",
+  };
+}
+
+export function buildContractStrategy(
+  getState: () => RootState,
+  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
+): GenerationStrategy {
+  const baseFactory = createContractFactory(getState);
+  const refineContext = opts?.refineContext;
+  const messageFactory: MessageFactory = refineContext
+    ? async () => {
+        const base = await baseFactory();
+        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
+      }
+    : baseFactory;
+  return {
+    requestId: opts?.requestId ?? api.v1.uuid(),
+    messageFactory,
+    target: { type: "foundation", field: "contract" },
     prefillBehavior: "trim",
   };
 }

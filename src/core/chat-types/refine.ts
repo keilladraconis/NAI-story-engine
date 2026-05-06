@@ -1,6 +1,7 @@
 import type { ChatTypeSpec, Chat, ChatMessage, ChatSeed, SpecCtx, RefineTarget } from "./types";
 import { REFINE_SYSTEM_PROMPT } from "../utils/prompts";
-import { attgUpdated, styleUpdated } from "../store/slices/foundation";
+import { attgUpdated, styleUpdated, intentUpdated, contractUpdated } from "../store/slices/foundation";
+import { parseContract } from "../store/effects/handlers/foundation";
 
 /**
  * Per-field commit dispatchers — applied when a refine session is committed.
@@ -13,6 +14,11 @@ const FIELD_COMMIT_DISPATCHERS: Record<
 > = {
   attg: (text, { dispatch }, _target) => dispatch(attgUpdated({ attg: text })),
   style: (text, { dispatch }, _target) => dispatch(styleUpdated({ style: text })),
+  intent: (text, { dispatch }, _target) => dispatch(intentUpdated({ intent: text })),
+  contract: (text, { dispatch }, _target) => {
+    const parsed = parseContract(text);
+    dispatch(contractUpdated({ contract: parsed }));
+  },
   lorebookContent: (text, _ctx, target) => {
     if (!target.entryId) return;
     void api.v1.lorebook.updateEntry(target.entryId, { text });

@@ -83,10 +83,10 @@ describe("refineSpec", () => {
     it("toasts and bails when committing an unsupported field", () => {
       const dispatch = vi.fn();
       const localCtx: SpecCtx = { getState: vi.fn(), dispatch };
-      refineSpec.onCommit?.(makeChat("intent", "x"), localCtx);
+      refineSpec.onCommit?.(makeChat("unsupported", "x"), localCtx);
       expect(dispatch).not.toHaveBeenCalled();
       expect(api.v1.ui.toast).toHaveBeenCalledWith(
-        expect.stringMatching(/intent/),
+        expect.stringMatching(/unsupported/),
         expect.objectContaining({ type: "warning" }),
       );
     });

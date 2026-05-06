@@ -381,7 +381,7 @@ Mirroring existing test layout under `tests/`:
 1. Existing brainstorm sessions migrate cleanly. Old chats appear in the new session list. Sub-mode is preserved. No data loss.
 2. Brainstorm UX matches v0.11.x feature-for-feature: send/edit/retry/clear, sessions modal, sub-mode toggle, "Sum" button.
 3. "Sum" creates a new `summary` chat seeded from the source brainstorm. The summary chat is iterable and saved in the session list.
-4. Foundation Intent, Style, ATTG, Story Contract REQUIRED/PROHIBITED/EMPHASIS, lorebook Content, lorebook Keys all expose `SeGenRefinePair`.
+4. Foundation Intent, Style, ATTG, Story Contract REQUIRED/PROHIBITED/EMPHASIS, lorebook Content all expose `SeGenRefinePair`.
 5. Clicking refine on any of the above opens the chat panel into a refine session bound to that field. Iterating produces candidate rewrites. Commit overwrites the field; Discard reverts.
 6. Refine sessions never appear in the session list, occupy at most a single state slot at any time, and are cleared from state on commit or discard.
 7. The active *saved* chat (brainstorm or summary) drives the brainstorm-context slot in `buildStoryEnginePrefix` via its spec's `contextSlice`. Refine sessions are invisible to SE generation context.

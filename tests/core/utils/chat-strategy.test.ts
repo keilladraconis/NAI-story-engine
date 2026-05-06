@@ -77,8 +77,8 @@ describe("buildChatStrategy", () => {
       type: "refine",
       title: "Refine",
       messages: [],
-      seed: { kind: "fromField", sourceFieldId: "intent", sourceText: "old" },
-      refineTarget: { fieldId: "intent", originalText: "old" },
+      seed: { kind: "fromField", sourceFieldId: "unregisteredField", sourceText: "old" },
+      refineTarget: { fieldId: "unregisteredField", originalText: "old" },
     };
     const getState = (() =>
       ({ chat: { chats: [], activeChatId: null, refineChat: refine } }) as unknown as RootState);

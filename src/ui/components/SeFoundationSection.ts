@@ -174,9 +174,9 @@ export class SeFoundationSection extends SuiComponent<
   private readonly _shapeEditBtn: SuiButton;
   private readonly _shapeBtnGen: SeGenerationIconButton;
   private readonly _intentEditBtn: SuiButton;
-  private readonly _intentBtnGen: SeGenerationIconButton;
+  private readonly _intentBtnGen: SeGenRefinePair;
   private readonly _contractEditBtn: SuiButton;
-  private readonly _contractBtnGen: SeGenerationIconButton;
+  private readonly _contractBtnGen: SeGenRefinePair;
   private readonly _attgEditBtn: SuiButton;
   private readonly _attgBtnGen: SeGenRefinePair;
   private readonly _attgSyncToggle: SuiToggle;
@@ -218,12 +218,13 @@ export class SeFoundationSection extends SuiComponent<
       theme: { default: { self: { iconId: "edit" as IconId } } },
     });
 
-    this._intentBtnGen = new SeGenerationIconButton({
+    this._intentBtnGen = new SeGenRefinePair({
       id: FN.INTENT_BTN,
-      iconId: "zap" as IconId,
+      fieldId: "intent",
       onGenerate: () => {
         store.dispatch(intentGenerationRequested());
       },
+      refineSourceText: () => store.getState().foundation.intent ?? "",
       stateProjection: foundationProjection("intent"),
       requestIdFromProjection: (p) => p as string | undefined,
     });
@@ -236,11 +237,16 @@ export class SeFoundationSection extends SuiComponent<
       theme: { default: { self: { iconId: "edit" as IconId } } },
     });
 
-    this._contractBtnGen = new SeGenerationIconButton({
+    this._contractBtnGen = new SeGenRefinePair({
       id: FN.CONTRACT_BTN,
-      iconId: "zap" as IconId,
+      fieldId: "contract",
       onGenerate: () => {
         store.dispatch(contractGenerationRequested());
+      },
+      refineSourceText: () => {
+        const c = store.getState().foundation.contract;
+        if (!c) return "";
+        return `REQUIRED: ${c.required}\nPROHIBITED: ${c.prohibited}\nEMPHASIS: ${c.emphasis}`;
       },
       stateProjection: foundationProjection("contract"),
       requestIdFromProjection: (p) => p as string | undefined,
