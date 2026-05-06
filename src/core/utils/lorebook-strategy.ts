@@ -1,6 +1,8 @@
-import { RootState } from "../store/types";
+import { RootState, GenerationStrategy } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "./context-builder";
+import type { RefineContext } from "../chat-types/types";
+import { buildRefineTail } from "./refine-strategy";
 import { DulfsFieldID, FIELD_CONFIGS } from "../../config/field-definitions";
 import { STORAGE_KEYS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../../ui/framework/ids";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
@@ -428,3 +430,59 @@ Type: ${entryType}
 Setting: ${setting}
 `;
 };
+
+/**
+ * Builds a refine-capable GenerationStrategy for lorebook content.
+ * Wraps the base factory and appends refine tail when refineContext is present.
+ */
+export function buildLorebookContentStrategy(
+  getState: () => RootState,
+  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
+): GenerationStrategy {
+  const entryId = opts?.entryId ?? "";
+  if (!entryId) {
+    throw new Error("buildLorebookContentStrategy requires entryId");
+  }
+  const baseFactory = createLorebookContentFactory(getState, entryId);
+  const refineContext = opts?.refineContext;
+  const messageFactory: MessageFactory = refineContext
+    ? async () => {
+        const base = await baseFactory();
+        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
+      }
+    : baseFactory;
+  return {
+    requestId: opts?.requestId ?? api.v1.uuid(),
+    messageFactory,
+    target: { type: "lorebookContent", entryId },
+    prefillBehavior: "keep",
+  };
+}
+
+/**
+ * Builds a refine-capable GenerationStrategy for lorebook keys.
+ * Wraps the base factory and appends refine tail when refineContext is present.
+ */
+export function buildLorebookKeysStrategy(
+  getState: () => RootState,
+  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
+): GenerationStrategy {
+  const entryId = opts?.entryId ?? "";
+  if (!entryId) {
+    throw new Error("buildLorebookKeysStrategy requires entryId");
+  }
+  const baseFactory = createLorebookKeysFactory(getState, entryId);
+  const refineContext = opts?.refineContext;
+  const messageFactory: MessageFactory = refineContext
+    ? async () => {
+        const base = await baseFactory();
+        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
+      }
+    : baseFactory;
+  return {
+    requestId: opts?.requestId ?? api.v1.uuid(),
+    messageFactory,
+    target: { type: "lorebookKeys", entryId },
+    prefillBehavior: "keep",
+  };
+}

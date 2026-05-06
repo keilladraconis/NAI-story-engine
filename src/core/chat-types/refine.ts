@@ -1,19 +1,27 @@
-import type { ChatTypeSpec, Chat, ChatMessage, ChatSeed, SpecCtx } from "./types";
+import type { ChatTypeSpec, Chat, ChatMessage, ChatSeed, SpecCtx, RefineTarget } from "./types";
 import { REFINE_SYSTEM_PROMPT } from "../utils/prompts";
 import { attgUpdated, styleUpdated } from "../store/slices/foundation";
 
 /**
  * Per-field commit dispatchers — applied when a refine session is committed.
- * Only fields backed by the field-strategy registry today (attg, style) can
- * be refined end-to-end; expand this map as more fields gain registered
- * strategies (intent / contract / lorebook in later tasks).
+ * Fields backed by the field-strategy registry (attg, style, lorebookContent,
+ * lorebookKeys) can be refined end-to-end.
  */
 const FIELD_COMMIT_DISPATCHERS: Record<
   string,
-  (text: string, ctx: SpecCtx) => void
+  (text: string, ctx: SpecCtx, target: RefineTarget) => void
 > = {
-  attg: (text, { dispatch }) => dispatch(attgUpdated({ attg: text })),
-  style: (text, { dispatch }) => dispatch(styleUpdated({ style: text })),
+  attg: (text, { dispatch }, _target) => dispatch(attgUpdated({ attg: text })),
+  style: (text, { dispatch }, _target) => dispatch(styleUpdated({ style: text })),
+  lorebookContent: (text, _ctx, target) => {
+    if (!target.entryId) return;
+    void api.v1.lorebook.updateEntry(target.entryId, { text });
+  },
+  lorebookKeys: (text, _ctx, target) => {
+    if (!target.entryId) return;
+    const keys = text.split(",").map((k) => k.trim()).filter((k) => k.length > 0);
+    void api.v1.lorebook.updateEntry(target.entryId, { keys });
+  },
 };
 
 export const refineSpec: ChatTypeSpec = {
@@ -63,6 +71,6 @@ export const refineSpec: ChatTypeSpec = {
       return;
     }
 
-    dispatcher(candidate.content, ctx);
+    dispatcher(candidate.content, ctx, chat.refineTarget);
   },
 };

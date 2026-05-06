@@ -32,6 +32,7 @@ export function buildChatStrategy(
         currentText: chat.refineTarget.originalText,
         history: chat.messages,
       },
+      entryId: chat.refineTarget.entryId,
     });
     return {
       ...inner,

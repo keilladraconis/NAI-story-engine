@@ -21,6 +21,7 @@ export type ChatSeed =
 export interface RefineTarget {
   fieldId: string;
   originalText: string;
+  entryId?: string;
 }
 
 export interface Chat {

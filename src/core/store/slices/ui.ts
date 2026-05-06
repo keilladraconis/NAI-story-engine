@@ -54,7 +54,7 @@ export const uiSlice = createSlice({
     ) => state,
     uiChatRefineRequested: (
       state,
-      _payload: { fieldId: string; sourceText: string },
+      _payload: { fieldId: string; sourceText: string; entryId?: string },
     ) => state,
     uiChatRefineCommitted: (state) => state,
     uiChatRefineDiscarded: (state) => state,

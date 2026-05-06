@@ -31,6 +31,8 @@ export type SeGenRefinePairOptions = {
   stateProjection?: (s: RootState) => unknown;
   /** Pass-through to SeGenerationIconButton for extracting ID from projection. */
   requestIdFromProjection?: (p: unknown) => string | undefined;
+  /** Optional entry ID for lorebook refine. */
+  entryId?: string;
 } & SuiComponentOptions<Theme, State>;
 
 export class SeGenRefinePair extends SuiComponent<
@@ -93,7 +95,11 @@ export class SeGenRefinePair extends SuiComponent<
       return;
     }
     store.dispatch(
-      uiChatRefineRequested({ fieldId: this.options.fieldId, sourceText }),
+      uiChatRefineRequested({
+        fieldId: this.options.fieldId,
+        sourceText,
+        entryId: this.options.entryId,
+      }),
     );
   }
 }

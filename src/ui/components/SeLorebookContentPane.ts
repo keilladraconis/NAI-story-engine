@@ -14,12 +14,11 @@ import {
   uiLorebookEntrySelected,
   uiLorebookContentGenerationRequested,
   uiLorebookKeysGenerationRequested,
-  uiLorebookRefineRequested,
 } from "../../core/store/slices/ui";
 import { entityUnbound } from "../../core/store/slices/world";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
-import { SeGenerationButton } from "./SeGenerationButton";
+import { SeGenRefinePair } from "./SeGenRefinePair";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 type Theme = { default: { self: { style: object } } };
@@ -47,8 +46,6 @@ const S = {
     "white-space": "nowrap",
   },
   keysInput: { "font-size": "12px", flex: "1" },
-  refineRow: { gap: "8px", "align-items": "center", "margin-top": "8px" },
-  refineInput: { "font-size": "12px", flex: "1" },
   actionRow: { gap: "8px", "margin-top": "12px" },
   unbindBtn: {
     flex: "1",
@@ -65,9 +62,10 @@ export class SeLorebookContentPane extends SuiComponent<
   UIPartColumn
 > {
   private readonly _watcher: StoreWatcher;
-  private readonly _contentBtn: SeGenerationButton;
-  private readonly _keysBtn: SeGenerationButton;
-  private readonly _refineBtn: SeGenerationButton;
+  private readonly _contentBtn: SeGenRefinePair;
+  private readonly _keysBtn: SeGenRefinePair;
+  private _latestContent = "";
+  private _latestKeys = "";
 
   constructor(options: SeLorebookContentPaneOptions) {
     super(
@@ -81,10 +79,11 @@ export class SeLorebookContentPane extends SuiComponent<
     const entity = store.getState().world.entitiesById[entityId];
     const entryId = entity?.lorebookEntryId ?? "";
 
-    this._contentBtn = new SeGenerationButton({
+    this._contentBtn = new SeGenRefinePair({
       id: IDS.LOREBOOK.GEN_CONTENT_BTN,
-      label: "⚡ Regen Content",
-      requestId: entryId ? IDS.LOREBOOK.entry(entryId).CONTENT_REQ : undefined,
+      fieldId: "lorebookContent",
+      entryId,
+      refineSourceText: () => this._latestContent,
       onGenerate: () => {
         if (!entryId) return;
         store.dispatch(
@@ -95,29 +94,16 @@ export class SeLorebookContentPane extends SuiComponent<
       },
     });
 
-    this._keysBtn = new SeGenerationButton({
+    this._keysBtn = new SeGenRefinePair({
       id: IDS.LOREBOOK.GEN_KEYS_BTN,
-      label: "⚡ Regen Keys",
-      requestId: entryId ? IDS.LOREBOOK.entry(entryId).KEYS_REQ : undefined,
+      fieldId: "lorebookKeys",
+      entryId,
+      refineSourceText: () => this._latestKeys,
       onGenerate: () => {
         if (!entryId) return;
         store.dispatch(
           uiLorebookKeysGenerationRequested({
             requestId: IDS.LOREBOOK.entry(entryId).KEYS_REQ,
-          }),
-        );
-      },
-    });
-
-    this._refineBtn = new SeGenerationButton({
-      id: IDS.LOREBOOK.REFINE_BTN,
-      label: "Refine",
-      requestId: entryId ? IDS.LOREBOOK.entry(entryId).REFINE_REQ : undefined,
-      onGenerate: () => {
-        if (!entryId) return;
-        store.dispatch(
-          uiLorebookRefineRequested({
-            requestId: IDS.LOREBOOK.entry(entryId).REFINE_REQ,
           }),
         );
       },
@@ -145,12 +131,13 @@ export class SeLorebookContentPane extends SuiComponent<
         L.KEYS_DRAFT_RAW,
         entry?.keys?.join(", ") || "",
       );
+      this._latestContent = entry?.text || "";
+      this._latestKeys = entry?.keys?.join(", ") || "";
     }
 
-    const [contentPart, keysPart, refinePart] = await Promise.all([
+    const [contentPart, keysPart] = await Promise.all([
       this._contentBtn.build(),
       this._keysBtn.build(),
-      this._refineBtn.build(),
     ]);
 
     const { column, row, text, button, multilineTextInput, textInput } =
@@ -203,6 +190,7 @@ export class SeLorebookContentPane extends SuiComponent<
           storageKey: `story:${L.CONTENT_DRAFT_KEY}`,
           style: S.contentInput,
           onChange: async (value: string) => {
+            this._latestContent = value;
             if (!entryId) return;
             const erato =
               (await api.v1.config.get("erato_compatibility")) || false;
@@ -224,6 +212,7 @@ export class SeLorebookContentPane extends SuiComponent<
               storageKey: `story:${L.KEYS_DRAFT_KEY}`,
               style: S.keysInput,
               onChange: async (value: string) => {
+                this._latestKeys = value;
                 if (!entryId) return;
                 const keys = value
                   .split(",")
@@ -232,21 +221,6 @@ export class SeLorebookContentPane extends SuiComponent<
                 await api.v1.lorebook.updateEntry(entryId, { keys });
               },
             }),
-          ],
-        }),
-
-        // ── Refine ─────────────────────────────────────────────────────
-        row({
-          style: S.refineRow,
-          content: [
-            textInput({
-              id: L.REFINE_INSTRUCTIONS_INPUT,
-              initialValue: "",
-              placeholder: "Describe changes...",
-              storageKey: `story:${L.REFINE_INSTRUCTIONS_KEY}`,
-              style: S.refineInput,
-            }),
-            refinePart,
           ],
         }),
 

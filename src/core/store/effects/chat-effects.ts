@@ -135,7 +135,7 @@ export function registerChatEffects(
   subscribeEffect(
     matchesAction(uiChatRefineRequested),
     async (action, { getState: latest }) => {
-      const { fieldId, sourceText } = action.payload;
+      const { fieldId, sourceText, entryId } = action.payload;
       if (!sourceText.trim()) {
         api.v1.ui.toast("Nothing to refine — field is empty.", { type: "info" });
         return;
@@ -159,7 +159,7 @@ export function registerChatEffects(
         title: init.title,
         messages: init.initialMessages,
         seed,
-        refineTarget: { fieldId, originalText: sourceText },
+        refineTarget: { fieldId, originalText: sourceText, entryId },
       };
       dispatch(refineChatOpened({ chat: refine }));
     },
