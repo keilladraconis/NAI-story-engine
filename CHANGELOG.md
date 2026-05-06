@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.0] - 2026-05-06
+
+### Added
+
+- **Typed chat session system.** Chat sessions are now driven by a `ChatTypeSpec` registry under `src/core/chat-types/`. Each type owns its own system prompt, prefill, lifecycle, sub-modes, and `contextSlice` projection. Adding a new chat type is a new file in the registry — no scattered switch statements.
+- **Field-level Refine restored.** A new `SeGenRefinePair` icon-pair sits next to the generate button on Foundation ATTG, Style, and on lorebook Content / Keys. Clicking refine opens an iterable chat scoped to that field. Iterate with chat instructions; **Commit** writes the latest candidate back; abandoning the chat (or **Discard**) leaves the field untouched. Intent and Story Contract refine wiring is deferred until per-field commit dispatchers are added.
+- **Summary chats.** Summarizing a brainstorm now creates a `summary` chat seeded from the source transcript. The summary is a real iterable chat — tighten it, expand it, retitle it. The summary chat is saved in the session list. A `fromStoryText` seed kind is available for future story-text summaries.
+
+### Changed
+
+- **Brainstorm reframed as a chat type.** The Brainstorm panel's behavior moves into `brainstormSpec`. The cowriter/critic toggle stays as a `subMode` field — same UX, registry-driven.
+- **`buildStoryEnginePrefix` consults the active chat's spec.** Brainstorm-context injection is now driven by `spec.contextSlice`, so each type controls what flows into Story Engine generation: brainstorm = full transcript, summary = last assistant turn, refine = nothing.
+
+### Removed
+
+- **Old `brainstorm` slice, effects, handlers, and UI components.** Replaced by the typed chat system.
+- **Standalone `lorebookRefine` request type.** Refine now flows through the chat infrastructure.
+- **Inline lorebook refine instructions input.** Replaced by the chat-driven refine pair.
+
+### Migration
+
+- **One-shot persisted-data migration on load.** v0.11 `brainstorm.chats[]` is auto-converted into the new `chat` slice shape on first load. Sub-mode is preserved. A toast confirms the migration. The old key is cleared. If migration fails, persisted state is left untouched and the error is logged.
+
 ## [0.11.3] - 2026-04-27
 
 ### Fixed
