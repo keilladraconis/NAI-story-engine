@@ -1,4 +1,5 @@
 import {
+  messageAppended,
   messageUpdated,
   refineCandidateMarked,
 } from "../../slices/chat";
@@ -11,14 +12,20 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 
-// Streaming is intentionally a no-op until Task 18+ wires the chat panel UI:
-// StreamingContext lacks a `dispatch`, the chat panel is store-driven (no
-// `api.v1.ui.updateParts` target exists yet), so per-chunk updates are
-// deferred. Completion dispatches the full cleaned content.
+// Per-chunk dispatches grow the message in state; SeMessage's liveSelector
+// picks up the change and updates the bubble's view text reactively. On
+// completion we replace the accumulated content with the think-stripped
+// version (mid-stream may briefly show <think> tags before they're cleaned).
 
 export const chatHandler: GenerationHandlers<ChatTarget> = {
-  streaming(_ctx: StreamingContext<ChatTarget>, _newText: string): void {
-    // No-op: see file-level comment.
+  streaming(ctx: StreamingContext<ChatTarget>, newText: string): void {
+    ctx.dispatch(
+      messageAppended({
+        chatId: ctx.target.chatId,
+        id: ctx.target.messageId,
+        content: newText,
+      }),
+    );
   },
 
   async completion(ctx: CompletionContext<ChatTarget>): Promise<void> {
@@ -34,11 +41,14 @@ export const chatHandler: GenerationHandlers<ChatTarget> = {
 };
 
 export const chatRefineHandler: GenerationHandlers<ChatRefineTarget> = {
-  streaming(
-    _ctx: StreamingContext<ChatRefineTarget>,
-    _newText: string,
-  ): void {
-    // No-op: see file-level comment.
+  streaming(ctx: StreamingContext<ChatRefineTarget>, newText: string): void {
+    ctx.dispatch(
+      messageAppended({
+        chatId: ctx.target.chatId,
+        id: ctx.target.messageId,
+        content: newText,
+      }),
+    );
   },
 
   async completion(ctx: CompletionContext<ChatRefineTarget>): Promise<void> {

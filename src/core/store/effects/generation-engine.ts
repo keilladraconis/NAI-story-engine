@@ -296,7 +296,7 @@ export function registerGenerationEngineEffects(
       const text = choices[0]?.text || "";
       if (text) {
         accumulatedText += text;
-        handler.streaming({ target, getState, accumulatedText }, text);
+        handler.streaming({ target, getState, dispatch, accumulatedText }, text);
       }
     };
 

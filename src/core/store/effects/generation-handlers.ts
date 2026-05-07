@@ -75,6 +75,7 @@ export type ChatRefineTarget = Extract<
 export interface StreamingContext<T = GenerationStrategy["target"]> {
   target: T;
   getState: () => RootState;
+  dispatch: AppDispatch;
   accumulatedText: string;
 }
 
@@ -82,7 +83,6 @@ export interface CompletionContext<
   T = GenerationStrategy["target"],
 > extends StreamingContext<T> {
   generationSucceeded: boolean;
-  dispatch: AppDispatch;
   originalContent?: string; // For lorebook rollback
   originalKeys?: string; // For lorebook rollback
 }

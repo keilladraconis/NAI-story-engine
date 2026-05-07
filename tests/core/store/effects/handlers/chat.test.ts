@@ -87,16 +87,23 @@ describe("chatRefineHandler.completion", () => {
 });
 
 describe("streaming handlers", () => {
-  it("chat streaming is a no-op", () => {
+  it("chat streaming dispatches messageAppended with the delta", () => {
+    const dispatch = vi.fn();
     const ctx = {
       target: { type: "chat" as const, chatId: "c1", messageId: "m1" },
       getState: vi.fn(),
-      accumulatedText: "partial",
+      dispatch,
+      accumulatedText: "Hello",
     };
-    expect(() => chatHandler.streaming(ctx, "delta")).not.toThrow();
+    chatHandler.streaming(ctx, " world");
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "chat/messageAppended",
+      payload: { chatId: "c1", id: "m1", content: " world" },
+    });
   });
 
-  it("chatRefine streaming is a no-op", () => {
+  it("chatRefine streaming dispatches messageAppended with the delta", () => {
+    const dispatch = vi.fn();
     const ctx = {
       target: {
         type: "chatRefine" as const,
@@ -105,8 +112,13 @@ describe("streaming handlers", () => {
         fieldId: "attg",
       },
       getState: vi.fn(),
-      accumulatedText: "partial",
+      dispatch,
+      accumulatedText: "tighter",
     };
-    expect(() => chatRefineHandler.streaming(ctx, "delta")).not.toThrow();
+    chatRefineHandler.streaming(ctx, " version");
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "chat/messageAppended",
+      payload: { chatId: "r1", id: "m1", content: " version" },
+    });
   });
 });
