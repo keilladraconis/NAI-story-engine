@@ -5,8 +5,10 @@ import { parseContract } from "../store/effects/handlers/foundation";
 
 /**
  * Per-field commit dispatchers — applied when a refine session is committed.
- * Fields backed by the field-strategy registry (attg, style, lorebookContent,
- * lorebookKeys) can be refined end-to-end.
+ * Fields backed by the field-strategy registry (attg, style, intent, contract,
+ * lorebookContent) can be refined end-to-end. lorebookKeys is intentionally
+ * omitted — keys are short comma-separated tokens, refining them through a
+ * chat is overkill versus typing them directly.
  */
 const FIELD_COMMIT_DISPATCHERS: Record<
   string,
@@ -22,11 +24,6 @@ const FIELD_COMMIT_DISPATCHERS: Record<
   lorebookContent: (text, _ctx, target) => {
     if (!target.entryId) return;
     void api.v1.lorebook.updateEntry(target.entryId, { text });
-  },
-  lorebookKeys: (text, _ctx, target) => {
-    if (!target.entryId) return;
-    const keys = text.split(",").map((k) => k.trim()).filter((k) => k.length > 0);
-    void api.v1.lorebook.updateEntry(target.entryId, { keys });
   },
 };
 

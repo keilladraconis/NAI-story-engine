@@ -19,6 +19,7 @@ import { entityUnbound } from "../../core/store/slices/world";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import { SeGenRefinePair } from "./SeGenRefinePair";
+import { SeGenerationIconButton } from "./SeGenerationButton";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 type Theme = { default: { self: { style: object } } };
@@ -63,9 +64,8 @@ export class SeLorebookContentPane extends SuiComponent<
 > {
   private readonly _watcher: StoreWatcher;
   private readonly _contentBtn: SeGenRefinePair;
-  private readonly _keysBtn: SeGenRefinePair;
+  private readonly _keysBtn: SeGenerationIconButton;
   private _latestContent = "";
-  private _latestKeys = "";
 
   constructor(options: SeLorebookContentPaneOptions) {
     super(
@@ -94,11 +94,10 @@ export class SeLorebookContentPane extends SuiComponent<
       },
     });
 
-    this._keysBtn = new SeGenRefinePair({
+    this._keysBtn = new SeGenerationIconButton({
       id: IDS.LOREBOOK.GEN_KEYS_BTN,
-      fieldId: "lorebookKeys",
-      entryId,
-      refineSourceText: () => this._latestKeys,
+      iconId: "zap",
+      requestId: entryId ? IDS.LOREBOOK.entry(entryId).KEYS_REQ : undefined,
       onGenerate: () => {
         if (!entryId) return;
         store.dispatch(
@@ -132,7 +131,6 @@ export class SeLorebookContentPane extends SuiComponent<
         entry?.keys?.join(", ") || "",
       );
       this._latestContent = entry?.text || "";
-      this._latestKeys = entry?.keys?.join(", ") || "";
     }
 
     const [contentPart, keysPart] = await Promise.all([
@@ -212,7 +210,6 @@ export class SeLorebookContentPane extends SuiComponent<
               storageKey: `story:${L.KEYS_DRAFT_KEY}`,
               style: S.keysInput,
               onChange: async (value: string) => {
-                this._latestKeys = value;
                 if (!entryId) return;
                 const keys = value
                   .split(",")

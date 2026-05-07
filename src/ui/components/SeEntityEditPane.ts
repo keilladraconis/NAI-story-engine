@@ -142,9 +142,8 @@ export class SeEntityEditPane extends SuiComponent<
 > {
   private readonly _summaryBtn: SeGenerationIconButton;
   private readonly _contentBtn: SeGenRefinePair;
-  private readonly _keysBtn: SeGenRefinePair;
+  private readonly _keysBtn: SeGenerationIconButton;
   private _latestContent = "";
-  private _latestKeys = "";
 
   /**
    * Resolve (or create + bind) the lorebook entry for this entity. Idempotent:
@@ -240,9 +239,9 @@ export class SeEntityEditPane extends SuiComponent<
       },
     });
 
-    this._keysBtn = new SeGenRefinePair({
+    this._keysBtn = new SeGenerationIconButton({
       id: IDS.LOREBOOK.GEN_KEYS_BTN,
-      fieldId: "lorebookKeys",
+      iconId: "zap",
       stateProjection: lorebookEntryProjection,
       requestIdFromProjection: (id) =>
         id ? IDS.LOREBOOK.entry(id as string).KEYS_REQ : undefined,
@@ -257,8 +256,6 @@ export class SeEntityEditPane extends SuiComponent<
           );
         })();
       },
-      refineSourceText: () => this._latestKeys,
-      resolveEntryId: () => this._ensureLiveEntryId(entityId),
       contentChecker: async () => {
         const id = store.getState().world.entitiesById[entityId]?.lorebookEntryId;
         if (!id) return false;
@@ -300,7 +297,6 @@ export class SeEntityEditPane extends SuiComponent<
       ]);
       // Seed the refine-pair cache so refineSourceText can return synchronously.
       this._latestContent = contentText;
-      this._latestKeys = keysText;
     } else {
       // Draft entity (or live with no entry yet on the API side) — clear any
       // stale draft content from a prior session so a fresh draft starts empty.
@@ -309,7 +305,6 @@ export class SeEntityEditPane extends SuiComponent<
         api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, ""),
       ]);
       this._latestContent = "";
-      this._latestKeys = "";
     }
 
     const _close = (): void => {
@@ -541,9 +536,6 @@ export class SeEntityEditPane extends SuiComponent<
             placeholder: "comma, separated, keys",
             storageKey: `story:${L.KEYS_DRAFT_KEY}`,
             style: S.keysInput,
-            onChange: (value) => {
-              this._latestKeys = value;
-            },
           }),
           keysGenPart,
           button({

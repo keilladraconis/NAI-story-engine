@@ -375,31 +375,3 @@ export function buildLorebookContentStrategy(
     prefillBehavior: "keep",
   };
 }
-
-/**
- * Builds a refine-capable GenerationStrategy for lorebook keys.
- * Wraps the base factory and appends refine tail when refineContext is present.
- */
-export function buildLorebookKeysStrategy(
-  getState: () => RootState,
-  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
-): GenerationStrategy {
-  const entryId = opts?.entryId ?? "";
-  if (!entryId) {
-    throw new Error("buildLorebookKeysStrategy requires entryId");
-  }
-  const baseFactory = createLorebookKeysFactory(getState, entryId);
-  const refineContext = opts?.refineContext;
-  const messageFactory: MessageFactory = refineContext
-    ? async () => {
-        const base = await baseFactory();
-        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
-      }
-    : baseFactory;
-  return {
-    requestId: opts?.requestId ?? api.v1.uuid(),
-    messageFactory,
-    target: { type: "lorebookKeys", entryId },
-    prefillBehavior: "keep",
-  };
-}
