@@ -2,6 +2,7 @@ import type { ChatTypeSpec, Chat, ChatMessage, ChatSeed, SpecCtx, RefineTarget }
 import { REFINE_SYSTEM_PROMPT } from "../utils/prompts";
 import { attgUpdated, styleUpdated, intentUpdated, contractUpdated } from "../store/slices/foundation";
 import { parseContract } from "../store/effects/handlers/foundation";
+import { IDS } from "../../ui/framework/ids";
 
 /**
  * Per-field commit dispatchers — applied when a refine session is committed.
@@ -23,6 +24,12 @@ const FIELD_COMMIT_DISPATCHERS: Record<
   },
   lorebookContent: (text, _ctx, target) => {
     if (!target.entryId) return;
+    // Sync the visible edit-pane draft so the textarea reflects the refined
+    // content. Both lorebook panes (per-entity and standalone) bind their
+    // textarea to the same shared CONTENT_DRAFT_KEY in storyStorage. Without
+    // this write, the entity edit pane's Save button would later clobber the
+    // refined lorebook entry with the stale textarea content.
+    void api.v1.storyStorage.set(IDS.LOREBOOK.CONTENT_DRAFT_KEY, text);
     void api.v1.lorebook.updateEntry(target.entryId, { text });
   },
 };

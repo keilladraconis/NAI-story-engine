@@ -23,8 +23,10 @@ export type SeGenRefinePairOptions = {
   generateRequestId?: string;
   generateAction?: { type: string; payload?: unknown };
   onGenerate?: () => void;
-  /** Called at click time to source the current field text (live read). */
-  refineSourceText: () => string;
+  /** Called at click time to source the current field text (live read).
+   *  Async is supported so callers can read directly from storyStorage rather
+   *  than maintaining a parallel sync cache. */
+  refineSourceText: () => string | Promise<string>;
   hasContent?: boolean;
   contentChecker?: () => Promise<boolean>;
   /** Pass-through to SeGenerationIconButton for dynamic request ID resolution. */
@@ -94,7 +96,7 @@ export class SeGenRefinePair extends SuiComponent<
   }
 
   private async _handleRefineClick(): Promise<void> {
-    const sourceText = this.options.refineSourceText().trim();
+    const sourceText = (await this.options.refineSourceText()).trim();
     if (!sourceText) {
       api.v1.ui.toast("Nothing to refine — field is empty.", { type: "info" });
       return;

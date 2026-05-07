@@ -65,7 +65,6 @@ export class SeLorebookContentPane extends SuiComponent<
   private readonly _watcher: StoreWatcher;
   private readonly _contentBtn: SeGenRefinePair;
   private readonly _keysBtn: SeGenerationIconButton;
-  private _latestContent = "";
 
   constructor(options: SeLorebookContentPaneOptions) {
     super(
@@ -83,7 +82,10 @@ export class SeLorebookContentPane extends SuiComponent<
       id: IDS.LOREBOOK.GEN_CONTENT_BTN,
       fieldId: "lorebookContent",
       entryId,
-      refineSourceText: () => this._latestContent,
+      refineSourceText: async () => {
+        const v = await api.v1.storyStorage.get(IDS.LOREBOOK.CONTENT_DRAFT_KEY);
+        return typeof v === "string" ? v : "";
+      },
       onGenerate: () => {
         if (!entryId) return;
         store.dispatch(
@@ -130,7 +132,6 @@ export class SeLorebookContentPane extends SuiComponent<
         L.KEYS_DRAFT_RAW,
         entry?.keys?.join(", ") || "",
       );
-      this._latestContent = entry?.text || "";
     }
 
     const [contentPart, keysPart] = await Promise.all([
@@ -188,7 +189,6 @@ export class SeLorebookContentPane extends SuiComponent<
           storageKey: `story:${L.CONTENT_DRAFT_KEY}`,
           style: S.contentInput,
           onChange: async (value: string) => {
-            this._latestContent = value;
             if (!entryId) return;
             const erato =
               (await api.v1.config.get("erato_compatibility")) || false;

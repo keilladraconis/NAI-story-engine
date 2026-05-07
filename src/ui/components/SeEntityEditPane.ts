@@ -143,7 +143,6 @@ export class SeEntityEditPane extends SuiComponent<
   private readonly _summaryBtn: SeGenerationIconButton;
   private readonly _contentBtn: SeGenRefinePair;
   private readonly _keysBtn: SeGenerationIconButton;
-  private _latestContent = "";
 
   /**
    * Resolve (or create + bind) the lorebook entry for this entity. Idempotent:
@@ -229,7 +228,10 @@ export class SeEntityEditPane extends SuiComponent<
           );
         })();
       },
-      refineSourceText: () => this._latestContent,
+      refineSourceText: async () => {
+        const v = await api.v1.storyStorage.get(IDS.LOREBOOK.CONTENT_DRAFT_KEY);
+        return typeof v === "string" ? v : "";
+      },
       resolveEntryId: () => this._ensureLiveEntryId(entityId),
       contentChecker: async () => {
         const id = store.getState().world.entitiesById[entityId]?.lorebookEntryId;
@@ -295,8 +297,6 @@ export class SeEntityEditPane extends SuiComponent<
         api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, contentText),
         api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, keysText),
       ]);
-      // Seed the refine-pair cache so refineSourceText can return synchronously.
-      this._latestContent = contentText;
     } else {
       // Draft entity (or live with no entry yet on the API side) — clear any
       // stale draft content from a prior session so a fresh draft starts empty.
@@ -304,7 +304,6 @@ export class SeEntityEditPane extends SuiComponent<
         api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, ""),
         api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, ""),
       ]);
-      this._latestContent = "";
     }
 
     const _close = (): void => {
@@ -522,9 +521,6 @@ export class SeEntityEditPane extends SuiComponent<
         placeholder: "Lorebook content…",
         storageKey: `story:${L.CONTENT_DRAFT_KEY}`,
         style: S.contentInput,
-        onChange: (value) => {
-          this._latestContent = value;
-        },
       }),
       row({
         style: S.keysRow,
