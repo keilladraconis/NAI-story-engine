@@ -14,6 +14,7 @@ import { requestQueued } from "../slices/runtime";
 import {
   chatCreated,
   messageAdded,
+  messageRemoved,
   messagesPrunedAfter,
   refineChatOpened,
   refineChatCleared,
@@ -36,7 +37,20 @@ async function submitChatGeneration(
   chat: Chat,
   assistantId: string,
 ): Promise<void> {
-  const strategy = buildChatStrategy(getState, chat, assistantId);
+  let strategy;
+  try {
+    strategy = buildChatStrategy(getState, chat, assistantId);
+  } catch (error) {
+    // Surface strategy-build errors instead of leaving a stranded empty
+    // placeholder. Without this, an exception here just rejects the async
+    // effect and disappears as an unhandled promise rejection.
+    api.v1.log(`[chat] failed to build strategy for ${chat.id}:`, error as Error);
+    api.v1.ui.toast(`Could not start refine: ${(error as Error).message}`, {
+      type: "error",
+    });
+    dispatch(messageRemoved({ chatId: chat.id, id: assistantId }));
+    return;
+  }
   const params = await buildModelParams({ max_tokens: 1024, temperature: 1.0 });
   dispatch(
     requestQueued({

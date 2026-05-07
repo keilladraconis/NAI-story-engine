@@ -31,8 +31,13 @@ export type SeGenRefinePairOptions = {
   stateProjection?: (s: RootState) => unknown;
   /** Pass-through to SeGenerationIconButton for extracting ID from projection. */
   requestIdFromProjection?: (p: unknown) => string | undefined;
-  /** Optional entry ID for lorebook refine. */
+  /** Optional entry ID for lorebook refine. Static when the caller has it at
+   *  construction time (e.g. SeLorebookContentPane). */
   entryId?: string;
+  /** Optional lazy resolver for entry ID — preferred when the entry doesn't
+   *  exist yet (drafts) and needs to be promoted at click time, or when the
+   *  binding may change after construction. Resolves to undefined to bail. */
+  resolveEntryId?: () => string | undefined | Promise<string | undefined>;
 } & SuiComponentOptions<Theme, State>;
 
 export class SeGenRefinePair extends SuiComponent<
@@ -82,23 +87,26 @@ export class SeGenRefinePair extends SuiComponent<
             opacity: "1",
             cursor: "pointer",
           },
-          callback: () => this._handleRefineClick(),
+          callback: () => void this._handleRefineClick(),
         }),
       ],
     });
   }
 
-  private _handleRefineClick(): void {
+  private async _handleRefineClick(): Promise<void> {
     const sourceText = this.options.refineSourceText().trim();
     if (!sourceText) {
       api.v1.ui.toast("Nothing to refine — field is empty.", { type: "info" });
       return;
     }
+    const entryId = this.options.resolveEntryId
+      ? await this.options.resolveEntryId()
+      : this.options.entryId;
     store.dispatch(
       uiChatRefineRequested({
         fieldId: this.options.fieldId,
         sourceText,
-        entryId: this.options.entryId,
+        entryId,
       }),
     );
   }

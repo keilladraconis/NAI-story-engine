@@ -231,6 +231,7 @@ export class SeEntityEditPane extends SuiComponent<
         })();
       },
       refineSourceText: () => this._latestContent,
+      resolveEntryId: () => this._ensureLiveEntryId(entityId),
       contentChecker: async () => {
         const id = store.getState().world.entitiesById[entityId]?.lorebookEntryId;
         if (!id) return false;
@@ -257,6 +258,7 @@ export class SeEntityEditPane extends SuiComponent<
         })();
       },
       refineSourceText: () => this._latestKeys,
+      resolveEntryId: () => this._ensureLiveEntryId(entityId),
       contentChecker: async () => {
         const id = store.getState().world.entitiesById[entityId]?.lorebookEntryId;
         if (!id) return false;
