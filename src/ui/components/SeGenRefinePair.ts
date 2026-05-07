@@ -3,7 +3,7 @@
  *
  * Drops in place of a bare generation button to enable refine UX.
  * Left: SeGenerationIconButton (zap icon)
- * Right: Refine button (edit-2 icon) — dispatches uiChatRefineRequested
+ * Right: Refine button (feather icon) — dispatches uiChatRefineRequested
  *
  * The refine button reads source text via caller's refineSourceText() callback
  * at click time (live read), trims, and bails with a toast if empty.
@@ -73,7 +73,7 @@ export class SeGenRefinePair extends SuiComponent<
         genPart,
         button({
           id: `${this.id}-refine`,
-          iconId: "edit-2",
+          iconId: "feather",
           style: {
             background: "none",
             border: "none",
