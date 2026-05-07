@@ -33,7 +33,12 @@ describe("buildChatStrategy", () => {
     const getState = (() =>
       ({ chat: { chats: [], activeChatId: null, refineChat: refine } }) as unknown as RootState);
     const strategy = buildChatStrategy(getState, refine, "asst");
-    expect(strategy.target).toEqual({ type: "chatRefine", messageId: "asst", fieldId: "attg" });
+    expect(strategy.target).toEqual({
+      type: "chatRefine",
+      chatId: "r1",
+      messageId: "asst",
+      fieldId: "attg",
+    });
     expect(strategy.requestId).toBe("refine-r1-asst");
   });
 

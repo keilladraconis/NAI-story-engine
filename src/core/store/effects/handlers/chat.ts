@@ -1,6 +1,5 @@
 import {
   messageUpdated,
-  refineMessageReplaced,
   refineCandidateMarked,
 } from "../../slices/chat";
 import { stripThinkingTags } from "../../../utils/tag-parser";
@@ -46,7 +45,11 @@ export const chatRefineHandler: GenerationHandlers<ChatRefineTarget> = {
     if (!ctx.accumulatedText) return;
     const cleaned = stripThinkingTags(ctx.accumulatedText);
     ctx.dispatch(
-      refineMessageReplaced({ id: ctx.target.messageId, content: cleaned }),
+      messageUpdated({
+        chatId: ctx.target.chatId,
+        id: ctx.target.messageId,
+        content: cleaned,
+      }),
     );
     ctx.dispatch(
       refineCandidateMarked({ messageId: ctx.target.messageId }),

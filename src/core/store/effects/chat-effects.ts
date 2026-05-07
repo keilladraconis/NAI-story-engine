@@ -26,6 +26,7 @@ import { flushActiveEditor } from "../../../ui/framework/editable-draft";
 import { IDS } from "../../../ui/framework/ids";
 
 function findChat(state: RootState, id: string): Chat | undefined {
+  if (state.chat.refineChat?.id === id) return state.chat.refineChat;
   return state.chat.chats.find((c) => c.id === id);
 }
 

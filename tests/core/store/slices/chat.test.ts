@@ -15,8 +15,6 @@ import {
   refineChatOpened,
   refineCandidateMarked,
   refineChatCleared,
-  refineMessageAdded,
-  refineMessageAppended,
 } from "../../../../src/core/store/slices/chat";
 import type { Chat } from "../../../../src/core/chat-types/types";
 
@@ -225,7 +223,7 @@ describe("chat slice", () => {
     expect(next.refineChat?.messages[0].refineCandidate).toBe(true);
   });
 
-  it("refineMessageAdded appends to the refine slot when set", () => {
+  it("messageAdded targets the refine slot when chatId matches it", () => {
     const open: Chat = {
       id: "r1",
       type: "refine",
@@ -236,22 +234,13 @@ describe("chat slice", () => {
     const start = { ...initialChatState, refineChat: open };
     const next = chatSliceReducer(
       start,
-      refineMessageAdded({ message: { id: "m1", role: "user", content: "hi" } }),
+      messageAdded({ chatId: "r1", message: { id: "m1", role: "user", content: "hi" } }),
     );
     expect(next.refineChat?.messages).toHaveLength(1);
     expect(next.refineChat?.messages[0].content).toBe("hi");
   });
 
-  it("refineMessageAdded is a no-op when the slot is null", () => {
-    const start = { ...initialChatState, refineChat: null };
-    const next = chatSliceReducer(
-      start,
-      refineMessageAdded({ message: { id: "m1", role: "user", content: "hi" } }),
-    );
-    expect(next.refineChat).toBeNull();
-  });
-
-  it("refineMessageAppended concatenates content for streaming on the refine slot", () => {
+  it("messageAppended streams into the refine slot when chatId matches it", () => {
     const open: Chat = {
       id: "r1",
       type: "refine",
@@ -260,7 +249,23 @@ describe("chat slice", () => {
       seed: { kind: "blank" },
     };
     const start = { ...initialChatState, refineChat: open };
-    const next = chatSliceReducer(start, refineMessageAppended({ id: "m1", content: "lo" }));
+    const next = chatSliceReducer(start, messageAppended({ chatId: "r1", id: "m1", content: "lo" }));
     expect(next.refineChat?.messages[0].content).toBe("Hello");
+  });
+
+  it("messageUpdated overwrites content on the refine slot when chatId matches it", () => {
+    const open: Chat = {
+      id: "r1",
+      type: "refine",
+      title: "x",
+      messages: [{ id: "m1", role: "assistant", content: "draft" }],
+      seed: { kind: "blank" },
+    };
+    const start = { ...initialChatState, refineChat: open };
+    const next = chatSliceReducer(
+      start,
+      messageUpdated({ chatId: "r1", id: "m1", content: "final" }),
+    );
+    expect(next.refineChat?.messages[0].content).toBe("final");
   });
 });

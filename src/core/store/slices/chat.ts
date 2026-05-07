@@ -26,6 +26,9 @@ export const initialChatState: ChatSliceState = {
 };
 
 function mapChat(state: ChatSliceState, id: string, fn: (c: Chat) => Chat): ChatSliceState {
+  if (state.refineChat?.id === id) {
+    return { ...state, refineChat: fn(state.refineChat) };
+  }
   return { ...state, chats: state.chats.map((c) => (c.id === id ? fn(c) : c)) };
 }
 
@@ -102,43 +105,6 @@ export const chatSlice = createSlice({
 
     refineChatCleared: (state) => ({ ...state, refineChat: null }),
 
-    refineMessageAdded: (state, payload: { message: ChatMessage }) => {
-      if (!state.refineChat) return state;
-      return {
-        ...state,
-        refineChat: {
-          ...state.refineChat,
-          messages: [...state.refineChat.messages, payload.message],
-        },
-      };
-    },
-
-    refineMessageAppended: (state, payload: { id: string; content: string }) => {
-      if (!state.refineChat) return state;
-      return {
-        ...state,
-        refineChat: {
-          ...state.refineChat,
-          messages: state.refineChat.messages.map((m) =>
-            m.id === payload.id ? { ...m, content: m.content + payload.content } : m,
-          ),
-        },
-      };
-    },
-
-    refineMessageReplaced: (state, payload: { id: string; content: string }) => {
-      if (!state.refineChat) return state;
-      return {
-        ...state,
-        refineChat: {
-          ...state.refineChat,
-          messages: state.refineChat.messages.map((m) =>
-            m.id === payload.id ? { ...m, content: payload.content } : m,
-          ),
-        },
-      };
-    },
-
     refineCandidateMarked: (state, payload: { messageId: string }) => {
       if (!state.refineChat) return state;
       return {
@@ -168,9 +134,6 @@ export const {
   messagesPrunedAfter,
   refineChatOpened,
   refineChatCleared,
-  refineMessageAdded,
-  refineMessageAppended,
-  refineMessageReplaced,
   refineCandidateMarked,
 } = chatSlice.actions;
 

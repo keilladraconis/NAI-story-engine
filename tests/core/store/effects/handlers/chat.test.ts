@@ -26,7 +26,7 @@ function makeRefineCtx(
   over: Partial<CompletionContext<ChatRefineTarget>> = {},
 ): CompletionContext<ChatRefineTarget> {
   return {
-    target: { type: "chatRefine", messageId: "m1", fieldId: "attg" },
+    target: { type: "chatRefine", chatId: "r1", messageId: "m1", fieldId: "attg" },
     getState: vi.fn(),
     accumulatedText: "",
     generationSucceeded: true,
@@ -59,9 +59,7 @@ describe("chatHandler.completion", () => {
 });
 
 describe("chatRefineHandler.completion", () => {
-  it("dispatches refineMessageReplaced and refineCandidateMarked", async () => {
-    // Confirms stripThinkingTags is applied before dispatching the
-    // refine candidate's content.
+  it("dispatches messageUpdated (routed to refine slot via chatId) and refineCandidateMarked", async () => {
     const ctx = makeRefineCtx({
       accumulatedText: "</think>cleaned candidate",
     });
@@ -71,8 +69,8 @@ describe("chatRefineHandler.completion", () => {
     ).mock.calls.map((c) => c[0]);
     expect(calls).toEqual([
       {
-        type: "chat/refineMessageReplaced",
-        payload: { id: "m1", content: "cleaned candidate" },
+        type: "chat/messageUpdated",
+        payload: { chatId: "r1", id: "m1", content: "cleaned candidate" },
       },
       {
         type: "chat/refineCandidateMarked",
@@ -102,6 +100,7 @@ describe("streaming handlers", () => {
     const ctx = {
       target: {
         type: "chatRefine" as const,
+        chatId: "r1",
         messageId: "m1",
         fieldId: "attg",
       },

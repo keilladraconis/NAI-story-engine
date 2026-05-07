@@ -94,7 +94,7 @@ export interface GenerationStrategy {
   params?: GenerationParams; // Optional if provided by factory
   target:
     | { type: "chat"; chatId: string; messageId: string }
-    | { type: "chatRefine"; messageId: string; fieldId: string }
+    | { type: "chatRefine"; chatId: string; messageId: string; fieldId: string }
     | { type: "field"; fieldId: string }
     | { type: "list"; fieldId: string }
     | { type: "lorebookContent"; entryId: string }

@@ -39,6 +39,7 @@ export function buildChatStrategy(
       requestId: `refine-${chat.id}-${assistantMessageId}`,
       target: {
         type: "chatRefine",
+        chatId: chat.id,
         messageId: assistantMessageId,
         fieldId: chat.refineTarget.fieldId,
       },
