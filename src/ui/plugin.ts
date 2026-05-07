@@ -287,15 +287,20 @@ export class StoryEnginePlugin extends SuiPlugin {
 
     await api.v1.ui.register(panels);
 
-    // When a refine chat opens, surface it: switch to the Chat tab so the user
-    // lands directly in the refine session. (Sidebar visibility itself is not
-    // controllable via the script API — clicking the sidebar icon is on the user.)
+    // Surface the refine session when it opens (auto-switch to Chat tab) and
+    // return to wherever the user came from when it closes (commit or discard),
+    // so the takeover doesn't strand them on the Chat tab afterwards.
     let lastRefineId: string | null = null;
+    let preRefineTab: number | null = null;
     store.subscribeSelector(
       (state) => state.chat.refineChat?.id ?? null,
       (id) => {
-        if (id && id !== lastRefineId) {
+        if (id && !lastRefineId) {
+          preRefineTab = this._tabBar?.activeTab ?? 0;
           void this._tabBar?.switchTo(0);
+        } else if (!id && lastRefineId && preRefineTab !== null) {
+          void this._tabBar?.switchTo(preRefineTab);
+          preRefineTab = null;
         }
         lastRefineId = id;
       },
