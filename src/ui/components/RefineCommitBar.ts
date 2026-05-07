@@ -26,6 +26,29 @@ function hasCandidate(state: RootState): boolean {
   );
 }
 
+const DISCARD_STYLE = {
+  flex: "1",
+  "background-color": "transparent",
+  border: "1px solid rgba(255,255,255,0.12)",
+  color: "rgba(255,255,255,0.6)",
+};
+
+const COMMIT_STYLE_BASE = {
+  flex: "1",
+  "font-weight": "bold",
+  border: "1px solid rgba(80,200,120,0.6)",
+  "background-color": "rgba(80,200,120,0.28)",
+  color: "rgba(230,255,235,1)",
+};
+
+function commitStyle(enabled: boolean): Record<string, string> {
+  return {
+    ...COMMIT_STYLE_BASE,
+    opacity: enabled ? "1" : "0.45",
+    cursor: enabled ? "pointer" : "default",
+  };
+}
+
 export class RefineCommitBar extends SuiComponent<
   Theme,
   State,
@@ -59,22 +82,17 @@ export class RefineCommitBar extends SuiComponent<
       style: { gap: "8px", "margin-top": "8px" },
       content: [
         button({
+          id: `${this.id}-discard`,
+          text: "Discard",
+          style: DISCARD_STYLE,
+          callback: () => store.dispatch(uiChatRefineDiscarded()),
+        }),
+        button({
           id: `${this.id}-commit`,
           text: "Commit",
           disabled: !this.state.commitEnabled,
-          style: {
-            flex: "1",
-            "font-weight": "bold",
-            opacity: this.state.commitEnabled ? "1" : "0.5",
-            cursor: this.state.commitEnabled ? "pointer" : "default",
-          },
+          style: commitStyle(this.state.commitEnabled),
           callback: () => store.dispatch(uiChatRefineCommitted()),
-        }),
-        button({
-          id: `${this.id}-discard`,
-          text: "Discard",
-          style: { flex: "1" },
-          callback: () => store.dispatch(uiChatRefineDiscarded()),
         }),
       ],
     });
@@ -85,12 +103,7 @@ export class RefineCommitBar extends SuiComponent<
       {
         id: `${this.id}-commit`,
         disabled: !this.state.commitEnabled,
-        style: {
-          flex: "1",
-          "font-weight": "bold",
-          opacity: this.state.commitEnabled ? "1" : "0.5",
-          cursor: this.state.commitEnabled ? "pointer" : "default",
-        },
+        style: commitStyle(this.state.commitEnabled),
       },
     ]);
   }
