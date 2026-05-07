@@ -25,6 +25,7 @@ export type SeMessageOptions = {
 const BUBBLE_STYLES = {
   rootUser: { width: "100%", "justify-content": "flex-end" },
   rootAssistant: { width: "100%", "justify-content": "flex-start" },
+  rootSystem: { width: "100%", "justify-content": "center" },
   bubbleUser: {
     padding: "10px",
     width: "85%",
@@ -38,6 +39,15 @@ const BUBBLE_STYLES = {
     border: "none",
     "background-color": "rgba(255,255,255,0.05)",
     "border-radius": "12px 12px 12px 0",
+  },
+  bubbleSystem: {
+    padding: "8px 10px",
+    width: "92%",
+    border: "1px dashed rgba(255,255,255,0.18)",
+    "background-color": "rgba(255,255,255,0.02)",
+    "border-radius": "6px",
+    opacity: "0.8",
+    "font-style": "italic",
   },
   btn: { padding: "4px" },
 } as const;
@@ -57,14 +67,38 @@ export class SeMessage extends SuiComponent<
     );
     const { chatId, message } = options;
     const isUser = message.role === "user";
+    const isSystem = message.role === "system";
 
     const findContent = (chats: { id: string; messages: ChatMessage[] }[]) =>
       chats.find((c) => c.id === chatId)?.messages.find((m) => m.id === message.id)
         ?.content ?? message.content;
 
+    const deleteBtn = api.v1.ui.part.button({
+      id: `se-bs-msg-${message.id}-delete`,
+      iconId: "trash" as IconId,
+      style: BUBBLE_STYLES.btn,
+      callback: () =>
+        store.dispatch(messageRemoved({ chatId, id: message.id })),
+    });
+
+    const extraControls = isSystem
+      ? [deleteBtn]
+      : [
+          api.v1.ui.part.button({
+            id: `se-bs-msg-${message.id}-retry`,
+            iconId: "rotate-cw" as IconId,
+            style: BUBBLE_STYLES.btn,
+            callback: () =>
+              store.dispatch(
+                uiChatRetryGeneration({ chatId, messageId: message.id }),
+              ),
+          }),
+          deleteBtn,
+        ];
+
     this._editable = new SeEditableText({
       id: `${options.id ?? `se-bs-msg-${message.id}`}-text`,
-      label: isUser ? "You" : "Assistant",
+      label: isUser ? "You" : isSystem ? "Context" : "Assistant",
       placeholder: "Edit message...",
       getContent: () => {
         const s = store.getState();
@@ -88,40 +122,35 @@ export class SeMessage extends SuiComponent<
       },
       onSave: (content) =>
         store.dispatch(messageUpdated({ chatId, id: message.id, content })),
-      extraControls: [
-        api.v1.ui.part.button({
-          id: `se-bs-msg-${message.id}-retry`,
-          iconId: "rotate-cw" as IconId,
-          style: BUBBLE_STYLES.btn,
-          callback: () =>
-            store.dispatch(
-              uiChatRetryGeneration({ chatId, messageId: message.id }),
-            ),
-        }),
-        api.v1.ui.part.button({
-          id: `se-bs-msg-${message.id}-delete`,
-          iconId: "trash" as IconId,
-          style: BUBBLE_STYLES.btn,
-          callback: () =>
-            store.dispatch(messageRemoved({ chatId, id: message.id })),
-        }),
-      ],
+      extraControls,
     });
   }
 
   async compose(): Promise<UIPartRow> {
     const { message } = this.options;
     const isUser = message.role === "user";
+    const isSystem = message.role === "system";
     const { row, column } = api.v1.ui.part;
 
     const editablePart = await this._editable.build();
 
+    const rootStyle = isSystem
+      ? BUBBLE_STYLES.rootSystem
+      : isUser
+        ? BUBBLE_STYLES.rootUser
+        : BUBBLE_STYLES.rootAssistant;
+    const bubbleStyle = isSystem
+      ? BUBBLE_STYLES.bubbleSystem
+      : isUser
+        ? BUBBLE_STYLES.bubbleUser
+        : BUBBLE_STYLES.bubbleAsst;
+
     return row({
       id: this.id,
-      style: isUser ? BUBBLE_STYLES.rootUser : BUBBLE_STYLES.rootAssistant,
+      style: rootStyle,
       content: [
         column({
-          style: isUser ? BUBBLE_STYLES.bubbleUser : BUBBLE_STYLES.bubbleAsst,
+          style: bubbleStyle,
           content: [editablePart],
         }),
       ],

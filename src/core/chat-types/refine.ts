@@ -37,7 +37,11 @@ export const refineSpec: ChatTypeSpec = {
 
   initialize(seed: ChatSeed, _ctx: SpecCtx) {
     const fieldId = seed.kind === "fromField" ? seed.sourceFieldId : "field";
-    return { title: `Refining: ${fieldId}`, initialMessages: [] };
+    const sourceText = seed.kind === "fromField" ? seed.sourceText : "";
+    const initialMessages: ChatMessage[] = sourceText.trim()
+      ? [{ id: api.v1.uuid(), role: "system", content: sourceText }]
+      : [];
+    return { title: `Refining: ${fieldId}`, initialMessages };
   },
 
   systemPromptFor(_chat: Chat, _ctx: SpecCtx): string {

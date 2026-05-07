@@ -287,14 +287,15 @@ export class StoryEnginePlugin extends SuiPlugin {
 
     await api.v1.ui.register(panels);
 
-    // Auto-open trigger when refine chat opens. No sidebar-open API exists in
-    // the script API, so we just log — user click is the only reliable path.
+    // When a refine chat opens, surface it: switch to the Chat tab so the user
+    // lands directly in the refine session. (Sidebar visibility itself is not
+    // controllable via the script API — clicking the sidebar icon is on the user.)
     let lastRefineId: string | null = null;
     store.subscribeSelector(
       (state) => state.chat.refineChat?.id ?? null,
       (id) => {
         if (id && id !== lastRefineId) {
-          api.v1.log("[chat] refine chat opened — sidebar-open API unavailable; user must click sidebar");
+          void this._tabBar?.switchTo(0);
         }
         lastRefineId = id;
       },

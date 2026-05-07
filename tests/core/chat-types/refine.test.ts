@@ -26,12 +26,24 @@ describe("refineSpec", () => {
     expect(refineSpec.subModes).toBeUndefined();
   });
 
-  it("initialize returns an empty transcript and refine title", () => {
+  it("initialize seeds a context system message with the source text", () => {
     const init = refineSpec.initialize(
-      { kind: "fromField", sourceFieldId: "intent", sourceText: "old" },
+      { kind: "fromField", sourceFieldId: "intent", sourceText: "old text" },
       ctx,
     );
     expect(init.title).toContain("intent");
+    expect(init.initialMessages).toHaveLength(1);
+    expect(init.initialMessages[0]).toMatchObject({
+      role: "system",
+      content: "old text",
+    });
+  });
+
+  it("initialize returns an empty transcript when the source text is blank", () => {
+    const init = refineSpec.initialize(
+      { kind: "fromField", sourceFieldId: "intent", sourceText: "   " },
+      ctx,
+    );
     expect(init.initialMessages).toEqual([]);
   });
 
