@@ -6,9 +6,13 @@ The UI is built on **`nai-simple-ui`**, the component framework from OnepunchVAM
 
 ## Key Features
 
-### Brainstorm
+### Chat — Brainstorm, Summary, Refine
 
-A dedicated tab for freeform idea conversation with the AI. Supports multiple named sessions, a summarize button to compress long chats into dense material, and Co/Crit mode toggle (cowriter vs. critic persona).
+A single **Chat** tab hosts every conversational surface in Story Engine, driven by a typed chat-session registry:
+
+- **Brainstorm** — Freeform idea conversation with the AI. Supports multiple named sessions and a Co/Crit mode toggle (cowriter vs. critic persona).
+- **Summary** — Clicking **Sum** on a brainstorm spawns a separate, iterable Summary chat seeded from the transcript. Downstream generation reads the summary's latest assistant turn, so you can shape exactly what the Forge sees without losing the raw brainstorm.
+- **Refine** — A field-level chat scoped to a single Foundation field or lorebook entry. See _Field-Level Refine_ below.
 
 ### Foundation
 
@@ -20,6 +24,8 @@ Sets the structural and tonal anchors for your story before worldbuilding begins
 - **Story Contract** — Three directives: REQUIRED, PROHIBITED, EMPHASIS.
 - **ATTG** — Author/Title/Tags/Genre block, synced to Memory.
 - **Style** — Prose style guidelines, synced to Author's Note.
+
+Intent, Story Contract, ATTG, and Style each expose a paired **Generate** + **Refine** button — see _Field-Level Refine_ below.
 
 ### Forge
 
@@ -64,7 +70,13 @@ For stories that already have lorebook entries, Memory, or Author's Note content
 Click any entity to open its edit pane:
 - Edit name, summary, and category (draft entities)
 - View and regenerate lorebook content and keys (live entities)
-- Refine entries with natural language: _"make her taller," "add a rivalry with the Silver Court"_
+- Refine the lorebook content via a scoped chat session: _"make her taller," "add a rivalry with the Silver Court"_
+
+### Field-Level Refine
+
+A **Refine** button (feather icon) sits next to the **Generate** button on every iterable field: Foundation **ATTG**, **Style**, **Intent**, **Story Contract**, and each entity's **Lorebook Content**. Clicking Refine opens a chat scoped to that field on the **Chat** tab, with the current field text pinned as a dashed-border **Context** bubble at the top of the conversation. Iterate with plain-language instructions, then **Commit** to write the latest candidate back into the field — or **Discard** to leave it untouched.
+
+Refine sessions are ephemeral (not saved in the session list), and the panel returns you to whichever tab you came from when you commit or discard.
 
 ## Installation
 
@@ -83,14 +95,25 @@ npm run build    # Outputs to dist/NAI-story-engine.naiscript
 npm run test     # Run tests
 ```
 
-## Upgrading from 0.10.x
+## Upgrading
+
+### From 0.11.x
+
+0.12 introduces a typed chat-session system: the old `brainstorm` slice and its panel are replaced by a unified **Chat** tab driven by a registry under `src/core/chat-types/`. Existing brainstorm chats are migrated automatically on first load — a small toast confirms the migration and the old persisted key is cleared.
+
+Behaviorally:
+
+- **Sum** spawns a separate, iterable **Summary chat** instead of rewriting the brainstorm in place. Generation reads the summary's latest assistant turn.
+- A field-level **Refine** button (feather icon) is now available on ATTG, Style, Intent, Story Contract, and each entity's Lorebook Content. The inline lorebook refine input from 0.11.x is gone — refine now flows through the chat infrastructure.
+
+### From 0.10.x
 
 Two Foundation fields from the old Crucible flow are gone:
 
-- **Direction** — superseded by **Brainstorm's summary mode**. Summarize your Brainstorm chat (the **Sum** button) and the Forge reads that directly; you no longer need to maintain Direction and Brainstorm as parallel sources of framing.
+- **Direction** — superseded by **Brainstorm's summary mode**. Summarize your Brainstorm chat (the **Sum** button, which as of 0.12 opens an iterable Summary chat) and the Forge reads that directly; you no longer need to maintain Direction and Brainstorm as parallel sources of framing.
 - **Canon** — removed with no direct replacement. Its job is now covered by **Story Contract** (REQUIRED / PROHIBITED / EMPHASIS) in Foundation plus the per-entity summaries in the World section.
 
-See `CHANGELOG.md` for the full 0.11.0 notes.
+See `CHANGELOG.md` for the full 0.11.x and 0.12.0 notes.
 
 ## License
 
