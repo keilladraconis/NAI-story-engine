@@ -37,6 +37,7 @@ import {
 } from "../../ui/framework/ids";
 import { FieldID, DulfsFieldID } from "../../config/field-definitions";
 import { SeGenerationIconButton } from "./SeGenerationButton";
+import { SeGenRefinePair } from "./SeGenRefinePair";
 import { SeConfirmButton } from "./SeConfirmButton";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 
@@ -140,7 +141,7 @@ export class SeEntityEditPane extends SuiComponent<
   UIPartColumn
 > {
   private readonly _summaryBtn: SeGenerationIconButton;
-  private readonly _contentBtn: SeGenerationIconButton;
+  private readonly _contentBtn: SeGenRefinePair;
   private readonly _keysBtn: SeGenerationIconButton;
 
   /**
@@ -210,9 +211,9 @@ export class SeEntityEditPane extends SuiComponent<
     const lorebookEntryProjection = (s: RootState) =>
       s.world.entitiesById[entityId]?.lorebookEntryId;
 
-    this._contentBtn = new SeGenerationIconButton({
+    this._contentBtn = new SeGenRefinePair({
       id: IDS.LOREBOOK.GEN_CONTENT_BTN,
-      iconId: "zap" as IconId,
+      fieldId: "lorebookContent",
       stateProjection: lorebookEntryProjection,
       requestIdFromProjection: (id) =>
         id ? IDS.LOREBOOK.entry(id as string).CONTENT_REQ : undefined,
@@ -227,6 +228,11 @@ export class SeEntityEditPane extends SuiComponent<
           );
         })();
       },
+      refineSourceText: async () => {
+        const v = await api.v1.storyStorage.get(IDS.LOREBOOK.CONTENT_DRAFT_KEY);
+        return typeof v === "string" ? v : "";
+      },
+      resolveEntryId: () => this._ensureLiveEntryId(entityId),
       contentChecker: async () => {
         const id = store.getState().world.entitiesById[entityId]?.lorebookEntryId;
         if (!id) return false;
@@ -237,7 +243,7 @@ export class SeEntityEditPane extends SuiComponent<
 
     this._keysBtn = new SeGenerationIconButton({
       id: IDS.LOREBOOK.GEN_KEYS_BTN,
-      iconId: "key" as IconId,
+      iconId: "zap",
       stateProjection: lorebookEntryProjection,
       requestIdFromProjection: (id) =>
         id ? IDS.LOREBOOK.entry(id as string).KEYS_REQ : undefined,
@@ -285,9 +291,11 @@ export class SeEntityEditPane extends SuiComponent<
     let _alwaysOnDraft = false;
     if (entryId && entry) {
       _alwaysOnDraft = entry.forceActivation ?? false;
+      const contentText = entry.text ?? "";
+      const keysText = entry.keys?.join(", ") ?? "";
       await Promise.all([
-        api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, entry.text ?? ""),
-        api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, entry.keys?.join(", ") ?? ""),
+        api.v1.storyStorage.set(L.CONTENT_DRAFT_RAW, contentText),
+        api.v1.storyStorage.set(L.KEYS_DRAFT_RAW, keysText),
       ]);
     } else {
       // Draft entity (or live with no entry yet on the API side) — clear any

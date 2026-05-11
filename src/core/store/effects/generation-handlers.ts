@@ -1,14 +1,9 @@
 import { RootState, GenerationStrategy, AppDispatch } from "../types";
-import {
-  brainstormHandler,
-  brainstormChatTitleHandler,
-} from "./handlers/brainstorm";
 import { fieldHandler } from "./handlers/field";
 import { listHandler } from "./handlers/list";
 import {
   lorebookContentHandler,
   lorebookKeysHandler,
-  lorebookRefineHandler,
 } from "./handlers/lorebook";
 import { forgeHandler } from "./handlers/forge";
 import { foundationHandler } from "./handlers/foundation";
@@ -18,19 +13,12 @@ import {
   threadSummaryHandler,
 } from "./handlers/summary";
 import { bootstrapHandler, bootstrapContinueHandler } from "./handlers/bootstrap";
+import { chatHandler, chatRefineHandler } from "./handlers/chat";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
 
 // Extract specific target types for handler type safety
-export type BrainstormTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "brainstorm" }
->;
-export type BrainstormChatTitleTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "brainstormChatTitle" }
->;
 export type FieldTarget = Extract<
   GenerationStrategy["target"],
   { type: "field" }
@@ -46,10 +34,6 @@ export type LorebookContentTarget = Extract<
 export type LorebookKeysTarget = Extract<
   GenerationStrategy["target"],
   { type: "lorebookKeys" }
->;
-export type LorebookRefineTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "lorebookRefine" }
 >;
 export type ForgeTarget = Extract<
   GenerationStrategy["target"],
@@ -79,10 +63,19 @@ export type BootstrapContinueTarget = Extract<
   GenerationStrategy["target"],
   { type: "bootstrapContinue" }
 >;
+export type ChatTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "chat" }
+>;
+export type ChatRefineTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "chatRefine" }
+>;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
   target: T;
   getState: () => RootState;
+  dispatch: AppDispatch;
   accumulatedText: string;
 }
 
@@ -90,7 +83,6 @@ export interface CompletionContext<
   T = GenerationStrategy["target"],
 > extends StreamingContext<T> {
   generationSucceeded: boolean;
-  dispatch: AppDispatch;
   originalContent?: string; // For lorebook rollback
   originalKeys?: string; // For lorebook rollback
 }
@@ -111,13 +103,10 @@ export interface GenerationHandlers<T = GenerationStrategy["target"]> {
 
 // Handler registry mapping target types to their handlers
 export const GENERATION_HANDLERS: {
-  brainstorm: GenerationHandlers<BrainstormTarget>;
-  brainstormChatTitle: GenerationHandlers<BrainstormChatTitleTarget>;
   field: GenerationHandlers<FieldTarget>;
   list: GenerationHandlers<ListTarget>;
   lorebookContent: GenerationHandlers<LorebookContentTarget>;
   lorebookKeys: GenerationHandlers<LorebookKeysTarget>;
-  lorebookRefine: GenerationHandlers<LorebookRefineTarget>;
   forge: GenerationHandlers<ForgeTarget>;
   foundation: GenerationHandlers<FoundationTarget>;
   entitySummary: GenerationHandlers<EntitySummaryTarget>;
@@ -125,14 +114,13 @@ export const GENERATION_HANDLERS: {
   threadSummary: GenerationHandlers<ThreadSummaryTarget>;
   bootstrap: GenerationHandlers<BootstrapTarget>;
   bootstrapContinue: GenerationHandlers<BootstrapContinueTarget>;
+  chat: GenerationHandlers<ChatTarget>;
+  chatRefine: GenerationHandlers<ChatRefineTarget>;
 } = {
-  brainstorm: brainstormHandler,
-  brainstormChatTitle: brainstormChatTitleHandler,
   field: fieldHandler,
   list: listHandler,
   lorebookContent: lorebookContentHandler,
   lorebookKeys: lorebookKeysHandler,
-  lorebookRefine: lorebookRefineHandler,
   forge: forgeHandler,
   foundation: foundationHandler,
   entitySummary: entitySummaryHandler,
@@ -140,6 +128,8 @@ export const GENERATION_HANDLERS: {
   threadSummary: threadSummaryHandler,
   bootstrap: bootstrapHandler,
   bootstrapContinue: bootstrapContinueHandler,
+  chat: chatHandler,
+  chatRefine: chatRefineHandler,
 };
 
 export function getHandler(

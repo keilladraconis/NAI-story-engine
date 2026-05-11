@@ -14,7 +14,7 @@ export function registerAutosaveEffects(
   subscribeEffect(
     (action) =>
       action.type.startsWith("story/") ||
-      action.type.startsWith("brainstorm/") ||
+      action.type.startsWith("chat/") ||
       action.type.startsWith("world/") ||
       action.type.startsWith("foundation/"),
     () => {
@@ -32,7 +32,7 @@ export function registerAutosaveEffects(
           const state = getState();
           const persistData = {
             story: state.story,
-            brainstorm: state.brainstorm,
+            chat: state.chat,
             world: state.world,
             foundation: state.foundation,
           };

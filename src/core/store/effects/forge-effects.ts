@@ -33,7 +33,7 @@ import {
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
 import { buildModelParams } from "../../utils/config";
-import { getConsolidatedBrainstorm } from "../../utils/context-builder";
+import { getActiveChatTranscript } from "../../utils/context-builder";
 import { IDS, STORAGE_KEYS } from "../../../ui/framework/ids";
 
 export function registerForgeEffects(
@@ -52,7 +52,7 @@ export function registerForgeEffects(
 
     const brainstormContext = forgeGuidance
       ? ""
-      : getConsolidatedBrainstorm(getState());
+      : getActiveChatTranscript(getState());
     if (!forgeGuidance && !brainstormContext) {
       api.v1.ui.toast("Add forge guidance or run a brainstorm first", {
         type: "info",

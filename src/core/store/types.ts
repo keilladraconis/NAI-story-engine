@@ -41,26 +41,6 @@ export interface StoryState {
   styleEnabled: boolean;
 }
 
-export type BrainstormMode = "cowriter" | "critic";
-
-export interface BrainstormMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-}
-
-export interface BrainstormChat {
-  id: string;
-  title: string;
-  messages: BrainstormMessage[];
-  mode: BrainstormMode;
-}
-
-export interface BrainstormState {
-  chats: BrainstormChat[];
-  currentChatIndex: number;
-}
-
 export interface LorebookUIState {
   selectedEntryId: string | null;
   selectedCategoryId: string | null;
@@ -69,9 +49,6 @@ export interface LorebookUIState {
 export interface UIState {
   activeEditId: string | null;
   inputs: Record<string, string>;
-  brainstorm: {
-    input: string;
-  };
   lorebook: LorebookUIState;
   worldExpanded: boolean | null;
 }
@@ -94,11 +71,10 @@ export interface GenerationRequest {
   type:
     | "field"
     | "list"
-    | "brainstorm"
-    | "brainstormChatTitle"
+    | "chat"
+    | "chatRefine"
     | "lorebookContent"
     | "lorebookKeys"
-    | "lorebookRefine"
     | "forge"
     | "foundation"
     | "entitySummary"
@@ -117,13 +93,12 @@ export interface GenerationStrategy {
   messageFactory?: MessageFactory; // JIT strategy builder
   params?: GenerationParams; // Optional if provided by factory
   target:
-    | { type: "brainstorm"; messageId: string }
-    | { type: "brainstormChatTitle"; chatIndex: number }
+    | { type: "chat"; chatId: string; messageId: string }
+    | { type: "chatRefine"; chatId: string; messageId: string; fieldId: string }
     | { type: "field"; fieldId: string }
     | { type: "list"; fieldId: string }
     | { type: "lorebookContent"; entryId: string }
     | { type: "lorebookKeys"; entryId: string }
-    | { type: "lorebookRefine"; entryId: string }
     | {
         type: "forge";
         step: number;
@@ -213,7 +188,7 @@ export interface FoundationState {
 
 export interface RootState {
   story: StoryState;
-  brainstorm: BrainstormState;
+  chat: import("./slices/chat").ChatSliceState;
   ui: UIState;
   runtime: RuntimeState;
   world: WorldState;

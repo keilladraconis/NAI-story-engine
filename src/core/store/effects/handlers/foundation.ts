@@ -70,7 +70,7 @@ function parseShape(text: string): ShapeData {
  * Parses contract generation output into { required, prohibited, emphasis }.
  * Format: "REQUIRED: ...\nPROHIBITED: ...\nEMPHASIS: ..."
  */
-function parseContract(text: string): ContractData {
+export function parseContract(text: string): ContractData {
   const requiredMatch = text.match(/^REQUIRED:\s*(.+)$/m);
   const prohibitedMatch = text.match(/^PROHIBITED:\s*(.+)$/m);
   const emphasisMatch = text.match(/^EMPHASIS:\s*(.+)$/m);

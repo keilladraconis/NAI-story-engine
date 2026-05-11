@@ -9,9 +9,6 @@ const initialLorebookState: LorebookUIState = {
 export const initialUIState: UIState = {
   activeEditId: null,
   inputs: {},
-  brainstorm: {
-    input: "",
-  },
   lorebook: initialLorebookState,
   worldExpanded: null,
 };
@@ -27,17 +24,29 @@ export const uiSlice = createSlice({
         [payload.id]: payload.value,
       },
     }),
-    setBrainstormInput: (state, input: string) => ({
-      ...state,
-      brainstorm: { ...state.brainstorm, input },
-    }),
     // Intents (handled by Effects)
     uiRequestCancellation: (state) => state,
     uiUserPresenceConfirmed: (state) => state,
-    uiBrainstormSubmitUserMessage: (state) => state,
-    uiBrainstormRetryGeneration: (state, _payload: { messageId: string }) =>
+    // Chat user intents
+    uiChatSubmitUserMessage: (state, _payload: { chatId: string }) => state,
+    uiChatRetryGeneration: (
       state,
-    uiBrainstormSummarize: (state) => state,
+      _payload: { chatId: string; messageId: string },
+    ) => state,
+    uiChatSummarizeRequested: (
+      state,
+      _payload: {
+        seed:
+          | { kind: "fromChat"; sourceChatId: string }
+          | { kind: "fromStoryText"; sourceText: string };
+      },
+    ) => state,
+    uiChatRefineRequested: (
+      state,
+      _payload: { fieldId: string; sourceText: string; entryId?: string },
+    ) => state,
+    uiChatRefineCommitted: (state) => state,
+    uiChatRefineDiscarded: (state) => state,
     // Internal: Submit generation to GenX (not a user intent)
     generationSubmitted: (state, _strategy: any) => state,
     uiCancelRequest: (state, _payload: { requestId: string }) => state,
@@ -79,9 +88,6 @@ export const uiSlice = createSlice({
         keysRequestId: string;
       },
     ) => state,
-    // Lorebook refinement (modify existing entry with instructions)
-    uiLorebookRefineRequested: (state, _payload: { requestId: string }) =>
-      state,
     // World expand/collapse all
     worldExpansionSet: (state, payload: { expanded: boolean }) => ({
       ...state,
@@ -101,13 +107,15 @@ export const uiSlice = createSlice({
 
 export const {
   uiInputChanged,
-  setBrainstormInput,
   worldExpansionSet,
   uiRequestCancellation,
   uiUserPresenceConfirmed,
-  uiBrainstormSubmitUserMessage,
-  uiBrainstormRetryGeneration,
-  uiBrainstormSummarize,
+  uiChatSubmitUserMessage,
+  uiChatRetryGeneration,
+  uiChatSummarizeRequested,
+  uiChatRefineRequested,
+  uiChatRefineCommitted,
+  uiChatRefineDiscarded,
   generationSubmitted,
   uiCancelRequest,
   uiEditableActivate,
@@ -116,7 +124,6 @@ export const {
   uiLorebookContentGenerationRequested,
   uiLorebookKeysGenerationRequested,
   uiLorebookItemGenerationRequested,
-  uiLorebookRefineRequested,
   uiEntitySummaryGenerationRequested,
   uiThreadSummaryGenerationRequested,
 } = uiSlice.actions;

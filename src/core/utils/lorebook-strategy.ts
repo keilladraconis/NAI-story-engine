@@ -1,6 +1,8 @@
-import { RootState } from "../store/types";
+import { RootState, GenerationStrategy } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "./context-builder";
+import type { RefineContext } from "../chat-types/types";
+import { buildRefineTail } from "./refine-strategy";
 import { DulfsFieldID, FIELD_CONFIGS } from "../../config/field-definitions";
 import { STORAGE_KEYS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../../ui/framework/ids";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
@@ -13,7 +15,6 @@ import {
 import {
   LOREBOOK_GENERATE_PROMPT,
   LOREBOOK_KEYS_PROMPT,
-  LOREBOOK_REFINE_PROMPT,
   LOREBOOK_WEAVING_PROMPT,
   CATEGORY_TEMPLATES,
   XIALONG_STYLE,
@@ -297,88 +298,6 @@ export const createLorebookKeysFactory = (
 };
 
 /**
- * Creates a message factory for lorebook entry refinement.
- * Uses unified prefix (excludes self) + volatile tail with refine-specific instruction.
- */
-export const createLorebookRefineFactory = (
-  getState: () => RootState,
-  entryId: string,
-  getInstructions: () => Promise<string>,
-): MessageFactory => {
-  return async () => {
-    const entry = await api.v1.lorebook.entry(entryId);
-    if (!entry) {
-      throw new Error(`Lorebook entry not found: ${entryId}`);
-    }
-
-    const state = getState();
-    const entity = findEntityForEntry(state, entryId);
-
-    const displayName = await resolveDisplayName(state, entryId, entry.displayName);
-    const currentContent = entry.text || "";
-    const instructions = await getInstructions();
-
-    // Get category name (prefers Redux entity.categoryId) for type + template
-    const categoryName = await resolveCategoryName(state, entryId, entry.category);
-    const entryType = getEntryType(categoryName);
-    const setting = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
-    );
-
-    // Get template based on category
-    const template = CATEGORY_TEMPLATES[categoryName] || "";
-
-    // Anchored assistant prefill
-    const prefillContent = `${displayName}
-Type: ${entryType}
-Setting: ${setting}
-`;
-
-    const refinePrompt = LOREBOOK_REFINE_PROMPT;
-
-    const prefix = await buildStoryEnginePrefix(getState);
-    const groupContext = entity
-      ? formatEntityGroups(state, entity.id)
-      : "";
-
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: `[LOREBOOK ENTRY REFINEMENT]\n${refinePrompt}${template ? `\n\nTEMPLATE:\n${template}` : ""}`,
-      },
-    ];
-
-    if (groupContext) {
-      messages.push({
-        role: "system",
-        content: `[GROUPS]\n${groupContext}`,
-      });
-    }
-
-    messages.push({
-      role: "user",
-      content: `CURRENT ENTRY:\n${currentContent}\n\nMODIFICATION INSTRUCTIONS:\n${instructions}`,
-    });
-
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.lorebookRefine);
-    messages.push({ role: "assistant", content: prefillContent });
-
-    return {
-      messages,
-      params: await buildModelParams({
-        max_tokens: 1024,
-        temperature: 0.7,
-        min_p: 0.05,
-        frequency_penalty: 0.1,
-        stop: LOREBOOK_CHAIN_STOPS,
-      }),
-      contextPinning: { head: 1, tail: groupContext ? 4 : 3 },
-    };
-  };
-};
-
-/**
  * Builds the complete generation payload for lorebook keys.
  * Consolidates factory creation, prefill setup, and params in one place.
  */
@@ -428,3 +347,31 @@ Type: ${entryType}
 Setting: ${setting}
 `;
 };
+
+/**
+ * Builds a refine-capable GenerationStrategy for lorebook content.
+ * Wraps the base factory and appends refine tail when refineContext is present.
+ */
+export function buildLorebookContentStrategy(
+  getState: () => RootState,
+  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
+): GenerationStrategy {
+  const entryId = opts?.entryId ?? "";
+  if (!entryId) {
+    throw new Error("buildLorebookContentStrategy requires entryId");
+  }
+  const baseFactory = createLorebookContentFactory(getState, entryId);
+  const refineContext = opts?.refineContext;
+  const messageFactory: MessageFactory = refineContext
+    ? async () => {
+        const base = await baseFactory();
+        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
+      }
+    : baseFactory;
+  return {
+    requestId: opts?.requestId ?? api.v1.uuid(),
+    messageFactory,
+    target: { type: "lorebookContent", entryId },
+    prefillBehavior: "keep",
+  };
+}

@@ -5,8 +5,8 @@
  * All UIExtensions registered in a single api.v1.ui.register() call (NAI
  * requires this — multiple calls overwrite each other).
  *
- * Brainstorm rebuild: BrainstormPane.onRebuild → updateParts on the tab pane
- * column (se-main-tab-bar.pane.1) — no full-panel re-registration needed.
+ * Chat rebuild: ChatPanel.onRebuild → updateParts on the tab pane
+ * column (se-main-tab-bar.pane.0) — no full-panel re-registration needed.
  *
  * Edit pane: plugin-level editHost swaps se-edit-slot content and toggles
  * se-main-content visibility — no full pane rebuild on open/close.
@@ -33,11 +33,13 @@ import {
   migrateLorebookCategories,
   registerLorebookSyncHooks,
 } from "../core/store/effects/lorebook-sync";
+import { migrateBrainstormToChat } from "../core/store/migrations/brainstorm-to-chat";
 import { stateUpdated, requestActivated } from "../core/store/slices/runtime";
 import { IDS, STORAGE_KEYS } from "./framework/ids";
 import type { EditPaneHost } from "./components/SeContentWithTitlePane";
 
-import { BrainstormPane } from "./components/BrainstormPane";
+import { ChatPanel } from "./components/ChatPanel";
+import { openSeSessionsModal } from "./components/SeSessionsModal";
 import { ForgePane } from "./components/ForgePane";
 import { SeHeaderBar } from "./components/SeHeaderBar";
 import { SeJournalPanel } from "./components/SeJournalPanel";
@@ -49,7 +51,7 @@ const { sidebarPanel, scriptPanel } = api.v1.ui.extension;
 
 export class StoryEnginePlugin extends SuiPlugin {
   private _genX?: GenX;
-  private _brainstormPane?: BrainstormPane;
+  private _chatPanel?: ChatPanel;
   private _tabBar?: SuiTabBar;
 
   // ── Story engine pane children (persistent for rebuild) ──
@@ -101,7 +103,12 @@ export class StoryEnginePlugin extends SuiPlugin {
     registerEffects(store, this._genX);
 
     const persisted = await api.v1.storyStorage.get(STORAGE_KEYS.PERSIST);
-    if (persisted) store.dispatch(persistedDataLoaded(persisted));
+    const migrated = migrateBrainstormToChat(persisted ?? {});
+    if (migrated.touched) {
+      await api.v1.storyStorage.set(STORAGE_KEYS.PERSIST, migrated.data);
+      api.v1.ui.toast("Brainstorm chats migrated to new chat system.", { type: "info" });
+    }
+    if (persisted) store.dispatch(persistedDataLoaded(migrated.data));
 
     await migrateLorebookCategories();
     await syncEratoCompatibility(store.getState);
@@ -137,9 +144,9 @@ export class StoryEnginePlugin extends SuiPlugin {
 
   // ── Rebuild helpers ────────────────────────────────────────────
 
-  private async _rebuildBrainstorm(): Promise<void> {
-    if (!this._brainstormPane) return;
-    const newContent = await this._brainstormPane.build();
+  private async _rebuildChat(): Promise<void> {
+    if (!this._chatPanel) return;
+    const newContent = await this._chatPanel.build();
     api.v1.ui.updateParts([
       {
         id: "se-main-tab-bar.pane.0",
@@ -178,11 +185,14 @@ export class StoryEnginePlugin extends SuiPlugin {
   // ── Compose ────────────────────────────────────────────────────
 
   protected async compose(): Promise<void> {
-    // ── Brainstorm pane ─────────────────────────────────────────────────────
-    this._brainstormPane = new BrainstormPane({
+    // ── Chat pane ───────────────────────────────────────────────────────────
+    this._chatPanel = new ChatPanel({
       id: IDS.BRAINSTORM.ROOT,
       onRebuild: () => {
-        void this._rebuildBrainstorm();
+        void this._rebuildChat();
+      },
+      onOpenSessions: () => {
+        void openSeSessionsModal();
       },
     });
 
@@ -223,7 +233,7 @@ export class StoryEnginePlugin extends SuiPlugin {
       callback: () => {
         void this._tabBar?.switchTo(0);
       },
-      theme: { default: { self: { text: "Brainstorm" } } },
+      theme: { default: { self: { text: "Chat" } } },
     });
     const tabEngine = new SuiButton({
       id: "se-tab-engine",
@@ -236,7 +246,7 @@ export class StoryEnginePlugin extends SuiPlugin {
     this._tabBar = new SuiTabBar({
       id: "se-main-tab-bar",
       tabs: [tabBrainstorm, tabEngine],
-      panes: [this._brainstormPane, storyEnginePane],
+      panes: [this._chatPanel, storyEnginePane],
       storageKey: "se-active-tab",
       storageMode: "story",
       theme: {
@@ -276,6 +286,25 @@ export class StoryEnginePlugin extends SuiPlugin {
     }
 
     await api.v1.ui.register(panels);
+
+    // Surface the refine session when it opens (auto-switch to Chat tab) and
+    // return to wherever the user came from when it closes (commit or discard),
+    // so the takeover doesn't strand them on the Chat tab afterwards.
+    let lastRefineId: string | null = null;
+    let preRefineTab: number | null = null;
+    store.subscribeSelector(
+      (state) => state.chat.refineChat?.id ?? null,
+      (id) => {
+        if (id && !lastRefineId) {
+          preRefineTab = this._tabBar?.activeTab ?? 0;
+          void this._tabBar?.switchTo(0);
+        } else if (!id && lastRefineId && preRefineTab !== null) {
+          void this._tabBar?.switchTo(preRefineTab);
+          preRefineTab = null;
+        }
+        lastRefineId = id;
+      },
+    );
   }
 
   protected async registerHooks(): Promise<void> {

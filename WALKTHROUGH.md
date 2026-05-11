@@ -7,19 +7,19 @@ The fastest way to go from "I have an idea" to "I'm writing a story" in NovelAI.
 ## Before You Start
 
 - Install Story Engine in a **new story** (fresh scenario recommended).
-- You'll see one sidebar panel: **Story Engine** — which contains two tabs: **Story Engine** (Foundation, Forge, World) and **Brainstorm**.
+- You'll see one sidebar panel: **Story Engine** — which contains two tabs: **Story Engine** (Foundation, Forge, World) and **Chat** (brainstorms, summaries, and field-level refine sessions).
 
 ---
 
 ## Step 1: Brainstorm
 
-> _Panel: Brainstorm_
+> _Panel: Chat → Brainstorm session_
 
-This is where your story begins — a freeform conversation with the AI about what you want to write.
+This is where your story begins — a freeform conversation with the AI about what you want to write. Brainstorm is one chat type in the Chat panel; summaries and field-level refines also live here (more on those below).
 
 **What to do:**
 
-1. Open the **Brainstorm** panel.
+1. Open the **Chat** tab. A fresh story opens with an empty Brainstorm session.
 2. Type anything — a genre, a character concept, a vibe, a "what if" question. Examples:
    - _"I want to write dark fantasy with political intrigue"_
    - _"A space station where the AI running life support has started making art"_
@@ -32,8 +32,9 @@ This is where your story begins — a freeform conversation with the AI about wh
 **Tips:**
 
 - The **Co / Crit** buttons in the header switch the AI between cowriter mode (generative, adds ideas) and critic mode (interrogates your assumptions). Critic mode is most useful mid-brainstorm — surface gaps, push back on thin ideas, then switch back to Cowriter to develop them. **Avoid ending on a Critic message before moving to Foundation/Forge:** if the last message is a Critic question, that framing can propagate into downstream generation.
-- If the chat is getting long, click **Sum** to collapse it into a dense summary.
-- Use the **folder icon** to manage multiple named sessions — useful for keeping separate story ideas organized.
+- If the chat is getting long, click **Sum**. This now creates a **separate Summary chat** seeded from the transcript — an iterable chat in its own right. Tighten or expand the summary by replying to it. Downstream generation reads the latest assistant message from the summary, so you can shape exactly what the Forge sees without destroying your raw brainstorm.
+- Use the **folder icon** to manage all chat sessions — brainstorms and summaries live in the same list and are loaded into the panel by clicking the folder beside their title.
+- The **+** button starts a new Brainstorm session, useful for keeping separate story ideas organized.
 
 ---
 
@@ -74,7 +75,9 @@ Edit the name or description if something's off. You can also type a shape name 
 
 ### Intent
 
-A plain statement of what this story is exploring. Click **Generate** or write it yourself: _"What is this story about? What do you want to explore?"_ Keep it honest — this anchors the AI's interpretation of ambiguous choices later.
+A plain statement of what this story is exploring. Click **Generate** (zap icon) or write it yourself: _"What is this story about? What do you want to explore?"_ Keep it honest — this anchors the AI's interpretation of ambiguous choices later.
+
+Next to the Generate button is a **Refine** button (feather icon). Clicking it opens a chat scoped to this field — see [Refining a field](#refining-a-field) below.
 
 ### Story Contract
 
@@ -84,7 +87,7 @@ Three directives that define the rules of your story:
 - **PROHIBITED** — What the story must never do (e.g., "no redemption arcs," "no comic relief")
 - **EMPHASIS** — What to foreground (e.g., "atmosphere over plot," "character interiority")
 
-Click **Generate** for a suggestion based on your brainstorm, or write your own.
+Click **Generate** for a suggestion based on your brainstorm, or write your own. Refine pairs with this field too — useful for nudging just one of the three lines without rerolling the whole contract.
 
 ### ATTG & Style
 
@@ -92,6 +95,19 @@ Click **Generate** for a suggestion based on your brainstorm, or write your own.
 - **Style (Author's Note)** — Style guidelines for prose tone. Syncs to Author's Note.
 
 These can also be generated later as part of S.E.G.A.
+
+Like Intent and Story Contract, both ATTG and Style have a **Refine** button beside their generator — use it to iterate on the existing text via chat instead of regenerating from scratch.
+
+### Refining a field
+
+The fields above (**ATTG**, **Style**, **Intent**, **Story Contract**, and per-entity **Lorebook Content**) all pair their **Generate** zap with a **Refine** feather. Clicking Refine:
+
+1. Switches you to the **Chat** tab and opens a Refine session scoped to that field.
+2. Pins the current field text at the top as a dashed-border **Context** bubble so the model — and you — always see the iteration target.
+3. Lets you steer with plain-language instructions: _"make this more ominous,"_ _"tighten this to three sentences,"_ _"keep the structure but rewrite Style for first-person."_
+4. Each model reply is a candidate revision. Iterate as many times as you like; the **Commit** button at the bottom writes the latest candidate back into the field, and **Discard** (or just leaving the chat) abandons the session and leaves your field untouched.
+
+Refine sessions are ephemeral — they don't appear in the Sessions list. When you commit or discard, you're returned to whichever tab you came from.
 
 ---
 
@@ -137,7 +153,7 @@ Each entity card shows:
 - Name (click to edit in the edit pane)
 - Summary (SE-internal description)
 
-From the edit pane you can also view and edit lorebook content and keys (once an entity has been cast to the lorebook).
+From the edit pane you can view and edit lorebook content and keys (once an entity has been cast to the lorebook). The **Content** field has its own Generate + Refine pair — Refine opens a chat scoped to that single entry so you can iterate with instructions like _"add a rivalry with the Silver Court"_ or _"make her taller"_ and commit the rewrite when it's right.
 
 **Adding entities manually:** Click **+** in the World section header to create a new entity.
 
@@ -236,13 +252,14 @@ From there you can run S.E.G.A. to regenerate lorebook content and keys with Sto
 
 ## Quick Reference
 
-| Tab / Section   | What it does                            | Key action                                         |
-| --------------- | --------------------------------------- | -------------------------------------------------- |
-| **Brainstorm**  | Freeform idea conversation              | Chat, summarize, manage sessions                   |
-| **Foundation**  | Tone, shape, intent, contract, metadata | Set Intensity → Shape → Intent → Contract → ATTG/Style |
-| **Forge**       | World element generation                | Enter guidance → Forge (runs sketch/expand/weave)  |
-| **World**       | World inventory, threads, S.E.G.A.      | Review entities → Run S.E.G.A.                     |
-| **Bootstrap**   | Cold-open writer (header button)        | Click Bootstrap, then Continue for more paragraphs |
+| Tab / Section   | What it does                                       | Key action                                         |
+| --------------- | -------------------------------------------------- | -------------------------------------------------- |
+| **Chat**        | Brainstorms, summaries, and field refine sessions  | Chat, summarize (creates a Summary chat), manage sessions |
+| **Foundation**  | Tone, shape, intent, contract, metadata            | Set Intensity → Shape → Intent → Contract → ATTG/Style |
+| **Forge**       | World element generation                           | Enter guidance → Forge (runs sketch/expand/weave)  |
+| **World**       | World inventory, threads, S.E.G.A.                 | Review entities → Run S.E.G.A.                     |
+| **Refine**      | Iterate any field via chat (feather button)        | Open chat → Iterate → Commit                       |
+| **Bootstrap**   | Cold-open writer (header button)                   | Click Bootstrap, then Continue for more paragraphs |
 
 ---
 
@@ -253,17 +270,27 @@ From there you can run S.E.G.A. to regenerate lorebook content and keys with Sto
 - **Intensity sets the emotional register.** It flows into all downstream generation — pick it before generating Shape or running the Forge.
 - **Shape is optional but useful.** Even typing a name like "Slice of Life" before generating gives the Forge and S.E.G.A. a clearer structural target.
 - **Summarize long brainstorms.** Click **Sum** before moving to Foundation/Forge to compress a sprawling chat into dense material.
-- **The Lorebook panel** (in Lorebook view) lets you refine individual entries with natural language — _"make her taller," "add a connection to the Silver Court," "rewrite this as more ominous."_
+- **Refine instead of regenerating.** ATTG, Style, Intent, Story Contract, and each entity's Lorebook Content all expose a Refine button (feather icon) next to their Generate button. Refine opens a chat scoped to that field — much faster than rerolling the whole generation when only one detail needs to change.
 - **Threads for organization.** Group related entities into a Thread to give generation a relational context and to optionally surface a group-level lorebook entry.
 - **Unnamed protagonists and lorebook collision.** If your protagonist has no personal name (e.g., "the physician," "the captain"), their lorebook entry may have high collision risk. Before you start writing, open the entity edit pane and add a personal name — then regenerate its keys so activation is specific.
 
 ---
 
-## Upgrading from 0.10.x
+## Upgrading
+
+### From 0.11.x
+
+The big shift is the **typed chat system**. The old single-purpose Brainstorm panel has been replaced by a **Chat** tab that hosts multiple chat types — Brainstorm, Summary, and the new field-level Refine sessions — all driven by a single registry.
+
+- Your existing brainstorm chats are migrated automatically on first load (you'll see a small toast). Sub-mode (Co / Crit) is preserved.
+- **Sum** no longer rewrites your brainstorm in place. It spawns a separate **Summary chat** that you can iterate on; downstream generation reads the summary's latest assistant turn. The original brainstorm transcript stays intact.
+- Foundation **ATTG**, **Style**, **Intent**, **Story Contract**, and the entity-pane **Lorebook Content** all gained a **Refine** button (feather icon) next to their Generate button — the inline lorebook refine input is gone, replaced by the chat-driven flow.
+
+### From 0.10.x
 
 If you're coming from a 0.10.x Story Engine, two Foundation fields are gone:
 
-- **Direction** — superseded by **Brainstorm's summary mode**. Summarize your Brainstorm chat with the **Sum** button and the Forge will read that directly; you no longer need to maintain Direction and Brainstorm as two parallel sources of story framing.
+- **Direction** — superseded by **Brainstorm's summary mode**. Summarize your Brainstorm chat with the **Sum** button (which, as of 0.12, opens an iterable Summary chat) and the Forge will read that directly; you no longer need to maintain Direction and Brainstorm as two parallel sources of story framing.
 - **Canon** — removed with no direct replacement. Its job is now covered by **Story Contract** (REQUIRED / PROHIBITED / EMPHASIS) in Foundation and by per-entity summaries in the World section; together they produce the same anchor points without the separate field.
 
-The Forge itself is also new: instead of a per-pass command menu it now runs the phased sketch → expand → weave loop described in Step 3. See `CHANGELOG.md` for the full 0.11.0 notes.
+The Forge itself is also new: instead of a per-pass command menu it now runs the phased sketch → expand → weave loop described in Step 3. See `CHANGELOG.md` for the full 0.11.x and 0.12.0 notes.
