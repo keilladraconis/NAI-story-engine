@@ -3,9 +3,8 @@ import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "./context-builder";
 import type { RefineContext } from "../chat-types/types";
 import { buildRefineTail } from "./refine-strategy";
-import { DulfsFieldID, FIELD_CONFIGS } from "../../config/field-definitions";
+import { FIELD_CONFIGS } from "../../config/field-definitions";
 import { STORAGE_KEYS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../../ui/framework/ids";
-import { WORLD_ENTRY_CATEGORIES } from "../store/types";
 import {
   buildModelParams,
   appendXialongStyleMessage,
@@ -15,7 +14,6 @@ import {
 import {
   LOREBOOK_GENERATE_PROMPT,
   LOREBOOK_KEYS_PROMPT,
-  LOREBOOK_WEAVING_PROMPT,
   CATEGORY_TEMPLATES,
   XIALONG_STYLE,
 } from "./prompts";
@@ -96,45 +94,22 @@ function formatEntityGroups(state: RootState, entityId: string): string {
   return groups.map((g) => `- ${g.title}: ${g.summary}`).join("\n");
 }
 
-/** Format live world entities as context, grouped by category. */
-function formatLiveWorldEntitiesContext(state: RootState): string {
-  const liveEntities = Object.values(state.world.entitiesById);
-  if (liveEntities.length === 0) return "";
-
-  const groups = new Map<DulfsFieldID, typeof liveEntities>();
-  for (const entity of liveEntities) {
-    const list = groups.get(entity.categoryId) || [];
-    list.push(entity);
-    groups.set(entity.categoryId, list);
-  }
-
-  const lines: string[] = [];
-  for (const fieldId of WORLD_ENTRY_CATEGORIES) {
-    const fieldEntities = groups.get(fieldId);
-    if (!fieldEntities) continue;
-    const label = FIELD_CONFIGS.find((f) => f.id === fieldId)?.label || fieldId;
-    lines.push(`${label}:`);
-    for (const entity of fieldEntities) {
-      lines.push(
-        `- ${entity.name}${entity.summary ? `: ${entity.summary.slice(0, 100)}` : ""}`,
-      );
-    }
-  }
-  return lines.join("\n");
-}
-
 // --- Factory Builders for JIT Strategy Building ---
 
 /**
  * Creates a message factory for lorebook content generation.
  *
- * Message structure:
- *   MSG 1 (system): Archivist instructions (LOREBOOK_GENERATE_PROMPT)
- *   MSG 2 (system): Story background — foundation, canon, setting, ATTG, style
- *   MSG 3 (system): Category template (varies per entry type)
- *   MSG 4 (system): World context — live entities + weaving prompt + thread groups
- *   MSG 5 (user):   Entity summary (immediate context before prefill)
- *   MSG 6 (asst):   Name / Type / Setting prefill (anchors output format)
+ * Uses the unified Story Engine prefix (system + weaving, state snapshot,
+ * world entries, story text) for cache reuse with other strategies, then
+ * appends an entity-specific volatile tail.
+ *
+ * Volatile tail structure (after `buildStoryEnginePrefix`):
+ *   - Archivist instructions (LOREBOOK_GENERATE_PROMPT, name-personalized)
+ *   - Category template (conditional)
+ *   - Thread groups for this entity (conditional)
+ *   - User entity summary (immediate context before prefill)
+ *   - Xialong style block (Xialong mode only)
+ *   - Assistant Name / Type / Setting prefill
  */
 export const createLorebookContentFactory = (
   getState: () => RootState,
@@ -164,61 +139,36 @@ export const createLorebookContentFactory = (
       ? String((await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) || "").trim()
       : "";
     const itemSummary = liveSummary || entity?.summary || "";
+    const setting = String(
+      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
+    );
 
-    // --- MSG 1: Archivist instructions ---
+    const prefix = await buildStoryEnginePrefix(getState);
+
     const messages: Message[] = [
+      ...prefix,
       {
         role: "system",
         content: LOREBOOK_GENERATE_PROMPT.replace("[itemName]", displayName),
       },
     ];
 
-    // --- MSG 2: Story background ---
-    const { foundation } = state;
-    const backgroundParts: string[] = [];
-    if (foundation.attg) backgroundParts.push(`[ATTG]\n${foundation.attg}`);
-    if (foundation.style) backgroundParts.push(`[STYLE]\n${foundation.style}`);
-    if (foundation.shape || foundation.intent || foundation.worldState) {
-      const fp: string[] = [];
-      if (foundation.shape) fp.push(`Shape: ${foundation.shape.name}\n${foundation.shape.description}`);
-      if (foundation.intent) fp.push(`Intent: ${foundation.intent}`);
-      if (foundation.worldState) fp.push(`World State: ${foundation.worldState}`);
-      backgroundParts.push(`[NARRATIVE FOUNDATION]\n${fp.join("\n")}`);
-    }
-    const setting = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
-    );
-    if (setting) backgroundParts.push(`[SETTING]\n${setting}`);
-    if (backgroundParts.length > 0) {
-      messages.push({ role: "system", content: backgroundParts.join("\n\n") });
-    }
-
-    // --- MSG 3: Category template ---
     if (template) {
       messages.push({ role: "system", content: `TEMPLATE:\n${template}` });
     }
 
-    // --- MSG 4: World context + weaving ---
-    const worldContext = formatLiveWorldEntitiesContext(state);
     const groupContext = entity ? formatEntityGroups(state, entity.id) : "";
-    const worldParts: string[] = [];
-    if (worldContext) worldParts.push(`[WORLD]\n${worldContext}`);
-    if (groupContext) worldParts.push(`[GROUPS]\n${groupContext}`);
-    if (LOREBOOK_WEAVING_PROMPT) worldParts.push(LOREBOOK_WEAVING_PROMPT);
-    if (worldParts.length > 0) {
-      messages.push({ role: "system", content: worldParts.join("\n\n") });
+    if (groupContext) {
+      messages.push({ role: "system", content: `[GROUPS]\n${groupContext}` });
     }
 
-    // --- MSG 5: Entity summary (right before prefill) ---
     messages.push({
       role: "user",
       content: itemSummary || `Generate a lorebook entry for: ${displayName}`,
     });
 
-    // --- MSG 6 (Xialong only): Style guidance ---
     await appendXialongStyleMessage(messages, XIALONG_STYLE.lorebookContent);
 
-    // --- MSG 7: Anchored prefill ---
     const assistantPrefill = `${displayName}\nType: ${entryType}\nSetting: ${setting || "original"}\n`;
     messages.push({ role: "assistant", content: assistantPrefill });
 
@@ -232,7 +182,7 @@ export const createLorebookContentFactory = (
         frequency_penalty: 0.1,
         stop: LOREBOOK_CHAIN_STOPS,
       }),
-      contextPinning: { head: 1, tail: xialong ? 4 : 3 },
+      contextPinning: { head: 1, tail: xialong ? 5 : 4 },
     };
   };
 };

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.1] - 2026-05-15
+
+### Changed
+
+- **Lorebook content generation now reads the story text.** Generating or refining a lorebook entry pulls in the rolling story window via the same unified prefix used by ATTG, Style, and Keys generation, so describing a character (or location, faction, etc.) in the prose and then generating a matching entry actually reflects what's on the page. As a side effect, lorebook content also gets the Foundation `Intensity` and `Story Contract` blocks that were already flowing into other strategies. SEGA batch runs additionally benefit from cache reuse across every entry in the batch.
+
 ## [0.12.0] - 2026-05-06
 
 ### Added
