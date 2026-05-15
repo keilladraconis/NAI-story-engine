@@ -174,6 +174,10 @@ const createWorldStateFactory =
 
 /**
  * ATTG: reads foundation context (shape, intent, world state) and generates an ATTG block.
+ *
+ * `attg` is excluded alongside `foundation` so a re-generate sees only the
+ * upstream anchors (shape/intent/worldState/intensity that we re-inject
+ * below), never the existing ATTG line — otherwise the model echoes it.
  */
 const createAttgFactory =
   (getState: () => RootState): MessageFactory =>
@@ -181,7 +185,7 @@ const createAttgFactory =
     const attgPrompt = ATTG_GENERATE_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState, {
-      excludeSections: ["foundation"],
+      excludeSections: ["foundation", "attg"],
     });
     const messages: Message[] = [...prefix];
 
@@ -211,6 +215,10 @@ const createAttgFactory =
 
 /**
  * Style: reads foundation context (shape, intent, world state) and generates a Style block.
+ *
+ * `style` is excluded alongside `foundation` so a re-generate sees only the
+ * upstream anchors (shape/intent/worldState/intensity that we re-inject
+ * below), never the existing Style block — otherwise the model echoes it.
  */
 const createStyleFactory =
   (getState: () => RootState): MessageFactory =>
@@ -218,7 +226,7 @@ const createStyleFactory =
     const stylePrompt = STYLE_GENERATE_PROMPT;
 
     const prefix = await buildStoryEnginePrefix(getState, {
-      excludeSections: ["foundation"],
+      excludeSections: ["foundation", "style"],
     });
     const messages: Message[] = [...prefix];
 
@@ -344,6 +352,46 @@ export function buildContractStrategy(
     requestId: opts?.requestId ?? api.v1.uuid(),
     messageFactory,
     target: { type: "foundation", field: "contract" },
+    prefillBehavior: "trim",
+  };
+}
+
+export function buildAttgStrategy(
+  getState: () => RootState,
+  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
+): GenerationStrategy {
+  const baseFactory = createAttgFactory(getState);
+  const refineContext = opts?.refineContext;
+  const messageFactory: MessageFactory = refineContext
+    ? async () => {
+        const base = await baseFactory();
+        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
+      }
+    : baseFactory;
+  return {
+    requestId: opts?.requestId ?? api.v1.uuid(),
+    messageFactory,
+    target: { type: "foundation", field: "attg" },
+    prefillBehavior: "trim",
+  };
+}
+
+export function buildStyleStrategy(
+  getState: () => RootState,
+  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
+): GenerationStrategy {
+  const baseFactory = createStyleFactory(getState);
+  const refineContext = opts?.refineContext;
+  const messageFactory: MessageFactory = refineContext
+    ? async () => {
+        const base = await baseFactory();
+        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
+      }
+    : baseFactory;
+  return {
+    requestId: opts?.requestId ?? api.v1.uuid(),
+    messageFactory,
+    target: { type: "foundation", field: "style" },
     prefillBehavior: "trim",
   };
 }

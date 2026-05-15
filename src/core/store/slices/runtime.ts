@@ -40,16 +40,6 @@ export const runtimeSlice = createSlice({
       segaRunning: !state.segaRunning,
     }),
 
-    // User intent: Request generation (triggers effect to build strategy)
-    uiGenerationRequested: (
-      state,
-      request: Omit<GenerationRequest, "status">,
-    ) => ({
-      ...state,
-      queue: [...state.queue, { ...request, status: "queued" as const }],
-      status: state.status === "idle" ? "queued" : state.status,
-    }),
-
     // Just adds to queue (no effect, for when strategy is already built)
     requestQueued: (state, request: Omit<GenerationRequest, "status">) => ({
       ...state,
@@ -200,7 +190,6 @@ export const runtimeSlice = createSlice({
 export const {
   stateUpdated,
   segaToggled,
-  uiGenerationRequested,
   requestQueued,
   requestActivated,
   queueCleared,

@@ -69,7 +69,6 @@ export type GenerationRequestStatus =
 export interface GenerationRequest {
   id: string;
   type:
-    | "field"
     | "list"
     | "chat"
     | "chatRefine"
@@ -95,7 +94,6 @@ export interface GenerationStrategy {
   target:
     | { type: "chat"; chatId: string; messageId: string }
     | { type: "chatRefine"; chatId: string; messageId: string; fieldId: string }
-    | { type: "field"; fieldId: string }
     | { type: "list"; fieldId: string }
     | { type: "lorebookContent"; entryId: string }
     | { type: "lorebookKeys"; entryId: string }

@@ -7,7 +7,6 @@ import {
 } from "../types";
 import { GenX, MessageFactory } from "nai-gen-x";
 import {
-  uiGenerationRequested,
   generationSubmitted,
   uiCancelRequest,
   uiRequestCancellation,
@@ -16,11 +15,6 @@ import {
   requestCancelled,
   requestCompleted,
 } from "../index";
-import {
-  buildATTGStrategy,
-  buildStyleStrategy,
-} from "../../utils/context-builder";
-import { FieldID } from "../../../config/field-definitions";
 import { getHandler } from "./generation-handlers";
 import { recordEntry, JournalEntry } from "../../generation-journal";
 import { getModel } from "../../utils/config";
@@ -42,8 +36,6 @@ function targetToQueueEntry(target: GenerationStrategy["target"]): {
       return { type: "chat", targetId: target.messageId };
     case "chatRefine":
       return { type: "chatRefine", targetId: target.messageId };
-    case "field":
-      return { type: "field", targetId: target.fieldId };
     case "list":
       return { type: "list", targetId: target.fieldId };
     case "lorebookContent":
@@ -76,7 +68,7 @@ function resolvePrefill(
   strategy: GenerationStrategy,
   getState: () => RootState,
 ): string {
-  const { prefillBehavior, assistantPrefill, target, messages } = strategy;
+  const { prefillBehavior, assistantPrefill, target } = strategy;
 
   if (prefillBehavior !== "keep") return "";
 
@@ -86,16 +78,6 @@ function resolvePrefill(
     const chat = state.chat.chats.find((c) => c.id === target.chatId);
     const message = chat?.messages.find((m) => m.id === target.messageId);
     return message?.content || "";
-  }
-
-  if (target.type === "field") {
-    if (assistantPrefill) return assistantPrefill;
-    if (messages) {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg?.role === "assistant" && lastMsg.content) {
-        return lastMsg.content;
-      }
-    }
   }
 
   if (target.type === "lorebookKeys") {
@@ -164,8 +146,6 @@ async function captureRollbackState(
  */
 export function cacheLabel(target: GenerationStrategy["target"]) {
   switch (target.type) {
-    case "field":
-      return `field:${target.fieldId}`;
     case "list":
       return `list:${target.fieldId}`;
     case "lorebookContent":
@@ -216,32 +196,6 @@ export function registerGenerationEngineEffects(
   getState: () => RootState,
   genX: GenX,
 ): void {
-  // Intent: Field/List Generation
-  subscribeEffect(matchesAction(uiGenerationRequested), async (action) => {
-    const { id: requestId, type, targetId } = action.payload;
-
-    if (type === "field") {
-      if (targetId.includes(":")) {
-        return;
-      }
-
-      let strategy;
-      if (targetId === FieldID.ATTG) {
-        strategy = buildATTGStrategy(getState);
-      } else if (targetId === FieldID.Style) {
-        strategy = buildStyleStrategy(getState);
-      } else {
-        api.v1.log(
-          `[effects] No generation strategy found for field: ${targetId}`,
-        );
-        return;
-      }
-
-      strategy.requestId = requestId;
-      dispatch(generationSubmitted(strategy));
-    }
-  });
-
   // Intent: GenX Generation (using handler map pattern)
   subscribeEffect(matchesAction(generationSubmitted), async (action) => {
     const strategy = action.payload;

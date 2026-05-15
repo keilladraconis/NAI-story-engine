@@ -1,5 +1,4 @@
 import { RootState, GenerationStrategy, AppDispatch } from "../types";
-import { fieldHandler } from "./handlers/field";
 import { listHandler } from "./handlers/list";
 import {
   lorebookContentHandler,
@@ -19,10 +18,6 @@ import { chatHandler, chatRefineHandler } from "./handlers/chat";
 export type TargetType = GenerationStrategy["target"]["type"];
 
 // Extract specific target types for handler type safety
-export type FieldTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "field" }
->;
 export type ListTarget = Extract<
   GenerationStrategy["target"],
   { type: "list" }
@@ -103,7 +98,6 @@ export interface GenerationHandlers<T = GenerationStrategy["target"]> {
 
 // Handler registry mapping target types to their handlers
 export const GENERATION_HANDLERS: {
-  field: GenerationHandlers<FieldTarget>;
   list: GenerationHandlers<ListTarget>;
   lorebookContent: GenerationHandlers<LorebookContentTarget>;
   lorebookKeys: GenerationHandlers<LorebookKeysTarget>;
@@ -117,7 +111,6 @@ export const GENERATION_HANDLERS: {
   chat: GenerationHandlers<ChatTarget>;
   chatRefine: GenerationHandlers<ChatRefineTarget>;
 } = {
-  field: fieldHandler,
   list: listHandler,
   lorebookContent: lorebookContentHandler,
   lorebookKeys: lorebookKeysHandler,

@@ -4,9 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [0.12.1] - 2026-05-15
 
+### Fixed
+
+- **Re-generating ATTG or Style no longer parrots the existing value back.** The Foundation re-generate path was excluding the upstream `[NARRATIVE FOUNDATION]` block from its prompt context but leaving the existing `[ATTG]` / `[STYLE]` block in front of the model, so it dutifully echoed what it saw. Both fields now also exclude themselves on re-generate, the way every other re-generate already does.
+
 ### Changed
 
+- **ATTG no longer emits the `[ S: N ]` star rating.** The trailing quality hint (e.g. `[ S: 4 ]`) was a Xialong fine-tune affordance, but Discord writing-advice consensus is that its guidance is too strong and dampens creativity downstream. The prompt now stops after the `[ Author; Title; Tags; Genre ]` line. Existing ATTGs that contain the rating are left alone — nothing parses it.
 - **Lorebook content generation now reads the story text.** Generating or refining a lorebook entry pulls in the rolling story window via the same unified prefix used by ATTG, Style, and Keys generation, so describing a character (or location, faction, etc.) in the prose and then generating a matching entry actually reflects what's on the page. As a side effect, lorebook content also gets the Foundation `Intensity` and `Story Contract` blocks that were already flowing into other strategies. SEGA batch runs additionally benefit from cache reuse across every entry in the batch.
+- **One ATTG/Style strategy instead of two.** The Foundation re-generate button and the chat-driven Refine flow were running through separate factories with subtly different prompts, stops, and prefills — the kind of split that's how the re-generate bug above slipped in. They now share a single factory per field, routed via `field-strategy-registry`. Knock-on cleanup: deleted the never-dispatched `uiGenerationRequested` action and its effect, the dead `field`-target handler, and the supporting target-type and handler-registry entries.
 
 ## [0.12.0] - 2026-05-06
 

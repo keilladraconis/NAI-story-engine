@@ -352,7 +352,7 @@ EXAMPLE:
 Author: Stephen King; Title: The Mist; Tags: horror, supernatural, small town; Genre: Horror
 
 INSTRUCTION:
-- Complete the ATTG line: [ Author: [author]; Title: [title]; Tags: [comma-separated-tags]; Genre: [genre] ][ S: [number rating 1-5] ]
+- Complete the ATTG line: [ Author: [author]; Title: [title]; Tags: [comma-separated-tags]; Genre: [genre] ]
 - You must enclose the ATTG line in spaced "[ ... ]" brackets.
 - Pick a well-known author that fits the story
 - DO NOT use any markdown bolding (**).

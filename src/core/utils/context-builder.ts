@@ -17,26 +17,17 @@
  * chat-type spec for its own context slice.
  */
 
-import { RootState, GenerationStrategy } from "../store/types";
-import type { RefineContext, SpecCtx } from "../chat-types/types";
+import { RootState } from "../store/types";
+import type { SpecCtx } from "../chat-types/types";
 import { activeSavedChat } from "../store/slices/chat";
 import { getChatTypeSpec } from "../chat-types";
-import { MessageFactory } from "nai-gen-x";
 import {
   FieldID,
   FIELD_CONFIGS,
   DulfsFieldID,
 } from "../../config/field-definitions";
 import { STORAGE_KEYS } from "../../ui/framework/ids";
-import { buildModelParams, appendXialongStyleMessage } from "./config";
-import {
-  SYSTEM_PROMPT,
-  LOREBOOK_WEAVING_PROMPT,
-  ATTG_GENERATE_PROMPT,
-  STYLE_GENERATE_PROMPT,
-  XIALONG_STYLE,
-} from "./prompts";
-import { buildRefineTail } from "./refine-strategy";
+import { SYSTEM_PROMPT, LOREBOOK_WEAVING_PROMPT } from "./prompts";
 // --- Helpers ---
 
 /**
@@ -439,129 +430,5 @@ export const buildStoryEnginePrefix = async (
   }
 
   return messages;
-};
-
-// --- Strategy Factories ---
-
-/**
- * Creates a message factory for ATTG generation.
- * Uses unified prefix + volatile tail with ATTG-specific instruction.
- */
-export const createATTGFactory = (
-  getState: () => RootState,
-): MessageFactory => {
-  return async () => {
-    const prompt = ATTG_GENERATE_PROMPT;
-
-    // Exclude ATTG (generating it)
-    const prefix = await buildStoryEnginePrefix(getState, {
-      excludeSections: ["attg"],
-    });
-
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: `[ATTG GENERATION]\n${prompt}`,
-      },
-    ];
-
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.attg);
-    messages.push({ role: "assistant", content: "[" });
-
-    return {
-      messages,
-      params: await buildModelParams({ max_tokens: 128, temperature: 0.7, min_p: 0.05 }),
-      contextPinning: { head: 1, tail: 2 },
-    };
-  };
-};
-
-/**
- * Builds an ATTG generation strategy using JIT factory pattern.
- */
-export const buildATTGStrategy = (
-  getState: () => RootState,
-  opts?: { refineContext?: RefineContext },
-): GenerationStrategy => {
-  const baseFactory = createATTGFactory(getState);
-  const refineContext = opts?.refineContext;
-  const messageFactory: MessageFactory = refineContext
-    ? async () => {
-        const base = await baseFactory();
-        return {
-          ...base,
-          messages: [...base.messages, ...buildRefineTail(refineContext)],
-        };
-      }
-    : baseFactory;
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory,
-    target: { type: "field", fieldId: FieldID.ATTG },
-    prefillBehavior: "keep",
-    assistantPrefill: "[",
-  };
-};
-
-/**
- * Creates a message factory for Style generation.
- * Uses unified prefix + volatile tail with style-specific instruction.
- */
-export const createStyleFactory = (
-  getState: () => RootState,
-): MessageFactory => {
-  return async () => {
-    const prompt = STYLE_GENERATE_PROMPT;
-
-    // Exclude style (generating it)
-    const prefix = await buildStoryEnginePrefix(getState, {
-      excludeSections: ["style"],
-    });
-
-    const messages: Message[] = [
-      ...prefix,
-      {
-        role: "system",
-        content: `[STYLE GENERATION]\n${prompt}`,
-      },
-    ];
-
-    await appendXialongStyleMessage(messages, buildXialongNarrativeStyleBlock(getState()));
-    messages.push({ role: "assistant", content: "[" });
-
-    return {
-      messages,
-      params: await buildModelParams({ max_tokens: 128, temperature: 0.8, min_p: 0.05 }),
-      contextPinning: { head: 1, tail: 2 },
-    };
-  };
-};
-
-/**
- * Builds a Style generation strategy using JIT factory pattern.
- */
-export const buildStyleStrategy = (
-  getState: () => RootState,
-  opts?: { refineContext?: RefineContext },
-): GenerationStrategy => {
-  const baseFactory = createStyleFactory(getState);
-  const refineContext = opts?.refineContext;
-  const messageFactory: MessageFactory = refineContext
-    ? async () => {
-        const base = await baseFactory();
-        return {
-          ...base,
-          messages: [...base.messages, ...buildRefineTail(refineContext)],
-        };
-      }
-    : baseFactory;
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory,
-    target: { type: "field", fieldId: FieldID.Style },
-    prefillBehavior: "keep",
-    assistantPrefill: "[",
-  };
 };
 

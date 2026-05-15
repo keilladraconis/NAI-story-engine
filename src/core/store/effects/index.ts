@@ -7,13 +7,11 @@ export {
   type CompletionHandler,
   type GenerationHandlers,
   type TargetType,
-  type FieldTarget,
   type ListTarget,
   type LorebookContentTarget,
   type LorebookKeysTarget,
 } from "./generation-handlers";
 
-export { fieldHandler } from "./handlers/field";
 export { listHandler } from "./handlers/list";
 export {
   lorebookContentHandler,
