@@ -208,4 +208,5 @@ export interface RootState {
   runtime: RuntimeState;
   world: WorldState;
   foundation: FoundationState;
+  forge: import("./slices/forge").ForgeSliceState;
 }

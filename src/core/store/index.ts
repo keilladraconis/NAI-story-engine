@@ -6,6 +6,8 @@ import { runtimeSlice } from "./slices/runtime";
 import { storySlice, initialStoryState } from "./slices/story";
 import { worldSlice, initialWorldState } from "./slices/world";
 import { foundationSlice, initialFoundationState } from "./slices/foundation";
+import { forgeSlice, initialForgeState } from "./slices/forge";
+import type { ForgeSliceState } from "./slices/forge";
 import {
   RootState,
   StoryState,
@@ -23,6 +25,7 @@ export interface PersistedData {
   chat?: ChatSliceState;
   world?: WorldState;
   foundation?: FoundationState;
+  forge?: ForgeSliceState;
 }
 
 const PERSISTED_DATA_LOADED = "persist/loaded";
@@ -80,6 +83,7 @@ const sliceReducer = combineReducers({
   runtime: runtimeSlice.reducer,
   world: worldSlice.reducer,
   foundation: foundationSlice.reducer,
+  forge: forgeSlice.reducer,
 });
 
 function rootReducer(state: RootState | undefined, action: Action): RootState {
@@ -99,6 +103,9 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
       foundation: data.foundation
         ? { ...initialFoundationState, ...data.foundation }
         : current.foundation,
+      forge: data.forge
+        ? { ...initialForgeState, ...data.forge }
+        : current.forge,
     };
   }
 
@@ -118,3 +125,4 @@ export * from "./slices/runtime";
 export * from "./slices/story";
 export * from "./slices/world";
 export * from "./slices/foundation";
+export * from "./slices/forge";
