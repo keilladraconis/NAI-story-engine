@@ -10,6 +10,12 @@ export interface ChatMessage {
   content: string;
   /** Marks an assistant message as a candidate rewrite inside a refine chat. */
   refineCandidate?: boolean;
+  /**
+   * Optional tag for non-conversational messages. Renderers may treat tagged
+   * messages distinctly (e.g., cleanup-turn confirmations, parser-rejection
+   * warnings). Plain conversational turns leave this undefined.
+   */
+  messageKind?: "warning" | "cleanup";
 }
 
 export type ChatSeed =
