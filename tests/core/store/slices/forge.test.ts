@@ -44,6 +44,24 @@ describe("forgeSlice tombstones", () => {
     expect(next.tombstonesByChatId.c1).toEqual([TS1]);
   });
 
+  it("tombstoneAdded does NOT dedup when name matches but category differs", () => {
+    const seeded = { tombstonesByChatId: { c1: [TS1] } };
+    const next = forgeSliceReducer(
+      seeded,
+      tombstoneAdded({
+        chatId: "c1",
+        tombstone: { name: "Vesper", category: "Location", reason: "user" },
+      }),
+    );
+    expect(next.tombstonesByChatId.c1).toHaveLength(2);
+    expect(next.tombstonesByChatId.c1[0]).toEqual(TS1);
+    expect(next.tombstonesByChatId.c1[1]).toEqual({
+      name: "Vesper",
+      category: "Location",
+      reason: "user",
+    });
+  });
+
   it("tombstonesClearedForChat removes only the targeted chat's list", () => {
     const seeded = {
       tombstonesByChatId: { c1: [TS1], c2: [TS2] },
