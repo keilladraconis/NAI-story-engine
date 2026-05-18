@@ -13,6 +13,7 @@ import {
 } from "./handlers/summary";
 import { bootstrapHandler, bootstrapContinueHandler } from "./handlers/bootstrap";
 import { chatHandler, chatRefineHandler } from "./handlers/chat";
+import { forgeChatHandler, forgeCleanupHandler } from "./handlers/forge-chat";
 
 // Target type union from GenerationStrategy
 export type TargetType = GenerationStrategy["target"]["type"];
@@ -125,14 +126,8 @@ export const GENERATION_HANDLERS: {
   lorebookContent: lorebookContentHandler,
   lorebookKeys: lorebookKeysHandler,
   forge: forgeHandler,
-  forgeChat: {
-    streaming: () => {},
-    completion: () => Promise.reject(new Error("forgeChat handler not yet implemented")),
-  },
-  forgeCleanup: {
-    streaming: () => {},
-    completion: () => Promise.reject(new Error("forgeCleanup handler not yet implemented")),
-  },
+  forgeChat: forgeChatHandler,
+  forgeCleanup: forgeCleanupHandler,
   foundation: foundationHandler,
   entitySummary: entitySummaryHandler,
   entitySummaryBind: entitySummaryBindHandler,
