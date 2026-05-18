@@ -147,8 +147,8 @@ export interface WorldEntity {
   lorebookEntryId?: string; // lorebook entry created on Cast (live only)
   name: string;
   summary: string; // SE-internal only — editable in SeEntityEditPane, never synced to lorebook
-  lifecycle: EntityLifecycle; // "draft" = no lorebook entry, transient until Cast; "live" = bound to a lorebook entry
-  sourceChatId?: string; // chat session that produced this entity (set by Forge on CREATE)
+  lifecycle: EntityLifecycle; // "draft" = no lorebook entry yet; "live" = lorebook-bound
+  sourceChatId?: string; // chat session that produced this entity
 }
 
 export interface WorldState {

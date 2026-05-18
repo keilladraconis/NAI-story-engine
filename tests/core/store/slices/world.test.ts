@@ -11,7 +11,6 @@ import {
   groupRenamed,
   groupSummaryUpdated,
   entityGroupToggled,
-  initialWorldState,
 } from "../../../../src/core/store/slices/world";
 import { WorldState, WorldEntity } from "../../../../src/core/store/types";
 import {
@@ -32,11 +31,12 @@ const makeState = (overrides: Partial<WorldState> = {}): WorldState => ({
   ...overrides,
 });
 
-const ENTITY = {
+const ENTITY: WorldEntity = {
   id: "e1",
   categoryId: FieldID.DramatisPersonae as DulfsFieldID,
   name: "Elara",
   summary: "",
+  lifecycle: "live" as const,
 };
 
 const GROUP = { id: "g1", title: "Main Circle", summary: "Core cast", entityIds: [] };
@@ -176,13 +176,8 @@ describe("worldSlice — lifecycle and sourceChatId", () => {
       lifecycle: "draft",
       sourceChatId: "chat-abc",
     };
-    const state = worldSlice.reducer(
-      initialWorldState,
-      entityForged({ entity }),
-    );
+    const state = reduce(makeState(), entityForged({ entity }));
     expect(state.entitiesById["e1"]).toEqual(entity);
-    expect(state.entitiesById["e1"].lifecycle).toBe("draft");
-    expect(state.entitiesById["e1"].sourceChatId).toBe("chat-abc");
   });
 
   it("entityForged accepts live entities without sourceChatId", () => {
@@ -194,10 +189,7 @@ describe("worldSlice — lifecycle and sourceChatId", () => {
       lifecycle: "live",
       lorebookEntryId: "lb-1",
     };
-    const state = worldSlice.reducer(
-      initialWorldState,
-      entityForged({ entity }),
-    );
+    const state = reduce(makeState(), entityForged({ entity }));
     expect(state.entitiesById["e2"].lifecycle).toBe("live");
     expect(state.entitiesById["e2"].sourceChatId).toBeUndefined();
   });
