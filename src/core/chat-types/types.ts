@@ -48,7 +48,11 @@ export interface HeaderControl {
     | "summarizeButton"
     | "sessionsButton"
     | "newChatButton"
-    | "label";
+    | "label"
+    | "continueButton"
+    | "castAllButton"
+    | "discardAllButton"
+    | "phaseIndicator";
 }
 
 export interface SpecCtx {
