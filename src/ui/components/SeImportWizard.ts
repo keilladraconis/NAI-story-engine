@@ -359,6 +359,7 @@ export class SeImportWizard extends SuiComponent<
                         lorebookEntryId: entryId,
                         name: entry.displayName || "Unknown",
                         summary: "",
+                        lifecycle: "live",
                       },
                     }),
                   );
