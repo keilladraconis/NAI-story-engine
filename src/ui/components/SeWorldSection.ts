@@ -171,6 +171,7 @@ export class SeWorldSection extends SuiComponent<
               categoryId: FieldID.DramatisPersonae,
               name: "",
               summary: "",
+              lifecycle: "draft",
             },
           }),
         );
