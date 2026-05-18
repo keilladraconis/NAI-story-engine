@@ -66,6 +66,14 @@ export type ChatRefineTarget = Extract<
   GenerationStrategy["target"],
   { type: "chatRefine" }
 >;
+export type ForgeChatTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "forgeChat" }
+>;
+export type ForgeCleanupTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "forgeCleanup" }
+>;
 
 export interface StreamingContext<T = GenerationStrategy["target"]> {
   target: T;
@@ -102,6 +110,8 @@ export const GENERATION_HANDLERS: {
   lorebookContent: GenerationHandlers<LorebookContentTarget>;
   lorebookKeys: GenerationHandlers<LorebookKeysTarget>;
   forge: GenerationHandlers<ForgeTarget>;
+  forgeChat: GenerationHandlers<ForgeChatTarget>;
+  forgeCleanup: GenerationHandlers<ForgeCleanupTarget>;
   foundation: GenerationHandlers<FoundationTarget>;
   entitySummary: GenerationHandlers<EntitySummaryTarget>;
   entitySummaryBind: GenerationHandlers<EntitySummaryBindTarget>;
@@ -115,6 +125,14 @@ export const GENERATION_HANDLERS: {
   lorebookContent: lorebookContentHandler,
   lorebookKeys: lorebookKeysHandler,
   forge: forgeHandler,
+  forgeChat: {
+    streaming: () => {},
+    completion: () => Promise.reject(new Error("forgeChat handler not yet implemented")),
+  },
+  forgeCleanup: {
+    streaming: () => {},
+    completion: () => Promise.reject(new Error("forgeCleanup handler not yet implemented")),
+  },
   foundation: foundationHandler,
   entitySummary: entitySummaryHandler,
   entitySummaryBind: entitySummaryBindHandler,

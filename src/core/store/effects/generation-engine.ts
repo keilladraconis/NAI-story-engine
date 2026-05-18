@@ -170,6 +170,10 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `chat:${target.messageId}`;
     case "chatRefine":
       return `chat-refine:${target.fieldId}`;
+    case "forgeChat":
+      return `forge-chat:${target.messageId}`;
+    case "forgeCleanup":
+      return `forge-cleanup:${target.messageId}`;
   }
 }
 

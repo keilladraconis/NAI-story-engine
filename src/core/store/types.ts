@@ -75,6 +75,8 @@ export interface GenerationRequest {
     | "lorebookContent"
     | "lorebookKeys"
     | "forge"
+    | "forgeChat"
+    | "forgeCleanup"
     | "foundation"
     | "entitySummary"
     | "entitySummaryBind"
@@ -104,6 +106,17 @@ export interface GenerationStrategy {
         forgeGuidance: string;
         brainstormContext: string;
         preForgeEntityIds: string[];
+      }
+    | {
+        type: "forgeChat";
+        chatId: string;
+        messageId: string;
+      }
+    | {
+        type: "forgeCleanup";
+        chatId: string;
+        messageId: string;
+        discardedName: string;
       }
     | {
         type: "foundation";
