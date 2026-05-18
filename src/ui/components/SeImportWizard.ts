@@ -448,6 +448,7 @@ export class SeImportWizard extends SuiComponent<
                 lorebookEntryId: entry.id,
                 name: entry.displayName || "Unknown",
                 summary: "",
+                lifecycle: "live" as const,
               }));
               store.dispatch(entitiesBoundBatch(entities));
             }
