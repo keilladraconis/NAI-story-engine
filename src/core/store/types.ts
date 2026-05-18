@@ -139,12 +139,16 @@ export interface WorldGroup {
   lorebookEntryId?: string; // optional: group summary synced as a lorebook entry
 }
 
+export type EntityLifecycle = "draft" | "live";
+
 export interface WorldEntity {
   id: string;
   categoryId: DulfsFieldID; // Character, Location, etc. — metadata
-  lorebookEntryId?: string; // lorebook entry created on forge
+  lorebookEntryId?: string; // lorebook entry created on Cast (live only)
   name: string;
   summary: string; // SE-internal only — editable in SeEntityEditPane, never synced to lorebook
+  lifecycle: EntityLifecycle; // "draft" = no lorebook entry, transient until Cast; "live" = bound to a lorebook entry
+  sourceChatId?: string; // chat session that produced this entity (set by Forge on CREATE)
 }
 
 export interface WorldState {

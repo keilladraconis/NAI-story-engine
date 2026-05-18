@@ -11,8 +11,9 @@ import {
   groupRenamed,
   groupSummaryUpdated,
   entityGroupToggled,
+  initialWorldState,
 } from "../../../../src/core/store/slices/world";
-import { WorldState } from "../../../../src/core/store/types";
+import { WorldState, WorldEntity } from "../../../../src/core/store/types";
 import {
   FieldID,
   DulfsFieldID,
@@ -158,5 +159,46 @@ describe("entityUnbound", () => {
     );
     expect(state.entityIds).toHaveLength(0);
     expect(state.entitiesById["e1"]).toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// lifecycle and sourceChatId fields
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("worldSlice — lifecycle and sourceChatId", () => {
+  it("entityForged stores lifecycle and sourceChatId on the entity", () => {
+    const entity: WorldEntity = {
+      id: "e1",
+      categoryId: FieldID.DramatisPersonae,
+      name: "Vesper",
+      summary: "Paranoid governess",
+      lifecycle: "draft",
+      sourceChatId: "chat-abc",
+    };
+    const state = worldSlice.reducer(
+      initialWorldState,
+      entityForged({ entity }),
+    );
+    expect(state.entitiesById["e1"]).toEqual(entity);
+    expect(state.entitiesById["e1"].lifecycle).toBe("draft");
+    expect(state.entitiesById["e1"].sourceChatId).toBe("chat-abc");
+  });
+
+  it("entityForged accepts live entities without sourceChatId", () => {
+    const entity: WorldEntity = {
+      id: "e2",
+      categoryId: FieldID.Locations,
+      name: "Old Quay",
+      summary: "Decaying waterfront",
+      lifecycle: "live",
+      lorebookEntryId: "lb-1",
+    };
+    const state = worldSlice.reducer(
+      initialWorldState,
+      entityForged({ entity }),
+    );
+    expect(state.entitiesById["e2"].lifecycle).toBe("live");
+    expect(state.entitiesById["e2"].sourceChatId).toBeUndefined();
   });
 });
