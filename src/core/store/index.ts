@@ -37,10 +37,11 @@ persistedDataLoaded.type = PERSISTED_DATA_LOADED;
 // World state migration (v11 entities[] → v12 entitiesById/entityIds)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function migrateWorldState(raw: WorldState | (Record<string, unknown> & { entities?: WorldEntity[] })): WorldState {
-  const backfillLifecycle = (e: WorldEntity): WorldEntity =>
-    e.lifecycle ? e : { ...e, lifecycle: e.lorebookEntryId ? "live" : "draft" };
+function backfillLifecycle(e: WorldEntity): WorldEntity {
+  return e.lifecycle ? e : { ...e, lifecycle: e.lorebookEntryId ? "live" : "draft" };
+}
 
+export function migrateWorldState(raw: WorldState | (Record<string, unknown> & { entities?: WorldEntity[] })): WorldState {
   // v12+ format: already has entitiesById
   if ("entitiesById" in raw && raw.entitiesById) {
     const src = raw as WorldState;

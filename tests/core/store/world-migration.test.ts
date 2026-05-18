@@ -43,7 +43,11 @@ describe("migrateWorldState — lifecycle backfill", () => {
     expect(migrated.entitiesById["e2"].lifecycle).toBe("draft");
   });
 
-  it("preserves explicit lifecycle when already present", () => {
+  it("preserves explicit lifecycle even when it contradicts the lorebookEntryId heuristic", () => {
+    // Entity has a lorebookEntryId, which would normally backfill to "live".
+    // But lifecycle is already explicitly "draft" — the guard must short-circuit
+    // and leave that value untouched. This proves the function never overwrites
+    // an explicit lifecycle, even when it disagrees with the heuristic.
     const fresh = {
       entitiesById: {
         "e3": {
@@ -51,6 +55,7 @@ describe("migrateWorldState — lifecycle backfill", () => {
           categoryId: FieldID.Locations,
           name: "Quay",
           summary: "z",
+          lorebookEntryId: "lb-3",
           lifecycle: "draft" as const,
         },
       },
