@@ -75,6 +75,7 @@ export const listHandler: GenerationHandlers<ListTarget> = {
             lorebookEntryId,
             name,
             summary: content,
+            lifecycle: "live",
           };
           ctx.dispatch(entityForged({ entity }));
         }
