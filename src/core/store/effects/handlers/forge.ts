@@ -89,6 +89,7 @@ async function executeForgeCommands(
           lorebookEntryId,
           name: cmd.name,
           summary: cmd.content,
+          lifecycle: "live",
         };
         dispatch(entityForged({ entity }));
         api.v1.log(`[forge] CREATE ${cmd.elementType} "${cmd.name}" → ${lorebookEntryId}`);
