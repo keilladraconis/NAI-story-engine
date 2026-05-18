@@ -37,18 +37,27 @@ persistedDataLoaded.type = PERSISTED_DATA_LOADED;
 // World state migration (v11 entities[] → v12 entitiesById/entityIds)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function migrateWorldState(raw: WorldState | (Record<string, unknown> & { entities?: WorldEntity[] })): WorldState {
+export function migrateWorldState(raw: WorldState | (Record<string, unknown> & { entities?: WorldEntity[] })): WorldState {
+  const backfillLifecycle = (e: WorldEntity): WorldEntity =>
+    e.lifecycle ? e : { ...e, lifecycle: e.lorebookEntryId ? "live" : "draft" };
+
   // v12+ format: already has entitiesById
   if ("entitiesById" in raw && raw.entitiesById) {
-    return { ...initialWorldState, ...(raw as WorldState), forgeLoopActive: false };
+    const src = raw as WorldState;
+    const entitiesById: Record<string, WorldEntity> = {};
+    for (const [id, e] of Object.entries(src.entitiesById)) {
+      entitiesById[id] = backfillLifecycle(e);
+    }
+    return { ...initialWorldState, ...src, entitiesById, forgeLoopActive: false };
   }
   // v11 format: has entities array — convert
   const entities = (raw as { entities?: WorldEntity[] }).entities ?? [];
   const entitiesById: Record<string, WorldEntity> = {};
   const entityIds: string[] = [];
   for (const e of entities) {
-    entitiesById[e.id] = e;
-    entityIds.push(e.id);
+    const filled = backfillLifecycle(e);
+    entitiesById[filled.id] = filled;
+    entityIds.push(filled.id);
   }
   return {
     ...initialWorldState,
