@@ -7,7 +7,7 @@ import {
   contractUpdated,
   attgUpdated,
   styleUpdated,
-} from "../../index";
+} from "../../slices/foundation";
 import {
   GenerationHandlers,
   StreamingContext,
@@ -15,7 +15,6 @@ import {
 } from "../generation-handlers";
 import { IDS } from "../../../../ui/framework/ids";
 import { escapeForMarkdown } from "../../../../ui/utils";
-import { store } from "../../../../core/store";
 
 type FoundationTarget = Extract<
   GenerationStrategy["target"],
@@ -43,9 +42,7 @@ const VIEW_IDS = {
  *    Format: "Hero's Journey\n\nLean toward the moment of return..."
  *    Output: { name: firstLine, description: rest }
  */
-function parseShape(text: string): ShapeData {
-  const existingName = store.getState().foundation.shape?.name ?? "";
-
+function parseShape(text: string, existingName: string): ShapeData {
   if (existingName) {
     // Name was pre-filled — entire output is the description
     return { name: existingName, description: text.trim() };
@@ -96,7 +93,8 @@ export const foundationHandler: GenerationHandlers<FoundationTarget> = {
 
     switch (ctx.target.field) {
       case "shape": {
-        const shape = parseShape(text);
+        const existingName = ctx.getState().foundation.shape?.name ?? "";
+        const shape = parseShape(text, existingName);
         ctx.dispatch(shapeUpdated({ shape }));
         break;
       }
@@ -115,14 +113,14 @@ export const foundationHandler: GenerationHandlers<FoundationTarget> = {
       }
       case "attg": {
         ctx.dispatch(attgUpdated({ attg: text }));
-        if (store.getState().foundation.attgSyncEnabled) {
+        if (ctx.getState().foundation.attgSyncEnabled) {
           await api.v1.memory.set(text.trim());
         }
         break;
       }
       case "style": {
         ctx.dispatch(styleUpdated({ style: text }));
-        if (store.getState().foundation.styleSyncEnabled) {
+        if (ctx.getState().foundation.styleSyncEnabled) {
           await api.v1.an.set(text.trim());
         }
         break;
