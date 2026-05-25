@@ -2,6 +2,7 @@ import type { ChatTypeSpec, Chat, ChatMessage, ChatSeed, SpecCtx } from "./types
 import {
   BRAINSTORM_SUMMARIZE_PROMPT,
   STORY_TEXT_SUMMARIZE_PROMPT,
+  XIALONG_STYLE,
 } from "../utils/prompts";
 
 function findChatById(ctx: SpecCtx, id: string): Chat | undefined {
@@ -54,6 +55,10 @@ export const summarySpec: ChatTypeSpec = {
     return chat.seed.kind === "fromStoryText"
       ? STORY_TEXT_SUMMARIZE_PROMPT
       : BRAINSTORM_SUMMARIZE_PROMPT;
+  },
+
+  xialongStyleFor(_chat: Chat, _ctx: SpecCtx): string {
+    return XIALONG_STYLE.summary;
   },
 
   contextSlice(chat: Chat, _ctx: SpecCtx): ChatMessage[] {

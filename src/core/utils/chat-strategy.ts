@@ -3,6 +3,7 @@ import type { GenerationStrategy, RootState, AppDispatch } from "../store/types"
 import { getChatTypeSpec } from "../chat-types";
 import { getFieldStrategy } from "./field-strategy-registry";
 import { buildStoryEnginePrefix } from "./context-builder";
+import { isXialongMode } from "./config";
 
 /**
  * Builds the GenerationStrategy for a chat-driven generation.
@@ -19,11 +20,11 @@ import { buildStoryEnginePrefix } from "./context-builder";
  * (excluding the placeholder assistant message we are about to fill), and
  * an optional assistant prefill from the spec.
  */
-export function buildChatStrategy(
+export async function buildChatStrategy(
   getState: () => RootState,
   chat: Chat,
   assistantMessageId: string,
-): GenerationStrategy {
+): Promise<GenerationStrategy> {
   if (chat.type === "refine" && chat.refineTarget) {
     const factory = getFieldStrategy(chat.refineTarget.fieldId);
     const inner = factory(getState, {
@@ -46,17 +47,20 @@ export function buildChatStrategy(
     };
   }
 
-  // Saved-chat path. systemPromptFor / prefillFor on the current specs only
-  // read from `chat` (not from ctx), so a no-op dispatch is safe to pass.
-  // When a future spec actually dispatches inside these hooks, switch this
-  // callsite to thread the real dispatch through.
+  // Saved-chat path.
   const spec = getChatTypeSpec(chat.type);
   const noopDispatch: AppDispatch = () => {};
   const ctx = { getState, dispatch: noopDispatch };
+
+  const styleBlock = spec.xialongStyleFor?.(chat, ctx);
+  const xialong = styleBlock ? await isXialongMode() : false;
+  const prefill = xialong && styleBlock
+    ? styleBlock
+    : spec.prefillFor?.(chat, ctx);
+
   return {
     requestId: `chat-${chat.id}-${assistantMessageId}`,
     messageFactory: async () => {
-      // excludeChat: we'll inject the chat's own transcript below
       const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true });
       const system: Message = {
         role: "system",
@@ -65,12 +69,20 @@ export function buildChatStrategy(
       const transcript: Message[] = chat.messages
         .filter((m) => m.id !== assistantMessageId)
         .map((m) => ({ role: m.role, content: m.content }));
-      return {
-        messages: [...prefix, system, ...transcript],
-      };
+      const messages = [...prefix];
+      messages.push({ role: "system", content: "----" });
+      messages.push(system, ...transcript);
+      if (prefill) {
+        messages.push({ role: "assistant", content: prefill });
+      }
+      const params = xialong
+        ? { stop: ["</think>", "\n[ Style"] }
+        : undefined;
+      return { messages, params };
     },
     target: { type: "chat", chatId: chat.id, messageId: assistantMessageId },
     prefillBehavior: "trim",
-    assistantPrefill: spec.prefillFor?.(chat, ctx),
+    assistantPrefill: prefill,
+    minResponseLength: xialong ? 40 : undefined,
   };
 }
