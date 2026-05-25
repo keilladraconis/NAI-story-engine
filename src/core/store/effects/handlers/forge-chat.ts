@@ -57,6 +57,7 @@ function emitWarning(dispatch: AppDispatch, chatId: string, text: string): void 
 async function executeForgeChatCommands(
   commands: ParsedCommand[],
   chatId: string,
+  assistantMessageId: string,
   getState: () => RootState,
   dispatch: AppDispatch,
 ): Promise<void> {
@@ -84,6 +85,7 @@ async function executeForgeChatCommands(
           summary: cmd.content,
           lifecycle: "draft",
           sourceChatId: chatId,
+          lastAffectingMessageId: assistantMessageId,
         };
         dispatch(entityForged({ entity }));
         break;
@@ -103,7 +105,7 @@ async function executeForgeChatCommands(
           );
           break;
         }
-        dispatch(entitySummaryUpdated({ entityId: target.id, summary: cmd.content }));
+        dispatch(entitySummaryUpdated({ entityId: target.id, summary: cmd.content, lastAffectingMessageId: assistantMessageId }));
         break;
       }
       case "DELETE": {
@@ -216,7 +218,7 @@ export const forgeChatHandler: GenerationHandlers<ForgeChatTarget> = {
     if (!ctx.generationSucceeded) return;
 
     const commands = parseCommands(cleaned);
-    await executeForgeChatCommands(commands, ctx.target.chatId, ctx.getState, ctx.dispatch);
+    await executeForgeChatCommands(commands, ctx.target.chatId, ctx.target.messageId, ctx.getState, ctx.dispatch);
   },
 };
 
@@ -247,6 +249,6 @@ export const forgeCleanupHandler: GenerationHandlers<ForgeCleanupTarget> = {
     const reviseOnly = all.filter(
       (c): c is Extract<ParsedCommand, { kind: "REVISE" }> => c.kind === "REVISE",
     );
-    await executeForgeChatCommands(reviseOnly, ctx.target.chatId, ctx.getState, ctx.dispatch);
+    await executeForgeChatCommands(reviseOnly, ctx.target.chatId, ctx.target.messageId, ctx.getState, ctx.dispatch);
   },
 };

@@ -190,6 +190,44 @@ describe("forgeChatHandler.completion", () => {
     expect(updated![0].payload.summary).toBe("new summary");
   });
 
+  it("sets lastAffectingMessageId on CREATE entity", async () => {
+    const dispatch = vi.fn();
+    const ctx: CompletionContext<ForgeChatTarget> = {
+      target: { type: "forgeChat", chatId: "c1", messageId: "m-42" },
+      getState: () => makeState(),
+      dispatch,
+      accumulatedText: "[CREATE CHARACTER \"Vesper\" | A lighthouse keeper.]",
+      generationSucceeded: true,
+    };
+    await forgeChatHandler.completion(ctx);
+    const forged = dispatch.mock.calls.find(
+      ([a]) => a.type === "world/entityForged",
+    );
+    expect(forged).toBeDefined();
+    expect(forged![0].payload.entity.lastAffectingMessageId).toBe("m-42");
+  });
+
+  it("sets lastAffectingMessageId on REVISE dispatch", async () => {
+    const dispatch = vi.fn();
+    const draft = makeEntity({
+      id: "d1", name: "Vesper", lifecycle: "draft",
+      summary: "old", sourceChatId: "c1",
+    });
+    const ctx: CompletionContext<ForgeChatTarget> = {
+      target: { type: "forgeChat", chatId: "c1", messageId: "m-99" },
+      getState: () => makeState([draft]),
+      dispatch,
+      accumulatedText: "[REVISE \"Vesper\" | revised content]",
+      generationSucceeded: true,
+    };
+    await forgeChatHandler.completion(ctx);
+    const updated = dispatch.mock.calls.find(
+      ([a]) => a.type === "world/entitySummaryUpdated",
+    );
+    expect(updated).toBeDefined();
+    expect(updated![0].payload.lastAffectingMessageId).toBe("m-99");
+  });
+
   it("DELETE on a draft adds a tombstone with reason=model", async () => {
     const dispatch = vi.fn();
     const draft = makeEntity({
