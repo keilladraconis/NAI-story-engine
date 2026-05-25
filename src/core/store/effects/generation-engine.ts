@@ -18,6 +18,8 @@ import {
 import { getHandler } from "./generation-handlers";
 import { recordEntry, JournalEntry } from "../../generation-journal";
 import { getModel } from "../../utils/config";
+import { stripThinkingTags } from "../../utils/tag-parser";
+import { messageUpdated } from "../slices/chat";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Private Helpers
@@ -255,7 +257,7 @@ export function registerGenerationEngineEffects(
     };
 
     try {
-      const result = await genX.generate(
+      let result = await genX.generate(
         messagesInput,
         { ...apiParams, taskId: requestId },
         onStream,
@@ -264,6 +266,39 @@ export function registerGenerationEngineEffects(
       );
 
       generationSucceeded = true;
+
+      // Retry: when the effective response (after thinking-tag strip) is
+      // too short, the model likely emitted an empty </think> block.
+      // Reset accumulated text and re-run up to maxRetries times.
+      if (strategy.minResponseLength && generationSucceeded) {
+        const maxRetries = 3;
+        let retries = 0;
+        while (retries < maxRetries) {
+          const effective = stripThinkingTags(accumulatedText).trim();
+          if (effective.length >= strategy.minResponseLength) break;
+          retries++;
+          api.v1.log(
+            `[retry] Response too short (${effective.length} chars), attempt ${retries}/${maxRetries}`,
+          );
+          if (checkCancellation(requestId, getState)) break;
+          accumulatedText = resolvePrefill(strategy, getState);
+          // Clear visible message so the retry streams from scratch
+          if ("chatId" in target && "messageId" in target) {
+            dispatch(messageUpdated({
+              chatId: target.chatId,
+              id: target.messageId,
+              content: "",
+            }));
+          }
+          result = await genX.generate(
+            resolvedMessages || messagesInput,
+            { ...apiParams, taskId: `${requestId}-retry-${retries}` },
+            onStream,
+            "background",
+            await api.v1.createCancellationSignal(),
+          );
+        }
+      }
 
       // Continuation: extend output when truncated by token limit
       if (strategy.continuation && resolvedMessages) {

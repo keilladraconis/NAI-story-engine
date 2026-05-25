@@ -83,5 +83,6 @@ export async function buildChatStrategy(
     target: { type: "chat", chatId: chat.id, messageId: assistantMessageId },
     prefillBehavior: "trim",
     assistantPrefill: prefill,
+    minResponseLength: xialong ? 40 : undefined,
   };
 }
