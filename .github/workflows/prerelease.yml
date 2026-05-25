@@ -25,6 +25,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   build-and-prerelease:
@@ -85,3 +86,20 @@ jobs:
             --prerelease \
             --generate-notes \
             --target "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Comment on PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          else
+            PR_NUMBER=$(gh pr list --head "${GITHUB_REF_NAME}" --json number --jq '.[0].number')
+          fi
+          if [ -n "$PR_NUMBER" ]; then
+            DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${FULL_VERSION}/NAI-story-engine-v${FULL_VERSION}.naiscript"
+            BODY="**Pre-release build successful** — \`v${FULL_VERSION}\`
+
+          [Download NAI-story-engine-v${FULL_VERSION}.naiscript](${DOWNLOAD_URL})"
+            gh pr comment "$PR_NUMBER" --body "$BODY"
+          fi
