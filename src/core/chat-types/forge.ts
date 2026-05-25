@@ -4,6 +4,8 @@ import {
   FORGE_EXPAND_PROMPT,
   FORGE_WEAVE_PROMPT,
 } from "../utils/prompts";
+import { forgeChatContinueRequested } from "../store/effects/forge-chat-actions";
+import { messageAdded } from "../store/slices/chat";
 
 type ForgePhase = "sketch" | "expand" | "weave";
 
@@ -64,5 +66,23 @@ export const forgeSpec: ChatTypeSpec<ForgePhase> = {
           e.lastAffectingMessageId === message.id,
       )
       .map((e) => e.id);
+  },
+
+  handleSend(chat, content, ctx) {
+    const trimmed = content.trim();
+    if (trimmed.length === 0) {
+      ctx.dispatch(forgeChatContinueRequested({ chatId: chat.id }));
+      return true;
+    }
+    ctx.dispatch(
+      messageAdded({
+        chatId: chat.id,
+        message: { id: api.v1.uuid(), role: "user", content: trimmed },
+      }),
+    );
+    ctx.dispatch(
+      forgeChatContinueRequested({ chatId: chat.id, advancePhase: false }),
+    );
+    return true;
   },
 };

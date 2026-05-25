@@ -75,6 +75,13 @@ export function registerChatEffects(
       await api.v1.storyStorage.set(inputKey, "");
       api.v1.ui.updateParts([{ id: IDS.BRAINSTORM.INPUT, value: "" }]);
 
+      const chat = findChat(latest(), chatId);
+      if (!chat) return;
+      const spec = getChatTypeSpec(chat.type);
+      if (spec.handleSend?.(chat, text, { getState: latest, dispatch })) {
+        return;
+      }
+
       if (text.trim()) {
         dispatch(
           messageAdded({
@@ -83,8 +90,8 @@ export function registerChatEffects(
           }),
         );
       }
-      const chat = findChat(latest(), chatId);
-      if (!chat || chat.messages.at(-1)?.role !== "user") return;
+      const refreshed = findChat(latest(), chatId);
+      if (!refreshed || refreshed.messages.at(-1)?.role !== "user") return;
       const assistantId = api.v1.uuid();
       dispatch(
         messageAdded({
@@ -92,7 +99,7 @@ export function registerChatEffects(
           message: { id: assistantId, role: "assistant", content: "" },
         }),
       );
-      await submitChatGeneration(latest, dispatch, chat, assistantId);
+      await submitChatGeneration(latest, dispatch, refreshed, assistantId);
     },
   );
 

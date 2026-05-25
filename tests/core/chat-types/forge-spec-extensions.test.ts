@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { forgeSpec } from "../../../src/core/chat-types/forge";
 import type { Chat, ChatMessage, SpecCtx } from "../../../src/core/chat-types/types";
+import { forgeChatContinueRequested } from "../../../src/core/store/effects/forge-chat-effects";
+import { messageAdded } from "../../../src/core/store/slices/chat";
 import type { RootState, WorldEntity } from "../../../src/core/store/types";
 import { FieldID } from "../../../src/config/field-definitions";
 
@@ -77,5 +79,43 @@ describe("forgeSpec.inlineEntityIdsFor", () => {
       dispatch: vi.fn(),
     };
     expect(forgeSpec.inlineEntityIdsFor!(assistantMsg, chat(), ctx)).toEqual([]);
+  });
+});
+
+describe("forgeSpec.handleSend", () => {
+  it("empty content dispatches forgeChatContinueRequested with no advancePhase override", () => {
+    const dispatch = vi.fn();
+    const ctx: SpecCtx = {
+      getState: () => stateWith([]),
+      dispatch: dispatch as any,
+    };
+    const handled = forgeSpec.handleSend!(chat(), "   ", ctx);
+    expect(handled).toBe(true);
+    const call = dispatch.mock.calls.find(
+      ([a]) => a.type === forgeChatContinueRequested.type,
+    );
+    expect(call).toBeDefined();
+    expect(call![0].payload).toEqual({ chatId: "fc-1" });
+  });
+
+  it("non-empty content appends user message and dispatches advancePhase:false", () => {
+    const dispatch = vi.fn();
+    const ctx: SpecCtx = {
+      getState: () => stateWith([]),
+      dispatch: dispatch as any,
+    };
+    const handled = forgeSpec.handleSend!(chat(), "more about Vesper", ctx);
+    expect(handled).toBe(true);
+    const userCall = dispatch.mock.calls.find(
+      ([a]) => a.type === messageAdded.type,
+    );
+    expect(userCall).toBeDefined();
+    expect(userCall![0].payload.message.role).toBe("user");
+    expect(userCall![0].payload.message.content).toBe("more about Vesper");
+    const continueCall = dispatch.mock.calls.find(
+      ([a]) => a.type === forgeChatContinueRequested.type,
+    );
+    expect(continueCall).toBeDefined();
+    expect(continueCall![0].payload).toEqual({ chatId: "fc-1", advancePhase: false });
   });
 });

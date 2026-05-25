@@ -33,23 +33,17 @@ import {
 } from "../../utils/forge-chat-strategy";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Action creators (declared here — no slice owns them since the work is in the
-// effect itself).
+// Action creators — ForgeChatContinueRequested lives in forge-chat-actions.ts
+// (a cycle-free module) so that chat-types/forge.ts can import it without
+// pulling in forge-chat-strategy → context-builder → chat-types/index → forge.
+// Re-exported here for backward compatibility.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface ForgeChatContinueRequestedPayload {
-  chatId: string;
-  /** When false, keep the current phase. Defaults to true (advance per loop logic). */
-  advancePhase?: boolean;
-}
-const FORGE_CHAT_CONTINUE_REQUESTED = "forgeChat/continueRequested";
-export const forgeChatContinueRequested = (
-  payload: ForgeChatContinueRequestedPayload,
-) => ({
-  type: FORGE_CHAT_CONTINUE_REQUESTED as typeof FORGE_CHAT_CONTINUE_REQUESTED,
-  payload,
-});
-forgeChatContinueRequested.type = FORGE_CHAT_CONTINUE_REQUESTED;
+import {
+  forgeChatContinueRequested,
+  type ForgeChatContinueRequestedPayload,
+} from "./forge-chat-actions";
+export { forgeChatContinueRequested, type ForgeChatContinueRequestedPayload };
 
 export interface EntityDiscardRequestedPayload {
   entityId: string;
