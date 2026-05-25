@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- **Xialong mode now steers chat responses toward the correct voice.** Brainstorm (cowriter and critic) and summary chats were missing the `[ Style: ... ]` guidance block that every other generation strategy injects when Xialong mode is active, causing the model to unpredictably produce prose instead of chat-style responses. The style blocks existed in `XIALONG_STYLE` but were never wired into the chat generation path.
+- **Xialong mode now steers chat responses toward the correct voice.** Brainstorm (cowriter and critic) and summary chats were missing the `[ Style: ... ]` guidance block that every other generation strategy injects when Xialong mode is active, causing the model to unpredictably produce prose instead of chat-style responses. The style blocks are now wired into the chat generation path, lead with a `chat` descriptor to override the prose context, and a `----` separator is injected between the story prefix and chat content to signal the prose/non-prose boundary.
 
 ### Changed
 

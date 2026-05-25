@@ -3,7 +3,7 @@ import type { GenerationStrategy, RootState, AppDispatch } from "../store/types"
 import { getChatTypeSpec } from "../chat-types";
 import { getFieldStrategy } from "./field-strategy-registry";
 import { buildStoryEnginePrefix } from "./context-builder";
-import { appendXialongStyleMessage } from "./config";
+import { appendXialongStyleMessage, isXialongMode } from "./config";
 
 /**
  * Builds the GenerationStrategy for a chat-driven generation.
@@ -66,8 +66,12 @@ export function buildChatStrategy(
       const transcript: Message[] = chat.messages
         .filter((m) => m.id !== assistantMessageId)
         .map((m) => ({ role: m.role, content: m.content }));
-      const messages = [...prefix, system, ...transcript];
+      const messages = [...prefix];
       const styleBlock = spec.xialongStyleFor?.(chat, ctx);
+      if (styleBlock && (await isXialongMode())) {
+        messages.push({ role: "system", content: "----" });
+      }
+      messages.push(system, ...transcript);
       if (styleBlock) {
         await appendXialongStyleMessage(messages, styleBlock);
       }
