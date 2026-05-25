@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.2] - 2026-05-25
+
+### Fixed
+
+- **Xialong mode now steers chat responses toward the correct voice.** Brainstorm (cowriter and critic) and summary chats were missing the `[ Style: ... ]` guidance block that every other generation strategy injects when Xialong mode is active, causing the model to unpredictably produce prose instead of chat-style responses. The style blocks existed in `XIALONG_STYLE` but were never wired into the chat generation path.
+
+### Changed
+
+- **Pre-release workflow comments on the PR with a download link.** Successful dev builds now post a comment to the associated pull request with the version tag and a direct link to the `.naiscript` artifact.
+
 ## [0.12.1] - 2026-05-15
 
 ### Fixed
