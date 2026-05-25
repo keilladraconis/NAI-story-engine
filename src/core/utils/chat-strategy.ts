@@ -75,7 +75,10 @@ export async function buildChatStrategy(
       if (prefill) {
         messages.push({ role: "assistant", content: prefill });
       }
-      return { messages };
+      const params = xialong
+        ? { stop: ["</think>", "\n[ Style"] }
+        : undefined;
+      return { messages, params };
     },
     target: { type: "chat", chatId: chat.id, messageId: assistantMessageId },
     prefillBehavior: "trim",
