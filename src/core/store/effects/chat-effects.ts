@@ -39,11 +39,8 @@ async function submitChatGeneration(
 ): Promise<void> {
   let strategy;
   try {
-    strategy = buildChatStrategy(getState, chat, assistantId);
+    strategy = await buildChatStrategy(getState, chat, assistantId);
   } catch (error) {
-    // Surface strategy-build errors instead of leaving a stranded empty
-    // placeholder. Without this, an exception here just rejects the async
-    // effect and disappears as an unhandled promise rejection.
     api.v1.log(`[chat] failed to build strategy for ${chat.id}:`, error as Error);
     api.v1.ui.toast(`Could not start refine: ${(error as Error).message}`, {
       type: "error",

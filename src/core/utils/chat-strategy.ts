@@ -20,11 +20,11 @@ import { isXialongMode } from "./config";
  * (excluding the placeholder assistant message we are about to fill), and
  * an optional assistant prefill from the spec.
  */
-export function buildChatStrategy(
+export async function buildChatStrategy(
   getState: () => RootState,
   chat: Chat,
   assistantMessageId: string,
-): GenerationStrategy {
+): Promise<GenerationStrategy> {
   if (chat.type === "refine" && chat.refineTarget) {
     const factory = getFieldStrategy(chat.refineTarget.fieldId);
     const inner = factory(getState, {
@@ -47,17 +47,20 @@ export function buildChatStrategy(
     };
   }
 
-  // Saved-chat path. systemPromptFor / prefillFor on the current specs only
-  // read from `chat` (not from ctx), so a no-op dispatch is safe to pass.
-  // When a future spec actually dispatches inside these hooks, switch this
-  // callsite to thread the real dispatch through.
+  // Saved-chat path.
   const spec = getChatTypeSpec(chat.type);
   const noopDispatch: AppDispatch = () => {};
   const ctx = { getState, dispatch: noopDispatch };
+
+  const styleBlock = spec.xialongStyleFor?.(chat, ctx);
+  const xialong = styleBlock ? await isXialongMode() : false;
+  const prefill = xialong && styleBlock
+    ? styleBlock
+    : spec.prefillFor?.(chat, ctx);
+
   return {
     requestId: `chat-${chat.id}-${assistantMessageId}`,
     messageFactory: async () => {
-      // excludeChat: we'll inject the chat's own transcript below
       const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true });
       const system: Message = {
         role: "system",
@@ -67,17 +70,12 @@ export function buildChatStrategy(
         .filter((m) => m.id !== assistantMessageId)
         .map((m) => ({ role: m.role, content: m.content }));
       const messages = [...prefix];
-      const styleBlock = spec.xialongStyleFor?.(chat, ctx);
-      const xialong = styleBlock ? await isXialongMode() : false;
-      const separator = xialong && styleBlock
-        ? `----\n${styleBlock}`
-        : "----";
-      messages.push({ role: "system", content: separator });
+      messages.push({ role: "system", content: "----" });
       messages.push(system, ...transcript);
       return { messages };
     },
     target: { type: "chat", chatId: chat.id, messageId: assistantMessageId },
     prefillBehavior: "trim",
-    assistantPrefill: spec.prefillFor?.(chat, ctx),
+    assistantPrefill: prefill,
   };
 }
