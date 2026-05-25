@@ -72,6 +72,9 @@ export async function buildChatStrategy(
       const messages = [...prefix];
       messages.push({ role: "system", content: "----" });
       messages.push(system, ...transcript);
+      if (prefill) {
+        messages.push({ role: "assistant", content: prefill });
+      }
       return { messages };
     },
     target: { type: "chat", chatId: chat.id, messageId: assistantMessageId },
