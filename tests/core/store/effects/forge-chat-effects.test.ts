@@ -197,6 +197,23 @@ describe("entityDiscardRequested effect", () => {
   });
 });
 
+describe("forgeChatContinueRequested with advancePhase: false", () => {
+  it("keeps the current phase and submits a forgeChat turn", async () => {
+    const chat = makeChat({ subMode: "expand" });
+    const draft = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
+    const state = makeState([chat], [draft]);
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatContinueRequested({ chatId: "fc-1", advancePhase: false }));
+    const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
+    expect(sub).toBeDefined();
+    expect(sub![0].payload.subMode).toBe("expand");
+    const submitted = dispatch.mock.calls.find(
+      ([a]) => a.type === "ui/generationSubmitted",
+    );
+    expect(submitted).toBeDefined();
+  });
+});
+
 describe("forgeChatNewSessionRequested effect", () => {
   it("creates a new forge-type chat and submits the first sketch turn", async () => {
     const state = makeState([]);

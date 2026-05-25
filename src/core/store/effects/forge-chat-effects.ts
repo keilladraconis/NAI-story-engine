@@ -39,6 +39,8 @@ import {
 
 export interface ForgeChatContinueRequestedPayload {
   chatId: string;
+  /** When false, keep the current phase. Defaults to true (advance per loop logic). */
+  advancePhase?: boolean;
 }
 const FORGE_CHAT_CONTINUE_REQUESTED = "forgeChat/continueRequested";
 export const forgeChatContinueRequested = (
@@ -122,7 +124,10 @@ export function registerForgeChatEffects(
       if (!chat) return;
 
       const pool = poolFor(state, chatId);
-      const target = pool.length === 0 ? "sketch" : nextPhase(chat.subMode);
+      const advance = action.payload.advancePhase !== false;
+      const target = !advance
+        ? (chat.subMode ?? "sketch")
+        : (pool.length === 0 ? "sketch" : nextPhase(chat.subMode));
       dispatch(subModeChanged({ id: chatId, subMode: target }));
 
       const assistantId = api.v1.uuid();
