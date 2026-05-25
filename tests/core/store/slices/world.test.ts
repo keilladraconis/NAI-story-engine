@@ -194,3 +194,44 @@ describe("worldSlice — lifecycle and sourceChatId", () => {
     expect(state.entitiesById["e2"].sourceChatId).toBeUndefined();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// lastAffectingMessageId field
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("WorldEntity.lastAffectingMessageId", () => {
+  it("entityForged accepts and stores lastAffectingMessageId", () => {
+    const entity: WorldEntity = {
+      id: "e1",
+      categoryId: FieldID.DramatisPersonae,
+      name: "Vesper",
+      summary: "Paranoid governess",
+      lifecycle: "draft",
+      lastAffectingMessageId: "m-a",
+    };
+    const state = reduce(makeState(), entityForged({ entity }));
+    expect(state.entitiesById["e1"].lastAffectingMessageId).toBe("m-a");
+  });
+
+  it("entitySummaryUpdated can update lastAffectingMessageId", () => {
+    const entity: WorldEntity = {
+      id: "e1",
+      categoryId: FieldID.DramatisPersonae,
+      name: "Vesper",
+      summary: "Paranoid governess",
+      lifecycle: "draft",
+      lastAffectingMessageId: "m-a",
+    };
+    const seeded = reduce(makeState(), entityForged({ entity }));
+    const next = reduce(
+      seeded,
+      entitySummaryUpdated({
+        entityId: "e1",
+        summary: "revised",
+        lastAffectingMessageId: "m-b",
+      } as any),
+    );
+    expect(next.entitiesById["e1"].summary).toBe("revised");
+    expect(next.entitiesById["e1"].lastAffectingMessageId).toBe("m-b");
+  });
+});

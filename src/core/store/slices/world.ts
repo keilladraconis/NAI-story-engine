@@ -37,7 +37,7 @@ export const worldSlice = createSlice({
 
     entitySummaryUpdated: (
       state,
-      payload: { entityId: string; summary: string },
+      payload: { entityId: string; summary: string; lastAffectingMessageId?: string },
     ) => {
       const entity = state.entitiesById[payload.entityId];
       if (!entity) return state;
@@ -45,7 +45,13 @@ export const worldSlice = createSlice({
         ...state,
         entitiesById: {
           ...state.entitiesById,
-          [payload.entityId]: { ...entity, summary: payload.summary },
+          [payload.entityId]: {
+            ...entity,
+            summary: payload.summary,
+            ...(payload.lastAffectingMessageId !== undefined
+              ? { lastAffectingMessageId: payload.lastAffectingMessageId }
+              : {}),
+          },
         },
       };
     },

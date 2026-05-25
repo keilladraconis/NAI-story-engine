@@ -163,6 +163,8 @@ export interface WorldEntity {
   summary: string; // SE-internal only — editable in SeEntityEditPane, never synced to lorebook
   lifecycle: EntityLifecycle; // "draft" = no lorebook entry yet; "live" = lorebook-bound
   sourceChatId?: string; // chat session that produced this entity
+  /** Id of the assistant message that most recently created or revised this entity. Set by the forge-chat completion handler; never cleared. Used by chat-types to render inline cards under the originating turn. */
+  lastAffectingMessageId?: string;
 }
 
 export interface WorldState {
