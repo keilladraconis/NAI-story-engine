@@ -88,6 +88,16 @@ export interface ChatTypeSpec<SubMode extends string = string> {
 
   onCommit?(chat: Chat, ctx: SpecCtx): void;
   onDiscard?(chat: Chat, ctx: SpecCtx): void;
+
+  /**
+   * Returns ids of entities that should render inline beneath the given message.
+   * Called by `ChatPanel` once per message during rebuild. Default: no inline entities.
+   */
+  inlineEntityIdsFor?(
+    message: ChatMessage,
+    chat: Chat,
+    ctx: SpecCtx,
+  ): string[];
 }
 
 export type AnyChatTypeSpec = ChatTypeSpec<string>;

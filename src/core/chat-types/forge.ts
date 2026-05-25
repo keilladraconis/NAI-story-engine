@@ -52,4 +52,17 @@ export const forgeSpec: ChatTypeSpec<ForgePhase> = {
       { id: "sessions", kind: "sessionsButton" },
     ];
   },
+
+  inlineEntityIdsFor(message, chat, ctx) {
+    if (message.role !== "assistant") return [];
+    const state = ctx.getState();
+    return Object.values(state.world.entitiesById)
+      .filter(
+        (e) =>
+          e.sourceChatId === chat.id &&
+          e.lifecycle === "draft" &&
+          e.lastAffectingMessageId === message.id,
+      )
+      .map((e) => e.id);
+  },
 };
