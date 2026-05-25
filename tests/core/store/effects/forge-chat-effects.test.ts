@@ -4,6 +4,7 @@ import {
   forgeChatContinueRequested,
   entityDiscardRequested,
   forgeChatNewSessionRequested,
+  entityCastRequested,
 } from "../../../../src/core/store/effects/forge-chat-effects";
 import type { RootState, WorldEntity } from "../../../../src/core/store/types";
 import type { Chat } from "../../../../src/core/chat-types/types";
@@ -245,5 +246,22 @@ describe("forgeChatNewSessionRequested effect", () => {
       (m: { role: string }) => m.role === "user",
     );
     expect(userMsgs).toEqual([]);
+  });
+});
+
+describe("entityCastRequested effect", () => {
+  it("noops for live entities", async () => {
+    const live = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "live" });
+    const state = makeState([makeChat()], [live]);
+    const { dispatch, fire } = makeHarness(state);
+    await fire(entityCastRequested({ entityId: "d1" }));
+    expect(dispatch.mock.calls).toEqual([]);
+  });
+
+  it("noops for unknown entities", async () => {
+    const state = makeState([makeChat()], []);
+    const { dispatch, fire } = makeHarness(state);
+    await fire(entityCastRequested({ entityId: "nope" }));
+    expect(dispatch.mock.calls).toEqual([]);
   });
 });

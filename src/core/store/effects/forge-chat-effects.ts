@@ -25,8 +25,9 @@ import { chatCreated, subModeChanged, messageAdded } from "../slices/chat";
 import { requestQueued } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
 import { tombstoneAdded } from "../slices/forge";
-import { entityDeleted } from "../slices/world";
+import { entityDeleted, entityLorebookEntryBound } from "../slices/world";
 import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
+import { ensureCategory } from "./lorebook-sync";
 import {
   buildForgeChatStrategy,
   buildForgeCleanupStrategy,
@@ -56,6 +57,16 @@ export const entityDiscardRequested = (
   payload,
 });
 entityDiscardRequested.type = ENTITY_DISCARD_REQUESTED;
+
+export interface EntityCastRequestedPayload {
+  entityId: string;
+}
+const ENTITY_CAST_REQUESTED = "forgeChat/entityCastRequested";
+export const entityCastRequested = (payload: EntityCastRequestedPayload) => ({
+  type: ENTITY_CAST_REQUESTED as typeof ENTITY_CAST_REQUESTED,
+  payload,
+});
+entityCastRequested.type = ENTITY_CAST_REQUESTED;
 
 export interface ForgeChatNewSessionRequestedPayload {
   initialUserMessage?: string;
@@ -248,6 +259,44 @@ export function registerForgeChatEffects(
         }),
       );
       dispatch(generationSubmitted(strategy));
+    },
+  );
+
+  // ─── Cast (promote a single draft to live by binding a lorebook entry) ──────
+  subscribeEffect(
+    matchesAction(entityCastRequested),
+    async (action, { getState: latest }) => {
+      const { entityId } = action.payload;
+      const entity = latest().world.entitiesById[entityId];
+      if (!entity) return;
+      if (entity.lifecycle !== "draft") return;
+
+      const categoryId = await ensureCategory(entity.categoryId);
+      const allEntries = await api.v1.lorebook.entries();
+      const existing = allEntries.find(
+        (e) =>
+          (e.displayName ?? "").toLowerCase() === entity.name.toLowerCase() &&
+          !e.category,
+      );
+
+      let lorebookEntryId: string;
+      if (existing) {
+        lorebookEntryId = existing.id;
+        await api.v1.lorebook.updateEntry(lorebookEntryId, {
+          category: categoryId,
+        });
+      } else {
+        lorebookEntryId = await api.v1.lorebook.createEntry({
+          id: api.v1.uuid(),
+          displayName: entity.name,
+          text: "",
+          keys: [],
+          enabled: true,
+          category: categoryId,
+        });
+      }
+
+      dispatch(entityLorebookEntryBound({ entityId, lorebookEntryId }));
     },
   );
 }
