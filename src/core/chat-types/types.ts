@@ -72,6 +72,7 @@ export interface ChatTypeSpec<SubMode extends string = string> {
   initialize(seed: ChatSeed, ctx: SpecCtx): InitializeResult;
   systemPromptFor(chat: Chat, ctx: SpecCtx): string;
   prefillFor?(chat: Chat, ctx: SpecCtx): string | undefined;
+  xialongStyleFor?(chat: Chat, ctx: SpecCtx): string | undefined;
   contextSlice(chat: Chat, ctx: SpecCtx): ChatMessage[];
   headerControls(chat: Chat, ctx: SpecCtx): HeaderControl[];
 

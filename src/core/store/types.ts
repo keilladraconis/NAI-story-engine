@@ -117,6 +117,7 @@ export interface GenerationStrategy {
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };
+  minResponseLength?: number;
 }
 
 export interface RuntimeState {

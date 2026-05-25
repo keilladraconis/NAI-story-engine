@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.2] - 2026-05-25
+
+### Fixed
+
+- **Xialong mode now steers chat responses toward the correct voice.** Brainstorm (cowriter and critic) and summary chats were producing prose continuation instead of chat-style responses when story text was in context. The fix layers three mechanisms: a `----` separator between the story prefix and chat content signals the prose/non-prose boundary to both models; a `[ Style: chat, ... ]` token in the assistant prefill steers Xialong at the generation point (trimmed from output); and `</think>` / `\n[ Style` stop sequences prevent fallback into prose after the chat response. Empty `</think>` blocks (a stochastic Xialong behavior) trigger automatic retry up to 3 times.
+
+### Changed
+
+- **Pre-release workflow comments on the PR with a download link.** Successful dev builds now post a comment to the associated pull request with the version tag and a direct link to the `.naiscript` artifact.
+
 ## [0.12.1] - 2026-05-15
 
 ### Fixed

@@ -5,7 +5,7 @@ import type { RootState } from "../../../src/core/store/types";
 import { BRAINSTORM_PROMPT } from "../../../src/core/utils/prompts";
 
 describe("buildChatStrategy", () => {
-  it("returns a strategy with chat target type for a saved chat", () => {
+  it("returns a strategy with chat target type for a saved chat", async () => {
     const chat: Chat = {
       id: "c1",
       type: "brainstorm",
@@ -16,12 +16,12 @@ describe("buildChatStrategy", () => {
     };
     const getState = (() =>
       ({ chat: { chats: [chat], activeChatId: chat.id, refineChat: null } }) as unknown as RootState);
-    const strategy = buildChatStrategy(getState, chat, "asst-id");
+    const strategy = await buildChatStrategy(getState, chat, "asst-id");
     expect(strategy.target).toEqual({ type: "chat", chatId: chat.id, messageId: "asst-id" });
     expect(strategy.requestId).toContain(chat.id);
   });
 
-  it("returns a chatRefine target with refineContext applied for a refine chat", () => {
+  it("returns a chatRefine target with refineContext applied for a refine chat", async () => {
     const refine: Chat = {
       id: "r1",
       type: "refine",
@@ -32,7 +32,7 @@ describe("buildChatStrategy", () => {
     };
     const getState = (() =>
       ({ chat: { chats: [], activeChatId: null, refineChat: refine } }) as unknown as RootState);
-    const strategy = buildChatStrategy(getState, refine, "asst");
+    const strategy = await buildChatStrategy(getState, refine, "asst");
     expect(strategy.target).toEqual({
       type: "chatRefine",
       chatId: "r1",
@@ -65,18 +65,18 @@ describe("buildChatStrategy", () => {
           currentChatIndex: 0,
         },
       }) as unknown as RootState);
-    const strategy = buildChatStrategy(getState, chat, assistantId);
+    const strategy = await buildChatStrategy(getState, chat, assistantId);
     const built = await strategy.messageFactory!();
     const messages = built.messages;
     // System message from spec is present
-    expect(messages.some((m) => m.role === "system" && m.content === BRAINSTORM_PROMPT)).toBe(true);
+    expect(messages.some((m: Message) => m.role === "system" && m.content === BRAINSTORM_PROMPT)).toBe(true);
     // First user message survives
-    expect(messages.some((m) => m.role === "user" && m.content === "first user message")).toBe(true);
+    expect(messages.some((m: Message) => m.role === "user" && m.content === "first user message")).toBe(true);
     // The in-progress assistant placeholder is NOT in the assembled transcript
-    expect(messages.every((m) => !(m.role === "assistant" && m.content === ""))).toBe(true);
+    expect(messages.every((m: Message) => !(m.role === "assistant" && m.content === ""))).toBe(true);
   });
 
-  it("throws (or surfaces) when a refine targets a field with no registered strategy", () => {
+  it("throws (or surfaces) when a refine targets a field with no registered strategy", async () => {
     const refine: Chat = {
       id: "r2",
       type: "refine",
@@ -88,6 +88,6 @@ describe("buildChatStrategy", () => {
     const getState = (() =>
       ({ chat: { chats: [], activeChatId: null, refineChat: refine } }) as unknown as RootState);
     // getFieldStrategy throws when fieldId is unknown — this propagates.
-    expect(() => buildChatStrategy(getState, refine, "asst")).toThrow();
+    await expect(buildChatStrategy(getState, refine, "asst")).rejects.toThrow();
   });
 });
