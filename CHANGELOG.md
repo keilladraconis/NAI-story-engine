@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.3] - 2026-05-26
+
+### Fixed
+
+- **Refine now steers Xialong toward the correct voice.** When Xialong mode was active, refining a Foundation field (Style, Intent, ATTG, Contract) or lorebook entry produced story prose instead of the rewritten field. The same two-part fix applied to brainstorm in 0.12.2 now applies to the refine path: a `----` separator is inserted between the field-strategy context and the refine instructions to mark the prose/non-prose boundary, and a `[ Style: chat, editor, revise ]` assistant prefill (trimmed from output) primes Xialong at generation time. Lorebook content refine uses the existing `[ Style: editor, discerning, revise ]` block since its output is structured prose. The generation placeholder message is also filtered from the refine context to prevent an empty trailing assistant message from being sent to the API.
+
 ## [0.12.2] - 2026-05-25
 
 ### Fixed

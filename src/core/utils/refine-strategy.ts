@@ -12,6 +12,7 @@ import { REFINE_SYSTEM_PROMPT } from "./prompts";
  */
 export function buildRefineTail(refine: RefineContext): Message[] {
   const tail: Message[] = [
+    { role: "system", content: "----" },
     { role: "system", content: REFINE_SYSTEM_PROMPT },
     {
       role: "system",

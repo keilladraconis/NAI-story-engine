@@ -9,10 +9,12 @@ describe("buildRefineTail", () => {
     history,
   });
 
-  it("emits a system instruction first", () => {
+  it("emits a prose-boundary divider first, then the rewriting instruction", () => {
     const tail = buildRefineTail(ctx());
     expect(tail[0].role).toBe("system");
-    expect(tail[0].content).toMatch(/rewriting/i);
+    expect(tail[0].content).toBe("----");
+    expect(tail[1].role).toBe("system");
+    expect(tail[1].content).toMatch(/rewriting/i);
   });
 
   it("includes the current field text labelled as the refine target", () => {
@@ -31,7 +33,7 @@ describe("buildRefineTail", () => {
     ];
     const tail = buildRefineTail(ctx(history));
     const tailRoles = tail.map((m) => m.role);
-    expect(tailRoles).toEqual(["system", "system", "user", "assistant", "user"]);
+    expect(tailRoles).toEqual(["system", "system", "system", "user", "assistant", "user"]);
   });
 
   it("filters out system messages from history", () => {

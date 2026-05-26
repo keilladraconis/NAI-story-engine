@@ -507,6 +507,7 @@ export const XIALONG_STYLE = {
   lorebookContent: "[ Style: archivist, world-builder, detail-oriented, lore ]",
   lorebookKeys: "[ Style: analyst, precise, semantic-indexer ]",
   lorebookRefine: "[ Style: editor, discerning, revise ]",
+  refine: "[ Style: chat, editor, revise ]",
   attg: "[ Style: critic, genre-savvy, metadata ]",
   style: "[ Style: literary-critic, prose-analyst ]",
   brainstorm: "[ Style: chat, creative-partner, generative, direct ]",
