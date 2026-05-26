@@ -309,7 +309,7 @@ export class StoryEnginePlugin extends SuiPlugin {
       },
     );
 
-    store.subscribeEffect(matchesAction(chatCreated), (action: any) => {
+    store.subscribeEffect(matchesAction(chatCreated), (action) => {
       if (action.payload.chat.type === "forge") {
         void this._tabBar?.switchTo(0);
       }
@@ -317,7 +317,7 @@ export class StoryEnginePlugin extends SuiPlugin {
 
     store.subscribeEffect(
       matchesAction(chatSwitched),
-      (action: any, { getState }) => {
+      (action, { getState }) => {
         const chat = getState().chat.chats.find(
           (c) => c.id === action.payload.id,
         );
