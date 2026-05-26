@@ -6,6 +6,7 @@ import {
   forgeChatNewSessionRequested,
   entityCastRequested,
   forgeCastAllRequested,
+  forgeDiscardAllRequested,
 } from "../../../../src/core/store/effects/forge-chat-effects";
 import type { RootState, WorldEntity } from "../../../../src/core/store/types";
 import type { Chat } from "../../../../src/core/chat-types/types";
@@ -282,5 +283,44 @@ describe("forgeCastAllRequested effect", () => {
       .map(([a]) => (a.payload as { entityId: string }).entityId)
       .sort();
     expect(castIds).toEqual(["d1", "d2"]);
+  });
+});
+
+describe("forgeDiscardAllRequested effect", () => {
+  it("tombstones and deletes every draft, then runs one cleanup turn", async () => {
+    const chat = makeChat();
+    const d1 = makeEntity({ id: "d1", name: "Vesper", sourceChatId: "fc-1", lifecycle: "draft" });
+    const d2 = makeEntity({ id: "d2", name: "Hollow", sourceChatId: "fc-1", lifecycle: "draft" });
+    const state = makeState([chat], [d1, d2]);
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeDiscardAllRequested({ chatId: "fc-1" }));
+
+    const tombstones = dispatch.mock.calls.filter(
+      ([a]) => a.type === "forge/tombstoneAdded",
+    );
+    expect(tombstones).toHaveLength(2);
+    const deletes = dispatch.mock.calls.filter(
+      ([a]) => a.type === "world/entityDeleted",
+    );
+    expect(deletes).toHaveLength(2);
+    const cleanupTurns = dispatch.mock.calls.filter(
+      ([a]) =>
+        a.type === "ui/generationSubmitted" &&
+        (a.payload as { target: { type: string } }).target.type === "forgeCleanup",
+    );
+    expect(cleanupTurns).toHaveLength(1);
+  });
+
+  it("skips the cleanup turn when no drafts remain after deletion", async () => {
+    const chat = makeChat();
+    const state = makeState([chat], []);
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeDiscardAllRequested({ chatId: "fc-1" }));
+    const cleanupTurns = dispatch.mock.calls.filter(
+      ([a]) =>
+        a.type === "ui/generationSubmitted" &&
+        (a.payload as { target: { type: string } }).target.type === "forgeCleanup",
+    );
+    expect(cleanupTurns).toHaveLength(0);
   });
 });

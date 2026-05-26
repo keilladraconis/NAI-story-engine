@@ -78,6 +78,18 @@ export const forgeCastAllRequested = (payload: ForgeCastAllRequestedPayload) => 
 });
 forgeCastAllRequested.type = FORGE_CAST_ALL_REQUESTED;
 
+export interface ForgeDiscardAllRequestedPayload {
+  chatId: string;
+}
+const FORGE_DISCARD_ALL_REQUESTED = "forgeChat/discardAllRequested";
+export const forgeDiscardAllRequested = (
+  payload: ForgeDiscardAllRequestedPayload,
+) => ({
+  type: FORGE_DISCARD_ALL_REQUESTED as typeof FORGE_DISCARD_ALL_REQUESTED,
+  payload,
+});
+forgeDiscardAllRequested.type = FORGE_DISCARD_ALL_REQUESTED;
+
 export interface ForgeChatNewSessionRequestedPayload {
   initialUserMessage?: string;
 }
@@ -319,6 +331,63 @@ export function registerForgeChatEffects(
       for (const entity of drafts) {
         dispatch(entityCastRequested({ entityId: entity.id }));
       }
+    },
+  );
+
+  // ─── Discard All (tombstone + delete every draft, then one cleanup turn) ────
+  subscribeEffect(
+    matchesAction(forgeDiscardAllRequested),
+    async (action, { getState: latest }) => {
+      const { chatId } = action.payload;
+      const drafts = poolFor(latest(), chatId);
+      if (drafts.length === 0) return;
+
+      const names: string[] = [];
+      for (const entity of drafts) {
+        dispatch(
+          tombstoneAdded({
+            chatId,
+            tombstone: {
+              name: entity.name,
+              category: FIELD_LABEL[entity.categoryId] ?? "Entity",
+              reason: "user",
+            },
+          }),
+        );
+        dispatch(entityDeleted({ entityId: entity.id }));
+        names.push(entity.name);
+      }
+
+      const chat = findChat(latest(), chatId);
+      if (!chat) return;
+
+      const assistantId = api.v1.uuid();
+      dispatch(
+        messageAdded({
+          chatId,
+          message: {
+            id: assistantId,
+            role: "assistant",
+            content: "",
+            messageKind: "cleanup",
+          },
+        }),
+      );
+
+      const strategy = buildForgeCleanupStrategy(
+        latest,
+        chat,
+        assistantId,
+        names.join(", "),
+      );
+      dispatch(
+        requestQueued({
+          id: strategy.requestId,
+          type: "forgeCleanup",
+          targetId: assistantId,
+        }),
+      );
+      dispatch(generationSubmitted(strategy));
     },
   );
 }
