@@ -4,6 +4,7 @@ import {
   entityForged,
   entityDeleted,
   entitySummaryUpdated,
+  entityLorebookEntryBound,
   entityBound,
   entityUnbound,
   groupCreated,
@@ -147,6 +148,49 @@ describe("entityBound", () => {
     const bound = { ...ENTITY, lorebookEntryId: "lb1" };
     const state = reduce(makeState(), entityBound({ entity: bound }));
     expect(state.entitiesById["e1"].lorebookEntryId).toBe("lb1");
+  });
+});
+
+describe("entityLorebookEntryBound", () => {
+  it("attaches the lorebook entry id to the entity", () => {
+    const draft: WorldEntity = { ...ENTITY, lifecycle: "draft" };
+    const state = reduce(
+      makeState({ entitiesById: { e1: draft }, entityIds: ["e1"] }),
+      entityLorebookEntryBound({ entityId: "e1", lorebookEntryId: "lb-new" }),
+    );
+    expect(state.entitiesById["e1"].lorebookEntryId).toBe("lb-new");
+  });
+
+  it("promotes a draft entity to live when binding", () => {
+    const draft: WorldEntity = { ...ENTITY, lifecycle: "draft" };
+    const state = reduce(
+      makeState({ entitiesById: { e1: draft }, entityIds: ["e1"] }),
+      entityLorebookEntryBound({ entityId: "e1", lorebookEntryId: "lb-new" }),
+    );
+    expect(state.entitiesById["e1"].lifecycle).toBe("live");
+  });
+
+  it("keeps a live entity live when re-bound", () => {
+    const live: WorldEntity = {
+      ...ENTITY,
+      lifecycle: "live",
+      lorebookEntryId: "lb-old",
+    };
+    const state = reduce(
+      makeState({ entitiesById: { e1: live }, entityIds: ["e1"] }),
+      entityLorebookEntryBound({ entityId: "e1", lorebookEntryId: "lb-new" }),
+    );
+    expect(state.entitiesById["e1"].lifecycle).toBe("live");
+    expect(state.entitiesById["e1"].lorebookEntryId).toBe("lb-new");
+  });
+
+  it("no-ops when the entity does not exist", () => {
+    const before = makeState();
+    const after = reduce(
+      before,
+      entityLorebookEntryBound({ entityId: "missing", lorebookEntryId: "lb-x" }),
+    );
+    expect(after).toBe(before);
   });
 });
 

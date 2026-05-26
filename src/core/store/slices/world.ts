@@ -91,7 +91,10 @@ export const worldSlice = createSlice({
     },
 
     // Attach a freshly-created lorebook entry to an existing draft entity,
-    // promoting it to "live" without touching other fields.
+    // promoting it to "live" without touching other fields. Setting
+    // lifecycle here means every caller (Cast, SeEntityEditPane Save,
+    // Generate Content/Keys) gets correct draft→live promotion without
+    // having to dispatch a second action.
     entityLorebookEntryBound: (
       state,
       payload: { entityId: string; lorebookEntryId: string },
@@ -105,6 +108,7 @@ export const worldSlice = createSlice({
           [payload.entityId]: {
             ...entity,
             lorebookEntryId: payload.lorebookEntryId,
+            lifecycle: "live",
           },
         },
       };
