@@ -13,7 +13,12 @@ import { store } from "../../core/store";
 import { getChatTypeSpec } from "../../core/chat-types";
 import { uiChatSummarizeRequested } from "../../core/store/slices/ui";
 import { subModeChanged, chatCreated, chatSwitched } from "../../core/store/slices/chat";
+import {
+  forgeCastAllRequested,
+  forgeDiscardAllRequested,
+} from "../../core/store/effects/forge-chat-effects";
 import { StoreWatcher } from "../store-watcher";
+import { SeConfirmButton } from "./SeConfirmButton";
 import type { Chat } from "../../core/chat-types/types";
 
 type Theme = { default: { self: { style: object } } };
@@ -181,6 +186,52 @@ export class ChatHeader extends SuiComponent<
           break;
         case "label":
           // Title is already shown at the start of the row; no extra label needed.
+          break;
+        case "phaseIndicator": {
+          const phase = (chat.subMode ?? "sketch").trim();
+          const phaseLabel =
+            phase.charAt(0).toUpperCase() + phase.slice(1);
+          built.push(
+            text({
+              id: `${this.id}-phase`,
+              text: `Phase: ${phaseLabel}`,
+              style: {
+                "font-size": "0.75em",
+                opacity: "0.6",
+                padding: "2px 8px",
+              },
+            }),
+          );
+          break;
+        }
+        case "castAllButton": {
+          const castAllBtn = new SeConfirmButton({
+            id: `${this.id}-cast-all`,
+            label: "Cast All",
+            confirmLabel: "Cast all drafts?",
+            style: { "font-size": "0.75em", padding: "2px 8px" },
+            onConfirm: async () => {
+              store.dispatch(forgeCastAllRequested({ chatId: chat.id }));
+            },
+          });
+          built.push(await castAllBtn.build());
+          break;
+        }
+        case "discardAllButton": {
+          const discardAllBtn = new SeConfirmButton({
+            id: `${this.id}-discard-all`,
+            label: "Discard All",
+            confirmLabel: "Discard all drafts?",
+            style: { "font-size": "0.75em", padding: "2px 8px" },
+            onConfirm: async () => {
+              store.dispatch(forgeDiscardAllRequested({ chatId: chat.id }));
+            },
+          });
+          built.push(await discardAllBtn.build());
+          break;
+        }
+        case "continueButton":
+          // Collapsed into empty Send. Plan 4 removes this kind.
           break;
         default:
           break;
