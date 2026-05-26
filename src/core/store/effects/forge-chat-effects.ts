@@ -68,6 +68,16 @@ export const entityCastRequested = (payload: EntityCastRequestedPayload) => ({
 });
 entityCastRequested.type = ENTITY_CAST_REQUESTED;
 
+export interface ForgeCastAllRequestedPayload {
+  chatId: string;
+}
+const FORGE_CAST_ALL_REQUESTED = "forgeChat/castAllRequested";
+export const forgeCastAllRequested = (payload: ForgeCastAllRequestedPayload) => ({
+  type: FORGE_CAST_ALL_REQUESTED as typeof FORGE_CAST_ALL_REQUESTED,
+  payload,
+});
+forgeCastAllRequested.type = FORGE_CAST_ALL_REQUESTED;
+
 export interface ForgeChatNewSessionRequestedPayload {
   initialUserMessage?: string;
 }
@@ -297,6 +307,18 @@ export function registerForgeChatEffects(
       }
 
       dispatch(entityLorebookEntryBound({ entityId, lorebookEntryId }));
+    },
+  );
+
+  // ─── Cast All (promote every draft in chat) ─────────────────────────────────
+  subscribeEffect(
+    matchesAction(forgeCastAllRequested),
+    async (action, { getState: latest }) => {
+      const { chatId } = action.payload;
+      const drafts = poolFor(latest(), chatId);
+      for (const entity of drafts) {
+        dispatch(entityCastRequested({ entityId: entity.id }));
+      }
     },
   );
 }

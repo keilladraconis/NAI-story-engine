@@ -5,6 +5,7 @@ import {
   entityDiscardRequested,
   forgeChatNewSessionRequested,
   entityCastRequested,
+  forgeCastAllRequested,
 } from "../../../../src/core/store/effects/forge-chat-effects";
 import type { RootState, WorldEntity } from "../../../../src/core/store/types";
 import type { Chat } from "../../../../src/core/chat-types/types";
@@ -263,5 +264,23 @@ describe("entityCastRequested effect", () => {
     const { dispatch, fire } = makeHarness(state);
     await fire(entityCastRequested({ entityId: "nope" }));
     expect(dispatch.mock.calls).toEqual([]);
+  });
+});
+
+describe("forgeCastAllRequested effect", () => {
+  it("dispatches entityCastRequested for every draft owned by the chat", async () => {
+    const chat = makeChat();
+    const d1 = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
+    const d2 = makeEntity({ id: "d2", sourceChatId: "fc-1", lifecycle: "draft" });
+    const live = makeEntity({ id: "L", sourceChatId: "fc-1", lifecycle: "live" });
+    const otherChat = makeEntity({ id: "X", sourceChatId: "fc-OTHER", lifecycle: "draft" });
+    const state = makeState([chat], [d1, d2, live, otherChat]);
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeCastAllRequested({ chatId: "fc-1" }));
+    const castIds = dispatch.mock.calls
+      .filter(([a]) => a.type === entityCastRequested.type)
+      .map(([a]) => (a.payload as { entityId: string }).entityId)
+      .sort();
+    expect(castIds).toEqual(["d1", "d2"]);
   });
 });
