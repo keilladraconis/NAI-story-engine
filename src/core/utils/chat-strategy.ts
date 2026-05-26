@@ -4,7 +4,6 @@ import { getChatTypeSpec } from "../chat-types";
 import { getFieldStrategy } from "./field-strategy-registry";
 import { buildStoryEnginePrefix } from "./context-builder";
 import { isXialongMode } from "./config";
-import { XIALONG_STYLE } from "./prompts";
 
 /**
  * Builds the GenerationStrategy for a chat-driven generation.
@@ -38,27 +37,9 @@ export async function buildChatStrategy(
     });
 
     const xialong = await isXialongMode();
-    const isLorebookField = chat.refineTarget.fieldId === "lorebookContent";
-    const xialongStyleBlock = xialong
-      ? (isLorebookField ? XIALONG_STYLE.lorebookRefine : XIALONG_STYLE.refine)
-      : undefined;
-
-    const messageFactory = xialongStyleBlock
-      ? async () => {
-          const result = await inner.messageFactory!();
-          return {
-            ...result,
-            messages: [
-              ...result.messages,
-              { role: "assistant" as const, content: xialongStyleBlock },
-            ],
-          };
-        }
-      : inner.messageFactory;
 
     return {
       ...inner,
-      messageFactory,
       requestId: `refine-${chat.id}-${assistantMessageId}`,
       target: {
         type: "chatRefine",
@@ -66,7 +47,6 @@ export async function buildChatStrategy(
         messageId: assistantMessageId,
         fieldId: chat.refineTarget.fieldId,
       },
-      assistantPrefill: xialongStyleBlock,
       prefillBehavior: "trim" as const,
       minResponseLength: xialong ? 40 : undefined,
     };
