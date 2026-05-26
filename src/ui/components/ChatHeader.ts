@@ -33,6 +33,10 @@ export type ChatHeaderOptions = {
 const MODE_ACTIVE_COWRITER = "rgba(80,200,120,0.25)";
 const MODE_ACTIVE_CRITIC = "rgba(255,100,100,0.25)";
 
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function modeButtonStyle(isActive: boolean, color: string): object {
   return {
     padding: "2px 8px",
@@ -100,6 +104,10 @@ export class ChatHeader extends SuiComponent<
           {
             id: critId,
             style: modeButtonStyle(subMode === "critic", MODE_ACTIVE_CRITIC),
+          },
+          {
+            id: `${this.id}-phase`,
+            text: `Phase: ${capitalize(subMode ?? "sketch")}`,
           },
         ]);
       },
@@ -189,12 +197,10 @@ export class ChatHeader extends SuiComponent<
           break;
         case "phaseIndicator": {
           const phase = (chat.subMode ?? "sketch").trim();
-          const phaseLabel =
-            phase.charAt(0).toUpperCase() + phase.slice(1);
           built.push(
             text({
               id: `${this.id}-phase`,
-              text: `Phase: ${phaseLabel}`,
+              text: `Phase: ${capitalize(phase)}`,
               style: {
                 "font-size": "0.75em",
                 opacity: "0.6",
