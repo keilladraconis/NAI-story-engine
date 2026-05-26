@@ -13,8 +13,11 @@ import type { RootState } from "../../core/store/types";
 import { ChatHeader } from "./ChatHeader";
 import { SeBrainstormInput } from "./SeBrainstormInput";
 import { SeMessage } from "./SeMessage";
+import { SeInlineEntityCard } from "./SeInlineEntityCard";
 import { RefineCommitBar } from "./RefineCommitBar";
 import type { Chat } from "../../core/chat-types/types";
+import { getChatTypeSpec } from "../../core/chat-types";
+import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 type Theme = { default: { self: { style: object } } };
 type State = Record<string, never>;
@@ -22,6 +25,7 @@ type State = Record<string, never>;
 export type ChatPanelOptions = {
   onRebuild: () => void;
   onOpenSessions: () => void;
+  editHost: EditPaneHost;
 } & SuiComponentOptions<Theme, State>;
 
 function visibleChat(state: RootState): Chat | null {
@@ -79,16 +83,32 @@ export class ChatPanel extends SuiComponent<
       return column({ id: this.id, content: [] });
     }
 
-    const messages = v.messages.slice().reverse();
-    const messageParts = await Promise.all(
-      messages.map((msg) =>
-        new SeMessage({
-          id: `se-bs-msg-${msg.id}`,
+    const spec = getChatTypeSpec(v.type);
+    const ctx = { getState: store.getState, dispatch: store.dispatch };
+
+    // Build each message with its inline entity cards appended. Layout is
+    // column-reverse so we build in source order then reverse the resulting
+    // group blocks.
+    const groupParts: UIPart[] = [];
+    for (const msg of v.messages) {
+      const msgPart = await new SeMessage({
+        id: `se-bs-msg-${msg.id}`,
+        chatId: v.id,
+        message: msg,
+      }).build();
+      groupParts.push(msgPart);
+      const inlineIds = spec.inlineEntityIdsFor?.(msg, v, ctx) ?? [];
+      for (const entityId of inlineIds) {
+        const cardPart = await new SeInlineEntityCard({
+          id: `se-inline-entity-${v.id}-${entityId}`,
+          entityId,
           chatId: v.id,
-          message: msg,
-        }).build(),
-      ),
-    );
+          editHost: this.options.editHost,
+        }).build();
+        groupParts.push(cardPart);
+      }
+    }
+    const messageParts = groupParts.reverse();
     const headerPart = await this._header.build();
     const inputPart = await this._input.build();
 

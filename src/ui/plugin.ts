@@ -194,6 +194,7 @@ export class StoryEnginePlugin extends SuiPlugin {
       onOpenSessions: () => {
         void openSeSessionsModal();
       },
+      editHost: this.editHost,
     });
 
     // ── Story Engine pane ───────────────────────────────────────────────────
