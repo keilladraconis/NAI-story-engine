@@ -10,7 +10,10 @@
 
 import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
-import { forgeRequested, forgeClearRequested } from "../../core/store/slices/world";
+import { forgeClearRequested } from "../../core/store/slices/world";
+import { chatSwitched } from "../../core/store/slices/chat";
+import { forgeChatNewSessionRequested } from "../../core/store/effects/forge-chat-effects";
+import { selectActiveForgeChatId } from "../../core/store/selectors/forge";
 import { IDS, STORAGE_KEYS } from "../../ui/framework/ids";
 import { SeGenerationButton } from "./SeGenerationButton";
 import { SeConfirmButton } from "./SeConfirmButton";
@@ -40,25 +43,31 @@ export class SeForgeSection extends SuiComponent<
     this._forgeBtn = new SeGenerationButton({
       id: FG.FORGE_BTN,
       label: "Forge",
-      onGenerate: () => {
-        store.dispatch(forgeRequested());
+      onGenerate: async () => {
+        const state = store.getState();
+        const activeId = selectActiveForgeChatId(state);
+        if (activeId) {
+          store.dispatch(chatSwitched({ id: activeId }));
+          return;
+        }
+        const guidance =
+          ((await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_GUIDANCE_UI)) as string) || "";
+        store.dispatch(
+          forgeChatNewSessionRequested({ initialUserMessage: guidance }),
+        );
       },
-      stateProjection: (s) => ({
-        loopActive: s.world.forgeLoopActive,
-        activeForgeId:
-          s.runtime.activeRequest?.type === "forge"
-            ? s.runtime.activeRequest.id
-            : undefined,
-      }),
-      requestIdFromProjection: (p) =>
-        (p as { loopActive: boolean; activeForgeId?: string }).activeForgeId,
-      isDisabledFromProjection: (p) => {
-        const { loopActive, activeForgeId } = p as {
-          loopActive: boolean;
-          activeForgeId?: string;
+      stateProjection: (s) => {
+        const t = s.runtime.activeRequest?.type;
+        return {
+          activeForgeId:
+            t === "forge" || t === "forgeChat" || t === "forgeCleanup"
+              ? s.runtime.activeRequest!.id
+              : undefined,
         };
-        return loopActive && !activeForgeId;
       },
+      requestIdFromProjection: (p) =>
+        (p as { activeForgeId?: string }).activeForgeId,
+      isDisabledFromProjection: () => false,
     });
 
     this._clearBtn = new SeConfirmButton({
