@@ -70,11 +70,21 @@ export class ChatPanel extends SuiComponent<
           id: v?.id,
           isRefine: !!s.chat.refineChat,
           msgIds: v?.messages.map((m) => m.id).join("|") ?? "",
+          draftIdHash: Object.values(s.world.entitiesById)
+            .filter(
+              (e) => e.sourceChatId === v?.id && e.lifecycle === "draft",
+            )
+            .map((e) => `${e.id}:${e.lastAffectingMessageId ?? ""}`)
+            .sort()
+            .join("|"),
         };
       },
       () => onRebuild(),
       (a, b) =>
-        a.id === b.id && a.isRefine === b.isRefine && a.msgIds === b.msgIds,
+        a.id === b.id &&
+        a.isRefine === b.isRefine &&
+        a.msgIds === b.msgIds &&
+        a.draftIdHash === b.draftIdHash,
     );
 
     const v = visibleChat(store.getState());
