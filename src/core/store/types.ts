@@ -116,7 +116,7 @@ export interface GenerationStrategy {
         type: "forgeCleanup";
         chatId: string;
         messageId: string;
-        discardedName: string;
+        discardedNames: string[];
       }
     | {
         type: "foundation";

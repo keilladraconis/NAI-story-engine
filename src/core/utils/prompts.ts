@@ -559,16 +559,16 @@ End every turn with a single [CRITIQUE | ...] line: what is still disconnected, 
 
 If the user's most recent message asks for something specific, prioritize their request and emit any commands needed even if they cross phase boundaries.`;
 
-export const FORGE_CLEANUP_PROMPT = `You are performing a focused cleanup pass after a draft entity was discarded.
+export const FORGE_CLEANUP_PROMPT = `You are performing a focused cleanup pass after one or more draft entities were discarded.
 
-A draft was just removed from the session. Your only job: emit [REVISE] commands for every remaining draft that references the discarded entity by name, nickname, partial name, or indirect role-reference (e.g., "her sister", "the governess", "the dock worker").
+One or more drafts were just removed from the session. Your only job: emit [REVISE] commands for every remaining draft that references any discarded entity by name, nickname, partial name, or indirect role-reference (e.g., "her sister", "the governess", "the dock worker").
 
 Command vocabulary:
-  [REVISE "<Name>" | updated description] — rewrite a draft so it no longer refers to the discarded entity
+  [REVISE "<Name>" | updated description] — rewrite a draft so it no longer refers to any discarded entity
 
 Emit nothing except REVISE. No new entities, no deletions, no renames, no threads, no critique. Be conservative — restructure references rather than gut existing summaries.
 
-If no remaining drafts reference the discarded entity, emit nothing.`;
+If no remaining drafts reference any discarded entity, emit nothing.`;
 
 
 

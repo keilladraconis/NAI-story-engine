@@ -232,7 +232,7 @@ export function registerForgeChatEffects(
         latest,
         chat,
         assistantId,
-        entity.name,
+        [entity.name],
       );
       dispatch(
         requestQueued({
@@ -378,7 +378,7 @@ export function registerForgeChatEffects(
         latest,
         chat,
         assistantId,
-        names.join(", "),
+        names,
       );
       dispatch(
         requestQueued({

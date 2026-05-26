@@ -15,14 +15,14 @@ describe("GenerationStrategy.target union", () => {
     }>();
   });
 
-  it("includes forgeCleanup target with chatId, messageId, discardedName", () => {
+  it("includes forgeCleanup target with chatId, messageId, discardedNames", () => {
     type T = GenerationStrategy["target"];
     type ForgeCleanup = Extract<T, { type: "forgeCleanup" }>;
     expectTypeOf<ForgeCleanup>().toEqualTypeOf<{
       type: "forgeCleanup";
       chatId: string;
       messageId: string;
-      discardedName: string;
+      discardedNames: string[];
     }>();
   });
 });

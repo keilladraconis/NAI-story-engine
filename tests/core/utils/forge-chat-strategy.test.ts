@@ -255,18 +255,18 @@ describe("buildForgeChatStrategy", () => {
 });
 
 describe("buildForgeCleanupStrategy", () => {
-  it("produces a strategy with forgeCleanup target carrying discardedName", () => {
+  it("produces a strategy with forgeCleanup target carrying discardedNames", () => {
     const chat: Chat = {
       id: "fc-1", type: "forge", title: "Forge", subMode: "sketch",
       messages: [], seed: { kind: "blank" },
     };
     const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", "Vesper");
+    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", ["Vesper"]);
     expect(strat.target).toEqual({
       type: "forgeCleanup",
       chatId: "fc-1",
       messageId: "asst-cleanup",
-      discardedName: "Vesper",
+      discardedNames: ["Vesper"],
     });
     expect(strat.requestId).toContain("fc-1");
   });
@@ -277,7 +277,7 @@ describe("buildForgeCleanupStrategy", () => {
       messages: [], seed: { kind: "blank" },
     };
     const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", "Vesper");
+    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", ["Vesper"]);
     const built = await strat.messageFactory!();
     expect(
       built.messages.some(
@@ -286,17 +286,40 @@ describe("buildForgeCleanupStrategy", () => {
     ).toBe(true);
   });
 
-  it("includes a user message naming the discarded entity", async () => {
+  it("includes a user message naming the discarded entity for a single discard", async () => {
     const chat: Chat = {
       id: "fc-1", type: "forge", title: "Forge", subMode: "sketch",
       messages: [], seed: { kind: "blank" },
     };
     const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", "Vesper");
+    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", ["Vesper"]);
     const built = await strat.messageFactory!();
     const userTurn = built.messages.find((m) => m.role === "user");
     expect(userTurn).toBeDefined();
-    expect(userTurn!.content).toContain("Vesper");
+    expect(userTurn!.content).toContain("Discarded entity:");
+    expect(userTurn!.content).toContain("\"Vesper\"");
+  });
+
+  it("pluralizes the user message when multiple entities were discarded", async () => {
+    const chat: Chat = {
+      id: "fc-1", type: "forge", title: "Forge", subMode: "sketch",
+      messages: [], seed: { kind: "blank" },
+    };
+    const getState = () => makeState();
+    const strat = buildForgeCleanupStrategy(
+      getState,
+      chat,
+      "asst-cleanup",
+      ["Vesper", "Hollow", "Echo"],
+    );
+    const built = await strat.messageFactory!();
+    const userTurn = built.messages.find((m) => m.role === "user");
+    expect(userTurn).toBeDefined();
+    expect(userTurn!.content).toContain("Discarded entities:");
+    expect(userTurn!.content).toContain("\"Vesper\"");
+    expect(userTurn!.content).toContain("\"Hollow\"");
+    expect(userTurn!.content).toContain("\"Echo\"");
+    expect(userTurn!.content).toContain("any of those entities");
   });
 
   it("uses a tight max_tokens budget (~400)", async () => {
@@ -305,7 +328,7 @@ describe("buildForgeCleanupStrategy", () => {
       messages: [], seed: { kind: "blank" },
     };
     const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", "Vesper");
+    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", ["Vesper"]);
     const built = await strat.messageFactory!();
     expect(built.params?.max_tokens).toBeLessThanOrEqual(512);
     expect(built.params?.max_tokens).toBeGreaterThanOrEqual(256);

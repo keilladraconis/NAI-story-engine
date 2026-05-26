@@ -17,7 +17,7 @@ type ForgeCleanupTarget = {
   type: "forgeCleanup";
   chatId: string;
   messageId: string;
-  discardedName: string;
+  discardedNames: string[];
 };
 
 function makeEntity(over: Partial<WorldEntity>): WorldEntity {
@@ -278,7 +278,7 @@ describe("forgeCleanupHandler.completion", () => {
       sourceChatId: "c1",
     });
     const ctx: CompletionContext<ForgeCleanupTarget> = {
-      target: { type: "forgeCleanup", chatId: "c1", messageId: "m-clean", discardedName: "Vesper" },
+      target: { type: "forgeCleanup", chatId: "c1", messageId: "m-clean", discardedNames: ["Vesper"] },
       getState: () => makeState([draft]),
       dispatch,
       accumulatedText: "[REVISE \"Marsh\" | dock worker, no family in the city]",
@@ -295,7 +295,7 @@ describe("forgeCleanupHandler.completion", () => {
   it("ignores non-REVISE commands (e.g., CREATE)", async () => {
     const dispatch = vi.fn();
     const ctx: CompletionContext<ForgeCleanupTarget> = {
-      target: { type: "forgeCleanup", chatId: "c1", messageId: "m-clean", discardedName: "Vesper" },
+      target: { type: "forgeCleanup", chatId: "c1", messageId: "m-clean", discardedNames: ["Vesper"] },
       getState: () => makeState(),
       dispatch,
       accumulatedText: "[CREATE CHARACTER \"Newbie\" | bad]",

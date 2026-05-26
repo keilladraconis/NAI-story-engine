@@ -203,7 +203,7 @@ export function buildForgeCleanupStrategy(
   getState: () => RootState,
   chat: Chat,
   assistantMessageId: string,
-  discardedName: string,
+  discardedNames: string[],
 ): GenerationStrategy {
   const factory = async () => {
     const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true });
@@ -218,7 +218,7 @@ export function buildForgeCleanupStrategy(
 
     const userInstruction: Message = {
       role: "user",
-      content: `Discarded entity: "${discardedName}". Emit REVISE commands for any draft in the pool that references "${discardedName}" — by name, nickname, partial name, or indirect role-reference. If no draft references it, emit nothing.`,
+      content: buildCleanupUserInstruction(discardedNames),
     };
 
     const messages: Message[] = [
@@ -245,9 +245,18 @@ export function buildForgeCleanupStrategy(
       type: "forgeCleanup",
       chatId: chat.id,
       messageId: assistantMessageId,
-      discardedName,
+      discardedNames,
     },
     prefillBehavior: "trim",
     assistantPrefill: "[",
   };
+}
+
+function buildCleanupUserInstruction(discardedNames: string[]): string {
+  if (discardedNames.length === 1) {
+    const name = discardedNames[0];
+    return `Discarded entity: "${name}". Emit REVISE commands for any draft in the pool that references "${name}" — by name, nickname, partial name, or indirect role-reference. If no draft references it, emit nothing.`;
+  }
+  const formattedList = discardedNames.map((n) => `"${n}"`).join(", ");
+  return `Discarded entities: ${formattedList}. Emit REVISE commands for any draft in the pool that references any of those entities — by name, nickname, partial name, or indirect role-reference. If none reference them, emit nothing.`;
 }
