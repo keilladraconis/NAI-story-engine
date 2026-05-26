@@ -33,6 +33,7 @@ import {
   migrateLorebookCategories,
   registerLorebookSyncHooks,
 } from "../core/store/effects/lorebook-sync";
+import { selectActiveForgeChatId } from "../core/store/selectors/forge";
 import { migrateBrainstormToChat } from "../core/store/migrations/brainstorm-to-chat";
 import { stateUpdated, requestActivated } from "../core/store/slices/runtime";
 import { IDS, STORAGE_KEYS } from "./framework/ids";
@@ -304,6 +305,35 @@ export class StoryEnginePlugin extends SuiPlugin {
           preRefineTab = null;
         }
         lastRefineId = id;
+      },
+    );
+
+    let lastForgeChatId: string | null = null;
+    store.subscribeSelector(
+      (state) => state.chat.activeChatId,
+      (activeId) => {
+        if (!activeId) return;
+        const state = store.getState();
+        const chat = state.chat.chats.find((c) => c.id === activeId);
+        if (chat?.type !== "forge") return;
+        if (lastForgeChatId === activeId) return;
+        lastForgeChatId = activeId;
+        void this._tabBar?.switchTo(0);
+      },
+    );
+
+    // Also switch when forgeChatNewSessionRequested creates a new chat —
+    // the activeChatId change above covers this, but only fires if the new
+    // chat is different from the prior active. selectActiveForgeChatId acts
+    // as a fallback for the first session.
+    let lastSelectedForgeId = selectActiveForgeChatId(store.getState()) ?? null;
+    store.subscribeSelector(
+      (state) => selectActiveForgeChatId(state),
+      (id) => {
+        if (id && id !== lastSelectedForgeId) {
+          lastSelectedForgeId = id;
+          void this._tabBar?.switchTo(0);
+        }
       },
     );
   }
