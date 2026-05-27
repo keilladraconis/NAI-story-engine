@@ -97,6 +97,15 @@ export function stripThinkingTags(text: string): string {
   return text.replace(/<\/?think>/g, "").replace(/<think>[\s\S]*$/g, "");
 }
 
+/** Strip `[ Style: ... ]` wrapper that Xialong emits around style output. */
+export function stripStyleBrackets(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("[ Style:") && trimmed.endsWith("]")) {
+    return trimmed.slice(trimmed.indexOf(":") + 1, -1).trim();
+  }
+  return text;
+}
+
 /** Split text into sections by `===` separator, trimmed and non-empty. */
 export function splitSections(text: string, sep = "+++"): string[] {
   return text
