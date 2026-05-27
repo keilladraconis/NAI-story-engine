@@ -1,7 +1,7 @@
 import type { Chat } from "../chat-types/types";
 import type { GenerationStrategy, RootState, AppDispatch } from "../store/types";
 import { getChatTypeSpec } from "../chat-types";
-import { buildStoryEnginePrefix, type StoryEnginePrefixOptions } from "./context-builder";
+import { buildStoryEnginePrefix, buildXialongNarrativeStyleBlock, type StoryEnginePrefixOptions } from "./context-builder";
 import { isXialongMode, buildModelParams } from "./config";
 import { buildRefineTail } from "./refine-strategy";
 import { XIALONG_STYLE } from "./prompts";
@@ -10,7 +10,6 @@ import { isDulfsField } from "../../config/field-definitions";
 // Returns the XIALONG_STYLE entry that governs Xialong output for a given
 // refine field — the same analytical mode the field uses for generation.
 function xialongStyleForRefine(fieldId: string): string {
-  if (fieldId === "style") return XIALONG_STYLE.style;
   if (fieldId === "attg") return XIALONG_STYLE.attg;
   if (fieldId === "intent") return XIALONG_STYLE.foundationIntent;
   if (fieldId === "contract") return XIALONG_STYLE.foundationContract;
@@ -51,7 +50,14 @@ export async function buildChatStrategy(
     const { fieldId, originalText } = chat.refineTarget;
     const filteredHistory = chat.messages.filter((m) => m.id !== assistantMessageId);
     const xialong = await isXialongMode();
-    const prefill = xialong ? xialongStyleForRefine(fieldId) : undefined;
+    // Style field: use the same narrative style block as generation
+    // (threshold-crossing, psychological, etc.) so Xialong produces a
+    // style description rather than literary criticism.
+    const prefill = xialong
+      ? fieldId === "style"
+        ? buildXialongNarrativeStyleBlock(getState())
+        : xialongStyleForRefine(fieldId)
+      : undefined;
     const excludeSections = excludeSectionsForRefine(fieldId);
 
     return {
