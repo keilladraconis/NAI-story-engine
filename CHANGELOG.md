@@ -2,11 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.12.3] - 2026-05-26
+## [0.12.3] - 2026-05-27
 
 ### Fixed
 
-- **Refine no longer produces story prose under Xialong mode.** When Xialong was active, refining a Foundation field (Style, Intent, ATTG, Contract) or lorebook entry would write prose continuation instead of the rewritten field. The fix mirrors what makes brainstorm work: the refine context is built from scratch using `buildStoryEnginePrefix` (pure story context, no generation directives) + `buildRefineTail` (divider, rewrite instructions, target snapshot, history); the field being refined is excluded from the prefix context so it does not appear twice (once as a style anchor above `----`, once as the refine target below it); `[ Style: chat, direct ]` is used as the Xialong assistant prefill (the same `chat` mode that brainstorm uses to avoid prose mode); and `REFINE_SYSTEM_PROMPT` is expanded to include explicit anti-patterns (no `EDITOR:` prefix, no preamble) with BAD/GOOD examples matching the structure of `BRAINSTORM_PROMPT`; for the Style field, `buildXialongNarrativeStyleBlock` is appended as a USER message at the end of the messages array (e.g. `[ Style: threshold-crossing, psychological, sardonic ]`), exactly mirroring how style generation steers Xialong — producing a direct style description rather than explanation or analysis; and a `STYLE_REFINE_PROMPT` injected between the system instructions and the refine target carries the same format constraints as generation (two-author tonal anchor, concrete voice description, ~100 words, no markdown, modify only what the instruction requires) so refinements stay iterative and structurally consistent with the original.
+- **Refine chats always use GLM regardless of Xialong mode.** Xialong's creative fine-tuning causes it to ignore rewrite instructions — producing story prose, lorebook entries, or `[ Style: ]`-wrapped metadata instead of the requested field rewrite. GLM handles instruction-following rewrites reliably, and the Xialong-generated baseline from the original generation step already provides the creative starting point. The refine path now hardcodes GLM via a new `buildGlmParams` helper; Xialong mode only governs story generation and brainstorm chats.
+- **Refine context strips `[ Style: ]` bracket wrapping.** If the model wraps its output in `[ Style: ... ]` brackets, the completion handler now strips the wrapper and stores only the inner content. Harmless no-op for GLM, safety net for future model changes.
 - **Empty story text block is no longer injected into context.** When no prose had been written, the story context contained a bare `***` separator message. The context builder now filters out messages whose content is only `***`, so the `[STORY TEXT]` block is omitted entirely when no prose exists.
 
 ## [0.12.2] - 2026-05-25

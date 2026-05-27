@@ -60,9 +60,15 @@ export async function buildModelParams(
 }
 
 /**
- * Append a Xialong style guidance message immediately before the assistant
- * prefill. Only adds the message when Xialong Mode is active.
+ * Build GLM generation params. Always uses glm-4-6 regardless of Xialong mode
+ * — used for instruction-following tasks (e.g. refine) where Xialong's creative
+ * bias works against accurate rewrites.
  */
+export async function buildGlmParams(
+  base: Omit<GenerationParams, "model">,
+): Promise<GenerationParams> {
+  return { model: GLM_MODEL, ...base };
+}
 export async function appendXialongStyleMessage(
   messages: Message[],
   styleBlock: string,
