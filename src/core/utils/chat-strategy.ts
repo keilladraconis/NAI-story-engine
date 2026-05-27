@@ -38,13 +38,6 @@ export async function buildChatStrategy(
     const filteredHistory = chat.messages.filter((m) => m.id !== assistantMessageId);
     const xialong = await isXialongMode();
     const excludeSections = excludeSectionsForRefine(fieldId);
-    // Xialong style refine: anchor output to match generation format exactly.
-    // "Write in a style that conveys the following:" is the literal opening of
-    // every STYLE_GENERATE_PROMPT example output, so this prefill steers Xialong
-    // into style-description mode without the explication nudge of "Style description:".
-    const prefill = xialong && fieldId === "style"
-      ? "Write in a style that conveys the following:"
-      : undefined;
 
     return {
       requestId: `refine-${chat.id}-${assistantMessageId}`,
@@ -55,16 +48,13 @@ export async function buildChatStrategy(
           currentText: originalText,
           history: filteredHistory,
         });
-        if (prefill) {
-          messages.push({ role: "assistant", content: prefill });
-        }
         return {
           messages,
           params: await buildModelParams({
             max_tokens: 400,
             temperature: 0.7,
             min_p: 0.05,
-            stop: ["</think>", "\n***", "\n---", "---", "\n[ S", "\n[ Style"],
+            stop: ["</think>", "\n***", "\n---", "---", "\n[ S", "\n[ Style", "[ Style:"],
           }),
         };
       },
@@ -75,7 +65,6 @@ export async function buildChatStrategy(
         fieldId,
       },
       prefillBehavior: "trim" as const,
-      assistantPrefill: prefill,
       minResponseLength: xialong ? 40 : undefined,
     };
   }

@@ -105,10 +105,12 @@ GOOD: Jeff VanderMeer's surreal...
 Preserve any required template structure (field labels, line format) unless the user asks otherwise.`;
 
 export const STYLE_REFINE_PROMPT = `Style field format — keep these constraints:
-- Preserve the two-author tonal anchor (keep the existing authors unless the instruction changes them)
+- Begin with the two-author tonal anchor: "[Author]'s [quality] meets [Author]'s [quality] —"
+- Keep the existing authors unless the instruction explicitly changes them
 - Describe the resulting voice in concrete terms: sentence rhythm, use of interiority, how prose handles emotion
+- Descriptive, not prescriptive — describe the voice as it IS, never what it "should" do
 - Modify only what the instruction requires; keep other elements intact
-- ~100 words, no markdown bolding`;
+- ~100 words, no markdown bolding, no [ Style: ] brackets`;
 
 
 export const LOREBOOK_GENERATE_PROMPT = `You are the **Archivist**.
