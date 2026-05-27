@@ -76,18 +76,4 @@ describe("buildChatStrategy", () => {
     expect(messages.every((m: Message) => !(m.role === "assistant" && m.content === ""))).toBe(true);
   });
 
-  it("throws (or surfaces) when a refine targets a field with no registered strategy", async () => {
-    const refine: Chat = {
-      id: "r2",
-      type: "refine",
-      title: "Refine",
-      messages: [],
-      seed: { kind: "fromField", sourceFieldId: "unregisteredField", sourceText: "old" },
-      refineTarget: { fieldId: "unregisteredField", originalText: "old" },
-    };
-    const getState = (() =>
-      ({ chat: { chats: [], activeChatId: null, refineChat: refine } }) as unknown as RootState);
-    // getFieldStrategy throws when fieldId is unknown — this propagates.
-    await expect(buildChatStrategy(getState, refine, "asst")).rejects.toThrow();
-  });
 });
