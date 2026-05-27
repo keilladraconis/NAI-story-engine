@@ -182,8 +182,8 @@ describe("stripStyleBrackets", () => {
     expect(stripStyleBrackets(input)).toBe("inner content");
   });
 
-  it("does not strip partial matches (no closing bracket)", () => {
+  it("handles missing closing bracket (stop sequence stripped it)", () => {
     const input = "[ Style: no closing bracket";
-    expect(stripStyleBrackets(input)).toBe(input);
+    expect(stripStyleBrackets(input)).toBe("no closing bracket");
   });
 });
