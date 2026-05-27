@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- **Refine no longer produces story prose under Xialong mode.** When Xialong was active, refining a Foundation field (Style, Intent, ATTG, Contract) or lorebook entry would write prose continuation instead of the rewritten field. The fix mirrors the `----` separator introduced for brainstorm in 0.12.2: a divider is inserted at the start of the refine tail to mark the prose/non-prose boundary before `REFINE_SYSTEM_PROMPT` and the target snapshot, giving Xialong a clean context break and letting the explicit "Output ONLY the rewritten field text" instruction take effect. The generation placeholder message is also filtered from the refine context to prevent a spurious empty assistant message from being sent to the API.
+- **Refine no longer produces story prose under Xialong mode.** When Xialong was active, refining a Foundation field (Style, Intent, ATTG, Contract) or lorebook entry would write prose continuation instead of the rewritten field. Two fixes applied: (1) `buildRefineTail` now opens with a `----` system message to mark the prose/non-prose boundary before `REFINE_SYSTEM_PROMPT` and the target snapshot; (2) in Xialong mode the `[USER] [ Style: ... ]` anchor that field factories append via `appendXialongStyleMessage` is stripped from the combined message array — without this, that USER message sat immediately above `----` and acted as a prose generation directive that overrode the rewrite instructions. The generation placeholder message is also filtered from the refine context to prevent a spurious empty assistant message from being sent to the API.
 
 ## [0.12.2] - 2026-05-25
 

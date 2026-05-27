@@ -38,8 +38,28 @@ export async function buildChatStrategy(
 
     const xialong = await isXialongMode();
 
+    // In Xialong mode, field factories append a [USER] style anchor via
+    // appendXialongStyleMessage immediately before the ---- divider that
+    // buildRefineTail inserts. That USER message acts as a prose directive
+    // that overrides the rewrite instructions. Strip it so the ---- divider
+    // cleanly separates field context from the refine prompt.
+    const messageFactory = xialong
+      ? async () => {
+          const result = await inner.messageFactory!();
+          const messages = [...result.messages];
+          const dividerIdx = messages.findIndex(
+            (m) => m.role === "system" && m.content === "----",
+          );
+          if (dividerIdx > 0 && messages[dividerIdx - 1].role === "user") {
+            messages.splice(dividerIdx - 1, 1);
+          }
+          return { ...result, messages };
+        }
+      : inner.messageFactory;
+
     return {
       ...inner,
+      messageFactory,
       requestId: `refine-${chat.id}-${assistantMessageId}`,
       target: {
         type: "chatRefine",
