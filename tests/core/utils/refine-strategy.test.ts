@@ -14,7 +14,7 @@ describe("buildRefineTail", () => {
     const dividerIdx = messages.findIndex((m) => m.role === "system" && m.content === "----");
     expect(dividerIdx).toBeGreaterThanOrEqual(0);
     expect(messages[dividerIdx + 1].role).toBe("system");
-    expect(messages[dividerIdx + 1].content).toMatch(/rewriting/i);
+    expect(messages[dividerIdx + 1].content).toMatch(/rewrite/i);
   });
 
   it("includes the current field text labelled as the refine target", () => {

@@ -94,7 +94,15 @@ If something was proposed then revised, write only the final version. If nothing
 
 export const STORY_TEXT_SUMMARIZE_PROMPT = `Read the story text below and produce dense declarative present-tense notes capturing setting, characters, situations, and unresolved tensions. Output the notes only — no preamble, no headers.`;
 
-export const REFINE_SYSTEM_PROMPT = `You are rewriting a Story Engine field per the user's instructions. Preserve any required template structure unless the user asks otherwise. Output ONLY the rewritten field text — no preamble, no headers, no commentary.`;
+export const REFINE_SYSTEM_PROMPT = `You are a field editor. Rewrite the REFINE TARGET below per the user's instructions.
+
+Output the rewritten text immediately — no EDITOR: prefix, no "Here is the revised text:", no explanation before or after. Start with the first word of the rewritten content itself.
+
+BAD: EDITOR: I've updated the style to include more sensory detail...
+BAD: Here is the revised style guideline: Jeff VanderMeer's...
+GOOD: Jeff VanderMeer's surreal...
+
+Preserve any required template structure (field labels, line format) unless the user asks otherwise.`;
 
 
 export const LOREBOOK_GENERATE_PROMPT = `You are the **Archivist**.
@@ -507,6 +515,7 @@ export const XIALONG_STYLE = {
   lorebookContent: "[ Style: archivist, world-builder, detail-oriented, lore ]",
   lorebookKeys: "[ Style: analyst, precise, semantic-indexer ]",
   lorebookRefine: "[ Style: editor, discerning, revise ]",
+  refine: "[ Style: chat, direct ]",
   attg: "[ Style: critic, genre-savvy, metadata ]",
   style: "[ Style: literary-critic, prose-analyst ]",
   brainstorm: "[ Style: chat, creative-partner, generative, direct ]",

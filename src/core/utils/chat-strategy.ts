@@ -1,25 +1,13 @@
 import type { Chat } from "../chat-types/types";
 import type { GenerationStrategy, RootState, AppDispatch } from "../store/types";
 import { getChatTypeSpec } from "../chat-types";
-import { buildStoryEnginePrefix, buildXialongNarrativeStyleBlock, type StoryEnginePrefixOptions } from "./context-builder";
+import { buildStoryEnginePrefix, type StoryEnginePrefixOptions } from "./context-builder";
 import { isXialongMode, buildModelParams } from "./config";
 import { buildRefineTail } from "./refine-strategy";
 import { XIALONG_STYLE } from "./prompts";
-import { isDulfsField } from "../../config/field-definitions";
-
-// Returns the XIALONG_STYLE entry that governs Xialong output for a given
-// refine field — the same analytical mode the field uses for generation.
-function xialongStyleForRefine(fieldId: string): string {
-  if (fieldId === "attg") return XIALONG_STYLE.attg;
-  if (fieldId === "intent") return XIALONG_STYLE.foundationIntent;
-  if (fieldId === "contract") return XIALONG_STYLE.foundationContract;
-  if (isDulfsField(fieldId)) return XIALONG_STYLE.lorebookRefine;
-  return XIALONG_STYLE.lorebookRefine;
-}
 
 // Returns sections to omit from buildStoryEnginePrefix so the field being
-// refined is not present in context above ----, avoiding double-injection
-// and the prose-mode signals that come from analytical style text.
+// refined is not present in context above ----, avoiding double-injection.
 function excludeSectionsForRefine(fieldId: string): StoryEnginePrefixOptions["excludeSections"] {
   if (fieldId === "style") return ["style"];
   if (fieldId === "attg") return ["attg"];
@@ -50,14 +38,7 @@ export async function buildChatStrategy(
     const { fieldId, originalText } = chat.refineTarget;
     const filteredHistory = chat.messages.filter((m) => m.id !== assistantMessageId);
     const xialong = await isXialongMode();
-    // Style field: use the same narrative style block as generation
-    // (threshold-crossing, psychological, etc.) so Xialong produces a
-    // style description rather than literary criticism.
-    const prefill = xialong
-      ? fieldId === "style"
-        ? buildXialongNarrativeStyleBlock(getState())
-        : xialongStyleForRefine(fieldId)
-      : undefined;
+    const prefill = xialong ? XIALONG_STYLE.refine : undefined;
     const excludeSections = excludeSectionsForRefine(fieldId);
 
     return {
