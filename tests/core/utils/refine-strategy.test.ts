@@ -10,16 +10,16 @@ describe("buildRefineTail", () => {
   });
 
   it("emits a prose-boundary divider first, then the rewriting instruction", () => {
-    const tail = buildRefineTail(ctx());
-    expect(tail[0].role).toBe("system");
-    expect(tail[0].content).toBe("----");
-    expect(tail[1].role).toBe("system");
-    expect(tail[1].content).toMatch(/rewriting/i);
+    const messages = buildRefineTail([], ctx());
+    const dividerIdx = messages.findIndex((m) => m.role === "system" && m.content === "----");
+    expect(dividerIdx).toBeGreaterThanOrEqual(0);
+    expect(messages[dividerIdx + 1].role).toBe("system");
+    expect(messages[dividerIdx + 1].content).toMatch(/rewriting/i);
   });
 
   it("includes the current field text labelled as the refine target", () => {
-    const tail = buildRefineTail(ctx());
-    const sys = tail.find(
+    const messages = buildRefineTail([], ctx());
+    const sys = messages.find(
       (m) => m.role === "system" && m.content?.includes("current value"),
     );
     expect(sys).toBeDefined();
@@ -31,15 +31,45 @@ describe("buildRefineTail", () => {
       { id: "a1", role: "assistant" as const, content: "tightened" },
       { id: "u2", role: "user" as const, content: "shorter" },
     ];
-    const tail = buildRefineTail(ctx(history));
-    const tailRoles = tail.map((m) => m.role);
-    expect(tailRoles).toEqual(["system", "system", "system", "user", "assistant", "user"]);
+    const messages = buildRefineTail([], ctx(history));
+    const roles = messages.map((m) => m.role);
+    expect(roles).toEqual(["system", "system", "system", "user", "assistant", "user"]);
   });
 
   it("filters out system messages from history", () => {
-    const tail = buildRefineTail(
+    const messages = buildRefineTail(
+      [],
       ctx([{ id: "s1", role: "system" as const, content: "ignore me" }]),
     );
-    expect(tail.find((m) => m.content === "ignore me")).toBeUndefined();
+    expect(messages.find((m) => m.content === "ignore me")).toBeUndefined();
+  });
+
+  it("preserves base messages that are not a trailing [ Style: ] user anchor", () => {
+    const base: Message[] = [
+      { role: "system", content: "system-context" },
+      { role: "system", content: "field-prompt" },
+    ];
+    const messages = buildRefineTail(base, ctx());
+    expect(messages[0]).toEqual({ role: "system", content: "system-context" });
+    expect(messages[1]).toEqual({ role: "system", content: "field-prompt" });
+  });
+
+  it("strips a trailing [ Style: ] user message from base messages", () => {
+    const base: Message[] = [
+      { role: "system", content: "field-prompt" },
+      { role: "user", content: "[ Style: threshold-crossing, sardonic ]" },
+    ];
+    const messages = buildRefineTail(base, ctx());
+    expect(messages.find((m) => m.content === "[ Style: threshold-crossing, sardonic ]")).toBeUndefined();
+    expect(messages[0]).toEqual({ role: "system", content: "field-prompt" });
+  });
+
+  it("does not strip a trailing user message that is not a style anchor", () => {
+    const base: Message[] = [
+      { role: "system", content: "field-prompt" },
+      { role: "user", content: "some regular user content" },
+    ];
+    const messages = buildRefineTail(base, ctx());
+    expect(messages.find((m) => m.content === "some regular user content")).toBeDefined();
   });
 });

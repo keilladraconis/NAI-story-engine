@@ -325,7 +325,7 @@ export function buildIntentStrategy(
   const messageFactory: MessageFactory = refineContext
     ? async () => {
         const base = await baseFactory();
-        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
+        return { ...base, messages: buildRefineTail(base.messages, refineContext) };
       }
     : baseFactory;
   return {
@@ -345,7 +345,7 @@ export function buildContractStrategy(
   const messageFactory: MessageFactory = refineContext
     ? async () => {
         const base = await baseFactory();
-        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
+        return { ...base, messages: buildRefineTail(base.messages, refineContext) };
       }
     : baseFactory;
   return {
@@ -365,7 +365,7 @@ export function buildAttgStrategy(
   const messageFactory: MessageFactory = refineContext
     ? async () => {
         const base = await baseFactory();
-        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
+        return { ...base, messages: buildRefineTail(base.messages, refineContext) };
       }
     : baseFactory;
   return {
@@ -385,7 +385,7 @@ export function buildStyleStrategy(
   const messageFactory: MessageFactory = refineContext
     ? async () => {
         const base = await baseFactory();
-        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
+        return { ...base, messages: buildRefineTail(base.messages, refineContext) };
       }
     : baseFactory;
   return {
