@@ -64,7 +64,7 @@ export async function buildChatStrategy(
             max_tokens: 400,
             temperature: 0.7,
             min_p: 0.05,
-            stop: ["</think>", "\n***", "\n---", "\n[ S", "\n[ Style"],
+            stop: ["</think>", "\n***", "\n---", "---", "\n[ S", "\n[ Style"],
           }),
         };
       },
