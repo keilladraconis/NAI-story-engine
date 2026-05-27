@@ -1,23 +1,15 @@
 import type { Chat } from "../chat-types/types";
 import type { GenerationStrategy, RootState, AppDispatch } from "../store/types";
 import { getChatTypeSpec } from "../chat-types";
-import { buildStoryEnginePrefix, type StoryEnginePrefixOptions } from "./context-builder";
+import { buildStoryEnginePrefix, buildXialongNarrativeStyleBlock, type StoryEnginePrefixOptions } from "./context-builder";
 import { isXialongMode, buildModelParams } from "./config";
 import { buildRefineTail } from "./refine-strategy";
+
 // Returns sections to omit from buildStoryEnginePrefix so the field being
 // refined is not present in context above ----, avoiding double-injection.
 function excludeSectionsForRefine(fieldId: string): StoryEnginePrefixOptions["excludeSections"] {
   if (fieldId === "style") return ["style"];
   if (fieldId === "attg") return ["attg"];
-  return undefined;
-}
-
-// Plain-text prefill for a refine field in Xialong mode. Using a text anchor
-// ("Style description:\n\n") directly shows Xialong the start of the expected
-// output format, bypassing the [ Style: ] mode-tag system. Only the style
-// field needs one; other fields rely on the system prompt + context alone.
-function xialongRefinePrefill(fieldId: string): string | undefined {
-  if (fieldId === "style") return "Style description:\n\n";
   return undefined;
 }
 
@@ -45,7 +37,6 @@ export async function buildChatStrategy(
     const { fieldId, originalText } = chat.refineTarget;
     const filteredHistory = chat.messages.filter((m) => m.id !== assistantMessageId);
     const xialong = await isXialongMode();
-    const prefill = xialong ? xialongRefinePrefill(fieldId) : undefined;
     const excludeSections = excludeSectionsForRefine(fieldId);
 
     return {
@@ -57,8 +48,12 @@ export async function buildChatStrategy(
           currentText: originalText,
           history: filteredHistory,
         });
-        if (prefill) {
-          messages.push({ role: "assistant", content: prefill });
+        // Style field in Xialong mode: append the narrative style block as a USER
+        // message, matching exactly how style generation steers the model. This
+        // produces the same output format as generation without the explanation
+        // nudge of a plain-text ASSISTANT prefill.
+        if (xialong && fieldId === "style") {
+          messages.push({ role: "user", content: buildXialongNarrativeStyleBlock(getState()) });
         }
         return {
           messages,
@@ -77,7 +72,6 @@ export async function buildChatStrategy(
         fieldId,
       },
       prefillBehavior: "trim" as const,
-      assistantPrefill: prefill,
       minResponseLength: xialong ? 40 : undefined,
     };
   }
