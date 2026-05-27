@@ -1,5 +1,5 @@
 import type { RefineContext } from "../chat-types/types";
-import { REFINE_SYSTEM_PROMPT } from "./prompts";
+import { REFINE_SYSTEM_PROMPT, STYLE_REFINE_PROMPT } from "./prompts";
 
 /**
  * Builds the complete message array for a refine generation by combining
@@ -26,9 +26,11 @@ export function buildRefineTail(baseMessages: Message[], refine: RefineContext):
   if (last?.role === "user" && last.content?.startsWith("[ Style:")) {
     messages.pop();
   }
+  const fieldFormatPrompt = refine.fieldId === "style" ? STYLE_REFINE_PROMPT : undefined;
   messages.push(
     { role: "system", content: "----" },
     { role: "system", content: REFINE_SYSTEM_PROMPT },
+    ...(fieldFormatPrompt ? [{ role: "system" as const, content: fieldFormatPrompt }] : []),
     {
       role: "system",
       content: `=== REFINE TARGET (${refine.fieldId}) ===\n${refine.currentText}\n=== END TARGET ===`,

@@ -104,6 +104,12 @@ GOOD: Jeff VanderMeer's surreal...
 
 Preserve any required template structure (field labels, line format) unless the user asks otherwise.`;
 
+export const STYLE_REFINE_PROMPT = `Style field format — keep these constraints:
+- Preserve the two-author tonal anchor (keep the existing authors unless the instruction changes them)
+- Describe the resulting voice in concrete terms: sentence rhythm, use of interiority, how prose handles emotion
+- Modify only what the instruction requires; keep other elements intact
+- ~100 words, no markdown bolding`;
+
 
 export const LOREBOOK_GENERATE_PROMPT = `You are the **Archivist**.
 Generate a structured Lorebook Entry for "[itemName]".
