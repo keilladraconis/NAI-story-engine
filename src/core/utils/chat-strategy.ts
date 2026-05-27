@@ -1,10 +1,31 @@
 import type { Chat } from "../chat-types/types";
 import type { GenerationStrategy, RootState, AppDispatch } from "../store/types";
 import { getChatTypeSpec } from "../chat-types";
-import { buildStoryEnginePrefix } from "./context-builder";
+import { buildStoryEnginePrefix, type StoryEnginePrefixOptions } from "./context-builder";
 import { isXialongMode, buildModelParams } from "./config";
 import { buildRefineTail } from "./refine-strategy";
 import { XIALONG_STYLE } from "./prompts";
+import { isDulfsField } from "../../config/field-definitions";
+
+// Returns the XIALONG_STYLE entry that governs Xialong output for a given
+// refine field — the same analytical mode the field uses for generation.
+function xialongStyleForRefine(fieldId: string): string {
+  if (fieldId === "style") return XIALONG_STYLE.style;
+  if (fieldId === "attg") return XIALONG_STYLE.attg;
+  if (fieldId === "intent") return XIALONG_STYLE.foundationIntent;
+  if (fieldId === "contract") return XIALONG_STYLE.foundationContract;
+  if (isDulfsField(fieldId)) return XIALONG_STYLE.lorebookRefine;
+  return XIALONG_STYLE.lorebookRefine;
+}
+
+// Returns sections to omit from buildStoryEnginePrefix so the field being
+// refined is not present in context above ----, avoiding double-injection
+// and the prose-mode signals that come from analytical style text.
+function excludeSectionsForRefine(fieldId: string): StoryEnginePrefixOptions["excludeSections"] {
+  if (fieldId === "style") return ["style"];
+  if (fieldId === "attg") return ["attg"];
+  return undefined;
+}
 
 /**
  * Builds the GenerationStrategy for a chat-driven generation.
@@ -30,12 +51,13 @@ export async function buildChatStrategy(
     const { fieldId, originalText } = chat.refineTarget;
     const filteredHistory = chat.messages.filter((m) => m.id !== assistantMessageId);
     const xialong = await isXialongMode();
-    const prefill = xialong ? XIALONG_STYLE.chatRefine : undefined;
+    const prefill = xialong ? xialongStyleForRefine(fieldId) : undefined;
+    const excludeSections = excludeSectionsForRefine(fieldId);
 
     return {
       requestId: `refine-${chat.id}-${assistantMessageId}`,
       messageFactory: async () => {
-        const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true });
+        const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true, excludeSections });
         const messages = buildRefineTail(prefix, {
           fieldId,
           currentText: originalText,
