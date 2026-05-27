@@ -2,7 +2,7 @@ import type { Chat } from "../chat-types/types";
 import type { GenerationStrategy, RootState, AppDispatch } from "../store/types";
 import { getChatTypeSpec } from "../chat-types";
 import { buildStoryEnginePrefix, type StoryEnginePrefixOptions } from "./context-builder";
-import { isXialongMode, buildGlmParams } from "./config";
+import { isXialongMode, buildModelParams } from "./config";
 import { buildRefineTail } from "./refine-strategy";
 
 // Returns sections to omit from buildStoryEnginePrefix so the field being
@@ -36,6 +36,7 @@ export async function buildChatStrategy(
   if (chat.type === "refine" && chat.refineTarget) {
     const { fieldId, originalText } = chat.refineTarget;
     const filteredHistory = chat.messages.filter((m) => m.id !== assistantMessageId);
+    const xialong = await isXialongMode();
     const excludeSections = excludeSectionsForRefine(fieldId);
 
     return {
@@ -49,13 +50,11 @@ export async function buildChatStrategy(
         });
         return {
           messages,
-          // Always use GLM for refine — Xialong's creative bias causes it to
-          // ignore rewrite instructions and generate prose or metadata instead.
-          params: await buildGlmParams({
+          params: await buildModelParams({
             max_tokens: 400,
             temperature: 0.7,
             min_p: 0.05,
-            stop: ["</think>", "\n***", "\n---", "---", "\n[ S", "\n[ Style"],
+            stop: ["</think>", "\n***", "\n---", "---"],
           }),
         };
       },
@@ -66,6 +65,7 @@ export async function buildChatStrategy(
         fieldId,
       },
       prefillBehavior: "trim" as const,
+      minResponseLength: xialong ? 40 : undefined,
     };
   }
 
