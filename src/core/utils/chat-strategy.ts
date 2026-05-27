@@ -4,6 +4,7 @@ import { getChatTypeSpec } from "../chat-types";
 import { buildStoryEnginePrefix } from "./context-builder";
 import { isXialongMode, buildModelParams } from "./config";
 import { buildRefineTail } from "./refine-strategy";
+import { XIALONG_STYLE } from "./prompts";
 
 /**
  * Builds the GenerationStrategy for a chat-driven generation.
@@ -29,17 +30,22 @@ export async function buildChatStrategy(
     const { fieldId, originalText } = chat.refineTarget;
     const filteredHistory = chat.messages.filter((m) => m.id !== assistantMessageId);
     const xialong = await isXialongMode();
+    const prefill = xialong ? XIALONG_STYLE.chatRefine : undefined;
 
     return {
       requestId: `refine-${chat.id}-${assistantMessageId}`,
       messageFactory: async () => {
         const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true });
+        const messages = buildRefineTail(prefix, {
+          fieldId,
+          currentText: originalText,
+          history: filteredHistory,
+        });
+        if (prefill) {
+          messages.push({ role: "assistant", content: prefill });
+        }
         return {
-          messages: buildRefineTail(prefix, {
-            fieldId,
-            currentText: originalText,
-            history: filteredHistory,
-          }),
+          messages,
           params: await buildModelParams({
             max_tokens: 400,
             temperature: 0.7,
@@ -55,6 +61,7 @@ export async function buildChatStrategy(
         fieldId,
       },
       prefillBehavior: "trim" as const,
+      assistantPrefill: prefill,
       minResponseLength: xialong ? 40 : undefined,
     };
   }

@@ -517,6 +517,7 @@ export const XIALONG_STYLE = {
   foundationIntent: "[ Style: logline, premise, direct ]",
   foundationWorldState: "[ Style: narrator, situational, grounded ]",
   foundationContract: "[ Style: critic, genre-aware, contractual ]",
+  chatRefine: "[ Style: editor, rewrite, instructed ]",
   summary: "[ Style: chat, archivist, concise, insightful ]",
   bootstrap: "[ Style: novelist; cold-open; observed-not-named; no-participle-stacks; no-absolutes; forward-momentum ]",
   bootstrapContinue: "[ Style: novelist; continuation; behavior-not-quality; no-participle-stacks; no-absolutes; forward-momentum ]",
