@@ -19,6 +19,8 @@ describe("buildChatStrategy", () => {
     const strategy = await buildChatStrategy(getState, chat, "asst-id");
     expect(strategy.target).toEqual({ type: "chat", chatId: chat.id, messageId: "asst-id" });
     expect(strategy.requestId).toContain(chat.id);
+    // Saved chats auto-continue when the model hits max_tokens.
+    expect(strategy.continuation).toEqual({ maxCalls: 5 });
   });
 
   it("returns a chatRefine target with refineContext applied for a refine chat", async () => {

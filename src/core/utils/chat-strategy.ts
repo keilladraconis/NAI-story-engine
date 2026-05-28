@@ -118,5 +118,10 @@ export async function buildChatStrategy(
     // Skip the short-response retry for continuations — its reset path clears
     // the visible message and would erase the original turn we're extending.
     minResponseLength: isContinuation ? undefined : xialong ? 40 : undefined,
+    // Auto-continue when the model hits max_tokens. Initial call is small
+    // (512) so it clears the token-budget bucket; up to 5 continuations
+    // approximate the throughput of a single 2048-token request without
+    // forcing the user to manually re-send to extend a truncated reply.
+    continuation: { maxCalls: 5 },
   };
 }

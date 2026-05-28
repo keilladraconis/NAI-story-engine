@@ -48,7 +48,7 @@ async function submitChatGeneration(
     dispatch(messageRemoved({ chatId: chat.id, id: assistantId }));
     return;
   }
-  const params = await buildModelParams({ max_tokens: 1024, temperature: 1.0 });
+  const params = await buildModelParams({ max_tokens: 512, temperature: 1.0 });
   dispatch(
     requestQueued({
       id: strategy.requestId,
