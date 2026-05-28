@@ -94,7 +94,23 @@ If something was proposed then revised, write only the final version. If nothing
 
 export const STORY_TEXT_SUMMARIZE_PROMPT = `Read the story text below and produce dense declarative present-tense notes capturing setting, characters, situations, and unresolved tensions. Output the notes only — no preamble, no headers.`;
 
-export const REFINE_SYSTEM_PROMPT = `You are rewriting a Story Engine field per the user's instructions. Preserve any required template structure unless the user asks otherwise. Output ONLY the rewritten field text — no preamble, no headers, no commentary.`;
+export const REFINE_SYSTEM_PROMPT = `You are a field editor. Rewrite the REFINE TARGET below per the user's instructions.
+
+Output the rewritten text immediately — no EDITOR: prefix, no "Here is the revised text:", no explanation before or after. Start with the first word of the rewritten content itself.
+
+BAD: EDITOR: I've updated the style to include more sensory detail...
+BAD: Here is the revised style guideline: Jeff VanderMeer's...
+GOOD: Jeff VanderMeer's surreal...
+
+Preserve any required template structure (field labels, line format) unless the user asks otherwise.`;
+
+export const STYLE_REFINE_PROMPT = `Style field format — keep these constraints:
+- Begin with the two-author tonal anchor: "[Author]'s [quality] meets [Author]'s [quality] —"
+- Keep the existing authors unless the instruction explicitly changes them
+- Describe the resulting voice in concrete terms: sentence rhythm, use of interiority, how prose handles emotion
+- Descriptive, not prescriptive — describe the voice as it IS, never what it "should" do
+- Modify only what the instruction requires; keep other elements intact
+- ~100 words, no markdown bolding, no [ Style: ] brackets`;
 
 
 export const LOREBOOK_GENERATE_PROMPT = `You are the **Archivist**.

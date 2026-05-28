@@ -5,6 +5,7 @@ import {
   splitSections,
   formatTagsWithEmoji,
   restoreTagsFromEmoji,
+  stripStyleBrackets,
 } from "../../../src/core/utils/tag-parser";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,5 +161,29 @@ describe("restoreTagsFromEmoji", () => {
 
   it("leaves plain text unchanged", () => {
     expect(restoreTagsFromEmoji("plain text")).toBe("plain text");
+  });
+});
+
+describe("stripStyleBrackets", () => {
+  it("strips [ Style: ... ] wrapper and returns inner content", () => {
+    const input = "[ Style: Joanna Russ's sardonic prose meets Jeff VanderMeer's lush ecology ]";
+    expect(stripStyleBrackets(input)).toBe(
+      "Joanna Russ's sardonic prose meets Jeff VanderMeer's lush ecology",
+    );
+  });
+
+  it("leaves text without [ Style: ] wrapper unchanged", () => {
+    const input = "Joanna Russ's sardonic prose meets Jeff VanderMeer's lush ecology";
+    expect(stripStyleBrackets(input)).toBe(input);
+  });
+
+  it("handles leading/trailing whitespace around the wrapper", () => {
+    const input = "  [ Style: inner content ]  ";
+    expect(stripStyleBrackets(input)).toBe("inner content");
+  });
+
+  it("handles missing closing bracket (stop sequence stripped it)", () => {
+    const input = "[ Style: no closing bracket";
+    expect(stripStyleBrackets(input)).toBe("no closing bracket");
   });
 });

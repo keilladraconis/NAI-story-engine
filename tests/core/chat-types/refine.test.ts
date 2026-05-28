@@ -48,7 +48,7 @@ describe("refineSpec", () => {
   });
 
   it("systemPromptFor returns the refine instruction prompt", () => {
-    expect(refineSpec.systemPromptFor(refineChat(), ctx)).toMatch(/rewriting/i);
+    expect(refineSpec.systemPromptFor(refineChat(), ctx)).toMatch(/rewrite/i);
   });
 
   it("contextSlice returns empty (refine never participates in SE prefix)", () => {

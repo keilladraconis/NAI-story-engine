@@ -1,19 +1,27 @@
 import type { Chat } from "../chat-types/types";
 import type { GenerationStrategy, RootState, AppDispatch } from "../store/types";
 import { getChatTypeSpec } from "../chat-types";
-import { getFieldStrategy } from "./field-strategy-registry";
-import { buildStoryEnginePrefix } from "./context-builder";
-import { isXialongMode } from "./config";
+import { buildStoryEnginePrefix, type StoryEnginePrefixOptions } from "./context-builder";
+import { isXialongMode, buildModelParams } from "./config";
+import { buildRefineTail } from "./refine-strategy";
+
+// Returns sections to omit from buildStoryEnginePrefix so the field being
+// refined is not present in context above ----, avoiding double-injection.
+function excludeSectionsForRefine(fieldId: string): StoryEnginePrefixOptions["excludeSections"] {
+  if (fieldId === "style") return ["style"];
+  if (fieldId === "attg") return ["attg"];
+  return undefined;
+}
 
 /**
  * Builds the GenerationStrategy for a chat-driven generation.
  *
- * For refine chats, delegates to the field strategy registered for
- * `chat.refineTarget.fieldId` with a `refineContext` injected — the field
- * strategy already knows how to weave the refine tail (system prompt + target
- * snapshot + chat history) onto its own messages. The returned strategy
- * preserves the field strategy's `messageFactory`, params and prefill, but
- * rewrites `requestId` and `target` so completion routes back to the chat.
+ * For refine chats, assembles context from scratch: the unified Story Engine
+ * prefix (story context, foundation data — no field-generation directives),
+ * a ---- boundary, REFINE_SYSTEM_PROMPT, the target snapshot, and the
+ * chat history. This mirrors the saved-chat path and avoids the field
+ * factory's generation-prompt context, which caused Xialong to treat refine
+ * as a fresh generate rather than a rewrite.
  *
  * For saved chats (brainstorm, summary), assembles a fresh strategy: the
  * unified Story Engine prefix, the chat's system prompt, the transcript
@@ -26,24 +34,38 @@ export async function buildChatStrategy(
   assistantMessageId: string,
 ): Promise<GenerationStrategy> {
   if (chat.type === "refine" && chat.refineTarget) {
-    const factory = getFieldStrategy(chat.refineTarget.fieldId);
-    const inner = factory(getState, {
-      refineContext: {
-        fieldId: chat.refineTarget.fieldId,
-        currentText: chat.refineTarget.originalText,
-        history: chat.messages,
-      },
-      entryId: chat.refineTarget.entryId,
-    });
+    const { fieldId, originalText } = chat.refineTarget;
+    const filteredHistory = chat.messages.filter((m) => m.id !== assistantMessageId);
+    const xialong = await isXialongMode();
+    const excludeSections = excludeSectionsForRefine(fieldId);
+
     return {
-      ...inner,
       requestId: `refine-${chat.id}-${assistantMessageId}`,
+      messageFactory: async () => {
+        const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true, excludeSections });
+        const messages = buildRefineTail(prefix, {
+          fieldId,
+          currentText: originalText,
+          history: filteredHistory,
+        });
+        return {
+          messages,
+          params: await buildModelParams({
+            max_tokens: 400,
+            temperature: 0.7,
+            min_p: 0.05,
+            stop: ["</think>", "\n***", "\n---", "---", "]\n"],
+          }),
+        };
+      },
       target: {
         type: "chatRefine",
         chatId: chat.id,
         messageId: assistantMessageId,
-        fieldId: chat.refineTarget.fieldId,
+        fieldId,
       },
+      prefillBehavior: "trim" as const,
+      minResponseLength: xialong ? 40 : undefined,
     };
   }
 
