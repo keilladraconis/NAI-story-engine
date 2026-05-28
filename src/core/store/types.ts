@@ -74,7 +74,6 @@ export interface GenerationRequest {
     | "chatRefine"
     | "lorebookContent"
     | "lorebookKeys"
-    | "forge"
     | "forgeChat"
     | "forgeCleanup"
     | "foundation"
@@ -99,14 +98,6 @@ export interface GenerationStrategy {
     | { type: "list"; fieldId: string }
     | { type: "lorebookContent"; entryId: string }
     | { type: "lorebookKeys"; entryId: string }
-    | {
-        type: "forge";
-        step: number;
-        phase: "sketch" | "expand" | "weave";
-        forgeGuidance: string;
-        brainstormContext: string;
-        preForgeEntityIds: string[];
-      }
     | {
         type: "forgeChat";
         chatId: string;

@@ -60,7 +60,7 @@ export class SeForgeSection extends SuiComponent<
         const t = s.runtime.activeRequest?.type;
         return {
           activeForgeId:
-            t === "forge" || t === "forgeChat" || t === "forgeCleanup"
+            t === "forgeChat" || t === "forgeCleanup"
               ? s.runtime.activeRequest!.id
               : undefined,
         };

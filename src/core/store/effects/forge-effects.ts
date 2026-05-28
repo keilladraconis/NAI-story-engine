@@ -14,7 +14,6 @@ import { GenX } from "nai-gen-x";
 import {
   forgeRequested,
   forgeClearRequested,
-  forgeLoopStarted,
   forgeLoopEnded,
   forgeStepCompleted,
   forgeCritiqueReceived,
@@ -25,15 +24,10 @@ import {
   uiEntitySummaryGenerationRequested,
 } from "../index";
 import {
-  buildForgeStrategy,
-  FORGE_MAX_STEPS,
-} from "../../utils/forge-strategy";
-import {
   createLorebookContentFactory,
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
 import { buildModelParams } from "../../utils/config";
-import { getActiveChatTranscript } from "../../utils/context-builder";
 import { IDS, STORAGE_KEYS } from "../../../ui/framework/ids";
 
 export function registerForgeEffects(
@@ -43,38 +37,11 @@ export function registerForgeEffects(
   _genX: GenX,
 ): void {
   // ─── Forge Requested ──────────────────────────────────────────────────────
+  // Legacy forge loop — decommissioned. The typed-chat forge path
+  // (forgeChatNewSessionRequested in forge-chat-effects.ts) is the sole entry point.
 
   subscribeEffect(matchesAction(forgeRequested), async () => {
-    const guidanceRaw = await api.v1.storyStorage.get(
-      STORAGE_KEYS.FORGE_GUIDANCE_UI,
-    );
-    const forgeGuidance = String(guidanceRaw || "").trim();
-
-    const brainstormContext = forgeGuidance
-      ? ""
-      : getActiveChatTranscript(getState());
-    if (!forgeGuidance && !brainstormContext) {
-      api.v1.ui.toast("Add forge guidance or run a brainstorm first", {
-        type: "info",
-      });
-      return;
-    }
-
-    // Capture entity IDs that exist before this forge session —
-    // used to distinguish ESTABLISHED WORLD from this session's pass log.
-    const preForgeEntityIds = Object.keys(getState().world.entitiesById);
-
-    dispatch(forgeLoopStarted());
-
-    const strategy = buildForgeStrategy(getState, 1, forgeGuidance, brainstormContext, preForgeEntityIds);
-    dispatch(
-      requestQueued({
-        id: strategy.requestId,
-        type: "forge",
-        targetId: strategy.requestId,
-      }),
-    );
-    dispatch(generationSubmitted(strategy));
+    api.v1.log("[forge-effects] forgeRequested: legacy forge loop is decommissioned");
   });
 
   // ─── Forge Clear Requested → clear guidance input ─────────────────────────
@@ -87,35 +54,10 @@ export function registerForgeEffects(
   });
 
   // ─── Forge Step Completed → schedule next step ────────────────────────────
+  // Legacy forge loop — decommissioned.
 
-  subscribeEffect(matchesAction(forgeStepCompleted), ({ payload }) => {
-    const state = getState();
-    if (!state.world.forgeLoopActive) {
-      dispatch(forgeLoopEnded());
-      return;
-    }
-
-    const nextStep = payload.step + 1;
-    if (nextStep > FORGE_MAX_STEPS) {
-      dispatch(forgeLoopEnded());
-      return;
-    }
-
-    const strategy = buildForgeStrategy(
-      getState,
-      nextStep,
-      payload.forgeGuidance,
-      payload.brainstormContext,
-      payload.preForgeEntityIds,
-    );
-    dispatch(
-      requestQueued({
-        id: strategy.requestId,
-        type: "forge",
-        targetId: strategy.requestId,
-      }),
-    );
-    dispatch(generationSubmitted(strategy));
+  subscribeEffect(matchesAction(forgeStepCompleted), () => {
+    api.v1.log("[forge-effects] forgeStepCompleted: legacy forge loop is decommissioned");
   });
 
   // ─── Forge Critique Received → write to FORGE_GUIDANCE field, end loop ───

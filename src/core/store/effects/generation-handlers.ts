@@ -4,7 +4,6 @@ import {
   lorebookContentHandler,
   lorebookKeysHandler,
 } from "./handlers/lorebook";
-import { forgeHandler } from "./handlers/forge";
 import { foundationHandler } from "./handlers/foundation";
 import {
   entitySummaryHandler,
@@ -30,10 +29,6 @@ export type LorebookContentTarget = Extract<
 export type LorebookKeysTarget = Extract<
   GenerationStrategy["target"],
   { type: "lorebookKeys" }
->;
-export type ForgeTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "forge" }
 >;
 export type FoundationTarget = Extract<
   GenerationStrategy["target"],
@@ -110,7 +105,6 @@ export const GENERATION_HANDLERS: {
   list: GenerationHandlers<ListTarget>;
   lorebookContent: GenerationHandlers<LorebookContentTarget>;
   lorebookKeys: GenerationHandlers<LorebookKeysTarget>;
-  forge: GenerationHandlers<ForgeTarget>;
   forgeChat: GenerationHandlers<ForgeChatTarget>;
   forgeCleanup: GenerationHandlers<ForgeCleanupTarget>;
   foundation: GenerationHandlers<FoundationTarget>;
@@ -125,7 +119,6 @@ export const GENERATION_HANDLERS: {
   list: listHandler,
   lorebookContent: lorebookContentHandler,
   lorebookKeys: lorebookKeysHandler,
-  forge: forgeHandler,
   forgeChat: forgeChatHandler,
   forgeCleanup: forgeCleanupHandler,
   foundation: foundationHandler,

@@ -9,7 +9,6 @@ import {
   StreamingContext,
   CompletionContext,
 } from "../generation-handlers";
-import { GenerationStrategy } from "../../types";
 import { DulfsFieldID } from "../../../../config/field-definitions";
 import {
   entityForged,
@@ -32,7 +31,15 @@ import { stripThinkingTags } from "../../../utils/tag-parser";
 import { getPhaseForStep, FORGE_MAX_STEPS } from "../../../utils/forge-strategy";
 import { IDS } from "../../../../ui/framework/ids";
 
-type ForgeTarget = Extract<GenerationStrategy["target"], { type: "forge" }>;
+/** @deprecated Kept for compilation until forge.ts is deleted in Task 2. */
+interface ForgeTarget {
+  type: "forge";
+  step: number;
+  phase: "sketch" | "expand" | "weave";
+  forgeGuidance: string;
+  brainstormContext: string;
+  preForgeEntityIds: string[];
+}
 
 /**
  * Executes forge commands against the world slice.

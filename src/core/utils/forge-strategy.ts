@@ -17,7 +17,7 @@
  * recreation of already-forged elements without any extra dedup logic.
  */
 
-import { RootState, GenerationStrategy } from "../store/types";
+import { RootState } from "../store/types";
 import { MessageFactory } from "nai-gen-x";
 import { buildModelParams, appendXialongStyleMessage } from "./config";
 import { XIALONG_STYLE } from "./prompts";
@@ -274,35 +274,16 @@ export const createForgeFactory = (
 };
 
 /**
- * Builds a GenerationStrategy for one step of the forge loop.
+ * @deprecated Legacy forge loop strategy — no longer used. Kept until forge-effects.ts
+ * and handlers/forge.ts are removed in a subsequent cleanup task.
  */
 export const buildForgeStrategy = (
-  getState: () => RootState,
-  step: number,
-  forgeGuidance: string,
-  brainstormContext: string,
-  preForgeEntityIds: string[],
-): GenerationStrategy => {
-  const prefill = step >= FORGE_MAX_STEPS ? "[CRITIQUE |" : "[";
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory: createForgeFactory(
-      getState,
-      step,
-      forgeGuidance,
-      brainstormContext,
-      preForgeEntityIds,
-    ),
-    target: {
-      type: "forge",
-      step,
-      phase: getPhaseForStep(step).name,
-      forgeGuidance,
-      brainstormContext,
-      preForgeEntityIds,
-    },
-    prefillBehavior: "keep",
-    assistantPrefill: prefill,
-  };
+  _getState: () => RootState,
+  _step: number,
+  _forgeGuidance: string,
+  _brainstormContext: string,
+  _preForgeEntityIds: string[],
+): never => {
+  throw new Error("buildForgeStrategy: legacy forge path is decommissioned");
 };
 

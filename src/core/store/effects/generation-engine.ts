@@ -44,8 +44,6 @@ function targetToQueueEntry(target: GenerationStrategy["target"]): {
       return { type: "lorebookContent", targetId: target.entryId };
     case "lorebookKeys":
       return { type: "lorebookKeys", targetId: target.entryId };
-    case "forge":
-      return { type: "forge", targetId: `forge:${target.step}` };
     case "foundation":
       return { type: "foundation", targetId: target.field };
     case "entitySummary":
@@ -83,10 +81,6 @@ function resolvePrefill(
   }
 
   if (target.type === "lorebookKeys") {
-    if (assistantPrefill) return assistantPrefill;
-  }
-
-  if (target.type === "forge") {
     if (assistantPrefill) return assistantPrefill;
   }
 
@@ -154,8 +148,6 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `lb-content:${target.entryId.slice(0, 8)}`;
     case "lorebookKeys":
       return `lb-keys:${target.entryId.slice(0, 8)}`;
-    case "forge":
-      return `forge:${target.step}`;
     case "foundation":
       return `foundation:${target.field}`;
     case "entitySummary":
