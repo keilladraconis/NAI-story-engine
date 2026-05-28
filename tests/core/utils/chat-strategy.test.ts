@@ -75,5 +75,4 @@ describe("buildChatStrategy", () => {
     // The in-progress assistant placeholder is NOT in the assembled transcript
     expect(messages.every((m: Message) => !(m.role === "assistant" && m.content === ""))).toBe(true);
   });
-
 });
