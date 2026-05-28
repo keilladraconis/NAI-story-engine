@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.0] - 2026-05-28
+
+### Added
+
+- **Forge is now a chat.** Clicking the Forge button opens a typed chat session in the Chat tab — phase indicator (Sketch → Expand → Weave), inline draft cards beneath each assistant turn, and Cast All / Discard All header controls. The previous one-shot loop is gone; you can talk to the forge mid-pass, send empty messages to advance phases, and revisit the same session by clicking Forge again.
+- **Inline entity cards in the chat body.** Drafts created or revised by a forge turn render as cards beneath the message that affected them, with their own Cast / Discard / Edit buttons. Each chat type spec can opt in by implementing `inlineEntityIdsFor`.
+- **World groups ("Threads") replace the older relationship/batch model.** Forge `[THREAD]` commands create groups; groups have their own summary, optional lorebook entry, and group-level reforge. Entities can belong to multiple threads.
+- **Explicit entity lifecycle on `WorldEntity`.** `lifecycle: "draft" | "live"` is now a first-class field — drafts have no lorebook entry until cast, live entries sync to lorebook as before. Saving a draft promotes it; Discard removes it cleanly.
+
+### Changed
+
+- **Forge generation runs through a per-turn message factory.** `buildForgeChatStrategy` injects `[POOL]`, `[LIVE]`, `[TOMBSTONES]`, and `[PREVIOUS CRITIQUE]` blocks alongside the unified Story Engine prefix, with phase-specific prompts (sketch/expand/weave) and temperatures. Discards trigger a cleanup pass via `buildForgeCleanupStrategy` to scrub references to abandoned entities.
+- **Plugin auto-switches to the Chat tab when a forge chat becomes active.** `chatCreated` / `chatSwitched` for a forge chat brings the session to the foreground so the new typed-chat surface is always in front of the user.
+- **Chat type specs can intercept Send.** `ChatTypeSpec.handleSend` is consulted before the default chat-strategy path; forge sends are routed to `forgeChatContinueRequested` with `advancePhase: false` so mid-phase conversation doesn't burn a phase.
+- **`FIELD_LABEL` consolidated onto `DULFS_CATEGORY_LABELS`.** Boyscouts two duplicated label tables in `summary-strategy.ts` and `forge-chat-strategy.ts` onto the canonical export in `category-detect.ts`, aligning the SituationalDynamics label on the forge-context term "Situation".
+
+### Removed
+
+- **Legacy forge loop machinery.** `forgeRequested`, `forgeFromBrainstormRequested`, `forgeLoopStarted`, `forgeLoopEnded`, `forgeStepCompleted`, `forgeCritiqueReceived`, and `forgeClearRequested` actions; the `forgeLoopActive` world-state field; `src/core/store/effects/forge-effects.ts`; `src/core/utils/forge-strategy.ts`; `src/core/store/effects/handlers/forge.ts`; and the legacy `forge` generation-target type.
+- **`continueButton` HeaderControl kind.** The new typed-chat surface uses an unconditional Send button — the dedicated continue control was already a no-op render branch.
+
 ## [0.12.3] - 2026-05-27
 
 ### Fixed
