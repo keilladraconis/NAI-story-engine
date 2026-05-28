@@ -23,6 +23,16 @@ All notable changes to this project will be documented in this file.
 - **Legacy forge loop machinery.** `forgeRequested`, `forgeFromBrainstormRequested`, `forgeLoopStarted`, `forgeLoopEnded`, `forgeStepCompleted`, `forgeCritiqueReceived`, and `forgeClearRequested` actions; the `forgeLoopActive` world-state field; `src/core/store/effects/forge-effects.ts`; `src/core/utils/forge-strategy.ts`; `src/core/store/effects/handlers/forge.ts`; and the legacy `forge` `GenerationTarget` variant (distinct from the new `chat.type === "forge"` typed-chat surface).
 - **`continueButton` HeaderControl kind.** The new typed-chat surface uses an unconditional Send button — the dedicated continue control was already a no-op render branch.
 
+## [0.12.4] - 2026-05-28
+
+### Fixed
+
+- **Manual continuation works again in the brainstorm chat.** Clicking Send with an empty input — the gesture for "keep going from where you stopped," useful when a long generation gets cut off or wraps short of a natural ending — was a no-op: the submit effect bailed early whenever the last message wasn't from the user. Empty sends on an assistant-tail message now extend that message in place. The strategy keeps the existing assistant turn as the transcript tail (so the model literally continues it), seeds `accumulatedText` from the live message content via `prefillBehavior: "keep"`, and skips both the fresh chat-style prefill and the short-response retry (whose reset path would otherwise erase the original turn).
+
+### Changed
+
+- **Brainstorm and summary chats auto-continue when truncated.** The single-call budget was 1024 tokens, which was both prone to blocking on a full token-budget bucket and not enough room for a long, deliberate brainstorm answer. Initial requests now ask for 512 tokens — small enough to clear the bucket reliably — and the engine's existing continuation loop is wired up via `continuation: { maxCalls: 5 }` on the saved-chat strategy. If the model stops on `length` / `max_tokens`, up to five follow-up calls extend the same assistant turn, approximating the throughput of a single 2048-token request without forcing the user to manually re-send. The engine's continuation calls no longer override `max_tokens` — they inherit the strategy's value, so each continuation is the same size as the initial chunk.
+
 ## [0.12.3] - 2026-05-27
 
 ### Fixed

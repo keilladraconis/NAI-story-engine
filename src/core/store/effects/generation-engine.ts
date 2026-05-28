@@ -334,7 +334,7 @@ export function registerGenerationEngineEffects(
 
           const contResult = await genX.generate(
             continuationMessages,
-            { ...apiParams, taskId: contTaskId, max_tokens: 1024 },
+            { ...apiParams, taskId: contTaskId },
             onStream,
             "background",
             await api.v1.createCancellationSignal(),
