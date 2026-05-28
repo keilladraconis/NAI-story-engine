@@ -74,11 +74,21 @@ export async function buildChatStrategy(
   const noopDispatch: AppDispatch = () => {};
   const ctx = { getState, dispatch: noopDispatch };
 
+  // Manual continuation: target points at an existing assistant message that
+  // already has content. Keep it as the tail of the transcript (the model
+  // will continue from there), skip the fresh spec prefill, and tell the
+  // engine to seed accumulatedText with the existing content via "keep".
+  const targetMsg = chat.messages.find((m) => m.id === assistantMessageId);
+  const isContinuation =
+    !!targetMsg && targetMsg.role === "assistant" && targetMsg.content.length > 0;
+
   const styleBlock = spec.xialongStyleFor?.(chat, ctx);
   const xialong = styleBlock ? await isXialongMode() : false;
-  const prefill = xialong && styleBlock
-    ? styleBlock
-    : spec.prefillFor?.(chat, ctx);
+  const prefill = isContinuation
+    ? undefined
+    : xialong && styleBlock
+      ? styleBlock
+      : spec.prefillFor?.(chat, ctx);
 
   return {
     requestId: `chat-${chat.id}-${assistantMessageId}`,
@@ -89,7 +99,7 @@ export async function buildChatStrategy(
         content: spec.systemPromptFor(chat, ctx),
       };
       const transcript: Message[] = chat.messages
-        .filter((m) => m.id !== assistantMessageId)
+        .filter((m) => isContinuation || m.id !== assistantMessageId)
         .map((m) => ({ role: m.role, content: m.content }));
       const messages = [...prefix];
       messages.push({ role: "system", content: "----" });
@@ -103,8 +113,10 @@ export async function buildChatStrategy(
       return { messages, params };
     },
     target: { type: "chat", chatId: chat.id, messageId: assistantMessageId },
-    prefillBehavior: "trim",
+    prefillBehavior: isContinuation ? "keep" : "trim",
     assistantPrefill: prefill,
-    minResponseLength: xialong ? 40 : undefined,
+    // Skip the short-response retry for continuations — its reset path clears
+    // the visible message and would erase the original turn we're extending.
+    minResponseLength: isContinuation ? undefined : xialong ? 40 : undefined,
   };
 }

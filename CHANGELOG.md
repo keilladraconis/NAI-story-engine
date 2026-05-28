@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.4] - 2026-05-28
+
+### Fixed
+
+- **Manual continuation works again in the brainstorm chat.** Clicking Send with an empty input — the gesture for "keep going from where you stopped," useful when a long generation hits the 2048-token cap or wraps short of a natural ending — was a no-op: the submit effect bailed early whenever the last message wasn't from the user. Empty sends on an assistant-tail message now extend that message in place. The strategy keeps the existing assistant turn as the transcript tail (so the model literally continues it), seeds `accumulatedText` from the live message content via `prefillBehavior: "keep"`, and skips both the fresh chat-style prefill and the short-response retry (whose reset path would otherwise erase the original turn).
+
 ## [0.12.3] - 2026-05-27
 
 ### Fixed
