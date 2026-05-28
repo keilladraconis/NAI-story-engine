@@ -104,6 +104,15 @@ export interface ChatTypeSpec<SubMode extends string = string> {
    * by the `uiChatSubmitUserMessage` effect after reading the input value.
    */
   handleSend?(chat: Chat, content: string, ctx: SpecCtx): boolean;
+
+  /**
+   * Optional chat-input customization, read by `SeBrainstormInput` for the
+   * active chat. Defaults when omitted: generic placeholder, a "Send" button,
+   * and the Clear button shown.
+   */
+  inputPlaceholder?: string;
+  sendLabel?: string;
+  showClearButton?: boolean;
 }
 
 export type AnyChatTypeSpec = ChatTypeSpec<string>;

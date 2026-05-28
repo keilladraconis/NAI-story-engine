@@ -10,6 +10,8 @@ import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
 import { uiChatSubmitUserMessage } from "../../core/store";
 import { messageRemoved } from "../../core/store/slices/chat";
+import type { Chat } from "../../core/chat-types/types";
+import { getChatTypeSpec } from "../../core/chat-types";
 import { StoreWatcher } from "../store-watcher";
 import { SeGenerationButton } from "./SeGenerationButton";
 import { SeConfirmButton } from "./SeConfirmButton";
@@ -24,16 +26,34 @@ export type SeBrainstormInputOptions = SuiComponentOptions<
 
 const INPUT_ID = "se-bs-input";
 
-/** Resolve the chat id the input should write to: refineChat takes precedence. */
-function targetChatId(): string | null {
+const DEFAULT_PLACEHOLDER =
+  "Explore ideas here — then switch to Story Engine to Forge.";
+
+/** Request types that occupy the chat surface — sending while one is in flight
+ *  (or queued) just stacks empty assistant bubbles, so the input locks out. */
+function isChatBusyType(t: string | undefined): boolean {
+  return (
+    t === "chat" ||
+    t === "chatRefine" ||
+    t === "forgeChat" ||
+    t === "forgeCleanup"
+  );
+}
+
+/** The chat the input writes to: refineChat takes precedence over active. */
+function visibleChat(): Chat | null {
   const s = store.getState();
-  return s.chat.refineChat?.id ?? s.chat.activeChatId;
+  return (
+    s.chat.refineChat ??
+    s.chat.chats.find((c) => c.id === s.chat.activeChatId) ??
+    null
+  );
 }
 
 function dispatchSubmit(): void {
-  const chatId = targetChatId();
-  if (!chatId) return;
-  store.dispatch(uiChatSubmitUserMessage({ chatId }));
+  const chat = visibleChat();
+  if (!chat) return;
+  store.dispatch(uiChatSubmitUserMessage({ chatId: chat.id }));
 }
 
 export class SeBrainstormInput extends SuiComponent<
@@ -54,17 +74,19 @@ export class SeBrainstormInput extends SuiComponent<
     this._watcher = new StoreWatcher();
     this._sendBtn = new SeGenerationButton({
       id: "se-bs-send-btn",
-      label: "Send",
+      // Re-read per build so the label tracks the active chat type
+      // (e.g. "Continue Forging" in a forge session).
+      labelProvider: () => {
+        const chat = visibleChat();
+        return (chat && getChatTypeSpec(chat.type).sendLabel) || "Send";
+      },
       style: { flex: "0.7" },
       onGenerate: () => dispatchSubmit(),
       stateProjection: (s) => {
-        const t = s.runtime.activeRequest?.type;
-        if (t === "chat" || t === "chatRefine") {
+        if (isChatBusyType(s.runtime.activeRequest?.type)) {
           return s.runtime.activeRequest!.id;
         }
-        return s.runtime.queue.find(
-          (r) => r.type === "chat" || r.type === "chatRefine",
-        )?.id;
+        return s.runtime.queue.find((r) => isChatBusyType(r.type))?.id;
       },
       requestIdFromProjection: (p) => p as string | undefined,
     });
@@ -93,29 +115,33 @@ export class SeBrainstormInput extends SuiComponent<
     // Dispose previous subscriptions to avoid duplicates on rebuild
     this._watcher.dispose();
 
-    // Keep textarea disabled while a chat-driven generation is active
+    // Lock the input while a chat/forge generation is active OR queued — both
+    // states mean another send would only stack empty assistant bubbles. This
+    // is the visible "waiting on tokens" signal during a budget wait too.
     this._watcher.watch(
       (s) => {
-        const t = s.runtime.activeRequest?.type;
-        return (
-          (t === "chat" || t === "chatRefine") &&
-          s.runtime.genx.status === "generating"
-        );
+        if (isChatBusyType(s.runtime.activeRequest?.type)) return true;
+        return s.runtime.queue.some((r) => isChatBusyType(r.type));
       },
-      (isGenerating) => {
+      (isBusy) => {
         api.v1.ui.updateParts([
           {
             id: INPUT_ID,
-            disabled: isGenerating,
+            disabled: isBusy,
           } as unknown as Partial<UIPart> & { id: string },
         ]);
       },
     );
 
-    const [sendPart, clearPart] = await Promise.all([
-      this._sendBtn.build(),
-      this._clearBtn.build(),
-    ]);
+    const chat = visibleChat();
+    const spec = chat ? getChatTypeSpec(chat.type) : null;
+    const placeholder = spec?.inputPlaceholder ?? DEFAULT_PLACEHOLDER;
+    const showClear = spec?.showClearButton ?? true;
+
+    const sendPart = await this._sendBtn.build();
+    const footerContent: UIPart[] = [];
+    if (showClear) footerContent.push(await this._clearBtn.build());
+    footerContent.push(sendPart);
 
     const { column, row, multilineTextInput } = api.v1.ui.part;
 
@@ -125,8 +151,7 @@ export class SeBrainstormInput extends SuiComponent<
       content: [
         multilineTextInput({
           id: INPUT_ID,
-          placeholder:
-            "Explore ideas here — then switch to Story Engine to Forge.",
+          placeholder,
           storageKey: `story:${INPUT_ID}`,
           style: { "min-height": "60px", "max-height": "120px" },
           onSubmit: () => {
@@ -135,7 +160,7 @@ export class SeBrainstormInput extends SuiComponent<
         }),
         row({
           style: { gap: "8px", "margin-top": "4px" },
-          content: [clearPart, sendPart],
+          content: footerContent,
         }),
       ],
     });

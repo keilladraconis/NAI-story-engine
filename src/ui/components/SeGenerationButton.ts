@@ -52,6 +52,8 @@ export type SeGenerationButtonOptions = {
   /** Callback alternative to generateAction. */
   onGenerate?: () => void;
   label?: string;
+  /** Dynamic label, re-read on every build (button variant). Wins over `label`. */
+  labelProvider?: () => string;
   variant?: SeGenButtonVariant;
   iconId?: IconId;
   /** Custom cancel handler — defaults to uiRequestCancellation(). */
@@ -470,8 +472,13 @@ export class SeGenerationButton extends SuiComponent<
 
   // ── Button variant ────────────────────────────────────────
 
+  private _resolveLabel(): string {
+    return this.options.labelProvider?.() ?? this.options.label ?? "";
+  }
+
   private _buildButtonPart(): UIPartRow {
-    const { label = "", iconId, style = {} } = this.options;
+    const { iconId, style = {} } = this.options;
+    const label = this._resolveLabel();
     const { button, row } = api.v1.ui.part;
 
     return row({
@@ -591,7 +598,7 @@ export class SeGenerationButton extends SuiComponent<
         },
       ]);
     } else {
-      const label = this.options.label ?? "";
+      const label = this._resolveLabel();
       api.v1.ui.updateParts([
         {
           id: `${this.id}-wait`,

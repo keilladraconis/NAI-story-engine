@@ -29,6 +29,13 @@ export const forgeSpec: ChatTypeSpec<ForgePhase> = {
   subModes: SUB_MODES,
   defaultSubMode: "sketch",
 
+  // Forge is a continuation loop, not free chat: the input nudges the next
+  // pass, the send button advances the forge, and there is no Clear (Cast All /
+  // Discard All end the session instead).
+  inputPlaceholder: "Influence the next forging step",
+  sendLabel: "Continue Forging",
+  showClearButton: false,
+
   initialize(_seed: ChatSeed, _ctx: SpecCtx) {
     return {
       title: "Forge",
