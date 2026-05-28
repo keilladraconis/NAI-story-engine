@@ -11,7 +11,7 @@
 import { MessageFactory } from "nai-gen-x";
 import { RootState } from "../store/types";
 import { WORLD_ENTRY_CATEGORIES } from "../store/types";
-import { DulfsFieldID, FieldID } from "../../config/field-definitions";
+import { DulfsFieldID } from "../../config/field-definitions";
 import {
   ENTITY_SUMMARY_PROMPT,
   ENTITY_SUMMARY_FROM_LOREBOOK_PROMPT,
@@ -19,16 +19,8 @@ import {
   XIALONG_STYLE,
 } from "./prompts";
 import { buildModelParams, appendXialongStyleMessage } from "./config";
+import { DULFS_CATEGORY_LABELS } from "./category-detect";
 import { EDIT_PANE_TITLE } from "../../ui/framework/ids";
-
-const FIELD_LABEL: Record<DulfsFieldID, string> = {
-  [FieldID.DramatisPersonae]: "Character",
-  [FieldID.UniverseSystems]: "System",
-  [FieldID.Locations]: "Location",
-  [FieldID.Factions]: "Faction",
-  [FieldID.SituationalDynamics]: "Situation",
-  [FieldID.Topics]: "Topic",
-};
 
 function formatLiveEntities(state: RootState): string {
   const live = Object.values(state.world.entitiesById);
@@ -45,7 +37,7 @@ function formatLiveEntities(state: RootState): string {
   for (const fieldId of WORLD_ENTRY_CATEGORIES) {
     const group = groups.get(fieldId);
     if (!group) continue;
-    lines.push(`${FIELD_LABEL[fieldId]}s:`);
+    lines.push(`${DULFS_CATEGORY_LABELS[fieldId]}s:`);
     for (const e of group) {
       lines.push(
         `  - ${e.name}${e.summary ? `: ${e.summary.slice(0, 100)}` : ""}`,
@@ -95,7 +87,7 @@ export function createEntitySummaryFactory(
     }
 
     const categoryLabel = entity?.categoryId
-      ? FIELD_LABEL[entity.categoryId]
+      ? DULFS_CATEGORY_LABELS[entity.categoryId]
       : "Entity";
     // Read live name from the open edit pane's storageKey field — falls back to
     // Redux state for entities opened without a pane (e.g. programmatic calls).

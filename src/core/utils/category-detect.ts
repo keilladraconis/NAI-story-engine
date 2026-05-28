@@ -23,7 +23,7 @@ export const DULFS_CATEGORY_LABELS: Record<DulfsFieldID, string> = {
   [FieldID.UniverseSystems]: "System",
   [FieldID.Locations]: "Location",
   [FieldID.Factions]: "Faction",
-  [FieldID.SituationalDynamics]: "Dynamic",
+  [FieldID.SituationalDynamics]: "Situation",
   [FieldID.Topics]: "Topic",
 };
 

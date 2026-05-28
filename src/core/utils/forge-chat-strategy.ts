@@ -26,18 +26,7 @@ import {
   FORGE_CLEANUP_PROMPT,
   XIALONG_STYLE,
 } from "./prompts";
-import { FieldID, DulfsFieldID } from "../../config/field-definitions";
-
-// --- Field labels for human-readable category names ---
-
-const FIELD_LABEL: Record<DulfsFieldID, string> = {
-  [FieldID.DramatisPersonae]: "Character",
-  [FieldID.UniverseSystems]: "System",
-  [FieldID.Locations]: "Location",
-  [FieldID.Factions]: "Faction",
-  [FieldID.SituationalDynamics]: "Situation",
-  [FieldID.Topics]: "Topic",
-};
+import { DULFS_CATEGORY_LABELS } from "./category-detect";
 
 // --- Phase table ---
 
@@ -83,7 +72,7 @@ export function extractLastCritique(messages: ChatMessage[]): string | null {
 // --- Context block formatters ---
 
 function formatEntityLine(e: WorldEntity, prefix: "D" | "L"): string {
-  const label = FIELD_LABEL[e.categoryId] ?? "Entity";
+  const label = DULFS_CATEGORY_LABELS[e.categoryId] ?? "Entity";
   const summary = e.summary ? ` — ${e.summary.slice(0, 160)}` : "";
   return `${prefix}:${e.id} — ${e.name} (${label})${summary}`;
 }
