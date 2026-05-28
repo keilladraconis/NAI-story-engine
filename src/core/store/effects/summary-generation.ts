@@ -13,7 +13,25 @@ import {
   createEntitySummaryFromLorebookFactory,
   createThreadSummaryFactory,
 } from "../../utils/summary-strategy";
+import {
+  createLorebookContentFactory,
+  buildLorebookKeysPayload,
+} from "../../utils/lorebook-strategy";
 import { buildModelParams } from "../../utils/config";
+
+// Quick "generate this entity" intent fired by the entity card's lightning
+// bolt. Fills only what's missing (summary, lorebook content, lorebook keys),
+// so clicking it on a complete entity is a no-op and it never clobbers
+// existing text. Lets a user queue a handful of entities before bootstrapping.
+export interface EntityRegenRequestedPayload {
+  entityId: string;
+}
+const ENTITY_REGEN_REQUESTED = "entity/regenRequested";
+export const entityRegenRequested = (payload: EntityRegenRequestedPayload) => ({
+  type: ENTITY_REGEN_REQUESTED as typeof ENTITY_REGEN_REQUESTED,
+  payload,
+});
+entityRegenRequested.type = ENTITY_REGEN_REQUESTED;
 
 export function registerSummaryGenerationEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
@@ -75,6 +93,59 @@ export function registerSummaryGenerationEffects(
           target: { type: "entitySummaryBind", entityId: entity.id },
           prefillBehavior: "trim",
         }),
+      );
+    }
+  });
+
+  // Intent: generate whatever the entity is still missing, in one click.
+  subscribeEffect(matchesAction(entityRegenRequested), async (action) => {
+    const { entityId } = action.payload;
+    const entity = getState().world.entitiesById[entityId];
+    if (!entity?.lorebookEntryId) {
+      api.v1.log(
+        `[summary-generation] entityRegenRequested: ${entityId} has no lorebook entry — open the edit pane to author/cast it first`,
+      );
+      return;
+    }
+    const { lorebookEntryId } = entity;
+    const entry = await api.v1.lorebook.entry(lorebookEntryId);
+    const hasSummary = !!entity.summary;
+    const hasContent = !!entry?.text;
+    const hasKeys = !!(entry?.keys && entry.keys.length > 0);
+
+    if (!hasSummary) {
+      const summaryRequestId = `se-entity-summary-${entityId}`;
+      dispatch(
+        requestQueued({ id: summaryRequestId, type: "entitySummary", targetId: entityId }),
+      );
+      dispatch(uiEntitySummaryGenerationRequested({ entityId, requestId: summaryRequestId }));
+    }
+
+    if (!hasContent) {
+      const contentRequestId = `lb-entity-${entityId}-content`;
+      dispatch(
+        requestQueued({ id: contentRequestId, type: "lorebookContent", targetId: lorebookEntryId }),
+      );
+      dispatch(
+        generationSubmitted({
+          requestId: contentRequestId,
+          messageFactory: createLorebookContentFactory(getState, lorebookEntryId),
+          params: await buildModelParams({ max_tokens: 1024 }),
+          target: { type: "lorebookContent", entryId: lorebookEntryId },
+          prefillBehavior: "trim",
+        }),
+      );
+    }
+
+    if (!hasKeys) {
+      const keysRequestId = `lb-entity-${entityId}-keys`;
+      dispatch(
+        requestQueued({ id: keysRequestId, type: "lorebookKeys", targetId: lorebookEntryId }),
+      );
+      dispatch(
+        generationSubmitted(
+          await buildLorebookKeysPayload(getState, lorebookEntryId, keysRequestId),
+        ),
       );
     }
   });

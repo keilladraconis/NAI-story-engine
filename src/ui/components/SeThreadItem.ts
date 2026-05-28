@@ -176,7 +176,9 @@ export class SeThreadItem extends SuiComponent<
     const cards = await Promise.all(
       (group?.entityIds ?? []).map((entityId) =>
         new SeEntityCard({
-          id: IDS.entity(entityId).ROOT,
+          // Scope the DOM id to this Thread — the same entity can appear in
+          // several Threads, and duplicate element IDs break the card's buttons.
+          id: IDS.entity(entityId, groupId).ROOT,
           entityId,
           editHost,
         }).build(),
@@ -334,7 +336,9 @@ export class SeThreadItem extends SuiComponent<
     const initialCards = await Promise.all(
       (group?.entityIds ?? []).map((entityId) =>
         new SeEntityCard({
-          id: IDS.entity(entityId).ROOT,
+          // Scope the DOM id to this Thread — the same entity can appear in
+          // several Threads, and duplicate element IDs break the card's buttons.
+          id: IDS.entity(entityId, groupId).ROOT,
           entityId,
           editHost,
         }).build(),

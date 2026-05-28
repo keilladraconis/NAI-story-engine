@@ -57,11 +57,20 @@ export const IDS = {
     STYLE_INPUT: "se-fn-style",
     STYLE_GEN_BTN: "se-fn-style-gen",
   },
-  entity: (id: string) => ({
-    ROOT: `se-entity-${id}`,
-    REGEN_BTN: `se-entity-${id}-regen`,
-    DELETE_BTN: `se-entity-${id}-delete`,
-  }),
+  // `context` disambiguates the SAME entity rendered in multiple places (e.g.
+  // a card under two Threads). Element IDs must be unique per context or the
+  // NAI engine binds a callback to one copy and the duplicate throws
+  // "callback not found". The bare form is fine for single-context renders
+  // (loose entities). NOTE: these are DOM element IDs, not generation request
+  // IDs — request IDs stay entity-scoped (`se-entity-summary-${id}`, etc.).
+  entity: (id: string, context?: string) => {
+    const root = context ? `se-entity-${id}--${context}` : `se-entity-${id}`;
+    return {
+      ROOT: root,
+      REGEN_BTN: `${root}-regen`,
+      DELETE_BTN: `${root}-delete`,
+    };
+  },
   FORGE: {
     SECTION: "se-forge-section",
     GUIDANCE_INPUT: "se-forge-guidance",

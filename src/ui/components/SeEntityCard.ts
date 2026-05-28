@@ -17,6 +17,7 @@ import {
   type SuiComponentOptions,
 } from "nai-simple-ui";
 import { store } from "../../core/store";
+import { entityRegenRequested } from "../../core/store/effects/summary-generation";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import { colors } from "../theme";
@@ -79,9 +80,12 @@ export class SeEntityCard extends SuiComponent<
 
     this._watcher = new StoreWatcher();
 
-    const { entityId, editHost } = options;
+    const { entityId } = options;
     this._regenBtn = new SeGenerationIconButton({
-      id: IDS.entity(entityId).REGEN_BTN,
+      // DOM id derived from the per-context root (options.id) so the same entity
+      // in two Threads gets two distinct buttons. The requestIds below stay
+      // entity-scoped — both copies track the same generation.
+      id: `${options.id}-regen`,
       iconId: "zap" as IconId,
       requestIds: [
         `se-entity-summary-${entityId}`,
@@ -89,14 +93,12 @@ export class SeEntityCard extends SuiComponent<
         `lb-entity-${entityId}-content`,
         `lb-entity-${entityId}-keys`,
       ],
+      // The bolt queues generation for this entity (summary/content/keys, only
+      // what's missing) — it does NOT open the edit pane, so a user can fire it
+      // on several entities without each click taking over the screen. Click
+      // the entity name to open the edit pane instead.
       onGenerate: () => {
-        editHost?.open(
-          new SeEntityEditPane({
-            id: IDS.EDIT_PANE.ROOT,
-            entityId,
-            editHost: editHost!,
-          }),
-        );
+        store.dispatch(entityRegenRequested({ entityId }));
       },
       contentChecker: async () => {
         const e = store.getState().world.entitiesById[entityId];
@@ -124,7 +126,10 @@ export class SeEntityCard extends SuiComponent<
 
   async compose(): Promise<UIPartColumn> {
     const { entityId } = this.options;
-    const E = IDS.entity(entityId);
+    // All DOM element IDs hang off the per-context root the parent gave us
+    // (this.id) so the same entity rendered under multiple Threads never
+    // collides. `entityId` is still used for entity lookup and request IDs.
+    const root = this.id;
 
     this._watcher.dispose();
 
@@ -134,8 +139,8 @@ export class SeEntityCard extends SuiComponent<
     const iconId = entity?.categoryId
       ? CATEGORY_ICON[entity.categoryId]
       : undefined;
-    const cardId = `${E.ROOT}.card`;
-    const summaryId = `${E.ROOT}-summary`;
+    const cardId = `${root}.card`;
+    const summaryId = `${root}-summary`;
 
     // Reactively update card label, icon, and summary when entity data changes.
     type EntitySlice = { name: string; categoryId: string; summary: string };
@@ -242,7 +247,7 @@ export class SeEntityCard extends SuiComponent<
       async (isPending) => {
         if (isPending) {
           api.v1.ui.updateParts([
-            { id: E.ROOT, style: PENDING_BORDER } as unknown as Partial<UIPart> & { id: string },
+            { id: root, style: PENDING_BORDER } as unknown as Partial<UIPart> & { id: string },
           ]);
         } else {
           const e = store.getState().world.entitiesById[entityId];
@@ -254,7 +259,7 @@ export class SeEntityCard extends SuiComponent<
             nowComplete = !!e?.summary && !!(lbEntry?.text && keysOk);
           }
           api.v1.ui.updateParts([
-            { id: E.ROOT, style: nowComplete ? COMPLETE_BORDER : INCOMPLETE_BORDER } as unknown as Partial<UIPart> & { id: string },
+            { id: root, style: nowComplete ? COMPLETE_BORDER : INCOMPLETE_BORDER } as unknown as Partial<UIPart> & { id: string },
           ]);
         }
       },
@@ -272,7 +277,7 @@ export class SeEntityCard extends SuiComponent<
     });
 
     this._collapsible = new SuiCollapsible({
-      id: `${E.ROOT}-c`,
+      id: `${root}-c`,
       header: card,
       children: [summaryText],
       initialCollapsed: false,
@@ -294,6 +299,6 @@ export class SeEntityCard extends SuiComponent<
     );
 
     const initialStyle = _pendingCache ? PENDING_BORDER : isComplete ? COMPLETE_BORDER : INCOMPLETE_BORDER;
-    return column({ id: E.ROOT, style: initialStyle, content: [collapsible] });
+    return column({ id: root, style: initialStyle, content: [collapsible] });
   }
 }
