@@ -48,7 +48,7 @@ async function submitChatGeneration(
     dispatch(messageRemoved({ chatId: chat.id, id: assistantId }));
     return;
   }
-  const params = await buildModelParams({ max_tokens: 1024, temperature: 1.0 });
+  const params = await buildModelParams({ max_tokens: 512, temperature: 1.0 });
   dispatch(
     requestQueued({
       id: strategy.requestId,
@@ -84,15 +84,24 @@ export function registerChatEffects(
         );
       }
       const chat = findChat(latest(), chatId);
-      if (!chat || chat.messages.at(-1)?.role !== "user") return;
-      const assistantId = api.v1.uuid();
-      dispatch(
-        messageAdded({
-          chatId,
-          message: { id: assistantId, role: "assistant", content: "" },
-        }),
-      );
-      await submitChatGeneration(latest, dispatch, chat, assistantId);
+      const last = chat?.messages.at(-1);
+      if (!chat || !last) return;
+      if (last.role === "user") {
+        const assistantId = api.v1.uuid();
+        dispatch(
+          messageAdded({
+            chatId,
+            message: { id: assistantId, role: "assistant", content: "" },
+          }),
+        );
+        await submitChatGeneration(latest, dispatch, chat, assistantId);
+        return;
+      }
+      // Empty send on an assistant tail = manual continuation: extend the
+      // existing message in place instead of opening a new turn.
+      if (last.role === "assistant" && !text.trim()) {
+        await submitChatGeneration(latest, dispatch, chat, last.id);
+      }
     },
   );
 

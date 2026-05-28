@@ -19,6 +19,8 @@ describe("buildChatStrategy", () => {
     const strategy = await buildChatStrategy(getState, chat, "asst-id");
     expect(strategy.target).toEqual({ type: "chat", chatId: chat.id, messageId: "asst-id" });
     expect(strategy.requestId).toContain(chat.id);
+    // Saved chats auto-continue when the model hits max_tokens.
+    expect(strategy.continuation).toEqual({ maxCalls: 5 });
   });
 
   it("returns a chatRefine target with refineContext applied for a refine chat", async () => {
@@ -40,6 +42,44 @@ describe("buildChatStrategy", () => {
       fieldId: "attg",
     });
     expect(strategy.requestId).toBe("refine-r1-asst");
+  });
+
+  it("manual continuation: keeps the existing assistant tail and switches prefillBehavior to keep", async () => {
+    const assistantId = "asst-existing";
+    const existingContent = "Half-written reply that hit the token cap.";
+    const chat: Chat = {
+      id: "c-cont",
+      type: "brainstorm",
+      title: "x",
+      subMode: "cowriter",
+      messages: [
+        { id: "u1", role: "user", content: "go" },
+        { id: assistantId, role: "assistant", content: existingContent },
+      ],
+      seed: { kind: "blank" },
+    };
+    const getState = (() =>
+      ({
+        chat: { chats: [chat], activeChatId: chat.id, refineChat: null },
+        foundation: {},
+        world: { entitiesById: {}, entityIds: [] },
+        brainstorm: {
+          chats: [{ id: "b1", title: "Brainstorm", messages: [], mode: "cowriter" }],
+          currentChatIndex: 0,
+        },
+      }) as unknown as RootState);
+    const strategy = await buildChatStrategy(getState, chat, assistantId);
+    expect(strategy.prefillBehavior).toBe("keep");
+    expect(strategy.minResponseLength).toBeUndefined();
+    const built = await strategy.messageFactory!();
+    const messages = built.messages;
+    // The existing assistant message survives as the tail of the transcript.
+    const last = messages[messages.length - 1];
+    expect(last.role).toBe("assistant");
+    expect(last.content).toBe(existingContent);
+    // No second assistant turn (i.e. no fresh chat-style prefill) is appended.
+    const assistantTurns = messages.filter((m: Message) => m.role === "assistant");
+    expect(assistantTurns).toHaveLength(1);
   });
 
   it("messageFactory produces system + transcript without the in-progress assistant message", async () => {
