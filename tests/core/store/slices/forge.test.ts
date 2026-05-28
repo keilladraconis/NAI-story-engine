@@ -4,15 +4,27 @@ import {
   initialForgeState,
   tombstoneAdded,
   tombstonesClearedForChat,
+  scrubQueued,
+  scrubCleared,
+  type ForgeSliceState,
   type Tombstone,
 } from "../../../../src/core/store/slices/forge";
 
 const TS1: Tombstone = { name: "Vesper", category: "Character", reason: "user" };
 const TS2: Tombstone = { name: "Felix", category: "Character", reason: "model" };
 
+function seedTombstones(
+  tombstonesByChatId: ForgeSliceState["tombstonesByChatId"],
+): ForgeSliceState {
+  return { tombstonesByChatId, pendingScrubByChatId: {} };
+}
+
 describe("forgeSlice tombstones", () => {
-  it("initial state has empty tombstonesByChatId", () => {
-    expect(initialForgeState).toEqual({ tombstonesByChatId: {} });
+  it("initial state has empty tombstones and pending-scrub maps", () => {
+    expect(initialForgeState).toEqual({
+      tombstonesByChatId: {},
+      pendingScrubByChatId: {},
+    });
   });
 
   it("tombstoneAdded appends a tombstone to the chat's list", () => {
@@ -24,7 +36,7 @@ describe("forgeSlice tombstones", () => {
   });
 
   it("tombstoneAdded appends to an existing chat list", () => {
-    const seeded = { tombstonesByChatId: { c1: [TS1] } };
+    const seeded = seedTombstones({ c1: [TS1] });
     const next = forgeSliceReducer(
       seeded,
       tombstoneAdded({ chatId: "c1", tombstone: TS2 }),
@@ -33,7 +45,7 @@ describe("forgeSlice tombstones", () => {
   });
 
   it("tombstoneAdded deduplicates by name+category (case-insensitive)", () => {
-    const seeded = { tombstonesByChatId: { c1: [TS1] } };
+    const seeded = seedTombstones({ c1: [TS1] });
     const next = forgeSliceReducer(
       seeded,
       tombstoneAdded({
@@ -45,7 +57,7 @@ describe("forgeSlice tombstones", () => {
   });
 
   it("tombstoneAdded does NOT dedup when name matches but category differs", () => {
-    const seeded = { tombstonesByChatId: { c1: [TS1] } };
+    const seeded = seedTombstones({ c1: [TS1] });
     const next = forgeSliceReducer(
       seeded,
       tombstoneAdded({
@@ -63,9 +75,7 @@ describe("forgeSlice tombstones", () => {
   });
 
   it("tombstonesClearedForChat removes only the targeted chat's list", () => {
-    const seeded = {
-      tombstonesByChatId: { c1: [TS1], c2: [TS2] },
-    };
+    const seeded = seedTombstones({ c1: [TS1], c2: [TS2] });
     const next = forgeSliceReducer(
       seeded,
       tombstonesClearedForChat({ chatId: "c1" }),
@@ -79,5 +89,36 @@ describe("forgeSlice tombstones", () => {
       tombstonesClearedForChat({ chatId: "missing" }),
     );
     expect(next).toEqual(initialForgeState);
+  });
+});
+
+describe("forgeSlice pending scrub", () => {
+  it("scrubQueued records names for the chat", () => {
+    const next = forgeSliceReducer(
+      initialForgeState,
+      scrubQueued({ chatId: "c1", names: ["Vesper"] }),
+    );
+    expect(next.pendingScrubByChatId).toEqual({ c1: ["Vesper"] });
+  });
+
+  it("scrubQueued accumulates and dedups (case-insensitive)", () => {
+    const seeded: ForgeSliceState = {
+      tombstonesByChatId: {},
+      pendingScrubByChatId: { c1: ["Vesper"] },
+    };
+    const next = forgeSliceReducer(
+      seeded,
+      scrubQueued({ chatId: "c1", names: ["vesper", "Felix"] }),
+    );
+    expect(next.pendingScrubByChatId.c1).toEqual(["Vesper", "Felix"]);
+  });
+
+  it("scrubCleared removes the chat's pending list", () => {
+    const seeded: ForgeSliceState = {
+      tombstonesByChatId: {},
+      pendingScrubByChatId: { c1: ["Vesper"], c2: ["Felix"] },
+    };
+    const next = forgeSliceReducer(seeded, scrubCleared({ chatId: "c1" }));
+    expect(next.pendingScrubByChatId).toEqual({ c2: ["Felix"] });
   });
 });

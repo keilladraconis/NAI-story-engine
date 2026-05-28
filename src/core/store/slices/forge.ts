@@ -8,10 +8,14 @@ export interface Tombstone {
 
 export interface ForgeSliceState {
   tombstonesByChatId: Record<string, Tombstone[]>;
+  /** Names discarded since the last forge turn, awaiting a reference-scrub
+   *  cleanup that the next continue dispatch leads off with. */
+  pendingScrubByChatId: Record<string, string[]>;
 }
 
 export const initialForgeState: ForgeSliceState = {
   tombstonesByChatId: {},
+  pendingScrubByChatId: {},
 };
 
 export const forgeSlice = createSlice({
@@ -43,8 +47,33 @@ export const forgeSlice = createSlice({
       const { [payload.chatId]: _, ...rest } = state.tombstonesByChatId;
       return { ...state, tombstonesByChatId: rest };
     },
+
+    scrubQueued: (state, payload: { chatId: string; names: string[] }) => {
+      const existing = state.pendingScrubByChatId[payload.chatId] ?? [];
+      const seen = new Set(existing.map((n) => n.toLowerCase()));
+      const added = payload.names.filter((n) => !seen.has(n.toLowerCase()));
+      if (added.length === 0) return state;
+      return {
+        ...state,
+        pendingScrubByChatId: {
+          ...state.pendingScrubByChatId,
+          [payload.chatId]: [...existing, ...added],
+        },
+      };
+    },
+
+    scrubCleared: (state, payload: { chatId: string }) => {
+      if (!state.pendingScrubByChatId[payload.chatId]) return state;
+      const { [payload.chatId]: _, ...rest } = state.pendingScrubByChatId;
+      return { ...state, pendingScrubByChatId: rest };
+    },
   },
 });
 
 export const forgeSliceReducer = forgeSlice.reducer;
-export const { tombstoneAdded, tombstonesClearedForChat } = forgeSlice.actions;
+export const {
+  tombstoneAdded,
+  tombstonesClearedForChat,
+  scrubQueued,
+  scrubCleared,
+} = forgeSlice.actions;

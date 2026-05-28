@@ -187,6 +187,7 @@ describe("buildForgeChatStrategy", () => {
               { name: "Felix", category: "Character", reason: "user" },
             ],
           },
+          pendingScrubByChatId: {},
         },
       });
     const strat = buildForgeChatStrategy(getState, chat, "asst-pending");

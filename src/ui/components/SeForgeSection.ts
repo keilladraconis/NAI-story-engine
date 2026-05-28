@@ -13,6 +13,7 @@ import { store } from "../../core/store";
 import { chatSwitched } from "../../core/store/slices/chat";
 import { forgeChatNewSessionRequested } from "../../core/store/effects/forge-chat-effects";
 import { selectActiveForgeChatId } from "../../core/store/selectors/forge";
+import { getChatTypeSpec } from "../../core/chat-types";
 import { IDS, STORAGE_KEYS } from "../../ui/framework/ids";
 import { SeGenerationButton } from "./SeGenerationButton";
 import { SeConfirmButton } from "./SeConfirmButton";
@@ -43,17 +44,33 @@ export class SeForgeSection extends SuiComponent<
       id: FG.FORGE_BTN,
       label: "Forge",
       onGenerate: async () => {
-        const state = store.getState();
-        const activeId = selectActiveForgeChatId(state);
-        if (activeId) {
-          store.dispatch(chatSwitched({ id: activeId }));
-          return;
-        }
         const guidance =
           ((await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_GUIDANCE_UI)) as string) || "";
-        store.dispatch(
-          forgeChatNewSessionRequested({ initialUserMessage: guidance }),
-        );
+        const activeId = selectActiveForgeChatId(store.getState());
+        if (activeId) {
+          // Resume the open session. Feed the guidance in exactly as a chat-input
+          // send would (Cast All / Discard All are what close a session) so it
+          // is no longer dropped on the floor.
+          store.dispatch(chatSwitched({ id: activeId }));
+          if (guidance.trim()) {
+            const chat = store
+              .getState()
+              .chat.chats.find((c) => c.id === activeId);
+            if (chat) {
+              getChatTypeSpec("forge").handleSend?.(chat, guidance, {
+                getState: store.getState,
+                dispatch: store.dispatch,
+              });
+            }
+          }
+        } else {
+          store.dispatch(
+            forgeChatNewSessionRequested({ initialUserMessage: guidance }),
+          );
+        }
+        if (guidance.trim()) {
+          await api.v1.storyStorage.remove(STORAGE_KEYS.FORGE_GUIDANCE_UI);
+        }
       },
       stateProjection: (s) => {
         const t = s.runtime.activeRequest?.type;

@@ -21,10 +21,20 @@
 import { Store, matchesAction } from "nai-store";
 import type { RootState, AppDispatch, WorldEntity } from "../types";
 import type { Chat } from "../../chat-types/types";
-import { chatCreated, subModeChanged, messageAdded } from "../slices/chat";
+import {
+  chatCreated,
+  chatDeleted,
+  subModeChanged,
+  messageAdded,
+} from "../slices/chat";
 import { requestQueued } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
-import { tombstoneAdded } from "../slices/forge";
+import {
+  tombstoneAdded,
+  tombstonesClearedForChat,
+  scrubQueued,
+  scrubCleared,
+} from "../slices/forge";
 import { entityDeleted, entityLorebookEntryBound } from "../slices/world";
 import { DULFS_CATEGORY_LABELS } from "../../utils/category-detect";
 import { ensureCategory } from "./lorebook-sync";
@@ -123,6 +133,17 @@ function nextPhase(current: string | undefined): "sketch" | "expand" | "weave" {
   return "sketch";
 }
 
+/**
+ * Ends a forge session (the explicit close performed by Cast All / Discard All):
+ * drops the chat and its transient forge state so the Forge button starts a
+ * fresh session next time instead of resuming this one.
+ */
+function closeForgeSession(dispatch: AppDispatch, chatId: string): void {
+  dispatch(scrubCleared({ chatId }));
+  dispatch(tombstonesClearedForChat({ chatId }));
+  dispatch(chatDeleted({ id: chatId }));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Effect registration
 // ─────────────────────────────────────────────────────────────────────────────
@@ -137,10 +158,48 @@ export function registerForgeChatEffects(
     matchesAction(forgeChatContinueRequested),
     async (action, { getState: latest }) => {
       const { chatId } = action.payload;
-      const state = latest();
-      const chat = findChat(state, chatId);
+      const chat = findChat(latest(), chatId);
       if (!chat) return;
 
+      // Lead off with a references-cleanup turn if drafts were discarded since
+      // the last forge turn, then continue into the normal phase turn. The
+      // cleanup is queued first, so it runs (and scrubs the pool) before the
+      // phase turn's JIT factory builds its context.
+      const pending = latest().forge.pendingScrubByChatId[chatId] ?? [];
+      if (pending.length > 0) {
+        if (poolFor(latest(), chatId).length > 0) {
+          const cleanupId = api.v1.uuid();
+          dispatch(
+            messageAdded({
+              chatId,
+              message: {
+                id: cleanupId,
+                role: "assistant",
+                content: "",
+                messageKind: "cleanup",
+              },
+            }),
+          );
+          const cleanupChat = findChat(latest(), chatId)!;
+          const cleanupStrategy = buildForgeCleanupStrategy(
+            latest,
+            cleanupChat,
+            cleanupId,
+            pending,
+          );
+          dispatch(
+            requestQueued({
+              id: cleanupStrategy.requestId,
+              type: "forgeCleanup",
+              targetId: cleanupId,
+            }),
+          );
+          dispatch(generationSubmitted(cleanupStrategy));
+        }
+        dispatch(scrubCleared({ chatId }));
+      }
+
+      const state = latest();
       const pool = poolFor(state, chatId);
       const advance = action.payload.advancePhase !== false;
       const target = !advance
@@ -195,44 +254,18 @@ export function registerForgeChatEffects(
       );
       dispatch(entityDeleted({ entityId }));
 
-      const remaining = Object.values(latest().world.entitiesById).filter(
+      // Defer the reference scrub rather than forging on every discard: flag
+      // the name so the next Continue Forging leads with one cleanup turn. Only
+      // worth scrubbing if other drafts remain that could mention it.
+      const otherDraftsRemain = Object.values(latest().world.entitiesById).some(
         (e) =>
           e.id !== entityId &&
           e.lifecycle === "draft" &&
           e.sourceChatId === chatId,
       );
-      if (remaining.length === 0) return;
-
-      const chat = findChat(latest(), chatId);
-      if (!chat) return;
-
-      const assistantId = api.v1.uuid();
-      dispatch(
-        messageAdded({
-          chatId,
-          message: {
-            id: assistantId,
-            role: "assistant",
-            content: "",
-            messageKind: "cleanup",
-          },
-        }),
-      );
-
-      const strategy = buildForgeCleanupStrategy(
-        latest,
-        chat,
-        assistantId,
-        [entity.name],
-      );
-      dispatch(
-        requestQueued({
-          id: strategy.requestId,
-          type: "forgeCleanup",
-          targetId: assistantId,
-        }),
-      );
-      dispatch(generationSubmitted(strategy));
+      if (otherDraftsRemain) {
+        dispatch(scrubQueued({ chatId, names: [entity.name] }));
+      }
     },
   );
 
@@ -313,7 +346,7 @@ export function registerForgeChatEffects(
     },
   );
 
-  // ─── Cast All (promote every draft in chat) ─────────────────────────────────
+  // ─── Cast All (promote every draft, then close the session) ─────────────────
   subscribeEffect(
     matchesAction(forgeCastAllRequested),
     async (action, { getState: latest }) => {
@@ -322,18 +355,19 @@ export function registerForgeChatEffects(
       for (const entity of drafts) {
         dispatch(entityCastRequested({ entityId: entity.id }));
       }
+      // Cast All is the explicit session close — drop the chat so a later Forge
+      // starts fresh. Per-entity casts run async off the dispatches above and
+      // reference entities, not the chat, so deleting it here is safe.
+      closeForgeSession(dispatch, chatId);
     },
   );
 
-  // ─── Discard All (tombstone + delete every draft, then one cleanup turn) ────
+  // ─── Discard All (tombstone + delete every draft, then close the session) ───
   subscribeEffect(
     matchesAction(forgeDiscardAllRequested),
     async (action, { getState: latest }) => {
       const { chatId } = action.payload;
       const drafts = poolFor(latest(), chatId);
-      if (drafts.length === 0) return;
-
-      const names: string[] = [];
       for (const entity of drafts) {
         dispatch(
           tombstoneAdded({
@@ -346,39 +380,10 @@ export function registerForgeChatEffects(
           }),
         );
         dispatch(entityDeleted({ entityId: entity.id }));
-        names.push(entity.name);
       }
-
-      const chat = findChat(latest(), chatId);
-      if (!chat) return;
-
-      const assistantId = api.v1.uuid();
-      dispatch(
-        messageAdded({
-          chatId,
-          message: {
-            id: assistantId,
-            role: "assistant",
-            content: "",
-            messageKind: "cleanup",
-          },
-        }),
-      );
-
-      const strategy = buildForgeCleanupStrategy(
-        latest,
-        chat,
-        assistantId,
-        names,
-      );
-      dispatch(
-        requestQueued({
-          id: strategy.requestId,
-          type: "forgeCleanup",
-          targetId: assistantId,
-        }),
-      );
-      dispatch(generationSubmitted(strategy));
+      // No cleanup turn: every draft is gone, so there is nothing left to scrub.
+      // Discard All also closes the session.
+      closeForgeSession(dispatch, chatId);
     },
   );
 }

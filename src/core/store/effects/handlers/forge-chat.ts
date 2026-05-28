@@ -21,7 +21,7 @@ import {
 } from "../../../utils/crucible-command-parser";
 import { stripThinkingTags } from "../../../utils/tag-parser";
 import { DULFS_CATEGORY_LABELS } from "../../../utils/category-detect";
-import { DulfsFieldID } from "../../../../config/field-definitions";
+import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
 
 type ForgeChatTarget = Extract<GenerationStrategy["target"], { type: "forgeChat" }>;
 type ForgeCleanupTarget = Extract<GenerationStrategy["target"], { type: "forgeCleanup" }>;
@@ -30,6 +30,12 @@ function findEntityByName(state: RootState, name: string): WorldEntity | undefin
   return Object.values(state.world.entitiesById).find(
     (e) => e.name.toLowerCase() === name.toLowerCase(),
   );
+}
+
+/** True if `name` was discarded earlier in this session — never resurrect it. */
+function isTombstoned(state: RootState, chatId: string, name: string): boolean {
+  const tombs = state.forge.tombstonesByChatId[chatId] ?? [];
+  return tombs.some((t) => t.name.toLowerCase() === name.toLowerCase());
 }
 
 function emitWarning(dispatch: AppDispatch, chatId: string, text: string): void {
@@ -70,6 +76,12 @@ async function executeForgeChatCommands(
           api.v1.log(`[forge-chat] CREATE rejected: "${cmd.name}" already exists`);
           break;
         }
+        if (isTombstoned(getState(), chatId, cmd.name)) {
+          api.v1.log(
+            `[forge-chat] CREATE rejected: "${cmd.name}" was removed this session`,
+          );
+          break;
+        }
         const entity: WorldEntity = {
           id: api.v1.uuid(),
           categoryId: fieldId,
@@ -85,19 +97,48 @@ async function executeForgeChatCommands(
       case "REVISE": {
         if (!cmd.content.trim()) break;
         const target = findEntityByName(getState(), cmd.name);
-        if (!target) {
-          api.v1.log(`[forge-chat] REVISE: "${cmd.name}" not found`);
-          break;
-        }
-        if (target.lifecycle === "live") {
-          emitWarning(
-            dispatch,
-            chatId,
-            `⚠ Forge attempted to revise live entity "${target.name}" — rejected. Live entities are read-only context.`,
+        if (target) {
+          if (target.lifecycle === "live") {
+            emitWarning(
+              dispatch,
+              chatId,
+              `⚠ Forge attempted to revise live entity "${target.name}" — rejected. Live entities are read-only context.`,
+            );
+            break;
+          }
+          dispatch(
+            entitySummaryUpdated({
+              entityId: target.id,
+              summary: cmd.content,
+              lastAffectingMessageId: assistantMessageId,
+            }),
           );
           break;
         }
-        dispatch(entitySummaryUpdated({ entityId: target.id, summary: cmd.content, lastAffectingMessageId: assistantMessageId }));
+        // Not found: find-or-create. The model routinely revises an element it
+        // never created, so treat REVISE as create-if-missing — but never
+        // resurrect something the user discarded this session.
+        if (isTombstoned(getState(), chatId, cmd.name)) {
+          api.v1.log(
+            `[forge-chat] REVISE: "${cmd.name}" was removed this session — not recreating`,
+          );
+          break;
+        }
+        // REVISE carries no element type; default to Character (the most common
+        // forge output). The user can recategorize in the edit pane.
+        const created: WorldEntity = {
+          id: api.v1.uuid(),
+          categoryId: FieldID.DramatisPersonae,
+          name: cmd.name,
+          summary: cmd.content,
+          lifecycle: "draft",
+          sourceChatId: chatId,
+          lastAffectingMessageId: assistantMessageId,
+        };
+        api.v1.log(
+          `[forge-chat] REVISE "${cmd.name}" not found — creating as draft Character`,
+        );
+        dispatch(entityForged({ entity: created }));
         break;
       }
       case "DELETE": {

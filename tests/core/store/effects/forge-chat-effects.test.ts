@@ -46,7 +46,7 @@ function makeState(
   return {
     chat: { chats, activeChatId: chats[0]?.id ?? null, refineChat: null },
     world: { groups: [], entitiesById, entityIds: entities.map(e=>e.id) },
-    forge: { tombstonesByChatId: {} },
+    forge: { tombstonesByChatId: {}, pendingScrubByChatId: {} },
   } as unknown as RootState;
 }
 
@@ -157,21 +157,24 @@ describe("entityDiscardRequested effect", () => {
     expect(del).toBeDefined();
   });
 
-  it("submits a cleanup turn when other drafts remain in the pool", async () => {
+  it("queues a deferred scrub (no generation) when other drafts remain", async () => {
     const chat = makeChat();
     const target = makeEntity({ id: "d1", name: "Vesper", sourceChatId: "fc-1", lifecycle: "draft" });
     const sibling = makeEntity({ id: "d2", name: "Marsh", sourceChatId: "fc-1", lifecycle: "draft" });
     const state = makeState([chat], [target, sibling]);
     const { dispatch, fire } = makeHarness(state);
     await fire(entityDiscardRequested({ entityId: "d1" }));
+    // Discard must NOT forge immediately — it flags a scrub for the next turn.
     const submitted = dispatch.mock.calls.find(
       ([a]) => a.type === "ui/generationSubmitted",
     );
-    expect(submitted).toBeDefined();
-    expect((submitted![0].payload as any).target?.type).toBe("forgeCleanup");
+    expect(submitted).toBeUndefined();
+    const scrub = dispatch.mock.calls.find(([a]) => a.type === "forge/scrubQueued");
+    expect(scrub).toBeDefined();
+    expect((scrub![0].payload as any).names).toEqual(["Vesper"]);
   });
 
-  it("skips cleanup when pool would be empty after discard", async () => {
+  it("does not queue a scrub when no other drafts remain", async () => {
     const chat = makeChat();
     const lone = makeEntity({ id: "d1", name: "Vesper", sourceChatId: "fc-1", lifecycle: "draft" });
     const state = makeState([chat], [lone]);
@@ -181,6 +184,8 @@ describe("entityDiscardRequested effect", () => {
       ([a]) => a.type === "ui/generationSubmitted",
     );
     expect(submitted).toBeUndefined();
+    const scrub = dispatch.mock.calls.find(([a]) => a.type === "forge/scrubQueued");
+    expect(scrub).toBeUndefined();
   });
 
   it("ignores discard on a live entity (only drafts are discardable via this path)", async () => {
@@ -197,6 +202,26 @@ describe("entityDiscardRequested effect", () => {
     const { dispatch, fire } = makeHarness(state);
     await fire(entityDiscardRequested({ entityId: "d-orphan" }));
     expect(dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("forgeChatContinueRequested with a pending scrub", () => {
+  it("leads off with a forgeCleanup turn before the phase turn", async () => {
+    const chat = makeChat({ subMode: "sketch" });
+    const draft = makeEntity({ id: "d1", name: "Marsh", sourceChatId: "fc-1", lifecycle: "draft" });
+    const state = makeState([chat], [draft]);
+    // Seed a pending scrub for a discarded sibling.
+    (state.forge as any).pendingScrubByChatId = { "fc-1": ["Vesper"] };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
+
+    const submitted = dispatch.mock.calls
+      .filter(([a]) => a.type === "ui/generationSubmitted")
+      .map(([a]) => (a.payload as { target: { type: string } }).target.type);
+    // Cleanup turn first, then the regular phase turn.
+    expect(submitted).toEqual(["forgeCleanup", "forgeChat"]);
+    const cleared = dispatch.mock.calls.find(([a]) => a.type === "forge/scrubCleared");
+    expect(cleared).toBeDefined();
   });
 });
 
@@ -269,7 +294,7 @@ describe("entityCastRequested effect", () => {
 });
 
 describe("forgeCastAllRequested effect", () => {
-  it("dispatches entityCastRequested for every draft owned by the chat", async () => {
+  it("casts every draft owned by the chat, then closes the session", async () => {
     const chat = makeChat();
     const d1 = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
     const d2 = makeEntity({ id: "d2", sourceChatId: "fc-1", lifecycle: "draft" });
@@ -283,11 +308,15 @@ describe("forgeCastAllRequested effect", () => {
       .map(([a]) => (a.payload as { entityId: string }).entityId)
       .sort();
     expect(castIds).toEqual(["d1", "d2"]);
+    // Cast All is the explicit session close.
+    const closed = dispatch.mock.calls.find(([a]) => a.type === "chat/chatDeleted");
+    expect(closed).toBeDefined();
+    expect((closed![0].payload as { id: string }).id).toBe("fc-1");
   });
 });
 
 describe("forgeDiscardAllRequested effect", () => {
-  it("tombstones and deletes every draft, then runs one cleanup turn", async () => {
+  it("tombstones and deletes every draft, then closes the session (no cleanup turn)", async () => {
     const chat = makeChat();
     const d1 = makeEntity({ id: "d1", name: "Vesper", sourceChatId: "fc-1", lifecycle: "draft" });
     const d2 = makeEntity({ id: "d2", name: "Hollow", sourceChatId: "fc-1", lifecycle: "draft" });
@@ -303,15 +332,18 @@ describe("forgeDiscardAllRequested effect", () => {
       ([a]) => a.type === "world/entityDeleted",
     );
     expect(deletes).toHaveLength(2);
+    // No cleanup turn — every draft is gone, nothing left to scrub.
     const cleanupTurns = dispatch.mock.calls.filter(
       ([a]) =>
         a.type === "ui/generationSubmitted" &&
         (a.payload as { target: { type: string } }).target.type === "forgeCleanup",
     );
-    expect(cleanupTurns).toHaveLength(1);
+    expect(cleanupTurns).toHaveLength(0);
+    const closed = dispatch.mock.calls.find(([a]) => a.type === "chat/chatDeleted");
+    expect(closed).toBeDefined();
   });
 
-  it("skips the cleanup turn when no drafts remain after deletion", async () => {
+  it("closes the session even when there are no drafts to discard", async () => {
     const chat = makeChat();
     const state = makeState([chat], []);
     const { dispatch, fire } = makeHarness(state);
@@ -322,5 +354,7 @@ describe("forgeDiscardAllRequested effect", () => {
         (a.payload as { target: { type: string } }).target.type === "forgeCleanup",
     );
     expect(cleanupTurns).toHaveLength(0);
+    const closed = dispatch.mock.calls.find(([a]) => a.type === "chat/chatDeleted");
+    expect(closed).toBeDefined();
   });
 });

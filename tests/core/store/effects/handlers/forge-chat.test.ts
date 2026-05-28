@@ -31,12 +31,18 @@ function makeEntity(over: Partial<WorldEntity>): WorldEntity {
   } as WorldEntity;
 }
 
-function makeState(entities: WorldEntity[] = []): RootState {
+function makeState(
+  entities: WorldEntity[] = [],
+  tombstonesByChatId: Record<
+    string,
+    { name: string; category: string; reason: "user" | "model" }[]
+  > = {},
+): RootState {
   const entitiesById: Record<string, WorldEntity> = {};
   for (const e of entities) entitiesById[e.id] = e;
   return {
     world: { groups: [], entitiesById, entityIds: entities.map(e => e.id) },
-    forge: { tombstonesByChatId: {} },
+    forge: { tombstonesByChatId, pendingScrubByChatId: {} },
   } as unknown as RootState;
 }
 
@@ -167,6 +173,65 @@ describe("forgeChatHandler.completion", () => {
     );
     expect(added).toBeDefined();
     expect(added![0].payload.message.messageKind).toBe("warning");
+  });
+
+  it("REVISE on a non-existent name creates a draft Character (find-or-create)", async () => {
+    const dispatch = vi.fn();
+    const ctx: CompletionContext<ForgeChatTarget> = {
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState: () => makeState(),
+      dispatch,
+      accumulatedText: "[REVISE \"Wholly New\" | a stranger from the marsh]",
+      generationSucceeded: true,
+    };
+    await forgeChatHandler.completion(ctx);
+    const forged = dispatch.mock.calls.find(
+      ([a]) => a.type === "world/entityForged",
+    );
+    expect(forged).toBeDefined();
+    expect(forged![0].payload.entity.name).toBe("Wholly New");
+    expect(forged![0].payload.entity.lifecycle).toBe("draft");
+    expect(forged![0].payload.entity.categoryId).toBe(FieldID.DramatisPersonae);
+    expect(forged![0].payload.entity.sourceChatId).toBe("c1");
+  });
+
+  it("REVISE on a tombstoned name does NOT recreate it", async () => {
+    const dispatch = vi.fn();
+    const ctx: CompletionContext<ForgeChatTarget> = {
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState: () =>
+        makeState([], {
+          c1: [{ name: "Vesper", category: "Character", reason: "user" }],
+        }),
+      dispatch,
+      accumulatedText: "[REVISE \"Vesper\" | back from the dead]",
+      generationSucceeded: true,
+    };
+    await forgeChatHandler.completion(ctx);
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "world/entityForged"),
+    ).toBe(false);
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "world/entitySummaryUpdated"),
+    ).toBe(false);
+  });
+
+  it("CREATE on a tombstoned name does NOT recreate it", async () => {
+    const dispatch = vi.fn();
+    const ctx: CompletionContext<ForgeChatTarget> = {
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState: () =>
+        makeState([], {
+          c1: [{ name: "Vesper", category: "Character", reason: "user" }],
+        }),
+      dispatch,
+      accumulatedText: "[CREATE CHARACTER \"Vesper\" | resurrected]",
+      generationSucceeded: true,
+    };
+    await forgeChatHandler.completion(ctx);
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "world/entityForged"),
+    ).toBe(false);
   });
 
   it("permits REVISE on a draft entity", async () => {
