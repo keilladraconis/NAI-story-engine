@@ -48,7 +48,6 @@ export const forgeSpec: ChatTypeSpec<ForgePhase> = {
   headerControls(_chat: Chat, _ctx: SpecCtx) {
     return [
       { id: "phase", kind: "phaseIndicator" },
-      { id: "continue", kind: "continueButton" },
       { id: "cast-all", kind: "castAllButton" },
       { id: "discard-all", kind: "discardAllButton" },
       { id: "sessions", kind: "sessionsButton" },

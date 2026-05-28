@@ -69,11 +69,10 @@ describe("forgeSpec", () => {
     expect(forgeSpec.contextSlice(chat, ctx)).toEqual(chat.messages);
   });
 
-  it("headerControls includes phase, continue, cast-all, discard-all, sessions", () => {
+  it("headerControls includes phase, cast-all, discard-all, sessions", () => {
     const controls = forgeSpec.headerControls(makeChat(), ctx);
     const kinds = controls.map((c) => c.kind);
     expect(kinds).toContain("phaseIndicator");
-    expect(kinds).toContain("continueButton");
     expect(kinds).toContain("castAllButton");
     expect(kinds).toContain("discardAllButton");
     expect(kinds).toContain("sessionsButton");

@@ -55,7 +55,6 @@ export interface HeaderControl {
     | "sessionsButton"
     | "newChatButton"
     | "label"
-    | "continueButton"
     | "castAllButton"
     | "discardAllButton"
     | "phaseIndicator";

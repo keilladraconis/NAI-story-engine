@@ -236,9 +236,6 @@ export class ChatHeader extends SuiComponent<
           built.push(await discardAllBtn.build());
           break;
         }
-        case "continueButton":
-          // Collapsed into empty Send. Plan 4 removes this kind.
-          break;
         default:
           break;
       }
