@@ -6,6 +6,7 @@ const XIALONG_MODEL = "xialong-v1";
 export const LOREBOOK_CHAIN_STOPS = [
   "\nName:",       // new entry header
   "\n---",         // markdown HR (GLM common separator)
+  "---",           // bare HR — appears without leading newline at end of output
   "\n***",         // markdown HR (asterisk variant)
   "\n[ Chapter",   // chapter / section header
   "\n[Chapter",

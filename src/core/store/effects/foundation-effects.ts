@@ -82,7 +82,7 @@ const createShapeFactory =
         max_tokens: 128,
         temperature: 0.7,
         min_p: 0.05,
-        stop: ["</think>"],
+        stop: ["</think>", "\n---", "---"],
       }),
     };
   };
@@ -167,7 +167,7 @@ const createWorldStateFactory =
         max_tokens: 256,
         temperature: 0.85,
         min_p: 0.05,
-        stop: ["</think>"],
+        stop: ["</think>", "\n---", "---"],
       }),
     };
   };
@@ -249,7 +249,7 @@ const createStyleFactory =
         max_tokens: 300,
         temperature: 0.7,
         min_p: 0.05,
-        stop: ["</think>", "\n***", "\n---", "\n[ S", "\n[ Style"],
+        stop: ["</think>", "\n***", "\n---", "---", "\n[ S", "\n[ Style"],
       }),
     };
   };
@@ -286,7 +286,7 @@ const createContractFactory =
         max_tokens: 400,
         temperature: 0.7,
         min_p: 0.05,
-        stop: ["</think>"],
+        stop: ["</think>", "\n---", "---"],
       }),
     };
   };
