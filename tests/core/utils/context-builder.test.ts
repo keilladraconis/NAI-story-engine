@@ -30,7 +30,6 @@ function makeState(
       groups: [],
       entitiesById: {},
       entityIds: [],
-      forgeLoopActive: false,
     },
     runtime: {} as any,
     ui: {} as any,

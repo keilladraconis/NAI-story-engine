@@ -20,7 +20,7 @@ function stateWith(entities: WorldEntity[]): RootState {
     chat: { chats: [], activeChatId: null, refineChat: null },
     world: {
       groups: [], entitiesById,
-      entityIds: entities.map((e) => e.id), forgeLoopActive: false,
+      entityIds: entities.map((e) => e.id),
     },
     forge: { tombstonesByChatId: {} },
   } as unknown as RootState;

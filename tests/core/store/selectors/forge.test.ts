@@ -12,7 +12,7 @@ function chat(over: Partial<Chat> = {}): Chat {
 function state(chats: Chat[]): RootState {
   return {
     chat: { chats, activeChatId: null, refineChat: null },
-    world: { groups: [], entitiesById: {}, entityIds: [], forgeLoopActive: false },
+    world: { groups: [], entitiesById: {}, entityIds: [] },
     forge: { tombstonesByChatId: {} },
   } as unknown as RootState;
 }

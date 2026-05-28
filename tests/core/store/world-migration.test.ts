@@ -17,7 +17,6 @@ describe("migrateWorldState — lifecycle backfill", () => {
       },
       entityIds: ["e1"],
       groups: [],
-      forgeLoopActive: false,
     } as unknown as WorldState;
 
     const migrated = migrateWorldState(legacy);
@@ -36,7 +35,6 @@ describe("migrateWorldState — lifecycle backfill", () => {
       },
       entityIds: ["e2"],
       groups: [],
-      forgeLoopActive: false,
     } as unknown as WorldState;
 
     const migrated = migrateWorldState(legacy);
@@ -61,7 +59,6 @@ describe("migrateWorldState — lifecycle backfill", () => {
       },
       entityIds: ["e3"],
       groups: [],
-      forgeLoopActive: false,
     } as WorldState;
 
     const migrated = migrateWorldState(fresh);

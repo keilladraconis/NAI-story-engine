@@ -35,7 +35,7 @@ function makeState(entities: WorldEntity[] = []): RootState {
   const entitiesById: Record<string, WorldEntity> = {};
   for (const e of entities) entitiesById[e.id] = e;
   return {
-    world: { groups: [], entitiesById, entityIds: entities.map(e => e.id), forgeLoopActive: false },
+    world: { groups: [], entitiesById, entityIds: entities.map(e => e.id) },
     forge: { tombstonesByChatId: {} },
   } as unknown as RootState;
 }

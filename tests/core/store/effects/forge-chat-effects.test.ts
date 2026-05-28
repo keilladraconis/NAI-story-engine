@@ -45,7 +45,7 @@ function makeState(
   for (const e of entities) entitiesById[e.id] = e;
   return {
     chat: { chats, activeChatId: chats[0]?.id ?? null, refineChat: null },
-    world: { groups: [], entitiesById, entityIds: entities.map(e=>e.id), forgeLoopActive: false },
+    world: { groups: [], entitiesById, entityIds: entities.map(e=>e.id) },
     forge: { tombstonesByChatId: {} },
   } as unknown as RootState;
 }
