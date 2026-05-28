@@ -35,6 +35,8 @@ import {
   registerLorebookSyncHooks,
 } from "../core/store/effects/lorebook-sync";
 import { chatCreated, chatSwitched } from "../core/store/slices/chat";
+import { forgeCastAllRequested } from "../core/store/effects/forge-chat-effects";
+import { worldExpansionSet } from "../core/store/slices/ui";
 import { migrateBrainstormToChat } from "../core/store/migrations/brainstorm-to-chat";
 import { stateUpdated, requestActivated } from "../core/store/slices/runtime";
 import { IDS, STORAGE_KEYS } from "./framework/ids";
@@ -60,10 +62,23 @@ export class StoryEnginePlugin extends SuiPlugin {
   private _seHeaderBar?: SeHeaderBar;
   private _forgePane?: ForgePane;
 
+  // Tab the user was on before an edit pane took over, so back-out returns
+  // them there. Captured on the first open of a session; null when not editing.
+  private _preEditTab: number | null = null;
+
   // ── Edit pane hosting ──
   readonly editHost: EditPaneHost = {
     open: (pane) => {
       void (async () => {
+        // The edit slot lives in the Story Engine pane (tab 1). Surface it
+        // whenever any edit pane opens — otherwise opening from an inline
+        // forge draft card (Chat tab) updates the slot behind the active tab.
+        // Remember the origin tab (first open only, so swapping one pane for
+        // another keeps the original) and restore it on close().
+        if (this._preEditTab === null) {
+          this._preEditTab = this._tabBar?.activeTab ?? 1;
+        }
+        await this._tabBar?.switchTo(1);
         const editPart = await pane.build();
         api.v1.ui.updateParts([
           { id: "se-edit-slot", content: [editPart] } as unknown as Partial<UIPart> & { id: string },
@@ -76,6 +91,10 @@ export class StoryEnginePlugin extends SuiPlugin {
         { id: "se-edit-slot", content: [] } as unknown as Partial<UIPart> & { id: string },
         { id: "se-main-content", style: {} } as unknown as Partial<UIPart> & { id: string },
       ]);
+      if (this._preEditTab !== null) {
+        void this._tabBar?.switchTo(this._preEditTab);
+        this._preEditTab = null;
+      }
     },
   };
 
@@ -135,8 +154,7 @@ export class StoryEnginePlugin extends SuiPlugin {
         (e) => !e.category || !seCategories.has(e.category),
       ).length;
       if (unmanagedCount > 0 || memText.trim() || anText.trim()) {
-        // Switch to Story Engine tab so the import wizard is visible
-        await this._tabBar?.switchTo(1);
+        // editHost.open() surfaces the Story Engine tab itself.
         this.editHost.open(
           new SeImportWizard({ id: IDS.IMPORT.WIZARD, editHost: this.editHost }),
         );
@@ -326,6 +344,13 @@ export class StoryEnginePlugin extends SuiPlugin {
         }
       },
     );
+
+    // Cast All closes the forge session — drop the user on the Story Engine tab
+    // with the World fully expanded so the freshly-cast entities are right there.
+    store.subscribeEffect(matchesAction(forgeCastAllRequested), () => {
+      void this._tabBar?.switchTo(1);
+      store.dispatch(worldExpansionSet({ expanded: true }));
+    });
   }
 
   protected async registerHooks(): Promise<void> {
