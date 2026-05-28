@@ -20,19 +20,11 @@ import {
   type ParsedCommand,
 } from "../../../utils/crucible-command-parser";
 import { stripThinkingTags } from "../../../utils/tag-parser";
-import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
+import { DULFS_CATEGORY_LABELS } from "../../../utils/category-detect";
+import { DulfsFieldID } from "../../../../config/field-definitions";
 
 type ForgeChatTarget = Extract<GenerationStrategy["target"], { type: "forgeChat" }>;
 type ForgeCleanupTarget = Extract<GenerationStrategy["target"], { type: "forgeCleanup" }>;
-
-const FIELD_LABEL: Record<DulfsFieldID, string> = {
-  [FieldID.DramatisPersonae]: "Character",
-  [FieldID.UniverseSystems]: "System",
-  [FieldID.Locations]: "Location",
-  [FieldID.Factions]: "Faction",
-  [FieldID.SituationalDynamics]: "Situation",
-  [FieldID.Topics]: "Topic",
-};
 
 function findEntityByName(state: RootState, name: string): WorldEntity | undefined {
   return Object.values(state.world.entitiesById).find(
@@ -128,7 +120,7 @@ async function executeForgeChatCommands(
             chatId,
             tombstone: {
               name: target.name,
-              category: FIELD_LABEL[target.categoryId] ?? "Entity",
+              category: DULFS_CATEGORY_LABELS[target.categoryId] ?? "Entity",
               reason: "model",
             },
           }),

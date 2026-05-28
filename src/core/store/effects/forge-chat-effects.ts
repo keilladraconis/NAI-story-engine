@@ -26,7 +26,7 @@ import { requestQueued } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
 import { tombstoneAdded } from "../slices/forge";
 import { entityDeleted, entityLorebookEntryBound } from "../slices/world";
-import { FieldID, DulfsFieldID } from "../../../config/field-definitions";
+import { DULFS_CATEGORY_LABELS } from "../../utils/category-detect";
 import { ensureCategory } from "./lorebook-sync";
 import {
   buildForgeChatStrategy,
@@ -105,15 +105,6 @@ forgeChatNewSessionRequested.type = FORGE_CHAT_NEW_SESSION_REQUESTED;
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-const FIELD_LABEL: Record<DulfsFieldID, string> = {
-  [FieldID.DramatisPersonae]: "Character",
-  [FieldID.UniverseSystems]: "System",
-  [FieldID.Locations]: "Location",
-  [FieldID.Factions]: "Faction",
-  [FieldID.SituationalDynamics]: "Situation",
-  [FieldID.Topics]: "Topic",
-};
 
 function findChat(state: RootState, id: string): Chat | undefined {
   return state.chat.chats.find((c) => c.id === id);
@@ -197,7 +188,7 @@ export function registerForgeChatEffects(
           chatId,
           tombstone: {
             name: entity.name,
-            category: FIELD_LABEL[entity.categoryId] ?? "Entity",
+            category: DULFS_CATEGORY_LABELS[entity.categoryId] ?? "Entity",
             reason: "user",
           },
         }),
@@ -349,7 +340,7 @@ export function registerForgeChatEffects(
             chatId,
             tombstone: {
               name: entity.name,
-              category: FIELD_LABEL[entity.categoryId] ?? "Entity",
+              category: DULFS_CATEGORY_LABELS[entity.categoryId] ?? "Entity",
               reason: "user",
             },
           }),
