@@ -162,7 +162,6 @@ export interface WorldState {
   groups: WorldGroup[];
   entitiesById: Record<string, WorldEntity>;
   entityIds: string[];
-  forgeLoopActive: boolean;
 }
 
 // Foundation Types (v11)

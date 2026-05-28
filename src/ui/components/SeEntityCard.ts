@@ -4,7 +4,7 @@
  * Header (SuiCard):
  *   - icon: category icon
  *   - label: entity name — clickable, opens SeEntityEditPane
- *   - actions: regen button
+ *   - actions: open-edit-pane button
  *
  * Collapsible content: summary text
  */
@@ -17,9 +17,6 @@ import {
   type SuiComponentOptions,
 } from "nai-simple-ui";
 import { store } from "../../core/store";
-import {
-  entityRegenRequested,
-} from "../../core/store/slices/world";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import { colors } from "../theme";
@@ -93,25 +90,13 @@ export class SeEntityCard extends SuiComponent<
         `lb-entity-${entityId}-keys`,
       ],
       onGenerate: () => {
-        void (async () => {
-          const e = store.getState().world.entitiesById[entityId];
-          const eid = e?.lorebookEntryId;
-          if (!eid) return;
-          const entry = await api.v1.lorebook.entry(eid);
-          const keysOk = entry?.forceActivation || !!(entry?.keys && entry.keys.length > 0);
-          const allComplete = !!e.summary && !!entry?.text && keysOk;
-          if (allComplete) {
-            editHost?.open(
-              new SeEntityEditPane({
-                id: IDS.EDIT_PANE.ROOT,
-                entityId,
-                editHost: editHost!,
-              }),
-            );
-          } else {
-            store.dispatch(entityRegenRequested({ entityId }));
-          }
-        })();
+        editHost?.open(
+          new SeEntityEditPane({
+            id: IDS.EDIT_PANE.ROOT,
+            entityId,
+            editHost: editHost!,
+          }),
+        );
       },
       contentChecker: async () => {
         const e = store.getState().world.entitiesById[entityId];

@@ -52,7 +52,7 @@ export function migrateWorldState(raw: WorldState | (Record<string, unknown> & {
     for (const [id, e] of Object.entries(src.entitiesById)) {
       entitiesById[id] = backfillLifecycle(e);
     }
-    return { ...initialWorldState, ...src, entitiesById, forgeLoopActive: false };
+    return { ...initialWorldState, ...src, entitiesById };
   }
   // v11 format: has entities array — convert
   const entities = (raw as { entities?: WorldEntity[] }).entities ?? [];
@@ -68,7 +68,6 @@ export function migrateWorldState(raw: WorldState | (Record<string, unknown> & {
     groups: (raw as { groups?: WorldState["groups"] }).groups ?? [],
     entitiesById,
     entityIds,
-    forgeLoopActive: false,
   };
 }
 

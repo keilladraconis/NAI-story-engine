@@ -6,7 +6,6 @@ export const initialWorldState: WorldState = {
   groups: [],
   entitiesById: {},
   entityIds: [],
-  forgeLoopActive: false,
 };
 
 export const worldSlice = createSlice({
@@ -206,29 +205,6 @@ export const worldSlice = createSlice({
     }),
 
     worldCleared: () => initialWorldState,
-
-    forgeLoopStarted: (state) => ({ ...state, forgeLoopActive: true }),
-    forgeLoopEnded: (state) => ({ ...state, forgeLoopActive: false }),
-
-    forgeStepCompleted: (
-      state,
-      _payload: {
-        step: number;
-        forgeGuidance: string;
-        brainstormContext: string;
-        preForgeEntityIds: string[];
-      },
-    ) => state,
-    forgeCritiqueReceived: (
-      state,
-      _payload: { critiqueText: string },
-    ) => state,
-
-    // Signal actions — effects handle the actual work
-    forgeClearRequested: (state) => state,
-    forgeRequested: (state) => state,
-    forgeFromBrainstormRequested: (state) => state,
-    entityRegenRequested: (state, _payload: { entityId: string }) => state,
   },
 });
 
@@ -249,12 +225,4 @@ export const {
   groupSummaryUpdated,
   entityGroupToggled,
   groupLorebookEntrySet,
-  forgeLoopStarted,
-  forgeLoopEnded,
-  forgeStepCompleted,
-  forgeCritiqueReceived,
-  forgeClearRequested,
-  forgeRequested,
-  forgeFromBrainstormRequested,
-  entityRegenRequested,
 } = worldSlice.actions;

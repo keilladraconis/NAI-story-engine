@@ -28,7 +28,6 @@ const makeState = (overrides: Partial<WorldState> = {}): WorldState => ({
   groups: [],
   entitiesById: {},
   entityIds: [],
-  forgeLoopActive: false,
   ...overrides,
 });
 

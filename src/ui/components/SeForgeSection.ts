@@ -10,7 +10,6 @@
 
 import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
-import { forgeClearRequested } from "../../core/store/slices/world";
 import { chatSwitched } from "../../core/store/slices/chat";
 import { forgeChatNewSessionRequested } from "../../core/store/effects/forge-chat-effects";
 import { selectActiveForgeChatId } from "../../core/store/selectors/forge";
@@ -76,7 +75,7 @@ export class SeForgeSection extends SuiComponent<
       confirmLabel: "Clear forge guidance?",
       style: { "font-size": "0.75em", opacity: "0.5", padding: "2px 8px" },
       onConfirm: async () => {
-        store.dispatch(forgeClearRequested());
+        await api.v1.storyStorage.remove(STORAGE_KEYS.FORGE_GUIDANCE_UI);
       },
     });
   }

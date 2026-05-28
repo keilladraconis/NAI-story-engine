@@ -32,7 +32,7 @@ function makeState(over: Partial<RootState> = {}): RootState {
       shape: null, intent: "", worldState: "", intensity: null, contract: null,
       attg: "", style: "", attgSyncEnabled: false, styleSyncEnabled: false,
     },
-    world: { groups: [], entitiesById: {}, entityIds: [], forgeLoopActive: false },
+    world: { groups: [], entitiesById: {}, entityIds: [] },
     story: { fields: {}, attgEnabled: false, styleEnabled: false },
     ui: { activeEditId: null, inputs: {}, lorebook: { selectedEntryId: null, selectedCategoryId: null }, worldExpanded: null },
     runtime: {} as RootState["runtime"],
@@ -142,7 +142,6 @@ describe("buildForgeChatStrategy", () => {
             }),
           },
           entityIds: ["d1"],
-          forgeLoopActive: false,
         },
       });
     const strat = buildForgeChatStrategy(getState, chat, "asst-pending");
@@ -169,7 +168,6 @@ describe("buildForgeChatStrategy", () => {
             }),
           },
           entityIds: ["l1"],
-          forgeLoopActive: false,
         },
       });
     const strat = buildForgeChatStrategy(getState, chat, "asst-pending");
