@@ -90,8 +90,13 @@ export function registerChatEffects(
           }),
         );
       }
-      const last = chat?.messages.at(-1);
-      if (!chat || !last) return;
+      // Re-read after the dispatch: the user message just added is not in the
+      // `chat` snapshot captured above. Computing `last` (and building the
+      // generation strategy) from the stale snapshot is what dropped the first
+      // send on the floor and forced a second, empty send to generate.
+      const refreshed = findChat(latest(), chatId);
+      const last = refreshed?.messages.at(-1);
+      if (!refreshed || !last) return;
       if (last.role === "user") {
         const assistantId = api.v1.uuid();
         dispatch(
@@ -100,13 +105,13 @@ export function registerChatEffects(
             message: { id: assistantId, role: "assistant", content: "" },
           }),
         );
-        await submitChatGeneration(latest, dispatch, chat, assistantId);
+        await submitChatGeneration(latest, dispatch, refreshed, assistantId);
         return;
       }
       // Empty send on an assistant tail = manual continuation: extend the
       // existing message in place instead of opening a new turn.
       if (last.role === "assistant" && !text.trim()) {
-        await submitChatGeneration(latest, dispatch, chat, last.id);
+        await submitChatGeneration(latest, dispatch, refreshed, last.id);
       }
     },
   );
