@@ -3,7 +3,7 @@ import {
   messageUpdated,
   refineCandidateMarked,
 } from "../../slices/chat";
-import { stripThinkingTags } from "../../../utils/tag-parser";
+import { stripThinkingTags, stripStyleBrackets } from "../../../utils/tag-parser";
 import {
   GenerationHandlers,
   ChatTarget,
@@ -53,7 +53,10 @@ export const chatRefineHandler: GenerationHandlers<ChatRefineTarget> = {
 
   async completion(ctx: CompletionContext<ChatRefineTarget>): Promise<void> {
     if (!ctx.accumulatedText) return;
-    const cleaned = stripThinkingTags(ctx.accumulatedText);
+    let cleaned = stripThinkingTags(ctx.accumulatedText);
+    if (ctx.target.fieldId === "style") {
+      cleaned = stripStyleBrackets(cleaned);
+    }
     ctx.dispatch(
       messageUpdated({
         chatId: ctx.target.chatId,

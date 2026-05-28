@@ -400,7 +400,8 @@ export const buildStoryEnginePrefix = async (
     });
     const storyText = storyMessages
       .filter((m) => m.role === "assistant")
-      .map((m) => m.content)
+      .map((m) => (m.content ?? "").trim())
+      .filter((c) => c !== "***" && c.length > 0)
       .join("\n\n");
     if (storyText) storyTextContent = `[STORY TEXT]\n${storyText}`;
   }

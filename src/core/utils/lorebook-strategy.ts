@@ -240,7 +240,7 @@ export const createLorebookKeysFactory = (
         max_tokens: 256,
         temperature: 0.8,
         min_p: 0.1,
-        stop: ["\n---", "\n***", "\n⁂", "[ Style", "</think>"],
+        stop: ["\n---", "---", "\n***", "\n⁂", "[ Style", "</think>"],
       }),
       contextPinning: { head: 1, tail: 3 },
     };
@@ -315,7 +315,7 @@ export function buildLorebookContentStrategy(
   const messageFactory: MessageFactory = refineContext
     ? async () => {
         const base = await baseFactory();
-        return { ...base, messages: [...base.messages, ...buildRefineTail(refineContext)] };
+        return { ...base, messages: buildRefineTail(base.messages, refineContext) };
       }
     : baseFactory;
   return {

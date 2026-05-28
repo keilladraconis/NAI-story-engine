@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.3] - 2026-05-27
+
+### Fixed
+
+- **Refine no longer produces story prose under Xialong mode.** Refining a Foundation field (Style, ATTG, etc.) would generate prose continuation or metadata instead of the requested rewrite. The refine context is now built from scratch — `buildStoryEnginePrefix` (pure story context, no generation directives) + `buildRefineTail` (divider, rewrite instructions, target snapshot, history) — avoiding the field factory's generation-prompt context that caused Xialong to treat refine as fresh generation. The field being refined is excluded from the prefix context to avoid double-injection.
+- **Style refine produces consistent, well-formatted rewrites.** A new `STYLE_REFINE_PROMPT` carries format constraints (two-author tonal anchor, descriptive not prescriptive voice, ~100 words) so refinements stay structurally consistent with the original. Xialong's natural `[ Style: ... ]` bracket wrapping is allowed through and stripped in the completion handler. A `]\n` stop token cuts off post-style metadata and prose continuation.
+- **`REFINE_SYSTEM_PROMPT` expanded with anti-patterns.** Now includes explicit BAD/GOOD examples (no `EDITOR:` prefix, no preamble) to prevent explanation or commentary in rewrite output.
+- **Empty story text block is no longer injected into context.** When no prose had been written, the story context contained a bare `***` separator message. The context builder now filters out messages whose content is only `***`, so the `[STORY TEXT]` block is omitted entirely when no prose exists.
+- **Trailing `---` no longer renders as a markdown heading in generated fields.** Style, Shape, World State, Contract, and lorebook content generation occasionally appended a bare `---` separator, which markdown renders as a setext heading on the preceding line. A bare `"---"` stop token is now added alongside the existing `"\n---"` stop in every multi-line field generator and in `LOREBOOK_CHAIN_STOPS`.
+
+### Changed
+
+- **NovelAI API type definitions updated.** `UIPart` union is now derived from a new `UIPartRegistry` interface; `api.v1.theme.get()` added for accessing current theme colors and fonts.
+
 ## [0.12.2] - 2026-05-25
 
 ### Fixed

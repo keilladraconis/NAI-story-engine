@@ -931,24 +931,29 @@ type UIExtensionToolboxOption = {
 }
 
 /**
+ * Registry of UIPart variants, keyed by their `type` discriminator.
+ */
+interface UIPartRegistry {
+    box: UIPartBox
+    button: UIPartButton
+    checkboxInput: UIPartCheckboxInput
+    column: UIPartColumn
+    container: UIPartContainer
+    image: UIPartImage
+    multilineTextInput: UIPartMultilineTextInput
+    numberInput: UIPartNumberInput
+    row: UIPartRow
+    text: UIPartText
+    textInput: UIPartTextInput
+    collapsibleSection: UIPartCollapsibleSection
+    sliderInput: UIPartSliderInput
+    codeEditor: UIPartCodeEditor
+}
+
+/**
  * Union type of all UIParts. The component objects can be used to build the UI.
  */
-type UIPart =
-    | UIPartBox
-    | UIPartButton
-    | UIPartCheckboxInput
-    | UIPartColumn
-    | UIPartContainer
-    | UIPartImage
-    | UIPartMultilineTextInput
-    | UIPartNumberInput
-    | UIPartRow
-    | UIPartText
-    | UIPartTextInput
-    | UIPartCollapsibleSection
-    | UIPartSliderInput
-    | UIPartCodeEditor
-    | null
+type UIPart = UIPartRegistry[keyof UIPartRegistry] | null
 
 /**
  * A styled container box for grouping UI elements.
@@ -3873,6 +3878,55 @@ declare namespace api {
              * api.v1.log(jsCode); // "const x = 42;"
              */
             function transpile(tsCode: string): string
+        }
+
+        /**
+         * Theme API - Access the current site theme colors and fonts.
+         */
+        namespace theme {
+            /**
+             * Get the current theme data including colors and fonts.
+             * Useful for color manipulation, computed styles, etc.
+             * For JSX UIParts usage, prefer the `--theme-*` CSS custom properties available to them.
+             * Fonts and colors may be in any format as these are user defined. Colors can be hex codes, color names, rgb/rgba strings, etc. Font values are font-family strings that may include multiple fallback fonts.
+             * @returns The current theme object
+             * @example
+             * const theme = await api.v1.theme.get();
+             * api.v1.log(theme.name); // "NovelAI Dark"
+             * api.v1.log(theme.colors.bg0); // "#000000"
+             * api.v1.log(theme.fonts.default); // "Source Sans Pro"
+             */
+            function get(): Promise<{
+                /** Theme name */
+                name: string
+                /** Font families */
+                fonts: {
+                    default: string
+                    code: string
+                    field: string
+                    headings: string
+                }
+                /** Theme colors */
+                colors: {
+                    bg0: string
+                    bg1: string
+                    bg2: string
+                    bg3: string
+                    textHeadings: string
+                    textMain: string
+                    textDisabled: string
+                    textPlaceholder: string
+                    warning: string
+                    textHighlight: string
+                    textPrompt: string
+                    textUser: string
+                    textEdit: string
+                    textAI: string
+                    lowIntensityColor: string
+                    highIntensityColor: string
+                    midIntensityColor: string
+                }
+            }>
         }
     }
 }
