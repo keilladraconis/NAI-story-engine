@@ -24,6 +24,7 @@ import {
   FORGE_EXPAND_PROMPT,
   FORGE_WEAVE_PROMPT,
   FORGE_CLEANUP_PROMPT,
+  FORGE_DISCUSS_PROMPT,
   XIALONG_STYLE,
 } from "./prompts";
 import { DULFS_CATEGORY_LABELS } from "./category-detect";
@@ -194,6 +195,74 @@ export function buildForgeChatStrategy(
     },
     prefillBehavior: "trim",
     assistantPrefill: "[",
+  };
+}
+
+export function buildForgeDiscussStrategy(
+  getState: () => RootState,
+  chat: Chat,
+  assistantMessageId: string,
+): GenerationStrategy {
+  const factory = async () => {
+    const state = getState();
+    const system: Message = { role: "system", content: FORGE_DISCUSS_PROMPT };
+
+    // Same briefing/dynamic-context layering as a forge pass, but conversational.
+    const fullTranscript = transcriptOf(chat, assistantMessageId);
+    const first = fullTranscript[0];
+    const briefing = first && first.role === "system" ? first : null;
+    const briefingMsg: Message[] = briefing
+      ? [{ role: "system", content: briefing.content }]
+      : [];
+    const conversation: Message[] = (
+      briefing ? fullTranscript.slice(1) : fullTranscript
+    ).map((m) => ({ role: m.role, content: m.content }));
+
+    const blocks: string[] = [];
+    const pool = formatPool(state, chat.id);
+    if (pool) blocks.push(pool);
+    const live = formatLive(state);
+    if (live) blocks.push(live);
+    const tombs = formatTombstones(state, chat.id);
+    if (tombs) blocks.push(tombs);
+    const prevCritique = formatPreviousCritique(chat.messages);
+    if (prevCritique) blocks.push(prevCritique);
+
+    const contextBlock: Message[] =
+      blocks.length > 0
+        ? [{ role: "assistant", content: blocks.join("\n\n") }]
+        : [];
+
+    const messages: Message[] = [
+      system,
+      ...briefingMsg,
+      ...contextBlock,
+      ...conversation,
+    ];
+
+    // Chat-voice steer (Phase 1.5 will tune this for reliable pseudo-tool use).
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.forgeDiscuss);
+
+    return {
+      messages,
+      params: await buildModelParams({
+        max_tokens: 768,
+        temperature: 0.85,
+        min_p: 0.05,
+      }),
+    };
+  };
+
+  return {
+    requestId: `forge-discuss-${chat.id}-${assistantMessageId}`,
+    messageFactory: factory,
+    target: {
+      type: "forgeChat",
+      chatId: chat.id,
+      messageId: assistantMessageId,
+    },
+    prefillBehavior: "trim",
+    // No assistantPrefill: a discuss reply starts as prose, not a command.
   };
 }
 

@@ -586,6 +586,20 @@ Emit nothing except REVISE. No new entities, no deletions, no renames, no thread
 
 If no remaining drafts reference any discarded entity, emit nothing.`;
 
+export const FORGE_DISCUSS_PROMPT = `You are the Forge, discussing worldbuilding with the author in a chat.
+
+Converse naturally: answer questions, weigh options, and propose ideas in prose. You are NOT running an expansion pass — do not proactively invent new elements the author did not ask for.
+
+When the author explicitly asks you to create, change, remove, rename, or group world elements, emit the matching action command on its own line, using exactly this grammar:
+[CREATE <TYPE> "<Name>" | one-line description]
+[REVISE "<Name>" | revised description]
+[DELETE "<Name>"]
+[RENAME "<Old>" → "<New>"]
+[THREAD "<Title>" | "<A>", "<B>" | description]
+where <TYPE> is one of CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC.
+
+Emit a command only for a change the author actually requested; otherwise just talk. You may end with a short [CRITIQUE | ...] note if you have a concern.`;
+
 
 
 /**
@@ -603,6 +617,7 @@ export const XIALONG_STYLE = {
   brainstormCritic: "[ Style: chat, editor, critic, diagnostic, direct ]",
   dulfsList: "[ Style: world-builder, inventive, catalog ]",
   forge: "[ Style: world-builder, systematic, architect ]",
+  forgeDiscuss: "[ Style: chat, world-builder, collaborative, direct ]",
   foundationShape: "[ Style: architect, visionary, dramatic ]",
   foundationIntent: "[ Style: logline, premise, direct ]",
   foundationWorldState: "[ Style: narrator, situational, grounded ]",

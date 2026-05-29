@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildForgeChatStrategy,
   buildForgeCleanupStrategy,
+  buildForgeDiscussStrategy,
   extractLastCritique,
 } from "../../../src/core/utils/forge-chat-strategy";
 import type { Chat } from "../../../src/core/chat-types/types";
@@ -12,6 +13,7 @@ import {
   FORGE_EXPAND_PROMPT,
   FORGE_WEAVE_PROMPT,
   FORGE_CLEANUP_PROMPT,
+  FORGE_DISCUSS_PROMPT,
   SYSTEM_PROMPT,
 } from "../../../src/core/utils/prompts";
 
@@ -431,5 +433,42 @@ describe("buildForgeChatStrategy briefing anchoring", () => {
     expect(
       built.messages.some((m) => m.role === "user" && m.content === "begin"),
     ).toBe(true);
+  });
+});
+
+describe("buildForgeDiscussStrategy", () => {
+  const discussChat: Chat = {
+    id: "fc-1",
+    type: "forge",
+    title: "Forge",
+    subMode: "sketch",
+    messages: [
+      { id: "brief", role: "system", content: "STORY ENGINE BRIEFING\n\n[BRAINSTORM]\nUSER: lighthouse" },
+      { id: "u1", role: "user", content: "what's the antagonist's wound?" },
+    ],
+    seed: { kind: "blank" },
+  };
+
+  it("uses FORGE_DISCUSS_PROMPT as the system message and has no command prefill", async () => {
+    const getState = () => makeState();
+    const strat = buildForgeDiscussStrategy(getState, discussChat, "asst-pending");
+    expect(strat.assistantPrefill).toBeUndefined();
+    expect(strat.target.type).toBe("forgeChat");
+    expect(strat.requestId).toContain("forge-discuss-fc-1");
+    const built = await strat.messageFactory!();
+    expect(
+      built.messages.some((m) => m.role === "system" && m.content === FORGE_DISCUSS_PROMPT),
+    ).toBe(true);
+  });
+
+  it("keeps the briefing ahead of the conversation and never adds a phase prompt", async () => {
+    const getState = () => makeState();
+    const strat = buildForgeDiscussStrategy(getState, discussChat, "asst-pending");
+    const built = await strat.messageFactory!();
+    const briefingIdx = built.messages.findIndex((m) => m.content?.includes("STORY ENGINE BRIEFING"));
+    const discussIdx = built.messages.findIndex((m) => m.content === FORGE_DISCUSS_PROMPT);
+    expect(discussIdx).toBeGreaterThanOrEqual(0);
+    expect(briefingIdx).toBeGreaterThan(discussIdx);
+    expect(built.messages.some((m) => m.content === FORGE_SKETCH_PROMPT)).toBe(false);
   });
 });
