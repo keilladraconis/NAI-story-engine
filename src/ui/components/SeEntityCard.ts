@@ -11,13 +11,19 @@
 
 import {
   SuiComponent,
+  SuiButton,
   SuiCard,
   SuiCollapsible,
+  SuiConfirmButton,
   SuiText,
   type SuiComponentOptions,
 } from "nai-simple-ui";
 import { store } from "../../core/store";
 import { entityRegenRequested } from "../../core/store/effects/summary-generation";
+import {
+  entityCastRequested,
+  entityDiscardRequested,
+} from "../../core/store/effects/forge-chat-effects";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import { colors } from "../theme";
@@ -70,6 +76,8 @@ export class SeEntityCard extends SuiComponent<
 > {
   private readonly _watcher: StoreWatcher;
   private readonly _regenBtn: SeGenerationIconButton;
+  private readonly _castBtn: SuiButton;
+  private readonly _discardBtn: SuiConfirmButton;
   private _collapsible: SuiCollapsible | null = null;
 
   constructor(options: SeEntityCardOptions) {
@@ -109,6 +117,42 @@ export class SeEntityCard extends SuiComponent<
         return !!e.summary && !!entry?.text && keysOk;
       },
     });
+
+    this._castBtn = new SuiButton({
+      id: `${options.id}-cast`,
+      callback: () => store.dispatch(entityCastRequested({ entityId })),
+      theme: {
+        default: {
+          self: {
+            text: "Cast",
+            iconId: "arrow-up-circle" as IconId,
+            style: { ...ACTION_BASE },
+          },
+        },
+      },
+    });
+
+    this._discardBtn = new SuiConfirmButton({
+      id: `${options.id}-discard`,
+      onConfirm: async () => {
+        store.dispatch(entityDiscardRequested({ entityId }));
+      },
+      timeout: 4000,
+      theme: {
+        default: {
+          self: {
+            iconId: "trash-2" as IconId,
+            style: { ...ACTION_BASE, opacity: "0.6" },
+          },
+        },
+        pending: {
+          self: {
+            iconId: "alertTriangle" as IconId,
+            style: { ...ACTION_BASE, color: "#ff5252", opacity: "1" },
+          },
+        },
+      },
+    });
   }
 
   private _openEditPane(): void {
@@ -136,6 +180,7 @@ export class SeEntityCard extends SuiComponent<
     const entity = store.getState().world.entitiesById[entityId];
     const name = entity?.name ?? "";
     const summary = entity?.summary ?? "";
+    const isDraft = entity?.lifecycle === "draft";
     const iconId = entity?.categoryId
       ? CATEGORY_ICON[entity.categoryId]
       : undefined;
@@ -182,6 +227,11 @@ export class SeEntityCard extends SuiComponent<
       "border-radius": "2px",
       "padding-left": "4px",
     } as const;
+    const DRAFT_BORDER = {
+      "border-left": "2px solid rgba(120,180,255,0.4)",
+      "border-radius": "2px",
+      "padding-left": "4px",
+    } as const;
 
     const pendingIds = new Set([
       `se-entity-summary-${entityId}`,
@@ -221,49 +271,64 @@ export class SeEntityCard extends SuiComponent<
 
     const { column } = api.v1.ui.part;
 
-    // Check completeness for initial border style
-    const entryId = entity?.lorebookEntryId ?? "";
-    let hasLore = false;
-    if (entryId) {
-      const lbEntry = await api.v1.lorebook.entry(entryId);
-      const keysOk = lbEntry?.forceActivation || !!(lbEntry?.keys && lbEntry.keys.length > 0);
-      hasLore = !!(lbEntry?.text && keysOk);
-    }
-    const isComplete = !!summary && hasLore;
+    // Live entities show a generation-status border that reacts to in-flight
+    // requests; drafts show a static tint and never generate, so the
+    // completeness check + status watcher run for live entities only.
+    let initialStyle: object = DRAFT_BORDER;
+    if (!isDraft) {
+      const entryId = entity?.lorebookEntryId ?? "";
+      let hasLore = false;
+      if (entryId) {
+        const lbEntry = await api.v1.lorebook.entry(entryId);
+        const keysOk = lbEntry?.forceActivation || !!(lbEntry?.keys && lbEntry.keys.length > 0);
+        hasLore = !!(lbEntry?.text && keysOk);
+      }
+      const isComplete = !!summary && hasLore;
 
-    this._watcher.watch(
-      (s): boolean => {
-        if (
-          s.runtime.activeRequest === _activeReqRef &&
-          s.runtime.queue === _queueRef &&
-          s.runtime.sega.activeRequestIds === _segaRef
-        ) return _pendingCache;
-        _activeReqRef = s.runtime.activeRequest;
-        _queueRef = s.runtime.queue;
-        _segaRef = s.runtime.sega.activeRequestIds;
-        _pendingCache = _isPending(s);
-        return _pendingCache;
-      },
-      async (isPending) => {
-        if (isPending) {
-          api.v1.ui.updateParts([
-            { id: root, style: PENDING_BORDER } as unknown as Partial<UIPart> & { id: string },
-          ]);
-        } else {
-          const e = store.getState().world.entitiesById[entityId];
-          const eid = e?.lorebookEntryId;
-          let nowComplete = false;
-          if (eid) {
-            const lbEntry = await api.v1.lorebook.entry(eid);
-            const keysOk = lbEntry?.forceActivation || !!(lbEntry?.keys && lbEntry.keys.length > 0);
-            nowComplete = !!e?.summary && !!(lbEntry?.text && keysOk);
+      this._watcher.watch(
+        (s): boolean => {
+          if (
+            s.runtime.activeRequest === _activeReqRef &&
+            s.runtime.queue === _queueRef &&
+            s.runtime.sega.activeRequestIds === _segaRef
+          ) return _pendingCache;
+          _activeReqRef = s.runtime.activeRequest;
+          _queueRef = s.runtime.queue;
+          _segaRef = s.runtime.sega.activeRequestIds;
+          _pendingCache = _isPending(s);
+          return _pendingCache;
+        },
+        async (isPending) => {
+          if (isPending) {
+            api.v1.ui.updateParts([
+              { id: root, style: PENDING_BORDER } as unknown as Partial<UIPart> & { id: string },
+            ]);
+          } else {
+            const e = store.getState().world.entitiesById[entityId];
+            const eid = e?.lorebookEntryId;
+            let nowComplete = false;
+            if (eid) {
+              const lbEntry = await api.v1.lorebook.entry(eid);
+              const keysOk = lbEntry?.forceActivation || !!(lbEntry?.keys && lbEntry.keys.length > 0);
+              nowComplete = !!e?.summary && !!(lbEntry?.text && keysOk);
+            }
+            api.v1.ui.updateParts([
+              { id: root, style: nowComplete ? COMPLETE_BORDER : INCOMPLETE_BORDER } as unknown as Partial<UIPart> & { id: string },
+            ]);
           }
-          api.v1.ui.updateParts([
-            { id: root, style: nowComplete ? COMPLETE_BORDER : INCOMPLETE_BORDER } as unknown as Partial<UIPart> & { id: string },
-          ]);
-        }
-      },
-    );
+        },
+      );
+
+      initialStyle = _pendingCache
+        ? PENDING_BORDER
+        : isComplete
+          ? COMPLETE_BORDER
+          : INCOMPLETE_BORDER;
+    }
+
+    const actions: SuiComponent[] = isDraft
+      ? [this._castBtn, this._discardBtn]
+      : [this._regenBtn];
 
     const card = new SuiCard({
       id: cardId,
@@ -272,7 +337,7 @@ export class SeEntityCard extends SuiComponent<
       labelCallback: () => {
         this._openEditPane();
       },
-      actions: [this._regenBtn],
+      actions,
       theme: CARD_THEME,
     });
 
@@ -298,7 +363,6 @@ export class SeEntityCard extends SuiComponent<
       },
     );
 
-    const initialStyle = _pendingCache ? PENDING_BORDER : isComplete ? COMPLETE_BORDER : INCOMPLETE_BORDER;
     return column({ id: root, style: initialStyle, content: [collapsible] });
   }
 }
