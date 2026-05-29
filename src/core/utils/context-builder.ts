@@ -371,6 +371,31 @@ export async function formatStoryTextBlock(): Promise<string> {
   return storyText ? `[STORY TEXT]\n${storyText}` : "";
 }
 
+const FORGE_BRIEFING_HEADER =
+  "STORY ENGINE BRIEFING — the source material for this forge session. Build the world from this premise.";
+
+/**
+ * Assembles the frozen briefing seeded at the top of a forge session: the
+ * static story-engine context (foundation, setting, brainstorm, story text).
+ * World entities are deliberately excluded — live entities are injected per
+ * turn via the strategy's [LIVE] block. Returns "" when there is nothing to say.
+ */
+export async function buildForgeBriefing(
+  getState: () => RootState,
+): Promise<string> {
+  const state = getState();
+  const blocks = [
+    formatAttgBlock(state),
+    formatStyleBlock(state),
+    formatFoundationBlock(state),
+    await formatSettingBlock(),
+    formatBrainstormBlock(getState),
+    await formatStoryTextBlock(),
+  ].filter((b) => b.length > 0);
+  if (blocks.length === 0) return "";
+  return `${FORGE_BRIEFING_HEADER}\n\n${blocks.join("\n\n")}`;
+}
+
 export const buildStoryEnginePrefix = async (
   getState: () => RootState,
   options: StoryEnginePrefixOptions = {},

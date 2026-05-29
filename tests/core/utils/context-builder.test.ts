@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { buildStoryEnginePrefix } from "../../../src/core/utils/context-builder";
+import {
+  buildStoryEnginePrefix,
+  buildForgeBriefing,
+} from "../../../src/core/utils/context-builder";
 import type { RootState } from "../../../src/core/store/types";
 import type { Chat } from "../../../src/core/chat-types/types";
 
@@ -101,5 +104,43 @@ describe("buildStoryEnginePrefix chat injection", () => {
     const concat = prefix.map((m) => m.content).join("\n");
     expect(concat).not.toContain(ACTIVE_PROBE);
     expect(concat).not.toContain("[BRAINSTORM]");
+  });
+});
+
+describe("buildForgeBriefing", () => {
+  it("includes the BRAINSTORM block from the active chat", async () => {
+    const chat: Chat = {
+      id: "c1",
+      type: "brainstorm",
+      title: "x",
+      subMode: "cowriter",
+      messages: [{ id: "u", role: "user", content: "a haunted lighthouse" }],
+      seed: { kind: "blank" },
+    };
+    const getState = () => makeState({ activeChat: chat });
+    const briefing = await buildForgeBriefing(getState);
+    expect(briefing).toContain("[BRAINSTORM]");
+    expect(briefing).toContain("a haunted lighthouse");
+  });
+
+  it("includes ATTG / STYLE / NARRATIVE FOUNDATION when foundation is populated", async () => {
+    const getState = () => {
+      const s = makeState();
+      s.foundation.attg = "Author: X; Title: Y";
+      s.foundation.style = "terse, dread-soaked";
+      s.foundation.intent = "a slow unravelling";
+      return s;
+    };
+    const briefing = await buildForgeBriefing(getState);
+    expect(briefing).toContain("[ATTG]");
+    expect(briefing).toContain("[STYLE]");
+    expect(briefing).toContain("[NARRATIVE FOUNDATION]");
+    expect(briefing).toContain("a slow unravelling");
+  });
+
+  it("returns an empty string when there is no context at all", async () => {
+    const getState = () => makeState();
+    const briefing = await buildForgeBriefing(getState);
+    expect(briefing).toBe("");
   });
 });
