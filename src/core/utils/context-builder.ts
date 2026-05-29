@@ -305,6 +305,72 @@ export interface StoryEnginePrefixOptions {
   excludeChat?: boolean;
 }
 
+// --- Stable story-state section builders ---
+// Shared by buildStoryEnginePrefix (which groups them into the cached MSG 2 /
+// MSG 4 messages) and buildForgeBriefing (which freezes them into one message).
+// Each returns the formatted block, or "" when its source is empty.
+
+export function formatAttgBlock(state: RootState): string {
+  const attg = state.foundation.attg;
+  return attg ? `[ATTG]\n${attg}` : "";
+}
+
+export function formatStyleBlock(state: RootState): string {
+  const style = state.foundation.style;
+  return style ? `[STYLE]\n${style}` : "";
+}
+
+export function formatFoundationBlock(state: RootState): string {
+  const { shape, intent, worldState, intensity, contract } = state.foundation;
+  const parts: string[] = [];
+  if (shape) parts.push(`Shape: ${shape.name}\n${shape.description}`);
+  if (intent) parts.push(`Intent: ${intent}`);
+  if (worldState) parts.push(`World State: ${worldState}`);
+  if (intensity)
+    parts.push(`Intensity: ${intensity.level} — ${intensity.description}`);
+  if (contract) {
+    const contractLines = [
+      `Required: ${contract.required}`,
+      `Prohibited: ${contract.prohibited}`,
+      `Emphasis: ${contract.emphasis}`,
+    ].join("\n");
+    parts.push(`Story Contract:\n${contractLines}`);
+  }
+  return parts.length > 0 ? `[NARRATIVE FOUNDATION]\n${parts.join("\n")}` : "";
+}
+
+export async function formatSettingBlock(): Promise<string> {
+  const setting = String(
+    (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
+  );
+  return setting ? `[SETTING]\n${setting}` : "";
+}
+
+export function formatBrainstormBlock(getState: () => RootState): string {
+  const state = getState();
+  const active = activeSavedChat(state.chat);
+  if (!active) return "";
+  const ctx: SpecCtx = { getState, dispatch: () => {} };
+  const messages = getChatTypeSpec(active.type).contextSlice(active, ctx);
+  const chatText = messages
+    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+    .join("\n");
+  return chatText ? `[BRAINSTORM]\n${chatText}` : "";
+}
+
+export async function formatStoryTextBlock(): Promise<string> {
+  const storyMessages = await getStoryContextMessages({
+    includeLorebookEntries: false,
+    contextLimitReduction: 8000,
+  });
+  const storyText = storyMessages
+    .filter((m) => m.role === "assistant")
+    .map((m) => (m.content ?? "").trim())
+    .filter((c) => c !== "***" && c.length > 0)
+    .join("\n\n");
+  return storyText ? `[STORY TEXT]\n${storyText}` : "";
+}
+
 export const buildStoryEnginePrefix = async (
   getState: () => RootState,
   options: StoryEnginePrefixOptions = {},
@@ -323,63 +389,28 @@ export const buildStoryEnginePrefix = async (
   // Order: Foundation (tone/intent anchors), then setting/brainstorm, then canon.
   const stableSections: string[] = [];
 
-  // ATTG — read from v11 foundation state (populated via NarrativeFoundation onChange)
+  // Order: Foundation (tone/intent anchors), then setting, then brainstorm.
   if (!excluded.has("attg")) {
-    const attg = state.foundation.attg;
-    if (attg) stableSections.push(`[ATTG]\n${attg}`);
+    const b = formatAttgBlock(state);
+    if (b) stableSections.push(b);
   }
-
-  // Style — read from v11 foundation state
   if (!excluded.has("style")) {
-    const style = state.foundation.style;
-    if (style) stableSections.push(`[STYLE]\n${style}`);
+    const b = formatStyleBlock(state);
+    if (b) stableSections.push(b);
   }
-
-  // Foundation context (shape, intent, worldState, intensity, contract)
   if (!excluded.has("foundation")) {
-    const { shape, intent, worldState, intensity, contract } = state.foundation;
-    const foundationParts: string[] = [];
-    if (shape)
-      foundationParts.push(`Shape: ${shape.name}\n${shape.description}`);
-    if (intent) foundationParts.push(`Intent: ${intent}`);
-    if (worldState) foundationParts.push(`World State: ${worldState}`);
-    if (intensity)
-      foundationParts.push(`Intensity: ${intensity.level} — ${intensity.description}`);
-    if (contract) {
-      const contractLines = [
-        `Required: ${contract.required}`,
-        `Prohibited: ${contract.prohibited}`,
-        `Emphasis: ${contract.emphasis}`,
-      ].join("\n");
-      foundationParts.push(`Story Contract:\n${contractLines}`);
-    }
-    if (foundationParts.length > 0) {
-      stableSections.push(
-        `[NARRATIVE FOUNDATION]\n${foundationParts.join("\n")}`,
-      );
-    }
+    const b = formatFoundationBlock(state);
+    if (b) stableSections.push(b);
   }
-
-  // Setting
   if (!excluded.has("setting")) {
-    const setting = String(
-      (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
-    );
-    if (setting) stableSections.push(`[SETTING]\n${setting}`);
+    const b = await formatSettingBlock();
+    if (b) stableSections.push(b);
   }
-
   // Active chat transcript — the active chat's spec.contextSlice() decides
   // which messages contribute to the prefix.
   if (!excluded.has("brainstorm") && !options.excludeChat) {
-    const active = activeSavedChat(state.chat);
-    if (active) {
-      const ctx: SpecCtx = { getState, dispatch: () => {} };
-      const messages = getChatTypeSpec(active.type).contextSlice(active, ctx);
-      const chatText = messages
-        .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-        .join("\n");
-      if (chatText) stableSections.push(`[BRAINSTORM]\n${chatText}`);
-    }
+    const b = formatBrainstormBlock(getState);
+    if (b) stableSections.push(b);
   }
 
   // --- MSG 3: World Entities (GROWS during list stage, stable during lorebook) ---
@@ -394,16 +425,8 @@ export const buildStoryEnginePrefix = async (
   // Placed last so frequent changes don't bust cache for stable sections above.
   let storyTextContent = "";
   if (!excluded.has("storyText")) {
-    const storyMessages = await getStoryContextMessages({
-      includeLorebookEntries: false,
-      contextLimitReduction: 8000,
-    });
-    const storyText = storyMessages
-      .filter((m) => m.role === "assistant")
-      .map((m) => (m.content ?? "").trim())
-      .filter((c) => c !== "***" && c.length > 0)
-      .join("\n\n");
-    if (storyText) storyTextContent = `[STORY TEXT]\n${storyText}`;
+    const b = await formatStoryTextBlock();
+    if (b) storyTextContent = b;
   }
 
   // --- Assemble prefix ---
