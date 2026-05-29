@@ -13,7 +13,8 @@ import type { RootState } from "../../core/store/types";
 import { ChatHeader } from "./ChatHeader";
 import { SeBrainstormInput } from "./SeBrainstormInput";
 import { SeMessage } from "./SeMessage";
-import { SeInlineEntityCard } from "./SeInlineEntityCard";
+import { SeEntityCard } from "./SeEntityCard";
+import { IDS } from "../../ui/framework/ids";
 import { RefineCommitBar } from "./RefineCommitBar";
 import type { Chat } from "../../core/chat-types/types";
 import { getChatTypeSpec } from "../../core/chat-types";
@@ -109,13 +110,19 @@ export class ChatPanel extends SuiComponent<
       groupParts.push(msgPart);
       const inlineIds = spec.inlineEntityIdsFor?.(msg, v, ctx) ?? [];
       for (const entityId of inlineIds) {
-        const cardPart = await new SeInlineEntityCard({
-          id: `se-inline-entity-${v.id}-${entityId}`,
+        const cardPart = await new SeEntityCard({
+          id: IDS.entity(entityId, v.id).ROOT,
           entityId,
-          chatId: v.id,
           editHost: this.options.editHost,
         }).build();
-        groupParts.push(cardPart);
+        // Indent so the inline draft card reads as belonging to its message.
+        groupParts.push(
+          column({
+            id: `se-inline-wrap-${v.id}-${entityId}`,
+            style: { "margin-left": "12px" },
+            content: [cardPart],
+          }),
+        );
       }
     }
     const messageParts = groupParts.reverse();
