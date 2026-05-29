@@ -238,9 +238,14 @@ export function registerForgeChatEffects(
       const { entityId } = action.payload;
       const state = latest();
       const entity = state.world.entitiesById[entityId];
-      if (!entity) return;
-      if (entity.lifecycle !== "draft") return;
-      if (!entity.sourceChatId) return;
+      if (!entity || entity.lifecycle !== "draft") return;
+
+      // Manual ("+ Add Entity") drafts belong to no forge session — just delete
+      // them. Tombstone + pending-scrub are forge-session concepts, so skip them.
+      if (!entity.sourceChatId) {
+        dispatch(entityDeleted({ entityId }));
+        return;
+      }
 
       const chatId = entity.sourceChatId;
       dispatch(

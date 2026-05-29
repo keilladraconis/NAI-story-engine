@@ -202,12 +202,16 @@ describe("entityDiscardRequested effect", () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
-  it("ignores discard when entity has no sourceChatId", async () => {
+  it("deletes a source-less (manual) draft without tombstone or scrub", async () => {
     const orphan = makeEntity({ id: "d-orphan", lifecycle: "draft" });
     const state = makeState([makeChat()], [orphan]);
     const { dispatch, fire } = makeHarness(state);
     await fire(entityDiscardRequested({ entityId: "d-orphan" }));
-    expect(dispatch).not.toHaveBeenCalled();
+    const deleted = dispatch.mock.calls.find(([a]) => a.type === "world/entityDeleted");
+    expect(deleted).toBeDefined();
+    expect((deleted![0].payload as { entityId: string }).entityId).toBe("d-orphan");
+    expect(dispatch.mock.calls.some(([a]) => a.type === "forge/tombstoneAdded")).toBe(false);
+    expect(dispatch.mock.calls.some(([a]) => a.type === "forge/scrubQueued")).toBe(false);
   });
 });
 
