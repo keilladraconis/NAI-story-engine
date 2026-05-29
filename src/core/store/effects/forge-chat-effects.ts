@@ -42,6 +42,7 @@ import { ensureCategory } from "./lorebook-sync";
 import {
   buildForgeChatStrategy,
   buildForgeCleanupStrategy,
+  buildForgeDiscussStrategy,
 } from "../../utils/forge-chat-strategy";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,8 +55,15 @@ import {
 import {
   forgeChatContinueRequested,
   type ForgeChatContinueRequestedPayload,
+  forgeChatDiscussRequested,
+  type ForgeChatDiscussRequestedPayload,
 } from "./forge-chat-actions";
-export { forgeChatContinueRequested, type ForgeChatContinueRequestedPayload };
+export {
+  forgeChatContinueRequested,
+  type ForgeChatContinueRequestedPayload,
+  forgeChatDiscussRequested,
+  type ForgeChatDiscussRequestedPayload,
+};
 
 export interface EntityDiscardRequestedPayload {
   entityId: string;
@@ -154,6 +162,37 @@ export function registerForgeChatEffects(
   dispatch: AppDispatch,
   _getState: () => RootState,
 ): void {
+  // ─── Discuss (conversational turn; emits commands only on request) ──────────
+  subscribeEffect(
+    matchesAction(forgeChatDiscussRequested),
+    async (action, { getState: latest }) => {
+      const { chatId } = action.payload;
+      const chat = findChat(latest(), chatId);
+      if (!chat) return;
+
+      const assistantId = api.v1.uuid();
+      dispatch(
+        messageAdded({
+          chatId,
+          message: { id: assistantId, role: "assistant", content: "" },
+        }),
+      );
+
+      const updatedChat = findChat(latest(), chatId);
+      if (!updatedChat) return;
+
+      const strategy = buildForgeDiscussStrategy(latest, updatedChat, assistantId);
+      dispatch(
+        requestQueued({
+          id: strategy.requestId,
+          type: "forgeChat",
+          targetId: assistantId,
+        }),
+      );
+      dispatch(generationSubmitted(strategy));
+    },
+  );
+
   // ─── Continue (advance phase + submit next turn) ────────────────────────────
   subscribeEffect(
     matchesAction(forgeChatContinueRequested),

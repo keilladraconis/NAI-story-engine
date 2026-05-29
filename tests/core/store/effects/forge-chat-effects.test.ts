@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { registerForgeChatEffects } from "../../../../src/core/store/effects/forge-chat-effects";
 import {
   forgeChatContinueRequested,
+  forgeChatDiscussRequested,
   entityDiscardRequested,
   forgeChatNewSessionRequested,
   entityCastRequested,
@@ -384,5 +385,30 @@ describe("forgeDiscardAllRequested effect", () => {
     expect(cleanupTurns).toHaveLength(0);
     const closed = dispatch.mock.calls.find(([a]) => a.type === "chat/chatDeleted");
     expect(closed).toBeDefined();
+  });
+});
+
+describe("forgeChatDiscussRequested effect", () => {
+  it("appends an assistant placeholder and submits a forgeChat turn without advancing the phase", async () => {
+    const chat = makeChat({ subMode: "expand" });
+    const state = makeState([chat], []);
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatDiscussRequested({ chatId: "fc-1" }));
+    const placeholder = dispatch.mock.calls.find(
+      ([a]) =>
+        a.type === "chat/messageAdded" &&
+        (a.payload as any).message?.role === "assistant",
+    );
+    expect(placeholder).toBeDefined();
+    const submitted = dispatch.mock.calls.find(
+      ([a]) => a.type === "ui/generationSubmitted",
+    );
+    expect(submitted).toBeDefined();
+    expect(
+      (submitted![0].payload as { target: { type: string } }).target.type,
+    ).toBe("forgeChat");
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "chat/subModeChanged"),
+    ).toBe(false);
   });
 });

@@ -19,3 +19,16 @@ export const forgeChatContinueRequested = (
   payload,
 });
 forgeChatContinueRequested.type = FORGE_CHAT_CONTINUE_REQUESTED;
+
+export interface ForgeChatDiscussRequestedPayload {
+  chatId: string;
+}
+
+const FORGE_CHAT_DISCUSS_REQUESTED = "forgeChat/discussRequested";
+export const forgeChatDiscussRequested = (
+  payload: ForgeChatDiscussRequestedPayload,
+) => ({
+  type: FORGE_CHAT_DISCUSS_REQUESTED as typeof FORGE_CHAT_DISCUSS_REQUESTED,
+  payload,
+});
+forgeChatDiscussRequested.type = FORGE_CHAT_DISCUSS_REQUESTED;
