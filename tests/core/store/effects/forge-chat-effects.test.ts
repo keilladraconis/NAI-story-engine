@@ -8,6 +8,7 @@ import {
   entityCastRequested,
   forgeCastAllRequested,
   forgeDiscardAllRequested,
+  forgeScrubNowRequested,
 } from "../../../../src/core/store/effects/forge-chat-effects";
 import type { RootState, WorldEntity } from "../../../../src/core/store/types";
 import type { Chat } from "../../../../src/core/chat-types/types";
@@ -385,6 +386,35 @@ describe("forgeDiscardAllRequested effect", () => {
     expect(cleanupTurns).toHaveLength(0);
     const closed = dispatch.mock.calls.find(([a]) => a.type === "chat/chatDeleted");
     expect(closed).toBeDefined();
+  });
+});
+
+describe("forgeScrubNowRequested effect", () => {
+  it("submits a forgeCleanup and clears the scrub when drafts remain", async () => {
+    const chat = makeChat();
+    const draft = makeEntity({ id: "d1", name: "Marsh", sourceChatId: "fc-1", lifecycle: "draft" });
+    const state = makeState([chat], [draft]);
+    (state.forge as any).pendingScrubByChatId = { "fc-1": ["Vesper"] };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeScrubNowRequested({ chatId: "fc-1" }));
+    const submitted = dispatch.mock.calls.find(
+      ([a]) =>
+        a.type === "ui/generationSubmitted" &&
+        (a.payload as { target: { type: string } }).target.type === "forgeCleanup",
+    );
+    expect(submitted).toBeDefined();
+    expect(dispatch.mock.calls.some(([a]) => a.type === "forge/scrubCleared")).toBe(true);
+    expect(dispatch.mock.calls.some(([a]) => a.type === "chat/subModeChanged")).toBe(false);
+  });
+
+  it("clears the scrub without generating when no drafts remain", async () => {
+    const chat = makeChat();
+    const state = makeState([chat], []);
+    (state.forge as any).pendingScrubByChatId = { "fc-1": ["Vesper"] };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeScrubNowRequested({ chatId: "fc-1" }));
+    expect(dispatch.mock.calls.some(([a]) => a.type === "ui/generationSubmitted")).toBe(false);
+    expect(dispatch.mock.calls.some(([a]) => a.type === "forge/scrubCleared")).toBe(true);
   });
 });
 

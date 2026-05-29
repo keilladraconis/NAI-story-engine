@@ -65,6 +65,18 @@ export {
   type ForgeChatDiscussRequestedPayload,
 };
 
+export interface ForgeScrubNowRequestedPayload {
+  chatId: string;
+}
+const FORGE_SCRUB_NOW_REQUESTED = "forgeChat/scrubNowRequested";
+export const forgeScrubNowRequested = (
+  payload: ForgeScrubNowRequestedPayload,
+) => ({
+  type: FORGE_SCRUB_NOW_REQUESTED as typeof FORGE_SCRUB_NOW_REQUESTED,
+  payload,
+});
+forgeScrubNowRequested.type = FORGE_SCRUB_NOW_REQUESTED;
+
 export interface EntityDiscardRequestedPayload {
   entityId: string;
 }
@@ -153,6 +165,54 @@ function closeForgeSession(dispatch: AppDispatch, chatId: string): void {
   dispatch(chatDeleted({ id: chatId }));
 }
 
+/**
+ * Runs the deferred reference-scrub for a chat if one is pending: submit one
+ * forgeCleanup turn over the discarded names (only if drafts remain to scrub),
+ * then clear the pending list. Shared by the Forge Ahead lead-off and the
+ * on-demand scrub control.
+ */
+function runPendingScrub(
+  latest: () => RootState,
+  dispatch: AppDispatch,
+  chatId: string,
+): void {
+  const pending = latest().forge.pendingScrubByChatId[chatId] ?? [];
+  if (pending.length === 0) return;
+  if (poolFor(latest(), chatId).length > 0) {
+    const chat = findChat(latest(), chatId);
+    if (chat) {
+      const cleanupId = api.v1.uuid();
+      dispatch(
+        messageAdded({
+          chatId,
+          message: {
+            id: cleanupId,
+            role: "assistant",
+            content: "",
+            messageKind: "cleanup",
+          },
+        }),
+      );
+      const cleanupChat = findChat(latest(), chatId)!;
+      const cleanupStrategy = buildForgeCleanupStrategy(
+        latest,
+        cleanupChat,
+        cleanupId,
+        pending,
+      );
+      dispatch(
+        requestQueued({
+          id: cleanupStrategy.requestId,
+          type: "forgeCleanup",
+          targetId: cleanupId,
+        }),
+      );
+      dispatch(generationSubmitted(cleanupStrategy));
+    }
+  }
+  dispatch(scrubCleared({ chatId }));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Effect registration
 // ─────────────────────────────────────────────────────────────────────────────
@@ -193,6 +253,14 @@ export function registerForgeChatEffects(
     },
   );
 
+  // ─── Scrub Now (run the deferred reference-cleanup on demand) ───────────────
+  subscribeEffect(
+    matchesAction(forgeScrubNowRequested),
+    async (action, { getState: latest }) => {
+      runPendingScrub(latest, dispatch, action.payload.chatId);
+    },
+  );
+
   // ─── Continue (advance phase + submit next turn) ────────────────────────────
   subscribeEffect(
     matchesAction(forgeChatContinueRequested),
@@ -201,43 +269,10 @@ export function registerForgeChatEffects(
       const chat = findChat(latest(), chatId);
       if (!chat) return;
 
-      // Lead off with a references-cleanup turn if drafts were discarded since
-      // the last forge turn, then continue into the normal phase turn. The
-      // cleanup is queued first, so it runs (and scrubs the pool) before the
-      // phase turn's JIT factory builds its context.
-      const pending = latest().forge.pendingScrubByChatId[chatId] ?? [];
-      if (pending.length > 0) {
-        if (poolFor(latest(), chatId).length > 0) {
-          const cleanupId = api.v1.uuid();
-          dispatch(
-            messageAdded({
-              chatId,
-              message: {
-                id: cleanupId,
-                role: "assistant",
-                content: "",
-                messageKind: "cleanup",
-              },
-            }),
-          );
-          const cleanupChat = findChat(latest(), chatId)!;
-          const cleanupStrategy = buildForgeCleanupStrategy(
-            latest,
-            cleanupChat,
-            cleanupId,
-            pending,
-          );
-          dispatch(
-            requestQueued({
-              id: cleanupStrategy.requestId,
-              type: "forgeCleanup",
-              targetId: cleanupId,
-            }),
-          );
-          dispatch(generationSubmitted(cleanupStrategy));
-        }
-        dispatch(scrubCleared({ chatId }));
-      }
+      // Lead off with the deferred references-cleanup (if any) before the phase
+      // turn. Queued first, so it runs and scrubs the pool before the phase
+      // turn's JIT factory builds its context.
+      runPendingScrub(latest, dispatch, chatId);
 
       const state = latest();
       const pool = poolFor(state, chatId);
