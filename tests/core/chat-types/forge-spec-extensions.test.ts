@@ -121,3 +121,11 @@ describe("forgeSpec.handleSend", () => {
     ).toBe(false);
   });
 });
+
+describe("forgeSpec.headerControls", () => {
+  it("includes a forgeAheadButton", () => {
+    const ctx: SpecCtx = { getState: () => stateWith([]), dispatch: vi.fn() };
+    const kinds = forgeSpec.headerControls(chat(), ctx).map((c) => c.kind);
+    expect(kinds).toContain("forgeAheadButton");
+  });
+});

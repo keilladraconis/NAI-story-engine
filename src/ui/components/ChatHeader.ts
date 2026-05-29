@@ -16,6 +16,7 @@ import { subModeChanged, chatCreated, chatSwitched } from "../../core/store/slic
 import {
   forgeCastAllRequested,
   forgeDiscardAllRequested,
+  forgeChatContinueRequested,
 } from "../../core/store/effects/forge-chat-effects";
 import { StoreWatcher } from "../store-watcher";
 import { SeConfirmButton } from "./SeConfirmButton";
@@ -223,6 +224,17 @@ export class ChatHeader extends SuiComponent<
           built.push(await castAllBtn.build());
           break;
         }
+        case "forgeAheadButton":
+          built.push(
+            button({
+              id: `${this.id}-forge-ahead`,
+              text: "⚡ Forge Ahead",
+              style: { padding: "2px 8px", "font-size": "0.75em" },
+              callback: () =>
+                store.dispatch(forgeChatContinueRequested({ chatId: chat.id })),
+            }),
+          );
+          break;
         case "discardAllButton": {
           const discardAllBtn = new SeConfirmButton({
             id: `${this.id}-discard-all`,

@@ -2,7 +2,7 @@ import { describe, it, expectTypeOf } from "vitest";
 import type { HeaderControl } from "../../../src/core/chat-types/types";
 
 describe("HeaderControl.kind union", () => {
-  it("includes the three new Forge variants", () => {
+  it("is exactly the set of supported control kinds", () => {
     expectTypeOf<HeaderControl["kind"]>().toEqualTypeOf<
       | "subModeToggle"
       | "summarizeButton"
@@ -12,6 +12,7 @@ describe("HeaderControl.kind union", () => {
       | "castAllButton"
       | "discardAllButton"
       | "phaseIndicator"
+      | "forgeAheadButton"
     >();
   });
 });
