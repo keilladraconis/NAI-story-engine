@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { parseCommands } from "../../../src/core/utils/crucible-command-parser";
+import {
+  parseCommands,
+  stripForgeCommands,
+} from "../../../src/core/utils/crucible-command-parser";
 
 describe("parseCommands", () => {
   it("parses a CREATE command with content", () => {
@@ -189,5 +192,25 @@ Line three of description.
     expect((commands[0] as any).content).toBe(
       "Line one of description.\nLine two of description.\nLine three of description.",
     );
+  });
+});
+
+describe("stripForgeCommands", () => {
+  it("removes command lines but keeps conversational prose", () => {
+    const text = [
+      "Tightening the dock crew.",
+      '[CREATE CHARACTER "Halloran" | the harbormaster]',
+      '[REVISE "Vesper" | now wary of Halloran]',
+      "Anything else you want to adjust?",
+    ].join("\n");
+    const out = stripForgeCommands(text);
+    expect(out).toContain("Tightening the dock crew.");
+    expect(out).toContain("Anything else you want to adjust?");
+    expect(out).not.toContain("[CREATE");
+    expect(out).not.toContain("[REVISE");
+  });
+
+  it("leaves text without commands unchanged (trimmed)", () => {
+    expect(stripForgeCommands("just a normal reply")).toBe("just a normal reply");
   });
 });

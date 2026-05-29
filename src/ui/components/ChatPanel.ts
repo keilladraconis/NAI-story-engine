@@ -18,6 +18,7 @@ import { IDS } from "../../ui/framework/ids";
 import { RefineCommitBar } from "./RefineCommitBar";
 import type { Chat } from "../../core/chat-types/types";
 import { getChatTypeSpec } from "../../core/chat-types";
+import { stripForgeCommands } from "../../core/utils/crucible-command-parser";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 type Theme = { default: { self: { style: object } } };
@@ -106,6 +107,7 @@ export class ChatPanel extends SuiComponent<
         id: `se-bs-msg-${msg.id}`,
         chatId: v.id,
         message: msg,
+        formatDisplay: v.type === "forge" ? stripForgeCommands : undefined,
       }).build();
       groupParts.push(msgPart);
       const inlineIds = spec.inlineEntityIdsFor?.(msg, v, ctx) ?? [];
