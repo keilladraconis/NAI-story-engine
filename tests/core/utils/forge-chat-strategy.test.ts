@@ -12,6 +12,7 @@ import {
   FORGE_EXPAND_PROMPT,
   FORGE_WEAVE_PROMPT,
   FORGE_CLEANUP_PROMPT,
+  SYSTEM_PROMPT,
 } from "../../../src/core/utils/prompts";
 
 function makeEntity(over: Partial<WorldEntity>): WorldEntity {
@@ -331,5 +332,104 @@ describe("buildForgeCleanupStrategy", () => {
     const built = await strat.messageFactory!();
     expect(built.params?.max_tokens).toBeLessThanOrEqual(512);
     expect(built.params?.max_tokens).toBeGreaterThanOrEqual(256);
+  });
+});
+
+describe("buildForgeChatStrategy briefing anchoring", () => {
+  const briefingChat: Chat = {
+    id: "fc-1",
+    type: "forge",
+    title: "Forge",
+    subMode: "sketch",
+    messages: [
+      {
+        id: "brief",
+        role: "system",
+        content: "STORY ENGINE BRIEFING\n\n[BRAINSTORM]\nUSER: haunted lighthouse",
+      },
+      { id: "u1", role: "user", content: "begin" },
+    ],
+    seed: { kind: "blank" },
+  };
+
+  it("does not inject the shared prefix (no SYSTEM_PROMPT, no [WORLD ENTRIES])", async () => {
+    const getState = () =>
+      makeState({
+        world: {
+          groups: [],
+          entitiesById: {
+            l1: makeEntity({
+              id: "l1",
+              name: "Old Quay",
+              summary: "decaying",
+              lifecycle: "live",
+              lorebookEntryId: "lb-1",
+              categoryId: FieldID.Locations,
+            }),
+          },
+          entityIds: ["l1"],
+        },
+      });
+    const strat = buildForgeChatStrategy(getState, briefingChat, "asst-pending");
+    const built = await strat.messageFactory!();
+    const allText = built.messages.map((m) => m.content).join("\n");
+    expect(allText).toContain("[LIVE]");
+    expect(allText).not.toContain("[WORLD ENTRIES]");
+    expect(allText).not.toContain(SYSTEM_PROMPT);
+  });
+
+  it("places the frozen briefing right after the phase prompt and before [POOL]", async () => {
+    const getState = () =>
+      makeState({
+        world: {
+          groups: [],
+          entitiesById: {
+            d1: makeEntity({
+              id: "d1",
+              name: "Vesper",
+              lifecycle: "draft",
+              sourceChatId: "fc-1",
+            }),
+          },
+          entityIds: ["d1"],
+        },
+      });
+    const strat = buildForgeChatStrategy(getState, briefingChat, "asst-pending");
+    const built = await strat.messageFactory!();
+    const briefingIdx = built.messages.findIndex((m) =>
+      m.content?.includes("STORY ENGINE BRIEFING"),
+    );
+    const poolIdx = built.messages.findIndex((m) => m.content?.includes("[POOL]"));
+    const sketchIdx = built.messages.findIndex(
+      (m) => m.content === FORGE_SKETCH_PROMPT,
+    );
+    expect(sketchIdx).toBeGreaterThanOrEqual(0);
+    expect(briefingIdx).toBeGreaterThan(sketchIdx);
+    expect(poolIdx).toBeGreaterThan(briefingIdx);
+    // The briefing must NOT be re-sent as a conversational turn.
+    const briefingMsgs = built.messages.filter((m) =>
+      m.content?.includes("STORY ENGINE BRIEFING"),
+    );
+    expect(briefingMsgs).toHaveLength(1);
+  });
+
+  it("works without a briefing (legacy session whose first message is not system)", async () => {
+    const legacy: Chat = {
+      id: "fc-1",
+      type: "forge",
+      title: "Forge",
+      subMode: "sketch",
+      messages: [{ id: "u1", role: "user", content: "begin" }],
+      seed: { kind: "blank" },
+    };
+    const getState = () => makeState();
+    const strat = buildForgeChatStrategy(getState, legacy, "asst-pending");
+    const built = await strat.messageFactory!();
+    expect(
+      built.messages.some((m) => m.content === FORGE_SKETCH_PROMPT),
+    ).toBe(true);
+    expect(
+      built.messages.some((m) => m.role === "user" && m.content === "begin"),
+    ).toBe(true);
   });
 });

@@ -131,11 +131,24 @@ export function buildForgeChatStrategy(
   const factory = async () => {
     const phase = resolvePhase(chat.subMode);
     const { prompt, maxTokens, temperature } = PHASE_TABLE[phase];
-
-    const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true });
     const state = getState();
 
     const system: Message = { role: "system", content: prompt };
+
+    // The frozen briefing is the leading system message of the transcript,
+    // seeded at session start. Anchor it right after the phase prompt; the rest
+    // of the transcript is the conversation. Legacy sessions with no leading
+    // system message simply have no briefing. Binding `briefing` to the narrowed
+    // message (not a boolean) lets TS know `.content` is safe.
+    const fullTranscript = transcriptOf(chat, assistantMessageId);
+    const first = fullTranscript[0];
+    const briefing = first && first.role === "system" ? first : null;
+    const briefingMsg: Message[] = briefing
+      ? [{ role: "system", content: briefing.content }]
+      : [];
+    const conversation: Message[] = (
+      briefing ? fullTranscript.slice(1) : fullTranscript
+    ).map((m) => ({ role: m.role, content: m.content }));
 
     const blocks: string[] = [];
     const pool = formatPool(state, chat.id);
@@ -152,15 +165,11 @@ export function buildForgeChatStrategy(
         ? [{ role: "assistant", content: blocks.join("\n\n") }]
         : [];
 
-    const transcript: Message[] = transcriptOf(chat, assistantMessageId).map(
-      (m) => ({ role: m.role, content: m.content }),
-    );
-
     const messages: Message[] = [
-      ...prefix,
       system,
+      ...briefingMsg,
       ...contextBlock,
-      ...transcript,
+      ...conversation,
     ];
 
     await appendXialongStyleMessage(messages, XIALONG_STYLE.forge);
