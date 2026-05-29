@@ -12,6 +12,12 @@ import type { RootState, WorldEntity } from "../../../../src/core/store/types";
 import type { Chat } from "../../../../src/core/chat-types/types";
 import { FieldID } from "../../../../src/config/field-definitions";
 
+// Isolate the effect from buildForgeBriefing's internals — it has its own tests.
+vi.mock("../../../../src/core/utils/context-builder", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../../src/core/utils/context-builder")>()),
+  buildForgeBriefing: vi.fn(async () => "BRIEFING TEXT"),
+}));
+
 type EffectHandler = (
   action: { type: string; payload: unknown },
   ctx: { getState: () => RootState },
@@ -273,6 +279,24 @@ describe("forgeChatNewSessionRequested effect", () => {
       (m: { role: string }) => m.role === "user",
     );
     expect(userMsgs).toEqual([]);
+  });
+
+  it("seeds the briefing as the first (system) message of the new chat", async () => {
+    const state = makeState([]);
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatNewSessionRequested({ initialUserMessage: "include Vesper" }));
+    const created = dispatch.mock.calls.find(([a]) => a.type === "chat/chatCreated");
+    expect(created).toBeDefined();
+    const msgs = created![0].payload.chat.messages;
+    expect(msgs[0].role).toBe("system");
+    expect(msgs[0].content).toBe("BRIEFING TEXT");
+    // The seeded user guidance follows the briefing.
+    expect(
+      msgs.some(
+        (m: { role: string; content: string }) =>
+          m.role === "user" && m.content === "include Vesper",
+      ),
+    ).toBe(true);
   });
 });
 

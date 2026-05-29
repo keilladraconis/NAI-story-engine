@@ -20,7 +20,8 @@
 
 import { Store, matchesAction } from "nai-store";
 import type { RootState, AppDispatch, WorldEntity } from "../types";
-import type { Chat } from "../../chat-types/types";
+import type { Chat, ChatMessage } from "../../chat-types/types";
+import { buildForgeBriefing } from "../../utils/context-builder";
 import {
   chatCreated,
   chatDeleted,
@@ -275,14 +276,26 @@ export function registerForgeChatEffects(
     async (action, { getState: latest }) => {
       const { initialUserMessage } = action.payload;
       const seedText = initialUserMessage?.trim();
+
+      // Capture the frozen briefing BEFORE chatCreated fires — at this point
+      // activeSavedChat still resolves to the brainstorm the user came from,
+      // not the forge chat we are about to create.
+      const briefing = await buildForgeBriefing(latest);
+
+      const messages: ChatMessage[] = [];
+      if (briefing) {
+        messages.push({ id: api.v1.uuid(), role: "system", content: briefing });
+      }
+      if (seedText) {
+        messages.push({ id: api.v1.uuid(), role: "user", content: seedText });
+      }
+
       const chat: Chat = {
         id: api.v1.uuid(),
         type: "forge",
         title: "Forge",
         subMode: "sketch",
-        messages: seedText
-          ? [{ id: api.v1.uuid(), role: "user", content: seedText }]
-          : [],
+        messages,
         seed: { kind: "blank" },
       };
       dispatch(chatCreated({ chat }));
