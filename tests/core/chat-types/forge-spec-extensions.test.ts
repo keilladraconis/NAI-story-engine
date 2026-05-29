@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { forgeSpec } from "../../../src/core/chat-types/forge";
 import type { Chat, ChatMessage, SpecCtx } from "../../../src/core/chat-types/types";
-import { forgeChatContinueRequested } from "../../../src/core/store/effects/forge-chat-effects";
+import {
+  forgeChatContinueRequested,
+  forgeChatDiscussRequested,
+} from "../../../src/core/store/effects/forge-chat-effects";
 import { messageAdded } from "../../../src/core/store/slices/chat";
 import type { RootState, WorldEntity } from "../../../src/core/store/types";
 import { FieldID } from "../../../src/config/field-definitions";
@@ -83,7 +86,7 @@ describe("forgeSpec.inlineEntityIdsFor", () => {
 });
 
 describe("forgeSpec.handleSend", () => {
-  it("empty content dispatches forgeChatContinueRequested with no advancePhase override", () => {
+  it("empty content is a consumed no-op (forging moved to the header)", () => {
     const dispatch = vi.fn();
     const ctx: SpecCtx = {
       getState: () => stateWith([]),
@@ -91,14 +94,10 @@ describe("forgeSpec.handleSend", () => {
     };
     const handled = forgeSpec.handleSend!(chat(), "   ", ctx);
     expect(handled).toBe(true);
-    const call = dispatch.mock.calls.find(
-      ([a]) => a.type === forgeChatContinueRequested.type,
-    );
-    expect(call).toBeDefined();
-    expect(call![0].payload).toEqual({ chatId: "fc-1" });
+    expect(dispatch).not.toHaveBeenCalled();
   });
 
-  it("non-empty content appends user message and dispatches advancePhase:false", () => {
+  it("non-empty content appends the user message and dispatches a discuss turn", () => {
     const dispatch = vi.fn();
     const ctx: SpecCtx = {
       getState: () => stateWith([]),
@@ -112,10 +111,13 @@ describe("forgeSpec.handleSend", () => {
     expect(userCall).toBeDefined();
     expect(userCall![0].payload.message.role).toBe("user");
     expect(userCall![0].payload.message.content).toBe("more about Vesper");
-    const continueCall = dispatch.mock.calls.find(
-      ([a]) => a.type === forgeChatContinueRequested.type,
+    const discussCall = dispatch.mock.calls.find(
+      ([a]) => a.type === forgeChatDiscussRequested.type,
     );
-    expect(continueCall).toBeDefined();
-    expect(continueCall![0].payload).toEqual({ chatId: "fc-1", advancePhase: false });
+    expect(discussCall).toBeDefined();
+    expect(discussCall![0].payload).toEqual({ chatId: "fc-1" });
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === forgeChatContinueRequested.type),
+    ).toBe(false);
   });
 });

@@ -4,7 +4,7 @@ import {
   FORGE_EXPAND_PROMPT,
   FORGE_WEAVE_PROMPT,
 } from "../utils/prompts";
-import { forgeChatContinueRequested } from "../store/effects/forge-chat-actions";
+import { forgeChatDiscussRequested } from "../store/effects/forge-chat-actions";
 import { messageAdded } from "../store/slices/chat";
 
 type ForgePhase = "sketch" | "expand" | "weave";
@@ -29,11 +29,12 @@ export const forgeSpec: ChatTypeSpec<ForgePhase> = {
   subModes: SUB_MODES,
   defaultSubMode: "sketch",
 
-  // Forge is a continuation loop, not free chat: the input nudges the next
-  // pass, the send button advances the forge, and there is no Clear (Cast All /
-  // Discard All end the session instead).
-  inputPlaceholder: "Influence the next forging step",
-  sendLabel: "Continue Forging",
+  // Forge is agentic: the input is for discussing and instructing (the forge
+  // emits actions only for what you ask), while "Forge Ahead" in the header runs
+  // the autonomous expansion pass. Cast All / Discard All end the session, so
+  // there is no Clear button.
+  inputPlaceholder: "Discuss or instruct the forge…",
+  sendLabel: "Send",
   showClearButton: false,
 
   initialize(_seed: ChatSeed, _ctx: SpecCtx) {
@@ -76,19 +77,16 @@ export const forgeSpec: ChatTypeSpec<ForgePhase> = {
 
   handleSend(chat, content, ctx) {
     const trimmed = content.trim();
-    if (trimmed.length === 0) {
-      ctx.dispatch(forgeChatContinueRequested({ chatId: chat.id }));
-      return true;
-    }
+    // Empty send is a no-op now — running the forge is the "Forge Ahead" header
+    // action, not an empty submit.
+    if (trimmed.length === 0) return true;
     ctx.dispatch(
       messageAdded({
         chatId: chat.id,
         message: { id: api.v1.uuid(), role: "user", content: trimmed },
       }),
     );
-    ctx.dispatch(
-      forgeChatContinueRequested({ chatId: chat.id, advancePhase: false }),
-    );
+    ctx.dispatch(forgeChatDiscussRequested({ chatId: chat.id }));
     return true;
   },
 };
