@@ -17,6 +17,7 @@ import {
   forgeCastAllRequested,
   forgeDiscardAllRequested,
   forgeChatContinueRequested,
+  forgeScrubNowRequested,
 } from "../../core/store/effects/forge-chat-effects";
 import { StoreWatcher } from "../store-watcher";
 import { SeConfirmButton } from "./SeConfirmButton";
@@ -222,6 +223,37 @@ export class ChatHeader extends SuiComponent<
             },
           });
           built.push(await castAllBtn.build());
+          break;
+        }
+        case "scrubIndicator": {
+          const scrubId = `${this.id}-scrub`;
+          const scrubStyle = (count: number): object => ({
+            padding: "2px 8px",
+            "font-size": "0.75em",
+            display: count > 0 ? "block" : "none",
+          });
+          const count0 = (store.getState().forge.pendingScrubByChatId[chat.id] ?? []).length;
+          built.push(
+            button({
+              id: scrubId,
+              text: `🧹 Scrub (${count0})`,
+              style: scrubStyle(count0),
+              callback: () =>
+                store.dispatch(forgeScrubNowRequested({ chatId: chat.id })),
+            }),
+          );
+          this._watcher.watch(
+            (s) => (s.forge.pendingScrubByChatId[chat.id] ?? []).length,
+            (count) => {
+              api.v1.ui.updateParts([
+                {
+                  id: scrubId,
+                  text: `🧹 Scrub (${count})`,
+                  style: scrubStyle(count),
+                } as unknown as Partial<UIPart> & { id: string },
+              ]);
+            },
+          );
           break;
         }
         case "forgeAheadButton":

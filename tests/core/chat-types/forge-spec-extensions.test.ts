@@ -128,4 +128,10 @@ describe("forgeSpec.headerControls", () => {
     const kinds = forgeSpec.headerControls(chat(), ctx).map((c) => c.kind);
     expect(kinds).toContain("forgeAheadButton");
   });
+
+  it("includes a scrubIndicator", () => {
+    const ctx: SpecCtx = { getState: () => stateWith([]), dispatch: vi.fn() };
+    const kinds = forgeSpec.headerControls(chat(), ctx).map((c) => c.kind);
+    expect(kinds).toContain("scrubIndicator");
+  });
 });

@@ -58,7 +58,8 @@ export interface HeaderControl {
     | "castAllButton"
     | "discardAllButton"
     | "phaseIndicator"
-    | "forgeAheadButton";
+    | "forgeAheadButton"
+    | "scrubIndicator";
 }
 
 export interface SpecCtx {
