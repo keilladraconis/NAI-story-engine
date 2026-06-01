@@ -86,6 +86,62 @@ export type ParsedCommand =
   | CritiqueCommand
   | DoneCommand;
 
+// --- Tokenizer ---
+
+export type ForgeLineToken =
+  | { kind: "prose"; text: string }
+  | { kind: "command"; command: ParsedCommand }
+  | { kind: "unrecognized"; raw: string };
+
+/** Verbs that begin a command line (mirrors isCommandLine's verb set). */
+const KNOWN_COMMAND_VERBS = new Set([
+  "CREATE",
+  "REVISE",
+  "DESCRIPTION",
+  "LINK",
+  "DELETE",
+  "RENAME",
+  "THREAD",
+  "CRITIQUE",
+  "DONE",
+]);
+
+/** A line that clearly *meant* to be a command (known verb or known element
+ *  type) but did not fully parse. Stray prose brackets like [she pauses] are
+ *  excluded — their first word is neither a verb nor a type. */
+function looksLikeIntendedCommand(line: string): boolean {
+  const m = line.match(/^\[\s*([A-Za-z]+)\b/);
+  if (!m) return false;
+  const word = m[1].toUpperCase();
+  return KNOWN_COMMAND_VERBS.has(word) || word in TYPE_TO_FIELD;
+}
+
+/**
+ * Walks `text` into document-order tokens: recognized commands (consuming any
+ * multiline content), intended-but-malformed command lines (`unrecognized`),
+ * and everything else (`prose`, one token per line). Reuses parseCommandAt so
+ * it can never drift from the parser.
+ */
+export function walkForgeLines(text: string): ForgeLineToken[] {
+  const lines = text.split("\n");
+  const tokens: ForgeLineToken[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const parsed = parseCommandAt(lines, i);
+    if (parsed) {
+      tokens.push({ kind: "command", command: parsed.command });
+      i += parsed.consumed;
+      continue;
+    }
+    const line = lines[i].trim();
+    if (looksLikeIntendedCommand(line)) {
+      tokens.push({ kind: "unrecognized", raw: line });
+    } else {
+      tokens.push({ kind: "prose", text: lines[i] });
+    }
+  }
+  return tokens;
+}
+
 // --- Parser ---
 
 interface ParsedCommandAt {
@@ -258,25 +314,13 @@ function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
 }
 
 /**
- * Parses structured commands from GLM output text.
- * Lenient: skips unparseable lines rather than failing.
+ * Parses structured commands from forge output text. Lenient: non-command
+ * lines are skipped. Delegates to walkForgeLines so there is one shared walk.
  */
 export function parseCommands(text: string): ParsedCommand[] {
-  const lines = text.split("\n");
-  const commands: ParsedCommand[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const parsed = parseCommandAt(lines, i);
-    if (parsed) {
-      commands.push(parsed.command);
-      i += parsed.consumed;
-      continue;
-    }
-    const line = lines[i].trim();
-    if (/^\[\s*[A-Z]/.test(line) && line.includes("]")) {
-      api.v1.log(`[crucible-parser] unrecognized command: ${line}`);
-    }
-  }
-  return commands;
+  return walkForgeLines(text)
+    .filter((t): t is Extract<ForgeLineToken, { kind: "command" }> => t.kind === "command")
+    .map((t) => t.command);
 }
 
 /** Render a parsed command back to its canonical single-line form. */

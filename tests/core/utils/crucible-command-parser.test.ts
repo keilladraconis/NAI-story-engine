@@ -4,6 +4,7 @@ import {
   stripForgeCommands,
   serializeForgeCommand,
   canonicalizeForgeCommands,
+  walkForgeLines,
 } from "../../../src/core/utils/crucible-command-parser";
 
 describe("parseCommands", () => {
@@ -323,5 +324,50 @@ describe("canonicalizeForgeCommands", () => {
   it("leaves a non-command bracket alone", () => {
     expect(canonicalizeForgeCommands('[NOTE: "x" | not a type]'))
       .toBe('[NOTE: "x" | not a type]');
+  });
+});
+
+describe("walkForgeLines", () => {
+  it("tokenizes prose, commands, and trailing prose in document order", () => {
+    const text = [
+      "Let me think about the apartment.",
+      '[CREATE SYSTEM "Apartment Evolution" | progressive transformation]',
+      "Now Wilson reacts.",
+      '[REVISE "Wilson" | quieter now]',
+      "Done for now.",
+    ].join("\n");
+    const kinds = walkForgeLines(text).map((t) => t.kind);
+    expect(kinds).toEqual(["prose", "command", "prose", "command", "prose"]);
+  });
+
+  it("flags a known-verb typo as unrecognized", () => {
+    const toks = walkForgeLines('[CREATE SYSTm "X" | desc]');
+    expect(toks).toEqual([{ kind: "unrecognized", raw: '[CREATE SYSTm "X" | desc]' }]);
+  });
+
+  it("flags a bare known-verb with no args as unrecognized", () => {
+    const toks = walkForgeLines("[REVISE]");
+    expect(toks).toEqual([{ kind: "unrecognized", raw: "[REVISE]" }]);
+  });
+
+  it("treats prose brackets as prose, not unrecognized", () => {
+    expect(walkForgeLines("[she pauses]")).toEqual([{ kind: "prose", text: "[she pauses]" }]);
+    expect(walkForgeLines("[redacted]")).toEqual([{ kind: "prose", text: "[redacted]" }]);
+  });
+
+  it("consumes multiline command content (no stray prose tokens)", () => {
+    const text = ['[CREATE LOCATION "Pier 7"]', "A rotting wharf.", "Fog rolls in."].join("\n");
+    const toks = walkForgeLines(text);
+    expect(toks).toHaveLength(1);
+    expect(toks[0].kind).toBe("command");
+  });
+});
+
+describe("parseCommands (still works via walkForgeLines)", () => {
+  it("returns only recognized commands", () => {
+    const text = ['narration', '[CREATE TOPIC "Decay" | rot spreads]', '[REVISE]'].join("\n");
+    const cmds = parseCommands(text);
+    expect(cmds).toHaveLength(1);
+    expect(cmds[0].kind).toBe("CREATE");
   });
 });
