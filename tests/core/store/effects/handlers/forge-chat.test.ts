@@ -63,6 +63,29 @@ describe("forgeChatHandler.streaming", () => {
 });
 
 describe("forgeChatHandler.completion", () => {
+  it("stores canonicalized content (bare TYPE → CREATE) and forges the draft", async () => {
+    const dispatch = vi.fn();
+    const ctx: CompletionContext<ForgeChatTarget> = {
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState: () => makeState(),
+      dispatch,
+      accumulatedText: '[SYSTEM: "Apartment Evolution" | progressive transformation]',
+      generationSucceeded: true,
+    };
+    await forgeChatHandler.completion(ctx);
+    const updateCall = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/messageUpdated",
+    );
+    expect(updateCall![0].payload.content).toBe(
+      '[CREATE SYSTEM "Apartment Evolution" | progressive transformation]',
+    );
+    const forged = dispatch.mock.calls.find(
+      ([a]) => a.type === "world/entityForged",
+    );
+    expect(forged).toBeDefined();
+    expect(forged![0].payload.entity.name).toBe("Apartment Evolution");
+  });
+
   it("strips thinking tags and writes cleaned text via messageUpdated", async () => {
     const dispatch = vi.fn();
     const ctx: CompletionContext<ForgeChatTarget> = {

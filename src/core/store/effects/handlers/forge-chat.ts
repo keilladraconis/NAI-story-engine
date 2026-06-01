@@ -16,6 +16,7 @@ import { tombstoneAdded } from "../../slices/forge";
 import { WorldEntity, WorldGroup, RootState, AppDispatch } from "../../types";
 import {
   parseCommands,
+  canonicalizeForgeCommands,
   TYPE_TO_FIELD,
   type ParsedCommand,
 } from "../../../utils/crucible-command-parser";
@@ -245,7 +246,7 @@ export const forgeChatHandler: GenerationHandlers<ForgeChatTarget> = {
       messageUpdated({
         chatId: ctx.target.chatId,
         id: ctx.target.messageId,
-        content: cleaned,
+        content: canonicalizeForgeCommands(cleaned),
       }),
     );
     if (!ctx.generationSucceeded) return;
@@ -273,7 +274,7 @@ export const forgeCleanupHandler: GenerationHandlers<ForgeCleanupTarget> = {
       messageUpdated({
         chatId: ctx.target.chatId,
         id: ctx.target.messageId,
-        content: cleaned,
+        content: canonicalizeForgeCommands(cleaned),
       }),
     );
     if (!ctx.generationSucceeded) return;
