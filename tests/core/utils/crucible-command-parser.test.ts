@@ -3,6 +3,7 @@ import {
   parseCommands,
   stripForgeCommands,
   serializeForgeCommand,
+  canonicalizeForgeCommands,
 } from "../../../src/core/utils/crucible-command-parser";
 
 describe("parseCommands", () => {
@@ -289,5 +290,38 @@ describe("serializeForgeCommand", () => {
       .toBe('[THREAD "Crew" | "A", "B" | dock hands]');
     expect(serializeForgeCommand({ kind: "THREAD", title: "Crew", memberNames: ["A", "B"], description: "" }))
       .toBe('[THREAD "Crew" | "A", "B"]');
+  });
+});
+
+describe("canonicalizeForgeCommands", () => {
+  it("rewrites a bare TYPE-led command to canonical CREATE", () => {
+    expect(canonicalizeForgeCommands('[SYSTEM: "X" | a description]'))
+      .toBe('[CREATE SYSTEM "X" | a description]');
+  });
+
+  it("preserves prose around commands", () => {
+    const input = [
+      "Tightening the dock crew.",
+      '[SYSTEM: "X" | a description]',
+      "Anything else?",
+    ].join("\n");
+    expect(canonicalizeForgeCommands(input)).toBe(
+      ["Tightening the dock crew.", '[CREATE SYSTEM "X" | a description]', "Anything else?"].join("\n"),
+    );
+  });
+
+  it("folds a multiline body into the canonical inline form", () => {
+    expect(canonicalizeForgeCommands('[FACTION "Dock Guild"]\nThe waterfront labor union.'))
+      .toBe('[CREATE FACTION "Dock Guild" | The waterfront labor union.]');
+  });
+
+  it("is idempotent on already-canonical text", () => {
+    const canonical = '[CREATE SYSTEM "X" | y]';
+    expect(canonicalizeForgeCommands(canonical)).toBe(canonical);
+  });
+
+  it("leaves a non-command bracket alone", () => {
+    expect(canonicalizeForgeCommands('[NOTE: "x" | not a type]'))
+      .toBe('[NOTE: "x" | not a type]');
   });
 });

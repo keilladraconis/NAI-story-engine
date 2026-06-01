@@ -305,6 +305,27 @@ export function serializeForgeCommand(cmd: ParsedCommand): string {
   }
 }
 
+/**
+ * Rewrites every recognized command in `text` to canonical form, in place,
+ * folding multiline bodies into the inline form and leaving prose and
+ * unrecognized brackets untouched. Idempotent on canonical input. Reuses
+ * parseCommandAt so it can never drift from parseCommands.
+ */
+export function canonicalizeForgeCommands(text: string): string {
+  const lines = text.split("\n");
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const parsed = parseCommandAt(lines, i);
+    if (parsed) {
+      out.push(serializeForgeCommand(parsed.command));
+      i += parsed.consumed;
+    } else {
+      out.push(lines[i]);
+    }
+  }
+  return out.join("\n");
+}
+
 /** Collect non-command lines following a command as its content.
  *  `inline` captures any text on the same line as the command (after the `]`).
  */
