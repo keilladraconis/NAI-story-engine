@@ -5,6 +5,8 @@ import {
   serializeForgeCommand,
   canonicalizeForgeCommands,
   walkForgeLines,
+  parseForgeStream,
+  describeForgeCommand,
 } from "../../../src/core/utils/crucible-command-parser";
 
 describe("parseCommands", () => {
@@ -424,5 +426,76 @@ describe("parseCommands (still works via walkForgeLines)", () => {
     const cmds = parseCommands(text);
     expect(cmds).toHaveLength(1);
     expect(cmds[0].kind).toBe("CREATE");
+  });
+});
+
+describe("describeForgeCommand", () => {
+  it("maps a CREATE to a provisional applied record", () => {
+    expect(
+      describeForgeCommand({ kind: "CREATE", elementType: "system", name: "X", content: "d" }),
+    ).toEqual({ kind: "CREATE", status: "applied", elementType: "SYSTEM", name: "X" });
+  });
+  it("maps RENAME and CRITIQUE", () => {
+    expect(describeForgeCommand({ kind: "RENAME", oldName: "A", newName: "B" })).toEqual({
+      kind: "RENAME", status: "applied", name: "A", newName: "B",
+    });
+    expect(describeForgeCommand({ kind: "CRITIQUE", text: "hm" })).toEqual({
+      kind: "CRITIQUE", status: "applied", text: "hm",
+    });
+  });
+});
+
+describe("parseForgeStream", () => {
+  it("treats trailing text as a streaming prose tail", () => {
+    expect(parseForgeStream("Let me think")).toEqual({
+      segments: [],
+      pending: { kind: "prose", text: "Let me think" },
+    });
+  });
+
+  it("buffers an open bracket (prefill) with no settled segments", () => {
+    expect(parseForgeStream("[")).toEqual({ segments: [], pending: { kind: "buffering" } });
+    expect(parseForgeStream('[CREATE SYSTEM "X" | des')).toEqual({
+      segments: [],
+      pending: { kind: "buffering" },
+    });
+  });
+
+  it("resolves a closed command into a settled provisional chip", () => {
+    expect(parseForgeStream('[CREATE SYSTEM "X" | desc]')).toEqual({
+      segments: [
+        { kind: "action", action: { kind: "CREATE", status: "applied", elementType: "SYSTEM", name: "X" } },
+      ],
+      pending: { kind: "none" },
+    });
+  });
+
+  it("interleaves prose, command, and a trailing prose tail in order", () => {
+    const r = parseForgeStream('Sketching.\n[CREATE CHARACTER "Kei" | shy fox]\nNow ');
+    expect(r.segments).toEqual([
+      { kind: "prose", text: "Sketching." },
+      { kind: "action", action: { kind: "CREATE", status: "applied", elementType: "CHARACTER", name: "Kei" } },
+    ]);
+    expect(r.pending).toEqual({ kind: "prose", text: "Now " });
+  });
+
+  it("flags a known-verb typo as an unrecognized chip", () => {
+    expect(parseForgeStream('[CREATE SYSTm "X" | d]')).toEqual({
+      segments: [
+        { kind: "action", action: { kind: "UNKNOWN", status: "unrecognized", reason: '[CREATE SYSTm "X" | d]' } },
+      ],
+      pending: { kind: "none" },
+    });
+  });
+
+  it("treats a closed prose bracket as prose, not a chip", () => {
+    expect(parseForgeStream("[she pauses]")).toEqual({
+      segments: [{ kind: "prose", text: "[she pauses]" }],
+      pending: { kind: "none" },
+    });
+  });
+
+  it("emits no segment for [DONE]", () => {
+    expect(parseForgeStream("[DONE]")).toEqual({ segments: [], pending: { kind: "none" } });
   });
 });

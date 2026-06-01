@@ -16,6 +16,7 @@
  */
 
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
+import type { ForgeActionRecord, ForgeSegment } from "../chat-types/types";
 
 /** Map command type names to World Entry field IDs. */
 export const TYPE_TO_FIELD: Record<string, DulfsFieldID> = {
@@ -140,6 +141,95 @@ export function walkForgeLines(text: string): ForgeLineToken[] {
     }
   }
   return tokens;
+}
+
+// --- Streaming Presenter ---
+
+export type PendingTail =
+  | { kind: "prose"; text: string }
+  | { kind: "buffering" }
+  | { kind: "none" };
+
+export interface ForgeStreamParse {
+  segments: ForgeSegment[];
+  pending: PendingTail;
+}
+
+/** Map a parsed command to a provisional (status "applied") display record —
+ *  no execution. DONE/LINK are filtered before this is called. */
+export function describeForgeCommand(cmd: ParsedCommand): ForgeActionRecord {
+  switch (cmd.kind) {
+    case "CREATE":
+      return { kind: "CREATE", status: "applied", elementType: cmd.elementType.toUpperCase(), name: cmd.name };
+    case "REVISE":
+      return { kind: "REVISE", status: "applied", name: cmd.name };
+    case "DELETE":
+      return { kind: "DELETE", status: "applied", name: cmd.name };
+    case "RENAME":
+      return { kind: "RENAME", status: "applied", name: cmd.oldName, newName: cmd.newName };
+    case "THREAD":
+      return { kind: "THREAD", status: "applied", name: cmd.title };
+    case "CRITIQUE":
+      return { kind: "CRITIQUE", status: "applied", text: cmd.text };
+    case "LINK":
+    case "DONE":
+      return { kind: "UNKNOWN", status: "applied" };
+  }
+}
+
+/**
+ * Provisional streaming parse: scans `text` (the accumulating turn) into settled
+ * segments plus a pending tail. Prose outside brackets streams; an open `[`
+ * buffers (hidden) until its `]`, then the `[…]` chunk is classified via
+ * walkForgeLines. Authoritative parse happens at completion elsewhere; this only
+ * drives the live view.
+ */
+export function parseForgeStream(text: string): ForgeStreamParse {
+  const segments: ForgeSegment[] = [];
+  let prose = "";
+  let bracket: string | null = null;
+
+  const flushProse = () => {
+    if (prose.trim()) segments.push({ kind: "prose", text: prose.trim() });
+    prose = "";
+  };
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (bracket === null) {
+      if (c === "[") {
+        flushProse();
+        bracket = "[";
+      } else {
+        prose += c;
+      }
+    } else {
+      bracket += c;
+      if (c === "]") {
+        const tok = walkForgeLines(bracket)[0];
+        if (tok && tok.kind === "command") {
+          if (tok.command.kind !== "DONE" && tok.command.kind !== "LINK") {
+            segments.push({ kind: "action", action: describeForgeCommand(tok.command) });
+          }
+        } else if (tok && tok.kind === "unrecognized") {
+          segments.push({ kind: "action", action: { kind: "UNKNOWN", status: "unrecognized", reason: tok.raw } });
+        } else {
+          segments.push({ kind: "prose", text: bracket });
+        }
+        bracket = null;
+      }
+    }
+  }
+
+  let pending: PendingTail;
+  if (bracket !== null) {
+    pending = { kind: "buffering" };
+  } else if (prose.trim()) {
+    pending = { kind: "prose", text: prose.trimStart() };
+  } else {
+    pending = { kind: "none" };
+  }
+  return { segments, pending };
 }
 
 // --- Parser ---
