@@ -78,6 +78,10 @@ export class ChatPanel extends SuiComponent<
             .map((e) => `${e.id}:${e.lastAffectingMessageId ?? ""}`)
             .sort()
             .join("|"),
+          segmentsHash:
+            v?.messages
+              .map((m) => (m.forgeSegments ? `${m.id}:${m.forgeSegments.length}` : ""))
+              .join("|") ?? "",
         };
       },
       () => onRebuild(),
@@ -85,7 +89,8 @@ export class ChatPanel extends SuiComponent<
         a.id === b.id &&
         a.isRefine === b.isRefine &&
         a.msgIds === b.msgIds &&
-        a.draftIdHash === b.draftIdHash,
+        a.draftIdHash === b.draftIdHash &&
+        a.segmentsHash === b.segmentsHash,
     );
 
     const v = visibleChat(store.getState());
@@ -106,10 +111,6 @@ export class ChatPanel extends SuiComponent<
         id: `se-bs-msg-${msg.id}`,
         chatId: v.id,
         message: msg,
-        // NOTE: command syntax is intentionally NOT stripped yet — until the
-        // Phase 2 action chips exist, showing the (canonical) action lines in
-        // the bubble is the only way to see a forge pass make progress.
-        // Re-introduce stripForgeCommands alongside the chips.
       }).build();
       groupParts.push(msgPart);
       const inlineIds = spec.inlineEntityIdsFor?.(msg, v, ctx) ?? [];
