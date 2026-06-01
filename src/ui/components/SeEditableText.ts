@@ -46,6 +46,10 @@ export type SeEditableTextOptions = {
   liveSelector?: (s: RootState) => string;
   /** Use single-line textInput in a compact row layout. Default: false. */
   singleLine?: boolean;
+  /** Replaces the single text view with these parts (multiline only). When set,
+   *  the live-text watcher is disabled — the parts are final. Edit still binds
+   *  to the full raw content via getContent/onSave. */
+  viewParts?: UIPart[];
 } & SuiComponentOptions<SeEditableTextTheme, SeEditableTextState>;
 
 // ── SeEditableText ────────────────────────────────────────────────────────────
@@ -80,9 +84,9 @@ export class SeEditableText extends SuiComponent<
   }
 
   async compose(): Promise<UIPartRow | UIPartColumn> {
-    const { liveSelector, formatDisplay, singleLine } = this.options;
+    const { liveSelector, formatDisplay, singleLine, viewParts } = this.options;
 
-    if (liveSelector) {
+    if (liveSelector && !viewParts) {
       this._watcher.watch(liveSelector, (content) => {
         const formatted = formatDisplay ? formatDisplay(content) : content;
         const escaped = singleLine
@@ -97,7 +101,7 @@ export class SeEditableText extends SuiComponent<
 
   override async onSync(): Promise<void> {
     const { editing } = this.state;
-    const { singleLine } = this.options;
+    const { singleLine, viewParts } = this.options;
 
     if (singleLine) {
       api.v1.ui.updateParts([
@@ -119,10 +123,11 @@ export class SeEditableText extends SuiComponent<
         },
       ]);
     } else {
+      const viewStyle = viewParts ? ML_STYLES.viewContainer : ML_STYLES.view;
       api.v1.ui.updateParts([
         {
           id: this._viewId,
-          style: editing ? { display: "none" } : ML_STYLES.view,
+          style: editing ? { display: "none" } : viewStyle,
         },
         {
           id: this._editId,
@@ -242,7 +247,7 @@ export class SeEditableText extends SuiComponent<
 
   private _buildMultiline(): UIPartColumn {
     const { column, row, text, multilineTextInput, button } = api.v1.ui.part;
-    const { placeholder, extraControls, label } = this.options;
+    const { placeholder, extraControls, label, viewParts } = this.options;
     const viewText = this._buildInitialViewText();
 
     const headerContent: UIPart[] = [];
@@ -281,6 +286,10 @@ export class SeEditableText extends SuiComponent<
 
     if (extraControls) headerContent.push(...extraControls);
 
+    const viewPart = viewParts
+      ? column({ id: this._viewId, style: ML_STYLES.viewContainer, content: viewParts })
+      : text({ id: this._viewId, text: viewText, markdown: true, style: ML_STYLES.view });
+
     return column({
       id: this.id,
       style: { gap: "4px" },
@@ -289,12 +298,7 @@ export class SeEditableText extends SuiComponent<
           style: label ? ML_STYLES.headerRowWithLabel : ML_STYLES.headerRow,
           content: headerContent,
         }),
-        text({
-          id: this._viewId,
-          text: viewText,
-          markdown: true,
-          style: ML_STYLES.view,
-        }),
+        viewPart,
         multilineTextInput({
           id: this._editId,
           initialValue: "",
@@ -315,6 +319,10 @@ const ML_STYLES = {
     "white-space": "pre-wrap",
     "word-break": "break-word",
     "min-height": "2em",
+    "user-select": "text",
+  },
+  viewContainer: {
+    width: "100%",
     "user-select": "text",
   },
   edit: { "min-height": "80px", width: "100%", "font-size": "0.85em" },
