@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseCommands,
   stripForgeCommands,
+  serializeForgeCommand,
 } from "../../../src/core/utils/crucible-command-parser";
 
 describe("parseCommands", () => {
@@ -264,5 +265,29 @@ describe("parseCommands — bare TYPE-led leniency", () => {
     const cmds = parseCommands('[CREATE SYSTEM "X" | y]');
     expect(cmds).toHaveLength(1);
     expect(cmds[0]).toEqual({ kind: "CREATE", elementType: "SYSTEM", name: "X", content: "y" });
+  });
+});
+
+describe("serializeForgeCommand", () => {
+  it("serializes each command kind to its canonical line", () => {
+    expect(serializeForgeCommand({ kind: "CREATE", elementType: "SYSTEM", name: "X", content: "y" }))
+      .toBe('[CREATE SYSTEM "X" | y]');
+    expect(serializeForgeCommand({ kind: "REVISE", name: "X", content: "y" }))
+      .toBe('[REVISE "X" | y]');
+    expect(serializeForgeCommand({ kind: "DELETE", name: "X" }))
+      .toBe('[DELETE "X"]');
+    expect(serializeForgeCommand({ kind: "RENAME", oldName: "A", newName: "B" }))
+      .toBe('[RENAME "A" → "B"]');
+    expect(serializeForgeCommand({ kind: "CRITIQUE", text: "thin" }))
+      .toBe("[CRITIQUE | thin]");
+    expect(serializeForgeCommand({ kind: "DONE" }))
+      .toBe("[DONE]");
+  });
+
+  it("serializes THREAD with and without a description", () => {
+    expect(serializeForgeCommand({ kind: "THREAD", title: "Crew", memberNames: ["A", "B"], description: "dock hands" }))
+      .toBe('[THREAD "Crew" | "A", "B" | dock hands]');
+    expect(serializeForgeCommand({ kind: "THREAD", title: "Crew", memberNames: ["A", "B"], description: "" }))
+      .toBe('[THREAD "Crew" | "A", "B"]');
   });
 });

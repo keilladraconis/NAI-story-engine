@@ -279,6 +279,32 @@ export function parseCommands(text: string): ParsedCommand[] {
   return commands;
 }
 
+/** Render a parsed command back to its canonical single-line form. */
+export function serializeForgeCommand(cmd: ParsedCommand): string {
+  switch (cmd.kind) {
+    case "CREATE":
+      return `[CREATE ${cmd.elementType.toUpperCase()} "${cmd.name}" | ${cmd.content}]`;
+    case "REVISE":
+      return `[REVISE "${cmd.name}" | ${cmd.content}]`;
+    case "DELETE":
+      return `[DELETE "${cmd.name}"]`;
+    case "RENAME":
+      return `[RENAME "${cmd.oldName}" → "${cmd.newName}"]`;
+    case "THREAD": {
+      const members = cmd.memberNames.map((n) => `"${n}"`).join(", ");
+      return cmd.description
+        ? `[THREAD "${cmd.title}" | ${members} | ${cmd.description}]`
+        : `[THREAD "${cmd.title}" | ${members}]`;
+    }
+    case "CRITIQUE":
+      return `[CRITIQUE | ${cmd.text}]`;
+    case "LINK":
+      return `[LINK "${cmd.fromName}" → "${cmd.toName}" | ${cmd.description}]`;
+    case "DONE":
+      return "[DONE]";
+  }
+}
+
 /** Collect non-command lines following a command as its content.
  *  `inline` captures any text on the same line as the command (after the `]`).
  */
