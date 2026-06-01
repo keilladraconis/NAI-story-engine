@@ -160,13 +160,23 @@ export interface ForgeStreamParse {
 export function describeForgeCommand(cmd: ParsedCommand): ForgeActionRecord {
   switch (cmd.kind) {
     case "CREATE":
-      return { kind: "CREATE", status: "applied", elementType: cmd.elementType.toUpperCase(), name: cmd.name };
+      return {
+        kind: "CREATE",
+        status: "applied",
+        elementType: cmd.elementType.toUpperCase(),
+        name: cmd.name,
+      };
     case "REVISE":
       return { kind: "REVISE", status: "applied", name: cmd.name };
     case "DELETE":
       return { kind: "DELETE", status: "applied", name: cmd.name };
     case "RENAME":
-      return { kind: "RENAME", status: "applied", name: cmd.oldName, newName: cmd.newName };
+      return {
+        kind: "RENAME",
+        status: "applied",
+        name: cmd.oldName,
+        newName: cmd.newName,
+      };
     case "THREAD":
       return { kind: "THREAD", status: "applied", name: cmd.title };
     case "CRITIQUE":
@@ -209,10 +219,20 @@ export function parseForgeStream(text: string): ForgeStreamParse {
         const tok = walkForgeLines(bracket)[0];
         if (tok && tok.kind === "command") {
           if (tok.command.kind !== "DONE" && tok.command.kind !== "LINK") {
-            segments.push({ kind: "action", action: describeForgeCommand(tok.command) });
+            segments.push({
+              kind: "action",
+              action: describeForgeCommand(tok.command),
+            });
           }
         } else if (tok && tok.kind === "unrecognized") {
-          segments.push({ kind: "action", action: { kind: "UNKNOWN", status: "unrecognized", reason: tok.raw } });
+          segments.push({
+            kind: "action",
+            action: {
+              kind: "UNKNOWN",
+              status: "unrecognized",
+              reason: tok.raw,
+            },
+          });
         } else {
           segments.push({ kind: "prose", text: bracket });
         }

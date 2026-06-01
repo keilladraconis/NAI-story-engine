@@ -432,15 +432,32 @@ describe("parseCommands (still works via walkForgeLines)", () => {
 describe("describeForgeCommand", () => {
   it("maps a CREATE to a provisional applied record", () => {
     expect(
-      describeForgeCommand({ kind: "CREATE", elementType: "system", name: "X", content: "d" }),
-    ).toEqual({ kind: "CREATE", status: "applied", elementType: "SYSTEM", name: "X" });
+      describeForgeCommand({
+        kind: "CREATE",
+        elementType: "system",
+        name: "X",
+        content: "d",
+      }),
+    ).toEqual({
+      kind: "CREATE",
+      status: "applied",
+      elementType: "SYSTEM",
+      name: "X",
+    });
   });
   it("maps RENAME and CRITIQUE", () => {
-    expect(describeForgeCommand({ kind: "RENAME", oldName: "A", newName: "B" })).toEqual({
-      kind: "RENAME", status: "applied", name: "A", newName: "B",
+    expect(
+      describeForgeCommand({ kind: "RENAME", oldName: "A", newName: "B" }),
+    ).toEqual({
+      kind: "RENAME",
+      status: "applied",
+      name: "A",
+      newName: "B",
     });
     expect(describeForgeCommand({ kind: "CRITIQUE", text: "hm" })).toEqual({
-      kind: "CRITIQUE", status: "applied", text: "hm",
+      kind: "CRITIQUE",
+      status: "applied",
+      text: "hm",
     });
   });
 });
@@ -454,7 +471,10 @@ describe("parseForgeStream", () => {
   });
 
   it("buffers an open bracket (prefill) with no settled segments", () => {
-    expect(parseForgeStream("[")).toEqual({ segments: [], pending: { kind: "buffering" } });
+    expect(parseForgeStream("[")).toEqual({
+      segments: [],
+      pending: { kind: "buffering" },
+    });
     expect(parseForgeStream('[CREATE SYSTEM "X" | des')).toEqual({
       segments: [],
       pending: { kind: "buffering" },
@@ -464,17 +484,35 @@ describe("parseForgeStream", () => {
   it("resolves a closed command into a settled provisional chip", () => {
     expect(parseForgeStream('[CREATE SYSTEM "X" | desc]')).toEqual({
       segments: [
-        { kind: "action", action: { kind: "CREATE", status: "applied", elementType: "SYSTEM", name: "X" } },
+        {
+          kind: "action",
+          action: {
+            kind: "CREATE",
+            status: "applied",
+            elementType: "SYSTEM",
+            name: "X",
+          },
+        },
       ],
       pending: { kind: "none" },
     });
   });
 
   it("interleaves prose, command, and a trailing prose tail in order", () => {
-    const r = parseForgeStream('Sketching.\n[CREATE CHARACTER "Kei" | shy fox]\nNow ');
+    const r = parseForgeStream(
+      'Sketching.\n[CREATE CHARACTER "Kei" | shy fox]\nNow ',
+    );
     expect(r.segments).toEqual([
       { kind: "prose", text: "Sketching." },
-      { kind: "action", action: { kind: "CREATE", status: "applied", elementType: "CHARACTER", name: "Kei" } },
+      {
+        kind: "action",
+        action: {
+          kind: "CREATE",
+          status: "applied",
+          elementType: "CHARACTER",
+          name: "Kei",
+        },
+      },
     ]);
     expect(r.pending).toEqual({ kind: "prose", text: "Now " });
   });
@@ -482,7 +520,14 @@ describe("parseForgeStream", () => {
   it("flags a known-verb typo as an unrecognized chip", () => {
     expect(parseForgeStream('[CREATE SYSTm "X" | d]')).toEqual({
       segments: [
-        { kind: "action", action: { kind: "UNKNOWN", status: "unrecognized", reason: '[CREATE SYSTm "X" | d]' } },
+        {
+          kind: "action",
+          action: {
+            kind: "UNKNOWN",
+            status: "unrecognized",
+            reason: '[CREATE SYSTm "X" | d]',
+          },
+        },
       ],
       pending: { kind: "none" },
     });
@@ -496,6 +541,9 @@ describe("parseForgeStream", () => {
   });
 
   it("emits no segment for [DONE]", () => {
-    expect(parseForgeStream("[DONE]")).toEqual({ segments: [], pending: { kind: "none" } });
+    expect(parseForgeStream("[DONE]")).toEqual({
+      segments: [],
+      pending: { kind: "none" },
+    });
   });
 });

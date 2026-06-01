@@ -13,7 +13,10 @@ import { uiChatRetryGeneration } from "../../core/store";
 import { messageRemoved, messageUpdated } from "../../core/store/slices/chat";
 import type { ChatMessage } from "../../core/chat-types/types";
 import { SeEditableText } from "./SeEditableText";
-import { buildForgeMessageView, buildForgeStreamView } from "./SeForgeMessageView";
+import {
+  buildForgeMessageView,
+  buildForgeStreamView,
+} from "./SeForgeMessageView";
 import { parseForgeStream } from "../../core/utils/crucible-command-parser";
 import { stripThinkingTags } from "../../core/utils/tag-parser";
 

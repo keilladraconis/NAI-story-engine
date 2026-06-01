@@ -113,7 +113,15 @@ describe("buildForgeMessageView", () => {
 
 describe("buildForgeStreamView", () => {
   const settled: ForgeStreamParse["segments"] = [
-    { kind: "action", action: { kind: "CREATE", status: "applied", elementType: "SYSTEM", name: "X" } },
+    {
+      kind: "action",
+      action: {
+        kind: "CREATE",
+        status: "applied",
+        elementType: "SYSTEM",
+        name: "X",
+      },
+    },
   ];
 
   it("appends a tail text part for a pending prose tail", () => {
@@ -139,7 +147,10 @@ describe("buildForgeStreamView", () => {
   });
 
   it("appends nothing for pending none", () => {
-    const parts = buildForgeStreamView({ segments: settled, pending: { kind: "none" } }, "pfx");
+    const parts = buildForgeStreamView(
+      { segments: settled, pending: { kind: "none" } },
+      "pfx",
+    );
     expect(parts).toHaveLength(1);
   });
 });

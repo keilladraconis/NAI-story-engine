@@ -89,14 +89,22 @@ const CHIP_ROW_STYLE = {
 const PENDING_CHIP_STYLE = { ...CHIP_ROW_STYLE, opacity: "0.55" } as const;
 
 /** Streaming view: settled prose+chips, plus a live tail (prose / pending chip). */
-export function buildForgeStreamView(parse: ForgeStreamParse, idPrefix: string): UIPart[] {
+export function buildForgeStreamView(
+  parse: ForgeStreamParse,
+  idPrefix: string,
+): UIPart[] {
   const { row, text } = api.v1.ui.part;
   const parts = buildForgeMessageView(parse.segments, idPrefix);
   const { pending } = parse;
   if (pending.kind === "prose") {
     const escaped = pending.text.replace(/\n/g, "  \n").replace(/</g, "\\<");
     parts.push(
-      text({ id: `${idPrefix}-tail`, text: escaped, markdown: true, style: PROSE_STYLE }),
+      text({
+        id: `${idPrefix}-tail`,
+        text: escaped,
+        markdown: true,
+        style: PROSE_STYLE,
+      }),
     );
   } else if (pending.kind === "buffering") {
     parts.push(
@@ -105,7 +113,11 @@ export function buildForgeStreamView(parse: ForgeStreamParse, idPrefix: string):
         style: PENDING_CHIP_STYLE,
         content: [
           text({ id: `${idPrefix}-pending-icon`, text: "⏳" }),
-          text({ id: `${idPrefix}-pending-label`, text: "…", style: { flex: "1" } }),
+          text({
+            id: `${idPrefix}-pending-label`,
+            text: "…",
+            style: { flex: "1" },
+          }),
         ],
       }),
     );

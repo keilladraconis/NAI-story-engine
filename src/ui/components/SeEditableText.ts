@@ -88,8 +88,13 @@ export class SeEditableText extends SuiComponent<
   }
 
   async compose(): Promise<UIPartRow | UIPartColumn> {
-    const { liveSelector, formatDisplay, singleLine, viewParts, liveViewParts } =
-      this.options;
+    const {
+      liveSelector,
+      formatDisplay,
+      singleLine,
+      viewParts,
+      liveViewParts,
+    } = this.options;
 
     if (liveViewParts && liveSelector) {
       this._watcher.watch(liveSelector, () => {
@@ -257,7 +262,8 @@ export class SeEditableText extends SuiComponent<
 
   private _buildMultiline(): UIPartColumn {
     const { column, row, text, multilineTextInput, button } = api.v1.ui.part;
-    const { placeholder, extraControls, label, viewParts, liveViewParts } = this.options;
+    const { placeholder, extraControls, label, viewParts, liveViewParts } =
+      this.options;
     const viewText = this._buildInitialViewText();
 
     const headerContent: UIPart[] = [];
@@ -297,9 +303,17 @@ export class SeEditableText extends SuiComponent<
     if (extraControls) headerContent.push(...extraControls);
 
     const viewPart = liveViewParts
-      ? column({ id: this._viewId, style: ML_STYLES.viewContainer, content: liveViewParts() })
+      ? column({
+          id: this._viewId,
+          style: ML_STYLES.viewContainer,
+          content: liveViewParts(),
+        })
       : viewParts
-        ? column({ id: this._viewId, style: ML_STYLES.viewContainer, content: viewParts })
+        ? column({
+            id: this._viewId,
+            style: ML_STYLES.viewContainer,
+            content: viewParts,
+          })
         : text({
             id: this._viewId,
             text: viewText,
