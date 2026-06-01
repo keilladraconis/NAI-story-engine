@@ -11,6 +11,13 @@ import type {
   WorldEntity,
 } from "../../../../../src/core/store/types";
 import { FieldID } from "../../../../../src/config/field-definitions";
+import type { ForgeSegment } from "../../../../../src/core/chat-types/types";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function segmentsFromCompletion(calls: any[][]): ForgeSegment[] {
+  const call = calls.find(([a]) => a.type === "chat/forgeSegmentsSet");
+  return call ? (call[0].payload.segments ?? []) : [];
+}
 
 type ForgeChatTarget = { type: "forgeChat"; chatId: string; messageId: string };
 type ForgeCleanupTarget = {
@@ -125,7 +132,7 @@ describe("forgeChatHandler.completion", () => {
     expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
   });
 
-  it("rejects REVISE on a live entity and inserts a warning message", async () => {
+  it("rejects REVISE on a live entity with a rejected chip (no warning message)", async () => {
     const dispatch = vi.fn();
     const live = makeEntity({
       id: "live-1", name: "OldQuay",
@@ -143,17 +150,13 @@ describe("forgeChatHandler.completion", () => {
     expect(
       dispatch.mock.calls.some(([a]) => a.type === "world/entitySummaryUpdated"),
     ).toBe(false);
-    const added = dispatch.mock.calls.find(
-      ([a]) => a.type === "chat/messageAdded",
-    );
-    expect(added).toBeDefined();
-    expect(added![0].payload.message.role).toBe("assistant");
-    expect(added![0].payload.message.messageKind).toBe("warning");
-    expect(added![0].payload.message.content).toMatch(/OldQuay/);
-    expect(added![0].payload.message.content).toMatch(/live/i);
+    expect(dispatch.mock.calls.some(([a]) => a.type === "chat/messageAdded")).toBe(false);
+    expect(segmentsFromCompletion(dispatch.mock.calls)).toEqual([
+      { kind: "action", action: { kind: "REVISE", status: "rejected", name: "OldQuay", reason: "live entity" } },
+    ]);
   });
 
-  it("rejects DELETE on a live entity and inserts a warning message", async () => {
+  it("rejects DELETE on a live entity with a rejected chip (no warning message)", async () => {
     const dispatch = vi.fn();
     const live = makeEntity({
       id: "live-1", name: "OldQuay",
@@ -170,14 +173,13 @@ describe("forgeChatHandler.completion", () => {
     expect(
       dispatch.mock.calls.some(([a]) => a.type === "world/entityDeleted"),
     ).toBe(false);
-    const added = dispatch.mock.calls.find(
-      ([a]) => a.type === "chat/messageAdded",
-    );
-    expect(added).toBeDefined();
-    expect(added![0].payload.message.messageKind).toBe("warning");
+    expect(dispatch.mock.calls.some(([a]) => a.type === "chat/messageAdded")).toBe(false);
+    expect(segmentsFromCompletion(dispatch.mock.calls)).toEqual([
+      { kind: "action", action: { kind: "DELETE", status: "rejected", name: "OldQuay", reason: "live entity" } },
+    ]);
   });
 
-  it("rejects RENAME on a live entity and inserts a warning message", async () => {
+  it("rejects RENAME on a live entity with a rejected chip (no warning message)", async () => {
     const dispatch = vi.fn();
     const live = makeEntity({ id: "live-1", name: "OldQuay", lifecycle: "live", lorebookEntryId: "lb-1" });
     const ctx: CompletionContext<ForgeChatTarget> = {
@@ -191,11 +193,10 @@ describe("forgeChatHandler.completion", () => {
     expect(
       dispatch.mock.calls.some(([a]) => a.type === "world/entityEdited"),
     ).toBe(false);
-    const added = dispatch.mock.calls.find(
-      ([a]) => a.type === "chat/messageAdded",
-    );
-    expect(added).toBeDefined();
-    expect(added![0].payload.message.messageKind).toBe("warning");
+    expect(dispatch.mock.calls.some(([a]) => a.type === "chat/messageAdded")).toBe(false);
+    expect(segmentsFromCompletion(dispatch.mock.calls)).toEqual([
+      { kind: "action", action: { kind: "RENAME", status: "rejected", name: "OldQuay", reason: "live entity" } },
+    ]);
   });
 
   it("REVISE on a non-existent name creates a draft Character (find-or-create)", async () => {
@@ -393,5 +394,74 @@ describe("forgeCleanupHandler.completion", () => {
     expect(
       dispatch.mock.calls.some(([a]) => a.type === "world/entityForged"),
     ).toBe(false);
+  });
+});
+
+describe("forgeChatHandler.completion — segments", () => {
+  it("interleaves prose and an applied CREATE chip in document order", async () => {
+    const dispatch = vi.fn();
+    await forgeChatHandler.completion({
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState: () => makeState(),
+      dispatch,
+      accumulatedText: [
+        "Let me sketch the apartment.",
+        '[CREATE SYSTEM "Apartment Evolution" | progressive transformation]',
+        "That anchors the dread.",
+      ].join("\n"),
+      generationSucceeded: true,
+    } as CompletionContext<ForgeChatTarget>);
+    const segs = segmentsFromCompletion(dispatch.mock.calls);
+    expect(segs.map((s) => s.kind)).toEqual(["prose", "action", "prose"]);
+    expect(segs[1]).toEqual({
+      kind: "action",
+      action: { kind: "CREATE", status: "applied", elementType: "SYSTEM", name: "Apartment Evolution" },
+    });
+  });
+
+  it("emits an unrecognized chip for a known-verb typo", async () => {
+    const dispatch = vi.fn();
+    await forgeChatHandler.completion({
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState: () => makeState(),
+      dispatch,
+      accumulatedText: '[CREATE SYSTm "X" | desc]',
+      generationSucceeded: true,
+    } as CompletionContext<ForgeChatTarget>);
+    expect(segmentsFromCompletion(dispatch.mock.calls)).toEqual([
+      { kind: "action", action: { kind: "UNKNOWN", status: "unrecognized", reason: '[CREATE SYSTm "X" | desc]' } },
+    ]);
+  });
+
+  it("records a CREATE chip when REVISE targets a missing entity (find-or-create)", async () => {
+    const dispatch = vi.fn();
+    await forgeChatHandler.completion({
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState: () => makeState(),
+      dispatch,
+      accumulatedText: '[REVISE "Ghost" | flickers]',
+      generationSucceeded: true,
+    } as CompletionContext<ForgeChatTarget>);
+    expect(segmentsFromCompletion(dispatch.mock.calls)[0]).toEqual({
+      kind: "action",
+      action: { kind: "CREATE", status: "applied", elementType: "CHARACTER", name: "Ghost" },
+    });
+  });
+});
+
+describe("forgeCleanupHandler.completion — reviseOnly", () => {
+  it("rejects a CREATE with reason 'cleanup pass'", async () => {
+    const dispatch = vi.fn();
+    await forgeCleanupHandler.completion({
+      target: { type: "forgeCleanup", chatId: "c1", messageId: "m1", discardedNames: [] },
+      getState: () => makeState(),
+      dispatch,
+      accumulatedText: '[CREATE SYSTEM "New Thing" | nope]',
+      generationSucceeded: true,
+    } as CompletionContext<ForgeCleanupTarget>);
+    expect(segmentsFromCompletion(dispatch.mock.calls)).toEqual([
+      { kind: "action", action: { kind: "CREATE", status: "rejected", elementType: "SYSTEM", name: "New Thing", reason: "cleanup pass" } },
+    ]);
+    expect(dispatch.mock.calls.filter(([a]) => a.type === "world/entityForged")).toHaveLength(0);
   });
 });
