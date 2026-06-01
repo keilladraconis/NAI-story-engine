@@ -28,7 +28,12 @@ import {
   groupDeleted,
   groupLorebookEntrySet,
 } from "../../core/store/slices/world";
-import type { WorldEntity, WorldGroup } from "../../core/store/types";
+import type {
+  RootState,
+  WorldEntity,
+  WorldGroup,
+} from "../../core/store/types";
+import { isForgeDraft } from "../../core/store/selectors/forge";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
@@ -61,6 +66,19 @@ const LORE_BORDER_YELLOW = {
   "border-left": "3px solid rgb(245,243,194)",
   "padding-left": "4px",
 } as const;
+
+/** Group member ids that should render as cards in the World. In-progress forge
+ *  drafts live in their forge chat as inline cards, so they are filtered out
+ *  here to avoid showing an entity in two places at once. */
+function visibleMemberIds(
+  group: WorldGroup | undefined,
+  state: RootState,
+): string[] {
+  return (group?.entityIds ?? []).filter((id) => {
+    const e = state.world.entitiesById[id];
+    return !!e && !isForgeDraft(e);
+  });
+}
 
 async function computeThreadLoreStatus(
   groupId: string,
@@ -144,7 +162,10 @@ export class SeThreadItem extends SuiComponent<
       store.dispatch(groupLorebookEntrySet({ groupId, entryId: undefined }));
     } else {
       const categoryId = await ensureThreadsCategory();
-      const content = buildThreadLorebookContent(group, Object.values(state.world.entitiesById));
+      const content = buildThreadLorebookContent(
+        group,
+        Object.values(state.world.entitiesById),
+      );
       const entryId = await api.v1.lorebook.createEntry({
         id: api.v1.uuid(),
         displayName: group.title || "Unnamed Thread",
@@ -163,7 +184,10 @@ export class SeThreadItem extends SuiComponent<
     const state = store.getState();
     const group = state.world.groups.find((g) => g.id === groupId);
     if (!group?.lorebookEntryId) return;
-    const content = buildThreadLorebookContent(group, Object.values(state.world.entitiesById));
+    const content = buildThreadLorebookContent(
+      group,
+      Object.values(state.world.entitiesById),
+    );
     await api.v1.lorebook.updateEntry(group.lorebookEntryId, { text: content });
   }
 
@@ -174,7 +198,7 @@ export class SeThreadItem extends SuiComponent<
     const group = state.world.groups.find((g) => g.id === groupId);
 
     const cards = await Promise.all(
-      (group?.entityIds ?? []).map((entityId) =>
+      visibleMemberIds(group, state).map((entityId) =>
         new SeEntityCard({
           // Scope the DOM id to this Thread — the same entity can appear in
           // several Threads, and duplicate element IDs break the card's buttons.
@@ -262,7 +286,10 @@ export class SeThreadItem extends SuiComponent<
     let _memberCache = "";
     this._watcher.watch(
       (s) => {
-        if (s.world.groups === _memberGroupsRef && s.world.entitiesById === _memberEntitiesRef) {
+        if (
+          s.world.groups === _memberGroupsRef &&
+          s.world.entitiesById === _memberEntitiesRef
+        ) {
           return _memberCache;
         }
         _memberGroupsRef = s.world.groups;
@@ -271,9 +298,14 @@ export class SeThreadItem extends SuiComponent<
         const memberIds = g?.entityIds ?? [];
         _memberCache = JSON.stringify({
           members: memberIds,
+          // Include lifecycle: forge drafts are filtered from the rendered
+          // cards, so a draft→live cast must bust the cache to surface the
+          // now-visible member.
           entities: memberIds.map((id) => {
             const e = s.world.entitiesById[id];
-            return e ? { id: e.id, name: e.name } : null;
+            return e
+              ? { id: e.id, name: e.name, lifecycle: e.lifecycle }
+              : null;
           }),
         });
         return _memberCache;
@@ -332,9 +364,9 @@ export class SeThreadItem extends SuiComponent<
       theme: { default: { actions: { base: ACTION_BASE } } },
     });
 
-    // Build initial member cards
+    // Build initial member cards (forge drafts are shown in their chat, not here)
     const initialCards = await Promise.all(
-      (group?.entityIds ?? []).map((entityId) =>
+      visibleMemberIds(group, state).map((entityId) =>
         new SeEntityCard({
           // Scope the DOM id to this Thread — the same entity can appear in
           // several Threads, and duplicate element IDs break the card's buttons.

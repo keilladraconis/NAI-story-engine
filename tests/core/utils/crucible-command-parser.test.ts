@@ -214,13 +214,17 @@ describe("stripForgeCommands", () => {
   });
 
   it("leaves text without commands unchanged (trimmed)", () => {
-    expect(stripForgeCommands("just a normal reply")).toBe("just a normal reply");
+    expect(stripForgeCommands("just a normal reply")).toBe(
+      "just a normal reply",
+    );
   });
 });
 
 describe("parseCommands — bare TYPE-led leniency", () => {
   it('accepts [TYPE: "Name" | desc] as a CREATE', () => {
-    const cmds = parseCommands('[SYSTEM: "Apartment Evolution" | progressive transformation]');
+    const cmds = parseCommands(
+      '[SYSTEM: "Apartment Evolution" | progressive transformation]',
+    );
     expect(cmds).toHaveLength(1);
     expect(cmds[0]).toEqual({
       kind: "CREATE",
@@ -243,7 +247,9 @@ describe("parseCommands — bare TYPE-led leniency", () => {
   });
 
   it("accepts the multiline bare-TYPE form", () => {
-    const cmds = parseCommands('[FACTION "Dock Guild"]\nThe waterfront labor union.');
+    const cmds = parseCommands(
+      '[FACTION "Dock Guild"]\nThe waterfront labor union.',
+    );
     expect(cmds).toHaveLength(1);
     expect(cmds[0]).toEqual({
       kind: "CREATE",
@@ -266,38 +272,65 @@ describe("parseCommands — bare TYPE-led leniency", () => {
   it("does not override an explicit CREATE", () => {
     const cmds = parseCommands('[CREATE SYSTEM "X" | y]');
     expect(cmds).toHaveLength(1);
-    expect(cmds[0]).toEqual({ kind: "CREATE", elementType: "SYSTEM", name: "X", content: "y" });
+    expect(cmds[0]).toEqual({
+      kind: "CREATE",
+      elementType: "SYSTEM",
+      name: "X",
+      content: "y",
+    });
   });
 });
 
 describe("serializeForgeCommand", () => {
   it("serializes each command kind to its canonical line", () => {
-    expect(serializeForgeCommand({ kind: "CREATE", elementType: "SYSTEM", name: "X", content: "y" }))
-      .toBe('[CREATE SYSTEM "X" | y]');
-    expect(serializeForgeCommand({ kind: "REVISE", name: "X", content: "y" }))
-      .toBe('[REVISE "X" | y]');
-    expect(serializeForgeCommand({ kind: "DELETE", name: "X" }))
-      .toBe('[DELETE "X"]');
-    expect(serializeForgeCommand({ kind: "RENAME", oldName: "A", newName: "B" }))
-      .toBe('[RENAME "A" → "B"]');
-    expect(serializeForgeCommand({ kind: "CRITIQUE", text: "thin" }))
-      .toBe("[CRITIQUE | thin]");
-    expect(serializeForgeCommand({ kind: "DONE" }))
-      .toBe("[DONE]");
+    expect(
+      serializeForgeCommand({
+        kind: "CREATE",
+        elementType: "SYSTEM",
+        name: "X",
+        content: "y",
+      }),
+    ).toBe('[CREATE SYSTEM "X" | y]');
+    expect(
+      serializeForgeCommand({ kind: "REVISE", name: "X", content: "y" }),
+    ).toBe('[REVISE "X" | y]');
+    expect(serializeForgeCommand({ kind: "DELETE", name: "X" })).toBe(
+      '[DELETE "X"]',
+    );
+    expect(
+      serializeForgeCommand({ kind: "RENAME", oldName: "A", newName: "B" }),
+    ).toBe('[RENAME "A" → "B"]');
+    expect(serializeForgeCommand({ kind: "CRITIQUE", text: "thin" })).toBe(
+      "[CRITIQUE | thin]",
+    );
+    expect(serializeForgeCommand({ kind: "DONE" })).toBe("[DONE]");
   });
 
   it("serializes THREAD with and without a description", () => {
-    expect(serializeForgeCommand({ kind: "THREAD", title: "Crew", memberNames: ["A", "B"], description: "dock hands" }))
-      .toBe('[THREAD "Crew" | "A", "B" | dock hands]');
-    expect(serializeForgeCommand({ kind: "THREAD", title: "Crew", memberNames: ["A", "B"], description: "" }))
-      .toBe('[THREAD "Crew" | "A", "B"]');
+    expect(
+      serializeForgeCommand({
+        kind: "THREAD",
+        title: "Crew",
+        memberNames: ["A", "B"],
+        description: "dock hands",
+      }),
+    ).toBe('[THREAD "Crew" | "A", "B" | dock hands]');
+    expect(
+      serializeForgeCommand({
+        kind: "THREAD",
+        title: "Crew",
+        memberNames: ["A", "B"],
+        description: "",
+      }),
+    ).toBe('[THREAD "Crew" | "A", "B"]');
   });
 });
 
 describe("canonicalizeForgeCommands", () => {
   it("rewrites a bare TYPE-led command to canonical CREATE", () => {
-    expect(canonicalizeForgeCommands('[SYSTEM: "X" | a description]'))
-      .toBe('[CREATE SYSTEM "X" | a description]');
+    expect(canonicalizeForgeCommands('[SYSTEM: "X" | a description]')).toBe(
+      '[CREATE SYSTEM "X" | a description]',
+    );
   });
 
   it("preserves prose around commands", () => {
@@ -307,13 +340,20 @@ describe("canonicalizeForgeCommands", () => {
       "Anything else?",
     ].join("\n");
     expect(canonicalizeForgeCommands(input)).toBe(
-      ["Tightening the dock crew.", '[CREATE SYSTEM "X" | a description]', "Anything else?"].join("\n"),
+      [
+        "Tightening the dock crew.",
+        '[CREATE SYSTEM "X" | a description]',
+        "Anything else?",
+      ].join("\n"),
     );
   });
 
   it("folds a multiline body into the canonical inline form", () => {
-    expect(canonicalizeForgeCommands('[FACTION "Dock Guild"]\nThe waterfront labor union.'))
-      .toBe('[CREATE FACTION "Dock Guild" | The waterfront labor union.]');
+    expect(
+      canonicalizeForgeCommands(
+        '[FACTION "Dock Guild"]\nThe waterfront labor union.',
+      ),
+    ).toBe('[CREATE FACTION "Dock Guild" | The waterfront labor union.]');
   });
 
   it("is idempotent on already-canonical text", () => {
@@ -322,8 +362,9 @@ describe("canonicalizeForgeCommands", () => {
   });
 
   it("leaves a non-command bracket alone", () => {
-    expect(canonicalizeForgeCommands('[NOTE: "x" | not a type]'))
-      .toBe('[NOTE: "x" | not a type]');
+    expect(canonicalizeForgeCommands('[NOTE: "x" | not a type]')).toBe(
+      '[NOTE: "x" | not a type]',
+    );
   });
 });
 
@@ -342,7 +383,9 @@ describe("walkForgeLines", () => {
 
   it("flags a known-verb typo as unrecognized", () => {
     const toks = walkForgeLines('[CREATE SYSTm "X" | desc]');
-    expect(toks).toEqual([{ kind: "unrecognized", raw: '[CREATE SYSTm "X" | desc]' }]);
+    expect(toks).toEqual([
+      { kind: "unrecognized", raw: '[CREATE SYSTm "X" | desc]' },
+    ]);
   });
 
   it("flags a bare known-verb with no args as unrecognized", () => {
@@ -351,12 +394,20 @@ describe("walkForgeLines", () => {
   });
 
   it("treats prose brackets as prose, not unrecognized", () => {
-    expect(walkForgeLines("[she pauses]")).toEqual([{ kind: "prose", text: "[she pauses]" }]);
-    expect(walkForgeLines("[redacted]")).toEqual([{ kind: "prose", text: "[redacted]" }]);
+    expect(walkForgeLines("[she pauses]")).toEqual([
+      { kind: "prose", text: "[she pauses]" },
+    ]);
+    expect(walkForgeLines("[redacted]")).toEqual([
+      { kind: "prose", text: "[redacted]" },
+    ]);
   });
 
   it("consumes multiline command content (no stray prose tokens)", () => {
-    const text = ['[CREATE LOCATION "Pier 7"]', "A rotting wharf.", "Fog rolls in."].join("\n");
+    const text = [
+      '[CREATE LOCATION "Pier 7"]',
+      "A rotting wharf.",
+      "Fog rolls in.",
+    ].join("\n");
     const toks = walkForgeLines(text);
     expect(toks).toHaveLength(1);
     expect(toks[0].kind).toBe("command");
@@ -365,7 +416,11 @@ describe("walkForgeLines", () => {
 
 describe("parseCommands (still works via walkForgeLines)", () => {
   it("returns only recognized commands", () => {
-    const text = ['narration', '[CREATE TOPIC "Decay" | rot spreads]', '[REVISE]'].join("\n");
+    const text = [
+      "narration",
+      '[CREATE TOPIC "Decay" | rot spreads]',
+      "[REVISE]",
+    ].join("\n");
     const cmds = parseCommands(text);
     expect(cmds).toHaveLength(1);
     expect(cmds[0].kind).toBe("CREATE");

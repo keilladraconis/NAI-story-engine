@@ -15,10 +15,15 @@ import type { Chat } from "../../../../src/core/chat-types/types";
 import { FieldID } from "../../../../src/config/field-definitions";
 
 // Isolate the effect from buildForgeBriefing's internals — it has its own tests.
-vi.mock("../../../../src/core/utils/context-builder", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../src/core/utils/context-builder")>()),
-  buildForgeBriefing: vi.fn(async () => "BRIEFING TEXT"),
-}));
+vi.mock(
+  "../../../../src/core/utils/context-builder",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("../../../../src/core/utils/context-builder")
+    >()),
+    buildForgeBriefing: vi.fn(async () => "BRIEFING TEXT"),
+  }),
+);
 
 type EffectHandler = (
   action: { type: string; payload: unknown },
@@ -32,15 +37,23 @@ interface Subscription {
 
 function makeEntity(over: Partial<WorldEntity>): WorldEntity {
   return {
-    id: "e", categoryId: FieldID.DramatisPersonae,
-    name: "X", summary: "", lifecycle: "draft", ...over,
+    id: "e",
+    categoryId: FieldID.DramatisPersonae,
+    name: "X",
+    summary: "",
+    lifecycle: "draft",
+    ...over,
   } as WorldEntity;
 }
 
 function makeChat(over: Partial<Chat> = {}): Chat {
   return {
-    id: "fc-1", type: "forge", title: "Forge",
-    subMode: "sketch", messages: [], seed: { kind: "blank" },
+    id: "fc-1",
+    type: "forge",
+    title: "Forge",
+    subMode: "sketch",
+    messages: [],
+    seed: { kind: "blank" },
     ...over,
   };
 }
@@ -53,7 +66,7 @@ function makeState(
   for (const e of entities) entitiesById[e.id] = e;
   return {
     chat: { chats, activeChatId: chats[0]?.id ?? null, refineChat: null },
-    world: { groups: [], entitiesById, entityIds: entities.map(e=>e.id) },
+    world: { groups: [], entitiesById, entityIds: entities.map((e) => e.id) },
     forge: { tombstonesByChatId: {}, pendingScrubByChatId: {} },
   } as unknown as RootState;
 }
@@ -68,11 +81,7 @@ function makeHarness(state: RootState) {
   );
   let current = state;
   const getState = () => current;
-  registerForgeChatEffects(
-    subscribeEffect as any,
-    dispatch,
-    getState,
-  );
+  registerForgeChatEffects(subscribeEffect as any, dispatch, getState);
 
   async function fire(action: { type: string; payload?: unknown }) {
     for (const s of subs) {
@@ -92,16 +101,23 @@ function makeHarness(state: RootState) {
 describe("forgeChatContinueRequested effect", () => {
   it("advances sketch → expand and submits a forgeChat generation", async () => {
     const chat = makeChat({ subMode: "sketch" });
-    const draft = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
+    const draft = makeEntity({
+      id: "d1",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [draft]);
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
-    const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
+    const sub = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/subModeChanged",
+    );
     expect(sub).toBeDefined();
     expect(sub![0].payload.subMode).toBe("expand");
     const placeholder = dispatch.mock.calls.find(
-      ([a]) => a.type === "chat/messageAdded" &&
-              (a.payload as any).message?.role === "assistant",
+      ([a]) =>
+        a.type === "chat/messageAdded" &&
+        (a.payload as any).message?.role === "assistant",
     );
     expect(placeholder).toBeDefined();
     const submitted = dispatch.mock.calls.find(
@@ -112,21 +128,33 @@ describe("forgeChatContinueRequested effect", () => {
 
   it("advances expand → weave", async () => {
     const chat = makeChat({ subMode: "expand" });
-    const draft = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
+    const draft = makeEntity({
+      id: "d1",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [draft]);
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
-    const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
+    const sub = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/subModeChanged",
+    );
     expect(sub![0].payload.subMode).toBe("weave");
   });
 
   it("advances weave → sketch (cycles)", async () => {
     const chat = makeChat({ subMode: "weave" });
-    const draft = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
+    const draft = makeEntity({
+      id: "d1",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [draft]);
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
-    const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
+    const sub = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/subModeChanged",
+    );
     expect(sub![0].payload.subMode).toBe("sketch");
   });
 
@@ -135,7 +163,9 @@ describe("forgeChatContinueRequested effect", () => {
     const state = makeState([chat], []);
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
-    const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
+    const sub = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/subModeChanged",
+    );
     expect(sub![0].payload.subMode).toBe("sketch");
   });
 
@@ -151,24 +181,41 @@ describe("entityDiscardRequested effect", () => {
   it("dispatches tombstoneAdded with reason=user and entityDeleted", async () => {
     const chat = makeChat();
     const draft = makeEntity({
-      id: "d1", name: "Vesper", sourceChatId: "fc-1",
-      lifecycle: "draft", categoryId: FieldID.DramatisPersonae,
+      id: "d1",
+      name: "Vesper",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+      categoryId: FieldID.DramatisPersonae,
     });
     const state = makeState([chat], [draft]);
     const { dispatch, fire } = makeHarness(state);
     await fire(entityDiscardRequested({ entityId: "d1" }));
-    const tomb = dispatch.mock.calls.find(([a]) => a.type === "forge/tombstoneAdded");
+    const tomb = dispatch.mock.calls.find(
+      ([a]) => a.type === "forge/tombstoneAdded",
+    );
     expect(tomb).toBeDefined();
     expect(tomb![0].payload.tombstone.reason).toBe("user");
     expect(tomb![0].payload.tombstone.name).toBe("Vesper");
-    const del = dispatch.mock.calls.find(([a]) => a.type === "world/entityDeleted");
+    const del = dispatch.mock.calls.find(
+      ([a]) => a.type === "world/entityDeleted",
+    );
     expect(del).toBeDefined();
   });
 
   it("queues a deferred scrub (no generation) when other drafts remain", async () => {
     const chat = makeChat();
-    const target = makeEntity({ id: "d1", name: "Vesper", sourceChatId: "fc-1", lifecycle: "draft" });
-    const sibling = makeEntity({ id: "d2", name: "Marsh", sourceChatId: "fc-1", lifecycle: "draft" });
+    const target = makeEntity({
+      id: "d1",
+      name: "Vesper",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
+    const sibling = makeEntity({
+      id: "d2",
+      name: "Marsh",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [target, sibling]);
     const { dispatch, fire } = makeHarness(state);
     await fire(entityDiscardRequested({ entityId: "d1" }));
@@ -177,14 +224,21 @@ describe("entityDiscardRequested effect", () => {
       ([a]) => a.type === "ui/generationSubmitted",
     );
     expect(submitted).toBeUndefined();
-    const scrub = dispatch.mock.calls.find(([a]) => a.type === "forge/scrubQueued");
+    const scrub = dispatch.mock.calls.find(
+      ([a]) => a.type === "forge/scrubQueued",
+    );
     expect(scrub).toBeDefined();
     expect((scrub![0].payload as any).names).toEqual(["Vesper"]);
   });
 
   it("does not queue a scrub when no other drafts remain", async () => {
     const chat = makeChat();
-    const lone = makeEntity({ id: "d1", name: "Vesper", sourceChatId: "fc-1", lifecycle: "draft" });
+    const lone = makeEntity({
+      id: "d1",
+      name: "Vesper",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [lone]);
     const { dispatch, fire } = makeHarness(state);
     await fire(entityDiscardRequested({ entityId: "d1" }));
@@ -192,12 +246,18 @@ describe("entityDiscardRequested effect", () => {
       ([a]) => a.type === "ui/generationSubmitted",
     );
     expect(submitted).toBeUndefined();
-    const scrub = dispatch.mock.calls.find(([a]) => a.type === "forge/scrubQueued");
+    const scrub = dispatch.mock.calls.find(
+      ([a]) => a.type === "forge/scrubQueued",
+    );
     expect(scrub).toBeUndefined();
   });
 
   it("ignores discard on a live entity (only drafts are discardable via this path)", async () => {
-    const live = makeEntity({ id: "live-1", lifecycle: "live", lorebookEntryId: "lb-1" });
+    const live = makeEntity({
+      id: "live-1",
+      lifecycle: "live",
+      lorebookEntryId: "lb-1",
+    });
     const state = makeState([makeChat()], [live]);
     const { dispatch, fire } = makeHarness(state);
     await fire(entityDiscardRequested({ entityId: "live-1" }));
@@ -209,18 +269,31 @@ describe("entityDiscardRequested effect", () => {
     const state = makeState([makeChat()], [orphan]);
     const { dispatch, fire } = makeHarness(state);
     await fire(entityDiscardRequested({ entityId: "d-orphan" }));
-    const deleted = dispatch.mock.calls.find(([a]) => a.type === "world/entityDeleted");
+    const deleted = dispatch.mock.calls.find(
+      ([a]) => a.type === "world/entityDeleted",
+    );
     expect(deleted).toBeDefined();
-    expect((deleted![0].payload as { entityId: string }).entityId).toBe("d-orphan");
-    expect(dispatch.mock.calls.some(([a]) => a.type === "forge/tombstoneAdded")).toBe(false);
-    expect(dispatch.mock.calls.some(([a]) => a.type === "forge/scrubQueued")).toBe(false);
+    expect((deleted![0].payload as { entityId: string }).entityId).toBe(
+      "d-orphan",
+    );
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "forge/tombstoneAdded"),
+    ).toBe(false);
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "forge/scrubQueued"),
+    ).toBe(false);
   });
 });
 
 describe("forgeChatContinueRequested with a pending scrub", () => {
   it("leads off with a forgeCleanup turn before the phase turn", async () => {
     const chat = makeChat({ subMode: "sketch" });
-    const draft = makeEntity({ id: "d1", name: "Marsh", sourceChatId: "fc-1", lifecycle: "draft" });
+    const draft = makeEntity({
+      id: "d1",
+      name: "Marsh",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [draft]);
     // Seed a pending scrub for a discarded sibling.
     (state.forge as any).pendingScrubByChatId = { "fc-1": ["Vesper"] };
@@ -232,7 +305,9 @@ describe("forgeChatContinueRequested with a pending scrub", () => {
       .map(([a]) => (a.payload as { target: { type: string } }).target.type);
     // Cleanup turn first, then the regular phase turn.
     expect(submitted).toEqual(["forgeCleanup", "forgeChat"]);
-    const cleared = dispatch.mock.calls.find(([a]) => a.type === "forge/scrubCleared");
+    const cleared = dispatch.mock.calls.find(
+      ([a]) => a.type === "forge/scrubCleared",
+    );
     expect(cleared).toBeDefined();
   });
 });
@@ -240,11 +315,19 @@ describe("forgeChatContinueRequested with a pending scrub", () => {
 describe("forgeChatContinueRequested with advancePhase: false", () => {
   it("keeps the current phase and submits a forgeChat turn", async () => {
     const chat = makeChat({ subMode: "expand" });
-    const draft = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
+    const draft = makeEntity({
+      id: "d1",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [draft]);
     const { dispatch, fire } = makeHarness(state);
-    await fire(forgeChatContinueRequested({ chatId: "fc-1", advancePhase: false }));
-    const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
+    await fire(
+      forgeChatContinueRequested({ chatId: "fc-1", advancePhase: false }),
+    );
+    const sub = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/subModeChanged",
+    );
     expect(sub).toBeDefined();
     expect(sub![0].payload.subMode).toBe("expand");
     const submitted = dispatch.mock.calls.find(
@@ -258,8 +341,12 @@ describe("forgeChatNewSessionRequested effect", () => {
   it("creates a new forge-type chat and submits the first sketch turn", async () => {
     const state = makeState([]);
     const { dispatch, fire } = makeHarness(state);
-    await fire(forgeChatNewSessionRequested({ initialUserMessage: "include Vesper" }));
-    const created = dispatch.mock.calls.find(([a]) => a.type === "chat/chatCreated");
+    await fire(
+      forgeChatNewSessionRequested({ initialUserMessage: "include Vesper" }),
+    );
+    const created = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/chatCreated",
+    );
     expect(created).toBeDefined();
     expect(created![0].payload.chat.type).toBe("forge");
     expect(created![0].payload.chat.subMode).toBe("sketch");
@@ -279,7 +366,9 @@ describe("forgeChatNewSessionRequested effect", () => {
     const state = makeState([]);
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeChatNewSessionRequested({}));
-    const created = dispatch.mock.calls.find(([a]) => a.type === "chat/chatCreated");
+    const created = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/chatCreated",
+    );
     expect(created).toBeDefined();
     const userMsgs = created![0].payload.chat.messages.filter(
       (m: { role: string }) => m.role === "user",
@@ -290,8 +379,12 @@ describe("forgeChatNewSessionRequested effect", () => {
   it("seeds the briefing as the first (system) message of the new chat", async () => {
     const state = makeState([]);
     const { dispatch, fire } = makeHarness(state);
-    await fire(forgeChatNewSessionRequested({ initialUserMessage: "include Vesper" }));
-    const created = dispatch.mock.calls.find(([a]) => a.type === "chat/chatCreated");
+    await fire(
+      forgeChatNewSessionRequested({ initialUserMessage: "include Vesper" }),
+    );
+    const created = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/chatCreated",
+    );
     expect(created).toBeDefined();
     const msgs = created![0].payload.chat.messages;
     expect(msgs[0].role).toBe("system");
@@ -308,7 +401,11 @@ describe("forgeChatNewSessionRequested effect", () => {
 
 describe("entityCastRequested effect", () => {
   it("noops for live entities", async () => {
-    const live = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "live" });
+    const live = makeEntity({
+      id: "d1",
+      sourceChatId: "fc-1",
+      lifecycle: "live",
+    });
     const state = makeState([makeChat()], [live]);
     const { dispatch, fire } = makeHarness(state);
     await fire(entityCastRequested({ entityId: "d1" }));
@@ -326,10 +423,26 @@ describe("entityCastRequested effect", () => {
 describe("forgeCastAllRequested effect", () => {
   it("casts every draft owned by the chat, then closes the session", async () => {
     const chat = makeChat();
-    const d1 = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
-    const d2 = makeEntity({ id: "d2", sourceChatId: "fc-1", lifecycle: "draft" });
-    const live = makeEntity({ id: "L", sourceChatId: "fc-1", lifecycle: "live" });
-    const otherChat = makeEntity({ id: "X", sourceChatId: "fc-OTHER", lifecycle: "draft" });
+    const d1 = makeEntity({
+      id: "d1",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
+    const d2 = makeEntity({
+      id: "d2",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
+    const live = makeEntity({
+      id: "L",
+      sourceChatId: "fc-1",
+      lifecycle: "live",
+    });
+    const otherChat = makeEntity({
+      id: "X",
+      sourceChatId: "fc-OTHER",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [d1, d2, live, otherChat]);
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeCastAllRequested({ chatId: "fc-1" }));
@@ -339,7 +452,9 @@ describe("forgeCastAllRequested effect", () => {
       .sort();
     expect(castIds).toEqual(["d1", "d2"]);
     // Cast All is the explicit session close.
-    const closed = dispatch.mock.calls.find(([a]) => a.type === "chat/chatDeleted");
+    const closed = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/chatDeleted",
+    );
     expect(closed).toBeDefined();
     expect((closed![0].payload as { id: string }).id).toBe("fc-1");
   });
@@ -348,8 +463,18 @@ describe("forgeCastAllRequested effect", () => {
 describe("forgeDiscardAllRequested effect", () => {
   it("tombstones and deletes every draft, then closes the session (no cleanup turn)", async () => {
     const chat = makeChat();
-    const d1 = makeEntity({ id: "d1", name: "Vesper", sourceChatId: "fc-1", lifecycle: "draft" });
-    const d2 = makeEntity({ id: "d2", name: "Hollow", sourceChatId: "fc-1", lifecycle: "draft" });
+    const d1 = makeEntity({
+      id: "d1",
+      name: "Vesper",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
+    const d2 = makeEntity({
+      id: "d2",
+      name: "Hollow",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [d1, d2]);
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeDiscardAllRequested({ chatId: "fc-1" }));
@@ -366,10 +491,13 @@ describe("forgeDiscardAllRequested effect", () => {
     const cleanupTurns = dispatch.mock.calls.filter(
       ([a]) =>
         a.type === "ui/generationSubmitted" &&
-        (a.payload as { target: { type: string } }).target.type === "forgeCleanup",
+        (a.payload as { target: { type: string } }).target.type ===
+          "forgeCleanup",
     );
     expect(cleanupTurns).toHaveLength(0);
-    const closed = dispatch.mock.calls.find(([a]) => a.type === "chat/chatDeleted");
+    const closed = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/chatDeleted",
+    );
     expect(closed).toBeDefined();
   });
 
@@ -381,10 +509,13 @@ describe("forgeDiscardAllRequested effect", () => {
     const cleanupTurns = dispatch.mock.calls.filter(
       ([a]) =>
         a.type === "ui/generationSubmitted" &&
-        (a.payload as { target: { type: string } }).target.type === "forgeCleanup",
+        (a.payload as { target: { type: string } }).target.type ===
+          "forgeCleanup",
     );
     expect(cleanupTurns).toHaveLength(0);
-    const closed = dispatch.mock.calls.find(([a]) => a.type === "chat/chatDeleted");
+    const closed = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/chatDeleted",
+    );
     expect(closed).toBeDefined();
   });
 });
@@ -392,7 +523,12 @@ describe("forgeDiscardAllRequested effect", () => {
 describe("forgeScrubNowRequested effect", () => {
   it("submits a forgeCleanup and clears the scrub when drafts remain", async () => {
     const chat = makeChat();
-    const draft = makeEntity({ id: "d1", name: "Marsh", sourceChatId: "fc-1", lifecycle: "draft" });
+    const draft = makeEntity({
+      id: "d1",
+      name: "Marsh",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [draft]);
     (state.forge as any).pendingScrubByChatId = { "fc-1": ["Vesper"] };
     const { dispatch, fire } = makeHarness(state);
@@ -400,11 +536,16 @@ describe("forgeScrubNowRequested effect", () => {
     const submitted = dispatch.mock.calls.find(
       ([a]) =>
         a.type === "ui/generationSubmitted" &&
-        (a.payload as { target: { type: string } }).target.type === "forgeCleanup",
+        (a.payload as { target: { type: string } }).target.type ===
+          "forgeCleanup",
     );
     expect(submitted).toBeDefined();
-    expect(dispatch.mock.calls.some(([a]) => a.type === "forge/scrubCleared")).toBe(true);
-    expect(dispatch.mock.calls.some(([a]) => a.type === "chat/subModeChanged")).toBe(false);
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "forge/scrubCleared"),
+    ).toBe(true);
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "chat/subModeChanged"),
+    ).toBe(false);
   });
 
   it("clears the scrub without generating when no drafts remain", async () => {
@@ -413,8 +554,12 @@ describe("forgeScrubNowRequested effect", () => {
     (state.forge as any).pendingScrubByChatId = { "fc-1": ["Vesper"] };
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeScrubNowRequested({ chatId: "fc-1" }));
-    expect(dispatch.mock.calls.some(([a]) => a.type === "ui/generationSubmitted")).toBe(false);
-    expect(dispatch.mock.calls.some(([a]) => a.type === "forge/scrubCleared")).toBe(true);
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "ui/generationSubmitted"),
+    ).toBe(false);
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "forge/scrubCleared"),
+    ).toBe(true);
   });
 });
 

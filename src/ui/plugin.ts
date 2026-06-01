@@ -21,10 +21,7 @@ import {
 } from "nai-simple-ui";
 import { GenX } from "nai-gen-x";
 
-import {
-  store,
-  persistedDataLoaded,
-} from "../core/store";
+import { store, persistedDataLoaded } from "../core/store";
 import { matchesAction } from "nai-store";
 import {
   registerEffects,
@@ -51,7 +48,6 @@ import { SeImportWizard } from "./components/SeImportWizard";
 import { loadJournal } from "../core/generation-journal";
 
 const { sidebarPanel, scriptPanel } = api.v1.ui.extension;
-
 
 export class StoryEnginePlugin extends SuiPlugin {
   private _genX?: GenX;
@@ -81,15 +77,25 @@ export class StoryEnginePlugin extends SuiPlugin {
         await this._tabBar?.switchTo(1);
         const editPart = await pane.build();
         api.v1.ui.updateParts([
-          { id: "se-edit-slot", content: [editPart] } as unknown as Partial<UIPart> & { id: string },
-          { id: "se-main-content", style: { display: "none" } } as unknown as Partial<UIPart> & { id: string },
+          {
+            id: "se-edit-slot",
+            content: [editPart],
+          } as unknown as Partial<UIPart> & { id: string },
+          {
+            id: "se-main-content",
+            style: { display: "none" },
+          } as unknown as Partial<UIPart> & { id: string },
         ]);
       })();
     },
     close: () => {
       api.v1.ui.updateParts([
-        { id: "se-edit-slot", content: [] } as unknown as Partial<UIPart> & { id: string },
-        { id: "se-main-content", style: {} } as unknown as Partial<UIPart> & { id: string },
+        { id: "se-edit-slot", content: [] } as unknown as Partial<UIPart> & {
+          id: string;
+        },
+        { id: "se-main-content", style: {} } as unknown as Partial<UIPart> & {
+          id: string;
+        },
       ]);
       if (this._preEditTab !== null) {
         void this._tabBar?.switchTo(this._preEditTab);
@@ -127,7 +133,9 @@ export class StoryEnginePlugin extends SuiPlugin {
     const migrated = migrateBrainstormToChat(persisted ?? {});
     if (migrated.touched) {
       await api.v1.storyStorage.set(STORAGE_KEYS.PERSIST, migrated.data);
-      api.v1.ui.toast("Brainstorm chats migrated to new chat system.", { type: "info" });
+      api.v1.ui.toast("Brainstorm chats migrated to new chat system.", {
+        type: "info",
+      });
     }
     if (persisted) store.dispatch(persistedDataLoaded(migrated.data));
 
@@ -148,7 +156,9 @@ export class StoryEnginePlugin extends SuiPlugin {
         api.v1.an.get(),
       ]);
       const seCategories = new Set(
-        categories.filter((c) => (c.name ?? "").startsWith("SE:")).map((c) => c.id),
+        categories
+          .filter((c) => (c.name ?? "").startsWith("SE:"))
+          .map((c) => c.id),
       );
       const unmanagedCount = entries.filter(
         (e) => !e.category || !seCategories.has(e.category),
@@ -156,7 +166,10 @@ export class StoryEnginePlugin extends SuiPlugin {
       if (unmanagedCount > 0 || memText.trim() || anText.trim()) {
         // editHost.open() surfaces the Story Engine tab itself.
         this.editHost.open(
-          new SeImportWizard({ id: IDS.IMPORT.WIZARD, editHost: this.editHost }),
+          new SeImportWizard({
+            id: IDS.IMPORT.WIZARD,
+            editHost: this.editHost,
+          }),
         );
       }
     }
@@ -218,7 +231,10 @@ export class StoryEnginePlugin extends SuiPlugin {
     });
 
     // ── Story Engine pane ───────────────────────────────────────────────────
-    this._seHeaderBar = new SeHeaderBar({ id: "kse-sidebar-header", editHost: this.editHost });
+    this._seHeaderBar = new SeHeaderBar({
+      id: "kse-sidebar-header",
+      editHost: this.editHost,
+    });
     this._forgePane = new ForgePane({
       id: "se-forge-pane",
       editHost: this.editHost,
@@ -232,7 +248,10 @@ export class StoryEnginePlugin extends SuiPlugin {
     class StoryEngineSlot extends SuiComponent<
       { default: { self: { style: object } } },
       Record<string, never>,
-      SuiComponentOptions<{ default: { self: { style: object } } }, Record<string, never>>,
+      SuiComponentOptions<
+        { default: { self: { style: object } } },
+        Record<string, never>
+      >,
       UIPartColumn
     > {
       constructor(private readonly _col: UIPartColumn) {

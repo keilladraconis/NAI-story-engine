@@ -72,15 +72,15 @@ export class ChatPanel extends SuiComponent<
           isRefine: !!s.chat.refineChat,
           msgIds: v?.messages.map((m) => m.id).join("|") ?? "",
           draftIdHash: Object.values(s.world.entitiesById)
-            .filter(
-              (e) => e.sourceChatId === v?.id && e.lifecycle === "draft",
-            )
+            .filter((e) => e.sourceChatId === v?.id && e.lifecycle === "draft")
             .map((e) => `${e.id}:${e.lastAffectingMessageId ?? ""}`)
             .sort()
             .join("|"),
           segmentsHash:
             v?.messages
-              .map((m) => (m.forgeSegments ? `${m.id}:${m.forgeSegments.length}` : ""))
+              .map((m) =>
+                m.forgeSegments ? `${m.id}:${m.forgeSegments.length}` : "",
+              )
               .join("|") ?? "",
         };
       },

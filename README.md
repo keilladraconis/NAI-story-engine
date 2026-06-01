@@ -68,6 +68,7 @@ For stories that already have lorebook entries, Memory, or Author's Note content
 ### Entity Edit Pane
 
 Click any entity to open its edit pane:
+
 - Edit name, summary, and category (draft entities)
 - View and regenerate lorebook content and keys (live entities)
 - Refine the lorebook content via a scoped chat session: _"make her taller," "add a rivalry with the Silver Court"_

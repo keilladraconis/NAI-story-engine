@@ -74,7 +74,9 @@ export class SeSimpleContentPane extends SuiComponent<
         id: `${this.id}-back`,
         text: "",
         iconId: "arrow-left" as IconId,
-        callback: () => { onBack(); },
+        callback: () => {
+          onBack();
+        },
       }),
     ];
     if (label) {

@@ -36,7 +36,11 @@ export const worldSlice = createSlice({
 
     entitySummaryUpdated: (
       state,
-      payload: { entityId: string; summary: string; lastAffectingMessageId?: string },
+      payload: {
+        entityId: string;
+        summary: string;
+        lastAffectingMessageId?: string;
+      },
     ) => {
       const entity = state.entitiesById[payload.entityId];
       if (!entity) return state;

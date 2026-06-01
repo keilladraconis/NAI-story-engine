@@ -235,7 +235,10 @@ function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
 
   const deleteMatch = line.match(/^\[\s*DELETE\s+"([^"]+)"\]/);
   if (deleteMatch) {
-    return { command: { kind: "DELETE", name: deleteMatch[1].trim() }, consumed: 0 };
+    return {
+      command: { kind: "DELETE", name: deleteMatch[1].trim() },
+      consumed: 0,
+    };
   }
 
   const renameMatch = line.match(
@@ -275,7 +278,10 @@ function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
 
   const critiqueMatch = line.match(/^\[\s*CRITIQUE\s*\|\s*(.+?)\]?\s*$/);
   if (critiqueMatch) {
-    return { command: { kind: "CRITIQUE", text: critiqueMatch[1].trim() }, consumed: 0 };
+    return {
+      command: { kind: "CRITIQUE", text: critiqueMatch[1].trim() },
+      consumed: 0,
+    };
   }
 
   // Lenient: a bare element type with no CREATE keyword, with or without a
@@ -319,7 +325,10 @@ function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
  */
 export function parseCommands(text: string): ParsedCommand[] {
   return walkForgeLines(text)
-    .filter((t): t is Extract<ForgeLineToken, { kind: "command" }> => t.kind === "command")
+    .filter(
+      (t): t is Extract<ForgeLineToken, { kind: "command" }> =>
+        t.kind === "command",
+    )
     .map((t) => t.command);
 }
 

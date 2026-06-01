@@ -14,7 +14,12 @@ const refineChat = (): Chat => ({
   title: "Refining: Intent",
   messages: [
     { id: "u1", role: "user", content: "make it tighter" },
-    { id: "a1", role: "assistant", content: "tighter version", refineCandidate: true },
+    {
+      id: "a1",
+      role: "assistant",
+      content: "tighter version",
+      refineCandidate: true,
+    },
   ],
   seed: { kind: "fromField", sourceFieldId: "intent", sourceText: "old" },
   refineTarget: { fieldId: "intent", originalText: "old" },
@@ -72,7 +77,12 @@ describe("refineSpec", () => {
       messages: [
         { id: "u1", role: "user", content: "tighten it" },
         { id: "a0", role: "assistant", content: "" }, // empty draft, should be skipped
-        { id: "a1", role: "assistant", content: lastAssistant, refineCandidate: true },
+        {
+          id: "a1",
+          role: "assistant",
+          content: lastAssistant,
+          refineCandidate: true,
+        },
       ],
       seed: { kind: "fromField", sourceFieldId: fieldId, sourceText: "old" },
       refineTarget: { fieldId, originalText: "old" },
@@ -82,14 +92,18 @@ describe("refineSpec", () => {
       const dispatch = vi.fn();
       const localCtx: SpecCtx = { getState: vi.fn(), dispatch };
       refineSpec.onCommit?.(makeChat("attg", "new attg text"), localCtx);
-      expect(dispatch).toHaveBeenCalledWith(attgUpdated({ attg: "new attg text" }));
+      expect(dispatch).toHaveBeenCalledWith(
+        attgUpdated({ attg: "new attg text" }),
+      );
     });
 
     it("dispatches styleUpdated when committing a style refine", () => {
       const dispatch = vi.fn();
       const localCtx: SpecCtx = { getState: vi.fn(), dispatch };
       refineSpec.onCommit?.(makeChat("style", "new style text"), localCtx);
-      expect(dispatch).toHaveBeenCalledWith(styleUpdated({ style: "new style text" }));
+      expect(dispatch).toHaveBeenCalledWith(
+        styleUpdated({ style: "new style text" }),
+      );
     });
 
     it("toasts and bails when committing an unsupported field", () => {

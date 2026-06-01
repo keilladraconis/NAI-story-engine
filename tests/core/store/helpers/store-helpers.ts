@@ -1,5 +1,8 @@
 import { createStore, combineReducers } from "nai-store";
-import { chatSlice, type ChatSliceState } from "../../../../src/core/store/slices/chat";
+import {
+  chatSlice,
+  type ChatSliceState,
+} from "../../../../src/core/store/slices/chat";
 import { uiSlice } from "../../../../src/core/store/slices/ui";
 import { runtimeSlice } from "../../../../src/core/store/slices/runtime";
 import type { UIState, RuntimeState } from "../../../../src/core/store/types";

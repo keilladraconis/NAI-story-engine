@@ -166,14 +166,16 @@ describe("restoreTagsFromEmoji", () => {
 
 describe("stripStyleBrackets", () => {
   it("strips [ Style: ... ] wrapper and returns inner content", () => {
-    const input = "[ Style: Joanna Russ's sardonic prose meets Jeff VanderMeer's lush ecology ]";
+    const input =
+      "[ Style: Joanna Russ's sardonic prose meets Jeff VanderMeer's lush ecology ]";
     expect(stripStyleBrackets(input)).toBe(
       "Joanna Russ's sardonic prose meets Jeff VanderMeer's lush ecology",
     );
   });
 
   it("leaves text without [ Style: ] wrapper unchanged", () => {
-    const input = "Joanna Russ's sardonic prose meets Jeff VanderMeer's lush ecology";
+    const input =
+      "Joanna Russ's sardonic prose meets Jeff VanderMeer's lush ecology";
     expect(stripStyleBrackets(input)).toBe(input);
   });
 

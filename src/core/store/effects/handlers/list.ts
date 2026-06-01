@@ -51,8 +51,12 @@ export const listHandler: GenerationHandlers<ListTarget> = {
           const name = extractEntityName(content, fieldId);
 
           // Dedup: skip if name already exists (case-insensitive)
-          const existing = Object.values(ctx.getState().world.entitiesById).find(
-            (e) => e.name.toLowerCase() === name.toLowerCase() && e.categoryId === fieldId,
+          const existing = Object.values(
+            ctx.getState().world.entitiesById,
+          ).find(
+            (e) =>
+              e.name.toLowerCase() === name.toLowerCase() &&
+              e.categoryId === fieldId,
           );
           if (existing) {
             api.v1.log(`[list] Skipped duplicate: "${name}"`);

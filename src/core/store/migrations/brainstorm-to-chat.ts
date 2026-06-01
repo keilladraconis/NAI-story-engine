@@ -10,7 +10,11 @@ type MigrationInput = Omit<PersistedData, "brainstorm"> & {
       id: string;
       title: string;
       mode: string;
-      messages: Array<{ id: string; role: "user" | "assistant" | "system"; content: string }>;
+      messages: Array<{
+        id: string;
+        role: "user" | "assistant" | "system";
+        content: string;
+      }>;
     }>;
     currentChatIndex: number;
   };
@@ -21,9 +25,12 @@ export interface MigrationResult {
   data: PersistedData;
 }
 
-export function migrateBrainstormToChat(input: MigrationInput): MigrationResult {
+export function migrateBrainstormToChat(
+  input: MigrationInput,
+): MigrationResult {
   if (input.chat) return { touched: false, data: input as PersistedData };
-  if (!input.brainstorm?.chats) return { touched: false, data: input as PersistedData };
+  if (!input.brainstorm?.chats)
+    return { touched: false, data: input as PersistedData };
 
   const chats: Chat[] = input.brainstorm.chats.map((c) => ({
     id: c.id,

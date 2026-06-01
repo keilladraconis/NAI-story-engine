@@ -1,4 +1,10 @@
-import type { ChatTypeSpec, Chat, ChatMessage, ChatSeed, SpecCtx } from "./types";
+import type {
+  ChatTypeSpec,
+  Chat,
+  ChatMessage,
+  ChatSeed,
+  SpecCtx,
+} from "./types";
 import {
   BRAINSTORM_SUMMARIZE_PROMPT,
   STORY_TEXT_SUMMARIZE_PROMPT,

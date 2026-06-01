@@ -3,7 +3,10 @@ import {
   messageUpdated,
   refineCandidateMarked,
 } from "../../slices/chat";
-import { stripThinkingTags, stripStyleBrackets } from "../../../utils/tag-parser";
+import {
+  stripThinkingTags,
+  stripStyleBrackets,
+} from "../../../utils/tag-parser";
 import {
   GenerationHandlers,
   ChatTarget,
@@ -64,8 +67,6 @@ export const chatRefineHandler: GenerationHandlers<ChatRefineTarget> = {
         content: cleaned,
       }),
     );
-    ctx.dispatch(
-      refineCandidateMarked({ messageId: ctx.target.messageId }),
-    );
+    ctx.dispatch(refineCandidateMarked({ messageId: ctx.target.messageId }));
   },
 };

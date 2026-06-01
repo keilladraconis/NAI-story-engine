@@ -46,7 +46,11 @@ export function registerSummaryGenerationEffects(
         generationSubmitted({
           requestId,
           messageFactory: createEntitySummaryFactory(getState, entityId),
-          params: await buildModelParams({ max_tokens: 150, temperature: 0.9, min_p: 0.05 }),
+          params: await buildModelParams({
+            max_tokens: 150,
+            temperature: 0.9,
+            min_p: 0.05,
+          }),
           target: { type: "entitySummary", entityId },
           prefillBehavior: "trim",
         }),
@@ -63,12 +67,25 @@ export function registerSummaryGenerationEffects(
     if (!entryText) return;
 
     const requestId = `entity-summary-bind-${entity.id}`;
-    dispatch(requestQueued({ id: requestId, type: "entitySummaryBind", targetId: entity.id }));
+    dispatch(
+      requestQueued({
+        id: requestId,
+        type: "entitySummaryBind",
+        targetId: entity.id,
+      }),
+    );
     dispatch(
       generationSubmitted({
         requestId,
-        messageFactory: createEntitySummaryFromLorebookFactory(getState, entity.id),
-        params: await buildModelParams({ max_tokens: 150, temperature: 0.8, min_p: 0.05 }),
+        messageFactory: createEntitySummaryFromLorebookFactory(
+          getState,
+          entity.id,
+        ),
+        params: await buildModelParams({
+          max_tokens: 150,
+          temperature: 0.8,
+          min_p: 0.05,
+        }),
         target: { type: "entitySummaryBind", entityId: entity.id },
         prefillBehavior: "trim",
       }),
@@ -84,12 +101,25 @@ export function registerSummaryGenerationEffects(
       if (!entryText) continue;
 
       const requestId = `entity-summary-bind-${entity.id}`;
-      dispatch(requestQueued({ id: requestId, type: "entitySummaryBind", targetId: entity.id }));
+      dispatch(
+        requestQueued({
+          id: requestId,
+          type: "entitySummaryBind",
+          targetId: entity.id,
+        }),
+      );
       dispatch(
         generationSubmitted({
           requestId,
-          messageFactory: createEntitySummaryFromLorebookFactory(getState, entity.id),
-          params: await buildModelParams({ max_tokens: 150, temperature: 0.8, min_p: 0.05 }),
+          messageFactory: createEntitySummaryFromLorebookFactory(
+            getState,
+            entity.id,
+          ),
+          params: await buildModelParams({
+            max_tokens: 150,
+            temperature: 0.8,
+            min_p: 0.05,
+          }),
           target: { type: "entitySummaryBind", entityId: entity.id },
           prefillBehavior: "trim",
         }),
@@ -116,20 +146,36 @@ export function registerSummaryGenerationEffects(
     if (!hasSummary) {
       const summaryRequestId = `se-entity-summary-${entityId}`;
       dispatch(
-        requestQueued({ id: summaryRequestId, type: "entitySummary", targetId: entityId }),
+        requestQueued({
+          id: summaryRequestId,
+          type: "entitySummary",
+          targetId: entityId,
+        }),
       );
-      dispatch(uiEntitySummaryGenerationRequested({ entityId, requestId: summaryRequestId }));
+      dispatch(
+        uiEntitySummaryGenerationRequested({
+          entityId,
+          requestId: summaryRequestId,
+        }),
+      );
     }
 
     if (!hasContent) {
       const contentRequestId = `lb-entity-${entityId}-content`;
       dispatch(
-        requestQueued({ id: contentRequestId, type: "lorebookContent", targetId: lorebookEntryId }),
+        requestQueued({
+          id: contentRequestId,
+          type: "lorebookContent",
+          targetId: lorebookEntryId,
+        }),
       );
       dispatch(
         generationSubmitted({
           requestId: contentRequestId,
-          messageFactory: createLorebookContentFactory(getState, lorebookEntryId),
+          messageFactory: createLorebookContentFactory(
+            getState,
+            lorebookEntryId,
+          ),
           params: await buildModelParams({ max_tokens: 1024 }),
           target: { type: "lorebookContent", entryId: lorebookEntryId },
           prefillBehavior: "trim",
@@ -140,11 +186,19 @@ export function registerSummaryGenerationEffects(
     if (!hasKeys) {
       const keysRequestId = `lb-entity-${entityId}-keys`;
       dispatch(
-        requestQueued({ id: keysRequestId, type: "lorebookKeys", targetId: lorebookEntryId }),
+        requestQueued({
+          id: keysRequestId,
+          type: "lorebookKeys",
+          targetId: lorebookEntryId,
+        }),
       );
       dispatch(
         generationSubmitted(
-          await buildLorebookKeysPayload(getState, lorebookEntryId, keysRequestId),
+          await buildLorebookKeysPayload(
+            getState,
+            lorebookEntryId,
+            keysRequestId,
+          ),
         ),
       );
     }
@@ -158,7 +212,11 @@ export function registerSummaryGenerationEffects(
         generationSubmitted({
           requestId,
           messageFactory: createThreadSummaryFactory(getState, groupId),
-          params: await buildModelParams({ max_tokens: 100, temperature: 0.9, min_p: 0.05 }),
+          params: await buildModelParams({
+            max_tokens: 100,
+            temperature: 0.9,
+            min_p: 0.05,
+          }),
           target: { type: "threadSummary", groupId },
           prefillBehavior: "trim",
         }),

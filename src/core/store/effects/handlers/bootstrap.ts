@@ -9,8 +9,14 @@ import { trimStopTail } from "../../../utils/config";
 import { buildBootstrapContinueStrategy } from "../bootstrap-effects";
 import { generationSubmitted, requestQueued } from "../../index";
 
-type BootstrapTarget = Extract<GenerationStrategy["target"], { type: "bootstrap" }>;
-type BootstrapContinueTarget = Extract<GenerationStrategy["target"], { type: "bootstrapContinue" }>;
+type BootstrapTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "bootstrap" }
+>;
+type BootstrapContinueTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "bootstrapContinue" }
+>;
 
 const MAX_CONTINUE_ITERATIONS = 5; // iterations 0–4 → 5 continuation paragraphs
 
@@ -62,7 +68,12 @@ function chunkParagraph(paragraph: string): string[] {
 
 /** True when text ended at a natural sentence/scene boundary (not mid-sentence max_tokens cut). */
 function endsAtBoundary(text: string): boolean {
-  return /[.!?…]["']?$/.test(text) || text.endsWith("***") || text.endsWith("---") || text.endsWith("⁂");
+  return (
+    /[.!?…]["']?$/.test(text) ||
+    text.endsWith("***") ||
+    text.endsWith("---") ||
+    text.endsWith("⁂")
+  );
 }
 
 /** Join text onto the last document section without creating a new paragraph. */
@@ -71,14 +82,18 @@ async function joinToLastSection(text: string): Promise<void> {
   const lastId = ids[ids.length - 1];
   const results = await api.v1.document.scan(undefined, { from: lastId });
   const lastText = results[0].section.text;
-  await api.v1.document.updateParagraph(lastId, { text: lastText + " " + text });
+  await api.v1.document.updateParagraph(lastId, {
+    text: lastText + " " + text,
+  });
 }
 
 /** True if the document's final section is already a scene break marker. */
 async function lastSectionIsBreak(): Promise<boolean> {
   const ids = await api.v1.document.sectionIds();
   if (ids.length === 0) return false;
-  const results = await api.v1.document.scan(undefined, { from: ids[ids.length - 1] });
+  const results = await api.v1.document.scan(undefined, {
+    from: ids[ids.length - 1],
+  });
   return /^(\*\*\*|---|⁂)\s*$/.test(results[0].section.text.trim());
 }
 
@@ -118,7 +133,11 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
     // Chain into phase 2
     const strategy = buildBootstrapContinueStrategy(ctx.getState, 0);
     ctx.dispatch(
-      requestQueued({ id: strategy.requestId, type: "bootstrapContinue", targetId: "bootstrap" }),
+      requestQueued({
+        id: strategy.requestId,
+        type: "bootstrapContinue",
+        targetId: "bootstrap",
+      }),
     );
     ctx.dispatch(generationSubmitted(strategy));
   },
@@ -126,69 +145,87 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
 
 // ─── Phase 2 handler ─────────────────────────────────────────────────────────
 
-export const bootstrapContinueHandler: GenerationHandlers<BootstrapContinueTarget> = {
-  streaming(ctx: StreamingContext<BootstrapContinueTarget>, _newText: string): void {
-    const tail = ctx.accumulatedText.slice(-100).replace(/\n/g, " ");
-    api.v1.ui.updateParts([{ id: "header-sega-status", text: `[${ctx.target.iteration + 2}] ${tail}` }]);
-  },
+export const bootstrapContinueHandler: GenerationHandlers<BootstrapContinueTarget> =
+  {
+    streaming(
+      ctx: StreamingContext<BootstrapContinueTarget>,
+      _newText: string,
+    ): void {
+      const tail = ctx.accumulatedText.slice(-100).replace(/\n/g, " ");
+      api.v1.ui.updateParts([
+        {
+          id: "header-sega-status",
+          text: `[${ctx.target.iteration + 2}] ${tail}`,
+        },
+      ]);
+    },
 
-  async completion(ctx: CompletionContext<BootstrapContinueTarget>): Promise<void> {
-    if (!ctx.generationSucceeded || !ctx.accumulatedText) {
-      continueInline = false;
-      api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
-      return;
-    }
-
-    const stripped = stripThinkingTags(ctx.accumulatedText);
-    // The model emitted an explicit scene break — preserve it.
-    const endsOnSceneBreak = /\n\s*(?:\*\*\*|---|⁂)\s*$/.test(stripped);
-
-    const cleaned = trimStopTail(stripped, ["\n***", "\n---", "\n⁂", "\n[ "]);
-    const paragraphs = parseParagraphs(cleaned);
-
-    // The model silently time-skipped without a marker — insert one.
-    const needsLeadingBreak =
-      paragraphs.length > 0 &&
-      !continueInline &&
-      TIME_SKIP_RE.test(paragraphs[0]) &&
-      !(await lastSectionIsBreak());
-    if (needsLeadingBreak) {
-      await api.v1.document.appendParagraph({ text: "***" });
-    }
-
-    if (paragraphs.length > 0) {
-      const [first, ...rest] = paragraphs;
-      if (continueInline && !needsLeadingBreak) {
-        await joinToLastSection(first);
-      } else {
-        await api.v1.document.appendParagraph({ text: first });
+    async completion(
+      ctx: CompletionContext<BootstrapContinueTarget>,
+    ): Promise<void> {
+      if (!ctx.generationSucceeded || !ctx.accumulatedText) {
+        continueInline = false;
+        api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
+        return;
       }
-      for (const p of rest) {
-        await api.v1.document.appendParagraph({ text: p });
-      }
-    }
 
-    if (endsOnSceneBreak) {
-      if (!(await lastSectionIsBreak())) {
+      const stripped = stripThinkingTags(ctx.accumulatedText);
+      // The model emitted an explicit scene break — preserve it.
+      const endsOnSceneBreak = /\n\s*(?:\*\*\*|---|⁂)\s*$/.test(stripped);
+
+      const cleaned = trimStopTail(stripped, ["\n***", "\n---", "\n⁂", "\n[ "]);
+      const paragraphs = parseParagraphs(cleaned);
+
+      // The model silently time-skipped without a marker — insert one.
+      const needsLeadingBreak =
+        paragraphs.length > 0 &&
+        !continueInline &&
+        TIME_SKIP_RE.test(paragraphs[0]) &&
+        !(await lastSectionIsBreak());
+      if (needsLeadingBreak) {
         await api.v1.document.appendParagraph({ text: "***" });
       }
-      continueInline = false;
-    } else if (paragraphs.length > 0) {
-      continueInline = !endsAtBoundary(paragraphs[paragraphs.length - 1]);
-    }
 
-    const maxReached = ctx.target.iteration >= MAX_CONTINUE_ITERATIONS - 1;
-    if (maxReached) {
-      continueInline = false;
-      api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
-      return;
-    }
+      if (paragraphs.length > 0) {
+        const [first, ...rest] = paragraphs;
+        if (continueInline && !needsLeadingBreak) {
+          await joinToLastSection(first);
+        } else {
+          await api.v1.document.appendParagraph({ text: first });
+        }
+        for (const p of rest) {
+          await api.v1.document.appendParagraph({ text: p });
+        }
+      }
 
-    // Queue next iteration
-    const strategy = buildBootstrapContinueStrategy(ctx.getState, ctx.target.iteration + 1);
-    ctx.dispatch(
-      requestQueued({ id: strategy.requestId, type: "bootstrapContinue", targetId: "bootstrap" }),
-    );
-    ctx.dispatch(generationSubmitted(strategy));
-  },
-};
+      if (endsOnSceneBreak) {
+        if (!(await lastSectionIsBreak())) {
+          await api.v1.document.appendParagraph({ text: "***" });
+        }
+        continueInline = false;
+      } else if (paragraphs.length > 0) {
+        continueInline = !endsAtBoundary(paragraphs[paragraphs.length - 1]);
+      }
+
+      const maxReached = ctx.target.iteration >= MAX_CONTINUE_ITERATIONS - 1;
+      if (maxReached) {
+        continueInline = false;
+        api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
+        return;
+      }
+
+      // Queue next iteration
+      const strategy = buildBootstrapContinueStrategy(
+        ctx.getState,
+        ctx.target.iteration + 1,
+      );
+      ctx.dispatch(
+        requestQueued({
+          id: strategy.requestId,
+          type: "bootstrapContinue",
+          targetId: "bootstrap",
+        }),
+      );
+      ctx.dispatch(generationSubmitted(strategy));
+    },
+  };

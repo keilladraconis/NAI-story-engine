@@ -12,7 +12,11 @@ import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
 import { getChatTypeSpec } from "../../core/chat-types";
 import { uiChatSummarizeRequested } from "../../core/store/slices/ui";
-import { subModeChanged, chatCreated, chatSwitched } from "../../core/store/slices/chat";
+import {
+  subModeChanged,
+  chatCreated,
+  chatSwitched,
+} from "../../core/store/slices/chat";
 import {
   forgeCastAllRequested,
   forgeDiscardAllRequested,
@@ -53,7 +57,9 @@ function modeButtonStyle(isActive: boolean, color: string): object {
 }
 
 function nextBrainstormTitle(): string {
-  const existing = store.getState().chat.chats.filter((c) => c.type === "brainstorm");
+  const existing = store
+    .getState()
+    .chat.chats.filter((c) => c.type === "brainstorm");
   return `Brainstorm ${existing.length + 1}`;
 }
 
@@ -88,7 +94,8 @@ export class ChatHeader extends SuiComponent<
     this._watcher.watch(
       (s) => {
         const active =
-          s.chat.refineChat ?? s.chat.chats.find((c) => c.id === s.chat.activeChatId);
+          s.chat.refineChat ??
+          s.chat.chats.find((c) => c.id === s.chat.activeChatId);
         return {
           id: active?.id ?? null,
           title: active?.title ?? "",
@@ -101,7 +108,10 @@ export class ChatHeader extends SuiComponent<
           { id: titleId, text: title },
           {
             id: coId,
-            style: modeButtonStyle(subMode === "cowriter", MODE_ACTIVE_COWRITER),
+            style: modeButtonStyle(
+              subMode === "cowriter",
+              MODE_ACTIVE_COWRITER,
+            ),
           },
           {
             id: critId,
@@ -135,16 +145,26 @@ export class ChatHeader extends SuiComponent<
             button({
               id: coId,
               text: "Co",
-              style: modeButtonStyle(chat.subMode === "cowriter", MODE_ACTIVE_COWRITER),
+              style: modeButtonStyle(
+                chat.subMode === "cowriter",
+                MODE_ACTIVE_COWRITER,
+              ),
               callback: () =>
-                store.dispatch(subModeChanged({ id: chat.id, subMode: "cowriter" })),
+                store.dispatch(
+                  subModeChanged({ id: chat.id, subMode: "cowriter" }),
+                ),
             }),
             button({
               id: critId,
               text: "Crit",
-              style: modeButtonStyle(chat.subMode === "critic", MODE_ACTIVE_CRITIC),
+              style: modeButtonStyle(
+                chat.subMode === "critic",
+                MODE_ACTIVE_CRITIC,
+              ),
               callback: () =>
-                store.dispatch(subModeChanged({ id: chat.id, subMode: "critic" })),
+                store.dispatch(
+                  subModeChanged({ id: chat.id, subMode: "critic" }),
+                ),
             }),
           );
           break;
@@ -232,7 +252,9 @@ export class ChatHeader extends SuiComponent<
             "font-size": "0.75em",
             display: count > 0 ? "block" : "none",
           });
-          const count0 = (store.getState().forge.pendingScrubByChatId[chat.id] ?? []).length;
+          const count0 = (
+            store.getState().forge.pendingScrubByChatId[chat.id] ?? []
+          ).length;
           built.push(
             button({
               id: scrubId,

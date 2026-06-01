@@ -182,9 +182,7 @@ export function createThreadSummaryFactory(
       .filter((e): e is NonNullable<typeof e> => e !== undefined);
 
     const memberLines = members
-      .map((e) =>
-        e.summary ? `- ${e.name}: ${e.summary}` : `- ${e.name}`,
-      )
+      .map((e) => (e.summary ? `- ${e.name}: ${e.summary}` : `- ${e.name}`))
       .join("\n");
 
     const titleLabel = group?.title ? `"${group.title}"` : "this thread";

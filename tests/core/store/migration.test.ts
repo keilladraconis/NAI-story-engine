@@ -11,7 +11,9 @@ describe("migrateBrainstormToChat", () => {
             id: "c1",
             title: "Brainstorm 1",
             mode: "cowriter",
-            messages: [{ id: "m1", role: "user" as const, content: "hi" }] as ChatMessage[],
+            messages: [
+              { id: "m1", role: "user" as const, content: "hi" },
+            ] as ChatMessage[],
           },
           {
             id: "c2",
@@ -26,7 +28,9 @@ describe("migrateBrainstormToChat", () => {
     const result = migrateBrainstormToChat(v11);
     expect(result.touched).toBe(true);
     // After migration, the legacy `brainstorm` slot should not be present.
-    expect((result.data as { brainstorm?: unknown }).brainstorm).toBeUndefined();
+    expect(
+      (result.data as { brainstorm?: unknown }).brainstorm,
+    ).toBeUndefined();
     expect(result.data.chat).toBeDefined();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const chat = result.data.chat!;
@@ -74,7 +78,14 @@ describe("migrateBrainstormToChat", () => {
   it("falls back to first chat when currentChatIndex is out of range", () => {
     const v11 = {
       brainstorm: {
-        chats: [{ id: "c1", title: "x", mode: "cowriter", messages: [] as ChatMessage[] }],
+        chats: [
+          {
+            id: "c1",
+            title: "x",
+            mode: "cowriter",
+            messages: [] as ChatMessage[],
+          },
+        ],
         currentChatIndex: 7,
       },
     };

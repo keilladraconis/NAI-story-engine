@@ -136,7 +136,8 @@ export async function syncEratoCompatibility(
 
   // Re-sync ATTG → Memory, Style → A/N if enabled. Skip when the current
   // value already matches to avoid bumping the story's modifiedAt on load.
-  const { attg, style, attgSyncEnabled, styleSyncEnabled } = getState().foundation;
+  const { attg, style, attgSyncEnabled, styleSyncEnabled } =
+    getState().foundation;
   if (attgSyncEnabled) {
     const trimmed = attg.trim();
     if (trimmed) {

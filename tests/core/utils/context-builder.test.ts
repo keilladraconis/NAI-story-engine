@@ -81,7 +81,9 @@ describe("buildStoryEnginePrefix chat injection", () => {
     };
     const getState = () => makeState({ activeChat: chat });
 
-    const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true });
+    const prefix = await buildStoryEnginePrefix(getState, {
+      excludeChat: true,
+    });
     const concat = prefix.map((m) => m.content).join("\n");
     expect(concat).not.toContain(ACTIVE_PROBE);
     expect(concat).not.toContain("[BRAINSTORM]");

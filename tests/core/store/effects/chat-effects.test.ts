@@ -89,7 +89,8 @@ describe("chat-effects: refine submit", () => {
   });
 
   it("uiChatRefineRequested while refineChat already set toasts and bails", async () => {
-    const { dispatchAndWait, getState, toast, openInitialRefine } = makeHarness();
+    const { dispatchAndWait, getState, toast, openInitialRefine } =
+      makeHarness();
     openInitialRefine();
     expect(getState().chat.refineChat).not.toBeNull();
     await dispatchAndWait(
@@ -133,7 +134,9 @@ describe("chat-effects: user-message submit generates on first send", () => {
 
     await dispatchAndWait(uiChatSubmitUserMessage({ chatId: "bs1" }));
 
-    const msgs = store.getState().chat.chats.find((c) => c.id === "bs1")!.messages;
+    const msgs = store
+      .getState()
+      .chat.chats.find((c) => c.id === "bs1")!.messages;
     // The user's message is recorded.
     expect(
       msgs.some((m) => m.role === "user" && m.content === "a fresh idea"),

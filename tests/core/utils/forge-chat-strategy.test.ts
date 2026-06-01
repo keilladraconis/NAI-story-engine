@@ -32,12 +32,24 @@ function makeState(over: Partial<RootState> = {}): RootState {
   return {
     chat: { chats: [], activeChatId: null, refineChat: null },
     foundation: {
-      shape: null, intent: "", worldState: "", intensity: null, contract: null,
-      attg: "", style: "", attgSyncEnabled: false, styleSyncEnabled: false,
+      shape: null,
+      intent: "",
+      worldState: "",
+      intensity: null,
+      contract: null,
+      attg: "",
+      style: "",
+      attgSyncEnabled: false,
+      styleSyncEnabled: false,
     },
     world: { groups: [], entitiesById: {}, entityIds: [] },
     story: { fields: {}, attgEnabled: false, styleEnabled: false },
-    ui: { activeEditId: null, inputs: {}, lorebook: { selectedEntryId: null, selectedCategoryId: null }, worldExpanded: null },
+    ui: {
+      activeEditId: null,
+      inputs: {},
+      lorebook: { selectedEntryId: null, selectedCategoryId: null },
+      worldExpanded: null,
+    },
     runtime: {} as RootState["runtime"],
     forge: { tombstonesByChatId: {} },
     ...over,
@@ -48,14 +60,22 @@ describe("extractLastCritique", () => {
   it("returns text from last assistant CRITIQUE", () => {
     const messages = [
       { id: "u", role: "user" as const, content: "go" },
-      { id: "a1", role: "assistant" as const, content: "[CREATE CHARACTER \"A\" | foo]\n[CRITIQUE | the pool is thin]" },
+      {
+        id: "a1",
+        role: "assistant" as const,
+        content: '[CREATE CHARACTER "A" | foo]\n[CRITIQUE | the pool is thin]',
+      },
     ];
     expect(extractLastCritique(messages)).toBe("the pool is thin");
   });
 
   it("returns null when no CRITIQUE present", () => {
     const messages = [
-      { id: "a", role: "assistant" as const, content: "[CREATE CHARACTER \"A\" | foo]" },
+      {
+        id: "a",
+        role: "assistant" as const,
+        content: '[CREATE CHARACTER "A" | foo]',
+      },
     ];
     expect(extractLastCritique(messages)).toBeNull();
   });
@@ -64,7 +84,11 @@ describe("extractLastCritique", () => {
     const messages = [
       { id: "a1", role: "assistant" as const, content: "[CRITIQUE | old]" },
       { id: "u", role: "user" as const, content: "more" },
-      { id: "a2", role: "assistant" as const, content: "[CREATE CHARACTER \"A\" | foo]" },
+      {
+        id: "a2",
+        role: "assistant" as const,
+        content: '[CREATE CHARACTER "A" | foo]',
+      },
     ];
     expect(extractLastCritique(messages)).toBeNull();
   });
@@ -136,7 +160,7 @@ describe("buildForgeChatStrategy", () => {
         world: {
           groups: [],
           entitiesById: {
-            "d1": makeEntity({
+            d1: makeEntity({
               id: "d1",
               name: "Vesper",
               summary: "paranoid governess",
@@ -161,7 +185,7 @@ describe("buildForgeChatStrategy", () => {
         world: {
           groups: [],
           entitiesById: {
-            "l1": makeEntity({
+            l1: makeEntity({
               id: "l1",
               name: "Old Quay",
               summary: "decaying waterfront",
@@ -186,9 +210,7 @@ describe("buildForgeChatStrategy", () => {
       makeState({
         forge: {
           tombstonesByChatId: {
-            "fc-1": [
-              { name: "Felix", category: "Character", reason: "user" },
-            ],
+            "fc-1": [{ name: "Felix", category: "Character", reason: "user" }],
           },
           pendingScrubByChatId: {},
         },
@@ -218,12 +240,21 @@ describe("buildForgeChatStrategy", () => {
       ...chat,
       messages: [
         { id: "u1", role: "user", content: "go" },
-        { id: "a1", role: "assistant", content: "[CREATE CHARACTER \"A\" | foo]\n[CRITIQUE | needs antagonist]" },
+        {
+          id: "a1",
+          role: "assistant",
+          content:
+            '[CREATE CHARACTER "A" | foo]\n[CRITIQUE | needs antagonist]',
+        },
         { id: "asst-pending", role: "assistant", content: "" },
       ],
     };
     const getState = () => makeState();
-    const strat = buildForgeChatStrategy(getState, chatWithCritique, "asst-pending");
+    const strat = buildForgeChatStrategy(
+      getState,
+      chatWithCritique,
+      "asst-pending",
+    );
     const built = await strat.messageFactory!();
     const allText = built.messages.map((m) => m.content).join("\n");
     expect(allText).toContain("[PREVIOUS CRITIQUE]");
@@ -246,7 +277,7 @@ describe("buildForgeChatStrategy", () => {
     const strat = buildForgeChatStrategy(getState, chat, "asst-pending");
     const built = await strat.messageFactory!();
     expect(built.params?.max_tokens).toBe(1536);
-    expect(built.params?.temperature).toBeCloseTo(0.90, 5);
+    expect(built.params?.temperature).toBeCloseTo(0.9, 5);
   });
 
   it("primes assistantPrefill with '[' so model continues the command syntax", () => {
@@ -259,11 +290,17 @@ describe("buildForgeChatStrategy", () => {
 describe("buildForgeCleanupStrategy", () => {
   it("produces a strategy with forgeCleanup target carrying discardedNames", () => {
     const chat: Chat = {
-      id: "fc-1", type: "forge", title: "Forge", subMode: "sketch",
-      messages: [], seed: { kind: "blank" },
+      id: "fc-1",
+      type: "forge",
+      title: "Forge",
+      subMode: "sketch",
+      messages: [],
+      seed: { kind: "blank" },
     };
     const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", ["Vesper"]);
+    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", [
+      "Vesper",
+    ]);
     expect(strat.target).toEqual({
       type: "forgeCleanup",
       chatId: "fc-1",
@@ -275,11 +312,17 @@ describe("buildForgeCleanupStrategy", () => {
 
   it("uses FORGE_CLEANUP_PROMPT as system message", async () => {
     const chat: Chat = {
-      id: "fc-1", type: "forge", title: "Forge", subMode: "sketch",
-      messages: [], seed: { kind: "blank" },
+      id: "fc-1",
+      type: "forge",
+      title: "Forge",
+      subMode: "sketch",
+      messages: [],
+      seed: { kind: "blank" },
     };
     const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", ["Vesper"]);
+    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", [
+      "Vesper",
+    ]);
     const built = await strat.messageFactory!();
     expect(
       built.messages.some(
@@ -290,47 +333,62 @@ describe("buildForgeCleanupStrategy", () => {
 
   it("includes a user message naming the discarded entity for a single discard", async () => {
     const chat: Chat = {
-      id: "fc-1", type: "forge", title: "Forge", subMode: "sketch",
-      messages: [], seed: { kind: "blank" },
+      id: "fc-1",
+      type: "forge",
+      title: "Forge",
+      subMode: "sketch",
+      messages: [],
+      seed: { kind: "blank" },
     };
     const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", ["Vesper"]);
+    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", [
+      "Vesper",
+    ]);
     const built = await strat.messageFactory!();
     const userTurn = built.messages.find((m) => m.role === "user");
     expect(userTurn).toBeDefined();
     expect(userTurn!.content).toContain("Discarded entity:");
-    expect(userTurn!.content).toContain("\"Vesper\"");
+    expect(userTurn!.content).toContain('"Vesper"');
   });
 
   it("pluralizes the user message when multiple entities were discarded", async () => {
     const chat: Chat = {
-      id: "fc-1", type: "forge", title: "Forge", subMode: "sketch",
-      messages: [], seed: { kind: "blank" },
+      id: "fc-1",
+      type: "forge",
+      title: "Forge",
+      subMode: "sketch",
+      messages: [],
+      seed: { kind: "blank" },
     };
     const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(
-      getState,
-      chat,
-      "asst-cleanup",
-      ["Vesper", "Hollow", "Echo"],
-    );
+    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", [
+      "Vesper",
+      "Hollow",
+      "Echo",
+    ]);
     const built = await strat.messageFactory!();
     const userTurn = built.messages.find((m) => m.role === "user");
     expect(userTurn).toBeDefined();
     expect(userTurn!.content).toContain("Discarded entities:");
-    expect(userTurn!.content).toContain("\"Vesper\"");
-    expect(userTurn!.content).toContain("\"Hollow\"");
-    expect(userTurn!.content).toContain("\"Echo\"");
+    expect(userTurn!.content).toContain('"Vesper"');
+    expect(userTurn!.content).toContain('"Hollow"');
+    expect(userTurn!.content).toContain('"Echo"');
     expect(userTurn!.content).toContain("any of those entities");
   });
 
   it("uses a tight max_tokens budget (~400)", async () => {
     const chat: Chat = {
-      id: "fc-1", type: "forge", title: "Forge", subMode: "sketch",
-      messages: [], seed: { kind: "blank" },
+      id: "fc-1",
+      type: "forge",
+      title: "Forge",
+      subMode: "sketch",
+      messages: [],
+      seed: { kind: "blank" },
     };
     const getState = () => makeState();
-    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", ["Vesper"]);
+    const strat = buildForgeCleanupStrategy(getState, chat, "asst-cleanup", [
+      "Vesper",
+    ]);
     const built = await strat.messageFactory!();
     expect(built.params?.max_tokens).toBeLessThanOrEqual(512);
     expect(built.params?.max_tokens).toBeGreaterThanOrEqual(256);
@@ -347,7 +405,8 @@ describe("buildForgeChatStrategy briefing anchoring", () => {
       {
         id: "brief",
         role: "system",
-        content: "STORY ENGINE BRIEFING\n\n[BRAINSTORM]\nUSER: haunted lighthouse",
+        content:
+          "STORY ENGINE BRIEFING\n\n[BRAINSTORM]\nUSER: haunted lighthouse",
       },
       { id: "u1", role: "user", content: "begin" },
     ],
@@ -372,7 +431,11 @@ describe("buildForgeChatStrategy briefing anchoring", () => {
           entityIds: ["l1"],
         },
       });
-    const strat = buildForgeChatStrategy(getState, briefingChat, "asst-pending");
+    const strat = buildForgeChatStrategy(
+      getState,
+      briefingChat,
+      "asst-pending",
+    );
     const built = await strat.messageFactory!();
     const allText = built.messages.map((m) => m.content).join("\n");
     expect(allText).toContain("[LIVE]");
@@ -396,12 +459,18 @@ describe("buildForgeChatStrategy briefing anchoring", () => {
           entityIds: ["d1"],
         },
       });
-    const strat = buildForgeChatStrategy(getState, briefingChat, "asst-pending");
+    const strat = buildForgeChatStrategy(
+      getState,
+      briefingChat,
+      "asst-pending",
+    );
     const built = await strat.messageFactory!();
     const briefingIdx = built.messages.findIndex((m) =>
       m.content?.includes("STORY ENGINE BRIEFING"),
     );
-    const poolIdx = built.messages.findIndex((m) => m.content?.includes("[POOL]"));
+    const poolIdx = built.messages.findIndex((m) =>
+      m.content?.includes("[POOL]"),
+    );
     const sketchIdx = built.messages.findIndex(
       (m) => m.content === FORGE_SKETCH_PROMPT,
     );
@@ -427,9 +496,9 @@ describe("buildForgeChatStrategy briefing anchoring", () => {
     const getState = () => makeState();
     const strat = buildForgeChatStrategy(getState, legacy, "asst-pending");
     const built = await strat.messageFactory!();
-    expect(
-      built.messages.some((m) => m.content === FORGE_SKETCH_PROMPT),
-    ).toBe(true);
+    expect(built.messages.some((m) => m.content === FORGE_SKETCH_PROMPT)).toBe(
+      true,
+    );
     expect(
       built.messages.some((m) => m.role === "user" && m.content === "begin"),
     ).toBe(true);
@@ -443,7 +512,11 @@ describe("buildForgeDiscussStrategy", () => {
     title: "Forge",
     subMode: "sketch",
     messages: [
-      { id: "brief", role: "system", content: "STORY ENGINE BRIEFING\n\n[BRAINSTORM]\nUSER: lighthouse" },
+      {
+        id: "brief",
+        role: "system",
+        content: "STORY ENGINE BRIEFING\n\n[BRAINSTORM]\nUSER: lighthouse",
+      },
       { id: "u1", role: "user", content: "what's the antagonist's wound?" },
     ],
     seed: { kind: "blank" },
@@ -451,24 +524,40 @@ describe("buildForgeDiscussStrategy", () => {
 
   it("uses FORGE_DISCUSS_PROMPT as the system message and has no command prefill", async () => {
     const getState = () => makeState();
-    const strat = buildForgeDiscussStrategy(getState, discussChat, "asst-pending");
+    const strat = buildForgeDiscussStrategy(
+      getState,
+      discussChat,
+      "asst-pending",
+    );
     expect(strat.assistantPrefill).toBeUndefined();
     expect(strat.target.type).toBe("forgeChat");
     expect(strat.requestId).toContain("forge-discuss-fc-1");
     const built = await strat.messageFactory!();
     expect(
-      built.messages.some((m) => m.role === "system" && m.content === FORGE_DISCUSS_PROMPT),
+      built.messages.some(
+        (m) => m.role === "system" && m.content === FORGE_DISCUSS_PROMPT,
+      ),
     ).toBe(true);
   });
 
   it("keeps the briefing ahead of the conversation and never adds a phase prompt", async () => {
     const getState = () => makeState();
-    const strat = buildForgeDiscussStrategy(getState, discussChat, "asst-pending");
+    const strat = buildForgeDiscussStrategy(
+      getState,
+      discussChat,
+      "asst-pending",
+    );
     const built = await strat.messageFactory!();
-    const briefingIdx = built.messages.findIndex((m) => m.content?.includes("STORY ENGINE BRIEFING"));
-    const discussIdx = built.messages.findIndex((m) => m.content === FORGE_DISCUSS_PROMPT);
+    const briefingIdx = built.messages.findIndex((m) =>
+      m.content?.includes("STORY ENGINE BRIEFING"),
+    );
+    const discussIdx = built.messages.findIndex(
+      (m) => m.content === FORGE_DISCUSS_PROMPT,
+    );
     expect(discussIdx).toBeGreaterThanOrEqual(0);
     expect(briefingIdx).toBeGreaterThan(discussIdx);
-    expect(built.messages.some((m) => m.content === FORGE_SKETCH_PROMPT)).toBe(false);
+    expect(built.messages.some((m) => m.content === FORGE_SKETCH_PROMPT)).toBe(
+      false,
+    );
   });
 });

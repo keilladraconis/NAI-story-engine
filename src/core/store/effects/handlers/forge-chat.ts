@@ -11,7 +11,11 @@ import {
   entityDeleted,
   groupCreated,
 } from "../../slices/world";
-import { messageAppended, messageUpdated, forgeSegmentsSet } from "../../slices/chat";
+import {
+  messageAppended,
+  messageUpdated,
+  forgeSegmentsSet,
+} from "../../slices/chat";
 import { tombstoneAdded } from "../../slices/forge";
 import { WorldEntity, WorldGroup, RootState, AppDispatch } from "../../types";
 import {
@@ -20,15 +24,27 @@ import {
   TYPE_TO_FIELD,
   type ParsedCommand,
 } from "../../../utils/crucible-command-parser";
-import type { ForgeActionRecord, ForgeSegment } from "../../../chat-types/types";
+import type {
+  ForgeActionRecord,
+  ForgeSegment,
+} from "../../../chat-types/types";
 import { stripThinkingTags } from "../../../utils/tag-parser";
 import { DULFS_CATEGORY_LABELS } from "../../../utils/category-detect";
 import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
 
-type ForgeChatTarget = Extract<GenerationStrategy["target"], { type: "forgeChat" }>;
-type ForgeCleanupTarget = Extract<GenerationStrategy["target"], { type: "forgeCleanup" }>;
+type ForgeChatTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "forgeChat" }
+>;
+type ForgeCleanupTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "forgeCleanup" }
+>;
 
-function findEntityByName(state: RootState, name: string): WorldEntity | undefined {
+function findEntityByName(
+  state: RootState,
+  name: string,
+): WorldEntity | undefined {
   return Object.values(state.world.entitiesById).find(
     (e) => e.name.toLowerCase() === name.toLowerCase(),
   );
@@ -62,7 +78,8 @@ function executeForgeCommand(
     return {
       kind: cmd.kind === "LINK" || cmd.kind === "DONE" ? "UNKNOWN" : cmd.kind,
       status: "rejected",
-      elementType: cmd.kind === "CREATE" ? cmd.elementType.toUpperCase() : undefined,
+      elementType:
+        cmd.kind === "CREATE" ? cmd.elementType.toUpperCase() : undefined,
       name,
       reason: "cleanup pass",
     };
@@ -72,17 +89,41 @@ function executeForgeCommand(
     case "CREATE": {
       const elementType = cmd.elementType.toUpperCase();
       if (!cmd.content.trim()) {
-        return { kind: "CREATE", status: "rejected", elementType, name: cmd.name, reason: "empty content" };
+        return {
+          kind: "CREATE",
+          status: "rejected",
+          elementType,
+          name: cmd.name,
+          reason: "empty content",
+        };
       }
       const fieldId = TYPE_TO_FIELD[elementType] as DulfsFieldID | undefined;
       if (!fieldId) {
-        return { kind: "CREATE", status: "rejected", elementType, name: cmd.name, reason: "unknown type" };
+        return {
+          kind: "CREATE",
+          status: "rejected",
+          elementType,
+          name: cmd.name,
+          reason: "unknown type",
+        };
       }
       if (findEntityByName(getState(), cmd.name)) {
-        return { kind: "CREATE", status: "rejected", elementType, name: cmd.name, reason: "duplicate" };
+        return {
+          kind: "CREATE",
+          status: "rejected",
+          elementType,
+          name: cmd.name,
+          reason: "duplicate",
+        };
       }
       if (isTombstoned(getState(), chatId, cmd.name)) {
-        return { kind: "CREATE", status: "rejected", elementType, name: cmd.name, reason: "removed this session" };
+        return {
+          kind: "CREATE",
+          status: "rejected",
+          elementType,
+          name: cmd.name,
+          reason: "removed this session",
+        };
       }
       const entity: WorldEntity = {
         id: api.v1.uuid(),
@@ -99,12 +140,22 @@ function executeForgeCommand(
 
     case "REVISE": {
       if (!cmd.content.trim()) {
-        return { kind: "REVISE", status: "rejected", name: cmd.name, reason: "empty content" };
+        return {
+          kind: "REVISE",
+          status: "rejected",
+          name: cmd.name,
+          reason: "empty content",
+        };
       }
       const target = findEntityByName(getState(), cmd.name);
       if (target) {
         if (target.lifecycle === "live") {
-          return { kind: "REVISE", status: "rejected", name: cmd.name, reason: "live entity" };
+          return {
+            kind: "REVISE",
+            status: "rejected",
+            name: cmd.name,
+            reason: "live entity",
+          };
         }
         dispatch(
           entitySummaryUpdated({
@@ -117,7 +168,12 @@ function executeForgeCommand(
       }
       // Find-or-create: the model routinely revises something it never created.
       if (isTombstoned(getState(), chatId, cmd.name)) {
-        return { kind: "REVISE", status: "rejected", name: cmd.name, reason: "removed this session" };
+        return {
+          kind: "REVISE",
+          status: "rejected",
+          name: cmd.name,
+          reason: "removed this session",
+        };
       }
       const created: WorldEntity = {
         id: api.v1.uuid(),
@@ -129,16 +185,31 @@ function executeForgeCommand(
         lastAffectingMessageId: assistantMessageId,
       };
       dispatch(entityForged({ entity: created }));
-      return { kind: "CREATE", status: "applied", elementType: "CHARACTER", name: cmd.name };
+      return {
+        kind: "CREATE",
+        status: "applied",
+        elementType: "CHARACTER",
+        name: cmd.name,
+      };
     }
 
     case "DELETE": {
       const target = findEntityByName(getState(), cmd.name);
       if (!target) {
-        return { kind: "DELETE", status: "rejected", name: cmd.name, reason: "not found" };
+        return {
+          kind: "DELETE",
+          status: "rejected",
+          name: cmd.name,
+          reason: "not found",
+        };
       }
       if (target.lifecycle === "live") {
-        return { kind: "DELETE", status: "rejected", name: cmd.name, reason: "live entity" };
+        return {
+          kind: "DELETE",
+          status: "rejected",
+          name: cmd.name,
+          reason: "live entity",
+        };
       }
       dispatch(entityDeleted({ entityId: target.id }));
       dispatch(
@@ -157,28 +228,68 @@ function executeForgeCommand(
     case "RENAME": {
       const target = findEntityByName(getState(), cmd.oldName);
       if (!target) {
-        return { kind: "RENAME", status: "rejected", name: cmd.oldName, reason: "not found" };
+        return {
+          kind: "RENAME",
+          status: "rejected",
+          name: cmd.oldName,
+          reason: "not found",
+        };
       }
       if (target.lifecycle === "live") {
-        return { kind: "RENAME", status: "rejected", name: target.name, reason: "live entity" };
+        return {
+          kind: "RENAME",
+          status: "rejected",
+          name: target.name,
+          reason: "live entity",
+        };
       }
       if (!cmd.newName.trim()) {
-        return { kind: "RENAME", status: "rejected", name: target.name, reason: "empty new name" };
+        return {
+          kind: "RENAME",
+          status: "rejected",
+          name: target.name,
+          reason: "empty new name",
+        };
       }
-      dispatch(entityEdited({ entityId: target.id, name: cmd.newName, summary: target.summary }));
-      return { kind: "RENAME", status: "applied", name: cmd.oldName, newName: cmd.newName };
+      dispatch(
+        entityEdited({
+          entityId: target.id,
+          name: cmd.newName,
+          summary: target.summary,
+        }),
+      );
+      return {
+        kind: "RENAME",
+        status: "applied",
+        name: cmd.oldName,
+        newName: cmd.newName,
+      };
     }
 
     case "THREAD": {
       const state = getState();
-      if (state.world.groups.find((g) => g.title.toLowerCase() === cmd.title.toLowerCase())) {
-        return { kind: "THREAD", status: "rejected", name: cmd.title, reason: "duplicate" };
+      if (
+        state.world.groups.find(
+          (g) => g.title.toLowerCase() === cmd.title.toLowerCase(),
+        )
+      ) {
+        return {
+          kind: "THREAD",
+          status: "rejected",
+          name: cmd.title,
+          reason: "duplicate",
+        };
       }
       const memberIds = cmd.memberNames
         .map((name) => findEntityByName(state, name)?.id)
         .filter((id): id is string => !!id);
       if (memberIds.length < 2) {
-        return { kind: "THREAD", status: "rejected", name: cmd.title, reason: "needs ≥2 members" };
+        return {
+          kind: "THREAD",
+          status: "rejected",
+          name: cmd.title,
+          reason: "needs ≥2 members",
+        };
       }
       const group: WorldGroup = {
         id: api.v1.uuid(),
@@ -223,12 +334,22 @@ function buildForgeSegments(
     }
     if (tok.kind === "unrecognized") {
       flush();
-      segments.push({ kind: "action", action: { kind: "UNKNOWN", status: "unrecognized", reason: tok.raw } });
+      segments.push({
+        kind: "action",
+        action: { kind: "UNKNOWN", status: "unrecognized", reason: tok.raw },
+      });
       continue;
     }
     if (tok.command.kind === "DONE" || tok.command.kind === "LINK") continue;
     flush();
-    const action = executeForgeCommand(tok.command, chatId, messageId, getState, dispatch, { reviseOnly });
+    const action = executeForgeCommand(
+      tok.command,
+      chatId,
+      messageId,
+      getState,
+      dispatch,
+      { reviseOnly },
+    );
     segments.push({ kind: "action", action });
   }
   flush();
@@ -267,7 +388,11 @@ export const forgeChatHandler: GenerationHandlers<ForgeChatTarget> = {
       false,
     );
     ctx.dispatch(
-      forgeSegmentsSet({ chatId: ctx.target.chatId, id: ctx.target.messageId, segments }),
+      forgeSegmentsSet({
+        chatId: ctx.target.chatId,
+        id: ctx.target.messageId,
+        segments,
+      }),
     );
   },
 };
@@ -304,7 +429,11 @@ export const forgeCleanupHandler: GenerationHandlers<ForgeCleanupTarget> = {
       true,
     );
     ctx.dispatch(
-      forgeSegmentsSet({ chatId: ctx.target.chatId, id: ctx.target.messageId, segments }),
+      forgeSegmentsSet({
+        chatId: ctx.target.chatId,
+        id: ctx.target.messageId,
+        segments,
+      }),
     );
   },
 };

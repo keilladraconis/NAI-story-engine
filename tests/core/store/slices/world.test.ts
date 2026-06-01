@@ -39,7 +39,12 @@ const ENTITY: WorldEntity = {
   lifecycle: "live" as const,
 };
 
-const GROUP = { id: "g1", title: "Main Circle", summary: "Core cast", entityIds: [] };
+const GROUP = {
+  id: "g1",
+  title: "Main Circle",
+  summary: "Core cast",
+  entityIds: [],
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Group (Thread) actions
@@ -119,7 +124,11 @@ describe("entityDeleted", () => {
   it("removes the entity and cleans up group membership", () => {
     const groupWithMember = { ...GROUP, entityIds: ["e1"] };
     const state = reduce(
-      makeState({ entitiesById: { e1: ENTITY }, entityIds: ["e1"], groups: [groupWithMember] }),
+      makeState({
+        entitiesById: { e1: ENTITY },
+        entityIds: ["e1"],
+        groups: [groupWithMember],
+      }),
       entityDeleted({ entityId: "e1" }),
     );
     expect(state.entityIds).toHaveLength(0);
@@ -187,7 +196,10 @@ describe("entityLorebookEntryBound", () => {
     const before = makeState();
     const after = reduce(
       before,
-      entityLorebookEntryBound({ entityId: "missing", lorebookEntryId: "lb-x" }),
+      entityLorebookEntryBound({
+        entityId: "missing",
+        lorebookEntryId: "lb-x",
+      }),
     );
     expect(after).toBe(before);
   });

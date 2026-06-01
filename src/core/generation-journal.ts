@@ -146,7 +146,9 @@ export function formatBootstrapDigest(): string {
       if (k === "taskId") continue;
       paramParts.push(`${k}=${JSON.stringify(v)}`);
     }
-    lines.push(`**Params:** ${paramParts.join(", ")}  **Uncached:** ${entry.uncachedTokens}`);
+    lines.push(
+      `**Params:** ${paramParts.join(", ")}  **Uncached:** ${entry.uncachedTokens}`,
+    );
     lines.push("");
 
     // Show only the contextually interesting messages:
@@ -155,7 +157,8 @@ export function formatBootstrapDigest(): string {
     // - Style hint (contains "[ Style:")
     // - Short system messages ≤ 600 chars (lorebook entries, world state snippets)
     // Skip: long SE prefix messages and story text (too large, not useful per-run)
-    const ANCHOR_PREFIX = /^(Intensity:|Shape:|Intent:|World State:|Story Contract:)/;
+    const ANCHOR_PREFIX =
+      /^(Intensity:|Shape:|Intent:|World State:|Story Contract:)/;
     const INSTRUCTION_CONTENT = /Write the opening|Continue directly/;
     const STYLE_HINT = /\[ Style:/;
 

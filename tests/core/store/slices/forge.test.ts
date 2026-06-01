@@ -10,8 +10,16 @@ import {
   type Tombstone,
 } from "../../../../src/core/store/slices/forge";
 
-const TS1: Tombstone = { name: "Vesper", category: "Character", reason: "user" };
-const TS2: Tombstone = { name: "Felix", category: "Character", reason: "model" };
+const TS1: Tombstone = {
+  name: "Vesper",
+  category: "Character",
+  reason: "user",
+};
+const TS2: Tombstone = {
+  name: "Felix",
+  category: "Character",
+  reason: "model",
+};
 
 function seedTombstones(
   tombstonesByChatId: ForgeSliceState["tombstonesByChatId"],

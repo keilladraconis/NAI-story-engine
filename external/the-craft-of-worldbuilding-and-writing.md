@@ -1,6 +1,6 @@
 # The Craft of World-Building and Writing
 
-*A distillation of hard-won insights from iterative fiction development*
+_A distillation of hard-won insights from iterative fiction development_
 
 **By: Wes Brown (@OccultSage)**
 
@@ -8,11 +8,11 @@
 
 ## What This Document Is
 
-This is a guide to two specific phases of fiction writing: *pre-writing* (developing premises, casts, locations, and situations before you draft) and *prose craft* (sentence-level and paragraph-level quality). It focuses heavily on opening scenes because openings do the most work per word.
+This is a guide to two specific phases of fiction writing: _pre-writing_ (developing premises, casts, locations, and situations before you draft) and _prose craft_ (sentence-level and paragraph-level quality). It focuses heavily on opening scenes because openings do the most work per word.
 
 ## What This Document Is Not
 
-**Not a plotting guide.** There's nothing here about three-act structure, story beats, rising action, midpoints, or climaxes. If you need to learn how to structure a novel-length plot, look elsewhere. This document assumes you'll figure out what happens; it helps you figure out *who it happens to*, *where it happens*, and *how to write it when you get there*.
+**Not a plotting guide.** There's nothing here about three-act structure, story beats, rising action, midpoints, or climaxes. If you need to learn how to structure a novel-length plot, look elsewhere. This document assumes you'll figure out what happens; it helps you figure out _who it happens to_, _where it happens_, and _how to write it when you get there_.
 
 **Not a pacing guide.** Scene vs. summary, when to speed up, when to slow down, chapter length, act breaks—none of that is covered here. Pacing is crucial, but it's a different skill from the ones this document teaches.
 
@@ -20,7 +20,7 @@ This is a guide to two specific phases of fiction writing: *pre-writing* (develo
 
 **Not a genre guide.** We discuss intensity levels and genre promises, but we don't teach the specific conventions of romance, mystery, thriller, literary fiction, or any other genre. Those conventions matter; they're just not covered here.
 
-**Not a world-building systems guide.** Magic systems, technology, economics, politics—if you need to design how things *work* in your world, this isn't that document. We cover how to make locations feel real and how to avoid unnecessary institutional scaffolding, but not how to build the scaffolding when you need it.
+**Not a world-building systems guide.** Magic systems, technology, economics, politics—if you need to design how things _work_ in your world, this isn't that document. We cover how to make locations feel real and how to avoid unnecessary institutional scaffolding, but not how to build the scaffolding when you need it.
 
 **Not about theme.** We don't discuss how to develop, layer, or execute thematic content. Theme emerges from the choices you make; this document helps you make those choices more deliberately, but it doesn't teach thematic craft directly.
 
@@ -76,7 +76,7 @@ Most compelling ideas emerge from combining:
 
 **A genre or tradition.** This is the narrative grammar readers will use to interpret your story. Space opera comes with different expectations than psychological horror. Romantic comedy operates by different rules than epic fantasy. The genre tells readers what kind of story they're in.
 
-**A distinctive element.** This is the hook, the ingredient that makes *this* story different from others in its genre. Found family. Heist. Rivals to lovers. Sentient AI. Secret identity. The element is what you're exploring—the thing that makes this story worth telling.
+**A distinctive element.** This is the hook, the ingredient that makes _this_ story different from others in its genre. Found family. Heist. Rivals to lovers. Sentient AI. Secret identity. The element is what you're exploring—the thing that makes this story worth telling.
 
 **A setting or atmosphere.** This grounds the abstraction. "1920s" is different from "far future." "Isolated estate" is different from "bustling city." The setting constrains and enables—certain stories can only happen in certain places.
 
@@ -116,21 +116,21 @@ Work through these categories:
 
 **Required elements**: What must appear in this story? Not themes or feelings—concrete things. The setting (steampunk airship, contemporary college campus, generation ship). The specific scenario (the inheritance dispute, the tournament, the road trip). The relationship configurations (rivals to lovers, found family, mentor and student). If you've promised yourself dragons, dragons must appear. If the story is about a bookshop, the bookshop must matter.
 
-*Example (cozy dragon fantasy):* "Dragon council politics, a protagonist who doesn't want to be involved, bureaucratic comedy, elderly dragons with centuries of grudges."
+_Example (cozy dragon fantasy):_ "Dragon council politics, a protagonist who doesn't want to be involved, bureaucratic comedy, elderly dragons with centuries of grudges."
 
-*Example (dark sci-fi):* "Generation ship, caste system based on augmentation, conspiracy within command, claustrophobic tension."
+_Example (dark sci-fi):_ "Generation ship, caste system based on augmentation, conspiracy within command, claustrophobic tension."
 
 **Prohibited elements**: What would break this story? This includes things you explicitly don't want (no love triangles, no dead parents as backstory) but also things incompatible with your tone. A cozy story prohibits malice, violence, and permanent loss—not because those things are bad, but because they belong to a different story. An erotic comedy prohibits consequences serious enough to kill the mood. Know what you're not writing.
 
-*Example (cozy):* "No deaths, no betrayals, no permanent relationship destruction. Setbacks are awkward, not catastrophic."
+_Example (cozy):_ "No deaths, no betrayals, no permanent relationship destruction. Setbacks are awkward, not catastrophic."
 
-*Example (gentle adventure):* "No torture, no sexual violence, no nihilism. Danger exists but hope is never extinguished."
+_Example (gentle adventure):_ "No torture, no sexual violence, no nihilism. Danger exists but hope is never extinguished."
 
 **Prose style**: How should this read? "Vivid and sensual" produces different sentences than "spare and hard-boiled." "Pulpy and breathless" differs from "literary and measured." If you want lush descriptions that linger on physical detail, commit to that. If you want tight functional prose, commit to that. Style isn't decoration—it's a promise to your reader about what kind of experience they're having.
 
-*Example:* "Voice like Terry Pratchett—wry, observational, digressions that earn their keep. Light touch on description, heavy on character voice."
+_Example:_ "Voice like Terry Pratchett—wry, observational, digressions that earn their keep. Light touch on description, heavy on character voice."
 
-*Example:* "Voice like Ursula Le Guin—measured, precise, each sentence doing work. Sparing description that lands hard."
+_Example:_ "Voice like Ursula Le Guin—measured, precise, each sentence doing work. Sparing description that lands hard."
 
 **Emphasis**: What should be foregrounded? Not everything can be equally important. If your story emphasizes the found family dynamics, those relationships need screen time and the plot exists to pressure them. If it emphasizes the mystery, the emotional beats serve the investigation. Emphasis tells you where to spend your words.
 
@@ -162,19 +162,19 @@ A developed premise establishes:
 
 Your intensity choice shapes how you develop every element of the premise.
 
-**Cozy** stories are about want, not need. Characters pursue things that would make their lives better, richer, more connected—but they're not desperate. The conflicts arise from misunderstanding, competing preferences, and the friction of people with different goals sharing space. A cozy story asks: *What do these characters want, and what small obstacles stand in the way?*
+**Cozy** stories are about want, not need. Characters pursue things that would make their lives better, richer, more connected—but they're not desperate. The conflicts arise from misunderstanding, competing preferences, and the friction of people with different goals sharing space. A cozy story asks: _What do these characters want, and what small obstacles stand in the way?_
 
 Examples of cozy tensions: Vision vs. resources (grand ambitions, shoestring budget). Craft vs. commerce (making the best product vs. making enough money). Independence vs. belonging (freedom of the road vs. relationships that require showing up).
 
-**Gentle** stories introduce real obstacles but maintain hope as the dominant register. Characters face challenges that require effort and might involve setbacks, but the path forward is visible. Antagonists exist but they're misguided rather than malicious—or they're circumstances rather than people. A gentle story asks: *What stands in the way, and how might it be overcome?*
+**Gentle** stories introduce real obstacles but maintain hope as the dominant register. Characters face challenges that require effort and might involve setbacks, but the path forward is visible. Antagonists exist but they're misguided rather than malicious—or they're circumstances rather than people. A gentle story asks: _What stands in the way, and how might it be overcome?_
 
-**Moderate** stories have genuine stakes. Characters can fail in ways that matter. Wins and losses both occur, and consequences persist. But the situation isn't hopeless—adaptation is possible, recovery is imaginable. A moderate story asks: *What must characters risk, and is the risk worth it?*
+**Moderate** stories have genuine stakes. Characters can fail in ways that matter. Wins and losses both occur, and consequences persist. But the situation isn't hopeless—adaptation is possible, recovery is imaginable. A moderate story asks: _What must characters risk, and is the risk worth it?_
 
-**Intense** stories trap characters. The system has hooks in everyone; walking away means losing everything you've built. Victory requires sacrifice—you can win, but not without cost. Choices have permanent weight. An intense story asks: *What will this cost, and how much are characters willing to pay?*
+**Intense** stories trap characters. The system has hooks in everyone; walking away means losing everything you've built. Victory requires sacrifice—you can win, but not without cost. Choices have permanent weight. An intense story asks: _What will this cost, and how much are characters willing to pay?_
 
 Examples of intense tensions: Legal ownership vs. practical control (you hold the deed but others hold the knowledge). Survival vs. ethics (stealing is wrong but starving is worse). Institutional loyalty vs. personal conscience (the organization that gave you everything is doing something terrible).
 
-**Nightmare** stories are actively hostile. The system isn't just indifferent—it's malevolent. Every apparent advantage conceals a trap. Allies may fail, betray, or be compromised. Even survival might be pyrrhic. A nightmare story asks: *What makes even winning feel like losing?*
+**Nightmare** stories are actively hostile. The system isn't just indifferent—it's malevolent. Every apparent advantage conceals a trap. Allies may fail, betray, or be compromised. Even survival might be pyrrhic. A nightmare story asks: _What makes even winning feel like losing?_
 
 ### How Intensity Shapes Everything
 
@@ -204,7 +204,7 @@ At **nightmare**, identify 3-4 "pressure vectors"—directions from which the ho
 
 ### Framing Conflict as Opposing Goods
 
-The strongest tensions are framed as *opposing goods* rather than *good vs evil*. "Independence" and "connection" are both desirable; the tension comes from their incompatibility in this specific situation.
+The strongest tensions are framed as _opposing goods_ rather than _good vs evil_. "Independence" and "connection" are both desirable; the tension comes from their incompatibility in this specific situation.
 
 **Weak:** "The fragile peace threatens to shatter as dark forces gather."
 
@@ -223,6 +223,7 @@ Not to imitate them, but to triangulate. A single author reference tends to domi
 Match authors to emotional register and prose style, not surface genre. A generation ship story focused on intimate betrayal needs different guides than one focused on survival logistics. A cozy fantasy about a tea shop needs different guides than one about dragon bureaucracy.
 
 Some pairings and what they might capture:
+
 - Alexander McCall Smith (gentle humor, community warmth) + Jan Karon (small-town dynamics, found purpose) → cozy small-town ensemble
 - Daphne du Maurier (atmosphere, obsession) + Sarah Waters (secrets, slow revelation) → gothic mystery with psychological depth
 - P.G. Wodehouse (comedic timing, social navigation) + Terry Pratchett (institutional satire, warmth) → comedy about absurd bureaucracies
@@ -234,7 +235,7 @@ The combination creates a tonal target more specific than either author alone.
 
 ## Building Worlds That Hold Together
 
-World-building is seductive. It's easy to spend months inventing currencies and calendars and lineages that will never appear in the actual story. The discipline lies in building *toward* something—creating the world your story needs rather than the world you find interesting to imagine.
+World-building is seductive. It's easy to spend months inventing currencies and calendars and lineages that will never appear in the actual story. The discipline lies in building _toward_ something—creating the world your story needs rather than the world you find interesting to imagine.
 
 ### Start With the Central Tension
 
@@ -276,19 +277,19 @@ Writers often impose institutional structures their stories don't require. This 
 
 **Adventurers don't require guilds.** The pressure to take dangerous jobs can come from debt, from a shared enemy, from being hunted and needing to keep moving, from a magical contract between individuals, from simple greed. Guilds add bureaucracy, dues, ranks, and regulations—useful if you want to write about institutions, unnecessary if you want to write about people doing dangerous things.
 
-*Alternative pressure sources:* The wizard owes the orc money. The whole party witnessed something they shouldn't have. A dying mentor's last request. Simple hunger and no other marketable skills.
+_Alternative pressure sources:_ The wizard owes the orc money. The whole party witnessed something they shouldn't have. A dying mentor's last request. Simple hunger and no other marketable skills.
 
 **Artists and performers don't require agencies.** They can be independent, self-promoting, working through personal connections. The entertainment industry has agencies, but your story about a dancer doesn't need to engage with that machinery unless the machinery is the point.
 
 **Space crews don't need military or corporate structure.** They can be freelancers, refugees, criminals, families. The hierarchy of captain-and-crew is one option, not the only option. Some of the most interesting ship dynamics come from people who are stuck together without clear authority.
 
-*Alternative structures:* The ship belongs to one person; everyone else is a passenger earning their way. Collective ownership with rotating responsibilities. A family where the youngest happens to be the best pilot.
+_Alternative structures:_ The ship belongs to one person; everyone else is a passenger earning their way. Collective ownership with rotating responsibilities. A family where the youngest happens to be the best pilot.
 
 **Fantasy settings don't require rigid caste systems, persecution narratives, or "monsters hiding among humans" tension.** These are story choices, not genre requirements. A world with elves doesn't have to be a world where elves face discrimination. A world with magic doesn't need a masquerade. You can write supernatural beings who exist openly, who have their own societies, who don't define themselves in relation to humans at all.
 
 **Non-human characters don't need to justify their existence.** If you're writing dragons, you don't need to explain why dragons exist or how they fit into human society. You can write dragons in dragon society, dealing with dragon concerns, where humans are irrelevant or peripheral. The story doesn't need to make the unfamiliar safe by filtering it through human perspectives.
 
-*Example:* A dragon council political comedy where humans are mentioned the way humans mention ants—briefly, if at all. The conflict is dragon politics, dragon grudges, dragon territorial disputes. No human viewpoint character required.
+_Example:_ A dragon council political comedy where humans are mentioned the way humans mention ants—briefly, if at all. The conflict is dragon politics, dragon grudges, dragon territorial disputes. No human viewpoint character required.
 
 The question to ask: does this institution serve my story, or am I including it because it seems like the default? Defaults are comfortable, but comfort isn't the same as necessity.
 
@@ -332,7 +333,8 @@ The same basic scenario transforms completely at different intensities. Here's h
 
 Useful verbs: discovers, realizes, accidentally, must choose between
 
-*Examples:*
+_Examples:_
+
 - "Two dragons both invite the protagonist to their competing post-meeting basking spots; choosing one offends the other."
 - "Temperature vote deadlocked because one elder fell asleep; waking them risks their wrath, letting them sleep delays everyone's basking time."
 - "Protagonist's predecessor left notes in incomprehensible personal shorthand; asking for help admits they can't handle the job."
@@ -343,7 +345,8 @@ The worst outcome here is social awkwardness. No one dies, no one is ruined, rel
 
 Useful verbs: struggles with, faces, must decide, risks
 
-*Examples:*
+_Examples:_
+
 - "Child saves coins for months to buy gift tea for parent; the amount isn't quite enough but refusing breaks their heart."
 - "Bridge washed out on usual route; alternate path goes through territory of a merchant who holds old grudge."
 - "Regular customer's village quarantined for minor illness; delivering to them risks spreading rumor of plague."
@@ -354,7 +357,8 @@ There's real emotional weight here, but no one is destroyed by the outcome. The 
 
 Useful verbs: confronts, forced to choose, discovers truth, must sacrifice
 
-*Examples:*
+_Examples:_
+
 - "Orc's mercenary code conflicts with cleric's vows when wounded enemy begs for death; party must decide together."
 - "Valuable item found; selling it funds the journey but it clearly belongs to someone, somewhere."
 - "Town offers bounty that conflicts with party member's past; taking it means hunting someone they once knew."
@@ -365,7 +369,8 @@ Someone's values will be compromised here. The choice matters and will be rememb
 
 Useful verbs: betrays, destroys, sacrifices, exposed, trapped
 
-*Examples:*
+_Examples:_
+
 - "Partner discovers Order corruption; exposing it endangers their bond, silence makes them complicit."
 - "Templar discovers partner's suppressed trauma during joint meditation; confronting it could heal or shatter them both."
 - "Mission requires temporary bond with third party; jealousy and psychic dissonance threaten the primary partnership."
@@ -376,7 +381,8 @@ There's no outcome here that doesn't cost something irreplaceable.
 
 Useful verbs: corrupts, consumes, annihilates, damns
 
-*Examples:*
+_Examples:_
+
 - "Destination planet confirmed uninhabitable; ship can sustain life for one more generation at most."
 - "Encrypted message proves someone in command is sabotaging the ship; accusations destroy trust, silence enables more damage."
 - "Protagonist discovers they were created for the mission—memories of Earth are implants, family never existed."
@@ -407,7 +413,7 @@ A cast list is not a collection of character sheets. It's a promise to yourself 
 
 For every character you're considering, ask: **Why does this story need this person?**
 
-Not "why is this person interesting" or "why do I want to write them." Why does the *story* need them? What role do they play in the conflicts you've established? What do they enable that wouldn't happen without them?
+Not "why is this person interesting" or "why do I want to write them." Why does the _story_ need them? What role do they play in the conflicts you've established? What do they enable that wouldn't happen without them?
 
 If you can't answer that question, the character probably doesn't belong in this story. They might belong in a different story. They might be a fragment of a character who needs development. But they're not ready for this cast.
 
@@ -421,11 +427,11 @@ The format for each entry:
 
 That's it. One line per character. Enough to differentiate them from each other, enough that an artist could draw them, not so much that you've invested hours in someone who might not fit.
 
-*Elena Chen (f, 32, protagonist's wife): oversized sweaters with sleeves past her hands, reading glasses perpetually pushed up into her hair, taps her front teeth when thinking*
+_Elena Chen (f, 32, protagonist's wife): oversized sweaters with sleeves past her hands, reading glasses perpetually pushed up into her hair, taps her front teeth when thinking_
 
-*Marcus Webb (m, 45, security chief): shaved head with old burn scar at temple, uniform always precisely pressed, stands with feet planted like he's expecting impact*
+_Marcus Webb (m, 45, security chief): shaved head with old burn scar at temple, uniform always precisely pressed, stands with feet planted like he's expecting impact_
 
-*Yuki Tanaka (f, 28, engineer): grease-stained fingernails she never quite gets clean, cropped hair with streak of premature gray, talks to machines under her breath*
+_Yuki Tanaka (f, 28, engineer): grease-stained fingernails she never quite gets clean, cropped hair with streak of premature gray, talks to machines under her breath_
 
 Three characters. You can see them. You know they're visually distinct. You haven't written a single scene yet.
 
@@ -439,7 +445,7 @@ At this stage, you're casting, not developing. You want to see the ensemble at a
 
 Your situations tell you who you need. If you've designed a situation where someone's secret threatens someone else's position, you need both those people. If you've designed a situation where a choice must be made between candidates, you need enough candidates to make the choice meaningful—that category should be your largest.
 
-Work backwards: look at your situations and ask what roles they require. The mentor figure. The rival. The person with leverage. The person with something to hide. Then look at your cast list and check: do you have someone for each role? Do you have *only one* someone, or redundant characters competing for the same function?
+Work backwards: look at your situations and ask what roles they require. The mentor figure. The rival. The person with leverage. The person with something to hide. Then look at your cast list and check: do you have someone for each role? Do you have _only one_ someone, or redundant characters competing for the same function?
 
 Gaps in your cast list are easier to spot than gaps in your head. That's the point.
 
@@ -447,19 +453,19 @@ Gaps in your cast list are easier to spot than gaps in your head. That's the poi
 
 Group characters by their function in your story, not by demographics or backstory. Categories might be "Command Staff," "Engineering," "Civilians"—or "Allies," "Obstacles," "Wildcards"—or "The Selection Pool," "Already Committed," "Authority Figures." Whatever grouping makes your cast's structure visible.
 
-*Example (generation ship):*
+_Example (generation ship):_
 Command: Captain Reyes, Commander Vasquez, Dr. Okonkwo
 Engineering: Yuki Tanaka, Ben Larsson
 Medical: Dr. Chen, Medic Ssytha
 Civilians: Maria Santos, Ambassador Kerensky
 
-*Example (dragon council comedy):*
+_Example (dragon council comedy):_
 Council Elders: Scorrath (847), Venatrix (612), Thornback (923)
 Committee Members: Pyrra, Coldmere, Ashfall, Ironwing
 Junior Dragons: Spark, Ember, Cinderscale
 Outside the Council: Old Sulfur, Quicksilver
 
-*Example (cozy tea merchant):*
+_Example (cozy tea merchant):_
 Regular Customers: Widow Tanaka, the Farmer, the Apothecary
 Suppliers: the Saffron Merchant, Old Mira
 Fellow Travelers: the Courier, the Wandering Monk
@@ -481,11 +487,11 @@ Useful attributes to track: age (or apparent age), build (slight, average, heavy
 
 The split that works: roughly two-thirds physical description, one-third behavioral tells. The physical grounds them; the behavioral makes them feel real.
 
-*She moves with a dancer's awareness of space, each gesture deliberate, the curve of her spine visible through thin fabric.*
+_She moves with a dancer's awareness of space, each gesture deliberate, the curve of her spine visible through thin fabric._
 
-*He's built like a boxer gone slightly soft, thick through the chest and shoulders, hands that look like they've hit things.*
+_He's built like a boxer gone slightly soft, thick through the chest and shoulders, hands that look like they've hit things._
 
-*Her uniform pulls taut across broad shoulders when she reaches for the controls, loose at the waist where it tucks into her belt.*
+_Her uniform pulls taut across broad shoulders when she reaches for the controls, loose at the waist where it tucks into her belt._
 
 Notice: these are observable. A camera could capture them. They're not interpretations ("commanding presence," "nervous energy") but specifics that let readers form their own impressions.
 
@@ -493,25 +499,27 @@ Notice: these are observable. A camera could capture them. They're not interpret
 
 The same character, four styles:
 
-*Hard-boiled:* "She was maybe forty, with the kind of tan you get from working outside and the kind of hands you get from working hard. The wedding ring was gone but the indent wasn't."
+_Hard-boiled:_ "She was maybe forty, with the kind of tan you get from working outside and the kind of hands you get from working hard. The wedding ring was gone but the indent wasn't."
 
-*Gothic:* "She stood in the doorway as if uncertain of her welcome, pale hands clasped before her. The light from the window behind her made it impossible to read her expression."
+_Gothic:_ "She stood in the doorway as if uncertain of her welcome, pale hands clasped before her. The light from the window behind her made it impossible to read her expression."
 
-*Lush:* "Warmth radiated from her—sun-browned skin, calloused fingers that caught on fabric when she gestured, a voice roughened by years of calling across fields. She smelled of lavender and honest sweat."
+_Lush:_ "Warmth radiated from her—sun-browned skin, calloused fingers that caught on fabric when she gestured, a voice roughened by years of calling across fields. She smelled of lavender and honest sweat."
 
-*Pulpy:* "Forty years old and every one of them earned the hard way. Arms like she could throw a hay bale or a punch. The kind of woman who'd buried a husband and kept the farm running anyway."
+_Pulpy:_ "Forty years old and every one of them earned the hard way. Arms like she could throw a hay bale or a punch. The kind of woman who'd buried a husband and kept the farm running anyway."
 
 Same character, completely different feel. The description on your character sheet should sound like it belongs in your story.
 
 **A quote that sounds like speech.** What would this character actually say to another person? Not a thesis statement about their theme—actual dialogue.
 
 Bad quotes explain the character to the audience:
+
 - "True intimacy isn't manufactured perfection, but the acceptance of imperfection in ourselves and others."
 - "In my brokenness, I found freedom."
 
 These are abstractions. No one talks like this.
 
 Good quotes reveal character through what they notice and how they speak:
+
 - "You've been watching the door since you sat down. Expecting someone, or just habit? Don't answer—I can tell which it is."
 - "Three exits. Two concealed. The guard by the bar favors his left knee. You didn't notice any of that, but you noticed me."
 - "The motion passes. Again. As it has for the last three centuries. We reconvene after the next lunar cycle to discuss implementation."
@@ -595,6 +603,7 @@ Start with your conflicts, not your aesthetics. What spaces does your story need
 A story about class division needs spaces that embody that division: places where the privileged go that others can't access, places where the excluded gather, and liminal spaces where different classes encounter each other. The specific aesthetics—whether it's a generation ship or a Victorian manor or a contemporary office—matter less than the functional relationships between spaces.
 
 For each major conflict in your story, ask:
+
 - Where does this conflict become visible?
 - Where are decisions made about it?
 - Where do consequences play out?
@@ -605,6 +614,7 @@ For each major conflict in your story, ask:
 A well-designed location has enough physical specificity that you could walk through it in your imagination. Not exhaustive floor plans, but the details that would strike you if you entered.
 
 When you think about a location, engage multiple senses:
+
 - What do you see first? (The obvious visual anchor)
 - What do you hear? (Machines, voices, silence, echoes)
 - What do you smell? (Every space has a smell, even if it's just "recycled air")
@@ -643,31 +653,31 @@ Each location needs three things in its description: a sensory anchor, a functio
 
 **Functional reality:** What actually happens here? Not in your story—in general. A kitchen is where food gets made; that means heat, sharp objects, people moving in tight spaces. A waiting room is where people sit with nothing to do; that means boredom, observation, the particular tension of enforced proximity to strangers.
 
-**Dramatic potential:** What *could* happen here that couldn't happen elsewhere? This is where location becomes participant rather than backdrop. The archive where forbidden knowledge is stored. The garden where the surveillance doesn't reach. The shared quarters where privacy is impossible.
+**Dramatic potential:** What _could_ happen here that couldn't happen elsewhere? This is where location becomes participant rather than backdrop. The archive where forbidden knowledge is stored. The garden where the surveillance doesn't reach. The shared quarters where privacy is impossible.
 
 The pattern looks like this:
 
-*The Bonding Chamber: Obsidian walls amplify psychic resonance. Incense masks the copper scent of blood sigils. Intimacy and violation merge in ritual space.*
+_The Bonding Chamber: Obsidian walls amplify psychic resonance. Incense masks the copper scent of blood sigils. Intimacy and violation merge in ritual space._
 
 Three sentences. Sensory (obsidian, incense, copper). Functional (amplifies resonance, masks scent). Dramatic (intimacy and violation merge—this is where boundaries blur).
 
-*Commons Cafeteria: Protein paste, social hierarchy on display. Aug and baseline separate by choice. Tension simmers over rations.*
+_Commons Cafeteria: Protein paste, social hierarchy on display. Aug and baseline separate by choice. Tension simmers over rations._
 
 Sensory (protein paste—you can almost taste it). Functional (hierarchy visible, self-segregation). Dramatic (tension over resources, the flash point waiting to happen).
 
 More examples across genres:
 
-*Council Chamber (dragon fantasy): Stone worn smooth by centuries of scaled bodies. Torchlight catches gold chains and dulled obsidian. Every word echoes, and everyone remembers everything.*
+_Council Chamber (dragon fantasy): Stone worn smooth by centuries of scaled bodies. Torchlight catches gold chains and dulled obsidian. Every word echoes, and everyone remembers everything._
 
-*The Tea Cart (cozy fantasy): Canvas walls smell of bergamot and woodsmoke. The kettle's whistle marks time. Customers linger because the road is lonely and the brew is good.*
+_The Tea Cart (cozy fantasy): Canvas walls smell of bergamot and woodsmoke. The kettle's whistle marks time. Customers linger because the road is lonely and the brew is good._
 
-*Hydroponics Bay (generation ship): Humidity fogs the viewport to the corridor. Green smell, growing things, the only earth-scent on the ship. Sanctuary for the unaugmented—the one place that feels alive.*
+_Hydroponics Bay (generation ship): Humidity fogs the viewport to the corridor. Green smell, growing things, the only earth-scent on the ship. Sanctuary for the unaugmented—the one place that feels alive._
 
-*The Green Room (contemporary): Stale coffee, nervous energy, mirrors that show too much. Performers wait here. Masks slip. Breakdowns happen where the audience can't see.*
+_The Green Room (contemporary): Stale coffee, nervous energy, mirrors that show too much. Performers wait here. Masks slip. Breakdowns happen where the audience can't see._
 
-*The Under-crypts (dark fantasy): Ancient bond-circles predate the Order. Heretical knowledge carved in stone. Discovery means execution—but the answers are here.*
+_The Under-crypts (dark fantasy): Ancient bond-circles predate the Order. Heretical knowledge carved in stone. Discovery means execution—but the answers are here._
 
-*Bridge Overlook (cozy mystery): Mrs. Patterson's bench faces both footpaths. She brings seed for the ducks. She sees everyone who crosses, and she remembers.
+\*Bridge Overlook (cozy mystery): Mrs. Patterson's bench faces both footpaths. She brings seed for the ducks. She sees everyone who crosses, and she remembers.
 
 ### Organizing by Function
 
@@ -741,13 +751,14 @@ The test isn't whether two characters share content—it's whether they share st
 
 **Relationship patterns.** How do your characters relate to others? If everyone is guarded and mistrustful, you have a cast of the same person. Vary how characters attach, how they protect themselves, what they want from relationships.
 
-The solution isn't to avoid patterns—patterns are how we make sense of the world. The solution is to use *different* patterns for different characters.
+The solution isn't to avoid patterns—patterns are how we make sense of the world. The solution is to use _different_ patterns for different characters.
 
 ### When to Cut
 
 Sometimes the answer isn't revision—it's removal.
 
 Cut a character when:
+
 - Their function can be absorbed by another character
 - They don't connect to your core conflicts
 - You can't answer "why does this story need this person?"
@@ -786,6 +797,7 @@ Most interesting characters have something to hide. Not necessarily dramatic sec
 The power of secrets lies in the threat of exposure. A secret nobody cares about isn't really a secret. A secret that would destroy a character's position, relationships, or self-image creates constant tension.
 
 Map your characters' secrets against each other:
+
 - Whose actions might inadvertently expose whose secret?
 - Who would be destroyed if certain information came out?
 - Who is actively protecting a secret vs. who has simply been lucky?
@@ -810,13 +822,13 @@ The same situation creates different pressures for different characters. Write t
 
 **Situation stakes format:** Take a plot situation; identify which characters it affects; note what each character's secrets or dependencies make impossible.
 
-*Nightmare (generation ship):* "Water recycling fails; the engineer knows her estranged son sabotaged it, while the council representative is watching for any sign of cover-up—she must choose between her child and the ship."
+_Nightmare (generation ship):_ "Water recycling fails; the engineer knows her estranged son sabotaged it, while the council representative is watching for any sign of cover-up—she must choose between her child and the ship."
 
-*Intense (psychic templars):* "Partners forced into shared quarters during siege; Kira's suppressed grief for her dead mentor bleeds through the bond, while Marcus realizes his attraction to her has been leaking for months—neither can pretend ignorance anymore."
+_Intense (psychic templars):_ "Partners forced into shared quarters during siege; Kira's suppressed grief for her dead mentor bleeds through the bond, while Marcus realizes his attraction to her has been leaking for months—neither can pretend ignorance anymore."
 
-*Moderate (adventuring party):* "Safe shelter for the night has room for most but not all; the orc captain knows the kobold is the most vulnerable to cold, but saying so will sound like an insult to his competence."
+_Moderate (adventuring party):_ "Safe shelter for the night has room for most but not all; the orc captain knows the kobold is the most vulnerable to cold, but saying so will sound like an insult to his competence."
 
-*Cozy (dragon council):* "Temperature vote deadlocked because Elder Thornback fell asleep; Pyrra could wake him and risk his wrath, or let him sleep and delay everyone's basking—but she also knows he'll blame her either way because of what her great-aunt did three centuries ago."
+_Cozy (dragon council):_ "Temperature vote deadlocked because Elder Thornback fell asleep; Pyrra could wake him and risk his wrath, or let him sleep and delay everyone's basking—but she also knows he'll blame her either way because of what her great-aunt did three centuries ago."
 
 Notice how this isn't just "character A vs. character B." It's these specific characters with their specific histories and their specific impossible positions.
 
@@ -826,15 +838,15 @@ Secrets create story when they intersect—when one character's actions might in
 
 Map these explicitly:
 
-*Intense (psychic templars):* "Kira's mentor was executed for the same crime Marcus is now committing; she hasn't told him."
+_Intense (psychic templars):_ "Kira's mentor was executed for the same crime Marcus is now committing; she hasn't told him."
 
-*Nightmare (generation ship):* "The engineer's son and the security chief's daughter are romantically involved; neither parent knows."
+_Nightmare (generation ship):_ "The engineer's son and the security chief's daughter are romantically involved; neither parent knows."
 
-*Moderate (mixed adventuring party):* "The goblin scout's 'reliable contact' is actually the cleric's estranged brother; revealing this means explaining why they're estranged."
+_Moderate (mixed adventuring party):_ "The goblin scout's 'reliable contact' is actually the cleric's estranged brother; revealing this means explaining why they're estranged."
 
-*Cozy (dragon council):* "Elder Scorrath once voted against the protagonist's grandfather in a dispute everyone else has forgotten; Scorrath remembers everything."
+_Cozy (dragon council):_ "Elder Scorrath once voted against the protagonist's grandfather in a dispute everyone else has forgotten; Scorrath remembers everything."
 
-*Gentle (tea merchant):* "The regular customer who always orders chamomile is avoiding the apothecary—who happens to be the tea merchant's best supplier."
+_Gentle (tea merchant):_ "The regular customer who always orders chamomile is avoiding the apothecary—who happens to be the tea merchant's best supplier."
 
 Each intersection is a bomb with a timer. You don't have to detonate all of them, but knowing where they are lets you build tension and choose your explosions deliberately. In cozy stories, these "explosions" might be awkward revelations rather than catastrophes—but they still create story.
 
@@ -842,15 +854,15 @@ Each intersection is a bomb with a timer. You don't have to detonate all of them
 
 Who needs what from whom? Map the leverage relationships:
 
-*Nightmare (generation ship):* "Tanaka needs Vasquez for augmentation maintenance; her leverage is the evidence trail she keeps."
+_Nightmare (generation ship):_ "Tanaka needs Vasquez for augmentation maintenance; her leverage is the evidence trail she keeps."
 
-*Intense (psychic templars):* "Kira needs Marcus to suppress his report on her hesitation; his leverage is knowing she'd do the same for him."
+_Intense (psychic templars):_ "Kira needs Marcus to suppress his report on her hesitation; his leverage is knowing she'd do the same for him."
 
-*Moderate (adventuring party):* "The hedge wizard needs the orc captain's protection on the road; her leverage is that he can't read the map."
+_Moderate (adventuring party):_ "The hedge wizard needs the orc captain's protection on the road; her leverage is that he can't read the map."
 
-*Gentle (tea merchant):* "The protagonist needs the saffron merchant's goodwill; his leverage is being the only supplier for fifty miles."
+_Gentle (tea merchant):_ "The protagonist needs the saffron merchant's goodwill; his leverage is being the only supplier for fifty miles."
 
-*Cozy (dragon council):* "The junior dragon needs Elder Scorrath's procedural knowledge to survive committee meetings; his leverage is that teaching her reminds him why the rules matter."
+_Cozy (dragon council):_ "The junior dragon needs Elder Scorrath's procedural knowledge to survive committee meetings; his leverage is that teaching her reminds him why the rules matter."
 
 Dependencies constrain behavior. A character who needs something from another character can't simply act on their own interests. That constraint creates drama—or, in cozy stories, creates the gentle pressure that drives scenes forward.
 
@@ -858,15 +870,15 @@ Dependencies constrain behavior. A character who needs something from another ch
 
 Past events reverberate through your cast. Map the history that still matters:
 
-*Nightmare (generation ship):* "The last resource crisis was solved by spacing fifty people; Okonkwo gave the order, and Yuki's mother was among them."
+_Nightmare (generation ship):_ "The last resource crisis was solved by spacing fifty people; Okonkwo gave the order, and Yuki's mother was among them."
 
-*Intense (psychic templars):* "Kira's mentor was bonded to the Inquisitor before his execution; neither has said this aloud to the current pair."
+_Intense (psychic templars):_ "Kira's mentor was bonded to the Inquisitor before his execution; neither has said this aloud to the current pair."
 
-*Moderate (adventuring party):* "The kobold trap-maker's previous party died because someone ignored his warning; he hasn't told this group, but he flinches every time they dismiss his concerns."
+_Moderate (adventuring party):_ "The kobold trap-maker's previous party died because someone ignored his warning; he hasn't told this group, but he flinches every time they dismiss his concerns."
 
-*Gentle (tea merchant):* "The protagonist's grandmother ran this same route; old customers remember her, and their expectations are impossibly high."
+_Gentle (tea merchant):_ "The protagonist's grandmother ran this same route; old customers remember her, and their expectations are impossibly high."
 
-*Cozy (dragon council):* "Three centuries ago, the Basking Pool temperature was changed by one degree; Elder Thornback voted against it and still brings it up at every meeting."
+_Cozy (dragon council):_ "Three centuries ago, the Basking Pool temperature was changed by one degree; Elder Thornback voted against it and still brings it up at every meeting."
 
 For each echo, note: who knows, who doesn't, and what exposure would mean. History becomes dramatic when it's unevenly distributed—when some characters carry knowledge that would change everything if it surfaced. In lighter stories, the "change" might be embarrassment or shifted relationships rather than catastrophe.
 
@@ -916,7 +928,7 @@ The constraint forces precision. When you can only introduce three characters, y
 
 ### Presence vs. Reference
 
-A character who appears in the opening scene must be *present*—physically there, taking action, available to interact with.
+A character who appears in the opening scene must be _present_—physically there, taking action, available to interact with.
 
 Characters who exist only in the protagonist's thoughts or memories haven't been introduced. The reader has been told they exist, but they haven't been seen. That's different, and weaker.
 
@@ -930,7 +942,7 @@ The pattern: physical detail, then behavior.
 
 **Physical detail:** What does the protagonist notice first? Something visible across the room, something that identifies this person. Hair, build, clothing, how they hold themselves.
 
-**Behavior:** What does this character *do*? Action reveals character more efficiently than description. A character who counts the exits. A character who touches everyone they talk to. A character who never makes eye contact.
+**Behavior:** What does this character _do_? Action reveals character more efficiently than description. A character who counts the exits. A character who touches everyone they talk to. A character who never makes eye contact.
 
 **Position in space:** Where is this character relative to the protagonist? Blocking matters. The character across the room creates different possibilities than the character at the protagonist's elbow.
 
@@ -942,35 +954,35 @@ An opening scene isn't just good sentences in sequence. It has architecture—ea
 
 **Paragraph 1: Sensory grounding.** The first paragraph establishes where we are through concrete sensory detail. Not "the station was busy" but what busy looks, sounds, smells like. The reader's first breath should be the air of this place.
 
-*Cozy fantasy:* "Steam rose from the kettle, carrying bergamot and something floral I couldn't name. The tea cart creaked as I shifted my weight, and outside the canvas walls, the morning market was already loud with haggling."
+_Cozy fantasy:_ "Steam rose from the kettle, carrying bergamot and something floral I couldn't name. The tea cart creaked as I shifted my weight, and outside the canvas walls, the morning market was already loud with haggling."
 
-*Dark sci-fi:* "The recycled air tasted of copper and ozone. Somewhere below deck, the engines hummed at a frequency I felt in my teeth more than heard."
+_Dark sci-fi:_ "The recycled air tasted of copper and ozone. Somewhere below deck, the engines hummed at a frequency I felt in my teeth more than heard."
 
-*Gothic:* "Ashworth Hall smelled of beeswax and something older—damp stone, maybe, or the particular mustiness of rooms that had been closed too long."
+_Gothic:_ "Ashworth Hall smelled of beeswax and something older—damp stone, maybe, or the particular mustiness of rooms that had been closed too long."
 
-**Paragraph 2: The protagonist's position.** Where is the protagonist in this space? What's their immediate situation? Not their backstory—their *now*. What are they doing, what are they facing, what's at stake in the next few minutes?
+**Paragraph 2: The protagonist's position.** Where is the protagonist in this space? What's their immediate situation? Not their backstory—their _now_. What are they doing, what are they facing, what's at stake in the next few minutes?
 
-*Cozy fantasy:* "I had maybe an hour before the Widow Tanaka expected her usual order, and I was three ingredients short for the blend she liked."
+_Cozy fantasy:_ "I had maybe an hour before the Widow Tanaka expected her usual order, and I was three ingredients short for the blend she liked."
 
-*Dark sci-fi:* "My shift ended in twenty minutes. Twenty minutes to decide whether to file the report that would end Commander Vasquez's career—or bury what I'd found."
+_Dark sci-fi:_ "My shift ended in twenty minutes. Twenty minutes to decide whether to file the report that would end Commander Vasquez's career—or bury what I'd found."
 
-*Gothic:* "The solicitor had given me a week to decide. Stay the required year and inherit everything, or walk away now and never know what my great-uncle had left behind."
+_Gothic:_ "The solicitor had given me a week to decide. Stay the required year and inherit everything, or walk away now and never know what my great-uncle had left behind."
 
 **Paragraphs 3-4: Character introductions.** Other characters enter through the protagonist's observation. Physical details first (what they see), then behavioral tells (what the character does), then positioning in space (where they are relative to the protagonist). Each character gets grounded before the next appears.
 
-*Cozy fantasy:* "Old Mira was already at her usual spot by the spice merchant, her grey braid coiled over one shoulder, fingers sorting through dried lavender with the speed of fifty years' practice. She looked up when the cart wheels hit the cobblestones, and her hand moved to her coin purse before I'd even stopped."
+_Cozy fantasy:_ "Old Mira was already at her usual spot by the spice merchant, her grey braid coiled over one shoulder, fingers sorting through dried lavender with the speed of fifty years' practice. She looked up when the cart wheels hit the cobblestones, and her hand moved to her coin purse before I'd even stopped."
 
-*Dark sci-fi:* "Vasquez stood at the viewport, silhouetted against the stars. She hadn't turned when I entered. Her shoulders were set in that particular way she had—braced, like she was expecting a blow. The data chip in my pocket felt heavier than it had any right to."
+_Dark sci-fi:_ "Vasquez stood at the viewport, silhouetted against the stars. She hadn't turned when I entered. Her shoulders were set in that particular way she had—braced, like she was expecting a blow. The data chip in my pocket felt heavier than it had any right to."
 
 **Paragraphs 5-6: Tension and style.** The situation develops. Tension builds. This is where your prose style announces itself most clearly—the rhythm of your sentences, your approach to description, how you handle interiority. The reader calibrates their expectations for the rest of the story based on these paragraphs.
 
 **Paragraph 7: Forward momentum.** The opening ends in motion—toward a decision, an interaction, a moment of change. Not resolved, not concluded. The reader should feel the pull of what comes next.
 
-*Cozy fantasy:* "Mira's hand was already extended, coins ready. But behind her, the spice merchant was watching me with an expression I couldn't read—and the Widow Tanaka's blend required his saffron."
+_Cozy fantasy:_ "Mira's hand was already extended, coins ready. But behind her, the spice merchant was watching me with an expression I couldn't read—and the Widow Tanaka's blend required his saffron."
 
-*Dark sci-fi:* "The chip. The viewport. Vasquez's back. Twenty minutes. I took a step forward, and she finally turned."
+_Dark sci-fi:_ "The chip. The viewport. Vasquez's back. Twenty minutes. I took a step forward, and she finally turned."
 
-*Gothic:* "The housekeeper was waiting in the doorway. 'Your room is ready,' she said. 'The east wing.' She didn't ask if I was staying. She already knew."
+_Gothic:_ "The housekeeper was waiting in the doorway. 'Your room is ready,' she said. 'The east wing.' She didn't ask if I was staying. She already knew."
 
 This isn't a rigid template. Some openings need more setup; some can move faster. But if you're stuck, this structure gives you a framework. Ask: have I grounded the senses? Established the protagonist? Introduced characters properly? Built tension? Ended with momentum?
 
@@ -979,31 +991,37 @@ This isn't a rigid template. Some openings need more setup; some can move faster
 Some problems are particularly deadly in openings because the reader hasn't yet committed to the story:
 
 **Backstory dumps.** The reader doesn't care about history yet. Make them care about the present first.
-- *Bad:* "She had spent fifteen years climbing the ranks, sacrificing everything for this moment."
-- *Fixed:* "The rank insignia was still unfamiliar on her collar. She caught herself reaching to adjust it and stopped."
+
+- _Bad:_ "She had spent fifteen years climbing the ranks, sacrificing everything for this moment."
+- _Fixed:_ "The rank insignia was still unfamiliar on her collar. She caught herself reaching to adjust it and stopped."
 
 **Philosophical framing.** This is an essay, not a story. Start with action, not thesis.
-- *Bad:* "The nature of power is that it corrupts those who seek it."
-- *Fixed:* "The council seat was still warm from its previous occupant. She sat anyway."
+
+- _Bad:_ "The nature of power is that it corrupts those who seek it."
+- _Fixed:_ "The council seat was still warm from its previous occupant. She sat anyway."
 
 **Rhetorical questions.** These feel writerly and stop momentum dead.
-- *Bad:* "What would the future hold? Only time would tell."
-- *Fixed:* "The future was someone else's problem. She had six hours."
+
+- _Bad:_ "What would the future hold? Only time would tell."
+- _Fixed:_ "The future was someone else's problem. She had six hours."
 
 **"It was" constructions.** The "It was" construction is almost always weak. Start with something specific and concrete.
-- *Bad:* "It was a dark and stormy night."
-- *Fixed:* "Lightning turned the windows white. In the flash, she saw the figure on the lawn."
-- *Bad:* "It was the kind of day that made you believe in second chances."
-- *Fixed:* "Sunlight hit the kitchen floor for the first time in three months. She stood in the warm square and didn't move."
+
+- _Bad:_ "It was a dark and stormy night."
+- _Fixed:_ "Lightning turned the windows white. In the flash, she saw the figure on the lawn."
+- _Bad:_ "It was the kind of day that made you believe in second chances."
+- _Fixed:_ "Sunlight hit the kitchen floor for the first time in three months. She stood in the warm square and didn't move."
 
 **Weather without function.** Weather belongs in an opening only if it affects action.
-- *Bad:* "Rain fell from a grey sky."
-- *Fixed:* "Rain hammered the canvas so hard she could barely hear the customer's order." (weather as obstacle)
-- *Fixed:* "The first clear day in weeks, and every vendor in the market had the same idea." (weather affecting situation)
+
+- _Bad:_ "Rain fell from a grey sky."
+- _Fixed:_ "Rain hammered the canvas so hard she could barely hear the customer's order." (weather as obstacle)
+- _Fixed:_ "The first clear day in weeks, and every vendor in the market had the same idea." (weather affecting situation)
 
 **Explaining the premise.** Show the world through character interaction, not narration.
-- *Bad:* "In the three centuries since launch, the generation ship had developed a rigid caste system based on genetic modification."
-- *Fixed:* "The aug-line moved faster. It always did. She watched the modified crew pass through security in seconds while her queue shuffled forward one person at a time."
+
+- _Bad:_ "In the three centuries since launch, the generation ship had developed a rigid caste system based on genetic modification."
+- _Fixed:_ "The aug-line moved faster. It always did. She watched the modified crew pass through security in seconds while her queue shuffled forward one person at a time."
 
 ### The Cold Start
 
@@ -1034,6 +1052,7 @@ Once you've drafted an opening, extract its components and check them:
 **Situation count.** List every plot situation or conflict seeded. One or two is right. Three or more means you're overloading—none of them will register.
 
 **Character introductions.** For each character who appears, extract:
+
 - How are they first described? (Physical detail?)
 - What do they do? (Behavioral tell?)
 - Where are they relative to the protagonist? (Spatial positioning?)
@@ -1064,14 +1083,16 @@ If you name an emotion, the scene has failed. "She was angry" is a conclusion de
 
 ## Narrative Flow: The Causal Chain
 
-Every sentence should answer two questions: *What triggered this?* and *What does this trigger?*
+Every sentence should answer two questions: _What triggered this?_ and _What does this trigger?_
 
 **Weak:**
+
 > He stood. Walked to the door. Opened it. She followed.
 
 This is a sequence of events with no causal tissue. Each sentence is an isolated fact.
 
 **Strong:**
+
 > He stood, and the chair scraped against tile. She looked up from her book, then followed him to the door.
 
 The scraping chair connects his standing to her attention. Her looking up connects to her following. Every sentence responds to what came before and propels what comes next.
@@ -1083,11 +1104,13 @@ Three short declarative sentences in a row signals you've lost the thread. It me
 Don't catalog setting. Reveal it through what characters notice.
 
 **Weak:**
+
 > The room was dark. Furniture filled the space. A window showed the street. She walked forward.
 
 This is a camera panning across a room. The character is irrelevant to the description.
 
 **Strong:**
+
 > She moved forward until her shin hit something—coffee table edge. Her hand swept the wall, found the switch.
 
 Now the environment exists because the character encounters it. The darkness matters because she can't see. The furniture matters because she walks into it. Setting and character become inseparable.
@@ -1105,8 +1128,9 @@ The prohibition on naming emotions extends beyond simple "show don't tell" advic
 This construction pretends to show while actually telling. The emotion word does all the work; the body part is decorative. What does "sparkling with mischief" actually look like? The phrase is a shortcut that bypasses the work of observation.
 
 **Sensation metaphors (especially in intimate scenes):**
+
 - "Her touch sent heat through me"
-- "Electricity shot up my spine" 
+- "Electricity shot up my spine"
 - "My pulse quickened"
 - "Her breath hitched"
 - "Heat pooled low in my stomach"
@@ -1122,18 +1146,21 @@ This is the auditory version of body part + emotion. How a voice sounds is inter
 Show emotion through **external observable action**:
 
 **Attraction:**
+
 - Character loses train of thought mid-sentence
 - Focuses on irrelevant details while missing important conversation
 - Actions contradict words: "I'm fine" while gripping the table edge
-- Moves *away* as response to attraction (approach is the expected response; withdrawal creates tension)
+- Moves _away_ as response to attraction (approach is the expected response; withdrawal creates tension)
 - Breaks things accidentally from distraction
 - Physical fidgeting, nervous energy
 
 **Anger:**
+
 - What do they do? Throw something, leave the room, grip the steering wheel, speak very quietly
-- Not "his face reddened with fury" but what the anger *looks like* in behavior
+- Not "his face reddened with fury" but what the anger _looks like_ in behavior
 
 **Fear:**
+
 - What does the body do? Freeze, back toward the wall, check exits, grip something
 - Not "terror coursed through her" but the physical response to that terror
 
@@ -1142,9 +1169,11 @@ Show emotion through **external observable action**:
 Contact should be described through pressure, position, and duration—not internal sensation:
 
 **Weak:**
+
 > Her touch sent shivers down my spine as heat pooled in my core.
 
 **Strong:**
+
 > Her hand found my thigh, fingers curling into the fabric of my jeans. She moved closer. I didn't move back.
 
 The strong version shows action and spatial relationship. The reader provides the sensation.
@@ -1181,7 +1210,7 @@ Even in third person, the appositive creates distance. Who is observing that Sar
 
 ## Character Introduction
 
-When a character enters the scene, the reader needs to be able to *see* them. But "see" doesn't mean a police sketch description.
+When a character enters the scene, the reader needs to be able to _see_ them. But "see" doesn't mean a police sketch description.
 
 ### The Pattern
 
@@ -1192,9 +1221,10 @@ When a character enters the scene, the reader needs to be able to *see* them. Bu
 
 ### Physical Description That Works
 
-Good physical description conveys *presence*—what draws the eye, how the body moves through space, what makes someone distinctive.
+Good physical description conveys _presence_—what draws the eye, how the body moves through space, what makes someone distinctive.
 
 **Good patterns:**
+
 > "Her uniform pulls taut across broad shoulders when she reaches for the controls, loose at the waist where it tucks into her belt."
 
 > "He's built like a boxer gone slightly soft, thick through the chest and shoulders, hands that look like they've hit things."
@@ -1204,41 +1234,46 @@ Good physical description conveys *presence*—what draws the eye, how the body 
 These describe what a camera would capture, not interpretation of what it means.
 
 **Bad patterns:**
+
 > "She moved with fluid grace, an elegant predator stalking her prey."
 
 > "He had a commanding presence that demanded attention."
 
 > "Her eyes held ancient wisdom."
 
-These describe *impressions* rather than *observations*. What does "fluid grace" look like? The phrase is a shortcut. What specific movements create that impression? Describe those.
+These describe _impressions_ rather than _observations_. What does "fluid grace" look like? The phrase is a shortcut. What specific movements create that impression? Describe those.
 
 ### Behavioral Tells
 
 A behavioral tell is a specific unconscious action that reveals character—a habit, a tic, a way of occupying space.
 
 **Good tells:**
+
 - "She clicks her pen three times before speaking"
 - "His thumb finds the ridge of scar tissue on his palm whenever he's thinking"
 - "She counts the exits in every room without appearing to look at them"
 - "When uncertain, he traces the raised numbers on the spine of the nearest book"
 
 **Bad tells (these are personality labels, not behaviors):**
+
 - "She had nervous energy"
 - "He exuded confidence"
 - "She was always alert"
 
-The good tells are *verbs*—actions you can observe. The bad tells are adjectives pretending to be tells.
+The good tells are _verbs_—actions you can observe. The bad tells are adjectives pretending to be tells.
 
 ### The Catalog Trap
 
 Avoid systematic feature descriptions: hair → eyes → body in sequence.
 
 **Weak:**
+
 > "Her dark hair cascaded over her shoulders. Her green eyes glittered with intelligence. Her slender figure moved with dancer's grace."
 
 This is a checklist. It reads like a form being filled out.
 
 **Strong:**
+
 > "She wore her hair up in a careless knot, strands escaping at the temples. When she turned, I noticed the ink staining her fingers—three different colors."
 
 Details scattered through action. The reader builds the image over time rather than receiving it in an information dump.
@@ -1254,11 +1289,13 @@ Dialogue isn't just what characters say—it's the gap between what they say and
 Real conversation has interruptions, hesitations, and distinct voices. Characters don't deliver complete thoughts in neat paragraphs.
 
 **Weak:**
+
 > "I've been thinking about what you said, and I believe you're right that we should reconsider our approach to the project. The timeline simply isn't realistic given our current resources."
 
 This is an essay delivered as dialogue.
 
 **Strong:**
+
 > "So about the project—"
 > "I know."
 > "Do you?"
@@ -1289,6 +1326,7 @@ Let the reader notice the significance of draining the glass. Trust them.
 When characters speak in exposition (character sheets, summary quotes), they should sound like people talking to other people—not like characters explaining their themes to an audience.
 
 **Bad (thesis statements):**
+
 > "True intimacy isn't manufactured perfection, but the acceptance of imperfection in ourselves and others."
 
 > "In my brokenness, I found freedom."
@@ -1296,6 +1334,7 @@ When characters speak in exposition (character sheets, summary quotes), they sho
 These are abstractions. No one talks like this.
 
 **Good (character voice):**
+
 > "You've been watching the door since you sat down. Expecting someone, or just habit? Don't answer—I can tell which it is."
 
 > "They tried to erase me. It didn't take. Now I remember things I never experienced."
@@ -1346,7 +1385,7 @@ The discipline is simple but hard: write what is seen, not what is known.
 
 ## Prose Prohibitions: A Reference
 
-Some patterns are so consistently weak that they warrant categorical prohibition in first drafts. You can always choose to break these rules—but you should break them *consciously*, not fall into them by default.
+Some patterns are so consistently weak that they warrant categorical prohibition in first drafts. You can always choose to break these rules—but you should break them _consciously_, not fall into them by default.
 
 ### Syntactic Prohibitions
 
@@ -1363,6 +1402,7 @@ Some patterns are so consistently weak that they warrant categorical prohibition
 ### Sensation Prohibitions
 
 All variations of internal sensation metaphors:
+
 - "pulse quickened/racing"
 - "breath hitched/caught"
 - "heart hammered/pounded"
@@ -1371,7 +1411,7 @@ All variations of internal sensation metaphors:
 - "blood ran cold"
 - "heat pooled"
 
-Replace with external observable action. What does the character *do*?
+Replace with external observable action. What does the character _do_?
 
 ### Description Prohibitions
 
@@ -1398,6 +1438,7 @@ When you write "commanding presence," you've concluded something. When you descr
 A technique for catching structural problems: reduce sentences to their patterns.
 
 Take a sentence. Replace content words with bracketed categories:
+
 - Names → [Name]
 - Body parts → [body part]
 - Garments → [garment]
@@ -1535,9 +1576,9 @@ Every abstraction is an opportunity for specificity. Take the opportunity.
 
 ### Action as Character
 
-What characters do is who they are. Not what they think about themselves, not what other characters think about them, not what you as author think about them. What they *do*.
+What characters do is who they are. Not what they think about themselves, not what other characters think about them, not what you as author think about them. What they _do_.
 
-When you're stuck on how to reveal a character trait, ask: "What would this person *do* that would show this?" Then write that action. The trait will follow.
+When you're stuck on how to reveal a character trait, ask: "What would this person _do_ that would show this?" Then write that action. The trait will follow.
 
 ### Narrative Momentum
 
@@ -1547,4 +1588,4 @@ When in doubt, check the causal chain. What triggered this? What does this trigg
 
 ---
 
-*These principles emerged from thousands of iterations, failures, and corrections. They represent patterns that consistently produce stronger prose—not because they're arbitrary rules, but because they reflect how readers actually engage with fiction. The goal is always the same: put the reader inside the experience, then get out of their way.*
+_These principles emerged from thousands of iterations, failures, and corrections. They represent patterns that consistently produce stronger prose—not because they're arbitrary rules, but because they reflect how readers actually engage with fiction. The goal is always the same: put the reader inside the experience, then get out of their way._

@@ -14,10 +14,16 @@ describe("buildChatStrategy", () => {
       messages: [{ id: "u", role: "user", content: "hi" }],
       seed: { kind: "blank" },
     };
-    const getState = (() =>
-      ({ chat: { chats: [chat], activeChatId: chat.id, refineChat: null } }) as unknown as RootState);
+    const getState = () =>
+      ({
+        chat: { chats: [chat], activeChatId: chat.id, refineChat: null },
+      }) as unknown as RootState;
     const strategy = await buildChatStrategy(getState, chat, "asst-id");
-    expect(strategy.target).toEqual({ type: "chat", chatId: chat.id, messageId: "asst-id" });
+    expect(strategy.target).toEqual({
+      type: "chat",
+      chatId: chat.id,
+      messageId: "asst-id",
+    });
     expect(strategy.requestId).toContain(chat.id);
     // Saved chats auto-continue when the model hits max_tokens.
     expect(strategy.continuation).toEqual({ maxCalls: 5 });
@@ -32,8 +38,10 @@ describe("buildChatStrategy", () => {
       seed: { kind: "fromField", sourceFieldId: "attg", sourceText: "old" },
       refineTarget: { fieldId: "attg", originalText: "old" },
     };
-    const getState = (() =>
-      ({ chat: { chats: [], activeChatId: null, refineChat: refine } }) as unknown as RootState);
+    const getState = () =>
+      ({
+        chat: { chats: [], activeChatId: null, refineChat: refine },
+      }) as unknown as RootState;
     const strategy = await buildChatStrategy(getState, refine, "asst");
     expect(strategy.target).toEqual({
       type: "chatRefine",
@@ -58,16 +66,18 @@ describe("buildChatStrategy", () => {
       ],
       seed: { kind: "blank" },
     };
-    const getState = (() =>
+    const getState = () =>
       ({
         chat: { chats: [chat], activeChatId: chat.id, refineChat: null },
         foundation: {},
         world: { entitiesById: {}, entityIds: [] },
         brainstorm: {
-          chats: [{ id: "b1", title: "Brainstorm", messages: [], mode: "cowriter" }],
+          chats: [
+            { id: "b1", title: "Brainstorm", messages: [], mode: "cowriter" },
+          ],
           currentChatIndex: 0,
         },
-      }) as unknown as RootState);
+      }) as unknown as RootState;
     const strategy = await buildChatStrategy(getState, chat, assistantId);
     expect(strategy.prefillBehavior).toBe("keep");
     expect(strategy.minResponseLength).toBeUndefined();
@@ -78,7 +88,9 @@ describe("buildChatStrategy", () => {
     expect(last.role).toBe("assistant");
     expect(last.content).toBe(existingContent);
     // No second assistant turn (i.e. no fresh chat-style prefill) is appended.
-    const assistantTurns = messages.filter((m: Message) => m.role === "assistant");
+    const assistantTurns = messages.filter(
+      (m: Message) => m.role === "assistant",
+    );
     expect(assistantTurns).toHaveLength(1);
   });
 
@@ -95,24 +107,38 @@ describe("buildChatStrategy", () => {
       ],
       seed: { kind: "blank" },
     };
-    const getState = (() =>
+    const getState = () =>
       ({
         chat: { chats: [chat], activeChatId: chat.id, refineChat: null },
         foundation: {},
         world: { entitiesById: {}, entityIds: [] },
         brainstorm: {
-          chats: [{ id: "b1", title: "Brainstorm", messages: [], mode: "cowriter" }],
+          chats: [
+            { id: "b1", title: "Brainstorm", messages: [], mode: "cowriter" },
+          ],
           currentChatIndex: 0,
         },
-      }) as unknown as RootState);
+      }) as unknown as RootState;
     const strategy = await buildChatStrategy(getState, chat, assistantId);
     const built = await strategy.messageFactory!();
     const messages = built.messages;
     // System message from spec is present
-    expect(messages.some((m: Message) => m.role === "system" && m.content === BRAINSTORM_PROMPT)).toBe(true);
+    expect(
+      messages.some(
+        (m: Message) => m.role === "system" && m.content === BRAINSTORM_PROMPT,
+      ),
+    ).toBe(true);
     // First user message survives
-    expect(messages.some((m: Message) => m.role === "user" && m.content === "first user message")).toBe(true);
+    expect(
+      messages.some(
+        (m: Message) => m.role === "user" && m.content === "first user message",
+      ),
+    ).toBe(true);
     // The in-progress assistant placeholder is NOT in the assembled transcript
-    expect(messages.every((m: Message) => !(m.role === "assistant" && m.content === ""))).toBe(true);
+    expect(
+      messages.every(
+        (m: Message) => !(m.role === "assistant" && m.content === ""),
+      ),
+    ).toBe(true);
   });
 });

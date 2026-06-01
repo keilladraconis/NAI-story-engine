@@ -7,7 +7,7 @@ describe("migrateWorldState — lifecycle backfill", () => {
   it("backfills lifecycle='live' for entities with a lorebookEntryId", () => {
     const legacy = {
       entitiesById: {
-        "e1": {
+        e1: {
           id: "e1",
           categoryId: FieldID.DramatisPersonae,
           name: "Vesper",
@@ -26,7 +26,7 @@ describe("migrateWorldState — lifecycle backfill", () => {
   it("backfills lifecycle='draft' for entities without a lorebookEntryId", () => {
     const legacy = {
       entitiesById: {
-        "e2": {
+        e2: {
           id: "e2",
           categoryId: FieldID.DramatisPersonae,
           name: "Unsaved",
@@ -48,7 +48,7 @@ describe("migrateWorldState — lifecycle backfill", () => {
     // an explicit lifecycle, even when it disagrees with the heuristic.
     const fresh = {
       entitiesById: {
-        "e3": {
+        e3: {
           id: "e3",
           categoryId: FieldID.Locations,
           name: "Quay",

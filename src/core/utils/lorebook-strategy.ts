@@ -4,7 +4,11 @@ import { buildStoryEnginePrefix } from "./context-builder";
 import type { RefineContext } from "../chat-types/types";
 import { buildRefineTail } from "./refine-strategy";
 import { FIELD_CONFIGS } from "../../config/field-definitions";
-import { STORAGE_KEYS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../../ui/framework/ids";
+import {
+  STORAGE_KEYS,
+  EDIT_PANE_TITLE,
+  EDIT_PANE_CONTENT,
+} from "../../ui/framework/ids";
 import {
   buildModelParams,
   appendXialongStyleMessage,
@@ -17,7 +21,6 @@ import {
   CATEGORY_TEMPLATES,
   XIALONG_STYLE,
 } from "./prompts";
-
 
 // Category-to-type mapping for anchored prefills
 export const CATEGORY_TO_TYPE: Record<string, string> = {
@@ -37,7 +40,9 @@ const getEntryType = (categoryName: string): string => {
 
 /** Find the WorldEntity associated with a lorebook entry ID, if any. */
 function findEntityForEntry(state: RootState, entryId: string) {
-  return Object.values(state.world.entitiesById).find((e) => e.lorebookEntryId === entryId);
+  return Object.values(state.world.entitiesById).find(
+    (e) => e.lorebookEntryId === entryId,
+  );
 }
 
 /**
@@ -126,14 +131,22 @@ export const createLorebookContentFactory = (
 
     // Resolve category from Redux first so the template follows the user's
     // current type selection even when the lorebook entry hasn't been moved.
-    const categoryName = await resolveCategoryName(state, entryId, entry.category);
+    const categoryName = await resolveCategoryName(
+      state,
+      entryId,
+      entry.category,
+    );
     const entryType = getEntryType(categoryName);
     const template = CATEGORY_TEMPLATES[categoryName] || "";
 
     // Pull name and summary from live input fields only when this entry is
     // currently open in the edit pane — avoids contaminating SEGA batch
     // generation with stale data from whatever entity was last edited.
-    const displayName = await resolveDisplayName(state, entryId, entry.displayName);
+    const displayName = await resolveDisplayName(
+      state,
+      entryId,
+      entry.displayName,
+    );
     const isCurrentlySelected = state.ui.lorebook.selectedEntryId === entryId;
     const liveSummary = isCurrentlySelected
       ? String((await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) || "").trim()
@@ -211,9 +224,7 @@ export const createLorebookKeysFactory = (
     // Thread (group) context for this entry
     const state = getState();
     const entity = findEntityForEntry(state, entryId);
-    const groupContext = entity
-      ? formatEntityGroups(state, entity.id)
-      : "";
+    const groupContext = entity ? formatEntityGroups(state, entity.id) : "";
 
     const contextContent = groupContext
       ? `${entryText}\n\n${groupContext}`
@@ -285,8 +296,16 @@ export const buildLorebookPrefill = async (
   if (!entry) return "";
 
   const state = getState();
-  const displayName = await resolveDisplayName(state, entryId, entry.displayName);
-  const categoryName = await resolveCategoryName(state, entryId, entry.category);
+  const displayName = await resolveDisplayName(
+    state,
+    entryId,
+    entry.displayName,
+  );
+  const categoryName = await resolveCategoryName(
+    state,
+    entryId,
+    entry.category,
+  );
   const entryType = getEntryType(categoryName);
   const setting = String(
     (await api.v1.storyStorage.get(STORAGE_KEYS.SETTING)) || "",
@@ -304,7 +323,11 @@ Setting: ${setting}
  */
 export function buildLorebookContentStrategy(
   getState: () => RootState,
-  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
+  opts?: {
+    refineContext?: RefineContext;
+    entryId?: string;
+    requestId?: string;
+  },
 ): GenerationStrategy {
   const entryId = opts?.entryId ?? "";
   if (!entryId) {
@@ -315,7 +338,10 @@ export function buildLorebookContentStrategy(
   const messageFactory: MessageFactory = refineContext
     ? async () => {
         const base = await baseFactory();
-        return { ...base, messages: buildRefineTail(base.messages, refineContext) };
+        return {
+          ...base,
+          messages: buildRefineTail(base.messages, refineContext),
+        };
       }
     : baseFactory;
   return {

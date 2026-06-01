@@ -30,7 +30,11 @@ import {
 import { WORLD_ENTRY_CATEGORIES } from "../../core/store/types";
 import type { WorldEntity, WorldGroup } from "../../core/store/types";
 import type { DulfsFieldID } from "../../config/field-definitions";
-import { IDS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../../ui/framework/ids";
+import {
+  IDS,
+  EDIT_PANE_TITLE,
+  EDIT_PANE_CONTENT,
+} from "../../ui/framework/ids";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 import { SeGenerationIconButton } from "./SeGenerationButton";
 
@@ -117,9 +121,9 @@ export class SeThreadEditPane extends SuiComponent<
 
     const { groupId } = options;
     const summaryRequestId = `se-thread-summary-${groupId}`;
-    const hasSummary = !!(
-      store.getState().world.groups.find((g) => g.id === groupId)?.summary
-    );
+    const hasSummary = !!store
+      .getState()
+      .world.groups.find((g) => g.id === groupId)?.summary;
     this._summaryBtn = new SeGenerationIconButton({
       id: `${options.id}-thread-summary-gen`,
       iconId: "zap" as IconId,
@@ -127,7 +131,10 @@ export class SeThreadEditPane extends SuiComponent<
       hasContent: hasSummary,
       onGenerate: () => {
         store.dispatch(
-          uiThreadSummaryGenerationRequested({ groupId, requestId: summaryRequestId }),
+          uiThreadSummaryGenerationRequested({
+            groupId,
+            requestId: summaryRequestId,
+          }),
         );
       },
     });
@@ -150,7 +157,8 @@ export class SeThreadEditPane extends SuiComponent<
         const newSummary = String(
           (await api.v1.storyStorage.get(EDIT_PANE_CONTENT)) ?? "",
         ).trim();
-        if (newTitle) store.dispatch(groupRenamed({ groupId, title: newTitle }));
+        if (newTitle)
+          store.dispatch(groupRenamed({ groupId, title: newTitle }));
         store.dispatch(groupSummaryUpdated({ groupId, summary: newSummary }));
         editHost.close();
       })();

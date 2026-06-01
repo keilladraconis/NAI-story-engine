@@ -56,9 +56,29 @@ const WAIT_STYLE = { "font-size": "0.8em", opacity: "0.8" };
 // force the row over its parent's width and — combined with the row's default
 // wrap — cause the center Continue to drop beneath the right-column bootstrap
 // button on mobile.
-const COL_LEFT = { flex: "1", "min-width": "0", overflow: "hidden", display: "flex", "align-items": "center" };
-const COL_CENTER = { flex: "1", "min-width": "0", display: "flex", "justify-content": "center", "align-items": "center" };
-const COL_RIGHT = { flex: "1", "min-width": "0", display: "flex", "justify-content": "flex-end", "align-items": "center", gap: "8px", "flex-wrap": "wrap" };
+const COL_LEFT = {
+  flex: "1",
+  "min-width": "0",
+  overflow: "hidden",
+  display: "flex",
+  "align-items": "center",
+};
+const COL_CENTER = {
+  flex: "1",
+  "min-width": "0",
+  display: "flex",
+  "justify-content": "center",
+  "align-items": "center",
+};
+const COL_RIGHT = {
+  flex: "1",
+  "min-width": "0",
+  display: "flex",
+  "justify-content": "flex-end",
+  "align-items": "center",
+  gap: "8px",
+  "flex-wrap": "wrap",
+};
 
 export class SeHeaderBar extends SuiComponent<
   SeHeaderBarTheme,
@@ -142,14 +162,21 @@ export class SeHeaderBar extends SuiComponent<
   private _tickBootstrapTimer(gen: number, endTime: number): void {
     if (gen !== this._bootstrapTimerGen) return;
     const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
-    api.v1.ui.updateParts([{
-      id: "header-bootstrap-btn",
-      text: `Wait (${remaining}s)`,
-      style: { ...BTN_STYLE, opacity: "0.7", display: "flex" },
-      callback: () => { store.dispatch(uiRequestCancellation()); },
-    }]);
+    api.v1.ui.updateParts([
+      {
+        id: "header-bootstrap-btn",
+        text: `Wait (${remaining}s)`,
+        style: { ...BTN_STYLE, opacity: "0.7", display: "flex" },
+        callback: () => {
+          store.dispatch(uiRequestCancellation());
+        },
+      },
+    ]);
     if (remaining > 0) {
-      void api.v1.timers.setTimeout(() => this._tickBootstrapTimer(gen, endTime), 1000);
+      void api.v1.timers.setTimeout(
+        () => this._tickBootstrapTimer(gen, endTime),
+        1000,
+      );
     }
   }
 
@@ -282,36 +309,65 @@ export class SeHeaderBar extends SuiComponent<
       ({ queuedId, isActive, genxStatus, budgetWaitEndTime }) => {
         this._bootstrapTimerGen++;
         if (queuedId) {
-          api.v1.ui.updateParts([{
-            id: "header-bootstrap-btn",
-            text: "Bootstrap",
-            style: { ...BTN_STYLE, opacity: "0.4", display: "flex" },
-            callback: () => { store.dispatch(uiCancelRequest({ requestId: queuedId })); },
-          }]);
+          api.v1.ui.updateParts([
+            {
+              id: "header-bootstrap-btn",
+              text: "Bootstrap",
+              style: { ...BTN_STYLE, opacity: "0.4", display: "flex" },
+              callback: () => {
+                store.dispatch(uiCancelRequest({ requestId: queuedId }));
+              },
+            },
+          ]);
         } else if (isActive && genxStatus === "waiting_for_user") {
-          api.v1.ui.updateParts([{
-            id: "header-bootstrap-btn",
-            text: "Continue",
-            style: { ...BTN_STYLE, color: colors.header, opacity: "1", display: "flex" },
-            callback: () => { store.dispatch(uiUserPresenceConfirmed()); },
-          }]);
+          api.v1.ui.updateParts([
+            {
+              id: "header-bootstrap-btn",
+              text: "Continue",
+              style: {
+                ...BTN_STYLE,
+                color: colors.header,
+                opacity: "1",
+                display: "flex",
+              },
+              callback: () => {
+                store.dispatch(uiUserPresenceConfirmed());
+              },
+            },
+          ]);
         } else if (isActive && genxStatus === "waiting_for_budget") {
           const gen = ++this._bootstrapTimerGen;
-          this._tickBootstrapTimer(gen, budgetWaitEndTime || Date.now() + 60000);
+          this._tickBootstrapTimer(
+            gen,
+            budgetWaitEndTime || Date.now() + 60000,
+          );
         } else if (isActive) {
-          api.v1.ui.updateParts([{
-            id: "header-bootstrap-btn",
-            text: "Cancel",
-            style: { ...BTN_STYLE, color: colors.warning, opacity: "1", display: "flex" },
-            callback: () => { store.dispatch(uiRequestCancellation()); },
-          }]);
+          api.v1.ui.updateParts([
+            {
+              id: "header-bootstrap-btn",
+              text: "Cancel",
+              style: {
+                ...BTN_STYLE,
+                color: colors.warning,
+                opacity: "1",
+                display: "flex",
+              },
+              callback: () => {
+                store.dispatch(uiRequestCancellation());
+              },
+            },
+          ]);
         } else {
-          api.v1.ui.updateParts([{
-            id: "header-bootstrap-btn",
-            text: "Bootstrap",
-            style: { ...BTN_STYLE, opacity: "0.7", display: "flex" },
-            callback: () => { store.dispatch(bootstrapRequested()); },
-          }]);
+          api.v1.ui.updateParts([
+            {
+              id: "header-bootstrap-btn",
+              text: "Bootstrap",
+              style: { ...BTN_STYLE, opacity: "0.7", display: "flex" },
+              callback: () => {
+                store.dispatch(bootstrapRequested());
+              },
+            },
+          ]);
         }
       },
       (a, b) =>
@@ -366,7 +422,9 @@ export class SeHeaderBar extends SuiComponent<
               id: "header-bootstrap-btn",
               text: "Bootstrap",
               style: { ...BTN_STYLE, opacity: "0.7", display: "flex" },
-              callback: () => { store.dispatch(bootstrapRequested()); },
+              callback: () => {
+                store.dispatch(bootstrapRequested());
+              },
             }),
             button({
               id: "header-import-btn",
@@ -375,7 +433,10 @@ export class SeHeaderBar extends SuiComponent<
               style: { ...BTN_STYLE, opacity: "0.7" },
               callback: () => {
                 this.options.editHost.open(
-                  new SeImportWizard({ id: IDS.IMPORT.WIZARD, editHost: this.options.editHost }),
+                  new SeImportWizard({
+                    id: IDS.IMPORT.WIZARD,
+                    editHost: this.options.editHost,
+                  }),
                 );
               },
             }),

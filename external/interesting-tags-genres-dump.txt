@@ -1,0 +1,1241 @@
+[
+        {
+          weight: 12,
+          entries: [
+            {
+              tag: 'fantasy',
+              weight: 12
+            },
+            {
+              tag: 'high fantasy',
+              weight: 12
+            },
+            {
+              tag: 'heroic fantasy',
+              weight: 12
+            },
+            {
+              tag: 'epic fantasy',
+              weight: 12
+            },
+            {
+              tag: 'dark fantasy',
+              weight: 12
+            },
+            {
+              tag: 'low fantasy',
+              weight: 12
+            },
+            {
+              tag: 'cozy fantasy',
+              weight: 12
+            },
+            {
+              tag: 'sword and sorcery',
+              weight: 12
+            },
+            {
+              tag: 'science fantasy',
+              weight: 12
+            },
+            {
+              tag: 'historical fantasy',
+              weight: 12
+            },
+            {
+              tag: 'portal fantasy',
+              weight: 12
+            },
+            {
+              tag: 'magical realism',
+              weight: 12
+            },
+            {
+              tag: 'fairy tales',
+              weight: 12
+            },
+            {
+              tag: 'folk tales',
+              weight: 12
+            },
+            {
+              tag: 'romantasy',
+              weight: 12
+            },
+            {
+              tag: 'urban fantasy',
+              weight: 12
+            },
+            {
+              tag: 'contemporary fantasy',
+              weight: 12
+            },
+            {
+              tag: 'paranormal romance',
+              weight: 12
+            },
+            {
+              tag: 'science fiction',
+              weight: 12
+            },
+            {
+              tag: 'space opera',
+              weight: 12
+            },
+            {
+              tag: 'cyberpunk',
+              weight: 12
+            },
+            {
+              tag: 'hard SF',
+              weight: 12
+            },
+            {
+              tag: 'solarpunk',
+              weight: 12
+            },
+            {
+              tag: 'steampunk',
+              weight: 12
+            },
+            {
+              tag: 'Golden Age science fiction',
+              weight: 12
+            },
+            {
+              tag: 'speculative fiction',
+              weight: 12
+            },
+            {
+              tag: 'horror',
+              weight: 12
+            },
+            {
+              tag: 'splatterpunk',
+              weight: 4
+            },
+            {
+              tag: 'mystery',
+              weight: 12
+            },
+            {
+              tag: 'cozy mystery',
+              weight: 12
+            },
+            {
+              tag: 'noir',
+              weight: 12
+            },
+            {
+              tag: 'psychological thriller',
+              weight: 12
+            },
+            {
+              tag: 'thriller',
+              weight: 12
+            },
+            {
+              tag: 'bio-thriller',
+              weight: 12
+            },
+            {
+              tag: 'suspense',
+              weight: 12
+            },
+            {
+              tag: 'romance',
+              weight: 12
+            },
+            {
+              tag: 'dark romance',
+              weight: 12
+            },
+            {
+              tag: 'historical romance',
+              weight: 12
+            },
+            {
+              tag: 'historical fiction',
+              weight: 12
+            },
+            {
+              tag: 'alternate history',
+              weight: 12
+            },
+            {
+              tag: 'western',
+              weight: 12
+            },
+            {
+              tag: 'weird west',
+              weight: 12
+            },
+            {
+              tag: 'space western',
+              weight: 12
+            },
+            {
+              tag: 'fantasy western',
+              weight: 12
+            },
+            {
+              tag: 'action',
+              weight: 12
+            },
+            {
+              tag: 'adventure',
+              weight: 12
+            },
+            {
+              tag: 'comedy',
+              weight: 12
+            },
+            {
+              tag: 'drama',
+              weight: 12
+            },
+            {
+              tag: 'literary fiction',
+              weight: 12
+            },
+            {
+              tag: 'contemporary fiction',
+              weight: 12
+            },
+            {
+              tag: 'slice of life',
+              weight: 12
+            },
+            {
+              tag: 'animal fiction',
+              weight: 12
+            },
+            {
+              tag: 'young adult',
+              weight: 12
+            },
+            {
+              tag: 'isekai',
+              weight: 12
+            },
+            {
+              tag: 'LitRPG',
+              weight: 12
+            },
+            {
+              tag: 'light novel',
+              weight: 12
+            },
+            {
+              tag: 'bizarro',
+              weight: 12
+            },
+            {
+              tag: 'eco-fiction',
+              weight: 12
+            },
+            {
+              tag: 'nonfiction',
+              weight: 12
+            },
+            {
+              tag: 'philosophy',
+              weight: 12
+            },
+            {
+              tag: 'poetry',
+              weight: 12
+            },
+            {
+              tag: 'essay',
+              weight: 12
+            },
+            {
+              tag: 'magazine',
+              weight: 12
+            },
+            {
+              tag: 'video games',
+              weight: 12
+            }
+          ]
+        }
+      ],
+      g = [
+        {
+          weight: 10,
+          entries: [
+            {
+              tag: 'medieval',
+              weight: 12
+            },
+            {
+              tag: 'ancient',
+              weight: 12
+            },
+            {
+              tag: 'Victorian',
+              weight: 12
+            },
+            {
+              tag: 'renaissance',
+              weight: 12
+            },
+            {
+              tag: '1920s',
+              weight: 12
+            },
+            {
+              tag: '1980s',
+              weight: 12
+            },
+            {
+              tag: 'modern',
+              weight: 12
+            },
+            {
+              tag: 'near future',
+              weight: 12
+            },
+            {
+              tag: 'far future',
+              weight: 12
+            },
+            {
+              tag: 'futuristic',
+              weight: 12
+            },
+            {
+              tag: 'post-apocalyptic',
+              weight: 12
+            },
+            {
+              tag: 'World War II',
+              weight: 12
+            },
+            {
+              tag: 'Cold War',
+              weight: 12
+            },
+            {
+              tag: 'prehistoric',
+              weight: 12
+            },
+            {
+              tag: 'post-war',
+              weight: 12
+            },
+            {
+              tag: '13th century',
+              weight: 12
+            },
+            {
+              tag: '17th century',
+              weight: 12
+            },
+            {
+              tag: '18th century',
+              weight: 12
+            },
+            {
+              tag: '1950s',
+              weight: 12
+            },
+            {
+              tag: '1970s',
+              weight: 12
+            },
+            {
+              tag: '1990s',
+              weight: 12
+            },
+            {
+              tag: 'Regency',
+              weight: 12
+            }
+          ]
+        },
+        {
+          weight: 8,
+          entries: [
+            {
+              tag: 'urban',
+              weight: 12
+            },
+            {
+              tag: 'rural',
+              weight: 12
+            },
+            {
+              tag: 'wilderness',
+              weight: 12
+            },
+            {
+              tag: 'space',
+              weight: 12
+            },
+            {
+              tag: 'spaceship',
+              weight: 12
+            },
+            {
+              tag: 'space station',
+              weight: 12
+            },
+            {
+              tag: 'underground',
+              weight: 12
+            },
+            {
+              tag: 'underwater',
+              weight: 12
+            },
+            {
+              tag: 'island',
+              weight: 12
+            },
+            {
+              tag: 'desert',
+              weight: 12
+            },
+            {
+              tag: 'arctic',
+              weight: 12
+            },
+            {
+              tag: 'small town',
+              weight: 12
+            },
+            {
+              tag: 'school',
+              weight: 12
+            },
+            {
+              tag: 'prison',
+              weight: 12
+            },
+            {
+              tag: 'generation ship',
+              weight: 12
+            },
+            {
+              tag: 'alternate Earth',
+              weight: 12
+            },
+            {
+              tag: 'boarding school',
+              weight: 12
+            },
+            {
+              tag: 'Central Asia',
+              weight: 12
+            },
+            {
+              tag: 'jungle',
+              weight: 12
+            },
+            {
+              tag: 'Roman Empire',
+              weight: 12
+            },
+            {
+              tag: 'virtual reality',
+              weight: 12
+            }
+          ]
+        },
+        {
+          weight: 5,
+          entries: [
+            {
+              tag: 'Japan',
+              weight: 12
+            },
+            {
+              tag: 'England',
+              weight: 12
+            },
+            {
+              tag: 'China',
+              weight: 12
+            },
+            {
+              tag: 'North America',
+              weight: 12
+            },
+            {
+              tag: 'France',
+              weight: 12
+            },
+            {
+              tag: 'Scandinavia',
+              weight: 12
+            },
+            {
+              tag: 'Middle East',
+              weight: 12
+            },
+            {
+              tag: 'Russia',
+              weight: 12
+            },
+            {
+              tag: 'India',
+              weight: 12
+            },
+            {
+              tag: 'Africa',
+              weight: 12
+            },
+            {
+              tag: 'Latin America',
+              weight: 12
+            },
+            {
+              tag: 'Australia',
+              weight: 12
+            },
+            {
+              tag: 'Turkey',
+              weight: 12
+            }
+          ]
+        },
+        {
+          weight: 12,
+          entries: [
+            {
+              tag: 'dark',
+              weight: 12
+            },
+            {
+              tag: 'grimdark',
+              weight: 12
+            },
+            {
+              tag: 'gritty',
+              weight: 12
+            },
+            {
+              tag: 'bleak',
+              weight: 12
+            },
+            {
+              tag: 'lighthearted',
+              weight: 12
+            },
+            {
+              tag: 'heartwarming',
+              weight: 12
+            },
+            {
+              tag: 'whimsical',
+              weight: 12
+            },
+            {
+              tag: 'campy',
+              weight: 12
+            },
+            {
+              tag: 'snarky',
+              weight: 12
+            },
+            {
+              tag: 'philosophical',
+              weight: 12
+            },
+            {
+              tag: 'psychological',
+              weight: 12
+            },
+            {
+              tag: 'slow burn',
+              weight: 12
+            },
+            {
+              tag: 'angst',
+              weight: 12
+            },
+            {
+              tag: 'fluff',
+              weight: 12
+            }
+          ]
+        },
+        {
+          weight: 15,
+          entries: [
+            {
+              tag: 'coming of age',
+              weight: 12
+            },
+            {
+              tag: 'found family',
+              weight: 12
+            },
+            {
+              tag: 'revenge',
+              weight: 12
+            },
+            {
+              tag: 'redemption',
+              weight: 12
+            },
+            {
+              tag: 'survival',
+              weight: 12
+            },
+            {
+              tag: 'war',
+              weight: 12
+            },
+            {
+              tag: 'betrayal',
+              weight: 12
+            },
+            {
+              tag: 'identity',
+              weight: 12
+            },
+            {
+              tag: 'exploration',
+              weight: 12
+            },
+            {
+              tag: 'rebellion',
+              weight: 12
+            },
+            {
+              tag: 'good vs evil',
+              weight: 12
+            },
+            {
+              tag: 'power',
+              weight: 12
+            },
+            {
+              tag: 'morality',
+              weight: 12
+            },
+            {
+              tag: 'isolation',
+              weight: 12
+            },
+            {
+              tag: 'grief',
+              weight: 12
+            },
+            {
+              tag: 'sacrifice',
+              weight: 12
+            },
+            {
+              tag: 'freedom',
+              weight: 12
+            },
+            {
+              tag: 'corruption',
+              weight: 12
+            },
+            {
+              tag: 'politics',
+              weight: 12
+            },
+            {
+              tag: 'heist',
+              weight: 12
+            },
+            {
+              tag: 'first contact',
+              weight: 12
+            },
+            {
+              tag: 'road trip',
+              weight: 12
+            },
+            {
+              tag: 'colonization',
+              weight: 12
+            },
+            {
+              tag: 'serial killer',
+              weight: 12
+            },
+            {
+              tag: 'religion',
+              weight: 12
+            },
+            {
+              tag: 'medicine',
+              weight: 12
+            },
+            {
+              tag: 'hospital',
+              weight: 12
+            },
+            {
+              tag: 'bureaucracy',
+              weight: 12
+            },
+            {
+              tag: 'courtroom',
+              weight: 12
+            },
+            {
+              tag: 'fish out of water',
+              weight: 12
+            },
+            {
+              tag: 'parenting',
+              weight: 12
+            },
+            {
+              tag: 'pets',
+              weight: 12
+            },
+            {
+              tag: 'storytelling',
+              weight: 12
+            }
+          ]
+        },
+        {
+          weight: 6,
+          entries: [
+            {
+              tag: 'enemies to lovers',
+              weight: 12
+            },
+            {
+              tag: 'friends to lovers',
+              weight: 12
+            },
+            {
+              tag: 'slow burn romance',
+              weight: 12
+            },
+            {
+              tag: 'forbidden love',
+              weight: 12
+            },
+            {
+              tag: 'love triangle',
+              weight: 12
+            },
+            {
+              tag: 'arranged marriage',
+              weight: 12
+            },
+            {
+              tag: 'forced proximity',
+              weight: 12
+            },
+            {
+              tag: 'grumpy x sunshine',
+              weight: 12
+            },
+            {
+              tag: 'opposites attract',
+              weight: 12
+            },
+            {
+              tag: 'second chance',
+              weight: 12
+            },
+            {
+              tag: 'marriage of convenience',
+              weight: 12
+            },
+            {
+              tag: 'unrequited love',
+              weight: 12
+            }
+          ]
+        },
+        {
+          weight: 8,
+          entries: [
+            {
+              tag: 'anti-hero',
+              weight: 12
+            },
+            {
+              tag: 'morally grey protagonist',
+              weight: 12
+            },
+            {
+              tag: 'villain protagonist',
+              weight: 12
+            },
+            {
+              tag: 'unreliable narrator',
+              weight: 12
+            },
+            {
+              tag: 'multiple protagonists',
+              weight: 12
+            },
+            {
+              tag: 'female protagonist',
+              weight: 12
+            },
+            {
+              tag: 'male protagonist',
+              weight: 12
+            },
+            {
+              tag: 'non-human protagonist',
+              weight: 12
+            },
+            {
+              tag: 'reluctant hero',
+              weight: 12
+            },
+            {
+              tag: 'royalty',
+              weight: 12
+            },
+            {
+              tag: 'AI protagonist',
+              weight: 12
+            },
+            {
+              tag: 'child protagonist',
+              weight: 12
+            },
+            {
+              tag: 'elderly protagonist',
+              weight: 12
+            },
+            {
+              tag: 'xenofiction',
+              weight: 12
+            },
+            {
+              tag: 'mentor',
+              weight: 12
+            },
+            {
+              tag: 'trickster',
+              weight: 12
+            }
+          ]
+        },
+        {
+          weight: 8,
+          entries: [
+            {
+              tag: 'dragons',
+              weight: 12
+            },
+            {
+              tag: 'vampires',
+              weight: 12
+            },
+            {
+              tag: 'werewolves',
+              weight: 12
+            },
+            {
+              tag: 'elves',
+              weight: 12
+            },
+            {
+              tag: 'demons',
+              weight: 12
+            },
+            {
+              tag: 'angels',
+              weight: 12
+            },
+            {
+              tag: 'undead',
+              weight: 12
+            },
+            {
+              tag: 'zombies',
+              weight: 12
+            },
+            {
+              tag: 'fae',
+              weight: 12
+            },
+            {
+              tag: 'ghosts',
+              weight: 12
+            },
+            {
+              tag: 'aliens',
+              weight: 12
+            },
+            {
+              tag: 'robots',
+              weight: 12
+            },
+            {
+              tag: 'monsters',
+              weight: 12
+            },
+            {
+              tag: 'witches',
+              weight: 12
+            },
+            {
+              tag: 'wizards',
+              weight: 12
+            },
+            {
+              tag: 'pirates',
+              weight: 12
+            },
+            {
+              tag: 'dwarves',
+              weight: 12
+            },
+            {
+              tag: 'orcs',
+              weight: 12
+            },
+            {
+              tag: 'goblins',
+              weight: 12
+            },
+            {
+              tag: 'androids',
+              weight: 12
+            },
+            {
+              tag: 'centaurs',
+              weight: 12
+            },
+            {
+              tag: 'knights',
+              weight: 12
+            },
+            {
+              tag: 'merfolk',
+              weight: 12
+            },
+            {
+              tag: 'necromancers',
+              weight: 12
+            },
+            {
+              tag: 'shifters',
+              weight: 12
+            }
+          ]
+        },
+        {
+          weight: 12,
+          entries: [
+            {
+              tag: 'magic',
+              weight: 12
+            },
+            {
+              tag: 'dungeon crawl',
+              weight: 12
+            },
+            {
+              tag: 'alchemy',
+              weight: 12
+            },
+            {
+              tag: 'necromancy',
+              weight: 12
+            },
+            {
+              tag: 'magic school',
+              weight: 12
+            },
+            {
+              tag: 'prophecy',
+              weight: 12
+            },
+            {
+              tag: 'shapeshifting',
+              weight: 12
+            },
+            {
+              tag: 'telepathy',
+              weight: 12
+            },
+            {
+              tag: 'time travel',
+              weight: 12
+            },
+            {
+              tag: 'time loop',
+              weight: 12
+            },
+            {
+              tag: 'alternate universe',
+              weight: 12
+            },
+            {
+              tag: 'multiverse',
+              weight: 12
+            },
+            {
+              tag: 'dystopia',
+              weight: 12
+            },
+            {
+              tag: 'military',
+              weight: 12
+            },
+            {
+              tag: 'espionage',
+              weight: 12
+            },
+            {
+              tag: 'conspiracies',
+              weight: 12
+            },
+            {
+              tag: 'secret society',
+              weight: 12
+            },
+            {
+              tag: 'superheroes',
+              weight: 12
+            },
+            {
+              tag: 'martial arts',
+              weight: 12
+            },
+            {
+              tag: 'tournament',
+              weight: 12
+            },
+            {
+              tag: 'mythology',
+              weight: 12
+            },
+            {
+              tag: 'AIs',
+              weight: 12
+            },
+            {
+              tag: 'possession',
+              weight: 12
+            },
+            {
+              tag: 'cosmic horror',
+              weight: 12
+            },
+            {
+              tag: 'lost civilization',
+              weight: 12
+            },
+            {
+              tag: 'furry',
+              weight: 12
+            }
+          ]
+        },
+        {
+          weight: 4,
+          entries: [
+            {
+              tag: 'dialogue heavy',
+              weight: 12
+            },
+            {
+              tag: 'text adventure',
+              weight: 12
+            },
+            {
+              tag: 'CYOA',
+              weight: 12
+            },
+            {
+              tag: 'epistolary',
+              weight: 12
+            },
+            {
+              tag: 'short stories',
+              weight: 12
+            },
+            {
+              tag: 'novella',
+              weight: 12
+            },
+            {
+              tag: 'chatfic',
+              weight: 12
+            },
+            {
+              tag: 'script',
+              weight: 12
+            },
+            {
+              tag: 'actual play',
+              weight: 12
+            },
+            {
+              tag: 'based on video game',
+              weight: 12
+            },
+            {
+              tag: 'blog',
+              weight: 12
+            }
+          ]
+        },
+        {
+          weight: 3,
+          entries: [
+            {
+              tag: 'LGBTQ+',
+              weight: 12
+            },
+            {
+              tag: 'mature themes',
+              weight: 12
+            },
+            {
+              tag: 'graphic violence',
+              weight: 12
+            }
+          ]
+        },
+        {
+          weight: 4,
+          entries: [
+            {
+              tag: 'sensory (sight)',
+              weight: 12
+            },
+            {
+              tag: 'sensory (sound)',
+              weight: 12
+            },
+            {
+              tag: 'sensory (smell)',
+              weight: 12
+            },
+            {
+              tag: 'sensory (taste)',
+              weight: 12
+            },
+            {
+              tag: 'sensory (sight, sound)',
+              weight: 8
+            },
+            {
+              tag: 'sensory (sight, smell)',
+              weight: 8
+            },
+            {
+              tag: 'sensory (sight, taste)',
+              weight: 8
+            },
+            {
+              tag: 'sensory (sound, smell)',
+              weight: 8
+            },
+            {
+              tag: 'sensory (sound, taste)',
+              weight: 8
+            },
+            {
+              tag: 'sensory (smell, taste)',
+              weight: 8
+            }
+          ]
+        },
+        {
+          weight: 3,
+          entries: [
+            {
+              tag: 'cooking',
+              weight: 12
+            },
+            {
+              tag: 'music',
+              weight: 12
+            },
+            {
+              tag: 'science',
+              weight: 12
+            },
+            {
+              tag: 'nature',
+              weight: 12
+            },
+            {
+              tag: 'sailing',
+              weight: 12
+            },
+            {
+              tag: 'hiking',
+              weight: 12
+            },
+            {
+              tag: 'camping',
+              weight: 12
+            },
+            {
+              tag: 'hunting',
+              weight: 12
+            },
+            {
+              tag: 'fishing',
+              weight: 12
+            },
+            {
+              tag: 'gaming',
+              weight: 12
+            },
+            {
+              tag: 'TTRPGS',
+              weight: 12
+            },
+            {
+              tag: 'hacking',
+              weight: 12
+            },
+            {
+              tag: 'mountaineering',
+              weight: 12
+            },
+            {
+              tag: 'sports',
+              weight: 12
+            },
+            {
+              tag: 'technology',
+              weight: 12
+            },
+            {
+              tag: 'computers',
+              weight: 12
+            },
+            {
+              tag: 'food',
+              weight: 12
+            },
+            {
+              tag: 'crafts',
+              weight: 12
+            },
+            {
+              tag: 'gardening',
+              weight: 12
+            },
+            {
+              tag: 'martial arts',
+              weight: 12
+            },
+            {
+              tag: 'travel',
+              weight: 12
+            },
+            {
+              tag: 'writing',
+              weight: 12
+            }
+          ]
+        }

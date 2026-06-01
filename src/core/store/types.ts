@@ -111,7 +111,13 @@ export interface GenerationStrategy {
       }
     | {
         type: "foundation";
-        field: "shape" | "intent" | "worldState" | "attg" | "style" | "contract";
+        field:
+          | "shape"
+          | "intent"
+          | "worldState"
+          | "attg"
+          | "style"
+          | "contract";
       }
     | { type: "entitySummary"; entityId: string }
     | { type: "entitySummaryBind"; entityId: string }

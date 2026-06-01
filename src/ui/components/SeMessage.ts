@@ -74,8 +74,9 @@ export class SeMessage extends SuiComponent<
     const isSystem = message.role === "system";
 
     const findContent = (chats: { id: string; messages: ChatMessage[] }[]) =>
-      chats.find((c) => c.id === chatId)?.messages.find((m) => m.id === message.id)
-        ?.content ?? message.content;
+      chats
+        .find((c) => c.id === chatId)
+        ?.messages.find((m) => m.id === message.id)?.content ?? message.content;
 
     const deleteBtn = api.v1.ui.part.button({
       id: `se-bs-msg-${message.id}-delete`,

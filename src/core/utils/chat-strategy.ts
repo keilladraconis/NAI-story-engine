@@ -1,13 +1,22 @@
 import type { Chat } from "../chat-types/types";
-import type { GenerationStrategy, RootState, AppDispatch } from "../store/types";
+import type {
+  GenerationStrategy,
+  RootState,
+  AppDispatch,
+} from "../store/types";
 import { getChatTypeSpec } from "../chat-types";
-import { buildStoryEnginePrefix, type StoryEnginePrefixOptions } from "./context-builder";
+import {
+  buildStoryEnginePrefix,
+  type StoryEnginePrefixOptions,
+} from "./context-builder";
 import { isXialongMode, buildModelParams } from "./config";
 import { buildRefineTail } from "./refine-strategy";
 
 // Returns sections to omit from buildStoryEnginePrefix so the field being
 // refined is not present in context above ----, avoiding double-injection.
-function excludeSectionsForRefine(fieldId: string): StoryEnginePrefixOptions["excludeSections"] {
+function excludeSectionsForRefine(
+  fieldId: string,
+): StoryEnginePrefixOptions["excludeSections"] {
   if (fieldId === "style") return ["style"];
   if (fieldId === "attg") return ["attg"];
   return undefined;
@@ -35,14 +44,19 @@ export async function buildChatStrategy(
 ): Promise<GenerationStrategy> {
   if (chat.type === "refine" && chat.refineTarget) {
     const { fieldId, originalText } = chat.refineTarget;
-    const filteredHistory = chat.messages.filter((m) => m.id !== assistantMessageId);
+    const filteredHistory = chat.messages.filter(
+      (m) => m.id !== assistantMessageId,
+    );
     const xialong = await isXialongMode();
     const excludeSections = excludeSectionsForRefine(fieldId);
 
     return {
       requestId: `refine-${chat.id}-${assistantMessageId}`,
       messageFactory: async () => {
-        const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true, excludeSections });
+        const prefix = await buildStoryEnginePrefix(getState, {
+          excludeChat: true,
+          excludeSections,
+        });
         const messages = buildRefineTail(prefix, {
           fieldId,
           currentText: originalText,
@@ -80,7 +94,9 @@ export async function buildChatStrategy(
   // engine to seed accumulatedText with the existing content via "keep".
   const targetMsg = chat.messages.find((m) => m.id === assistantMessageId);
   const isContinuation =
-    !!targetMsg && targetMsg.role === "assistant" && targetMsg.content.length > 0;
+    !!targetMsg &&
+    targetMsg.role === "assistant" &&
+    targetMsg.content.length > 0;
 
   const styleBlock = spec.xialongStyleFor?.(chat, ctx);
   const xialong = styleBlock ? await isXialongMode() : false;
@@ -93,7 +109,9 @@ export async function buildChatStrategy(
   return {
     requestId: `chat-${chat.id}-${assistantMessageId}`,
     messageFactory: async () => {
-      const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true });
+      const prefix = await buildStoryEnginePrefix(getState, {
+        excludeChat: true,
+      });
       const system: Message = {
         role: "system",
         content: spec.systemPromptFor(chat, ctx),
@@ -107,9 +125,7 @@ export async function buildChatStrategy(
       if (prefill) {
         messages.push({ role: "assistant", content: prefill });
       }
-      const params = xialong
-        ? { stop: ["</think>", "\n[ Style"] }
-        : undefined;
+      const params = xialong ? { stop: ["</think>", "\n[ Style"] } : undefined;
       return { messages, params };
     },
     target: { type: "chat", chatId: chat.id, messageId: assistantMessageId },

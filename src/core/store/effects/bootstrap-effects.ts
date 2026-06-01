@@ -1,7 +1,14 @@
 import { Store, matchesAction } from "nai-store";
 import { RootState, AppDispatch, GenerationStrategy } from "../types";
-import { buildModelParams, appendXialongStyleMessage } from "../../utils/config";
-import { bootstrapRequested, generationSubmitted, requestQueued } from "../index";
+import {
+  buildModelParams,
+  appendXialongStyleMessage,
+} from "../../utils/config";
+import {
+  bootstrapRequested,
+  generationSubmitted,
+  requestQueued,
+} from "../index";
 import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "../../utils/context-builder";
 import {
@@ -24,9 +31,11 @@ const createBootstrapP1Factory =
     const messages: Message[] = [...prefix];
 
     // Re-inject compact foundation anchors close to the instruction
-    const { shape, intent, worldState, intensity, contract } = getState().foundation;
+    const { shape, intent, worldState, intensity, contract } =
+      getState().foundation;
     const anchors: string[] = [];
-    if (intensity) anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
+    if (intensity)
+      anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
     if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
     if (intent) anchors.push(`Intent: ${intent}`);
     if (worldState) anchors.push(`World State: ${worldState}`);
@@ -64,7 +73,9 @@ const createBootstrapContinueFactory =
   (getState: () => RootState): MessageFactory =>
   async () => {
     const [prefix, storyContext] = await Promise.all([
-      buildStoryEnginePrefix(getState, { excludeSections: ["storyText", "brainstorm"] }),
+      buildStoryEnginePrefix(getState, {
+        excludeSections: ["storyText", "brainstorm"],
+      }),
       api.v1.buildContext({ suppressScriptHooks: "self" }),
     ]);
 
@@ -76,7 +87,8 @@ const createBootstrapContinueFactory =
     // Compact foundation anchors immediately before the continue instruction
     const { shape, intent, intensity, contract } = getState().foundation;
     const anchors: string[] = [];
-    if (intensity) anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
+    if (intensity)
+      anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
     if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
     if (intent) anchors.push(`Intent: ${intent}`);
     if (contract) {
@@ -88,7 +100,10 @@ const createBootstrapContinueFactory =
       messages.push({ role: "system" as const, content: anchors.join("\n\n") });
     }
 
-    messages.push({ role: "system" as const, content: BOOTSTRAP_CONTINUE_PROMPT });
+    messages.push({
+      role: "system" as const,
+      content: BOOTSTRAP_CONTINUE_PROMPT,
+    });
     await appendXialongStyleMessage(messages, XIALONG_STYLE.bootstrapContinue);
 
     return {
@@ -105,7 +120,9 @@ const createBootstrapContinueFactory =
 
 // ─── Strategy builders ────────────────────────────────────────────────────────
 
-function buildBootstrapP1Strategy(getState: () => RootState): GenerationStrategy {
+function buildBootstrapP1Strategy(
+  getState: () => RootState,
+): GenerationStrategy {
   return {
     requestId: api.v1.uuid(),
     messageFactory: createBootstrapP1Factory(getState),

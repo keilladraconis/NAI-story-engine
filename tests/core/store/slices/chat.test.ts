@@ -38,7 +38,10 @@ describe("chat slice", () => {
 
   it("chatCreated appends and switches to the new chat", () => {
     const start = { ...initialChatState };
-    const next = chatSliceReducer(start, chatCreated({ chat: blankChat({ id: "c2" }) }));
+    const next = chatSliceReducer(
+      start,
+      chatCreated({ chat: blankChat({ id: "c2" }) }),
+    );
     expect(next.chats.length).toBe(2);
     expect(next.activeChatId).toBe("c2");
   });
@@ -49,7 +52,10 @@ describe("chat slice", () => {
       activeChatId: "a",
       refineChat: null,
     };
-    const next = chatSliceReducer(start, chatRenamed({ id: "b", title: "renamed" }));
+    const next = chatSliceReducer(
+      start,
+      chatRenamed({ id: "b", title: "renamed" }),
+    );
     expect(next.chats[0].title).toBe("Test");
     expect(next.chats[1].title).toBe("renamed");
   });
@@ -60,7 +66,9 @@ describe("chat slice", () => {
       activeChatId: "a",
       refineChat: null,
     };
-    expect(chatSliceReducer(start, chatSwitched({ id: "missing" })).activeChatId).toBe("a");
+    expect(
+      chatSliceReducer(start, chatSwitched({ id: "missing" })).activeChatId,
+    ).toBe("a");
     expect(
       chatSliceReducer(
         { ...start, chats: [...start.chats, blankChat({ id: "b" })] },
@@ -85,7 +93,10 @@ describe("chat slice", () => {
       activeChatId: "a",
       refineChat: null,
     };
-    const next = chatSliceReducer(start, subModeChanged({ id: "a", subMode: "critic" }));
+    const next = chatSliceReducer(
+      start,
+      subModeChanged({ id: "a", subMode: "critic" }),
+    );
     expect(next.chats[0].subMode).toBe("critic");
   });
 
@@ -97,7 +108,10 @@ describe("chat slice", () => {
     };
     const next = chatSliceReducer(
       start,
-      messageAdded({ chatId: "a", message: { id: "m1", role: "user", content: "hi" } }),
+      messageAdded({
+        chatId: "a",
+        message: { id: "m1", role: "user", content: "hi" },
+      }),
     );
     expect(next.chats[0].messages).toHaveLength(1);
     expect(next.chats[0].messages[0].content).toBe("hi");
@@ -105,17 +119,30 @@ describe("chat slice", () => {
 
   it("messageAppended concatenates content for streaming", () => {
     const start = {
-      chats: [blankChat({ id: "a", messages: [{ id: "m1", role: "assistant", content: "Hel" }] })],
+      chats: [
+        blankChat({
+          id: "a",
+          messages: [{ id: "m1", role: "assistant", content: "Hel" }],
+        }),
+      ],
       activeChatId: "a",
       refineChat: null,
     };
-    const next = chatSliceReducer(start, messageAppended({ chatId: "a", id: "m1", content: "lo" }));
+    const next = chatSliceReducer(
+      start,
+      messageAppended({ chatId: "a", id: "m1", content: "lo" }),
+    );
     expect(next.chats[0].messages[0].content).toBe("Hello");
   });
 
   it("messageUpdated overwrites content", () => {
     const start = {
-      chats: [blankChat({ id: "a", messages: [{ id: "m1", role: "assistant", content: "wrong" }] })],
+      chats: [
+        blankChat({
+          id: "a",
+          messages: [{ id: "m1", role: "assistant", content: "wrong" }],
+        }),
+      ],
       activeChatId: "a",
       refineChat: null,
     };
@@ -140,7 +167,10 @@ describe("chat slice", () => {
       activeChatId: "a",
       refineChat: null,
     };
-    const next = chatSliceReducer(start, messageRemoved({ chatId: "a", id: "m1" }));
+    const next = chatSliceReducer(
+      start,
+      messageRemoved({ chatId: "a", id: "m1" }),
+    );
     expect(next.chats[0].messages).toHaveLength(1);
     expect(next.chats[0].messages[0].id).toBe("m2");
   });
@@ -161,7 +191,10 @@ describe("chat slice", () => {
       activeChatId: "a",
       refineChat: null,
     };
-    const next = chatSliceReducer(start, messagesPrunedAfter({ chatId: "a", id: "m3" }));
+    const next = chatSliceReducer(
+      start,
+      messagesPrunedAfter({ chatId: "a", id: "m3" }),
+    );
     expect(next.chats[0].messages.map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
   });
 
@@ -219,7 +252,10 @@ describe("chat slice", () => {
       seed: { kind: "blank" },
     };
     const start = { ...initialChatState, refineChat: open };
-    const next = chatSliceReducer(start, refineCandidateMarked({ messageId: "m1" }));
+    const next = chatSliceReducer(
+      start,
+      refineCandidateMarked({ messageId: "m1" }),
+    );
     expect(next.refineChat?.messages[0].refineCandidate).toBe(true);
   });
 
@@ -234,7 +270,10 @@ describe("chat slice", () => {
     const start = { ...initialChatState, refineChat: open };
     const next = chatSliceReducer(
       start,
-      messageAdded({ chatId: "r1", message: { id: "m1", role: "user", content: "hi" } }),
+      messageAdded({
+        chatId: "r1",
+        message: { id: "m1", role: "user", content: "hi" },
+      }),
     );
     expect(next.refineChat?.messages).toHaveLength(1);
     expect(next.refineChat?.messages[0].content).toBe("hi");
@@ -249,7 +288,10 @@ describe("chat slice", () => {
       seed: { kind: "blank" },
     };
     const start = { ...initialChatState, refineChat: open };
-    const next = chatSliceReducer(start, messageAppended({ chatId: "r1", id: "m1", content: "lo" }));
+    const next = chatSliceReducer(
+      start,
+      messageAppended({ chatId: "r1", id: "m1", content: "lo" }),
+    );
     expect(next.refineChat?.messages[0].content).toBe("Hello");
   });
 

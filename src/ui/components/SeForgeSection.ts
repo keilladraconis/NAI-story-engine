@@ -21,7 +21,10 @@ import { SeConfirmButton } from "./SeConfirmButton";
 type SeForgeSectionTheme = { default: { self: { style: object } } };
 type SeForgeSectionState = Record<string, never>;
 
-export type SeForgeSectionOptions = SuiComponentOptions<SeForgeSectionTheme, SeForgeSectionState>;
+export type SeForgeSectionOptions = SuiComponentOptions<
+  SeForgeSectionTheme,
+  SeForgeSectionState
+>;
 
 const FG = IDS.FORGE;
 
@@ -45,7 +48,9 @@ export class SeForgeSection extends SuiComponent<
       label: "Forge",
       onGenerate: async () => {
         const guidance =
-          ((await api.v1.storyStorage.get(STORAGE_KEYS.FORGE_GUIDANCE_UI)) as string) || "";
+          ((await api.v1.storyStorage.get(
+            STORAGE_KEYS.FORGE_GUIDANCE_UI,
+          )) as string) || "";
         const activeId = selectActiveForgeChatId(store.getState());
         if (activeId) {
           // Resume the open session. Feed the guidance in exactly as a chat-input
@@ -98,13 +103,8 @@ export class SeForgeSection extends SuiComponent<
   }
 
   async compose(): Promise<UIPartCollapsibleSection> {
-    const {
-      column,
-      row,
-      text,
-      collapsibleSection,
-      multilineTextInput,
-    } = api.v1.ui.part;
+    const { column, row, text, collapsibleSection, multilineTextInput } =
+      api.v1.ui.part;
 
     const [forgeBtnPart, clearBtnPart] = await Promise.all([
       this._forgeBtn.build(),

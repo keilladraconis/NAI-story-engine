@@ -8,13 +8,17 @@
  * is detected. Also accessible via the "Import" button in SeHeaderBar.
  */
 
-import {
-  SuiComponent,
-  type SuiComponentOptions,
-} from "nai-simple-ui";
+import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
 import { entityBound, entitiesBoundBatch } from "../../core/store/slices/world";
-import { attgUpdated, styleUpdated, attgSyncSet, styleSyncSet, shapeGenerationRequested, intentGenerationRequested } from "../../core/store/slices/foundation";
+import {
+  attgUpdated,
+  styleUpdated,
+  attgSyncSet,
+  styleSyncSet,
+  shapeGenerationRequested,
+  intentGenerationRequested,
+} from "../../core/store/slices/foundation";
 import { DulfsFieldID, FieldID } from "../../config/field-definitions";
 import {
   detectCategory,
@@ -141,7 +145,6 @@ function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + "…" : s;
 }
 
-
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export class SeImportWizard extends SuiComponent<
@@ -153,7 +156,6 @@ export class SeImportWizard extends SuiComponent<
   private _entries: LorebookEntry[] = [];
   private _categoryNames: Map<string, string> = new Map();
   private _dulfsMap: Map<string, DulfsFieldID> = new Map();
-
 
   constructor(options: SeImportWizardOptions) {
     super(
@@ -217,8 +219,14 @@ export class SeImportWizard extends SuiComponent<
                 store.dispatch(attgSyncSet({ enabled: true }));
                 void api.v1.memory.set(memText);
                 api.v1.ui.updateParts([
-                  { id: IDS.IMPORT.ATTG_ROW, style: { ...S.importRow, opacity: "0.4" } } as unknown as Partial<UIPart> & { id: string },
-                  { id: IDS.IMPORT.ATTG_BTN, text: "Imported ✓" } as unknown as Partial<UIPart> & { id: string },
+                  {
+                    id: IDS.IMPORT.ATTG_ROW,
+                    style: { ...S.importRow, opacity: "0.4" },
+                  } as unknown as Partial<UIPart> & { id: string },
+                  {
+                    id: IDS.IMPORT.ATTG_BTN,
+                    text: "Imported ✓",
+                  } as unknown as Partial<UIPart> & { id: string },
                 ]);
               },
             }),
@@ -243,8 +251,14 @@ export class SeImportWizard extends SuiComponent<
                 store.dispatch(styleUpdated({ style: anText }));
                 store.dispatch(styleSyncSet({ enabled: true }));
                 api.v1.ui.updateParts([
-                  { id: IDS.IMPORT.STYLE_ROW, style: { ...S.importRow, opacity: "0.4" } } as unknown as Partial<UIPart> & { id: string },
-                  { id: IDS.IMPORT.STYLE_BTN, text: "Imported ✓" } as unknown as Partial<UIPart> & { id: string },
+                  {
+                    id: IDS.IMPORT.STYLE_ROW,
+                    style: { ...S.importRow, opacity: "0.4" },
+                  } as unknown as Partial<UIPart> & { id: string },
+                  {
+                    id: IDS.IMPORT.STYLE_BTN,
+                    text: "Imported ✓",
+                  } as unknown as Partial<UIPart> & { id: string },
                 ]);
               },
             }),
@@ -265,12 +279,16 @@ export class SeImportWizard extends SuiComponent<
             id: IDS.IMPORT.ANALYZE_BTN,
             text: "Shape",
             style: S.importBtn,
-            callback: () => { store.dispatch(shapeGenerationRequested()); },
+            callback: () => {
+              store.dispatch(shapeGenerationRequested());
+            },
           }),
           api.v1.ui.part.button({
             text: "Intent",
             style: S.importBtn,
-            callback: () => { store.dispatch(intentGenerationRequested()); },
+            callback: () => {
+              store.dispatch(intentGenerationRequested());
+            },
           }),
         ],
       }),
@@ -288,9 +306,10 @@ export class SeImportWizard extends SuiComponent<
     if (unmanaged.length === 0) {
       return [
         text({
-          text: this._entries.length === 0
-            ? "No lorebook entries found. Click Refresh after adding entries."
-            : "All lorebook entries are already bound to Story Engine entities.",
+          text:
+            this._entries.length === 0
+              ? "No lorebook entries found. Click Refresh after adding entries."
+              : "All lorebook entries are already bound to Story Engine entities.",
           style: S.empty,
         }),
       ];
@@ -336,7 +355,10 @@ export class SeImportWizard extends SuiComponent<
             id: ids.ROW,
             style: S.entryRow,
             content: [
-              text({ text: entry.displayName || "(unnamed)", style: S.entryName }),
+              text({
+                text: entry.displayName || "(unnamed)",
+                style: S.entryName,
+              }),
               api.v1.ui.part.button({
                 id: ids.CAT_BTN,
                 text: `${DULFS_SHORT[catId]} ▶`,
@@ -363,10 +385,9 @@ export class SeImportWizard extends SuiComponent<
                       },
                     }),
                   );
-                  api.v1.ui.toast(
-                    `Bound: ${entry.displayName || "entry"}`,
-                    { type: "success" },
-                  );
+                  api.v1.ui.toast(`Bound: ${entry.displayName || "entry"}`, {
+                    type: "success",
+                  });
                   this._rebuildLorebookBody();
                 },
               }),
@@ -408,9 +429,15 @@ export class SeImportWizard extends SuiComponent<
       content: [
         button({
           iconId: "arrow-left" as IconId,
-          callback: () => { editHost.close(); },
+          callback: () => {
+            editHost.close();
+          },
         }),
-        text({ text: "**Import Existing Content**", markdown: true, style: S.title }),
+        text({
+          text: "**Import Existing Content**",
+          markdown: true,
+          style: S.title,
+        }),
         button({
           iconId: "refresh" as IconId,
           style: S.importBtn,

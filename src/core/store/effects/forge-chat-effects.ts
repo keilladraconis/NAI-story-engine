@@ -103,7 +103,9 @@ export interface ForgeCastAllRequestedPayload {
   chatId: string;
 }
 const FORGE_CAST_ALL_REQUESTED = "forgeChat/castAllRequested";
-export const forgeCastAllRequested = (payload: ForgeCastAllRequestedPayload) => ({
+export const forgeCastAllRequested = (
+  payload: ForgeCastAllRequestedPayload,
+) => ({
   type: FORGE_CAST_ALL_REQUESTED as typeof FORGE_CAST_ALL_REQUESTED,
   payload,
 });
@@ -241,7 +243,11 @@ export function registerForgeChatEffects(
       const updatedChat = findChat(latest(), chatId);
       if (!updatedChat) return;
 
-      const strategy = buildForgeDiscussStrategy(latest, updatedChat, assistantId);
+      const strategy = buildForgeDiscussStrategy(
+        latest,
+        updatedChat,
+        assistantId,
+      );
       dispatch(
         requestQueued({
           id: strategy.requestId,
@@ -279,7 +285,9 @@ export function registerForgeChatEffects(
       const advance = action.payload.advancePhase !== false;
       const target = !advance
         ? (chat.subMode ?? "sketch")
-        : (pool.length === 0 ? "sketch" : nextPhase(chat.subMode));
+        : pool.length === 0
+          ? "sketch"
+          : nextPhase(chat.subMode);
       dispatch(subModeChanged({ id: chatId, subMode: target }));
 
       const assistantId = api.v1.uuid();

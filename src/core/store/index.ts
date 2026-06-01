@@ -41,10 +41,14 @@ persistedDataLoaded.type = PERSISTED_DATA_LOADED;
 // ─────────────────────────────────────────────────────────────────────────────
 
 function backfillLifecycle(e: WorldEntity): WorldEntity {
-  return e.lifecycle ? e : { ...e, lifecycle: e.lorebookEntryId ? "live" : "draft" };
+  return e.lifecycle
+    ? e
+    : { ...e, lifecycle: e.lorebookEntryId ? "live" : "draft" };
 }
 
-export function migrateWorldState(raw: WorldState | (Record<string, unknown> & { entities?: WorldEntity[] })): WorldState {
+export function migrateWorldState(
+  raw: WorldState | (Record<string, unknown> & { entities?: WorldEntity[] }),
+): WorldState {
   // v12+ format: already has entitiesById
   if ("entitiesById" in raw && raw.entitiesById) {
     const src = raw as WorldState;

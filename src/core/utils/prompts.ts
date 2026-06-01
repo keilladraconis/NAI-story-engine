@@ -112,7 +112,6 @@ export const STYLE_REFINE_PROMPT = `Style field format — keep these constraint
 - Modify only what the instruction requires; keep other elements intact
 - ~100 words, no markdown bolding, no [ Style: ] brackets`;
 
-
 export const LOREBOOK_GENERATE_PROMPT = `You are the **Archivist**.
 Generate a structured Lorebook Entry for "[itemName]".
 
@@ -452,7 +451,6 @@ Respond with a shape name on the first line, then a blank line, then 2-4 sentenc
 
 CRITICAL: The description must be structural logic — the kind of moment the story leans toward and the forces that govern it. Not a plot summary, not a story pitch, not a list of events. If a shape name is already provided, describe the structural logic of THAT shape as it applies to the story material. Do not anchor to specific characters or plot events.`;
 
-
 export const CONTRACT_GENERATE_PROMPT = `You are drafting the Story Contract for this story — the implicit agreement with the reader about what kind of story this is.
 
 The contract has three components:
@@ -600,8 +598,6 @@ where <TYPE> is one of CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC.
 
 Emit a command only for a change the author actually requested; otherwise just talk. You may end with a short [CRITIQUE | ...] note if you have a concern.`;
 
-
-
 /**
  * Per-strategy style guidance blocks for Xialong v1.
  * Injected as a user message immediately before assistant prefill to signal
@@ -623,8 +619,10 @@ export const XIALONG_STYLE = {
   foundationWorldState: "[ Style: narrator, situational, grounded ]",
   foundationContract: "[ Style: critic, genre-aware, contractual ]",
   summary: "[ Style: chat, archivist, concise, insightful ]",
-  bootstrap: "[ Style: novelist; cold-open; observed-not-named; no-participle-stacks; no-absolutes; forward-momentum ]",
-  bootstrapContinue: "[ Style: novelist; continuation; behavior-not-quality; no-participle-stacks; no-absolutes; forward-momentum ]",
+  bootstrap:
+    "[ Style: novelist; cold-open; observed-not-named; no-participle-stacks; no-absolutes; forward-momentum ]",
+  bootstrapContinue:
+    "[ Style: novelist; continuation; behavior-not-quality; no-participle-stacks; no-absolutes; forward-momentum ]",
 } as const;
 
 export const BOOTSTRAP_P1_PROMPT = `Write the opening passage of this story.
@@ -665,4 +663,3 @@ Characters introduced: physical detail first, then one behavioral tell, then spa
 Use natural paragraphing — break on new speakers, shifts in action, or distinct beats. Blank line between paragraphs. Dialogue gets its own paragraph.
 
 Prose only.`;
-

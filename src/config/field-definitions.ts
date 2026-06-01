@@ -18,10 +18,7 @@ export type DulfsFieldID =
   | FieldID.SituationalDynamics
   | FieldID.Topics;
 
-export type TextFieldID =
-  | FieldID.Brainstorm
-  | FieldID.ATTG
-  | FieldID.Style;
+export type TextFieldID = FieldID.Brainstorm | FieldID.ATTG | FieldID.Style;
 
 export function isDulfsField(id: string): id is DulfsFieldID {
   return [
@@ -35,11 +32,9 @@ export function isDulfsField(id: string): id is DulfsFieldID {
 }
 
 export function isTextField(id: string): id is TextFieldID {
-  return [
-    FieldID.Brainstorm,
-    FieldID.ATTG,
-    FieldID.Style,
-  ].includes(id as FieldID);
+  return [FieldID.Brainstorm, FieldID.ATTG, FieldID.Style].includes(
+    id as FieldID,
+  );
 }
 
 export interface FieldConfig {

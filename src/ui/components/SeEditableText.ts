@@ -287,8 +287,17 @@ export class SeEditableText extends SuiComponent<
     if (extraControls) headerContent.push(...extraControls);
 
     const viewPart = viewParts
-      ? column({ id: this._viewId, style: ML_STYLES.viewContainer, content: viewParts })
-      : text({ id: this._viewId, text: viewText, markdown: true, style: ML_STYLES.view });
+      ? column({
+          id: this._viewId,
+          style: ML_STYLES.viewContainer,
+          content: viewParts,
+        })
+      : text({
+          id: this._viewId,
+          text: viewText,
+          markdown: true,
+          style: ML_STYLES.view,
+        });
 
     return column({
       id: this.id,

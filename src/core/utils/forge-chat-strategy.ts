@@ -40,9 +40,9 @@ interface PhaseConfig {
 }
 
 const PHASE_TABLE: Record<ForgePhase, PhaseConfig> = {
-  sketch: { prompt: FORGE_SKETCH_PROMPT, maxTokens: 1536, temperature: 0.90 },
+  sketch: { prompt: FORGE_SKETCH_PROMPT, maxTokens: 1536, temperature: 0.9 },
   expand: { prompt: FORGE_EXPAND_PROMPT, maxTokens: 1280, temperature: 0.85 },
-  weave: { prompt: FORGE_WEAVE_PROMPT, maxTokens: 1536, temperature: 0.80 },
+  weave: { prompt: FORGE_WEAVE_PROMPT, maxTokens: 1536, temperature: 0.8 },
 };
 
 function resolvePhase(subMode: string | undefined): ForgePhase {
@@ -273,7 +273,9 @@ export function buildForgeCleanupStrategy(
   discardedNames: string[],
 ): GenerationStrategy {
   const factory = async () => {
-    const prefix = await buildStoryEnginePrefix(getState, { excludeChat: true });
+    const prefix = await buildStoryEnginePrefix(getState, {
+      excludeChat: true,
+    });
     const state = getState();
 
     const system: Message = { role: "system", content: FORGE_CLEANUP_PROMPT };

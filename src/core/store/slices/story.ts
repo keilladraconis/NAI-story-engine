@@ -58,9 +58,5 @@ export const storySlice = createSlice({
   },
 });
 
-export const {
-  storyCleared,
-  fieldUpdated,
-  attgToggled,
-  styleToggled,
-} = storySlice.actions;
+export const { storyCleared, fieldUpdated, attgToggled, styleToggled } =
+  storySlice.actions;

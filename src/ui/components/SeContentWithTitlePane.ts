@@ -100,7 +100,9 @@ export class SeContentWithTitlePane extends SuiComponent<
         id: EP.BACK_BTN,
         text: "",
         iconId: "arrow-left" as IconId,
-        callback: () => { onBack(); },
+        callback: () => {
+          onBack();
+        },
       }),
     ];
     if (label) {

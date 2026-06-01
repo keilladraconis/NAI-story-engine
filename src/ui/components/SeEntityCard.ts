@@ -113,7 +113,8 @@ export class SeEntityCard extends SuiComponent<
         const eid = e?.lorebookEntryId;
         if (!eid) return false;
         const entry = await api.v1.lorebook.entry(eid);
-        const keysOk = entry?.forceActivation || !!(entry?.keys && entry.keys.length > 0);
+        const keysOk =
+          entry?.forceActivation || !!(entry?.keys && entry.keys.length > 0);
         return !!e.summary && !!entry?.text && keysOk;
       },
     });
@@ -200,16 +201,29 @@ export class SeEntityCard extends SuiComponent<
       },
       ({ name: newName, categoryId, summary: newSummary }) => {
         const parts: Array<Partial<UIPart> & { id: string }> = [
-          { id: `${cardId}.label`, text: newName } as unknown as Partial<UIPart> & { id: string },
-          { id: summaryId, text: newSummary } as unknown as Partial<UIPart> & { id: string },
+          {
+            id: `${cardId}.label`,
+            text: newName,
+          } as unknown as Partial<UIPart> & { id: string },
+          { id: summaryId, text: newSummary } as unknown as Partial<UIPart> & {
+            id: string;
+          },
         ];
         const newIconId = CATEGORY_ICON[categoryId];
         if (newIconId) {
-          parts.push({ id: `${cardId}.icon`, iconId: newIconId } as unknown as Partial<UIPart> & { id: string });
+          parts.push({
+            id: `${cardId}.icon`,
+            iconId: newIconId,
+          } as unknown as Partial<UIPart> & { id: string });
         }
-        api.v1.ui.updateParts(parts as unknown as (Partial<UIPart> & { id: string })[]);
+        api.v1.ui.updateParts(
+          parts as unknown as (Partial<UIPart> & { id: string })[],
+        );
       },
-      (a, b) => a.name === b.name && a.categoryId === b.categoryId && a.summary === b.summary,
+      (a, b) =>
+        a.name === b.name &&
+        a.categoryId === b.categoryId &&
+        a.summary === b.summary,
     );
 
     const INCOMPLETE_BORDER = {
@@ -240,7 +254,13 @@ export class SeEntityCard extends SuiComponent<
       `lb-entity-${entityId}-keys`,
     ]);
 
-    const _isPending = (s: { runtime: { activeRequest: { id: string } | null; queue: Array<{ id: string }>; sega: { activeRequestIds: string[] } } }): boolean =>
+    const _isPending = (s: {
+      runtime: {
+        activeRequest: { id: string } | null;
+        queue: Array<{ id: string }>;
+        sega: { activeRequestIds: string[] };
+      };
+    }): boolean =>
       pendingIds.has(s.runtime.activeRequest?.id ?? "") ||
       s.runtime.sega.activeRequestIds.some((id) => pendingIds.has(id)) ||
       s.runtime.queue.some((q) => pendingIds.has(q.id));
@@ -280,7 +300,9 @@ export class SeEntityCard extends SuiComponent<
       let hasLore = false;
       if (entryId) {
         const lbEntry = await api.v1.lorebook.entry(entryId);
-        const keysOk = lbEntry?.forceActivation || !!(lbEntry?.keys && lbEntry.keys.length > 0);
+        const keysOk =
+          lbEntry?.forceActivation ||
+          !!(lbEntry?.keys && lbEntry.keys.length > 0);
         hasLore = !!(lbEntry?.text && keysOk);
       }
       const isComplete = !!summary && hasLore;
@@ -291,7 +313,8 @@ export class SeEntityCard extends SuiComponent<
             s.runtime.activeRequest === _activeReqRef &&
             s.runtime.queue === _queueRef &&
             s.runtime.sega.activeRequestIds === _segaRef
-          ) return _pendingCache;
+          )
+            return _pendingCache;
           _activeReqRef = s.runtime.activeRequest;
           _queueRef = s.runtime.queue;
           _segaRef = s.runtime.sega.activeRequestIds;
@@ -301,7 +324,10 @@ export class SeEntityCard extends SuiComponent<
         async (isPending) => {
           if (isPending) {
             api.v1.ui.updateParts([
-              { id: root, style: PENDING_BORDER } as unknown as Partial<UIPart> & { id: string },
+              {
+                id: root,
+                style: PENDING_BORDER,
+              } as unknown as Partial<UIPart> & { id: string },
             ]);
           } else {
             const e = store.getState().world.entitiesById[entityId];
@@ -309,11 +335,16 @@ export class SeEntityCard extends SuiComponent<
             let nowComplete = false;
             if (eid) {
               const lbEntry = await api.v1.lorebook.entry(eid);
-              const keysOk = lbEntry?.forceActivation || !!(lbEntry?.keys && lbEntry.keys.length > 0);
+              const keysOk =
+                lbEntry?.forceActivation ||
+                !!(lbEntry?.keys && lbEntry.keys.length > 0);
               nowComplete = !!e?.summary && !!(lbEntry?.text && keysOk);
             }
             api.v1.ui.updateParts([
-              { id: root, style: nowComplete ? COMPLETE_BORDER : INCOMPLETE_BORDER } as unknown as Partial<UIPart> & { id: string },
+              {
+                id: root,
+                style: nowComplete ? COMPLETE_BORDER : INCOMPLETE_BORDER,
+              } as unknown as Partial<UIPart> & { id: string },
             ]);
           }
         },

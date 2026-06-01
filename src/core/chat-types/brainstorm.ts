@@ -1,5 +1,15 @@
-import type { ChatTypeSpec, Chat, ChatMessage, ChatSeed, SpecCtx } from "./types";
-import { BRAINSTORM_PROMPT, BRAINSTORM_CRITIC_PROMPT, XIALONG_STYLE } from "../utils/prompts";
+import type {
+  ChatTypeSpec,
+  Chat,
+  ChatMessage,
+  ChatSeed,
+  SpecCtx,
+} from "./types";
+import {
+  BRAINSTORM_PROMPT,
+  BRAINSTORM_CRITIC_PROMPT,
+  XIALONG_STYLE,
+} from "../utils/prompts";
 
 type BrainstormSubMode = "cowriter" | "critic";
 
@@ -21,11 +31,15 @@ export const brainstormSpec: ChatTypeSpec<BrainstormSubMode> = {
   },
 
   systemPromptFor(chat: Chat, _ctx: SpecCtx): string {
-    return chat.subMode === "critic" ? BRAINSTORM_CRITIC_PROMPT : BRAINSTORM_PROMPT;
+    return chat.subMode === "critic"
+      ? BRAINSTORM_CRITIC_PROMPT
+      : BRAINSTORM_PROMPT;
   },
 
   xialongStyleFor(chat: Chat, _ctx: SpecCtx): string {
-    return chat.subMode === "critic" ? XIALONG_STYLE.brainstormCritic : XIALONG_STYLE.brainstorm;
+    return chat.subMode === "critic"
+      ? XIALONG_STYLE.brainstormCritic
+      : XIALONG_STYLE.brainstorm;
   },
 
   contextSlice(chat: Chat, _ctx: SpecCtx): ChatMessage[] {

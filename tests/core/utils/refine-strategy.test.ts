@@ -11,7 +11,9 @@ describe("buildRefineTail", () => {
 
   it("emits a prose-boundary divider first, then the rewriting instruction", () => {
     const messages = buildRefineTail([], ctx());
-    const dividerIdx = messages.findIndex((m) => m.role === "system" && m.content === "----");
+    const dividerIdx = messages.findIndex(
+      (m) => m.role === "system" && m.content === "----",
+    );
     expect(dividerIdx).toBeGreaterThanOrEqual(0);
     expect(messages[dividerIdx + 1].role).toBe("system");
     expect(messages[dividerIdx + 1].content).toMatch(/rewrite/i);
@@ -33,7 +35,14 @@ describe("buildRefineTail", () => {
     ];
     const messages = buildRefineTail([], ctx(history));
     const roles = messages.map((m) => m.role);
-    expect(roles).toEqual(["system", "system", "system", "user", "assistant", "user"]);
+    expect(roles).toEqual([
+      "system",
+      "system",
+      "system",
+      "user",
+      "assistant",
+      "user",
+    ]);
   });
 
   it("filters out system messages from history", () => {
@@ -60,7 +69,11 @@ describe("buildRefineTail", () => {
       { role: "user", content: "[ Style: threshold-crossing, sardonic ]" },
     ];
     const messages = buildRefineTail(base, ctx());
-    expect(messages.find((m) => m.content === "[ Style: threshold-crossing, sardonic ]")).toBeUndefined();
+    expect(
+      messages.find(
+        (m) => m.content === "[ Style: threshold-crossing, sardonic ]",
+      ),
+    ).toBeUndefined();
     expect(messages[0]).toEqual({ role: "system", content: "field-prompt" });
   });
 
@@ -70,6 +83,8 @@ describe("buildRefineTail", () => {
       { role: "user", content: "some regular user content" },
     ];
     const messages = buildRefineTail(base, ctx());
-    expect(messages.find((m) => m.content === "some regular user content")).toBeDefined();
+    expect(
+      messages.find((m) => m.content === "some regular user content"),
+    ).toBeDefined();
   });
 });

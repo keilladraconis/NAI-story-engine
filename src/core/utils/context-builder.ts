@@ -34,10 +34,7 @@ import { SYSTEM_PROMPT, LOREBOOK_WEAVING_PROMPT } from "./prompts";
  * Extracts the name portion from a World Entry item content using field-specific parsing.
  * Falls back to raw content if no regex match.
  */
-export const extractEntityName = (
-  content: string,
-  fieldId: string,
-): string => {
+export const extractEntityName = (content: string, fieldId: string): string => {
   const fieldConfig = FIELD_CONFIGS.find((f) => f.id === fieldId);
   const regex = fieldConfig?.parsingRegex;
 
@@ -480,4 +477,3 @@ export const buildStoryEnginePrefix = async (
 
   return messages;
 };
-

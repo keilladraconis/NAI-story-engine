@@ -1,4 +1,10 @@
-import type { ChatTypeSpec, Chat, ChatMessage, ChatSeed, SpecCtx } from "./types";
+import type {
+  ChatTypeSpec,
+  Chat,
+  ChatMessage,
+  ChatSeed,
+  SpecCtx,
+} from "./types";
 import {
   FORGE_SKETCH_PROMPT,
   FORGE_EXPAND_PROMPT,

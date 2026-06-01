@@ -10,7 +10,10 @@ import {
   entitySummaryBindHandler,
   threadSummaryHandler,
 } from "./handlers/summary";
-import { bootstrapHandler, bootstrapContinueHandler } from "./handlers/bootstrap";
+import {
+  bootstrapHandler,
+  bootstrapContinueHandler,
+} from "./handlers/bootstrap";
 import { chatHandler, chatRefineHandler } from "./handlers/chat";
 import { forgeChatHandler, forgeCleanupHandler } from "./handlers/forge-chat";
 

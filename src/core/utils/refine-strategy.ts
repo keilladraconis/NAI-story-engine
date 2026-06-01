@@ -20,17 +20,23 @@ import { REFINE_SYSTEM_PROMPT, STYLE_REFINE_PROMPT } from "./prompts";
  *   [system] === REFINE TARGET (<fieldId>) ===\n<currentText>\n=== END TARGET ===
  *   [user/assistant ...] history turns (system messages filtered out)
  */
-export function buildRefineTail(baseMessages: Message[], refine: RefineContext): Message[] {
+export function buildRefineTail(
+  baseMessages: Message[],
+  refine: RefineContext,
+): Message[] {
   const messages = [...baseMessages];
   const last = messages[messages.length - 1];
   if (last?.role === "user" && last.content?.startsWith("[ Style:")) {
     messages.pop();
   }
-  const fieldFormatPrompt = refine.fieldId === "style" ? STYLE_REFINE_PROMPT : undefined;
+  const fieldFormatPrompt =
+    refine.fieldId === "style" ? STYLE_REFINE_PROMPT : undefined;
   messages.push(
     { role: "system", content: "----" },
     { role: "system", content: REFINE_SYSTEM_PROMPT },
-    ...(fieldFormatPrompt ? [{ role: "system" as const, content: fieldFormatPrompt }] : []),
+    ...(fieldFormatPrompt
+      ? [{ role: "system" as const, content: fieldFormatPrompt }]
+      : []),
     {
       role: "system",
       content: `=== REFINE TARGET (${refine.fieldId}) ===\n${refine.currentText}\n=== END TARGET ===`,

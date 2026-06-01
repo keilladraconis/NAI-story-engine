@@ -196,10 +196,7 @@ function buildModeSelector(opts: SeGenerationButtonOptions) {
   };
 }
 
-function computeMode(
-  opts: SeGenerationButtonOptions,
-  s: RootState,
-): Mode {
+function computeMode(opts: SeGenerationButtonOptions, s: RootState): Mode {
   const activeRequestId = s.runtime.activeRequest?.id;
   const genxStatus = s.runtime.genx.status;
   const hasProjection = !!opts.stateProjection;

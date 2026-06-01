@@ -53,12 +53,12 @@ Foundation turns the raw energy of your brainstorm into a set of structural anch
 
 Sets the tonality register of your story. Choose from:
 
-| Level | Description |
-|-------|-------------|
-| **Cozy** | Safe, warm, low stakes |
-| **Grounded** | Realistic, everyday tension |
-| **Gritty** | Harsh, morally complex |
-| **Noir** | Cynical, dark, fatalistic |
+| Level         | Description                   |
+| ------------- | ----------------------------- |
+| **Cozy**      | Safe, warm, low stakes        |
+| **Grounded**  | Realistic, everyday tension   |
+| **Gritty**    | Harsh, morally complex        |
+| **Noir**      | Cynical, dark, fatalistic     |
 | **Nightmare** | Extreme, disturbing, no mercy |
 
 Pick the level that matches the emotional register you want. This flows into generation downstream.
@@ -66,6 +66,7 @@ Pick the level that matches the emotional register you want. This flows into gen
 ### Shape
 
 A structural lens — what kind of moment your story is building toward. Click **Generate** and the AI reads your brainstorm to invent one. Examples:
+
 - _"Lean toward scenes of ordinary continuity — the texture of how these specific people inhabit their world"_ (Slice of Life)
 - _"Lean toward the moment after which the protagonist cannot be what they were"_ (Threshold Crossing)
 
@@ -149,6 +150,7 @@ The World section is your world inventory — every entity the Forge created, pl
 ### Entities
 
 Each entity card shows:
+
 - Category icon (character, system, location, faction, dynamic, topic)
 - Name (click to edit in the edit pane)
 - Summary (SE-internal description)
@@ -223,15 +225,16 @@ The wizard has two sections:
 
 **Foundation Fields**
 
-| Row | What it does |
-|-----|-------------|
-| **Memory → ATTG** | Imports existing Memory text into the Foundation ATTG field and enables sync. |
-| **A/N → Style** | Imports existing Author's Note text into the Foundation Style field and enables sync. |
+| Row                        | What it does                                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Memory → ATTG**          | Imports existing Memory text into the Foundation ATTG field and enables sync.                                                              |
+| **A/N → Style**            | Imports existing Author's Note text into the Foundation Style field and enables sync.                                                      |
 | **Story → Shape + Intent** | Reads your existing story content — lorebook, Memory, document — and generates a Shape and Intent to anchor the Foundation for this story. |
 
 **Lorebook Entries**
 
 All unmanaged lorebook entries are listed, grouped by category. For each entry:
+
 - The category is auto-detected from the entry text (Character, Location, Faction, etc.). Click the category label to cycle through options.
 - Click **⚡ Bind** to register the entry as a Story Engine entity. The existing lorebook text is preserved exactly — binding doesn't modify the entry, it just makes it visible and manageable in the World section.
 
@@ -252,14 +255,14 @@ From there you can run S.E.G.A. to regenerate lorebook content and keys with Sto
 
 ## Quick Reference
 
-| Tab / Section   | What it does                                       | Key action                                         |
-| --------------- | -------------------------------------------------- | -------------------------------------------------- |
-| **Chat**        | Brainstorms, summaries, and field refine sessions  | Chat, summarize (creates a Summary chat), manage sessions |
-| **Foundation**  | Tone, shape, intent, contract, metadata            | Set Intensity → Shape → Intent → Contract → ATTG/Style |
-| **Forge**       | World element generation                           | Enter guidance → Forge (runs sketch/expand/weave)  |
-| **World**       | World inventory, threads, S.E.G.A.                 | Review entities → Run S.E.G.A.                     |
-| **Refine**      | Iterate any field via chat (feather button)        | Open chat → Iterate → Commit                       |
-| **Bootstrap**   | Cold-open writer (header button)                   | Click Bootstrap, then Continue for more paragraphs |
+| Tab / Section  | What it does                                      | Key action                                                |
+| -------------- | ------------------------------------------------- | --------------------------------------------------------- |
+| **Chat**       | Brainstorms, summaries, and field refine sessions | Chat, summarize (creates a Summary chat), manage sessions |
+| **Foundation** | Tone, shape, intent, contract, metadata           | Set Intensity → Shape → Intent → Contract → ATTG/Style    |
+| **Forge**      | World element generation                          | Enter guidance → Forge (runs sketch/expand/weave)         |
+| **World**      | World inventory, threads, S.E.G.A.                | Review entities → Run S.E.G.A.                            |
+| **Refine**     | Iterate any field via chat (feather button)       | Open chat → Iterate → Commit                              |
+| **Bootstrap**  | Cold-open writer (header button)                  | Click Bootstrap, then Continue for more paragraphs        |
 
 ---
 

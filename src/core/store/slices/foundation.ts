@@ -1,5 +1,10 @@
 import { createSlice } from "nai-store";
-import { FoundationState, ShapeData, IntensityData, ContractData } from "../types";
+import {
+  FoundationState,
+  ShapeData,
+  IntensityData,
+  ContractData,
+} from "../types";
 
 export const initialFoundationState: FoundationState = {
   shape: null,
@@ -32,7 +37,10 @@ export const foundationSlice = createSlice({
       worldState: payload.worldState,
     }),
 
-    intensityUpdated: (state, payload: { intensity: IntensityData | null }) => ({
+    intensityUpdated: (
+      state,
+      payload: { intensity: IntensityData | null },
+    ) => ({
       ...state,
       intensity: payload.intensity,
     }),

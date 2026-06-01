@@ -25,7 +25,11 @@ export const initialChatState: ChatSliceState = {
   refineChat: null,
 };
 
-function mapChat(state: ChatSliceState, id: string, fn: (c: Chat) => Chat): ChatSliceState {
+function mapChat(
+  state: ChatSliceState,
+  id: string,
+  fn: (c: Chat) => Chat,
+): ChatSliceState {
   if (state.refineChat?.id === id) {
     return { ...state, refineChat: fn(state.refineChat) };
   }
@@ -54,7 +58,9 @@ export const chatSlice = createSlice({
       if (state.chats.length <= 1) return state;
       const chats = state.chats.filter((c) => c.id !== payload.id);
       const activeChatId =
-        state.activeChatId === payload.id ? chats[chats.length - 1].id : state.activeChatId;
+        state.activeChatId === payload.id
+          ? chats[chats.length - 1].id
+          : state.activeChatId;
       return { ...state, chats, activeChatId };
     },
 
@@ -67,7 +73,10 @@ export const chatSlice = createSlice({
         messages: [...c.messages, payload.message],
       })),
 
-    messageUpdated: (state, payload: { chatId: string; id: string; content: string }) =>
+    messageUpdated: (
+      state,
+      payload: { chatId: string; id: string; content: string },
+    ) =>
       mapChat(state, payload.chatId, (c) => ({
         ...c,
         messages: c.messages.map((m) =>
@@ -75,11 +84,16 @@ export const chatSlice = createSlice({
         ),
       })),
 
-    messageAppended: (state, payload: { chatId: string; id: string; content: string }) =>
+    messageAppended: (
+      state,
+      payload: { chatId: string; id: string; content: string },
+    ) =>
       mapChat(state, payload.chatId, (c) => ({
         ...c,
         messages: c.messages.map((m) =>
-          m.id === payload.id ? { ...m, content: m.content + payload.content } : m,
+          m.id === payload.id
+            ? { ...m, content: m.content + payload.content }
+            : m,
         ),
       })),
 

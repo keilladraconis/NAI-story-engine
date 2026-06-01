@@ -22,7 +22,17 @@ import {
   type SuiComponentOptions,
 } from "nai-simple-ui";
 import { store } from "../../core/store";
-import { groupCreated, entityForged, worldCleared } from "../../core/store/slices/world";
+import {
+  groupCreated,
+  entityForged,
+  worldCleared,
+} from "../../core/store/slices/world";
+import { isForgeDraft } from "../../core/store/selectors/forge";
+import type {
+  RootState,
+  WorldEntity,
+  WorldGroup,
+} from "../../core/store/types";
 import { segaToggled } from "../../core/store/slices/runtime";
 import { worldExpansionSet } from "../../core/store/slices/ui";
 import { FieldID } from "../../config/field-definitions";
@@ -75,7 +85,10 @@ export class SeWorldSection extends SuiComponent<
       timeout: 4000,
       theme: {
         default: {
-          self: { iconId: "trash-2" as IconId, style: { ...ACTION_BASE, opacity: "0.6" } },
+          self: {
+            iconId: "trash-2" as IconId,
+            style: { ...ACTION_BASE, opacity: "0.6" },
+          },
         },
         pending: {
           self: {
@@ -87,16 +100,39 @@ export class SeWorldSection extends SuiComponent<
     });
   }
 
-  private async _rebuildBody(): Promise<void> {
-    const { editHost } = this.options;
-    const state = store.getState();
-
+  /**
+   * The World section shows the committed world only: live entities (loose or
+   * in Threads) and any Threads that have at least one such member. In-progress
+   * forge drafts live in their forge chat as inline cards, so they are filtered
+   * out here — they would otherwise appear in two places at once. Threads whose
+   * only members are forge drafts are hidden until those drafts are cast.
+   */
+  private _selectBody(state: RootState): {
+    groups: WorldGroup[];
+    loose: WorldEntity[];
+  } {
+    const isVisibleMember = (id: string): boolean => {
+      const e = state.world.entitiesById[id];
+      return !!e && !isForgeDraft(e);
+    };
+    const groups = state.world.groups.filter((g) =>
+      g.entityIds.some(isVisibleMember),
+    );
     const threadedEntityIds = new Set(
       state.world.groups.flatMap((g) => g.entityIds),
     );
+    const loose = Object.values(state.world.entitiesById).filter(
+      (e) => !threadedEntityIds.has(e.id) && !isForgeDraft(e),
+    );
+    return { groups, loose };
+  }
+
+  private async _rebuildBody(): Promise<void> {
+    const { editHost } = this.options;
+    const { groups, loose } = this._selectBody(store.getState());
 
     const threadParts = await Promise.all(
-      state.world.groups.map((g) =>
+      groups.map((g) =>
         new SeThreadItem({
           id: IDS.WORLD.thread(g.id).SECTION,
           groupId: g.id,
@@ -105,12 +141,8 @@ export class SeWorldSection extends SuiComponent<
       ),
     );
 
-    const looseEntities = Object.values(state.world.entitiesById).filter(
-      (e) => !threadedEntityIds.has(e.id),
-    );
-
     const looseParts = await Promise.all(
-      looseEntities.map((e) =>
+      loose.map((e) =>
         new SeEntityCard({
           id: IDS.entity(e.id).ROOT,
           entityId: e.id,
@@ -141,18 +173,25 @@ export class SeWorldSection extends SuiComponent<
     let _wsCache = "";
     this._watcher.watch(
       (s) => {
-        if (s.world.entitiesById === _wsEntitiesRef && s.world.groups === _wsGroupsRef) {
+        if (
+          s.world.entitiesById === _wsEntitiesRef &&
+          s.world.groups === _wsGroupsRef
+        ) {
           return _wsCache;
         }
         _wsEntitiesRef = s.world.entitiesById;
         _wsGroupsRef = s.world.groups;
-        const liveIds = Object.values(s.world.entitiesById)
-          .map((e) => e.id);
+        // Include lifecycle: hiding forge drafts means a draft→live cast must
+        // re-render the body so the now-live entity appears (its id was already
+        // present, only its lifecycle changed).
+        const entitySnapshot = Object.values(s.world.entitiesById).map(
+          (e) => `${e.id}:${e.lifecycle}`,
+        );
         const groupSnapshot = s.world.groups.map((g) => ({
           id: g.id,
           members: [...g.entityIds],
         }));
-        _wsCache = JSON.stringify({ liveIds, groupSnapshot });
+        _wsCache = JSON.stringify({ entitySnapshot, groupSnapshot });
         return _wsCache;
       },
       () => {
@@ -208,14 +247,30 @@ export class SeWorldSection extends SuiComponent<
 
     const segaStartBtn = new SuiButton({
       id: `${IDS.WORLD.SECTION}-sega-start-btn`,
-      callback: () => { store.dispatch(segaToggled()); },
-      theme: { default: { self: { text: "S.E.G.A.", iconId: "play-circle" as IconId } } },
+      callback: () => {
+        store.dispatch(segaToggled());
+      },
+      theme: {
+        default: {
+          self: { text: "S.E.G.A.", iconId: "play-circle" as IconId },
+        },
+      },
     });
 
     const segaStopBtn = new SuiButton({
       id: `${IDS.WORLD.SECTION}-sega-stop-btn`,
-      callback: () => { store.dispatch(segaToggled()); },
-      theme: { default: { self: { text: "S.E.G.A.", iconId: "fast-forward" as IconId, style: { display: "none", color: "#ff9800" } } } },
+      callback: () => {
+        store.dispatch(segaToggled());
+      },
+      theme: {
+        default: {
+          self: {
+            text: "S.E.G.A.",
+            iconId: "fast-forward" as IconId,
+            style: { display: "none", color: "#ff9800" },
+          },
+        },
+      },
     });
 
     this._watcher.watch(
@@ -228,7 +283,11 @@ export class SeWorldSection extends SuiComponent<
           },
           {
             id: `${IDS.WORLD.SECTION}-sega-stop-btn`,
-            style: { ...ACTION_BASE, color: "#ff9800", display: segaRunning ? "flex" : "none" },
+            style: {
+              ...ACTION_BASE,
+              color: "#ff9800",
+              display: segaRunning ? "flex" : "none",
+            },
           },
         ]);
       },
@@ -268,16 +327,22 @@ export class SeWorldSection extends SuiComponent<
       id: `${IDS.WORLD.SECTION}.card`,
       label: "World",
       icon: "globe" as IconId,
-      actions: [segaStartBtn, segaStopBtn, expandCollapseBtn, addEntityBtn, addThreadBtn, this._clearBtn],
+      actions: [
+        segaStartBtn,
+        segaStopBtn,
+        expandCollapseBtn,
+        addEntityBtn,
+        addThreadBtn,
+        this._clearBtn,
+      ],
       theme: { default: { actions: { base: ACTION_BASE } } },
     });
 
-    const threadedEntityIds = new Set(
-      state.world.groups.flatMap((g) => g.entityIds),
-    );
+    const { groups: initialGroups, loose: initialLoose } =
+      this._selectBody(state);
 
     const initialThreadParts = await Promise.all(
-      state.world.groups.map((g) =>
+      initialGroups.map((g) =>
         new SeThreadItem({
           id: IDS.WORLD.thread(g.id).SECTION,
           groupId: g.id,
@@ -286,12 +351,8 @@ export class SeWorldSection extends SuiComponent<
       ),
     );
 
-    const looseEntities = Object.values(state.world.entitiesById).filter(
-      (e) => !threadedEntityIds.has(e.id),
-    );
-
     const initialLooseParts = await Promise.all(
-      looseEntities.map((e) =>
+      initialLoose.map((e) =>
         new SeEntityCard({
           id: IDS.entity(e.id).ROOT,
           entityId: e.id,

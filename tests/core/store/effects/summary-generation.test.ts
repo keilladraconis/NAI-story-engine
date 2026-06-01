@@ -46,7 +46,10 @@ function makeState(entity?: WorldEntity): RootState {
 }
 
 function makeHarness(state: RootState) {
-  const subs: { predicate: (a: { type: string }) => boolean; handler: Handler }[] = [];
+  const subs: {
+    predicate: (a: { type: string }) => boolean;
+    handler: Handler;
+  }[] = [];
   const dispatch = vi.fn();
   const subscribeEffect = vi.fn(
     (predicate: (a: { type: string }) => boolean, handler: Handler) => {
@@ -82,18 +85,29 @@ describe("entityRegenRequested effect", () => {
   });
 
   it("is a no-op for a draft entity with no lorebook entry", async () => {
-    const draft = makeEntity({ lifecycle: "draft", lorebookEntryId: undefined });
+    const draft = makeEntity({
+      lifecycle: "draft",
+      lorebookEntryId: undefined,
+    });
     const { dispatch, fire } = makeHarness(makeState(draft));
     await fire(entityRegenRequested({ entityId: "e1" }));
     expect(dispatch).not.toHaveBeenCalled();
   });
 
   it("generates content and keys (not summary) when the entry is empty but summary exists", async () => {
-    const live = makeEntity({ lorebookEntryId: "lb-1", summary: "a governess" });
-    const { fire, queuedTypes, submittedTargets } = makeHarness(makeState(live));
+    const live = makeEntity({
+      lorebookEntryId: "lb-1",
+      summary: "a governess",
+    });
+    const { fire, queuedTypes, submittedTargets } = makeHarness(
+      makeState(live),
+    );
     await fire(entityRegenRequested({ entityId: "e1" }));
     expect(queuedTypes().sort()).toEqual(["lorebookContent", "lorebookKeys"]);
-    expect(submittedTargets().sort()).toEqual(["lorebookContent", "lorebookKeys"]);
+    expect(submittedTargets().sort()).toEqual([
+      "lorebookContent",
+      "lorebookKeys",
+    ]);
   });
 
   it("also generates the summary when it is missing", async () => {
@@ -113,8 +127,13 @@ describe("entityRegenRequested effect", () => {
       text: "rich lore",
       keys: ["vesper"],
     } as never);
-    const live = makeEntity({ lorebookEntryId: "lb-1", summary: "a governess" });
-    const { fire, queuedTypes, submittedTargets } = makeHarness(makeState(live));
+    const live = makeEntity({
+      lorebookEntryId: "lb-1",
+      summary: "a governess",
+    });
+    const { fire, queuedTypes, submittedTargets } = makeHarness(
+      makeState(live),
+    );
     await fire(entityRegenRequested({ entityId: "e1" }));
     expect(queuedTypes()).toEqual([]);
     expect(submittedTargets()).toEqual([]);

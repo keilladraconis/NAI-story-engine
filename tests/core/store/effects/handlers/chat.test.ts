@@ -34,7 +34,12 @@ function makeRefineCtx(
   over: Partial<CompletionContext<ChatRefineTarget>> = {},
 ): CompletionContext<ChatRefineTarget> {
   return {
-    target: { type: "chatRefine", chatId: "r1", messageId: "m1", fieldId: "attg" },
+    target: {
+      type: "chatRefine",
+      chatId: "r1",
+      messageId: "m1",
+      fieldId: "attg",
+    },
     getState: vi.fn(),
     accumulatedText: "",
     generationSucceeded: true,
@@ -137,7 +142,13 @@ describe("chat slice — forgeSegmentsSet", () => {
     state = chatSliceReducer(
       state,
       chatCreated({
-        chat: { id: "c1", type: "forge", title: "F", messages: [], seed: { kind: "blank" } },
+        chat: {
+          id: "c1",
+          type: "forge",
+          title: "F",
+          messages: [],
+          seed: { kind: "blank" },
+        },
       }),
     );
     state = chatSliceReducer(
@@ -149,9 +160,20 @@ describe("chat slice — forgeSegmentsSet", () => {
     );
     const segments: ForgeSegment[] = [
       { kind: "prose", text: "hi" },
-      { kind: "action", action: { kind: "CREATE", status: "applied", elementType: "SYSTEM", name: "X" } },
+      {
+        kind: "action",
+        action: {
+          kind: "CREATE",
+          status: "applied",
+          elementType: "SYSTEM",
+          name: "X",
+        },
+      },
     ];
-    state = chatSliceReducer(state, forgeSegmentsSet({ chatId: "c1", id: "m1", segments }));
+    state = chatSliceReducer(
+      state,
+      forgeSegmentsSet({ chatId: "c1", id: "m1", segments }),
+    );
     const msg = state.chats
       .find((c) => c.id === "c1")!
       .messages.find((m) => m.id === "m1")!;

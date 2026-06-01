@@ -96,10 +96,7 @@ function queueLorebookRequestIfNeeded(
   getState: () => RootState,
   dispatch: AppDispatch,
 ): void {
-  if (
-    target.type !== "lorebookContent" &&
-    target.type !== "lorebookKeys"
-  ) {
+  if (target.type !== "lorebookContent" && target.type !== "lorebookKeys") {
     return;
   }
 
@@ -123,10 +120,7 @@ function queueLorebookRequestIfNeeded(
 async function captureRollbackState(
   target: GenerationStrategy["target"],
 ): Promise<{ content: string; keys: string }> {
-  if (
-    target.type !== "lorebookContent" &&
-    target.type !== "lorebookKeys"
-  ) {
+  if (target.type !== "lorebookContent" && target.type !== "lorebookKeys") {
     return { content: "", keys: "" };
   }
 
@@ -248,7 +242,10 @@ export function registerGenerationEngineEffects(
       const text = choices[0]?.text || "";
       if (text) {
         accumulatedText += text;
-        handler.streaming({ target, getState, dispatch, accumulatedText }, text);
+        handler.streaming(
+          { target, getState, dispatch, accumulatedText },
+          text,
+        );
       }
     };
 
@@ -280,11 +277,13 @@ export function registerGenerationEngineEffects(
           accumulatedText = resolvePrefill(strategy, getState);
           // Clear visible message so the retry streams from scratch
           if ("chatId" in target && "messageId" in target) {
-            dispatch(messageUpdated({
-              chatId: target.chatId,
-              id: target.messageId,
-              content: "",
-            }));
+            dispatch(
+              messageUpdated({
+                chatId: target.chatId,
+                id: target.messageId,
+                content: "",
+              }),
+            );
           }
           result = await genX.generate(
             resolvedMessages || messagesInput,

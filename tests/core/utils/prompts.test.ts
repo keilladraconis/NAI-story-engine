@@ -35,7 +35,11 @@ describe("Forge phase prompts", () => {
   });
 
   it("all phase prompts assert draft-only modification (D: prefix or 'drafts only')", () => {
-    for (const p of [FORGE_SKETCH_PROMPT, FORGE_EXPAND_PROMPT, FORGE_WEAVE_PROMPT]) {
+    for (const p of [
+      FORGE_SKETCH_PROMPT,
+      FORGE_EXPAND_PROMPT,
+      FORGE_WEAVE_PROMPT,
+    ]) {
       expect(p).toMatch(/D:|drafts only|never modify.*live/i);
     }
   });

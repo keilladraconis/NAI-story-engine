@@ -40,30 +40,34 @@ describe("forgeSpec", () => {
   });
 
   it("systemPromptFor returns sketch prompt for sketch subMode", () => {
-    expect(forgeSpec.systemPromptFor(makeChat({ subMode: "sketch" }), ctx))
-      .toBe(FORGE_SKETCH_PROMPT);
+    expect(
+      forgeSpec.systemPromptFor(makeChat({ subMode: "sketch" }), ctx),
+    ).toBe(FORGE_SKETCH_PROMPT);
   });
 
   it("systemPromptFor returns expand prompt for expand subMode", () => {
-    expect(forgeSpec.systemPromptFor(makeChat({ subMode: "expand" }), ctx))
-      .toBe(FORGE_EXPAND_PROMPT);
+    expect(
+      forgeSpec.systemPromptFor(makeChat({ subMode: "expand" }), ctx),
+    ).toBe(FORGE_EXPAND_PROMPT);
   });
 
   it("systemPromptFor returns weave prompt for weave subMode", () => {
-    expect(forgeSpec.systemPromptFor(makeChat({ subMode: "weave" }), ctx))
-      .toBe(FORGE_WEAVE_PROMPT);
+    expect(forgeSpec.systemPromptFor(makeChat({ subMode: "weave" }), ctx)).toBe(
+      FORGE_WEAVE_PROMPT,
+    );
   });
 
   it("systemPromptFor defaults to sketch when subMode is missing", () => {
-    expect(forgeSpec.systemPromptFor(makeChat({ subMode: undefined }), ctx))
-      .toBe(FORGE_SKETCH_PROMPT);
+    expect(
+      forgeSpec.systemPromptFor(makeChat({ subMode: undefined }), ctx),
+    ).toBe(FORGE_SKETCH_PROMPT);
   });
 
   it("contextSlice returns the full transcript", () => {
     const chat = makeChat({
       messages: [
         { id: "u", role: "user", content: "hi" },
-        { id: "a", role: "assistant", content: "[CREATE CHARACTER \"A\" | foo]" },
+        { id: "a", role: "assistant", content: '[CREATE CHARACTER "A" | foo]' },
       ],
     });
     expect(forgeSpec.contextSlice(chat, ctx)).toEqual(chat.messages);

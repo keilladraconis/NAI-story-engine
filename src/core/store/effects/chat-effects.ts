@@ -41,7 +41,10 @@ async function submitChatGeneration(
   try {
     strategy = await buildChatStrategy(getState, chat, assistantId);
   } catch (error) {
-    api.v1.log(`[chat] failed to build strategy for ${chat.id}:`, error as Error);
+    api.v1.log(
+      `[chat] failed to build strategy for ${chat.id}:`,
+      error as Error,
+    );
     api.v1.ui.toast(`Could not start refine: ${(error as Error).message}`, {
       type: "error",
     });
@@ -169,7 +172,9 @@ export function registerChatEffects(
     async (action, { getState: latest }) => {
       const { fieldId, sourceText, entryId } = action.payload;
       if (!sourceText.trim()) {
-        api.v1.ui.toast("Nothing to refine — field is empty.", { type: "info" });
+        api.v1.ui.toast("Nothing to refine — field is empty.", {
+          type: "info",
+        });
         return;
       }
       if (latest().chat.refineChat) {

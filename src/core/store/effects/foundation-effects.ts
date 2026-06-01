@@ -11,7 +11,10 @@
 
 import { Store, matchesAction } from "nai-store";
 import { RootState, AppDispatch, GenerationStrategy } from "../types";
-import { buildModelParams, appendXialongStyleMessage } from "../../utils/config";
+import {
+  buildModelParams,
+  appendXialongStyleMessage,
+} from "../../utils/config";
 import {
   shapeGenerationRequested,
   intentGenerationRequested,
@@ -23,7 +26,10 @@ import {
   requestQueued,
 } from "../index";
 import { MessageFactory } from "nai-gen-x";
-import { buildStoryEnginePrefix, buildXialongNarrativeStyleBlock } from "../../utils/context-builder";
+import {
+  buildStoryEnginePrefix,
+  buildXialongNarrativeStyleBlock,
+} from "../../utils/context-builder";
 import {
   CRUCIBLE_SHAPE_PROMPT,
   FOUNDATION_INTENT_PROMPT,
@@ -151,7 +157,8 @@ const createWorldStateFactory =
 
     const { shape, intent, intensity } = getState().foundation;
     const anchors: string[] = [];
-    if (intensity) anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
+    if (intensity)
+      anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
     if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
     if (intent) anchors.push(`Intent: ${intent}`);
     if (anchors.length > 0) {
@@ -159,7 +166,10 @@ const createWorldStateFactory =
     }
 
     messages.push({ role: "system" as const, content: worldStatePrompt });
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.foundationWorldState);
+    await appendXialongStyleMessage(
+      messages,
+      XIALONG_STYLE.foundationWorldState,
+    );
 
     return {
       messages,
@@ -191,7 +201,8 @@ const createAttgFactory =
 
     const { shape, intent, worldState, intensity } = getState().foundation;
     const anchors: string[] = [];
-    if (intensity) anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
+    if (intensity)
+      anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
     if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
     if (intent) anchors.push(`Intent: ${intent}`);
     if (worldState) anchors.push(`World State: ${worldState}`);
@@ -232,7 +243,8 @@ const createStyleFactory =
 
     const { shape, intent, worldState, intensity } = getState().foundation;
     const anchors: string[] = [];
-    if (intensity) anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
+    if (intensity)
+      anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
     if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
     if (intent) anchors.push(`Intent: ${intent}`);
     if (worldState) anchors.push(`World State: ${worldState}`);
@@ -241,7 +253,10 @@ const createStyleFactory =
     }
 
     messages.push({ role: "system" as const, content: stylePrompt });
-    await appendXialongStyleMessage(messages, buildXialongNarrativeStyleBlock(getState()));
+    await appendXialongStyleMessage(
+      messages,
+      buildXialongNarrativeStyleBlock(getState()),
+    );
 
     return {
       messages,
@@ -271,13 +286,17 @@ const createContractFactory =
     if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
     if (intent) anchors.push(`Intent: ${intent}`);
     if (worldState) anchors.push(`World State: ${worldState}`);
-    if (intensity) anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
+    if (intensity)
+      anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
 
     if (anchors.length > 0) {
       messages.push({ role: "system" as const, content: anchors.join("\n") });
     }
 
-    messages.push({ role: "system" as const, content: CONTRACT_GENERATE_PROMPT });
+    messages.push({
+      role: "system" as const,
+      content: CONTRACT_GENERATE_PROMPT,
+    });
     await appendXialongStyleMessage(messages, XIALONG_STYLE.foundationContract);
 
     return {
@@ -318,14 +337,21 @@ function buildFoundationStrategy(
 
 export function buildIntentStrategy(
   getState: () => RootState,
-  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
+  opts?: {
+    refineContext?: RefineContext;
+    entryId?: string;
+    requestId?: string;
+  },
 ): GenerationStrategy {
   const baseFactory = createIntentFactory(getState);
   const refineContext = opts?.refineContext;
   const messageFactory: MessageFactory = refineContext
     ? async () => {
         const base = await baseFactory();
-        return { ...base, messages: buildRefineTail(base.messages, refineContext) };
+        return {
+          ...base,
+          messages: buildRefineTail(base.messages, refineContext),
+        };
       }
     : baseFactory;
   return {
@@ -338,14 +364,21 @@ export function buildIntentStrategy(
 
 export function buildContractStrategy(
   getState: () => RootState,
-  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
+  opts?: {
+    refineContext?: RefineContext;
+    entryId?: string;
+    requestId?: string;
+  },
 ): GenerationStrategy {
   const baseFactory = createContractFactory(getState);
   const refineContext = opts?.refineContext;
   const messageFactory: MessageFactory = refineContext
     ? async () => {
         const base = await baseFactory();
-        return { ...base, messages: buildRefineTail(base.messages, refineContext) };
+        return {
+          ...base,
+          messages: buildRefineTail(base.messages, refineContext),
+        };
       }
     : baseFactory;
   return {
@@ -358,14 +391,21 @@ export function buildContractStrategy(
 
 export function buildAttgStrategy(
   getState: () => RootState,
-  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
+  opts?: {
+    refineContext?: RefineContext;
+    entryId?: string;
+    requestId?: string;
+  },
 ): GenerationStrategy {
   const baseFactory = createAttgFactory(getState);
   const refineContext = opts?.refineContext;
   const messageFactory: MessageFactory = refineContext
     ? async () => {
         const base = await baseFactory();
-        return { ...base, messages: buildRefineTail(base.messages, refineContext) };
+        return {
+          ...base,
+          messages: buildRefineTail(base.messages, refineContext),
+        };
       }
     : baseFactory;
   return {
@@ -378,14 +418,21 @@ export function buildAttgStrategy(
 
 export function buildStyleStrategy(
   getState: () => RootState,
-  opts?: { refineContext?: RefineContext; entryId?: string; requestId?: string },
+  opts?: {
+    refineContext?: RefineContext;
+    entryId?: string;
+    requestId?: string;
+  },
 ): GenerationStrategy {
   const baseFactory = createStyleFactory(getState);
   const refineContext = opts?.refineContext;
   const messageFactory: MessageFactory = refineContext
     ? async () => {
         const base = await baseFactory();
-        return { ...base, messages: buildRefineTail(base.messages, refineContext) };
+        return {
+          ...base,
+          messages: buildRefineTail(base.messages, refineContext),
+        };
       }
     : baseFactory;
   return {
@@ -404,7 +451,13 @@ function submitFoundation(
   field: "shape" | "intent" | "worldState" | "contract" | "attg" | "style",
 ): void {
   const strategy = buildFoundationStrategy(getState, field);
-  dispatch(requestQueued({ id: strategy.requestId, type: "foundation", targetId: field }));
+  dispatch(
+    requestQueued({
+      id: strategy.requestId,
+      type: "foundation",
+      targetId: field,
+    }),
+  );
   dispatch(generationSubmitted(strategy));
 }
 

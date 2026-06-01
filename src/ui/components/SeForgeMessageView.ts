@@ -5,7 +5,10 @@
  * SeEditableText's viewParts slot.
  */
 
-import type { ForgeSegment, ForgeActionRecord } from "../../core/chat-types/types";
+import type {
+  ForgeSegment,
+  ForgeActionRecord,
+} from "../../core/chat-types/types";
 
 const ELEMENT_LABEL: Record<string, string> = {
   CHARACTER: "Character",
@@ -27,7 +30,10 @@ const ATTEMPT_VERB: Record<ForgeActionRecord["kind"], string> = {
 };
 
 /** Map an outcome record to a chip icon + label. Pure. */
-export function formatForgeChip(a: ForgeActionRecord): { icon: string; label: string } {
+export function formatForgeChip(a: ForgeActionRecord): {
+  icon: string;
+  label: string;
+} {
   if (a.status === "unrecognized") {
     return { icon: "⚠️", label: `Unrecognized · ${a.reason ?? ""}`.trimEnd() };
   }
@@ -41,7 +47,8 @@ export function formatForgeChip(a: ForgeActionRecord): { icon: string; label: st
   }
   switch (a.kind) {
     case "CREATE": {
-      const type = ELEMENT_LABEL[a.elementType ?? ""] ?? a.elementType ?? "Entity";
+      const type =
+        ELEMENT_LABEL[a.elementType ?? ""] ?? a.elementType ?? "Entity";
       return { icon: "➕", label: `${type} · ${a.name ?? ""}` };
     }
     case "REVISE":
@@ -49,7 +56,10 @@ export function formatForgeChip(a: ForgeActionRecord): { icon: string; label: st
     case "DELETE":
       return { icon: "🗑", label: `Deleted · ${a.name ?? ""}` };
     case "RENAME":
-      return { icon: "✏️", label: `Renamed · ${a.name ?? ""} → ${a.newName ?? ""}` };
+      return {
+        icon: "✏️",
+        label: `Renamed · ${a.name ?? ""} → ${a.newName ?? ""}`,
+      };
     case "THREAD":
       return { icon: "🧵", label: `Thread · ${a.name ?? ""}` };
     case "CRITIQUE":
@@ -97,7 +107,11 @@ export function buildForgeMessageView(
       style: CHIP_ROW_STYLE,
       content: [
         text({ id: `${idPrefix}-seg-${i}-icon`, text: icon }),
-        text({ id: `${idPrefix}-seg-${i}-label`, text: label, style: { flex: "1" } }),
+        text({
+          id: `${idPrefix}-seg-${i}-label`,
+          text: label,
+          style: { flex: "1" },
+        }),
       ],
     });
   });

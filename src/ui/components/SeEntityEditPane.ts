@@ -151,8 +151,11 @@ export class SeEntityEditPane extends SuiComponent<
    * single creation path covers every branch and no caller has to special-case
    * "draft vs live".
    */
-  private async _ensureLiveEntryId(entityId: string): Promise<string | undefined> {
-    const existing = store.getState().world.entitiesById[entityId]?.lorebookEntryId;
+  private async _ensureLiveEntryId(
+    entityId: string,
+  ): Promise<string | undefined> {
+    const existing =
+      store.getState().world.entitiesById[entityId]?.lorebookEntryId;
     if (existing) return existing;
 
     const current = store.getState().world.entitiesById[entityId];
@@ -191,7 +194,7 @@ export class SeEntityEditPane extends SuiComponent<
 
     const { entityId } = options;
     const summaryRequestId = `se-entity-summary-${entityId}`;
-    const hasSummary = !!(store.getState().world.entitiesById[entityId]?.summary);
+    const hasSummary = !!store.getState().world.entitiesById[entityId]?.summary;
     this._summaryBtn = new SeGenerationIconButton({
       id: `${options.id}-summary-gen`,
       iconId: "zap" as IconId,
@@ -199,7 +202,10 @@ export class SeEntityEditPane extends SuiComponent<
       hasContent: hasSummary,
       onGenerate: () => {
         store.dispatch(
-          uiEntitySummaryGenerationRequested({ entityId, requestId: summaryRequestId }),
+          uiEntitySummaryGenerationRequested({
+            entityId,
+            requestId: summaryRequestId,
+          }),
         );
       },
     });
@@ -234,7 +240,8 @@ export class SeEntityEditPane extends SuiComponent<
       },
       resolveEntryId: () => this._ensureLiveEntryId(entityId),
       contentChecker: async () => {
-        const id = store.getState().world.entitiesById[entityId]?.lorebookEntryId;
+        const id =
+          store.getState().world.entitiesById[entityId]?.lorebookEntryId;
         if (!id) return false;
         const entry = await api.v1.lorebook.entry(id);
         return !!entry?.text;
@@ -259,7 +266,8 @@ export class SeEntityEditPane extends SuiComponent<
         })();
       },
       contentChecker: async () => {
-        const id = store.getState().world.entitiesById[entityId]?.lorebookEntryId;
+        const id =
+          store.getState().world.entitiesById[entityId]?.lorebookEntryId;
         if (!id) return false;
         const entry = await api.v1.lorebook.entry(id);
         return !!(entry?.keys && entry.keys.length > 0);
@@ -308,7 +316,9 @@ export class SeEntityEditPane extends SuiComponent<
 
     const _close = (): void => {
       store.dispatch(uiEditableDeactivate());
-      store.dispatch(uiLorebookEntrySelected({ entryId: null, categoryId: null }));
+      store.dispatch(
+        uiLorebookEntrySelected({ entryId: null, categoryId: null }),
+      );
       editHost.close();
     };
 
@@ -333,7 +343,9 @@ export class SeEntityEditPane extends SuiComponent<
             oldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
             "gi",
           );
-          for (const other of Object.values(store.getState().world.entitiesById)) {
+          for (const other of Object.values(
+            store.getState().world.entitiesById,
+          )) {
             if (other.id === entityId) continue;
             const updated = other.summary.replace(pattern, trimmedName);
             if (updated !== other.summary) {
@@ -352,7 +364,8 @@ export class SeEntityEditPane extends SuiComponent<
           const rawContent = String(
             (await api.v1.storyStorage.get(L.CONTENT_DRAFT_RAW)) ?? "",
           );
-          const erato = (await api.v1.config.get("erato_compatibility")) || false;
+          const erato =
+            (await api.v1.config.get("erato_compatibility")) || false;
           const content =
             rawContent && erato && !rawContent.startsWith("----\n")
               ? "----\n" + rawContent
@@ -438,14 +451,19 @@ export class SeEntityEditPane extends SuiComponent<
       },
     });
 
-    const [categoryBarPart, summaryBtnPart, deleteConfirmPart, contentGenPart, keysGenPart] =
-      await Promise.all([
-        categoryBar.build(),
-        this._summaryBtn.build(),
-        deleteConfirmBtn.build(),
-        this._contentBtn.build(),
-        this._keysBtn.build(),
-      ]);
+    const [
+      categoryBarPart,
+      summaryBtnPart,
+      deleteConfirmPart,
+      contentGenPart,
+      keysGenPart,
+    ] = await Promise.all([
+      categoryBar.build(),
+      this._summaryBtn.build(),
+      deleteConfirmBtn.build(),
+      this._contentBtn.build(),
+      this._keysBtn.build(),
+    ]);
 
     const parts: UIPart[] = [
       // ── Header ─────────────────────────────────────────────────────────────
@@ -491,10 +509,7 @@ export class SeEntityEditPane extends SuiComponent<
       // ── Summary ────────────────────────────────────────────────────────────
       row({
         style: S.sectionRow,
-        content: [
-          text({ text: "Summary", style: S.rowLabel }),
-          summaryBtnPart,
-        ],
+        content: [text({ text: "Summary", style: S.rowLabel }), summaryBtnPart],
       }),
       multilineTextInput({
         id: EP.CONTENT_INPUT,
@@ -510,10 +525,7 @@ export class SeEntityEditPane extends SuiComponent<
       text({ text: "", style: S.lbDivider }),
       row({
         style: S.sectionRow,
-        content: [
-          text({ text: "Content", style: S.rowLabel }),
-          contentGenPart,
-        ],
+        content: [text({ text: "Content", style: S.rowLabel }), contentGenPart],
       }),
       multilineTextInput({
         id: L.CONTENT_INPUT,
@@ -540,10 +552,12 @@ export class SeEntityEditPane extends SuiComponent<
             style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
             callback: () => {
               _alwaysOnDraft = !_alwaysOnDraft;
-              api.v1.ui.updateParts([{
-                id: L.ALWAYS_ON_TOGGLE,
-                style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
-              } as unknown as Partial<UIPart> & { id: string }]);
+              api.v1.ui.updateParts([
+                {
+                  id: L.ALWAYS_ON_TOGGLE,
+                  style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
+                } as unknown as Partial<UIPart> & { id: string },
+              ]);
             },
           }),
         ],

@@ -5,7 +5,14 @@ export type ChatLifecycle = "save" | "commit-discard";
 export type ChatMessageRole = "system" | "user" | "assistant";
 
 export interface ForgeActionRecord {
-  kind: "CREATE" | "REVISE" | "DELETE" | "RENAME" | "THREAD" | "CRITIQUE" | "UNKNOWN";
+  kind:
+    | "CREATE"
+    | "REVISE"
+    | "DELETE"
+    | "RENAME"
+    | "THREAD"
+    | "CRITIQUE"
+    | "UNKNOWN";
   status: "applied" | "rejected" | "unrecognized";
   /** CREATE element type, e.g. "SYSTEM". */
   elementType?: string;
@@ -116,11 +123,7 @@ export interface ChatTypeSpec<SubMode extends string = string> {
    * Returns ids of entities that should render inline beneath the given message.
    * Called by `ChatPanel` once per message during rebuild. Default: no inline entities.
    */
-  inlineEntityIdsFor?(
-    message: ChatMessage,
-    chat: Chat,
-    ctx: SpecCtx,
-  ): string[];
+  inlineEntityIdsFor?(message: ChatMessage, chat: Chat, ctx: SpecCtx): string[];
 
   /**
    * Handles a user send action for this chat. Return true if the spec fully
