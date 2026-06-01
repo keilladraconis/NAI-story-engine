@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   formatForgeChip,
   buildForgeMessageView,
+  buildForgeStreamView,
 } from "../../../src/ui/components/SeForgeMessageView";
 import type { ForgeSegment } from "../../../src/core/chat-types/types";
+import type { ForgeStreamParse } from "../../../src/core/utils/crucible-command-parser";
 
 describe("formatForgeChip", () => {
   it("formats applied actions", () => {
@@ -106,5 +108,38 @@ describe("buildForgeMessageView", () => {
     expect(parts[0].text).toBe("hello  \nworld");
     expect(parts[1].type).toBe("row");
     expect(parts[1].id).toBe("pfx-seg-1");
+  });
+});
+
+describe("buildForgeStreamView", () => {
+  const settled: ForgeStreamParse["segments"] = [
+    { kind: "action", action: { kind: "CREATE", status: "applied", elementType: "SYSTEM", name: "X" } },
+  ];
+
+  it("appends a tail text part for a pending prose tail", () => {
+    const parts = buildForgeStreamView(
+      { segments: settled, pending: { kind: "prose", text: "Now this" } },
+      "pfx",
+    ) as unknown as Array<{ type: string; id: string; text?: string }>;
+    expect(parts).toHaveLength(2);
+    const tail = parts[parts.length - 1];
+    expect(tail.type).toBe("text");
+    expect(tail.id).toBe("pfx-tail");
+    expect(tail.text).toBe("Now this");
+  });
+
+  it("appends a pending placeholder chip while buffering", () => {
+    const parts = buildForgeStreamView(
+      { segments: settled, pending: { kind: "buffering" } },
+      "pfx",
+    ) as unknown as Array<{ type: string; id: string }>;
+    const tail = parts[parts.length - 1];
+    expect(tail.type).toBe("row");
+    expect(tail.id).toBe("pfx-pending");
+  });
+
+  it("appends nothing for pending none", () => {
+    const parts = buildForgeStreamView({ segments: settled, pending: { kind: "none" } }, "pfx");
+    expect(parts).toHaveLength(1);
   });
 });

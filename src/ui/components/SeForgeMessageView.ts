@@ -9,6 +9,7 @@ import type {
   ForgeSegment,
   ForgeActionRecord,
 } from "../../core/chat-types/types";
+import type { ForgeStreamParse } from "../../core/utils/crucible-command-parser";
 
 const ELEMENT_LABEL: Record<string, string> = {
   CHARACTER: "Character",
@@ -84,6 +85,33 @@ const CHIP_ROW_STYLE = {
   "background-color": "rgba(255,255,255,0.06)",
   "font-size": "0.8em",
 } as const;
+
+const PENDING_CHIP_STYLE = { ...CHIP_ROW_STYLE, opacity: "0.55" } as const;
+
+/** Streaming view: settled prose+chips, plus a live tail (prose / pending chip). */
+export function buildForgeStreamView(parse: ForgeStreamParse, idPrefix: string): UIPart[] {
+  const { row, text } = api.v1.ui.part;
+  const parts = buildForgeMessageView(parse.segments, idPrefix);
+  const { pending } = parse;
+  if (pending.kind === "prose") {
+    const escaped = pending.text.replace(/\n/g, "  \n").replace(/</g, "\\<");
+    parts.push(
+      text({ id: `${idPrefix}-tail`, text: escaped, markdown: true, style: PROSE_STYLE }),
+    );
+  } else if (pending.kind === "buffering") {
+    parts.push(
+      row({
+        id: `${idPrefix}-pending`,
+        style: PENDING_CHIP_STYLE,
+        content: [
+          text({ id: `${idPrefix}-pending-icon`, text: "⏳" }),
+          text({ id: `${idPrefix}-pending-label`, text: "…", style: { flex: "1" } }),
+        ],
+      }),
+    );
+  }
+  return parts;
+}
 
 /** Build the ordered view parts for SeEditableText.viewParts. */
 export function buildForgeMessageView(
