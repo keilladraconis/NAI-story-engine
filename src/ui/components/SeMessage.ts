@@ -13,6 +13,7 @@ import { uiChatRetryGeneration } from "../../core/store";
 import { messageRemoved, messageUpdated } from "../../core/store/slices/chat";
 import type { ChatMessage } from "../../core/chat-types/types";
 import { SeEditableText } from "./SeEditableText";
+import { buildForgeMessageView } from "./SeForgeMessageView";
 
 type SeMessageTheme = { default: { self: { style: object } } };
 type SeMessageState = Record<string, never>;
@@ -99,8 +100,14 @@ export class SeMessage extends SuiComponent<
           deleteBtn,
         ];
 
+    const editableId = `${options.id ?? `se-bs-msg-${message.id}`}-text`;
+    const viewParts =
+      message.forgeSegments && message.forgeSegments.length > 0
+        ? buildForgeMessageView(message.forgeSegments, editableId)
+        : undefined;
+
     this._editable = new SeEditableText({
-      id: `${options.id ?? `se-bs-msg-${message.id}`}-text`,
+      id: editableId,
       label: isUser ? "You" : isSystem ? "Context" : "Assistant",
       placeholder: "Edit message...",
       getContent: () => {
@@ -126,6 +133,7 @@ export class SeMessage extends SuiComponent<
       onSave: (content) =>
         store.dispatch(messageUpdated({ chatId, id: message.id, content })),
       formatDisplay: options.formatDisplay,
+      viewParts,
       extraControls,
     });
   }
