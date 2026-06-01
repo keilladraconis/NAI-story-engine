@@ -214,3 +214,55 @@ describe("stripForgeCommands", () => {
     expect(stripForgeCommands("just a normal reply")).toBe("just a normal reply");
   });
 });
+
+describe("parseCommands — bare TYPE-led leniency", () => {
+  it('accepts [TYPE: "Name" | desc] as a CREATE', () => {
+    const cmds = parseCommands('[SYSTEM: "Apartment Evolution" | progressive transformation]');
+    expect(cmds).toHaveLength(1);
+    expect(cmds[0]).toEqual({
+      kind: "CREATE",
+      elementType: "SYSTEM",
+      name: "Apartment Evolution",
+      content: "progressive transformation",
+    });
+  });
+
+  it('accepts the colon-less form [TYPE "Name" | desc]', () => {
+    const cmds = parseCommands('[CHARACTER "Halloran" | the harbormaster]');
+    expect(cmds).toHaveLength(1);
+    expect(cmds[0].kind).toBe("CREATE");
+    expect((cmds[0] as { elementType: string }).elementType).toBe("CHARACTER");
+  });
+
+  it("is case-insensitive on the type word", () => {
+    const cmds = parseCommands('[location: "Old Quay" | decaying waterfront]');
+    expect((cmds[0] as { elementType: string }).elementType).toBe("LOCATION");
+  });
+
+  it("accepts the multiline bare-TYPE form", () => {
+    const cmds = parseCommands('[FACTION "Dock Guild"]\nThe waterfront labor union.');
+    expect(cmds).toHaveLength(1);
+    expect(cmds[0]).toEqual({
+      kind: "CREATE",
+      elementType: "FACTION",
+      name: "Dock Guild",
+      content: "The waterfront labor union.",
+    });
+  });
+
+  it("rejects an unknown leading word", () => {
+    const cmds = parseCommands('[NOTE: "whatever" | not a type]');
+    expect(cmds).toHaveLength(0);
+  });
+
+  it("rejects an unquoted name", () => {
+    const cmds = parseCommands("[SYSTEM Apartment Evolution | desc]");
+    expect(cmds).toHaveLength(0);
+  });
+
+  it("does not override an explicit CREATE", () => {
+    const cmds = parseCommands('[CREATE SYSTEM "X" | y]');
+    expect(cmds).toHaveLength(1);
+    expect(cmds[0]).toEqual({ kind: "CREATE", elementType: "SYSTEM", name: "X", content: "y" });
+  });
+});

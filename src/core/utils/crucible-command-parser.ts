@@ -222,6 +222,38 @@ function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
     return { command: { kind: "CRITIQUE", text: critiqueMatch[1].trim() }, consumed: 0 };
   }
 
+  // Lenient: a bare element type with no CREATE keyword, with or without a
+  // colon — the forge frequently emits [SYSTEM: "Name" | desc] instead of
+  // [CREATE SYSTEM "Name" | desc]. Gated on the known element types.
+  const bareInline = line.match(
+    /^\[\s*([A-Za-z]+)\s*:?\s+"([^"]+)"\s*\|\s*(.+?)\]?\s*$/,
+  );
+  if (bareInline && bareInline[1].toUpperCase() in TYPE_TO_FIELD) {
+    return {
+      command: {
+        kind: "CREATE",
+        elementType: bareInline[1].toUpperCase(),
+        name: bareInline[2].trim(),
+        content: bareInline[3].trim(),
+      },
+      consumed: 0,
+    };
+  }
+
+  const bareMulti = line.match(/^\[\s*([A-Za-z]+)\s*:?\s+"([^"]+)"\]/);
+  if (bareMulti && bareMulti[1].toUpperCase() in TYPE_TO_FIELD) {
+    const inline = line.slice(bareMulti[0].length).trim();
+    return {
+      command: {
+        kind: "CREATE",
+        elementType: bareMulti[1].toUpperCase(),
+        name: bareMulti[2].trim(),
+        content: collectContent(lines, i + 1, inline),
+      },
+      consumed: countContentLines(lines, i + 1),
+    };
+  }
+
   return null;
 }
 
@@ -277,9 +309,16 @@ function countContentLines(lines: string[], startIdx: number): number {
 
 /** Check if a line starts a new command. */
 function isCommandLine(line: string): boolean {
-  return /^\[\s*(CREATE|REVISE|DESCRIPTION|LINK|DELETE|RENAME|THREAD|CRITIQUE|DONE)\b/.test(
-    line,
-  );
+  if (
+    /^\[\s*(CREATE|REVISE|DESCRIPTION|LINK|DELETE|RENAME|THREAD|CRITIQUE|DONE)\b/.test(
+      line,
+    )
+  ) {
+    return true;
+  }
+  // Bare TYPE-led command (e.g. [SYSTEM: "Name" …]) — a known type + quoted name.
+  const bare = line.match(/^\[\s*([A-Za-z]+)\s*:?\s+"/);
+  return !!bare && bare[1].toUpperCase() in TYPE_TO_FIELD;
 }
 
 /**
