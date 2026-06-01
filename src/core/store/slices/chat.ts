@@ -1,5 +1,5 @@
 import { createSlice } from "nai-store";
-import type { Chat, ChatMessage } from "../../chat-types/types";
+import type { Chat, ChatMessage, ForgeSegment } from "../../chat-types/types";
 
 export interface ChatSliceState {
   chats: Chat[];
@@ -89,6 +89,17 @@ export const chatSlice = createSlice({
         messages: c.messages.filter((m) => m.id !== payload.id),
       })),
 
+    forgeSegmentsSet: (
+      state,
+      payload: { chatId: string; id: string; segments: ForgeSegment[] },
+    ) =>
+      mapChat(state, payload.chatId, (c) => ({
+        ...c,
+        messages: c.messages.map((m) =>
+          m.id === payload.id ? { ...m, forgeSegments: payload.segments } : m,
+        ),
+      })),
+
     messagesPrunedAfter: (state, payload: { chatId: string; id: string }) =>
       mapChat(state, payload.chatId, (c) => {
         const idx = c.messages.findIndex((m) => m.id === payload.id);
@@ -131,6 +142,7 @@ export const {
   messageUpdated,
   messageAppended,
   messageRemoved,
+  forgeSegmentsSet,
   messagesPrunedAfter,
   refineChatOpened,
   refineChatCleared,

@@ -3,6 +3,14 @@ import {
   chatHandler,
   chatRefineHandler,
 } from "../../../../../src/core/store/effects/handlers/chat";
+import {
+  chatSliceReducer,
+  initialChatState,
+  chatCreated,
+  messageAdded,
+  forgeSegmentsSet,
+} from "../../../../../src/core/store/slices/chat";
+import type { ForgeSegment } from "../../../../../src/core/chat-types/types";
 import type {
   ChatTarget,
   ChatRefineTarget,
@@ -120,5 +128,33 @@ describe("streaming handlers", () => {
       type: "chat/messageAppended",
       payload: { chatId: "r1", id: "m1", content: " version" },
     });
+  });
+});
+
+describe("chat slice — forgeSegmentsSet", () => {
+  it("attaches segments to the matching message", () => {
+    let state = initialChatState;
+    state = chatSliceReducer(
+      state,
+      chatCreated({
+        chat: { id: "c1", type: "forge", title: "F", messages: [], seed: { kind: "blank" } },
+      }),
+    );
+    state = chatSliceReducer(
+      state,
+      messageAdded({
+        chatId: "c1",
+        message: { id: "m1", role: "assistant", content: "raw" },
+      }),
+    );
+    const segments: ForgeSegment[] = [
+      { kind: "prose", text: "hi" },
+      { kind: "action", action: { kind: "CREATE", status: "applied", elementType: "SYSTEM", name: "X" } },
+    ];
+    state = chatSliceReducer(state, forgeSegmentsSet({ chatId: "c1", id: "m1", segments }));
+    const msg = state.chats
+      .find((c) => c.id === "c1")!
+      .messages.find((m) => m.id === "m1")!;
+    expect(msg.forgeSegments).toEqual(segments);
   });
 });

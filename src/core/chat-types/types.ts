@@ -4,6 +4,25 @@ export type ChatLifecycle = "save" | "commit-discard";
 
 export type ChatMessageRole = "system" | "user" | "assistant";
 
+export interface ForgeActionRecord {
+  kind: "CREATE" | "REVISE" | "DELETE" | "RENAME" | "THREAD" | "CRITIQUE" | "UNKNOWN";
+  status: "applied" | "rejected" | "unrecognized";
+  /** CREATE element type, e.g. "SYSTEM". */
+  elementType?: string;
+  /** Entity / thread / old name. */
+  name?: string;
+  /** RENAME target name. */
+  newName?: string;
+  /** CRITIQUE body. */
+  text?: string;
+  /** Rejection or unrecognized detail (reason, or the raw line). */
+  reason?: string;
+}
+
+export type ForgeSegment =
+  | { kind: "prose"; text: string }
+  | { kind: "action"; action: ForgeActionRecord };
+
 export interface ChatMessage {
   id: string;
   role: ChatMessageRole;
@@ -15,7 +34,10 @@ export interface ChatMessage {
    * messages distinctly (e.g., cleanup-turn confirmations, parser-rejection
    * warnings). Plain conversational turns leave this undefined.
    */
-  messageKind?: "warning" | "cleanup";
+  messageKind?: "cleanup";
+  /** Ordered display projection of a forge turn (prose runs + action chips),
+   *  built at completion. Display-only; `content` stays the raw canonical text. */
+  forgeSegments?: ForgeSegment[];
 }
 
 export type ChatSeed =
