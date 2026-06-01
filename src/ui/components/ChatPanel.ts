@@ -111,6 +111,7 @@ export class ChatPanel extends SuiComponent<
         id: `se-bs-msg-${msg.id}`,
         chatId: v.id,
         message: msg,
+        forge: v.type === "forge",
       }).build();
       groupParts.push(msgPart);
       const inlineIds = spec.inlineEntityIdsFor?.(msg, v, ctx) ?? [];

@@ -13,7 +13,9 @@ import { uiChatRetryGeneration } from "../../core/store";
 import { messageRemoved, messageUpdated } from "../../core/store/slices/chat";
 import type { ChatMessage } from "../../core/chat-types/types";
 import { SeEditableText } from "./SeEditableText";
-import { buildForgeMessageView } from "./SeForgeMessageView";
+import { buildForgeMessageView, buildForgeStreamView } from "./SeForgeMessageView";
+import { parseForgeStream } from "../../core/utils/crucible-command-parser";
+import { stripThinkingTags } from "../../core/utils/tag-parser";
 
 type SeMessageTheme = { default: { self: { style: object } } };
 type SeMessageState = Record<string, never>;
@@ -24,6 +26,9 @@ export type SeMessageOptions = {
   /** Optional view-only transform (e.g. strip forge command syntax). The edit
    *  textarea still gets the raw stored content. */
   formatDisplay?: (content: string) => string;
+  /** True when this message lives in a forge chat — enables live streaming chips
+   *  for assistant turns that have not yet finalized into `forgeSegments`. */
+  forge?: boolean;
 } & SuiComponentOptions<SeMessageTheme, SeMessageState>;
 
 const BUBBLE_STYLES = {
@@ -102,9 +107,19 @@ export class SeMessage extends SuiComponent<
         ];
 
     const editableId = `${options.id ?? `se-bs-msg-${message.id}`}-text`;
-    const viewParts =
-      message.forgeSegments && message.forgeSegments.length > 0
-        ? buildForgeMessageView(message.forgeSegments, editableId)
+    const hasSegments = !!message.forgeSegments?.length;
+    const viewParts = hasSegments
+      ? buildForgeMessageView(message.forgeSegments!, editableId)
+      : undefined;
+    // Forge assistant turn still streaming (no final segments yet): provisional
+    // live chips parsed from the accumulating content.
+    const liveViewParts =
+      options.forge && message.role === "assistant" && !hasSegments
+        ? () =>
+            buildForgeStreamView(
+              parseForgeStream(stripThinkingTags(this._readContent())),
+              editableId,
+            )
         : undefined;
 
     this._editable = new SeEditableText({
@@ -135,8 +150,25 @@ export class SeMessage extends SuiComponent<
         store.dispatch(messageUpdated({ chatId, id: message.id, content })),
       formatDisplay: options.formatDisplay,
       viewParts,
+      liveViewParts,
       extraControls,
     });
+  }
+
+  private _readContent(): string {
+    const s = store.getState();
+    const { chatId, message } = this.options;
+    if (s.chat.refineChat?.id === chatId) {
+      return (
+        s.chat.refineChat.messages.find((m) => m.id === message.id)?.content ??
+        message.content
+      );
+    }
+    const findContent = (chats: { id: string; messages: ChatMessage[] }[]) =>
+      chats
+        .find((c) => c.id === chatId)
+        ?.messages.find((m) => m.id === message.id)?.content ?? message.content;
+    return findContent(s.chat.chats);
   }
 
   async compose(): Promise<UIPartRow> {
