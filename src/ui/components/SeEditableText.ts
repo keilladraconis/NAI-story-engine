@@ -40,8 +40,6 @@ export type SeEditableTextOptions = {
   label?: string;
   /** Initial view text (markdown) shown before any save. */
   initialDisplay?: string;
-  /** Formatter applied to content before display (e.g. emoji tags). */
-  formatDisplay?: (content: string) => string;
   /** When provided, a StoreWatcher subscription keeps view text live. */
   liveSelector?: (s: RootState) => string;
   /** Use single-line textInput in a compact row layout. Default: false. */
@@ -88,13 +86,7 @@ export class SeEditableText extends SuiComponent<
   }
 
   async compose(): Promise<UIPartRow | UIPartColumn> {
-    const {
-      liveSelector,
-      formatDisplay,
-      singleLine,
-      viewParts,
-      liveViewParts,
-    } = this.options;
+    const { liveSelector, singleLine, viewParts, liveViewParts } = this.options;
 
     if (liveViewParts && liveSelector) {
       this._watcher.watch(liveSelector, () => {
@@ -102,10 +94,9 @@ export class SeEditableText extends SuiComponent<
       });
     } else if (liveSelector && !viewParts) {
       this._watcher.watch(liveSelector, (content) => {
-        const formatted = formatDisplay ? formatDisplay(content) : content;
         const escaped = singleLine
-          ? formatted
-          : formatted.replace(/\n/g, "  \n").replace(/</g, "\\<");
+          ? content
+          : content.replace(/\n/g, "  \n").replace(/</g, "\\<");
         api.v1.ui.updateParts([{ id: this._viewId, text: escaped }]);
       });
     }
@@ -183,11 +174,10 @@ export class SeEditableText extends SuiComponent<
     const content = String(
       (await api.v1.storyStorage.get(EDITABLE_DRAFT_RAW)) || "",
     );
-    const { formatDisplay, onSave, singleLine } = this.options;
-    const displayText = formatDisplay ? formatDisplay(content) : content;
+    const { onSave, singleLine } = this.options;
     const escaped = singleLine
-      ? displayText
-      : displayText.replace(/\n/g, "  \n").replace(/</g, "\\<");
+      ? content
+      : content.replace(/\n/g, "  \n").replace(/</g, "\\<");
     api.v1.ui.updateParts([{ id: this._viewId, text: escaped }]);
     await this.setState({ editing: false });
     onSave?.(content);
@@ -196,18 +186,7 @@ export class SeEditableText extends SuiComponent<
   // ── Builders ──────────────────────────────────────────────
 
   private _buildInitialViewText(): string | undefined {
-    const { getContent, formatDisplay, initialDisplay, singleLine } =
-      this.options;
-    if (formatDisplay) {
-      const raw = getContent();
-      if (typeof raw === "string") {
-        const formatted = formatDisplay(raw);
-        return singleLine
-          ? formatted
-          : formatted.replace(/\n/g, "  \n").replace(/</g, "\\<");
-      }
-    }
-    return initialDisplay;
+    return this.options.initialDisplay;
   }
 
   private _buildSingleLine(): UIPartRow {

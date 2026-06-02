@@ -26,9 +26,6 @@ type SeMessageState = Record<string, never>;
 export type SeMessageOptions = {
   chatId: string;
   message: ChatMessage;
-  /** Optional view-only transform (e.g. strip forge command syntax). The edit
-   *  textarea still gets the raw stored content. */
-  formatDisplay?: (content: string) => string;
   /** True when this message lives in a forge chat — enables live streaming chips
    *  for assistant turns that have not yet finalized into `forgeSegments`. */
   forge?: boolean;
@@ -151,7 +148,6 @@ export class SeMessage extends SuiComponent<
       },
       onSave: (content) =>
         store.dispatch(messageUpdated({ chatId, id: message.id, content })),
-      formatDisplay: options.formatDisplay,
       viewParts,
       liveViewParts,
       extraControls,
