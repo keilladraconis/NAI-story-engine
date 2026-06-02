@@ -530,18 +530,3 @@ function isCommandLine(line: string): boolean {
   const bare = line.match(/^\[\s*([A-Za-z]+)\s*:?\s+"/);
   return !!bare && bare[1].toUpperCase() in TYPE_TO_FIELD;
 }
-
-/**
- * Removes whole-line forge action commands from a message for display, leaving
- * conversational prose. Operates on the single-line command grammar the forge
- * emits; the stored message is unchanged, so parseCommands / extractLastCritique
- * still read the full text.
- */
-export function stripForgeCommands(text: string): string {
-  return text
-    .split("\n")
-    .filter((line) => !isCommandLine(line.trim()))
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
