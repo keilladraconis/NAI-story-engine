@@ -145,7 +145,8 @@ describe("forgeSpec.handleSend", () => {
   it("is a no-op while a forge request is already pending", () => {
     const dispatch = vi.fn();
     const ctx: SpecCtx = {
-      getState: () => stateWith([], { queue: [{ id: "r1", type: "forgeChat" }] }),
+      getState: () =>
+        stateWith([], { queue: [{ id: "r1", type: "forgeChat" }] }),
       dispatch: dispatch as any,
     };
     expect(forgeSpec.handleSend!(chat(), "", ctx)).toBe(true);

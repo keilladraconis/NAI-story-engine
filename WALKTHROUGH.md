@@ -114,30 +114,33 @@ Refine sessions are ephemeral — they don't appear in the Sessions list. When y
 
 ## Step 3: Forge
 
-> _Panel: Story Engine → Forge section_
+> _Panel: Story Engine → Forge section, then the Chat tab_
 
-The Forge builds your world. It reads your Foundation and Brainstorm, then generates world elements — characters, locations, factions, systems, dynamics, topics — through an intent-driven, 12-step phased loop.
+The Forge builds your world. It reads your Foundation and Brainstorm, then generates world elements — characters, locations, factions, systems, situational dynamics, topics — in a **typed forge chat**. Clicking **Forge** opens that chat (in the Chat tab) and runs the first pass; from there you drive it one phase at a time.
 
 **The three phases:**
 
-| Phase      | Steps | What it does                                                                  |
-| ---------- | ----- | ----------------------------------------------------------------------------- |
-| **Sketch** | 1–4   | Populate breadth: characters, locations, situations, systems in broad strokes |
-| **Expand** | 5–8   | Deepen thin entries, add noticeable gaps, cut overlap                         |
-| **Weave**  | 9–12  | Thread structural bonds, spin up situation entries at collision points        |
+| Phase      | What it does                                                                     |
+| ---------- | -------------------------------------------------------------------------------- |
+| **Sketch** | Populate breadth: characters, locations, factions, systems in broad strokes      |
+| **Expand** | Deepen thin entries with behavior-rich detail; cut overlap                       |
+| **Weave**  | Thread structural bonds; author situational-dynamics entries at collision points |
 
-The Forge can emit `[DONE]` during Weave to end early once the world feels complete.
+Each turn streams as live **action chips** (Create / Revise / Delete / Rename / Thread, plus a running critique), and the new or changed elements land as **draft cards** beneath the message. Drafts aren't in your World or lorebook yet — they live in the forge session until you cast them.
 
 **What to do:**
 
-1. Scroll to the **Forge** section in the Story Engine panel.
-2. Optionally type **guidance** in the text field — what should the Forge build? You can leave it blank and it will draw from your Brainstorm (use **Sum** on the Brainstorm tab first if your chat is long — the summary is what the Forge reads).
+1. Scroll to the **Forge** section. Optionally type **guidance** — what should the Forge build? Leave it blank to draw from your Brainstorm (run **Sum** first if the chat is long — the summary is what the Forge reads).
    - Examples: _"Focus on the rival factions"_, _"Give me a mentor figure and a corrupt official"_, _"More locations"_
-3. Click **Forge**. Watch as the AI runs through the phased loop, generating world elements.
+2. Click **Forge**. You're taken to the Chat tab with a **Sketch** pass running and a phase indicator in the header.
+3. **Drive the loop with the single send button:**
+   - **Send with an empty input** to run the next pass — the button reads **⚡ Forge Ahead**. It cycles Sketch → Expand → Weave → Sketch.
+   - **Type a message** to _discuss or instruct_ — the button reads **Send**. The Forge answers conversationally and only changes elements you explicitly ask for (e.g. _"make Elara younger,"_ _"add a dockmaster named Halloran,"_ _"drop the second tavern"_).
+4. Review the draft cards. Each has **Cast** (promote it to a live World entity + lorebook entry) and **Discard**. The header's **Cast All** / **Discard All** act on every draft and end the session.
 
-**Viewing results:** Generated elements appear in the **World** section below, organized by category and optionally grouped into Threads.
+**The Story Contract is enforced.** The Forge honors your Foundation's intensity and Story Contract — it won't introduce anything the contract's PROHIBITED line rules out, and it scales conflict to the intensity (a cozy world gets gentle friction, not betrayal).
 
-**When you're done:** When the Forge signals `[DONE]` or you stop it manually — your world is ready for S.E.G.A.
+**When you're done:** Click **Cast All** to promote every draft into the World section — you're dropped back on the Story Engine tab with World expanded, and your world is ready for S.E.G.A.
 
 ---
 
@@ -255,14 +258,14 @@ From there you can run S.E.G.A. to regenerate lorebook content and keys with Sto
 
 ## Quick Reference
 
-| Tab / Section  | What it does                                      | Key action                                                |
-| -------------- | ------------------------------------------------- | --------------------------------------------------------- |
-| **Chat**       | Brainstorms, summaries, and field refine sessions | Chat, summarize (creates a Summary chat), manage sessions |
-| **Foundation** | Tone, shape, intent, contract, metadata           | Set Intensity → Shape → Intent → Contract → ATTG/Style    |
-| **Forge**      | World element generation                          | Enter guidance → Forge (runs sketch/expand/weave)         |
-| **World**      | World inventory, threads, S.E.G.A.                | Review entities → Run S.E.G.A.                            |
-| **Refine**     | Iterate any field via chat (feather button)       | Open chat → Iterate → Commit                              |
-| **Bootstrap**  | Cold-open writer (header button)                  | Click Bootstrap, then Continue for more paragraphs        |
+| Tab / Section  | What it does                                      | Key action                                                 |
+| -------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| **Chat**       | Brainstorms, summaries, and field refine sessions | Chat, summarize (creates a Summary chat), manage sessions  |
+| **Foundation** | Tone, shape, intent, contract, metadata           | Set Intensity → Shape → Intent → Contract → ATTG/Style     |
+| **Forge**      | World element generation (typed forge chat)       | Forge → empty send = Forge Ahead, type = discuss; Cast All |
+| **World**      | World inventory, threads, S.E.G.A.                | Review entities → Run S.E.G.A.                             |
+| **Refine**     | Iterate any field via chat (feather button)       | Open chat → Iterate → Commit                               |
+| **Bootstrap**  | Cold-open writer (header button)                  | Click Bootstrap, then Continue for more paragraphs         |
 
 ---
 
@@ -280,6 +283,15 @@ From there you can run S.E.G.A. to regenerate lorebook content and keys with Sto
 ---
 
 ## Upgrading
+
+### From 0.12.x
+
+The Forge is now a **typed chat** instead of a one-click loop:
+
+- Clicking **Forge** opens a forge chat in the Chat tab and runs the first **Sketch** pass. Advance the loop by **sending with an empty input** (the button reads **⚡ Forge Ahead** and cycles Sketch → Expand → Weave); **type a message** to discuss or instruct instead (the button reads **Send**, and the Forge only changes what you explicitly ask for). The old separate "Forge Ahead" header button is gone — one button does both, and it can't be spammed into stacking empty turns.
+- Generated elements stream as inline **action chips** and land as **draft cards** in the chat. Drafts aren't in your World or lorebook yet — use a card's **Cast** to promote it, or **Cast All** / **Discard All** in the header to act on all of them and end the session. `WorldEntity` now carries an explicit `draft | live` lifecycle.
+- The Forge honors your **Story Contract** as a binding constraint — it won't introduce anything the PROHIBITED line rules out — and scales conflict to the chosen **Intensity**.
+- World **Threads** replace the older relationship/batch model: `[THREAD]` commands group related entities, and a thread can sync its own lorebook entry.
 
 ### From 0.11.x
 
