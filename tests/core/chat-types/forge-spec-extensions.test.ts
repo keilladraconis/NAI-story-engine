@@ -24,7 +24,10 @@ function entity(over: Partial<WorldEntity>): WorldEntity {
   } as WorldEntity;
 }
 
-function stateWith(entities: WorldEntity[]): RootState {
+function stateWith(
+  entities: WorldEntity[],
+  runtime: { queue?: unknown[]; activeRequest?: unknown } = {},
+): RootState {
   const entitiesById: Record<string, WorldEntity> = {};
   for (const e of entities) entitiesById[e.id] = e;
   return {
@@ -35,6 +38,7 @@ function stateWith(entities: WorldEntity[]): RootState {
       entityIds: entities.map((e) => e.id),
     },
     forge: { tombstonesByChatId: {} },
+    runtime: { queue: [], activeRequest: null, ...runtime },
   } as unknown as RootState;
 }
 
@@ -120,7 +124,7 @@ describe("forgeSpec.inlineEntityIdsFor", () => {
 });
 
 describe("forgeSpec.handleSend", () => {
-  it("empty content is a consumed no-op (forging moved to the header)", () => {
+  it("empty content runs the next pass (Forge Ahead) with no user message", () => {
     const dispatch = vi.fn();
     const ctx: SpecCtx = {
       getState: () => stateWith([]),
@@ -128,6 +132,24 @@ describe("forgeSpec.handleSend", () => {
     };
     const handled = forgeSpec.handleSend!(chat(), "   ", ctx);
     expect(handled).toBe(true);
+    const cont = dispatch.mock.calls.find(
+      ([a]) => a.type === forgeChatContinueRequested.type,
+    );
+    expect(cont).toBeDefined();
+    expect(cont![0].payload).toEqual({ chatId: "fc-1" });
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === messageAdded.type),
+    ).toBe(false);
+  });
+
+  it("is a no-op while a forge request is already pending", () => {
+    const dispatch = vi.fn();
+    const ctx: SpecCtx = {
+      getState: () => stateWith([], { queue: [{ id: "r1", type: "forgeChat" }] }),
+      dispatch: dispatch as any,
+    };
+    expect(forgeSpec.handleSend!(chat(), "", ctx)).toBe(true);
+    expect(forgeSpec.handleSend!(chat(), "more about Vesper", ctx)).toBe(true);
     expect(dispatch).not.toHaveBeenCalled();
   });
 
@@ -159,10 +181,10 @@ describe("forgeSpec.handleSend", () => {
 });
 
 describe("forgeSpec.headerControls", () => {
-  it("includes a forgeAheadButton", () => {
+  it("no longer includes a forgeAheadButton (the send button forges ahead)", () => {
     const ctx: SpecCtx = { getState: () => stateWith([]), dispatch: vi.fn() };
     const kinds = forgeSpec.headerControls(chat(), ctx).map((c) => c.kind);
-    expect(kinds).toContain("forgeAheadButton");
+    expect(kinds).not.toContain("forgeAheadButton");
   });
 
   it("includes a scrubIndicator", () => {

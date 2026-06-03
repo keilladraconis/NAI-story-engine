@@ -65,6 +65,9 @@ export class SeBrainstormInput extends SuiComponent<
   private readonly _watcher: StoreWatcher;
   private readonly _sendBtn: SeGenerationButton;
   private readonly _clearBtn: SeConfirmButton;
+  /** Forge-only send label, flipped live by the input's onChange: "Forge Ahead"
+   *  when empty (runs the next pass), "Send" when there is text to discuss. */
+  private _forgeLabel = "Forge Ahead";
 
   constructor(options: SeBrainstormInputOptions) {
     super(
@@ -74,11 +77,13 @@ export class SeBrainstormInput extends SuiComponent<
     this._watcher = new StoreWatcher();
     this._sendBtn = new SeGenerationButton({
       id: "se-bs-send-btn",
-      // Re-read per build so the label tracks the active chat type
-      // (e.g. "Continue Forging" in a forge session).
+      // Re-read per build/sync so the label tracks the active chat type and,
+      // for a forge session, the current input emptiness (see _forgeLabel).
       labelProvider: () => {
         const chat = visibleChat();
-        return (chat && getChatTypeSpec(chat.type).sendLabel) || "Send";
+        if (!chat) return "Send";
+        if (chat.type === "forge") return this._forgeLabel;
+        return getChatTypeSpec(chat.type).sendLabel || "Send";
       },
       style: { flex: "0.7" },
       onGenerate: () => dispatchSubmit(),
@@ -111,6 +116,19 @@ export class SeBrainstormInput extends SuiComponent<
     });
   }
 
+  /** Set the forge send label from the current input emptiness. No-op off a
+   *  forge chat. setReadyLabel is a harmless no-op before the button is built. */
+  private async _syncForgeLabel(): Promise<void> {
+    const chat = visibleChat();
+    if (chat?.type !== "forge") return;
+    const cur = ((await api.v1.storyStorage.get(INPUT_ID)) as string) || "";
+    const next = cur.trim().length === 0 ? "Forge Ahead" : "Send";
+    if (next !== this._forgeLabel) {
+      this._forgeLabel = next;
+      this._sendBtn.setReadyLabel(next);
+    }
+  }
+
   async compose(): Promise<UIPartColumn> {
     // Dispose previous subscriptions to avoid duplicates on rebuild
     this._watcher.dispose();
@@ -123,13 +141,17 @@ export class SeBrainstormInput extends SuiComponent<
         if (isChatBusyType(s.runtime.activeRequest?.type)) return true;
         return s.runtime.queue.some((r) => isChatBusyType(r.type));
       },
-      (isBusy) => {
+      async (isBusy) => {
         api.v1.ui.updateParts([
           {
             id: INPUT_ID,
             disabled: isBusy,
           } as unknown as Partial<UIPart> & { id: string },
         ]);
+        // When generation frees the input, re-sync the forge label to the
+        // (now usually cleared) input — a programmatic clear after a discuss
+        // send does not fire the input's onChange.
+        if (!isBusy) await this._syncForgeLabel();
       },
     );
 
@@ -137,6 +159,11 @@ export class SeBrainstormInput extends SuiComponent<
     const spec = chat ? getChatTypeSpec(chat.type) : null;
     const placeholder = spec?.inputPlaceholder ?? DEFAULT_PLACEHOLDER;
     const showClear = spec?.showClearButton ?? true;
+
+    // Seed the forge send label from the current input so a rebuild (e.g. tab
+    // switch) shows "Send" vs "Forge Ahead" correctly before the first keystroke.
+    // Runs before build() so labelProvider reads the resolved _forgeLabel.
+    await this._syncForgeLabel();
 
     const sendPart = await this._sendBtn.build();
     const footerContent: UIPart[] = [];
@@ -154,6 +181,17 @@ export class SeBrainstormInput extends SuiComponent<
           placeholder,
           storageKey: `story:${INPUT_ID}`,
           style: { "min-height": "60px", "max-height": "120px" },
+          // Forge only: flip the send button between "Forge Ahead" (empty) and
+          // "Send" (has text) live as the user types.
+          onChange: (value) => {
+            const c = visibleChat();
+            if (c?.type !== "forge") return;
+            const next = value.trim().length === 0 ? "Forge Ahead" : "Send";
+            if (next !== this._forgeLabel) {
+              this._forgeLabel = next;
+              this._sendBtn.setReadyLabel(next);
+            }
+          },
           onSubmit: () => {
             dispatchSubmit();
           },

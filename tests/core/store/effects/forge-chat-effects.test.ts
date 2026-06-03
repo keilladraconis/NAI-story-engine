@@ -68,6 +68,7 @@ function makeState(
     chat: { chats, activeChatId: chats[0]?.id ?? null, refineChat: null },
     world: { groups: [], entitiesById, entityIds: entities.map((e) => e.id) },
     forge: { tombstonesByChatId: {}, pendingScrubByChatId: {} },
+    runtime: { queue: [], activeRequest: null },
   } as unknown as RootState;
 }
 
@@ -99,6 +100,17 @@ function makeHarness(state: RootState) {
 }
 
 describe("forgeChatContinueRequested effect", () => {
+  it("is a no-op while a forge request is already pending (no stacked turn)", async () => {
+    const chat = makeChat({ subMode: "sketch" });
+    const state = makeState([chat], []);
+    (state.runtime as { queue: unknown[] }).queue = [
+      { id: "r1", type: "forgeChat" },
+    ];
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
   it("advances sketch → expand and submits a forgeChat generation", async () => {
     const chat = makeChat({ subMode: "sketch" });
     const draft = makeEntity({

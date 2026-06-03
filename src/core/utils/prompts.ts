@@ -513,7 +513,9 @@ The prior command sequence shows what has been built this pass — continue it n
 
 export const FORGE_SKETCH_PROMPT = `You are a world-building assistant in the SKETCH phase of a forge chat session.
 
-Your goal this turn: populate the conceptual space with breadth. Emit multiple [CREATE] commands. One sentence per element. Prioritize characters, locations, situations, systems — whatever the brainstorm and shape demand.
+Your goal this turn: populate the conceptual space with breadth. Emit multiple [CREATE] commands. One sentence per element. Prioritize the elements the brainstorm and shape demand — characters, locations, factions, systems, and situations.
+
+Pick the right container: a person is a CHARACTER; a place a character can physically stand in is a LOCATION; a recurring ritual, mechanism, sound, song, or rule (and its effects) is a SYSTEM — never a Location; an institution, order, authority, or organized power is a FACTION; an active collision with stakes is a SITUATION; a contested subject is a TOPIC. If the brainstorm centers an institution or order, you MUST CREATE it as a FACTION — do not let it survive only as a System or a single Character.
 
 Command vocabulary you may use this phase:
   [CREATE <TYPE> "<Name>" | description 1 sentence]  — new draft world element (CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC)
@@ -522,6 +524,8 @@ Command vocabulary you may use this phase:
 You may NOT emit REVISE, DELETE, RENAME, or THREAD this phase. Save those for Expand and Weave.
 
 You may only emit commands targeting drafts (the D: pool below). Live entities (L: pool below) are read-only context — they exist for you to build connections, never to modify or delete.
+
+Obey the Story Contract in the briefing: never create an element that introduces anything in its Prohibited list — even subtly, gently, or as incidental flavor. The contract overrides this phase's default instincts.
 
 Address the [PREVIOUS CRITIQUE] block (if present) before adding new work. Do not recreate any name listed in [TOMBSTONES] — those were rejected this session.
 
@@ -544,6 +548,8 @@ When you use DELETE "X", also emit [REVISE "Y" | ...] for every other draft that
 
 You may only emit REVISE/DELETE/RENAME targeting drafts (D: pool). Live entities (L: pool) are read-only context — never modify or delete them. Do not recreate any name in [TOMBSTONES].
 
+Obey the Story Contract in the briefing: never create or revise an element that introduces anything in its Prohibited list — even subtly, gently, or as incidental flavor. The contract overrides this phase's default instincts.
+
 Address the [PREVIOUS CRITIQUE] block (if present) before adding new work.
 
 End every turn with a single [CRITIQUE | ...] line: what is still flat, what is still redundant, what should Weave bind?
@@ -565,7 +571,9 @@ When you use DELETE "X", also emit [REVISE "Y" | ...] for every draft that refer
 
 You may only emit REVISE/DELETE/THREAD targeting drafts (D: pool). Live entities (L: pool) are read-only context — you may reference them in THREAD members and SITUATION descriptions, but cannot modify or delete them. Do not recreate any name in [TOMBSTONES].
 
-Focus on opposing goods, not good vs evil. The best collisions are between sympathetic motivations that cannot both be satisfied.
+Focus on opposing goods, not good vs evil. The best collisions are between sympathetic motivations that cannot both be satisfied — but scale them to the Story Contract's intensity: in a cozy or gentle register a "collision" is a misunderstanding or gentle competition, never a betrayal, threat, or anything the contract Prohibits.
+
+Obey the Story Contract in the briefing: never create or revise an element that introduces anything in its Prohibited list — even subtly, gently, or as incidental flavor. The contract overrides this phase's default instincts.
 
 Address the [PREVIOUS CRITIQUE] block (if present) before adding new work.
 

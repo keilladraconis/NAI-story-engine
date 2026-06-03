@@ -87,7 +87,6 @@ export interface HeaderControl {
     | "castAllButton"
     | "discardAllButton"
     | "phaseIndicator"
-    | "forgeAheadButton"
     | "scrubIndicator";
 }
 

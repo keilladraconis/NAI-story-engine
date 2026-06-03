@@ -20,7 +20,6 @@ import {
 import {
   forgeCastAllRequested,
   forgeDiscardAllRequested,
-  forgeChatContinueRequested,
   forgeScrubNowRequested,
 } from "../../core/store/effects/forge-chat-effects";
 import { StoreWatcher } from "../store-watcher";
@@ -278,17 +277,6 @@ export class ChatHeader extends SuiComponent<
           );
           break;
         }
-        case "forgeAheadButton":
-          built.push(
-            button({
-              id: `${this.id}-forge-ahead`,
-              text: "⚡ Forge Ahead",
-              style: { padding: "2px 8px", "font-size": "0.75em" },
-              callback: () =>
-                store.dispatch(forgeChatContinueRequested({ chatId: chat.id })),
-            }),
-          );
-          break;
         case "discardAllButton": {
           const discardAllBtn = new SeConfirmButton({
             id: `${this.id}-discard-all`,

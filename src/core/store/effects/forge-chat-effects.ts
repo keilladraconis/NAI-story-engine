@@ -156,6 +156,17 @@ function nextPhase(current: string | undefined): "sketch" | "expand" | "weave" {
   return "sketch";
 }
 
+/** True if a forge generation (phase turn or reference scrub) is already queued
+ *  or in flight — forge sends/advances guard on this so a second one is a no-op
+ *  rather than another stacked empty assistant turn. */
+function forgeRequestPending(state: RootState): boolean {
+  const isForge = (t: string): boolean =>
+    t === "forgeChat" || t === "forgeCleanup";
+  const active = state.runtime.activeRequest;
+  if (active && isForge(active.type)) return true;
+  return state.runtime.queue.some((r) => isForge(r.type));
+}
+
 /**
  * Ends a forge session (the explicit close performed by Cast All / Discard All):
  * drops the chat and its transient forge state so the Forge button starts a
@@ -231,6 +242,7 @@ export function registerForgeChatEffects(
       const { chatId } = action.payload;
       const chat = findChat(latest(), chatId);
       if (!chat) return;
+      if (forgeRequestPending(latest())) return;
 
       const assistantId = api.v1.uuid();
       dispatch(
@@ -274,6 +286,9 @@ export function registerForgeChatEffects(
       const { chatId } = action.payload;
       const chat = findChat(latest(), chatId);
       if (!chat) return;
+      // No-op if a forge pass is already queued or running, so repeated Forge
+      // Ahead / empty sends can't stack empty turns + background generations.
+      if (forgeRequestPending(latest())) return;
 
       // Lead off with the deferred references-cleanup (if any) before the phase
       // turn. Queued first, so it runs and scrubs the pool before the phase

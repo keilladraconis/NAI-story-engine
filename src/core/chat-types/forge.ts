@@ -10,7 +10,10 @@ import {
   FORGE_EXPAND_PROMPT,
   FORGE_WEAVE_PROMPT,
 } from "../utils/prompts";
-import { forgeChatDiscussRequested } from "../store/effects/forge-chat-actions";
+import {
+  forgeChatContinueRequested,
+  forgeChatDiscussRequested,
+} from "../store/effects/forge-chat-actions";
 import { messageAdded } from "../store/slices/chat";
 
 type ForgePhase = "sketch" | "expand" | "weave";
@@ -35,11 +38,12 @@ export const forgeSpec: ChatTypeSpec<ForgePhase> = {
   subModes: SUB_MODES,
   defaultSubMode: "sketch",
 
-  // Forge is agentic: the input is for discussing and instructing (the forge
-  // emits actions only for what you ask), while "Forge Ahead" in the header runs
-  // the autonomous expansion pass. Cast All / Discard All end the session, so
-  // there is no Clear button.
-  inputPlaceholder: "Discuss or instruct the forge…",
+  // Forge is agentic and driven by a single button: type to discuss/instruct
+  // (the forge emits actions only for what you ask), or send with an empty input
+  // to run the next autonomous pass ("Forge Ahead"). The send button's label
+  // tracks this (see SeBrainstormInput). Cast All / Discard All end the session,
+  // so there is no Clear button.
+  inputPlaceholder: "Discuss, instruct, or send empty to Forge Ahead…",
   sendLabel: "Send",
   showClearButton: false,
 
@@ -63,7 +67,6 @@ export const forgeSpec: ChatTypeSpec<ForgePhase> = {
     return [
       { id: "phase", kind: "phaseIndicator" },
       { id: "scrub", kind: "scrubIndicator" },
-      { id: "forge-ahead", kind: "forgeAheadButton" },
       { id: "cast-all", kind: "castAllButton" },
       { id: "discard-all", kind: "discardAllButton" },
       { id: "sessions", kind: "sessionsButton" },
@@ -84,10 +87,24 @@ export const forgeSpec: ChatTypeSpec<ForgePhase> = {
   },
 
   handleSend(chat, content, ctx) {
+    // Block while a forge pass (phase turn or reference scrub) is already queued
+    // or running — a second send would only stack another empty assistant turn.
+    const rt = ctx.getState().runtime;
+    const forgePending =
+      rt.activeRequest?.type === "forgeChat" ||
+      rt.activeRequest?.type === "forgeCleanup" ||
+      rt.queue.some((r) => r.type === "forgeChat" || r.type === "forgeCleanup");
+    if (forgePending) return true;
+
     const trimmed = content.trim();
-    // Empty send is a no-op now — running the forge is the "Forge Ahead" header
-    // action, not an empty submit.
-    if (trimmed.length === 0) return true;
+    // Single-button forge: an empty send runs the next autonomous pass (Forge
+    // Ahead); a non-empty send is a discuss/instruct turn. The continue/discuss
+    // effects each guard against a forge request already being in flight, so a
+    // second send while one is pending is a no-op rather than a stacked turn.
+    if (trimmed.length === 0) {
+      ctx.dispatch(forgeChatContinueRequested({ chatId: chat.id }));
+      return true;
+    }
     ctx.dispatch(
       messageAdded({
         chatId: chat.id,

@@ -140,6 +140,22 @@ describe("buildForgeBriefing", () => {
     expect(briefing).toContain("a slow unravelling");
   });
 
+  it("includes the Story Contract as binding constraints, with the Prohibited list", async () => {
+    const getState = () => {
+      const s = makeState();
+      s.foundation.contract = {
+        required: "cozy mystery, found family",
+        prohibited: "death, betrayal, supernatural elements",
+        emphasis: "the healing power of tea",
+      } as RootState["foundation"]["contract"];
+      return s;
+    };
+    const briefing = await buildForgeBriefing(getState);
+    expect(briefing).toContain("Story Contract — binding");
+    expect(briefing).toContain("Prohibited (never introduce");
+    expect(briefing).toContain("death, betrayal, supernatural elements");
+  });
+
   it("returns an empty string when there is no context at all", async () => {
     const getState = () => makeState();
     const briefing = await buildForgeBriefing(getState);

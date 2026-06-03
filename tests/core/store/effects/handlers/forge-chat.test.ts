@@ -400,7 +400,7 @@ describe("forgeChatHandler.completion", () => {
     expect(tombstone![0].payload.tombstone.reason).toBe("model");
   });
 
-  it("does nothing on empty accumulatedText", async () => {
+  it("removes the empty placeholder turn on empty accumulatedText", async () => {
     const dispatch = vi.fn();
     const ctx: CompletionContext<ForgeChatTarget> = {
       target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
@@ -410,7 +410,11 @@ describe("forgeChatHandler.completion", () => {
       generationSucceeded: true,
     };
     await forgeChatHandler.completion(ctx);
-    expect(dispatch).not.toHaveBeenCalled();
+    const removed = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/messageRemoved",
+    );
+    expect(removed).toBeDefined();
+    expect(removed![0].payload).toEqual({ chatId: "c1", id: "m1" });
   });
 });
 

@@ -153,4 +153,47 @@ describe("buildForgeStreamView", () => {
     );
     expect(parts).toHaveLength(1);
   });
+
+  it("shows a budget-wait hint on an empty turn while awaiting budget", () => {
+    const parts = buildForgeStreamView(
+      { segments: [], pending: { kind: "none" } },
+      "pfx",
+      "budget",
+    ) as unknown as Array<{ type: string; id: string }>;
+    expect(parts).toHaveLength(1);
+    expect(parts[0].type).toBe("row");
+    expect(parts[0].id).toBe("pfx-budget-wait");
+  });
+
+  it("shows a presence hint on an empty turn while awaiting the user", () => {
+    const parts = buildForgeStreamView(
+      { segments: [], pending: { kind: "none" } },
+      "pfx",
+      "user",
+    ) as unknown as Array<{ type: string; id: string }>;
+    expect(parts).toHaveLength(1);
+    expect(parts[0].id).toBe("pfx-budget-wait");
+  });
+
+  it("does NOT show the wait hint once chips have streamed, even while waiting", () => {
+    const parts = buildForgeStreamView(
+      { segments: settled, pending: { kind: "none" } },
+      "pfx",
+      "budget",
+    );
+    expect(parts).toHaveLength(1);
+    expect(
+      (parts as unknown as Array<{ id: string }>).some(
+        (p) => p.id === "pfx-budget-wait",
+      ),
+    ).toBe(false);
+  });
+
+  it("defaults to no hint when budgetWait is omitted", () => {
+    const parts = buildForgeStreamView(
+      { segments: [], pending: { kind: "none" } },
+      "pfx",
+    );
+    expect(parts).toHaveLength(0);
+  });
 });

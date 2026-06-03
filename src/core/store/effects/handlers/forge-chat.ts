@@ -14,6 +14,7 @@ import {
 import {
   messageAppended,
   messageUpdated,
+  messageRemoved,
   forgeSegmentsSet,
 } from "../../slices/chat";
 import { tombstoneAdded } from "../../slices/forge";
@@ -368,7 +369,14 @@ export const forgeChatHandler: GenerationHandlers<ForgeChatTarget> = {
   },
 
   async completion(ctx: CompletionContext<ForgeChatTarget>): Promise<void> {
-    if (!ctx.accumulatedText) return;
+    if (!ctx.accumulatedText) {
+      // Cancelled or returned nothing before any tokens streamed: drop the empty
+      // placeholder turn instead of leaving a blank bubble behind.
+      ctx.dispatch(
+        messageRemoved({ chatId: ctx.target.chatId, id: ctx.target.messageId }),
+      );
+      return;
+    }
     const cleaned = stripThinkingTags(ctx.accumulatedText);
     ctx.dispatch(
       messageUpdated({
@@ -409,7 +417,13 @@ export const forgeCleanupHandler: GenerationHandlers<ForgeCleanupTarget> = {
   },
 
   async completion(ctx: CompletionContext<ForgeCleanupTarget>): Promise<void> {
-    if (!ctx.accumulatedText) return;
+    if (!ctx.accumulatedText) {
+      // Same as the phase turn: a cancelled/empty cleanup leaves no husk.
+      ctx.dispatch(
+        messageRemoved({ chatId: ctx.target.chatId, id: ctx.target.messageId }),
+      );
+      return;
+    }
     const cleaned = stripThinkingTags(ctx.accumulatedText);
     ctx.dispatch(
       messageUpdated({

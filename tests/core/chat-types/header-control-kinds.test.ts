@@ -12,7 +12,6 @@ describe("HeaderControl.kind union", () => {
       | "castAllButton"
       | "discardAllButton"
       | "phaseIndicator"
-      | "forgeAheadButton"
       | "scrubIndicator"
     >();
   });

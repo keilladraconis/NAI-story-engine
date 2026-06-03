@@ -473,6 +473,17 @@ export class SeGenerationButton extends SuiComponent<
     return this.options.labelProvider?.() ?? this.options.label ?? "";
   }
 
+  /** Live-update the ready ("gen") button label without a rebuild — used by the
+   *  forge input to flip between "Send" and "Forge Ahead" as the user types.
+   *  Only the gen button's text changes; its show/hide is owned by _syncButton,
+   *  and the busy-state buttons (queue/cancel/wait) keep their own labels. */
+  setReadyLabel(label: string): void {
+    const { iconId } = this.options;
+    api.v1.ui.updateParts([
+      { id: `${this.id}-gen`, text: `${iconId ? "" : "⚡"} ${label}` },
+    ]);
+  }
+
   private _buildButtonPart(): UIPartRow {
     const { iconId, style = {} } = this.options;
     const label = this._resolveLabel();

@@ -327,11 +327,13 @@ export function formatFoundationBlock(state: RootState): string {
     parts.push(`Intensity: ${intensity.level} — ${intensity.description}`);
   if (contract) {
     const contractLines = [
-      `Required: ${contract.required}`,
-      `Prohibited: ${contract.prohibited}`,
-      `Emphasis: ${contract.emphasis}`,
+      `Required (must deliver): ${contract.required}`,
+      `Prohibited (never introduce, even subtly, gently, or as incidental flavor): ${contract.prohibited}`,
+      `Emphasis (foreground): ${contract.emphasis}`,
     ].join("\n");
-    parts.push(`Story Contract:\n${contractLines}`);
+    parts.push(
+      `Story Contract — binding constraints, honor every line:\n${contractLines}`,
+    );
   }
   return parts.length > 0 ? `[NARRATIVE FOUNDATION]\n${parts.join("\n")}` : "";
 }

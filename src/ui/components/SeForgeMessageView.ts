@@ -88,10 +88,48 @@ const CHIP_ROW_STYLE = {
 
 const PENDING_CHIP_STYLE = { ...CHIP_ROW_STYLE, opacity: "0.55" } as const;
 
-/** Streaming view: settled prose+chips, plus a live tail (prose / pending chip). */
+const WAIT_HINT_STYLE = {
+  "align-items": "flex-start",
+  gap: "6px",
+  padding: "3px 8px",
+  margin: "2px 0",
+  "border-radius": "6px",
+  "background-color": "rgba(255,255,255,0.04)",
+  "font-size": "0.8em",
+  "font-style": "italic",
+  opacity: "0.7",
+} as const;
+
+/**
+ * Why a forge turn is sitting empty. Lets the streaming view show a "paused, not
+ * crashed" hint while the GenX budget bucket is awaiting (`budget`) or a presence
+ * interaction (`user`). The authoritative Continue button / live countdown lives
+ * in the bottom bar (SeBudgetFeedback); this is just the in-bubble explanation.
+ */
+export type BudgetWaitHint = "none" | "budget" | "user";
+
+const WAIT_HINT_COPY: Record<
+  Exclude<BudgetWaitHint, "none">,
+  { icon: string; label: string }
+> = {
+  budget: {
+    icon: "⏳",
+    label: "Output token budget exhausted — waiting for more tokens…",
+  },
+  user: {
+    icon: "⏸",
+    label:
+      "Output token budget exhausted — press Continue (below) to wait for more tokens.",
+  },
+};
+
+/** Streaming view: settled prose+chips, plus a live tail (prose / pending chip).
+ *  When the turn is still empty and GenX is awaiting budget/presence, show a
+ *  "paused" hint so the empty bubble does not read as a crash. */
 export function buildForgeStreamView(
   parse: ForgeStreamParse,
   idPrefix: string,
+  budgetWait: BudgetWaitHint = "none",
 ): UIPart[] {
   const { row, text } = api.v1.ui.part;
   const parts = buildForgeMessageView(parse.segments, idPrefix);
@@ -116,6 +154,28 @@ export function buildForgeStreamView(
           text({
             id: `${idPrefix}-pending-label`,
             text: "…",
+            style: { flex: "1" },
+          }),
+        ],
+      }),
+    );
+  }
+
+  // Empty turn while the budget bucket is awaiting: surface a "paused" hint in
+  // place of a blank bubble. Only when nothing has streamed yet — a turn that
+  // already has chips/prose reads as in-progress on its own.
+  const isEmpty = parse.segments.length === 0 && pending.kind === "none";
+  if (isEmpty && budgetWait !== "none") {
+    const copy = WAIT_HINT_COPY[budgetWait];
+    parts.push(
+      row({
+        id: `${idPrefix}-budget-wait`,
+        style: WAIT_HINT_STYLE,
+        content: [
+          text({ id: `${idPrefix}-budget-wait-icon`, text: copy.icon }),
+          text({
+            id: `${idPrefix}-budget-wait-label`,
+            text: copy.label,
             style: { flex: "1" },
           }),
         ],
