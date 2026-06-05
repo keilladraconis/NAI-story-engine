@@ -53,7 +53,6 @@ export function migrateBrainstormToChat(
       chat: {
         chats,
         activeChatId: active?.id ?? null,
-        refineChat: null,
       },
     },
   };

@@ -4,7 +4,6 @@ import type { Chat, ChatMessage, ForgeSegment } from "../../chat-types/types";
 export interface ChatSliceState {
   chats: Chat[];
   activeChatId: string | null;
-  refineChat: Chat | null;
 }
 
 function makeDefaultBrainstorm(): Chat {
@@ -22,7 +21,6 @@ const seedChat = makeDefaultBrainstorm();
 export const initialChatState: ChatSliceState = {
   chats: [seedChat],
   activeChatId: seedChat.id,
-  refineChat: null,
 };
 
 function mapChat(
@@ -30,9 +28,6 @@ function mapChat(
   id: string,
   fn: (c: Chat) => Chat,
 ): ChatSliceState {
-  if (state.refineChat?.id === id) {
-    return { ...state, refineChat: fn(state.refineChat) };
-  }
   return { ...state, chats: state.chats.map((c) => (c.id === id ? fn(c) : c)) };
 }
 
@@ -123,25 +118,16 @@ export const chatSlice = createSlice({
         return { ...c, messages: c.messages.slice(0, cut) };
       }),
 
-    refineChatOpened: (state, payload: { chat: Chat }) => {
-      if (state.refineChat) return state; // single-slot collision: ignore
-      return { ...state, refineChat: payload.chat };
-    },
-
-    refineChatCleared: (state) => ({ ...state, refineChat: null }),
-
-    refineCandidateMarked: (state, payload: { messageId: string }) => {
-      if (!state.refineChat) return state;
-      return {
-        ...state,
-        refineChat: {
-          ...state.refineChat,
-          messages: state.refineChat.messages.map((m) =>
-            m.id === payload.messageId ? { ...m, refineCandidate: true } : m,
-          ),
-        },
-      };
-    },
+    refineCandidateMarked: (
+      state,
+      payload: { chatId: string; messageId: string },
+    ) =>
+      mapChat(state, payload.chatId, (c) => ({
+        ...c,
+        messages: c.messages.map((m) =>
+          m.id === payload.messageId ? { ...m, refineCandidate: true } : m,
+        ),
+      })),
   },
 });
 
@@ -158,8 +144,6 @@ export const {
   messageRemoved,
   forgeSegmentsSet,
   messagesPrunedAfter,
-  refineChatOpened,
-  refineChatCleared,
   refineCandidateMarked,
 } = chatSlice.actions;
 

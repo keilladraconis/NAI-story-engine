@@ -5,6 +5,7 @@ import {
   uiChatRetryGeneration,
   uiChatSummarizeRequested,
   uiChatRefineRequested,
+  uiChatRefineGenerateRequested,
   uiChatRefineCommitted,
   uiChatRefineDiscarded,
   uiCancelRequest,
@@ -13,11 +14,11 @@ import {
 import { requestQueued } from "../slices/runtime";
 import {
   chatCreated,
+  chatSwitched,
+  chatDeleted,
   messageAdded,
   messageRemoved,
   messagesPrunedAfter,
-  refineChatOpened,
-  refineChatCleared,
 } from "../slices/chat";
 import { getChatTypeSpec } from "../../chat-types";
 import type { Chat } from "../../chat-types/types";
@@ -27,7 +28,6 @@ import { flushActiveEditor } from "../../../ui/framework/editable-draft";
 import { IDS } from "../../../ui/framework/ids";
 
 function findChat(state: RootState, id: string): Chat | undefined {
-  if (state.chat.refineChat?.id === id) return state.chat.refineChat;
   return state.chat.chats.find((c) => c.id === id);
 }
 
@@ -166,7 +166,7 @@ export function registerChatEffects(
     },
   );
 
-  // Intent: Refine Open — single-slot; toast on empty source or collision
+  // Intent: Refine Open — create (or reuse) a refine chat in chats[] for a field
   subscribeEffect(
     matchesAction(uiChatRefineRequested),
     async (action, { getState: latest }) => {
@@ -177,10 +177,14 @@ export function registerChatEffects(
         });
         return;
       }
-      if (latest().chat.refineChat) {
-        api.v1.ui.toast("Finish or discard the current refine first.", {
-          type: "warning",
-        });
+      // Reuse an open refine for this field (it may be backgrounded) rather than
+      // stacking duplicates; otherwise open a fresh one. chatCreated foregrounds
+      // it (and plugin.ts switches to the Chat tab for refine chats).
+      const existing = latest().chat.chats.find(
+        (c) => c.type === "refine" && c.refineTarget?.fieldId === fieldId,
+      );
+      if (existing) {
+        dispatch(chatSwitched({ id: existing.id }));
         return;
       }
       const spec = getChatTypeSpec("refine");
@@ -198,29 +202,58 @@ export function registerChatEffects(
         seed,
         refineTarget: { fieldId, originalText: sourceText, entryId },
       };
-      dispatch(refineChatOpened({ chat: refine }));
+      dispatch(chatCreated({ chat: refine }));
     },
   );
 
-  // Intent: Refine Discard — cancel any in-flight refine request, clear slot
+  // Intent: Refine Generate — add a fresh assistant candidate placeholder and
+  // run a refine generation. The strategy decides rewrite (seeded snapshot
+  // present) vs fresh field generation (snapshot deleted).
+  subscribeEffect(
+    matchesAction(uiChatRefineGenerateRequested),
+    async (action, { getState: latest }) => {
+      const { chatId } = action.payload;
+      const rt = latest().runtime;
+      const pending =
+        rt.activeRequest?.type === "chatRefine" ||
+        rt.queue.some((r) => r.type === "chatRefine");
+      if (pending) return;
+      const chat = findChat(latest(), chatId);
+      if (!chat) return;
+      const assistantId = api.v1.uuid();
+      dispatch(
+        messageAdded({
+          chatId,
+          message: { id: assistantId, role: "assistant", content: "" },
+        }),
+      );
+      const refreshed = findChat(latest(), chatId);
+      if (!refreshed) return;
+      await submitChatGeneration(latest, dispatch, refreshed, assistantId);
+    },
+  );
+
+  // Intent: Refine Discard — cancel any in-flight refine request, delete the chat
   subscribeEffect(
     matchesAction(uiChatRefineDiscarded),
-    async (_action, { getState: latest }) => {
-      const refine = latest().chat.refineChat;
-      if (!refine) return;
+    async (action, { getState: latest }) => {
+      const { chatId } = action.payload;
+      const refine = findChat(latest(), chatId);
+      if (!refine || refine.type !== "refine") return;
       const inflightId = latest().runtime.activeRequest?.id;
       if (inflightId && inflightId.startsWith(`refine-${refine.id}`)) {
         dispatch(uiCancelRequest({ requestId: inflightId }));
       }
-      dispatch(refineChatCleared());
+      dispatch(chatDeleted({ id: chatId }));
     },
   );
 
-  // Intent: Refine Commit — let spec apply candidate to field, then clear slot
+  // Intent: Refine Commit — apply the candidate to the field, then delete the chat
   subscribeEffect(
     matchesAction(uiChatRefineCommitted),
-    async (_action, { getState: latest }) => {
-      const refine = latest().chat.refineChat;
+    async (action, { getState: latest }) => {
+      const { chatId } = action.payload;
+      const refine = findChat(latest(), chatId);
       if (!refine?.refineTarget) return;
       const hasCandidate = refine.messages.some(
         (m) => m.role === "assistant" && m.content.trim().length > 0,
@@ -228,7 +261,7 @@ export function registerChatEffects(
       if (!hasCandidate) return;
       const spec = getChatTypeSpec("refine");
       spec.onCommit?.(refine, { getState: latest, dispatch });
-      dispatch(refineChatCleared());
+      dispatch(chatDeleted({ id: chatId }));
     },
   );
 }

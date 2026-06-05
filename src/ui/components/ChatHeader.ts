@@ -17,13 +17,8 @@ import {
   chatCreated,
   chatSwitched,
 } from "../../core/store/slices/chat";
-import {
-  forgeCastAllRequested,
-  forgeDiscardAllRequested,
-  forgeScrubNowRequested,
-} from "../../core/store/effects/forge-chat-effects";
+import { forgeScrubNowRequested } from "../../core/store/effects/forge-chat-effects";
 import { StoreWatcher } from "../store-watcher";
-import { SeConfirmButton } from "./SeConfirmButton";
 import type { Chat } from "../../core/chat-types/types";
 
 type Theme = { default: { self: { style: object } } };
@@ -33,6 +28,9 @@ export type ChatHeaderOptions = {
   /** Resolves the chat to render the header for; called at compose time. */
   chatProvider: () => Chat | null;
   onOpenSessions?: () => void;
+  /** Leave the chat view (returns to the Story Engine tab) without ending the
+   *  session. Wired by the "Back" header control (forge + refine). */
+  onBack?: () => void;
 } & SuiComponentOptions<Theme, State>;
 
 const MODE_ACTIVE_COWRITER = "rgba(80,200,120,0.25)";
@@ -92,9 +90,7 @@ export class ChatHeader extends SuiComponent<
     // changes are handled by ChatPanel's outer rebuild — this watcher ignores them.
     this._watcher.watch(
       (s) => {
-        const active =
-          s.chat.refineChat ??
-          s.chat.chats.find((c) => c.id === s.chat.activeChatId);
+        const active = s.chat.chats.find((c) => c.id === s.chat.activeChatId);
         return {
           id: active?.id ?? null,
           title: active?.title ?? "",
@@ -129,13 +125,16 @@ export class ChatHeader extends SuiComponent<
     const ctx = { getState: store.getState, dispatch: store.dispatch };
     const controls = spec.headerControls(chat, ctx);
 
-    const built: UIPart[] = [
-      text({
-        id: titleId,
-        text: chat.title,
-        style: { flex: "1", "font-size": "0.85em", opacity: "0.8" },
-      }),
-    ];
+    // The forge Back button renders flush-left, ahead of the flex-filling
+    // title (the title's `flex: 1` would otherwise push it to the right edge).
+    // Collected separately so it lands first in the row.
+    const leading: UIPart[] = [];
+    const titlePart = text({
+      id: titleId,
+      text: chat.title,
+      style: { flex: "1", "font-size": "0.85em", "font-weight": "bold" },
+    });
+    const built: UIPart[] = [];
 
     for (const c of controls) {
       switch (c.kind) {
@@ -231,19 +230,18 @@ export class ChatHeader extends SuiComponent<
           );
           break;
         }
-        case "castAllButton": {
-          const castAllBtn = new SeConfirmButton({
-            id: `${this.id}-cast-all`,
-            label: "Cast All",
-            confirmLabel: "Cast all drafts?",
-            style: { "font-size": "0.75em", padding: "2px 8px" },
-            onConfirm: async () => {
-              store.dispatch(forgeCastAllRequested({ chatId: chat.id }));
-            },
-          });
-          built.push(await castAllBtn.build());
+        case "backButton":
+          // Simple bare back arrow, matching the Entity Edit pane header
+          // (SeContentWithTitlePane): icon-only, default button styling.
+          leading.push(
+            button({
+              id: `${this.id}-back`,
+              text: "",
+              iconId: "arrow-left" as IconId,
+              callback: () => this.options.onBack?.(),
+            }),
+          );
           break;
-        }
         case "scrubIndicator": {
           const scrubId = `${this.id}-scrub`;
           const scrubStyle = (count: number): object => ({
@@ -277,19 +275,6 @@ export class ChatHeader extends SuiComponent<
           );
           break;
         }
-        case "discardAllButton": {
-          const discardAllBtn = new SeConfirmButton({
-            id: `${this.id}-discard-all`,
-            label: "Discard All",
-            confirmLabel: "Discard all drafts?",
-            style: { "font-size": "0.75em", padding: "2px 8px" },
-            onConfirm: async () => {
-              store.dispatch(forgeDiscardAllRequested({ chatId: chat.id }));
-            },
-          });
-          built.push(await discardAllBtn.build());
-          break;
-        }
         default:
           break;
       }
@@ -304,7 +289,7 @@ export class ChatHeader extends SuiComponent<
         "border-bottom": "1px solid rgba(255,255,255,0.1)",
         "flex-shrink": "0",
       },
-      content: built,
+      content: [...leading, titlePart, ...built],
     });
   }
 }

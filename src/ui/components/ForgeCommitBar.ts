@@ -1,37 +1,45 @@
 /**
- * RefineCommitBar — two-button row for refine chat commit/discard.
- * Commit is enabled only when the refine chat has at least one non-empty
- * assistant message; Discard is always enabled.
+ * ForgeCommitBar — two-button [Discard]/[Commit] row for a forge chat, mirroring
+ * RefineCommitBar. Both buttons END the forge session (delete the chat):
+ *   - Discard (always enabled): tombstone + delete every draft, then close.
+ *   - Commit (enabled when ≥1 draft): cast every draft to live, then close.
+ *
+ * The bar resolves the active forge chat from the store at compose and at click
+ * time, so a stale closure can never act on the wrong (or an already-closed)
+ * chat.
  */
 
 import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
 import {
-  uiChatRefineCommitted,
-  uiChatRefineDiscarded,
-} from "../../core/store/slices/ui";
+  forgeCastAllRequested,
+  forgeDiscardAllRequested,
+} from "../../core/store/effects/forge-chat-effects";
 import { StoreWatcher } from "../store-watcher";
 import type { RootState } from "../../core/store/types";
-import type { Chat } from "../../core/chat-types/types";
 
 type Theme = { default: { self: { style: object } } };
 type State = { commitEnabled: boolean };
 
-export type RefineCommitBarOptions = SuiComponentOptions<Theme, State>;
+export type ForgeCommitBarOptions = SuiComponentOptions<Theme, State>;
 
-/** The active chat if it is a refine, else null. */
-function activeRefineChat(state: RootState): Chat | null {
+/** The currently-visible forge chat's id, or null if the active chat is not a
+ *  forge (a brainstorm / summary / refine is active). */
+function activeForgeChatId(state: RootState): string | null {
   const { activeChatId, chats } = state.chat;
   const chat = chats.find((c) => c.id === activeChatId);
-  return chat?.type === "refine" ? chat : null;
+  return chat?.type === "forge" ? chat.id : null;
 }
 
-function hasCandidate(state: RootState): boolean {
-  const refine = activeRefineChat(state);
-  if (!refine) return false;
-  return refine.messages.some(
-    (m) => m.role === "assistant" && m.content.trim().length > 0,
-  );
+function draftCount(state: RootState, chatId: string): number {
+  return Object.values(state.world.entitiesById).filter(
+    (e) => e.lifecycle === "draft" && e.sourceChatId === chatId,
+  ).length;
+}
+
+function hasDrafts(state: RootState): boolean {
+  const id = activeForgeChatId(state);
+  return !!id && draftCount(state, id) > 0;
 }
 
 const DISCARD_STYLE = {
@@ -57,17 +65,17 @@ function commitStyle(enabled: boolean): Record<string, string> {
   };
 }
 
-export class RefineCommitBar extends SuiComponent<
+export class ForgeCommitBar extends SuiComponent<
   Theme,
   State,
-  RefineCommitBarOptions,
+  ForgeCommitBarOptions,
   UIPartRow
 > {
   private readonly _watcher: StoreWatcher;
 
-  constructor(options: RefineCommitBarOptions) {
+  constructor(options: ForgeCommitBarOptions) {
     super(
-      { state: { commitEnabled: hasCandidate(store.getState()) }, ...options },
+      { state: { commitEnabled: hasDrafts(store.getState()) }, ...options },
       { default: { self: { style: {} } } },
     );
     this._watcher = new StoreWatcher();
@@ -76,7 +84,7 @@ export class RefineCommitBar extends SuiComponent<
   async compose(): Promise<UIPartRow> {
     this._watcher.dispose();
     this._watcher.watch(
-      (s: RootState) => hasCandidate(s),
+      (s: RootState) => hasDrafts(s),
       (enabled: boolean) => {
         if (enabled !== this.state.commitEnabled) {
           void this.setState({ commitEnabled: enabled });
@@ -94,9 +102,8 @@ export class RefineCommitBar extends SuiComponent<
           text: "Discard",
           style: DISCARD_STYLE,
           callback: () => {
-            const refine = activeRefineChat(store.getState());
-            if (refine)
-              store.dispatch(uiChatRefineDiscarded({ chatId: refine.id }));
+            const id = activeForgeChatId(store.getState());
+            if (id) store.dispatch(forgeDiscardAllRequested({ chatId: id }));
           },
         }),
         button({
@@ -105,9 +112,8 @@ export class RefineCommitBar extends SuiComponent<
           disabled: !this.state.commitEnabled,
           style: commitStyle(this.state.commitEnabled),
           callback: () => {
-            const refine = activeRefineChat(store.getState());
-            if (refine)
-              store.dispatch(uiChatRefineCommitted({ chatId: refine.id }));
+            const id = activeForgeChatId(store.getState());
+            if (id) store.dispatch(forgeCastAllRequested({ chatId: id }));
           },
         }),
       ],

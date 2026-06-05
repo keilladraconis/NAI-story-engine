@@ -87,7 +87,7 @@ describe("chatRefineHandler.completion", () => {
       },
       {
         type: "chat/refineCandidateMarked",
-        payload: { messageId: "m1" },
+        payload: { chatId: "r1", messageId: "m1" },
       },
     ]);
   });

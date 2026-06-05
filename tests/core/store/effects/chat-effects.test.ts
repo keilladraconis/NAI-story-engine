@@ -6,10 +6,7 @@ import {
   uiChatRefineRequested,
   uiChatSubmitUserMessage,
 } from "../../../../src/core/store/slices/ui";
-import {
-  refineChatOpened,
-  chatCreated,
-} from "../../../../src/core/store/slices/chat";
+import { chatCreated } from "../../../../src/core/store/slices/chat";
 import type { Chat } from "../../../../src/core/chat-types/types";
 import type { Action } from "nai-store";
 import type { RootState, AppDispatch } from "../../../../src/core/store/types";
@@ -52,13 +49,16 @@ function makeHarness() {
     const minimalRefineChat: Chat = {
       id: "refine-initial",
       type: "refine",
-      title: "Refining: existing",
+      title: "Refining: intent",
       messages: [],
       seed: { kind: "fromField", sourceFieldId: "intent", sourceText: "seed" },
       refineTarget: { fieldId: "intent", originalText: "seed" },
     };
-    store.dispatch(refineChatOpened({ chat: minimalRefineChat }));
+    store.dispatch(chatCreated({ chat: minimalRefineChat }));
   };
+
+  const refineChats = () =>
+    store.getState().chat.chats.filter((c) => c.type === "refine");
 
   return {
     store,
@@ -66,6 +66,7 @@ function makeHarness() {
     getState,
     toast: vi.mocked(api.v1.ui.toast),
     openInitialRefine,
+    refineChats,
   };
 }
 
@@ -77,7 +78,7 @@ describe("chat-effects: refine submit", () => {
   });
 
   it("uiChatRefineRequested with empty source toasts and bails", async () => {
-    const { dispatchAndWait, getState, toast } = makeHarness();
+    const { dispatchAndWait, toast, refineChats } = makeHarness();
     await dispatchAndWait(
       uiChatRefineRequested({ fieldId: "intent", sourceText: "  " }),
     );
@@ -85,32 +86,32 @@ describe("chat-effects: refine submit", () => {
       expect.stringMatching(/empty/i),
       expect.any(Object),
     );
-    expect(getState().chat.refineChat).toBeNull();
+    expect(refineChats()).toHaveLength(0);
   });
 
-  it("uiChatRefineRequested while refineChat already set toasts and bails", async () => {
-    const { dispatchAndWait, getState, toast, openInitialRefine } =
+  it("uiChatRefineRequested reuses the open refine for the same field", async () => {
+    const { dispatchAndWait, getState, openInitialRefine, refineChats } =
       makeHarness();
     openInitialRefine();
-    expect(getState().chat.refineChat).not.toBeNull();
+    expect(refineChats()).toHaveLength(1);
     await dispatchAndWait(
-      uiChatRefineRequested({ fieldId: "attg", sourceText: "x" }),
+      uiChatRefineRequested({ fieldId: "intent", sourceText: "x" }),
     );
-    expect(toast).toHaveBeenCalledWith(
-      expect.stringMatching(/finish or discard/i),
-      expect.any(Object),
-    );
+    // No duplicate — the existing refine is reused and re-foregrounded.
+    expect(refineChats()).toHaveLength(1);
+    expect(getState().chat.activeChatId).toBe("refine-initial");
   });
 
-  it("uiChatRefineRequested with valid input opens the refine slot", async () => {
-    const { dispatchAndWait, getState } = makeHarness();
+  it("uiChatRefineRequested with valid input creates a refine chat", async () => {
+    const { dispatchAndWait, getState, refineChats } = makeHarness();
     await dispatchAndWait(
       uiChatRefineRequested({ fieldId: "intent", sourceText: "old text" }),
     );
-    expect(getState().chat.refineChat?.refineTarget?.fieldId).toBe("intent");
-    expect(getState().chat.refineChat?.refineTarget?.originalText).toBe(
-      "old text",
-    );
+    const refine = refineChats()[0];
+    expect(refine?.refineTarget?.fieldId).toBe("intent");
+    expect(refine?.refineTarget?.originalText).toBe("old text");
+    // The new refine chat is foregrounded.
+    expect(getState().chat.activeChatId).toBe(refine?.id);
   });
 });
 

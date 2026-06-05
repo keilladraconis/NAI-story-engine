@@ -9,8 +9,7 @@ describe("HeaderControl.kind union", () => {
       | "sessionsButton"
       | "newChatButton"
       | "label"
-      | "castAllButton"
-      | "discardAllButton"
+      | "backButton"
       | "phaseIndicator"
       | "scrubIndicator"
     >();

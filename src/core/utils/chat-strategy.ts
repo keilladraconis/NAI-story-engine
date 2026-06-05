@@ -11,6 +11,7 @@ import {
 } from "./context-builder";
 import { isXialongMode, buildModelParams } from "./config";
 import { buildRefineTail } from "./refine-strategy";
+import { getFieldStrategy } from "./field-strategy-registry";
 
 // Returns sections to omit from buildStoryEnginePrefix so the field being
 // refined is not present in context above ----, avoiding double-injection.
@@ -43,35 +44,63 @@ export async function buildChatStrategy(
   assistantMessageId: string,
 ): Promise<GenerationStrategy> {
   if (chat.type === "refine" && chat.refineTarget) {
-    const { fieldId, originalText } = chat.refineTarget;
+    const { fieldId, originalText, entryId } = chat.refineTarget;
     const filteredHistory = chat.messages.filter(
       (m) => m.id !== assistantMessageId,
+    );
+    // The seeded field snapshot governs the mode: present → rewrite that
+    // snapshot; deleted → a fresh field generation (the "regenerate from
+    // scratch" escape hatch). Either way the output lands as a chatRefine
+    // candidate the user reviews and commits.
+    const contextPresent = filteredHistory.some(
+      (m) => m.messageKind === "refineSource",
     );
     const xialong = await isXialongMode();
     const excludeSections = excludeSectionsForRefine(fieldId);
 
+    const rewriteFactory = async () => {
+      const prefix = await buildStoryEnginePrefix(getState, {
+        excludeChat: true,
+        excludeSections,
+      });
+      const messages = buildRefineTail(prefix, {
+        fieldId,
+        currentText: originalText,
+        history: filteredHistory,
+      });
+      return {
+        messages,
+        params: await buildModelParams({
+          max_tokens: 400,
+          temperature: 0.7,
+          min_p: 0.05,
+          stop: ["</think>", "\n***", "\n---", "---", "]\n"],
+        }),
+      };
+    };
+
+    const freshFactory = async () => {
+      // Reuse the field's own base generation (no refineContext), then append
+      // the latest typed instruction (if any) so it guides the fresh result.
+      const fieldStrategy = getFieldStrategy(fieldId)(getState, { entryId });
+      const base = fieldStrategy.messageFactory
+        ? await fieldStrategy.messageFactory()
+        : { messages: fieldStrategy.messages ?? [], params: undefined };
+      const lastUser = [...filteredHistory]
+        .reverse()
+        .find((m) => m.role === "user" && m.content.trim().length > 0);
+      const messages = lastUser
+        ? [
+            ...base.messages,
+            { role: "user" as const, content: lastUser.content },
+          ]
+        : base.messages;
+      return { messages, params: base.params };
+    };
+
     return {
       requestId: `refine-${chat.id}-${assistantMessageId}`,
-      messageFactory: async () => {
-        const prefix = await buildStoryEnginePrefix(getState, {
-          excludeChat: true,
-          excludeSections,
-        });
-        const messages = buildRefineTail(prefix, {
-          fieldId,
-          currentText: originalText,
-          history: filteredHistory,
-        });
-        return {
-          messages,
-          params: await buildModelParams({
-            max_tokens: 400,
-            temperature: 0.7,
-            min_p: 0.05,
-            stop: ["</think>", "\n***", "\n---", "---", "]\n"],
-          }),
-        };
-      },
+      messageFactory: contextPresent ? rewriteFactory : freshFactory,
       target: {
         type: "chatRefine",
         chatId: chat.id,

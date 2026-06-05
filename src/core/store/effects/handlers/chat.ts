@@ -67,6 +67,11 @@ export const chatRefineHandler: GenerationHandlers<ChatRefineTarget> = {
         content: cleaned,
       }),
     );
-    ctx.dispatch(refineCandidateMarked({ messageId: ctx.target.messageId }));
+    ctx.dispatch(
+      refineCandidateMarked({
+        chatId: ctx.target.chatId,
+        messageId: ctx.target.messageId,
+      }),
+    );
   },
 };

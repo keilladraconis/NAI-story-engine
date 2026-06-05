@@ -60,9 +60,12 @@ describe("refineSpec", () => {
     expect(refineSpec.contextSlice(refineChat(), ctx)).toEqual([]);
   });
 
-  it("headerControls is just the target label", () => {
+  it("headerControls expose Back + Sessions (like other chat types)", () => {
     const controls = refineSpec.headerControls(refineChat(), ctx);
-    expect(controls.map((c) => c.kind)).toEqual(["label"]);
+    expect(controls.map((c) => c.kind)).toEqual([
+      "backButton",
+      "sessionsButton",
+    ]);
   });
 
   describe("onCommit", () => {

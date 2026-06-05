@@ -73,12 +73,14 @@ describe("forgeSpec", () => {
     expect(forgeSpec.contextSlice(chat, ctx)).toEqual(chat.messages);
   });
 
-  it("headerControls includes phase, cast-all, discard-all, sessions", () => {
+  it("headerControls includes back, phase, scrub, sessions (no cast/discard — those are in the bottom bar)", () => {
     const controls = forgeSpec.headerControls(makeChat(), ctx);
     const kinds = controls.map((c) => c.kind);
+    expect(kinds).toContain("backButton");
     expect(kinds).toContain("phaseIndicator");
-    expect(kinds).toContain("castAllButton");
-    expect(kinds).toContain("discardAllButton");
+    expect(kinds).toContain("scrubIndicator");
     expect(kinds).toContain("sessionsButton");
+    expect(kinds).not.toContain("castAllButton");
+    expect(kinds).not.toContain("discardAllButton");
   });
 });

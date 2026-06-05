@@ -8,6 +8,7 @@
 
 import { store } from "../../core/store";
 import { chatDeleted, chatSwitched } from "../../core/store/slices/chat";
+import { CHAT_TYPE_REGISTRY } from "../../core/chat-types";
 
 export async function openSeSessionsModal(): Promise<void> {
   const modal = await api.v1.ui.modal.open({
@@ -24,6 +25,8 @@ export async function openSeSessionsModal(): Promise<void> {
       const isCurrent = chat.id === activeChatId;
       const canDelete = chats.length > 1;
       const rowId = `se-bs-session-${index}`;
+      const typeLabel =
+        CHAT_TYPE_REGISTRY[chat.type]?.displayName ?? chat.type;
 
       const controls: UIPart[] = [
         button({
@@ -68,6 +71,18 @@ export async function openSeSessionsModal(): Promise<void> {
                 id: `${rowId}-title`,
                 text: chat.title,
                 style: { flex: "1", "font-size": "0.85em" },
+              }),
+              text({
+                id: `${rowId}-type`,
+                text: typeLabel,
+                style: {
+                  "font-size": "0.68em",
+                  opacity: "0.6",
+                  padding: "1px 6px",
+                  "border-radius": "8px",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  "white-space": "nowrap",
+                },
               }),
               ...controls,
             ],

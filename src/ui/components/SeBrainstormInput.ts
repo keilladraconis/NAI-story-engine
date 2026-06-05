@@ -1,9 +1,8 @@
 /**
  * SeBrainstormInput — multiline input + send/clear controls for the chat panel.
  *
- * Sends to the active chat from the chat slice. When `chat.refineChat` is set,
- * sends to the refine chat instead. Disabled while a chat / chatRefine
- * generation is active.
+ * Sends to the active chat from the chat slice (brainstorm, forge, or refine).
+ * Disabled while a chat / chatRefine generation is active.
  */
 
 import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
@@ -40,14 +39,10 @@ function isChatBusyType(t: string | undefined): boolean {
   );
 }
 
-/** The chat the input writes to: refineChat takes precedence over active. */
+/** The chat the input writes to: the active chat in chats[]. */
 function visibleChat(): Chat | null {
   const s = store.getState();
-  return (
-    s.chat.refineChat ??
-    s.chat.chats.find((c) => c.id === s.chat.activeChatId) ??
-    null
-  );
+  return s.chat.chats.find((c) => c.id === s.chat.activeChatId) ?? null;
 }
 
 function dispatchSubmit(): void {
@@ -101,16 +96,20 @@ export class SeBrainstormInput extends SuiComponent<
       confirmLabel: "Clear?",
       style: { flex: "0.3" },
       onConfirm: async () => {
-        const s = store.getState();
-        const chat =
-          s.chat.refineChat ??
-          s.chat.chats.find((c) => c.id === s.chat.activeChatId) ??
-          null;
+        const chat = visibleChat();
         if (!chat) return;
-        // Clear messages by removing each one — chat slice has no bulk reset action.
-        const ids = chat.messages.map((m) => m.id);
-        for (const id of ids) {
-          store.dispatch(messageRemoved({ chatId: chat.id, id }));
+        const spec = getChatTypeSpec(chat.type);
+        // A spec may own Clear (refine: drop the seeded snapshot + regenerate).
+        if (spec.onClear) {
+          spec.onClear(chat, {
+            getState: store.getState,
+            dispatch: store.dispatch,
+          });
+          return;
+        }
+        // Default: clear messages one by one — the chat slice has no bulk reset.
+        for (const m of chat.messages) {
+          store.dispatch(messageRemoved({ chatId: chat.id, id: m.id }));
         }
       },
     });

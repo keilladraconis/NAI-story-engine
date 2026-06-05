@@ -13,8 +13,19 @@ import {
   intentUpdated,
   contractUpdated,
 } from "../store/slices/foundation";
+import { messageAdded, messageRemoved } from "../store/slices/chat";
+import { uiChatRefineGenerateRequested } from "../store/slices/ui";
 import { parseContract } from "../store/effects/handlers/foundation";
 import { IDS } from "../../ui/framework/ids";
+
+/** True while a refine generation for this chat is queued or in flight. */
+function refinePending(ctx: SpecCtx): boolean {
+  const rt = ctx.getState().runtime;
+  return (
+    rt.activeRequest?.type === "chatRefine" ||
+    rt.queue.some((r) => r.type === "chatRefine")
+  );
+}
 
 /**
  * Per-field commit dispatchers — applied when a refine session is committed.
@@ -53,11 +64,25 @@ export const refineSpec: ChatTypeSpec = {
   displayName: "Refine",
   lifecycle: "commit-discard",
 
+  // Type to describe a change (rewrites the seeded snapshot), or send empty /
+  // hit Clear to regenerate the field from scratch. Deleting the seeded
+  // snapshot message switches every send to a fresh generation.
+  inputPlaceholder: "Describe a change, or send empty to regenerate…",
+  sendLabel: "Send",
+  showClearButton: true,
+
   initialize(seed: ChatSeed, _ctx: SpecCtx) {
     const fieldId = seed.kind === "fromField" ? seed.sourceFieldId : "field";
     const sourceText = seed.kind === "fromField" ? seed.sourceText : "";
     const initialMessages: ChatMessage[] = sourceText.trim()
-      ? [{ id: api.v1.uuid(), role: "system", content: sourceText }]
+      ? [
+          {
+            id: api.v1.uuid(),
+            role: "system",
+            content: sourceText,
+            messageKind: "refineSource",
+          },
+        ]
       : [];
     return { title: `Refining: ${fieldId}`, initialMessages };
   },
@@ -71,7 +96,13 @@ export const refineSpec: ChatTypeSpec = {
   },
 
   headerControls(_chat: Chat, _ctx: SpecCtx) {
-    return [{ id: "target", kind: "label" }];
+    // Back (leave to the Story Engine tab, keep the refine alive) + Sessions
+    // (switch to another chat) — like other chat types. The "Refining: <field>"
+    // title renders automatically in the header.
+    return [
+      { id: "back", kind: "backButton" },
+      { id: "sessions", kind: "sessionsButton" },
+    ];
   },
 
   onCommit(chat: Chat, ctx: SpecCtx) {
@@ -100,5 +131,33 @@ export const refineSpec: ChatTypeSpec = {
     }
 
     dispatcher(candidate.content, ctx, chat.refineTarget);
+  },
+
+  // Every send produces a fresh assistant candidate (never a continuation): add
+  // the typed instruction as a user turn (if any), then run a refine generation.
+  // The strategy decides rewrite-vs-fresh from the seeded snapshot's presence.
+  handleSend(chat: Chat, content: string, ctx: SpecCtx): boolean {
+    if (refinePending(ctx)) return true;
+    const trimmed = content.trim();
+    if (trimmed) {
+      ctx.dispatch(
+        messageAdded({
+          chatId: chat.id,
+          message: { id: api.v1.uuid(), role: "user", content: trimmed },
+        }),
+      );
+    }
+    ctx.dispatch(uiChatRefineGenerateRequested({ chatId: chat.id }));
+    return true;
+  },
+
+  // Clear = "start over from scratch": drop the seeded snapshot and any prior
+  // candidates, then run a fresh, unguided generation.
+  onClear(chat: Chat, ctx: SpecCtx) {
+    if (refinePending(ctx)) return;
+    for (const m of chat.messages) {
+      ctx.dispatch(messageRemoved({ chatId: chat.id, id: m.id }));
+    }
+    ctx.dispatch(uiChatRefineGenerateRequested({ chatId: chat.id }));
   },
 };

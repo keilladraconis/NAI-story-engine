@@ -32,8 +32,15 @@ import {
   registerLorebookSyncHooks,
 } from "../core/store/effects/lorebook-sync";
 import { chatCreated, chatSwitched } from "../core/store/slices/chat";
-import { forgeCastAllRequested } from "../core/store/effects/forge-chat-effects";
-import { worldExpansionSet } from "../core/store/slices/ui";
+import {
+  forgeCastAllRequested,
+  forgeDiscardAllRequested,
+} from "../core/store/effects/forge-chat-effects";
+import {
+  worldExpansionSet,
+  uiChatRefineCommitted,
+  uiChatRefineDiscarded,
+} from "../core/store/slices/ui";
 import { migrateBrainstormToChat } from "../core/store/migrations/brainstorm-to-chat";
 import { stateUpdated, requestActivated } from "../core/store/slices/runtime";
 import { IDS, STORAGE_KEYS } from "./framework/ids";
@@ -61,6 +68,12 @@ export class StoryEnginePlugin extends SuiPlugin {
   // Tab the user was on before an edit pane took over, so back-out returns
   // them there. Captured on the first open of a session; null when not editing.
   private _preEditTab: number | null = null;
+
+  // Monotonic token for chat-pane rebuilds. Each _rebuildChat captures the
+  // token at start and only applies its result if still latest — so a slower
+  // stale rebuild (e.g. the forge pane, mid-close) can't resolve last and
+  // clobber a newer one (the brainstorm pane the deletion switched to).
+  private _rebuildSeq = 0;
 
   // ── Edit pane hosting ──
   readonly editHost: EditPaneHost = {
@@ -179,7 +192,12 @@ export class StoryEnginePlugin extends SuiPlugin {
 
   private async _rebuildChat(): Promise<void> {
     if (!this._chatPanel) return;
+    const seq = ++this._rebuildSeq;
     const newContent = await this._chatPanel.build();
+    // Superseded by a newer rebuild while we were awaiting build(): drop this
+    // result so the latest-requested pane always wins, regardless of which
+    // async build resolves first.
+    if (seq !== this._rebuildSeq) return;
     api.v1.ui.updateParts([
       {
         id: "se-main-tab-bar.pane.0",
@@ -226,6 +244,11 @@ export class StoryEnginePlugin extends SuiPlugin {
       },
       onOpenSessions: () => {
         void openSeSessionsModal();
+      },
+      // Back out of a forge/refine to the Story Engine view without ending the
+      // session — the chat stays alive in the background.
+      onBack: () => {
+        void this._tabBar?.switchTo(1);
       },
       editHost: this.editHost,
     });
@@ -327,27 +350,14 @@ export class StoryEnginePlugin extends SuiPlugin {
 
     await api.v1.ui.register(panels);
 
-    // Surface the refine session when it opens (auto-switch to Chat tab) and
-    // return to wherever the user came from when it closes (commit or discard),
-    // so the takeover doesn't strand them on the Chat tab afterwards.
-    let lastRefineId: string | null = null;
-    let preRefineTab: number | null = null;
-    store.subscribeSelector(
-      (state) => state.chat.refineChat?.id ?? null,
-      (id) => {
-        if (id && !lastRefineId) {
-          preRefineTab = this._tabBar?.activeTab ?? 0;
-          void this._tabBar?.switchTo(0);
-        } else if (!id && lastRefineId && preRefineTab !== null) {
-          void this._tabBar?.switchTo(preRefineTab);
-          preRefineTab = null;
-        }
-        lastRefineId = id;
-      },
-    );
+    // Forge and refine chats live on the Chat tab — surface them when they
+    // become active (created or switched to). Leaving (Back / commit / discard)
+    // is what returns to the Story Engine tab.
+    const isChatTabType = (t: string | undefined): boolean =>
+      t === "forge" || t === "refine";
 
     store.subscribeEffect(matchesAction(chatCreated), (action) => {
-      if (action.payload.chat.type === "forge") {
+      if (isChatTabType(action.payload.chat.type)) {
         void this._tabBar?.switchTo(0);
       }
     });
@@ -358,7 +368,7 @@ export class StoryEnginePlugin extends SuiPlugin {
         const chat = getState().chat.chats.find(
           (c) => c.id === action.payload.id,
         );
-        if (chat?.type === "forge") {
+        if (isChatTabType(chat?.type)) {
           void this._tabBar?.switchTo(0);
         }
       },
@@ -369,6 +379,21 @@ export class StoryEnginePlugin extends SuiPlugin {
     store.subscribeEffect(matchesAction(forgeCastAllRequested), () => {
       void this._tabBar?.switchTo(1);
       store.dispatch(worldExpansionSet({ expanded: true }));
+    });
+
+    // Discard All also closes the session — return to the Story Engine tab so
+    // the user is unambiguously out of the (now-deleted) forge chat.
+    store.subscribeEffect(matchesAction(forgeDiscardAllRequested), () => {
+      void this._tabBar?.switchTo(1);
+    });
+
+    // Refine commit/discard close the refine chat — return to the Story Engine
+    // tab (where the refined field lives), mirroring the forge close.
+    store.subscribeEffect(matchesAction(uiChatRefineCommitted), () => {
+      void this._tabBar?.switchTo(1);
+    });
+    store.subscribeEffect(matchesAction(uiChatRefineDiscarded), () => {
+      void this._tabBar?.switchTo(1);
     });
   }
 

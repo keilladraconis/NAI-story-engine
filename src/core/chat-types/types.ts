@@ -40,8 +40,12 @@ export interface ChatMessage {
    * Optional tag for non-conversational messages. Renderers may treat tagged
    * messages distinctly (e.g., cleanup-turn confirmations, parser-rejection
    * warnings). Plain conversational turns leave this undefined.
+   *
+   * "refineSource" marks the seeded field-snapshot message in a refine chat:
+   * while present, the refine rewrites that snapshot; deleting it switches the
+   * refine to a fresh field generation.
    */
-  messageKind?: "cleanup";
+  messageKind?: "cleanup" | "refineSource";
   /** Ordered display projection of a forge turn (prose runs + action chips),
    *  built at completion. Display-only; `content` stays the raw canonical text. */
   forgeSegments?: ForgeSegment[];
@@ -84,8 +88,7 @@ export interface HeaderControl {
     | "sessionsButton"
     | "newChatButton"
     | "label"
-    | "castAllButton"
-    | "discardAllButton"
+    | "backButton"
     | "phaseIndicator"
     | "scrubIndicator";
 }
@@ -117,6 +120,12 @@ export interface ChatTypeSpec<SubMode extends string = string> {
 
   onCommit?(chat: Chat, ctx: SpecCtx): void;
   onDiscard?(chat: Chat, ctx: SpecCtx): void;
+  /**
+   * Optional handler for the chat-input Clear button. When present it replaces
+   * the default (clear the input's message history). The refine spec uses this
+   * to drop the seeded context and run a fresh generation in one click.
+   */
+  onClear?(chat: Chat, ctx: SpecCtx): void;
 
   /**
    * Returns ids of entities that should render inline beneath the given message.

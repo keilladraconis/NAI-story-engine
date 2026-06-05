@@ -64,11 +64,13 @@ export const forgeSpec: ChatTypeSpec<ForgePhase> = {
   },
 
   headerControls(_chat: Chat, _ctx: SpecCtx) {
+    // Cast All / Discard All moved to the bottom [Discard]/[Commit] bar
+    // (ForgeCommitBar). The Back button leaves the forge view without ending
+    // the session.
     return [
+      { id: "back", kind: "backButton" },
       { id: "phase", kind: "phaseIndicator" },
       { id: "scrub", kind: "scrubIndicator" },
-      { id: "cast-all", kind: "castAllButton" },
-      { id: "discard-all", kind: "discardAllButton" },
       { id: "sessions", kind: "sessionsButton" },
     ];
   },

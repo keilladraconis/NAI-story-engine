@@ -45,8 +45,15 @@ export const uiSlice = createSlice({
       state,
       _payload: { fieldId: string; sourceText: string; entryId?: string },
     ) => state,
-    uiChatRefineCommitted: (state) => state,
-    uiChatRefineDiscarded: (state) => state,
+    // Run a refine generation turn (rewrite or fresh-generate, decided by the
+    // strategy from the seeded-context presence) — fired by the refine send and
+    // the refine Clear/onClear hook.
+    uiChatRefineGenerateRequested: (
+      state,
+      _payload: { chatId: string },
+    ) => state,
+    uiChatRefineCommitted: (state, _payload: { chatId: string }) => state,
+    uiChatRefineDiscarded: (state, _payload: { chatId: string }) => state,
     // Internal: Submit generation to GenX (not a user intent)
     generationSubmitted: (state, _strategy: any) => state,
     uiCancelRequest: (state, _payload: { requestId: string }) => state,
@@ -114,6 +121,7 @@ export const {
   uiChatRetryGeneration,
   uiChatSummarizeRequested,
   uiChatRefineRequested,
+  uiChatRefineGenerateRequested,
   uiChatRefineCommitted,
   uiChatRefineDiscarded,
   generationSubmitted,

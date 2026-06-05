@@ -1,7 +1,7 @@
 /**
  * ChatPanel — Top-level chat panel that hosts a chat (header, messages, input, optional commit bar).
  *
- * Visible chat resolution: refineChat takes precedence; else activeSavedChat.
+ * Visible chat resolution: the active chat in chats[] (refine/forge included).
  * Watches chat identity, refine flag, and message-id sequence; recomposes (via onRebuild
  * callback) only when one of those changes.
  */
@@ -16,6 +16,7 @@ import { SeMessage } from "./SeMessage";
 import { SeEntityCard } from "./SeEntityCard";
 import { IDS } from "../../ui/framework/ids";
 import { RefineCommitBar } from "./RefineCommitBar";
+import { ForgeCommitBar } from "./ForgeCommitBar";
 import type { Chat } from "../../core/chat-types/types";
 import { getChatTypeSpec } from "../../core/chat-types";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
@@ -26,11 +27,12 @@ type State = Record<string, never>;
 export type ChatPanelOptions = {
   onRebuild: () => void;
   onOpenSessions: () => void;
+  /** Leave the chat view without ending the session ("Back" button). */
+  onBack: () => void;
   editHost: EditPaneHost;
 } & SuiComponentOptions<Theme, State>;
 
 function visibleChat(state: RootState): Chat | null {
-  if (state.chat.refineChat) return state.chat.refineChat;
   if (!state.chat.activeChatId) return null;
   return state.chat.chats.find((c) => c.id === state.chat.activeChatId) ?? null;
 }
@@ -45,6 +47,7 @@ export class ChatPanel extends SuiComponent<
   private readonly _header: ChatHeader;
   private readonly _input: SeBrainstormInput;
   private readonly _commitBar: RefineCommitBar;
+  private readonly _forgeCommitBar: ForgeCommitBar;
 
   constructor(options: ChatPanelOptions) {
     super(
@@ -56,9 +59,11 @@ export class ChatPanel extends SuiComponent<
       id: "se-chat-header",
       chatProvider: () => visibleChat(store.getState()),
       onOpenSessions: options.onOpenSessions,
+      onBack: options.onBack,
     });
     this._input = new SeBrainstormInput({ id: "se-bs-input-area" });
     this._commitBar = new RefineCommitBar({ id: "se-refine-commit" });
+    this._forgeCommitBar = new ForgeCommitBar({ id: "se-forge-commit" });
   }
 
   async compose(): Promise<UIPartColumn> {
@@ -69,7 +74,7 @@ export class ChatPanel extends SuiComponent<
         const v = visibleChat(s);
         return {
           id: v?.id,
-          isRefine: !!s.chat.refineChat,
+          isRefine: v?.type === "refine",
           msgIds: v?.messages.map((m) => m.id).join("|") ?? "",
           draftIdHash: Object.values(s.world.entitiesById)
             .filter((e) => e.sourceChatId === v?.id && e.lifecycle === "draft")
@@ -135,10 +140,12 @@ export class ChatPanel extends SuiComponent<
     const headerPart = await this._header.build();
     const inputPart = await this._input.build();
 
-    const isRefine = !!store.getState().chat.refineChat;
-    const footerParts = isRefine
-      ? [inputPart, await this._commitBar.build()]
-      : [inputPart];
+    const footerParts =
+      v.type === "refine"
+        ? [inputPart, await this._commitBar.build()]
+        : v.type === "forge"
+          ? [inputPart, await this._forgeCommitBar.build()]
+          : [inputPart];
 
     return column({
       id: this.id,

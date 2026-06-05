@@ -12,7 +12,7 @@ A single **Chat** tab hosts every conversational surface in Story Engine, driven
 
 - **Brainstorm** — Freeform idea conversation with the AI. Supports multiple named sessions and a Co/Crit mode toggle (cowriter vs. critic persona).
 - **Summary** — Clicking **Sum** on a brainstorm spawns a separate, iterable Summary chat seeded from the transcript. Downstream generation reads the summary's latest assistant turn, so you can shape exactly what the Forge sees without losing the raw brainstorm.
-- **Refine** — A field-level chat scoped to a single Foundation field or lorebook entry. See _Field-Level Refine_ below.
+- **Refine** — A field-level chat scoped to a single Foundation field or lorebook entry — a real, backgroundable session like the others. See _Field-Level Refine_ below.
 
 ### Foundation
 
@@ -25,7 +25,7 @@ Sets the structural and tonal anchors for your story before worldbuilding begins
 - **ATTG** — Author/Title/Tags/Genre block, synced to Memory.
 - **Style** — Prose style guidelines, synced to Author's Note.
 
-Intent, Story Contract, ATTG, and Style each expose a paired **Generate** + **Refine** button — see _Field-Level Refine_ below.
+Intent, Story Contract, ATTG, and Style each expose a single **Generate** (⚡) button that adapts: it generates when the field is empty and opens a **Refine** when the field already has content — see _Field-Level Refine_ below.
 
 ### Forge
 
@@ -75,9 +75,16 @@ Click any entity to open its edit pane:
 
 ### Field-Level Refine
 
-A **Refine** button (feather icon) sits next to the **Generate** button on every iterable field: Foundation **ATTG**, **Style**, **Intent**, **Story Contract**, and each entity's **Lorebook Content**. Clicking Refine opens a chat scoped to that field on the **Chat** tab, with the current field text pinned as a dashed-border **Context** bubble at the top of the conversation. Iterate with plain-language instructions, then **Commit** to write the latest candidate back into the field — or **Discard** to leave it untouched.
+Foundation **Intent**, **Story Contract**, **ATTG**, and **Style** use a single **Generate** (⚡) button that opens a **Refine** when the field already has content (an empty field just generates). Each entity's **Lorebook Content** still pairs Generate with a dedicated Refine (✎) button.
 
-Refine sessions are ephemeral (not saved in the session list), and the panel returns you to whichever tab you came from when you commit or discard.
+A refine opens as a chat scoped to that field on the **Chat** tab, with the current field text pinned as a deletable **Context** bubble at the top. From there you can:
+
+- **Rewrite** — type plain-language instructions (_"make her taller," "add a rivalry with the Silver Court"_) and send; the candidate rewrites the pinned text.
+- **Regenerate from scratch** — delete the Context bubble (or hit **Clear**) and send empty to run a fresh field generation; add an instruction alongside to steer it.
+
+**Commit** writes the latest candidate back into the field; **Discard** leaves it untouched. Both close the refine and return you to the Story Engine.
+
+Refines behave like any other chat: a refine has a **Back** button (leave it running and come back later), shows up in the **Chat Sessions** list labeled "Refine," and can sit in the background while you work on a brainstorm or forge.
 
 ## Installation
 
@@ -98,6 +105,15 @@ npm run test     # Run tests
 
 ## Upgrading
 
+### From 0.12.x
+
+0.13 turns the **Forge** into a chat session and makes **Refine** a first-class chat:
+
+- The Forge runs as a typed chat on the **Chat** tab (Sketch → Expand → Weave), with inline draft cards, a **Back** button, and a bottom **Commit** / **Discard** bar. Drafts are promoted in bulk via **Commit** — the per-card Cast button is gone.
+- Field-level **Refine** is now a listed, backgroundable chat (with Back + Sessions), and Foundation fields use a single adaptive **⚡** button instead of the old ⚡/✎ pair: it generates an empty field and refines a populated one. Inside a refine you can delete the pinned Context bubble (or hit **Clear**) to regenerate the field from scratch.
+
+A half-finished refine from 0.12 is not carried across the upgrade (the single-slot `refineChat` is gone); nothing else needs migrating.
+
 ### From 0.11.x
 
 0.12 introduces a typed chat-session system: the old `brainstorm` slice and its panel are replaced by a unified **Chat** tab driven by a registry under `src/core/chat-types/`. Existing brainstorm chats are migrated automatically on first load — a small toast confirms the migration and the old persisted key is cleared.
@@ -114,7 +130,7 @@ Two Foundation fields from the old Crucible flow are gone:
 - **Direction** — superseded by **Brainstorm's summary mode**. Summarize your Brainstorm chat (the **Sum** button, which as of 0.12 opens an iterable Summary chat) and the Forge reads that directly; you no longer need to maintain Direction and Brainstorm as parallel sources of framing.
 - **Canon** — removed with no direct replacement. Its job is now covered by **Story Contract** (REQUIRED / PROHIBITED / EMPHASIS) in Foundation plus the per-entity summaries in the World section.
 
-See `CHANGELOG.md` for the full 0.11.x and 0.12.0 notes.
+See `CHANGELOG.md` for the full 0.11.x, 0.12.x, and 0.13.0 notes.
 
 ## License
 

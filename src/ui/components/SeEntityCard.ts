@@ -11,7 +11,6 @@
 
 import {
   SuiComponent,
-  SuiButton,
   SuiCard,
   SuiCollapsible,
   SuiConfirmButton,
@@ -20,10 +19,7 @@ import {
 } from "nai-simple-ui";
 import { store } from "../../core/store";
 import { entityRegenRequested } from "../../core/store/effects/summary-generation";
-import {
-  entityCastRequested,
-  entityDiscardRequested,
-} from "../../core/store/effects/forge-chat-effects";
+import { entityDiscardRequested } from "../../core/store/effects/forge-chat-effects";
 import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import { colors } from "../theme";
@@ -76,7 +72,6 @@ export class SeEntityCard extends SuiComponent<
 > {
   private readonly _watcher: StoreWatcher;
   private readonly _regenBtn: SeGenerationIconButton;
-  private readonly _castBtn: SuiButton;
   private readonly _discardBtn: SuiConfirmButton;
   private _collapsible: SuiCollapsible | null = null;
 
@@ -116,20 +111,6 @@ export class SeEntityCard extends SuiComponent<
         const keysOk =
           entry?.forceActivation || !!(entry?.keys && entry.keys.length > 0);
         return !!e.summary && !!entry?.text && keysOk;
-      },
-    });
-
-    this._castBtn = new SuiButton({
-      id: `${options.id}-cast`,
-      callback: () => store.dispatch(entityCastRequested({ entityId })),
-      theme: {
-        default: {
-          self: {
-            text: "Cast",
-            iconId: "arrow-up-circle" as IconId,
-            style: { ...ACTION_BASE },
-          },
-        },
       },
     });
 
@@ -357,8 +338,10 @@ export class SeEntityCard extends SuiComponent<
           : INCOMPLETE_BORDER;
     }
 
+    // Drafts get a Discard only — promotion to live happens via the forge
+    // [Commit] bar (Cast All), not per-card, so the per-entity Cast is gone.
     const actions: SuiComponent[] = isDraft
-      ? [this._castBtn, this._discardBtn]
+      ? [this._discardBtn]
       : [this._regenBtn];
 
     const card = new SuiCard({

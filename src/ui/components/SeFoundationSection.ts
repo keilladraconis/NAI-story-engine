@@ -252,6 +252,7 @@ export class SeFoundationSection extends SuiComponent<
     this._intentBtnGen = new SeGenRefinePair({
       id: FN.INTENT_BTN,
       fieldId: "intent",
+      unified: true,
       onGenerate: () => {
         store.dispatch(intentGenerationRequested());
       },
@@ -271,6 +272,7 @@ export class SeFoundationSection extends SuiComponent<
     this._contractBtnGen = new SeGenRefinePair({
       id: FN.CONTRACT_BTN,
       fieldId: "contract",
+      unified: true,
       onGenerate: () => {
         store.dispatch(contractGenerationRequested());
       },
@@ -294,6 +296,7 @@ export class SeFoundationSection extends SuiComponent<
     this._attgBtnGen = new SeGenRefinePair({
       id: FN.ATTG_BTN,
       fieldId: "attg",
+      unified: true,
       onGenerate: () => {
         store.dispatch(attgGenerationRequested());
       },
@@ -322,6 +325,7 @@ export class SeFoundationSection extends SuiComponent<
     this._styleBtnGen = new SeGenRefinePair({
       id: FN.STYLE_BTN,
       fieldId: "style",
+      unified: true,
       onGenerate: () => {
         store.dispatch(styleGenerationRequested());
       },

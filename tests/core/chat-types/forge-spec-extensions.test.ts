@@ -193,4 +193,17 @@ describe("forgeSpec.headerControls", () => {
     const kinds = forgeSpec.headerControls(chat(), ctx).map((c) => c.kind);
     expect(kinds).toContain("scrubIndicator");
   });
+
+  it("includes a Back button to leave the forge view", () => {
+    const ctx: SpecCtx = { getState: () => stateWith([]), dispatch: vi.fn() };
+    const kinds = forgeSpec.headerControls(chat(), ctx).map((c) => c.kind);
+    expect(kinds).toContain("backButton");
+  });
+
+  it("no longer puts Cast All / Discard All in the header (they live in the bottom bar)", () => {
+    const ctx: SpecCtx = { getState: () => stateWith([]), dispatch: vi.fn() };
+    const kinds = forgeSpec.headerControls(chat(), ctx).map((c) => c.kind);
+    expect(kinds).not.toContain("castAllButton");
+    expect(kinds).not.toContain("discardAllButton");
+  });
 });

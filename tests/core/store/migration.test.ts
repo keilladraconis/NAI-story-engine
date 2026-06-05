@@ -43,7 +43,6 @@ describe("migrateBrainstormToChat", () => {
     });
     expect(chat.chats[1].subMode).toBe("critic");
     expect(chat.activeChatId).toBe("c2");
-    expect(chat.refineChat).toBeNull();
   });
 
   it("is idempotent: running on already-migrated data is a no-op", () => {
@@ -60,7 +59,6 @@ describe("migrateBrainstormToChat", () => {
           },
         ],
         activeChatId: "c1",
-        refineChat: null,
       },
     };
     const result = migrateBrainstormToChat(already);
