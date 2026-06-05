@@ -77,7 +77,6 @@ export const IDS = {
     FORGE_BTN: "se-forge-btn",
     BRAINSTORM_BTN: "se-forge-brainstorm-btn",
     TICKER: "se-forge-ticker",
-    CLEAR_BTN: "se-forge-clear-btn",
   },
   WORLD: {
     SECTION: "se-world-section",

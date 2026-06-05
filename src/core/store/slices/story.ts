@@ -23,7 +23,6 @@ export const storySlice = createSlice({
   name: "story",
   initialState: initialStoryState,
   reducers: {
-    storyCleared: () => initialStoryState,
     fieldUpdated: (
       state,
       payload: {
@@ -58,5 +57,4 @@ export const storySlice = createSlice({
   },
 });
 
-export const { storyCleared, fieldUpdated, attgToggled, styleToggled } =
-  storySlice.actions;
+export const { fieldUpdated, attgToggled, styleToggled } = storySlice.actions;

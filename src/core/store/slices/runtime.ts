@@ -25,6 +25,7 @@ export const initialRuntimeState: RuntimeState = {
     status: "idle",
     queueLength: 0,
   },
+  historyEpoch: 0,
 };
 
 export const runtimeSlice = createSlice({
@@ -184,6 +185,11 @@ export const runtimeSlice = createSlice({
     }),
 
     bootstrapRequested: (state) => state,
+    bootstrapContinueRequested: (state) => state,
+    documentHistoryNavigated: (state) => ({
+      ...state,
+      historyEpoch: state.historyEpoch + 1,
+    }),
   },
 });
 
@@ -205,4 +211,6 @@ export const {
   segaStatusUpdated,
   segaKeysCompleted,
   bootstrapRequested,
+  bootstrapContinueRequested,
+  documentHistoryNavigated,
 } = runtimeSlice.actions;

@@ -39,6 +39,7 @@ import {
 import { entityDeleted, entityLorebookEntryBound } from "../slices/world";
 import { DULFS_CATEGORY_LABELS } from "../../utils/category-detect";
 import { ensureCategory } from "./lorebook-sync";
+import { nameKey } from "./handlers/lorebook";
 import {
   buildForgeChatStrategy,
   buildForgeCleanupStrategy,
@@ -451,7 +452,7 @@ export function registerForgeChatEffects(
           id: api.v1.uuid(),
           displayName: entity.name,
           text: "",
-          keys: [],
+          keys: [nameKey(entity.name)],
           enabled: true,
           category: categoryId,
         });

@@ -2,6 +2,7 @@ import { DulfsFieldID } from "../../../../config/field-definitions";
 import { WorldEntity } from "../../types";
 import { entityForged } from "../../slices/world";
 import { ensureCategory } from "../lorebook-sync";
+import { nameKey } from "./lorebook";
 import { extractEntityName } from "../../../utils/context-builder";
 import {
   GenerationHandlers,
@@ -68,7 +69,7 @@ export const listHandler: GenerationHandlers<ListTarget> = {
             id: api.v1.uuid(),
             displayName: name,
             text: "",
-            keys: [],
+            keys: [nameKey(name)],
             enabled: true,
             category: categoryId,
           });

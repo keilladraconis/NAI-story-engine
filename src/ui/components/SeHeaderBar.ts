@@ -6,24 +6,22 @@
  *   - Status text with marquee animation during SEGA
  *   - Continue button (shown when genx waiting for user)
  *   - Wait countdown text (shown when genx waiting for budget)
- *   - Clear story button (SuiConfirmButton — no SeConfirmButton wrapper needed)
+ *   - Bootstrap + Import buttons (inline, right-aligned)
  *
  * Timer machinery uses api.v1.timers — no setTimeout, no DOM.
  */
 
-import {
-  SuiComponent,
-  SuiConfirmButton,
-  type SuiComponentOptions,
-} from "nai-simple-ui";
+import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
 import {
   uiCancelRequest,
   uiRequestCancellation,
   uiUserPresenceConfirmed,
 } from "../../core/store";
-import { storyCleared } from "../../core/store/slices/story";
-import { bootstrapRequested } from "../../core/store/slices/runtime";
+import {
+  bootstrapRequested,
+  bootstrapContinueRequested,
+} from "../../core/store/slices/runtime";
 import { StoreWatcher } from "../store-watcher";
 import { colors } from "../theme";
 import { IDS } from "../framework/ids";
@@ -51,11 +49,18 @@ const STATUS_STYLE = {
 };
 const WAIT_STYLE = { "font-size": "0.8em", opacity: "0.8" };
 
-// Every column needs `min-width: 0` so flex:1 can shrink past the intrinsic
-// content width on narrow viewports. Without it, the buttons in CENTER/RIGHT
-// force the row over its parent's width and — combined with the row's default
-// wrap — cause the center Continue to drop beneath the right-column bootstrap
-// button on mobile.
+/**
+ * Transparent label for the bootstrap stage a request belongs to. The two
+ * stages are deliberate, user-triggered steps: "Opening Scene" writes the cold
+ * open; "Continue Scene" extends it one paragraph per click.
+ */
+const stageLabel = (type?: string): string =>
+  type === "bootstrapContinue" ? "⚡ Continue Scene" : "⚡ Opening Scene";
+
+// LEFT/CENTER need `min-width: 0` so flex:1 can shrink past the intrinsic
+// content width on narrow viewports. RIGHT is content-sized (flex-shrink:0,
+// no grow, no wrap) so its action buttons stay on one inline, right-aligned
+// row instead of each wrapping onto its own line in the narrow sidebar.
 const COL_LEFT = {
   flex: "1",
   "min-width": "0",
@@ -71,13 +76,12 @@ const COL_CENTER = {
   "align-items": "center",
 };
 const COL_RIGHT = {
-  flex: "1",
-  "min-width": "0",
+  "flex-shrink": "0",
   display: "flex",
   "justify-content": "flex-end",
   "align-items": "center",
   gap: "8px",
-  "flex-wrap": "wrap",
+  "flex-wrap": "nowrap",
 };
 
 export class SeHeaderBar extends SuiComponent<
@@ -87,7 +91,6 @@ export class SeHeaderBar extends SuiComponent<
   UIPartRow
 > {
   private readonly _watcher: StoreWatcher;
-  private readonly _clearBtn: SuiConfirmButton;
 
   // Marquee state
   private _marqueeRunning = false;
@@ -108,30 +111,6 @@ export class SeHeaderBar extends SuiComponent<
     );
 
     this._watcher = new StoreWatcher();
-
-    this._clearBtn = new SuiConfirmButton({
-      id: "header-clear",
-      onConfirm: async () => {
-        store.dispatch(storyCleared());
-      },
-      timeout: 4000,
-      theme: {
-        default: {
-          self: { text: "Clear", style: { ...BTN_STYLE, opacity: "0.7" } },
-        },
-        pending: {
-          self: {
-            text: "Clear?",
-            iconId: "alertTriangle" as IconId,
-            style: {
-              ...BTN_STYLE,
-              color: colors.warning,
-              "font-weight": "bold",
-            },
-          },
-        },
-      },
-    });
   }
 
   private async _runMarquee(): Promise<void> {
@@ -157,6 +136,34 @@ export class SeHeaderBar extends SuiComponent<
       await api.v1.timers.sleep(next === 0 ? PAUSE : SPEED);
       this._marqueePosition = next;
     }
+  }
+
+  /**
+   * Idle bootstrap button. The stage is derived live from the document: an empty
+   * document offers "Opening Scene" (runs the cold open), a non-empty one offers
+   * "Continue Scene" (extends it one paragraph). Async because document length is
+   * the single source of truth — it self-corrects on load for existing stories
+   * and after each stage completes, with no extra persisted state.
+   */
+  private async _renderIdleBootstrapButton(): Promise<void> {
+    // Guard against a stale resolution clobbering a newer state: every watcher
+    // fire bumps _bootstrapTimerGen, so if it moved while we awaited the
+    // document read, a queued/active render has superseded us — bail.
+    const gen = this._bootstrapTimerGen;
+    const hasContent = (await api.v1.document.sectionIds()).length > 0;
+    if (gen !== this._bootstrapTimerGen) return;
+    api.v1.ui.updateParts([
+      {
+        id: "header-bootstrap-btn",
+        text: hasContent ? stageLabel("bootstrapContinue") : stageLabel(),
+        style: { ...BTN_STYLE, opacity: "0.7", display: "flex" },
+        callback: () => {
+          store.dispatch(
+            hasContent ? bootstrapContinueRequested() : bootstrapRequested(),
+          );
+        },
+      },
+    ]);
   }
 
   private _tickBootstrapTimer(gen: number, endTime: number): void {
@@ -200,6 +207,12 @@ export class SeHeaderBar extends SuiComponent<
 
   async compose(): Promise<UIPartRow> {
     const { row, text, button } = api.v1.ui.part;
+
+    // Seed the bootstrap stage label synchronously for the first render (the
+    // watcher does not fire on mount). Empty doc → "Opening Scene", otherwise
+    // "Continue Scene".
+    const bootstrapHasContent =
+      (await api.v1.document.sectionIds()).length > 0;
 
     this._watcher.dispose();
 
@@ -287,8 +300,6 @@ export class SeHeaderBar extends SuiComponent<
         a.bootstrapActive === b.bootstrapActive,
     );
 
-    const clearPart = await this._clearBtn.build();
-
     // Bootstrap button state machine — single button that mutates in place
     this._watcher.watch(
       (s) => {
@@ -299,20 +310,24 @@ export class SeHeaderBar extends SuiComponent<
           s.runtime.activeRequest?.type === "bootstrap" ||
           s.runtime.activeRequest?.type === "bootstrapContinue";
         const genxStatus = isActive ? s.runtime.genx.status : "idle";
+        const pendingType = queued?.type ?? s.runtime.activeRequest?.type;
         return {
           queuedId: queued?.id as string | undefined,
+          pendingType: pendingType as string | undefined,
           isActive,
           genxStatus,
           budgetWaitEndTime: s.runtime.genx.budgetWaitEndTime ?? 0,
+          // Re-derive the idle stage label after an undo/redo changes the document.
+          historyEpoch: s.runtime.historyEpoch,
         };
       },
-      ({ queuedId, isActive, genxStatus, budgetWaitEndTime }) => {
+      ({ queuedId, pendingType, isActive, genxStatus, budgetWaitEndTime }) => {
         this._bootstrapTimerGen++;
         if (queuedId) {
           api.v1.ui.updateParts([
             {
               id: "header-bootstrap-btn",
-              text: "Bootstrap",
+              text: stageLabel(pendingType),
               style: { ...BTN_STYLE, opacity: "0.4", display: "flex" },
               callback: () => {
                 store.dispatch(uiCancelRequest({ requestId: queuedId }));
@@ -358,23 +373,16 @@ export class SeHeaderBar extends SuiComponent<
             },
           ]);
         } else {
-          api.v1.ui.updateParts([
-            {
-              id: "header-bootstrap-btn",
-              text: "Bootstrap",
-              style: { ...BTN_STYLE, opacity: "0.7", display: "flex" },
-              callback: () => {
-                store.dispatch(bootstrapRequested());
-              },
-            },
-          ]);
+          void this._renderIdleBootstrapButton();
         }
       },
       (a, b) =>
         a.queuedId === b.queuedId &&
+        a.pendingType === b.pendingType &&
         a.isActive === b.isActive &&
         a.genxStatus === b.genxStatus &&
-        a.budgetWaitEndTime === b.budgetWaitEndTime,
+        a.budgetWaitEndTime === b.budgetWaitEndTime &&
+        a.historyEpoch === b.historyEpoch,
     );
 
     return row({
@@ -420,10 +428,16 @@ export class SeHeaderBar extends SuiComponent<
           content: [
             button({
               id: "header-bootstrap-btn",
-              text: "Bootstrap",
+              text: bootstrapHasContent
+                ? stageLabel("bootstrapContinue")
+                : stageLabel(),
               style: { ...BTN_STYLE, opacity: "0.7", display: "flex" },
               callback: () => {
-                store.dispatch(bootstrapRequested());
+                store.dispatch(
+                  bootstrapHasContent
+                    ? bootstrapContinueRequested()
+                    : bootstrapRequested(),
+                );
               },
             }),
             button({
@@ -440,7 +454,6 @@ export class SeHeaderBar extends SuiComponent<
                 );
               },
             }),
-            clearPart,
           ],
         }),
       ],

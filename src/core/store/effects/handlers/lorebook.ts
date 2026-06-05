@@ -94,13 +94,14 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
           text: finalContent,
         });
 
-        // Insert a stub key so the entry activates in story text immediately.
-        // displayName.toLowerCase() doubles as an unambiguous sentinel (single key
-        // matching the lorebook title) and as a useful plain-text activation key.
-        // Stage 7 (keys) replaces it with map-informed proper keys.
+        // Seed the entity name as the activation key so the entry fires in story
+        // text immediately. A single name-only key also flags the entry as still
+        // needing key generation (see findEntityNeedingKeys); Stage 7 keeps this
+        // name key first and adds the model's map-informed keys around it.
         const lorebookEntry = await api.v1.lorebook.entry(entryId);
-        const stubKey = (lorebookEntry?.displayName || "").toLowerCase();
-        await api.v1.lorebook.updateEntry(entryId, { keys: [stubKey] });
+        await api.v1.lorebook.updateEntry(entryId, {
+          keys: [nameKey(lorebookEntry?.displayName || "")],
+        });
 
         // Update draft with full content if viewing this entry
         if (entryId === currentSelected) {
@@ -231,6 +232,24 @@ export function keysFromDisplayName(displayName: string): string[] {
     .filter((w) => w.length > 1 && w.length < 50);
 }
 
+/** The entity name as its canonical lowercase activation key. */
+export function nameKey(displayName: string): string {
+  return displayName.trim().toLowerCase();
+}
+
+/**
+ * Guarantee the entity name is the FIRST activation key (deduped, case-insensitive).
+ * Every entity carries its own name as a key so a bare mention — "John looked at
+ * the cards" — always activates John's entry, even when the model's generated
+ * keys are weak. Without it the AI can lose the character's appearance and facts.
+ */
+export function withNameKeyFirst(keys: string[], displayName: string): string[] {
+  const nk = nameKey(displayName);
+  if (!nk) return keys;
+  const rest = keys.filter((k) => k.trim().toLowerCase() !== nk);
+  return [nk, ...rest];
+}
+
 export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
   streaming(
     _ctx: StreamingContext<LorebookKeysTarget>,
@@ -258,30 +277,30 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
       // Mark completed BEFORE async reads to prevent re-queue race condition
       ctx.dispatch(segaKeysCompleted({ entryId: ctx.target.entryId }));
 
-      // Merge with existing keys (dedup case-insensitive, preserve first casing)
-      // Drop the displayName stub — real keys have arrived
+      // Merge existing + generated keys (dedup case-insensitive, preserve first
+      // casing), then pin the entity name as the first key so the entry always
+      // activates on a bare name mention regardless of the model's other keys.
       const entry = await api.v1.lorebook.entry(ctx.target.entryId);
       const existing = entry?.keys || [];
-      const stubKey = (entry?.displayName || "").toLowerCase();
       const seen = new Set<string>();
       const merged: string[] = [];
       for (const k of [...existing, ...keys]) {
         const lower = k.toLowerCase();
-        if (lower === stubKey && keys.length > 0) continue;
         if (!seen.has(lower)) {
           seen.add(lower);
           merged.push(k);
         }
       }
+      const finalKeys = withNameKeyFirst(merged, entry?.displayName || "");
 
-      await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys: merged });
+      await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys: finalKeys });
 
-      // Update draft with parsed keys if viewing this entry
+      // Update draft with the saved keys if viewing this entry
       // (storageKey binding auto-updates UI)
       if (ctx.target.entryId === currentSelected) {
         await api.v1.storyStorage.set(
           IDS.LOREBOOK.KEYS_DRAFT_RAW,
-          keys.join(", "),
+          finalKeys.join(", "),
         );
       }
     } else {

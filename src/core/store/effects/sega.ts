@@ -35,6 +35,7 @@ import {
 } from "../../utils/lorebook-strategy";
 import { hashEntryPosition, getStoryIdSeed } from "../../utils/seeded-random";
 import { buildModelParams } from "../../utils/config";
+import { nameKey } from "./handlers/lorebook";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper Functions
@@ -93,7 +94,7 @@ async function findEntityNeedingKeys(
     if (!entry?.text?.trim()) continue;
     const isStub =
       entry.keys?.length === 1 &&
-      entry.keys[0] === (entry.displayName || "").toLowerCase();
+      entry.keys[0] === nameKey(entry.displayName || "");
     if (!isStub && entry.keys && entry.keys.length > 0) continue;
     needsKeys.push(entity);
   }

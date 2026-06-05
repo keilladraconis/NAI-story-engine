@@ -9,7 +9,6 @@ import { registerLorebookGenerationEffects } from "./effects/lorebook-generation
 import { registerAutosaveEffects } from "./effects/autosave";
 import { registerForgeChatEffects } from "./effects/forge-chat-effects";
 import { registerFoundationEffects } from "./effects/foundation-effects";
-import { registerStoryEffects } from "./effects/story-effects";
 import { registerSummaryGenerationEffects } from "./effects/summary-generation";
 import { registerBootstrapEffects } from "./effects/bootstrap-effects";
 
@@ -17,7 +16,6 @@ export { syncEratoCompatibility } from "./effects/lorebook-sync";
 
 export function registerEffects(store: Store<RootState>, genX: GenX): void {
   const { subscribeEffect, dispatch, getState } = store;
-  registerStoryEffects(subscribeEffect, dispatch, getState);
   registerChatEffects(subscribeEffect, dispatch, getState);
   registerSegaEffects(subscribeEffect, dispatch, getState, genX);
   registerGenerationEngineEffects(subscribeEffect, dispatch, getState, genX);

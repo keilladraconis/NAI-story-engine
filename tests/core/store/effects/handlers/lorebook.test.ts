@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   parseLorebookKeys,
   keysFromDisplayName,
+  nameKey,
+  withNameKeyFirst,
 } from "../../../../../src/core/store/effects/handlers/lorebook";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -222,5 +224,46 @@ describe("keysFromDisplayName", () => {
 
   it("returns empty array when all tokens are single characters", () => {
     expect(keysFromDisplayName("A B C")).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// nameKey / withNameKeyFirst — the entity name is always a guaranteed first key
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("nameKey", () => {
+  it("lowercases and trims the display name", () => {
+    expect(nameKey("  John  ")).toBe("john");
+    expect(nameKey("Mira Voss")).toBe("mira voss");
+  });
+
+  it("returns empty string for a blank name", () => {
+    expect(nameKey("   ")).toBe("");
+  });
+});
+
+describe("withNameKeyFirst", () => {
+  it("prepends the name key when it is missing", () => {
+    expect(withNameKeyFirst(["cards", "table"], "John")).toEqual([
+      "john",
+      "cards",
+      "table",
+    ]);
+  });
+
+  it("moves an existing name key to the front (case-insensitive) without duplicating", () => {
+    expect(withNameKeyFirst(["cards", "John", "table"], "John")).toEqual([
+      "john",
+      "cards",
+      "table",
+    ]);
+  });
+
+  it("keeps the name first even when keys are empty", () => {
+    expect(withNameKeyFirst([], "John")).toEqual(["john"]);
+  });
+
+  it("leaves keys untouched when the display name is blank", () => {
+    expect(withNameKeyFirst(["cards"], "   ")).toEqual(["cards"]);
   });
 });

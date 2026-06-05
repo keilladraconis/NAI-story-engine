@@ -2,7 +2,6 @@
  * SeForgeSection — Forge guidance input + generation button.
  *
  * Contains:
- *   - Clear forge button (upper right) — clears the guidance input
  *   - Guidance multilineTextInput (storageKey)
  *   - Forge SeGenerationButton
  *   - Ticker text (updated by generation handlers)
@@ -16,7 +15,6 @@ import { selectActiveForgeChatId } from "../../core/store/selectors/forge";
 import { getChatTypeSpec } from "../../core/chat-types";
 import { IDS, STORAGE_KEYS } from "../../ui/framework/ids";
 import { SeGenerationButton } from "./SeGenerationButton";
-import { SeConfirmButton } from "./SeConfirmButton";
 
 type SeForgeSectionTheme = { default: { self: { style: object } } };
 type SeForgeSectionState = Record<string, never>;
@@ -35,7 +33,6 @@ export class SeForgeSection extends SuiComponent<
   UIPartCollapsibleSection
 > {
   private readonly _forgeBtn: SeGenerationButton;
-  private readonly _clearBtn: SeConfirmButton;
 
   constructor(options: SeForgeSectionOptions) {
     super(
@@ -90,26 +87,13 @@ export class SeForgeSection extends SuiComponent<
         (p as { activeForgeId?: string }).activeForgeId,
       isDisabledFromProjection: () => false,
     });
-
-    this._clearBtn = new SeConfirmButton({
-      id: FG.CLEAR_BTN,
-      label: "Clear",
-      confirmLabel: "Clear forge guidance?",
-      style: { "font-size": "0.75em", opacity: "0.5", padding: "2px 8px" },
-      onConfirm: async () => {
-        await api.v1.storyStorage.remove(STORAGE_KEYS.FORGE_GUIDANCE_UI);
-      },
-    });
   }
 
   async compose(): Promise<UIPartCollapsibleSection> {
     const { column, row, text, collapsibleSection, multilineTextInput } =
       api.v1.ui.part;
 
-    const [forgeBtnPart, clearBtnPart] = await Promise.all([
-      this._forgeBtn.build(),
-      this._clearBtn.build(),
-    ]);
+    const forgeBtnPart = await this._forgeBtn.build();
 
     const guidanceInput = multilineTextInput({
       id: FG.GUIDANCE_INPUT,
@@ -138,10 +122,6 @@ export class SeForgeSection extends SuiComponent<
         column({
           style: { gap: "6px" },
           content: [
-            row({
-              style: { "justify-content": "flex-end" },
-              content: [clearBtnPart],
-            }),
             guidanceInput,
             row({
               style: { gap: "6px" },

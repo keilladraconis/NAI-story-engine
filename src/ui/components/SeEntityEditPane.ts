@@ -29,6 +29,10 @@ import {
   entityDeleted,
 } from "../../core/store/slices/world";
 import { ensureCategory } from "../../core/store/effects/lorebook-sync";
+import {
+  nameKey,
+  withNameKeyFirst,
+} from "../../core/store/effects/handlers/lorebook";
 import type { RootState } from "../../core/store/types";
 import {
   IDS,
@@ -171,7 +175,7 @@ export class SeEntityEditPane extends SuiComponent<
       id: newEntryId,
       displayName: draftName,
       text: "",
-      keys: [],
+      keys: [nameKey(draftName)],
       enabled: true,
       category: categoryId,
     });
@@ -373,10 +377,13 @@ export class SeEntityEditPane extends SuiComponent<
           const rawKeys = String(
             (await api.v1.storyStorage.get(L.KEYS_DRAFT_RAW)) ?? "",
           );
-          const keys = rawKeys
+          const enteredKeys = rawKeys
             .split(",")
             .map((k) => k.trim())
             .filter((k) => k.length > 0);
+          // The entity name stays pinned as the first key so the entry always
+          // activates on a bare name mention, even if it was edited out by hand.
+          const keys = withNameKeyFirst(enteredKeys, trimmedName);
           await api.v1.lorebook.updateEntry(liveEntryId, {
             displayName: trimmedName,
             text: content,

@@ -6,6 +6,8 @@ import {
 } from "../../utils/config";
 import {
   bootstrapRequested,
+  bootstrapContinueRequested,
+  documentHistoryNavigated,
   generationSubmitted,
   requestQueued,
 } from "../index";
@@ -150,12 +152,37 @@ export function registerBootstrapEffects(
   dispatch: AppDispatch,
   getState: () => RootState,
 ): void {
+  // Undo/redo/jump changes the document out from under the bootstrap button,
+  // whose stage ("Opening Scene" vs "Continue Scene") is derived from document
+  // content. Surface history navigation as a Redux signal so the button's
+  // watcher re-derives — e.g. undoing the opening flips it back to Opening Scene.
+  api.v1.hooks.register("onHistoryNavigated", () => {
+    dispatch(documentHistoryNavigated());
+  });
+
+  // Stage 1 — "Opening Scene". User-triggered; does NOT auto-chain into Continue.
   subscribeEffect(matchesAction(bootstrapRequested), () => {
     const strategy = buildBootstrapP1Strategy(getState);
     dispatch(
       requestQueued({
         id: strategy.requestId,
         type: "bootstrap",
+        targetId: "bootstrap",
+      }),
+    );
+    dispatch(generationSubmitted(strategy));
+  });
+
+  // Stage 2+ — "Continue Scene". Each click runs exactly one continuation
+  // paragraph; the handler no longer queues the next one. Iteration is derived
+  // from the current document length purely for the streaming status ticker.
+  subscribeEffect(matchesAction(bootstrapContinueRequested), async () => {
+    const iteration = (await api.v1.document.sectionIds()).length;
+    const strategy = buildBootstrapContinueStrategy(getState, iteration);
+    dispatch(
+      requestQueued({
+        id: strategy.requestId,
+        type: "bootstrapContinue",
         targetId: "bootstrap",
       }),
     );

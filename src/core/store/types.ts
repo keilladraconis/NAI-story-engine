@@ -138,6 +138,10 @@ export interface RuntimeState {
   status: GenerationStatus;
   genx: GenerationState;
   budgetTimeRemaining: number;
+  /** Bumped whenever the user navigates document history (undo/redo/jump). UI
+   *  that derives from document content — e.g. the bootstrap stage button —
+   *  watches this to re-derive after an undo. */
+  historyEpoch: number;
 }
 
 // World Types (v13)
