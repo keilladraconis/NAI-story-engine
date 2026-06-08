@@ -113,6 +113,8 @@ describe("lorebook archivist prompt", () => {
     expect(LOREBOOK_GENERATE_PROMPT).toMatch(
       /Weave these connections naturally/,
     );
-    expect(LOREBOOK_GENERATE_PROMPT).toMatch(/Characters may belong to factions/);
+    expect(LOREBOOK_GENERATE_PROMPT).toMatch(
+      /Characters may belong to factions/,
+    );
   });
 });
