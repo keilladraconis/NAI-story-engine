@@ -45,6 +45,7 @@ import {
   type EditPaneHost,
 } from "./SeContentWithTitlePane";
 import { SeSimpleContentPane } from "./SeSimpleContentPane";
+import type { IntensityLevel } from "../../core/utils/prompts";
 
 type SeFoundationSectionTheme = { default: { self: { style: object } } };
 type SeFoundationSectionState = Record<string, never>;
@@ -129,7 +130,7 @@ const CONTENT_TEXT_STYLE = {
 
 // ── Intensity levels ────────────────────────────────────────────────────────
 
-const INTENSITY_LEVELS = [
+const INTENSITY_LEVELS: { level: IntensityLevel; description: string }[] = [
   {
     level: "Cozy",
     description:
@@ -155,7 +156,7 @@ const INTENSITY_LEVELS = [
     description:
       "High lethality, psychological extremity; no guaranteed safety for anyone.",
   },
-] as const;
+];
 
 const INTENSITY_BTN_BASE = {
   fontWeight: "normal",
