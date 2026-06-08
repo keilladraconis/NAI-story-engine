@@ -90,15 +90,37 @@ describe("brainstorm register prompts", () => {
 
   it("Cozy does not require friction/conflict (the reported failure)", () => {
     const cozyCo = BRAINSTORM_REGISTERS.Cozy.cowriter;
-    expect(cozyCo).toMatch(/optional, not required/i);
-    expect(cozyCo).toMatch(/frictionless/i);
     expect(cozyCo).toMatch(/warmth/i);
+    // Tightened to pure warmth: no optional push-pull / friction engine.
+    expect(cozyCo).not.toMatch(/push-pull/i);
     expect(cozyCo).not.toMatch(/engine here is small relational friction/i);
+    expect(cozyCo).toMatch(/Never introduce inconvenience, conflict, danger/);
 
     const cozyCr = BRAINSTORM_REGISTERS.Cozy.critic;
     expect(cozyCr).toMatch(/do not demand/i);
     expect(cozyCr).toMatch(/missing specificity, not missing conflict/i);
     expect(cozyCr).toMatch(/complete with no friction at all/i);
+  });
+
+  it("Cowriter voice is warm for Cozy/Grounded and direct for high registers", () => {
+    // The shared frame no longer mandates the bossy imperative opener.
+    expect(BRAINSTORM_FRAME).not.toMatch(/Never open with praise/i);
+    // Warm registers carry a VOICE line and model a "what if" suggestion,
+    // and drop the old imperative "Give her one…" example.
+    for (const k of ["Cozy", "Grounded"] as const) {
+      expect(BRAINSTORM_REGISTERS[k].cowriter).toMatch(/VOICE:/);
+      expect(BRAINSTORM_REGISTERS[k].cowriter).toMatch(/what if/i);
+    }
+    expect(BRAINSTORM_REGISTERS.Cozy.cowriter).not.toMatch(
+      /Give her one recurring face in town/,
+    );
+    expect(BRAINSTORM_REGISTERS.Grounded.cowriter).not.toMatch(
+      /Give her one standing obligation/,
+    );
+    // High registers stay direct.
+    for (const k of ["Gritty", "Noir", "Nightmare"] as const) {
+      expect(BRAINSTORM_REGISTERS[k].cowriter).toMatch(/VOICE: Direct/);
+    }
   });
 
   it("Noir critic is distinct from Gritty (systemic trap, not one costly choice)", () => {
