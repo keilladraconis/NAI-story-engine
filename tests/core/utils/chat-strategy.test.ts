@@ -130,6 +130,11 @@ describe("buildChatStrategy", () => {
           m.content === buildBrainstormPrompt("cowriter", "unset"),
       ),
     ).toBe(true);
+    // The brainstorm generation must not inherit the entity-generation bundle.
+    const allText = messages.map((m: Message) => m.content).join("\n");
+    expect(allText).not.toContain("You are a Story Engine Agent");
+    expect(allText).not.toContain("Possibility over Plot");
+    expect(allText).not.toContain("Container Discipline");
     // First user message survives
     expect(
       messages.some(

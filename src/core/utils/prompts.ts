@@ -5,18 +5,6 @@
  * This keeps prompts stable and design-sensitive (not user-tunable by default).
  */
 
-export const SYSTEM_PROMPT = `You are a Story Engine Agent.
-Your goal is to assist the user in building a rich, reactive narrative universe.
-
-**Core Creative Directives:**
-1.  **Possibility over Plot:** Create potential for conflict ("Narrative Vectors"), not just a sequence of events.
-2.  **Show, Don't Tell:** Focus on behavior and actions that reveal inner states.
-3.  **Depth:** Ensure every entity has a Surface (public), Shadow (hidden), and Personal (history) layer.
-4.  **No Fluff:** Every detail must be a hook for potential interaction.
-5.  **Interconnection:** Every entity should connect to at least two others — through allegiance, opposition, geography, or history. Isolated elements are dead weight.
-
-Where indicated by \`[placeholder]\`, replace placeholders.`;
-
 // ── Brainstorm: register-aware prompts ──────────────────────────────────────
 // A shared FRAME per mode (register-neutral craft rules) + a per-intensity
 // REGISTER block. Selected by buildBrainstormPrompt(mode, level). Keeps the
@@ -202,6 +190,14 @@ Generate a structured Lorebook Entry for "[itemName]".
 
 **Format:** Identity header (Name, Type, Setting), then a few key
 attributes, then dense prose. Follow the template for this entry type.
+
+**Cross-reference the existing world** (draw on the [WORLD ENTRIES] above where narratively appropriate):
+- Characters may belong to factions, frequent locations, or have relationships with other characters
+- Locations may be controlled by factions, inhabited by characters, or connected to other places
+- Factions may have notable members, headquarters, rivals, or territorial interests
+- Systems may be practiced by factions, studied at locations, or mastered by characters
+- Topics may involve characters with opposing positions, connect to factions or locations
+Weave these connections naturally into the entry to create a cohesive world.
 
 **Content Directives:**
 - **Characters:** Appearance a camera would capture — specific
@@ -470,25 +466,6 @@ INSTRUCTION:
 - DO NOT use any markdown bolding (**).
 - Total limit 100 words.
 - OUTPUT ONLY THE GUIDELINE.`;
-
-export const LOREBOOK_WEAVING_PROMPT = `When generating this entry, actively reference existing world elements where narratively appropriate:
-- Characters may belong to factions, frequent locations, or have relationships with other characters
-- Locations may be controlled by factions, inhabited by characters, or connected to other places
-- Factions may have notable members, headquarters, rivals, or territorial interests
-- Systems may be practiced by factions, studied at locations, or mastered by characters
-- Topics may involve characters with opposing positions, connect to factions or locations
-Weave these connections naturally into the entry to create a cohesive world.
-
-**Container Boundaries:**
-- Character entries: internal/solitary data only — never name another character to define a dynamic
-- Location entries: sensory anchor + functional reality + dramatic potential (Atmosphere/Description/Hook) — no recurring events, schedules, or mechanics
-- Narrative Vectors: situation + complication (what's happening and why every option costs) — frame as opposing goods, no history, no outcomes
-- Systems: mechanical rules only — no events or character histories
-- Topics: what characters discuss — per-actor positions, no resolution
-
-**Character Motive Lines** (Location, System, and Narrative Vector entries only):
-> [CHARACTER]'s Motive ([GOAL]): [need. trigger. tactic.]
-Include where situationally appropriate. Never in Character or Faction entries.`;
 
 export const FOUNDATION_INTENT_PROMPT = `Write one sentence — the story's logline: who this protagonist is, what situation they're in, and what's at stake. Specific to this story; not a theme, not a question.
 

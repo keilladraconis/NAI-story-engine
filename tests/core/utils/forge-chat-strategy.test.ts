@@ -14,7 +14,6 @@ import {
   FORGE_WEAVE_PROMPT,
   FORGE_CLEANUP_PROMPT,
   FORGE_DISCUSS_PROMPT,
-  SYSTEM_PROMPT,
 } from "../../../src/core/utils/prompts";
 
 function makeEntity(over: Partial<WorldEntity>): WorldEntity {
@@ -413,7 +412,7 @@ describe("buildForgeChatStrategy briefing anchoring", () => {
     seed: { kind: "blank" },
   };
 
-  it("does not inject the shared prefix (no SYSTEM_PROMPT, no [WORLD ENTRIES])", async () => {
+  it("does not inject the shared prefix (no archivist directives, no [WORLD ENTRIES])", async () => {
     const getState = () =>
       makeState({
         world: {
@@ -440,7 +439,7 @@ describe("buildForgeChatStrategy briefing anchoring", () => {
     const allText = built.messages.map((m) => m.content).join("\n");
     expect(allText).toContain("[LIVE]");
     expect(allText).not.toContain("[WORLD ENTRIES]");
-    expect(allText).not.toContain(SYSTEM_PROMPT);
+    expect(allText).not.toContain("You are the **Archivist**");
   });
 
   it("places the frozen briefing right after the phase prompt and before [POOL]", async () => {

@@ -4,6 +4,7 @@ import {
   FORGE_EXPAND_PROMPT,
   FORGE_WEAVE_PROMPT,
   FORGE_CLEANUP_PROMPT,
+  LOREBOOK_GENERATE_PROMPT,
 } from "../../../src/core/utils/prompts";
 import {
   buildBrainstormPrompt,
@@ -104,5 +105,14 @@ describe("brainstorm register prompts", () => {
     const noir = BRAINSTORM_REGISTERS.Noir.critic;
     expect(noir).toMatch(/that's Gritty/i);
     expect(noir).toMatch(/deepen the rot/i);
+  });
+});
+
+describe("lorebook archivist prompt", () => {
+  it("carries the weaving cross-reference instruction (relocated from the shared prefix)", () => {
+    expect(LOREBOOK_GENERATE_PROMPT).toMatch(
+      /Weave these connections naturally/,
+    );
+    expect(LOREBOOK_GENERATE_PROMPT).toMatch(/Characters may belong to factions/);
   });
 });
