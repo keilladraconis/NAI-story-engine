@@ -243,7 +243,10 @@ export function nameKey(displayName: string): string {
  * the cards" — always activates John's entry, even when the model's generated
  * keys are weak. Without it the AI can lose the character's appearance and facts.
  */
-export function withNameKeyFirst(keys: string[], displayName: string): string[] {
+export function withNameKeyFirst(
+  keys: string[],
+  displayName: string,
+): string[] {
   const nk = nameKey(displayName);
   if (!nk) return keys;
   const rest = keys.filter((k) => k.trim().toLowerCase() !== nk);
@@ -293,7 +296,9 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
       }
       const finalKeys = withNameKeyFirst(merged, entry?.displayName || "");
 
-      await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys: finalKeys });
+      await api.v1.lorebook.updateEntry(ctx.target.entryId, {
+        keys: finalKeys,
+      });
 
       // Update draft with the saved keys if viewing this entry
       // (storageKey binding auto-updates UI)

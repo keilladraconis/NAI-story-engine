@@ -25,8 +25,7 @@ export async function openSeSessionsModal(): Promise<void> {
       const isCurrent = chat.id === activeChatId;
       const canDelete = chats.length > 1;
       const rowId = `se-bs-session-${index}`;
-      const typeLabel =
-        CHAT_TYPE_REGISTRY[chat.type]?.displayName ?? chat.type;
+      const typeLabel = CHAT_TYPE_REGISTRY[chat.type]?.displayName ?? chat.type;
 
       const controls: UIPart[] = [
         button({

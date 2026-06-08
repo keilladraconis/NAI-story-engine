@@ -5,7 +5,9 @@ import { buildBrainstormPrompt } from "../../../src/core/utils/prompts";
 import type { IntensityData, RootState } from "../../../src/core/store/types";
 
 const ctxWith = (intensity: IntensityData | null): SpecCtx => ({
-  getState: vi.fn(() => ({ foundation: { intensity } }) as unknown as RootState),
+  getState: vi.fn(
+    () => ({ foundation: { intensity } }) as unknown as RootState,
+  ),
   dispatch: vi.fn(),
 });
 

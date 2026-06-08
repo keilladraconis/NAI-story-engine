@@ -372,9 +372,9 @@ describe("forgeChatNewSessionRequested effect", () => {
     );
     expect(submitted).toBeDefined();
     // Discuss turn, NOT the autonomous sketch pass.
-    expect(
-      (submitted![0].payload as { requestId: string }).requestId,
-    ).toMatch(/^forge-discuss-/);
+    expect((submitted![0].payload as { requestId: string }).requestId).toMatch(
+      /^forge-discuss-/,
+    );
   });
 
   it("empty open creates an idle session — no generation, no assistant placeholder", async () => {
