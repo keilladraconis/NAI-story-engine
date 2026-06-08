@@ -1,11 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
 import { brainstormSpec } from "../../../src/core/chat-types/brainstorm";
 import type { Chat, SpecCtx } from "../../../src/core/chat-types/types";
+import { buildBrainstormPrompt } from "../../../src/core/utils/prompts";
+import type { IntensityData, RootState } from "../../../src/core/store/types";
 
-const ctx: SpecCtx = {
-  getState: vi.fn(),
+const ctxWith = (intensity: IntensityData | null): SpecCtx => ({
+  getState: vi.fn(() => ({ foundation: { intensity } }) as unknown as RootState),
   dispatch: vi.fn(),
-};
+});
+
+const ctx: SpecCtx = ctxWith(null);
 
 const brainstormChat = (subMode: "cowriter" | "critic" = "cowriter"): Chat => ({
   id: "c1",
@@ -40,6 +44,27 @@ describe("brainstormSpec", () => {
     expect(co).not.toEqual(cr);
     expect(co.length).toBeGreaterThan(0);
     expect(cr.length).toBeGreaterThan(0);
+  });
+
+  it("systemPromptFor selects the register from foundation.intensity", () => {
+    const cozyCtx = ctxWith({ level: "Cozy", description: "" });
+    expect(
+      brainstormSpec.systemPromptFor(brainstormChat("cowriter"), cozyCtx),
+    ).toBe(buildBrainstormPrompt("cowriter", "Cozy"));
+    expect(
+      brainstormSpec.systemPromptFor(brainstormChat("critic"), cozyCtx),
+    ).toBe(buildBrainstormPrompt("critic", "Cozy"));
+
+    const nightmareCtx = ctxWith({ level: "Nightmare", description: "" });
+    expect(
+      brainstormSpec.systemPromptFor(brainstormChat("critic"), nightmareCtx),
+    ).toBe(buildBrainstormPrompt("critic", "Nightmare"));
+  });
+
+  it("systemPromptFor falls back to the unset register when no intensity is set", () => {
+    expect(
+      brainstormSpec.systemPromptFor(brainstormChat("cowriter"), ctxWith(null)),
+    ).toBe(buildBrainstormPrompt("cowriter", "unset"));
   });
 
   it("contextSlice returns the full transcript", () => {
