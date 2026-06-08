@@ -98,7 +98,7 @@ export class SeForgeSection extends SuiComponent<
     const guidanceInput = multilineTextInput({
       id: FG.GUIDANCE_INPUT,
       placeholder:
-        "What should the Forge build? Leave blank to draw from your Brainstorm conversation.",
+        "What should the Forge build? Leave blank to open a session and Forge Ahead from your Brainstorm.",
       initialValue: "",
       storageKey: `story:${STORAGE_KEYS.FORGE_GUIDANCE_UI}`,
       style: { "min-height": "5em", "font-size": "0.85em" },

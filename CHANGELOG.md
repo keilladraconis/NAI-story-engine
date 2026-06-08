@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.1] - 2026-06-08
+
+### Changed
+
+- **The Forge button now opens a session instead of immediately generating.** Clicking Forge drops you into the forge chat first: with guidance typed in, the forge replies conversationally (and only makes entities if you ask) so you can discuss or critique before committing; with the box left blank, it opens an idle session and you send an empty message to Forge Ahead. Previously, a single click started an autonomous entity pass before you could weigh in.
+- **Brainstorm matches your Intensity register.** The Brainstorm assistant (both Cowriter and Critic) now selects its guidance from the story's Intensity level (Cozy → Nightmare), so a Cozy or Grounded story is no longer pushed toward danger, stakes, or manufactured conflict it doesn't want. Higher registers keep their pressure; with no intensity set yet, Brainstorm helps you find the right register before imposing one.
+
 ## [0.13.0] - 2026-06-04
 
 ### Added

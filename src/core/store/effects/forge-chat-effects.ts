@@ -11,8 +11,9 @@
  *                                     other drafts remain) submit a forgeCleanup
  *                                     turn to scrub references.
  *   3. forgeChatNewSessionRequested → create a fresh forge chat, optionally seed
- *                                     a user message, append an assistant
- *                                     placeholder, submit the first sketch turn.
+ *                                     a user message. With guidance, submit one
+ *                                     discuss turn; with none, leave it idle (no
+ *                                     placeholder, no generation).
  *
  * All three actions are local to this module — declared with a static `.type`
  * field so `matchesAction` can subscribe.
@@ -373,7 +374,7 @@ export function registerForgeChatEffects(
     },
   );
 
-  // ─── New Session (fresh forge chat + first sketch turn) ─────────────────────
+  // ─── New Session (fresh forge chat; discuss turn if seeded, else idle) ──────
   subscribeEffect(
     matchesAction(forgeChatNewSessionRequested),
     async (action, { getState: latest }) => {
@@ -403,6 +404,12 @@ export function registerForgeChatEffects(
       };
       dispatch(chatCreated({ chat }));
 
+      // Opening a Forge no longer auto-runs a pass. With guidance, run one
+      // conversational discuss turn (emits commands only if explicitly asked);
+      // with no guidance, leave the session idle — the user sends empty to
+      // Forge Ahead or types to discuss. chatCreated already switched the tab.
+      if (!seedText) return;
+
       const assistantId = api.v1.uuid();
       dispatch(
         messageAdded({
@@ -412,7 +419,7 @@ export function registerForgeChatEffects(
       );
 
       const seeded = findChat(latest(), chat.id) ?? chat;
-      const strategy = buildForgeChatStrategy(latest, seeded, assistantId);
+      const strategy = buildForgeDiscussStrategy(latest, seeded, assistantId);
       dispatch(
         requestQueued({
           id: strategy.requestId,
