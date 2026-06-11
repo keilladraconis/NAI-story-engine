@@ -350,7 +350,7 @@ describe("forgeChatContinueRequested with advancePhase: false", () => {
 });
 
 describe("forgeChatNewSessionRequested effect", () => {
-  it("creates a new forge-type chat and submits the first sketch turn", async () => {
+  it("seeded open runs a discuss turn (not a sketch) and seeds the user guidance", async () => {
     const state = makeState([]);
     const { dispatch, fire } = makeHarness(state);
     await fire(
@@ -361,7 +361,6 @@ describe("forgeChatNewSessionRequested effect", () => {
     );
     expect(created).toBeDefined();
     expect(created![0].payload.chat.type).toBe("forge");
-    expect(created![0].payload.chat.subMode).toBe("sketch");
     expect(
       created![0].payload.chat.messages.some(
         (m: { role: string; content: string }) =>
@@ -372,9 +371,13 @@ describe("forgeChatNewSessionRequested effect", () => {
       ([a]) => a.type === "ui/generationSubmitted",
     );
     expect(submitted).toBeDefined();
+    // Discuss turn, NOT the autonomous sketch pass.
+    expect((submitted![0].payload as { requestId: string }).requestId).toMatch(
+      /^forge-discuss-/,
+    );
   });
 
-  it("creates a new forge chat with no initial user message when none provided", async () => {
+  it("empty open creates an idle session — no generation, no assistant placeholder", async () => {
     const state = makeState([]);
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeChatNewSessionRequested({}));
@@ -386,6 +389,18 @@ describe("forgeChatNewSessionRequested effect", () => {
       (m: { role: string }) => m.role === "user",
     );
     expect(userMsgs).toEqual([]);
+    // No autonomous pass and no empty assistant turn left dangling.
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "ui/generationSubmitted"),
+    ).toBe(false);
+    expect(
+      dispatch.mock.calls.some(
+        ([a]) =>
+          a.type === "chat/messageAdded" &&
+          (a.payload as { message?: { role: string } }).message?.role ===
+            "assistant",
+      ),
+    ).toBe(false);
   });
 
   it("seeds the briefing as the first (system) message of the new chat", async () => {
@@ -397,17 +412,9 @@ describe("forgeChatNewSessionRequested effect", () => {
     const created = dispatch.mock.calls.find(
       ([a]) => a.type === "chat/chatCreated",
     );
-    expect(created).toBeDefined();
     const msgs = created![0].payload.chat.messages;
     expect(msgs[0].role).toBe("system");
     expect(msgs[0].content).toBe("BRIEFING TEXT");
-    // The seeded user guidance follows the briefing.
-    expect(
-      msgs.some(
-        (m: { role: string; content: string }) =>
-          m.role === "user" && m.content === "include Vesper",
-      ),
-    ).toBe(true);
   });
 });
 

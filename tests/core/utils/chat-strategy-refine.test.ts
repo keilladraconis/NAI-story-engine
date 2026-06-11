@@ -10,9 +10,15 @@ vi.mock("../../../src/core/utils/context-builder", () => ({
 }));
 vi.mock("../../../src/core/utils/refine-strategy", () => ({
   buildRefineTail: vi.fn(
-    (prefix: { role: string; content: string }[], refine: {
-      currentText: string;
-    }) => [...prefix, { role: "system", content: `REWRITE:${refine.currentText}` }],
+    (
+      prefix: { role: string; content: string }[],
+      refine: {
+        currentText: string;
+      },
+    ) => [
+      ...prefix,
+      { role: "system", content: `REWRITE:${refine.currentText}` },
+    ],
   ),
 }));
 vi.mock("../../../src/core/utils/field-strategy-registry", () => ({

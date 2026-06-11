@@ -211,8 +211,7 @@ export class SeHeaderBar extends SuiComponent<
     // Seed the bootstrap stage label synchronously for the first render (the
     // watcher does not fire on mount). Empty doc → "Opening Scene", otherwise
     // "Continue Scene".
-    const bootstrapHasContent =
-      (await api.v1.document.sectionIds()).length > 0;
+    const bootstrapHasContent = (await api.v1.document.sectionIds()).length > 0;
 
     this._watcher.dispose();
 

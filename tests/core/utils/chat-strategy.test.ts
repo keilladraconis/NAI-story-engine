@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildChatStrategy } from "../../../src/core/utils/chat-strategy";
 import type { Chat } from "../../../src/core/chat-types/types";
 import type { RootState } from "../../../src/core/store/types";
-import { BRAINSTORM_PROMPT } from "../../../src/core/utils/prompts";
+import { buildBrainstormPrompt } from "../../../src/core/utils/prompts";
 
 describe("buildChatStrategy", () => {
   it("returns a strategy with chat target type for a saved chat", async () => {
@@ -125,9 +125,16 @@ describe("buildChatStrategy", () => {
     // System message from spec is present
     expect(
       messages.some(
-        (m: Message) => m.role === "system" && m.content === BRAINSTORM_PROMPT,
+        (m: Message) =>
+          m.role === "system" &&
+          m.content === buildBrainstormPrompt("cowriter", "unset"),
       ),
     ).toBe(true);
+    // The brainstorm generation must not inherit the entity-generation bundle.
+    const allText = messages.map((m: Message) => m.content).join("\n");
+    expect(allText).not.toContain("You are a Story Engine Agent");
+    expect(allText).not.toContain("Possibility over Plot");
+    expect(allText).not.toContain("Container Discipline");
     // First user message survives
     expect(
       messages.some(

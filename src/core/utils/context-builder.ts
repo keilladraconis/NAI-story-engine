@@ -2,16 +2,16 @@
  * Context Builder - Strategy factories for GLM generation.
  *
  * UNIFIED PREFIX STRATEGY (for token cache efficiency):
- * All Story Engine strategies share a common prefix via buildStoryEnginePrefix():
+ * All Story Engine strategies share a common prefix via buildStoryEnginePrefix().
+ * The prefix is story-state context only — each strategy supplies its own system
+ * prompt (persona + directives) after the prefix:
  *
- *   MSG 1 (SYSTEM): systemPrompt + weaving prompt             [STABLE]
- *   MSG 2 (SYSTEM): story state snapshot (ATTG, style,        [STABLE during SEGA]
+ *   MSG 1 (SYSTEM): story state snapshot (ATTG, style,        [STABLE during SEGA]
  *                    setting, brainstorm, canon)
- *   MSG 3 (SYSTEM): World Entry items                               [GROWS during list stage]
- *   MSG 4 (SYSTEM): story text (rolling window)               [VOLATILE — at end]
+ *   MSG 2 (SYSTEM): World Entry items                         [GROWS during list stage]
+ *   MSG 3 (SYSTEM): story text (rolling window)               [VOLATILE — at end]
  *   ─── cache boundary ───
- *   MSG 5+ : strategy-specific instructions                   [VOLATILE]
- *   LAST   : assistant prefill                                [VOLATILE]
+ *   MSG 4+ : strategy-specific instructions + prefill         [VOLATILE]
  *
  * Chat-driven generation lives in chat-strategy.ts and consults the active
  * chat-type spec for its own context slice.
@@ -27,7 +27,6 @@ import {
   DulfsFieldID,
 } from "../../config/field-definitions";
 import { STORAGE_KEYS } from "../../ui/framework/ids";
-import { SYSTEM_PROMPT, LOREBOOK_WEAVING_PROMPT } from "./prompts";
 // --- Helpers ---
 
 /**
@@ -278,11 +277,10 @@ export const getStoryContextMessages = async (
  * Brainstorm mode is excluded — it uses its own chat-based context.
  *
  * Prefix structure:
- *   MSG 1 (SYSTEM): systemPrompt + weaving prompt             [STABLE]
- *   MSG 2 (SYSTEM): story state snapshot (ATTG, style,        [STABLE during SEGA]
+ *   MSG 1 (SYSTEM): story state snapshot (ATTG, style,        [STABLE during SEGA]
  *                    setting, brainstorm, canon)
- *   MSG 3 (SYSTEM): World Entry items                               [GROWS during list stage]
- *   MSG 4 (SYSTEM): story text (rolling window)               [VOLATILE — at end]
+ *   MSG 2 (SYSTEM): World Entry items                         [GROWS during list stage]
+ *   MSG 3 (SYSTEM): story text (rolling window)               [VOLATILE — at end]
  *
  * After the prefix, each factory appends its own volatile tail
  * (strategy-specific instructions, prefill, etc.).
@@ -402,14 +400,7 @@ export const buildStoryEnginePrefix = async (
   const state = getState();
   const excluded = new Set(options.excludeSections || []);
 
-  // --- MSG 1: System prompt + weaving ---
-  const systemPrompt = SYSTEM_PROMPT;
-  const weavingPrompt = LOREBOOK_WEAVING_PROMPT;
-  const msg1Content = weavingPrompt
-    ? `${systemPrompt}\n\n${weavingPrompt}`
-    : systemPrompt;
-
-  // --- MSG 2: Story state snapshot (STABLE sections) ---
+  // --- MSG 1: Story state snapshot (STABLE sections) ---
   // Order: Foundation (tone/intent anchors), then setting/brainstorm, then canon.
   const stableSections: string[] = [];
 
@@ -437,7 +428,7 @@ export const buildStoryEnginePrefix = async (
     if (b) stableSections.push(b);
   }
 
-  // --- MSG 3: World Entities (GROWS during list stage, stable during lorebook) ---
+  // --- MSG 2: World Entities (GROWS during list stage, stable during lorebook) ---
   // Separate message so growth doesn't invalidate MSG 2's cached tokens.
   let worldEntityContent = "";
   if (!excluded.has("worldEntities")) {
@@ -445,7 +436,7 @@ export const buildStoryEnginePrefix = async (
     if (entityContext) worldEntityContent = `[WORLD ENTRIES]\n${entityContext}`;
   }
 
-  // --- MSG 4: Story text (VOLATILE — at end of prefix) ---
+  // --- MSG 3: Story text (VOLATILE — at end of prefix) ---
   // Placed last so frequent changes don't bust cache for stable sections above.
   let storyTextContent = "";
   if (!excluded.has("storyText")) {
@@ -453,8 +444,9 @@ export const buildStoryEnginePrefix = async (
     if (b) storyTextContent = b;
   }
 
-  // --- Assemble prefix ---
-  const messages: Message[] = [{ role: "system", content: msg1Content }];
+  // --- Assemble prefix (story-state context only; each task supplies its own
+  //     system prompt after this prefix) ---
+  const messages: Message[] = [];
 
   if (stableSections.length > 0) {
     messages.push({

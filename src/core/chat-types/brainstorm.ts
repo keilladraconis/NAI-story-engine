@@ -6,8 +6,8 @@ import type {
   SpecCtx,
 } from "./types";
 import {
-  BRAINSTORM_PROMPT,
-  BRAINSTORM_CRITIC_PROMPT,
+  buildBrainstormPrompt,
+  normalizeRegisterKey,
   XIALONG_STYLE,
 } from "../utils/prompts";
 
@@ -30,10 +30,12 @@ export const brainstormSpec: ChatTypeSpec<BrainstormSubMode> = {
     };
   },
 
-  systemPromptFor(chat: Chat, _ctx: SpecCtx): string {
-    return chat.subMode === "critic"
-      ? BRAINSTORM_CRITIC_PROMPT
-      : BRAINSTORM_PROMPT;
+  systemPromptFor(chat: Chat, ctx: SpecCtx): string {
+    const level = normalizeRegisterKey(
+      ctx.getState().foundation.intensity?.level,
+    );
+    const mode = chat.subMode === "critic" ? "critic" : "cowriter";
+    return buildBrainstormPrompt(mode, level);
   },
 
   xialongStyleFor(chat: Chat, _ctx: SpecCtx): string {

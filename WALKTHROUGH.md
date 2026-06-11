@@ -80,7 +80,7 @@ The Forge and S.E.G.A. treat these as binding.
 
 Generate them here or leave them for S.E.G.A.
 
-*Note*: The new Genre and Tags sections of the Story tab do not have script API, so we cannot update them based on your ATTG. If you prefer to use these, then flip off the toggle on ATTG.
+_Note_: The new Genre and Tags sections of the Story tab do not have script API, so we cannot update them based on your ATTG. If you prefer to use these, then flip off the toggle on ATTG.
 
 ### Refining a field
 
@@ -100,11 +100,11 @@ A Refine runs as a normal chat session — step away to other work and come back
 
 The Forge builds your world — characters, locations, factions, systems, situations, topics — in a typed chat that walks three phases:
 
-| Phase      | What it does                                                            |
-| ---------- | ---------------------------------------------------------------------- |
-| **Sketch** | Breadth: characters, locations, factions, systems in broad strokes     |
-| **Expand** | Depth: behavior-rich detail on thin entries; cut overlap               |
-| **Weave**  | Bonds: thread relationships and author situational-dynamics entries    |
+| Phase      | What it does                                                        |
+| ---------- | ------------------------------------------------------------------- |
+| **Sketch** | Breadth: characters, locations, factions, systems in broad strokes  |
+| **Expand** | Depth: behavior-rich detail on thin entries; cut overlap            |
+| **Weave**  | Bonds: thread relationships and author situational-dynamics entries |
 
 **What to do:**
 
@@ -184,11 +184,11 @@ Open it in such a story and the **Import Wizard** appears (or open it anytime vi
 
 **Foundation fields**
 
-| Row                        | What it does                                                       |
-| -------------------------- | ----------------------------------------------------------------- |
-| **Memory → ATTG**          | Pulls Memory text into the ATTG field and enables sync.           |
-| **A/N → Style**            | Pulls Author's Note into the Style field and enables sync.        |
-| **Story → Shape + Intent** | Reads your story and generates a Shape and Intent to anchor it.    |
+| Row                        | What it does                                                    |
+| -------------------------- | --------------------------------------------------------------- |
+| **Memory → ATTG**          | Pulls Memory text into the ATTG field and enables sync.         |
+| **A/N → Style**            | Pulls Author's Note into the Style field and enables sync.      |
+| **Story → Shape + Intent** | Reads your story and generates a Shape and Intent to anchor it. |
 
 **Lorebook entries** — every unmanaged entry, grouped by auto-detected category (click a label to change it). **⚡ Bind** registers an entry as an entity without touching its text.
 
@@ -200,13 +200,13 @@ Your lorebook is never destroyed. Removing the script, resetting, or clearing en
 
 ## Quick Reference
 
-| Tab / Section  | What it does                              | Key action                                              |
-| -------------- | ----------------------------------------- | ------------------------------------------------------- |
-| **Chat**       | Brainstorms, summaries, field refines     | Chat, **Sum** to summarize, **folder** to manage        |
-| **Foundation** | Tone, shape, intent, contract, metadata   | Intensity → Shape → Intent → Contract → ATTG/Style      |
-| **Forge**      | World-element generation (typed chat)     | **Forge** → empty send = Forge Ahead, type = discuss    |
-| **World**      | Entities, Threads, S.E.G.A.               | Review entities → **S.E.G.A.**                          |
-| **Bootstrap**  | Cold-open writer (header button)          | **⚡ Opening Scene**, then **⚡ Continue Scene**          |
+| Tab / Section  | What it does                            | Key action                                           |
+| -------------- | --------------------------------------- | ---------------------------------------------------- |
+| **Chat**       | Brainstorms, summaries, field refines   | Chat, **Sum** to summarize, **folder** to manage     |
+| **Foundation** | Tone, shape, intent, contract, metadata | Intensity → Shape → Intent → Contract → ATTG/Style   |
+| **Forge**      | World-element generation (typed chat)   | **Forge** → empty send = Forge Ahead, type = discuss |
+| **World**      | Entities, Threads, S.E.G.A.             | Review entities → **S.E.G.A.**                       |
+| **Bootstrap**  | Cold-open writer (header button)        | **⚡ Opening Scene**, then **⚡ Continue Scene**     |
 
 ---
 

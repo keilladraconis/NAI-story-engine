@@ -70,6 +70,26 @@ describe("buildStoryEnginePrefix chat injection", () => {
     expect(concat).not.toContain("[BRAINSTORM]");
   });
 
+  it("emits no worldbuilding directives — the shared prefix is pure story-state context", async () => {
+    const chat: Chat = {
+      id: "c1",
+      type: "brainstorm",
+      title: "x",
+      subMode: "cowriter",
+      messages: [{ id: "u", role: "user", content: ACTIVE_PROBE }],
+      seed: { kind: "blank" },
+    };
+    const getState = () => makeState({ activeChat: chat });
+
+    const prefix = await buildStoryEnginePrefix(getState);
+    const concat = prefix.map((m) => m.content).join("\n");
+    // None of the old MSG1 entity-generation bundle should survive.
+    expect(concat).not.toContain("You are a Story Engine Agent");
+    expect(concat).not.toContain("Possibility over Plot");
+    expect(concat).not.toContain("Weave these connections naturally");
+    expect(concat).not.toContain("You are the **Archivist**");
+  });
+
   it("excludeChat suppresses chat injection entirely (active chat path)", async () => {
     const chat: Chat = {
       id: "c1",
