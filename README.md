@@ -10,7 +10,7 @@ The UI is built on **`nai-simple-ui`**, the component framework from OnepunchVAM
 
 A single **Chat** tab hosts every conversational surface in Story Engine, driven by a typed chat-session registry:
 
-- **Brainstorm** — Freeform idea conversation with the AI. Supports multiple named sessions and a Co/Crit mode toggle (cowriter vs. critic persona).
+- **Brainstorm** — Freeform idea conversation with the AI. Supports multiple named sessions and a Co/Crit mode toggle (cowriter vs. critic persona). Both personas tune to the story's **Intensity** register — set it first (see Foundation) so a Cozy story isn't pushed toward manufactured conflict and a Nightmare isn't softened; with no Intensity set yet, the assistant helps you find the right register before imposing one. At Cozy/Grounded the cowriter is a warm collaborator that builds on your idea; from Gritty up it stays direct and unsoftened.
 - **Summary** — Clicking **Sum** on a brainstorm spawns a separate, iterable Summary chat seeded from the transcript. Downstream generation reads the summary's latest assistant turn, so you can shape exactly what the Forge sees without losing the raw brainstorm.
 - **Refine** — A field-level chat scoped to a single Foundation field or lorebook entry — a real, backgroundable session like the others. See _Field-Level Refine_ below.
 
@@ -18,7 +18,7 @@ A single **Chat** tab hosts every conversational surface in Story Engine, driven
 
 Sets the structural and tonal anchors for your story before worldbuilding begins:
 
-- **Intensity** — Tonality register: Cozy, Grounded, Gritty, Noir, or Nightmare.
+- **Intensity** — Tonality register: Cozy, Grounded, Gritty, Noir, or Nightmare. Pick this first — before brainstorming — since it feeds the Brainstorm assistant, the Forge, and S.E.G.A.
 - **Shape** — AI reads your brainstorm and invents a structural lens: the kind of moment your story is building toward. Edit or generate.
 - **Intent** — A plain statement of what this story is exploring.
 - **Story Contract** — Three directives: REQUIRED, PROHIBITED, EMPHASIS.
