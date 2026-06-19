@@ -11,39 +11,15 @@ Install Story Engine and open it in a story. The panel has two tabs:
 - **Story Engine** — Foundation, Forge, and World.
 - **Chat** — brainstorms, summaries, and field refine sessions.
 
-A fresh story opens on the Chat tab with an empty Brainstorm.
+A fresh story opens on the Chat tab with an empty Brainstorm — but before you type, hop to **Foundation → Intensity** and pick a register (Step 1). The brainstorm reads it.
 
 ---
 
-## Step 1: Brainstorm
+## Step 1: Pick an Intensity
 
-> _Chat tab → Brainstorm_
+> _Story Engine tab → Foundation → Intensity_
 
-A freeform conversation with the AI about what you want to write.
-
-1. Type anything — a genre, a character, a vibe, a "what if." For example: _"Two rival chefs in 1920s Paris, one of them is secretly a spy."_
-2. The AI responds with ideas and questions. Bounce them back and forth.
-3. Don't worry about structure. The richer the brainstorm, the more the Forge has to work with.
-
-**Move on** when you've described the _kind_ of story you want — characters, world, tone, conflicts. You need raw material, not an outline.
-
-**Header controls:**
-
-- **Co / Crit** switch the AI between cowriter (adds ideas) and critic (interrogates your assumptions). Critic is sharpest mid-brainstorm; switch back to Co to develop what it surfaces. Don't leave a Critic question as the last message before Foundation or Forge — that framing carries into generation.
-- **Sum** creates a separate **Summary** chat from the transcript. Reply to it to tighten or expand. Downstream generation reads the summary's latest reply, so you shape what the Forge sees without touching your raw brainstorm.
-- **folder** manages every chat session. **+** starts a fresh Brainstorm.
-
----
-
-## Step 2: Foundation
-
-> _Story Engine tab → Foundation_
-
-Foundation turns your brainstorm into structural anchors. Each field has a **⚡** button — it **generates** when the field is empty and opens a **Refine** chat when the field already has content — and a **pencil** for editing the text by hand.
-
-### Intensity
-
-The emotional register of your story:
+Before you brainstorm, set the emotional register of your story. The Brainstorm assistant reads this and tunes itself to it — a Cozy story won't be pushed toward danger and manufactured conflict, and a Nightmare won't be softened with false reassurance.
 
 | Level         | Feel                          |
 | ------------- | ----------------------------- |
@@ -53,7 +29,43 @@ The emotional register of your story:
 | **Noir**      | Cynical, dark, fatalistic     |
 | **Nightmare** | Extreme, disturbing, no mercy |
 
-Pick this first — it flows into everything downstream.
+This is the same Intensity you'll see in Foundation (Step 3) — set it now so it shapes the brainstorm, and revisit it there alongside the rest of your anchors.
+
+**Haven't decided?** You can skip ahead and brainstorm with no Intensity set — the assistant will help you _find_ the register first (asking how much pressure the world is under, whether characters can walk away) instead of imposing one. Once you know, come back and pick it.
+
+---
+
+## Step 2: Brainstorm
+
+> _Chat tab → Brainstorm_
+
+A freeform conversation with the AI about what you want to write.
+
+1. Type anything — a genre, a character, a vibe, a "what if." For example: _"Two rival chefs in 1920s Paris, one of them is secretly a spy."_
+2. The AI responds with ideas and questions. Bounce them back and forth.
+3. Don't worry about structure. The richer the brainstorm, the more the Forge has to work with.
+
+The brainstorm matches your **Intensity** (Step 1). At Cozy and Grounded the cowriter is a warm collaborator that builds on your idea — _"what if…"_ rather than _"give her…/don't give her…"_; from Gritty up it stays direct and unsoftened, pressing on stakes and consequences.
+
+**Move on** when you've described the _kind_ of story you want — characters, world, tone, conflicts. You need raw material, not an outline.
+
+**Header controls:**
+
+- **Co / Crit** switch the AI between cowriter (adds ideas) and critic (interrogates your assumptions). Both honor your Intensity register. Critic is sharpest mid-brainstorm; switch back to Co to develop what it surfaces. Don't leave a Critic question as the last message before Foundation or Forge — that framing carries into generation.
+- **Sum** creates a separate **Summary** chat from the transcript. Reply to it to tighten or expand. Downstream generation reads the summary's latest reply, so you shape what the Forge sees without touching your raw brainstorm.
+- **folder** manages every chat session. **+** starts a fresh Brainstorm.
+
+---
+
+## Step 3: Foundation
+
+> _Story Engine tab → Foundation_
+
+Foundation turns your brainstorm into structural anchors. Each field has a **⚡** button — it **generates** when the field is empty and opens a **Refine** chat when the field already has content — and a **pencil** for editing the text by hand.
+
+### Intensity
+
+The emotional register of your story (the table is back in [Step 1](#step-1-pick-an-intensity)). You ideally set this before brainstorming; if you skipped it, pick it here. It flows into everything downstream — the brainstorm, the Forge, and S.E.G.A. all read it.
 
 ### Shape
 
@@ -94,7 +106,7 @@ A Refine runs as a normal chat session — step away to other work and come back
 
 ---
 
-## Step 3: Forge
+## Step 4: Forge
 
 > _Story Engine tab → Forge, then the Chat tab_
 
@@ -120,7 +132,7 @@ Each turn streams as **action chips** (Create / Revise / Thread, plus a running 
 
 ---
 
-## Step 4: World
+## Step 5: World
 
 > _Story Engine tab → World_
 
@@ -150,7 +162,7 @@ Watch the status as it works. You can also regenerate content or keys for any si
 
 ---
 
-## Step 5: Bootstrap (optional)
+## Step 6: Bootstrap (optional)
 
 > _Story Engine tab → header **⚡ Opening Scene / ⚡ Continue Scene** button_
 
@@ -163,7 +175,7 @@ You decide how much the engine writes — nothing chains on its own. The button 
 
 ---
 
-## Step 6: Write
+## Step 7: Write
 
 Your scenario is ready:
 
@@ -202,7 +214,7 @@ Your lorebook is never destroyed. Removing the script, resetting, or clearing en
 
 | Tab / Section  | What it does                            | Key action                                           |
 | -------------- | --------------------------------------- | ---------------------------------------------------- |
-| **Chat**       | Brainstorms, summaries, field refines   | Chat, **Sum** to summarize, **folder** to manage     |
+| **Chat**       | Brainstorms, summaries, field refines   | Set Intensity first, then chat; **Sum** to summarize |
 | **Foundation** | Tone, shape, intent, contract, metadata | Intensity → Shape → Intent → Contract → ATTG/Style   |
 | **Forge**      | World-element generation (typed chat)   | **Forge** → empty send = Forge Ahead, type = discuss |
 | **World**      | Entities, Threads, S.E.G.A.             | Review entities → **S.E.G.A.**                       |
@@ -214,7 +226,7 @@ Your lorebook is never destroyed. Removing the script, resetting, or clearing en
 
 - **Iterate, don't restart.** If a field or entry isn't right, regenerate or refine just that one from its own ⚡ — no need to start over.
 - **Re-run the Forge with guidance.** Each run builds on the existing world rather than recreating it. Steer it: _"add a rival faction," "this character needs a secret."_
-- **Intensity first.** It sets the register for every downstream generation — choose it before Shape or the Forge.
+- **Intensity first — before you even brainstorm.** It sets the register for every downstream generation, and the Brainstorm assistant now tunes to it: pick it in Foundation before your first message so a Cozy story stays cozy and a Nightmare keeps its dread. Unsure? Brainstorm with it unset and the assistant helps you find the register before imposing one.
 - **Summarize long brainstorms.** Hit **Sum** before Foundation or Forge to compress a sprawling chat into dense material.
 - **Group with Threads.** A Thread gives generation relational context and can surface a group-level lorebook entry.
 - **Name an unnamed protagonist.** A nameless lead (_"the physician," "the captain"_) makes for collision-prone keys. Add a personal name in the edit pane and regenerate keys before you write.
