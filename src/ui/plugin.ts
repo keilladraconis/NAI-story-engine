@@ -53,6 +53,7 @@ import { SeHeaderBar } from "./components/SeHeaderBar";
 import { SeJournalPanel } from "./components/SeJournalPanel";
 import { SeImportWizard } from "./components/SeImportWizard";
 import { loadJournal } from "../core/generation-journal";
+import { buildJsxSidebarPanel } from "../ui-jsx/mount";
 
 const { sidebarPanel, scriptPanel } = api.v1.ui.extension;
 
@@ -330,6 +331,7 @@ export class StoryEnginePlugin extends SuiPlugin {
         iconId: "lightning",
         content: [tabBarPart],
       }),
+      buildJsxSidebarPanel(),
     ];
 
     const journalEnabled = await api.v1.config.get("generation_journal");
