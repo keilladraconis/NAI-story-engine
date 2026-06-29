@@ -6,7 +6,7 @@
 import { useSlice } from "../bridge";
 import { useDraftField } from "../hooks";
 import { T, SP } from "../style";
-import { Zap, Edit, ToggleLeft, ToggleRight } from "../icons";
+import { Zap, Edit, ToggleLeft, ToggleRight } from "nai:icons/feather";
 import {
   store,
   attgUpdated,
