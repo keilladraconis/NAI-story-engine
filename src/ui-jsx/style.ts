@@ -1,7 +1,8 @@
 // Semantic theme tokens for the JSX UI. Values are NAI theme CSS custom
-// properties (see external/theme-css-variables.d.ts) consumed as inline styles;
+// properties (see external/theme-variables.d.ts) consumed as inline styles;
 // CSS custom properties inherit through the shadow DOM, so the UI auto-follows
-// the user's active theme. No static hex colors.
+// the user's active theme. `satisfies Record<string, ThemeVarRef>` enforces
+// theme vars only — no static hex colors.
 
 export const T = {
   bg: "var(--theme-bg0)",
@@ -11,7 +12,10 @@ export const T = {
   textDisabled: "var(--theme-text-disabled)",
   warning: "var(--theme-warning)",
   fontDefault: "var(--theme-font-default)",
-} as const;
+  // Mid-intensity is green in the default theme; SUI's sync-toggle "on" state
+  // (SeFoundationSection SYNC_TOGGLE_THEME) uses the same green literal.
+  midIntensity: "var(--theme-mid-intensity)",
+} as const satisfies Record<string, ThemeVarRef>;
 
 export const SP = {
   xs: "2px",

@@ -6,7 +6,7 @@
 import { useSlice } from "../bridge";
 import { useDraftField } from "../hooks";
 import { T, SP } from "../style";
-import { Zap, Edit, ToggleLeft, ToggleRight } from "nai:icons/feather";
+import { Zap, Edit, ToggleLeft, ToggleRight, ArrowLeft } from "nai:icons/feather";
 import {
   store,
   attgUpdated,
@@ -16,6 +16,9 @@ import {
   attgSyncToggled,
   styleSyncToggled,
 } from "../../core/store";
+
+// Card-header action icons; smaller than feather's 24px default to fit the row.
+const ICON_SIZE = 16;
 
 // Mirrors SeFoundationSection._syncMemory: push to Memory / A.N. when the
 // per-field sync toggle is on.
@@ -38,11 +41,37 @@ function FieldEditor(props: FieldEditorProps) {
   const { value, setValue } = useDraftField(props.initial);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: SP.sm }}>
-      <div style={{ color: T.textHeadings }}>{props.label}</div>
+      {/* Header row: [← Back] title [Save] — mirrors SeSimpleContentPane. */}
+      <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
+        <button
+          title="Back"
+          onClick={props.onBack}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: T.text,
+            display: "flex",
+            alignItems: "center",
+            padding: 0,
+          }}
+        >
+          <ArrowLeft size={ICON_SIZE} />
+        </button>
+        <span style={{ flex: 1, color: T.textHeadings, fontWeight: "bold" }}>
+          {props.label}
+        </span>
+        <button
+          onClick={() => props.onCommit(value.trim())}
+          style={{ padding: "4px 16px" }}
+        >
+          Save
+        </button>
+      </div>
       {/* Uncontrolled: a <textarea> renders its child text, NOT a `value`
           attribute (NovelAI's renderer applies value via setAttribute, which
           textarea ignores). Seed display from the stable committed `initial` so
-          re-renders don't reset the caret; `usePersistedField` tracks edits via
+          re-renders don't reset the caret; `useDraftField` tracks edits via
           onInput for Save. */}
       <textarea
         placeholder={props.placeholder}
@@ -59,10 +88,6 @@ function FieldEditor(props: FieldEditorProps) {
       >
         {props.initial}
       </textarea>
-      <div style={{ display: "flex", gap: SP.sm }}>
-        <button onClick={() => props.onCommit(value.trim())}>Save</button>
-        <button onClick={props.onBack}>Back</button>
-      </div>
     </div>
   );
 }
@@ -103,21 +128,25 @@ function FieldCard(props: CardProps) {
             onClick={props.onToggleSync}
             style={{ background: "none", border: "none", cursor: "pointer" }}
           >
-            {props.syncEnabled ? <ToggleRight /> : <ToggleLeft />}
+            {props.syncEnabled ? (
+              <ToggleRight size={ICON_SIZE} color={T.midIntensity} />
+            ) : (
+              <ToggleLeft size={ICON_SIZE} style={{ opacity: 0.45 }} />
+            )}
           </button>
           <button
             title="Generate"
             onClick={props.onGenerate}
             style={{ background: "none", border: "none", cursor: "pointer" }}
           >
-            <Zap />
+            <Zap size={ICON_SIZE} />
           </button>
           <button
             title="Edit"
             onClick={props.onEdit}
             style={{ background: "none", border: "none", cursor: "pointer" }}
           >
-            <Edit />
+            <Edit size={ICON_SIZE} />
           </button>
         </div>
       </div>
