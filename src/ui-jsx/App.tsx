@@ -3,18 +3,84 @@
 
 import { Foundation } from "./panels/Foundation";
 import { T, SP } from "./style";
+import {
+  store,
+  chatCreated,
+  chatSwitched,
+  uiChatRefineCommitted,
+  uiChatRefineDiscarded,
+} from "../core/store";
+import { matchesAction } from "nai-store";
+
+type Tab = "chat" | "engine";
+
+function tabButtonStyle(active: boolean) {
+  return {
+    flex: 1,
+    padding: SP.md,
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    color: active ? T.textHeadings : T.textDisabled,
+    fontWeight: active ? "bold" : "normal",
+    borderBottom: active
+      ? `2px solid ${T.textHeadings}`
+      : "2px solid transparent",
+  };
+}
 
 export function App() {
+  const [tab, setTab] = useState<Tab>("engine");
+
+  // Mirror the SUI plugin's tab-switch effects, local to the JSX panel:
+  // a refine opening surfaces the Chat tab; commit/discard returns to Engine.
+  useEffect(() => {
+    const unsubs = [
+      store.subscribeEffect(matchesAction(chatCreated), (action) => {
+        if (action.payload.chat.type === "refine") setTab("chat");
+      }),
+      store.subscribeEffect(matchesAction(chatSwitched), (action, { getState }) => {
+        const c = getState().chat.chats.find((x) => x.id === action.payload.id);
+        if (c?.type === "refine") setTab("chat");
+      }),
+      store.subscribeEffect(matchesAction(uiChatRefineCommitted), () =>
+        setTab("engine"),
+      ),
+      store.subscribeEffect(matchesAction(uiChatRefineDiscarded), () =>
+        setTab("engine"),
+      ),
+    ];
+    return () => unsubs.forEach((u) => u());
+  }, []);
+
   return (
     <div
       style={{
-        padding: SP.md,
-        background: T.bg,
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
         color: T.text,
         fontFamily: T.fontDefault,
       }}
     >
-      <Foundation />
+      <div style={{ display: "flex" }}>
+        <button style={tabButtonStyle(tab === "chat")} onClick={() => setTab("chat")}>
+          Chat
+        </button>
+        <button
+          style={tabButtonStyle(tab === "engine")}
+          onClick={() => setTab("engine")}
+        >
+          Story Engine
+        </button>
+      </div>
+      <div style={{ flex: 1, overflow: "auto", padding: SP.md }}>
+        {tab === "chat" ? (
+          <div style={{ color: T.textDisabled }}>Chat (coming next task)</div>
+        ) : (
+          <Foundation />
+        )}
+      </div>
     </div>
   );
 }
