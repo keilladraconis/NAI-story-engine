@@ -25,6 +25,30 @@ export function useSlice<T>(
   selector: (s: RootState) => T,
   equals?: (a: T, b: T) => boolean,
 ): T {
-  const { subscribe, getSnapshot } = sliceStore(selector, equals);
+  // `useSyncExternalStore` requires REFERENTIALLY STABLE subscribe/getSnapshot.
+  // Passing fresh closures each render (as a bare `sliceStore(selector)` call
+  // does) breaks live re-rendering for a component that only updates from a
+  // store change with no co-occurring local re-render — e.g. a streaming chat
+  // bubble subscribes but never re-renders. Keep the latest selector/equals in
+  // refs so subscribe/getSnapshot identities stay fixed for the component's life.
+  const selectorRef = useRef(selector);
+  selectorRef.current = selector;
+  const equalsRef = useRef(equals);
+  equalsRef.current = equals;
+
+  const subscribe = useCallback(
+    (onChange: () => void) =>
+      store.subscribeSelector(
+        (s) => selectorRef.current(s),
+        () => onChange(),
+        equalsRef.current,
+      ),
+    [],
+  );
+  const getSnapshot = useCallback(
+    () => selectorRef.current(store.getState()),
+    [],
+  );
+
   return useSyncExternalStore(subscribe, getSnapshot);
 }
