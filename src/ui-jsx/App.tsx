@@ -2,6 +2,7 @@
 // h/Fragment are NAI-runtime globals (see external/jsx-typings.d.ts) — no import.
 
 import { Foundation } from "./panels/Foundation";
+import { Chat } from "./panels/chat/Chat";
 import { T, SP } from "./style";
 import {
   store,
@@ -75,11 +76,7 @@ export function App() {
         </button>
       </div>
       <div style={{ flex: 1, overflow: "auto", padding: SP.md }}>
-        {tab === "chat" ? (
-          <div style={{ color: T.textDisabled }}>Chat (coming next task)</div>
-        ) : (
-          <Foundation />
-        )}
+        {tab === "chat" ? <Chat /> : <Foundation />}
       </div>
     </div>
   );
