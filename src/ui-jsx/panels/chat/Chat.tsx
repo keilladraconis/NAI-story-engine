@@ -7,6 +7,7 @@ import { Message } from "./Message";
 import { ChatInput } from "./ChatInput";
 import { ChatHeader } from "./ChatHeader";
 import { Sessions } from "./Sessions";
+import { RefineCommitBar } from "./RefineCommitBar";
 
 // Primitive re-render key: chat identity + message-id sequence. Streaming
 // content changes are handled inside each Message (its own useSlice), so the
@@ -66,6 +67,7 @@ export function Chat(props: { onBack: () => void }) {
         ))}
       </div>
       <ChatInput />
+      {chat.type === "refine" && <RefineCommitBar />}
     </div>
   );
 }

@@ -15,10 +15,24 @@ import {
   styleGenerationRequested,
   attgSyncToggled,
   styleSyncToggled,
+  uiChatRefineRequested,
 } from "../../core/store";
+import { decideFieldAction } from "./chat/chat-actions";
 
 // Card-header action icons; smaller than feather's 24px default to fit the row.
 const ICON_SIZE = 16;
+
+function runFieldZap(
+  fieldId: "attg" | "style",
+  text: string,
+  generate: () => void,
+): void {
+  if (decideFieldAction(text) === "generate") {
+    generate();
+  } else {
+    store.dispatch(uiChatRefineRequested({ fieldId, sourceText: text }));
+  }
+}
 
 // Mirrors SeFoundationSection._syncMemory: push to Memory / A.N. when the
 // per-field sync toggle is on.
@@ -202,7 +216,9 @@ export function Foundation() {
         value={attg}
         syncEnabled={attgSync}
         onEdit={() => setEditing("attg")}
-        onGenerate={() => store.dispatch(attgGenerationRequested())}
+        onGenerate={() =>
+          runFieldZap("attg", attg, () => store.dispatch(attgGenerationRequested()))
+        }
         onToggleSync={() => {
           store.dispatch(attgSyncToggled());
           void syncMemory();
@@ -213,7 +229,9 @@ export function Foundation() {
         value={style}
         syncEnabled={styleSync}
         onEdit={() => setEditing("style")}
-        onGenerate={() => store.dispatch(styleGenerationRequested())}
+        onGenerate={() =>
+          runFieldZap("style", style, () => store.dispatch(styleGenerationRequested()))
+        }
         onToggleSync={() => {
           store.dispatch(styleSyncToggled());
           void syncMemory();
