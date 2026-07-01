@@ -26,7 +26,7 @@
     "@types/node": "^25.0.9",
     "nai-gen-x": "^0.4.0",
     "nai-store": "^0.4.0",
-    "nibs-cli": "^4.2.2",
+    "nibs-cli": "^4.4.0",
     "prettier": "^3.7.4",
     "vitest": "^4.0.17"
   }
