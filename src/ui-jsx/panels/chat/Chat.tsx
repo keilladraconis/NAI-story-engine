@@ -17,6 +17,18 @@ function visibleChatKey(s: RootState): string {
 
 export function Chat() {
   const key = useSlice(visibleChatKey);
+  // Scroll the list to the bottom whenever the message set changes (new turn).
+  // Source-order render in a normal column keeps messages chronological and
+  // avoids the keyed-reconciliation glitch that `.reverse()` + `column-reverse`
+  // produced when a new turn was inserted at the array front.
+  const listRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(
+    null,
+  );
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [key]);
+
   if (!key) return null;
   const chat = activeSavedChat(store.getState().chat);
   if (!chat) return null;
@@ -34,19 +46,19 @@ export function Chat() {
         {chat.title}
       </div>
       <div
+        ref={listRef}
         style={{
           flex: 1,
           overflow: "auto",
           display: "flex",
-          flexDirection: "column-reverse",
-          justifyContent: "flex-start",
+          flexDirection: "column",
           gap: "10px",
           padding: SP.md,
         }}
       >
-        {chat.messages
-          .map((m) => <Message key={m.id} chatId={chat.id} message={m} />)
-          .reverse()}
+        {chat.messages.map((m) => (
+          <Message key={m.id} chatId={chat.id} message={m} />
+        ))}
       </div>
       <ChatInput />
     </div>
