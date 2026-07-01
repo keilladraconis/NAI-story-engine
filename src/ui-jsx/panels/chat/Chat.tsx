@@ -1,11 +1,12 @@
 // src/ui-jsx/panels/chat/Chat.tsx
 import { useSlice } from "../../bridge";
-import { T, SP } from "../../style";
+import { SP } from "../../style";
 import { store, activeSavedChat } from "../../../core/store";
 import type { RootState } from "../../../core/store";
 import { Message } from "./Message";
 import { ChatInput } from "./ChatInput";
 import { ChatHeader } from "./ChatHeader";
+import { Sessions } from "./Sessions";
 
 // Primitive re-render key: chat identity + message-id sequence. Streaming
 // content changes are handled inside each Message (its own useSlice), so the
@@ -36,14 +37,7 @@ export function Chat(props: { onBack: () => void }) {
   if (!chat) return null;
 
   if (showSessions) {
-    return (
-      <div style={{ padding: SP.md, color: T.textDisabled }}>
-        Sessions (coming next task)
-        <div>
-          <button onClick={() => setShowSessions(false)}>Back</button>
-        </div>
-      </div>
-    );
+    return <Sessions onBack={() => setShowSessions(false)} />;
   }
 
   return (
