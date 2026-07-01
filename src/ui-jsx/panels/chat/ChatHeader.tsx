@@ -63,7 +63,7 @@ export function ChatHeader(props: ChatHeaderProps) {
     switch (c.kind) {
       case "subModeToggle":
         return (
-          <div style={{ display: "flex", gap: SP.xs }}>
+          <div key={c.id} style={{ display: "flex", gap: SP.xs }}>
             <button
               style={modeBtnStyle(chat.subMode === "cowriter", MODE_COWRITER)}
               onClick={() => store.dispatch(subModeChanged({ id: chat.id, subMode: "cowriter" }))}
@@ -81,6 +81,7 @@ export function ChatHeader(props: ChatHeaderProps) {
       case "summarizeButton":
         return (
           <button
+            key={c.id}
             style={{ ...modeBtnStyle(false, "transparent"), opacity: 1 }}
             onClick={() =>
               store.dispatch(
@@ -94,6 +95,7 @@ export function ChatHeader(props: ChatHeaderProps) {
       case "newChatButton":
         return (
           <button
+            key={c.id}
             style={iconBtn}
             title="New chat"
             onClick={() => {
@@ -114,7 +116,7 @@ export function ChatHeader(props: ChatHeaderProps) {
         );
       case "sessionsButton":
         return (
-          <button style={iconBtn} title="Sessions" onClick={props.onOpenSessions}>
+          <button key={c.id} style={iconBtn} title="Sessions" onClick={props.onOpenSessions}>
             <Folder size={ICON} />
           </button>
         );
