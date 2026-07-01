@@ -76,7 +76,7 @@ export function App() {
         </button>
       </div>
       <div style={{ flex: 1, overflow: "auto", padding: SP.md }}>
-        {tab === "chat" ? <Chat /> : <Foundation />}
+        {tab === "chat" ? <Chat onBack={() => setTab("engine")} /> : <Foundation />}
       </div>
     </div>
   );

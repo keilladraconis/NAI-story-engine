@@ -5,6 +5,7 @@ import { store, activeSavedChat } from "../../../core/store";
 import type { RootState } from "../../../core/store";
 import { Message } from "./Message";
 import { ChatInput } from "./ChatInput";
+import { ChatHeader } from "./ChatHeader";
 
 // Primitive re-render key: chat identity + message-id sequence. Streaming
 // content changes are handled inside each Message (its own useSlice), so the
@@ -15,8 +16,9 @@ function visibleChatKey(s: RootState): string {
   return c.id + "::" + c.messages.map((m) => m.id).join(",");
 }
 
-export function Chat() {
+export function Chat(props: { onBack: () => void }) {
   const key = useSlice(visibleChatKey);
+  const [showSessions, setShowSessions] = useState(false);
   // Scroll the list to the bottom whenever the message set changes (new turn).
   // Source-order render in a normal column keeps messages chronological and
   // avoids the keyed-reconciliation glitch that `.reverse()` + `column-reverse`
@@ -33,6 +35,17 @@ export function Chat() {
   const chat = activeSavedChat(store.getState().chat);
   if (!chat) return null;
 
+  if (showSessions) {
+    return (
+      <div style={{ padding: SP.md, color: T.textDisabled }}>
+        Sessions (coming next task)
+        <div>
+          <button onClick={() => setShowSessions(false)}>Back</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -42,9 +55,7 @@ export function Chat() {
         justifyContent: "space-between",
       }}
     >
-      <div style={{ color: T.textHeadings, fontWeight: "bold", padding: SP.md }}>
-        {chat.title}
-      </div>
+      <ChatHeader onBack={props.onBack} onOpenSessions={() => setShowSessions(true)} />
       <div
         ref={listRef}
         style={{
