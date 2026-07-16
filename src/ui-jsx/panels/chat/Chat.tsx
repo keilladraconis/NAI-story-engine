@@ -9,30 +9,63 @@ import { ChatHeader } from "./ChatHeader";
 import { Sessions } from "./Sessions";
 import { RefineCommitBar } from "./RefineCommitBar";
 
-// Primitive re-render key: chat identity + message-id sequence. Streaming
-// content changes are handled inside each Message (its own useSlice), so the
-// shell does NOT rebuild per token.
-function visibleChatKey(s: RootState): string {
+// Identity + message-id sequence (NO content). Drives the shell: it re-renders
+// only when the chat switches or a message is added/removed — NOT per streaming
+// token — so the composer and its native listener stay stable during a stream.
+function idKey(s: RootState): string {
   const c = activeSavedChat(s.chat);
   if (!c) return "";
   return c.id + "::" + c.messages.map((m) => m.id).join(",");
 }
 
-export function Chat(props: { onBack: () => void }) {
-  const key = useSlice(visibleChatKey);
-  const [showSessions, setShowSessions] = useState(false);
-  // Scroll the list to the bottom whenever the message set changes (new turn).
-  // Source-order render in a normal column keeps messages chronological and
-  // avoids the keyed-reconciliation glitch that `.reverse()` + `column-reverse`
-  // produced when a new turn was inserted at the array front.
-  const listRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(
-    null,
+// Identity + per-message content length. Drives the message list only, so every
+// bubble reflects the latest text even when it mounted during a list re-render.
+function contentKey(s: RootState): string {
+  const c = activeSavedChat(s.chat);
+  if (!c) return "";
+  return (
+    c.id + "::" + c.messages.map((m) => `${m.id}:${m.content.length}`).join(",")
   );
-  useEffect(() => {
-    const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [key]);
+}
 
+function MessageList() {
+  useSlice(contentKey); // re-render on content change so bubbles update live
+
+  const chat = activeSavedChat(store.getState().chat);
+  if (!chat) return null;
+  // Match SUI (ChatPanel): a `column-reverse` scroller — the first child sits at
+  // the bottom and the scroll stays pinned there as new turns arrive, with no DOM
+  // scroll access needed. Messages are reversed so newest is the first child.
+  //
+  // Keyed by INDEX, not message id: this renderer's keyed reconciliation
+  // mishandles the insert-at-front that reversing causes on each new message
+  // (it scrambles the order). Index keys make Preact patch positionally — the
+  // same effect as SUI rebuilding the list — so order stays correct. (SUI has no
+  // keyed diffing at all; index keys are the closest JSX equivalent.)
+  const reversed = chat.messages.slice().reverse();
+  return (
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        overflow: "auto",
+        display: "flex",
+        flexDirection: "column-reverse",
+        justifyContent: "flex-start",
+        gap: "10px",
+        padding: SP.md,
+      }}
+    >
+      {reversed.map((m, i) => (
+        <Message key={i} chatId={chat.id} message={m} />
+      ))}
+    </div>
+  );
+}
+
+export function Chat(props: { onBack: () => void }) {
+  const key = useSlice(idKey);
+  const [showSessions, setShowSessions] = useState(false);
   if (!key) return null;
   const chat = activeSavedChat(store.getState().chat);
   if (!chat) return null;
@@ -46,26 +79,15 @@ export function Chat(props: { onBack: () => void }) {
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "100%",
-        justifyContent: "space-between",
+        flex: 1,
+        minHeight: 0,
       }}
     >
-      <ChatHeader onBack={props.onBack} onOpenSessions={() => setShowSessions(true)} />
-      <div
-        ref={listRef}
-        style={{
-          flex: 1,
-          overflow: "auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: "10px",
-          padding: SP.md,
-        }}
-      >
-        {chat.messages.map((m) => (
-          <Message key={m.id} chatId={chat.id} message={m} />
-        ))}
-      </div>
+      <ChatHeader
+        onBack={props.onBack}
+        onOpenSessions={() => setShowSessions(true)}
+      />
+      <MessageList />
       <ChatInput />
       {chat.type === "refine" && <RefineCommitBar />}
     </div>

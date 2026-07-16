@@ -7,6 +7,7 @@
 export const T = {
   bg: "var(--theme-bg0)",
   bg2: "var(--theme-bg2)",
+  bg3: "var(--theme-bg3)",
   text: "var(--theme-text-main)",
   textHeadings: "var(--theme-text-headings)",
   textDisabled: "var(--theme-text-disabled)",

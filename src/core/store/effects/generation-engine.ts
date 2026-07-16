@@ -20,6 +20,7 @@ import { recordEntry, JournalEntry } from "../../generation-journal";
 import { getModel } from "../../utils/config";
 import { stripThinkingTags } from "../../utils/tag-parser";
 import { messageUpdated } from "../slices/chat";
+import { clearStream } from "../stream-buffer";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Private Helpers
@@ -275,8 +276,11 @@ export function registerGenerationEngineEffects(
           );
           if (checkCancellation(requestId, getState)) break;
           accumulatedText = resolvePrefill(strategy, getState);
-          // Clear visible message so the retry streams from scratch
+          // Clear visible message so the retry streams from scratch. The stream
+          // buffer (chat's live view) is appended per chunk, so it must be reset
+          // too or the retry concatenates onto the discarded attempt.
           if ("chatId" in target && "messageId" in target) {
+            clearStream(target.messageId);
             dispatch(
               messageUpdated({
                 chatId: target.chatId,

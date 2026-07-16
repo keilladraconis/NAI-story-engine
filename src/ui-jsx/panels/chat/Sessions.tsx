@@ -1,6 +1,5 @@
 // src/ui-jsx/panels/chat/Sessions.tsx
 import { useSlice } from "../../bridge";
-import { useDraftField } from "../../hooks";
 import { T, SP } from "../../style";
 import {
   store,
@@ -24,30 +23,35 @@ const iconBtn = {
   alignItems: "center",
 } as const;
 
-interface RenameRowProps {
-  c: ChatT;
-  onDone: () => void;
+function rowStyle(active: boolean) {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: SP.sm,
+    padding: SP.sm,
+    background: active ? T.bg2 : "transparent",
+    borderRadius: "4px",
+  };
 }
 
-function RenameRow({ c, onDone }: RenameRowProps) {
-  // Uncontrolled: seed display from child text (the renderer applies `value`
-  // via setAttribute, which text fields ignore); track edits via onInput. Sanit-
-  // ize any stray newline so a single-line title stays single-line.
-  const { value, setValue } = useDraftField(c.title);
-
+// A row in rename mode: uncontrolled textarea (seeded via child text, read via
+// ref on save) + Save / Cancel. Rendered as a full row and keyed by chat id at
+// the map's top level so switching to/from SessionRow is a clean same-slot swap.
+function RenameRow(props: { c: ChatT; active: boolean; onDone: () => void }) {
+  const taRef = useRef<{ value: string } | null>(null);
   const save = () => {
-    const title = value.replace(/\s+/g, " ").trim() || c.title;
-    store.dispatch(chatRenamed({ id: c.id, title }));
-    onDone();
+    const raw = taRef.current?.value ?? props.c.title;
+    const title = raw.replace(/\s+/g, " ").trim() || props.c.title;
+    store.dispatch(chatRenamed({ id: props.c.id, title }));
+    props.onDone();
   };
-
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: SP.sm, flex: 1 }}>
+    <div style={rowStyle(props.active)}>
       <textarea
+        ref={taRef}
         rows={1}
-        onInput={(e) => setValue(e.target.value ?? "")}
         onKeyDown={(e) => {
-          if (e.key === "Escape") onDone();
+          if (e.key === "Escape") props.onDone();
         }}
         style={{
           flex: 1,
@@ -60,14 +64,47 @@ function RenameRow({ c, onDone }: RenameRowProps) {
           resize: "none",
         }}
       >
-        {c.title}
+        {props.c.title}
       </textarea>
       <button style={iconBtn} title="Save" onClick={save}>
         ✓
       </button>
-      <button style={iconBtn} title="Cancel" onClick={onDone}>
+      <button style={iconBtn} title="Cancel" onClick={props.onDone}>
         ✗
       </button>
+    </div>
+  );
+}
+
+// A normal row: switch (title) + rename + delete. Delete is hidden when there is
+// only one chat (the lone chat cannot be deleted — the slice guards length<=1).
+function SessionRow(props: {
+  c: ChatT;
+  active: boolean;
+  canDelete: boolean;
+  onSwitch: () => void;
+  onRename: () => void;
+}) {
+  return (
+    <div style={rowStyle(props.active)}>
+      <button
+        style={{ ...iconBtn, flex: 1, justifyContent: "flex-start" }}
+        onClick={props.onSwitch}
+      >
+        {props.c.title}
+      </button>
+      <button style={iconBtn} title="Rename" onClick={props.onRename}>
+        ✎
+      </button>
+      {props.canDelete && (
+        <button
+          style={iconBtn}
+          title="Delete"
+          onClick={() => store.dispatch(chatDeleted({ id: props.c.id }))}
+        >
+          <Trash size={ICON} />
+        </button>
+      )}
     </div>
   );
 }
@@ -82,6 +119,7 @@ export function Sessions(props: { onBack: () => void }) {
   void stamp; // re-render trigger
   const chats = store.getState().chat.chats;
   const activeId = store.getState().chat.activeChatId;
+  const canDelete = chats.length > 1;
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
@@ -113,13 +151,7 @@ export function Sessions(props: { onBack: () => void }) {
         <button style={iconBtn} title="Back" onClick={props.onBack}>
           <ArrowLeft size={16} />
         </button>
-        <span
-          style={{
-            flex: 1,
-            color: T.textHeadings,
-            fontWeight: "bold",
-          }}
-        >
+        <span style={{ flex: 1, color: T.textHeadings, fontWeight: "bold" }}>
           Sessions
         </span>
         <button style={iconBtn} title="New chat" onClick={newChat}>
@@ -134,47 +166,28 @@ export function Sessions(props: { onBack: () => void }) {
           overflow: "auto",
         }}
       >
-        {chats.map((c) => (
-          <div
-            key={c.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: SP.sm,
-              padding: SP.sm,
-              background: c.id === activeId ? T.bg2 : "transparent",
-              borderRadius: "4px",
-            }}
-          >
-            {renamingId === c.id ? (
-              <RenameRow c={c} onDone={() => setRenamingId(null)} />
-            ) : (
-              <button
-                style={{ ...iconBtn, flex: 1, justifyContent: "flex-start" }}
-                onClick={() => {
-                  store.dispatch(chatSwitched({ id: c.id }));
-                  props.onBack();
-                }}
-              >
-                {c.title}
-              </button>
-            )}
-            <button
-              style={iconBtn}
-              title="Rename"
-              onClick={() => setRenamingId(c.id)}
-            >
-              ✎
-            </button>
-            <button
-              style={iconBtn}
-              title="Delete"
-              onClick={() => store.dispatch(chatDeleted({ id: c.id }))}
-            >
-              <Trash size={ICON} />
-            </button>
-          </div>
-        ))}
+        {chats.map((c) =>
+          renamingId === c.id ? (
+            <RenameRow
+              key={c.id}
+              c={c}
+              active={c.id === activeId}
+              onDone={() => setRenamingId(null)}
+            />
+          ) : (
+            <SessionRow
+              key={c.id}
+              c={c}
+              active={c.id === activeId}
+              canDelete={canDelete}
+              onSwitch={() => {
+                store.dispatch(chatSwitched({ id: c.id }));
+                props.onBack();
+              }}
+              onRename={() => setRenamingId(c.id)}
+            />
+          ),
+        )}
       </div>
     </div>
   );

@@ -9,6 +9,7 @@
 // loop. For derived objects, pass an `equals` and memoize at the call site.
 
 import { store, type RootState } from "../core/store";
+import { readStream, subscribeStream } from "../core/store/stream-buffer";
 
 export function sliceStore<T>(
   selector: (s: RootState) => T,
@@ -50,5 +51,17 @@ export function useSlice<T>(
     [],
   );
 
+  return useSyncExternalStore(subscribe, getSnapshot);
+}
+
+// Live in-flight generation text for a stream key (chat message id), or undefined
+// when nothing is streaming for it. Reads the effect-free stream-buffer, which
+// repaints cleanly during streaming where per-token store dispatch does not.
+export function useStream(key: string): string | undefined {
+  const subscribe = useCallback(
+    (onChange: () => void) => subscribeStream(key, onChange),
+    [key],
+  );
+  const getSnapshot = useCallback(() => readStream(key), [key]);
   return useSyncExternalStore(subscribe, getSnapshot);
 }

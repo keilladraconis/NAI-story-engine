@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 - **Experimental "Story Engine (JSX)" sidebar panel.** A second sidebar tab built on NovelAI's new JSX/Preact UI API runs alongside the existing Story Engine panel as the first slice of a migration off the homebrew SUI framework. It hosts a Foundation proof: ATTG and Style cards that render reactively from the shared store, generate/sync controls, and an inline edit pane. Both panels read and write the same state, so edits in one appear live in the other. The UI styles itself from the active NovelAI theme via CSS variables. This is a scaffold for the migration — the SUI panel remains the primary UI.
 - **Experimental JSX panel gains a Chat tab.** The JSX panel now has Chat | Story Engine tabs. The Chat tab hosts brainstorm and refine chats through the same shared chat engine as the SUI panel — send/stream/edit/retry/delete messages, switch sub-mode (Co/Crit), summarize, manage sessions (new/switch/rename/delete), and refine a Foundation field end-to-end (its ⚡ opens a refine when the field has content; Commit writes the rewrite back). Forge in the JSX chat comes later.
 
+### Changed
+
+- **Chat streaming no longer flows through the store per token.** In-flight generation text is now written to a lightweight, effect-free stream buffer that the bubble reads directly; the finished message is committed to the store once, on completion. Dispatching every token through the store (running the full effects pipeline each time) prevented the JSX panel from repainting mid-stream — the reply only appeared after switching tabs. As a side effect, the SUI chat bubble now fills in when generation completes rather than animating token-by-token; the JSX panel streams live.
+
 ## [0.13.1] - 2026-06-08
 
 ### Changed

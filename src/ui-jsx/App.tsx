@@ -40,10 +40,15 @@ export function App() {
       store.subscribeEffect(matchesAction(chatCreated), (action) => {
         if (action.payload.chat.type === "refine") setTab("chat");
       }),
-      store.subscribeEffect(matchesAction(chatSwitched), (action, { getState }) => {
-        const c = getState().chat.chats.find((x) => x.id === action.payload.id);
-        if (c?.type === "refine") setTab("chat");
-      }),
+      store.subscribeEffect(
+        matchesAction(chatSwitched),
+        (action, { getState }) => {
+          const c = getState().chat.chats.find(
+            (x) => x.id === action.payload.id,
+          );
+          if (c?.type === "refine") setTab("chat");
+        },
+      ),
       store.subscribeEffect(matchesAction(uiChatRefineCommitted), () =>
         setTab("engine"),
       ),
@@ -60,12 +65,20 @@ export function App() {
         display: "flex",
         flexDirection: "column",
         height: "100%",
+        minHeight: 0,
         color: T.text,
         fontFamily: T.fontDefault,
+        // The shadow root resets scrollbars to the browser default; `scrollbar-*`
+        // are inherited, so setting them here restyles every scroller in the tree.
+        scrollbarWidth: "thin",
+        scrollbarColor: `${T.bg3} transparent`,
       }}
     >
       <div style={{ display: "flex" }}>
-        <button style={tabButtonStyle(tab === "chat")} onClick={() => setTab("chat")}>
+        <button
+          style={tabButtonStyle(tab === "chat")}
+          onClick={() => setTab("chat")}
+        >
           Chat
         </button>
         <button
@@ -75,9 +88,24 @@ export function App() {
           Story Engine
         </button>
       </div>
-      <div style={{ flex: 1, overflow: "auto", padding: SP.md }}>
-        {tab === "chat" ? <Chat onBack={() => setTab("engine")} /> : <Foundation />}
-      </div>
+      {/* Chat manages its own scroll + pins its composer, so it gets an
+          unpadded bounded flex box; the Story Engine tab keeps padding/scroll. */}
+      {tab === "chat" ? (
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <Chat onBack={() => setTab("engine")} />
+        </div>
+      ) : (
+        <div style={{ flex: 1, overflow: "auto", padding: SP.md }}>
+          <Foundation />
+        </div>
+      )}
     </div>
   );
 }
