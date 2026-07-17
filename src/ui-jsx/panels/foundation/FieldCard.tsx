@@ -1,0 +1,111 @@
+// One Foundation field row: label + derived display text + an actions row
+// (optional Sync toggle, Zap, Edit). The Zap adapts: empty field generates,
+// filled field refines (decideFieldAction), except Shape which is generate-only
+// (descriptor.hasRefine === false). While a matching foundation request is
+// queued/active the Zap is disabled and dimmed. All differences come from the
+// descriptor — one render path.
+
+import { useSlice } from "../../bridge";
+import { T, SP } from "../../style";
+import { Zap, Edit, ToggleLeft, ToggleRight } from "nai:icons/feather";
+import { store, uiChatRefineRequested } from "../../../core/store";
+import { decideFieldAction } from "../chat/chat-actions";
+import { type FieldDescriptor, isFoundationGenerating } from "./fields";
+
+const ICON_SIZE = 16;
+
+export function FieldCard(props: {
+  descriptor: FieldDescriptor;
+  onEdit: () => void;
+}) {
+  const d = props.descriptor;
+  const label = useSlice((s) => d.cardLabel(s));
+  const value = useSlice((s) => d.display(s));
+  const generating = useSlice((s) => isFoundationGenerating(s, d.id));
+  const syncEnabled = useSlice((s) =>
+    d.syncEnabled ? d.syncEnabled(s) : false,
+  );
+
+  const onZap = () => {
+    if (generating) return;
+    if (!d.hasRefine) {
+      d.generate();
+      return;
+    }
+    const text = d.refineSource(store.getState());
+    if (decideFieldAction(text) === "generate") {
+      d.generate();
+    } else {
+      store.dispatch(
+        uiChatRefineRequested({ fieldId: d.id, sourceText: text }),
+      );
+    }
+  };
+
+  return (
+    <div
+      style={{
+        background: T.bg2,
+        color: T.text,
+        fontFamily: T.fontDefault,
+        padding: SP.md,
+        display: "flex",
+        flexDirection: "column",
+        gap: SP.sm,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <span style={{ color: T.textHeadings }}>{label}</span>
+        <div style={{ display: "flex", gap: SP.sm }}>
+          {d.hasSync ? (
+            <button
+              title="Sync to Memory / A.N."
+              onClick={() => d.toggleSync?.()}
+              style={{ background: "none", border: "none", cursor: "pointer" }}
+            >
+              {syncEnabled ? (
+                <ToggleRight size={ICON_SIZE} color={T.midIntensity} />
+              ) : (
+                <ToggleLeft size={ICON_SIZE} style={{ opacity: 0.45 }} />
+              )}
+            </button>
+          ) : null}
+          <button
+            title={generating ? "Generating…" : "Generate"}
+            onClick={onZap}
+            disabled={generating}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: generating ? "default" : "pointer",
+              opacity: generating ? 0.4 : 1,
+            }}
+          >
+            <Zap size={ICON_SIZE} />
+          </button>
+          <button
+            title="Edit"
+            onClick={props.onEdit}
+            style={{ background: "none", border: "none", cursor: "pointer" }}
+          >
+            <Edit size={ICON_SIZE} />
+          </button>
+        </div>
+      </div>
+      <div
+        style={{
+          whiteSpace: "pre-wrap",
+          color: value ? T.text : T.textDisabled,
+        }}
+      >
+        {value || "(empty)"}
+      </div>
+    </div>
+  );
+}
