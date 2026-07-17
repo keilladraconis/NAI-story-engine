@@ -1,7 +1,7 @@
 // Root of the JSX/Preact Story Engine UI. Rendered into the sidebar jsx part.
 // h/Fragment are NAI-runtime globals (see external/jsx-typings.d.ts) — no import.
 
-import { Foundation } from "./panels/Foundation";
+import { Foundation } from "./panels/foundation/Foundation";
 import { Chat } from "./panels/chat/Chat";
 import { T, SP } from "./style";
 import {
