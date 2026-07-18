@@ -63,7 +63,7 @@ export function FieldEditor(props: FieldEditorProps) {
       {props.titled ? (
         <input
           placeholder={props.titlePlaceholder ?? ""}
-          value={props.initialTitle}
+          value={title.value}
           onInput={(e) => title.setValue(e.target.value ?? "")}
           style={{
             background: T.bg2,
