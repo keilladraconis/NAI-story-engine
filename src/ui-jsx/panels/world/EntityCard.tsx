@@ -1,12 +1,14 @@
-// One entity card: category icon + name (non-interactive — edit deferred) +
-// collapsible summary (follows ui.worldExpanded) + store-only status border.
-// Live cards show a regen bolt that dims while pending; draft cards show a
-// discard confirm. Name-click editing and the green "complete" border are
-// deferred to the entity-edit slice.
+// One entity card: category icon + name (click → edit pane) + collapsible summary
+// (follows ui.worldExpanded) + status border (draft/pending/complete/incomplete).
+// Live cards show a regen bolt that dims while pending; draft cards show discard.
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
-import { store, entityDiscardRequested } from "../../../core/store";
+import {
+  store,
+  entityDiscardRequested,
+  uiEditableActivate,
+} from "../../../core/store";
 import { entityRegenRequested } from "../../../core/store/effects/summary-generation";
 import {
   entityPending,
@@ -40,6 +42,7 @@ const CATEGORY_ICON: Record<string, typeof User> = {
 function borderColor(kind: BorderKind): string {
   if (kind === "draft") return T.lowIntensity;
   if (kind === "pending") return T.warning;
+  if (kind === "complete") return T.midIntensity;
   return T.textDisabled;
 }
 
@@ -49,9 +52,33 @@ export function EntityCard(props: { entityId: string }) {
   const worldExpanded = useSlice((s) => s.ui.worldExpanded ?? true);
   const pending = useSlice((s) => entityPending(s.runtime, entityId));
 
+  const [complete, setComplete] = useState(false);
+
+  // Green "complete" needs a lorebook read (text + keys). Re-fetch when the
+  // entity object changes (a Save produces a new object) or a regen settles.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const eid = entity?.lorebookEntryId;
+      if (!entity || entity.lifecycle === "draft" || !eid) {
+        if (!cancelled) setComplete(false);
+        return;
+      }
+      const entry = await api.v1.lorebook.entry(eid);
+      const keysOk =
+        !!entry?.forceActivation || !!(entry?.keys && entry.keys.length > 0);
+      if (!cancelled) {
+        setComplete(!!entity.summary && !!entry?.text && keysOk);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [entity, pending]);
+
   if (!entity) return null;
 
-  const kind = entityBorderKind(entity, pending);
+  const kind = entityBorderKind(entity, pending, complete);
   const Icon = CATEGORY_ICON[entity.categoryId];
   const isDraft = entity.lifecycle === "draft";
 
@@ -75,9 +102,22 @@ export function EntityCard(props: { entityId: string }) {
         }}
       >
         {Icon ? <Icon size={ICON_SIZE} /> : null}
-        <span style={{ flex: 1, color: T.text }}>
+        <button
+          title="Edit entity"
+          onClick={() => store.dispatch(uiEditableActivate({ id: entityId }))}
+          style={{
+            flex: 1,
+            textAlign: "left",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: T.text,
+            padding: 0,
+            font: "inherit",
+          }}
+        >
           {entity.name || "(unnamed)"}
-        </span>
+        </button>
         {isDraft ? (
           <ConfirmButton
             title="Discard entity"
