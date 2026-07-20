@@ -11,7 +11,10 @@ import {
   segaToggled,
   worldExpansionSet,
   worldCleared,
+  entityForged,
+  uiEditableActivate,
 } from "../../../core/store";
+import { FieldID } from "../../../config/field-definitions";
 import { selectWorldBody } from "./world-select";
 import { ThreadItem } from "./ThreadItem";
 import { EntityCard } from "./EntityCard";
@@ -52,6 +55,22 @@ export function World() {
     groups,
   );
   const isEmpty = visibleGroups.length === 0 && loose.length === 0;
+
+  const onAddEntity = () => {
+    const id = api.v1.uuid();
+    store.dispatch(
+      entityForged({
+        entity: {
+          id,
+          categoryId: FieldID.DramatisPersonae,
+          name: "",
+          summary: "",
+          lifecycle: "draft",
+        },
+      }),
+    );
+    store.dispatch(uiEditableActivate({ id }));
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: SP.sm }}>
@@ -97,8 +116,7 @@ export function World() {
             <PlayCircle size={ICON_SIZE} />
           )}
         </button>
-        {/* Deferred: creation — shown disabled. */}
-        <button title="Add entity (coming soon)" disabled style={DISABLED_BTN}>
+        <button title="Add entity" onClick={onAddEntity} style={ICON_BTN}>
           <Plus size={ICON_SIZE} />
         </button>
         <button title="Add thread (coming soon)" disabled style={DISABLED_BTN}>
