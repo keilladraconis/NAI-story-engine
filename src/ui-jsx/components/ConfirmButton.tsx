@@ -11,6 +11,7 @@ export function ConfirmButton(props: {
   title: string;
   onConfirm: () => void;
   timeoutMs?: number;
+  label?: string;
 }) {
   const [armed, setArmed] = useState(false);
   const timerRef = useRef<number | null>(null);
@@ -50,9 +51,16 @@ export function ConfirmButton(props: {
         cursor: "pointer",
         color: armed ? T.warning : T.text,
         opacity: armed ? 1 : 0.6,
+        display: "inline-flex",
+        alignItems: "center",
       }}
     >
       {armed ? <AlertTriangle size={ICON_SIZE} /> : <Trash2 size={ICON_SIZE} />}
+      {props.label ? (
+        <span style={{ marginLeft: "4px", fontSize: "0.85em" }}>
+          {armed ? "Confirm?" : props.label}
+        </span>
+      ) : null}
     </button>
   );
 }
