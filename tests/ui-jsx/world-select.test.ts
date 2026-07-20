@@ -95,11 +95,21 @@ describe("entityPending", () => {
 });
 
 describe("entityBorderKind", () => {
-  it("draft → draft (even if pending); live+pending → pending; live+idle → incomplete", () => {
-    expect(entityBorderKind(ent("a", { lifecycle: "draft" }), true)).toBe(
+  it("draft → draft (regardless of pending/complete)", () => {
+    expect(entityBorderKind(ent("a", { lifecycle: "draft" }), true, true)).toBe(
       "draft",
     );
-    expect(entityBorderKind(ent("a"), true)).toBe("pending");
+  });
+  it("live + pending → pending (pending wins over complete)", () => {
+    expect(entityBorderKind(ent("a"), true, true)).toBe("pending");
+  });
+  it("live + not pending + complete → complete", () => {
+    expect(entityBorderKind(ent("a"), false, true)).toBe("complete");
+  });
+  it("live + not pending + not complete → incomplete", () => {
+    expect(entityBorderKind(ent("a"), false, false)).toBe("incomplete");
+  });
+  it("complete defaults to false (2-arg call) → incomplete", () => {
     expect(entityBorderKind(ent("a"), false)).toBe("incomplete");
   });
 });

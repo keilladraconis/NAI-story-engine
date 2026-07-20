@@ -46,14 +46,17 @@ export function entityPending(
   );
 }
 
-export type BorderKind = "draft" | "pending" | "incomplete";
+export type BorderKind = "draft" | "pending" | "incomplete" | "complete";
 
-/** Store-only status border kind. Green "complete" (needs lorebook reads) is
- *  deferred to the entity-edit slice. */
+/** Status border kind. Draft wins; then pending (an in-flight regen) wins over a
+ *  stale complete; then complete (summary + lorebook text + keys) vs incomplete.
+ *  `complete` defaults false so a 2-arg call yields the store-only behavior. */
 export function entityBorderKind(
   entity: WorldEntity,
   pending: boolean,
+  complete: boolean = false,
 ): BorderKind {
   if (entity.lifecycle === "draft") return "draft";
-  return pending ? "pending" : "incomplete";
+  if (pending) return "pending";
+  return complete ? "complete" : "incomplete";
 }
