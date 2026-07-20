@@ -1,8 +1,8 @@
 // World section: header (World + globe, section-collapse, expand/collapse-all,
-// SEGA start/stop, disabled add-entity/add-thread, clear-confirm) + body
+// SEGA start/stop, add-entity, disabled add-thread, clear-confirm) + body
 // (Threads then loose entity cards). Body recomputed in render via
-// selectWorldBody from store-owned refs. Creation + editing are deferred, so
-// add-entity/add-thread render disabled.
+// selectWorldBody from store-owned refs. add-entity creates a draft and opens
+// the edit pane; add-thread stays disabled (thread edit pane is a later slice).
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
