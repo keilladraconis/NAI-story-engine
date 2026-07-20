@@ -2,6 +2,7 @@
 // h/Fragment are NAI-runtime globals (see external/jsx-typings.d.ts) — no import.
 
 import { Foundation } from "./panels/foundation/Foundation";
+import { World } from "./panels/world/World";
 import { Chat } from "./panels/chat/Chat";
 import { T, SP } from "./style";
 import {
@@ -103,7 +104,10 @@ export function App() {
         </div>
       ) : (
         <div style={{ flex: 1, overflow: "auto", padding: SP.md }}>
-          <Foundation />
+          <div style={{ display: "flex", flexDirection: "column", gap: SP.md }}>
+            <Foundation />
+            <World />
+          </div>
         </div>
       )}
     </div>
