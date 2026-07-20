@@ -16,6 +16,8 @@ export const T = {
   // Mid-intensity is green in the default theme; SUI's sync-toggle "on" state
   // (SeFoundationSection SYNC_TOGGLE_THEME) uses the same green literal.
   midIntensity: "var(--theme-mid-intensity)",
+  // Cool accent for "draft" entity borders (not-yet-live).
+  lowIntensity: "var(--theme-low-intensity)",
 } as const satisfies Record<string, ThemeVarRef>;
 
 export const SP = {
