@@ -1,6 +1,12 @@
 // Two-click destructive confirm. First click arms (warning icon/color); a second
 // click within timeoutMs fires onConfirm; otherwise it auto-resets. Uses
 // api.v1.timers (no setTimeout in QuickJS). Mirrors SUI SuiConfirmButton.
+//
+// Both icons stay mounted and toggle via `display`. A conditional component-type
+// swap ({armed ? <AlertTriangle/> : <Trash2/>}) left BOTH svgs in the DOM when
+// the timer-driven reset re-rendered — this runtime's reconciler doesn't unmount
+// the old type on a detached-callback render. A style toggle on stable elements
+// is the reliable path (same reason the highlight toggles elsewhere use style).
 
 import { T } from "../style";
 import { Trash2, AlertTriangle } from "nai:icons/feather";
@@ -55,7 +61,11 @@ export function ConfirmButton(props: {
         alignItems: "center",
       }}
     >
-      {armed ? <AlertTriangle size={ICON_SIZE} /> : <Trash2 size={ICON_SIZE} />}
+      <Trash2 size={ICON_SIZE} style={{ display: armed ? "none" : "inline" }} />
+      <AlertTriangle
+        size={ICON_SIZE}
+        style={{ display: armed ? "inline" : "none" }}
+      />
       {props.label ? (
         <span style={{ marginLeft: "4px", fontSize: "0.85em" }}>
           {armed ? "Confirm?" : props.label}
