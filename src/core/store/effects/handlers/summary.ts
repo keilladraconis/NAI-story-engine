@@ -88,14 +88,21 @@ export const threadSummaryHandler: GenerationHandlers<ThreadSummaryTarget> = {
     _newText: string,
   ): void {
     void api.v1.storyStorage.set(EDIT_PANE_CONTENT, ctx.accumulatedText);
+    // JSX pane stages the live text from the effect-free buffer (per-token, no
+    // store dispatch), then stages the final into its editable draft.
+    writeStream(`thread-summary:${ctx.target.groupId}`, ctx.accumulatedText);
   },
 
   async completion(ctx: CompletionContext<ThreadSummaryTarget>): Promise<void> {
     if (ctx.generationSucceeded && ctx.accumulatedText) {
-      await api.v1.storyStorage.set(
-        EDIT_PANE_CONTENT,
-        ctx.accumulatedText.trim(),
-      );
+      const trimmed = ctx.accumulatedText.trim();
+      // Carry the final into the buffer for the open JSX pane to stage; the pane
+      // owns clearing. Thread summary is only generated from the open pane, so
+      // there is no background ...Updated branch (unlike entity summary).
+      writeStream(`thread-summary:${ctx.target.groupId}`, trimmed);
+      await api.v1.storyStorage.set(EDIT_PANE_CONTENT, trimmed);
+    } else {
+      clearStream(`thread-summary:${ctx.target.groupId}`);
     }
   },
 };

@@ -3,7 +3,10 @@ import {
   registerSummaryGenerationEffects,
   entityRegenRequested,
 } from "../../../../src/core/store/effects/summary-generation";
-import { uiEntitySummaryGenerationRequested } from "../../../../src/core/store/index";
+import {
+  uiEntitySummaryGenerationRequested,
+  uiThreadSummaryGenerationRequested,
+} from "../../../../src/core/store/index";
 import type {
   RootState,
   AppDispatch,
@@ -207,6 +210,50 @@ describe("uiEntitySummaryGenerationRequested effect", () => {
       uiEntitySummaryGenerationRequested({
         entityId: "e1",
         requestId: "se-entity-summary-e1",
+      }),
+    );
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "runtime/requestQueued"),
+    ).toBe(false);
+  });
+});
+
+describe("uiThreadSummaryGenerationRequested effect", () => {
+  it("registers the request in the runtime queue before submitting generation", async () => {
+    const { fire, dispatch } = makeHarness(makeState());
+    await fire(
+      uiThreadSummaryGenerationRequested({
+        groupId: "g1",
+        requestId: "se-thread-summary-g1",
+      }),
+    );
+    const queuedCall = dispatch.mock.calls.find(
+      ([a]) => a.type === "runtime/requestQueued",
+    );
+    expect(queuedCall?.[0].payload).toEqual({
+      id: "se-thread-summary-g1",
+      type: "threadSummary",
+      targetId: "g1",
+    });
+    const queuedIdx = dispatch.mock.calls.findIndex(
+      ([a]) => a.type === "runtime/requestQueued",
+    );
+    const submittedIdx = dispatch.mock.calls.findIndex(
+      ([a]) => a.type === "ui/generationSubmitted",
+    );
+    expect(queuedIdx).toBeGreaterThanOrEqual(0);
+    expect(queuedIdx).toBeLessThan(submittedIdx);
+  });
+
+  it("does not double-queue when the id is already tracked", async () => {
+    const state = makeState(undefined, {
+      queue: [{ id: "se-thread-summary-g1" }],
+    });
+    const { fire, dispatch } = makeHarness(state);
+    await fire(
+      uiThreadSummaryGenerationRequested({
+        groupId: "g1",
+        requestId: "se-thread-summary-g1",
       }),
     );
     expect(

@@ -1,10 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
-import { entitySummaryHandler } from "../../../../../src/core/store/effects/handlers/summary";
+import {
+  entitySummaryHandler,
+  threadSummaryHandler,
+} from "../../../../../src/core/store/effects/handlers/summary";
 import {
   readStream,
   clearStream,
+  writeStream as writeStreamForTest,
 } from "../../../../../src/core/store/stream-buffer";
-import type { CompletionContext } from "../../../../../src/core/store/effects/generation-handlers";
+import type {
+  CompletionContext,
+  StreamingContext,
+} from "../../../../../src/core/store/effects/generation-handlers";
 import type { GenerationStrategy } from "../../../../../src/core/store/types";
 
 type EntitySummaryTarget = Extract<
@@ -62,5 +69,57 @@ describe("entitySummaryHandler.completion", () => {
     expect(readStream("entity-summary:e1")).toBe("A sterile research lab");
     expect(ctx.dispatch).not.toHaveBeenCalled();
     clearStream("entity-summary:e1");
+  });
+});
+
+type ThreadSummaryTarget = Extract<
+  GenerationStrategy["target"],
+  { type: "threadSummary" }
+>;
+
+function makeThreadCtx(
+  over: Partial<CompletionContext<ThreadSummaryTarget>> = {},
+): CompletionContext<ThreadSummaryTarget> {
+  return {
+    target: { type: "threadSummary", groupId: "g1" },
+    getState: () => ({ ui: { activeEditId: "g1" } }),
+    accumulatedText: "",
+    generationSucceeded: true,
+    dispatch: vi.fn(),
+    ...over,
+  } as unknown as CompletionContext<ThreadSummaryTarget>;
+}
+
+describe("threadSummaryHandler.streaming", () => {
+  it("writes accumulatedText to the thread-summary buffer", () => {
+    clearStream("thread-summary:g1");
+    const ctx = makeThreadCtx({ accumulatedText: "A rivalry" });
+    threadSummaryHandler.streaming(
+      ctx as unknown as StreamingContext<ThreadSummaryTarget>,
+      "rivalry",
+    );
+    expect(readStream("thread-summary:g1")).toBe("A rivalry");
+    clearStream("thread-summary:g1");
+  });
+});
+
+describe("threadSummaryHandler.completion", () => {
+  it("success: writes the trimmed final to the buffer", async () => {
+    clearStream("thread-summary:g1");
+    const ctx = makeThreadCtx({ accumulatedText: "  A tense rivalry  " });
+    await threadSummaryHandler.completion(ctx);
+    expect(readStream("thread-summary:g1")).toBe("A tense rivalry");
+    clearStream("thread-summary:g1");
+  });
+
+  it("failure: clears the buffer", async () => {
+    clearStream("thread-summary:g1");
+    writeStreamForTest("thread-summary:g1", "stale");
+    const ctx = makeThreadCtx({
+      accumulatedText: "",
+      generationSucceeded: false,
+    });
+    await threadSummaryHandler.completion(ctx);
+    expect(readStream("thread-summary:g1")).toBeUndefined();
   });
 });

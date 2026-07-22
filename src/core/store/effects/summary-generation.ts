@@ -221,6 +221,19 @@ export function registerSummaryGenerationEffects(
     matchesAction(uiThreadSummaryGenerationRequested),
     async (action) => {
       const { groupId, requestId } = action.payload;
+      const rt = getState().runtime;
+      const alreadyTracked =
+        rt.activeRequest?.id === requestId ||
+        rt.queue.some((r) => r.id === requestId);
+      if (!alreadyTracked) {
+        dispatch(
+          requestQueued({
+            id: requestId,
+            type: "threadSummary",
+            targetId: groupId,
+          }),
+        );
+      }
       dispatch(
         generationSubmitted({
           requestId,
