@@ -4,7 +4,17 @@ import {
   keysFromDisplayName,
   nameKey,
   withNameKeyFirst,
+  lorebookContentHandler,
 } from "../../../../../src/core/store/effects/handlers/lorebook";
+import {
+  readStream,
+  clearStream,
+} from "../../../../../src/core/store/stream-buffer";
+import type {
+  CompletionContext,
+  StreamingContext,
+} from "../../../../../src/core/store/effects/generation-handlers";
+import { vi } from "vitest";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // parseLorebookKeys
@@ -265,5 +275,56 @@ describe("withNameKeyFirst", () => {
 
   it("leaves keys untouched when the display name is blank", () => {
     expect(withNameKeyFirst(["cards"], "   ")).toEqual(["cards"]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// lorebookContentHandler dual-write
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("lorebookContentHandler dual-write", () => {
+  const streamCtx = (entryId: string, accumulatedText: string) =>
+    ({
+      target: { type: "lorebookContent", entryId },
+      getState: () => ({ ui: { lorebook: { selectedEntryId: entryId } } }),
+      dispatch: vi.fn(),
+      accumulatedText,
+    }) as unknown as StreamingContext<never>;
+
+  const completeCtx = (entryId: string, over: Record<string, unknown> = {}) =>
+    ({
+      target: { type: "lorebookContent", entryId },
+      getState: () => ({ ui: { lorebook: { selectedEntryId: entryId } } }),
+      dispatch: vi.fn(),
+      accumulatedText: "final body",
+      generationSucceeded: true,
+      ...over,
+    }) as unknown as CompletionContext<never>;
+
+  it("streaming writes accumulated content to the buffer (when selected)", () => {
+    clearStream("lb-content:c1");
+    lorebookContentHandler.streaming(streamCtx("c1", "streamed body"), "");
+    expect(readStream("lb-content:c1")).toContain("streamed body");
+    clearStream("lb-content:c1");
+  });
+
+  it("completion writes the full content to the buffer on success", async () => {
+    clearStream("lb-content:c1");
+    await lorebookContentHandler.completion(completeCtx("c1"));
+    const v = readStream("lb-content:c1");
+    expect(v).toBeDefined();
+    expect(v).toContain("final body");
+    clearStream("lb-content:c1");
+  });
+
+  it("completion clears the buffer on failure", async () => {
+    clearStream("lb-content:c1");
+    // seed a partial as if streaming had run
+    lorebookContentHandler.streaming(streamCtx("c1", "partial"), "");
+    await lorebookContentHandler.completion(
+      completeCtx("c1", { generationSucceeded: false }),
+    );
+    expect(readStream("lb-content:c1")).toBeUndefined();
+    clearStream("lb-content:c1");
   });
 });

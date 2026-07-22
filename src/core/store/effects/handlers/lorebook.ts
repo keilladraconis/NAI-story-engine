@@ -11,6 +11,7 @@ import { LOREBOOK_CHAIN_STOPS, trimStopTail } from "../../../utils/config";
 import { segaKeysCompleted } from "../../slices/runtime";
 import { stripThinkingTags } from "../../../utils/tag-parser";
 import { RootState } from "../../types";
+import { writeStream, clearStream } from "../../stream-buffer";
 
 // Cache for prefills during streaming (cleared on completion)
 const prefillCache = new Map<string, string>();
@@ -60,6 +61,7 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
       const displayContent = prefill + ctx.accumulatedText;
 
       api.v1.storyStorage.set(IDS.LOREBOOK.CONTENT_DRAFT_RAW, displayContent);
+      writeStream(`lb-content:${ctx.target.entryId}`, displayContent);
     },
 
     async completion(
@@ -81,6 +83,9 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
           LOREBOOK_CHAIN_STOPS,
         );
         const fullContent = prefill + cleaned;
+
+        // JSX pane reads the editable (pre-erato) content from the buffer.
+        writeStream(`lb-content:${entryId}`, fullContent);
 
         // Erato compatibility: prepend separator if needed
         const erato = (await api.v1.config.get("erato_compatibility")) || false;
@@ -118,6 +123,7 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
             ctx.originalContent || "",
           );
         }
+        clearStream(`lb-content:${entryId}`);
       }
 
       // Clear cache for this entry
