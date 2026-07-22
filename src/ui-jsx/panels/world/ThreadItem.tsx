@@ -1,6 +1,6 @@
 // One Thread card: a per-thread collapse chevron + layers icon + title button
-// (opens ThreadEditPane) + disabled lorebook toggle (deferred) + immediate
-// delete + member entity cards. Members exclude forge drafts (they render in
+// (opens ThreadEditPane) + disabled lorebook toggle (deferred) + two-click
+// confirm delete + member entity cards. Members exclude forge drafts (render in
 // their forge chat). worldExpanded drives each member card's summary; the
 // chevron collapses this thread's own member list independently.
 
@@ -9,9 +9,9 @@ import { T, SP } from "../../style";
 import { store, groupDeleted, uiEditableActivate } from "../../../core/store";
 import { isForgeDraft } from "../../../core/store/selectors/forge";
 import { EntityCard } from "./EntityCard";
+import { ConfirmButton } from "../../components/ConfirmButton";
 import {
   Layers,
-  Trash2,
   ToggleLeft,
   ChevronDown,
   ChevronRight,
@@ -90,18 +90,10 @@ export function ThreadItem(props: { groupId: string }) {
         >
           <ToggleLeft size={ICON_SIZE} />
         </button>
-        <button
+        <ConfirmButton
           title="Delete thread"
-          onClick={() => store.dispatch(groupDeleted({ groupId }))}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            opacity: 0.6,
-          }}
-        >
-          <Trash2 size={ICON_SIZE} />
-        </button>
+          onConfirm={() => store.dispatch(groupDeleted({ groupId }))}
+        />
       </div>
       {!collapsed ? (
         <div
