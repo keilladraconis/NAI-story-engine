@@ -378,14 +378,16 @@ describe("forgeChatContinueRequested pin", () => {
   });
 
   it("does not consume the pin on a non-advancing continue", async () => {
-    const chat = makeChat({ subMode: "sketch" });
+    // subMode "expand" (not the "sketch" default) so the assertion proves the
+    // current subMode is preserved, not merely matching the fallback.
+    const chat = makeChat({ subMode: "expand" });
     const draft = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
     const state = makeState([chat], [draft]);
     (state.forge as { pinnedNextPhaseByChatId: Record<string, string> }).pinnedNextPhaseByChatId = { "fc-1": "weave" };
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeChatContinueRequested({ chatId: "fc-1", advancePhase: false }));
     const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
-    expect(sub![0].payload.subMode).toBe("sketch"); // stays on current subMode, pin not read
+    expect(sub![0].payload.subMode).toBe("expand"); // stays on current subMode, pin not read
     const cleared = dispatch.mock.calls.find(([a]) => a.type === "forge/forgeNextPhaseCleared");
     expect(cleared).toBeUndefined();
   });
