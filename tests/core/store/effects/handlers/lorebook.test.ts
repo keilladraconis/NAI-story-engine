@@ -5,6 +5,7 @@ import {
   nameKey,
   withNameKeyFirst,
   lorebookContentHandler,
+  lorebookKeysHandler,
 } from "../../../../../src/core/store/effects/handlers/lorebook";
 import {
   readStream,
@@ -326,5 +327,41 @@ describe("lorebookContentHandler dual-write", () => {
     );
     expect(readStream("lb-content:c1")).toBeUndefined();
     clearStream("lb-content:c1");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// lorebookKeysHandler dual-write
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("lorebookKeysHandler dual-write", () => {
+  const completeCtx = (entryId: string, over: Record<string, unknown> = {}) =>
+    ({
+      target: { type: "lorebookKeys", entryId },
+      getState: () => ({ ui: { lorebook: { selectedEntryId: entryId } } }),
+      dispatch: vi.fn(),
+      accumulatedText: "KEYS: alpha, beta",
+      generationSucceeded: true,
+      ...over,
+    }) as unknown as CompletionContext<never>;
+
+  it("completion writes the joined final keys to the buffer on success", async () => {
+    clearStream("lb-keys:k1");
+    await lorebookKeysHandler.completion(completeCtx("k1"));
+    // api.v1.lorebook.entry mock returns no existing keys / empty displayName,
+    // so the final keys are exactly the parsed ["alpha","beta"].
+    expect(readStream("lb-keys:k1")).toBe("alpha, beta");
+    clearStream("lb-keys:k1");
+  });
+
+  it("completion clears the buffer on failure", async () => {
+    // seed the buffer, then a failed completion must clear it
+    clearStream("lb-keys:k1");
+    await lorebookKeysHandler.completion(completeCtx("k1"));
+    await lorebookKeysHandler.completion(
+      completeCtx("k1", { generationSucceeded: false, accumulatedText: "" }),
+    );
+    expect(readStream("lb-keys:k1")).toBeUndefined();
+    clearStream("lb-keys:k1");
   });
 });

@@ -306,6 +306,8 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
         keys: finalKeys,
       });
 
+      writeStream(`lb-keys:${ctx.target.entryId}`, finalKeys.join(", "));
+
       // Update draft with the saved keys if viewing this entry
       // (storageKey binding auto-updates UI)
       if (ctx.target.entryId === currentSelected) {
@@ -323,6 +325,7 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
           ctx.originalKeys || "",
         );
       }
+      clearStream(`lb-keys:${ctx.target.entryId}`);
     }
   },
 };
