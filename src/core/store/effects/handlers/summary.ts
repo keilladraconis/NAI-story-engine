@@ -6,6 +6,7 @@ import {
 } from "../generation-handlers";
 import { GenerationStrategy } from "../../types";
 import { entitySummaryUpdated } from "../../index";
+import { writeStream } from "../../stream-buffer";
 
 type EntitySummaryTarget = Extract<
   GenerationStrategy["target"],
@@ -26,11 +27,18 @@ export const entitySummaryHandler: GenerationHandlers<EntitySummaryTarget> = {
     _newText: string,
   ): void {
     void api.v1.storyStorage.set(EDIT_PANE_CONTENT, ctx.accumulatedText);
+    // JSX pane reads the live text from the effect-free buffer; per-token, no
+    // store dispatch. The pane stages the final into its editable draft.
+    writeStream(`entity-summary:${ctx.target.entityId}`, ctx.accumulatedText);
   },
 
   async completion(ctx: CompletionContext<EntitySummaryTarget>): Promise<void> {
     if (ctx.generationSucceeded && ctx.accumulatedText) {
       const trimmed = ctx.accumulatedText.trim();
+      // Carry the final into the buffer for the open JSX pane to stage into its
+      // draft (the pane owns clearing). NOT committed to the store when the pane
+      // is open, so Back discards; Save commits.
+      writeStream(`entity-summary:${ctx.target.entityId}`, trimmed);
       const editPaneOpen =
         ctx.getState().ui.activeEditId === ctx.target.entityId;
       if (editPaneOpen) {
