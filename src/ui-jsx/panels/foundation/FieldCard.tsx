@@ -5,7 +5,7 @@
 // queued/active the Zap is disabled and dimmed. All differences come from the
 // descriptor — one render path.
 
-import { useSlice } from "../../bridge";
+import { useSlice, useStream } from "../../bridge";
 import { T, SP } from "../../style";
 import { Zap, Edit, ToggleLeft, ToggleRight } from "nai:icons/feather";
 import { store, uiChatRefineRequested } from "../../../core/store";
@@ -20,7 +20,12 @@ export function FieldCard(props: {
 }) {
   const d = props.descriptor;
   const label = useSlice((s) => d.cardLabel(s));
-  const value = useSlice((s) => d.display(s));
+  // While generating, show the live per-token text from the effect-free buffer;
+  // on completion the handler clears it and we fall back to the committed
+  // (formatted) store value. Mirrors the chat bubble.
+  const storeValue = useSlice((s) => d.display(s));
+  const live = useStream(`foundation:${d.id}`);
+  const value = live ?? storeValue;
   const generating = useSlice((s) => isFoundationGenerating(s, d.id));
   const syncEnabled = useSlice((s) =>
     d.syncEnabled ? d.syncEnabled(s) : false,
