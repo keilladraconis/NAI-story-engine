@@ -147,7 +147,10 @@ function useGenField(opts: {
   }, [pending, live]);
 
   const onGenerate = () => {
-    if (pending) return;
+    // genRef.current guards the promotion window: during `await ensureLiveEntryId`
+    // `pending` is still false, so without it a double-click could create two
+    // lorebook entries (the second orphaning the first).
+    if (pending || genRef.current) return;
     genRef.current = true;
     if (opts.bufferKey) clearStream(opts.bufferKey);
     opts.arm();
