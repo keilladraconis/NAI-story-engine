@@ -56,7 +56,11 @@ const ICON_SIZE = 16;
 const EDIT_PANE_TITLE_KEY = "kse-edit-title";
 const EDIT_PANE_CONTENT_KEY = "kse-edit-content";
 
-const CATEGORIES: { id: DulfsFieldID; label: string; Icon: typeof User }[] = [
+export const CATEGORIES: {
+  id: DulfsFieldID;
+  label: string;
+  Icon: typeof User;
+}[] = [
   { id: FieldID.DramatisPersonae, label: "Characters", Icon: User },
   { id: FieldID.UniverseSystems, label: "Systems", Icon: Cpu },
   { id: FieldID.Locations, label: "Locations", Icon: MapPin },
