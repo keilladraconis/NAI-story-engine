@@ -7,6 +7,7 @@
 import { useSlice } from "../bridge";
 import { SP } from "../style";
 import { Foundation } from "./foundation/Foundation";
+import { ForgeSection } from "./forge/ForgeSection";
 import { World } from "./world/World";
 import { EntityEditPane } from "./world/EntityEditPane";
 import { ThreadEditPane } from "./world/ThreadEditPane";
@@ -30,6 +31,7 @@ export function StoryEngine() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: SP.md }}>
       <Foundation />
+      <ForgeSection />
       <World />
     </div>
   );

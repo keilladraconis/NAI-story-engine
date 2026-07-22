@@ -38,7 +38,11 @@ export function App() {
   useEffect(() => {
     const unsubs = [
       store.subscribeEffect(matchesAction(chatCreated), (action) => {
-        if (action.payload.chat.type === "refine") setTab("chat");
+        if (
+          action.payload.chat.type === "refine" ||
+          action.payload.chat.type === "forge"
+        )
+          setTab("chat");
       }),
       store.subscribeEffect(
         matchesAction(chatSwitched),
@@ -46,7 +50,7 @@ export function App() {
           const c = getState().chat.chats.find(
             (x) => x.id === action.payload.id,
           );
-          if (c?.type === "refine") setTab("chat");
+          if (c?.type === "refine" || c?.type === "forge") setTab("chat");
         },
       ),
       store.subscribeEffect(matchesAction(uiChatRefineCommitted), () =>
