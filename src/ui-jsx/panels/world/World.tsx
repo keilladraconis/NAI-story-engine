@@ -1,8 +1,8 @@
 // World section: header (World + globe, section-collapse, expand/collapse-all,
-// SEGA start/stop, add-entity, disabled add-thread, clear-confirm) + body
+// SEGA start/stop, add-entity, add-thread, clear-confirm) + body
 // (Threads then loose entity cards). Body recomputed in render via
 // selectWorldBody from store-owned refs. add-entity creates a draft and opens
-// the edit pane; add-thread stays disabled (thread edit pane is a later slice).
+// the edit pane; add-thread creates an empty group and opens ThreadEditPane.
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
@@ -13,6 +13,7 @@ import {
   worldCleared,
   entityForged,
   uiEditableActivate,
+  groupCreated,
 } from "../../../core/store";
 import { FieldID } from "../../../config/field-definitions";
 import { selectWorldBody } from "./world-select";
@@ -35,12 +36,6 @@ const ICON_BTN = {
   border: "none",
   cursor: "pointer",
   opacity: 0.6,
-} as const;
-const DISABLED_BTN = {
-  background: "none",
-  border: "none",
-  cursor: "default",
-  opacity: 0.35,
 } as const;
 
 export function World() {
@@ -68,6 +63,14 @@ export function World() {
           lifecycle: "draft",
         },
       }),
+    );
+    store.dispatch(uiEditableActivate({ id }));
+  };
+
+  const onAddThread = () => {
+    const id = api.v1.uuid();
+    store.dispatch(
+      groupCreated({ group: { id, title: "", summary: "", entityIds: [] } }),
     );
     store.dispatch(uiEditableActivate({ id }));
   };
@@ -119,7 +122,7 @@ export function World() {
         <button title="Add entity" onClick={onAddEntity} style={ICON_BTN}>
           <Plus size={ICON_SIZE} />
         </button>
-        <button title="Add thread (coming soon)" disabled style={DISABLED_BTN}>
+        <button title="Add thread" onClick={onAddThread} style={ICON_BTN}>
           <Layers size={ICON_SIZE} />
         </button>
         <ConfirmButton

@@ -1,11 +1,11 @@
-// One Thread card: layers icon + title (non-interactive — edit deferred) +
+// One Thread card: layers icon + title button (opens ThreadEditPane) +
 // disabled lorebook toggle (deferred) + immediate delete + member entity cards.
 // Members exclude forge drafts (they render in their forge chat). worldExpanded
 // drives each member card's summary; the member list itself always shows.
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
-import { store, groupDeleted } from "../../../core/store";
+import { store, groupDeleted, uiEditableActivate } from "../../../core/store";
 import { isForgeDraft } from "../../../core/store/selectors/forge";
 import { EntityCard } from "./EntityCard";
 import { Layers, Trash2, ToggleLeft } from "nai:icons/feather";
@@ -36,9 +36,20 @@ export function ThreadItem(props: { groupId: string }) {
         }}
       >
         <Layers size={ICON_SIZE} />
-        <span style={{ flex: 1, color: T.textHeadings }}>
+        <button
+          onClick={() => store.dispatch(uiEditableActivate({ id: groupId }))}
+          style={{
+            flex: 1,
+            textAlign: "left",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: T.textHeadings,
+            padding: 0,
+          }}
+        >
           {group.title || "New Thread"}
-        </span>
+        </button>
         {/* Deferred: thread lorebook sync — shown disabled. */}
         <button
           title="Lorebook sync (coming soon)"
