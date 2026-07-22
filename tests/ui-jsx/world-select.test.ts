@@ -4,6 +4,7 @@ import {
   entityRequestIds,
   entityPending,
   entityBorderKind,
+  isRequestActive,
 } from "../../src/ui-jsx/panels/world/world-select";
 import type { WorldEntity, WorldGroup, RootState } from "../../src/core/store";
 
@@ -122,5 +123,36 @@ describe("entityRequestIds", () => {
       "lb-entity-x-content",
       "lb-entity-x-keys",
     ]);
+  });
+});
+
+describe("isRequestActive", () => {
+  const rt = (over: Partial<RootState["runtime"]>): RootState["runtime"] =>
+    ({
+      activeRequest: null,
+      queue: [],
+      sega: { activeRequestIds: [] },
+      ...over,
+    }) as unknown as RootState["runtime"];
+
+  it("true when the id is the active request / queued / SEGA-active", () => {
+    expect(
+      isRequestActive(rt({ activeRequest: { id: "req-1" } as never }), "req-1"),
+    ).toBe(true);
+    expect(
+      isRequestActive(rt({ queue: [{ id: "req-1" } as never] }), "req-1"),
+    ).toBe(true);
+    expect(
+      isRequestActive(
+        rt({ sega: { activeRequestIds: ["req-1"] } as never }),
+        "req-1",
+      ),
+    ).toBe(true);
+  });
+
+  it("false when the id matches nothing", () => {
+    expect(
+      isRequestActive(rt({ queue: [{ id: "other" } as never] }), "req-1"),
+    ).toBe(false);
   });
 });

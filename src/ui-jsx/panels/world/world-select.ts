@@ -33,17 +33,24 @@ export function entityRequestIds(entityId: string): string[] {
   ];
 }
 
+/** True while a specific request id is active, queued, or SEGA-active. */
+export function isRequestActive(
+  runtime: RootState["runtime"],
+  requestId: string,
+): boolean {
+  return (
+    runtime.activeRequest?.id === requestId ||
+    runtime.queue.some((q) => q.id === requestId) ||
+    runtime.sega.activeRequestIds.includes(requestId)
+  );
+}
+
 /** True while any of the entity's requests is active, queued, or SEGA-active. */
 export function entityPending(
   runtime: RootState["runtime"],
   entityId: string,
 ): boolean {
-  const ids = new Set(entityRequestIds(entityId));
-  return (
-    ids.has(runtime.activeRequest?.id ?? "") ||
-    runtime.queue.some((q) => ids.has(q.id)) ||
-    runtime.sega.activeRequestIds.some((id) => ids.has(id))
-  );
+  return entityRequestIds(entityId).some((id) => isRequestActive(runtime, id));
 }
 
 export type BorderKind = "draft" | "pending" | "incomplete" | "complete";
