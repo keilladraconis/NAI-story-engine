@@ -5,22 +5,18 @@
 import { isForgeDraft } from "../../../core/store/selectors/forge";
 import type { RootState, WorldEntity, WorldGroup } from "../../../core/store";
 
-/** Visible World body: threads with >=1 non-forge-draft member, plus loose
- *  (ungrouped, non-forge-draft) entities. Mirrors SUI _selectBody. */
+/** Visible World body: every thread (including empty ones, so they stay
+ *  editable/deletable from their card), plus loose (ungrouped, non-forge-draft)
+ *  entities. A thread's own member list still hides forge drafts (ThreadItem). */
 export function selectWorldBody(
   entitiesById: Record<string, WorldEntity>,
   groups: WorldGroup[],
 ): { groups: WorldGroup[]; loose: WorldEntity[] } {
-  const isVisibleMember = (id: string): boolean => {
-    const e = entitiesById[id];
-    return !!e && !isForgeDraft(e);
-  };
-  const visibleGroups = groups.filter((g) => g.entityIds.some(isVisibleMember));
   const grouped = new Set(groups.flatMap((g) => g.entityIds));
   const loose = Object.values(entitiesById).filter(
     (e) => !grouped.has(e.id) && !isForgeDraft(e),
   );
-  return { groups: visibleGroups, loose };
+  return { groups, loose };
 }
 
 /** The four request ids that represent in-flight work for an entity. */

@@ -45,13 +45,20 @@ describe("selectWorldBody", () => {
     expect(loose.map((e) => e.id)).toEqual(["b"]);
   });
 
-  it("hides a group whose only members are forge drafts", () => {
+  it("keeps an empty group (rendered so it stays editable/deletable)", () => {
+    const { groups } = selectWorldBody({}, [group("g", [])]);
+    expect(groups.map((g) => g.id)).toEqual(["g"]);
+  });
+
+  it("keeps a group whose only members are forge drafts (its own list hides them)", () => {
     const entitiesById = {
       d: ent("d", { lifecycle: "draft", sourceChatId: "c" }),
     };
-    expect(selectWorldBody(entitiesById, [group("g", ["d"])]).groups).toEqual(
-      [],
-    );
+    expect(
+      selectWorldBody(entitiesById, [group("g", ["d"])]).groups.map(
+        (g) => g.id,
+      ),
+    ).toEqual(["g"]);
   });
 });
 

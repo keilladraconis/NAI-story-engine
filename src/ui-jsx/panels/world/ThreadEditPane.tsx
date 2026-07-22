@@ -192,7 +192,9 @@ export function ThreadEditPane(props: { groupId: string }) {
                     cursor: "pointer",
                     // Icons inherit this via SVG currentColor — the codebase
                     // passes only `size` to feather icons, never a color prop.
-                    color: isMember ? T.warning : T.text,
+                    // Green (mid-intensity) marks an active member, matching
+                    // SUI's sync-toggle "on" state; red/warning would misread.
+                    color: isMember ? T.midIntensity : T.text,
                     padding: SP.sm,
                     textAlign: "left",
                   }}
