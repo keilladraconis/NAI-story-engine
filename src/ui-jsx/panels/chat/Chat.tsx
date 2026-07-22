@@ -8,6 +8,7 @@ import { ChatInput } from "./ChatInput";
 import { ChatHeader } from "./ChatHeader";
 import { Sessions } from "./Sessions";
 import { RefineCommitBar } from "./RefineCommitBar";
+import { ForgeCommitBar } from "./ForgeCommitBar";
 
 // Identity + message-id sequence (NO content). Drives the shell: it re-renders
 // only when the chat switches or a message is added/removed — NOT per streaming
@@ -90,6 +91,7 @@ export function Chat(props: { onBack: () => void }) {
       <MessageList />
       <ChatInput />
       {chat.type === "refine" && <RefineCommitBar />}
+      {chat.type === "forge" && <ForgeCommitBar onEnd={props.onBack} />}
     </div>
   );
 }
