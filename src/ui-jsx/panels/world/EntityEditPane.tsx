@@ -48,6 +48,14 @@ import {
 
 const ICON_SIZE = 16;
 
+// SUI edit-pane draft slots the generation factories read (resolveDisplayName,
+// createEntitySummaryFactory). The JSX pane mirrors its local name/summary drafts
+// into these so generation targets THIS entity's current name/summary, not a
+// stale value left by a prior SUI edit. Bare constants avoid coupling ui-jsx to
+// the SUI ui/framework/ids tree (see chat-actions CHAT_INPUT_KEY).
+const EDIT_PANE_TITLE_KEY = "kse-edit-title";
+const EDIT_PANE_CONTENT_KEY = "kse-edit-content";
+
 const CATEGORIES: { id: DulfsFieldID; label: string; Icon: typeof User }[] = [
   { id: FieldID.DramatisPersonae, label: "Characters", Icon: User },
   { id: FieldID.UniverseSystems, label: "Systems", Icon: Cpu },
@@ -193,6 +201,15 @@ export function EntityEditPane(props: { entityId: string }) {
       cancelled = true;
     };
   }, []);
+
+  // Mirror the name/summary drafts into the SUI storyStorage slots the generation
+  // factories read, so generation uses THIS entity's current name/summary.
+  useEffect(() => {
+    void api.v1.storyStorage.set(EDIT_PANE_TITLE_KEY, name.value);
+  }, [name.value]);
+  useEffect(() => {
+    void api.v1.storyStorage.set(EDIT_PANE_CONTENT_KEY, summary.value);
+  }, [summary.value]);
 
   const summaryGen = useGenField({
     requestId: `se-entity-summary-${entityId}`,
