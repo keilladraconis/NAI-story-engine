@@ -17,6 +17,9 @@ import {
   entityDeleted,
   uiEditableDeactivate,
   uiEntitySummaryGenerationRequested,
+  uiLorebookEntrySelected,
+  uiLorebookContentGenerationRequested,
+  uiLorebookKeysGenerationRequested,
 } from "../../../core/store";
 import { ensureCategory } from "../../../core/store/effects/lorebook-sync";
 import {
@@ -71,12 +74,6 @@ const sectionLabel = {
   fontSize: "0.8em",
   fontWeight: "bold",
   color: T.textHeadings,
-} as const;
-const disabledZap = {
-  background: "none",
-  border: "none",
-  cursor: "default",
-  opacity: 0.35,
 } as const;
 const genZapStyle = (pending: boolean) => ({
   background: "none",
@@ -206,6 +203,53 @@ export function EntityEditPane(props: { entityId: string }) {
         }),
       ),
   });
+
+  const eid = entity?.lorebookEntryId ?? "";
+  const contentGen = useGenField({
+    requestId: eid ? `lb-item-${eid}-content` : "",
+    bufferKey: eid ? `lb-content:${eid}` : "",
+    draft: content,
+    arm: () =>
+      void (async () => {
+        const liveId = await ensureLiveEntryId(entityId);
+        if (!liveId) return;
+        store.dispatch(
+          uiLorebookEntrySelected({ entryId: liveId, categoryId: null }),
+        );
+        store.dispatch(
+          uiLorebookContentGenerationRequested({
+            requestId: `lb-item-${liveId}-content`,
+          }),
+        );
+      })(),
+  });
+  const keysGen = useGenField({
+    requestId: eid ? `lb-item-${eid}-keys` : "",
+    bufferKey: eid ? `lb-keys:${eid}` : "",
+    draft: keys,
+    arm: () =>
+      void (async () => {
+        const liveId = await ensureLiveEntryId(entityId);
+        if (!liveId) return;
+        store.dispatch(
+          uiLorebookEntrySelected({ entryId: liveId, categoryId: null }),
+        );
+        store.dispatch(
+          uiLorebookKeysGenerationRequested({
+            requestId: `lb-item-${liveId}-keys`,
+          }),
+        );
+      })(),
+  });
+
+  // Release the shared lorebook selection when the pane closes.
+  useEffect(
+    () => () =>
+      store.dispatch(
+        uiLorebookEntrySelected({ entryId: null, categoryId: null }),
+      ),
+    [],
+  );
 
   if (!entity) return null;
 
@@ -365,15 +409,20 @@ export function EntityEditPane(props: { entityId: string }) {
       >
         <div style={sectionRow}>
           <span style={sectionLabel}>Content</span>
-          <button title="Generate (coming soon)" disabled style={disabledZap}>
+          <button
+            title={contentGen.pending ? "Generating…" : "Generate content"}
+            onClick={contentGen.onGenerate}
+            disabled={contentGen.pending}
+            style={genZapStyle(contentGen.pending)}
+          >
             <Zap size={ICON_SIZE} />
           </button>
         </div>
         <textarea
           placeholder="Lorebook content…"
           rows={6}
-          disabled={loading}
-          value={content.value}
+          disabled={loading || contentGen.pending}
+          value={contentGen.live ?? content.value}
           onInput={(e) => content.setValue(e.target.value ?? "")}
           style={{ ...inputStyle, resize: "vertical" }}
         />
@@ -381,12 +430,17 @@ export function EntityEditPane(props: { entityId: string }) {
           <span style={{ ...sectionLabel, flex: "none" }}>Keys</span>
           <input
             placeholder="comma, separated, keys"
-            disabled={loading}
-            value={keys.value}
+            disabled={loading || keysGen.pending}
+            value={keysGen.live ?? keys.value}
             onInput={(e) => keys.setValue(e.target.value ?? "")}
             style={{ ...inputStyle, flex: 1 }}
           />
-          <button title="Generate (coming soon)" disabled style={disabledZap}>
+          <button
+            title={keysGen.pending ? "Generating…" : "Generate keys"}
+            onClick={keysGen.onGenerate}
+            disabled={keysGen.pending}
+            style={genZapStyle(keysGen.pending)}
+          >
             <Zap size={ICON_SIZE} />
           </button>
           <button
