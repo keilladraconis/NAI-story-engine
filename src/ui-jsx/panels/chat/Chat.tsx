@@ -57,7 +57,7 @@ function MessageList() {
       }}
     >
       {reversed.map((m, i) => (
-        <Message key={i} chatId={chat.id} message={m} />
+        <Message key={i} chatId={chat.id} chat={chat} message={m} />
       ))}
     </div>
   );

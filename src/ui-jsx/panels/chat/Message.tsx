@@ -9,10 +9,12 @@ import {
   uiChatRetryGeneration,
 } from "../../../core/store";
 import type { RootState } from "../../../core/store";
-import type { ChatMessage } from "../../../core/chat-types/types";
+import type { ChatMessage, Chat } from "../../../core/chat-types/types";
+import { getChatTypeSpec } from "../../../core/chat-types";
+import { EntityCard } from "../world/EntityCard";
 import { Edit, RotateCw, Trash, X, Check } from "nai:icons/feather";
 
-type MessageProps = { chatId: string; message: ChatMessage };
+type MessageProps = { chatId: string; chat: Chat; message: ChatMessage };
 
 const ICON = 14;
 
@@ -113,13 +115,27 @@ function EditBody(props: {
 }
 
 export function Message(props: MessageProps) {
-  const { chatId, message } = props;
+  const { chatId, chat, message } = props;
   const committed = useSlice((s) => readContent(s, chatId, message));
   // While this message is generating, its text lives in the effect-free stream
   // buffer (per-token store dispatch wedges the render flush); fall back to the
   // committed store value once streaming clears the buffer on completion.
   const live = useStream(message.id);
   const content = live ?? committed;
+  // Draft-entity ids for this turn (e.g. forge chats), rendered as inline cards
+  // below the bubble. Non-forge chats have no `inlineEntityIdsFor`, so this is
+  // inert. Must return a primitive string from useSlice — a fresh array would
+  // trigger a render loop — so join/split around the selector boundary.
+  const inlineKey = useSlice((s) => {
+    const spec = getChatTypeSpec(chat.type);
+    return (
+      spec.inlineEntityIdsFor?.(message, chat, {
+        getState: () => s,
+        dispatch: store.dispatch,
+      }) ?? []
+    ).join(",");
+  });
+  const inlineIds = inlineKey ? inlineKey.split(",") : [];
   const [editing, setEditing] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
   const isUser = message.role === "user";
@@ -230,6 +246,20 @@ export function Message(props: MessageProps) {
               </div>
             </div>
             <div>{content || "…"}</div>
+            {inlineIds.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: SP.xs,
+                  marginTop: SP.sm,
+                }}
+              >
+                {inlineIds.map((id) => (
+                  <EntityCard key={`inline-${message.id}-${id}`} entityId={id} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
