@@ -1,0 +1,110 @@
+// Foundation-import rows of the JSX Import wizard: Memory→ATTG, A/N→Style (each a
+// one-click import that marks itself done), and Story→Shape+Intent generation.
+
+import { T, SP } from "../../style";
+import {
+  store,
+  attgUpdated,
+  attgSyncSet,
+  styleUpdated,
+  styleSyncSet,
+  shapeGenerationRequested,
+  intentGenerationRequested,
+} from "../../../core/store";
+
+const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
+
+const row = {
+  display: "flex",
+  alignItems: "center",
+  gap: SP.sm,
+  padding: "6px 0",
+  borderBottom: "1px solid rgba(255,255,255,0.04)",
+} as const;
+const label = {
+  flexShrink: 0,
+  fontSize: "0.8em",
+  fontWeight: "bold",
+  opacity: 0.8,
+  minWidth: "84px",
+} as const;
+const preview = {
+  flex: 1,
+  fontSize: "0.75em",
+  opacity: 0.5,
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
+} as const;
+const btn = {
+  flexShrink: 0,
+  fontSize: "0.75em",
+  padding: "2px 8px",
+  background: T.bg2,
+  color: T.text,
+  border: "none",
+  cursor: "pointer",
+} as const;
+
+export function ImportFoundation(props: { memText: string; anText: string }) {
+  const [attgDone, setAttgDone] = useState(false);
+  const [styleDone, setStyleDone] = useState(false);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {props.memText.trim() ? (
+        <div style={{ ...row, opacity: attgDone ? 0.4 : 1 }}>
+          <span style={label}>Memory → ATTG</span>
+          <span style={preview}>{truncate(props.memText, 60)}</span>
+          <button
+            style={btn}
+            disabled={attgDone}
+            onClick={() => {
+              store.dispatch(attgUpdated({ attg: props.memText }));
+              store.dispatch(attgSyncSet({ enabled: true }));
+              void api.v1.memory.set(props.memText);
+              setAttgDone(true);
+            }}
+          >
+            {attgDone ? "Imported ✓" : "Import"}
+          </button>
+        </div>
+      ) : null}
+
+      {props.anText.trim() ? (
+        <div style={{ ...row, opacity: styleDone ? 0.4 : 1 }}>
+          <span style={label}>A/N → Style</span>
+          <span style={preview}>{truncate(props.anText, 60)}</span>
+          <button
+            style={btn}
+            disabled={styleDone}
+            onClick={() => {
+              store.dispatch(styleUpdated({ style: props.anText }));
+              store.dispatch(styleSyncSet({ enabled: true }));
+              setStyleDone(true);
+            }}
+          >
+            {styleDone ? "Imported ✓" : "Import"}
+          </button>
+        </div>
+      ) : null}
+
+      <div style={row}>
+        <span style={label}>Story → Shape + Intent</span>
+        <span style={preview} />
+        <button
+          style={btn}
+          onClick={() => store.dispatch(shapeGenerationRequested())}
+        >
+          Shape
+        </button>
+        <button
+          style={btn}
+          onClick={() => store.dispatch(intentGenerationRequested())}
+        >
+          Intent
+        </button>
+      </div>
+    </div>
+  );
+}
