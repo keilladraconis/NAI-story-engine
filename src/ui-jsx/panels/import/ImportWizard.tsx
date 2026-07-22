@@ -51,6 +51,8 @@ export function ImportWizard(props: { onClose: () => void }) {
       store.dispatch(styleSyncSet({ enabled: true }));
     }
     // Bind every currently-unmanaged entry (fresh managed set from the store).
+    // `data.entries` is the last-loaded lorebook snapshot — Refresh to re-read
+    // if entries were added since the wizard opened.
     const managed = new Set(
       Object.values(store.getState().world.entitiesById)
         .map((e) => e.lorebookEntryId)
@@ -77,7 +79,14 @@ export function ImportWizard(props: { onClose: () => void }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: SP.xs, paddingBottom: "32px" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: SP.xs,
+        paddingBottom: "32px",
+      }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
         <button title="Back" onClick={props.onClose} style={iconBtn}>
           <ArrowLeft size={16} />
@@ -117,7 +126,10 @@ export function ImportWizard(props: { onClose: () => void }) {
       <ImportFoundation memText={data.memText} anText={data.anText} />
 
       <span style={sectionLabel}>Lorebook Entries</span>
-      <ImportLorebook entries={data.entries} categoryNames={data.categoryNames} />
+      <ImportLorebook
+        entries={data.entries}
+        categoryNames={data.categoryNames}
+      />
     </div>
   );
 }

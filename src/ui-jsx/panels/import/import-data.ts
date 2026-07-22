@@ -63,7 +63,6 @@ export function useImportData(): {
   anText: string;
   entries: LorebookEntry[];
   categoryNames: Map<string, string>;
-  loading: boolean;
   refresh: () => void;
 } {
   const [memText, setMemText] = useState("");
@@ -72,7 +71,6 @@ export function useImportData(): {
   const [categoryNames, setCategoryNames] = useState<Map<string, string>>(
     new Map(),
   );
-  const [loading, setLoading] = useState(true);
   const [epoch, setEpoch] = useState(0);
 
   useEffect(() => {
@@ -85,11 +83,10 @@ export function useImportData(): {
         api.v1.lorebook.categories(),
       ]);
       if (cancelled) return;
-      setMemText(mem ?? "");
-      setAnText(an ?? "");
+      setMemText(mem);
+      setAnText(an);
       setEntries(es as LorebookEntry[]);
       setCategoryNames(new Map(cats.map((c) => [c.id, c.name ?? c.id])));
-      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -101,7 +98,6 @@ export function useImportData(): {
     anText,
     entries,
     categoryNames,
-    loading,
     refresh: () => setEpoch((n) => n + 1),
   };
 }
