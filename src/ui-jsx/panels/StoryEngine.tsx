@@ -6,6 +6,7 @@
 
 import { useSlice } from "../bridge";
 import { SP } from "../style";
+import { Header } from "./header/Header";
 import { Foundation } from "./foundation/Foundation";
 import { ForgeSection } from "./forge/ForgeSection";
 import { World } from "./world/World";
@@ -30,6 +31,7 @@ export function StoryEngine() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: SP.md }}>
+      <Header />
       <Foundation />
       <ForgeSection />
       <World />

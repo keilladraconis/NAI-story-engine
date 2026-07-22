@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - **Experimental JSX panel gains a Chat tab.** The JSX panel now has Chat | Story Engine tabs. The Chat tab hosts brainstorm and refine chats through the same shared chat engine as the SUI panel — send/stream/edit/retry/delete messages, switch sub-mode (Co/Crit), summarize, manage sessions (new/switch/rename/delete), and refine a Foundation field end-to-end (its ⚡ opens a refine when the field has content; Commit writes the rewrite back). Forge in the JSX chat comes later.
 - **The JSX panel can now create and edit Threads.** The World section's add-thread button opens an edit pane with a title, a summary field with a streaming generate button, and per-entity membership toggles; clicking a Thread card's title opens the same pane to edit it.
 - **The JSX panel now has Forge.** A Forge section on the Story Engine tab opens or resumes a forge session in the Chat tab, with an interactive phase bar (Sketch/Expand/Weave) that shows and lets you pin the next phase (auto-advance is the default), inline draft-entity cards under each turn, a scrub hint, and a Commit/Discard bar.
+- **The JSX panel gains a header.** The Story Engine tab now opens with an **Opening Scene** / **Continue Scene** button — writes the cold open, then extends it a paragraph per click, and reflects undo/redo — alongside live generation status: a **Continue** prompt when generation is waiting on you, a budget-wait countdown, and the S.E.G.A. status line.
 
 ### Changed
 
