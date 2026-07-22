@@ -376,6 +376,19 @@ describe("forgeChatContinueRequested pin", () => {
     const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
     expect(sub![0].payload.subMode).toBe("sketch");
   });
+
+  it("does not consume the pin on a non-advancing continue", async () => {
+    const chat = makeChat({ subMode: "sketch" });
+    const draft = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
+    const state = makeState([chat], [draft]);
+    (state.forge as { pinnedNextPhaseByChatId: Record<string, string> }).pinnedNextPhaseByChatId = { "fc-1": "weave" };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatContinueRequested({ chatId: "fc-1", advancePhase: false }));
+    const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
+    expect(sub![0].payload.subMode).toBe("sketch"); // stays on current subMode, pin not read
+    const cleared = dispatch.mock.calls.find(([a]) => a.type === "forge/forgeNextPhaseCleared");
+    expect(cleared).toBeUndefined();
+  });
 });
 
 describe("forgeChatNewSessionRequested effect", () => {
@@ -565,6 +578,17 @@ describe("forgeDiscardAllRequested effect", () => {
       ([a]) => a.type === "chat/chatDeleted",
     );
     expect(closed).toBeDefined();
+  });
+
+  it("clears the pin when the session ends (discard all)", async () => {
+    const chat = makeChat({ subMode: "expand" });
+    const draft = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
+    const state = makeState([chat], [draft]);
+    (state.forge as { pinnedNextPhaseByChatId: Record<string, string> }).pinnedNextPhaseByChatId = { "fc-1": "weave" };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeDiscardAllRequested({ chatId: "fc-1" }));
+    const cleared = dispatch.mock.calls.find(([a]) => a.type === "forge/forgeNextPhaseCleared");
+    expect(cleared).toBeDefined();
   });
 });
 

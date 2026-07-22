@@ -309,7 +309,7 @@ export function registerForgeChatEffects(
           ? "sketch"
           : (pinned ?? nextPhase(chat.subMode));
       dispatch(subModeChanged({ id: chatId, subMode: target }));
-      if (pinned) dispatch(forgeNextPhaseCleared({ chatId }));
+      if (advance && pinned) dispatch(forgeNextPhaseCleared({ chatId }));
 
       const assistantId = api.v1.uuid();
       dispatch(
