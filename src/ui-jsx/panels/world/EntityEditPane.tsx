@@ -5,7 +5,7 @@
 // The 3 generate zap buttons stream into the pane (unsolved in JSX) and render
 // disabled; the card's regen bolt already generates for live entities.
 
-import { useSlice } from "../../bridge";
+import { useSlice, useStream } from "../../bridge";
 import { useDraftField } from "../../hooks";
 import { T, SP } from "../../style";
 import {
@@ -16,6 +16,7 @@ import {
   entitySummaryUpdated,
   entityDeleted,
   uiEditableDeactivate,
+  uiEntitySummaryGenerationRequested,
 } from "../../../core/store";
 import { ensureCategory } from "../../../core/store/effects/lorebook-sync";
 import {
@@ -28,6 +29,8 @@ import {
   applyEratoPrefix,
   propagateNameInSummaries,
 } from "./entity-edit";
+import { clearStream } from "../../../core/store/stream-buffer";
+import { isRequestActive } from "./world-select";
 import { ConfirmButton } from "../../components/ConfirmButton";
 import {
   ArrowLeft,
@@ -137,6 +140,33 @@ export function EntityEditPane(props: { entityId: string }) {
     };
   }, []);
 
+  const summaryReqId = `se-entity-summary-${entityId}`;
+  const summaryKey = `entity-summary:${entityId}`;
+  const summaryPending = useSlice((s) =>
+    isRequestActive(s.runtime, summaryReqId),
+  );
+  const summaryLive = useStream(summaryKey);
+  const genRef = useRef(false);
+
+  // Wipe a stale background buffer on open (so the display shows the seeded
+  // draft, not a leftover from a card-regen) and clean up on unmount.
+  useEffect(() => {
+    clearStream(summaryKey);
+    return () => clearStream(summaryKey);
+  }, []);
+
+  // Stage the final streamed summary into the editable draft when a
+  // pane-triggered generation finishes. genRef guards against mount/stale
+  // auto-transfer; the [pending, live] deps make it order-independent (fires
+  // once both the request has cleared and the final text is in the buffer).
+  useEffect(() => {
+    if (genRef.current && !summaryPending && summaryLive !== undefined) {
+      summary.setValue(summaryLive);
+      clearStream(summaryKey);
+      genRef.current = false;
+    }
+  }, [summaryPending, summaryLive]);
+
   if (!entity) return null;
 
   const close = () => store.dispatch(uiEditableDeactivate());
@@ -144,6 +174,15 @@ export function EntityEditPane(props: { entityId: string }) {
   const onCategory = (id: DulfsFieldID) => {
     setCategory(id);
     store.dispatch(entityCategoryChanged({ entityId, categoryId: id }));
+  };
+
+  const onGenerateSummary = () => {
+    if (summaryPending) return;
+    genRef.current = true;
+    clearStream(summaryKey);
+    store.dispatch(
+      uiEntitySummaryGenerationRequested({ entityId, requestId: summaryReqId }),
+    );
   };
 
   const onSave = () => {
@@ -264,14 +303,25 @@ export function EntityEditPane(props: { entityId: string }) {
       {/* Summary */}
       <div style={sectionRow}>
         <span style={sectionLabel}>Summary</span>
-        <button title="Generate (coming soon)" disabled style={disabledZap}>
+        <button
+          title={summaryPending ? "Generating…" : "Generate summary"}
+          onClick={onGenerateSummary}
+          disabled={summaryPending}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: summaryPending ? "default" : "pointer",
+            opacity: summaryPending ? 0.4 : 1,
+          }}
+        >
           <Zap size={ICON_SIZE} />
         </button>
       </div>
       <textarea
         placeholder="Brief description of this entity…"
         rows={4}
-        value={summary.value}
+        disabled={summaryPending}
+        value={summaryLive ?? summary.value}
         onInput={(e) => summary.setValue(e.target.value ?? "")}
         style={{ ...inputStyle, resize: "vertical" }}
       />
