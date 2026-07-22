@@ -78,6 +78,12 @@ const disabledZap = {
   cursor: "default",
   opacity: 0.35,
 } as const;
+const genZapStyle = (pending: boolean) => ({
+  background: "none",
+  border: "none",
+  cursor: pending ? "default" : "pointer",
+  opacity: pending ? 0.4 : 1,
+});
 
 /** Resolve, or create+bind, the lorebook entry for this entity. Idempotent —
  *  returns the existing id for live entities, lazily promotes drafts. */
@@ -103,6 +109,54 @@ async function ensureLiveEntryId(
     entityLorebookEntryBound({ entityId, lorebookEntryId: newEntryId }),
   );
   return newEntryId;
+}
+
+// Shared generate-field wiring: pending (isRequestActive), live stream display,
+// and a genRef-guarded transfer of the final buffered text into the editable
+// draft on completion. `arm` is the field-specific dispatch (Summary dispatches
+// directly; Content/Keys promote + select first). requestId/bufferKey are "" when
+// not yet available (a draft with no lorebook entry), so the field isn't pending
+// and the button stays clickable.
+function useGenField(opts: {
+  requestId: string;
+  bufferKey: string;
+  draft: { value: string; setValue: (v: string) => void };
+  arm: () => void;
+}): { pending: boolean; live: string | undefined; onGenerate: () => void } {
+  const pending = useSlice((s) =>
+    opts.requestId ? isRequestActive(s.runtime, opts.requestId) : false,
+  );
+  const live = useStream(opts.bufferKey);
+  const genRef = useRef(false);
+
+  // Wipe a stale buffer on open / when the key changes post-promotion; clean up
+  // on unmount.
+  useEffect(() => {
+    if (opts.bufferKey) clearStream(opts.bufferKey);
+    return () => {
+      if (opts.bufferKey) clearStream(opts.bufferKey);
+    };
+  }, [opts.bufferKey]);
+
+  // Stage the final into the editable draft when a pane-triggered generation
+  // finishes. genRef guards mount/stale/foreign completions; [pending, live] deps
+  // make it order-independent (fires once the request has cleared and the final
+  // is in the buffer; on failure the handler cleared it, so nothing stages).
+  useEffect(() => {
+    if (!genRef.current || pending) return;
+    if (live !== undefined) opts.draft.setValue(live);
+    if (opts.bufferKey) clearStream(opts.bufferKey);
+    genRef.current = false;
+  }, [pending, live]);
+
+  const onGenerate = () => {
+    if (pending) return;
+    genRef.current = true;
+    if (opts.bufferKey) clearStream(opts.bufferKey);
+    opts.arm();
+  };
+
+  return { pending, live, onGenerate };
 }
 
 export function EntityEditPane(props: { entityId: string }) {
@@ -140,34 +194,18 @@ export function EntityEditPane(props: { entityId: string }) {
     };
   }, []);
 
-  const summaryReqId = `se-entity-summary-${entityId}`;
-  const summaryKey = `entity-summary:${entityId}`;
-  const summaryPending = useSlice((s) =>
-    isRequestActive(s.runtime, summaryReqId),
-  );
-  const summaryLive = useStream(summaryKey);
-  const genRef = useRef(false);
-
-  // Wipe a stale background buffer on open (so the display shows the seeded
-  // draft, not a leftover from a card-regen) and clean up on unmount.
-  useEffect(() => {
-    clearStream(summaryKey);
-    return () => clearStream(summaryKey);
-  }, []);
-
-  // Stage the final streamed summary into the editable draft when a
-  // pane-triggered generation finishes. genRef guards against mount/stale
-  // auto-transfer; the [pending, live] deps make it order-independent (fires
-  // once both the request has cleared and the final text is in the buffer).
-  useEffect(() => {
-    if (!genRef.current || summaryPending) return;
-    // A pane-triggered generation just finished: success → the completion-written
-    // final is in the buffer; failure → the handler cleared it (summaryLive
-    // undefined), so nothing stages. Either way, disarm genRef.
-    if (summaryLive !== undefined) summary.setValue(summaryLive);
-    clearStream(summaryKey);
-    genRef.current = false;
-  }, [summaryPending, summaryLive]);
+  const summaryGen = useGenField({
+    requestId: `se-entity-summary-${entityId}`,
+    bufferKey: `entity-summary:${entityId}`,
+    draft: summary,
+    arm: () =>
+      store.dispatch(
+        uiEntitySummaryGenerationRequested({
+          entityId,
+          requestId: `se-entity-summary-${entityId}`,
+        }),
+      ),
+  });
 
   if (!entity) return null;
 
@@ -176,15 +214,6 @@ export function EntityEditPane(props: { entityId: string }) {
   const onCategory = (id: DulfsFieldID) => {
     setCategory(id);
     store.dispatch(entityCategoryChanged({ entityId, categoryId: id }));
-  };
-
-  const onGenerateSummary = () => {
-    if (summaryPending) return;
-    genRef.current = true;
-    clearStream(summaryKey);
-    store.dispatch(
-      uiEntitySummaryGenerationRequested({ entityId, requestId: summaryReqId }),
-    );
   };
 
   const onSave = () => {
@@ -306,15 +335,10 @@ export function EntityEditPane(props: { entityId: string }) {
       <div style={sectionRow}>
         <span style={sectionLabel}>Summary</span>
         <button
-          title={summaryPending ? "Generating…" : "Generate summary"}
-          onClick={onGenerateSummary}
-          disabled={summaryPending}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: summaryPending ? "default" : "pointer",
-            opacity: summaryPending ? 0.4 : 1,
-          }}
+          title={summaryGen.pending ? "Generating…" : "Generate summary"}
+          onClick={summaryGen.onGenerate}
+          disabled={summaryGen.pending}
+          style={genZapStyle(summaryGen.pending)}
         >
           <Zap size={ICON_SIZE} />
         </button>
@@ -322,8 +346,8 @@ export function EntityEditPane(props: { entityId: string }) {
       <textarea
         placeholder="Brief description of this entity…"
         rows={4}
-        disabled={summaryPending}
-        value={summaryLive ?? summary.value}
+        disabled={summaryGen.pending}
+        value={summaryGen.live ?? summary.value}
         onInput={(e) => summary.setValue(e.target.value ?? "")}
         style={{ ...inputStyle, resize: "vertical" }}
       />
