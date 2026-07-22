@@ -170,9 +170,7 @@ export function ThreadEditPane(props: { groupId: string }) {
             key={cat.id}
             style={{ display: "flex", flexDirection: "column", gap: SP.xs }}
           >
-            <span
-              style={{ fontSize: "0.75em", color: T.textDisabled }}
-            >
+            <span style={{ fontSize: "0.75em", color: T.textDisabled }}>
               {cat.label}
             </span>
             {members.map((e) => {
