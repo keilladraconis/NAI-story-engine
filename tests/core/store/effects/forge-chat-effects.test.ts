@@ -67,7 +67,11 @@ function makeState(
   return {
     chat: { chats, activeChatId: chats[0]?.id ?? null, refineChat: null },
     world: { groups: [], entitiesById, entityIds: entities.map((e) => e.id) },
-    forge: { tombstonesByChatId: {}, pendingScrubByChatId: {} },
+    forge: {
+      tombstonesByChatId: {},
+      pendingScrubByChatId: {},
+      pinnedNextPhaseByChatId: {},
+    },
     runtime: { queue: [], activeRequest: null },
   } as unknown as RootState;
 }
@@ -346,6 +350,31 @@ describe("forgeChatContinueRequested with advancePhase: false", () => {
       ([a]) => a.type === "ui/generationSubmitted",
     );
     expect(submitted).toBeDefined();
+  });
+});
+
+describe("forgeChatContinueRequested pin", () => {
+  it("honors a pin over auto-advance and clears it", async () => {
+    const chat = makeChat({ subMode: "sketch" });
+    const draft = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
+    const state = makeState([chat], [draft]);
+    (state.forge as { pinnedNextPhaseByChatId: Record<string, string> }).pinnedNextPhaseByChatId = { "fc-1": "weave" };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
+    const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
+    expect(sub![0].payload.subMode).toBe("weave"); // pin, not nextPhase(sketch)=expand
+    const cleared = dispatch.mock.calls.find(([a]) => a.type === "forge/forgeNextPhaseCleared");
+    expect(cleared).toBeDefined();
+  });
+
+  it("pool-empty forces sketch even with a pin", async () => {
+    const chat = makeChat({ subMode: "expand" });
+    const state = makeState([chat], []); // no drafts
+    (state.forge as { pinnedNextPhaseByChatId: Record<string, string> }).pinnedNextPhaseByChatId = { "fc-1": "weave" };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
+    const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
+    expect(sub![0].payload.subMode).toBe("sketch");
   });
 });
 

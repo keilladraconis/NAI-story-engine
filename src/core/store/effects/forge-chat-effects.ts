@@ -36,6 +36,7 @@ import {
   tombstonesClearedForChat,
   scrubQueued,
   scrubCleared,
+  forgeNextPhaseCleared,
 } from "../slices/forge";
 import { entityDeleted, entityLorebookEntryBound } from "../slices/world";
 import { DULFS_CATEGORY_LABELS } from "../../utils/category-detect";
@@ -177,6 +178,7 @@ function forgeRequestPending(state: RootState): boolean {
 function closeForgeSession(dispatch: AppDispatch, chatId: string): void {
   dispatch(scrubCleared({ chatId }));
   dispatch(tombstonesClearedForChat({ chatId }));
+  dispatch(forgeNextPhaseCleared({ chatId }));
   dispatch(chatDeleted({ id: chatId }));
 }
 
@@ -300,12 +302,14 @@ export function registerForgeChatEffects(
       const state = latest();
       const pool = poolFor(state, chatId);
       const advance = action.payload.advancePhase !== false;
+      const pinned = state.forge.pinnedNextPhaseByChatId?.[chatId];
       const target = !advance
         ? (chat.subMode ?? "sketch")
         : pool.length === 0
           ? "sketch"
-          : nextPhase(chat.subMode);
+          : (pinned ?? nextPhase(chat.subMode));
       dispatch(subModeChanged({ id: chatId, subMode: target }));
+      if (pinned) dispatch(forgeNextPhaseCleared({ chatId }));
 
       const assistantId = api.v1.uuid();
       dispatch(
