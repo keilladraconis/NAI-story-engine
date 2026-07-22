@@ -160,11 +160,13 @@ export function EntityEditPane(props: { entityId: string }) {
   // auto-transfer; the [pending, live] deps make it order-independent (fires
   // once both the request has cleared and the final text is in the buffer).
   useEffect(() => {
-    if (genRef.current && !summaryPending && summaryLive !== undefined) {
-      summary.setValue(summaryLive);
-      clearStream(summaryKey);
-      genRef.current = false;
-    }
+    if (!genRef.current || summaryPending) return;
+    // A pane-triggered generation just finished: success → the completion-written
+    // final is in the buffer; failure → the handler cleared it (summaryLive
+    // undefined), so nothing stages. Either way, disarm genRef.
+    if (summaryLive !== undefined) summary.setValue(summaryLive);
+    clearStream(summaryKey);
+    genRef.current = false;
   }, [summaryPending, summaryLive]);
 
   if (!entity) return null;

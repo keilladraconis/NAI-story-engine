@@ -6,7 +6,7 @@ import {
 } from "../generation-handlers";
 import { GenerationStrategy } from "../../types";
 import { entitySummaryUpdated } from "../../index";
-import { writeStream } from "../../stream-buffer";
+import { writeStream, clearStream } from "../../stream-buffer";
 
 type EntitySummaryTarget = Extract<
   GenerationStrategy["target"],
@@ -53,6 +53,8 @@ export const entitySummaryHandler: GenerationHandlers<EntitySummaryTarget> = {
           }),
         );
       }
+    } else {
+      clearStream(`entity-summary:${ctx.target.entityId}`);
     }
   },
 };

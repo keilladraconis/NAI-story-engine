@@ -42,6 +42,19 @@ export function registerSummaryGenerationEffects(
     matchesAction(uiEntitySummaryGenerationRequested),
     async (action) => {
       const { entityId, requestId } = action.payload;
+      const rt = getState().runtime;
+      const alreadyTracked =
+        rt.activeRequest?.id === requestId ||
+        rt.queue.some((r) => r.id === requestId);
+      if (!alreadyTracked) {
+        dispatch(
+          requestQueued({
+            id: requestId,
+            type: "entitySummary",
+            targetId: entityId,
+          }),
+        );
+      }
       dispatch(
         generationSubmitted({
           requestId,
