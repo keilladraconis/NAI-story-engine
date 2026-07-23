@@ -357,7 +357,11 @@ export function EntityEditPane(props: { entityId: string }) {
         display: "flex",
         flexDirection: "column",
         gap: SP.sm,
-        paddingBottom: "32px",
+        // Fill the pane height so the Content textarea can grow to the bottom
+        // (Keys pinned below it). Grows past the panel if the fields are tall
+        // (the engine tab scrolls); the textarea scrolls its own overflow.
+        minHeight: "100%",
+        paddingBottom: SP.sm,
       }}
     >
       {/* Header */}
@@ -448,7 +452,8 @@ export function EntityEditPane(props: { entityId: string }) {
         style={{ ...inputStyle, resize: "vertical" }}
       />
 
-      {/* Lorebook section */}
+      {/* Lorebook section — grows to fill the pane so the content textarea can
+          expand, with Keys held at the bottom. */}
       <div
         style={{
           marginTop: SP.sm,
@@ -457,6 +462,8 @@ export function EntityEditPane(props: { entityId: string }) {
           display: "flex",
           flexDirection: "column",
           gap: SP.sm,
+          flex: 1,
+          minHeight: 0,
         }}
       >
         <div style={sectionRow}>
@@ -480,11 +487,12 @@ export function EntityEditPane(props: { entityId: string }) {
         </div>
         <textarea
           placeholder="Lorebook content…"
-          rows={6}
           disabled={loading || contentGen.pending}
           value={contentGen.live ?? content.value}
           onInput={(e) => content.setValue(e.target.value ?? "")}
-          style={{ ...inputStyle, resize: "vertical" }}
+          // flex:1 fills the section down to Keys; minHeight keeps it usable when
+          // the pane is short; the textarea scrolls its own overflow.
+          style={{ ...inputStyle, flex: 1, minHeight: "8em", resize: "none" }}
         />
         <div style={sectionRow}>
           <span style={{ ...sectionLabel, flex: "none" }}>Keys</span>
