@@ -27,7 +27,9 @@ const label = {
   fontSize: "0.8em",
   fontWeight: "bold",
   opacity: 0.8,
-  minWidth: "84px",
+  // No fixed min-width: it can't shrink (flexShrink:0), so a floor wider than the
+  // label's text inflates the row's intrinsic width past the overflow:auto pane
+  // and clips the trailing button. Content-width labels keep the row within the pane.
 } as const;
 const preview = {
   flex: 1,
