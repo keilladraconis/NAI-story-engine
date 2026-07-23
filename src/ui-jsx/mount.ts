@@ -3,8 +3,9 @@
 // requires a single call — multiple calls overwrite each other).
 
 import { App } from "./App";
+import { JournalPanel } from "./panels/journal/JournalPanel";
 
-const { sidebarPanel } = api.v1.ui.extension;
+const { sidebarPanel, scriptPanel } = api.v1.ui.extension;
 
 export function buildJsxSidebarPanel(): UIExtension {
   const jsxPart = api.v1.ui.part.jsx({
@@ -40,6 +41,23 @@ export function buildJsxSidebarPanel(): UIExtension {
     id: "kse-sidebar-jsx",
     name: "Story Engine (JSX)",
     iconId: "lightning",
+    content: [jsxPart],
+  });
+}
+
+// The Generation Journal panel (gated by `generation_journal` in plugin.ts).
+// A short, non-scrolling panel — a plain jsx part, no grid-height constraint.
+export function buildJsxJournalPanel(): UIExtension {
+  const jsxPart = api.v1.ui.part.jsx({
+    id: "kse-jsx-journal-root",
+    onMount: (elem) => {
+      render(h(JournalPanel, null), elem);
+    },
+  });
+
+  return scriptPanel({
+    id: "kse-journal",
+    name: "Generation Journal",
     content: [jsxPart],
   });
 }

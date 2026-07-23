@@ -50,12 +50,11 @@ import { ChatPanel } from "./components/ChatPanel";
 import { openSeSessionsModal } from "./components/SeSessionsModal";
 import { ForgePane } from "./components/ForgePane";
 import { SeHeaderBar } from "./components/SeHeaderBar";
-import { SeJournalPanel } from "./components/SeJournalPanel";
 import { SeImportWizard } from "./components/SeImportWizard";
 import { loadJournal } from "../core/generation-journal";
-import { buildJsxSidebarPanel } from "../ui-jsx/mount";
+import { buildJsxSidebarPanel, buildJsxJournalPanel } from "../ui-jsx/mount";
 
-const { sidebarPanel, scriptPanel } = api.v1.ui.extension;
+const { sidebarPanel } = api.v1.ui.extension;
 
 export class StoryEnginePlugin extends SuiPlugin {
   private _genX?: GenX;
@@ -338,16 +337,7 @@ export class StoryEnginePlugin extends SuiPlugin {
     if (journalEnabled) {
       api.v1.permissions.request(["clipboardWrite"]);
       loadJournal();
-      const journalPart = await new SeJournalPanel({
-        id: "kse-journal-root",
-      }).build();
-      panels.push(
-        scriptPanel({
-          id: "kse-journal",
-          name: "Generation Journal",
-          content: [journalPart],
-        }),
-      );
+      panels.push(buildJsxJournalPanel());
     }
 
     await api.v1.ui.register(panels);

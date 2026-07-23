@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **The Generation Journal panel is now the JSX implementation.** Same entry count, copy-digest buttons (Full/SEGA/Bootstrap/Forge), and Clear behavior, now rendered through the JSX/Preact migration instead of the SUI framework — the SUI `SeJournalPanel` is retired.
 - **Chat streaming no longer flows through the store per token.** In-flight generation text is now written to a lightweight, effect-free stream buffer that the bubble reads directly; the finished message is committed to the store once, on completion. Dispatching every token through the store (running the full effects pipeline each time) prevented the JSX panel from repainting mid-stream — the reply only appeared after switching tabs. As a side effect, the SUI chat bubble now fills in when generation completes rather than animating token-by-token; the JSX panel streams live.
 
 ### Fixed
