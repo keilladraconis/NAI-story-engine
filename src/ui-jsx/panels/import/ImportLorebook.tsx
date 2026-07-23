@@ -35,6 +35,7 @@ const entryRow = {
 } as const;
 const entryName = {
   flex: 1,
+  minWidth: 0, // let the flex item shrink below content width so the buttons stay on-screen
   fontSize: "0.85em",
   overflow: "hidden",
   whiteSpace: "nowrap",
@@ -91,7 +92,9 @@ export function ImportLorebook(props: {
             const cat = catFor(entry);
             return (
               <div key={entry.id} style={entryRow}>
-                <span style={entryName}>{entry.displayName || "(unnamed)"}</span>
+                <span style={entryName}>
+                  {entry.displayName || "(unnamed)"}
+                </span>
                 <button
                   style={{ ...smallBtn, opacity: 0.7 }}
                   title="Cycle category"

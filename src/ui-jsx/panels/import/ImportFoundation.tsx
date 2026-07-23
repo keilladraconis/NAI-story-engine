@@ -12,7 +12,8 @@ import {
   intentGenerationRequested,
 } from "../../../core/store";
 
-const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
+const truncate = (s: string, n: number) =>
+  s.length > n ? s.slice(0, n) + "…" : s;
 
 const row = {
   display: "flex",
@@ -30,6 +31,7 @@ const label = {
 } as const;
 const preview = {
   flex: 1,
+  minWidth: 0, // let the flex item shrink below content width so the button stays on-screen
   fontSize: "0.75em",
   opacity: 0.5,
   overflow: "hidden",
