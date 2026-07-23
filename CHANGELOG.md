@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - **The JSX panel now has Forge.** A Forge section on the Story Engine tab opens or resumes a forge session in the Chat tab, with an interactive phase bar (Sketch/Expand/Weave) that shows and lets you pin the next phase (auto-advance is the default), inline draft-entity cards under each turn, a scrub hint, and a Commit/Discard bar.
 - **The JSX panel gains a header.** The Story Engine tab now opens with an **Opening Scene** / **Continue Scene** button — writes the cold open, then extends it a paragraph per click, and reflects undo/redo — alongside live generation status: a **Continue** prompt when generation is waiting on you, a budget-wait countdown, and the S.E.G.A. status line.
 - **The JSX panel gains an Import flow.** A header button opens a wizard that pulls existing content into Story Engine: one-click Memory→ATTG and A/N→Style imports, Shape and Intent generated straight from the story, and existing lorebook entries bound to Story Engine entities — per-entry with a category picker and Bind, or all at once via **Import All**.
+- **The entity edit pane's Content ⚡ is now adaptive.** Like the Foundation fields, it generates lorebook content on an empty entry and opens a refine chat (rewriting the entry) once content exists, instead of always generating.
 
 ### Changed
 
