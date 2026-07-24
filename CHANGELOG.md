@@ -7,7 +7,8 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - **Story Engine's interface is rebuilt on NovelAI's JSX/Preact UI API.** The whole sidebar panel — Foundation, Chat, World and Threads, Forge, the Opening/Continue Scene header, and the Import wizard — now renders reactively from the shared store through NovelAI's JSX runtime and styles itself from the active theme via CSS variables. The homebrew SUI component framework and its vendored library are removed, and Story Engine is a single sidebar panel again (no parallel "(JSX)" tab). This is a foundations change: every workflow behaves as before, now on a supported UI platform.
-- **Chat, Foundation, and lorebook generation stream live again.** In-flight text is written to a lightweight, effect-free stream buffer that the view reads directly, and the finished result is committed to the store once, on completion. Previously every token was dispatched through the store — running the full effects pipeline each time — which blocked the panel from repainting mid-stream, so replies only appeared after switching tabs.
+- **Improved Performance** Owing to clean Preact-based updates instead of clunky updateParts calls via the old API. There should also be far fewer bugs owing to missing callbacks and other lost connections.
+- **Reduced Filesize** The overall bundle size shrank by 30%!
 
 ### Added
 
