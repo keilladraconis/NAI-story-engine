@@ -1,4 +1,4 @@
-import { EDIT_PANE_CONTENT } from "../../../../ui/framework/ids";
+import { EDIT_PANE_CONTENT } from "../../../keys";
 import {
   GenerationHandlers,
   StreamingContext,

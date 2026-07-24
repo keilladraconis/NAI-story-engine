@@ -13,24 +13,12 @@ import {
   StreamingContext,
   CompletionContext,
 } from "../generation-handlers";
-import { IDS } from "../../../../ui/framework/ids";
-import { escapeForMarkdown } from "../../../../ui/utils";
 import { writeStream, clearStream } from "../../stream-buffer";
 
 type FoundationTarget = Extract<
   GenerationStrategy["target"],
   { type: "foundation" }
 >;
-
-/** Shape streaming updates the description text below the card. */
-const VIEW_IDS = {
-  shape: "se-fn-shape-card-desc",
-  intent: "se-fn-intent-card-desc",
-  contract: "se-fn-contract-card-desc",
-  attg: "se-fn-attg-card-desc",
-  style: "se-fn-style-card-desc",
-  worldState: `${IDS.FOUNDATION.WORLD_STATE_TEXT}-view`,
-} as const;
 
 /**
  * Parses shape generation output into { name, description }.
@@ -81,12 +69,8 @@ export function parseContract(text: string): ContractData {
 
 export const foundationHandler: GenerationHandlers<FoundationTarget> = {
   streaming(ctx: StreamingContext<FoundationTarget>, _newText: string): void {
-    const viewId = VIEW_IDS[ctx.target.field];
-    api.v1.ui.updateParts([
-      { id: viewId, text: escapeForMarkdown(ctx.accumulatedText) },
-    ]);
-    // JSX reads the raw accumulated text from the effect-free buffer; the SUI
-    // path above renders the markdown-escaped copy. Per-token, no store dispatch.
+    // The JSX field card reads the live text from the effect-free stream buffer.
+    // Per-token, no store dispatch (that would wedge the Preact repaint).
     writeStream(`foundation:${ctx.target.field}`, ctx.accumulatedText);
   },
 

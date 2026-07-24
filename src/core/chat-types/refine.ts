@@ -16,7 +16,7 @@ import {
 import { messageAdded, messageRemoved } from "../store/slices/chat";
 import { uiChatRefineGenerateRequested } from "../store/slices/ui";
 import { parseContract } from "../store/effects/handlers/foundation";
-import { IDS } from "../../ui/framework/ids";
+import { LB_CONTENT_DRAFT } from "../keys";
 
 /** True while a refine generation for this chat is queued or in flight. */
 function refinePending(ctx: SpecCtx): boolean {
@@ -54,7 +54,7 @@ const FIELD_COMMIT_DISPATCHERS: Record<
     // textarea to the same shared CONTENT_DRAFT_KEY in storyStorage. Without
     // this write, the entity edit pane's Save button would later clobber the
     // refined lorebook entry with the stale textarea content.
-    void api.v1.storyStorage.set(IDS.LOREBOOK.CONTENT_DRAFT_KEY, text);
+    void api.v1.storyStorage.set(LB_CONTENT_DRAFT, text);
     void api.v1.lorebook.updateEntry(target.entryId, { text });
   },
 };

@@ -1,6 +1,6 @@
 import { Store } from "nai-store";
 import { RootState } from "../types";
-import { STORAGE_KEYS } from "../../../ui/framework/ids";
+import { STORAGE_KEYS } from "../../keys";
 
 const AUTOSAVE_DELAY_MS = 2000;
 

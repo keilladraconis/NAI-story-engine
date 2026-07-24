@@ -1,4 +1,4 @@
-import { IDS } from "../../../../ui/framework/ids";
+import { LB_CONTENT_DRAFT, LB_KEYS_DRAFT } from "../../../keys";
 import {
   GenerationHandlers,
   LorebookContentTarget,
@@ -60,7 +60,7 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
       const prefill = getCachedPrefill(ctx.target.entryId) || "";
       const displayContent = prefill + ctx.accumulatedText;
 
-      api.v1.storyStorage.set(IDS.LOREBOOK.CONTENT_DRAFT_RAW, displayContent);
+      api.v1.storyStorage.set(LB_CONTENT_DRAFT, displayContent);
       writeStream(`lb-content:${ctx.target.entryId}`, displayContent);
     },
 
@@ -110,16 +110,13 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
 
         // Update draft with full content if viewing this entry
         if (entryId === currentSelected) {
-          await api.v1.storyStorage.set(
-            IDS.LOREBOOK.CONTENT_DRAFT_RAW,
-            finalContent,
-          );
+          await api.v1.storyStorage.set(LB_CONTENT_DRAFT, finalContent);
         }
       } else {
         // Cancelled or failed: restore draft to original content if viewing this entry
         if (entryId === currentSelected) {
           await api.v1.storyStorage.set(
-            IDS.LOREBOOK.CONTENT_DRAFT_RAW,
+            LB_CONTENT_DRAFT,
             ctx.originalContent || "",
           );
         }
@@ -311,19 +308,13 @@ export const lorebookKeysHandler: GenerationHandlers<LorebookKeysTarget> = {
       // Update draft with the saved keys if viewing this entry
       // (storageKey binding auto-updates UI)
       if (ctx.target.entryId === currentSelected) {
-        await api.v1.storyStorage.set(
-          IDS.LOREBOOK.KEYS_DRAFT_RAW,
-          finalKeys.join(", "),
-        );
+        await api.v1.storyStorage.set(LB_KEYS_DRAFT, finalKeys.join(", "));
       }
     } else {
       // Cancelled or failed: restore draft to original keys if viewing this entry
       // (storageKey binding auto-updates UI)
       if (ctx.target.entryId === currentSelected) {
-        await api.v1.storyStorage.set(
-          IDS.LOREBOOK.KEYS_DRAFT_RAW,
-          ctx.originalKeys || "",
-        );
+        await api.v1.storyStorage.set(LB_KEYS_DRAFT, ctx.originalKeys || "");
       }
       clearStream(`lb-keys:${ctx.target.entryId}`);
     }

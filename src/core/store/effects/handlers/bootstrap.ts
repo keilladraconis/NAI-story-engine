@@ -96,10 +96,10 @@ function stripTrailingSceneBreak(text: string): {
 // ─── Phase 1 handler ─────────────────────────────────────────────────────────
 
 export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
-  streaming(ctx: StreamingContext<BootstrapTarget>, _newText: string): void {
-    const tail = ctx.accumulatedText.slice(-100).replace(/\n/g, " ");
-    api.v1.ui.updateParts([{ id: "header-sega-status", text: tail }]);
-  },
+  // The opening scene lands on the page on completion (document.append); there
+  // is no live streaming preview in the JSX header — the dimmed Bootstrap button
+  // signals that generation is in flight.
+  streaming(_ctx: StreamingContext<BootstrapTarget>, _newText: string): void {},
 
   async completion(ctx: CompletionContext<BootstrapTarget>): Promise<void> {
     if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
@@ -107,7 +107,6 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
     // Race protection: bail if document was populated while generating
     const sectionIds = await api.v1.document.sectionIds();
     if (sectionIds.length > 0) {
-      api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
       return;
     }
 
@@ -127,7 +126,6 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
 
     // Stage stops here. The opening is on the page; the header button now offers
     // "Continue Scene", and the user decides whether to extend it.
-    api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
   },
 };
 
@@ -136,24 +134,15 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
 export const bootstrapContinueHandler: GenerationHandlers<BootstrapContinueTarget> =
   {
     streaming(
-      ctx: StreamingContext<BootstrapContinueTarget>,
+      _ctx: StreamingContext<BootstrapContinueTarget>,
       _newText: string,
-    ): void {
-      const tail = ctx.accumulatedText.slice(-100).replace(/\n/g, " ");
-      api.v1.ui.updateParts([
-        {
-          id: "header-sega-status",
-          text: `[${ctx.target.iteration + 2}] ${tail}`,
-        },
-      ]);
-    },
+    ): void {},
 
     async completion(
       ctx: CompletionContext<BootstrapContinueTarget>,
     ): Promise<void> {
       if (!ctx.generationSucceeded || !ctx.accumulatedText) {
         continueInline = false;
-        api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
         return;
       }
 
@@ -178,6 +167,5 @@ export const bootstrapContinueHandler: GenerationHandlers<BootstrapContinueTarge
 
       // One paragraph per click. No auto-chain and no cap — the user keeps the
       // wheel: the header button stays on "Continue Scene" for the next push.
-      api.v1.ui.updateParts([{ id: "header-sega-status", text: "" }]);
     },
   };

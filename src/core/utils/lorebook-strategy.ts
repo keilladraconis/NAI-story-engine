@@ -4,11 +4,7 @@ import { buildStoryEnginePrefix } from "./context-builder";
 import type { RefineContext } from "../chat-types/types";
 import { buildRefineTail } from "./refine-strategy";
 import { FIELD_CONFIGS } from "../../config/field-definitions";
-import {
-  STORAGE_KEYS,
-  EDIT_PANE_TITLE,
-  EDIT_PANE_CONTENT,
-} from "../../ui/framework/ids";
+import { STORAGE_KEYS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../keys";
 import {
   buildModelParams,
   appendXialongStyleMessage,

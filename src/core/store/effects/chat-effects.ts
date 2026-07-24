@@ -24,8 +24,7 @@ import { getChatTypeSpec } from "../../chat-types";
 import type { Chat } from "../../chat-types/types";
 import { buildChatStrategy } from "../../utils/chat-strategy";
 import { buildModelParams } from "../../utils/config";
-import { flushActiveEditor } from "../../../ui/framework/editable-draft";
-import { IDS } from "../../../ui/framework/ids";
+import { CHAT_INPUT_KEY } from "../../keys";
 
 function findChat(state: RootState, id: string): Chat | undefined {
   return state.chat.chats.find((c) => c.id === id);
@@ -71,12 +70,10 @@ export function registerChatEffects(
   subscribeEffect(
     matchesAction(uiChatSubmitUserMessage),
     async (action, { getState: latest }) => {
-      await flushActiveEditor();
       const { chatId } = action.payload;
-      const inputKey = IDS.BRAINSTORM.INPUT;
-      const text = ((await api.v1.storyStorage.get(inputKey)) as string) || "";
-      await api.v1.storyStorage.set(inputKey, "");
-      api.v1.ui.updateParts([{ id: IDS.BRAINSTORM.INPUT, value: "" }]);
+      const text =
+        ((await api.v1.storyStorage.get(CHAT_INPUT_KEY)) as string) || "";
+      await api.v1.storyStorage.set(CHAT_INPUT_KEY, "");
 
       const chat = findChat(latest(), chatId);
       if (!chat) return;

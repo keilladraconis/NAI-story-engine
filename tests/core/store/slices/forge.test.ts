@@ -154,7 +154,10 @@ describe("forgeSlice next-phase pin", () => {
       initialForgeState,
       forgeNextPhasePinned({ chatId: "c1", phase: "expand" }),
     );
-    const s = forgeSliceReducer(pinned, forgeNextPhaseCleared({ chatId: "c1" }));
+    const s = forgeSliceReducer(
+      pinned,
+      forgeNextPhaseCleared({ chatId: "c1" }),
+    );
     expect(s.pinnedNextPhaseByChatId["c1"]).toBeUndefined();
   });
 

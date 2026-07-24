@@ -356,24 +356,38 @@ describe("forgeChatContinueRequested with advancePhase: false", () => {
 describe("forgeChatContinueRequested pin", () => {
   it("honors a pin over auto-advance and clears it", async () => {
     const chat = makeChat({ subMode: "sketch" });
-    const draft = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
+    const draft = makeEntity({
+      id: "d1",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [draft]);
-    (state.forge as { pinnedNextPhaseByChatId: Record<string, string> }).pinnedNextPhaseByChatId = { "fc-1": "weave" };
+    (
+      state.forge as { pinnedNextPhaseByChatId: Record<string, string> }
+    ).pinnedNextPhaseByChatId = { "fc-1": "weave" };
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
-    const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
+    const sub = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/subModeChanged",
+    );
     expect(sub![0].payload.subMode).toBe("weave"); // pin, not nextPhase(sketch)=expand
-    const cleared = dispatch.mock.calls.find(([a]) => a.type === "forge/forgeNextPhaseCleared");
+    const cleared = dispatch.mock.calls.find(
+      ([a]) => a.type === "forge/forgeNextPhaseCleared",
+    );
     expect(cleared).toBeDefined();
   });
 
   it("pool-empty forces sketch even with a pin", async () => {
     const chat = makeChat({ subMode: "expand" });
     const state = makeState([chat], []); // no drafts
-    (state.forge as { pinnedNextPhaseByChatId: Record<string, string> }).pinnedNextPhaseByChatId = { "fc-1": "weave" };
+    (
+      state.forge as { pinnedNextPhaseByChatId: Record<string, string> }
+    ).pinnedNextPhaseByChatId = { "fc-1": "weave" };
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
-    const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
+    const sub = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/subModeChanged",
+    );
     expect(sub![0].payload.subMode).toBe("sketch");
   });
 
@@ -381,14 +395,26 @@ describe("forgeChatContinueRequested pin", () => {
     // subMode "expand" (not the "sketch" default) so the assertion proves the
     // current subMode is preserved, not merely matching the fallback.
     const chat = makeChat({ subMode: "expand" });
-    const draft = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
+    const draft = makeEntity({
+      id: "d1",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [draft]);
-    (state.forge as { pinnedNextPhaseByChatId: Record<string, string> }).pinnedNextPhaseByChatId = { "fc-1": "weave" };
+    (
+      state.forge as { pinnedNextPhaseByChatId: Record<string, string> }
+    ).pinnedNextPhaseByChatId = { "fc-1": "weave" };
     const { dispatch, fire } = makeHarness(state);
-    await fire(forgeChatContinueRequested({ chatId: "fc-1", advancePhase: false }));
-    const sub = dispatch.mock.calls.find(([a]) => a.type === "chat/subModeChanged");
+    await fire(
+      forgeChatContinueRequested({ chatId: "fc-1", advancePhase: false }),
+    );
+    const sub = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/subModeChanged",
+    );
     expect(sub![0].payload.subMode).toBe("expand"); // stays on current subMode, pin not read
-    const cleared = dispatch.mock.calls.find(([a]) => a.type === "forge/forgeNextPhaseCleared");
+    const cleared = dispatch.mock.calls.find(
+      ([a]) => a.type === "forge/forgeNextPhaseCleared",
+    );
     expect(cleared).toBeUndefined();
   });
 });
@@ -584,12 +610,20 @@ describe("forgeDiscardAllRequested effect", () => {
 
   it("clears the pin when the session ends (discard all)", async () => {
     const chat = makeChat({ subMode: "expand" });
-    const draft = makeEntity({ id: "d1", sourceChatId: "fc-1", lifecycle: "draft" });
+    const draft = makeEntity({
+      id: "d1",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
     const state = makeState([chat], [draft]);
-    (state.forge as { pinnedNextPhaseByChatId: Record<string, string> }).pinnedNextPhaseByChatId = { "fc-1": "weave" };
+    (
+      state.forge as { pinnedNextPhaseByChatId: Record<string, string> }
+    ).pinnedNextPhaseByChatId = { "fc-1": "weave" };
     const { dispatch, fire } = makeHarness(state);
     await fire(forgeDiscardAllRequested({ chatId: "fc-1" }));
-    const cleared = dispatch.mock.calls.find(([a]) => a.type === "forge/forgeNextPhaseCleared");
+    const cleared = dispatch.mock.calls.find(
+      ([a]) => a.type === "forge/forgeNextPhaseCleared",
+    );
     expect(cleared).toBeDefined();
   });
 });

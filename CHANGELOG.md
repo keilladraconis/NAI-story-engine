@@ -4,24 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [0.14.0] - 2026-06-29
 
-### Added
-
-- **Experimental "Story Engine (JSX)" sidebar panel.** A second sidebar tab built on NovelAI's new JSX/Preact UI API runs alongside the existing Story Engine panel as the first slice of a migration off the homebrew SUI framework. It hosts a Foundation proof: ATTG and Style cards that render reactively from the shared store, generate/sync controls, and an inline edit pane. Both panels read and write the same state, so edits in one appear live in the other. The UI styles itself from the active NovelAI theme via CSS variables. This is a scaffold for the migration — the SUI panel remains the primary UI.
-- **Experimental JSX panel gains a Chat tab.** The JSX panel now has Chat | Story Engine tabs. The Chat tab hosts brainstorm and refine chats through the same shared chat engine as the SUI panel — send/stream/edit/retry/delete messages, switch sub-mode (Co/Crit), summarize, manage sessions (new/switch/rename/delete), and refine a Foundation field end-to-end (its ⚡ opens a refine when the field has content; Commit writes the rewrite back). Forge in the JSX chat comes later.
-- **The JSX panel can now create and edit Threads.** The World section's add-thread button opens an edit pane with a title, a summary field with a streaming generate button, and per-entity membership toggles; clicking a Thread card's title opens the same pane to edit it.
-- **The JSX panel now has Forge.** A Forge section on the Story Engine tab opens or resumes a forge session in the Chat tab, with an interactive phase bar (Sketch/Expand/Weave) that shows and lets you pin the next phase (auto-advance is the default), inline draft-entity cards under each turn, a scrub hint, and a Commit/Discard bar.
-- **The JSX panel gains a header.** The Story Engine tab now opens with an **Opening Scene** / **Continue Scene** button — writes the cold open, then extends it a paragraph per click, and reflects undo/redo — alongside live generation status: a **Continue** prompt when generation is waiting on you, a budget-wait countdown, and the S.E.G.A. status line.
-- **The JSX panel gains an Import flow.** A header button opens a wizard that pulls existing content into Story Engine: one-click Memory→ATTG and A/N→Style imports, Shape and Intent generated straight from the story, and existing lorebook entries bound to Story Engine entities — per-entry with a category picker and Bind, or all at once via **Import All**.
-- **The entity edit pane's Content ⚡ is now adaptive.** Like the Foundation fields, it generates lorebook content on an empty entry and opens a refine chat (rewriting the entry) once content exists, instead of always generating.
-
 ### Changed
 
-- **The Generation Journal panel is now the JSX implementation.** Same entry count, copy-digest buttons (Full/SEGA/Bootstrap/Forge), and Clear behavior, now rendered through the JSX/Preact migration instead of the SUI framework — the SUI `SeJournalPanel` is retired.
-- **Chat streaming no longer flows through the store per token.** In-flight generation text is now written to a lightweight, effect-free stream buffer that the bubble reads directly; the finished message is committed to the store once, on completion. Dispatching every token through the store (running the full effects pipeline each time) prevented the JSX panel from repainting mid-stream — the reply only appeared after switching tabs. As a side effect, the SUI chat bubble now fills in when generation completes rather than animating token-by-token; the JSX panel streams live.
+- **Story Engine's interface is rebuilt on NovelAI's JSX/Preact UI API.** The whole sidebar panel — Foundation, Chat, World and Threads, Forge, the Opening/Continue Scene header, and the Import wizard — now renders reactively from the shared store through NovelAI's JSX runtime and styles itself from the active theme via CSS variables. The homebrew SUI component framework and its vendored library are removed, and Story Engine is a single sidebar panel again (no parallel "(JSX)" tab). This is a foundations change: every workflow behaves as before, now on a supported UI platform.
+- **Chat, Foundation, and lorebook generation stream live again.** In-flight text is written to a lightweight, effect-free stream buffer that the view reads directly, and the finished result is committed to the store once, on completion. Previously every token was dispatched through the store — running the full effects pipeline each time — which blocked the panel from repainting mid-stream, so replies only appeared after switching tabs.
+
+### Added
+
+- **The entity edit pane's Content ⚡ is adaptive.** Like the Foundation fields, it generates lorebook content on an empty entry and opens a refine chat (rewriting the entry) once content exists, instead of always generating.
 
 ### Fixed
 
-- **Thread summary generation no longer risks losing all but the first token.** Generating a thread's summary now registers its request in the generation queue like every other field, so a save no longer races an in-flight stream. This also fixes the same latent bug in the existing SUI thread edit pane, which shares the same request.
+- **Thread summary generation no longer risks losing all but the first token.** Generating a thread's summary now registers its request in the generation queue like every other field, so a save no longer races an in-flight stream.
 
 ## [0.13.1] - 2026-06-08
 

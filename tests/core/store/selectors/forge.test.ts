@@ -104,7 +104,9 @@ function forgeState(opts: {
   }
   return {
     chat: {
-      chats: [chat({ id: "f1", type: "forge", subMode: opts.subMode ?? "sketch" })],
+      chats: [
+        chat({ id: "f1", type: "forge", subMode: opts.subMode ?? "sketch" }),
+      ],
       activeChatId: "f1",
       refineChat: null,
     },
@@ -127,7 +129,10 @@ describe("selectForgeDraftPoolCount", () => {
 describe("selectForgeNextPhase", () => {
   it("pool empty → sketch (even with a pin)", () => {
     expect(
-      selectForgeNextPhase(forgeState({ drafts: 0, subMode: "expand", pin: "weave" }), "f1"),
+      selectForgeNextPhase(
+        forgeState({ drafts: 0, subMode: "expand", pin: "weave" }),
+        "f1",
+      ),
     ).toBe("sketch");
   });
 
@@ -139,7 +144,10 @@ describe("selectForgeNextPhase", () => {
 
   it("pool non-empty, pinned → the pin", () => {
     expect(
-      selectForgeNextPhase(forgeState({ drafts: 1, subMode: "sketch", pin: "weave" }), "f1"),
+      selectForgeNextPhase(
+        forgeState({ drafts: 1, subMode: "sketch", pin: "weave" }),
+        "f1",
+      ),
     ).toBe("weave");
   });
 });

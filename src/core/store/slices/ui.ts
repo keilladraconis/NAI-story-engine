@@ -11,6 +11,7 @@ export const initialUIState: UIState = {
   inputs: {},
   lorebook: initialLorebookState,
   worldExpanded: null,
+  importWizardOpen: false,
 };
 
 export const uiSlice = createSlice({
@@ -98,6 +99,9 @@ export const uiSlice = createSlice({
       ...state,
       worldExpanded: payload.expanded,
     }),
+    // Import wizard visibility (shown over the Story Engine tab)
+    importWizardOpened: (state) => ({ ...state, importWizardOpen: true }),
+    importWizardClosed: (state) => ({ ...state, importWizardOpen: false }),
     // Summary generation intents
     uiEntitySummaryGenerationRequested: (
       state,
@@ -113,6 +117,8 @@ export const uiSlice = createSlice({
 export const {
   uiInputChanged,
   worldExpansionSet,
+  importWizardOpened,
+  importWizardClosed,
   uiRequestCancellation,
   uiUserPresenceConfirmed,
   uiChatSubmitUserMessage,

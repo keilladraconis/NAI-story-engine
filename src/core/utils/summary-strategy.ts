@@ -20,7 +20,7 @@ import {
 } from "./prompts";
 import { buildModelParams, appendXialongStyleMessage } from "./config";
 import { DULFS_CATEGORY_LABELS } from "./category-detect";
-import { EDIT_PANE_TITLE } from "../../ui/framework/ids";
+import { EDIT_PANE_TITLE } from "../keys";
 
 function formatLiveEntities(state: RootState): string {
   const live = Object.values(state.world.entitiesById);
