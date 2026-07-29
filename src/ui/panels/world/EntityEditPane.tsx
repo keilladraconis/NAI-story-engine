@@ -34,7 +34,13 @@ import {
   propagateNameInSummaries,
 } from "./entity-edit";
 import { clearStream } from "../../../core/store/stream-buffer";
-import { EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../../../core/keys";
+import {
+  EDIT_PANE_TITLE,
+  EDIT_PANE_CONTENT,
+  entitySummaryRequestId,
+  lorebookContentRequestId,
+  lorebookKeysRequestId,
+} from "../../../core/keys";
 import { isRequestActive } from "./world-select";
 import { ConfirmButton } from "../../components/ConfirmButton";
 import {
@@ -217,21 +223,26 @@ export function EntityEditPane(props: { entityId: string }) {
   }, [summary.value]);
 
   const summaryGen = useGenField({
-    requestId: `se-entity-summary-${entityId}`,
+    requestId: entitySummaryRequestId(entityId),
     bufferKey: `entity-summary:${entityId}`,
     draft: summary,
     arm: () =>
       store.dispatch(
         uiEntitySummaryGenerationRequested({
           entityId,
-          requestId: `se-entity-summary-${entityId}`,
+          requestId: entitySummaryRequestId(entityId),
         }),
       ),
   });
 
+  // Request ids key by entityId (shared with the card regen + SEGA); buffer keys
+  // key by the lorebook entry id (where the handlers stream). Buffer keys are ""
+  // for a not-yet-promoted draft so no stale stream shows; the entity-keyed
+  // request id is stable across promotion, so pending tracks correctly the moment
+  // the entry exists.
   const eid = entity?.lorebookEntryId ?? "";
   const contentGen = useGenField({
-    requestId: eid ? `lb-item-${eid}-content` : "",
+    requestId: eid ? lorebookContentRequestId(entityId) : "",
     bufferKey: eid ? `lb-content:${eid}` : "",
     draft: content,
     arm: () =>
@@ -243,13 +254,13 @@ export function EntityEditPane(props: { entityId: string }) {
         );
         store.dispatch(
           uiLorebookContentGenerationRequested({
-            requestId: `lb-item-${liveId}-content`,
+            requestId: lorebookContentRequestId(entityId),
           }),
         );
       })(),
   });
   const keysGen = useGenField({
-    requestId: eid ? `lb-item-${eid}-keys` : "",
+    requestId: eid ? lorebookKeysRequestId(entityId) : "",
     bufferKey: eid ? `lb-keys:${eid}` : "",
     draft: keys,
     arm: () =>
@@ -261,7 +272,7 @@ export function EntityEditPane(props: { entityId: string }) {
         );
         store.dispatch(
           uiLorebookKeysGenerationRequested({
-            requestId: `lb-item-${liveId}-keys`,
+            requestId: lorebookKeysRequestId(entityId),
           }),
         );
       })(),

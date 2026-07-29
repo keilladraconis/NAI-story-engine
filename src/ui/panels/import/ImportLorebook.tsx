@@ -1,20 +1,19 @@
 // Lorebook-binding section of the JSX Import wizard: unmanaged lorebook entries
-// grouped by category, each with a DULFS category picker (local, seeded by
-// detectCategory) and a Bind button. `unmanaged` is reactive — binding an entry
-// changes world.entitiesById, so the managedKey selector drops the row.
+// grouped by category, each with a DULFS category picker (override state lives in
+// ImportWizard so "Import All" honors it) and a Bind button. `unmanaged` is
+// reactive — binding an entry changes world.entitiesById, so the managedKey
+// selector drops the row.
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
 import { store, entityBound } from "../../../core/store";
-import {
-  detectCategory,
-  cycleDulfsCategory,
-} from "../../../core/utils/category-detect";
+import { cycleDulfsCategory } from "../../../core/utils/category-detect";
 import type { DulfsFieldID } from "../../../config/field-definitions";
 import {
   DULFS_SHORT,
   groupAndSortEntries,
   unmanagedEntries,
+  resolveImportCategory,
   type LorebookEntry,
 } from "./import-data";
 
@@ -54,6 +53,10 @@ const smallBtn = {
 export function ImportLorebook(props: {
   entries: LorebookEntry[];
   categoryNames: Map<string, string>;
+  // Per-entry category overrides live in ImportWizard so "Import All" honors the
+  // same choices these rows show. onCycle advances one entry's override.
+  dulfsMap: Record<string, DulfsFieldID>;
+  onCycle: (entryId: string, next: DulfsFieldID) => void;
 }) {
   // Primitive: the sorted, joined set of bound lorebookEntryIds. Changes on Bind.
   const managedKey = useSlice((s) =>
@@ -63,7 +66,6 @@ export function ImportLorebook(props: {
       .sort()
       .join(","),
   );
-  const [dulfsMap, setDulfsMap] = useState<Record<string, DulfsFieldID>>({});
 
   const managed = new Set(managedKey ? managedKey.split(",") : []);
   const unmanaged = unmanagedEntries(props.entries, managed);
@@ -79,7 +81,7 @@ export function ImportLorebook(props: {
   }
 
   const catFor = (e: LorebookEntry): DulfsFieldID =>
-    dulfsMap[e.id] ?? detectCategory(e.text ?? "");
+    resolveImportCategory(e, props.dulfsMap);
 
   const groups = groupAndSortEntries(unmanaged, props.categoryNames);
 
@@ -99,10 +101,7 @@ export function ImportLorebook(props: {
                   style={{ ...smallBtn, opacity: 0.7 }}
                   title="Cycle category"
                   onClick={() =>
-                    setDulfsMap((m) => ({
-                      ...m,
-                      [entry.id]: cycleDulfsCategory(cat),
-                    }))
+                    props.onCycle(entry.id, cycleDulfsCategory(cat))
                   }
                 >
                   {DULFS_SHORT[cat]} ▶

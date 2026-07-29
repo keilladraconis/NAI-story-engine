@@ -13,8 +13,12 @@ import {
   intentGenerationRequested,
   entitiesBoundBatch,
 } from "../../../core/store";
-import { detectCategory } from "../../../core/utils/category-detect";
-import { useImportData, unmanagedEntries } from "./import-data";
+import type { DulfsFieldID } from "../../../config/field-definitions";
+import {
+  useImportData,
+  unmanagedEntries,
+  resolveImportCategory,
+} from "./import-data";
 import { ImportFoundation } from "./ImportFoundation";
 import { ImportLorebook } from "./ImportLorebook";
 import { ArrowLeft, RefreshCw, Download } from "nai:icons/feather";
@@ -39,6 +43,11 @@ const iconBtn = {
 
 export function ImportWizard(props: { onClose: () => void }) {
   const data = useImportData();
+  // Per-entry category overrides, owned here so the ImportLorebook rows and the
+  // "Import All" batch bind resolve categories identically.
+  const [dulfsMap, setDulfsMap] = useState<Record<string, DulfsFieldID>>({});
+  const onCycle = (entryId: string, next: DulfsFieldID) =>
+    setDulfsMap((m) => ({ ...m, [entryId]: next }));
 
   const onImportAll = () => {
     if (data.memText.trim()) {
@@ -64,7 +73,7 @@ export function ImportWizard(props: { onClose: () => void }) {
         entitiesBoundBatch(
           unmanaged.map((entry) => ({
             id: api.v1.uuid(),
-            categoryId: detectCategory(entry.text ?? ""),
+            categoryId: resolveImportCategory(entry, dulfsMap),
             lorebookEntryId: entry.id,
             name: entry.displayName || "Unknown",
             summary: "",
@@ -129,6 +138,8 @@ export function ImportWizard(props: { onClose: () => void }) {
       <ImportLorebook
         entries={data.entries}
         categoryNames={data.categoryNames}
+        dulfsMap={dulfsMap}
+        onCycle={onCycle}
       />
     </div>
   );

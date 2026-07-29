@@ -2,8 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   unmanagedEntries,
   groupAndSortEntries,
+  resolveImportCategory,
 } from "../../src/ui/panels/import/import-data";
 import type { LorebookEntry } from "../../src/ui/panels/import/import-data";
+import { detectCategory } from "../../src/core/utils/category-detect";
+import { FieldID } from "../../src/config/field-definitions";
 
 const e = (id: string, over: Partial<LorebookEntry> = {}): LorebookEntry => ({
   id,
@@ -58,5 +61,28 @@ describe("groupAndSortEntries", () => {
       new Map(),
     );
     expect(groups[0].label).toBe("raw-key");
+  });
+});
+
+describe("resolveImportCategory", () => {
+  it("uses a per-entry override when present, ignoring the text", () => {
+    const entry = e("1", {
+      text: "some prose that would auto-detect otherwise",
+    });
+    expect(resolveImportCategory(entry, { "1": FieldID.Locations })).toBe(
+      FieldID.Locations,
+    );
+  });
+
+  it("auto-detects from text when no override exists", () => {
+    const entry = e("1", { text: "a nameless stretch of ruined coastline" });
+    expect(resolveImportCategory(entry, {})).toBe(detectCategory(entry.text!));
+  });
+
+  it("only applies the override to the matching entry id", () => {
+    const entry = e("2", { text: "unrelated" });
+    expect(resolveImportCategory(entry, { "1": FieldID.Factions })).toBe(
+      detectCategory("unrelated"),
+    );
   });
 });

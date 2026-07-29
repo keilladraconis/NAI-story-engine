@@ -3,6 +3,12 @@
 // (no async lorebook reads this slice). Unit-tested headless — no icon imports.
 
 import { isForgeDraft } from "../../../core/store/selectors/forge";
+import {
+  entitySummaryRequestId,
+  entitySummaryBindRequestId,
+  lorebookContentRequestId,
+  lorebookKeysRequestId,
+} from "../../../core/keys";
 import type { RootState, WorldEntity, WorldGroup } from "../../../core/store";
 
 /** Visible World body: every thread (including empty ones, so they stay
@@ -19,13 +25,14 @@ export function selectWorldBody(
   return { groups, loose };
 }
 
-/** The four request ids that represent in-flight work for an entity. */
+/** The four request ids that represent in-flight work for an entity — all keyed
+ *  by entity id and shared with the edit pane, the card regen, and SEGA. */
 export function entityRequestIds(entityId: string): string[] {
   return [
-    `se-entity-summary-${entityId}`,
-    `entity-summary-bind-${entityId}`,
-    `lb-entity-${entityId}-content`,
-    `lb-entity-${entityId}-keys`,
+    entitySummaryRequestId(entityId),
+    entitySummaryBindRequestId(entityId),
+    lorebookContentRequestId(entityId),
+    lorebookKeysRequestId(entityId),
   ];
 }
 

@@ -31,6 +31,7 @@ import {
 } from "../slices/chat";
 import { requestQueued } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
+import { selectForgeNextPhase } from "../selectors/forge";
 import {
   tombstoneAdded,
   tombstonesClearedForChat,
@@ -150,13 +151,6 @@ function poolFor(state: RootState, chatId: string): WorldEntity[] {
   return Object.values(state.world.entitiesById).filter(
     (e) => e.lifecycle === "draft" && e.sourceChatId === chatId,
   );
-}
-
-function nextPhase(current: string | undefined): "sketch" | "expand" | "weave" {
-  if (current === "sketch") return "expand";
-  if (current === "expand") return "weave";
-  if (current === "weave") return "sketch";
-  return "sketch";
 }
 
 /** True if a forge generation (phase turn or reference scrub) is already queued
@@ -300,14 +294,15 @@ export function registerForgeChatEffects(
       runPendingScrub(latest, dispatch, chatId);
 
       const state = latest();
-      const pool = poolFor(state, chatId);
       const advance = action.payload.advancePhase !== false;
       const pinned = state.forge.pinnedNextPhaseByChatId?.[chatId];
-      const target = !advance
-        ? (chat.subMode ?? "sketch")
-        : pool.length === 0
-          ? "sketch"
-          : (pinned ?? nextPhase(chat.subMode));
+      // Advancing continue: the phase (pool-empty→sketch, else pin, else
+      // auto-advance) comes from selectForgeNextPhase — the SAME selector the
+      // header pill reads, so the pill and the effect can't drift. A
+      // non-advancing continue (empty-send / retry) re-runs the current phase.
+      const target = advance
+        ? selectForgeNextPhase(state, chatId)
+        : (chat.subMode ?? "sketch");
       dispatch(subModeChanged({ id: chatId, subMode: target }));
       if (advance && pinned) dispatch(forgeNextPhaseCleared({ chatId }));
 

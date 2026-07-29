@@ -89,11 +89,16 @@ export function createEntitySummaryFactory(
     const categoryLabel = entity?.categoryId
       ? DULFS_CATEGORY_LABELS[entity.categoryId]
       : "Entity";
-    // Read live name from the open edit pane's storageKey field — falls back to
-    // Redux state for entities opened without a pane (e.g. programmatic calls).
-    const liveName = String(
-      (await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || entity?.name || "",
-    ).trim();
+    // Prefer the open edit pane's live name (DRAFT layer), but ONLY when the pane
+    // is actually editing THIS entity — otherwise a stale EDIT_PANE_TITLE left by
+    // a previously-closed pane would name a card-triggered regen after the wrong
+    // entity (the same contamination the lorebook content factory guards with
+    // `isCurrentlySelected`). Card regen (no matching pane) falls back to Redux.
+    const paneEditingThis = state.ui.activeEditId === entityId;
+    const draftName = paneEditingThis
+      ? String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "").trim()
+      : "";
+    const liveName = draftName || String(entity?.name || "").trim();
     const nameLabel = liveName ? `"${liveName}"` : "this entity";
 
     const userContent = `Generate a summary for ${nameLabel} (${categoryLabel}).`;

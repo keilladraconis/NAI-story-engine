@@ -3,6 +3,7 @@
 // globals (useState/useEffect) are available in .ts files (see hooks.ts).
 
 import { FieldID, type DulfsFieldID } from "../../../config/field-definitions";
+import { detectCategory } from "../../../core/utils/category-detect";
 
 export type LorebookEntry = {
   id: string;
@@ -10,6 +11,17 @@ export type LorebookEntry = {
   category?: string;
   text?: string;
 };
+
+/** The DULFS category to bind an entry as: a per-entry override the user cycled
+ *  in the wizard wins, else auto-detect from the entry text. Shared by the
+ *  ImportLorebook rows (display + cycle) and ImportWizard's "Import All" so the
+ *  batch bind can't silently discard overrides the per-row Bind would honor. */
+export function resolveImportCategory(
+  entry: LorebookEntry,
+  dulfsMap: Record<string, DulfsFieldID>,
+): DulfsFieldID {
+  return dulfsMap[entry.id] ?? detectCategory(entry.text ?? "");
+}
 
 export const DULFS_SHORT: Record<DulfsFieldID, string> = {
   [FieldID.DramatisPersonae]: "Char",

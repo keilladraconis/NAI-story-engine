@@ -30,3 +30,19 @@ export const CHAT_INPUT_KEY = "se-bs-input";
 // the refine flow, and the JSX entity edit pane.
 export const LB_CONTENT_DRAFT = "lb-draft-content";
 export const LB_KEYS_DRAFT = "lb-draft-keys";
+
+// Generation-request tracking ids for an entity — all keyed by the ENTITY id (the
+// generation TARGET stays the lorebook entry; these are only the tracking tokens).
+// The card regen bolt, the edit pane, and SEGA all build ids from these, so a
+// generation started on one surface is visible to the others — the zap disables
+// and a second click can't launch a concurrent generation into the same entry.
+// Keep these the single source of the scheme; scattered literals are what let the
+// card and pane drift apart (the bug this fixes).
+export const entitySummaryRequestId = (entityId: string): string =>
+  `se-entity-summary-${entityId}`;
+export const entitySummaryBindRequestId = (entityId: string): string =>
+  `entity-summary-bind-${entityId}`;
+export const lorebookContentRequestId = (entityId: string): string =>
+  `lb-entity-${entityId}-content`;
+export const lorebookKeysRequestId = (entityId: string): string =>
+  `lb-entity-${entityId}-keys`;

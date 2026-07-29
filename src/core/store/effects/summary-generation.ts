@@ -18,6 +18,12 @@ import {
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
 import { buildModelParams } from "../../utils/config";
+import {
+  entitySummaryRequestId,
+  entitySummaryBindRequestId,
+  lorebookContentRequestId,
+  lorebookKeysRequestId,
+} from "../../keys";
 
 // Quick "generate this entity" intent fired by the entity card's lightning
 // bolt. Fills only what's missing (summary, lorebook content, lorebook keys),
@@ -113,7 +119,7 @@ export function registerSummaryGenerationEffects(
       const entryText = entry?.text?.trim() ?? "";
       if (!entryText) continue;
 
-      const requestId = `entity-summary-bind-${entity.id}`;
+      const requestId = entitySummaryBindRequestId(entity.id);
       dispatch(
         requestQueued({
           id: requestId,
@@ -157,7 +163,7 @@ export function registerSummaryGenerationEffects(
     const hasKeys = !!(entry?.keys && entry.keys.length > 0);
 
     if (!hasSummary) {
-      const summaryRequestId = `se-entity-summary-${entityId}`;
+      const summaryRequestId = entitySummaryRequestId(entityId);
       dispatch(
         requestQueued({
           id: summaryRequestId,
@@ -174,7 +180,7 @@ export function registerSummaryGenerationEffects(
     }
 
     if (!hasContent) {
-      const contentRequestId = `lb-entity-${entityId}-content`;
+      const contentRequestId = lorebookContentRequestId(entityId);
       dispatch(
         requestQueued({
           id: contentRequestId,
@@ -197,7 +203,7 @@ export function registerSummaryGenerationEffects(
     }
 
     if (!hasKeys) {
-      const keysRequestId = `lb-entity-${entityId}-keys`;
+      const keysRequestId = lorebookKeysRequestId(entityId);
       dispatch(
         requestQueued({
           id: keysRequestId,

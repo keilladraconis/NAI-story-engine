@@ -36,6 +36,7 @@ import {
 import { hashEntryPosition, getStoryIdSeed } from "../../utils/seeded-random";
 import { buildModelParams } from "../../utils/config";
 import { nameKey } from "./handlers/lorebook";
+import { lorebookContentRequestId, lorebookKeysRequestId } from "../../keys";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper Functions
@@ -122,7 +123,7 @@ async function queueSegaLorebookContent(
   entity: WorldEntity,
 ): Promise<void> {
   const entryId = entity.lorebookEntryId!;
-  const contentRequestId = `lb-entity-${entity.id}-content`;
+  const contentRequestId = lorebookContentRequestId(entity.id);
 
   dispatch(segaStatusUpdated({ statusText: `Lorebook: ${entity.name}` }));
   dispatch(segaRequestTracked({ requestId: contentRequestId }));
@@ -148,7 +149,7 @@ async function queueSegaLorebookKeys(
   entity: WorldEntity,
 ): Promise<void> {
   const entryId = entity.lorebookEntryId!;
-  const keysRequestId = `lb-entity-${entity.id}-keys`;
+  const keysRequestId = lorebookKeysRequestId(entity.id);
 
   dispatch(segaStatusUpdated({ statusText: `Keys: ${entity.name}` }));
   dispatch(segaRequestTracked({ requestId: keysRequestId }));
