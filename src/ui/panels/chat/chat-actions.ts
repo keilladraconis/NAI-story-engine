@@ -1,11 +1,6 @@
 // Small, pure helpers for the JSX chat UI. Kept framework-free so they are
 // unit-testable headless.
 
-// The storyStorage slot the `uiChatSubmitUserMessage` effect reads the composer
-// text from. Re-exported from the shared core registry so the UI and the effect
-// stay in lockstep.
-export { CHAT_INPUT_KEY } from "../../../core/keys";
-
 /** Adaptive Foundation zap: an empty field generates, a field with content
  *  opens a refine. Mirrors SUI's SeGenRefinePair unified mode. */
 export function decideFieldAction(text: string): "generate" | "refine" {

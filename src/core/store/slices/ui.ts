@@ -29,7 +29,13 @@ export const uiSlice = createSlice({
     uiRequestCancellation: (state) => state,
     uiUserPresenceConfirmed: (state) => state,
     // Chat user intents
-    uiChatSubmitUserMessage: (state, _payload: { chatId: string }) => state,
+    // `text` travels in the payload, NOT via a shared storyStorage slot: the
+    // effect's read is async, so two sends in flight at once would both read
+    // whatever the last one wrote (see ChatInput's duplicate-tap note).
+    uiChatSubmitUserMessage: (
+      state,
+      _payload: { chatId: string; text: string },
+    ) => state,
     uiChatRetryGeneration: (
       state,
       _payload: { chatId: string; messageId: string },

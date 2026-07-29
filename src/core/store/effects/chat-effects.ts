@@ -24,7 +24,6 @@ import { getChatTypeSpec } from "../../chat-types";
 import type { Chat } from "../../chat-types/types";
 import { buildChatStrategy } from "../../utils/chat-strategy";
 import { buildModelParams } from "../../utils/config";
-import { CHAT_INPUT_KEY } from "../../keys";
 
 function findChat(state: RootState, id: string): Chat | undefined {
   return state.chat.chats.find((c) => c.id === id);
@@ -70,11 +69,7 @@ export function registerChatEffects(
   subscribeEffect(
     matchesAction(uiChatSubmitUserMessage),
     async (action, { getState: latest }) => {
-      const { chatId } = action.payload;
-      const text =
-        ((await api.v1.storyStorage.get(CHAT_INPUT_KEY)) as string) || "";
-      await api.v1.storyStorage.set(CHAT_INPUT_KEY, "");
-
+      const { chatId, text } = action.payload;
       const chat = findChat(latest(), chatId);
       if (!chat) return;
       const spec = getChatTypeSpec(chat.type);

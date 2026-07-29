@@ -22,10 +22,6 @@ export const STORAGE_KEYS = {
 export const EDIT_PANE_TITLE = "kse-edit-title";
 export const EDIT_PANE_CONTENT = "kse-edit-content";
 
-// Chat composer slot the `uiChatSubmitUserMessage` effect reads the message
-// text from; the JSX ChatInput writes it just before dispatching.
-export const CHAT_INPUT_KEY = "se-bs-input";
-
 // Lorebook streaming draft slots (content + keys) shared by generation handlers,
 // the refine flow, and the JSX entity edit pane.
 export const LB_CONTENT_DRAFT = "lb-draft-content";

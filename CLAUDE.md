@@ -87,6 +87,9 @@ npm run test       # vitest run
 
 **UI Input Patterns:**
 
+- **A tap can deliver `click` twice — never let a handler depend on being called once.** Observed on mobile: two `click` events inside one gesture, the second running after the first mutated state. Two rules follow. (1) Carry the data an intent needs **in the action payload**, never through a shared storyStorage slot read asynchronously by the effect — a second dispatch will overwrite the slot before the first read lands. (2) Wrap non-idempotent click handlers (sends, two-stage confirms, anything destructive) in `useTapGuard()` from `src/ui/tap-guard.ts`.
+- **Bind text entry with `onInput`, never `onChange`.** The JSX renderer keeps native DOM semantics (Preact, not React): `input` fires per keystroke, `change` only when a modified field commits — i.e. on blur. An `onChange`-bound field therefore holds stale local state until focus leaves it, so anything reading that state before blur (a Send/Save button) sees the pre-edit value. `tests/ui/text-input-events.test.ts` guards the invariant.
+
 - Prefer `storageKey` on inputs for automatic persistence — avoid manual onChange handlers for simple state sync.
 - Exception: Use `onChange` callbacks alongside `storageKey` when syncing to non-UIPart targets (e.g., `api.v1.an.set()`, `api.v1.memory.set()`).
 - **Never dispatch actions in `onChange` callbacks.** The reducer overhead is too high for keystroke-frequency events.

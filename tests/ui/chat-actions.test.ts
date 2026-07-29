@@ -1,15 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
-  CHAT_INPUT_KEY,
   decideFieldAction,
   nextBrainstormTitle,
 } from "../../src/ui/panels/chat/chat-actions";
 
 describe("chat-actions", () => {
-  it("CHAT_INPUT_KEY matches the effect's storyStorage key", () => {
-    expect(CHAT_INPUT_KEY).toBe("se-bs-input");
-  });
-
   it("decideFieldAction: empty / whitespace → generate", () => {
     expect(decideFieldAction("")).toBe("generate");
     expect(decideFieldAction("   \n\t ")).toBe("generate");

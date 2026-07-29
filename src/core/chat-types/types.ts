@@ -136,7 +136,7 @@ export interface ChatTypeSpec<SubMode extends string = string> {
   /**
    * Handles a user send action for this chat. Return true if the spec fully
    * handled the send (no fallback to the standard chat-strategy path). Called
-   * by the `uiChatSubmitUserMessage` effect after reading the input value.
+   * by the `uiChatSubmitUserMessage` effect with the submitted text.
    */
   handleSend?(chat: Chat, content: string, ctx: SpecCtx): boolean;
 

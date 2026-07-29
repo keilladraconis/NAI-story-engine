@@ -116,11 +116,6 @@ describe("chat-effects: refine submit", () => {
 });
 
 describe("chat-effects: user-message submit generates on first send", () => {
-  beforeEach(() => {
-    vi.mocked(api.v1.storyStorage.get).mockReset();
-    vi.mocked(api.v1.storyStorage.get).mockResolvedValue(null);
-  });
-
   it("adds an assistant placeholder after a non-empty submit (no second send required)", async () => {
     const { store, dispatchAndWait } = makeHarness();
     const chat: Chat = {
@@ -131,9 +126,10 @@ describe("chat-effects: user-message submit generates on first send", () => {
       seed: { kind: "blank" },
     };
     store.dispatch(chatCreated({ chat }));
-    vi.mocked(api.v1.storyStorage.get).mockResolvedValue("a fresh idea");
 
-    await dispatchAndWait(uiChatSubmitUserMessage({ chatId: "bs1" }));
+    await dispatchAndWait(
+      uiChatSubmitUserMessage({ chatId: "bs1", text: "a fresh idea" }),
+    );
 
     const msgs = store
       .getState()
@@ -147,5 +143,36 @@ describe("chat-effects: user-message submit generates on first send", () => {
     // so `last` was computed from a stale snapshot and generation never fired
     // until a second (empty) send.
     expect(msgs.some((m) => m.role === "assistant")).toBe(true);
+  });
+
+  it("a concurrent empty submit cannot blank a message already in flight", async () => {
+    // A mobile tap delivers `click` twice: the real send, then an empty one
+    // fired after the composer cleared. While the text travelled through a
+    // shared storyStorage slot, the empty send overwrote the slot before the
+    // first effect's async read — so nothing was ever posted. Carrying the text
+    // in the payload makes the two sends independent.
+    const { store, dispatchAndWait } = makeHarness();
+    const chat: Chat = {
+      id: "bs2",
+      type: "brainstorm",
+      title: "Brainstorm",
+      messages: [],
+      seed: { kind: "blank" },
+    };
+    store.dispatch(chatCreated({ chat }));
+
+    await Promise.all([
+      dispatchAndWait(
+        uiChatSubmitUserMessage({ chatId: "bs2", text: "hello" }),
+      ),
+      dispatchAndWait(uiChatSubmitUserMessage({ chatId: "bs2", text: "" })),
+    ]);
+
+    const msgs = store
+      .getState()
+      .chat.chats.find((c) => c.id === "bs2")!.messages;
+    expect(msgs.some((m) => m.role === "user" && m.content === "hello")).toBe(
+      true,
+    );
   });
 });
