@@ -3,6 +3,11 @@
 // active, using api.v1.timers (no setInterval in QuickJS) with ConfirmButton's
 // timer/ref/cancel discipline. Date.now() is available in the UI runtime.
 
+/** Shared label for the budget-wait button, e.g. "⏳ Wait (12s)". */
+export function waitLabel(seconds: number): string {
+  return `⏳ Wait (${seconds}s)`;
+}
+
 /** Whole seconds remaining until `endTime` (epoch ms), floored at 0. */
 export function remainingSeconds(endTime: number | null, now: number): number {
   if (endTime == null) return 0;

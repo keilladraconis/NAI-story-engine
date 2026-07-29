@@ -5,7 +5,7 @@
 //   queue → ⏳ Queued (cancel the queued request)
 //   cancel → 🚫 Cancel (cancel the active request)
 //   continue → ⚠️ Continue (confirm user presence)
-//   wait → ⏳ Wait (budget wait; click cancels)
+//   wait → ⏳ Wait (Ns) (budget wait, live countdown; click cancels)
 // Idle vs busy is derived from the runtime slice via useSlice.
 
 import { useSlice } from "../../bridge";
@@ -17,6 +17,7 @@ import {
   uiUserPresenceConfirmed,
 } from "../../../core/store";
 import type { RootState } from "../../../core/store";
+import { useCountdown, waitLabel } from "../header/countdown";
 import { Zap } from "nai:icons/feather";
 
 type Mode = "gen" | "queue" | "cancel" | "continue" | "wait";
@@ -65,6 +66,10 @@ const btnBase = {
 
 export function SendButton(props: { label: string; onGenerate: () => void }) {
   const mode = useSlice(computeMode);
+  const budgetEnd = useSlice((s) => s.runtime.genx.budgetWaitEndTime ?? null);
+  // Gate on the mode, not just the endTime: genx leaves budgetWaitEndTime set
+  // after the wait resolves, so an ungated hook would keep ticking while idle.
+  const secs = useCountdown(mode === "wait" ? budgetEnd : null);
 
   const cancelActive = () => {
     store.dispatch(uiRequestCancellation());
@@ -105,7 +110,7 @@ export function SendButton(props: { label: string; onGenerate: () => void }) {
         store.dispatch(uiUserPresenceConfirmed()),
       );
     case "wait":
-      return make(T.bg2, T.text, "⏳ Wait", cancelActive);
+      return make(T.bg2, T.text, waitLabel(secs), cancelActive);
     default:
       // Mimics the NAI editor send button: transparent fill (our backdrop is
       // already dark), text-headings text + border.

@@ -10,7 +10,7 @@ import {
   uiUserPresenceConfirmed,
   uiRequestCancellation,
 } from "../../../core/store";
-import { useCountdown } from "./countdown";
+import { useCountdown, waitLabel } from "./countdown";
 
 export function GenxStatus() {
   const status = useSlice((s) => s.runtime.genx.status);
@@ -53,7 +53,7 @@ export function GenxStatus() {
         }}
         onClick={() => store.dispatch(uiRequestCancellation())}
       >
-        ⏳ Wait ({secs}s)
+        {waitLabel(secs)}
       </button>
     );
   }

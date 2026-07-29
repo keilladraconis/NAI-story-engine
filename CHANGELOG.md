@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 
 - **Sending a chat message works on mobile.** On phones and tablets, tapping Send in Brainstorm (or any chat) cleared the composer without posting the message or starting a reply — the text was simply lost, while desktop was fine. A message now travels with the send action itself instead of through a shared scratch slot, so a second tap arriving mid-send can no longer blank the message before it is read.
 - **A single tap can no longer trigger a two-step confirmation.** Destructive buttons that ask you to click twice (deleting an entity, a thread, or a chat's history) could arm _and_ fire from one mobile tap, destroying data without ever showing you the confirm state. Repeat clicks landing inside the same tap are now ignored.
+- **The chat's Wait button counts down again.** When a generation stalls on the output-token budget, the Send button becomes ⚠️ Continue; clicking it left a frozen "⏳ Wait" with no indication of how long the wait had left. It now ticks down the remaining seconds each second, matching the header's status readout.
 - **Thread summary generation no longer risks losing all but the first token.** Generating a thread's summary now registers its request in the generation queue like every other field, so a save no longer races an in-flight stream.
 
 ## [0.13.1] - 2026-06-08
