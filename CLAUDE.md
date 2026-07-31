@@ -38,9 +38,9 @@ npm run test       # vitest run
 
 **UI (`src/ui/`):**
 
-- All components are `SuiComponent` subclasses from `nai-simple-ui`. `compose()` returns a static UIPart tree; `StoreWatcher.watch()` drives reactive `updateParts()` calls.
-- The UI is Preact/JSX and re-renders from the store — never `updateParts`. **One deliberate exception:** `src/ui/header/header-driver.ts`. The header is built from UIParts because a click inside a `part.jsx()` does not clear the harness's user-interaction flag, so budget-stalled generation can only be resumed from a real `part.button()`. That driver is the only permitted `updateParts` caller in `src/`; it holds no logic beyond diffing `header-model.ts`'s `derive()` output and pushing what changed.
-- Element IDs centralized in `src/ui/framework/ids.ts` with prefixes: `se-` (story engine), `se-bs-` (brainstorm), `kse-` (storage keys)
+- Components are Preact function components under `src/ui/panels/` and `src/ui/components/`, composed into `App.tsx` and mounted by `mount.ts`. They read the store via `useSlice`/`useStream` (`src/ui/bridge.ts`), thin wrappers over `useSyncExternalStore` — snapshots are correct on first render, so there's no separate "seed the initial value" step to remember.
+- The UI is Preact/JSX and re-renders from the store — never `updateParts`. **One deliberate exception:** `src/ui/header/header-driver.ts`. The header is built from UIParts because a click inside a `part.jsx()` does not clear the harness's user-interaction flag, so budget-stalled generation can only be resumed from a real `part.button()`. That driver is the only permitted `updateParts` caller in `src/`. Per its own header comment, `derive()` (`header-model.ts`) decides the model and `patch()` (`header-parts.ts`) diffs it — the driver's job is to call `initialModel()` for first paint and push whatever `patch()` returns. It is not logic-free otherwise: it also owns the click-handler dispatch table, timer scheduling, and an async document-refresh race guard.
+- Shared storyStorage keys and other core↔UI slot constants live in `src/core/keys.ts` (see its header comment — relocated out of the retired SUI `ui/framework/ids.ts`, which no longer exists). The handful of remaining literal UIPart ids (`kse-jsx-root`/`kse-sidebar` in `mount.ts`, `HEADER_IDS` in `header-parts.ts`) are local constants scoped to their own file, not a centralized registry — ordinary JSX elements need no ids of their own.
 - `src/core/utils/context-builder.ts` — Builds layered AI prompts from current state
 
 **Entity system (`src/ui/components/SeEntityCard.ts`, `SeEntityEditPane.ts`):**
@@ -97,19 +97,13 @@ npm run test       # vitest run
 - **`storageKey` inputs are owned by storyStorage — never use `updateParts` to set their value.** Read with `api.v1.storyStorage.get(key)`, write with `api.v1.storyStorage.set(key, value)`, clear with `api.v1.storyStorage.remove(key)`. The input reads from its storageKey automatically. Using `updateParts({ value })` on a storageKey-bound input is incorrect — the stored value and displayed value will diverge.
 - **`story:` prefix routing**: In a `storageKey` binding, `story:` is a routing directive the UI framework strips — `storageKey: "story:my-key"` persists under bare key `"my-key"` in storyStorage. `storyStorage.get("my-key")` reads the same slot; `storyStorage.get("story:my-key")` reads a literally different key and is always wrong. Never embed `story:` in storage key constants — add it only at the `storageKey` binding site. Pattern: constant = `"my-key"`, binding = `` `story:${MY_KEY}` ``, direct API = `storyStorage.get(MY_KEY)`. Use `storyStorage.remove(key)` to clear (not `set(key, null)`).
 
-**UI Rendering Rules (SUI + NAI constraints — these cause recurrent bugs when violated):**
+**UI Rendering Rules (NAI UIPart constraints — SUI is gone, so these now apply specifically to the header driver, not the JSX tree):**
 
-- **Parts are static objects.** A `UIPart` returned from `compose()` is a frozen spec. If a container's `content` array is ever updated via `updateParts`, the NovelAI UI engine re-applies all child specs — overwriting any text/style previously set by direct `updateParts` calls to those children. There is no `appendPart`; updating a container always re-initializes its children.
+- **Parts are static objects.** `buildHeader()`/`buildRoot()` in `header-parts.ts` return frozen UIPart specs. If a container's `content` array is ever re-passed to `updateParts`, the NovelAI UI engine re-applies all child specs — overwriting any text/style a prior targeted `updateParts` set on those children. There is no `appendPart`; updating a container always re-initializes its children. This is why `header-driver.ts`'s `patch()`-driven pushes always target leaf ids (`HEADER_IDS.widget`, `.import`, etc.), never the header container itself. Outside the header, JSX/Preact re-renders normally and this constraint doesn't apply.
 
-- **`StoreWatcher.watch()` does NOT fire on mount.** It fires only on subsequent state changes. Always populate initial display values synchronously inside `compose()` via `store.getState()`. Never rely on a watcher callback to set the first render's content.
+- **`header-driver.ts`'s store/timer subscriptions do NOT fire on mount** — only on subsequent signals. `initialModel()` must be called explicitly before `buildHeader()` so the first paint's specs are already correct, with no follow-up `updateParts` needed. (Ordinary JSX components don't have this failure mode: `useSlice`/`useStream`, built on `useSyncExternalStore`, always return a correct snapshot on first render — see the `UI (src/ui/)` section above.)
 
-- **`compose()` must call `this._watcher.dispose()` at its start** to tear down subscriptions from any prior build cycle, then re-register all watchers fresh.
-
-- **Component root IDs must be unique per context, not just per entity.** If the same logical entity appears in two contexts (e.g., draft in ForgeSection, live in BatchSection), each context must produce a distinct root ID — e.g., `se-entity-draft-${id}` vs `se-entity-live-${id}`. The `IDS.entity(id, lifecycle)` factory enforces this: `lifecycle` is required with no default so TypeScript will catch any omission.
-
-- **`SuiTabBar` reads `tab.options.callback` at compose time.** Tab button callbacks that call `tabBar.switchTo(i)` must use closures over `this._tabBar` (assigned before any click fires), not post-construction assignment to `options.callback` (which is `Readonly`).
-
-- **`updateParts` replaces style wholesale.** When a SUI component like `SuiActionBar` bakes a `base` style onto its children at build time, a subsequent `updateParts` call must include ALL desired CSS properties — not just the changed ones. Use camelCase property names (`fontWeight`, `fontSize`) to match what `SuiActionBar` emits; mixing kebab-case into the same object causes divergence before vs. after interaction.
+- **`updateParts` replaces style wholesale.** `header-parts.ts`'s `patch()` always emits complete style objects, never a delta (see its own doc comment) — a partial style update would silently drop previously-set properties. Use camelCase property names (`fontWeight`, `fontSize`) matching what `api.v1.ui.part.*` emits; mixing kebab-case into the same object causes divergence between the pre- and post-interaction look.
 
 ## Key Constraints
 
