@@ -185,8 +185,8 @@ export function buildHeader(
 export function patch(
   prev: HeaderModel | null,
   next: HeaderModel,
-): Partial<UIPart>[] {
-  const parts: Partial<UIPart>[] = [];
+): (Partial<UIPart> & { id: string })[] {
+  const parts: (Partial<UIPart> & { id: string })[] = [];
 
   if (
     !prev ||

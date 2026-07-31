@@ -11,6 +11,7 @@ import {
   uiChatRefineCommitted,
   uiChatRefineDiscarded,
   worldExpansionSet,
+  importWizardOpened,
 } from "../core/store";
 import {
   forgeCastAllRequested,
@@ -72,6 +73,11 @@ export function App() {
       }),
       // Discard All also closes the session — return to the Story Engine tab.
       store.subscribeEffect(matchesAction(forgeDiscardAllRequested), () =>
+        setTab("engine"),
+      ),
+      // The Import icon lives in the always-visible UIPart header, but the
+      // wizard itself only renders inside the Story Engine tab — surface it.
+      store.subscribeEffect(matchesAction(importWizardOpened), () =>
         setTab("engine"),
       ),
     ];

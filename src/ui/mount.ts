@@ -155,7 +155,9 @@ export async function start(): Promise<void> {
   registerLorebookSyncHooks(store.dispatch, store.getState);
 
   // ── Panels (single register call) ────────────────────────────────────────
-  const headerDriver = createHeaderDriver(store);
+  const headerDriver = createHeaderDriver(store, {
+    hasDocumentContent: (await api.v1.document.sectionIds()).length > 0,
+  });
   const panels: UIExtension[] = [buildSidebarPanel(headerDriver)];
 
   const journalEnabled = await api.v1.config.get("generation_journal");

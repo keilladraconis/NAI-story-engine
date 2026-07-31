@@ -9,13 +9,14 @@
 // No module-level state: everything lives in the closure so the driver is
 // injected from mount.ts rather than being a singleton.
 
+import type { Store } from "nai-store";
 import {
-  store as storeInstance,
   uiRequestCancellation,
   uiUserPresenceConfirmed,
   importWizardOpened,
   bootstrapRequested,
   bootstrapContinueRequested,
+  type RootState,
 } from "../../core/store";
 import { derive, storeSignature, type HeaderModel } from "./header-model";
 import { patch, type HeaderHandlers } from "./header-parts";
@@ -24,6 +25,13 @@ import { patch, type HeaderHandlers } from "./header-parts";
  *  there to notice the output bucket silently refilling. */
 const TICK_WAIT_MS = 1000;
 const TICK_IDLE_MS = 5000;
+
+export type HeaderDriverOptions = {
+  /** Result of `(await api.v1.document.sectionIds()).length > 0`, read before
+   *  the header is built so `initialModel()` is correct on first paint and
+   *  no post-register updateParts correction is needed. */
+  hasDocumentContent: boolean;
+};
 
 export type HeaderDriver = {
   /** Model for the first paint. Call before buildHeader so the initial specs
@@ -35,13 +43,15 @@ export type HeaderDriver = {
 };
 
 export function createHeaderDriver(
-  store: typeof storeInstance,
+  store: Store<RootState>,
+  options: HeaderDriverOptions,
 ): HeaderDriver {
   let lastModel: HeaderModel | null = null;
-  let hasDocumentContent = false;
+  let hasDocumentContent = options.hasDocumentContent;
   let bootstrapWasPending = false;
   let timerId: number | null = null;
   let stopped = false;
+  let docSeq = 0;
   const unsubscribes: Array<() => void> = [];
 
   function currentModel(): HeaderModel {
@@ -56,16 +66,17 @@ export function createHeaderDriver(
     const parts = patch(lastModel, model);
     lastModel = model;
     if (parts.length > 0) {
-      void api.v1.ui.updateParts(
-        parts as Partial<UIPart>[] & { id: string }[],
-      );
+      void api.v1.ui.updateParts(parts);
     }
   }
 
   async function refreshDocument(): Promise<void> {
+    const seq = ++docSeq;
     const ids = await api.v1.document.sectionIds();
     const has = ids.length > 0;
-    if (stopped || has === hasDocumentContent) return;
+    // seq !== docSeq means a newer refreshDocument() call started while this
+    // one was in flight; an older read resolving later must not clobber it.
+    if (stopped || seq !== docSeq || has === hasDocumentContent) return;
     hasDocumentContent = has;
     push(currentModel());
   }
@@ -74,7 +85,8 @@ export function createHeaderDriver(
     if (stopped) return;
     const model = currentModel();
     // A bootstrap that just settled changed the document — re-derive its label.
-    if (bootstrapWasPending && !model.bootstrap.disabled) void refreshDocument();
+    if (bootstrapWasPending && !model.bootstrap.disabled)
+      void refreshDocument();
     bootstrapWasPending = model.bootstrap.disabled;
     push(model);
   }
@@ -110,7 +122,9 @@ export function createHeaderDriver(
     onImport: () => store.dispatch(importWizardOpened()),
     onBootstrap: () =>
       store.dispatch(
-        hasDocumentContent ? bootstrapContinueRequested() : bootstrapRequested(),
+        hasDocumentContent
+          ? bootstrapContinueRequested()
+          : bootstrapRequested(),
       ),
   };
 
@@ -130,9 +144,6 @@ export function createHeaderDriver(
           () => void refreshDocument(),
         ),
       );
-      // hasDocumentContent starts false, so the first paint may briefly read
-      // "Opening Scene" on a story that has content; this corrects it.
-      void refreshDocument();
       scheduleTimer();
     },
     stop: () => {
