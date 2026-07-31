@@ -10,7 +10,7 @@ import {
   uiUserPresenceConfirmed,
   uiRequestCancellation,
 } from "../../../core/store";
-import { useCountdown, waitLabel } from "./countdown";
+import { useCountdown, waitLabel } from "../../header/countdown";
 
 export function GenxStatus() {
   const status = useSlice((s) => s.runtime.genx.status);

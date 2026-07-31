@@ -4,7 +4,7 @@ import { join } from "node:path";
 import {
   remainingSeconds,
   waitLabel,
-} from "../../src/ui/panels/header/countdown";
+} from "../../src/ui/header/countdown";
 
 describe("remainingSeconds", () => {
   it("returns 0 for a null endTime", () => {

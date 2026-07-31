@@ -17,7 +17,7 @@ import {
   uiUserPresenceConfirmed,
 } from "../../../core/store";
 import type { RootState } from "../../../core/store";
-import { useCountdown, waitLabel } from "../header/countdown";
+import { useCountdown, waitLabel } from "../../header/countdown";
 import { Zap } from "nai:icons/feather";
 
 type Mode = "gen" | "queue" | "cancel" | "continue" | "wait";
