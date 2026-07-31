@@ -20,10 +20,7 @@ const INPUTS: DeriveInputs = {
   now: 1_000_000,
 };
 
-function req(
-  type: GenerationRequest["type"],
-  id: string,
-): GenerationRequest {
+function req(type: GenerationRequest["type"], id: string): GenerationRequest {
   return { id, type, targetId: "t", status: "queued" };
 }
 
@@ -108,7 +105,10 @@ describe("derive — bootstrap, status text, import", () => {
   it("disables bootstrap while its request is active", () => {
     const m = derive(
       state({
-        activeRequest: { ...req("bootstrapContinue", "b2"), status: "processing" },
+        activeRequest: {
+          ...req("bootstrapContinue", "b2"),
+          status: "processing",
+        },
       }),
       INPUTS,
     );

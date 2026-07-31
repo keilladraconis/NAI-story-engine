@@ -39,7 +39,7 @@ npm run test       # vitest run
 **UI (`src/ui/`):**
 
 - All components are `SuiComponent` subclasses from `nai-simple-ui`. `compose()` returns a static UIPart tree; `StoreWatcher.watch()` drives reactive `updateParts()` calls.
-- Non-storageKey UI mutations use `api.v1.ui.updateParts()` — never re-render. storageKey-bound inputs are the exception: update them via storyStorage, not updateParts (see UI Input Patterns below).
+- The UI is Preact/JSX and re-renders from the store — never `updateParts`. **One deliberate exception:** `src/ui/header/header-driver.ts`. The header is built from UIParts because a click inside a `part.jsx()` does not clear the harness's user-interaction flag, so budget-stalled generation can only be resumed from a real `part.button()`. That driver is the only permitted `updateParts` caller in `src/`; it holds no logic beyond diffing `header-model.ts`'s `derive()` output and pushing what changed.
 - Element IDs centralized in `src/ui/framework/ids.ts` with prefixes: `se-` (story engine), `se-bs-` (brainstorm), `kse-` (storage keys)
 - `src/core/utils/context-builder.ts` — Builds layered AI prompts from current state
 

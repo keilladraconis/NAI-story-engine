@@ -102,8 +102,9 @@ describe("buildHeader", () => {
       ...MODEL,
       widget: { mode: "cancel", text: "🚫 Cancel" },
     };
-    expect(findPart(buildHeader(busy, HANDLERS), HEADER_IDS.widget)!.disabled)
-      .toBeUndefined();
+    expect(
+      findPart(buildHeader(busy, HANDLERS), HEADER_IDS.widget)!.disabled,
+    ).toBeUndefined();
   });
 
   it("marks the status text as non-templated", () => {

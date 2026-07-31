@@ -68,7 +68,9 @@ export function derive(state: RootState, inputs: DeriveInputs): HeaderModel {
     widget: deriveWidget(state, inputs),
     statusText: sega.statusText,
     bootstrap: {
-      text: inputs.hasDocumentContent ? "⚡ Continue Scene" : "⚡ Opening Scene",
+      text: inputs.hasDocumentContent
+        ? "⚡ Continue Scene"
+        : "⚡ Opening Scene",
       disabled: bootstrapPending,
     },
     importDisabled: state.ui.importWizardOpen,
