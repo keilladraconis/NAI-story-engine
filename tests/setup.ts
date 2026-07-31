@@ -116,12 +116,17 @@ const apiMock = {
           ...props,
           type: "multilineTextInput",
         })),
+        container: vi.fn((props) => ({ ...props, type: "container" })),
+        jsx: vi.fn((props) => ({ ...props, type: "jsx" })),
       },
       update: vi.fn(),
       register: vi.fn(),
       extension: {
         sidebarPanel: vi.fn((props) => ({ ...props, type: "sidebarPanel" })),
       },
+    },
+    document: {
+      sectionIds: vi.fn().mockResolvedValue([]),
     },
     generate: vi.fn(),
     buildContext: vi.fn().mockResolvedValue([]),

@@ -28,6 +28,7 @@ import {
 import { migrateBrainstormToChat } from "../core/store/migrations/brainstorm-to-chat";
 import { loadJournal } from "../core/generation-journal";
 import { STORAGE_KEYS } from "../core/keys";
+import { buildRoot, HEADER_IDS } from "./header/header-parts";
 
 const { sidebarPanel, scriptPanel } = api.v1.ui.extension;
 
@@ -60,11 +61,20 @@ function buildSidebarPanel(): UIExtension {
     },
   });
 
+  // Placeholder until Task 3 builds the real header. Present now so the grid
+  // height contract can be verified live with a real occupied top row.
+  const placeholderHeader = api.v1.ui.part.text({
+    id: HEADER_IDS.status,
+    text: "header placeholder",
+    noTemplate: true,
+    style: { fontSize: "0.8em", opacity: "0.8", padding: "4px 8px" },
+  });
+
   return sidebarPanel({
     id: "kse-sidebar",
     name: "Story Engine",
     iconId: "lightning",
-    content: [jsxPart],
+    content: [buildRoot(placeholderHeader, jsxPart)],
   });
 }
 
