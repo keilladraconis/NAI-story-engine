@@ -14,6 +14,8 @@ import {
   requestQueued,
   requestCancelled,
   requestCompleted,
+  queueCleared,
+  stateUpdated,
 } from "../index";
 import { getHandler } from "./generation-handlers";
 import { recordEntry, JournalEntry } from "../../generation-journal";
@@ -445,6 +447,22 @@ export function registerGenerationEngineEffects(
         dispatch(requestCancelled({ requestId: activeRequest.id }));
       }
       genX.cancelAll();
+
+      // cancelAll() cannot report `idle` while its current task is parked in a
+      // budget wait: that await sits on api.v1.script.waitForAllowedOutput(),
+      // which takes no cancellation signal and only resolves once the budget
+      // refills — potentially minutes later. Until then GenX keeps reporting
+      // waiting_for_budget, and requestCancelled only stamps the request rather
+      // than clearing it, so every surface reading runtime still shows work in
+      // flight and the cancel reads as having done nothing.
+      //
+      // Reset the mirror here so cancelling is visible at once. The eventual
+      // real resolution reports idle as well, so the two converge rather than
+      // fight. Note the abandoned task still occupies GenX's currentTask until
+      // it unparks, so a generation started in the meantime stays queued —
+      // that is GenX's own behaviour, unchanged by this reset.
+      dispatch(queueCleared());
+      dispatch(stateUpdated({ genxState: { status: "idle", queueLength: 0 } }));
     },
   );
 
