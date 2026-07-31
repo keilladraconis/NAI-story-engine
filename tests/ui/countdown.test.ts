@@ -1,10 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import {
-  remainingSeconds,
-  waitLabel,
-} from "../../src/ui/header/countdown";
+import { remainingSeconds, waitLabel } from "../../src/ui/header/countdown";
 
 describe("remainingSeconds", () => {
   it("returns 0 for a null endTime", () => {
@@ -33,12 +30,12 @@ describe("waitLabel", () => {
   });
 });
 
-// Regression guard: the SUI generation button drove a 1s tick loop while in
-// budget-wait so the label counted down live. The JSX port dropped that in the
-// chat composer, leaving a frozen "⏳ Wait" after the user clicked Continue.
-// Any component that branches on `waiting_for_budget` owes the user a ticking
-// countdown, which means it must go through `useCountdown`.
-describe("budget-wait countdown coverage", () => {
+// The generation state machine has exactly one home: header-model.ts's
+// derive(). A JSX click cannot clear the harness's FlagB interaction flag, so a
+// Continue or Wait button rendered in the Preact tree is dead UI — it looks
+// interactive and does nothing. This guard is what stops the machine leaking
+// back into JSX in a later change.
+describe("generation state machine lives only in the UIPart header", () => {
   const UI_DIR = join(__dirname, "../../src/ui");
 
   function tsxFiles(dir: string): string[] {
@@ -49,13 +46,16 @@ describe("budget-wait countdown coverage", () => {
     });
   }
 
-  it("every component branching on waiting_for_budget uses useCountdown", () => {
-    const offenders = tsxFiles(UI_DIR).filter((file) => {
-      const src = readFileSync(file, "utf8");
-      return (
-        src.includes('"waiting_for_budget"') && !src.includes("useCountdown")
-      );
-    });
+  it("no JSX component branches on waiting_for_budget", () => {
+    const offenders = tsxFiles(UI_DIR).filter((file) =>
+      readFileSync(file, "utf8").includes('"waiting_for_budget"'),
+    );
     expect(offenders).toEqual([]);
+  });
+
+  it("header-model.ts owns the branch", () => {
+    const src = readFileSync(join(UI_DIR, "header/header-model.ts"), "utf8");
+    expect(src).toContain('"waiting_for_budget"');
+    expect(src).toContain('"waiting_for_user"');
   });
 });

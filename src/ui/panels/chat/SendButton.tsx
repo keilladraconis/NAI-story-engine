@@ -1,26 +1,15 @@
-// Reactive send button for the chat composer — a JSX port of SUI's
-// SeGenerationButton (button variant) for chat sends. It cycles through the
-// generation states of the active/queued chat request:
-//   gen → ⚡ Send (dispatch submit)
-//   queue → ⏳ Queued (cancel the queued request)
-//   cancel → 🚫 Cancel (cancel the active request)
-//   continue → ⚠️ Continue (confirm user presence)
-//   wait → ⏳ Wait (Ns) (budget wait, live countdown; click cancels)
-// Idle vs busy is derived from the runtime slice via useSlice.
+// Chat composer send button. Two states: enabled "⚡ {label}", or disabled
+// while a chat-family request is queued or active.
+//
+// The old five-mode machine (queue/cancel/continue/wait) is gone. All
+// generation-state interaction lives in the UIPart header — a click inside the
+// JSX panel cannot clear the harness's FlagB interaction flag, so a Continue
+// button here was decorative.
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
-import {
-  store,
-  uiCancelRequest,
-  uiRequestCancellation,
-  uiUserPresenceConfirmed,
-} from "../../../core/store";
 import type { RootState } from "../../../core/store";
-import { useCountdown, waitLabel } from "../../header/countdown";
 import { Zap } from "nai:icons/feather";
-
-type Mode = "gen" | "queue" | "cancel" | "continue" | "wait";
 
 // Chat-family request types (mirrors SeBrainstormInput.isChatBusyType).
 function isChatBusyType(t: string | undefined): boolean {
@@ -32,96 +21,37 @@ function isChatBusyType(t: string | undefined): boolean {
   );
 }
 
-// The active/queued chat request id, or undefined when the composer is idle.
-function busyRequestId(s: RootState): string | undefined {
-  const ar = s.runtime.activeRequest;
-  if (ar && isChatBusyType(ar.type)) return ar.id;
-  return s.runtime.queue.find((r) => isChatBusyType(r.type))?.id;
+function isBusy(s: RootState): boolean {
+  if (isChatBusyType(s.runtime.activeRequest?.type)) return true;
+  return s.runtime.queue.some((r) => isChatBusyType(r.type));
 }
-
-function computeMode(s: RootState): Mode {
-  const id = busyRequestId(s);
-  if (!id) return "gen";
-  if (s.runtime.activeRequest?.id === id) {
-    const st = s.runtime.genx.status;
-    if (st === "waiting_for_user") return "continue";
-    if (st === "waiting_for_budget") return "wait";
-    return "cancel";
-  }
-  return "queue";
-}
-
-const btnBase = {
-  flex: 1,
-  padding: "6px 12px",
-  border: "none",
-  cursor: "pointer",
-  fontWeight: "bold",
-  borderRadius: "4px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: SP.sm,
-} as const;
 
 export function SendButton(props: { label: string; onGenerate: () => void }) {
-  const mode = useSlice(computeMode);
-  const budgetEnd = useSlice((s) => s.runtime.genx.budgetWaitEndTime ?? null);
-  // Gate on the mode, not just the endTime: genx leaves budgetWaitEndTime set
-  // after the wait resolves, so an ungated hook would keep ticking while idle.
-  const secs = useCountdown(mode === "wait" ? budgetEnd : null);
+  const busy = useSlice(isBusy);
 
-  const cancelActive = () => {
-    store.dispatch(uiRequestCancellation());
-    const id = busyRequestId(store.getState());
-    if (id) store.dispatch(uiCancelRequest({ requestId: id }));
-  };
-
-  const make = (
-    bg: string,
-    fg: string,
-    label: preact.ComponentChildren,
-    onClick: () => void,
-    borderColor?: string,
-  ) => (
+  return (
     <button
+      disabled={busy}
+      onClick={props.onGenerate}
       style={{
-        ...btnBase,
-        background: bg,
-        color: fg,
-        border: borderColor ? `1px solid ${borderColor}` : "none",
+        flex: 1,
+        padding: "6px 12px",
+        cursor: busy ? "default" : "pointer",
+        fontWeight: "bold",
+        borderRadius: "4px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: SP.sm,
+        // Mimics the NAI editor send button: transparent fill over our dark
+        // backdrop, text-headings text + border.
+        background: "transparent",
+        color: T.textHeadings,
+        border: `1px solid ${T.textHeadings}`,
+        opacity: busy ? 0.4 : 1,
       }}
-      onClick={onClick}
     >
-      {label}
+      <Zap size={14} /> {props.label}
     </button>
   );
-
-  switch (mode) {
-    case "queue":
-      return make(T.bg2, T.text, "⏳ Queued", () => {
-        const id = busyRequestId(store.getState());
-        if (id) store.dispatch(uiCancelRequest({ requestId: id }));
-      });
-    case "cancel":
-      return make(T.warning, T.bg, "🚫 Cancel", cancelActive);
-    case "continue":
-      return make(T.textHeadings, T.bg, "⚠️ Continue", () =>
-        store.dispatch(uiUserPresenceConfirmed()),
-      );
-    case "wait":
-      return make(T.bg2, T.text, waitLabel(secs), cancelActive);
-    default:
-      // Mimics the NAI editor send button: transparent fill (our backdrop is
-      // already dark), text-headings text + border.
-      return make(
-        "transparent",
-        T.textHeadings,
-        <>
-          <Zap size={14} /> {props.label}
-        </>,
-        props.onGenerate,
-        T.textHeadings,
-      );
-  }
 }
