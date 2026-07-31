@@ -25,8 +25,8 @@ describe("remainingSeconds", () => {
 
 describe("waitLabel", () => {
   it("renders the remaining seconds", () => {
-    expect(waitLabel(12)).toBe("⏳ Wait (12s)");
-    expect(waitLabel(0)).toBe("⏳ Wait (0s)");
+    expect(waitLabel(12)).toBe("Wait (12s)");
+    expect(waitLabel(0)).toBe("Wait (0s)");
   });
 });
 

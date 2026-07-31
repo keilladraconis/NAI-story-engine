@@ -4,6 +4,7 @@ import {
   buildHeader,
   patch,
   widgetStyle,
+  widgetIcon,
   statusStyle,
   HEADER_IDS,
   type HeaderHandlers,
@@ -17,9 +18,9 @@ const HANDLERS: HeaderHandlers = {
 };
 
 const MODEL: HeaderModel = {
-  widget: { mode: "budget", text: "4.2k out" },
+  widget: { mode: "budget", text: "GenX: 4200 tokens" },
   statusText: "",
-  bootstrap: { text: "⚡ Opening Scene", disabled: false },
+  bootstrap: { text: "Opening Scene", disabled: false },
   importDisabled: false,
 };
 
@@ -100,7 +101,7 @@ describe("buildHeader", () => {
   it("never disables the widget — a disabled button clears no FlagB", () => {
     const busy: HeaderModel = {
       ...MODEL,
-      widget: { mode: "cancel", text: "🚫 Cancel" },
+      widget: { mode: "cancel", text: "Cancel" },
     };
     expect(
       findPart(buildHeader(busy, HANDLERS), HEADER_IDS.widget)!.disabled,
@@ -126,18 +127,18 @@ describe("patch", () => {
   it("pushes only the widget when only the widget changed", () => {
     const next: HeaderModel = {
       ...MODEL,
-      widget: { mode: "cancel", text: "🚫 Cancel" },
+      widget: { mode: "cancel", text: "Cancel" },
     };
     const parts = patch(MODEL, next) as Record<string, any>[];
     expect(parts).toHaveLength(1);
     expect(parts[0].id).toBe(HEADER_IDS.widget);
-    expect(parts[0].text).toBe("🚫 Cancel");
+    expect(parts[0].text).toBe("Cancel");
   });
 
   it("carries the complete style object, not a delta", () => {
     const next: HeaderModel = {
       ...MODEL,
-      widget: { mode: "cancel", text: "🚫 Cancel" },
+      widget: { mode: "cancel", text: "Cancel" },
     };
     const parts = patch(MODEL, next) as Record<string, any>[];
     expect(Object.keys(parts[0].style).sort()).toEqual(
@@ -151,5 +152,50 @@ describe("patch", () => {
     expect(parts).toHaveLength(1);
     expect(parts[0].id).toBe(HEADER_IDS.status);
     expect(parts[0].style.display).toBe("block");
+  });
+});
+
+describe("widgetIcon", () => {
+  it("gives every mode its own feather glyph", () => {
+    const modes = ["budget", "cancel", "continue", "wait"] as const;
+    const icons = modes.map(widgetIcon);
+    // Distinct: two modes sharing a glyph would make the widget ambiguous at a
+    // glance, which is the whole reason the label lost its emoji.
+    expect(new Set(icons).size).toBe(modes.length);
+    expect(icons.every((i) => typeof i === "string" && i.length > 0)).toBe(
+      true,
+    );
+  });
+});
+
+describe("header row layout", () => {
+  function idsOf(node: unknown): string[] {
+    const n = node as { id?: string; content?: unknown[] };
+    return (n?.content ?? []).map((c) => (c as { id?: string }).id ?? "");
+  }
+
+  it("puts the readout left and groups the two actions right", () => {
+    // space-between across [widget, actions] pins the readout to the left edge
+    // and the pair to the right. Three flat children would spread evenly.
+    const row = findPart(buildHeader(MODEL, HANDLERS), HEADER_IDS.row1)!;
+    expect(row.spacing).toBe("space-between");
+    expect(idsOf(row)).toEqual([HEADER_IDS.widget, HEADER_IDS.row1Right]);
+  });
+
+  it("orders the right-hand group bootstrap then import", () => {
+    const right = findPart(buildHeader(MODEL, HANDLERS), HEADER_IDS.row1Right)!;
+    expect(idsOf(right)).toEqual([HEADER_IDS.bootstrap, HEADER_IDS.import]);
+  });
+
+  it("gives the widget an iconId matching its mode, on build and on patch", () => {
+    const built = findPart(buildHeader(MODEL, HANDLERS), HEADER_IDS.widget)!;
+    expect(built.iconId).toBe(widgetIcon("budget"));
+
+    const next: HeaderModel = {
+      ...MODEL,
+      widget: { mode: "continue", text: "Continue" },
+    };
+    const parts = patch(MODEL, next) as Record<string, any>[];
+    expect(parts[0].iconId).toBe(widgetIcon("continue"));
   });
 });

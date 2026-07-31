@@ -35,21 +35,24 @@ function state(
 }
 
 describe("formatOutputBudget", () => {
-  it("prints a bare count below 1k", () => {
-    expect(formatOutputBudget(412)).toBe("412 out");
-    expect(formatOutputBudget(999)).toBe("999 out");
+  it("spells the count out in full, never abbreviated", () => {
+    // An abbreviated "2.0k out" reads as jargon; the exact number is what a
+    // user reasons about when a generation is about to stall.
+    expect(formatOutputBudget(412)).toBe("GenX: 412 tokens");
+    expect(formatOutputBudget(2000)).toBe("GenX: 2000 tokens");
+    expect(formatOutputBudget(12345)).toBe("GenX: 12345 tokens");
   });
 
-  it("switches to one-decimal k at 1000", () => {
-    expect(formatOutputBudget(1000)).toBe("1.0k out");
-    expect(formatOutputBudget(1234)).toBe("1.2k out");
+  it("agrees in number", () => {
+    expect(formatOutputBudget(1)).toBe("GenX: 1 token");
+    expect(formatOutputBudget(0)).toBe("GenX: 0 tokens");
   });
 });
 
 describe("derive — widget mode", () => {
   it("shows the output budget when idle", () => {
     const m = derive(state(), INPUTS);
-    expect(m.widget).toEqual({ mode: "budget", text: "4.2k out" });
+    expect(m.widget).toEqual({ mode: "budget", text: "GenX: 4200 tokens" });
   });
 
   it("shows Continue while waiting on the user", () => {
@@ -57,7 +60,7 @@ describe("derive — widget mode", () => {
       state({ genx: { status: "waiting_for_user", queueLength: 0 } }),
       INPUTS,
     );
-    expect(m.widget).toEqual({ mode: "continue", text: "⚠️ Continue" });
+    expect(m.widget).toEqual({ mode: "continue", text: "Continue" });
   });
 
   it("counts down while waiting on budget", () => {
@@ -71,13 +74,13 @@ describe("derive — widget mode", () => {
       }),
       INPUTS,
     );
-    expect(m.widget).toEqual({ mode: "wait", text: "⏳ Wait (12s)" });
+    expect(m.widget).toEqual({ mode: "wait", text: "Wait (12s)" });
   });
 
   it("offers Cancel while generating and while queued", () => {
     for (const status of ["generating", "queued"] as const) {
       const m = derive(state({ genx: { status, queueLength: 1 } }), INPUTS);
-      expect(m.widget).toEqual({ mode: "cancel", text: "🚫 Cancel" });
+      expect(m.widget).toEqual({ mode: "cancel", text: "Cancel" });
     }
   });
 
@@ -91,10 +94,10 @@ describe("derive — widget mode", () => {
 
 describe("derive — bootstrap, status text, import", () => {
   it("labels bootstrap from document content", () => {
-    expect(derive(state(), INPUTS).bootstrap.text).toBe("⚡ Opening Scene");
+    expect(derive(state(), INPUTS).bootstrap.text).toBe("Opening Scene");
     expect(
       derive(state(), { ...INPUTS, hasDocumentContent: true }).bootstrap.text,
-    ).toBe("⚡ Continue Scene");
+    ).toBe("Continue Scene");
   });
 
   it("disables bootstrap while its request is queued", () => {

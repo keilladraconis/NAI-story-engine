@@ -9,6 +9,7 @@ export const HEADER_IDS = {
   root: "kse-root",
   header: "kse-header",
   row1: "kse-header-row1",
+  row1Right: "kse-header-row1-right",
   widget: "kse-widget",
   import: "kse-import",
   bootstrap: "kse-bootstrap",
@@ -39,50 +40,73 @@ export type HeaderHandlers = {
 };
 
 // Every widgetStyle branch spreads this, so all four modes emit the same key
-// set — required because updateParts replaces style wholesale.
+// set — required because updateParts replaces style wholesale. The pill radius
+// and hairline border live here so the widget keeps one silhouette across all
+// four states and only its colour changes.
 const WIDGET_BASE = {
-  padding: "4px 8px",
+  padding: "3px 10px",
   fontSize: "0.8em",
-  borderRadius: "4px",
-  border: "none",
+  borderRadius: "999px",
+  borderWidth: "1px",
+  borderStyle: "solid",
   cursor: "pointer",
   whiteSpace: "nowrap",
+  opacity: "1",
 } as const;
 
 export function widgetStyle(mode: WidgetMode): Record<string, string> {
   switch (mode) {
     case "continue":
+      // Filled gold: the one state that needs the user to act.
       return {
         ...WIDGET_BASE,
+        borderColor: T.textHeadings,
         background: T.textHeadings,
         color: T.bg,
         fontWeight: "bold",
-        opacity: "1",
       };
     case "cancel":
+      // Salmon-red fill — a stop action, deliberately not the gold accent.
       return {
         ...WIDGET_BASE,
+        borderColor: T.warning,
         background: T.warning,
         color: T.bg,
         fontWeight: "bold",
-        opacity: "1",
       };
     case "wait":
       return {
         ...WIDGET_BASE,
+        borderColor: T.bg3,
         background: T.bg2,
         color: T.text,
         fontWeight: "normal",
-        opacity: "1",
       };
     case "budget":
+      // Outline-only gold pill: a readout, not a call to action — but still a
+      // real button, because clicking it is what clears the interaction flag.
       return {
         ...WIDGET_BASE,
+        borderColor: T.textHeadings,
         background: "transparent",
-        color: T.text,
+        color: T.textHeadings,
         fontWeight: "normal",
-        opacity: "0.8",
       };
+  }
+}
+
+/** Feather iconId per widget mode. Kept beside widgetStyle so a new mode has to
+ *  answer for both its colour and its glyph in one place. */
+export function widgetIcon(mode: WidgetMode): IconId {
+  switch (mode) {
+    case "continue":
+      return "play";
+    case "cancel":
+      return "x";
+    case "wait":
+      return "clock";
+    case "budget":
+      return "zap";
   }
 }
 
@@ -147,25 +171,37 @@ export function buildHeader(
           api.v1.ui.part.button({
             id: HEADER_IDS.widget,
             text: model.widget.text,
+            iconId: widgetIcon(model.widget.mode),
             style: widgetStyle(model.widget.mode),
             callback: handlers.onWidget,
           }),
-          api.v1.ui.part.button({
-            id: HEADER_IDS.import,
-            iconId: "download",
-            disabled: model.importDisabled,
-            style: ICON_STYLE,
-            callback: handlers.onImport,
-          }),
-          api.v1.ui.part.button({
-            id: HEADER_IDS.bootstrap,
-            text: model.bootstrap.text,
-            disabled: model.bootstrap.disabled,
-            // A tap can deliver click twice on mobile; bootstrap is the one
-            // non-idempotent header action.
-            disabledWhileCallbackRunning: true,
-            style: BOOTSTRAP_STYLE,
-            callback: handlers.onBootstrap,
+          // The two actions are grouped so space-between pushes them together
+          // against the right edge, rather than spreading all three evenly.
+          api.v1.ui.part.row({
+            id: HEADER_IDS.row1Right,
+            alignment: "center",
+            spacing: "end",
+            style: { gap: SP.sm },
+            content: [
+              api.v1.ui.part.button({
+                id: HEADER_IDS.bootstrap,
+                text: model.bootstrap.text,
+                iconId: "feather",
+                disabled: model.bootstrap.disabled,
+                // A tap can deliver click twice on mobile; bootstrap is the one
+                // non-idempotent header action.
+                disabledWhileCallbackRunning: true,
+                style: BOOTSTRAP_STYLE,
+                callback: handlers.onBootstrap,
+              }),
+              api.v1.ui.part.button({
+                id: HEADER_IDS.import,
+                iconId: "download",
+                disabled: model.importDisabled,
+                style: ICON_STYLE,
+                callback: handlers.onImport,
+              }),
+            ],
           }),
         ],
       }),
@@ -196,6 +232,7 @@ export function patch(
     parts.push({
       id: HEADER_IDS.widget,
       text: next.widget.text,
+      iconId: widgetIcon(next.widget.mode),
       style: widgetStyle(next.widget.mode),
     });
   }

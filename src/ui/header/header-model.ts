@@ -32,11 +32,12 @@ export type DeriveInputs = {
 
 const BOOTSTRAP_TYPES: readonly string[] = ["bootstrap", "bootstrapContinue"];
 
-/** "412 out" below 1k, "1.2k out" at or above it. No ⚡ — the bolt belongs to
- *  the action buttons, so the readout doesn't read as a third action. */
+/** Spelled out in full — "GenX: 2000 tokens". An abbreviated readout ("2.0k
+ *  out") reads as cryptic jargon in a header that is otherwise plain English,
+ *  and the exact count is the number a user actually reasons about when a
+ *  generation is about to stall. No glyph: the button carries a `zap` iconId. */
 export function formatOutputBudget(tokens: number): string {
-  const n = tokens < 1000 ? String(tokens) : `${(tokens / 1000).toFixed(1)}k`;
-  return `${n} out`;
+  return `GenX: ${tokens} ${tokens === 1 ? "token" : "tokens"}`;
 }
 
 function deriveWidget(
@@ -44,15 +45,17 @@ function deriveWidget(
   inputs: DeriveInputs,
 ): HeaderModel["widget"] {
   const { genx } = state.runtime;
+  // Labels carry no emoji — every widget mode has its own feather iconId (see
+  // widgetIcon in header-parts.ts), so a glyph here would render twice.
   if (genx.status === "waiting_for_user") {
-    return { mode: "continue", text: "⚠️ Continue" };
+    return { mode: "continue", text: "Continue" };
   }
   if (genx.status === "waiting_for_budget") {
     const secs = remainingSeconds(genx.budgetWaitEndTime ?? null, inputs.now);
     return { mode: "wait", text: waitLabel(secs) };
   }
   if (genx.status === "queued" || genx.status === "generating") {
-    return { mode: "cancel", text: "🚫 Cancel" };
+    return { mode: "cancel", text: "Cancel" };
   }
   return { mode: "budget", text: formatOutputBudget(inputs.allowedOutput) };
 }
@@ -68,9 +71,7 @@ export function derive(state: RootState, inputs: DeriveInputs): HeaderModel {
     widget: deriveWidget(state, inputs),
     statusText: sega.statusText,
     bootstrap: {
-      text: inputs.hasDocumentContent
-        ? "⚡ Continue Scene"
-        : "⚡ Opening Scene",
+      text: inputs.hasDocumentContent ? "Continue Scene" : "Opening Scene",
       disabled: bootstrapPending,
     },
     importDisabled: state.ui.importWizardOpen,
