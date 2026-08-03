@@ -8,16 +8,17 @@
 import { useSlice, useStream } from "../../bridge";
 import { T, SP } from "../../style";
 import { Zap, Edit, ToggleLeft, ToggleRight } from "nai:icons/feather";
-import { store, uiChatRefineRequested } from "../../../core/store";
+import {
+  store,
+  uiChatRefineRequested,
+  uiEditableActivate,
+} from "../../../core/store";
 import { decideFieldAction } from "../chat/chat-actions";
 import { type FieldDescriptor, isFoundationGenerating } from "./fields";
 
 const ICON_SIZE = 16;
 
-export function FieldCard(props: {
-  descriptor: FieldDescriptor;
-  onEdit: () => void;
-}) {
+export function FieldCard(props: { descriptor: FieldDescriptor }) {
   const d = props.descriptor;
   const label = useSlice((s) => d.cardLabel(s));
   // While generating, show the live per-token text from the effect-free buffer;
@@ -96,7 +97,7 @@ export function FieldCard(props: {
           </button>
           <button
             title="Edit"
-            onClick={props.onEdit}
+            onClick={() => store.dispatch(uiEditableActivate({ id: d.id }))}
             style={{ background: "none", border: "none", cursor: "pointer" }}
           >
             <Edit size={ICON_SIZE} />

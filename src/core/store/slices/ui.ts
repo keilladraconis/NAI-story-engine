@@ -62,7 +62,9 @@ export const uiSlice = createSlice({
     // Internal: Submit generation to GenX (not a user intent)
     generationSubmitted: (state, _strategy: any) => state,
     uiCancelRequest: (state, _payload: { requestId: string }) => state,
-    // Editable singleton — at most one editor active at a time
+    // Editable singleton — at most one editor active at a time. `id` is an
+    // entity id, a world group id, or a Foundation field id ("shape", "intent",
+    // …); StoryEngine routes the open pane by membership.
     uiEditableActivate: (state, payload: { id: string }) => ({
       ...state,
       activeEditId: payload.id,
