@@ -2,6 +2,8 @@
 // optional title input (Shape's name + description). Uncontrolled textareas:
 // child text seeds the display from the committed store value; onInput tracks
 // edits via useDraftField. Save hands back a { title, content } draft.
+// Layout mirrors EntityEditPane: the pane fills the panel height so the content
+// textarea can grow to the bottom.
 
 import { useDraftField } from "../../hooks";
 import { T, SP } from "../../style";
@@ -26,7 +28,18 @@ export function FieldEditor(props: FieldEditorProps) {
   const content = useDraftField(props.initialContent);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: SP.sm }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: SP.sm,
+        // Fill the pane height so the content textarea can grow to the bottom.
+        // Grows past the panel if the header/title wrap (the engine tab
+        // scrolls); the textarea scrolls its own overflow.
+        minHeight: "100%",
+        paddingBottom: SP.sm,
+      }}
+    >
       {/* Header row: [← Back] title [Save] */}
       <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
         <button
@@ -77,15 +90,18 @@ export function FieldEditor(props: FieldEditorProps) {
 
       <textarea
         placeholder={props.placeholder}
-        rows={6}
         onInput={(e) => content.setValue(e.target.value ?? "")}
+        // flex:1 fills the pane down to the bottom; minHeight keeps it usable
+        // when the panel is short; the textarea scrolls its own overflow.
         style={{
           background: T.bg2,
           color: T.text,
           fontFamily: T.fontDefault,
           padding: SP.md,
           border: "none",
-          resize: "vertical",
+          flex: 1,
+          minHeight: "8em",
+          resize: "none",
         }}
       >
         {props.initialContent}
