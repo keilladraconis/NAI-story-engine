@@ -9,6 +9,7 @@
 import { useSlice, useStream } from "../../bridge";
 import { useDraftField } from "../../hooks";
 import { T, SP } from "../../style";
+import { useTapGuard } from "../../tap-guard";
 import {
   store,
   groupRenamed,
@@ -43,6 +44,55 @@ const genZapStyle = (pending: boolean) =>
     cursor: pending ? "default" : "pointer",
     opacity: pending ? 0.4 : 1,
   }) as const;
+
+// One membership row. Its own component so each row owns its own tap guard —
+// a shared guard would let a tap on one member swallow a tap on the next.
+function MemberToggle(props: {
+  groupId: string;
+  entityId: string;
+  name: string;
+  isMember: boolean;
+}) {
+  // Membership is a boolean flip: an unguarded repeat click from a single tap
+  // toggles it straight back, so the row looks unresponsive.
+  const onceTap = useTapGuard();
+  return (
+    <button
+      onClick={() =>
+        onceTap(() =>
+          store.dispatch(
+            entityGroupToggled({
+              groupId: props.groupId,
+              entityId: props.entityId,
+            }),
+          ),
+        )
+      }
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: SP.sm,
+        background: T.bg2,
+        border: "none",
+        cursor: "pointer",
+        // Icons inherit this via SVG currentColor — the codebase
+        // passes only `size` to feather icons, never a color prop.
+        // Green (mid-intensity) marks an active member, matching
+        // SUI's sync-toggle "on" state; red/warning would misread.
+        color: props.isMember ? T.midIntensity : T.text,
+        padding: SP.sm,
+        textAlign: "left",
+      }}
+    >
+      {props.isMember ? (
+        <ToggleRight size={ICON_SIZE} />
+      ) : (
+        <ToggleLeft size={ICON_SIZE} />
+      )}
+      <span style={{ flex: 1 }}>{props.name || "(unnamed)"}</span>
+    </button>
+  );
+}
 
 export function ThreadEditPane(props: { groupId: string }) {
   const { groupId } = props;
@@ -173,41 +223,15 @@ export function ThreadEditPane(props: { groupId: string }) {
             <span style={{ fontSize: "0.75em", color: T.textDisabled }}>
               {cat.label}
             </span>
-            {members.map((e) => {
-              const isMember = group.entityIds.includes(e.id);
-              return (
-                <button
-                  key={e.id}
-                  onClick={() =>
-                    store.dispatch(
-                      entityGroupToggled({ groupId, entityId: e.id }),
-                    )
-                  }
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: SP.sm,
-                    background: T.bg2,
-                    border: "none",
-                    cursor: "pointer",
-                    // Icons inherit this via SVG currentColor — the codebase
-                    // passes only `size` to feather icons, never a color prop.
-                    // Green (mid-intensity) marks an active member, matching
-                    // SUI's sync-toggle "on" state; red/warning would misread.
-                    color: isMember ? T.midIntensity : T.text,
-                    padding: SP.sm,
-                    textAlign: "left",
-                  }}
-                >
-                  {isMember ? (
-                    <ToggleRight size={ICON_SIZE} />
-                  ) : (
-                    <ToggleLeft size={ICON_SIZE} />
-                  )}
-                  <span style={{ flex: 1 }}>{e.name || "(unnamed)"}</span>
-                </button>
-              );
-            })}
+            {members.map((e) => (
+              <MemberToggle
+                key={e.id}
+                groupId={groupId}
+                entityId={e.id}
+                name={e.name}
+                isMember={group.entityIds.includes(e.id)}
+              />
+            ))}
           </div>
         );
       })}
