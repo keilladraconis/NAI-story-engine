@@ -6,6 +6,7 @@
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
+import { useTapGuard } from "../../tap-guard";
 import {
   store,
   segaToggled,
@@ -45,6 +46,14 @@ export function World() {
   const segaRunning = useSlice((s) => s.runtime.segaRunning);
   const [collapsed, setCollapsed] = useState(false);
 
+  // Each of these flips a boolean, so an unguarded repeat click from one tap
+  // flips it straight back. SEGA is the worst of the three: start-then-stop
+  // from a single tap. One guard each — a shared guard would let a tap on the
+  // section header swallow the next tap on expand-all.
+  const onceCollapseTap = useTapGuard();
+  const onceExpandAllTap = useTapGuard();
+  const onceSegaTap = useTapGuard();
+
   const { groups: visibleGroups, loose } = selectWorldBody(
     entitiesById,
     groups,
@@ -79,7 +88,7 @@ export function World() {
     <div style={{ display: "flex", flexDirection: "column", gap: SP.sm }}>
       <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
         <button
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={() => onceCollapseTap(() => setCollapsed((c) => !c))}
           style={{
             flex: 1,
             display: "flex",
@@ -98,7 +107,9 @@ export function World() {
         <button
           title={worldExpanded ? "Collapse all" : "Expand all"}
           onClick={() =>
-            store.dispatch(worldExpansionSet({ expanded: !worldExpanded }))
+            onceExpandAllTap(() =>
+              store.dispatch(worldExpansionSet({ expanded: !worldExpanded })),
+            )
           }
           style={ICON_BTN}
         >
@@ -110,7 +121,7 @@ export function World() {
         </button>
         <button
           title="S.E.G.A."
-          onClick={() => store.dispatch(segaToggled())}
+          onClick={() => onceSegaTap(() => store.dispatch(segaToggled()))}
           style={{ ...ICON_BTN, color: segaRunning ? T.warning : T.text }}
         >
           {segaRunning ? (

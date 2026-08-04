@@ -8,6 +8,7 @@
 import { useSlice, useStream } from "../../bridge";
 import { useDraftField } from "../../hooks";
 import { T, SP } from "../../style";
+import { useTapGuard } from "../../tap-guard";
 import {
   store,
   entityEdited,
@@ -191,6 +192,9 @@ export function EntityEditPane(props: { entityId: string }) {
     entity?.categoryId ?? FieldID.DramatisPersonae,
   );
   const [loading, setLoading] = useState(true);
+  // Always On flips a boolean, so an unguarded repeat click from one tap
+  // sets it straight back and the button looks dead.
+  const onceAlwaysOnTap = useTapGuard();
 
   // Seed lorebook content/keys/always-on from the entry once, on open.
   useEffect(() => {
@@ -524,7 +528,7 @@ export function EntityEditPane(props: { entityId: string }) {
           </button>
           <button
             title="Always On"
-            onClick={() => setAlwaysOn((v) => !v)}
+            onClick={() => onceAlwaysOnTap(() => setAlwaysOn((v) => !v))}
             style={{
               background: "none",
               border: "none",

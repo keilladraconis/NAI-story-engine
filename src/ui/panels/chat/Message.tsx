@@ -2,6 +2,7 @@
 import { useSlice, useStream } from "../../bridge";
 import { useDraftField } from "../../hooks";
 import { T, SP } from "../../style";
+import { useTapGuard } from "../../tap-guard";
 import {
   store,
   messageUpdated,
@@ -138,6 +139,9 @@ export function Message(props: MessageProps) {
   const inlineIds = inlineKey ? inlineKey.split(",") : [];
   const [editing, setEditing] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
+  // Expanding a Context bubble flips a boolean — an unguarded repeat click
+  // from one tap collapses it again, so the block refuses to open.
+  const onceCollapseTap = useTapGuard();
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
 
@@ -166,7 +170,7 @@ export function Message(props: MessageProps) {
           >
             <button
               style={{ ...iconBtn, fontStyle: "italic" }}
-              onClick={() => setCollapsed((c) => !c)}
+              onClick={() => onceCollapseTap(() => setCollapsed((c) => !c))}
             >
               {collapsed ? "▸ Context" : "▾ Context"}
             </button>
