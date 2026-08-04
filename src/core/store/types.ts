@@ -8,7 +8,10 @@ export type AppDispatch = (action: Action) => void;
 
 // SEGA Types
 export type SegaStage =
-  "idle" | "lorebookContent" | "lorebookKeys" | "completed";
+  | "idle"
+  | "lorebookContent"
+  | "lorebookKeys"
+  | "completed";
 
 export interface SegaState {
   stage: SegaStage;
@@ -55,10 +58,17 @@ export interface UIState {
 }
 
 export type GenerationStatus =
-  "idle" | "queued" | "generating" | "paused" | "error";
+  | "idle"
+  | "queued"
+  | "generating"
+  | "paused"
+  | "error";
 
 export type GenerationRequestStatus =
-  "queued" | "processing" | "completed" | "cancelled";
+  | "queued"
+  | "processing"
+  | "completed"
+  | "cancelled";
 
 export interface GenerationRequest {
   id: string;
@@ -106,7 +116,12 @@ export interface GenerationStrategy {
     | {
         type: "foundation";
         field:
-          "shape" | "intent" | "worldState" | "attg" | "style" | "contract";
+          | "shape"
+          | "intent"
+          | "worldState"
+          | "attg"
+          | "style"
+          | "contract";
       }
     | { type: "entitySummary"; entityId: string }
     | { type: "entitySummaryBind"; entityId: string }

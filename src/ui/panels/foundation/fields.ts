@@ -23,7 +23,11 @@ import {
 } from "../../../core/store";
 
 export type FoundationFieldId =
-  "shape" | "intent" | "contract" | "attg" | "style";
+  | "shape"
+  | "intent"
+  | "contract"
+  | "attg"
+  | "style";
 
 export type IntensityLevelDef = { level: string; description: string };
 
