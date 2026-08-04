@@ -9,7 +9,7 @@
  *
  * Shape editing opens a ContentWithTitle edit pane.
  * Intent/ATTG/Style editing opens a SimpleContent edit pane.
- * ATTG/Style have a SuiToggle (radio icon) for syncing to Memory.
+ * ATTG/Style have an SeToggle (radio icon) for syncing to Memory/Author's Note.
  */
 
 import {
@@ -17,7 +17,6 @@ import {
   SuiCard,
   SuiButton,
   SuiActionBar,
-  SuiToggle,
   type SuiComponentOptions,
 } from "nai-simple-ui";
 import { store } from "../../core/store";
@@ -40,6 +39,7 @@ import { IDS } from "../framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import { SeGenerationIconButton } from "./SeGenerationButton";
 import { SeGenRefinePair } from "./SeGenRefinePair";
+import { SeToggle } from "./SeToggle";
 import {
   SeContentWithTitlePane,
   type EditPaneHost,
@@ -211,10 +211,10 @@ export class SeFoundationSection extends SuiComponent<
   private readonly _contractBtnGen: SeGenRefinePair;
   private readonly _attgEditBtn: SuiButton;
   private readonly _attgBtnGen: SeGenRefinePair;
-  private readonly _attgSyncToggle: SuiToggle;
+  private readonly _attgSyncToggle: SeToggle;
   private readonly _styleEditBtn: SuiButton;
   private readonly _styleBtnGen: SeGenRefinePair;
-  private readonly _styleSyncToggle: SuiToggle;
+  private readonly _styleSyncToggle: SeToggle;
 
   constructor(options: SeFoundationSectionOptions) {
     super(
@@ -306,7 +306,7 @@ export class SeFoundationSection extends SuiComponent<
       requestIdFromProjection: (p) => p as string | undefined,
     });
 
-    this._attgSyncToggle = new SuiToggle({
+    this._attgSyncToggle = new SeToggle({
       id: FN.ATTG_SYNC,
       state: { on: store.getState().foundation.attgSyncEnabled },
       theme: SYNC_TOGGLE_THEME,
@@ -335,7 +335,7 @@ export class SeFoundationSection extends SuiComponent<
       requestIdFromProjection: (p) => p as string | undefined,
     });
 
-    this._styleSyncToggle = new SuiToggle({
+    this._styleSyncToggle = new SeToggle({
       id: FN.STYLE_SYNC,
       state: { on: store.getState().foundation.styleSyncEnabled },
       theme: SYNC_TOGGLE_THEME,

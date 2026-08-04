@@ -20,7 +20,6 @@ import {
   SuiButton,
   SuiCard,
   SuiCollapsible,
-  SuiToggle,
   type SuiComponentOptions,
 } from "nai-simple-ui";
 import { store } from "../../core/store";
@@ -39,6 +38,7 @@ import { StoreWatcher } from "../store-watcher";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 import { SeEntityCard } from "./SeEntityCard";
 import { SeThreadEditPane } from "./SeThreadEditPane";
+import { SeToggle } from "./SeToggle";
 
 type SeThreadItemTheme = { default: { self: { style: object } } };
 type SeThreadItemState = Record<string, never>;
@@ -332,7 +332,7 @@ export class SeThreadItem extends SuiComponent<
       (a, b) => a === b, // reference equality
     );
 
-    const lorebookToggle = new SuiToggle({
+    const lorebookToggle = new SeToggle({
       id: T.LOREBOOK_BTN,
       state: { on: hasLorebook },
       disabledWhileCallbackRunning: true,

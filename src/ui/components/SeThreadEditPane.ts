@@ -7,7 +7,7 @@
  *   - Header: back, thread title, save
  *   - Title textInput
  *   - Summary multilineTextInput
- *   - Members section: SuiSectionedList of entity cards with SuiToggle for membership
+ *   - Members section: SuiSectionedList of entity cards with SeToggle for membership
  *
  * Title and summary are committed on Save.
  * Membership toggles dispatch entityGroupToggled immediately.
@@ -17,7 +17,6 @@ import {
   SuiComponent,
   SuiCard,
   SuiSectionedList,
-  SuiToggle,
   type SuiComponentOptions,
 } from "nai-simple-ui";
 import { store } from "../../core/store";
@@ -37,6 +36,7 @@ import {
 } from "../../ui/framework/ids";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 import { SeGenerationIconButton } from "./SeGenerationButton";
+import { SeToggle } from "./SeToggle";
 
 type Theme = { default: { self: { style: object } } };
 type State = Record<string, never>;
@@ -73,7 +73,7 @@ function buildEntitySections(
     if (!bucket) return [];
     const children = bucket.map((entity) => {
       const isMember = group.entityIds.includes(entity.id);
-      const toggle = new SuiToggle({
+      const toggle = new SeToggle({
         id: `${listId}-${entity.id}-toggle`,
         state: { on: isMember },
         callback: () => {

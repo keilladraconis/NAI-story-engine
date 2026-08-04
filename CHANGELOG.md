@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.2] - 2026-08-04
+
+### Fixed
+
+- **Toggles no longer fight back on touch devices.** The ATTG (Memory) and Style (Author's Note) sync toggles — along with the Thread lorebook and Thread membership toggles — flipped twice per tap on touch interfaces, because a tap arrives as both a real and a synthesized click. The toggle would snap back to where it started and the underlying action ran twice, making the switches feel stuck. Repeat clicks landing within 400ms of an accepted one are now ignored, so one tap is one toggle.
+
 ## [0.13.1] - 2026-06-08
 
 ### Changed
