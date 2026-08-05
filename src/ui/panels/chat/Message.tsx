@@ -142,6 +142,18 @@ export function Message(props: MessageProps) {
   // Expanding a Context bubble flips a boolean — an unguarded repeat click
   // from one tap collapses it again, so the block refuses to open.
   const onceCollapseTap = useTapGuard();
+  // Retry and Delete are destructive and must not run twice from one tap.
+  // Neither is saved by targeting a specific message id: MessageList keys by
+  // index (deliberately — see its comment), so the first click's dispatch
+  // re-renders the list and this same instance is reused for whichever message
+  // shifted into the slot. The second click then carries the NEW message's id:
+  // one tap deletes two messages, or retries against the wrong turn. Retry is
+  // worse still — it prunes everything after the message and starts a
+  // generation, so a repeat prunes the reply the first one just queued.
+  // One guard each; the two Delete buttons below are on mutually exclusive
+  // branches, so they share.
+  const onceRetryTap = useTapGuard();
+  const onceDeleteTap = useTapGuard();
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
 
@@ -178,7 +190,9 @@ export function Message(props: MessageProps) {
               style={iconBtn}
               title="Delete"
               onClick={() =>
-                store.dispatch(messageRemoved({ chatId, id: message.id }))
+                onceDeleteTap(() =>
+                  store.dispatch(messageRemoved({ chatId, id: message.id })),
+                )
               }
             >
               <Trash size={ICON} />
@@ -227,11 +241,13 @@ export function Message(props: MessageProps) {
                     style={iconBtn}
                     title="Retry"
                     onClick={() =>
-                      store.dispatch(
-                        uiChatRetryGeneration({
-                          chatId,
-                          messageId: message.id,
-                        }),
+                      onceRetryTap(() =>
+                        store.dispatch(
+                          uiChatRetryGeneration({
+                            chatId,
+                            messageId: message.id,
+                          }),
+                        ),
                       )
                     }
                   >
@@ -242,7 +258,11 @@ export function Message(props: MessageProps) {
                   style={iconBtn}
                   title="Delete"
                   onClick={() =>
-                    store.dispatch(messageRemoved({ chatId, id: message.id }))
+                    onceDeleteTap(() =>
+                      store.dispatch(
+                        messageRemoved({ chatId, id: message.id }),
+                      ),
+                    )
                   }
                 >
                   <Trash size={ICON} />

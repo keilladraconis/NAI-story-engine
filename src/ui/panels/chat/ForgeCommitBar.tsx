@@ -5,6 +5,7 @@
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
+import { useTapGuard } from "../../tap-guard";
 import { store, activeSavedChat } from "../../../core/store";
 import {
   forgeCastAllRequested,
@@ -17,6 +18,13 @@ export function ForgeCommitBar(props: { onEnd: () => void }) {
     const c = activeSavedChat(s.chat);
     return !!c && selectForgeDraftPoolCount(s, c.id) >= 1;
   });
+
+  // Both buttons end the session — the effect deletes the chat, and chatDeleted
+  // moves activeChatId to another chat. Since the target is re-resolved from
+  // the store on each click, an unguarded repeat from one tap would cast or
+  // discard the drafts of whatever chat became active. One guard each.
+  const onceCommitTap = useTapGuard();
+  const onceDiscardTap = useTapGuard();
 
   return (
     <div
@@ -36,25 +44,29 @@ export function ForgeCommitBar(props: { onEnd: () => void }) {
           opacity: canCommit ? 1 : 0.4,
           cursor: canCommit ? "pointer" : "default",
         }}
-        onClick={() => {
-          const chat = activeSavedChat(store.getState().chat);
-          if (chat && canCommit) {
-            store.dispatch(forgeCastAllRequested({ chatId: chat.id }));
-            props.onEnd();
-          }
-        }}
+        onClick={() =>
+          onceCommitTap(() => {
+            const chat = activeSavedChat(store.getState().chat);
+            if (chat && canCommit) {
+              store.dispatch(forgeCastAllRequested({ chatId: chat.id }));
+              props.onEnd();
+            }
+          })
+        }
       >
         Commit
       </button>
       <button
         style={{ flex: 1, padding: "6px", color: T.warning }}
-        onClick={() => {
-          const chat = activeSavedChat(store.getState().chat);
-          if (chat) {
-            store.dispatch(forgeDiscardAllRequested({ chatId: chat.id }));
-            props.onEnd();
-          }
-        }}
+        onClick={() =>
+          onceDiscardTap(() => {
+            const chat = activeSavedChat(store.getState().chat);
+            if (chat) {
+              store.dispatch(forgeDiscardAllRequested({ chatId: chat.id }));
+              props.onEnd();
+            }
+          })
+        }
       >
         Discard
       </button>
