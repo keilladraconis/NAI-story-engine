@@ -28,6 +28,7 @@ import {
 import { migrateBrainstormToChat } from "../core/store/migrations/brainstorm-to-chat";
 import { loadJournal } from "../core/generation-journal";
 import { STORAGE_KEYS } from "../core/keys";
+import { hydrateComposerDrafts } from "./panels/chat/composer-draft";
 import { buildRoot, buildHeader } from "./header/header-parts";
 import { createHeaderDriver, type HeaderDriver } from "./header/header-driver";
 
@@ -149,6 +150,10 @@ export async function start(): Promise<void> {
     });
   }
   if (persisted) store.dispatch(persistedDataLoaded(migrated.data));
+
+  // After persistedDataLoaded so the prune sees the real chat list, and before
+  // register() so the composer's first render already carries its unsent text.
+  await hydrateComposerDrafts(store.getState().chat.chats.map((c) => c.id));
 
   await migrateLorebookCategories();
   await syncEratoCompatibility(store.getState);
