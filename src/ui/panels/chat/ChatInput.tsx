@@ -18,12 +18,32 @@ import {
 import { getChatTypeSpec } from "../../../core/chat-types";
 import { SendButton } from "./SendButton";
 import { useTapGuard } from "../../tap-guard";
+import {
+  readComposerDraft,
+  writeComposerDraft,
+  clearComposerDraft,
+} from "./composer-draft";
 
 export function ChatInput() {
   const chatId = useSlice((s) => s.chat.activeChatId);
   const chatType = useSlice((s) => activeSavedChat(s.chat)?.type ?? "");
-  const [text, setText] = useState("");
+  // Seeded from the draft buffer, so text typed before a tab switch is already
+  // there on the first render after remounting.
+  const [text, setText] = useState(readComposerDraft(chatId ?? ""));
   const [confirming, setConfirming] = useState(false);
+
+  // Mirror every keystroke into the buffer so it outlives this component.
+  const editText = (next: string) => {
+    setText(next);
+    writeComposerDraft(chatId ?? "", next);
+  };
+
+  // The active chat can change while the composer stays mounted (a refine or
+  // forge session opening switches it underneath us). Swap in that chat's own
+  // draft rather than leaving the previous chat's text in the box.
+  useEffect(() => {
+    setText(readComposerDraft(chatId ?? ""));
+  }, [chatId]);
   // One tap = one send. A repeated mobile click submits a second, empty body
   // immediately after `setText("")` — and an empty send on an assistant tail
   // means "continue", so it would fire a stray generation.
@@ -33,6 +53,7 @@ export function ChatInput() {
     const cid = store.getState().chat.activeChatId;
     if (!cid) return;
     store.dispatch(uiChatSubmitUserMessage({ chatId: cid, text }));
+    clearComposerDraft(cid);
     setText("");
     setConfirming(false);
   };
@@ -59,6 +80,7 @@ export function ChatInput() {
         }
       }
     }
+    clearComposerDraft(chat?.id ?? chatId ?? "");
     setText("");
   };
 
@@ -73,7 +95,7 @@ export function ChatInput() {
     >
       <textarea
         value={text}
-        onInput={(e) => setText(e.target.value ?? "")}
+        onInput={(e) => editText(e.target.value ?? "")}
         placeholder={spec.inputPlaceholder ?? "Message…"}
         style={{
           minHeight: "60px",
