@@ -13,11 +13,15 @@ import type { RootState } from "../../../core/store";
 import type { ChatMessage, Chat } from "../../../core/chat-types/types";
 import { getChatTypeSpec } from "../../../core/chat-types";
 import { EntityCard } from "../world/EntityCard";
-import { Edit, RotateCw, Trash, X, Check } from "nai:icons/feather";
+import { ConfirmButton } from "../../components/ConfirmButton";
+import { Edit, RotateCw, X, Check } from "nai:icons/feather";
 
 type MessageProps = { chatId: string; chat: Chat; message: ChatMessage };
 
 const ICON = 14;
+// Separation between the ordinary actions and Delete, so a mis-aimed tap at the
+// edge of the bubble hits dead space rather than the destructive control.
+const DESTRUCTIVE_GAP = "14px";
 
 function readContent(s: RootState, chatId: string, msg: ChatMessage): string {
   return (
@@ -142,18 +146,9 @@ export function Message(props: MessageProps) {
   // Expanding a Context bubble flips a boolean — an unguarded repeat click
   // from one tap collapses it again, so the block refuses to open.
   const onceCollapseTap = useTapGuard();
-  // Retry and Delete are destructive and must not run twice from one tap.
-  // Neither is saved by targeting a specific message id: MessageList keys by
-  // index (deliberately — see its comment), so the first click's dispatch
-  // re-renders the list and this same instance is reused for whichever message
-  // shifted into the slot. The second click then carries the NEW message's id:
-  // one tap deletes two messages, or retries against the wrong turn. Retry is
-  // worse still — it prunes everything after the message and starts a
-  // generation, so a repeat prunes the reply the first one just queued.
-  // One guard each; the two Delete buttons below are on mutually exclusive
-  // branches, so they share.
-  const onceRetryTap = useTapGuard();
-  const onceDeleteTap = useTapGuard();
+  // Retry and Delete destroy data with no undo, so both are ConfirmButtons —
+  // which own their own tap guard and disarm via resetKey when this instance is
+  // reused for another message (MessageList keys by index, deliberately).
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
 
@@ -186,17 +181,14 @@ export function Message(props: MessageProps) {
             >
               {collapsed ? "▸ Context" : "▾ Context"}
             </button>
-            <button
-              style={iconBtn}
+            <ConfirmButton
               title="Delete"
-              onClick={() =>
-                onceDeleteTap(() =>
-                  store.dispatch(messageRemoved({ chatId, id: message.id })),
-                )
+              size={ICON}
+              resetKey={message.id}
+              onConfirm={() =>
+                store.dispatch(messageRemoved({ chatId, id: message.id }))
               }
-            >
-              <Trash size={ICON} />
-            </button>
+            />
           </div>
           {!collapsed && <div style={{ marginTop: SP.sm }}>{content}</div>}
         </div>
@@ -216,16 +208,17 @@ export function Message(props: MessageProps) {
           />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: SP.xs }}>
-            {/* Header row: role label left, actions top-right (matches SUI). */}
+            {/* Header row: role label left, non-destructive actions right, then
+                Delete alone at the far edge. The DESTRUCTIVE_GAP keeps it clear
+                of Edit/Retry so a mis-aimed tap lands on nothing. */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
                 gap: SP.sm,
               }}
             >
-              <span style={{ fontSize: "0.72em", opacity: 0.55 }}>
+              <span style={{ flex: 1, fontSize: "0.72em", opacity: 0.55 }}>
                 {isUser ? "You" : "Assistant"}
               </span>
               <div style={{ display: "flex", gap: SP.xs }}>
@@ -237,36 +230,31 @@ export function Message(props: MessageProps) {
                   <Edit size={ICON} />
                 </button>
                 {message.role === "assistant" && (
-                  <button
-                    style={iconBtn}
+                  <ConfirmButton
                     title="Retry"
-                    onClick={() =>
-                      onceRetryTap(() =>
-                        store.dispatch(
-                          uiChatRetryGeneration({
-                            chatId,
-                            messageId: message.id,
-                          }),
-                        ),
+                    icon={RotateCw}
+                    size={ICON}
+                    resetKey={message.id}
+                    onConfirm={() =>
+                      store.dispatch(
+                        uiChatRetryGeneration({
+                          chatId,
+                          messageId: message.id,
+                        }),
                       )
                     }
-                  >
-                    <RotateCw size={ICON} />
-                  </button>
+                  />
                 )}
-                <button
-                  style={iconBtn}
+              </div>
+              <div style={{ marginLeft: DESTRUCTIVE_GAP, display: "flex" }}>
+                <ConfirmButton
                   title="Delete"
-                  onClick={() =>
-                    onceDeleteTap(() =>
-                      store.dispatch(
-                        messageRemoved({ chatId, id: message.id }),
-                      ),
-                    )
+                  size={ICON}
+                  resetKey={message.id}
+                  onConfirm={() =>
+                    store.dispatch(messageRemoved({ chatId, id: message.id }))
                   }
-                >
-                  <Trash size={ICON} />
-                </button>
+                />
               </div>
             </div>
             <div>{content || "…"}</div>

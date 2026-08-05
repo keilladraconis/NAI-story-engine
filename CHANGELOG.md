@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Deleting or retrying a chat message now takes two taps.** Both destroy work with no undo — Delete removes the turn, and Retry throws away every turn after the one you retried — so each now arms on the first tap (the icon turns into an amber warning) and only acts on a second within four seconds, resetting itself if you leave it alone. Delete has also moved out to the far right edge of the bubble, clear of Edit and Retry, so a mis-aimed tap lands on empty space instead of the destructive control.
 - **Story Engine's interface is rebuilt on NovelAI's JSX/Preact UI API.** The whole sidebar panel — Foundation, Chat, World and Threads, Forge, the Opening/Continue Scene header, and the Import wizard — now renders reactively from the shared store through NovelAI's JSX runtime and styles itself from the active theme via CSS variables. The homebrew SUI component framework and its vendored library are removed, and Story Engine is a single sidebar panel again (no parallel "(JSX)" tab). This is a foundations change: every workflow behaves as before, now on a supported UI platform.
 - **Improved Performance** Owing to clean Preact-based updates instead of clunky updateParts calls via the old API. There should also be far fewer bugs owing to missing callbacks and other lost connections.
 - **Reduced Filesize** The overall bundle size shrank by 30%!
