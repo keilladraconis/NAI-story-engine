@@ -473,6 +473,44 @@ describe("forgeChatNewSessionRequested effect", () => {
     ).toBe(false);
   });
 
+  it("a second request while the first is still building creates only ONE session", async () => {
+    // The new chat is not in state until chatCreated fires, which is after the
+    // briefing await — so a caller checking "is a forge open?" still sees none
+    // and asks again. Both requests are started before either settles, which is
+    // exactly the window a UI tap guard cannot reach.
+    const state = makeState([]);
+    const { dispatch, fire } = makeHarness(state);
+
+    const first = fire(
+      forgeChatNewSessionRequested({ initialUserMessage: "include Vesper" }),
+    );
+    const second = fire(
+      forgeChatNewSessionRequested({ initialUserMessage: "include Vesper" }),
+    );
+    await Promise.all([first, second]);
+
+    const created = dispatch.mock.calls.filter(
+      ([a]) => a.type === "chat/chatCreated",
+    );
+    expect(created).toHaveLength(1);
+    // And only one generation — two would race in the same session.
+    const submitted = dispatch.mock.calls.filter(
+      ([a]) => a.type === "ui/generationSubmitted",
+    );
+    expect(submitted).toHaveLength(1);
+  });
+
+  it("the guard releases, so a later request still opens a session", async () => {
+    // A guard that never resets would silently break Forge after one use.
+    const state = makeState([]);
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatNewSessionRequested({}));
+    await fire(forgeChatNewSessionRequested({}));
+    expect(
+      dispatch.mock.calls.filter(([a]) => a.type === "chat/chatCreated"),
+    ).toHaveLength(2);
+  });
+
   it("seeds the briefing as the first (system) message of the new chat", async () => {
     const state = makeState([]);
     const { dispatch, fire } = makeHarness(state);

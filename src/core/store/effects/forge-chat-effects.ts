@@ -374,59 +374,78 @@ export function registerForgeChatEffects(
   );
 
   // ─── New Session (fresh forge chat; discuss turn if seeded, else idle) ──────
+  //
+  // Re-entrancy guard. A new session only becomes observable when chatCreated
+  // lands, and that is AFTER `await buildForgeBriefing` below — so a caller
+  // that checks "is a forge already open?" (ForgeSection) still sees none
+  // during that window and asks for a second. Two sessions then generate side
+  // by side. That window is as long as the briefing takes to build, well past
+  // what a UI tap guard covers, so it has to be closed here.
+  let creatingSession = false;
+
   subscribeEffect(
     matchesAction(forgeChatNewSessionRequested),
     async (action, { getState: latest }) => {
-      const { initialUserMessage } = action.payload;
-      const seedText = initialUserMessage?.trim();
+      if (creatingSession) return;
+      creatingSession = true;
+      try {
+        const { initialUserMessage } = action.payload;
+        const seedText = initialUserMessage?.trim();
 
-      // Capture the frozen briefing BEFORE chatCreated fires — at this point
-      // activeSavedChat still resolves to the brainstorm the user came from,
-      // not the forge chat we are about to create.
-      const briefing = await buildForgeBriefing(latest);
+        // Capture the frozen briefing BEFORE chatCreated fires — at this point
+        // activeSavedChat still resolves to the brainstorm the user came from,
+        // not the forge chat we are about to create.
+        const briefing = await buildForgeBriefing(latest);
 
-      const messages: ChatMessage[] = [];
-      if (briefing) {
-        messages.push({ id: api.v1.uuid(), role: "system", content: briefing });
+        const messages: ChatMessage[] = [];
+        if (briefing) {
+          messages.push({
+            id: api.v1.uuid(),
+            role: "system",
+            content: briefing,
+          });
+        }
+        if (seedText) {
+          messages.push({ id: api.v1.uuid(), role: "user", content: seedText });
+        }
+
+        const chat: Chat = {
+          id: api.v1.uuid(),
+          type: "forge",
+          title: "Forge",
+          subMode: "sketch",
+          messages,
+          seed: { kind: "blank" },
+        };
+        dispatch(chatCreated({ chat }));
+
+        // Opening a Forge no longer auto-runs a pass. With guidance, run one
+        // conversational discuss turn (emits commands only if explicitly asked);
+        // with no guidance, leave the session idle — the user sends empty to
+        // Forge Ahead or types to discuss. chatCreated already switched the tab.
+        if (!seedText) return;
+
+        const assistantId = api.v1.uuid();
+        dispatch(
+          messageAdded({
+            chatId: chat.id,
+            message: { id: assistantId, role: "assistant", content: "" },
+          }),
+        );
+
+        const seeded = findChat(latest(), chat.id) ?? chat;
+        const strategy = buildForgeDiscussStrategy(latest, seeded, assistantId);
+        dispatch(
+          requestQueued({
+            id: strategy.requestId,
+            type: "forgeChat",
+            targetId: assistantId,
+          }),
+        );
+        dispatch(generationSubmitted(strategy));
+      } finally {
+        creatingSession = false;
       }
-      if (seedText) {
-        messages.push({ id: api.v1.uuid(), role: "user", content: seedText });
-      }
-
-      const chat: Chat = {
-        id: api.v1.uuid(),
-        type: "forge",
-        title: "Forge",
-        subMode: "sketch",
-        messages,
-        seed: { kind: "blank" },
-      };
-      dispatch(chatCreated({ chat }));
-
-      // Opening a Forge no longer auto-runs a pass. With guidance, run one
-      // conversational discuss turn (emits commands only if explicitly asked);
-      // with no guidance, leave the session idle — the user sends empty to
-      // Forge Ahead or types to discuss. chatCreated already switched the tab.
-      if (!seedText) return;
-
-      const assistantId = api.v1.uuid();
-      dispatch(
-        messageAdded({
-          chatId: chat.id,
-          message: { id: assistantId, role: "assistant", content: "" },
-        }),
-      );
-
-      const seeded = findChat(latest(), chat.id) ?? chat;
-      const strategy = buildForgeDiscussStrategy(latest, seeded, assistantId);
-      dispatch(
-        requestQueued({
-          id: strategy.requestId,
-          type: "forgeChat",
-          targetId: assistantId,
-        }),
-      );
-      dispatch(generationSubmitted(strategy));
     },
   );
 
