@@ -714,6 +714,16 @@ Use natural paragraphing — break on shifts of beat, focus, or action. Blank li
 
 Prose only.`;
 
+/** Frames the writer's free-text direction from the Opening Scene modal. Sits
+ *  after BOOTSTRAP_P1_PROMPT so it is the last thing read before generation —
+ *  the writer's answer outranks the generic opening recipe wherever the two
+ *  disagree. */
+export const BOOTSTRAP_OPENING_DIRECTION_FRAME = `The writer has specified how this story opens. Everything below is the starting condition of the passage — not a theme to gesture at, not something to arrive at later. Write from inside it, and honour it over any default choice of moment or vantage:`;
+
+export function buildOpeningDirectionPrompt(guidance: string): string {
+  return `${BOOTSTRAP_OPENING_DIRECTION_FRAME}\n\n${guidance.trim()}`;
+}
+
 export const BOOTSTRAP_CONTINUE_PROMPT = `Continue directly from the last sentence of the story. Do not advance time, change location, or begin a new scene — stay inside the exact moment where the text ended.
 
 Prohibited:

@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Opening Scene asks how the story should open.** The header button no longer fires a generation the moment you click it — it opens a box asking _"Open the story with:"_, and generates only when you press Generate. Type a technique (_"in media res"_), a beat (_"the protagonist's first trauma"_), or a literal moment (_"waking up on the first day at the new high school"_) and the opening is written from inside it, outranking the engine's default choice of where to start. Leave the box empty and you get exactly the opening the button wrote before. What you type is kept with the story, so undoing the opening and clicking again brings your direction back for another pass, and closing the box without generating writes nothing.
 - **The entity edit pane's Content ⚡ is adaptive.** Like the Foundation fields, it generates lorebook content on an empty entry and opens a refine chat (rewriting the entry) once content exists, instead of always generating.
 
 ### Fixed

@@ -16,15 +16,20 @@ import { buildStoryEnginePrefix } from "../../utils/context-builder";
 import {
   BOOTSTRAP_P1_PROMPT,
   BOOTSTRAP_CONTINUE_PROMPT,
+  buildOpeningDirectionPrompt,
   XIALONG_STYLE,
 } from "../../utils/prompts";
 
 // ─── Phase 1 factory ─────────────────────────────────────────────────────────
 // Narrow context: just ATTG/style/foundation/setting — no world entities,
 // no brainstorm, no story text. Generates the opening paragraph only.
+//
+// `guidance` is the Opening Scene modal's answer to "Open the story with:".
+// Blank means the writer generated without a direction — the prompt is then
+// exactly what it was before the modal existed.
 
 const createBootstrapP1Factory =
-  (getState: () => RootState): MessageFactory =>
+  (getState: () => RootState, guidance: string): MessageFactory =>
   async () => {
     const prefix = await buildStoryEnginePrefix(getState, {
       excludeSections: ["worldEntities", "storyText"],
@@ -51,6 +56,12 @@ const createBootstrapP1Factory =
     }
 
     messages.push({ role: "system" as const, content: BOOTSTRAP_P1_PROMPT });
+    if (guidance.trim()) {
+      messages.push({
+        role: "system" as const,
+        content: buildOpeningDirectionPrompt(guidance),
+      });
+    }
     await appendXialongStyleMessage(messages, XIALONG_STYLE.bootstrap);
 
     return {
@@ -124,10 +135,11 @@ const createBootstrapContinueFactory =
 
 function buildBootstrapP1Strategy(
   getState: () => RootState,
+  guidance: string,
 ): GenerationStrategy {
   return {
     requestId: api.v1.uuid(),
-    messageFactory: createBootstrapP1Factory(getState),
+    messageFactory: createBootstrapP1Factory(getState, guidance),
     target: { type: "bootstrap" },
     prefillBehavior: "trim",
   };
@@ -160,9 +172,13 @@ export function registerBootstrapEffects(
     dispatch(documentHistoryNavigated());
   });
 
-  // Stage 1 — "Opening Scene". User-triggered; does NOT auto-chain into Continue.
-  subscribeEffect(matchesAction(bootstrapRequested), () => {
-    const strategy = buildBootstrapP1Strategy(getState);
+  // Stage 1 — "Opening Scene". User-triggered from the Opening Scene modal,
+  // which carries the writer's direction; does NOT auto-chain into Continue.
+  subscribeEffect(matchesAction(bootstrapRequested), (action) => {
+    const strategy = buildBootstrapP1Strategy(
+      getState,
+      action.payload.guidance,
+    );
     dispatch(
       requestQueued({
         id: strategy.requestId,

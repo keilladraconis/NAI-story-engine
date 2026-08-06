@@ -168,10 +168,10 @@ Watch the status as it works. You can also regenerate content or keys for any si
 
 If the document is empty and you'd like the engine to write the opening, use the header button. It walks two user-triggered stages, and its label always tells you what the next click does:
 
-1. **⚡ Opening Scene** — writes the cold open from your Shape, Intent, and Brainstorm: the protagonist already in the scene, mid-action, no introductions or backstory dumps. Then it stops.
+1. **⚡ Opening Scene** — asks _"Open the story with:"_ before it writes anything. Answer in a line or leave it blank, hit **Generate**, and it writes the cold open from your Shape, Intent, and Brainstorm: the protagonist already in the scene, mid-action, no introductions or backstory dumps. Then it stops. Anything you type steers the moment — a technique (_"in media res"_), a beat (_"the protagonist's first trauma"_), or a literal scene (_"waking up on the first day at the new high school"_).
 2. **⚡ Continue Scene** — extends the opening one paragraph per click, picking up from the last sentence. Click as far as you like, or stop and write the rest by hand.
 
-You decide how much the engine writes — nothing chains on its own. The button tracks the document: undo back to a blank page and it reads **⚡ Opening Scene** again. Prefer to write the opening yourself? Skip this step.
+You decide how much the engine writes — nothing chains on its own. The button tracks the document: undo back to a blank page and it reads **⚡ Opening Scene** again, with your last direction still in the box for another pass. Prefer to write the opening yourself? Skip this step.
 
 ---
 

@@ -14,6 +14,8 @@ export const STORAGE_KEYS = {
   SETTING: "kse-setting",
   // Forge guidance draft.
   FORGE_GUIDANCE_UI: "se-forge-guidance",
+  // Opening Scene direction draft (the modal's textarea).
+  OPENING_GUIDANCE: "se-opening-guidance",
   // Unsent chat composer text, as a { [chatId]: string } blob.
   COMPOSER_DRAFTS: "kse-composer-drafts",
 };

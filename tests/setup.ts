@@ -123,6 +123,14 @@ const apiMock = {
       },
       update: vi.fn(),
       register: vi.fn(),
+      modal: {
+        open: vi.fn(async () => ({
+          update: vi.fn(),
+          close: vi.fn(async () => {}),
+          isClosed: vi.fn(() => false),
+          closed: Promise.resolve(),
+        })),
+      },
       extension: {
         sidebarPanel: vi.fn((props) => ({ ...props, type: "sidebarPanel" })),
       },
