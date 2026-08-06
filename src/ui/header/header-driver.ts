@@ -20,6 +20,7 @@ import {
 } from "../../core/store";
 import { derive, storeSignature, type HeaderModel } from "./header-model";
 import { patch, type HeaderHandlers } from "./header-parts";
+import { openOpeningSceneModal } from "./opening-scene-modal";
 
 /** 1s while counting down so the label ticks; 5s otherwise, which is only
  *  there to notice the output bucket silently refilling. */
@@ -49,6 +50,10 @@ export function createHeaderDriver(
   let lastModel: HeaderModel | null = null;
   let hasDocumentContent = options.hasDocumentContent;
   let bootstrapWasPending = false;
+  // The header button stays enabled while the Opening Scene modal is up (no
+  // request exists yet, so nothing in the store dims it) — this is what stops a
+  // second click stacking a second modal on the first.
+  let openingModalOpen = false;
   let timerId: number | null = null;
   let stopped = false;
   let docSeq = 0;
@@ -120,12 +125,26 @@ export function createHeaderDriver(
         store.dispatch(uiRequestCancellation());
     },
     onImport: () => store.dispatch(importWizardOpened()),
-    onBootstrap: () =>
-      store.dispatch(
-        hasDocumentContent
-          ? bootstrapContinueRequested()
-          : bootstrapRequested(),
-      ),
+    // Continuing fires on the click — there is nothing to ask once the story has
+    // a first page. Opening asks first: the modal collects the writer's
+    // direction and dispatches on its Generate, so a dismissed modal generates
+    // nothing.
+    onBootstrap: () => {
+      if (hasDocumentContent) {
+        store.dispatch(bootstrapContinueRequested());
+        return;
+      }
+      if (openingModalOpen) return;
+      openingModalOpen = true;
+      const release = () => {
+        openingModalOpen = false;
+      };
+      // Released on rejection too — a modal that failed to open must not leave
+      // the button permanently dead.
+      void openOpeningSceneModal((guidance) =>
+        store.dispatch(bootstrapRequested({ guidance })),
+      ).then(release, release);
+    },
   };
 
   return {
