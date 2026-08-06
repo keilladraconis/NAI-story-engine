@@ -87,10 +87,12 @@ const apiMock = {
       set: vi.fn().mockResolvedValue(undefined),
     },
     lorebook: {
+      categories: vi.fn().mockResolvedValue([]),
       category: vi.fn(),
       createCategory: vi.fn(),
       updateCategory: vi.fn(),
       removeCategory: vi.fn(),
+      entries: vi.fn().mockResolvedValue([]),
       entry: vi.fn(),
       createEntry: vi.fn(),
       updateEntry: vi.fn(),
