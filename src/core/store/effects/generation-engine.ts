@@ -23,6 +23,7 @@ import { getModel } from "../../utils/config";
 import { stripThinkingTags } from "../../utils/tag-parser";
 import { messageUpdated } from "../slices/chat";
 import { clearStream } from "../stream-buffer";
+import { continuationTaskId, isRequestOrContinuation } from "../request-ids";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Private Helpers
@@ -169,7 +170,12 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
 }
 
 /**
- * Check if a request was cancelled by the user
+ * Check if a request was cancelled by the user.
+ *
+ * Matches the parent request or any of its continuation tasks: while a
+ * continuation runs it is the request the runtime holds as active, so a check
+ * against the parent id alone would report "not cancelled" for the whole
+ * continuation window and let the next call start.
  */
 function checkCancellation(
   requestId: string,
@@ -177,7 +183,9 @@ function checkCancellation(
 ): boolean {
   const activeRequest = getState().runtime.activeRequest;
   return (
-    activeRequest?.id === requestId && activeRequest?.status === "cancelled"
+    !!activeRequest &&
+    activeRequest.status === "cancelled" &&
+    isRequestOrContinuation(activeRequest.id, requestId)
   );
 }
 
@@ -240,6 +248,12 @@ export function registerGenerationEngineEffects(
 
     const handler = getHandler(target.type);
     let generationSucceeded = false;
+    // Set while a continuation call is in flight. If that call throws we still
+    // have to retire its runtime entry — it is the request the runtime holds as
+    // active, so leaving it behind strands every surface that reads runtime on
+    // "still generating". Cleared after the cancellation check below, which
+    // needs to see the cancelled task before it disappears.
+    let inFlightContTaskId: string | undefined;
 
     const onStream = (choices: GenerationChoice[], _final: boolean) => {
       const text = choices[0]?.text || "";
@@ -331,7 +345,7 @@ export function registerGenerationEngineEffects(
         while (calls < maxCalls && isTruncated(finishReason)) {
           if (checkCancellation(requestId, getState)) break;
 
-          const contTaskId = `${requestId}-cont-${calls}`;
+          const contTaskId = continuationTaskId(requestId, calls);
           api.v1.log(
             `[continuation] Call ${calls + 1}/${maxCalls}, extending output...`,
           );
@@ -349,6 +363,7 @@ export function registerGenerationEngineEffects(
           ];
 
           const lengthBefore = accumulatedText.length;
+          inFlightContTaskId = contTaskId;
           const contResult = await genX.generate(
             continuationMessages,
             { ...apiParams, taskId: contTaskId },
@@ -356,6 +371,7 @@ export function registerGenerationEngineEffects(
             "background",
             await api.v1.createCancellationSignal(),
           );
+          inFlightContTaskId = undefined;
 
           dispatch(requestCompleted({ requestId: contTaskId }));
           finishReason = contResult.choices?.[0]?.finish_reason;
@@ -386,6 +402,10 @@ export function registerGenerationEngineEffects(
     if (wasCancelled) {
       api.v1.log(`[effects] Generation was cancelled for ${requestId}`);
       generationSucceeded = false;
+    }
+    if (inFlightContTaskId) {
+      dispatch(requestCompleted({ requestId: inFlightContTaskId }));
+      inFlightContTaskId = undefined;
     }
 
     // Trim leading whitespace from model output (prevents double-space artifacts after prefill)

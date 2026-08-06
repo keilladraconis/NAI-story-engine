@@ -30,11 +30,11 @@ import {
 } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
 import {
-  createLorebookContentFactory,
+  buildLorebookContentPayload,
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
 import { hashEntryPosition, getStoryIdSeed } from "../../utils/seeded-random";
-import { buildModelParams } from "../../utils/config";
+import { isRequestOrContinuation } from "../request-ids";
 import { nameKey } from "./handlers/lorebook";
 import { lorebookContentRequestId, lorebookKeysRequestId } from "../../keys";
 
@@ -128,15 +128,10 @@ async function queueSegaLorebookContent(
   dispatch(segaStatusUpdated({ statusText: `Lorebook: ${entity.name}` }));
   dispatch(segaRequestTracked({ requestId: contentRequestId }));
 
-  const contentFactory = createLorebookContentFactory(getState, entryId);
   dispatch(
-    generationSubmitted({
-      requestId: contentRequestId,
-      messageFactory: contentFactory,
-      params: await buildModelParams({ max_tokens: 1024 }),
-      target: { type: "lorebookContent", entryId },
-      prefillBehavior: "trim",
-    }),
+    generationSubmitted(
+      buildLorebookContentPayload(getState, entryId, contentRequestId),
+    ),
   );
 }
 
@@ -176,8 +171,16 @@ function cancelAllSegaTasks(
     genX.cancelQueued(requestId);
   }
 
+  // A generation that ran past the token cap is mid-continuation, and the
+  // runtime holds the continuation task — not the tracked parent — as active.
+  // Matching on the id alone let Stop sail past an in-flight lorebook entry.
   const activeRequest = getState().runtime.activeRequest;
-  if (activeRequest && activeRequestIds.includes(activeRequest.id)) {
+  const activeIsSega =
+    !!activeRequest &&
+    activeRequestIds.some((id) =>
+      isRequestOrContinuation(activeRequest.id, id),
+    );
+  if (activeRequest && activeIsSega) {
     dispatch(requestCancelled({ requestId: activeRequest.id }));
     genX.cancelAll();
     dispatch(stateUpdated({ genxState: { status: "idle", queueLength: 0 } }));

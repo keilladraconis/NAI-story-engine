@@ -16,7 +16,15 @@ import { FieldID } from "../../../../src/config/field-definitions";
 
 // Isolate the effect's branching from real strategy construction.
 vi.mock("../../../../src/core/utils/lorebook-strategy", () => ({
-  createLorebookContentFactory: vi.fn(() => async () => ({ messages: [] })),
+  buildLorebookContentPayload: vi.fn(
+    (_g: unknown, entryId: string, requestId: string) => ({
+      requestId,
+      messageFactory: async () => ({ messages: [] }),
+      target: { type: "lorebookContent", entryId },
+      prefillBehavior: "trim" as const,
+      continuation: { maxCalls: 4 },
+    }),
+  ),
   buildLorebookKeysPayload: vi.fn(
     async (_g: unknown, entryId: string, requestId: string) => ({
       requestId,

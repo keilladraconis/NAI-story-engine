@@ -14,7 +14,7 @@ import {
   createThreadSummaryFactory,
 } from "../../utils/summary-strategy";
 import {
-  createLorebookContentFactory,
+  buildLorebookContentPayload,
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
 import { buildModelParams } from "../../utils/config";
@@ -189,16 +189,13 @@ export function registerSummaryGenerationEffects(
         }),
       );
       dispatch(
-        generationSubmitted({
-          requestId: contentRequestId,
-          messageFactory: createLorebookContentFactory(
+        generationSubmitted(
+          buildLorebookContentPayload(
             getState,
             lorebookEntryId,
+            contentRequestId,
           ),
-          params: await buildModelParams({ max_tokens: 1024 }),
-          target: { type: "lorebookContent", entryId: lorebookEntryId },
-          prefillBehavior: "trim",
-        }),
+        ),
       );
     }
 

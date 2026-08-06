@@ -5,6 +5,10 @@ import { makeTestStore } from "../helpers/store-helpers";
 import { registerGenerationEngineEffects } from "../../../../src/core/store/effects/generation-engine";
 import { generationSubmitted } from "../../../../src/core/store/slices/ui";
 import {
+  requestActivated,
+  requestCancelled,
+} from "../../../../src/core/store/slices/runtime";
+import {
   chatCreated,
   messageAdded,
 } from "../../../../src/core/store/slices/chat";
@@ -18,13 +22,22 @@ import type { Chat } from "../../../../src/core/chat-types/types";
 const CHAT_ID = "refine-chat";
 const MESSAGE_ID = "candidate";
 
-type Step = { text: string; finish_reason?: string };
+type TestStore = ReturnType<typeof makeTestStore>;
+
+type Step = {
+  text: string;
+  finish_reason?: string;
+  /** Runs once the call is registered — use it to simulate a user cancelling. */
+  onCall?: (taskId: string, store: TestStore) => void;
+  /** Reject instead of returning, as GenX does for a cancelled signal. */
+  rejectWith?: string;
+};
 
 /**
  * GenX stub that replays a scripted sequence of responses — one per call — so a
  * test can say "the model hit the token cap twice, then finished".
  */
-function makeScriptedGenX(script: Step[]) {
+function makeScriptedGenX(script: Step[], getStore: () => TestStore) {
   const seen: { messages: Message[]; params: Record<string, unknown> }[] = [];
   let call = 0;
 
@@ -39,8 +52,10 @@ function makeScriptedGenX(script: Step[]) {
       const resolved =
         typeof messages === "function" ? (await messages()).messages : messages;
       seen.push({ messages: resolved, params });
+      step.onCall?.(String(params.taskId), getStore());
       if (step.text)
         onStream?.([{ text: step.text }] as GenerationChoice[], true);
+      if (step.rejectWith) throw new Error(step.rejectWith);
       return {
         choices: [{ text: step.text, finish_reason: step.finish_reason }],
       };
@@ -52,7 +67,7 @@ function makeScriptedGenX(script: Step[]) {
 
 function makeHarness(script: Step[]) {
   const store = makeTestStore();
-  const { genX, generate, seen } = makeScriptedGenX(script);
+  const { genX, generate, seen } = makeScriptedGenX(script, () => store);
 
   registerGenerationEngineEffects(
     store.subscribeEffect as Store<RootState>["subscribeEffect"],
@@ -109,7 +124,7 @@ function strategyWith(
   };
 }
 
-function committedText(store: ReturnType<typeof makeTestStore>): string {
+function committedText(store: TestStore): string {
   const chat = store.getState().chat.chats.find((c) => c.id === CHAT_ID);
   return chat?.messages.find((m) => m.id === MESSAGE_ID)?.content ?? "";
 }
@@ -197,5 +212,31 @@ describe("generation engine — continuation", () => {
     await vi.waitFor(() =>
       expect(committedText(store)).toBe("A fortress of black stone."),
     );
+  });
+
+  it("stops when the user cancels mid-continuation and retires the continuation task", async () => {
+    // While a continuation runs it — not the parent — is the request the
+    // runtime holds as active. Cancellation has to recognise that, and the
+    // dead task must not be left sitting in activeRequest afterwards.
+    const { store, generate } = makeHarness([
+      { text: "first", finish_reason: "length" },
+      {
+        text: "",
+        finish_reason: "length",
+        onCall: (taskId, s) => {
+          s.dispatch(requestActivated({ requestId: taskId }));
+          s.dispatch(requestCancelled({ requestId: taskId }));
+        },
+        rejectWith: "Cancelled",
+      },
+    ]);
+
+    store.dispatch(generationSubmitted(strategyWith({})));
+
+    await vi.waitFor(() => expect(generate).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() =>
+      expect(store.getState().runtime.activeRequest).toBeNull(),
+    );
+    expect(generate).toHaveBeenCalledTimes(2);
   });
 });
