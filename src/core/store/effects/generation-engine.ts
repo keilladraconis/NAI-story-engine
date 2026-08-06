@@ -315,6 +315,19 @@ export function registerGenerationEngineEffects(
 
         const queueEntry = targetToQueueEntry(target);
 
+        // The trailing assistant message is a prefill — text the model is
+        // treated as having already written. Fold it into the single
+        // continuation turn rather than leaving two adjacent assistant
+        // messages, and drop it from the base so it is not sent twice.
+        // `accumulatedText` already begins with it whenever prefillBehavior is
+        // "keep", so only prepend when it is missing.
+        const lastMsg = resolvedMessages[resolvedMessages.length - 1];
+        const prefillText =
+          lastMsg?.role === "assistant" ? lastMsg.content || "" : "";
+        const baseMessages = prefillText
+          ? resolvedMessages.slice(0, -1)
+          : resolvedMessages;
+
         while (calls < maxCalls && isTruncated(finishReason)) {
           if (checkCancellation(requestId, getState)) break;
 
@@ -327,16 +340,15 @@ export function registerGenerationEngineEffects(
           // and UI buttons (stateProjection) see a live request of the same type.
           dispatch(requestQueued({ id: contTaskId, ...queueEntry }));
 
-          const lastMsg = resolvedMessages[resolvedMessages.length - 1];
-          const baseMessages =
-            lastMsg?.role === "assistant"
-              ? resolvedMessages.slice(0, -1)
-              : resolvedMessages;
+          const soFar = accumulatedText.startsWith(prefillText)
+            ? accumulatedText
+            : prefillText + accumulatedText;
           const continuationMessages: Message[] = [
             ...baseMessages,
-            { role: "assistant", content: accumulatedText },
+            { role: "assistant", content: soFar },
           ];
 
+          const lengthBefore = accumulatedText.length;
           const contResult = await genX.generate(
             continuationMessages,
             { ...apiParams, taskId: contTaskId },
@@ -348,6 +360,21 @@ export function registerGenerationEngineEffects(
           dispatch(requestCompleted({ requestId: contTaskId }));
           finishReason = contResult.choices?.[0]?.finish_reason;
           calls++;
+
+          // A call that adds nothing will keep adding nothing — stop rather
+          // than burning the rest of the allowance on identical requests.
+          if (accumulatedText.length === lengthBefore) {
+            api.v1.log(
+              `[continuation] Call ${calls} returned no new text — stopping`,
+            );
+            break;
+          }
+        }
+
+        if (isTruncated(finishReason)) {
+          api.v1.log(
+            `[continuation] Still truncated after ${calls}/${maxCalls} calls — committing as-is`,
+          );
         }
       }
     } catch (error: any) {

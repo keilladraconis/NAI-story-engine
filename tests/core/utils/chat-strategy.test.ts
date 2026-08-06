@@ -3,6 +3,7 @@ import { buildChatStrategy } from "../../../src/core/utils/chat-strategy";
 import type { Chat } from "../../../src/core/chat-types/types";
 import type { RootState } from "../../../src/core/store/types";
 import { buildBrainstormPrompt } from "../../../src/core/utils/prompts";
+import { refineBudgetFor } from "../../../src/core/utils/refine-strategy";
 
 describe("buildChatStrategy", () => {
   it("returns a strategy with chat target type for a saved chat", async () => {
@@ -50,6 +51,50 @@ describe("buildChatStrategy", () => {
       fieldId: "attg",
     });
     expect(strategy.requestId).toBe("refine-r1-asst");
+    // Refines auto-continue too — a rewrite cut off by the token cap used to
+    // be committed mid-sentence.
+    expect(strategy.continuation).toEqual({
+      maxCalls: refineBudgetFor("attg").maxCalls,
+    });
+  });
+
+  it("sizes a lorebook refine to the lorebook budget, not the short-field default", async () => {
+    const refine: Chat = {
+      id: "r2",
+      type: "refine",
+      title: "Refine",
+      messages: [
+        {
+          id: "s",
+          role: "system",
+          content: "entry text",
+          messageKind: "refineSource",
+        },
+      ],
+      seed: {
+        kind: "fromField",
+        sourceFieldId: "lorebookContent",
+        sourceText: "entry text",
+      },
+      refineTarget: {
+        fieldId: "lorebookContent",
+        originalText: "entry text",
+        entryId: "e1",
+      },
+    };
+    const getState = () =>
+      ({
+        chat: { chats: [], activeChatId: null, refineChat: refine },
+        foundation: {},
+        world: { entitiesById: {}, entityIds: [], groups: [] },
+        brainstorm: { chats: [], currentChatIndex: 0 },
+      }) as unknown as RootState;
+    const budget = refineBudgetFor("lorebookContent");
+    const strategy = await buildChatStrategy(getState, refine, "asst");
+    expect(strategy.continuation).toEqual({ maxCalls: budget.maxCalls });
+    const built = await strategy.messageFactory!();
+    expect(built.params?.max_tokens).toBe(budget.maxTokens);
+    expect(built.params?.stop).toEqual(budget.stop);
   });
 
   it("manual continuation: keeps the existing assistant tail and switches prefillBehavior to keep", async () => {
