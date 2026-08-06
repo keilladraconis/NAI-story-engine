@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.2] - 2026-08-06
+
+### Fixed
+
+- **One click on ⚡ Generate runs one generation.** A double-click — or a single tap the UI delivered twice — used to queue the same generation twice, so a lorebook entry got two responses streamed into it (doubled text) for double the output budget. Every generation button now debounces its own clicks, and the generation engine drops a request whose ID is already running, so a duplicate can't get through from any surface. The debounce is keyed per action, so the Cancel click that follows a Generate still lands immediately.
+- **The lorebook edit pane's other buttons are debounced too.** Save, Back, Always On, Unbind, and the ✎ Refine button all guard against a doubled click. Save mattered most: two clicks on a draft entity raced each other into creating **two** lorebook entries, leaving the first orphaned in your lorebook. Draft promotion is now shared between concurrent callers, so Save and the Content/Keys ⚡ can no longer each mint an entry for the same draft.
+
 ## [0.13.1] - 2026-06-08
 
 ### Changed

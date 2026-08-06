@@ -188,13 +188,23 @@ export function registerGenerationEngineEffects(
   getState: () => RootState,
   genX: GenX,
 ): void {
-  // Intent: GenX Generation (using handler map pattern)
-  subscribeEffect(matchesAction(generationSubmitted), async (action) => {
-    const strategy = action.payload;
+  // Request IDs currently being generated. Every generation request has a
+  // stable, target-derived ID, so a repeated submission of the same ID while
+  // the first is still running is always a duplicate — a double-clicked
+  // Generate button, or an effect fired twice — and running it would stream a
+  // second response into the same target (doubling lorebook text) and burn
+  // output budget. UI debouncing catches most of this; this is the backstop
+  // that makes it impossible. Effects run synchronously up to their first
+  // await, so the ID is registered before any duplicate can arrive.
+  const inFlight = new Set<string>();
+
+  const runGeneration = async (strategy: GenerationStrategy): Promise<void> => {
     const { requestId, messages, messageFactory, params, target } = strategy;
 
     let accumulatedText = resolvePrefill(strategy, getState);
-    const apiParams = { ...params };
+    // Strategies either carry complete params or defer them to their message
+    // factory, which Object.assigns them in below before the first generate().
+    const apiParams = { ...params } as GenerationParams;
 
     // Resolved messages captured via closure for potential continuation calls
     let resolvedMessages: Message[] | undefined;
@@ -418,6 +428,23 @@ export function registerGenerationEngineEffects(
       } else if (target.type === "bootstrap") {
         api.v1.ui.toast("Story opener generated", { type: "success" });
       }
+    }
+  };
+
+  // Intent: GenX Generation (using handler map pattern)
+  subscribeEffect(matchesAction(generationSubmitted), async (action) => {
+    const strategy: GenerationStrategy = action.payload;
+    if (inFlight.has(strategy.requestId)) {
+      api.v1.log(
+        `[effects] Duplicate submission ignored for ${strategy.requestId}`,
+      );
+      return;
+    }
+    inFlight.add(strategy.requestId);
+    try {
+      await runGeneration(strategy);
+    } finally {
+      inFlight.delete(strategy.requestId);
     }
   });
 

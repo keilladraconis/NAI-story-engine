@@ -20,6 +20,7 @@ import { IDS } from "../../ui/framework/ids";
 import { StoreWatcher } from "../store-watcher";
 import { SeGenRefinePair } from "./SeGenRefinePair";
 import { SeGenerationIconButton } from "./SeGenerationButton";
+import { ClickGuard } from "../framework/click-guard";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 type Theme = { default: { self: { style: object } } };
@@ -65,6 +66,8 @@ export class SeLorebookContentPane extends SuiComponent<
   private readonly _watcher: StoreWatcher;
   private readonly _contentBtn: SeGenRefinePair;
   private readonly _keysBtn: SeGenerationIconButton;
+  /** Debounces this pane's own buttons; the gen buttons guard themselves. */
+  private readonly _clicks: ClickGuard;
 
   constructor(options: SeLorebookContentPaneOptions) {
     super(
@@ -73,6 +76,7 @@ export class SeLorebookContentPane extends SuiComponent<
     );
 
     this._watcher = new StoreWatcher();
+    this._clicks = new ClickGuard();
 
     const { entityId } = options;
     const entity = store.getState().world.entitiesById[entityId];
@@ -165,9 +169,7 @@ export class SeLorebookContentPane extends SuiComponent<
               id: `${this.id}-back`,
               text: "",
               iconId: "arrow-left" as IconId,
-              callback: () => {
-                _close();
-              },
+              callback: this._clicks.wrap("back", _close),
             }),
             text({
               id: L.ENTRY_NAME,
@@ -229,14 +231,14 @@ export class SeLorebookContentPane extends SuiComponent<
               id: L.UNBIND_BTN,
               text: "✕ Unbind",
               style: S.unbindBtn,
-              callback: () => {
+              callback: this._clicks.wrap("unbind", () => {
                 const e = store.getState().world.entitiesById[entityId];
                 if (e) {
                   store.dispatch(entityUnbound({ entityId }));
                   api.v1.ui.toast(`Unbound: ${e.name}`, { type: "success" });
                 }
                 _close();
-              },
+              }),
             }),
           ],
         }),

@@ -20,6 +20,7 @@ import {
   uiUserPresenceConfirmed,
 } from "../../core/store";
 import { StoreWatcher } from "../store-watcher";
+import { ClickGuard } from "../framework/click-guard";
 import type { RootState } from "../../core/store/types";
 import { colors } from "../theme";
 
@@ -247,6 +248,10 @@ export class SeGenerationButton extends SuiComponent<
 > {
   private readonly _watcher: StoreWatcher;
   private readonly _modeSelector: (s: RootState) => ModeSlice;
+  /** Leading-edge debounce shared by every action this button can fire.
+   *  Without it a double-click (or a doubled tap event) queued the same
+   *  generation twice. Keyed per action so generate → cancel still works. */
+  private readonly _clicks: ClickGuard;
   private _timerGen = 0;
   private _prevMode: Mode;
 
@@ -266,6 +271,7 @@ export class SeGenerationButton extends SuiComponent<
     );
     this._watcher = new StoreWatcher();
     this._modeSelector = buildModeSelector(options);
+    this._clicks = new ClickGuard();
     this._prevMode = initMode;
   }
 
@@ -338,12 +344,14 @@ export class SeGenerationButton extends SuiComponent<
   // ── Actions ───────────────────────────────────────────────
 
   private _generate(): void {
+    if (!this._clicks.accepts("generate")) return;
     if (this.options.generateAction)
       store.dispatch(this.options.generateAction);
     this.options.onGenerate?.();
   }
 
   private _cancel(): void {
+    if (!this._clicks.accepts("cancel")) return;
     const { requestIds, requestId, onCancel } = this.options;
     if (requestIds && requestIds.length > 0) {
       requestIds.forEach((id) =>
@@ -357,6 +365,7 @@ export class SeGenerationButton extends SuiComponent<
   }
 
   private _cancelActive(): void {
+    if (!this._clicks.accepts("cancelActive")) return;
     if (this.options.onCancel) {
       this.options.onCancel();
     } else {
@@ -371,6 +380,7 @@ export class SeGenerationButton extends SuiComponent<
   }
 
   private _cancelWait(): void {
+    if (!this._clicks.accepts("cancelWait")) return;
     this._stopTimer();
     if (this.options.variant === "icon") {
       const { iconId } = this.options;
@@ -390,6 +400,7 @@ export class SeGenerationButton extends SuiComponent<
   }
 
   private _continue(): void {
+    if (!this._clicks.accepts("continue")) return;
     if (this.options.onContinue) {
       this.options.onContinue();
     } else {

@@ -15,6 +15,7 @@ import { SuiComponent, type SuiComponentOptions } from "nai-simple-ui";
 import { store } from "../../core/store";
 import { uiChatRefineRequested } from "../../core/store/slices/ui";
 import { SeGenerationIconButton } from "./SeGenerationButton";
+import { ClickGuard } from "../framework/click-guard";
 import type { RootState } from "../../core/store/types";
 
 type Theme = { default: { self: { style: object } } };
@@ -54,12 +55,16 @@ export class SeGenRefinePair extends SuiComponent<
   UIPartRow
 > {
   private readonly _gen: SeGenerationIconButton;
+  /** The zap is debounced inside SeGenerationButton; the feather is a raw part
+   *  callback, so it needs its own guard or a double-click opens two refines. */
+  private readonly _clicks: ClickGuard;
 
   constructor(options: SeGenRefinePairOptions) {
     super(
       { state: {} as State, ...options },
       { default: { self: { style: {} } } },
     );
+    this._clicks = new ClickGuard();
     // In unified mode the zap click is intercepted to branch on content
     // (empty → generate, content → refine), so the inner button gets neither
     // the direct generateAction nor onGenerate — _handleUnifiedClick runs them.
@@ -116,7 +121,10 @@ export class SeGenRefinePair extends SuiComponent<
             opacity: "1",
             cursor: "pointer",
           },
-          callback: () => void this._handleRefineClick(),
+          callback: this._clicks.wrap(
+            "refine",
+            () => void this._handleRefineClick(),
+          ),
         }),
       ],
     });

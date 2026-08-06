@@ -43,6 +43,7 @@ import { FieldID, DulfsFieldID } from "../../config/field-definitions";
 import { SeGenerationIconButton } from "./SeGenerationButton";
 import { SeGenRefinePair } from "./SeGenRefinePair";
 import { SeConfirmButton } from "./SeConfirmButton";
+import { ClickGuard } from "../framework/click-guard";
 import type { EditPaneHost } from "./SeContentWithTitlePane";
 
 // ── Category definitions ──────────────────────────────────────────────────────
@@ -147,6 +148,13 @@ export class SeEntityEditPane extends SuiComponent<
   private readonly _summaryBtn: SeGenerationIconButton;
   private readonly _contentBtn: SeGenRefinePair;
   private readonly _keysBtn: SeGenerationIconButton;
+  /** Debounces the pane's own buttons. Save matters most: two clicks used to
+   *  race through _ensureLiveEntryId and create two lorebook entries for one
+   *  draft, orphaning the first. */
+  private readonly _clicks: ClickGuard;
+
+  /** In-flight draft promotion, shared by every concurrent caller. */
+  private _promoting?: Promise<string | undefined>;
 
   /**
    * Resolve (or create + bind) the lorebook entry for this entity. Idempotent:
@@ -154,14 +162,29 @@ export class SeEntityEditPane extends SuiComponent<
    * first call. Used by Save and by the Content/Keys Generate buttons so a
    * single creation path covers every branch and no caller has to special-case
    * "draft vs live".
+   *
+   * Concurrency-safe: creation is awaited, so two callers racing on the same
+   * draft (Save plus a Generate button, or both Generate buttons in quick
+   * succession) would each see no entry and each create one — orphaning the
+   * first. They share the first in-flight promotion instead.
    */
-  private async _ensureLiveEntryId(
-    entityId: string,
-  ): Promise<string | undefined> {
+  private _ensureLiveEntryId(entityId: string): Promise<string | undefined> {
     const existing =
       store.getState().world.entitiesById[entityId]?.lorebookEntryId;
-    if (existing) return existing;
+    if (existing) return Promise.resolve(existing);
 
+    if (!this._promoting) {
+      this._promoting = this._createLiveEntry(entityId).finally(() => {
+        this._promoting = undefined;
+      });
+    }
+    return this._promoting;
+  }
+
+  /** Create the lorebook entry for a draft entity and bind it. */
+  private async _createLiveEntry(
+    entityId: string,
+  ): Promise<string | undefined> {
     const current = store.getState().world.entitiesById[entityId];
     if (!current) return undefined;
 
@@ -195,6 +218,8 @@ export class SeEntityEditPane extends SuiComponent<
       { state: {} as State, ...options },
       { default: { self: { style: {} } } },
     );
+
+    this._clicks = new ClickGuard();
 
     const { entityId } = options;
     const summaryRequestId = `se-entity-summary-${entityId}`;
@@ -480,9 +505,7 @@ export class SeEntityEditPane extends SuiComponent<
           button({
             id: `${this.id}-back`,
             iconId: "arrow-left" as IconId,
-            callback: () => {
-              _close();
-            },
+            callback: this._clicks.wrap("back", _close),
           }),
           text({
             text: `**${entity?.name ?? "Entity"}**`,
@@ -494,9 +517,7 @@ export class SeEntityEditPane extends SuiComponent<
             id: EP.SAVE_BTN,
             text: "Save",
             style: S.saveBtn,
-            callback: () => {
-              _save();
-            },
+            callback: this._clicks.wrap("save", _save),
           }),
         ],
       }),
@@ -557,7 +578,9 @@ export class SeEntityEditPane extends SuiComponent<
             id: L.ALWAYS_ON_TOGGLE,
             text: "Always On",
             style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
-            callback: () => {
+            // Guarded: a doubled event would toggle twice and silently land
+            // back on the state the user was trying to leave.
+            callback: this._clicks.wrap("alwaysOn", () => {
               _alwaysOnDraft = !_alwaysOnDraft;
               api.v1.ui.updateParts([
                 {
@@ -565,7 +588,7 @@ export class SeEntityEditPane extends SuiComponent<
                   style: _alwaysOnDraft ? S.alwaysOnOn : S.alwaysOnOff,
                 } as unknown as Partial<UIPart> & { id: string },
               ]);
-            },
+            }),
           }),
         ],
       }),
