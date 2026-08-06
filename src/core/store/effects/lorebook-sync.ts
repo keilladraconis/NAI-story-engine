@@ -13,9 +13,16 @@ const CATEGORY_RENAME_MAP: Record<string, string> = {
   "SE: Situational Dynamics": "SE: Narrative Vectors",
 };
 
+/** The "SE: <Label>" lorebook category name a Story Engine category maps to. */
+function categoryNameFor(fieldId: DulfsFieldID): string {
+  const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
+  return `${SE_CATEGORY_PREFIX}${config?.label || fieldId}`;
+}
+
 /**
- * Migrate old lorebook category names to new names.
- * Safe to call multiple times — skips already-renamed categories.
+ * Migrate old lorebook category names to new names, then merge any duplicate
+ * "SE: " categories left behind by older builds.
+ * Safe to call multiple times — skips already-renamed, already-unique categories.
  */
 export async function migrateLorebookCategories(): Promise<void> {
   const categories = await api.v1.lorebook.categories();
@@ -28,13 +35,78 @@ export async function migrateLorebookCategories(): Promise<void> {
       );
     }
   }
+  await mergeDuplicateCategories();
 }
+
+/**
+ * Collapse duplicate "SE: " categories into one.
+ *
+ * Cast All used to race itself into creating a fresh category per draft (see
+ * `ensureCategory`), so existing stories carry the leftovers. The first
+ * category with a given name wins — every entry filed under a duplicate moves
+ * to it, then the emptied duplicate is removed. Only "SE: " categories are
+ * touched; the user's own categories are never merged, even if same-named.
+ */
+async function mergeDuplicateCategories(): Promise<void> {
+  const categories = await api.v1.lorebook.categories();
+  const canonicalByName = new Map<string, string>();
+  const duplicates: { id: string; name: string; canonicalId: string }[] = [];
+
+  for (const category of categories) {
+    const name = category.name;
+    if (!name?.startsWith(SE_CATEGORY_PREFIX)) continue;
+    const canonicalId = canonicalByName.get(name);
+    if (canonicalId) {
+      duplicates.push({ id: category.id, name, canonicalId });
+    } else {
+      canonicalByName.set(name, category.id);
+    }
+  }
+  if (duplicates.length === 0) return;
+
+  const allEntries = await api.v1.lorebook.entries();
+  for (const duplicate of duplicates) {
+    for (const entry of allEntries) {
+      if (entry.category !== duplicate.id) continue;
+      await api.v1.lorebook.updateEntry(entry.id, {
+        category: duplicate.canonicalId,
+      });
+    }
+    await api.v1.lorebook.removeCategory(duplicate.id);
+    api.v1.log(`[lorebook] Merged duplicate category "${duplicate.name}"`);
+  }
+}
+
+/**
+ * In-flight `ensureCategory` calls, keyed by category name.
+ *
+ * `ensureCategory` looks the category up and creates it only if missing, but
+ * there is an `await` between the two — and its callers run concurrently
+ * (store effects are fire-and-forget, and Cast All dispatches one per draft).
+ * Without this, every draft in a category would look first, all miss, and all
+ * create their own copy. Sharing the pending promise collapses a burst into a
+ * single find-or-create. The entry is dropped once it settles, so later calls
+ * re-read the lorebook instead of trusting a cached id the user may have since
+ * deleted.
+ */
+const inFlightCategories = new Map<string, Promise<string>>();
 
 // Helper: Find or create a category for a field
 export async function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
-  const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
-  const name = `${SE_CATEGORY_PREFIX}${config?.label || fieldId}`;
+  const name = categoryNameFor(fieldId);
+  const pending = inFlightCategories.get(name);
+  if (pending) return pending;
 
+  const work = findOrCreateCategory(name);
+  inFlightCategories.set(name, work);
+  try {
+    return await work;
+  } finally {
+    inFlightCategories.delete(name);
+  }
+}
+
+async function findOrCreateCategory(name: string): Promise<string> {
   const categories = await api.v1.lorebook.categories();
   const existing = categories.find((c) => c.name === name);
   if (existing) return existing.id;
@@ -53,8 +125,7 @@ export async function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
 export async function findCategory(
   fieldId: DulfsFieldID,
 ): Promise<string | null> {
-  const config = FIELD_CONFIGS.find((c) => c.id === fieldId);
-  const name = `${SE_CATEGORY_PREFIX}${config?.label || fieldId}`;
+  const name = categoryNameFor(fieldId);
   const categories = await api.v1.lorebook.categories();
   return categories.find((c) => c.name === name)?.id || null;
 }
