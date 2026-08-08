@@ -2,9 +2,10 @@
 // anything is generated. "Continue Scene" is untouched: it still fires on the
 // click, because there is nothing to ask once the story has a first page.
 //
-// UIParts, not JSX: api.v1.ui.modal.open takes a UIPart[]. Construction is kept
-// separate from opening (buildOpeningSceneContent / openOpeningSceneModal) so
-// the layout is testable without a browser, the same split header-parts.ts uses.
+// UIParts, not JSX: api.v1.ui.modal.open takes a UIPart[], so this is an API
+// constraint rather than a leftover of the old UIPart header. Construction is
+// kept separate from opening (buildOpeningSceneContent / openOpeningSceneModal)
+// so the layout stays testable without a browser.
 //
 // The textarea is storageKey-bound, so its text is owned by storyStorage: the
 // Generate button reads the slot rather than tracking keystrokes, and a draft

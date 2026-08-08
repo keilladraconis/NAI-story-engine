@@ -29,12 +29,26 @@ import { migrateBrainstormToChat } from "../core/store/migrations/brainstorm-to-
 import { loadJournal } from "../core/generation-journal";
 import { STORAGE_KEYS } from "../core/keys";
 import { hydrateComposerDrafts } from "./panels/chat/composer-draft";
-import { buildRoot, buildHeader } from "./header/header-parts";
-import { createHeaderDriver, type HeaderDriver } from "./header/header-driver";
 
 const { sidebarPanel, scriptPanel } = api.v1.ui.extension;
 
-function buildSidebarPanel(driver: HeaderDriver): UIExtension {
+/** The panel's one child: a full-height grid whose single row can shrink below
+ *  its content, so the jsx part is bounded by the panel rather than growing to
+ *  fit App. Without it App's `height: 100%` resolves against `auto`. */
+function buildRoot(body: UIPart): UIPart {
+  return api.v1.ui.part.container({
+    id: "kse-root",
+    style: {
+      display: "grid",
+      gridTemplateRows: "minmax(0, 1fr)",
+      height: "100%",
+      minHeight: "0",
+    },
+    content: [body],
+  });
+}
+
+function buildSidebarPanel(hasDocumentContent: boolean): UIExtension {
   const jsxPart = api.v1.ui.part.jsx({
     id: "kse-jsx-root",
     // This `style` lands on the panel's light-DOM wrapper around our shadow host.
@@ -59,7 +73,9 @@ function buildSidebarPanel(driver: HeaderDriver): UIExtension {
         "100%";
       (elem as unknown as { style: Record<string, string> }).style.minHeight =
         "0";
-      render(h(App, null), elem);
+      // hasDocumentContent is read before register() so the header's bootstrap
+      // button carries the right label on its first paint.
+      render(h(App, { initialHasDocumentContent: hasDocumentContent }), elem);
     },
   });
 
@@ -67,9 +83,7 @@ function buildSidebarPanel(driver: HeaderDriver): UIExtension {
     id: "kse-sidebar",
     name: "Story Engine",
     iconId: "lightning",
-    content: [
-      buildRoot(buildHeader(driver.initialModel(), driver.handlers), jsxPart),
-    ],
+    content: [buildRoot(jsxPart)],
   });
 }
 
@@ -160,10 +174,8 @@ export async function start(): Promise<void> {
   registerLorebookSyncHooks(store.dispatch, store.getState);
 
   // ── Panels (single register call) ────────────────────────────────────────
-  const headerDriver = createHeaderDriver(store, {
-    hasDocumentContent: (await api.v1.document.sectionIds()).length > 0,
-  });
-  const panels: UIExtension[] = [buildSidebarPanel(headerDriver)];
+  const hasDocumentContent = (await api.v1.document.sectionIds()).length > 0;
+  const panels: UIExtension[] = [buildSidebarPanel(hasDocumentContent)];
 
   const journalEnabled = await api.v1.config.get("generation_journal");
   if (journalEnabled) {
@@ -173,10 +185,6 @@ export async function start(): Promise<void> {
   }
 
   await api.v1.ui.register(panels);
-
-  // Only after register(): updateParts is a no-op on a part React has not
-  // mounted yet. The first paint is already correct via initialModel().
-  headerDriver.start();
 
   // Auto-open the import wizard once, after the panel is mounted.
   await maybeOpenImportWizard();

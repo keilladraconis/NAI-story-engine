@@ -3,6 +3,7 @@
 
 import { StoryEngine } from "./panels/StoryEngine";
 import { Chat } from "./panels/chat/Chat";
+import { Header } from "./header/Header";
 import { T, SP } from "./style";
 import {
   store,
@@ -36,7 +37,7 @@ function tabButtonStyle(active: boolean) {
   };
 }
 
-export function App() {
+export function App(props: { initialHasDocumentContent: boolean }) {
   const [tab, setTab] = useState<Tab>("engine");
 
   // Mirror the SUI plugin's tab-switch effects, local to the JSX panel:
@@ -75,8 +76,8 @@ export function App() {
       store.subscribeEffect(matchesAction(forgeDiscardAllRequested), () =>
         setTab("engine"),
       ),
-      // The Import icon lives in the always-visible UIPart header, but the
-      // wizard itself only renders inside the Story Engine tab — surface it.
+      // The Import icon lives in the always-visible header, but the wizard
+      // itself only renders inside the Story Engine tab — surface it.
       store.subscribeEffect(matchesAction(importWizardOpened), () =>
         setTab("engine"),
       ),
@@ -99,7 +100,8 @@ export function App() {
         scrollbarColor: `${T.bg3} transparent`,
       }}
     >
-      <div style={{ display: "flex" }}>
+      <Header initialHasDocumentContent={props.initialHasDocumentContent} />
+      <div style={{ display: "flex", flexShrink: 0 }}>
         <button
           style={tabButtonStyle(tab === "chat")}
           onClick={() => setTab("chat")}

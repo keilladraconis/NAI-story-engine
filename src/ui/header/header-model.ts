@@ -1,10 +1,10 @@
-// Pure derivation for the UIPart header.
+// Pure derivation for the header.
 //
 // `derive` is the ONLY place in the codebase that branches on genx.status —
 // every other surface keys off per-target request ids. tests/ui/countdown.test.ts
 // enforces that mechanically.
 //
-// `storeSignature` is the change-detection key the driver subscribes with. It
+// `storeSignature` is the change-detection key Header.tsx subscribes with. It
 // must cover every store field `derive` reads: a missing field means the header
 // silently goes stale until the next timer tick rather than failing loudly.
 
@@ -46,7 +46,7 @@ function deriveWidget(
 ): HeaderModel["widget"] {
   const { genx } = state.runtime;
   // Labels carry no emoji — every widget mode has its own feather iconId (see
-  // widgetIcon in header-parts.ts), so a glyph here would render twice.
+  // WIDGET_ICONS in Header.tsx), so a glyph here would render twice.
   if (genx.status === "waiting_for_user") {
     return { mode: "continue", text: "Continue" };
   }
@@ -60,19 +60,26 @@ function deriveWidget(
   return { mode: "budget", text: formatOutputBudget(inputs.allowedOutput) };
 }
 
-export function derive(state: RootState, inputs: DeriveInputs): HeaderModel {
-  const { sega, queue, activeRequest } = state.runtime;
-
-  const bootstrapPending =
+/** Is an opening/continue generation queued or in flight? Exported because the
+ *  header also re-reads the document when one settles — a bootstrap is what
+ *  turns an empty story into a non-empty one. */
+export function selectBootstrapPending(state: RootState): boolean {
+  const { queue, activeRequest } = state.runtime;
+  return (
     queue.some((r) => BOOTSTRAP_TYPES.includes(r.type)) ||
-    (activeRequest !== null && BOOTSTRAP_TYPES.includes(activeRequest.type));
+    (activeRequest !== null && BOOTSTRAP_TYPES.includes(activeRequest.type))
+  );
+}
+
+export function derive(state: RootState, inputs: DeriveInputs): HeaderModel {
+  const { sega } = state.runtime;
 
   return {
     widget: deriveWidget(state, inputs),
     statusText: sega.statusText,
     bootstrap: {
       text: inputs.hasDocumentContent ? "Continue Scene" : "Opening Scene",
-      disabled: bootstrapPending,
+      disabled: selectBootstrapPending(state),
     },
     importDisabled: state.ui.importWizardOpen,
   };

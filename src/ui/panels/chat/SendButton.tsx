@@ -2,9 +2,9 @@
 // while a chat-family request is queued or active.
 //
 // The old five-mode machine (queue/cancel/continue/wait) is gone. All
-// generation-state interaction lives in the UIPart header — a click inside the
-// JSX panel cannot clear the harness's FlagB interaction flag, so a Continue
-// button here was decorative.
+// generation-state interaction lives in the header widget, which is the single
+// home for that state (see tests/ui/countdown.test.ts) — a second copy here
+// would only be one more surface to drift.
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";

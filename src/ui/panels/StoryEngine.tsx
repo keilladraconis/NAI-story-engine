@@ -7,8 +7,8 @@
 // Forge and World are all gone while one is open. Routed by membership:
 // FIELD_DESCRIPTORS for foundation fields, entitiesById for entities,
 // world.groups for threads.
-// The header lives above this tree as a UIPart (see ../mount.ts,
-// ../header/header-driver.ts) — it is not part of this component.
+// The header lives above this tree, rendered by App alongside the tab bar (see
+// ../header/Header.tsx) — it is not part of this component.
 
 import { useSlice } from "../bridge";
 import { store, importWizardClosed } from "../../core/store";

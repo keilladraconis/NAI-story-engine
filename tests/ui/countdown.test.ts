@@ -31,11 +31,12 @@ describe("waitLabel", () => {
 });
 
 // The generation state machine has exactly one home: header-model.ts's
-// derive(). A JSX click cannot clear the harness's FlagB interaction flag, so a
-// Continue or Wait button rendered in the Preact tree is dead UI — it looks
-// interactive and does nothing. This guard is what stops the machine leaking
-// back into JSX in a later change.
-describe("generation state machine lives only in the UIPart header", () => {
+// derive(). Everything else — including the header's own JSX — keys off the
+// WidgetMode derive() hands back, never off genx.status directly. Two surfaces
+// reading the raw status is how they drift out of agreement about whether a
+// generation is waiting, queued, or done. This guard keeps the branch in one
+// place now that the header renders in the Preact tree.
+describe("generation state machine lives only in header-model", () => {
   const UI_DIR = join(__dirname, "../../src/ui");
 
   function tsxFiles(dir: string): string[] {

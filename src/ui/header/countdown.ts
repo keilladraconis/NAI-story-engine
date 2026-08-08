@@ -1,6 +1,6 @@
 // Budget-wait countdown helpers. Pure and unit-tested; consumed by
-// header-model.ts's derive(), which is re-run by header-driver.ts's 1s timer
-// while a budget wait is active.
+// header-model.ts's derive(), which Header.tsx re-runs on a 1s tick while a
+// budget wait is active.
 
 /** Shared label for the budget-wait button, e.g. "Wait (12s)". No glyph — the
  *  button carries a `clock` iconId, so an emoji would double up. */
