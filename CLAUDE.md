@@ -14,6 +14,8 @@ npm run format     # prettier -w .
 npm run test       # vitest run
 ```
 
+**Prettier is pinned to an exact version — keep it that way.** Under a `^` range an older prettier already sitting in `node_modules` satisfies the range, so `npm install` leaves it in place and ignores the lockfile. That happened: a session formatting with 3.7.4 wrapped union types the pinned version keeps inline, which shipped as a spurious "formatting cleanup" (15fb872) and had to be reverted (ac49266). If `npm run format` wants to reformat files you did not touch, check `npx prettier --version` against `package.json` before committing the diff — the formatter is wrong, not the repo.
+
 ## Architecture
 
 **Entry point:** `src/index.ts` — initializes GenX, registers store effects, loads persisted data, mounts UI extensions.
