@@ -1,5 +1,5 @@
 import { Store, matchesAction } from "nai-store";
-import type { RootState, AppDispatch } from "../types";
+import type { RootState, AppDispatch, RuntimeState } from "../types";
 import {
   uiChatSubmitUserMessage,
   uiChatRetryGeneration,
@@ -21,12 +21,43 @@ import {
   messagesPrunedAfter,
 } from "../slices/chat";
 import { getChatTypeSpec } from "../../chat-types";
-import type { Chat } from "../../chat-types/types";
+import type { Chat, ChatSeed } from "../../chat-types/types";
 import { buildChatStrategy } from "../../utils/chat-strategy";
 import { buildModelParams } from "../../utils/config";
 
 function findChat(state: RootState, id: string): Chat | undefined {
   return state.chat.chats.find((c) => c.id === id);
+}
+
+/**
+ * Do two seeds summarize the same thing? Summarize is the one chat action that
+ * mints its target as it goes — a fresh chat id and a fresh assistant id per
+ * request — so a repeated request is invisible to the request-id dedupe every
+ * other generation relies on. Its source is the stable identity instead.
+ *
+ * Seeds that are not summary sources (blank, fromField) never match: there is
+ * nothing to compare, so nothing to call a repeat.
+ */
+export function sameSummarySource(a: ChatSeed, b: ChatSeed): boolean {
+  if (a.kind === "fromChat" && b.kind === "fromChat") {
+    return a.sourceChatId === b.sourceChatId;
+  }
+  if (a.kind === "fromStoryText" && b.kind === "fromStoryText") {
+    return a.sourceText === b.sourceText;
+  }
+  return false;
+}
+
+/** True while a generation for this chat is queued or running. Chat request ids
+ *  are `chat-<chatId>-<messageId>`, plus any continuation suffix. */
+export function chatHasPendingRequest(
+  runtime: RuntimeState,
+  chatId: string,
+): boolean {
+  const prefix = `chat-${chatId}-`;
+  return [runtime.activeRequest, ...runtime.queue].some(
+    (r) => !!r && r.status !== "cancelled" && r.id.startsWith(prefix),
+  );
 }
 
 async function submitChatGeneration(
@@ -130,31 +161,58 @@ export function registerChatEffects(
     },
   );
 
+  // Summaries whose chat exists but whose request has not reached the queue
+  // yet. Strategy building is awaited, so without this a repeat arriving in
+  // that gap sees a summary chat with nothing pending and opens its own.
+  const openingSummaries: ChatSeed[] = [];
+
   // Intent: Chat Summarize → create new summary chat, generate summary
   subscribeEffect(
     matchesAction(uiChatSummarizeRequested),
     async (action, { getState: latest }) => {
-      const spec = getChatTypeSpec("summary");
-      const init = spec.initialize(action.payload.seed, {
-        getState: latest,
-        dispatch,
-      });
-      const newChat: Chat = {
-        id: api.v1.uuid(),
-        type: "summary",
-        title: init.title,
-        messages: init.initialMessages,
-        seed: action.payload.seed as Chat["seed"],
-      };
-      dispatch(chatCreated({ chat: newChat }));
-      const assistantId = api.v1.uuid();
-      dispatch(
-        messageAdded({
-          chatId: newChat.id,
-          message: { id: assistantId, role: "assistant", content: "" },
-        }),
+      const seed = action.payload.seed as Chat["seed"];
+      // One Sum tap is one summary. A doubled tap (or an impatient second
+      // press) used to open a second summary chat over the same transcript,
+      // each with its own generation running against the same budget.
+      if (openingSummaries.some((s) => sameSummarySource(s, seed))) return;
+      const running = latest().chat.chats.find(
+        (c) =>
+          c.type === "summary" &&
+          sameSummarySource(c.seed, seed) &&
+          chatHasPendingRequest(latest().runtime, c.id),
       );
-      await submitChatGeneration(latest, dispatch, newChat, assistantId);
+      if (running) {
+        dispatch(chatSwitched({ id: running.id }));
+        return;
+      }
+
+      openingSummaries.push(seed);
+      try {
+        const spec = getChatTypeSpec("summary");
+        const init = spec.initialize(action.payload.seed, {
+          getState: latest,
+          dispatch,
+        });
+        const newChat: Chat = {
+          id: api.v1.uuid(),
+          type: "summary",
+          title: init.title,
+          messages: init.initialMessages,
+          seed,
+        };
+        dispatch(chatCreated({ chat: newChat }));
+        const assistantId = api.v1.uuid();
+        dispatch(
+          messageAdded({
+            chatId: newChat.id,
+            message: { id: assistantId, role: "assistant", content: "" },
+          }),
+        );
+        await submitChatGeneration(latest, dispatch, newChat, assistantId);
+      } finally {
+        const i = openingSummaries.indexOf(seed);
+        if (i >= 0) openingSummaries.splice(i, 1);
+      }
     },
   );
 

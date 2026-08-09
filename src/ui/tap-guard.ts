@@ -41,3 +41,19 @@ export function useTapGuard(
     action();
   };
 }
+
+/** Keyed guard for a component whose buttons are built in a loop, where one
+ *  `useTapGuard` per button is not an option (hook count must stay stable) and
+ *  a single shared guard would let one button swallow the next button's tap.
+ *  Each key gets its own window, so Sum then New chat both land. */
+export function useTapGuards(
+  windowMs: number = TAP_WINDOW_MS,
+): (key: string, action: () => void) => void {
+  const lastRef = useRef<Record<string, number>>({});
+  return (key: string, action: () => void) => {
+    const now = Date.now();
+    if (isDuplicateTap(lastRef.current[key] ?? 0, now, windowMs)) return;
+    lastRef.current[key] = now;
+    action();
+  };
+}

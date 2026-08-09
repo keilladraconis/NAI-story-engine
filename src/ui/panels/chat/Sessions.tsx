@@ -10,6 +10,7 @@ import {
 } from "../../../core/store";
 import type { Chat as ChatT } from "../../../core/chat-types/types";
 import { nextBrainstormTitle } from "./chat-actions";
+import { useTapGuards } from "../../tap-guard";
 import { Plus, Trash, ArrowLeft } from "nai:icons/feather";
 
 const ICON = 14;
@@ -39,12 +40,14 @@ function rowStyle(active: boolean) {
 // the map's top level so switching to/from SessionRow is a clean same-slot swap.
 function RenameRow(props: { c: ChatT; active: boolean; onDone: () => void }) {
   const taRef = useRef<{ value: string } | null>(null);
-  const save = () => {
-    const raw = taRef.current?.value ?? props.c.title;
-    const title = raw.replace(/\s+/g, " ").trim() || props.c.title;
-    store.dispatch(chatRenamed({ id: props.c.id, title }));
-    props.onDone();
-  };
+  const onceTap = useTapGuards();
+  const save = () =>
+    onceTap("save", () => {
+      const raw = taRef.current?.value ?? props.c.title;
+      const title = raw.replace(/\s+/g, " ").trim() || props.c.title;
+      store.dispatch(chatRenamed({ id: props.c.id, title }));
+      props.onDone();
+    });
   return (
     <div style={rowStyle(props.active)}>
       <textarea
@@ -69,7 +72,11 @@ function RenameRow(props: { c: ChatT; active: boolean; onDone: () => void }) {
       <button style={iconBtn} title="Save" onClick={save}>
         ✓
       </button>
-      <button style={iconBtn} title="Cancel" onClick={props.onDone}>
+      <button
+        style={iconBtn}
+        title="Cancel"
+        onClick={() => onceTap("cancel", props.onDone)}
+      >
         ✗
       </button>
     </div>
@@ -85,22 +92,34 @@ function SessionRow(props: {
   onSwitch: () => void;
   onRename: () => void;
 }) {
+  // Rows are patched in place as the list changes, so the repeat click of a
+  // doubled tap can land on whichever chat has shifted into this slot — the
+  // Delete here would then take a session the user never picked.
+  const onceTap = useTapGuards();
   return (
     <div style={rowStyle(props.active)}>
       <button
         style={{ ...iconBtn, flex: 1, justifyContent: "flex-start" }}
-        onClick={props.onSwitch}
+        onClick={() => onceTap("switch", props.onSwitch)}
       >
         {props.c.title}
       </button>
-      <button style={iconBtn} title="Rename" onClick={props.onRename}>
+      <button
+        style={iconBtn}
+        title="Rename"
+        onClick={() => onceTap("rename", props.onRename)}
+      >
         ✎
       </button>
       {props.canDelete && (
         <button
           style={iconBtn}
           title="Delete"
-          onClick={() => store.dispatch(chatDeleted({ id: props.c.id }))}
+          onClick={() =>
+            onceTap("delete", () =>
+              store.dispatch(chatDeleted({ id: props.c.id })),
+            )
+          }
         >
           <Trash size={ICON} />
         </button>
@@ -122,20 +141,22 @@ export function Sessions(props: { onBack: () => void }) {
   const canDelete = chats.length > 1;
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const onceTap = useTapGuards();
 
-  const newChat = () => {
-    const c: ChatT = {
-      id: api.v1.uuid(),
-      type: "brainstorm",
-      title: nextBrainstormTitle(chats),
-      subMode: "cowriter",
-      messages: [],
-      seed: { kind: "blank" },
-    };
-    store.dispatch(chatCreated({ chat: c }));
-    store.dispatch(chatSwitched({ id: c.id }));
-    props.onBack();
-  };
+  const newChat = () =>
+    onceTap("new", () => {
+      const c: ChatT = {
+        id: api.v1.uuid(),
+        type: "brainstorm",
+        title: nextBrainstormTitle(chats),
+        subMode: "cowriter",
+        messages: [],
+        seed: { kind: "blank" },
+      };
+      store.dispatch(chatCreated({ chat: c }));
+      store.dispatch(chatSwitched({ id: c.id }));
+      props.onBack();
+    });
 
   return (
     <div
@@ -148,7 +169,11 @@ export function Sessions(props: { onBack: () => void }) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
-        <button style={iconBtn} title="Back" onClick={props.onBack}>
+        <button
+          style={iconBtn}
+          title="Back"
+          onClick={() => onceTap("back", props.onBack)}
+        >
           <ArrowLeft size={16} />
         </button>
         <span style={{ flex: 1, color: T.textHeadings, fontWeight: "bold" }}>
