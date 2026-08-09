@@ -101,7 +101,9 @@ function useHasDocumentContent(initial: boolean): boolean {
 }
 
 // Every branch spreads this, so the widget keeps one silhouette across all four
-// states and only its colour changes.
+// states and only its colour changes. The border box is part of that silhouette
+// even where the edge is invisible, and `opacity` is declared here so every mode
+// states its own value rather than inheriting the last one's.
 const WIDGET_BASE = {
   display: "inline-flex",
   alignItems: "center",
@@ -111,6 +113,7 @@ const WIDGET_BASE = {
   borderRadius: "999px",
   borderWidth: "1px",
   borderStyle: "solid",
+  opacity: "1",
   cursor: "pointer",
   whiteSpace: "nowrap",
 } as const;
@@ -136,22 +139,31 @@ export function widgetStyle(mode: WidgetMode): Record<string, string> {
         fontWeight: "bold",
       };
     case "wait":
-      return {
-        ...WIDGET_BASE,
-        borderColor: T.bg3,
-        background: T.bg2,
-        color: T.text,
-        fontWeight: "normal",
-      };
-    case "budget":
-      // Outline-only gold pill: a readout, not a call to action — but still a
-      // real button, so there is always one deliberate way to poke the
-      // interaction flag and watch the number refill.
+      // Outline-only gold pill. Generation is stalled on budget and the
+      // countdown is the one number worth watching, so it gets the accent the
+      // idle readout gives up.
       return {
         ...WIDGET_BASE,
         borderColor: T.textHeadings,
         background: "transparent",
         color: T.textHeadings,
+        fontWeight: "normal",
+      };
+    case "budget":
+      // Recessed and border-free: idle output budget is information, not a call
+      // to action, so it recedes and leaves the accent to the states that want
+      // an answer. Still a real button — clicking it is one deliberate way to
+      // poke the interaction flag and watch the number refill.
+      //
+      // The border is transparent rather than absent: dropping borderWidth
+      // would shrink the pill by 2px and shift the row every time the mode
+      // changes. Same box, invisible edge.
+      return {
+        ...WIDGET_BASE,
+        borderColor: "transparent",
+        background: "transparent",
+        color: T.text,
+        opacity: "0.7",
         fontWeight: "normal",
       };
   }
