@@ -19,6 +19,7 @@
   "packageManager": "npm@11.7.0",
   "scripts": {
     "build": "nibs build",
+    "preformat": "npm ls prettier --depth=0 || node -e \"console.error('\\nInstalled prettier does not match the pin in package.json. Run npm ci before formatting: the wrong version rewrites files you did not touch.'); process.exit(1)\"",
     "format": "prettier -w .",
     "test": "vitest run"
   },
