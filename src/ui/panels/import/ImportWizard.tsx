@@ -11,6 +11,7 @@ import {
   styleSyncSet,
   shapeGenerationRequested,
   intentGenerationRequested,
+  contractGenerationRequested,
   entitiesBoundBatch,
 } from "../../../core/store";
 import type { DulfsFieldID } from "../../../config/field-definitions";
@@ -88,6 +89,10 @@ export function ImportWizard(props: { onClose: () => void }) {
     }
     store.dispatch(shapeGenerationRequested());
     store.dispatch(intentGenerationRequested());
+    // Last of the three: message factories resolve when the queued task runs, so
+    // the contract reads the Shape and Intent the two above have committed by
+    // then rather than the empty anchors they started from.
+    store.dispatch(contractGenerationRequested());
     props.onClose();
   };
 

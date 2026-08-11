@@ -84,11 +84,12 @@ function resolvePrefill(
     return message?.content || "";
   }
 
-  if (target.type === "lorebookKeys") {
-    if (assistantPrefill) return assistantPrefill;
-  }
-
-  return "";
+  // Any strategy that both carries a prefill and asks to keep it: the model
+  // resumes from that text, so the response only reads correctly with it back on
+  // the front (lorebook keys' REJECTED: header, the contract's REQUIRED: label).
+  // Strategies that set a prefill but trim it — the forge's "[" — return "" via
+  // the prefillBehavior check above.
+  return assistantPrefill ?? "";
 }
 
 /**

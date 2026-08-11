@@ -39,6 +39,8 @@ import {
   FOUNDATION_INTENT_PROMPT,
   FOUNDATION_WORLD_STATE_PROMPT,
   CONTRACT_GENERATE_PROMPT,
+  CONTRACT_GENERATE_REQUEST,
+  CONTRACT_GENERATE_PREFILL,
   ATTG_GENERATE_PROMPT,
   STYLE_GENERATE_PROMPT,
   XIALONG_STYLE,
@@ -275,9 +277,15 @@ const createStyleFactory =
 
 /**
  * Contract: reads full foundation context, generates REQUIRED + PROHIBITED + EMPHASIS.
+ *
+ * Unlike the prose fields, this one has to come back in a fixed three-line shape,
+ * so it closes with a user turn and an assistant prefill rather than trailing off
+ * after a system message. Context-only prompts (system blocks and nothing else)
+ * leave the model with no turn to answer, and what it continues instead is the
+ * [STORY TEXT] block sitting in that context — prose where a contract should be.
  */
 const createContractFactory =
-  (getState: () => RootState): MessageFactory =>
+  (getState: () => RootState, opts?: { prefill?: boolean }): MessageFactory =>
   async () => {
     const prefix = await buildStoryEnginePrefix(getState, {
       excludeSections: ["foundation"],
@@ -301,7 +309,19 @@ const createContractFactory =
       role: "system" as const,
       content: CONTRACT_GENERATE_PROMPT,
     });
+    messages.push({
+      role: "user" as const,
+      content: CONTRACT_GENERATE_REQUEST,
+    });
     await appendXialongStyleMessage(messages, XIALONG_STYLE.foundationContract);
+    // Opt-in: the refine builders reuse this factory and append their own tail,
+    // so a prefill baked in here would strand an assistant turn mid-conversation.
+    if (opts?.prefill) {
+      messages.push({
+        role: "assistant" as const,
+        content: CONTRACT_GENERATE_PREFILL,
+      });
+    }
 
     return {
       messages,
@@ -324,7 +344,9 @@ function buildFoundationStrategy(
     shape: createShapeFactory,
     intent: createIntentFactory,
     worldState: createWorldStateFactory,
-    contract: createContractFactory,
+    // Generate-from-scratch is the one contract path that ends in a prefill.
+    contract: (gs: () => RootState) =>
+      createContractFactory(gs, { prefill: true }),
     attg: createAttgFactory,
     style: createStyleFactory,
   };
@@ -333,8 +355,23 @@ function buildFoundationStrategy(
     requestId: api.v1.uuid(),
     messageFactory: factoryMap[field](getState),
     target: { type: "foundation", field },
-    prefillBehavior: "trim",
+    ...foundationPrefill(field),
   };
+}
+
+/** Contract is the one foundation field generated from an assistant prefill, and
+ *  it has to keep it: the prefill IS the REQUIRED label, so trimming would hand
+ *  parseContract a block whose first line no longer matches. The prose fields
+ *  have no prefill to keep. */
+function foundationPrefill(
+  field: "shape" | "intent" | "worldState" | "contract" | "attg" | "style",
+): Pick<GenerationStrategy, "prefillBehavior" | "assistantPrefill"> {
+  return field === "contract"
+    ? {
+        prefillBehavior: "keep" as const,
+        assistantPrefill: CONTRACT_GENERATE_PREFILL,
+      }
+    : { prefillBehavior: "trim" as const };
 }
 
 // ─── Refine strategy builders ────────────────────────────────────────────────

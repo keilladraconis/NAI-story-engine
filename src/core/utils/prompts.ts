@@ -528,6 +528,16 @@ EMPHASIS: [comma-separated list — 3-5 items]
 
 Be specific to THIS story's material. No generic filler.`;
 
+/** The user turn that actually asks for the contract. The context above it is
+ *  all system messages; without a turn addressed to it the model has nothing to
+ *  answer and continues the story text instead. */
+export const CONTRACT_GENERATE_REQUEST = `Write the Story Contract for this story now — the three labeled lines, nothing else.`;
+
+/** Assistant prefill. The model resumes from this, so it cannot open with prose;
+ *  it is carried into the response (prefillBehavior "keep") so the committed text
+ *  still starts with the REQUIRED label parseContract looks for. */
+export const CONTRACT_GENERATE_PREFILL = `REQUIRED:`;
+
 export const FOUNDATION_WORLD_STATE_PROMPT = `Describe the current state of the world at the story's opening.
 Cover: the dominant mood or atmosphere, ongoing conflicts or tensions, power dynamics, and what is visibly in flux.
 3-5 sentences. Output only the world state description — no preamble.`;

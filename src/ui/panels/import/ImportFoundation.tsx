@@ -10,6 +10,7 @@ import {
   styleSyncSet,
   shapeGenerationRequested,
   intentGenerationRequested,
+  contractGenerationRequested,
 } from "../../../core/store";
 import { useTapGuard } from "../../tap-guard";
 
@@ -60,6 +61,7 @@ export function ImportFoundation(props: { memText: string; anText: string }) {
   const onceStyleTap = useTapGuard();
   const onceShapeTap = useTapGuard();
   const onceIntentTap = useTapGuard();
+  const onceContractTap = useTapGuard();
 
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
@@ -105,7 +107,7 @@ export function ImportFoundation(props: { memText: string; anText: string }) {
       ) : null}
 
       <div style={row}>
-        <span style={label}>Story → Shape + Intent</span>
+        <span style={label}>Story → Shape + Intent + Contract</span>
         <span style={preview} />
         <button
           style={btn}
@@ -122,6 +124,16 @@ export function ImportFoundation(props: { memText: string; anText: string }) {
           }
         >
           Intent
+        </button>
+        {/* Contract reads Shape/Intent as anchors, and factories resolve when the
+            queued task runs — so pressing this after the other two picks them up. */}
+        <button
+          style={btn}
+          onClick={() =>
+            onceContractTap(() => store.dispatch(contractGenerationRequested()))
+          }
+        >
+          Contract
         </button>
       </div>
     </div>
