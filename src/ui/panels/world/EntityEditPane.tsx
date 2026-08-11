@@ -195,6 +195,11 @@ export function EntityEditPane(props: { entityId: string }) {
   // Always On flips a boolean, so an unguarded repeat click from one tap
   // sets it straight back and the button looks dead.
   const onceAlwaysOnTap = useTapGuard();
+  // Save and the content Zap's refine branch both promote a draft; the tap guard
+  // is the first line, flushingRef (below) covers the longer await window.
+  const onceSaveTap = useTapGuard();
+  const onceContentTap = useTapGuard();
+  const flushingRef = useRef(false);
 
   // Seed lorebook content/keys/always-on from the entry once, on open.
   useEffect(() => {
@@ -304,36 +309,50 @@ export function EntityEditPane(props: { entityId: string }) {
   // without closing). Returns the live lorebook entry id (promoting a draft if
   // needed). Used by Save and by content-refine (which must persist drafts
   // before the Chat tab unmounts this pane).
+  //
+  // Re-entrancy flag, for the same reason useGenField carries one: promoting a
+  // draft goes through `await ensureLiveEntryId`, and during that await the
+  // entity still has no lorebookEntryId — so a second flush landing in the gap
+  // creates a SECOND lorebook entry and binds over the first, orphaning it in
+  // the user's lorebook. The window is as long as a category lookup plus an
+  // entry create, well past what a tap guard covers. Refusing returns undefined,
+  // which is also what callers do when there is no live entry to act on.
   const flushToStore = async (): Promise<string | undefined> => {
-    const newName = name.value.trim() || entity.name;
-    const newSummary = summary.value.trim();
-    const oldName = entity.name;
-    store.dispatch(
-      entityEdited({ entityId, name: newName, summary: newSummary }),
-    );
-
-    for (const u of propagateNameInSummaries(
-      Object.values(store.getState().world.entitiesById),
-      entityId,
-      oldName,
-      newName,
-    )) {
+    if (flushingRef.current) return undefined;
+    flushingRef.current = true;
+    try {
+      const newName = name.value.trim() || entity.name;
+      const newSummary = summary.value.trim();
+      const oldName = entity.name;
       store.dispatch(
-        entitySummaryUpdated({ entityId: u.entityId, summary: u.summary }),
+        entityEdited({ entityId, name: newName, summary: newSummary }),
       );
-    }
 
-    const liveId = await ensureLiveEntryId(entityId);
-    if (liveId) {
-      const erato = (await api.v1.config.get("erato_compatibility")) || false;
-      await api.v1.lorebook.updateEntry(liveId, {
-        displayName: newName,
-        text: applyEratoPrefix(content.value, !!erato),
-        keys: withNameKeyFirst(parseKeys(keys.value), newName),
-        forceActivation: alwaysOn,
-      });
+      for (const u of propagateNameInSummaries(
+        Object.values(store.getState().world.entitiesById),
+        entityId,
+        oldName,
+        newName,
+      )) {
+        store.dispatch(
+          entitySummaryUpdated({ entityId: u.entityId, summary: u.summary }),
+        );
+      }
+
+      const liveId = await ensureLiveEntryId(entityId);
+      if (liveId) {
+        const erato = (await api.v1.config.get("erato_compatibility")) || false;
+        await api.v1.lorebook.updateEntry(liveId, {
+          displayName: newName,
+          text: applyEratoPrefix(content.value, !!erato),
+          keys: withNameKeyFirst(parseKeys(keys.value), newName),
+          forceActivation: alwaysOn,
+        });
+      }
+      return liveId;
+    } finally {
+      flushingRef.current = false;
     }
-    return liveId;
   };
 
   const onSave = () => {
@@ -404,7 +423,10 @@ export function EntityEditPane(props: { entityId: string }) {
           label="Delete"
           onConfirm={onDelete}
         />
-        <button onClick={onSave} style={{ padding: "4px 16px" }}>
+        <button
+          onClick={() => onceSaveTap(onSave)}
+          style={{ padding: "4px 16px" }}
+        >
           Save
         </button>
       </div>
@@ -491,8 +513,12 @@ export function EntityEditPane(props: { entityId: string }) {
                   ? "Refine content"
                   : "Generate content"
             }
-            onClick={
-              content.value.trim() ? onRefineContent : contentGen.onGenerate
+            // `disabled` does not cover the refine branch — contentGen.pending
+            // only goes true on the generate branch, so refine is never dimmed.
+            onClick={() =>
+              onceContentTap(
+                content.value.trim() ? onRefineContent : contentGen.onGenerate,
+              )
             }
             disabled={loading || contentGen.pending}
             style={genZapStyle(contentGen.pending)}

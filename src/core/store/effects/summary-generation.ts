@@ -18,6 +18,7 @@ import {
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
 import { buildModelParams } from "../../utils/config";
+import { isRequestActive } from "../selectors/runtime";
 import {
   entitySummaryRequestId,
   entitySummaryBindRequestId,
@@ -162,7 +163,16 @@ export function registerSummaryGenerationEffects(
     const hasContent = !!entry?.text;
     const hasKeys = !!(entry?.keys && entry.keys.length > 0);
 
-    if (!hasSummary) {
+    // The card's `pending` dims the button a render too late to stop a doubled
+    // tap, and the lorebook read above is a far longer window than a tap guard
+    // covers: both repeats resume here having seen the same "missing" state.
+    // These ids are stable per entity, so a repeat is recognisable — skip any
+    // that is already tracked. Each requestQueued below lands synchronously
+    // before the next await, so a repeat resuming later sees all three.
+    const alreadyQueued = (requestId: string) =>
+      isRequestActive(getState().runtime, requestId);
+
+    if (!hasSummary && !alreadyQueued(entitySummaryRequestId(entityId))) {
       const summaryRequestId = entitySummaryRequestId(entityId);
       dispatch(
         requestQueued({
@@ -179,7 +189,7 @@ export function registerSummaryGenerationEffects(
       );
     }
 
-    if (!hasContent) {
+    if (!hasContent && !alreadyQueued(lorebookContentRequestId(entityId))) {
       const contentRequestId = lorebookContentRequestId(entityId);
       dispatch(
         requestQueued({
@@ -199,7 +209,7 @@ export function registerSummaryGenerationEffects(
       );
     }
 
-    if (!hasKeys) {
+    if (!hasKeys && !alreadyQueued(lorebookKeysRequestId(entityId))) {
       const keysRequestId = lorebookKeysRequestId(entityId);
       dispatch(
         requestQueued({

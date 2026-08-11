@@ -13,6 +13,10 @@ import type {
   WorldEntity,
 } from "../../../../src/core/store/types";
 import { FieldID } from "../../../../src/config/field-definitions";
+import {
+  entitySummaryRequestId,
+  lorebookContentRequestId,
+} from "../../../../src/core/keys";
 
 // Isolate the effect's branching from real strategy construction.
 vi.mock("../../../../src/core/utils/lorebook-strategy", () => ({
@@ -62,6 +66,7 @@ function makeState(
     runtime: {
       activeRequest: runtime?.activeRequest ?? null,
       queue: runtime?.queue ?? [],
+      sega: { activeRequestIds: [] },
     },
   } as unknown as RootState;
 }
@@ -141,6 +146,31 @@ describe("entityRegenRequested effect", () => {
         ([a]) => a.type === "ui/uiEntitySummaryGenerationRequested",
       ),
     ).toBe(true);
+  });
+
+  // A doubled tap on the card's ⚡ reaches the effect twice; both repeats clear
+  // the `await api.v1.lorebook.entry` above having seen the same empty entry, so
+  // the tracked-request check is what stops the second queueing under the same
+  // stable ids.
+  it("skips a request id already sitting in the queue", async () => {
+    const live = makeEntity({ lorebookEntryId: "lb-1", summary: "" });
+    const { fire, queuedTypes } = makeHarness(
+      makeState(live, { queue: [{ id: entitySummaryRequestId("e1") }] }),
+    );
+    await fire(entityRegenRequested({ entityId: "e1" }));
+    expect(queuedTypes()).not.toContain("entitySummary");
+    expect(queuedTypes().sort()).toEqual(["lorebookContent", "lorebookKeys"]);
+  });
+
+  it("skips a request id that is already generating", async () => {
+    const live = makeEntity({ lorebookEntryId: "lb-1", summary: "" });
+    const { fire, queuedTypes } = makeHarness(
+      makeState(live, {
+        activeRequest: { id: lorebookContentRequestId("e1") },
+      }),
+    );
+    await fire(entityRegenRequested({ entityId: "e1" }));
+    expect(queuedTypes()).not.toContain("lorebookContent");
   });
 
   it("does nothing when the entity is already complete", async () => {

@@ -3,6 +3,7 @@
 // (no async lorebook reads this slice). Unit-tested headless — no icon imports.
 
 import { isForgeDraft } from "../../../core/store/selectors/forge";
+import { isRequestActive } from "../../../core/store/selectors/runtime";
 import {
   entitySummaryRequestId,
   entitySummaryBindRequestId,
@@ -36,17 +37,9 @@ export function entityRequestIds(entityId: string): string[] {
   ];
 }
 
-/** True while a specific request id is active, queued, or SEGA-active. */
-export function isRequestActive(
-  runtime: RootState["runtime"],
-  requestId: string,
-): boolean {
-  return (
-    runtime.activeRequest?.id === requestId ||
-    runtime.queue.some((q) => q.id === requestId) ||
-    runtime.sega.activeRequestIds.includes(requestId)
-  );
-}
+// Lives in core/store/selectors/runtime so the regen effect can gate on the same
+// predicate the cards dim from; re-exported here for the World's own callers.
+export { isRequestActive };
 
 /** True while any of the entity's requests is active, queued, or SEGA-active. */
 export function entityPending(
