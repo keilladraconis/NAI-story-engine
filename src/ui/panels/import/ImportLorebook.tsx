@@ -5,6 +5,7 @@
 // selector drops the row.
 
 import { useSlice } from "../../bridge";
+import { useTapGuards } from "../../tap-guard";
 import { T, SP } from "../../style";
 import { store, entityBound } from "../../../core/store";
 import { cycleDulfsCategory } from "../../../core/utils/category-detect";
@@ -67,6 +68,10 @@ export function ImportLorebook(props: {
       .join(","),
   );
 
+  // Keyed by entry id (not by row position): binding drops a row and shifts the
+  // rest up, so a per-row guard has to follow the entry, not the slot.
+  const onceTap = useTapGuards();
+
   const managed = new Set(managedKey ? managedKey.split(",") : []);
   const unmanaged = unmanagedEntries(props.entries, managed);
 
@@ -101,31 +106,35 @@ export function ImportLorebook(props: {
                   style={{ ...smallBtn, opacity: 0.7 }}
                   title="Cycle category"
                   onClick={() =>
-                    props.onCycle(entry.id, cycleDulfsCategory(cat))
+                    onceTap(`cycle:${entry.id}`, () =>
+                      props.onCycle(entry.id, cycleDulfsCategory(cat)),
+                    )
                   }
                 >
                   {DULFS_SHORT[cat]} ▶
                 </button>
                 <button
                   style={smallBtn}
-                  onClick={() => {
-                    store.dispatch(
-                      entityBound({
-                        entity: {
-                          id: api.v1.uuid(),
-                          categoryId: cat,
-                          lorebookEntryId: entry.id,
-                          name: entry.displayName || "Unknown",
-                          summary: "",
-                          lifecycle: "live",
-                        },
-                      }),
-                    );
-                    void api.v1.ui.toast(
-                      `Bound: ${entry.displayName || "entry"}`,
-                      { type: "success" },
-                    );
-                  }}
+                  onClick={() =>
+                    onceTap(`bind:${entry.id}`, () => {
+                      store.dispatch(
+                        entityBound({
+                          entity: {
+                            id: api.v1.uuid(),
+                            categoryId: cat,
+                            lorebookEntryId: entry.id,
+                            name: entry.displayName || "Unknown",
+                            summary: "",
+                            lifecycle: "live",
+                          },
+                        }),
+                      );
+                      void api.v1.ui.toast(
+                        `Bound: ${entry.displayName || "entry"}`,
+                        { type: "success" },
+                      );
+                    })
+                  }
                 >
                   ⚡ Bind
                 </button>

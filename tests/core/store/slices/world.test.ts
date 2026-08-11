@@ -6,6 +6,7 @@ import {
   entitySummaryUpdated,
   entityLorebookEntryBound,
   entityBound,
+  entitiesBoundBatch,
   entityUnbound,
   groupCreated,
   groupDeleted,
@@ -156,6 +157,91 @@ describe("entityBound", () => {
     const bound = { ...ENTITY, lorebookEntryId: "lb1" };
     const state = reduce(makeState(), entityBound({ entity: bound }));
     expect(state.entitiesById["e1"].lorebookEntryId).toBe("lb1");
+  });
+
+  // The Import wizard's Bind mints a fresh entity id per click, so a doubled
+  // mobile tap arrives as two binds that differ only by id.
+  it("ignores a second bind of a lorebook entry already bound", () => {
+    const first = reduce(
+      makeState(),
+      entityBound({ entity: { ...ENTITY, lorebookEntryId: "lb1" } }),
+    );
+    const second = reduce(
+      first,
+      entityBound({
+        entity: { ...ENTITY, id: "e2", lorebookEntryId: "lb1" },
+      }),
+    );
+    expect(second.entityIds).toEqual(["e1"]);
+    expect(second.entitiesById["e2"]).toBeUndefined();
+  });
+
+  it("still binds a different lorebook entry", () => {
+    const first = reduce(
+      makeState(),
+      entityBound({ entity: { ...ENTITY, lorebookEntryId: "lb1" } }),
+    );
+    const second = reduce(
+      first,
+      entityBound({
+        entity: { ...ENTITY, id: "e2", lorebookEntryId: "lb2" },
+      }),
+    );
+    expect(second.entityIds).toEqual(["e1", "e2"]);
+  });
+
+  it("binds again after the entry is unbound", () => {
+    const first = reduce(
+      makeState(),
+      entityBound({ entity: { ...ENTITY, lorebookEntryId: "lb1" } }),
+    );
+    const cleared = reduce(first, entityUnbound({ entityId: "e1" }));
+    const rebound = reduce(
+      cleared,
+      entityBound({
+        entity: { ...ENTITY, id: "e2", lorebookEntryId: "lb1" },
+      }),
+    );
+    expect(rebound.entitiesById["e2"].lorebookEntryId).toBe("lb1");
+  });
+});
+
+describe("entitiesBoundBatch", () => {
+  it("binds every unmanaged entry in one dispatch", () => {
+    const state = reduce(
+      makeState(),
+      entitiesBoundBatch([
+        { ...ENTITY, id: "e1", lorebookEntryId: "lb1" },
+        { ...ENTITY, id: "e2", lorebookEntryId: "lb2" },
+      ]),
+    );
+    expect(state.entityIds).toEqual(["e1", "e2"]);
+  });
+
+  it("skips entries already bound, keeping the rest", () => {
+    const first = reduce(
+      makeState(),
+      entityBound({ entity: { ...ENTITY, lorebookEntryId: "lb1" } }),
+    );
+    const state = reduce(
+      first,
+      entitiesBoundBatch([
+        { ...ENTITY, id: "e2", lorebookEntryId: "lb1" },
+        { ...ENTITY, id: "e3", lorebookEntryId: "lb2" },
+      ]),
+    );
+    expect(state.entityIds).toEqual(["e1", "e3"]);
+  });
+
+  it("keeps one entity when the batch repeats an entry within itself", () => {
+    const state = reduce(
+      makeState(),
+      entitiesBoundBatch([
+        { ...ENTITY, id: "e1", lorebookEntryId: "lb1" },
+        { ...ENTITY, id: "e2", lorebookEntryId: "lb1" },
+      ]),
+    );
+    expect(state.entityIds).toEqual(["e1"]);
   });
 });
 

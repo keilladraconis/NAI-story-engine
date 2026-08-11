@@ -25,6 +25,10 @@ import {
   generationSubmitted,
   requestQueued,
 } from "../index";
+import {
+  isFoundationRequestPending,
+  type FoundationTarget,
+} from "../selectors/runtime";
 import { MessageFactory } from "nai-gen-x";
 import {
   buildStoryEnginePrefix,
@@ -448,8 +452,12 @@ export function buildStyleStrategy(
 function submitFoundation(
   dispatch: AppDispatch,
   getState: () => RootState,
-  field: "shape" | "intent" | "worldState" | "contract" | "attg" | "style",
+  field: FoundationTarget,
 ): void {
+  // One generation per field at a time. Import All dispatches Shape and Intent
+  // together, and a mobile tap arriving twice would otherwise submit each of
+  // them twice under unrelated request ids.
+  if (isFoundationRequestPending(getState(), field)) return;
   const strategy = buildFoundationStrategy(getState, field);
   dispatch(
     requestQueued({

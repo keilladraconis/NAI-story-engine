@@ -21,6 +21,7 @@ import {
   type RootState,
   type ContractData,
 } from "../../../core/store";
+import { isFoundationRequestPending } from "../../../core/store/selectors/runtime";
 
 export type FoundationFieldId =
   "shape" | "intent" | "contract" | "attg" | "style";
@@ -78,19 +79,14 @@ function displayContract(c: ContractData | null): string {
   return `Required: ${c.required}\nProhibited: ${c.prohibited}\nEmphasis: ${c.emphasis}`;
 }
 
-/** True while a foundation request for `fieldId` is queued or active.
- *  Mirrors SUI's foundationProjection. */
+/** True while a foundation request for `fieldId` is queued or active. The same
+ *  predicate the effect uses to refuse a duplicate submission, so a dimmed ⚡ and
+ *  an ignored dispatch always agree. */
 export function isFoundationGenerating(
   s: RootState,
   fieldId: FoundationFieldId,
 ): boolean {
-  const inQueue = s.runtime.queue.some(
-    (r) => r.type === "foundation" && r.targetId === fieldId,
-  );
-  const active =
-    s.runtime.activeRequest?.type === "foundation" &&
-    s.runtime.activeRequest.targetId === fieldId;
-  return inQueue || active;
+  return isFoundationRequestPending(s, fieldId);
 }
 
 /** Push ATTG→Memory / Style→A.N. when their sync toggles are on. */

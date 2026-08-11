@@ -8,6 +8,22 @@ export const initialWorldState: WorldState = {
   entityIds: [],
 };
 
+/** The set of lorebook entry ids some entity already binds.
+ *
+ *  A lorebook entry belongs to at most one entity — two entities over the same
+ *  entry would generate into it twice and show it twice in the World. The bind
+ *  actions are the only way to break that (Cast and the Forge attach an entry to
+ *  an entity that exists), and the Import wizard can fire one twice from a single
+ *  mobile tap, so both bind reducers drop entries that are already spoken for. */
+function boundEntryIds(state: WorldState): Set<string> {
+  const ids = new Set<string>();
+  for (const id of state.entityIds) {
+    const entryId = state.entitiesById[id]?.lorebookEntryId;
+    if (entryId) ids.add(entryId);
+  }
+  return ids;
+}
+
 export const worldSlice = createSlice({
   name: "world",
   initialState: initialWorldState,
@@ -118,20 +134,32 @@ export const worldSlice = createSlice({
     },
 
     // Bind/Unbind (adopt existing lorebook entries)
-    entityBound: (state, payload: { entity: WorldEntity }) => ({
-      ...state,
-      entitiesById: {
-        ...state.entitiesById,
-        [payload.entity.id]: payload.entity,
-      },
-      entityIds: [...state.entityIds, payload.entity.id],
-    }),
+    entityBound: (state, payload: { entity: WorldEntity }) => {
+      const { lorebookEntryId } = payload.entity;
+      if (lorebookEntryId && boundEntryIds(state).has(lorebookEntryId)) {
+        return state;
+      }
+      return {
+        ...state,
+        entitiesById: {
+          ...state.entitiesById,
+          [payload.entity.id]: payload.entity,
+        },
+        entityIds: [...state.entityIds, payload.entity.id],
+      };
+    },
 
     // Batch bind: single dispatch for N entities — prevents N concurrent _rebuildBody() races
     entitiesBoundBatch: (state, payload: WorldEntity[]) => {
+      const taken = boundEntryIds(state);
       const newById: Record<string, WorldEntity> = {};
       const newIds: string[] = [];
       for (const entity of payload) {
+        // Also guards a batch that repeats an entry within itself.
+        if (entity.lorebookEntryId) {
+          if (taken.has(entity.lorebookEntryId)) continue;
+          taken.add(entity.lorebookEntryId);
+        }
         newById[entity.id] = entity;
         newIds.push(entity.id);
       }

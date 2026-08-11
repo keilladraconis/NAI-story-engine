@@ -11,6 +11,7 @@ import {
   shapeGenerationRequested,
   intentGenerationRequested,
 } from "../../../core/store";
+import { useTapGuard } from "../../tap-guard";
 
 const truncate = (s: string, n: number) =>
   s.length > n ? s.slice(0, n) + "…" : s;
@@ -53,6 +54,12 @@ const btn = {
 export function ImportFoundation(props: { memText: string; anText: string }) {
   const [attgDone, setAttgDone] = useState(false);
   const [styleDone, setStyleDone] = useState(false);
+  // `disabled` is not a guard here: the repeat click of a doubled tap arrives
+  // before the re-render that would disable the button.
+  const onceAttgTap = useTapGuard();
+  const onceStyleTap = useTapGuard();
+  const onceShapeTap = useTapGuard();
+  const onceIntentTap = useTapGuard();
 
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
@@ -63,12 +70,14 @@ export function ImportFoundation(props: { memText: string; anText: string }) {
           <button
             style={btn}
             disabled={attgDone}
-            onClick={() => {
-              store.dispatch(attgUpdated({ attg: props.memText }));
-              store.dispatch(attgSyncSet({ enabled: true }));
-              void api.v1.memory.set(props.memText);
-              setAttgDone(true);
-            }}
+            onClick={() =>
+              onceAttgTap(() => {
+                store.dispatch(attgUpdated({ attg: props.memText }));
+                store.dispatch(attgSyncSet({ enabled: true }));
+                void api.v1.memory.set(props.memText);
+                setAttgDone(true);
+              })
+            }
           >
             {attgDone ? "Imported ✓" : "Import"}
           </button>
@@ -82,11 +91,13 @@ export function ImportFoundation(props: { memText: string; anText: string }) {
           <button
             style={btn}
             disabled={styleDone}
-            onClick={() => {
-              store.dispatch(styleUpdated({ style: props.anText }));
-              store.dispatch(styleSyncSet({ enabled: true }));
-              setStyleDone(true);
-            }}
+            onClick={() =>
+              onceStyleTap(() => {
+                store.dispatch(styleUpdated({ style: props.anText }));
+                store.dispatch(styleSyncSet({ enabled: true }));
+                setStyleDone(true);
+              })
+            }
           >
             {styleDone ? "Imported ✓" : "Import"}
           </button>
@@ -98,13 +109,17 @@ export function ImportFoundation(props: { memText: string; anText: string }) {
         <span style={preview} />
         <button
           style={btn}
-          onClick={() => store.dispatch(shapeGenerationRequested())}
+          onClick={() =>
+            onceShapeTap(() => store.dispatch(shapeGenerationRequested()))
+          }
         >
           Shape
         </button>
         <button
           style={btn}
-          onClick={() => store.dispatch(intentGenerationRequested())}
+          onClick={() =>
+            onceIntentTap(() => store.dispatch(intentGenerationRequested()))
+          }
         >
           Intent
         </button>
