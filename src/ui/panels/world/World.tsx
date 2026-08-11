@@ -46,13 +46,17 @@ export function World() {
   const segaRunning = useSlice((s) => s.runtime.segaRunning);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Each of these flips a boolean, so an unguarded repeat click from one tap
-  // flips it straight back. SEGA is the worst of the three: start-then-stop
-  // from a single tap. One guard each — a shared guard would let a tap on the
-  // section header swallow the next tap on expand-all.
+  // The first three flip a boolean, so an unguarded repeat click from one tap
+  // flips it straight back. SEGA is the worst of those: start-then-stop from a
+  // single tap. The two Add buttons mint an id per click instead, so a repeat
+  // creates a second entity/thread rather than undoing the first. One guard each
+  // — a shared guard would let a tap on the section header swallow the next tap
+  // on expand-all.
   const onceCollapseTap = useTapGuard();
   const onceExpandAllTap = useTapGuard();
   const onceSegaTap = useTapGuard();
+  const onceAddEntityTap = useTapGuard();
+  const onceAddThreadTap = useTapGuard();
 
   const { groups: visibleGroups, loose } = selectWorldBody(
     entitiesById,
@@ -130,10 +134,18 @@ export function World() {
             <PlayCircle size={ICON_SIZE} />
           )}
         </button>
-        <button title="Add entity" onClick={onAddEntity} style={ICON_BTN}>
+        <button
+          title="Add entity"
+          onClick={() => onceAddEntityTap(onAddEntity)}
+          style={ICON_BTN}
+        >
           <Plus size={ICON_SIZE} />
         </button>
-        <button title="Add thread" onClick={onAddThread} style={ICON_BTN}>
+        <button
+          title="Add thread"
+          onClick={() => onceAddThreadTap(onAddThread)}
+          style={ICON_BTN}
+        >
           <Layers size={ICON_SIZE} />
         </button>
         <ConfirmButton
