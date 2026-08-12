@@ -67,7 +67,11 @@ function makeState(
   return {
     chat: { chats, activeChatId: chats[0]?.id ?? null, refineChat: null },
     world: { groups: [], entitiesById, entityIds: entities.map((e) => e.id) },
-    forge: { tombstonesByChatId: {}, pendingScrubByChatId: {} },
+    forge: {
+      tombstonesByChatId: {},
+      pendingScrubByChatId: {},
+      pinnedNextPhaseByChatId: {},
+    },
     runtime: { queue: [], activeRequest: null },
   } as unknown as RootState;
 }
@@ -349,6 +353,72 @@ describe("forgeChatContinueRequested with advancePhase: false", () => {
   });
 });
 
+describe("forgeChatContinueRequested pin", () => {
+  it("honors a pin over auto-advance and clears it", async () => {
+    const chat = makeChat({ subMode: "sketch" });
+    const draft = makeEntity({
+      id: "d1",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
+    const state = makeState([chat], [draft]);
+    (
+      state.forge as { pinnedNextPhaseByChatId: Record<string, string> }
+    ).pinnedNextPhaseByChatId = { "fc-1": "weave" };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
+    const sub = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/subModeChanged",
+    );
+    expect(sub![0].payload.subMode).toBe("weave"); // pin, not nextPhase(sketch)=expand
+    const cleared = dispatch.mock.calls.find(
+      ([a]) => a.type === "forge/forgeNextPhaseCleared",
+    );
+    expect(cleared).toBeDefined();
+  });
+
+  it("pool-empty forces sketch even with a pin", async () => {
+    const chat = makeChat({ subMode: "expand" });
+    const state = makeState([chat], []); // no drafts
+    (
+      state.forge as { pinnedNextPhaseByChatId: Record<string, string> }
+    ).pinnedNextPhaseByChatId = { "fc-1": "weave" };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
+    const sub = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/subModeChanged",
+    );
+    expect(sub![0].payload.subMode).toBe("sketch");
+  });
+
+  it("does not consume the pin on a non-advancing continue", async () => {
+    // subMode "expand" (not the "sketch" default) so the assertion proves the
+    // current subMode is preserved, not merely matching the fallback.
+    const chat = makeChat({ subMode: "expand" });
+    const draft = makeEntity({
+      id: "d1",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
+    const state = makeState([chat], [draft]);
+    (
+      state.forge as { pinnedNextPhaseByChatId: Record<string, string> }
+    ).pinnedNextPhaseByChatId = { "fc-1": "weave" };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(
+      forgeChatContinueRequested({ chatId: "fc-1", advancePhase: false }),
+    );
+    const sub = dispatch.mock.calls.find(
+      ([a]) => a.type === "chat/subModeChanged",
+    );
+    expect(sub![0].payload.subMode).toBe("expand"); // stays on current subMode, pin not read
+    const cleared = dispatch.mock.calls.find(
+      ([a]) => a.type === "forge/forgeNextPhaseCleared",
+    );
+    expect(cleared).toBeUndefined();
+  });
+});
+
 describe("forgeChatNewSessionRequested effect", () => {
   it("seeded open runs a discuss turn (not a sketch) and seeds the user guidance", async () => {
     const state = makeState([]);
@@ -401,6 +471,44 @@ describe("forgeChatNewSessionRequested effect", () => {
             "assistant",
       ),
     ).toBe(false);
+  });
+
+  it("a second request while the first is still building creates only ONE session", async () => {
+    // The new chat is not in state until chatCreated fires, which is after the
+    // briefing await — so a caller checking "is a forge open?" still sees none
+    // and asks again. Both requests are started before either settles, which is
+    // exactly the window a UI tap guard cannot reach.
+    const state = makeState([]);
+    const { dispatch, fire } = makeHarness(state);
+
+    const first = fire(
+      forgeChatNewSessionRequested({ initialUserMessage: "include Vesper" }),
+    );
+    const second = fire(
+      forgeChatNewSessionRequested({ initialUserMessage: "include Vesper" }),
+    );
+    await Promise.all([first, second]);
+
+    const created = dispatch.mock.calls.filter(
+      ([a]) => a.type === "chat/chatCreated",
+    );
+    expect(created).toHaveLength(1);
+    // And only one generation — two would race in the same session.
+    const submitted = dispatch.mock.calls.filter(
+      ([a]) => a.type === "ui/generationSubmitted",
+    );
+    expect(submitted).toHaveLength(1);
+  });
+
+  it("the guard releases, so a later request still opens a session", async () => {
+    // A guard that never resets would silently break Forge after one use.
+    const state = makeState([]);
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatNewSessionRequested({}));
+    await fire(forgeChatNewSessionRequested({}));
+    expect(
+      dispatch.mock.calls.filter(([a]) => a.type === "chat/chatCreated"),
+    ).toHaveLength(2);
   });
 
   it("seeds the briefing as the first (system) message of the new chat", async () => {
@@ -536,6 +644,25 @@ describe("forgeDiscardAllRequested effect", () => {
       ([a]) => a.type === "chat/chatDeleted",
     );
     expect(closed).toBeDefined();
+  });
+
+  it("clears the pin when the session ends (discard all)", async () => {
+    const chat = makeChat({ subMode: "expand" });
+    const draft = makeEntity({
+      id: "d1",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
+    const state = makeState([chat], [draft]);
+    (
+      state.forge as { pinnedNextPhaseByChatId: Record<string, string> }
+    ).pinnedNextPhaseByChatId = { "fc-1": "weave" };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeDiscardAllRequested({ chatId: "fc-1" }));
+    const cleared = dispatch.mock.calls.find(
+      ([a]) => a.type === "forge/forgeNextPhaseCleared",
+    );
+    expect(cleared).toBeDefined();
   });
 });
 

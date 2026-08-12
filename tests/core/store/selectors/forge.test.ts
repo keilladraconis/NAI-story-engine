@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   selectActiveForgeChatId,
   isForgeDraft,
+  selectForgeNextPhase,
+  selectForgeDraftPoolCount,
 } from "../../../../src/core/store/selectors/forge";
 import type { RootState, WorldEntity } from "../../../../src/core/store/types";
 import type { Chat } from "../../../../src/core/chat-types/types";
@@ -22,7 +24,11 @@ function state(chats: Chat[]): RootState {
   return {
     chat: { chats, activeChatId: null, refineChat: null },
     world: { groups: [], entitiesById: {}, entityIds: [] },
-    forge: { tombstonesByChatId: {} },
+    forge: {
+      tombstonesByChatId: {},
+      pendingScrubByChatId: {},
+      pinnedNextPhaseByChatId: {},
+    },
   } as unknown as RootState;
 }
 
@@ -77,5 +83,71 @@ describe("isForgeDraft", () => {
         }),
       ),
     ).toBe(false);
+  });
+});
+
+function forgeState(opts: {
+  subMode?: string;
+  drafts?: number;
+  pin?: "sketch" | "expand" | "weave";
+}): RootState {
+  const entitiesById: Record<string, WorldEntity> = {};
+  for (let i = 0; i < (opts.drafts ?? 0); i++) {
+    entitiesById[`d${i}`] = {
+      id: `d${i}`,
+      categoryId: FieldID.DramatisPersonae,
+      name: `D${i}`,
+      summary: "",
+      lifecycle: "draft",
+      sourceChatId: "f1",
+    } as WorldEntity;
+  }
+  return {
+    chat: {
+      chats: [
+        chat({ id: "f1", type: "forge", subMode: opts.subMode ?? "sketch" }),
+      ],
+      activeChatId: "f1",
+      refineChat: null,
+    },
+    world: { groups: [], entitiesById, entityIds: Object.keys(entitiesById) },
+    forge: {
+      tombstonesByChatId: {},
+      pendingScrubByChatId: {},
+      pinnedNextPhaseByChatId: opts.pin ? { f1: opts.pin } : {},
+    },
+  } as unknown as RootState;
+}
+
+describe("selectForgeDraftPoolCount", () => {
+  it("counts draft entities for the chat", () => {
+    expect(selectForgeDraftPoolCount(forgeState({ drafts: 2 }), "f1")).toBe(2);
+    expect(selectForgeDraftPoolCount(forgeState({ drafts: 0 }), "f1")).toBe(0);
+  });
+});
+
+describe("selectForgeNextPhase", () => {
+  it("pool empty → sketch (even with a pin)", () => {
+    expect(
+      selectForgeNextPhase(
+        forgeState({ drafts: 0, subMode: "expand", pin: "weave" }),
+        "f1",
+      ),
+    ).toBe("sketch");
+  });
+
+  it("pool non-empty, no pin → nextPhase(subMode)", () => {
+    expect(
+      selectForgeNextPhase(forgeState({ drafts: 1, subMode: "sketch" }), "f1"),
+    ).toBe("expand");
+  });
+
+  it("pool non-empty, pinned → the pin", () => {
+    expect(
+      selectForgeNextPhase(
+        forgeState({ drafts: 1, subMode: "sketch", pin: "weave" }),
+        "f1",
+      ),
+    ).toBe("weave");
   });
 });

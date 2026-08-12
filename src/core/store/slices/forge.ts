@@ -11,11 +11,16 @@ export interface ForgeSliceState {
   /** Names discarded since the last forge turn, awaiting a reference-scrub
    *  cleanup that the next continue dispatch leads off with. */
   pendingScrubByChatId: Record<string, string[]>;
+  /** User-pinned phase for the next forge continue (one-shot; consumed by the
+   *  continue effect, cleared on session end). Overrides auto-advance but not
+   *  the pool-empty→sketch safety. */
+  pinnedNextPhaseByChatId: Record<string, "sketch" | "expand" | "weave">;
 }
 
 export const initialForgeState: ForgeSliceState = {
   tombstonesByChatId: {},
   pendingScrubByChatId: {},
+  pinnedNextPhaseByChatId: {},
 };
 
 export const forgeSlice = createSlice({
@@ -67,6 +72,23 @@ export const forgeSlice = createSlice({
       const { [payload.chatId]: _, ...rest } = state.pendingScrubByChatId;
       return { ...state, pendingScrubByChatId: rest };
     },
+
+    forgeNextPhasePinned: (
+      state,
+      payload: { chatId: string; phase: "sketch" | "expand" | "weave" },
+    ) => ({
+      ...state,
+      pinnedNextPhaseByChatId: {
+        ...state.pinnedNextPhaseByChatId,
+        [payload.chatId]: payload.phase,
+      },
+    }),
+
+    forgeNextPhaseCleared: (state, payload: { chatId: string }) => {
+      if (!state.pinnedNextPhaseByChatId[payload.chatId]) return state;
+      const { [payload.chatId]: _, ...rest } = state.pinnedNextPhaseByChatId;
+      return { ...state, pinnedNextPhaseByChatId: rest };
+    },
   },
 });
 
@@ -76,4 +98,6 @@ export const {
   tombstonesClearedForChat,
   scrubQueued,
   scrubCleared,
+  forgeNextPhasePinned,
+  forgeNextPhaseCleared,
 } = forgeSlice.actions;

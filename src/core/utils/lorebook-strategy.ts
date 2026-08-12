@@ -4,11 +4,7 @@ import { buildStoryEnginePrefix } from "./context-builder";
 import type { RefineContext } from "../chat-types/types";
 import { buildRefineTail } from "./refine-strategy";
 import { FIELD_CONFIGS } from "../../config/field-definitions";
-import {
-  STORAGE_KEYS,
-  EDIT_PANE_TITLE,
-  EDIT_PANE_CONTENT,
-} from "../../ui/framework/ids";
+import { STORAGE_KEYS, EDIT_PANE_TITLE, EDIT_PANE_CONTENT } from "../keys";
 import {
   buildModelParams,
   appendXialongStyleMessage,
@@ -318,6 +314,36 @@ Setting: ${setting}
 };
 
 /**
+ * Total generation calls one lorebook entry may spend — the first plus its
+ * continuations. Entries are written at 1024 tokens (see
+ * `createLorebookContentFactory`); a longer one used to be saved exactly where
+ * the cap fell, mid-sentence. Continuations only fire when the model was cut
+ * off rather than finishing, so a normal entry still costs a single call.
+ */
+export const LOREBOOK_CONTENT_MAX_CALLS = 4;
+
+/**
+ * Builds the complete generation payload for lorebook content.
+ *
+ * The single source of truth for every lorebook content generation — the edit
+ * pane, the entity item pass, SEGA, and entity binding all go through here, so
+ * they cannot drift apart on token budget or continuation behaviour. Params
+ * come from the factory itself (JIT, so they reflect the entry at execution
+ * time) rather than being restated per callsite.
+ */
+export const buildLorebookContentPayload = (
+  getState: () => RootState,
+  entryId: string,
+  requestId: string,
+): GenerationStrategy => ({
+  requestId,
+  messageFactory: createLorebookContentFactory(getState, entryId),
+  target: { type: "lorebookContent", entryId },
+  prefillBehavior: "trim",
+  continuation: { maxCalls: LOREBOOK_CONTENT_MAX_CALLS },
+});
+
+/**
  * Builds a refine-capable GenerationStrategy for lorebook content.
  * Wraps the base factory and appends refine tail when refineContext is present.
  */
@@ -333,21 +359,21 @@ export function buildLorebookContentStrategy(
   if (!entryId) {
     throw new Error("buildLorebookContentStrategy requires entryId");
   }
-  const baseFactory = createLorebookContentFactory(getState, entryId);
+  const base = buildLorebookContentPayload(
+    getState,
+    entryId,
+    opts?.requestId ?? api.v1.uuid(),
+  );
   const refineContext = opts?.refineContext;
-  const messageFactory: MessageFactory = refineContext
-    ? async () => {
-        const base = await baseFactory();
-        return {
-          ...base,
-          messages: buildRefineTail(base.messages, refineContext),
-        };
-      }
-    : baseFactory;
-  return {
-    requestId: opts?.requestId ?? api.v1.uuid(),
-    messageFactory,
-    target: { type: "lorebookContent", entryId },
-    prefillBehavior: "keep",
+  if (!refineContext) return base;
+
+  const baseFactory = base.messageFactory as MessageFactory;
+  const messageFactory: MessageFactory = async () => {
+    const resolved = await baseFactory();
+    return {
+      ...resolved,
+      messages: buildRefineTail(resolved.messages, refineContext),
+    };
   };
+  return { ...base, messageFactory };
 }

@@ -10,6 +10,10 @@ import {
   messageAdded,
   forgeSegmentsSet,
 } from "../../../../../src/core/store/slices/chat";
+import {
+  readStream,
+  clearStream,
+} from "../../../../../src/core/store/stream-buffer";
 import type { ForgeSegment } from "../../../../../src/core/chat-types/types";
 import type {
   ChatTarget,
@@ -100,7 +104,11 @@ describe("chatRefineHandler.completion", () => {
 });
 
 describe("streaming handlers", () => {
-  it("chat streaming dispatches messageAppended with the delta", () => {
+  // Streaming no longer dispatches per token — it appends to the effect-free
+  // stream-buffer keyed by message id (per-token store dispatch wedges the JSX
+  // render flush). It must NOT dispatch, and must grow the buffer by the delta.
+  it("chat streaming appends the delta to the stream buffer, no dispatch", () => {
+    clearStream("m1");
     const dispatch = vi.fn();
     const ctx = {
       target: { type: "chat" as const, chatId: "c1", messageId: "m1" },
@@ -108,14 +116,15 @@ describe("streaming handlers", () => {
       dispatch,
       accumulatedText: "Hello",
     };
+    chatHandler.streaming(ctx, "Hello");
     chatHandler.streaming(ctx, " world");
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "chat/messageAppended",
-      payload: { chatId: "c1", id: "m1", content: " world" },
-    });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(readStream("m1")).toBe("Hello world");
+    clearStream("m1");
   });
 
-  it("chatRefine streaming dispatches messageAppended with the delta", () => {
+  it("chatRefine streaming appends the delta to the stream buffer, no dispatch", () => {
+    clearStream("m1");
     const dispatch = vi.fn();
     const ctx = {
       target: {
@@ -128,11 +137,30 @@ describe("streaming handlers", () => {
       dispatch,
       accumulatedText: "tighter",
     };
+    chatRefineHandler.streaming(ctx, "tighter");
     chatRefineHandler.streaming(ctx, " version");
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "chat/messageAppended",
-      payload: { chatId: "r1", id: "m1", content: " version" },
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(readStream("m1")).toBe("tighter version");
+    clearStream("m1");
+  });
+
+  it("chat completion commits the text and clears the buffer", async () => {
+    clearStream("m1");
+    const streamCtx = {
+      target: { type: "chat" as const, chatId: "c1", messageId: "m1" },
+      getState: vi.fn(),
+      dispatch: vi.fn(),
+      accumulatedText: "partial",
+    };
+    chatHandler.streaming(streamCtx, "partial");
+    expect(readStream("m1")).toBe("partial");
+    const ctx = makeChatCtx({ accumulatedText: "done" });
+    await chatHandler.completion(ctx);
+    expect(ctx.dispatch).toHaveBeenCalledWith({
+      type: "chat/messageUpdated",
+      payload: { chatId: "c1", id: "m1", content: "done" },
     });
+    expect(readStream("m1")).toBeUndefined();
   });
 });
 

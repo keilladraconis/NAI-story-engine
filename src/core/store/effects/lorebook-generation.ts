@@ -8,10 +8,9 @@ import {
   uiLorebookItemGenerationRequested,
 } from "../index";
 import {
-  createLorebookContentFactory,
+  buildLorebookContentPayload,
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
-import { buildModelParams } from "../../utils/config";
 
 export function registerLorebookGenerationEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
@@ -32,19 +31,10 @@ export function registerLorebookGenerationEffects(
         return;
       }
 
-      const messageFactory = createLorebookContentFactory(
-        getState,
-        selectedEntryId,
-      );
-
       dispatch(
-        generationSubmitted({
-          requestId,
-          messageFactory,
-          params: await buildModelParams({ max_tokens: 512 }),
-          target: { type: "lorebookContent", entryId: selectedEntryId },
-          prefillBehavior: "trim",
-        }),
+        generationSubmitted(
+          buildLorebookContentPayload(getState, selectedEntryId, requestId),
+        ),
       );
     },
   );
@@ -91,15 +81,10 @@ export function registerLorebookGenerationEffects(
         }),
       );
 
-      const contentFactory = createLorebookContentFactory(getState, entryId);
       dispatch(
-        generationSubmitted({
-          requestId: contentRequestId,
-          messageFactory: contentFactory,
-          params: await buildModelParams({ max_tokens: 512 }),
-          target: { type: "lorebookContent", entryId },
-          prefillBehavior: "trim",
-        }),
+        generationSubmitted(
+          buildLorebookContentPayload(getState, entryId, contentRequestId),
+        ),
       );
 
       const keysPayload = await buildLorebookKeysPayload(

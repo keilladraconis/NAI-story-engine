@@ -11,6 +11,7 @@ export const initialUIState: UIState = {
   inputs: {},
   lorebook: initialLorebookState,
   worldExpanded: null,
+  importWizardOpen: false,
 };
 
 export const uiSlice = createSlice({
@@ -28,7 +29,13 @@ export const uiSlice = createSlice({
     uiRequestCancellation: (state) => state,
     uiUserPresenceConfirmed: (state) => state,
     // Chat user intents
-    uiChatSubmitUserMessage: (state, _payload: { chatId: string }) => state,
+    // `text` travels in the payload, NOT via a shared storyStorage slot: the
+    // effect's read is async, so two sends in flight at once would both read
+    // whatever the last one wrote (see ChatInput's duplicate-tap note).
+    uiChatSubmitUserMessage: (
+      state,
+      _payload: { chatId: string; text: string },
+    ) => state,
     uiChatRetryGeneration: (
       state,
       _payload: { chatId: string; messageId: string },
@@ -55,7 +62,9 @@ export const uiSlice = createSlice({
     // Internal: Submit generation to GenX (not a user intent)
     generationSubmitted: (state, _strategy: any) => state,
     uiCancelRequest: (state, _payload: { requestId: string }) => state,
-    // Editable singleton — at most one editor active at a time
+    // Editable singleton — at most one editor active at a time. `id` is an
+    // entity id, a world group id, or a Foundation field id ("shape", "intent",
+    // …); StoryEngine routes the open pane by membership.
     uiEditableActivate: (state, payload: { id: string }) => ({
       ...state,
       activeEditId: payload.id,
@@ -98,6 +107,9 @@ export const uiSlice = createSlice({
       ...state,
       worldExpanded: payload.expanded,
     }),
+    // Import wizard visibility (shown over the Story Engine tab)
+    importWizardOpened: (state) => ({ ...state, importWizardOpen: true }),
+    importWizardClosed: (state) => ({ ...state, importWizardOpen: false }),
     // Summary generation intents
     uiEntitySummaryGenerationRequested: (
       state,
@@ -113,6 +125,8 @@ export const uiSlice = createSlice({
 export const {
   uiInputChanged,
   worldExpansionSet,
+  importWizardOpened,
+  importWizardClosed,
   uiRequestCancellation,
   uiUserPresenceConfirmed,
   uiChatSubmitUserMessage,

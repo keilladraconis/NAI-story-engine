@@ -87,10 +87,12 @@ const apiMock = {
       set: vi.fn().mockResolvedValue(undefined),
     },
     lorebook: {
+      categories: vi.fn().mockResolvedValue([]),
       category: vi.fn(),
       createCategory: vi.fn(),
       updateCategory: vi.fn(),
       removeCategory: vi.fn(),
+      entries: vi.fn().mockResolvedValue([]),
       entry: vi.fn(),
       createEntry: vi.fn(),
       updateEntry: vi.fn(),
@@ -116,12 +118,25 @@ const apiMock = {
           ...props,
           type: "multilineTextInput",
         })),
+        container: vi.fn((props) => ({ ...props, type: "container" })),
+        jsx: vi.fn((props) => ({ ...props, type: "jsx" })),
       },
       update: vi.fn(),
       register: vi.fn(),
+      modal: {
+        open: vi.fn(async () => ({
+          update: vi.fn(),
+          close: vi.fn(async () => {}),
+          isClosed: vi.fn(() => false),
+          closed: Promise.resolve(),
+        })),
+      },
       extension: {
         sidebarPanel: vi.fn((props) => ({ ...props, type: "sidebarPanel" })),
       },
+    },
+    document: {
+      sectionIds: vi.fn().mockResolvedValue([]),
     },
     generate: vi.fn(),
     buildContext: vi.fn().mockResolvedValue([]),

@@ -1,3 +1,3 @@
-import { StoryEnginePlugin } from "./ui/plugin";
+import { start } from "./ui/mount";
 
-new StoryEnginePlugin({ id: "kse-story-engine" }).start();
+void start();

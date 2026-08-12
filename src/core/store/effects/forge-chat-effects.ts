@@ -31,11 +31,13 @@ import {
 } from "../slices/chat";
 import { requestQueued } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
+import { selectForgeNextPhase } from "../selectors/forge";
 import {
   tombstoneAdded,
   tombstonesClearedForChat,
   scrubQueued,
   scrubCleared,
+  forgeNextPhaseCleared,
 } from "../slices/forge";
 import { entityDeleted, entityLorebookEntryBound } from "../slices/world";
 import { DULFS_CATEGORY_LABELS } from "../../utils/category-detect";
@@ -151,13 +153,6 @@ function poolFor(state: RootState, chatId: string): WorldEntity[] {
   );
 }
 
-function nextPhase(current: string | undefined): "sketch" | "expand" | "weave" {
-  if (current === "sketch") return "expand";
-  if (current === "expand") return "weave";
-  if (current === "weave") return "sketch";
-  return "sketch";
-}
-
 /** True if a forge generation (phase turn or reference scrub) is already queued
  *  or in flight — forge sends/advances guard on this so a second one is a no-op
  *  rather than another stacked empty assistant turn. */
@@ -177,6 +172,7 @@ function forgeRequestPending(state: RootState): boolean {
 function closeForgeSession(dispatch: AppDispatch, chatId: string): void {
   dispatch(scrubCleared({ chatId }));
   dispatch(tombstonesClearedForChat({ chatId }));
+  dispatch(forgeNextPhaseCleared({ chatId }));
   dispatch(chatDeleted({ id: chatId }));
 }
 
@@ -298,14 +294,17 @@ export function registerForgeChatEffects(
       runPendingScrub(latest, dispatch, chatId);
 
       const state = latest();
-      const pool = poolFor(state, chatId);
       const advance = action.payload.advancePhase !== false;
-      const target = !advance
-        ? (chat.subMode ?? "sketch")
-        : pool.length === 0
-          ? "sketch"
-          : nextPhase(chat.subMode);
+      const pinned = state.forge.pinnedNextPhaseByChatId?.[chatId];
+      // Advancing continue: the phase (pool-empty→sketch, else pin, else
+      // auto-advance) comes from selectForgeNextPhase — the SAME selector the
+      // header pill reads, so the pill and the effect can't drift. A
+      // non-advancing continue (empty-send / retry) re-runs the current phase.
+      const target = advance
+        ? selectForgeNextPhase(state, chatId)
+        : (chat.subMode ?? "sketch");
       dispatch(subModeChanged({ id: chatId, subMode: target }));
+      if (advance && pinned) dispatch(forgeNextPhaseCleared({ chatId }));
 
       const assistantId = api.v1.uuid();
       dispatch(
@@ -375,59 +374,78 @@ export function registerForgeChatEffects(
   );
 
   // ─── New Session (fresh forge chat; discuss turn if seeded, else idle) ──────
+  //
+  // Re-entrancy guard. A new session only becomes observable when chatCreated
+  // lands, and that is AFTER `await buildForgeBriefing` below — so a caller
+  // that checks "is a forge already open?" (ForgeSection) still sees none
+  // during that window and asks for a second. Two sessions then generate side
+  // by side. That window is as long as the briefing takes to build, well past
+  // what a UI tap guard covers, so it has to be closed here.
+  let creatingSession = false;
+
   subscribeEffect(
     matchesAction(forgeChatNewSessionRequested),
     async (action, { getState: latest }) => {
-      const { initialUserMessage } = action.payload;
-      const seedText = initialUserMessage?.trim();
+      if (creatingSession) return;
+      creatingSession = true;
+      try {
+        const { initialUserMessage } = action.payload;
+        const seedText = initialUserMessage?.trim();
 
-      // Capture the frozen briefing BEFORE chatCreated fires — at this point
-      // activeSavedChat still resolves to the brainstorm the user came from,
-      // not the forge chat we are about to create.
-      const briefing = await buildForgeBriefing(latest);
+        // Capture the frozen briefing BEFORE chatCreated fires — at this point
+        // activeSavedChat still resolves to the brainstorm the user came from,
+        // not the forge chat we are about to create.
+        const briefing = await buildForgeBriefing(latest);
 
-      const messages: ChatMessage[] = [];
-      if (briefing) {
-        messages.push({ id: api.v1.uuid(), role: "system", content: briefing });
+        const messages: ChatMessage[] = [];
+        if (briefing) {
+          messages.push({
+            id: api.v1.uuid(),
+            role: "system",
+            content: briefing,
+          });
+        }
+        if (seedText) {
+          messages.push({ id: api.v1.uuid(), role: "user", content: seedText });
+        }
+
+        const chat: Chat = {
+          id: api.v1.uuid(),
+          type: "forge",
+          title: "Forge",
+          subMode: "sketch",
+          messages,
+          seed: { kind: "blank" },
+        };
+        dispatch(chatCreated({ chat }));
+
+        // Opening a Forge no longer auto-runs a pass. With guidance, run one
+        // conversational discuss turn (emits commands only if explicitly asked);
+        // with no guidance, leave the session idle — the user sends empty to
+        // Forge Ahead or types to discuss. chatCreated already switched the tab.
+        if (!seedText) return;
+
+        const assistantId = api.v1.uuid();
+        dispatch(
+          messageAdded({
+            chatId: chat.id,
+            message: { id: assistantId, role: "assistant", content: "" },
+          }),
+        );
+
+        const seeded = findChat(latest(), chat.id) ?? chat;
+        const strategy = buildForgeDiscussStrategy(latest, seeded, assistantId);
+        dispatch(
+          requestQueued({
+            id: strategy.requestId,
+            type: "forgeChat",
+            targetId: assistantId,
+          }),
+        );
+        dispatch(generationSubmitted(strategy));
+      } finally {
+        creatingSession = false;
       }
-      if (seedText) {
-        messages.push({ id: api.v1.uuid(), role: "user", content: seedText });
-      }
-
-      const chat: Chat = {
-        id: api.v1.uuid(),
-        type: "forge",
-        title: "Forge",
-        subMode: "sketch",
-        messages,
-        seed: { kind: "blank" },
-      };
-      dispatch(chatCreated({ chat }));
-
-      // Opening a Forge no longer auto-runs a pass. With guidance, run one
-      // conversational discuss turn (emits commands only if explicitly asked);
-      // with no guidance, leave the session idle — the user sends empty to
-      // Forge Ahead or types to discuss. chatCreated already switched the tab.
-      if (!seedText) return;
-
-      const assistantId = api.v1.uuid();
-      dispatch(
-        messageAdded({
-          chatId: chat.id,
-          message: { id: assistantId, role: "assistant", content: "" },
-        }),
-      );
-
-      const seeded = findChat(latest(), chat.id) ?? chat;
-      const strategy = buildForgeDiscussStrategy(latest, seeded, assistantId);
-      dispatch(
-        requestQueued({
-          id: strategy.requestId,
-          type: "forgeChat",
-          targetId: assistantId,
-        }),
-      );
-      dispatch(generationSubmitted(strategy));
     },
   );
 

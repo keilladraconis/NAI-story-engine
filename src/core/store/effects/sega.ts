@@ -30,12 +30,13 @@ import {
 } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
 import {
-  createLorebookContentFactory,
+  buildLorebookContentPayload,
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
 import { hashEntryPosition, getStoryIdSeed } from "../../utils/seeded-random";
-import { buildModelParams } from "../../utils/config";
+import { isRequestOrContinuation } from "../request-ids";
 import { nameKey } from "./handlers/lorebook";
+import { lorebookContentRequestId, lorebookKeysRequestId } from "../../keys";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper Functions
@@ -122,20 +123,15 @@ async function queueSegaLorebookContent(
   entity: WorldEntity,
 ): Promise<void> {
   const entryId = entity.lorebookEntryId!;
-  const contentRequestId = `lb-entity-${entity.id}-content`;
+  const contentRequestId = lorebookContentRequestId(entity.id);
 
   dispatch(segaStatusUpdated({ statusText: `Lorebook: ${entity.name}` }));
   dispatch(segaRequestTracked({ requestId: contentRequestId }));
 
-  const contentFactory = createLorebookContentFactory(getState, entryId);
   dispatch(
-    generationSubmitted({
-      requestId: contentRequestId,
-      messageFactory: contentFactory,
-      params: await buildModelParams({ max_tokens: 1024 }),
-      target: { type: "lorebookContent", entryId },
-      prefillBehavior: "trim",
-    }),
+    generationSubmitted(
+      buildLorebookContentPayload(getState, entryId, contentRequestId),
+    ),
   );
 }
 
@@ -148,7 +144,7 @@ async function queueSegaLorebookKeys(
   entity: WorldEntity,
 ): Promise<void> {
   const entryId = entity.lorebookEntryId!;
-  const keysRequestId = `lb-entity-${entity.id}-keys`;
+  const keysRequestId = lorebookKeysRequestId(entity.id);
 
   dispatch(segaStatusUpdated({ statusText: `Keys: ${entity.name}` }));
   dispatch(segaRequestTracked({ requestId: keysRequestId }));
@@ -175,8 +171,16 @@ function cancelAllSegaTasks(
     genX.cancelQueued(requestId);
   }
 
+  // A generation that ran past the token cap is mid-continuation, and the
+  // runtime holds the continuation task — not the tracked parent — as active.
+  // Matching on the id alone let Stop sail past an in-flight lorebook entry.
   const activeRequest = getState().runtime.activeRequest;
-  if (activeRequest && activeRequestIds.includes(activeRequest.id)) {
+  const activeIsSega =
+    !!activeRequest &&
+    activeRequestIds.some((id) =>
+      isRequestOrContinuation(activeRequest.id, id),
+    );
+  if (activeRequest && activeIsSega) {
     dispatch(requestCancelled({ requestId: activeRequest.id }));
     genX.cancelAll();
     dispatch(stateUpdated({ genxState: { status: "idle", queueLength: 0 } }));

@@ -3,16 +3,32 @@ import {
   registerSummaryGenerationEffects,
   entityRegenRequested,
 } from "../../../../src/core/store/effects/summary-generation";
+import {
+  uiEntitySummaryGenerationRequested,
+  uiThreadSummaryGenerationRequested,
+} from "../../../../src/core/store/index";
 import type {
   RootState,
   AppDispatch,
   WorldEntity,
 } from "../../../../src/core/store/types";
 import { FieldID } from "../../../../src/config/field-definitions";
+import {
+  entitySummaryRequestId,
+  lorebookContentRequestId,
+} from "../../../../src/core/keys";
 
 // Isolate the effect's branching from real strategy construction.
 vi.mock("../../../../src/core/utils/lorebook-strategy", () => ({
-  createLorebookContentFactory: vi.fn(() => async () => ({ messages: [] })),
+  buildLorebookContentPayload: vi.fn(
+    (_g: unknown, entryId: string, requestId: string) => ({
+      requestId,
+      messageFactory: async () => ({ messages: [] }),
+      target: { type: "lorebookContent", entryId },
+      prefillBehavior: "trim" as const,
+      continuation: { maxCalls: 4 },
+    }),
+  ),
   buildLorebookKeysPayload: vi.fn(
     async (_g: unknown, entryId: string, requestId: string) => ({
       requestId,
@@ -39,10 +55,20 @@ function makeEntity(over: Partial<WorldEntity>): WorldEntity {
   } as WorldEntity;
 }
 
-function makeState(entity?: WorldEntity): RootState {
+function makeState(
+  entity?: WorldEntity,
+  runtime?: { activeRequest?: { id: string } | null; queue?: { id: string }[] },
+): RootState {
   const entitiesById: Record<string, WorldEntity> = {};
   if (entity) entitiesById[entity.id] = entity;
-  return { world: { entitiesById } } as unknown as RootState;
+  return {
+    world: { entitiesById },
+    runtime: {
+      activeRequest: runtime?.activeRequest ?? null,
+      queue: runtime?.queue ?? [],
+      sega: { activeRequestIds: [] },
+    },
+  } as unknown as RootState;
 }
 
 function makeHarness(state: RootState) {
@@ -122,6 +148,31 @@ describe("entityRegenRequested effect", () => {
     ).toBe(true);
   });
 
+  // A doubled tap on the card's ⚡ reaches the effect twice; both repeats clear
+  // the `await api.v1.lorebook.entry` above having seen the same empty entry, so
+  // the tracked-request check is what stops the second queueing under the same
+  // stable ids.
+  it("skips a request id already sitting in the queue", async () => {
+    const live = makeEntity({ lorebookEntryId: "lb-1", summary: "" });
+    const { fire, queuedTypes } = makeHarness(
+      makeState(live, { queue: [{ id: entitySummaryRequestId("e1") }] }),
+    );
+    await fire(entityRegenRequested({ entityId: "e1" }));
+    expect(queuedTypes()).not.toContain("entitySummary");
+    expect(queuedTypes().sort()).toEqual(["lorebookContent", "lorebookKeys"]);
+  });
+
+  it("skips a request id that is already generating", async () => {
+    const live = makeEntity({ lorebookEntryId: "lb-1", summary: "" });
+    const { fire, queuedTypes } = makeHarness(
+      makeState(live, {
+        activeRequest: { id: lorebookContentRequestId("e1") },
+      }),
+    );
+    await fire(entityRegenRequested({ entityId: "e1" }));
+    expect(queuedTypes()).not.toContain("lorebookContent");
+  });
+
   it("does nothing when the entity is already complete", async () => {
     vi.mocked(api.v1.lorebook.entry).mockResolvedValue({
       text: "rich lore",
@@ -137,5 +188,114 @@ describe("entityRegenRequested effect", () => {
     await fire(entityRegenRequested({ entityId: "e1" }));
     expect(queuedTypes()).toEqual([]);
     expect(submittedTargets()).toEqual([]);
+  });
+});
+
+describe("uiEntitySummaryGenerationRequested effect", () => {
+  it("registers the request in the runtime queue before submitting generation", async () => {
+    const live = makeEntity({ lorebookEntryId: "lb-1" });
+    const { fire, dispatch } = makeHarness(makeState(live));
+    await fire(
+      uiEntitySummaryGenerationRequested({
+        entityId: "e1",
+        requestId: "se-entity-summary-e1",
+      }),
+    );
+    const queuedCall = dispatch.mock.calls.find(
+      ([a]) => a.type === "runtime/requestQueued",
+    );
+    expect(queuedCall?.[0].payload).toEqual({
+      id: "se-entity-summary-e1",
+      type: "entitySummary",
+      targetId: "e1",
+    });
+    // requestQueued must precede generationSubmitted so the pane's pending
+    // signal (isRequestActive) is true for the whole stream.
+    const queuedIdx = dispatch.mock.calls.findIndex(
+      ([a]) => a.type === "runtime/requestQueued",
+    );
+    const submittedIdx = dispatch.mock.calls.findIndex(
+      ([a]) => a.type === "ui/generationSubmitted",
+    );
+    expect(queuedIdx).toBeGreaterThanOrEqual(0);
+    expect(queuedIdx).toBeLessThan(submittedIdx);
+  });
+
+  it("does not double-queue when the id is already tracked in the queue", async () => {
+    const live = makeEntity({ lorebookEntryId: "lb-1" });
+    const state = makeState(live, {
+      queue: [{ id: "se-entity-summary-e1" }],
+    });
+    const { fire, dispatch } = makeHarness(state);
+    await fire(
+      uiEntitySummaryGenerationRequested({
+        entityId: "e1",
+        requestId: "se-entity-summary-e1",
+      }),
+    );
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "runtime/requestQueued"),
+    ).toBe(false);
+  });
+
+  it("does not double-queue when the id is already the active request", async () => {
+    const live = makeEntity({ lorebookEntryId: "lb-1" });
+    const state = makeState(live, {
+      activeRequest: { id: "se-entity-summary-e1" },
+    });
+    const { fire, dispatch } = makeHarness(state);
+    await fire(
+      uiEntitySummaryGenerationRequested({
+        entityId: "e1",
+        requestId: "se-entity-summary-e1",
+      }),
+    );
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "runtime/requestQueued"),
+    ).toBe(false);
+  });
+});
+
+describe("uiThreadSummaryGenerationRequested effect", () => {
+  it("registers the request in the runtime queue before submitting generation", async () => {
+    const { fire, dispatch } = makeHarness(makeState());
+    await fire(
+      uiThreadSummaryGenerationRequested({
+        groupId: "g1",
+        requestId: "se-thread-summary-g1",
+      }),
+    );
+    const queuedCall = dispatch.mock.calls.find(
+      ([a]) => a.type === "runtime/requestQueued",
+    );
+    expect(queuedCall?.[0].payload).toEqual({
+      id: "se-thread-summary-g1",
+      type: "threadSummary",
+      targetId: "g1",
+    });
+    const queuedIdx = dispatch.mock.calls.findIndex(
+      ([a]) => a.type === "runtime/requestQueued",
+    );
+    const submittedIdx = dispatch.mock.calls.findIndex(
+      ([a]) => a.type === "ui/generationSubmitted",
+    );
+    expect(queuedIdx).toBeGreaterThanOrEqual(0);
+    expect(queuedIdx).toBeLessThan(submittedIdx);
+  });
+
+  it("does not double-queue when the id is already tracked", async () => {
+    const state = makeState(undefined, {
+      queue: [{ id: "se-thread-summary-g1" }],
+    });
+    const { fire, dispatch } = makeHarness(state);
+    await fire(
+      uiThreadSummaryGenerationRequested({
+        groupId: "g1",
+        requestId: "se-thread-summary-g1",
+      }),
+    );
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "runtime/requestQueued"),
+    ).toBe(false);
   });
 });

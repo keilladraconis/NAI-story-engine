@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildRefineTail } from "../../../src/core/utils/refine-strategy";
+import {
+  buildRefineTail,
+  refineBudgetFor,
+} from "../../../src/core/utils/refine-strategy";
+import { LOREBOOK_CHAIN_STOPS } from "../../../src/core/utils/config";
 import type { RefineContext } from "../../../src/core/chat-types/types";
 
 describe("buildRefineTail", () => {
@@ -86,5 +90,36 @@ describe("buildRefineTail", () => {
     expect(
       messages.find((m) => m.content === "some regular user content"),
     ).toBeDefined();
+  });
+});
+
+describe("refineBudgetFor", () => {
+  it("gives every field enough calls to finish a truncated rewrite", () => {
+    for (const fieldId of [
+      "attg",
+      "style",
+      "intent",
+      "contract",
+      "lorebookContent",
+    ]) {
+      expect(refineBudgetFor(fieldId).maxCalls).toBeGreaterThan(1);
+    }
+  });
+
+  it("budgets a lorebook rewrite past the 1024 tokens the entry was written at", () => {
+    // A single 400-token call is what truncated lorebook rewrites mid-sentence.
+    const { maxTokens, maxCalls } = refineBudgetFor("lorebookContent");
+    expect(maxTokens * maxCalls).toBeGreaterThan(1024);
+  });
+
+  it("uses lorebook chain stops for lorebook content, not the bracket stop", () => {
+    // `]\n` cuts prose containing a legitimate bracketed clause.
+    const { stop } = refineBudgetFor("lorebookContent");
+    expect(stop).toEqual(LOREBOOK_CHAIN_STOPS);
+    expect(stop).not.toContain("]\n");
+  });
+
+  it("falls back to the default budget for unknown fields", () => {
+    expect(refineBudgetFor("nope")).toEqual(refineBudgetFor("attg"));
   });
 });

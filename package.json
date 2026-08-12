@@ -19,6 +19,7 @@
   "packageManager": "npm@11.7.0",
   "scripts": {
     "build": "nibs build",
+    "preformat": "npm ls prettier --depth=0 || node -e \"console.error('\\nInstalled prettier does not match the pin in package.json. Run npm ci before formatting: the wrong version rewrites files you did not touch.'); process.exit(1)\"",
     "format": "prettier -w .",
     "test": "vitest run"
   },
@@ -26,8 +27,9 @@
     "@types/node": "^25.0.9",
     "nai-gen-x": "^0.4.0",
     "nai-store": "^0.4.0",
-    "nibs-cli": "^4.2.2",
-    "prettier": "^3.7.4",
+    "nibs-cli": "^4.4.1",
+    "prettier": "3.9.4",
+    "typescript": "^5.9.3",
     "vitest": "^4.0.17"
   }
 }

@@ -14,6 +14,10 @@ npm run format     # prettier -w .
 npm run test       # vitest run
 ```
 
+**Prettier is pinned to an exact version — keep it that way.** Under a `^` range an older prettier already sitting in `node_modules` satisfies the range, so `npm install` leaves it in place and ignores the lockfile. That happened: a session formatting with 3.7.4 wrapped union types the pinned version keeps inline, which shipped as a spurious "formatting cleanup" (15fb872) and had to be reverted (ac49266). The exact pin does not help a `node_modules` installed for a _different branch_ — check out this branch over a tree installed from `main` and you still get 3.7.4, which is how a fourth session churned the same three files. So `npm run format` now runs a `preformat` guard (`npm ls prettier`) that refuses to format when the installed version does not match the pin, and tells you to run `npm ci`. If format ever does rewrite files you did not touch, the formatter is wrong, not the repo — do not commit the diff.
+
+`npm run format` deliberately calls `prettier`, not `npx prettier`. npm already puts `node_modules/.bin` first on `PATH`, so both run the same local binary; the difference is that `npx` _fetches_ prettier from the registry when it is missing locally, which is one more way to format with a version the lockfile never pinned.
+
 ## Architecture
 
 **Entry point:** `src/index.ts` — initializes GenX, registers store effects, loads persisted data, mounts UI extensions.
@@ -38,9 +42,10 @@ npm run test       # vitest run
 
 **UI (`src/ui/`):**
 
-- All components are `SuiComponent` subclasses from `nai-simple-ui`. `compose()` returns a static UIPart tree; `StoreWatcher.watch()` drives reactive `updateParts()` calls.
-- Non-storageKey UI mutations use `api.v1.ui.updateParts()` — never re-render. storageKey-bound inputs are the exception: update them via storyStorage, not updateParts (see UI Input Patterns below).
-- Element IDs centralized in `src/ui/framework/ids.ts` with prefixes: `se-` (story engine), `se-bs-` (brainstorm), `kse-` (storage keys)
+- Components are Preact function components under `src/ui/panels/` and `src/ui/components/`, composed into `App.tsx` and mounted by `mount.ts`. They read the store via `useSlice`/`useStream` (`src/ui/bridge.ts`), thin wrappers over `useSyncExternalStore` — snapshots are correct on first render, so there's no separate "seed the initial value" step to remember.
+- The UI is Preact/JSX and re-renders from the store — **never** `updateParts`, with no exceptions. Nothing in `src/` calls it. The header used to be the one carve-out: a UIPart tree with its own diffing driver, because a click inside a `part.jsx()` did not clear the harness's user-interaction flag ("FlagB") and budget-stalled generation could only be resumed from a real `part.button()`. The runtime now sets that flag from JSX events (`click`, `dblclick`, `mousedown`/`mouseup`, `contextmenu`, `keydown`/`keyup`/`keypress`, `pointerdown`/`pointerup`, `touchstart`/`touchend`, `input`, `change`, `submit`), so `src/ui/header/Header.tsx` is an ordinary component rendered by `App` above the tab bar. Do not reintroduce a parts-and-patch surface to work around FlagB.
+- `derive()` in `src/ui/header/header-model.ts` owns the generation state machine — it is the **only** place that branches on `genx.status`, and `tests/ui/countdown.test.ts` enforces that mechanically. `Header.tsx` renders the `WidgetMode` it returns and never reads the raw status; neither does any other component. Two surfaces reading the status directly is how they drift about whether a generation is waiting, queued, or done.
+- Shared storyStorage keys and other core↔UI slot constants live in `src/core/keys.ts` (see its header comment — relocated out of the retired SUI `ui/framework/ids.ts`, which no longer exists). The handful of remaining literal UIPart ids (`kse-root`/`kse-jsx-root`/`kse-sidebar` in `mount.ts`, `OPENING_MODAL_IDS` in `header/opening-scene-modal.ts`) are local constants scoped to their own file, not a centralized registry — ordinary JSX elements need no ids of their own.
 - `src/core/utils/context-builder.ts` — Builds layered AI prompts from current state
 
 **Entity system (`src/ui/components/SeEntityCard.ts`, `SeEntityEditPane.ts`):**
@@ -50,6 +55,7 @@ npm run test       # vitest run
 - **Draft entities** have no lorebook entry. The "+ Add Entity" button creates a draft — **no lorebook entry is created until the user hits Save**, so cancelling out leaves no orphaned lorebook entries behind. The edit pane still exposes every field (name, summary, category, lorebook content, keys, Always On) so users can author the full entry by hand before promoting it; only the Generate icon buttons for content/keys are hidden, since those stream into a live lorebook entry that doesn't exist yet.
 - **Live entities** have a lorebook entry (`lorebookEntryId`). Their edit pane additionally shows the Generate icon buttons next to Content and Keys. Lorebook content/keys are **only flushed to the lorebook API on Save** — not on every keystroke.
 - **Draft → live promotion:** Saving a draft entity creates a lorebook entry in the entity's current category (via `ensureCategory(entity.categoryId)`) and persists the draft name, lorebook content, keys, and Always On state that were entered in the pane. The entry id is attached via `entityLorebookEntryBound`.
+- **One entity per lorebook entry**: `entityBound` / `entitiesBoundBatch` drop any entity whose `lorebookEntryId` is already bound. Two entities over one entry would generate into it twice and list it twice in the World, and the Import wizard's Bind mints a fresh entity id per click — so the invariant is enforced in the reducer, not at the callsites.
 - **Cast**: `castAllRequested` / `entityCastRequested` effects first look for an existing unmanaged lorebook entry with a matching `displayName` (case-insensitive) and bind to it. If none found, a new entry is created in the appropriate `SE: <Category>` lorebook category with empty text (summary is not seeded into lorebook).
 - **Category**: `entity.categoryId` is a Story Engine concept — it drives sidebar organization, template selection, and the prefill `Type:` line. It is **independent of the lorebook entry's own category**: the lorebook category is where the entry lives in the user's lorebook, only assigned at creation time (`SeEntityEditPane` on save; cast/forge effects at bind time). Users commonly reorganize imported or long-running entries in their lorebook for their own preferences; Story Engine does **not** chase those moves, and `entityCategoryChanged` only updates Redux — it does not rewrite `entry.category`. `SeEntityEditPane` shows a category picker (SuiActionBar) for all entities.
 
@@ -87,6 +93,9 @@ npm run test       # vitest run
 
 **UI Input Patterns:**
 
+- **A tap can deliver `click` twice — never let a handler depend on being called once.** Observed on mobile: two `click` events inside one gesture, the second running after the first mutated state. Two rules follow. (1) Carry the data an intent needs **in the action payload**, never through a shared storyStorage slot read asynchronously by the effect — a second dispatch will overwrite the slot before the first read lands. (2) Wrap non-idempotent click handlers (sends, two-stage confirms, anything destructive) in `useTapGuard()` from `src/ui/tap-guard.ts`.
+- **Bind text entry with `onInput`, never `onChange`.** The JSX renderer keeps native DOM semantics (Preact, not React): `input` fires per keystroke, `change` only when a modified field commits — i.e. on blur. An `onChange`-bound field therefore holds stale local state until focus leaves it, so anything reading that state before blur (a Send/Save button) sees the pre-edit value. `tests/ui/text-input-events.test.ts` guards the invariant.
+
 - Prefer `storageKey` on inputs for automatic persistence — avoid manual onChange handlers for simple state sync.
 - Exception: Use `onChange` callbacks alongside `storageKey` when syncing to non-UIPart targets (e.g., `api.v1.an.set()`, `api.v1.memory.set()`).
 - **Never dispatch actions in `onChange` callbacks.** The reducer overhead is too high for keystroke-frequency events.
@@ -94,19 +103,15 @@ npm run test       # vitest run
 - **`storageKey` inputs are owned by storyStorage — never use `updateParts` to set their value.** Read with `api.v1.storyStorage.get(key)`, write with `api.v1.storyStorage.set(key, value)`, clear with `api.v1.storyStorage.remove(key)`. The input reads from its storageKey automatically. Using `updateParts({ value })` on a storageKey-bound input is incorrect — the stored value and displayed value will diverge.
 - **`story:` prefix routing**: In a `storageKey` binding, `story:` is a routing directive the UI framework strips — `storageKey: "story:my-key"` persists under bare key `"my-key"` in storyStorage. `storyStorage.get("my-key")` reads the same slot; `storyStorage.get("story:my-key")` reads a literally different key and is always wrong. Never embed `story:` in storage key constants — add it only at the `storageKey` binding site. Pattern: constant = `"my-key"`, binding = `` `story:${MY_KEY}` ``, direct API = `storyStorage.get(MY_KEY)`. Use `storyStorage.remove(key)` to clear (not `set(key, null)`).
 
-**UI Rendering Rules (SUI + NAI constraints — these cause recurrent bugs when violated):**
+**UI Rendering Rules (JSX tree — SUI and the UIPart header are both gone):**
 
-- **Parts are static objects.** A `UIPart` returned from `compose()` is a frozen spec. If a container's `content` array is ever updated via `updateParts`, the NovelAI UI engine re-applies all child specs — overwriting any text/style previously set by direct `updateParts` calls to those children. There is no `appendPart`; updating a container always re-initializes its children.
+- **UIParts survive in exactly two places, and neither mutates.** `mount.ts` builds the panel scaffolding (`buildRoot` + the `part.jsx()` body), and `header/opening-scene-modal.ts` builds the Opening Scene modal, because `api.v1.ui.modal.open` takes a `UIPart[]` — an API constraint, not a FlagB workaround. Both construct their specs once and hand them over; parts are frozen objects, so anything that needs to change over time belongs in the Preact tree instead.
 
-- **`StoreWatcher.watch()` does NOT fire on mount.** It fires only on subsequent state changes. Always populate initial display values synchronously inside `compose()` via `store.getState()`. Never rely on a watcher callback to set the first render's content.
+- **Never swap a component's _type_ at a fixed position.** `{armed ? <AlertTriangle/> : <Trash2/>}` leaves BOTH svgs in the DOM when the re-render comes from a detached callback — a timer tick or a store subscription rather than a JSX event handler. Mount every variant and toggle `display`, or give each variant its own keyed position in a list. `ConfirmButton.tsx` and `Header.tsx`'s `WidgetIcon` are the two worked examples; the header renders every state it can be in, since all of its renders are detached.
 
-- **`compose()` must call `this._watcher.dispose()` at its start** to tear down subscriptions from any prior build cycle, then re-register all watchers fresh.
+- **First render is already correct.** `useSlice`/`useStream` are built on `useSyncExternalStore`, so they return a real snapshot on mount — there is no "seed the initial value" step. Values that live outside the store need explicit help instead: `getAllowedOutput()` and the budget countdown come from a self-rescheduling `api.v1.timers` tick (`useTick` in `Header.tsx`), and `hasDocumentContent` is read once in `mount.ts` and passed to `App` as a prop so the bootstrap button's first paint carries the right label.
 
-- **Component root IDs must be unique per context, not just per entity.** If the same logical entity appears in two contexts (e.g., draft in ForgeSection, live in BatchSection), each context must produce a distinct root ID — e.g., `se-entity-draft-${id}` vs `se-entity-live-${id}`. The `IDS.entity(id, lifecycle)` factory enforces this: `lifecycle` is required with no default so TypeScript will catch any omission.
-
-- **`SuiTabBar` reads `tab.options.callback` at compose time.** Tab button callbacks that call `tabBar.switchTo(i)` must use closures over `this._tabBar` (assigned before any click fires), not post-construction assignment to `options.callback` (which is `Readonly`).
-
-- **`updateParts` replaces style wholesale.** When a SUI component like `SuiActionBar` bakes a `base` style onto its children at build time, a subsequent `updateParts` call must include ALL desired CSS properties — not just the changed ones. Use camelCase property names (`fontWeight`, `fontSize`) to match what `SuiActionBar` emits; mixing kebab-case into the same object causes divergence before vs. after interaction.
+- **Non-idempotent handlers need `useTapGuard()`.** A mobile tap can deliver `click` twice within one gesture. UIPart buttons had `disabledWhileCallbackRunning`; JSX has no equivalent, so wrap the handler (`src/ui/tap-guard.ts`). The header's bootstrap button is the canonical case — it is the one non-idempotent header action.
 
 ## Key Constraints
 

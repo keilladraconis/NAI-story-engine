@@ -528,6 +528,16 @@ EMPHASIS: [comma-separated list — 3-5 items]
 
 Be specific to THIS story's material. No generic filler.`;
 
+/** The user turn that actually asks for the contract. The context above it is
+ *  all system messages; without a turn addressed to it the model has nothing to
+ *  answer and continues the story text instead. */
+export const CONTRACT_GENERATE_REQUEST = `Write the Story Contract for this story now — the three labeled lines, nothing else.`;
+
+/** Assistant prefill. The model resumes from this, so it cannot open with prose;
+ *  it is carried into the response (prefillBehavior "keep") so the committed text
+ *  still starts with the REQUIRED label parseContract looks for. */
+export const CONTRACT_GENERATE_PREFILL = `REQUIRED:`;
+
 export const FOUNDATION_WORLD_STATE_PROMPT = `Describe the current state of the world at the story's opening.
 Cover: the dominant mood or atmosphere, ongoing conflicts or tensions, power dynamics, and what is visibly in flux.
 3-5 sentences. Output only the world state description — no preamble.`;
@@ -713,6 +723,16 @@ Prohibited:
 Use natural paragraphing — break on shifts of beat, focus, or action. Blank line between paragraphs.
 
 Prose only.`;
+
+/** Frames the writer's free-text direction from the Opening Scene modal. Sits
+ *  after BOOTSTRAP_P1_PROMPT so it is the last thing read before generation —
+ *  the writer's answer outranks the generic opening recipe wherever the two
+ *  disagree. */
+export const BOOTSTRAP_OPENING_DIRECTION_FRAME = `The writer has specified how this story opens. Everything below is the starting condition of the passage — not a theme to gesture at, not something to arrive at later. Write from inside it, and honour it over any default choice of moment or vantage:`;
+
+export function buildOpeningDirectionPrompt(guidance: string): string {
+  return `${BOOTSTRAP_OPENING_DIRECTION_FRAME}\n\n${guidance.trim()}`;
+}
 
 export const BOOTSTRAP_CONTINUE_PROMPT = `Continue directly from the last sentence of the story. Do not advance time, change location, or begin a new scene — stay inside the exact moment where the text ended.
 

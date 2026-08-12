@@ -13,23 +13,12 @@ import {
   StreamingContext,
   CompletionContext,
 } from "../generation-handlers";
-import { IDS } from "../../../../ui/framework/ids";
-import { escapeForMarkdown } from "../../../../ui/utils";
+import { writeStream, clearStream } from "../../stream-buffer";
 
 type FoundationTarget = Extract<
   GenerationStrategy["target"],
   { type: "foundation" }
 >;
-
-/** Shape streaming updates the description text below the card. */
-const VIEW_IDS = {
-  shape: "se-fn-shape-card-desc",
-  intent: "se-fn-intent-card-desc",
-  contract: "se-fn-contract-card-desc",
-  attg: "se-fn-attg-card-desc",
-  style: "se-fn-style-card-desc",
-  worldState: `${IDS.FOUNDATION.WORLD_STATE_TEXT}-view`,
-} as const;
 
 /**
  * Parses shape generation output into { name, description }.
@@ -80,51 +69,55 @@ export function parseContract(text: string): ContractData {
 
 export const foundationHandler: GenerationHandlers<FoundationTarget> = {
   streaming(ctx: StreamingContext<FoundationTarget>, _newText: string): void {
-    const viewId = VIEW_IDS[ctx.target.field];
-    api.v1.ui.updateParts([
-      { id: viewId, text: escapeForMarkdown(ctx.accumulatedText) },
-    ]);
+    // The JSX field card reads the live text from the effect-free stream buffer.
+    // Per-token, no store dispatch (that would wedge the Preact repaint).
+    writeStream(`foundation:${ctx.target.field}`, ctx.accumulatedText);
   },
 
   async completion(ctx: CompletionContext<FoundationTarget>): Promise<void> {
-    if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
+    const field = ctx.target.field;
+    try {
+      if (!ctx.generationSucceeded || !ctx.accumulatedText) return;
 
-    const text = stripThinkingTags(ctx.accumulatedText).trim();
+      const text = stripThinkingTags(ctx.accumulatedText).trim();
 
-    switch (ctx.target.field) {
-      case "shape": {
-        const existingName = ctx.getState().foundation.shape?.name ?? "";
-        const shape = parseShape(text, existingName);
-        ctx.dispatch(shapeUpdated({ shape }));
-        break;
-      }
-      case "intent": {
-        ctx.dispatch(intentUpdated({ intent: text }));
-        break;
-      }
-      case "worldState": {
-        ctx.dispatch(worldStateUpdated({ worldState: text }));
-        break;
-      }
-      case "contract": {
-        const contract = parseContract(text);
-        ctx.dispatch(contractUpdated({ contract }));
-        break;
-      }
-      case "attg": {
-        ctx.dispatch(attgUpdated({ attg: text }));
-        if (ctx.getState().foundation.attgSyncEnabled) {
-          await api.v1.memory.set(text.trim());
+      switch (field) {
+        case "shape": {
+          const existingName = ctx.getState().foundation.shape?.name ?? "";
+          const shape = parseShape(text, existingName);
+          ctx.dispatch(shapeUpdated({ shape }));
+          break;
         }
-        break;
-      }
-      case "style": {
-        ctx.dispatch(styleUpdated({ style: text }));
-        if (ctx.getState().foundation.styleSyncEnabled) {
-          await api.v1.an.set(text.trim());
+        case "intent": {
+          ctx.dispatch(intentUpdated({ intent: text }));
+          break;
         }
-        break;
+        case "worldState": {
+          ctx.dispatch(worldStateUpdated({ worldState: text }));
+          break;
+        }
+        case "contract": {
+          const contract = parseContract(text);
+          ctx.dispatch(contractUpdated({ contract }));
+          break;
+        }
+        case "attg": {
+          ctx.dispatch(attgUpdated({ attg: text }));
+          if (ctx.getState().foundation.attgSyncEnabled) {
+            await api.v1.memory.set(text.trim());
+          }
+          break;
+        }
+        case "style": {
+          ctx.dispatch(styleUpdated({ style: text }));
+          if (ctx.getState().foundation.styleSyncEnabled) {
+            await api.v1.an.set(text.trim());
+          }
+          break;
+        }
       }
+    } finally {
+      clearStream(`foundation:${field}`);
     }
   },
 };

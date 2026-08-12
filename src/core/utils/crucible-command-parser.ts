@@ -146,9 +146,7 @@ export function walkForgeLines(text: string): ForgeLineToken[] {
 // --- Streaming Presenter ---
 
 export type PendingTail =
-  | { kind: "prose"; text: string }
-  | { kind: "buffering" }
-  | { kind: "none" };
+  { kind: "prose"; text: string } | { kind: "buffering" } | { kind: "none" };
 
 export interface ForgeStreamParse {
   segments: ForgeSegment[];

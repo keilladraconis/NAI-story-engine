@@ -20,6 +20,11 @@ vi.mock("../../../src/core/utils/refine-strategy", () => ({
       { role: "system", content: `REWRITE:${refine.currentText}` },
     ],
   ),
+  refineBudgetFor: vi.fn(() => ({
+    maxTokens: 400,
+    maxCalls: 4,
+    stop: ["</think>"],
+  })),
 }));
 vi.mock("../../../src/core/utils/field-strategy-registry", () => ({
   getFieldStrategy: vi.fn((fieldId: string) => () => ({
@@ -27,6 +32,7 @@ vi.mock("../../../src/core/utils/field-strategy-registry", () => ({
     messageFactory: async () => ({
       messages: [{ role: "system", content: `FRESH:${fieldId}` }],
       params: { temperature: 0.9 },
+      contextPinning: { head: 1, tail: 4 },
     }),
     target: { type: "foundation", field: fieldId },
   })),
@@ -79,5 +85,13 @@ describe("buildChatStrategy — refine rewrite-vs-fresh branch", () => {
     const built = await strategy.messageFactory!();
     const last = built.messages[built.messages.length - 1];
     expect(last).toEqual({ role: "user", content: "make it punchier" });
+  });
+
+  it("carries the field's contextPinning through the fresh path", async () => {
+    // Dropping it let the rollover trimmer evict the instruction/prefill tail,
+    // which matters more now that a refine can run several continuation calls.
+    const strategy = await buildChatStrategy(getState, refineChat([]), "asst");
+    const built = await strategy.messageFactory!();
+    expect(built.contextPinning).toEqual({ head: 1, tail: 4 });
   });
 });

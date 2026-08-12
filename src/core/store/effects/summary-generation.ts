@@ -14,10 +14,17 @@ import {
   createThreadSummaryFactory,
 } from "../../utils/summary-strategy";
 import {
-  createLorebookContentFactory,
+  buildLorebookContentPayload,
   buildLorebookKeysPayload,
 } from "../../utils/lorebook-strategy";
 import { buildModelParams } from "../../utils/config";
+import { isRequestActive } from "../selectors/runtime";
+import {
+  entitySummaryRequestId,
+  entitySummaryBindRequestId,
+  lorebookContentRequestId,
+  lorebookKeysRequestId,
+} from "../../keys";
 
 // Quick "generate this entity" intent fired by the entity card's lightning
 // bolt. Fills only what's missing (summary, lorebook content, lorebook keys),
@@ -42,6 +49,19 @@ export function registerSummaryGenerationEffects(
     matchesAction(uiEntitySummaryGenerationRequested),
     async (action) => {
       const { entityId, requestId } = action.payload;
+      const rt = getState().runtime;
+      const alreadyTracked =
+        rt.activeRequest?.id === requestId ||
+        rt.queue.some((r) => r.id === requestId);
+      if (!alreadyTracked) {
+        dispatch(
+          requestQueued({
+            id: requestId,
+            type: "entitySummary",
+            targetId: entityId,
+          }),
+        );
+      }
       dispatch(
         generationSubmitted({
           requestId,
@@ -100,7 +120,7 @@ export function registerSummaryGenerationEffects(
       const entryText = entry?.text?.trim() ?? "";
       if (!entryText) continue;
 
-      const requestId = `entity-summary-bind-${entity.id}`;
+      const requestId = entitySummaryBindRequestId(entity.id);
       dispatch(
         requestQueued({
           id: requestId,
@@ -143,8 +163,17 @@ export function registerSummaryGenerationEffects(
     const hasContent = !!entry?.text;
     const hasKeys = !!(entry?.keys && entry.keys.length > 0);
 
-    if (!hasSummary) {
-      const summaryRequestId = `se-entity-summary-${entityId}`;
+    // The card's `pending` dims the button a render too late to stop a doubled
+    // tap, and the lorebook read above is a far longer window than a tap guard
+    // covers: both repeats resume here having seen the same "missing" state.
+    // These ids are stable per entity, so a repeat is recognisable — skip any
+    // that is already tracked. Each requestQueued below lands synchronously
+    // before the next await, so a repeat resuming later sees all three.
+    const alreadyQueued = (requestId: string) =>
+      isRequestActive(getState().runtime, requestId);
+
+    if (!hasSummary && !alreadyQueued(entitySummaryRequestId(entityId))) {
+      const summaryRequestId = entitySummaryRequestId(entityId);
       dispatch(
         requestQueued({
           id: summaryRequestId,
@@ -160,8 +189,8 @@ export function registerSummaryGenerationEffects(
       );
     }
 
-    if (!hasContent) {
-      const contentRequestId = `lb-entity-${entityId}-content`;
+    if (!hasContent && !alreadyQueued(lorebookContentRequestId(entityId))) {
+      const contentRequestId = lorebookContentRequestId(entityId);
       dispatch(
         requestQueued({
           id: contentRequestId,
@@ -170,21 +199,18 @@ export function registerSummaryGenerationEffects(
         }),
       );
       dispatch(
-        generationSubmitted({
-          requestId: contentRequestId,
-          messageFactory: createLorebookContentFactory(
+        generationSubmitted(
+          buildLorebookContentPayload(
             getState,
             lorebookEntryId,
+            contentRequestId,
           ),
-          params: await buildModelParams({ max_tokens: 1024 }),
-          target: { type: "lorebookContent", entryId: lorebookEntryId },
-          prefillBehavior: "trim",
-        }),
+        ),
       );
     }
 
-    if (!hasKeys) {
-      const keysRequestId = `lb-entity-${entityId}-keys`;
+    if (!hasKeys && !alreadyQueued(lorebookKeysRequestId(entityId))) {
+      const keysRequestId = lorebookKeysRequestId(entityId);
       dispatch(
         requestQueued({
           id: keysRequestId,
@@ -208,6 +234,19 @@ export function registerSummaryGenerationEffects(
     matchesAction(uiThreadSummaryGenerationRequested),
     async (action) => {
       const { groupId, requestId } = action.payload;
+      const rt = getState().runtime;
+      const alreadyTracked =
+        rt.activeRequest?.id === requestId ||
+        rt.queue.some((r) => r.id === requestId);
+      if (!alreadyTracked) {
+        dispatch(
+          requestQueued({
+            id: requestId,
+            type: "threadSummary",
+            targetId: groupId,
+          }),
+        );
+      }
       dispatch(
         generationSubmitted({
           requestId,

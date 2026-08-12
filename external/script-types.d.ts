@@ -948,6 +948,7 @@ interface UIPartRegistry {
     collapsibleSection: UIPartCollapsibleSection
     sliderInput: UIPartSliderInput
     codeEditor: UIPartCodeEditor
+    jsx: UIPartJSX
 }
 
 /**
@@ -1263,6 +1264,30 @@ type UIPartCodeEditor = {
     diagnosticCodesToIgnore?: number[]
     /** Custom CSS styles for the container */
     style?: any
+}
+
+/**
+ * A JSX component rendered via Preact. The onMount callback receives
+ * the root element to render into. Only specific whitelisted elements,
+ * attributes, and events are allowed to be used.
+ */
+type UIPartJSX = {
+    type: 'jsx'
+    /** Optional ID for updating this UIPart */
+    id?: string
+    /** Callback invoked with the root element when the component mounts */
+    onMount: (elem: any) => void
+    /** Optional inline styles */
+    style?: any
+    /**
+     * DOM event names (e.g. `'keydown'`, `'wheel'`) that should be prevented
+     * from bubbling out of the JSX panel to the rest of the page. Listed events
+     * have `stopPropagation()` and `preventDefault()` called on them at the
+     * shadow host after they cross the shadow DOM boundary, so handlers inside
+     * the JSX tree still see them but global handlers (editor hotkeys, etc.)
+     * do not. By default no events are captured, and all events are allowed through.
+     */
+    captureEvents?: string[]
 }
 
 /**
@@ -3511,6 +3536,13 @@ declare namespace api {
                  * @returns A code editor UIPart
                  */
                 function codeEditor(config: Omit<UIPartCodeEditor, 'type'>): UIPartCodeEditor
+
+                /**
+                 * Create a JSX component rendered via Preact.
+                 * @param config JSX configuration
+                 * @returns A JSX UIPart
+                 */
+                function jsx(config: Omit<UIPartJSX, 'type'>): UIPartJSX
             }
 
             /**

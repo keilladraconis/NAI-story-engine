@@ -1,4 +1,4 @@
-import { EDIT_PANE_CONTENT } from "../../../../ui/framework/ids";
+import { EDIT_PANE_CONTENT } from "../../../keys";
 import {
   GenerationHandlers,
   StreamingContext,
@@ -6,6 +6,7 @@ import {
 } from "../generation-handlers";
 import { GenerationStrategy } from "../../types";
 import { entitySummaryUpdated } from "../../index";
+import { writeStream, clearStream } from "../../stream-buffer";
 
 type EntitySummaryTarget = Extract<
   GenerationStrategy["target"],
@@ -26,11 +27,18 @@ export const entitySummaryHandler: GenerationHandlers<EntitySummaryTarget> = {
     _newText: string,
   ): void {
     void api.v1.storyStorage.set(EDIT_PANE_CONTENT, ctx.accumulatedText);
+    // JSX pane reads the live text from the effect-free buffer; per-token, no
+    // store dispatch. The pane stages the final into its editable draft.
+    writeStream(`entity-summary:${ctx.target.entityId}`, ctx.accumulatedText);
   },
 
   async completion(ctx: CompletionContext<EntitySummaryTarget>): Promise<void> {
     if (ctx.generationSucceeded && ctx.accumulatedText) {
       const trimmed = ctx.accumulatedText.trim();
+      // Carry the final into the buffer for the open JSX pane to stage into its
+      // draft (the pane owns clearing). NOT committed to the store when the pane
+      // is open, so Back discards; Save commits.
+      writeStream(`entity-summary:${ctx.target.entityId}`, trimmed);
       const editPaneOpen =
         ctx.getState().ui.activeEditId === ctx.target.entityId;
       if (editPaneOpen) {
@@ -45,6 +53,8 @@ export const entitySummaryHandler: GenerationHandlers<EntitySummaryTarget> = {
           }),
         );
       }
+    } else {
+      clearStream(`entity-summary:${ctx.target.entityId}`);
     }
   },
 };
@@ -78,14 +88,21 @@ export const threadSummaryHandler: GenerationHandlers<ThreadSummaryTarget> = {
     _newText: string,
   ): void {
     void api.v1.storyStorage.set(EDIT_PANE_CONTENT, ctx.accumulatedText);
+    // JSX pane stages the live text from the effect-free buffer (per-token, no
+    // store dispatch), then stages the final into its editable draft.
+    writeStream(`thread-summary:${ctx.target.groupId}`, ctx.accumulatedText);
   },
 
   async completion(ctx: CompletionContext<ThreadSummaryTarget>): Promise<void> {
     if (ctx.generationSucceeded && ctx.accumulatedText) {
-      await api.v1.storyStorage.set(
-        EDIT_PANE_CONTENT,
-        ctx.accumulatedText.trim(),
-      );
+      const trimmed = ctx.accumulatedText.trim();
+      // Carry the final into the buffer for the open JSX pane to stage; the pane
+      // owns clearing. Thread summary is only generated from the open pane, so
+      // there is no background ...Updated branch (unlike entity summary).
+      writeStream(`thread-summary:${ctx.target.groupId}`, trimmed);
+      await api.v1.storyStorage.set(EDIT_PANE_CONTENT, trimmed);
+    } else {
+      clearStream(`thread-summary:${ctx.target.groupId}`);
     }
   },
 };

@@ -10,7 +10,7 @@ import {
   type StoryEnginePrefixOptions,
 } from "./context-builder";
 import { isXialongMode, buildModelParams } from "./config";
-import { buildRefineTail } from "./refine-strategy";
+import { buildRefineTail, refineBudgetFor } from "./refine-strategy";
 import { getFieldStrategy } from "./field-strategy-registry";
 
 // Returns sections to omit from buildStoryEnginePrefix so the field being
@@ -57,6 +57,7 @@ export async function buildChatStrategy(
     );
     const xialong = await isXialongMode();
     const excludeSections = excludeSectionsForRefine(fieldId);
+    const budget = refineBudgetFor(fieldId);
 
     const rewriteFactory = async () => {
       const prefix = await buildStoryEnginePrefix(getState, {
@@ -71,10 +72,10 @@ export async function buildChatStrategy(
       return {
         messages,
         params: await buildModelParams({
-          max_tokens: 400,
+          max_tokens: budget.maxTokens,
           temperature: 0.7,
           min_p: 0.05,
-          stop: ["</think>", "\n***", "\n---", "---", "]\n"],
+          stop: budget.stop,
         }),
       };
     };
@@ -85,7 +86,11 @@ export async function buildChatStrategy(
       const fieldStrategy = getFieldStrategy(fieldId)(getState, { entryId });
       const base = fieldStrategy.messageFactory
         ? await fieldStrategy.messageFactory()
-        : { messages: fieldStrategy.messages ?? [], params: undefined };
+        : {
+            messages: fieldStrategy.messages ?? [],
+            params: undefined,
+            contextPinning: undefined,
+          };
       const lastUser = [...filteredHistory]
         .reverse()
         .find((m) => m.role === "user" && m.content.trim().length > 0);
@@ -95,7 +100,13 @@ export async function buildChatStrategy(
             { role: "user" as const, content: lastUser.content },
           ]
         : base.messages;
-      return { messages, params: base.params };
+      // Carry the field's own contextPinning through — dropping it left the
+      // rollover trimmer free to evict the instruction/prefill tail.
+      return {
+        messages,
+        params: base.params,
+        contextPinning: base.contextPinning,
+      };
     };
 
     return {
@@ -109,6 +120,10 @@ export async function buildChatStrategy(
       },
       prefillBehavior: "trim" as const,
       minResponseLength: xialong ? 40 : undefined,
+      // Auto-continue when the rewrite is cut off by the token cap rather than
+      // by a stop sequence. Without this a long field — a lorebook entry above
+      // all — commits a candidate that ends mid-sentence.
+      continuation: { maxCalls: budget.maxCalls },
     };
   }
 

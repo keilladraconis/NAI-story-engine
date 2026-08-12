@@ -14,12 +14,16 @@ import {
   requestQueued,
   requestCancelled,
   requestCompleted,
+  queueCleared,
+  stateUpdated,
 } from "../index";
 import { getHandler } from "./generation-handlers";
 import { recordEntry, JournalEntry } from "../../generation-journal";
 import { getModel } from "../../utils/config";
 import { stripThinkingTags } from "../../utils/tag-parser";
 import { messageUpdated } from "../slices/chat";
+import { clearStream } from "../stream-buffer";
+import { continuationTaskId, isRequestOrContinuation } from "../request-ids";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Private Helpers
@@ -80,11 +84,12 @@ function resolvePrefill(
     return message?.content || "";
   }
 
-  if (target.type === "lorebookKeys") {
-    if (assistantPrefill) return assistantPrefill;
-  }
-
-  return "";
+  // Any strategy that both carries a prefill and asks to keep it: the model
+  // resumes from that text, so the response only reads correctly with it back on
+  // the front (lorebook keys' REJECTED: header, the contract's REQUIRED: label).
+  // Strategies that set a prefill but trim it — the forge's "[" — return "" via
+  // the prefillBehavior check above.
+  return assistantPrefill ?? "";
 }
 
 /**
@@ -166,7 +171,12 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
 }
 
 /**
- * Check if a request was cancelled by the user
+ * Check if a request was cancelled by the user.
+ *
+ * Matches the parent request or any of its continuation tasks: while a
+ * continuation runs it is the request the runtime holds as active, so a check
+ * against the parent id alone would report "not cancelled" for the whole
+ * continuation window and let the next call start.
  */
 function checkCancellation(
   requestId: string,
@@ -174,7 +184,9 @@ function checkCancellation(
 ): boolean {
   const activeRequest = getState().runtime.activeRequest;
   return (
-    activeRequest?.id === requestId && activeRequest?.status === "cancelled"
+    !!activeRequest &&
+    activeRequest.status === "cancelled" &&
+    isRequestOrContinuation(activeRequest.id, requestId)
   );
 }
 
@@ -237,6 +249,12 @@ export function registerGenerationEngineEffects(
 
     const handler = getHandler(target.type);
     let generationSucceeded = false;
+    // Set while a continuation call is in flight. If that call throws we still
+    // have to retire its runtime entry — it is the request the runtime holds as
+    // active, so leaving it behind strands every surface that reads runtime on
+    // "still generating". Cleared after the cancellation check below, which
+    // needs to see the cancelled task before it disappears.
+    let inFlightContTaskId: string | undefined;
 
     const onStream = (choices: GenerationChoice[], _final: boolean) => {
       const text = choices[0]?.text || "";
@@ -275,8 +293,11 @@ export function registerGenerationEngineEffects(
           );
           if (checkCancellation(requestId, getState)) break;
           accumulatedText = resolvePrefill(strategy, getState);
-          // Clear visible message so the retry streams from scratch
+          // Clear visible message so the retry streams from scratch. The stream
+          // buffer (chat's live view) is appended per chunk, so it must be reset
+          // too or the retry concatenates onto the discarded attempt.
           if ("chatId" in target && "messageId" in target) {
+            clearStream(target.messageId);
             dispatch(
               messageUpdated({
                 chatId: target.chatId,
@@ -309,10 +330,23 @@ export function registerGenerationEngineEffects(
 
         const queueEntry = targetToQueueEntry(target);
 
+        // The trailing assistant message is a prefill — text the model is
+        // treated as having already written. Fold it into the single
+        // continuation turn rather than leaving two adjacent assistant
+        // messages, and drop it from the base so it is not sent twice.
+        // `accumulatedText` already begins with it whenever prefillBehavior is
+        // "keep", so only prepend when it is missing.
+        const lastMsg = resolvedMessages[resolvedMessages.length - 1];
+        const prefillText =
+          lastMsg?.role === "assistant" ? lastMsg.content || "" : "";
+        const baseMessages = prefillText
+          ? resolvedMessages.slice(0, -1)
+          : resolvedMessages;
+
         while (calls < maxCalls && isTruncated(finishReason)) {
           if (checkCancellation(requestId, getState)) break;
 
-          const contTaskId = `${requestId}-cont-${calls}`;
+          const contTaskId = continuationTaskId(requestId, calls);
           api.v1.log(
             `[continuation] Call ${calls + 1}/${maxCalls}, extending output...`,
           );
@@ -321,16 +355,16 @@ export function registerGenerationEngineEffects(
           // and UI buttons (stateProjection) see a live request of the same type.
           dispatch(requestQueued({ id: contTaskId, ...queueEntry }));
 
-          const lastMsg = resolvedMessages[resolvedMessages.length - 1];
-          const baseMessages =
-            lastMsg?.role === "assistant"
-              ? resolvedMessages.slice(0, -1)
-              : resolvedMessages;
+          const soFar = accumulatedText.startsWith(prefillText)
+            ? accumulatedText
+            : prefillText + accumulatedText;
           const continuationMessages: Message[] = [
             ...baseMessages,
-            { role: "assistant", content: accumulatedText },
+            { role: "assistant", content: soFar },
           ];
 
+          const lengthBefore = accumulatedText.length;
+          inFlightContTaskId = contTaskId;
           const contResult = await genX.generate(
             continuationMessages,
             { ...apiParams, taskId: contTaskId },
@@ -338,10 +372,26 @@ export function registerGenerationEngineEffects(
             "background",
             await api.v1.createCancellationSignal(),
           );
+          inFlightContTaskId = undefined;
 
           dispatch(requestCompleted({ requestId: contTaskId }));
           finishReason = contResult.choices?.[0]?.finish_reason;
           calls++;
+
+          // A call that adds nothing will keep adding nothing — stop rather
+          // than burning the rest of the allowance on identical requests.
+          if (accumulatedText.length === lengthBefore) {
+            api.v1.log(
+              `[continuation] Call ${calls} returned no new text — stopping`,
+            );
+            break;
+          }
+        }
+
+        if (isTruncated(finishReason)) {
+          api.v1.log(
+            `[continuation] Still truncated after ${calls}/${maxCalls} calls — committing as-is`,
+          );
         }
       }
     } catch (error: any) {
@@ -353,6 +403,10 @@ export function registerGenerationEngineEffects(
     if (wasCancelled) {
       api.v1.log(`[effects] Generation was cancelled for ${requestId}`);
       generationSucceeded = false;
+    }
+    if (inFlightContTaskId) {
+      dispatch(requestCompleted({ requestId: inFlightContTaskId }));
+      inFlightContTaskId = undefined;
     }
 
     // Trim leading whitespace from model output (prevents double-space artifacts after prefill)
@@ -441,6 +495,22 @@ export function registerGenerationEngineEffects(
         dispatch(requestCancelled({ requestId: activeRequest.id }));
       }
       genX.cancelAll();
+
+      // cancelAll() cannot report `idle` while its current task is parked in a
+      // budget wait: that await sits on api.v1.script.waitForAllowedOutput(),
+      // which takes no cancellation signal and only resolves once the budget
+      // refills — potentially minutes later. Until then GenX keeps reporting
+      // waiting_for_budget, and requestCancelled only stamps the request rather
+      // than clearing it, so every surface reading runtime still shows work in
+      // flight and the cancel reads as having done nothing.
+      //
+      // Reset the mirror here so cancelling is visible at once. The eventual
+      // real resolution reports idle as well, so the two converge rather than
+      // fight. Note the abandoned task still occupies GenX's currentTask until
+      // it unparks, so a generation started in the meantime stays queued —
+      // that is GenX's own behaviour, unchanged by this reset.
+      dispatch(queueCleared());
+      dispatch(stateUpdated({ genxState: { status: "idle", queueLength: 0 } }));
     },
   );
 

@@ -23,3 +23,35 @@ export function selectActiveForgeChatId(state: RootState): string | undefined {
 export function isForgeDraft(entity: WorldEntity): boolean {
   return entity.lifecycle === "draft" && !!entity.sourceChatId;
 }
+
+type ForgePhase = "sketch" | "expand" | "weave";
+
+function nextForgePhase(current: string | undefined): ForgePhase {
+  if (current === "sketch") return "expand";
+  if (current === "expand") return "weave";
+  if (current === "weave") return "sketch";
+  return "sketch";
+}
+
+/** Number of uncommitted forge drafts belonging to a chat. */
+export function selectForgeDraftPoolCount(
+  state: RootState,
+  chatId: string,
+): number {
+  return Object.values(state.world.entitiesById).filter(
+    (e) => e.lifecycle === "draft" && e.sourceChatId === chatId,
+  ).length;
+}
+
+/** The phase the next forge continue will run: pool-empty forces sketch;
+ *  otherwise a user pin wins, else auto-advance from the current subMode. */
+export function selectForgeNextPhase(
+  state: RootState,
+  chatId: string,
+): ForgePhase {
+  if (selectForgeDraftPoolCount(state, chatId) === 0) return "sketch";
+  const pinned = state.forge.pinnedNextPhaseByChatId?.[chatId];
+  if (pinned) return pinned;
+  const chat = state.chat.chats.find((c) => c.id === chatId);
+  return nextForgePhase(chat?.subMode);
+}
