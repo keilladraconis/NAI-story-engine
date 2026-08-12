@@ -14,9 +14,17 @@ npm run format     # prettier -w .
 npm run test       # vitest run
 ```
 
-**Prettier is pinned to an exact version — keep it that way.** Under a `^` range an older prettier already sitting in `node_modules` satisfies the range, so `npm install` leaves it in place and ignores the lockfile. That happened: a session formatting with 3.7.4 wrapped union types the pinned version keeps inline, which shipped as a spurious "formatting cleanup" (15fb872) and had to be reverted (ac49266). The exact pin does not help a `node_modules` installed for a _different branch_ — check out this branch over a tree installed from `main` and you still get 3.7.4, which is how a fourth session churned the same three files. So `npm run format` now runs a `preformat` guard (`npm ls prettier`) that refuses to format when the installed version does not match the pin, and tells you to run `npm ci`. If format ever does rewrite files you did not touch, the formatter is wrong, not the repo — do not commit the diff.
+**Prettier is pinned to an exact version — keep it that way.** Under a `^` range an older prettier already sitting in `node_modules` satisfies the range, so `npm install` leaves it in place and ignores the lockfile. That happened: a session formatting with 3.7.4 wrapped union types the pinned version keeps inline, which shipped as a spurious "formatting cleanup" (15fb872) and had to be reverted (ac49266). The exact pin does not help a `node_modules` installed for a _different branch_ — check out this branch over a tree installed from `main` and you still get 3.7.4, which is how a fourth session churned the same three files. Two things now prevent it. `scripts/install_pkgs.sh` — the `SessionStart` hook that installs dependencies — runs `npm ci`, not `npm install`, so every session starts from a `node_modules` rebuilt from the lockfile instead of whatever the previous branch left behind. That removes the cause. And `npm run format` runs a `preformat` guard (`npm ls prettier`) that refuses to format when the installed version does not match the pin, which catches the case anyway if you installed by hand. If format ever does rewrite files you did not touch, the formatter is wrong, not the repo — do not commit the diff.
 
 `npm run format` deliberately calls `prettier`, not `npx prettier`. npm already puts `node_modules/.bin` first on `PATH`, so both run the same local binary; the difference is that `npx` _fetches_ prettier from the registry when it is missing locally, which is one more way to format with a version the lockfile never pinned.
+
+## Superpowers skills
+
+`.claude/skills/` holds a vendored copy of [obra/superpowers](https://github.com/obra/superpowers) (MIT, v6.2.0) — TDD, systematic debugging, brainstorming, plan writing, and related workflows. They are **vendored rather than installed as a plugin** because the remote sandbox sets `SKIP_PLUGIN_MARKETPLACE=true`, so a plugin would only ever resolve on a local checkout. Committed skills are discovered directly and work everywhere the repo is cloned.
+
+Do not hand-edit anything under `.claude/skills/` — it is generated. Run `scripts/vendor_superpowers.sh` to regenerate; bump `SUPERPOWERS_REF` in that script to update. The pinned ref is the same commit the official `claude-plugins-official` marketplace ships for v6.2.0, so the tree matches what the plugin install would deliver. The one deliberate change is that upstream's `superpowers:<skill>` cross-references are rewritten to bare `<skill>`, since project skills are invoked without the plugin namespace.
+
+Do not also enable the superpowers plugin in `.claude/settings.json` — the plugin and the vendored copy would load all 14 skills twice.
 
 ## Architecture
 

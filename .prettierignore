@@ -6,3 +6,8 @@ external/
 
 # Build output.
 dist/
+
+# Vendored upstream skills (scripts/vendor_superpowers.sh). Same reasoning as
+# external/: not authored here, and formatting them means every re-vendor
+# fights the formatter over ~900 lines that are not ours to restyle.
+.claude/skills/
