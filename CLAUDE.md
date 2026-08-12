@@ -18,6 +18,14 @@ npm run test       # vitest run
 
 `npm run format` deliberately calls `prettier`, not `npx prettier`. npm already puts `node_modules/.bin` first on `PATH`, so both run the same local binary; the difference is that `npx` _fetches_ prettier from the registry when it is missing locally, which is one more way to format with a version the lockfile never pinned.
 
+## Superpowers skills
+
+`.claude/skills/` holds a vendored copy of [obra/superpowers](https://github.com/obra/superpowers) (MIT, v6.2.0) — TDD, systematic debugging, brainstorming, plan writing, and related workflows. They are **vendored rather than installed as a plugin** because the remote sandbox sets `SKIP_PLUGIN_MARKETPLACE=true`, so a plugin would only ever resolve on a local checkout. Committed skills are discovered directly and work everywhere the repo is cloned.
+
+Do not hand-edit anything under `.claude/skills/` — it is generated. Run `scripts/vendor_superpowers.sh` to regenerate; bump `SUPERPOWERS_REF` in that script to update. The pinned ref is the same commit the official `claude-plugins-official` marketplace ships for v6.2.0, so the tree matches what the plugin install would deliver. The one deliberate change is that upstream's `superpowers:<skill>` cross-references are rewritten to bare `<skill>`, since project skills are invoked without the plugin namespace.
+
+Do not also enable the superpowers plugin in `.claude/settings.json` — the plugin and the vendored copy would load all 14 skills twice.
+
 ## Architecture
 
 **Entry point:** `src/index.ts` — initializes GenX, registers store effects, loads persisted data, mounts UI extensions.
