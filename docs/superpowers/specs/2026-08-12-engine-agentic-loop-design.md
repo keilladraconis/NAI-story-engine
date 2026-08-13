@@ -174,8 +174,8 @@ than free.
   and every Engine request keeps `max_tokens` as tight as its step allows so a lost
   race costs as little as possible.
 
-`tools/budget-probe` exists to settle this. Layer 1 is correct under either
-answer, which is why it carries the design.
+`tools/budget-probe.naiscript` exists to settle this. Layer 1 is correct under
+either answer, which is why it carries the design.
 
 **Collisions are normal, not exceptional.** They are never surfaced to the writer —
 no error state, no HUD warning (§9.1). Only a persistent inability to make progress
@@ -581,7 +581,7 @@ resolution for seeding upgraded stories.
    `index` key (§6.2) makes the load path immune either way, but the answer affects
    diagnostics and cleanup.
 3. **What a refused generation costs, and how to recognise one.** Run
-   `tools/budget-probe` (see its README). Two findings needed: whether the output
+   `tools/budget-probe.naiscript` in a scratch story. Two findings needed: whether the output
    budget is debited on delivery or on request, and what a concurrency refusal is
    charged. A refusal charged its full `max_tokens` removes retry from §3.4
    entirely and puts a premium on tight per-step `max_tokens`. The probe also
@@ -629,7 +629,7 @@ spine for the implementation plan, ordered so each phase is independently
 verifiable:
 
 0. **Spike the four unknowns in §12.** Cheap, and several later decisions hinge on
-   them. `tools/budget-probe` already covers item 3 and should be run first — it is
+   them. `tools/budget-probe.naiscript` already covers item 3 and should be run first — it is
    the one whose answer changes the design rather than just an implementation
    detail.
 1. **Persistence.** Move branch-scoped slices to `historyStorage`, shard

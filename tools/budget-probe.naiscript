@@ -1,0 +1,45 @@
+/*---
+compatibilityVersion: naiscript-1.0
+id: fe28e9a5-58ad-40bb-8e1b-219bc1ad343e
+name: Budget Probe
+version: 0.1.0
+description: What does a refused concurrent generation cost from the script output budget?
+memoryLimit: 8
+---*/
+
+// A: one gen, max_tokens 512 vs a ~20 token reply.
+//    delta~=got -> debited on DELIVERY; delta~=512 -> on REQUEST
+// B: two at once, one refused. delta~=got -> FREE; ~got+512 -> CHARGED
+// Budget refills as you interact, so run it twice and compare.
+
+const u = api.v1.ui;
+const P = [{ role: "user", content: "Count to ten in words." }];
+const M = { model: "glm-4-6", max_tokens: 512 };
+const g = () => api.v1.script.getAllowedOutput();
+const n = (r) => r.choices.reduce((a, c) => a + c.token_ids.length, 0);
+const err = (x) => Object.getOwnPropertyNames(Object(x)).filter((k) => k != "stack").map((k) => k + "=" + x[k]).join(" | ") || String(x);
+
+let out = "";
+const say = (s) => { out += s + "\n"; api.v1.log(s); void u.updateParts([{ id: "out", text: out }]); };
+
+async function run() {
+  let a = g();
+  const r = await api.v1.generate(P, M);
+  let b = g();
+  say(`A req=512 got=${n(r)} ${a}->${b} delta=${a - b}`);
+
+  a = g();
+  const z = await Promise.allSettled([api.v1.generate(P, M), api.v1.generate(P, M)]);
+  b = g();
+  const ok = z.filter((x) => x.status === "fulfilled");
+  const no = z.length - ok.length;
+  const got = ok.reduce((s, x) => s + n(x.value), 0);
+  say(`B ok=${ok.length} refused=${no} got=${got} ${a}->${b} delta=${a - b}`);
+  say(`  free~${got} charged~${got + no * 512}`);
+  z.forEach((x) => x.status === "rejected" && say("  err " + err(x.reason)));
+}
+
+u.register([u.extension.sidebarPanel({ name: "Budget Probe", content: [u.part.column({ content: [
+  u.part.button({ text: "Run", callback: () => void run(), disabledWhileCallbackRunning: true }),
+  u.part.text({ id: "out", text: "-", noTemplate: true, style: { whiteSpace: "pre-wrap" } }),
+] })] })]);

@@ -11,3 +11,7 @@ dist/
 # external/: not authored here, and formatting them means every re-vendor
 # fights the formatter over ~900 lines that are not ours to restyle.
 .claude/skills/
+
+# Hand-written probe scripts. Prettier has no parser for .naiscript, and
+# `prettier -w .` errors out on them rather than skipping.
+*.naiscript
