@@ -28,7 +28,7 @@ would duplicate the native window.
 **Not a bullet-list digest injected into Memory.** Extracting character and
 location facts to a bulleted list is redundant with the lorebook, and list-shaped
 prose sitting in context risks polluting the model's writing style. The lorebook
-already solves persistent recall; the gap is *activation*, not storage.
+already solves persistent recall; the gap is _activation_, not storage.
 
 **Not a second author.** The Engine writes change, never invention. It records what
 the prose has made true; it does not decide what happens next.
@@ -38,12 +38,12 @@ the prose has made true; it does not decide what happens next.
 The Forge and the Engine both write World entities, and the boundary between them
 is tense, not territory.
 
-| | Forge | Engine |
-|---|---|---|
-| when | before the story starts, or on demand mid-story | continuously while writing |
-| writes | **setup** — root facts, standing pressure | **change** — what the prose has made true |
-| may assert | situations, complications, no outcomes | outcomes, consequences, resolutions |
-| triggered by | the writer, explicitly | generation activity, automatically |
+|              | Forge                                           | Engine                                    |
+| ------------ | ----------------------------------------------- | ----------------------------------------- |
+| when         | before the story starts, or on demand mid-story | continuously while writing                |
+| writes       | **setup** — root facts, standing pressure       | **change** — what the prose has made true |
+| may assert   | situations, complications, no outcomes          | outcomes, consequences, resolutions       |
+| triggered by | the writer, explicitly                          | generation activity, automatically        |
 
 The Forge's existing no-outcomes discipline (`src/config/field-definitions.ts:155`)
 is what keeps these from colliding. The Forge establishes what is unsettled; the
@@ -63,9 +63,13 @@ The triage prompt and every other Engine prompt is an exported constant in
 `src/core/utils/prompts.ts`.
 
 Keying on quiet rather than on either hook directly has two advantages: it covers
-hand-written prose, which no generation hook observes at all, and it avoids firing
-at the moment the writer's attention returns to the editor and they are most likely
-to generate again.
+hand-written prose, which no generation hook observes at all, and it avoids
+triaging a scene that is still being written, which wastes a pass on prose about to
+be extended or undone.
+
+Note that the quiet gate is a _work-quality_ device, not a safety device.
+Collisions with the writer are cheap and recoverable (§3.4), so the interval can be
+tuned for usefulness rather than defensively.
 
 `onGenerationEnd` is documented at `external/script-types.d.ts:4092`;
 `onGenerationRequested` at `:3989`. The project currently registers exactly one hook
@@ -85,8 +89,8 @@ assess ──▶ triage ──▶ enqueue ──▶ drain ──▶ idle
   new sections)? Produces the manifest for triage and can terminate the firing at
   zero cost.
 - **triage** — one small instruct generation over new prose plus a compact
-  manifest (entity names, one-line summaries, open loose ends). Answers only *what
-  needs attention*: this entry is now wrong, this is a new commitment, this
+  manifest (entity names, one-line summaries, open loose ends). Answers only _what
+  needs attention_: this entry is now wrong, this is a new commitment, this
   commitment looks satisfied. Most firings on quiet prose return nothing.
 - **enqueue** — triage output becomes intents in a persisted queue.
 - **drain** — execute intents while budget permits.
@@ -100,13 +104,13 @@ The only genuinely scarce resource is **output tokens: 2048 per 240 seconds**,
 released FIFO and gated by FlagB. Input tokens are bucketed far more generously and
 benefit from caching.
 
-| step | output cost |
-|---|---|
-| assess | 0 — no generation |
-| triage | ~150 |
+| step                         | output cost                             |
+| ---------------------------- | --------------------------------------- |
+| assess                       | 0 — no generation                       |
+| triage                       | ~150                                    |
 | retire a satisfied loose end | 0 — `updateEntry(id, {enabled: false})` |
-| open a loose end | ~150 |
-| revise an entity entry | ~300 |
+| open a loose end             | ~150                                    |
+| revise an entity entry       | ~300                                    |
 
 At a writing cadence of one generation every 40–60s, that is four to six firings
 per bucket. Triage at every firing costs 600–900 tokens, leaving 1100–1400 for two
@@ -128,22 +132,38 @@ when the writer is fast.
 **Retiring a satisfied loose end never queues**, because it costs zero output
 tokens. The action that most protects context health is free.
 
-### 3.4 Yielding to the writer
+### 3.4 Colliding with the writer
 
-The backend rejects concurrent API requests, and a rejection in the story editor is
-a far worse outcome than a lost Engine pass. The loop always loses.
+The backend refuses concurrent requests, but the constraint is **time-gated rather
+than an absolute lock** — a short-lived key that expires on its own, not a shared
+lock requiring reconciliation. That makes collisions cheap, self-clearing, and
+detectable after the fact.
 
-On `onGenerationRequested` with `scriptInitiated: false`, cancel the in-flight
-request via its `CancellationSignal`
-(`api.v1.generate`'s third parameter; `createCancellationSignal()` at
-`external/script-types.d.ts:2495`) and leave the queue intact. The next firing
-resumes where it stopped.
+So the loop is **optimistic**: it issues its request, and if the request is refused
+for concurrency it swallows the error, keeps the intent queued, and carries on. A
+refused request never generates, so a collision costs no output tokens — only
+latency on work that was already allowed to lag (§3.3).
 
-The typings note cancellation "may not cancel immediately." If hooks are awaited by
-the harness — `OnGenerationRequested` returns
-`... | Promise<...>`, which suggests they may be — the hook can hold the writer's
-request until ours is confirmed dead, giving a real mutex rather than a hopeful
-abort. See §12.
+This is deliberately _not_ pre-emptive cancellation. Cancelling in-flight work on
+`onGenerationRequested` is pessimistic locking, which is the expensive strategy for
+a cheap failure: it needs a cancellation path, it needs the harness to await hooks
+if the abort is to be reliable, and the typings warn that cancellation "may not
+cancel immediately" — so it would buy an unreliable guarantee at the cost of real
+machinery. Optimistic execution needs only an error classifier.
+
+**Recovery.** Within a drain sequence, a refused action backs off briefly and
+retries, since the gate is short-lived and the remaining intents are already loaded.
+Repeated refusals abandon the firing and leave the queue for the next one, which is
+naturally correct: a collision means the quiet gate guessed wrong and the writer is
+active, so the next firing's own quiet check is the right arbiter.
+
+**Collisions are normal, not exceptional.** They are never surfaced to the writer —
+no error state, no HUD warning (§9.1). Only a persistent inability to make progress
+is worth showing.
+
+`createCancellationSignal()` (`external/script-types.d.ts:2495`) is still wanted, but
+for the writer explicitly stopping the Engine and for abandoning work when they go
+idle — not for collision avoidance.
 
 ### 3.5 FlagB as a safety property
 
@@ -170,7 +190,7 @@ with different triggers, and collapse into one entity.
 A Thread's purpose was to keep a cluster of entities warm in context so the editor's
 model could reach for them. It achieved that with blanket always-on, because that
 was the only instrument available. The negated-key condition (§4.3) is the same
-intent with a trigger that fires *when the cluster has actually gone quiet* — which
+intent with a trigger that fires _when the cluster has actually gone quiet_ — which
 is precisely the moment the old always-on was paying for.
 
 `WorldGroup` is deleted. `LooseEnd` replaces it.
@@ -179,9 +199,9 @@ is precisely the moment the old always-on was paying for.
 interface LooseEnd {
   id: string;
   title: string;
-  text: string;                       // the reminder prose
+  text: string; // the reminder prose
   horizon: "arc" | "plot" | "point";
-  entityIds: string[];                // the cast it drags into context
+  entityIds: string[]; // the cast it drags into context
   lorebookEntryId?: string;
   status: "open" | "satisfied";
 }
@@ -270,7 +290,7 @@ This extends the existing `DRAFT > LOREBOOK > STATE` hierarchy
 (`src/core/utils/lorebook-strategy.ts`) across time as well as across surfaces.
 
 **Consequences are revisions, not loose ends.** A character dying or an item being
-spent is a permanent fact and belongs in the *subject's own* entry — keyed on their
+spent is a permanent fact and belongs in the _subject's own_ entry — keyed on their
 name, activating naturally when mentioned. A loose end wants retiring on resolution;
 a consequence wants keeping forever. Filing a consequence as a loose end would
 switch it off at exactly the moment it became permanent truth.
@@ -293,12 +313,12 @@ story is already a single copy operation in the editor.
 
 ### 6.1 Storage scoping
 
-| storage | holds | why |
-|---|---|---|
+| storage          | holds                                                                                                | why                                                     |
+| ---------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | `historyStorage` | World entities, loose ends, foundation, DULFS lists, watermark, intent queue, lorebook write-records | derived from or about the story; must follow the branch |
-| `storyStorage` | chat sessions (brainstorm, forge, refine), lorebook original snapshots | follows the writer, not the branch |
-| `tempStorage` | in-flight pass state | must not survive a reload half-applied |
-| — | `ui`, `runtime` slices | ephemeral, not persisted |
+| `storyStorage`   | chat sessions (brainstorm, forge, refine), lorebook original snapshots                               | follows the writer, not the branch                      |
+| `tempStorage`    | in-flight pass state                                                                                 | must not survive a reload half-applied                  |
+| —                | `ui`, `runtime` slices                                                                               | ephemeral, not persisted                                |
 
 `historyStorage.get()` searches ancestor nodes until it finds a value — copy-on-write
 inheritance along the history DAG. This gives branch-correct state with no journal,
@@ -317,7 +337,7 @@ continuation should be — the thinking disappears exactly when it is acted on.
 
 **Foundation is branch-local.** Switching intensity to Noir on a branch, then rolling
 back past that point, restores the previous intensity. A branch exploring a different
-register genuinely is a different story. The known rough edge is that a *correction*
+register genuinely is a different story. The known rough edge is that a _correction_
 ("I set this wrong at the start") silently applies only to the current branch. This
 is documented, not worked around: writing at root would not help, since
 nearest-ancestor-wins means any later write on the current path shadows it, and
@@ -385,8 +405,8 @@ binding site only, never embedded in the key constant.
 
 ## 7. History navigation and lorebook reconciliation
 
-`historyStorage` reverts what the Engine *believes*, but the lorebook is global story
-state and is not history-scoped — so it does not revert what the Engine *did*. This
+`historyStorage` reverts what the Engine _believes_, but the lorebook is global story
+state and is not history-scoped — so it does not revert what the Engine _did_. This
 is the entire residue of the branching problem.
 
 `onHistoryNavigated` (`cause: 'undo' | 'redo' | 'retry' | 'jump'`):
@@ -458,16 +478,20 @@ time; it never narrates individual actions.
 ◉  14¶  ⚑5  ✎23  ▮▮▮▯
 ```
 
-| slot | reads | what watching it teaches |
-|---|---|---|
-| state | `◉` watching · `◐` reading · `✎` acting · `⏸` held · `⚠` stalled | whether it's alive, and what it's doing |
-| backlog | unread paragraphs since the watermark | climbing = falling behind |
-| loose ends | open loose ends | context pressure — climbing means go close some |
-| touched | entities revised on this branch | activity level |
-| budget | remaining output bucket | why it's quiet when it's quiet |
+| slot       | reads                                                            | what watching it teaches                        |
+| ---------- | ---------------------------------------------------------------- | ----------------------------------------------- |
+| state      | `◉` watching · `◐` reading · `✎` acting · `⏸` held · `⚠` stalled | whether it's alive, and what it's doing         |
+| backlog    | unread paragraphs since the watermark                            | climbing = falling behind                       |
+| loose ends | open loose ends                                                  | context pressure — climbing means go close some |
+| touched    | entities revised on this branch                                  | activity level                                  |
+| budget     | remaining output bucket                                          | why it's quiet when it's quiet                  |
 
-The compound readings carry the density: backlog climbing *with an empty budget*
-means starved; climbing *with a full budget* means constantly yielding; a persistent
+`⚠` means the loop cannot make progress at all. Ordinary concurrency refusals
+(§3.4) are routine and stay invisible — surfacing them would train the writer to
+ignore the one slot that should mean something.
+
+The compound readings carry the density: backlog climbing _with an empty budget_
+means starved; climbing _with a full budget_ means colliding constantly; a persistent
 `⏸` means FlagB is not releasing buckets. None of that is legible from a log of
 individual actions.
 
@@ -478,7 +502,7 @@ reads better at small sizes.
 **It must not read `genx.status`.** CLAUDE.md establishes `derive()` in
 `src/ui/header/header-model.ts` as the only place that branches on generation
 status, with `tests/ui/countdown.test.ts` enforcing it mechanically. The HUD reads a
-*loop*-state model, which is a genuinely different state machine — conflating the
+_loop_-state model, which is a genuinely different state machine — conflating the
 Engine's states with the generation queue's is how the two surfaces drift.
 
 ### 9.2 Tabs
@@ -503,7 +527,7 @@ Labelling a branch-local surface "Config" would mislead on both counts.
 Story Engine is alpha. **No migration code is written, anywhere.** Upgrading is at
 the user's own risk, and this is stated in the changelog and README for 0.15.0.
 
-This applies to *our* persisted schema, not to the user's lorebook. Dropping Engine
+This applies to _our_ persisted schema, not to the user's lorebook. Dropping Engine
 state orphans bindings, so previously-managed entries become unmanaged entries
 sitting in the lorebook — untouched, not destroyed. The Import wizard's Bind is
 already the re-adoption path. The read-then-write and never-clobber rules in §5 and
@@ -514,15 +538,15 @@ resolution for seeding upgraded stories.
 
 ## 11. Failure modes
 
-| condition | behaviour |
-|---|---|
-| writer starts a generation mid-pass | cancel in place, queue intact, resume next firing |
-| budget exhausted | hold; abandon if the writer goes idle |
-| malformed model output | the Forge's existing parser already surfaces rejected and unparseable commands as warning chips |
-| lorebook entry deleted underneath us | read-then-write finds nothing; drop the intent, clean the record |
-| entity renamed by the writer | read-then-write reads live `displayName` per `DRAFT > LOREBOOK > STATE` |
-| reload mid-pass | `tempStorage` in-flight state is gone; pass aborts cleanly, queue survives in `historyStorage` |
-| loose-end cap reached | triage displaces rather than adds (§4.5) |
+| condition                            | behaviour                                                                                                                    |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| request refused for concurrency      | swallow, keep the intent queued, brief backoff-retry within the firing; abandon to the next firing on repeat. Never surfaced |
+| budget exhausted                     | hold; abandon if the writer goes idle                                                                                        |
+| malformed model output               | the Forge's existing parser already surfaces rejected and unparseable commands as warning chips                              |
+| lorebook entry deleted underneath us | read-then-write finds nothing; drop the intent, clean the record                                                             |
+| entity renamed by the writer         | read-then-write reads live `displayName` per `DRAFT > LOREBOOK > STATE`                                                      |
+| reload mid-pass                      | `tempStorage` in-flight state is gone; pass aborts cleanly, queue survives in `historyStorage`                               |
+| loose-end cap reached                | triage displaces rather than adds (§4.5)                                                                                     |
 
 ## 12. Open items
 
@@ -535,7 +559,11 @@ resolution for seeding upgraded stories.
    returns inherited ancestor keys or only keys written at that exact node. The
    `index` key (§6.2) makes the load path immune either way, but the answer affects
    diagnostics and cleanup.
-3. **Are hooks awaited?** Decides whether §3.4 gets a real mutex or a hopeful abort.
+3. **The shape of a concurrency refusal.** §3.4 depends on telling "refused because
+   the writer is mid-request" apart from every other generation failure. Capture the
+   actual status/message so the classifier keys on something real rather than
+   pattern-matching error strings, and confirm a refusal genuinely consumes no
+   output budget.
 4. **`scriptPanel` placement and visibility.** The typings describe it as appearing
    below the editor and being user-collapsible. If it can be closed, Engine
    visibility is opt-in and the sidebar Engine tab must remain the authoritative
@@ -584,7 +612,8 @@ verifiable:
    its own: existing features keep working, undo now moves World state.
 2. **Model capability.** Add the parameter to `buildModelParams()` with a
    `"creative"` default. Pure addition, no behaviour change.
-3. **Loop harness + HUD, triage only.** Trigger, state machine, pacing, yielding —
+3. **Loop harness + HUD, triage only.** Trigger, state machine, pacing, collision
+   recovery —
    with triage producing intents that are logged but not executed. The HUD makes
    this observable, which is why it comes early rather than last.
 4. **`LooseEnd` replacing `WorldGroup`**, including `advancedConditions`
