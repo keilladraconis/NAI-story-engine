@@ -129,6 +129,12 @@ own regulator: generating hard keeps the loop out of the way, pausing to read le
 it catch up. A fixed rate does neither — it overprocesses when idle and falls behind
 when the writer is fast.
 
+The reserve must survive a **failed** attempt, not merely a successful one. A refused
+request is charged its full `max_tokens` (§12.0), so the check before firing an
+action is that the budget would still clear the triage reserve if the action were
+refused outright. The same finding makes the column above do double duty: each figure
+is both the expected cost and the amount lost to a lost race.
+
 **Retiring a satisfied loose end never queues**, because it costs zero output
 tokens. The action that most protects context health is free.
 
@@ -137,9 +143,10 @@ tokens. The action that most protects context health is free.
 The backend refuses concurrent requests, but the constraint is **time-gated rather
 than an absolute lock** — a short-lived key that expires on its own, not a shared
 lock requiring reconciliation. Collisions are therefore self-clearing and
-detectable after the fact. Whether they are also _cheap_ is unresolved; see §12.3.
+detectable after the fact. They are not, however, _cheap_ — see §12.0.
 
-Handling has two layers, and only the second depends on an unresolved question.
+Handling has two layers: keep out of the way for free, and fail safely when that
+is not enough.
 
 **Layer 1 — a free local gate.** The loop already registers both generation hooks
 for its activity watermark (§3.1), so it always knows whether one of the writer's
@@ -160,22 +167,31 @@ need a cancellation path and a reliable abort, and the typings warn cancellation
 "may not cancel immediately" — an unreliable guarantee bought with real machinery.
 Layer 1 gets the same benefit for free.
 
-**Retry policy is unresolved and depends on §12 item 3.** The budget is managed
-client-side through the script runtime's own API surface, which makes it entirely
-possible that a _successful_ generation is debited what it returned while a
-_failed_ one is debited what it requested. If so, a refused 300-token revision
-costs 300 tokens of a 2048 bucket, and backoff-retry is actively harmful rather
-than free.
+**A refusal is charged its full `max_tokens`. Measured, not assumed** — see §12.0.
+A successful generation is debited what it returned; a refused one is debited what
+it asked for. So a lost race on a 400-token revision costs 400 tokens of a 2048
+bucket, roughly a fifth of the window.
 
-- **If a refusal is free:** a refused action backs off briefly and retries within
-  the firing, since the gate is short-lived and the remaining intents are loaded.
-- **If a refusal is charged its `max_tokens`:** no retry at all. The intent defers
-  to the next firing, whose own quiet check and local gate are the right arbiters,
-  and every Engine request keeps `max_tokens` as tight as its step allows so a lost
-  race costs as little as possible.
+Three rules follow.
 
-`tools/budget-probe.naiscript` exists to settle this. Layer 1 is correct under
-either answer, which is why it carries the design.
+**No retry.** A refused intent stays queued and waits for the next firing, whose own
+quiet check and local gate are the right arbiters. Retrying inside the firing would
+spend the request's full cost again against a gate that is still closed.
+
+**`max_tokens` is a correctness concern, not politeness.** Every Engine request sizes
+`max_tokens` as tightly as its step allows, because that number — not the output — is
+what a lost race costs. This is the strongest argument in the design for keeping
+triage's output small.
+
+**Classify conservatively.** The refusal arrives as a bare `Error` with
+`message: "A generation is already in progress"` and no status code or subclass, so
+matching the message is the only option available. Any failure the classifier does
+_not_ recognise is therefore treated as non-retryable too. Default-deny means a
+future change to that message string degrades to "stopped retrying" rather than
+"burns the bucket in a loop".
+
+Layer 1 is what actually protects the budget; layer 2 only keeps a lost race from
+corrupting the queue.
 
 **Collisions are normal, not exceptional.** They are never surfaced to the writer —
 no error state, no HUD warning (§9.1). Only a persistent inability to make progress
@@ -558,18 +574,41 @@ resolution for seeding upgraded stories.
 
 ## 11. Failure modes
 
-| condition                            | behaviour                                                                                                              |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| writer's generation outstanding      | do not fire — free local gate from the two hooks (§3.4)                                                                |
-| request refused for concurrency      | swallow, keep the intent queued, defer to the next firing. Retry only if §12.3 shows refusals are free. Never surfaced |
-| budget exhausted                     | hold; abandon if the writer goes idle                                                                                  |
-| malformed model output               | the Forge's existing parser already surfaces rejected and unparseable commands as warning chips                        |
-| lorebook entry deleted underneath us | read-then-write finds nothing; drop the intent, clean the record                                                       |
-| entity renamed by the writer         | read-then-write reads live `displayName` per `DRAFT > LOREBOOK > STATE`                                                |
-| reload mid-pass                      | `tempStorage` in-flight state is gone; pass aborts cleanly, queue survives in `historyStorage`                         |
-| loose-end cap reached                | triage displaces rather than adds (§4.5)                                                                               |
+| condition                            | behaviour                                                                                       |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| writer's generation outstanding      | do not fire — free local gate from the two hooks (§3.4)                                         |
+| request refused for concurrency      | swallow, keep the intent queued, defer to the next firing. Never retried, never surfaced (§3.4) |
+| budget exhausted                     | hold; abandon if the writer goes idle                                                           |
+| malformed model output               | the Forge's existing parser already surfaces rejected and unparseable commands as warning chips |
+| lorebook entry deleted underneath us | read-then-write finds nothing; drop the intent, clean the record                                |
+| entity renamed by the writer         | read-then-write reads live `displayName` per `DRAFT > LOREBOOK > STATE`                         |
+| reload mid-pass                      | `tempStorage` in-flight state is gone; pass aborts cleanly, queue survives in `historyStorage`  |
+| loose-end cap reached                | triage displaces rather than adds (§4.5)                                                        |
 
 ## 12. Open items
+
+### 12.0 Resolved: what a refused generation costs
+
+Measured with `tools/budget-probe.naiscript` against the live backend:
+
+```
+A  requested=512 returned=8
+   budget 2048 -> 2040   delta=8
+B  succeeded=1 refused=1 returned=21
+   budget 2040 -> 1507   delta=533
+   free ~21   charged ~533
+   error: message=A generation is already in progress | name=Error
+```
+
+**A successful generation is debited what it returned. A refused one is debited
+what it requested.** `533 = 21 + 512` — the refusal cost its whole `max_tokens`.
+
+The refusal surfaces as a bare `Error`: `message` is
+`"A generation is already in progress"`, `name` is `"Error"`, and there is no status
+code, error code, or subclass. Message matching is the only classifier available.
+
+Consequences are folded into §3.4: no retry, tight `max_tokens` per step, and
+default-deny classification.
 
 ### Verify before writing code
 
@@ -580,29 +619,22 @@ resolution for seeding upgraded stories.
    returns inherited ancestor keys or only keys written at that exact node. The
    `index` key (§6.2) makes the load path immune either way, but the answer affects
    diagnostics and cleanup.
-3. **What a refused generation costs, and how to recognise one.** Run
-   `tools/budget-probe.naiscript` in a scratch story. Two findings needed: whether the output
-   budget is debited on delivery or on request, and what a concurrency refusal is
-   charged. A refusal charged its full `max_tokens` removes retry from §3.4
-   entirely and puts a premium on tight per-step `max_tokens`. The probe also
-   dumps the refusal's error object so the classifier can key on something
-   structured rather than matching error strings.
-4. **`scriptPanel` placement and visibility.** The typings describe it as appearing
+3. **`scriptPanel` placement and visibility.** The typings describe it as appearing
    below the editor and being user-collapsible. If it can be closed, Engine
    visibility is opt-in and the sidebar Engine tab must remain the authoritative
    view.
 
 ### Naming calls
 
-5. The Forge's `[THREAD]` command now creates loose ends; the verb should match the
+4. The Forge's `[THREAD]` command now creates loose ends; the verb should match the
    concept.
-6. Confirm "Loose Ends" as the user-facing category label.
+5. Confirm "Loose Ends" as the user-facing category label.
 
 ### Risks
 
-7. **Triage prompt quality is the whole ballgame** and cannot be settled on paper.
+6. **Triage prompt quality is the whole ballgame** and cannot be settled on paper.
    It is the first thing to build and the thing to iterate against real stories.
-8. **Loose-end proliferation** (§4.5) is the failure mode that would make the Engine
+7. **Loose-end proliferation** (§4.5) is the failure mode that would make the Engine
    actively harmful rather than merely unhelpful. The cap, justification, and expiry
    are not polish.
 
@@ -615,7 +647,10 @@ Everything decidable is pure and testable headless, consistent with the existing
 - intent parsing, extending the existing Forge parser tests
 - condition construction (loose end + horizon → `advancedConditions` tree)
 - watermark math across document edits and history navigation
-- drain policy (available budget in → actions permitted out)
+- drain policy (available budget in → actions permitted out), including the
+  survive-a-refusal reserve check in §3.3
+- failure classification: the measured refusal message is recognised, and every
+  unrecognised failure is treated as non-retryable (§3.4's default-deny)
 - the loop state machine as a pure reducer, table-driven
 - reconciliation decision table (live text vs recorded write → revise / leave alone)
 
@@ -629,9 +664,8 @@ spine for the implementation plan, ordered so each phase is independently
 verifiable:
 
 0. **Spike the four unknowns in §12.** Cheap, and several later decisions hinge on
-   them. `tools/budget-probe.naiscript` already covers item 3 and should be run first — it is
-   the one whose answer changes the design rather than just an implementation
-   detail.
+   them. The costliest one is already answered — see §12.0, measured with
+   `tools/budget-probe.naiscript`.
 1. **Persistence.** Move branch-scoped slices to `historyStorage`, shard
    `kse-persist` into the §6.2 keyspace, capture nodeId at dispatch. Verifiable on
    its own: existing features keep working, undo now moves World state.
