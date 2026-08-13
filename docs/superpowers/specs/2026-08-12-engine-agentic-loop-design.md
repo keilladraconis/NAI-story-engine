@@ -610,6 +610,14 @@ code, error code, or subclass. Message matching is the only classifier available
 Consequences are folded into §3.4: no retry, tight `max_tokens` per step, and
 default-deny classification.
 
+**This is believed to be a defect rather than intended policy** — the backend
+performed no work, so there is nothing to charge for — and has been raised with
+NovelAI. Treat the behaviour as current fact, not as permanent. If it is fixed so
+that a refusal costs nothing, the only change is that the retry branch becomes
+available again: the local gate, the tight `max_tokens`, and the default-deny
+classifier all stay worth having regardless. Re-run the probe to confirm before
+relying on a change.
+
 ### Verify before writing code
 
 1. **`onHistoryNavigated`'s `nodeId` type.** Typed `string` in the hook params,
