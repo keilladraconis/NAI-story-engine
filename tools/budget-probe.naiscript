@@ -2,44 +2,100 @@
 compatibilityVersion: naiscript-1.0
 id: fe28e9a5-58ad-40bb-8e1b-219bc1ad343e
 name: Budget Probe
-version: 0.1.0
+version: 0.2.0
 description: What does a refused concurrent generation cost from the script output budget?
 memoryLimit: 8
 ---*/
 
-// A: one gen, max_tokens 512 vs a ~20 token reply.
-//    delta~=got -> debited on DELIVERY; delta~=512 -> on REQUEST
-// B: two at once, one refused. delta~=got -> FREE; ~got+512 -> CHARGED
-// Budget refills as you interact, so run it twice and compare.
+// A: one generation, max_tokens far above what the prompt can return.
+//      delta ~= returned        -> budget debited on delivery
+//      delta ~= MAX             -> debited on request
+// B: two generations at once, one should be refused.
+//      delta ~= returned        -> refusal is free
+//      delta ~= returned + MAX  -> refusal charged its max_tokens
 
-const u = api.v1.ui;
-const P = [{ role: "user", content: "Count to ten in words." }];
-const M = { model: "glm-4-6", max_tokens: 512 };
-const g = () => api.v1.script.getAllowedOutput();
-const n = (r) => r.choices.reduce((a, c) => a + c.token_ids.length, 0);
-const err = (x) => Object.getOwnPropertyNames(Object(x)).filter((k) => k != "stack").map((k) => k + "=" + x[k]).join(" | ") || String(x);
+const MAX = 512;
+const PROMPT = [{ role: "user", content: "Count to ten in words." }];
+const PARAMS = { model: "glm-4-6", max_tokens: MAX };
 
-let out = "";
-const say = (s) => { out += s + "\n"; api.v1.log(s); void u.updateParts([{ id: "out", text: out }]); };
+const allowedOutput = () => api.v1.script.getAllowedOutput();
 
-async function run() {
-  let a = g();
-  const r = await api.v1.generate(P, M);
-  let b = g();
-  say(`A req=512 got=${n(r)} ${a}->${b} delta=${a - b}`);
+const tokensReturned = (response) =>
+  response.choices.reduce((total, choice) => total + choice.token_ids.length, 0);
 
-  a = g();
-  const z = await Promise.allSettled([api.v1.generate(P, M), api.v1.generate(P, M)]);
-  b = g();
-  const ok = z.filter((x) => x.status === "fulfilled");
-  const no = z.length - ok.length;
-  const got = ok.reduce((s, x) => s + n(x.value), 0);
-  say(`B ok=${ok.length} refused=${no} got=${got} ${a}->${b} delta=${a - b}`);
-  say(`  free~${got} charged~${got + no * 512}`);
-  z.forEach((x) => x.status === "rejected" && say("  err " + err(x.reason)));
+function describeError(error) {
+  const fields = Object.getOwnPropertyNames(Object(error))
+    .filter((key) => key !== "stack")
+    .map((key) => `${key}=${error[key]}`);
+  return fields.length ? fields.join(" | ") : String(error);
 }
 
-u.register([u.extension.sidebarPanel({ name: "Budget Probe", content: [u.part.column({ content: [
-  u.part.button({ text: "Run", callback: () => void run(), disabledWhileCallbackRunning: true }),
-  u.part.text({ id: "out", text: "-", noTemplate: true, style: { whiteSpace: "pre-wrap" } }),
-] })] })]);
+let report = "";
+
+function log(line) {
+  report += line + "\n";
+  api.v1.log(line);
+  void api.v1.ui.updateParts([{ id: "report", text: report }]);
+}
+
+async function singleGeneration() {
+  const before = allowedOutput();
+  const response = await api.v1.generate(PROMPT, PARAMS);
+  const after = allowedOutput();
+
+  log(`A  requested=${MAX} returned=${tokensReturned(response)}`);
+  log(`   budget ${before} -> ${after}   delta=${before - after}`);
+}
+
+async function concurrentGenerations() {
+  const before = allowedOutput();
+  const results = await Promise.allSettled([
+    api.v1.generate(PROMPT, PARAMS),
+    api.v1.generate(PROMPT, PARAMS),
+  ]);
+  const after = allowedOutput();
+
+  const succeeded = results.filter((result) => result.status === "fulfilled");
+  const refused = results.length - succeeded.length;
+  const returned = succeeded.reduce(
+    (total, result) => total + tokensReturned(result.value),
+    0,
+  );
+
+  log(`B  succeeded=${succeeded.length} refused=${refused} returned=${returned}`);
+  log(`   budget ${before} -> ${after}   delta=${before - after}`);
+  log(`   free ~${returned}   charged ~${returned + refused * MAX}`);
+
+  results
+    .filter((result) => result.status === "rejected")
+    .forEach((result) => log(`   error: ${describeError(result.reason)}`));
+}
+
+async function run() {
+  await singleGeneration();
+  await concurrentGenerations();
+  log("");
+}
+
+api.v1.ui.register([
+  api.v1.ui.extension.scriptPanel({
+    name: "Budget Probe",
+    content: [
+      api.v1.ui.part.column({
+        content: [
+          api.v1.ui.part.button({
+            text: "Run",
+            callback: () => void run(),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.text({
+            id: "report",
+            text: "Budget refills as you interact — run twice and compare.",
+            noTemplate: true,
+            style: { whiteSpace: "pre-wrap", userSelect: "text" },
+          }),
+        ],
+      }),
+    ],
+  }),
+]);
