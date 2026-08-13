@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "lib": ["ES2023"],
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noImplicitAny": true,
+    "noEmit": true,
+    "typeRoots": ["./external", "../../node_modules/@types"],
+    "types": []
+  },
+  "include": ["src/**/*", "external/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

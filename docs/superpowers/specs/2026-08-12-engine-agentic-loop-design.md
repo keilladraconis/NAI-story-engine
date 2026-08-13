@@ -67,9 +67,9 @@ hand-written prose, which no generation hook observes at all, and it avoids
 triaging a scene that is still being written, which wastes a pass on prose about to
 be extended or undone.
 
-Note that the quiet gate is a _work-quality_ device, not a safety device.
-Collisions with the writer are cheap and recoverable (§3.4), so the interval can be
-tuned for usefulness rather than defensively.
+The quiet gate is primarily a _work-quality_ device. Collision avoidance is handled
+separately and more directly by the local in-flight gate in §3.4, so the interval
+can be tuned for usefulness rather than as a defensive margin.
 
 `onGenerationEnd` is documented at `external/script-types.d.ts:4092`;
 `onGenerationRequested` at `:3989`. The project currently registers exactly one hook
@@ -136,26 +136,46 @@ tokens. The action that most protects context health is free.
 
 The backend refuses concurrent requests, but the constraint is **time-gated rather
 than an absolute lock** — a short-lived key that expires on its own, not a shared
-lock requiring reconciliation. That makes collisions cheap, self-clearing, and
-detectable after the fact.
+lock requiring reconciliation. Collisions are therefore self-clearing and
+detectable after the fact. Whether they are also _cheap_ is unresolved; see §12.3.
 
-So the loop is **optimistic**: it issues its request, and if the request is refused
-for concurrency it swallows the error, keeps the intent queued, and carries on. A
-refused request never generates, so a collision costs no output tokens — only
-latency on work that was already allowed to lag (§3.3).
+Handling has two layers, and only the second depends on an unresolved question.
 
-This is deliberately _not_ pre-emptive cancellation. Cancelling in-flight work on
-`onGenerationRequested` is pessimistic locking, which is the expensive strategy for
-a cheap failure: it needs a cancellation path, it needs the harness to await hooks
-if the abort is to be reliable, and the typings warn that cancellation "may not
-cancel immediately" — so it would buy an unreliable guarantee at the cost of real
-machinery. Optimistic execution needs only an error classifier.
+**Layer 1 — a free local gate.** The loop already registers both generation hooks
+for its activity watermark (§3.1), so it always knows whether one of the writer's
+generations is outstanding: `onGenerationRequested` with `scriptInitiated: false`
+opens the window, `onGenerationEnd` closes it. Simply not firing while that window
+is open costs nothing, needs no backend round trip, and eliminates almost every
+collision. This is not pessimistic locking — no cancellation path, no reliance on
+the harness awaiting hooks — it is just declining to act on information already in
+hand.
 
-**Recovery.** Within a drain sequence, a refused action backs off briefly and
-retries, since the gate is short-lived and the remaining intents are already loaded.
-Repeated refusals abandon the firing and leave the queue for the next one, which is
-naturally correct: a collision means the quiet gate guessed wrong and the writer is
-active, so the next firing's own quiet check is the right arbiter.
+**Layer 2 — optimistic recovery for the race.** The gate cannot close the window
+between the loop's check and its request landing, so a refusal is still possible.
+When one occurs, the loop swallows the error, keeps the intent queued, and carries
+on.
+
+This is deliberately _not_ pre-emptive cancellation of in-flight work. That would
+need a cancellation path and a reliable abort, and the typings warn cancellation
+"may not cancel immediately" — an unreliable guarantee bought with real machinery.
+Layer 1 gets the same benefit for free.
+
+**Retry policy is unresolved and depends on §12 item 3.** The budget is managed
+client-side through the script runtime's own API surface, which makes it entirely
+possible that a _successful_ generation is debited what it returned while a
+_failed_ one is debited what it requested. If so, a refused 300-token revision
+costs 300 tokens of a 2048 bucket, and backoff-retry is actively harmful rather
+than free.
+
+- **If a refusal is free:** a refused action backs off briefly and retries within
+  the firing, since the gate is short-lived and the remaining intents are loaded.
+- **If a refusal is charged its `max_tokens`:** no retry at all. The intent defers
+  to the next firing, whose own quiet check and local gate are the right arbiters,
+  and every Engine request keeps `max_tokens` as tight as its step allows so a lost
+  race costs as little as possible.
+
+`tools/budget-probe` exists to settle this. Layer 1 is correct under either
+answer, which is why it carries the design.
 
 **Collisions are normal, not exceptional.** They are never surfaced to the writer —
 no error state, no HUD warning (§9.1). Only a persistent inability to make progress
@@ -538,15 +558,16 @@ resolution for seeding upgraded stories.
 
 ## 11. Failure modes
 
-| condition                            | behaviour                                                                                                                    |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| request refused for concurrency      | swallow, keep the intent queued, brief backoff-retry within the firing; abandon to the next firing on repeat. Never surfaced |
-| budget exhausted                     | hold; abandon if the writer goes idle                                                                                        |
-| malformed model output               | the Forge's existing parser already surfaces rejected and unparseable commands as warning chips                              |
-| lorebook entry deleted underneath us | read-then-write finds nothing; drop the intent, clean the record                                                             |
-| entity renamed by the writer         | read-then-write reads live `displayName` per `DRAFT > LOREBOOK > STATE`                                                      |
-| reload mid-pass                      | `tempStorage` in-flight state is gone; pass aborts cleanly, queue survives in `historyStorage`                               |
-| loose-end cap reached                | triage displaces rather than adds (§4.5)                                                                                     |
+| condition                            | behaviour                                                                                                              |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| writer's generation outstanding      | do not fire — free local gate from the two hooks (§3.4)                                                                |
+| request refused for concurrency      | swallow, keep the intent queued, defer to the next firing. Retry only if §12.3 shows refusals are free. Never surfaced |
+| budget exhausted                     | hold; abandon if the writer goes idle                                                                                  |
+| malformed model output               | the Forge's existing parser already surfaces rejected and unparseable commands as warning chips                        |
+| lorebook entry deleted underneath us | read-then-write finds nothing; drop the intent, clean the record                                                       |
+| entity renamed by the writer         | read-then-write reads live `displayName` per `DRAFT > LOREBOOK > STATE`                                                |
+| reload mid-pass                      | `tempStorage` in-flight state is gone; pass aborts cleanly, queue survives in `historyStorage`                         |
+| loose-end cap reached                | triage displaces rather than adds (§4.5)                                                                               |
 
 ## 12. Open items
 
@@ -559,11 +580,13 @@ resolution for seeding upgraded stories.
    returns inherited ancestor keys or only keys written at that exact node. The
    `index` key (§6.2) makes the load path immune either way, but the answer affects
    diagnostics and cleanup.
-3. **The shape of a concurrency refusal.** §3.4 depends on telling "refused because
-   the writer is mid-request" apart from every other generation failure. Capture the
-   actual status/message so the classifier keys on something real rather than
-   pattern-matching error strings, and confirm a refusal genuinely consumes no
-   output budget.
+3. **What a refused generation costs, and how to recognise one.** Run
+   `tools/budget-probe` (see its README). Two findings needed: whether the output
+   budget is debited on delivery or on request, and what a concurrency refusal is
+   charged. A refusal charged its full `max_tokens` removes retry from §3.4
+   entirely and puts a premium on tight per-step `max_tokens`. The probe also
+   dumps the refusal's error object so the classifier can key on something
+   structured rather than matching error strings.
 4. **`scriptPanel` placement and visibility.** The typings describe it as appearing
    below the editor and being user-collapsible. If it can be closed, Engine
    visibility is opt-in and the sidebar Engine tab must remain the authoritative
@@ -606,7 +629,9 @@ spine for the implementation plan, ordered so each phase is independently
 verifiable:
 
 0. **Spike the four unknowns in §12.** Cheap, and several later decisions hinge on
-   them.
+   them. `tools/budget-probe` already covers item 3 and should be run first — it is
+   the one whose answer changes the design rather than just an implementation
+   detail.
 1. **Persistence.** Move branch-scoped slices to `historyStorage`, shard
    `kse-persist` into the §6.2 keyspace, capture nodeId at dispatch. Verifiable on
    its own: existing features keep working, undo now moves World state.

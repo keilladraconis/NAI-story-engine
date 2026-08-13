@@ -1,0 +1,13 @@
+compatibilityVersion: naiscript-1.0
+id: fe28e9a5-58ad-40bb-8e1b-219bc1ad343e
+name: SE Budget Probe
+version: 0.1.0
+createdAt: 1786505348
+author: Keilla
+description: >-
+  Diagnostic probe for Story Engine v15. Measures whether the script output
+  token budget is debited on delivery or on request, and what a
+  concurrency-refused generation costs. Not part of Story Engine.
+memoryLimit: 8
+config: []
+updatedAt: 1786587973

@@ -28,3 +28,7 @@ yarn-error.log*
 # misc
 scratch.txt
 PLAN.md
+
+# Diagnostic tool build output and fetched typings
+tools/*/dist/
+tools/*/external/
