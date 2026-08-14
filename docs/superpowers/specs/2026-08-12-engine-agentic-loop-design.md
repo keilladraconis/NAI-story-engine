@@ -501,7 +501,8 @@ binding site only, never embedded in the key constant.
 state and is not history-scoped — so it does not revert what the Engine _did_. This
 is the entire residue of the branching problem.
 
-`onHistoryNavigated` (`cause: 'undo' | 'redo' | 'retry' | 'jump'`):
+`onHistoryNavigated` (`cause: 'undo' | 'redo' | 'retry' | 'jump'`), whose `nodeId`
+arrives as a `number` despite the `.d.ts` declaring `string` (§12.1):
 
 1. Reload branch-scoped slices at the new node; dispatch a replace-state. The UI
    re-renders through `useSyncExternalStore` normally.
@@ -692,28 +693,56 @@ make the answer immediate.
 
 Measured with `tools/history-storage-probe.naiscript`:
 
+Write at a node, generate (creating a child), write again, check, undo, check:
+
 ```
-wrote marker-1 at node 2000700501153961 (number)
-  list(2000700501153961) right after = ["marker-1","shared"]
+wrote marker-1 at node 2148354315150205 (number)
+wrote marker-2 at node 889126403141294 (number)
+
+--- check at node 889126403141294 ---
+list()      = ["marker-2","shared","marker-1"]
+ancestry: [889126403141294,2148354315150205,2000700501153961,2108041959196779]
+  marker-1 written@2148354315150205  get=writtenAt 2148354315150205  ancestor=yes(+1)
+  shared resolves to node 889126403141294
+verdict: list() INHERITS ancestor keys
+
+navigated undo: hook nodeId=2148354315150205 (number)  currentNodeId=2148354315150205 (number)
+
 --- check at node 2148354315150205 ---
 list()      = ["marker-1","shared"]
-list(2148354315150205) = ["marker-1","shared"]
-ancestry: [2148354315150205,2000700501153961,2108041959196779]
-  marker-1 written@2000700501153961  ...  ancestor=yes(+1)
-  shared resolves to node 2000700501153961
-verdict: list() INHERITS ancestor keys
+  marker-2 written@889126403141294  get=MISSING  list@node=[]  ancestor=NO
+  shared resolves to node 2148354315150205
 ```
 
 - **`list()` returns inherited ancestor keys**, matching `get()`. A key written at
   the parent is listed at the child.
 - **The `nodeId` argument is honoured** by `set`, `get`, and `list`. `list()` and
   `list(currentNodeId())` agree.
-- **Nearest-ancestor-wins is confirmed** — `shared`, written at several nodes,
-  resolves to the closest one.
-- **Node ids are numbers**, and large (~2×10¹⁵). Comfortably inside
-  `Number.MAX_SAFE_INTEGER` (~9×10¹⁵), but close enough that they must never be
-  arithmetic operands or round-tripped through anything lossy. Treat them as opaque
-  identifiers.
+- **Nearest-ancestor-wins is confirmed** — `shared` resolves to the child's value at
+  the child, and falls back to the parent's after an undo.
+- **Undo hides the branch's writes.** `marker-2`, written on the abandoned branch,
+  reads `MISSING` after navigating away. This is the behaviour the whole persistence
+  model in §6 rests on, now measured rather than inferred.
+
+**`onHistoryNavigated` delivers `nodeId` as a `number`**, matching `currentNodeId()`,
+so no normalisation is needed anywhere. The `.d.ts` declares it `string`
+(`OnHistoryNavigated`) and is simply wrong. This is a deliberate exception to
+CLAUDE.md's "trust `.d.ts` files implicitly" — the declared type will mislead anyone
+who follows it, so the handler needs a narrow cast with a comment pointing here.
+
+**Node ids are opaque and unordered.** They are large numbers (~10¹⁵ — inside
+`Number.MAX_SAFE_INTEGER` at ~9×10¹⁵, but close enough that they must never be
+arithmetic operands or round-tripped through anything lossy). Critically they are
+**not monotonic**: above, the child `889126403141294` is smaller than its parent
+`2148354315150205`. Never sort them, compare them, or infer recency or ancestry from
+their values — ancestry comes only from walking `nodeState().targetNode.parent`.
+
+**Nodes off the current path are not addressable.** After the undo,
+`list(889126403141294)` returned `[]` for a node that certainly holds a value. The
+Engine only ever reads the current branch, so this costs nothing — but it does mean
+records stranded on abandoned branches can never be enumerated or swept. They are
+unreachable rather than merely unreferenced, which is acceptable: they consume
+storage and nothing else.
 
 The v0.1 run also produced a useful accident: reading `currentNodeId()` and then
 calling `set()` without a node landed the value two nodes away from the id just
@@ -721,13 +750,7 @@ read. That is the evidence behind §6.3.
 
 ### Verify before writing code
 
-1. **`onHistoryNavigated`'s `nodeId` type.** Typed `string` in the hook params, while
-   `currentNodeId()` returns `number` — and `currentNodeId()` is confirmed to return
-   a number (§12.1). The hook has not yet fired during a probe run, so the
-   contradiction stands. Undo once with `tools/history-storage-probe.naiscript`
-   loaded; it logs the hook's `nodeId` and `currentNodeId()` side by side with their
-   `typeof`s.
-2. **`scriptPanel` placement and visibility.** The typings describe it as appearing
+1. **`scriptPanel` placement and visibility.** The typings describe it as appearing
    below the editor and being user-collapsible. If it can be closed, Engine
    visibility is opt-in and the sidebar Engine tab must remain the authoritative
    view. Both probes render in one, so the remaining question is only whether the
@@ -735,15 +758,15 @@ read. That is the evidence behind §6.3.
 
 ### Naming calls
 
-3. The Forge's `[THREAD]` command now creates loose ends; the verb should match the
+2. The Forge's `[THREAD]` command now creates loose ends; the verb should match the
    concept.
-4. Confirm "Loose Ends" as the user-facing category label.
+3. Confirm "Loose Ends" as the user-facing category label.
 
 ### Risks
 
-5. **Triage prompt quality is the whole ballgame** and cannot be settled on paper.
+4. **Triage prompt quality is the whole ballgame** and cannot be settled on paper.
    It is the first thing to build and the thing to iterate against real stories.
-6. **Loose-end proliferation** (§4.5) is the failure mode that would make the Engine
+5. **Loose-end proliferation** (§4.5) is the failure mode that would make the Engine
    actively harmful rather than merely unhelpful. The cap, justification, and expiry
    are not polish.
 
