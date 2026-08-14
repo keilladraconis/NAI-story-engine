@@ -11,6 +11,7 @@ export const initialUIState: UIState = {
   inputs: {},
   lorebook: initialLorebookState,
   worldExpanded: null,
+  foundationExpanded: null,
   importWizardOpen: false,
 };
 
@@ -107,6 +108,12 @@ export const uiSlice = createSlice({
       ...state,
       worldExpanded: payload.expanded,
     }),
+    // Foundation collapse/expand on the Setup tab. Distinct from worldExpanded:
+    // that one defaults open, this one defaults to following the flow.
+    foundationExpansionSet: (state, payload: { expanded: boolean }) => ({
+      ...state,
+      foundationExpanded: payload.expanded,
+    }),
     // Import wizard visibility (shown over the Setup tab)
     importWizardOpened: (state) => ({ ...state, importWizardOpen: true }),
     importWizardClosed: (state) => ({ ...state, importWizardOpen: false }),
@@ -125,6 +132,7 @@ export const uiSlice = createSlice({
 export const {
   uiInputChanged,
   worldExpansionSet,
+  foundationExpansionSet,
   importWizardOpened,
   importWizardClosed,
   uiRequestCancellation,

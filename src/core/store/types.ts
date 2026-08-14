@@ -48,6 +48,9 @@ export interface UIState {
   inputs: Record<string, string>;
   lorebook: LorebookUIState;
   worldExpanded: boolean | null;
+  // null = the writer has not touched the Foundation toggle, so it follows the
+  // flow (collapsed until a brainstorm has content). Once set it is theirs.
+  foundationExpanded: boolean | null;
   // The Import wizard is shown over the Setup tab. Store-driven so the
   // cold-start bootstrap can open it once on first run (foundation empty +
   // existing unmanaged content to pull in).

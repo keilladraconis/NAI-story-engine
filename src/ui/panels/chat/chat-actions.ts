@@ -14,3 +14,13 @@ export function nextBrainstormTitle(
   const count = chats.filter((c) => c.type === "brainstorm").length;
   return `Brainstorm ${count + 1}`;
 }
+
+/** Has any brainstorm actually been talked in? A freshly minted session — and
+ *  the default one the store seeds — carries no messages, so mere existence is
+ *  not content. Drives the Setup tab's flow: the brainstorm prompt steps aside
+ *  and the Foundation opens once there is something to work from. */
+export function hasBrainstormContent(
+  chats: ReadonlyArray<{ type: string; messages: ReadonlyArray<unknown> }>,
+): boolean {
+  return chats.some((c) => c.type === "brainstorm" && c.messages.length > 0);
+}
