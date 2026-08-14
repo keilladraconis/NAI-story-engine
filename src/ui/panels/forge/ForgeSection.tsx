@@ -14,18 +14,12 @@ import { forgeChatNewSessionRequested } from "../../../core/store/effects/forge-
 import { selectActiveForgeChatId } from "../../../core/store/selectors/forge";
 import { getChatTypeSpec } from "../../../core/chat-types";
 import { STORAGE_KEYS } from "../../../core/keys";
-import { useTapGuard } from "../../tap-guard";
 import { Zap } from "nai:icons/feather";
 
 const GUIDANCE_KEY = STORAGE_KEYS.FORGE_GUIDANCE_UI;
 
 export function ForgeSection() {
   const [guidance, setGuidance] = useState("");
-  // One tap = one forge. The effect refuses a concurrent second session, but
-  // the resume branch below has no such backstop — an unguarded repeat would
-  // send the guidance into the open forge twice.
-  const onceTap = useTapGuard();
-
   // Seed once from storyStorage (survives a tab-switch remount), like ChatInput.
   useEffect(() => {
     void (async () => {
@@ -82,7 +76,7 @@ export function ForgeSection() {
         }}
       />
       <button
-        onClick={() => onceTap(onForge)}
+        onClick={onForge}
         style={{
           display: "flex",
           alignItems: "center",

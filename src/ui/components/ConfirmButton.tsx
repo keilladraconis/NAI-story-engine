@@ -13,7 +13,6 @@
 // is the reliable path (same reason the highlight toggles elsewhere use style).
 
 import { T } from "../style";
-import { useTapGuard } from "../tap-guard";
 import { Trash2, AlertTriangle } from "nai:icons/feather";
 
 const ICON_SIZE = 16;
@@ -57,10 +56,6 @@ export function ConfirmButton(props: {
     setArmed(false);
   }, [props.resetKey]);
 
-  // A mobile tap can deliver `click` twice. Unguarded, click #1 arms and
-  // click #2 confirms — one tap deletes, with no confirmation the user saw.
-  const onceTap = useTapGuard();
-
   const onClick = async () => {
     if (armed) {
       clearTimer();
@@ -79,7 +74,7 @@ export function ConfirmButton(props: {
   return (
     <button
       title={armed ? `${props.title}? Click again to confirm` : props.title}
-      onClick={() => onceTap(() => void onClick())}
+      onClick={() => void onClick()}
       style={{
         background: "none",
         border: "none",

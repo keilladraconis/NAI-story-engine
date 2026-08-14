@@ -17,7 +17,6 @@ import {
 } from "../../../core/store";
 import { getChatTypeSpec } from "../../../core/chat-types";
 import { SendButton } from "./SendButton";
-import { useTapGuard } from "../../tap-guard";
 import {
   readComposerDraft,
   writeComposerDraft,
@@ -44,11 +43,6 @@ export function ChatInput() {
   useEffect(() => {
     setText(readComposerDraft(chatId ?? ""));
   }, [chatId]);
-  // One tap = one send. A repeated mobile click submits a second, empty body
-  // immediately after `setText("")` — and an empty send on an assistant tail
-  // means "continue", so it would fire a stray generation.
-  const onceTap = useTapGuard();
-
   const submit = () => {
     const cid = store.getState().chat.activeChatId;
     if (!cid) return;
@@ -109,15 +103,10 @@ export function ChatInput() {
         }}
       />
       <div style={{ display: "flex", gap: SP.sm }}>
-        <SendButton
-          label={spec.sendLabel || "Send"}
-          onGenerate={() => onceTap(submit)}
-        />
+        <SendButton label={spec.sendLabel || "Send"} onGenerate={submit} />
         {showClear && (
           <button
-            // Guarded: the duplicate tap would arm the confirm AND fire it,
-            // wiping the chat from a single tap.
-            onClick={() => onceTap(clear)}
+            onClick={clear}
             style={{
               padding: "6px 12px",
               borderRadius: "4px",

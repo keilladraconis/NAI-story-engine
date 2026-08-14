@@ -22,7 +22,6 @@ import {
 } from "./import-data";
 import { ImportFoundation } from "./ImportFoundation";
 import { ImportLorebook } from "./ImportLorebook";
-import { useTapGuard } from "../../tap-guard";
 import { ArrowLeft, RefreshCw, Download } from "nai:icons/feather";
 
 const sectionLabel = {
@@ -45,9 +44,6 @@ const iconBtn = {
 
 export function ImportWizard(props: { onClose: () => void }) {
   const data = useImportData();
-  const onceBackTap = useTapGuard();
-  const onceRefreshTap = useTapGuard();
-  const onceImportAllTap = useTapGuard();
   // Per-entry category overrides, owned here so the ImportLorebook rows and the
   // "Import All" batch bind resolve categories identically.
   const [dulfsMap, setDulfsMap] = useState<Record<string, DulfsFieldID>>({});
@@ -106,11 +102,7 @@ export function ImportWizard(props: { onClose: () => void }) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
-        <button
-          title="Back"
-          onClick={() => onceBackTap(props.onClose)}
-          style={iconBtn}
-        >
+        <button title="Back" onClick={props.onClose} style={iconBtn}>
           <ArrowLeft size={16} />
         </button>
         <span style={{ flex: 1, fontWeight: "bold", color: T.textHeadings }}>
@@ -118,18 +110,16 @@ export function ImportWizard(props: { onClose: () => void }) {
         </span>
         <button
           title="Refresh lorebook"
-          onClick={() =>
-            onceRefreshTap(() => {
-              data.refresh();
-              void api.v1.ui.toast("Lorebook refreshed", { type: "info" });
-            })
-          }
+          onClick={() => {
+            data.refresh();
+            void api.v1.ui.toast("Lorebook refreshed", { type: "info" });
+          }}
           style={iconBtn}
         >
           <RefreshCw size={16} />
         </button>
         <button
-          onClick={() => onceImportAllTap(onImportAll)}
+          onClick={onImportAll}
           style={{
             display: "flex",
             alignItems: "center",

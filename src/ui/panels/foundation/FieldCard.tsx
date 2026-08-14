@@ -7,7 +7,6 @@
 
 import { useSlice, useStream } from "../../bridge";
 import { T, SP } from "../../style";
-import { useTapGuard } from "../../tap-guard";
 import { Zap, Edit, ToggleLeft, ToggleRight } from "nai:icons/feather";
 import {
   store,
@@ -32,13 +31,6 @@ export function FieldCard(props: { descriptor: FieldDescriptor }) {
   const syncEnabled = useSlice((s) =>
     d.syncEnabled ? d.syncEnabled(s) : false,
   );
-
-  // A tap can deliver `click` twice. The sync toggle flips a boolean, so an
-  // unguarded repeat flips it straight back — the switch looks stuck and the
-  // Memory/A.N. write runs twice. The Zap would queue two generations.
-  // Separate guards so tapping one button never swallows the other.
-  const onceSyncTap = useTapGuard();
-  const onceZapTap = useTapGuard();
 
   const onZap = () => {
     if (generating) return;
@@ -80,7 +72,7 @@ export function FieldCard(props: { descriptor: FieldDescriptor }) {
           {d.hasSync ? (
             <button
               title="Sync to Memory / A.N."
-              onClick={() => onceSyncTap(() => d.toggleSync?.())}
+              onClick={() => d.toggleSync?.()}
               style={{ background: "none", border: "none", cursor: "pointer" }}
             >
               {syncEnabled ? (
@@ -92,7 +84,7 @@ export function FieldCard(props: { descriptor: FieldDescriptor }) {
           ) : null}
           <button
             title={generating ? "Generating…" : "Generate"}
-            onClick={() => onceZapTap(onZap)}
+            onClick={onZap}
             disabled={generating}
             style={{
               background: "none",

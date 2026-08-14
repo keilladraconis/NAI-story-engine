@@ -6,7 +6,6 @@
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
-import { useTapGuard } from "../../tap-guard";
 import { store, groupDeleted, uiEditableActivate } from "../../../core/store";
 import { isForgeDraft } from "../../../core/store/selectors/forge";
 import { EntityCard } from "./EntityCard";
@@ -25,9 +24,6 @@ export function ThreadItem(props: { groupId: string }) {
   const group = useSlice((s) => s.world.groups.find((g) => g.id === groupId));
   const entitiesById = useSlice((s) => s.world.entitiesById);
   const [collapsed, setCollapsed] = useState(false);
-  // Boolean flip: an unguarded repeat click from one tap re-collapses the
-  // thread. Declared above the early return — hooks must run unconditionally.
-  const onceCollapseTap = useTapGuard();
 
   if (!group) return null;
 
@@ -49,7 +45,7 @@ export function ThreadItem(props: { groupId: string }) {
       >
         <button
           title={collapsed ? "Expand thread" : "Collapse thread"}
-          onClick={() => onceCollapseTap(() => setCollapsed((c) => !c))}
+          onClick={() => setCollapsed((c) => !c)}
           style={{
             background: "none",
             border: "none",

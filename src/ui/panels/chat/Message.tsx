@@ -2,7 +2,6 @@
 import { useSlice, useStream } from "../../bridge";
 import { useDraftField } from "../../hooks";
 import { T, SP } from "../../style";
-import { useTapGuard } from "../../tap-guard";
 import {
   store,
   messageUpdated,
@@ -143,12 +142,9 @@ export function Message(props: MessageProps) {
   const inlineIds = inlineKey ? inlineKey.split(",") : [];
   const [editing, setEditing] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
-  // Expanding a Context bubble flips a boolean — an unguarded repeat click
-  // from one tap collapses it again, so the block refuses to open.
-  const onceCollapseTap = useTapGuard();
-  // Retry and Delete destroy data with no undo, so both are ConfirmButtons —
-  // which own their own tap guard and disarm via resetKey when this instance is
-  // reused for another message (MessageList keys by index, deliberately).
+  // Retry and Delete destroy data with no undo, so both are ConfirmButtons,
+  // which disarm via resetKey when this instance is reused for another message
+  // (MessageList keys by index, deliberately).
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
 
@@ -177,7 +173,7 @@ export function Message(props: MessageProps) {
           >
             <button
               style={{ ...iconBtn, fontStyle: "italic" }}
-              onClick={() => onceCollapseTap(() => setCollapsed((c) => !c))}
+              onClick={() => setCollapsed((c) => !c)}
             >
               {collapsed ? "▸ Context" : "▾ Context"}
             </button>
