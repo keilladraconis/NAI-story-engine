@@ -91,8 +91,8 @@ arrived — which is also the window where FlagB is freshest and buckets are
 releasing. More importantly, a tracked in-flight window is a persistent flag that
 can fail to close: one missed `onGenerationEnd` and the Engine is gated off
 permanently and silently, with nothing in the UI to explain why. A timer has no
-such state. Its worst failure is being mistimed, and a mistimed wakeup costs one
-refused request and corrects itself on the next generation.
+such state. Its worst failure is being mistimed, which costs nothing and corrects
+itself.
 
 **A wakeup can land mid-stream, and that is fine.** The backend lock is held while
 the writer's tokens are streaming, so an early wakeup is refused — but a refusal is
