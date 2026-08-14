@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - **Story Engine's sidebar is now three tabs: Setup, Engine, and Chat.** Setup comes first and is where a story begins — it holds the narrative Foundation (Shape, Intent, Story Contract, ATTG, Style and Intensity) together with the **Opening Scene / Continue Scene** button and the **Import Wizard**, both of which used to sit in the header. The header keeps the generation status widget and the S.E.G.A. progress line, and is quieter for it. The Engine tab keeps the World, Threads and the Forge. Opening a story with nothing written yet lands you on Setup; opening one already in progress lands you on Engine.
 - **The Setup tab reads in the order a story is actually built.** Import Wizard at the top for bringing existing material in, then Intensity, then the Foundation cards, with Opening Scene / Continue Scene last — the step everything above it prepares for.
-- **"Talk it through" opens a fresh brainstorm, and appears when you need it.** It sits directly under Intensity while the Foundation is still blank, and steps aside once you have filled anything in. Starting a conversation about the story no longer means a trip to the Chat tab and a New chat button.
+- **"Talk it through" opens a fresh brainstorm, and appears when you need it.** It sits directly under Intensity while the Foundation is still blank, and steps aside once you have filled anything in. Starting a conversation about the story no longer means a trip to the Chat tab and a New chat button. Until you have picked an Intensity it waits, pointing back up at the picker — the brainstorm writes in the register you set, so choosing one first is worth the extra click.
 
 ## [0.14.1] - 2026-08-14
 
