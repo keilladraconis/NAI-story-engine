@@ -1,9 +1,9 @@
 // Unsent composer text, held per chat outside the component tree and persisted
 // to storyStorage.
 //
-// The tab strip renders `tab === "chat" ? <Chat/> : <StoryEngine/>`, so
-// switching to Story Engine UNMOUNTS the composer and any useState text dies
-// with it — losing a long setup message the user had not sent yet.
+// The tab strip renders the Chat tab only while it is selected, so switching
+// to Setup or Engine UNMOUNTS the composer and any useState text dies with it —
+// losing a long setup message the user had not sent yet.
 //
 // Two layers, because renders cannot await:
 //   - an in-memory Map is the synchronous read/write path, so the composer has

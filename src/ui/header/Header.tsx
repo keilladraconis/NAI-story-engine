@@ -1,5 +1,6 @@
-// The Story Engine header: generation-state widget, Opening/Continue Scene,
-// Import, and the SEGA status line. Always visible, above the tab bar.
+// The Story Engine header: the generation-state widget and the SEGA status
+// line. Always visible, above the tab bar. Opening/Continue Scene and Import
+// live on the Setup tab (src/ui/panels/setup/Setup.tsx).
 //
 // This was a UIPart tree driven by api.v1.ui.updateParts, because a click
 // inside a jsx part did not clear the harness's FlagB interaction flag — a
@@ -14,21 +15,11 @@ import {
   store,
   uiRequestCancellation,
   uiUserPresenceConfirmed,
-  importWizardOpened,
-  bootstrapRequested,
-  bootstrapContinueRequested,
 } from "../../core/store";
 import { useSlice } from "../bridge";
-import { useTapGuard } from "../tap-guard";
 import { SP, T } from "../style";
-import {
-  derive,
-  storeSignature,
-  selectBootstrapPending,
-  type WidgetMode,
-} from "./header-model";
-import { openOpeningSceneModal } from "./opening-scene-modal";
-import { Play, X, Clock, Zap, Feather, Download } from "nai:icons/feather";
+import { derive, storeSignature, type WidgetMode } from "./header-model";
+import { Play, X, Clock, Zap } from "nai:icons/feather";
 
 /** 1s while counting down so the label ticks; 5s otherwise, which is only
  *  there to notice the output bucket silently refilling. */
@@ -74,30 +65,6 @@ function useTick(delayMs: number): void {
       if (pending !== null) void api.v1.timers.clearTimeout(pending);
     };
   }, [delayMs]);
-}
-
-/**
- * Whether the story has any content yet — it picks the bootstrap button's
- * label. `initial` is read once before mount so the first paint is already
- * right; after that it is re-read whenever the document history moves or a
- * bootstrap settles, the two ways an empty story becomes non-empty.
- */
-function useHasDocumentContent(initial: boolean): boolean {
-  const [has, setHas] = useState(initial);
-  const historyEpoch = useSlice((s) => s.runtime.historyEpoch);
-  const bootstrapPending = useSlice(selectBootstrapPending);
-  const seqRef = useRef(0);
-
-  useEffect(() => {
-    const seq = ++seqRef.current;
-    void api.v1.document.sectionIds().then((ids) => {
-      // seq !== seqRef.current means a newer read started while this one was in
-      // flight; an older read resolving later must not clobber it.
-      if (seq === seqRef.current) setHas(ids.length > 0);
-    });
-  }, [historyEpoch, bootstrapPending]);
-
-  return has;
 }
 
 // Every branch spreads this, so the widget keeps one silhouette across all four
@@ -199,49 +166,13 @@ function WidgetIcon(props: { mode: WidgetMode }) {
   );
 }
 
-function actionStyle(disabled: boolean): Record<string, string | number> {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: SP.sm,
-    padding: "4px 8px",
-    fontSize: "0.8em",
-    background: "none",
-    border: "none",
-    cursor: disabled ? "default" : "pointer",
-    color: T.textHeadings,
-    whiteSpace: "nowrap",
-    opacity: disabled ? 0.4 : 0.85,
-  };
-}
-
-function iconButtonStyle(disabled: boolean): Record<string, string | number> {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    background: "none",
-    border: "none",
-    cursor: disabled ? "default" : "pointer",
-    color: T.text,
-    padding: "2px",
-    opacity: disabled ? 0.4 : 1,
-  };
-}
-
-export function Header(props: { initialHasDocumentContent: boolean }) {
+export function Header() {
   // Subscribing to the signature — a primitive covering exactly the fields
   // derive() reads — is what repaints the header on any relevant store change.
   useSlice(storeSignature);
 
-  const hasDocumentContent = useHasDocumentContent(
-    props.initialHasDocumentContent,
-  );
-  const onceTap = useTapGuard();
-  const openingModalOpen = useRef(false);
-
   const model = derive(store.getState(), {
     allowedOutput: api.v1.script.getAllowedOutput(),
-    hasDocumentContent,
     now: Date.now(),
   });
 
@@ -256,28 +187,6 @@ export function Header(props: { initialHasDocumentContent: boolean }) {
       // Already calls genX.cancelAll() and marks the active request cancelled,
       // so this one dispatch is the whole global cancel.
       store.dispatch(uiRequestCancellation());
-  };
-
-  // Continuing fires on the click — there is nothing to ask once the story has
-  // a first page. Opening asks first: the modal collects the writer's direction
-  // and dispatches on its Generate, so a dismissed modal generates nothing.
-  const onBootstrap = () => {
-    if (hasDocumentContent) {
-      store.dispatch(bootstrapContinueRequested());
-      return;
-    }
-    // Nothing in the store dims the button while the modal is up (no request
-    // exists yet), so this is what stops a second click stacking a second modal.
-    if (openingModalOpen.current) return;
-    openingModalOpen.current = true;
-    const release = () => {
-      openingModalOpen.current = false;
-    };
-    // Released on rejection too — a modal that failed to open must not leave
-    // the button permanently dead.
-    void openOpeningSceneModal((guidance) =>
-      store.dispatch(bootstrapRequested({ guidance })),
-    ).then(release, release);
   };
 
   return (
@@ -295,7 +204,7 @@ export function Header(props: { initialHasDocumentContent: boolean }) {
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "flex-start",
           gap: SP.sm,
         }}
       >
@@ -305,28 +214,6 @@ export function Header(props: { initialHasDocumentContent: boolean }) {
           <WidgetIcon mode={model.widget.mode} />
           {model.widget.text}
         </button>
-        {/* The two actions are grouped so space-between pushes them together
-            against the right edge, rather than spreading all three evenly. */}
-        <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
-          <button
-            disabled={model.bootstrap.disabled}
-            // A tap can deliver click twice on mobile; bootstrap is the one
-            // non-idempotent header action.
-            onClick={() => onceTap(onBootstrap)}
-            style={actionStyle(model.bootstrap.disabled)}
-          >
-            <Feather size={ICON_SIZE} />
-            {model.bootstrap.text}
-          </button>
-          <button
-            title="Import"
-            disabled={model.importDisabled}
-            onClick={() => store.dispatch(importWizardOpened())}
-            style={iconButtonStyle(model.importDisabled)}
-          >
-            <Download size={16} />
-          </button>
-        </div>
       </div>
       {model.statusText ? (
         <div

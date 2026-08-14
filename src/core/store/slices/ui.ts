@@ -64,7 +64,7 @@ export const uiSlice = createSlice({
     uiCancelRequest: (state, _payload: { requestId: string }) => state,
     // Editable singleton — at most one editor active at a time. `id` is an
     // entity id, a world group id, or a Foundation field id ("shape", "intent",
-    // …); StoryEngine routes the open pane by membership.
+    // …); the Setup and Engine tabs route the open pane by membership.
     uiEditableActivate: (state, payload: { id: string }) => ({
       ...state,
       activeEditId: payload.id,

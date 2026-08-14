@@ -1,7 +1,7 @@
-// Foundation field edit pane. Routed from StoryEngine off the shared
-// ui.activeEditId singleton (same as the entity and thread panes) so opening a
-// field editor takes over the whole Story Engine tab instead of only replacing
-// the Foundation list. Seeds from the committed store value at mount
+// Foundation field edit pane. Routed from the Setup tab off the shared
+// ui.activeEditId singleton (same as the entity and thread panes in Engine) so
+// opening a field editor takes over the whole Setup tab instead of only
+// replacing the Foundation list. Seeds from the committed store value at mount
 // (descriptor.seed) and commits back through descriptor.commit.
 
 import { store, uiEditableDeactivate } from "../../../core/store";
