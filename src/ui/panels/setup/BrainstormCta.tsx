@@ -79,15 +79,18 @@ export function BrainstormCta(props: { onOpenChat: () => void }) {
         color: T.text,
         fontFamily: T.fontDefault,
         padding: SP.md,
-        opacity: ready ? 1 : 0.7,
       }}
     >
+      {/* Gold in both states, and no dimming on the button as a whole. The
+          waiting state is the one that has to catch the eye — a disabled-looking
+          box reads as one more inert control and the prompt goes unread. Only
+          the border stays muted, to say "not yet" without hiding the message. */}
       <span
         style={{
           display: "inline-flex",
           alignItems: "center",
           gap: SP.sm,
-          color: ready ? T.textHeadings : T.textDisabled,
+          color: T.textHeadings,
           fontWeight: "bold",
         }}
       >
