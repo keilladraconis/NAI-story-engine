@@ -33,6 +33,20 @@ already solves persistent recall; the gap is _activation_, not storage.
 **Not a second author.** The Engine writes change, never invention. It records what
 the prose has made true; it does not decide what happens next.
 
+### 1.2 Who it serves
+
+The Engine is for the writer steering an **autonomous story** — generating, then
+guiding with small revisions and undos. Its trigger is anchored to generation
+(§3.1) precisely because that is the population it should reach.
+
+A writer composing prose by hand is very likely curating their own lorebook
+already, and an Engine that woke up and started revising entries alongside them
+would be competing with them rather than helping. So the Engine not firing for
+hand-written prose is a **positioning decision, not a gap**: no idle fallback tick,
+no background sweep. Someone hand-writing who does want a pass can ask for one
+(§9.1), and asking is the appropriate amount of friction for a writer who is
+already in their own lorebook.
+
 ## 2. Division of labour: Forge vs Engine
 
 The Forge and the Engine both write World entities, and the boundary between them
@@ -91,6 +105,10 @@ Implementation note: follow the cancellation-flag pattern in
 `src/core/store/effects/autosave.ts` rather than storing timer ids —
 `api.v1.timers.setTimeout` returns a `Promise<number>`, which makes the id awkward
 to hold and clear.
+
+**There is no idle or fallback tick.** Prose written by hand produces no hook and
+therefore no wakeup, and that is deliberate — see §1.2. The manual trigger in §9.1
+covers the case where such a writer does want a pass.
 
 `onGenerationRequested` is documented at `external/script-types.d.ts:3989`. The
 project currently registers exactly one hook (`onHistoryNavigated`,
@@ -508,7 +526,7 @@ between trims.
 
 ### 9.1 The Engine HUD
 
-A `scriptPanel` UI extension, read-only, one line.
+A `scriptPanel` UI extension. One line, reporting only, plus a single control.
 
 Mechanically it is a container wrapping a single `part.jsx()` with a small Preact
 root — the same construction `src/ui/mount.ts` uses for the sidebar — so CLAUDE.md's
@@ -521,7 +539,7 @@ position, read as a shape rather than parsed as words. It rewards observation ov
 time; it never narrates individual actions.
 
 ```
-◉  14¶  ⚑5  ✎23  ▮▮▮▯
+◉  14¶  ⚑5  ✎23  ▮▮▮▯  ⚡
 ```
 
 | slot       | reads                                                            | what watching it teaches                        |
@@ -531,6 +549,7 @@ time; it never narrates individual actions.
 | loose ends | open loose ends                                                  | context pressure — climbing means go close some |
 | touched    | entities revised on this branch                                  | activity level                                  |
 | budget     | remaining output bucket                                          | why it's quiet when it's quiet                  |
+| ⚡ (`zap`) | **the one control** — run a pass now                             | —                                               |
 
 `⚠` means the loop cannot make progress at all. Ordinary concurrency refusals
 (§3.4) are routine and stay invisible — surfacing them would train the writer to
@@ -541,9 +560,21 @@ means starved; climbing _with a full budget_ means colliding constantly; a persi
 `⏸` means FlagB is not releasing buckets. None of that is legible from a log of
 individual actions.
 
-Lucide-style icon components are already idiomatic in the tree
-(`src/ui/panels/world/EntityEditPane.tsx:72-75`), so slots may be icons where that
-reads better at small sizes.
+Feather icons come from `nai:icons/feather` and are already idiomatic in the tree
+(`Header.tsx:31` imports `Zap` among others), so slots may be icons where that reads
+better at small sizes.
+
+**The ⚡ is the only control, and the only reason the HUD is not purely a
+readout.** It runs a pass immediately, bypassing the wakeup — which is what a
+hand-writing writer needs, since no generation means no wakeup (§1.2). It is
+otherwise inert: it does not edit, retire, or revert anything, so it does not
+reopen the question of whether the HUD should carry the Engine's controls. Undo
+remains the story editor's own (§7), and everything else lives in the Engine tab.
+
+Two guards, because a pass is not idempotent and a wasted one costs real budget:
+wrap it in `useTapGuard()` (`src/ui/tap-guard.ts`) so a doubled mobile tap cannot
+start two passes, and make it a no-op while the loop is already assessing, triaging,
+or acting.
 
 **It must not read `genx.status`.** CLAUDE.md establishes `derive()` in
 `src/ui/header/header-model.ts` as the only place that branches on generation
@@ -672,6 +703,7 @@ Everything decidable is pure and testable headless, consistent with the existing
 - the loop state machine as a pure reducer, table-driven
 - wakeup arming: a pending wakeup is not rescheduled by a further generation, and a
   `scriptInitiated: true` request never arms one
+- manual invocation is refused while a pass is already in flight (§9.1)
 - reconciliation decision table (live text vs recorded write → revise / leave alone)
 
 Plus one guard test in the spirit of `tests/ui/countdown.test.ts`, asserting the HUD
