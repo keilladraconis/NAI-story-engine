@@ -94,12 +94,11 @@ permanently and silently, with nothing in the UI to explain why. A timer has no
 such state. Its worst failure is being mistimed, and a mistimed wakeup costs one
 refused request and corrects itself on the next generation.
 
-**The delay must clear the generation's own duration.** The backend lock is held
-while the writer's tokens are streaming, so a wakeup that fires mid-stream is
-refused by construction. The configured delay is therefore "typical generation time
-plus a little reading time," not "reading time" — and since generation length
-varies, some refusals are expected rather than exceptional. That is priced in
-(§3.4): a refused triage costs its `max_tokens` and the intent survives.
+**A wakeup can land mid-stream, and that is fine.** The backend lock is held while
+the writer's tokens are streaming, so an early wakeup is refused — but a refusal is
+free and the retry backoff in §3.4 simply lands the pass as the generation
+completes. The delay can therefore be chosen for where the pass is most useful
+rather than defensively sized to clear a worst-case generation.
 
 Implementation note: follow the cancellation-flag pattern in
 `src/core/store/effects/autosave.ts` rather than storing timer ids —
@@ -168,11 +167,9 @@ own regulator: generating hard keeps the loop out of the way, pausing to read le
 it catch up. A fixed rate does neither — it overprocesses when idle and falls behind
 when the writer is fast.
 
-The reserve must survive a **failed** attempt, not merely a successful one. A refused
-request is charged its full `max_tokens` (§12.0), so the check before firing an
-action is that the budget would still clear the triage reserve if the action were
-refused outright. The same finding makes the column above do double duty: each figure
-is both the expected cost and the amount lost to a lost race.
+The reserve only has to cover actual consumption. Refused requests are free
+(§12.0), so a lost race costs latency rather than budget and the figures above are
+expected costs only.
 
 **Retiring a satisfied loose end never queues**, because it costs zero output
 tokens. The action that most protects context health is free.
@@ -194,32 +191,36 @@ to close would gate the Engine off permanently and silently.
 So the loop simply fires when its wakeup says to, and handles refusal after the
 fact: swallow the error, keep the intent queued, carry on.
 
-**A refusal is charged its full `max_tokens`. Measured, not assumed** — see §12.0.
-A successful generation is debited what it returned; a refused one is debited what
-it asked for. So a lost race on a 400-token revision costs 400 tokens of a 2048
-bucket, roughly a fifth of the window.
+**A refusal costs nothing** — see §12.0. It was briefly charged its full
+`max_tokens`, which would have made retry actively harmful, but that was a defect
+and has been fixed upstream. A refused request performs no work and is debited
+nothing.
 
 Three rules follow.
 
-**No retry.** A refused intent stays queued and waits for the next wakeup, which is
-anchored to the writer's next generation and is therefore the right arbiter.
-Retrying inside the firing would spend the request's full cost again against a lock
-that is very likely still held.
+**Retry with bounded backoff.** A refused request waits a short, growing interval
+and tries again, a small fixed number of times, before the intent is requeued for
+the next wakeup. Since a refusal is free, the only cost of retrying is latency, and
+the thing being waited on — the writer's generation finishing — typically clears in
+seconds. The bound matters more than the interval: a long passage should hand the
+work back to the next wakeup rather than let one firing spin against a lock that is
+still held.
 
-**`max_tokens` is a correctness concern, not politeness.** Every Engine request sizes
-`max_tokens` as tightly as its step allows, because that number — not the output — is
-what a lost race costs. This is the strongest argument in the design for keeping
-triage's output small.
+**This makes the delay in §3.1 forgiving.** A wakeup that fires mid-stream is no
+longer a wasted pass; it is refused, backs off, and lands as soon as the writer's
+generation completes. The loop effectively rides the end of that generation without
+needing the delay tuned precisely, so the delay can be chosen for where it is most
+_useful_ rather than where it is safest.
 
-**Classify conservatively.** The refusal arrives as a bare `Error` with
+**Classify conservatively anyway.** The refusal is a bare `Error` with
 `message: "A generation is already in progress"` and no status code or subclass, so
-matching the message is the only option available. Any failure the classifier does
-_not_ recognise is therefore treated as non-retryable too. Default-deny means a
-future change to that message string degrades to "stopped retrying" rather than
-"burns the bucket in a loop".
+message matching is the only option available. Failures the classifier does not
+recognise are still treated as non-retryable — not because a retry is expensive now,
+but because retrying an unrecognised failure is unlikely to help and the attempt
+bound is the real guard against spinning.
 
-Wakeup timing is what actually protects the budget; refusal handling only keeps a
-lost race from corrupting the queue.
+**`max_tokens` stays tight per step** — not for correctness now, but because it
+bounds actual consumption and keeps the pacing arithmetic in §3.3 honest.
 
 **Collisions are normal, not exceptional.** They are never surfaced to the writer —
 no error state, no HUD warning (§9.1). Only a persistent inability to make progress
@@ -617,8 +618,8 @@ resolution for seeding upgraded stories.
 
 | condition                                        | behaviour                                                                                       |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| wakeup fires while the writer is still streaming | refused like any collision; the delay is tuned to make this uncommon, not impossible (§3.1)     |
-| request refused for concurrency                  | swallow, keep the intent queued, defer to the next firing. Never retried, never surfaced (§3.4) |
+| wakeup fires while the writer is still streaming | refused, backs off, lands as the generation completes — costs latency only (§3.1)               |
+| request refused for concurrency                  | bounded backoff retry; requeue for the next wakeup if the bound is hit. Never surfaced (§3.4)   |
 | budget exhausted                                 | hold; abandon if the writer goes idle                                                           |
 | malformed model output                           | the Forge's existing parser already surfaces rejected and unparseable commands as warning chips |
 | lorebook entry deleted underneath us             | read-then-write finds nothing; drop the intent, clean the record                                |
@@ -628,9 +629,19 @@ resolution for seeding upgraded stories.
 
 ## 12. Open items
 
-### 12.0 Resolved: what a refused generation costs
+### 12.0 Resolved: a refused generation is free, and how to recognise one
 
-Measured with `tools/budget-probe.naiscript` against the live backend:
+**Current behaviour: a successful generation is debited what it returned, and a
+refused one is debited nothing.** Retry is therefore safe, and §3.4 uses bounded
+backoff.
+
+The refusal surfaces as a bare `Error`: `message` is
+`"A generation is already in progress"`, `name` is `"Error"`, and there is no status
+code, error code, or subclass. Message matching is the only classifier available —
+this part is unchanged and still shapes §3.4's default-deny rule.
+
+**History, because it explains the shape of §3.4.** The probe originally measured a
+refusal being charged its full `max_tokens`:
 
 ```
 A  requested=512 returned=8
@@ -641,23 +652,14 @@ B  succeeded=1 refused=1 returned=21
    error: message=A generation is already in progress | name=Error
 ```
 
-**A successful generation is debited what it returned. A refused one is debited
-what it requested.** `533 = 21 + 512` — the refusal cost its whole `max_tokens`.
+`533 = 21 + 512`. That was a defect — the backend performed no work, so there was
+nothing to charge for — and NovelAI has since fixed it in response to this probe.
+Under the old behaviour retry was actively harmful and the design had no retry at
+all; the fix is what restores it.
 
-The refusal surfaces as a bare `Error`: `message` is
-`"A generation is already in progress"`, `name` is `"Error"`, and there is no status
-code, error code, or subclass. Message matching is the only classifier available.
-
-Consequences are folded into §3.4: no retry, tight `max_tokens` per step, and
-default-deny classification.
-
-**This is believed to be a defect rather than intended policy** — the backend
-performed no work, so there is nothing to charge for — and has been raised with
-NovelAI. Treat the behaviour as current fact, not as permanent. If it is fixed so
-that a refusal costs nothing, the only change is that the retry branch becomes
-available again: the wakeup timing, the tight `max_tokens`, and the default-deny
-classifier all stay worth having regardless. Re-run the probe to confirm before
-relying on a change.
+`tools/budget-probe.naiscript` stays in the repo as the regression check. Re-run it
+if refusal costs ever look suspicious again; Test B's `free ~N` / `charged ~N` lines
+make the answer immediate.
 
 ### Verify before writing code
 
@@ -696,10 +698,11 @@ Everything decidable is pure and testable headless, consistent with the existing
 - intent parsing, extending the existing Forge parser tests
 - condition construction (loose end + horizon → `advancedConditions` tree)
 - watermark math across document edits and history navigation
-- drain policy (available budget in → actions permitted out), including the
-  survive-a-refusal reserve check in §3.3
-- failure classification: the measured refusal message is recognised, and every
-  unrecognised failure is treated as non-retryable (§3.4's default-deny)
+- drain policy (available budget in → actions permitted out)
+- failure classification: the refusal message is recognised, and every unrecognised
+  failure is treated as non-retryable (§3.4's default-deny)
+- retry backoff: a refused request retries up to the bound and then requeues for the
+  next wakeup rather than spinning
 - the loop state machine as a pure reducer, table-driven
 - wakeup arming: a pending wakeup is not rescheduled by a further generation, and a
   `scriptInitiated: true` request never arms one
