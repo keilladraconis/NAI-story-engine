@@ -726,9 +726,43 @@ list()      = ["marker-1","shared"]
 
 **`onHistoryNavigated` delivers `nodeId` as a `number`**, matching `currentNodeId()`,
 so no normalisation is needed anywhere. The `.d.ts` declares it `string`
-(`OnHistoryNavigated`) and is simply wrong. This is a deliberate exception to
-CLAUDE.md's "trust `.d.ts` files implicitly" — the declared type will mislead anyone
-who follows it, so the handler needs a narrow cast with a comment pointing here.
+(`OnHistoryNavigated`) and is simply wrong.
+
+The correction belongs in `src/type-overrides.d.ts`, which exists for exactly this —
+upstream typings are not always right, and the project keeps its own corrections
+rather than working around them at each callsite. The defect should also be reported
+to NovelAI so the override can eventually be dropped.
+
+Mechanically, neither obvious route works: `OnHistoryNavigated` is a `type` alias so
+it cannot be augmented, and while `HookCallbacks` is an `interface`, declaration
+merging cannot _change_ a member's type. What does work is the pattern the override
+file already uses — `api.v1.hooks` is a namespace, so a merged declaration adds a
+`register` **overload** specific to this hook:
+
+```ts
+// NAI TYPE DOCUMENTATION OVERRIDE
+// onHistoryNavigated's nodeId/previousNodeId are declared `string` upstream but
+// arrive as `number`. Measured; see the v15 design §12.1. Reported to NovelAI.
+namespace api.v1.hooks {
+  function register(
+    hookName: "onHistoryNavigated",
+    callback: (params: {
+      nodeId: number;
+      previousNodeId: number;
+      direction: "forward" | "backward" | "both";
+      distance: number;
+      cause: "undo" | "redo" | "retry" | "jump";
+    }) => void | Promise<void>,
+  ): void;
+}
+```
+
+The generic `register<K extends keyof HookCallbacks>` is tried first and fails to
+accept a `number`-typed callback, so resolution falls through to this overload — no
+cast anywhere. Confirm that resolution order actually behaves this way when the
+override is written; if it does not, the fallback is a declared corrected params type
+plus a single reinterpreting cast in the one handler, which is still better than
+propagating a wrong `string` through the reconciliation path.
 
 **Node ids are opaque and unordered.** They are large numbers (~10¹⁵ — inside
 `Number.MAX_SAFE_INTEGER` at ~9×10¹⁵, but close enough that they must never be
@@ -802,18 +836,19 @@ The design is one coherent system, but it is not one sitting of work. A suggeste
 spine for the implementation plan, ordered so each phase is independently
 verifiable:
 
-0. **Spike the four unknowns in §12.** Cheap, and several later decisions hinge on
-   them. The costliest one is already answered — see §12.0, measured with
-   `tools/budget-probe.naiscript`.
-1. **Persistence.** Move branch-scoped slices to `historyStorage`, shard
+0. **Spike what remains open in §12.** Only `scriptPanel` dismissability is left;
+   the costly ones are answered in §12.0 and §12.1, measured with the two probes in
+   `tools/`.
+1. **Persistence.** Add the `onHistoryNavigated` correction to
+   `src/type-overrides.d.ts` (§12.1) first, since the navigation handler depends on
+   it. Then move branch-scoped slices to `historyStorage`, shard
    `kse-persist` into the §6.2 keyspace, capture nodeId at dispatch. Verifiable on
    its own: existing features keep working, undo now moves World state.
 2. **Model capability.** Add the parameter to `buildModelParams()` with a
    `"creative"` default. Pure addition, no behaviour change.
 3. **Loop harness + HUD, triage only.** Trigger, state machine, pacing, collision
-   recovery —
-   with triage producing intents that are logged but not executed. The HUD makes
-   this observable, which is why it comes early rather than last.
+   recovery — with triage producing intents that are logged but not executed. The
+   HUD makes this observable, which is why it comes early rather than last.
 4. **`LooseEnd` replacing `WorldGroup`**, including `advancedConditions`
    construction and the §4.5 controls.
 5. **Actions.** Revise, open, retire — plus §7 reconciliation.
