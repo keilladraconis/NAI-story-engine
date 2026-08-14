@@ -7,11 +7,12 @@
 ## 1. What this is
 
 A minimal agentic loop that fires while the writer works, reads the prose produced
-since it last looked, and maintains the World against it. It does three things:
+since it last looked, and maintains the World against it. It does four things:
 
 1. Revises lorebook entries the story has made wrong.
 2. Opens entries for narrative commitments the model is likely to forget.
 3. Retires those entries once the story satisfies them.
+4. Condenses entries that revision has let sprawl.
 
 It exists to repair a specific, observed model failure. Xialong (and LLMs
 generally) will happily carry a scene to its conclusion, but drop commitments
@@ -79,10 +80,12 @@ the delay.
 The `scriptInitiated` filter is load-bearing: without it the Engine's own
 generations would re-arm the wakeup and drive themselves in a loop.
 
-Both the delay and the prose threshold are new `project.yaml` entries. This is
-consistent with the prompt policy in CLAUDE.md: `project.yaml` carries runtime
-settings only, never prompts. The triage prompt and every other Engine prompt is an
-exported constant in `src/core/utils/prompts.ts`.
+The delay and the prose threshold are new `project.yaml` entries, joining the
+loose-end cap (§4.5, default 8) and the condense threshold (§5.1). This is consistent
+with the prompt policy in CLAUDE.md: `project.yaml` carries runtime settings only,
+never prompts. The triage prompt and every other Engine prompt is an exported
+constant in `src/core/utils/prompts.ts`. Per §9.2 these settings are surfaced in the
+Setup tab rather than left in NovelAI's script config.
 
 **Why a delay from generation start**, rather than tracking whether one of the
 writer's generations is currently in flight. The delay lands the pass in the window
@@ -119,13 +122,14 @@ unused.
 ```
 assess ──▶ triage ──▶ enqueue ──▶ drain ──▶ idle
   │          │                      │
-  └─(free)   └─(~150 tok)           └─(150–300 tok each, budget-governed)
+  └─(free)   └─(~150 tok)           └─(up to 1024 each, budget-governed)
 ```
 
 - **assess** — pure string work, no generation. Is there enough new prose to
   bother? Which entities are plausibly in play (name and key matching against the
-  new sections)? Produces the manifest for triage and can terminate the firing at
-  zero cost.
+  new sections)? Which entries have grown past the condense threshold (§5.1)?
+  Produces the manifest for triage, enqueues condense intents directly, and can
+  terminate the firing at zero cost.
 - **triage** — one small instruct generation over new prose plus a compact
   manifest (entity names, one-line summaries, open loose ends). Answers only _what
   needs attention_: this entry is now wrong, this is a new commitment, this
@@ -148,11 +152,17 @@ benefit from caching.
 | triage                       | ~150                                    |
 | retire a satisfied loose end | 0 — `updateEntry(id, {enabled: false})` |
 | open a loose end             | ~150                                    |
-| revise an entity entry       | ~300                                    |
+| revise an entity entry       | up to 1024 — a full lorebook rewrite    |
+| condense an entry            | up to 1024 — a full lorebook rewrite    |
 
 At a writing cadence of one generation every 40–60s, that is four to six firings
-per bucket. Triage at every firing costs 600–900 tokens, leaving 1100–1400 for two
-to four actions.
+per bucket. Triage at every firing costs 600–900 tokens, leaving roughly 1150–1450
+— **one entry rewrite, or several cheap actions, but not both.**
+
+That asymmetry is the whole shape of the pacing. A revision or condense is a full
+lorebook entry rewrite and can consume half the bucket on its own, while triage,
+opening a loose end, and retiring one are cheap or free. So entry rewrites are the
+scarce operation and everything else is nearly incidental.
 
 **Therefore: triage runs hot, actions run cold.** This is not merely affordable, it
 is the correct asymmetry. A commitment never noticed is lost permanently, whereas a
@@ -338,7 +348,8 @@ Unbounded growth would slowly poison the context the Engine exists to improve.
 
 Three controls:
 
-- A **cap** on simultaneously-open loose ends (8–12), enforced in the reducer.
+- A **cap** on simultaneously-open loose ends, enforced in the reducer. A
+  `project.yaml` setting, **default 8**.
 - Triage must **justify** a new loose end against the cap, and displace rather than
   add when at the ceiling.
 - A **paragraph-count expiry**, so an end the story quietly abandoned ages out
@@ -364,7 +375,39 @@ The two action shapes map onto the Forge's existing command grammar
 (`src/core/utils/crucible-command-parser.ts`): a changed fact is `REVISE`, a new
 commitment is `CREATE`. The Engine introduces no second action vocabulary.
 
-### 5.1 The user's lorebook is never destroyed
+### 5.1 Condense — the counterweight to revision
+
+Revision only ever adds. Each pass appends what the story has newly made true, and
+nothing in the mechanism removes what has become redundant, superseded, or merely
+verbose. Left alone, an entry that gets revised twenty times becomes a sprawl — and
+because lorebook entries share the context window with story text (§4.3), a bloated
+World crowds out the recent prose the writer is relying on. Revision without a
+counterweight makes context worse, slowly, in exactly the way the Engine exists to
+prevent.
+
+So **condense** is a first-class action alongside revise, open, and retire: rewrite
+an entry tighter without losing what it asserts. Not a summary — a compaction. Facts
+survive; repetition, superseded detail, and accumulated hedging do not.
+
+**Triggering it needs no model.** An entry's length is measurable in `assess`, which
+is free, so an entry crossing a configurable size threshold enqueues a condense
+intent directly — triage is never spent noticing that something is long. The
+threshold is a `project.yaml` setting.
+
+Condense obeys every rule revision does: read-then-write against the live entry, the
+write-once original preserved (§5.2), and the same `lb:<entryId>` record so history
+reconciliation treats it identically. It is also the same price as a revision (up to
+1024 output tokens, §3.3), so it competes for the same scarce slot — which is
+correct, since a condense that never runs and a revision that never runs both leave
+the World wrong.
+
+The risk worth naming: **condensing is the one action that can lose information.**
+Every other action adds, retires, or flags. A bad condense silently drops a fact the
+story established, and nothing downstream would notice. That argues for a
+conservative prompt biased toward retention over brevity, and for condensing being
+the action most worth reviewing in the Engine tab.
+
+### 5.2 The user's lorebook is never destroyed
 
 Story Engine will edit lorebook entries automatically, and the original content of
 any entry it first touches is preserved in storage as a write-once snapshot. That
@@ -416,7 +459,7 @@ performance concern rather than a cosmetic one. Today's single `kse-persist` blo
 snapshot the entire World onto that node.
 
 The `historyStorage` keyspace (the `storyStorage` side keeps chat and the write-once
-lorebook originals from §5.1):
+lorebook originals from §5.2):
 
 ```
 index          { entityIds[], looseEndIds[] }   — authoritative for existence (§6.2.1)
@@ -557,6 +600,12 @@ between trims.
 
 A `scriptPanel` UI extension. One line, reporting only, plus a single control.
 
+**Visibility is guaranteed.** A `scriptPanel` can be minimized but never dismissed,
+so the HUD can never be lost — at worst it is one gesture away. That is what lets it
+carry the trust burden: a writer can always see what the Engine is doing without
+opening a tab, and the Engine can never be quietly running behind a surface the
+writer has closed and forgotten.
+
 Mechanically it is a container wrapping a single `part.jsx()` with a small Preact
 root — the same construction `src/ui/mount.ts` uses for the sidebar — so CLAUDE.md's
 no-`updateParts` rule holds and this does not become a third UIPart carve-out. It
@@ -613,16 +662,30 @@ Engine's states with the generation queue's is how the two surfaces drift.
 
 ### 9.2 Tabs
 
-`Chat | Setup | Engine`.
+`Setup | Engine | Chat`, with **Setup leftmost and first**.
 
-- **Setup** — all of Foundation, plus the `project.yaml` settings surfaced properly
-  rather than left in NovelAI's script config, whose UX suits power users only.
-  Includes a small CTA beneath Intensity that opens a brainstorm chat about the
-  story.
-- **Engine** — Forge, World, Loose Ends, loop status detail, and the journal. The
-  Engine's domain: what exists, and what the Engine has done to it. The Forge lives
-  here because under the new division it is the instrument that seeds this surface.
+- **Setup** — all of Foundation, plus **bootstrap** (Opening Scene / Continue Scene)
+  and the **Import wizard**, plus user-facing configuration as it accumulates:
+  `project.yaml` settings surfaced properly rather than left in NovelAI's script
+  config, whose UX suits power users only. Includes a small CTA beneath Intensity
+  that opens a brainstorm chat about the story.
+- **Engine** — World, Loose Ends, the Forge, loop status detail, and the journal.
+  The Engine's domain: what exists, and what the Engine has done to it. The Forge
+  lives here because under the new division it is the instrument that seeds this
+  surface.
 - **Chat** — unchanged.
+
+Setup leads because it is where a story begins, and absorbing bootstrap and import
+makes it the actual starting point rather than a settings drawer. Both currently
+live in the always-visible header (`src/ui/header/Header.tsx`), which shrinks
+accordingly — the header keeps generation status and loses the two controls that
+only matter at the beginning of a story.
+
+**Default tab follows the story's state.** An empty document opens on Setup, since
+there is nothing else to do yet; a story with prose opens on Engine. `mount.ts`
+already reads `hasDocumentContent` before `register()` and passes it to `App` so the
+bootstrap button's first paint is correct, so the signal exists and needs no new
+plumbing.
 
 Named "Setup" rather than "Config" deliberately: everything in it is history-scoped
 and branch-local, while NovelAI's own script config is global and account-level.
@@ -637,7 +700,7 @@ This applies to _our_ persisted schema, not to the user's lorebook. Dropping Eng
 state orphans bindings, so previously-managed entries become unmanaged entries
 sitting in the lorebook — untouched, not destroyed. The Import wizard's Bind is
 already the re-adoption path. The read-then-write and never-clobber rules in §5 and
-§5.1 apply in full regardless.
+§5.2 apply in full regardless.
 
 Consequently there is no `WorldGroup` → `LooseEnd` mapping, and no root-node
 resolution for seeding upgraded stories.
@@ -782,27 +845,29 @@ The v0.1 run also produced a useful accident: reading `currentNodeId()` and then
 calling `set()` without a node landed the value two nodes away from the id just
 read. That is the evidence behind §6.3.
 
-### Verify before writing code
+### 12.2 Resolved: scriptPanel visibility
 
-1. **`scriptPanel` placement and visibility.** The typings describe it as appearing
-   below the editor and being user-collapsible. If it can be closed, Engine
-   visibility is opt-in and the sidebar Engine tab must remain the authoritative
-   view. Both probes render in one, so the remaining question is only whether the
-   writer can dismiss it.
+A `scriptPanel` can be **minimized but never dismissed**. Engine visibility is
+therefore guaranteed rather than opt-in, which is what allows the HUD to carry the
+trust burden (§9.1). No API unknowns remain.
 
 ### Naming calls
 
-2. The Forge's `[THREAD]` command now creates loose ends; the verb should match the
+1. The Forge's `[THREAD]` command now creates loose ends; the verb should match the
    concept.
-3. Confirm "Loose Ends" as the user-facing category label.
+2. Confirm "Loose Ends" as the user-facing category label.
 
 ### Risks
 
-4. **Triage prompt quality is the whole ballgame** and cannot be settled on paper.
+3. **Triage prompt quality is the whole ballgame** and cannot be settled on paper.
    It is the first thing to build and the thing to iterate against real stories.
-5. **Loose-end proliferation** (§4.5) is the failure mode that would make the Engine
+4. **Loose-end proliferation** (§4.5) is the failure mode that would make the Engine
    actively harmful rather than merely unhelpful. The cap, justification, and expiry
    are not polish.
+5. **Condense is the only action that can lose information** (§5.1). Every other
+   action adds, retires, or flags; a bad condense silently drops an established fact
+   and nothing downstream notices. Bias the prompt toward retention, and treat
+   condense as the action most worth surfacing for review.
 
 ## 13. Testing
 
@@ -810,6 +875,9 @@ Everything decidable is pure and testable headless, consistent with the existing
 `tests/ui` suite:
 
 - manifest builder (state in → manifest text out)
+- condense triggering: entry length crosses the threshold → intent enqueued from
+  `assess`, with no triage generation involved (§5.1)
+- the loose-end cap reads from config and defaults to 8 (§4.5)
 - intent parsing, extending the existing Forge parser tests
 - condition construction (loose end + horizon → `advancedConditions` tree)
 - watermark math across document edits and history navigation
@@ -836,23 +904,27 @@ The design is one coherent system, but it is not one sitting of work. A suggeste
 spine for the implementation plan, ordered so each phase is independently
 verifiable:
 
-0. **Spike what remains open in §12.** Only `scriptPanel` dismissability is left;
-   the costly ones are answered in §12.0 and §12.1, measured with the two probes in
-   `tools/`.
-1. **Persistence.** Add the `onHistoryNavigated` correction to
+All §12 unknowns are now closed, so the plan starts with real work.
+
+1. **Setup tab.** Split the Foundation fields out, build Setup as the leftmost tab,
+   absorb bootstrap and the Import wizard out of the header, add the Intensity CTA,
+   and wire the default-tab rule. Ships user-visible value on its own, touches
+   nothing the loop depends on, and gives the later phases a home for the
+   configuration they add.
+2. **Persistence.** Add the `onHistoryNavigated` correction to
    `src/type-overrides.d.ts` (§12.1) first, since the navigation handler depends on
-   it. Then move branch-scoped slices to `historyStorage`, shard
-   `kse-persist` into the §6.2 keyspace, capture nodeId at dispatch. Verifiable on
-   its own: existing features keep working, undo now moves World state.
-2. **Model capability.** Add the parameter to `buildModelParams()` with a
+   it. Then move branch-scoped slices to `historyStorage`, shard `kse-persist` into
+   the §6.2 keyspace, capture nodeId at dispatch, and route deletion through the
+   index (§6.2.1). Verifiable on its own: existing features keep working, undo now
+   moves World state.
+3. **Model capability.** Add the parameter to `buildModelParams()` with a
    `"creative"` default. Pure addition, no behaviour change.
-3. **Loop harness + HUD, triage only.** Trigger, state machine, pacing, collision
+4. **Loop harness + HUD, triage only.** Trigger, state machine, pacing, collision
    recovery — with triage producing intents that are logged but not executed. The
    HUD makes this observable, which is why it comes early rather than last.
-4. **`LooseEnd` replacing `WorldGroup`**, including `advancedConditions`
+5. **`LooseEnd` replacing `WorldGroup`**, including `advancedConditions`
    construction and the §4.5 controls.
-5. **Actions.** Revise, open, retire — plus §7 reconciliation.
-6. **Tabs.** `Chat | Setup | Engine`, and the Intensity CTA.
+6. **Actions.** Revise, open, retire, condense — plus §7 reconciliation.
 
 ## 15. Versioning
 
