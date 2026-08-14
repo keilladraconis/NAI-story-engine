@@ -96,7 +96,8 @@ export const refineSpec: ChatTypeSpec = {
   },
 
   headerControls(_chat: Chat, _ctx: SpecCtx) {
-    // Back (leave to the Story Engine tab, keep the refine alive) + Sessions
+    // Back (leave to whichever tab owns the open edit pane — Setup for a
+    // Foundation field, Engine otherwise — keeping the refine alive) + Sessions
     // (switch to another chat) — like other chat types. The "Refining: <field>"
     // title renders automatically in the header.
     return [

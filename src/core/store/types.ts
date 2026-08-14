@@ -48,7 +48,7 @@ export interface UIState {
   inputs: Record<string, string>;
   lorebook: LorebookUIState;
   worldExpanded: boolean | null;
-  // The Import wizard is shown over the Story Engine tab. Store-driven so the
+  // The Import wizard is shown over the Setup tab. Store-driven so the
   // cold-start bootstrap can open it once on first run (foundation empty +
   // existing unmanaged content to pull in).
   importWizardOpen: boolean;

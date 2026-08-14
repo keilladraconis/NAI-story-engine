@@ -73,8 +73,8 @@ function buildSidebarPanel(hasDocumentContent: boolean): UIExtension {
         "100%";
       (elem as unknown as { style: Record<string, string> }).style.minHeight =
         "0";
-      // hasDocumentContent is read before register() so the header's bootstrap
-      // button carries the right label on its first paint.
+      // hasDocumentContent is read before register() so the Setup tab's
+      // bootstrap button carries the right label on its first paint.
       render(h(App, { initialHasDocumentContent: hasDocumentContent }), elem);
     },
   });

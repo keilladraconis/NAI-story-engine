@@ -107,7 +107,7 @@ export const uiSlice = createSlice({
       ...state,
       worldExpanded: payload.expanded,
     }),
-    // Import wizard visibility (shown over the Story Engine tab)
+    // Import wizard visibility (shown over the Setup tab)
     importWizardOpened: (state) => ({ ...state, importWizardOpen: true }),
     importWizardClosed: (state) => ({ ...state, importWizardOpen: false }),
     // Summary generation intents

@@ -19,7 +19,6 @@ import { FIELD_DESCRIPTORS } from "../foundation/fields";
 import { ImportWizard } from "../import/ImportWizard";
 import { BootstrapButton } from "./BootstrapButton";
 import { BrainstormCta } from "./BrainstormCta";
-import { useHasDocumentContent } from "./use-document-content";
 import { deriveSetup, setupSignature } from "./setup-model";
 import { Download } from "nai:icons/feather";
 
@@ -37,7 +36,7 @@ function iconButtonStyle(disabled: boolean): Record<string, string | number> {
 }
 
 export function Setup(props: {
-  initialHasDocumentContent: boolean;
+  hasDocumentContent: boolean;
   onOpenChat: () => void;
 }) {
   // Subscribing to the signature — a primitive covering exactly the fields
@@ -46,9 +45,8 @@ export function Setup(props: {
 
   const editId = useSlice((s) => s.ui.activeEditId);
   const importOpen = useSlice((s) => s.ui.importWizardOpen);
-  const hasDocumentContent = useHasDocumentContent(
-    props.initialHasDocumentContent,
-  );
+  // Owned by App, which never unmounts — this panel does, on every tab switch.
+  const hasDocumentContent = props.hasDocumentContent;
 
   const field = editId
     ? FIELD_DESCRIPTORS.find((d) => d.id === editId)
