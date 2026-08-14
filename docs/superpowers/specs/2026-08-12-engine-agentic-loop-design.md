@@ -655,10 +655,17 @@ otherwise inert: it does not edit, retire, or revert anything, so it does not
 reopen the question of whether the HUD should carry the Engine's controls. Undo
 remains the story editor's own (§7), and everything else lives in the Engine tab.
 
-Two guards, because a pass is not idempotent and a wasted one costs real budget:
-wrap it in `useTapGuard()` (`src/ui/tap-guard.ts`) so a doubled mobile tap cannot
-start two passes, and make it a no-op while the loop is already assessing, triaging,
-or acting.
+A pass is not idempotent and a wasted one costs real budget, so the ⚡ refuses
+re-entry: it is a no-op while the loop is already assessing, triaging, or acting.
+That check is the whole guard, and it must live in the handler or the effect
+rather than in the button's `disabled` prop — `disabled` is a render-time value,
+so a press arriving before the re-render that sets it still gets through.
+
+No tap debounce. The runtime once delivered a single mobile tap as two `click`
+events and `useTapGuard()` absorbed it; that bug is fixed upstream and the hook
+was removed in 0.14.1. CLAUDE.md now forbids reintroducing a timestamp window —
+a deliberate second press is a real press, and the loop's own in-flight state is
+what distinguishes "already running" from "run it again".
 
 **It must not read `genx.status`.** CLAUDE.md establishes `derive()` in
 `src/ui/header/header-model.ts` as the only place that branches on generation

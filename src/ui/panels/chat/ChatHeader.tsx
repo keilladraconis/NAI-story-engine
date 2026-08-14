@@ -17,7 +17,6 @@ import {
 import { getChatTypeSpec } from "../../../core/chat-types";
 import type { Chat as ChatT } from "../../../core/chat-types/types";
 import { nextBrainstormTitle } from "./chat-actions";
-import { useTapGuards } from "../../tap-guard";
 import { Plus, Folder, ArrowLeft } from "nai:icons/feather";
 
 const ICON = 16;
@@ -90,10 +89,6 @@ export function ChatHeader(props: ChatHeaderProps) {
     const c = activeSavedChat(s.chat);
     return !!c && (s.forge.pendingScrubByChatId[c.id]?.length ?? 0) > 0;
   });
-  // Every control here is one tap = one action. Sum is the one that hurt: a
-  // doubled tap opened two summary chats, each with its own generation.
-  // Declared above the early return so the hook count stays stable.
-  const onceTap = useTapGuards();
   if (!stamp) return null;
   const chat = activeSavedChat(store.getState().chat)!;
   const spec = getChatTypeSpec(chat.type);
@@ -112,10 +107,8 @@ export function ChatHeader(props: ChatHeaderProps) {
             <button
               style={modeBtnStyle(chat.subMode === "cowriter", MODE_COWRITER)}
               onClick={() =>
-                onceTap("mode-cowriter", () =>
-                  store.dispatch(
-                    subModeChanged({ id: chat.id, subMode: "cowriter" }),
-                  ),
+                store.dispatch(
+                  subModeChanged({ id: chat.id, subMode: "cowriter" }),
                 )
               }
             >
@@ -124,10 +117,8 @@ export function ChatHeader(props: ChatHeaderProps) {
             <button
               style={modeBtnStyle(chat.subMode === "critic", MODE_CRITIC)}
               onClick={() =>
-                onceTap("mode-critic", () =>
-                  store.dispatch(
-                    subModeChanged({ id: chat.id, subMode: "critic" }),
-                  ),
+                store.dispatch(
+                  subModeChanged({ id: chat.id, subMode: "critic" }),
                 )
               }
             >
@@ -141,12 +132,10 @@ export function ChatHeader(props: ChatHeaderProps) {
             key={c.id}
             style={{ ...modeBtnStyle(false, "transparent"), opacity: 1 }}
             onClick={() =>
-              onceTap("sum", () =>
-                store.dispatch(
-                  uiChatSummarizeRequested({
-                    seed: { kind: "fromChat", sourceChatId: chat.id },
-                  }),
-                ),
+              store.dispatch(
+                uiChatSummarizeRequested({
+                  seed: { kind: "fromChat", sourceChatId: chat.id },
+                }),
               )
             }
           >
@@ -159,20 +148,18 @@ export function ChatHeader(props: ChatHeaderProps) {
             key={c.id}
             style={iconBtn}
             title="New chat"
-            onClick={() =>
-              onceTap("new", () => {
-                const newChat: ChatT = {
-                  id: api.v1.uuid(),
-                  type: "brainstorm",
-                  title: nextBrainstormTitle(store.getState().chat.chats),
-                  subMode: "cowriter",
-                  messages: [],
-                  seed: { kind: "blank" },
-                };
-                store.dispatch(chatCreated({ chat: newChat }));
-                store.dispatch(chatSwitched({ id: newChat.id }));
-              })
-            }
+            onClick={() => {
+              const newChat: ChatT = {
+                id: api.v1.uuid(),
+                type: "brainstorm",
+                title: nextBrainstormTitle(store.getState().chat.chats),
+                subMode: "cowriter",
+                messages: [],
+                seed: { kind: "blank" },
+              };
+              store.dispatch(chatCreated({ chat: newChat }));
+              store.dispatch(chatSwitched({ id: newChat.id }));
+            }}
           >
             <Plus size={ICON} />
           </button>
@@ -183,7 +170,7 @@ export function ChatHeader(props: ChatHeaderProps) {
             key={c.id}
             style={iconBtn}
             title="Sessions"
-            onClick={() => onceTap("sessions", props.onOpenSessions)}
+            onClick={props.onOpenSessions}
           >
             <Folder size={ICON} />
           </button>
@@ -202,17 +189,15 @@ export function ChatHeader(props: ChatHeaderProps) {
                   key={p.id}
                   disabled={disabled}
                   style={phasePillStyle(forgeNext === p.id, disabled)}
-                  onClick={() =>
-                    onceTap(`phase-${p.id}`, () => {
-                      if (!disabled)
-                        store.dispatch(
-                          forgeNextPhasePinned({
-                            chatId: chat.id,
-                            phase: p.id,
-                          }),
-                        );
-                    })
-                  }
+                  onClick={() => {
+                    if (!disabled)
+                      store.dispatch(
+                        forgeNextPhasePinned({
+                          chatId: chat.id,
+                          phase: p.id,
+                        }),
+                      );
+                  }}
                 >
                   {p.label}
                 </button>
@@ -245,11 +230,7 @@ export function ChatHeader(props: ChatHeaderProps) {
       }}
     >
       {hasBack && (
-        <button
-          style={iconBtn}
-          title="Back"
-          onClick={() => onceTap("back", props.onBack)}
-        >
+        <button style={iconBtn} title="Back" onClick={props.onBack}>
           <ArrowLeft size={ICON} />
         </button>
       )}

@@ -16,7 +16,6 @@ import {
   type BorderKind,
 } from "./world-select";
 import { ConfirmButton } from "../../components/ConfirmButton";
-import { useTapGuard } from "../../tap-guard";
 import {
   User,
   Cpu,
@@ -52,7 +51,6 @@ export function EntityCard(props: { entityId: string }) {
   const entity = useSlice((s) => s.world.entitiesById[entityId]);
   const worldExpanded = useSlice((s) => s.ui.worldExpanded ?? true);
   const pending = useSlice((s) => entityPending(s.runtime, entityId));
-  const onceRegenTap = useTapGuard();
 
   const [complete, setComplete] = useState(false);
 
@@ -131,16 +129,12 @@ export function EntityCard(props: { entityId: string }) {
           <button
             title={pending ? "Generating…" : "Generate"}
             disabled={pending}
-            // `pending` is a render-time value, so the repeat click of a doubled
-            // tap reads it before the re-render that would flip it — the tap
-            // guard is what actually stops the second dispatch here. The regen
-            // effect refuses ids it has already queued as the real backstop.
-            onClick={() =>
-              onceRegenTap(() => {
-                if (!pending)
-                  store.dispatch(entityRegenRequested({ entityId }));
-              })
-            }
+            // `pending` is a render-time value, so a press arriving before the
+            // re-render that flips it still gets through here; the regen effect
+            // refusing ids it has already queued is the real backstop.
+            onClick={() => {
+              if (!pending) store.dispatch(entityRegenRequested({ entityId }));
+            }}
             style={{
               background: "none",
               border: "none",

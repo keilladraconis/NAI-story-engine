@@ -10,6 +10,18 @@ All notable changes to this project will be documented in this file.
 - **The Setup tab reads in the order a story is actually built.** Import Wizard at the top for bringing existing material in, then Intensity, then the Foundation cards, with Opening Scene / Continue Scene last — the step everything above it prepares for.
 - **"Talk it through" opens a fresh brainstorm, and appears when you need it.** It sits directly under Intensity while the Foundation is still blank, and steps aside once you have filled anything in. Starting a conversation about the story no longer means a trip to the Chat tab and a New chat button.
 
+## [0.14.1] - 2026-08-14
+
+### Changed
+
+- **Buttons respond on the first press again.** Through v0.14 a single tap on a phone or tablet could reach Story Engine as two clicks, so nearly every control carried a 400ms deadline that ignored anything arriving too soon after the press before it. NovelAI has fixed the underlying event handling, and that workaround is now gone from all of the roughly forty controls that carried it — Send, Save, Sum, Commit and Discard, the forge phase pills, the Import wizard's buttons and lorebook rows, Foundation's ⚡ and sync switches, S.E.G.A., add-entity and add-thread, and every two-click confirm. The visible difference is at the fast end: a second, deliberate press — confirming a delete the instant the amber warning appears, or tapping Co then Crit in quick succession — now registers instead of being discarded as an echo.
+
+### Fixed
+
+- **Confirming a delete immediately after arming it no longer does nothing.** The two-click confirms (deleting an entity, a thread, a chat message, or a chat's history) discarded a second click landing within 400ms of the first. Since the first click is what shows the amber warning, anyone who reacted quickly was confirming inside exactly that window — the press was swallowed, and the button silently disarmed itself four seconds later.
+
+The protections that guard against a genuine repeat press are unchanged: an entity still cannot be saved into two lorebook entries, a lorebook entry still belongs to only one entity, the Forge still refuses to open a second session while one is starting, and a field or entity already queued for generation is still skipped rather than queued twice.
+
 ## [0.14.0] - 2026-06-29
 
 ### Changed

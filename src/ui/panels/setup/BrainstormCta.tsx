@@ -8,15 +8,15 @@
 // place where it is the primary action.
 
 import { store, chatCreated, chatSwitched } from "../../../core/store";
-import { useTapGuard } from "../../tap-guard";
 import { SP, T } from "../../style";
 import { nextBrainstormTitle } from "../chat/chat-actions";
 import type { Chat as ChatT } from "../../../core/chat-types/types";
 import { MessageSquare } from "nai:icons/feather";
 
 export function BrainstormCta(props: { onOpenChat: () => void }) {
-  const onceTap = useTapGuard();
-
+  // No re-entry guard, matching Sessions.tsx's New chat: the body is wholly
+  // synchronous, so there is no await for a second press to slip inside, and
+  // the first click switches to the Chat tab — which unmounts this button.
   const start = () => {
     const chats = store.getState().chat.chats;
     const chat: ChatT = {
@@ -34,9 +34,7 @@ export function BrainstormCta(props: { onOpenChat: () => void }) {
 
   return (
     <button
-      // Creating a chat is not idempotent — a doubled tap would leave a stray
-      // empty brainstorm behind.
-      onClick={() => onceTap(start)}
+      onClick={start}
       style={{
         display: "flex",
         flexDirection: "column",

@@ -10,7 +10,6 @@ import {
   bootstrapRequested,
   bootstrapContinueRequested,
 } from "../../../core/store";
-import { useTapGuard } from "../../tap-guard";
 import { SP, T } from "../../style";
 import { openOpeningSceneModal } from "../../header/opening-scene-modal";
 import { Feather } from "nai:icons/feather";
@@ -38,7 +37,6 @@ export function BootstrapButton(props: {
   text: string;
   disabled: boolean;
 }) {
-  const onceTap = useTapGuard();
   const openingModalOpen = useRef(false);
 
   const onBootstrap = () => {
@@ -63,8 +61,7 @@ export function BootstrapButton(props: {
   return (
     <button
       disabled={props.disabled}
-      // A tap can deliver click twice on mobile; bootstrap is not idempotent.
-      onClick={() => onceTap(onBootstrap)}
+      onClick={onBootstrap}
       style={actionStyle(props.disabled)}
     >
       <Feather size={ICON_SIZE} />
