@@ -23,7 +23,6 @@ describe("bootstrap and import live in Setup", () => {
   it("the header dispatches neither bootstrap nor the import wizard", () => {
     const src = read("header/Header.tsx");
     expect(src).not.toContain("bootstrapRequested");
-    expect(src).not.toContain("bootstrapContinueRequested");
     expect(src).not.toContain("importWizardOpened");
   });
 

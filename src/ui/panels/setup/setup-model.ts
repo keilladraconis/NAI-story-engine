@@ -30,9 +30,9 @@ export type SetupInputs = {
   hasDocumentContent: boolean;
 };
 
-const BOOTSTRAP_TYPES: readonly string[] = ["bootstrap", "bootstrapContinue"];
+const BOOTSTRAP_TYPES: readonly string[] = ["bootstrap"];
 
-/** Is an opening generation queued or in flight? Also read by
+/** Is the opening generation queued or in flight? Also read by
  *  useHasDocumentContent — a bootstrap is what turns an empty story non-empty. */
 export function selectBootstrapPending(state: RootState): boolean {
   const { queue, activeRequest } = state.runtime;

@@ -6,7 +6,6 @@ import {
 } from "../../utils/config";
 import {
   bootstrapRequested,
-  bootstrapContinueRequested,
   documentHistoryNavigated,
   generationSubmitted,
   requestQueued,
@@ -15,7 +14,6 @@ import { MessageFactory } from "nai-gen-x";
 import { buildStoryEnginePrefix } from "../../utils/context-builder";
 import {
   BOOTSTRAP_P1_PROMPT,
-  BOOTSTRAP_CONTINUE_PROMPT,
   buildOpeningDirectionPrompt,
   XIALONG_STYLE,
 } from "../../utils/prompts";
@@ -82,57 +80,6 @@ const createBootstrapP1Factory =
 // so far, plus the real story text. Instruction sits in strong position
 // (after story text, close to generation).
 
-const createBootstrapContinueFactory =
-  (getState: () => RootState): MessageFactory =>
-  async () => {
-    const [prefix, storyContext] = await Promise.all([
-      buildStoryEnginePrefix(getState, {
-        excludeSections: ["storyText", "brainstorm"],
-      }),
-      api.v1.buildContext({ suppressScriptHooks: "self" }),
-    ]);
-
-    const messages: Message[] = [
-      ...prefix,
-      ...storyContext.slice(1), // drop NAI's system prompt, keep lorebook entries + story text
-    ];
-
-    // Compact foundation anchors immediately before the continue instruction
-    const { shape, intent, intensity, contract } = getState().foundation;
-    const anchors: string[] = [];
-    if (intensity)
-      anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
-    if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
-    if (intent) anchors.push(`Intent: ${intent}`);
-    if (contract) {
-      anchors.push(
-        `Story Contract:\nRequired: ${contract.required}\nProhibited: ${contract.prohibited}\nEmphasis: ${contract.emphasis}`,
-      );
-    }
-    if (anchors.length > 0) {
-      messages.push({ role: "system" as const, content: anchors.join("\n\n") });
-    }
-
-    messages.push({
-      role: "system" as const,
-      content: BOOTSTRAP_CONTINUE_PROMPT,
-    });
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.bootstrapContinue);
-
-    return {
-      messages,
-      params: await buildModelParams({
-        max_tokens: 384,
-        temperature: 1.0,
-        min_p: 0.05,
-        frequency_penalty: 0.15,
-        stop: ["</think>", "\n***", "\n---", "\n⁂", "\n[ "],
-      }),
-    };
-  };
-
-// ─── Strategy builders ────────────────────────────────────────────────────────
-
 function buildBootstrapP1Strategy(
   getState: () => RootState,
   guidance: string,
@@ -145,29 +92,15 @@ function buildBootstrapP1Strategy(
   };
 }
 
-export function buildBootstrapContinueStrategy(
-  getState: () => RootState,
-  iteration: number,
-): GenerationStrategy {
-  return {
-    requestId: api.v1.uuid(),
-    messageFactory: createBootstrapContinueFactory(getState),
-    target: { type: "bootstrapContinue", iteration },
-    prefillBehavior: "trim",
-  };
-}
-
-// ─── Effect registration ──────────────────────────────────────────────────────
-
 export function registerBootstrapEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
   dispatch: AppDispatch,
   getState: () => RootState,
 ): void {
-  // Undo/redo/jump changes the document out from under the bootstrap button,
-  // whose stage ("Opening Scene" vs "Continue Scene") is derived from document
-  // content. Surface history navigation as a Redux signal so the button's
-  // watcher re-derives — e.g. undoing the opening flips it back to Opening Scene.
+  // Undo/redo/jump changes the document out from under the opening-scene card,
+  // which only shows while the story is still blank. Surface history navigation
+  // as a Redux signal so the card's watcher re-derives — undoing the opening
+  // brings it back.
   api.v1.hooks.register("onHistoryNavigated", () => {
     dispatch(documentHistoryNavigated());
   });
@@ -183,22 +116,6 @@ export function registerBootstrapEffects(
       requestQueued({
         id: strategy.requestId,
         type: "bootstrap",
-        targetId: "bootstrap",
-      }),
-    );
-    dispatch(generationSubmitted(strategy));
-  });
-
-  // Stage 2+ — "Continue Scene". Each click runs exactly one continuation
-  // paragraph; the handler no longer queues the next one. Iteration is derived
-  // from the current document length purely for the streaming status ticker.
-  subscribeEffect(matchesAction(bootstrapContinueRequested), async () => {
-    const iteration = (await api.v1.document.sectionIds()).length;
-    const strategy = buildBootstrapContinueStrategy(getState, iteration);
-    dispatch(
-      requestQueued({
-        id: strategy.requestId,
-        type: "bootstrapContinue",
         targetId: "bootstrap",
       }),
     );

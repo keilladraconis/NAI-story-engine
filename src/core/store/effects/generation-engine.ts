@@ -58,8 +58,6 @@ function targetToQueueEntry(target: GenerationStrategy["target"]): {
       return { type: "threadSummary", targetId: target.groupId };
     case "bootstrap":
       return { type: "bootstrap", targetId: "bootstrap" };
-    case "bootstrapContinue":
-      return { type: "bootstrapContinue", targetId: String(target.iteration) };
   }
   // Unreachable — satisfies noImplicitReturns for exhaustive switch
   throw new Error(`Unhandled target type: ${(target as any).type}`);
@@ -157,8 +155,6 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
       return `thread-summary:${target.groupId.slice(0, 8)}`;
     case "bootstrap":
       return "bootstrap";
-    case "bootstrapContinue":
-      return `bootstrap-continue:${target.iteration}`;
     case "chat":
       return `chat:${target.messageId}`;
     case "chatRefine":

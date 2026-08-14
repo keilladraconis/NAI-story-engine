@@ -1,5 +1,5 @@
 // The Story Engine header: the generation-state widget and the SEGA status
-// line. Always visible, above the tab bar. Opening/Continue Scene and Import
+// line. Always visible, above the tab bar. The opening scene and Import
 // live on the Setup tab (src/ui/panels/setup/Setup.tsx).
 //
 // This was a UIPart tree driven by api.v1.ui.updateParts, because a click

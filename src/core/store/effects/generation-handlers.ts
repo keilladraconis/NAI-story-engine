@@ -10,10 +10,7 @@ import {
   entitySummaryBindHandler,
   threadSummaryHandler,
 } from "./handlers/summary";
-import {
-  bootstrapHandler,
-  bootstrapContinueHandler,
-} from "./handlers/bootstrap";
+import { bootstrapHandler } from "./handlers/bootstrap";
 import { chatHandler, chatRefineHandler } from "./handlers/chat";
 import { forgeChatHandler, forgeCleanupHandler } from "./handlers/forge-chat";
 
@@ -52,10 +49,6 @@ export type ThreadSummaryTarget = Extract<
 export type BootstrapTarget = Extract<
   GenerationStrategy["target"],
   { type: "bootstrap" }
->;
-export type BootstrapContinueTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "bootstrapContinue" }
 >;
 export type ChatTarget = Extract<
   GenerationStrategy["target"],
@@ -115,7 +108,6 @@ export const GENERATION_HANDLERS: {
   entitySummaryBind: GenerationHandlers<EntitySummaryBindTarget>;
   threadSummary: GenerationHandlers<ThreadSummaryTarget>;
   bootstrap: GenerationHandlers<BootstrapTarget>;
-  bootstrapContinue: GenerationHandlers<BootstrapContinueTarget>;
   chat: GenerationHandlers<ChatTarget>;
   chatRefine: GenerationHandlers<ChatRefineTarget>;
 } = {
@@ -129,7 +121,6 @@ export const GENERATION_HANDLERS: {
   entitySummaryBind: entitySummaryBindHandler,
   threadSummary: threadSummaryHandler,
   bootstrap: bootstrapHandler,
-  bootstrapContinue: bootstrapContinueHandler,
   chat: chatHandler,
   chatRefine: chatRefineHandler,
 };

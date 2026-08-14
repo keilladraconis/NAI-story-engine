@@ -5,22 +5,11 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import { stripThinkingTags } from "../../../utils/tag-parser";
-import { trimStopTail } from "../../../utils/config";
 
 type BootstrapTarget = Extract<
   GenerationStrategy["target"],
   { type: "bootstrap" }
 >;
-type BootstrapContinueTarget = Extract<
-  GenerationStrategy["target"],
-  { type: "bootstrapContinue" }
->;
-
-// When true, the next "Continue Scene" should join the last document section inline
-// rather than starting a new paragraph. Set when a generation ends mid-sentence
-// (max_tokens fired before a natural \n\n boundary). Reset on completion or failure.
-let continueInline = false;
-
 function parseParagraphs(text: string): string[] {
   return stripThinkingTags(text)
     .trim()
@@ -62,16 +51,6 @@ function chunkParagraph(paragraph: string): string[] {
   return result;
 }
 
-/** True when text ended at a natural sentence/scene boundary (not mid-sentence max_tokens cut). */
-function endsAtBoundary(text: string): boolean {
-  return (
-    /[.!?…]["']?$/.test(text) ||
-    text.endsWith("***") ||
-    text.endsWith("---") ||
-    text.endsWith("⁂")
-  );
-}
-
 // A scene-break marker the model appends to close a scene. We render these as a
 // proper centered "***" section rather than leaving the glyph in the prose.
 const SCENE_BREAK_TAIL = /\s*(?:\*{3,}|-{3,}|⁂)\s*$/;
@@ -110,7 +89,7 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
       return;
     }
 
-    const { text: cleaned, hadBreak } = stripTrailingSceneBreak(
+    const { text: cleaned } = stripTrailingSceneBreak(
       stripThinkingTags(ctx.accumulatedText),
     );
     const chunks = parseParagraphs(cleaned);
@@ -119,53 +98,9 @@ export const bootstrapHandler: GenerationHandlers<BootstrapTarget> = {
       // paragraph break). The engine still records one undo step per paragraph —
       // multi-paragraph single-undo isn't reachable through the document API.
       await api.v1.document.append(chunks.join("\n"));
-      // If the opening ended mid-sentence (no clean break), the next "Continue
-      // Scene" joins inline.
-      continueInline = !hadBreak && !endsAtBoundary(chunks[chunks.length - 1]);
     }
 
-    // Stage stops here. The opening is on the page; the header button now offers
-    // "Continue Scene", and the user decides whether to extend it.
+    // The opening is on the page and the stage is done. Continuing the scene is
+    // the story editor's job — Story Engine has no Continue control.
   },
 };
-
-// ─── Phase 2 handler ─────────────────────────────────────────────────────────
-
-export const bootstrapContinueHandler: GenerationHandlers<BootstrapContinueTarget> =
-  {
-    streaming(
-      _ctx: StreamingContext<BootstrapContinueTarget>,
-      _newText: string,
-    ): void {},
-
-    async completion(
-      ctx: CompletionContext<BootstrapContinueTarget>,
-    ): Promise<void> {
-      if (!ctx.generationSucceeded || !ctx.accumulatedText) {
-        continueInline = false;
-        return;
-      }
-
-      const { text: noBreak, hadBreak: endsOnSceneBreak } =
-        stripTrailingSceneBreak(stripThinkingTags(ctx.accumulatedText));
-      const cleaned = trimStopTail(noBreak, ["\n[ "]);
-      const paragraphs = parseParagraphs(cleaned);
-
-      if (paragraphs.length > 0) {
-        // A leading newline starts a fresh paragraph; when the previous stage was
-        // cut mid-sentence we lead with a space instead so this stitches onto the
-        // end of the last paragraph.
-        const body = paragraphs.join("\n");
-        await api.v1.document.append((continueInline ? " " : "\n") + body);
-
-        continueInline = endsOnSceneBreak
-          ? false
-          : !endsAtBoundary(paragraphs[paragraphs.length - 1]);
-      } else if (endsOnSceneBreak) {
-        continueInline = false;
-      }
-
-      // One paragraph per click. No auto-chain and no cap — the user keeps the
-      // wheel: the header button stays on "Continue Scene" for the next push.
-    },
-  };

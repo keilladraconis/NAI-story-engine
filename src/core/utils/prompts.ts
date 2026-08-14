@@ -702,8 +702,6 @@ export const XIALONG_STYLE = {
   summary: "[ Style: chat, archivist, concise, insightful ]",
   bootstrap:
     "[ Style: novelist; cold-open; observed-not-named; no-participle-stacks; no-absolutes; forward-momentum ]",
-  bootstrapContinue:
-    "[ Style: novelist; continuation; behavior-not-quality; no-participle-stacks; no-absolutes; forward-momentum ]",
 } as const;
 
 export const BOOTSTRAP_P1_PROMPT = `Write the opening passage of this story.
@@ -733,24 +731,3 @@ export const BOOTSTRAP_OPENING_DIRECTION_FRAME = `The writer has specified how t
 export function buildOpeningDirectionPrompt(guidance: string): string {
   return `${BOOTSTRAP_OPENING_DIRECTION_FRAME}\n\n${guidance.trim()}`;
 }
-
-export const BOOTSTRAP_CONTINUE_PROMPT = `Continue directly from the last sentence of the story. Do not advance time, change location, or begin a new scene — stay inside the exact moment where the text ended.
-
-Prohibited:
-- Appositives and absolute phrases — noun + participle or adjective trailing any clause: "she said, her hand moving" / "he turned, his eyes fixed on the door" / "she stepped forward, her voice low" / "the movement subtle yet deliberate" / "his hair falling across his forehead"
-- Named emotions: "she felt afraid" / "unease settled over her"
-- Internal sensation metaphors: "pulse quickened" / "breath hitched" / "heat pooled" / "chest tightened"
-- Abstract qualities: "commanding presence" / "fluid grace" / "unnerving stillness"
-- Editorial interpretation: "as if they heard it constantly" / "too controlled for a child his age" / "something darker beneath the surface"
-- Thematic narration or payoff language — stating what the scene means: "the rational tools I'd brought to this irrational place" / "she finally understood" / "something had shifted" / "not just X but Y" / "the true work of"
-- Story-level arc conclusions: no character arriving at an insight, lesson, or turning point. This is an opening, not an ending.
-- Resolution — end in motion, never in conclusion. No closing image that implies finality.
-- Scene transitions: no ***, ---, or any break marker; no time jumps; no shift to a different location or moment
-- Backstory dumps
-- POV violations: in first person, "I failed to notice" is impossible
-
-Characters introduced: physical detail first, then one behavioral tell, then spatial position.
-
-Use natural paragraphing — break on new speakers, shifts in action, or distinct beats. Blank line between paragraphs. Dialogue gets its own paragraph.
-
-Prose only.`;

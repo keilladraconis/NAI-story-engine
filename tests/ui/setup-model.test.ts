@@ -174,12 +174,9 @@ describe("selectBootstrapPending", () => {
     expect(selectBootstrapPending(state())).toBe(false);
   });
 
-  it("is true for both bootstrap request types", () => {
+  it("is true for a queued opening generation", () => {
     expect(
       selectBootstrapPending(state({ queue: [req("bootstrap", "a")] })),
-    ).toBe(true);
-    expect(
-      selectBootstrapPending(state({ queue: [req("bootstrapContinue", "b")] })),
     ).toBe(true);
   });
 });
