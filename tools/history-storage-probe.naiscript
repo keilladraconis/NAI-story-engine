@@ -2,27 +2,32 @@
 compatibilityVersion: naiscript-1.0
 id: 02187497-3d1d-4675-9b32-56782994db3c
 name: History Storage Probe
-version: 0.1.0
+version: 0.2.0
 description: Does historyStorage.list() return inherited ancestor keys, or only keys written at that exact node?
 memoryLimit: 8
 ---*/
 
 // Press Write markers, add a generation or two in the editor, press Write markers
-// again, then press Check. Repeat as you like — the ledger accumulates.
+// again, then press Check.
 //
-// Each Write stamps two things at the current node:
-//   marker-N  a key unique to that node
-//   shared    the same key every time, so get() shows which ancestor wins
+// v0.1 gave a contradictory reading: list() at the current node showed a marker,
+// while list(theNodeItWasWrittenAt) came back empty. So this version pins down the
+// things v0.1 assumed.
 //
-// Check answers three questions:
-//   1. does list() here include keys written at ancestor nodes?
-//   2. does get() resolve keys written at ancestor nodes?
-//   3. which node does the shared key resolve to?
+//   - writes pass an EXPLICIT nodeId, so we know where the value went rather than
+//     trusting that set() and currentNodeId() agree about "current"
+//   - it verifies straight after writing that list(node) can see what we just put
+//     there, which tells us whether the nodeId argument works at all
+//   - it compares list() against list(currentNodeId()) — same node, two call
+//     forms. If those disagree, the argument is the problem, not inheritance
+//   - it walks parents from the current node so we can see whether a marker's node
+//     is genuinely an ancestor
 //
 // The ledger lives in storyStorage on purpose. historyStorage is what we are
 // testing, so keeping our own bookkeeping there would bury the result.
 
 const LEDGER = "history-probe-ledger";
+const MAX_ANCESTORS = 12;
 
 const currentNode = () => api.v1.document.history.currentNodeId();
 
@@ -34,8 +39,21 @@ function log(line) {
   void api.v1.ui.updateParts([{ id: "report", text: report }]);
 }
 
-async function readLedger() {
-  return (await api.v1.storyStorage.get(LEDGER)) || [];
+const readLedger = async () =>
+  (await api.v1.storyStorage.get(LEDGER)) || [];
+
+// Read-only inspection. nodeState() is documented as reporting the path to a node;
+// jump() is the call that actually navigates. If the document moves while this
+// runs, that assumption is wrong and worth knowing.
+async function ancestry(node) {
+  const chain = [];
+  let id = node;
+  for (let i = 0; i < MAX_ANCESTORS && id !== undefined && id !== null; i++) {
+    chain.push(id);
+    const state = await api.v1.document.history.nodeState(id);
+    id = state && state.targetNode ? state.targetNode.parent : undefined;
+  }
+  return chain;
 }
 
 async function writeMarkers() {
@@ -43,48 +61,64 @@ async function writeMarkers() {
   const ledger = await readLedger();
   const key = `marker-${ledger.length + 1}`;
 
-  await api.v1.historyStorage.set(key, { writtenAt: node });
-  await api.v1.historyStorage.set("shared", { writtenAt: node });
+  await api.v1.historyStorage.set(key, { writtenAt: node }, node);
+  await api.v1.historyStorage.set("shared", { writtenAt: node }, node);
   await api.v1.storyStorage.set(LEDGER, ledger.concat([{ key, node }]));
 
-  log(`wrote ${key} and shared at node ${node} (${typeof node})`);
+  const atNode = await api.v1.historyStorage.list(node);
+  const bare = await api.v1.historyStorage.list();
+
+  log(`\nwrote ${key} at node ${node} (${typeof node})`);
+  log(`  list(${node}) right after = ${JSON.stringify(atNode)}`);
+  log(`  list() right after       = ${JSON.stringify(bare)}`);
+  if (!atNode.includes(key)) {
+    log("  !! the explicit nodeId argument did not see its own write");
+  }
 }
 
 async function check() {
   const node = await currentNode();
   const ledger = await readLedger();
-  const here = await api.v1.historyStorage.list();
+  const bare = await api.v1.historyStorage.list();
+  const explicit = await api.v1.historyStorage.list(node);
 
   log(`\n--- check at node ${node} ---`);
-  log(`list() here: ${JSON.stringify(here)}`);
+  log(`list()      = ${JSON.stringify(bare)}`);
+  log(`list(${node}) = ${JSON.stringify(explicit)}`);
+  if (JSON.stringify(bare) !== JSON.stringify(explicit)) {
+    log("  !! list() and list(currentNodeId()) disagree — the argument is suspect");
+  }
 
-  const ancestors = ledger.filter((entry) => entry.node !== node);
+  const chain = await ancestry(node);
+  log(`ancestry: ${JSON.stringify(chain)}`);
 
   for (const entry of ledger) {
     const value = await api.v1.historyStorage.get(entry.key);
-    const has = await api.v1.historyStorage.has(entry.key);
     const atNode = await api.v1.historyStorage.list(entry.node);
+    const where = chain.indexOf(entry.node);
     log(
       `  ${entry.key} written@${entry.node}` +
         `  get=${value ? `writtenAt ${value.writtenAt}` : "MISSING"}` +
-        `  has=${has}` +
-        `  list@${entry.node}=${JSON.stringify(atNode)}`,
+        `  list@node=${JSON.stringify(atNode)}` +
+        `  ancestor=${where === 0 ? "current" : where > 0 ? `yes(+${where})` : "NO"}`,
     );
   }
 
   const shared = await api.v1.historyStorage.get("shared");
   log(`  shared resolves to node ${shared ? shared.writtenAt : "MISSING"}`);
 
+  const ancestors = ledger.filter(
+    (entry) => entry.node !== node && chain.indexOf(entry.node) > 0,
+  );
   if (ancestors.length === 0) {
-    log("verdict: write markers, add a generation, then check again");
+    log("verdict: no marker sits on a confirmed ancestor yet — write, generate, check");
     return;
   }
-
-  const visible = ancestors.filter((entry) => here.includes(entry.key));
+  const visible = ancestors.filter((entry) => bare.includes(entry.key));
   if (visible.length === ancestors.length) {
     log("verdict: list() INHERITS ancestor keys");
   } else if (visible.length === 0) {
-    log("verdict: list() is NODE-LOCAL (get() still inherits)");
+    log("verdict: list() is NODE-LOCAL");
   } else {
     log(`verdict: mixed — ${visible.length}/${ancestors.length} ancestor keys listed`);
   }
@@ -92,7 +126,10 @@ async function check() {
 
 async function clear() {
   const ledger = await readLedger();
-  for (const entry of ledger) await api.v1.historyStorage.remove(entry.key);
+  for (const entry of ledger) {
+    await api.v1.historyStorage.remove(entry.key, entry.node);
+    await api.v1.historyStorage.remove(entry.key);
+  }
   await api.v1.historyStorage.remove("shared");
   await api.v1.storyStorage.remove(LEDGER);
   report = "";
