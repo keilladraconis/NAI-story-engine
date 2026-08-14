@@ -81,7 +81,7 @@ The `scriptInitiated` filter is load-bearing: without it the Engine's own
 generations would re-arm the wakeup and drive themselves in a loop.
 
 The delay and the prose threshold are new `project.yaml` entries, joining the
-loose-end cap (§4.5, default 8) and the condense threshold (§5.1). This is consistent
+thread cap (§4.5, default 8) and the condense threshold (§5.1). This is consistent
 with the prompt policy in CLAUDE.md: `project.yaml` carries runtime settings only,
 never prompts. The triage prompt and every other Engine prompt is an exported
 constant in `src/core/utils/prompts.ts`. Per §9.2 these settings are surfaced in the
@@ -131,7 +131,7 @@ assess ──▶ triage ──▶ enqueue ──▶ drain ──▶ idle
   Produces the manifest for triage, enqueues condense intents directly, and can
   terminate the firing at zero cost.
 - **triage** — one small instruct generation over new prose plus a compact
-  manifest (entity names, one-line summaries, open loose ends). Answers only _what
+  manifest (entity names, one-line summaries, open threads). Answers only _what
   needs attention_: this entry is now wrong, this is a new commitment, this
   commitment looks satisfied. Most firings on quiet prose return nothing.
 - **enqueue** — triage output becomes intents in a persisted queue.
@@ -146,14 +146,14 @@ The only genuinely scarce resource is **output tokens: 2048 per 240 seconds**,
 released FIFO and gated by FlagB. Input tokens are bucketed far more generously and
 benefit from caching.
 
-| step                         | output cost                             |
-| ---------------------------- | --------------------------------------- |
-| assess                       | 0 — no generation                       |
-| triage                       | ~150                                    |
-| retire a satisfied loose end | 0 — `updateEntry(id, {enabled: false})` |
-| open a loose end             | ~150                                    |
-| revise an entity entry       | up to 1024 — a full lorebook rewrite    |
-| condense an entry            | up to 1024 — a full lorebook rewrite    |
+| step                      | output cost                             |
+| ------------------------- | --------------------------------------- |
+| assess                    | 0 — no generation                       |
+| triage                    | ~150                                    |
+| retire a satisfied thread | 0 — `updateEntry(id, {enabled: false})` |
+| open a thread             | ~150                                    |
+| revise an entity entry    | up to 1024 — a full lorebook rewrite    |
+| condense an entry         | up to 1024 — a full lorebook rewrite    |
 
 At a writing cadence of one generation every 40–60s, that is four to six firings
 per bucket. Triage at every firing costs 600–900 tokens, leaving roughly 1150–1450
@@ -161,12 +161,12 @@ per bucket. Triage at every firing costs 600–900 tokens, leaving roughly 1150�
 
 That asymmetry is the whole shape of the pacing. A revision or condense is a full
 lorebook entry rewrite and can consume half the bucket on its own, while triage,
-opening a loose end, and retiring one are cheap or free. So entry rewrites are the
+opening a thread, and retiring one are cheap or free. So entry rewrites are the
 scarce operation and everything else is nearly incidental.
 
 **Therefore: triage runs hot, actions run cold.** This is not merely affordable, it
 is the correct asymmetry. A commitment never noticed is lost permanently, whereas a
-queued action is safe indefinitely — a loose end's condition does not fire until its
+queued action is safe indefinitely — a thread's condition does not fire until its
 subject has gone unmentioned for thousands of characters, so creating the entry
 three paragraphs late costs nothing. Prose does not un-happen, so a queued intent
 does not go stale.
@@ -181,7 +181,7 @@ The reserve only has to cover actual consumption. Refused requests are free
 (§12.0), so a lost race costs latency rather than budget and the figures above are
 expected costs only.
 
-**Retiring a satisfied loose end never queues**, because it costs zero output
+**Retiring a satisfied thread never queues**, because it costs zero output
 tokens. The action that most protects context health is free.
 
 ### 3.4 Colliding with the writer
@@ -255,23 +255,29 @@ Two consequences, both desirable and both free:
 Work still queued when the writer goes idle is **abandoned**, not held. A background
 loop has no business demanding a Continue click.
 
-## 4. Loose Ends
+## 4. Threads
 
 ### 4.1 The concept
 
-`WorldGroup` ("Threads") and the new open-commitment concept are the same mechanism
-with different triggers, and collapse into one entity.
+**Threads keep their name; their role grows.** A Thread's purpose was always to keep
+a cluster of entities warm in context so the editor's model could reach for them. It
+achieved that with blanket always-on, because that was the only instrument
+available. The negated-key condition (§4.3) is the same intent with a trigger that
+fires _when the cluster has actually gone quiet_ — precisely the moment the old
+always-on was paying for. So this is not a new concept displacing Threads; it is
+Threads with the blunt trigger removed and a lifecycle added.
 
-A Thread's purpose was to keep a cluster of entities warm in context so the editor's
-model could reach for them. It achieved that with blanket always-on, because that
-was the only instrument available. The negated-key condition (§4.3) is the same
-intent with a trigger that fires _when the cluster has actually gone quiet_ — which
-is precisely the moment the old always-on was paying for.
+`WorldGroup` is deleted and `Thread` replaces it. Because the two never coexist, the
+name carries forward without ambiguity, and the continuity is honest — a writer's
+existing mental model of Threads still applies, just with more behind it.
 
-`WorldGroup` is deleted. `LooseEnd` replaces it.
+The `[THREAD]` verb in the Forge's command grammar
+(`src/core/utils/crucible-command-parser.ts`) is unchanged for the same reason.
+Renaming it would read worse and risk confusing a model that has been prompted
+against that vocabulary throughout.
 
 ```ts
-interface LooseEnd {
+interface Thread {
   id: string;
   title: string;
   text: string; // the reminder prose
@@ -290,17 +296,17 @@ whether a hidden letter is a plot or a point. One category with a horizon attrib
 drives the behavioural differences that genuinely exist: condition range, whether it
 gets a pacing gate, and how eagerly triage proposes retiring it.
 
-`entityIds` is load-bearing, not inherited baggage. It is what lets a loose end build
+`entityIds` is load-bearing, not inherited baggage. It is what lets a thread build
 its condition from its participants' own keys, and what makes the `lore` condition
 usable — remind about the unsettled succession only when a member of the Inner
 Circle is on stage. A bare unresolved detail is the degenerate case with one member
 or none.
 
-### 4.2 Loose Ends are not Narrative Vectors
+### 4.2 Threads are not Narrative Vectors
 
 Narrative Vectors (`FieldID.SituationalDynamics`, labelled "Narrative Vectors")
 stay exactly as they are. A Vector is standing pressure with explicitly "no
-outcomes, no predictions," authored by the Forge before the story runs. A Loose End
+outcomes, no predictions," authored by the Forge before the story runs. A Thread
 is an emergent commitment with a terminus, authored by the Engine while the story
 runs. Different tense, different author, different lifetime.
 
@@ -321,13 +327,13 @@ not( key <subject> in ['story'] within range N )
 
 A **forgetting detector**: silent while the thread is alive in the prose, injecting
 precisely when the model has stopped carrying it. This inverts the cost model —
-loose ends are free while they are being honoured, and only spend context when they
+threads are free while they are being honoured, and only spend context when they
 are being neglected.
 
 Supporting constructions:
 
 - `range` scales with `horizon` (a point decays fast, an arc slowly).
-- `{type: "lore", entryId}` gates a loose end on a participant being on stage.
+- `{type: "lore", entryId}` gates a thread on a participant being on stage.
 - `paragraphCount` equations give arc-horizon ends a pacing gate.
 
 None of `advancedConditions` is used anywhere in `src/` today.
@@ -343,14 +349,14 @@ satisfaction rides along in triage's output at no extra generation cost.
 ### 4.5 Proliferation control
 
 Nothing about the mechanism prevents triage opening an entry for every glance and
-half-promise, and each open loose end is a permanent context cost until satisfied.
+half-promise, and each open thread is a permanent context cost until satisfied.
 Unbounded growth would slowly poison the context the Engine exists to improve.
 
 Three controls:
 
-- A **cap** on simultaneously-open loose ends, enforced in the reducer. A
+- A **cap** on simultaneously-open threads, enforced in the reducer. A
   `project.yaml` setting, **default 8**.
-- Triage must **justify** a new loose end against the cap, and displace rather than
+- Triage must **justify** a new thread against the cap, and displace rather than
   add when at the ceiling.
 - A **paragraph-count expiry**, so an end the story quietly abandoned ages out
   instead of accumulating forever.
@@ -365,10 +371,10 @@ currently says.
 This extends the existing `DRAFT > LOREBOOK > STATE` hierarchy
 (`src/core/utils/lorebook-strategy.ts`) across time as well as across surfaces.
 
-**Consequences are revisions, not loose ends.** A character dying or an item being
+**Consequences are revisions, not threads.** A character dying or an item being
 spent is a permanent fact and belongs in the _subject's own_ entry — keyed on their
-name, activating naturally when mentioned. A loose end wants retiring on resolution;
-a consequence wants keeping forever. Filing a consequence as a loose end would
+name, activating naturally when mentioned. A thread wants retiring on resolution;
+a consequence wants keeping forever. Filing a consequence as a thread would
 switch it off at exactly the moment it became permanent truth.
 
 The two action shapes map onto the Forge's existing command grammar
@@ -421,12 +427,12 @@ story is already a single copy operation in the editor.
 
 ### 6.1 Storage scoping
 
-| storage          | holds                                                                                                | why                                                     |
-| ---------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `historyStorage` | World entities, loose ends, foundation, DULFS lists, watermark, intent queue, lorebook write-records | derived from or about the story; must follow the branch |
-| `storyStorage`   | chat sessions (brainstorm, forge, refine), lorebook original snapshots                               | follows the writer, not the branch                      |
-| `tempStorage`    | in-flight pass state                                                                                 | must not survive a reload half-applied                  |
-| —                | `ui`, `runtime` slices                                                                               | ephemeral, not persisted                                |
+| storage          | holds                                                                                             | why                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `historyStorage` | World entities, threads, foundation, DULFS lists, watermark, intent queue, lorebook write-records | derived from or about the story; must follow the branch |
+| `storyStorage`   | chat sessions (brainstorm, forge, refine), lorebook original snapshots                            | follows the writer, not the branch                      |
+| `tempStorage`    | in-flight pass state                                                                              | must not survive a reload half-applied                  |
+| —                | `ui`, `runtime` slices                                                                            | ephemeral, not persisted                                |
 
 `historyStorage.get()` searches ancestor nodes until it finds a value — copy-on-write
 inheritance along the history DAG. This gives branch-correct state with no journal,
@@ -462,9 +468,9 @@ The `historyStorage` keyspace (the `storyStorage` side keeps chat and the write-
 lorebook originals from §5.2):
 
 ```
-index          { entityIds[], looseEndIds[] }   — authoritative for existence (§6.2.1)
+index          { entityIds[], threadIds[] }   — authoritative for existence (§6.2.1)
 e:<id>         WorldEntity
-t:<id>         LooseEnd
+t:<id>         Thread
 lb:<entryId>   what the loop last wrote to that lorebook entry
 watermark      last observed sectionId
 queue          pending intents
@@ -489,7 +495,7 @@ reason: **`remove()` cannot express a branch-local deletion.**
 Because `get()` falls through to the nearest ancestor, removing `e:<id>` at the
 current node does not delete the entity — it uncovers whatever the parent branch
 holds, resurrecting the record the writer just deleted. The same applies to
-retiring a loose end.
+retiring a thread.
 
 So deletion is an **index write**: the index at the current node is rewritten
 without that id, and the id simply stops being referenced. Existence is whatever
@@ -624,7 +630,7 @@ time; it never narrates individual actions.
 | ---------- | ---------------------------------------------------------------- | ----------------------------------------------- |
 | state      | `◉` watching · `◐` reading · `✎` acting · `⏸` held · `⚠` stalled | whether it's alive, and what it's doing         |
 | backlog    | unread paragraphs since the watermark                            | climbing = falling behind                       |
-| loose ends | open loose ends                                                  | context pressure — climbing means go close some |
+| threads    | count of open threads                                            | context pressure — climbing means go close some |
 | touched    | entities revised on this branch                                  | activity level                                  |
 | budget     | remaining output bucket                                          | why it's quiet when it's quiet                  |
 | ⚡ (`zap`) | **the one control** — run a pass now                             | —                                               |
@@ -669,7 +675,7 @@ Engine's states with the generation queue's is how the two surfaces drift.
   `project.yaml` settings surfaced properly rather than left in NovelAI's script
   config, whose UX suits power users only. Includes a small CTA beneath Intensity
   that opens a brainstorm chat about the story.
-- **Engine** — World, Loose Ends, the Forge, loop status detail, and the journal.
+- **Engine** — World, Threads, the Forge, loop status detail, and the journal.
   The Engine's domain: what exists, and what the Engine has done to it. The Forge
   lives here because under the new division it is the instrument that seeds this
   surface.
@@ -702,7 +708,7 @@ sitting in the lorebook — untouched, not destroyed. The Import wizard's Bind i
 already the re-adoption path. The read-then-write and never-clobber rules in §5 and
 §5.2 apply in full regardless.
 
-Consequently there is no `WorldGroup` → `LooseEnd` mapping, and no root-node
+Consequently there is no `WorldGroup` → `Thread` mapping, and no root-node
 resolution for seeding upgraded stories.
 
 ## 11. Failure modes
@@ -716,9 +722,14 @@ resolution for seeding upgraded stories.
 | lorebook entry deleted underneath us             | read-then-write finds nothing; drop the intent, clean the record                                |
 | entity renamed by the writer                     | read-then-write reads live `displayName` per `DRAFT > LOREBOOK > STATE`                         |
 | reload mid-pass                                  | `tempStorage` in-flight state is gone; pass aborts cleanly, queue survives in `historyStorage`  |
-| loose-end cap reached                            | triage displaces rather than adds (§4.5)                                                        |
+| thread cap reached                               | triage displaces rather than adds (§4.5)                                                        |
 
-## 12. Open items
+## 12. Findings and standing risks
+
+Every question this design opened has been answered — the API unknowns empirically,
+via the two probes in `tools/`, and the naming and sizing calls by decision. What
+remains under Risks are not unknowns but things that can only be got right by
+building and using them.
 
 ### 12.0 Resolved: a refused generation is free, and how to recognise one
 
@@ -851,20 +862,19 @@ A `scriptPanel` can be **minimized but never dismissed**. Engine visibility is
 therefore guaranteed rather than opt-in, which is what allows the HUD to carry the
 trust burden (§9.1). No API unknowns remain.
 
-### Naming calls
+### 12.3 Resolved: naming
 
-1. The Forge's `[THREAD]` command now creates loose ends; the verb should match the
-   concept.
-2. Confirm "Loose Ends" as the user-facing category label.
+Threads keep their name and the Forge keeps its `[THREAD]` verb (§4.1). Nothing
+about naming is outstanding.
 
 ### Risks
 
-3. **Triage prompt quality is the whole ballgame** and cannot be settled on paper.
+1. **Triage prompt quality is the whole ballgame** and cannot be settled on paper.
    It is the first thing to build and the thing to iterate against real stories.
-4. **Loose-end proliferation** (§4.5) is the failure mode that would make the Engine
+2. **Thread proliferation** (§4.5) is the failure mode that would make the Engine
    actively harmful rather than merely unhelpful. The cap, justification, and expiry
    are not polish.
-5. **Condense is the only action that can lose information** (§5.1). Every other
+3. **Condense is the only action that can lose information** (§5.1). Every other
    action adds, retires, or flags; a bad condense silently drops an established fact
    and nothing downstream notices. Bias the prompt toward retention, and treat
    condense as the action most worth surfacing for review.
@@ -877,9 +887,9 @@ Everything decidable is pure and testable headless, consistent with the existing
 - manifest builder (state in → manifest text out)
 - condense triggering: entry length crosses the threshold → intent enqueued from
   `assess`, with no triage generation involved (§5.1)
-- the loose-end cap reads from config and defaults to 8 (§4.5)
+- the thread cap reads from config and defaults to 8 (§4.5)
 - intent parsing, extending the existing Forge parser tests
-- condition construction (loose end + horizon → `advancedConditions` tree)
+- condition construction (thread + horizon → `advancedConditions` tree)
 - watermark math across document edits and history navigation
 - drain policy (available budget in → actions permitted out)
 - failure classification: the refusal message is recognised, and every unrecognised
@@ -904,7 +914,7 @@ The design is one coherent system, but it is not one sitting of work. A suggeste
 spine for the implementation plan, ordered so each phase is independently
 verifiable:
 
-All §12 unknowns are now closed, so the plan starts with real work.
+Nothing in §12 is still unknown, so the plan starts with real work.
 
 1. **Setup tab.** Split the Foundation fields out, build Setup as the leftmost tab,
    absorb bootstrap and the Import wizard out of the header, add the Intensity CTA,
@@ -922,7 +932,7 @@ All §12 unknowns are now closed, so the plan starts with real work.
 4. **Loop harness + HUD, triage only.** Trigger, state machine, pacing, collision
    recovery — with triage producing intents that are logged but not executed. The
    HUD makes this observable, which is why it comes early rather than last.
-5. **`LooseEnd` replacing `WorldGroup`**, including `advancedConditions`
+5. **`Thread` replacing `WorldGroup`**, including `advancedConditions`
    construction and the §4.5 controls.
 6. **Actions.** Revise, open, retire, condense — plus §7 reconciliation.
 
