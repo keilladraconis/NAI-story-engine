@@ -9,7 +9,6 @@
 import { useSlice, useStream } from "../../bridge";
 import { useDraftField } from "../../hooks";
 import { T, SP } from "../../style";
-import { useTapGuard } from "../../tap-guard";
 import {
   store,
   groupRenamed,
@@ -45,27 +44,21 @@ const genZapStyle = (pending: boolean) =>
     opacity: pending ? 0.4 : 1,
   }) as const;
 
-// One membership row. Its own component so each row owns its own tap guard —
-// a shared guard would let a tap on one member swallow a tap on the next.
+// One membership row.
 function MemberToggle(props: {
   groupId: string;
   entityId: string;
   name: string;
   isMember: boolean;
 }) {
-  // Membership is a boolean flip: an unguarded repeat click from a single tap
-  // toggles it straight back, so the row looks unresponsive.
-  const onceTap = useTapGuard();
   return (
     <button
       onClick={() =>
-        onceTap(() =>
-          store.dispatch(
-            entityGroupToggled({
-              groupId: props.groupId,
-              entityId: props.entityId,
-            }),
-          ),
+        store.dispatch(
+          entityGroupToggled({
+            groupId: props.groupId,
+            entityId: props.entityId,
+          }),
         )
       }
       style={{

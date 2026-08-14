@@ -19,7 +19,6 @@ import {
   bootstrapContinueRequested,
 } from "../../core/store";
 import { useSlice } from "../bridge";
-import { useTapGuard } from "../tap-guard";
 import { SP, T } from "../style";
 import {
   derive,
@@ -236,7 +235,6 @@ export function Header(props: { initialHasDocumentContent: boolean }) {
   const hasDocumentContent = useHasDocumentContent(
     props.initialHasDocumentContent,
   );
-  const onceTap = useTapGuard();
   const openingModalOpen = useRef(false);
 
   const model = derive(store.getState(), {
@@ -310,9 +308,7 @@ export function Header(props: { initialHasDocumentContent: boolean }) {
         <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
           <button
             disabled={model.bootstrap.disabled}
-            // A tap can deliver click twice on mobile; bootstrap is the one
-            // non-idempotent header action.
-            onClick={() => onceTap(onBootstrap)}
+            onClick={onBootstrap}
             style={actionStyle(model.bootstrap.disabled)}
           >
             <Feather size={ICON_SIZE} />

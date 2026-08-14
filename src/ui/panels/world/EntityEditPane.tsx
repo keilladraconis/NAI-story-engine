@@ -8,7 +8,6 @@
 import { useSlice, useStream } from "../../bridge";
 import { useDraftField } from "../../hooks";
 import { T, SP } from "../../style";
-import { useTapGuard } from "../../tap-guard";
 import {
   store,
   entityEdited,
@@ -192,13 +191,9 @@ export function EntityEditPane(props: { entityId: string }) {
     entity?.categoryId ?? FieldID.DramatisPersonae,
   );
   const [loading, setLoading] = useState(true);
-  // Always On flips a boolean, so an unguarded repeat click from one tap
-  // sets it straight back and the button looks dead.
-  const onceAlwaysOnTap = useTapGuard();
-  // Save and the content Zap's refine branch both promote a draft; the tap guard
-  // is the first line, flushingRef (below) covers the longer await window.
-  const onceSaveTap = useTapGuard();
-  const onceContentTap = useTapGuard();
+  // Save and the content Zap's refine branch both promote a draft, which is a
+  // multi-await sequence: without this, a second press landing mid-flight mints
+  // a second lorebook entry and strands the first.
   const flushingRef = useRef(false);
 
   // Seed lorebook content/keys/always-on from the entry once, on open.
@@ -423,10 +418,7 @@ export function EntityEditPane(props: { entityId: string }) {
           label="Delete"
           onConfirm={onDelete}
         />
-        <button
-          onClick={() => onceSaveTap(onSave)}
-          style={{ padding: "4px 16px" }}
-        >
+        <button onClick={onSave} style={{ padding: "4px 16px" }}>
           Save
         </button>
       </div>
@@ -515,10 +507,8 @@ export function EntityEditPane(props: { entityId: string }) {
             }
             // `disabled` does not cover the refine branch — contentGen.pending
             // only goes true on the generate branch, so refine is never dimmed.
-            onClick={() =>
-              onceContentTap(
-                content.value.trim() ? onRefineContent : contentGen.onGenerate,
-              )
+            onClick={
+              content.value.trim() ? onRefineContent : contentGen.onGenerate
             }
             disabled={loading || contentGen.pending}
             style={genZapStyle(contentGen.pending)}
@@ -554,7 +544,7 @@ export function EntityEditPane(props: { entityId: string }) {
           </button>
           <button
             title="Always On"
-            onClick={() => onceAlwaysOnTap(() => setAlwaysOn((v) => !v))}
+            onClick={() => setAlwaysOn((v) => !v)}
             style={{
               background: "none",
               border: "none",

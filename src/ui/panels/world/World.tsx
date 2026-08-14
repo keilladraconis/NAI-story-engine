@@ -6,7 +6,6 @@
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
-import { useTapGuard } from "../../tap-guard";
 import {
   store,
   segaToggled,
@@ -46,18 +45,6 @@ export function World() {
   const segaRunning = useSlice((s) => s.runtime.segaRunning);
   const [collapsed, setCollapsed] = useState(false);
 
-  // The first three flip a boolean, so an unguarded repeat click from one tap
-  // flips it straight back. SEGA is the worst of those: start-then-stop from a
-  // single tap. The two Add buttons mint an id per click instead, so a repeat
-  // creates a second entity/thread rather than undoing the first. One guard each
-  // — a shared guard would let a tap on the section header swallow the next tap
-  // on expand-all.
-  const onceCollapseTap = useTapGuard();
-  const onceExpandAllTap = useTapGuard();
-  const onceSegaTap = useTapGuard();
-  const onceAddEntityTap = useTapGuard();
-  const onceAddThreadTap = useTapGuard();
-
   const { groups: visibleGroups, loose } = selectWorldBody(
     entitiesById,
     groups,
@@ -92,7 +79,7 @@ export function World() {
     <div style={{ display: "flex", flexDirection: "column", gap: SP.sm }}>
       <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
         <button
-          onClick={() => onceCollapseTap(() => setCollapsed((c) => !c))}
+          onClick={() => setCollapsed((c) => !c)}
           style={{
             flex: 1,
             display: "flex",
@@ -111,9 +98,7 @@ export function World() {
         <button
           title={worldExpanded ? "Collapse all" : "Expand all"}
           onClick={() =>
-            onceExpandAllTap(() =>
-              store.dispatch(worldExpansionSet({ expanded: !worldExpanded })),
-            )
+            store.dispatch(worldExpansionSet({ expanded: !worldExpanded }))
           }
           style={ICON_BTN}
         >
@@ -125,7 +110,7 @@ export function World() {
         </button>
         <button
           title="S.E.G.A."
-          onClick={() => onceSegaTap(() => store.dispatch(segaToggled()))}
+          onClick={() => store.dispatch(segaToggled())}
           style={{ ...ICON_BTN, color: segaRunning ? T.warning : T.text }}
         >
           {segaRunning ? (
@@ -134,18 +119,10 @@ export function World() {
             <PlayCircle size={ICON_SIZE} />
           )}
         </button>
-        <button
-          title="Add entity"
-          onClick={() => onceAddEntityTap(onAddEntity)}
-          style={ICON_BTN}
-        >
+        <button title="Add entity" onClick={onAddEntity} style={ICON_BTN}>
           <Plus size={ICON_SIZE} />
         </button>
-        <button
-          title="Add thread"
-          onClick={() => onceAddThreadTap(onAddThread)}
-          style={ICON_BTN}
-        >
+        <button title="Add thread" onClick={onAddThread} style={ICON_BTN}>
           <Layers size={ICON_SIZE} />
         </button>
         <ConfirmButton
