@@ -53,28 +53,49 @@ Engine records how the story settles it.
 
 ### 3.1 Trigger
 
-Both `onGenerationRequested` and `onGenerationEnd` feed a single last-activity
-watermark. The loop fires when the story has been quiet for a configurable interval
-**and** there is at least a configurable minimum of unobserved prose.
+`onGenerationRequested` with `scriptInitiated: false` schedules a **one-shot wakeup**
+a configurable delay later. When the wakeup fires, the loop runs a pass if there is
+at least a configurable minimum of unobserved prose.
 
-Both thresholds are new `project.yaml` entries. This is consistent with the prompt
-policy in CLAUDE.md: `project.yaml` carries runtime settings only, never prompts.
-The triage prompt and every other Engine prompt is an exported constant in
-`src/core/utils/prompts.ts`.
+If a wakeup is already pending, a further generation does **not** reschedule it. The
+loop therefore fires at most once per delay window, anchored to the first generation
+of a burst — no stacking, and no starvation for a writer who generates faster than
+the delay.
 
-Keying on quiet rather than on either hook directly has two advantages: it covers
-hand-written prose, which no generation hook observes at all, and it avoids
-triaging a scene that is still being written, which wastes a pass on prose about to
-be extended or undone.
+The `scriptInitiated` filter is load-bearing: without it the Engine's own
+generations would re-arm the wakeup and drive themselves in a loop.
 
-The quiet gate is primarily a _work-quality_ device. Collision avoidance is handled
-separately and more directly by the local in-flight gate in §3.4, so the interval
-can be tuned for usefulness rather than as a defensive margin.
+Both the delay and the prose threshold are new `project.yaml` entries. This is
+consistent with the prompt policy in CLAUDE.md: `project.yaml` carries runtime
+settings only, never prompts. The triage prompt and every other Engine prompt is an
+exported constant in `src/core/utils/prompts.ts`.
 
-`onGenerationEnd` is documented at `external/script-types.d.ts:4092`;
-`onGenerationRequested` at `:3989`. The project currently registers exactly one hook
-(`onHistoryNavigated`, `src/core/store/effects/bootstrap-effects.ts:171`), so this
-surface is otherwise unused.
+**Why a delay from generation start**, rather than tracking whether one of the
+writer's generations is currently in flight. The delay lands the pass in the window
+of greatest utility — the writer is watching tokens stream in, or reading what
+arrived — which is also the window where FlagB is freshest and buckets are
+releasing. More importantly, a tracked in-flight window is a persistent flag that
+can fail to close: one missed `onGenerationEnd` and the Engine is gated off
+permanently and silently, with nothing in the UI to explain why. A timer has no
+such state. Its worst failure is being mistimed, and a mistimed wakeup costs one
+refused request and corrects itself on the next generation.
+
+**The delay must clear the generation's own duration.** The backend lock is held
+while the writer's tokens are streaming, so a wakeup that fires mid-stream is
+refused by construction. The configured delay is therefore "typical generation time
+plus a little reading time," not "reading time" — and since generation length
+varies, some refusals are expected rather than exceptional. That is priced in
+(§3.4): a refused triage costs its `max_tokens` and the intent survives.
+
+Implementation note: follow the cancellation-flag pattern in
+`src/core/store/effects/autosave.ts` rather than storing timer ids —
+`api.v1.timers.setTimeout` returns a `Promise<number>`, which makes the id awkward
+to hold and clear.
+
+`onGenerationRequested` is documented at `external/script-types.d.ts:3989`. The
+project currently registers exactly one hook (`onHistoryNavigated`,
+`src/core/store/effects/bootstrap-effects.ts:171`), so this surface is otherwise
+unused.
 
 ### 3.2 Per-firing state machine
 
@@ -145,27 +166,15 @@ than an absolute lock** — a short-lived key that expires on its own, not a sha
 lock requiring reconciliation. Collisions are therefore self-clearing and
 detectable after the fact. They are not, however, _cheap_ — see §12.0.
 
-Handling has two layers: keep out of the way for free, and fail safely when that
-is not enough.
+Avoidance is entirely the timing of the wakeup (§3.1). The loop holds **no state
+about whether the writer is busy** — no in-flight flag to open and close, and no
+pre-emptive cancellation of the writer's request. Both were considered and both
+were rejected for the same reason: they add persistent state or an unreliable abort
+in exchange for avoiding a failure that is already transient, and a flag that fails
+to close would gate the Engine off permanently and silently.
 
-**Layer 1 — a free local gate.** The loop already registers both generation hooks
-for its activity watermark (§3.1), so it always knows whether one of the writer's
-generations is outstanding: `onGenerationRequested` with `scriptInitiated: false`
-opens the window, `onGenerationEnd` closes it. Simply not firing while that window
-is open costs nothing, needs no backend round trip, and eliminates almost every
-collision. This is not pessimistic locking — no cancellation path, no reliance on
-the harness awaiting hooks — it is just declining to act on information already in
-hand.
-
-**Layer 2 — optimistic recovery for the race.** The gate cannot close the window
-between the loop's check and its request landing, so a refusal is still possible.
-When one occurs, the loop swallows the error, keeps the intent queued, and carries
-on.
-
-This is deliberately _not_ pre-emptive cancellation of in-flight work. That would
-need a cancellation path and a reliable abort, and the typings warn cancellation
-"may not cancel immediately" — an unreliable guarantee bought with real machinery.
-Layer 1 gets the same benefit for free.
+So the loop simply fires when its wakeup says to, and handles refusal after the
+fact: swallow the error, keep the intent queued, carry on.
 
 **A refusal is charged its full `max_tokens`. Measured, not assumed** — see §12.0.
 A successful generation is debited what it returned; a refused one is debited what
@@ -174,9 +183,10 @@ bucket, roughly a fifth of the window.
 
 Three rules follow.
 
-**No retry.** A refused intent stays queued and waits for the next firing, whose own
-quiet check and local gate are the right arbiters. Retrying inside the firing would
-spend the request's full cost again against a gate that is still closed.
+**No retry.** A refused intent stays queued and waits for the next wakeup, which is
+anchored to the writer's next generation and is therefore the right arbiter.
+Retrying inside the firing would spend the request's full cost again against a lock
+that is very likely still held.
 
 **`max_tokens` is a correctness concern, not politeness.** Every Engine request sizes
 `max_tokens` as tightly as its step allows, because that number — not the output — is
@@ -190,8 +200,8 @@ _not_ recognise is therefore treated as non-retryable too. Default-deny means a
 future change to that message string degrades to "stopped retrying" rather than
 "burns the bucket in a loop".
 
-Layer 1 is what actually protects the budget; layer 2 only keeps a lost race from
-corrupting the queue.
+Wakeup timing is what actually protects the budget; refusal handling only keeps a
+lost race from corrupting the queue.
 
 **Collisions are normal, not exceptional.** They are never surfaced to the writer —
 no error state, no HUD warning (§9.1). Only a persistent inability to make progress
@@ -574,16 +584,16 @@ resolution for seeding upgraded stories.
 
 ## 11. Failure modes
 
-| condition                            | behaviour                                                                                       |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| writer's generation outstanding      | do not fire — free local gate from the two hooks (§3.4)                                         |
-| request refused for concurrency      | swallow, keep the intent queued, defer to the next firing. Never retried, never surfaced (§3.4) |
-| budget exhausted                     | hold; abandon if the writer goes idle                                                           |
-| malformed model output               | the Forge's existing parser already surfaces rejected and unparseable commands as warning chips |
-| lorebook entry deleted underneath us | read-then-write finds nothing; drop the intent, clean the record                                |
-| entity renamed by the writer         | read-then-write reads live `displayName` per `DRAFT > LOREBOOK > STATE`                         |
-| reload mid-pass                      | `tempStorage` in-flight state is gone; pass aborts cleanly, queue survives in `historyStorage`  |
-| loose-end cap reached                | triage displaces rather than adds (§4.5)                                                        |
+| condition                                        | behaviour                                                                                       |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| wakeup fires while the writer is still streaming | refused like any collision; the delay is tuned to make this uncommon, not impossible (§3.1)     |
+| request refused for concurrency                  | swallow, keep the intent queued, defer to the next firing. Never retried, never surfaced (§3.4) |
+| budget exhausted                                 | hold; abandon if the writer goes idle                                                           |
+| malformed model output                           | the Forge's existing parser already surfaces rejected and unparseable commands as warning chips |
+| lorebook entry deleted underneath us             | read-then-write finds nothing; drop the intent, clean the record                                |
+| entity renamed by the writer                     | read-then-write reads live `displayName` per `DRAFT > LOREBOOK > STATE`                         |
+| reload mid-pass                                  | `tempStorage` in-flight state is gone; pass aborts cleanly, queue survives in `historyStorage`  |
+| loose-end cap reached                            | triage displaces rather than adds (§4.5)                                                        |
 
 ## 12. Open items
 
@@ -614,7 +624,7 @@ default-deny classification.
 performed no work, so there is nothing to charge for — and has been raised with
 NovelAI. Treat the behaviour as current fact, not as permanent. If it is fixed so
 that a refusal costs nothing, the only change is that the retry branch becomes
-available again: the local gate, the tight `max_tokens`, and the default-deny
+available again: the wakeup timing, the tight `max_tokens`, and the default-deny
 classifier all stay worth having regardless. Re-run the probe to confirm before
 relying on a change.
 
@@ -660,6 +670,8 @@ Everything decidable is pure and testable headless, consistent with the existing
 - failure classification: the measured refusal message is recognised, and every
   unrecognised failure is treated as non-retryable (§3.4's default-deny)
 - the loop state machine as a pure reducer, table-driven
+- wakeup arming: a pending wakeup is not rescheduled by a further generation, and a
+  `scriptInitiated: true` request never arms one
 - reconciliation decision table (live text vs recorded write → revise / leave alone)
 
 Plus one guard test in the spirit of `tests/ui/countdown.test.ts`, asserting the HUD
