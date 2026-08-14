@@ -1,9 +1,13 @@
-// A small prompt under the Intensity picker: the register is chosen, now go
-// talk about the story. Creates a fresh brainstorm and hands the tab switch
-// back to App, which owns the active tab.
+// "Talk it through" — the obvious next step once a register is chosen and the
+// Foundation is still blank. Sits directly under the Intensity picker and only
+// while every field card is empty (Setup owns that condition), so it is a
+// starting prompt rather than permanent furniture.
+//
+// Sized to match the field cards it stands in for: full width, card background,
+// its own padding. A small text link would read as an afterthought in the one
+// place where it is the primary action.
 
 import { store, chatCreated, chatSwitched } from "../../../core/store";
-import { useSlice } from "../../bridge";
 import { useTapGuard } from "../../tap-guard";
 import { SP, T } from "../../style";
 import { nextBrainstormTitle } from "../chat/chat-actions";
@@ -11,7 +15,6 @@ import type { Chat as ChatT } from "../../../core/chat-types/types";
 import { MessageSquare } from "nai:icons/feather";
 
 export function BrainstormCta(props: { onOpenChat: () => void }) {
-  const chatCount = useSlice((s) => s.chat.chats.length);
   const onceTap = useTapGuard();
 
   const start = () => {
@@ -34,25 +37,37 @@ export function BrainstormCta(props: { onOpenChat: () => void }) {
       // Creating a chat is not idempotent — a doubled tap would leave a stray
       // empty brainstorm behind.
       onClick={() => onceTap(start)}
-      // chatCount is read only so this button re-renders when the chat list
-      // changes; the title it mints must not go stale.
-      title={`${chatCount} chat${chatCount === 1 ? "" : "s"} so far`}
       style={{
-        display: "inline-flex",
-        alignItems: "center",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
         gap: SP.sm,
-        alignSelf: "flex-start",
-        padding: `0 ${SP.md}`,
-        background: "none",
-        border: "none",
+        width: "100%",
+        textAlign: "left",
+        background: T.bg2,
+        border: `1px solid ${T.textHeadings}`,
         cursor: "pointer",
-        color: T.textHeadings,
-        fontSize: "0.8em",
-        opacity: 0.85,
+        color: T.text,
+        fontFamily: T.fontDefault,
+        padding: SP.md,
       }}
     >
-      <MessageSquare size={13} />
-      Talk it through
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: SP.sm,
+          color: T.textHeadings,
+          fontWeight: "bold",
+        }}
+      >
+        <MessageSquare size={16} />
+        Talk it through
+      </span>
+      <span style={{ fontSize: "0.85em", opacity: 0.8 }}>
+        Not sure where to start? Brainstorm the story and fill the Foundation
+        from the conversation.
+      </span>
     </button>
   );
 }
