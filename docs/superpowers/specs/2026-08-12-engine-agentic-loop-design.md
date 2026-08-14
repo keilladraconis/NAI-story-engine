@@ -419,7 +419,7 @@ The `historyStorage` keyspace (the `storyStorage` side keeps chat and the write-
 lorebook originals from §5.1):
 
 ```
-index          { entityIds[], looseEndIds[] }   — changes only on create/delete
+index          { entityIds[], looseEndIds[] }   — authoritative for existence (§6.2.1)
 e:<id>         WorldEntity
 t:<id>         LooseEnd
 lb:<entryId>   what the loop last wrote to that lorebook entry
@@ -437,9 +437,29 @@ A typical pass copies two small records onto its node. Going finer — per field
 within an entity — would multiply the read path without meaningfully reducing write
 cost, since an entity's fields tend to change together.
 
-`index` makes the load path independent of `historyStorage.list()`'s inheritance
-semantics (§12): load reads the index, then fans out to record keys with
-`Promise.all`.
+### 6.2.1 The index is how deletion works
+
+`list()` inherits ancestor keys (§12.1), so the index is not needed merely to
+enumerate the keyspace. It earns its place for a different and more important
+reason: **`remove()` cannot express a branch-local deletion.**
+
+Because `get()` falls through to the nearest ancestor, removing `e:<id>` at the
+current node does not delete the entity — it uncovers whatever the parent branch
+holds, resurrecting the record the writer just deleted. The same applies to
+retiring a loose end.
+
+So deletion is an **index write**: the index at the current node is rewritten
+without that id, and the id simply stops being referenced. Existence is whatever
+the nearest-ancestor index says, which is branch-correct by construction — a
+sibling branch keeps its own index and its own entity. No tombstones are needed,
+and the orphaned `e:<id>` record left behind is harmless because nothing reads a
+record the index does not name.
+
+This makes the index authoritative for existence, and `list()` diagnostic only.
+Load reads the index, then fans out to the named record keys with `Promise.all`.
+
+**Corollary: never call `historyStorage.remove()` on a record key.** It reads as
+"delete" and behaves as "revert to the parent branch's version".
 
 ### 6.3 Node capture at dispatch time
 
@@ -448,9 +468,16 @@ explicitly does not fire for nodes created during normal editing or generation. 
 debounced flush (currently 2000ms) can therefore land after the current node has
 moved on, writing conclusions about node N onto node N+2.
 
-`historyStorage.set(key, value, nodeId)` takes an explicit node. **Capture
-`currentNodeId()` at dispatch time and pass it at flush time.** This is correctness,
-not optimisation.
+`historyStorage.set(key, value, nodeId)` takes an explicit node, and the argument is
+honoured (§12.1). **Capture `currentNodeId()` at dispatch time and pass it at flush
+time.** This is correctness, not optimisation.
+
+The probe demonstrated the failure mode by accident. Its first version called
+`currentNodeId()` and then `set()` with no explicit node, a few statements apart —
+and the value landed on a different node than the one just read, far enough apart
+that the recorded node turned out to be the _grandparent_ of where the write went.
+If two adjacent calls can disagree about "current", a 2000ms debounce certainly can.
+**No `historyStorage` write in the Engine omits its node argument.**
 
 ### 6.4 The store boundary
 
@@ -661,31 +688,62 @@ all; the fix is what restores it.
 if refusal costs ever look suspicious again; Test B's `free ~N` / `charged ~N` lines
 make the answer immediate.
 
+### 12.1 Resolved: historyStorage inheritance and the node argument
+
+Measured with `tools/history-storage-probe.naiscript`:
+
+```
+wrote marker-1 at node 2000700501153961 (number)
+  list(2000700501153961) right after = ["marker-1","shared"]
+--- check at node 2148354315150205 ---
+list()      = ["marker-1","shared"]
+list(2148354315150205) = ["marker-1","shared"]
+ancestry: [2148354315150205,2000700501153961,2108041959196779]
+  marker-1 written@2000700501153961  ...  ancestor=yes(+1)
+  shared resolves to node 2000700501153961
+verdict: list() INHERITS ancestor keys
+```
+
+- **`list()` returns inherited ancestor keys**, matching `get()`. A key written at
+  the parent is listed at the child.
+- **The `nodeId` argument is honoured** by `set`, `get`, and `list`. `list()` and
+  `list(currentNodeId())` agree.
+- **Nearest-ancestor-wins is confirmed** — `shared`, written at several nodes,
+  resolves to the closest one.
+- **Node ids are numbers**, and large (~2×10¹⁵). Comfortably inside
+  `Number.MAX_SAFE_INTEGER` (~9×10¹⁵), but close enough that they must never be
+  arithmetic operands or round-tripped through anything lossy. Treat them as opaque
+  identifiers.
+
+The v0.1 run also produced a useful accident: reading `currentNodeId()` and then
+calling `set()` without a node landed the value two nodes away from the id just
+read. That is the evidence behind §6.3.
+
 ### Verify before writing code
 
-1. **`onHistoryNavigated`'s `nodeId` type.** Typed `string` in the hook params,
-   while `currentNodeId()` returns `number`. One of them is wrong in the `.d.ts`, and
-   journal/record keys depend on which.
-2. **`historyStorage.list(nodeId)` inheritance.** The docs do not say whether it
-   returns inherited ancestor keys or only keys written at that exact node. The
-   `index` key (§6.2) makes the load path immune either way, but the answer affects
-   diagnostics and cleanup.
-3. **`scriptPanel` placement and visibility.** The typings describe it as appearing
+1. **`onHistoryNavigated`'s `nodeId` type.** Typed `string` in the hook params, while
+   `currentNodeId()` returns `number` — and `currentNodeId()` is confirmed to return
+   a number (§12.1). The hook has not yet fired during a probe run, so the
+   contradiction stands. Undo once with `tools/history-storage-probe.naiscript`
+   loaded; it logs the hook's `nodeId` and `currentNodeId()` side by side with their
+   `typeof`s.
+2. **`scriptPanel` placement and visibility.** The typings describe it as appearing
    below the editor and being user-collapsible. If it can be closed, Engine
    visibility is opt-in and the sidebar Engine tab must remain the authoritative
-   view.
+   view. Both probes render in one, so the remaining question is only whether the
+   writer can dismiss it.
 
 ### Naming calls
 
-4. The Forge's `[THREAD]` command now creates loose ends; the verb should match the
+3. The Forge's `[THREAD]` command now creates loose ends; the verb should match the
    concept.
-5. Confirm "Loose Ends" as the user-facing category label.
+4. Confirm "Loose Ends" as the user-facing category label.
 
 ### Risks
 
-6. **Triage prompt quality is the whole ballgame** and cannot be settled on paper.
+5. **Triage prompt quality is the whole ballgame** and cannot be settled on paper.
    It is the first thing to build and the thing to iterate against real stories.
-7. **Loose-end proliferation** (§4.5) is the failure mode that would make the Engine
+6. **Loose-end proliferation** (§4.5) is the failure mode that would make the Engine
    actively harmful rather than merely unhelpful. The cap, justification, and expiry
    are not polish.
 
@@ -708,6 +766,9 @@ Everything decidable is pure and testable headless, consistent with the existing
   `scriptInitiated: true` request never arms one
 - manual invocation is refused while a pass is already in flight (§9.1)
 - reconciliation decision table (live text vs recorded write → revise / leave alone)
+- deletion goes through the index and never calls `historyStorage.remove()` on a
+  record key (§6.2.1) — the resurrection bug is silent and branch-dependent, so it
+  wants a test rather than a comment
 
 Plus one guard test in the spirit of `tests/ui/countdown.test.ts`, asserting the HUD
 has not become a second reader of generation status.
