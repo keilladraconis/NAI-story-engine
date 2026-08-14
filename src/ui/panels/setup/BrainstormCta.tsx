@@ -44,10 +44,16 @@ export function BrainstormCta(props: { onOpenChat: () => void }) {
   const level = useSlice((s) => s.foundation.intensity?.level ?? "");
   const ready = level !== "";
 
-  // No re-entry guard, matching Sessions.tsx's New chat: the body is wholly
-  // synchronous, so there is no await for a second press to slip inside, and
-  // the first click switches to the Chat tab — which unmounts this button.
+  // Not `disabled` — the UA greys a disabled button on its own, and this box is
+  // at its most useful in exactly the state that would grey it. The check lives
+  // in the handler instead, which is where CLAUDE.md puts it anyway: `disabled`
+  // is a render-time value, never the guard.
+  //
+  // No re-entry guard beyond that, matching Sessions.tsx's New chat: the body is
+  // wholly synchronous, so there is no await for a second press to slip inside,
+  // and the first click switches to the Chat tab — which unmounts this button.
   const start = () => {
+    if (!ready) return;
     const chats = store.getState().chat.chats;
     const chat: ChatT = {
       id: api.v1.uuid(),
@@ -64,7 +70,6 @@ export function BrainstormCta(props: { onOpenChat: () => void }) {
 
   return (
     <button
-      disabled={!ready}
       onClick={start}
       style={{
         display: "flex",
@@ -79,12 +84,13 @@ export function BrainstormCta(props: { onOpenChat: () => void }) {
         color: T.text,
         fontFamily: T.fontDefault,
         padding: SP.md,
+        opacity: 1,
       }}
     >
-      {/* Gold in both states, and no dimming on the button as a whole. The
-          waiting state is the one that has to catch the eye — a disabled-looking
-          box reads as one more inert control and the prompt goes unread. Only
-          the border stays muted, to say "not yet" without hiding the message. */}
+      {/* Nothing here is dimmed while waiting. The waiting state is the one that
+          has to catch the eye — anything that reads as disabled becomes one more
+          inert control and the prompt goes unread. Only the border stays muted,
+          to say "not yet" without hiding the message. */}
       <span
         style={{
           display: "inline-flex",
@@ -97,7 +103,7 @@ export function BrainstormCta(props: { onOpenChat: () => void }) {
         <CtaIcon ready={ready} />
         {ready ? "Talk it through" : "Choose an Intensity first"}
       </span>
-      <span style={{ fontSize: "0.85em", opacity: 0.8 }}>
+      <span style={{ fontSize: "0.85em", opacity: ready ? 0.8 : 1 }}>
         {ready
           ? "Not sure where to start? Brainstorm the story and fill the Foundation from the conversation."
           : "Pick a register above. The brainstorm writes in the tone you set, so it is worth choosing before you start talking."}
