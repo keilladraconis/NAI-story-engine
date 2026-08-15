@@ -29,6 +29,14 @@ export function registerAutosaveEffects(
   // writing creates history nodes continuously and onHistoryNavigated does not
   // fire for them, so a 2s debounce can easily land after the cursor has moved
   // — writing this state onto a node it does not describe. See design §6.3.
+  //
+  // And captured on the FIRST action of a burst, not the last: a window holding
+  // two edits either side of a node boundary writes both onto the earlier node.
+  // That is deliberate. The alternative — re-capturing per action — stamps the
+  // whole window with the later node, so undoing back across the boundary loses
+  // the first edit outright. Leaking a later edit backwards is recoverable (the
+  // next flush at the later node writes it there too); losing one is not.
+  // Pinned by "keeps the whole burst on the node it started at" below.
   let pendingNode: Promise<number> | null = null;
 
   async function flush(): Promise<void> {

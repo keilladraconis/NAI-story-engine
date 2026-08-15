@@ -1,7 +1,7 @@
 // Bootstrap + mount for the JSX/Preact Story Engine.
 //
 // `start()` is the single entry point (called from src/index.ts). It wires the
-// store (GenX, effects, persistence, migrations, lorebook sync), then registers
+// store (GenX, effects, persistence, lorebook sync), then registers
 // the sidebar panel — and, when enabled, the Generation Journal panel — in ONE
 // `api.v1.ui.register()` call (NAI requires a single call; multiple overwrite
 // each other). All UI is Preact rendered into a jsx part.
@@ -26,6 +26,7 @@ import {
   registerLorebookSyncHooks,
 } from "../core/store/effects/lorebook-sync";
 import { loadBranchState } from "../core/store/persistence/history-store";
+import type { ChatSliceState } from "../core/store/slices/chat";
 import { loadJournal } from "../core/generation-journal";
 import { STORAGE_KEYS } from "../core/keys";
 import { hydrateComposerDrafts } from "./panels/chat/composer-draft";
@@ -160,10 +161,12 @@ export async function start(): Promise<void> {
   // Engine is alpha and upgrading drops Engine state — previously managed
   // lorebook entries simply become unmanaged, and the Import wizard's Bind is
   // the way back.
-  const [branch, chat] = await Promise.all([
+  // storyStorage.get is typed `any`; name the shape here rather than letting it
+  // flow unchecked into PersistedData, the way history-store.ts does for the index.
+  const [branch, chat] = (await Promise.all([
     loadBranchState(),
     api.v1.storyStorage.get(STORAGE_KEYS.CHAT),
-  ]);
+  ])) as [Awaited<ReturnType<typeof loadBranchState>>, ChatSliceState | null];
   store.dispatch(
     persistedDataLoaded({
       story: branch.story,

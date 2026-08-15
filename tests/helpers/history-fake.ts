@@ -94,7 +94,15 @@ export function installHistoryFake(): HistoryFake {
         return v === undefined ? fallback : v;
       },
     ),
-    setIfAbsent: vi.fn(async () => false),
+    // Nothing in src/ uses this yet. Model it properly rather than stubbing
+    // `false`: a hardcoded stub is a fake that lies, and the first caller would
+    // get green tests for a write that never happened.
+    setIfAbsent: vi.fn(async (key: string, value: unknown, node?: number) => {
+      const target = node ?? cursor;
+      if (lookup(key, target) !== undefined) return false;
+      at(target).set(key, value);
+      return true;
+    }),
   } as unknown as typeof api.v1.historyStorage;
 
   api.v1.document.history = {

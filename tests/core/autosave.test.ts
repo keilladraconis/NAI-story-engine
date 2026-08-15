@@ -21,6 +21,26 @@ function entity(id: string): WorldEntity {
   };
 }
 
+/** As `harness`, but the state can change between actions — the shape a burst
+ *  spanning a node boundary actually has. */
+function mutableHarness(getState: () => RootState) {
+  const handlers: Array<{
+    match: (a: Action) => boolean;
+    run: (a: Action) => void;
+  }> = [];
+  const subscribeEffect = ((match: never, run: never) => {
+    handlers.push({ match, run });
+    return () => {};
+  }) as never;
+  registerAutosaveEffects(subscribeEffect, getState);
+  return {
+    fire(type: string) {
+      const action = { type } as Action;
+      for (const h of handlers) if (h.match(action)) h.run(action);
+    },
+  };
+}
+
 /** Minimal stand-in for the store's subscribeEffect: captures the predicate and
  *  handler so the test can fire actions synchronously. */
 function harness(state: RootState) {
@@ -89,6 +109,28 @@ describe("autosave", () => {
     fire("runtime/requestQueued");
     await vi.runAllTimersAsync();
     expect(api.v1.historyStorage.set).not.toHaveBeenCalled();
+  });
+
+  it("keeps the whole burst on the node it started at", async () => {
+    // Two edits either side of a node boundary both land on the earlier node.
+    // That is the deliberate trade: re-capturing per action would stamp the
+    // window with the later node instead, and undoing back across the boundary
+    // would then lose the first edit outright. A later edit leaking backwards
+    // is recoverable; a lost one is not. Do not "fix" this without reading the
+    // comment on pendingNode.
+    const h = installHistoryFake();
+    const n1 = h.current();
+    let state = baseState(["E1"]);
+    const { fire } = mutableHarness(() => state);
+
+    fire("world/entityForged"); // arms pendingNode = n1
+    h.push(); // the writer generates a paragraph; the cursor moves
+    state = baseState(["E1", "E2"]);
+    fire("world/entityForged"); // extends the debounce, does NOT re-stamp
+    await vi.runAllTimersAsync();
+
+    h.goto(n1);
+    expect((await loadBranchState(n1)).world.entityIds).toEqual(["E1", "E2"]);
   });
 
   it("never removes a record key", async () => {

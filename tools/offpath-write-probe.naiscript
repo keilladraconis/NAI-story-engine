@@ -1,0 +1,156 @@
+/*---
+compatibilityVersion: naiscript-1.0
+id: 6f3b2c81-9d4a-4e17-8c52-a1d0e7b4f923
+name: Off-Path Write Probe
+version: 0.1.0
+description: Does historyStorage.set() land when the target node is not an ancestor of the cursor?
+memoryLimit: 8
+---*/
+
+// We know reads off the current path come back empty. Writes were never measured,
+// and Story Engine now depends on them: when the writer undoes, the engine flushes
+// pending state to the node they just LEFT — which is a forward (redo) node, not an
+// ancestor. If that write is dropped, an entity created just before an undo is lost
+// for good.
+//
+// Two cases, because they may differ:
+//   FORWARD  — the node is a redo target, still in the graph ahead of the cursor
+//   ABANDONED — the writer undid and then typed, forking away; the node is orphaned
+//
+// Run:
+//   1. Arm            (records the current node)
+//   2. Undo in the editor
+//   3. Write to armed (the off-path write under test)
+//   4. Redo           -> Verify   ... this is the FORWARD case
+//   5. To test ABANDONED: after step 3, type a new paragraph instead of redoing,
+//      then Verify. The armed node is now orphaned.
+
+const LEDGER = "offpath-probe";
+
+let report = "";
+
+function log(line) {
+  report += line + "\n";
+  api.v1.log(line);
+  void api.v1.ui.updateParts([{ id: "report", text: report }]);
+}
+
+const currentNode = () => api.v1.document.history.currentNodeId();
+
+async function ancestry(node) {
+  const chain = [];
+  let id = node;
+  for (let i = 0; i < 12 && id !== undefined && id !== null; i++) {
+    chain.push(id);
+    const state = await api.v1.document.history.nodeState(id);
+    id = state && state.targetNode ? state.targetNode.parent : undefined;
+  }
+  return chain;
+}
+
+async function arm() {
+  const node = await currentNode();
+  await api.v1.storyStorage.set(LEDGER, { node, key: `off-${node}` });
+  report = "";
+  log(`armed at node ${node}`);
+  log("now undo in the editor, then press Write to armed");
+}
+
+async function writeToArmed() {
+  const armed = await api.v1.storyStorage.get(LEDGER);
+  if (!armed) return log("nothing armed");
+
+  const cursor = await currentNode();
+  const chain = await ancestry(cursor);
+  const isAncestor = chain.indexOf(armed.node) >= 0;
+
+  log(`\ncursor ${cursor}, armed ${armed.node}`);
+  log(`ancestry ${JSON.stringify(chain)}`);
+  log(`armed is ${isAncestor ? "AN ANCESTOR — undo first, this proves nothing" : "off-path (good)"}`);
+
+  await api.v1.historyStorage.set(armed.key, { writtenAt: armed.node }, armed.node);
+
+  // Straight back out through the same off-path id. A read here is itself
+  // off-path, so MISSING is expected either way — it is not the verdict.
+  const echo = await api.v1.historyStorage.get(armed.key, armed.node);
+  log(`immediate read-back = ${echo ? `writtenAt ${echo.writtenAt}` : "MISSING"}`);
+  log("now navigate back to the armed node and press Verify");
+}
+
+async function verify() {
+  const armed = await api.v1.storyStorage.get(LEDGER);
+  if (!armed) return log("nothing armed");
+
+  const cursor = await currentNode();
+  const chain = await ancestry(cursor);
+  const reachable = chain.indexOf(armed.node) >= 0;
+
+  const value = await api.v1.historyStorage.get(armed.key);
+  const atNode = await api.v1.historyStorage.get(armed.key, armed.node);
+
+  log(`\n--- verify at node ${cursor} ---`);
+  log(`armed ${armed.node} is ${reachable ? `on the chain (+${chain.indexOf(armed.node)})` : "still off-path"}`);
+  log(`get(key)            = ${value ? `writtenAt ${value.writtenAt}` : "MISSING"}`);
+  log(`get(key, armedNode) = ${atNode ? `writtenAt ${atNode.writtenAt}` : "MISSING"}`);
+
+  if (!reachable) {
+    log("verdict: inconclusive — navigate back to the armed node first");
+  } else if (value || atNode) {
+    log("verdict: OFF-PATH WRITES LAND. The flush-on-navigate fix is sound.");
+  } else {
+    log("verdict: OFF-PATH WRITES ARE DROPPED. Engine loses state written on undo.");
+  }
+}
+
+async function clear() {
+  const armed = await api.v1.storyStorage.get(LEDGER);
+  if (armed) {
+    await api.v1.historyStorage.remove(armed.key, armed.node);
+    await api.v1.historyStorage.remove(armed.key);
+  }
+  await api.v1.storyStorage.remove(LEDGER);
+  report = "";
+  log("cleared");
+}
+
+api.v1.hooks.register("onHistoryNavigated", async (params) => {
+  log(`navigated ${params.cause}: nodeId=${params.nodeId}, current=${await currentNode()}`);
+});
+
+api.v1.ui.register([
+  api.v1.ui.extension.scriptPanel({
+    name: "Off-Path Write Probe",
+    content: [
+      api.v1.ui.part.column({
+        content: [
+          api.v1.ui.part.button({
+            text: "1. Arm",
+            callback: () => void arm(),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.button({
+            text: "2. Write to armed",
+            callback: () => void writeToArmed(),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.button({
+            text: "3. Verify",
+            callback: () => void verify(),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.button({
+            text: "Clear",
+            callback: () => void clear(),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.text({
+            id: "report",
+            text: "Arm, undo, write, redo, verify.",
+            noTemplate: true,
+            style: { whiteSpace: "pre-wrap", userSelect: "text" },
+          }),
+        ],
+      }),
+    ],
+  }),
+]);
