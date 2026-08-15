@@ -1437,7 +1437,9 @@ back."
 - Create: `src/core/store/effects/history-sync.ts`
 - Modify: `src/core/store/effects/bootstrap-effects.ts`
 - Modify: `src/core/store/register-effects.ts`
+- Modify: `src/core/store/index.ts` (export `rootReducer` — step 8)
 - Test: `tests/core/history-sync.test.ts`
+- Test: `tests/core/persist-loaded.test.ts`
 
 **Interfaces:**
 
@@ -1673,7 +1675,112 @@ describe("onHistoryNavigated has exactly one home", () => {
 Run: `npx vitest run tests/core/history-sync.test.ts`
 Expected: PASS, 6 tests.
 
-- [ ] **Step 8: Build, format, commit**
+- [ ] **Step 8: Pin the reducer's replace semantics**
+
+The test above asserts on the dispatched *payload*. Nothing yet asserts that the
+reducer *applying* it replaces rather than merges — and that line
+(`src/core/store/index.ts`, `world: data.world ?? current.world`) is what the
+whole phase rests on. A future session that "fixes" it to
+`{ ...current.world, ...data.world }` would keep all 625 tests green while
+resurrecting entities from abandoned branches.
+
+Create `tests/core/persist-loaded.test.ts`:
+
+```ts
+import { describe, it, expect } from "vitest";
+import { persistedDataLoaded } from "../../src/core/store";
+import { initialWorldState } from "../../src/core/store/slices/world";
+import { initialStoryState } from "../../src/core/store/slices/story";
+import type { RootState, WorldEntity, WorldState } from "../../src/core/store/types";
+
+function entity(id: string): WorldEntity {
+  return {
+    id,
+    categoryId: "dramatisPersonae" as WorldEntity["categoryId"],
+    lifecycle: "live",
+    name: id,
+    summary: "",
+  };
+}
+
+function world(ids: string[]): WorldState {
+  return {
+    ...initialWorldState,
+    entityIds: ids,
+    entitiesById: Object.fromEntries(ids.map((id) => [id, entity(id)])),
+  };
+}
+
+describe("persist/loaded replaces branch-scoped slices", () => {
+  it("drops an entity the incoming branch does not have", () => {
+    const before = { world: world(["a", "b"]) } as RootState;
+    const after = reduce(before, persistedDataLoaded({ world: world(["a"]) }));
+
+    expect(after.world.entityIds).toEqual(["a"]);
+    // The merge bug hides here: entityIds is replaced but the record survives.
+    expect(after.world.entitiesById).not.toHaveProperty("b");
+  });
+
+  it("drops a field the incoming branch does not have", () => {
+    const before = {
+      story: {
+        ...initialStoryState,
+        fields: { ...initialStoryState.fields, storyPrompt: "from a dead branch" },
+      },
+    } as RootState;
+    const after = reduce(
+      before,
+      persistedDataLoaded({ story: initialStoryState }),
+    );
+
+    expect(after.story.fields.storyPrompt).toBe(
+      initialStoryState.fields.storyPrompt,
+    );
+  });
+});
+```
+
+`rootReducer` is module-private today. Export it — it is a pure function and
+exporting it costs nothing, whereas driving the singleton `store` (created at
+module load, reading `story_engine_debug` through the config mock) buries the
+thing under test. In `src/core/store/index.ts` change
+
+```ts
+function rootReducer(state: RootState | undefined, action: Action): RootState {
+```
+
+to
+
+```ts
+/** Exported for tests: the persist/loaded replace semantics are load-bearing
+ *  and deserve a direct test rather than one mediated by the store singleton. */
+export function rootReducer(
+  state: RootState | undefined,
+  action: Action,
+): RootState {
+```
+
+and add the helper to the test file:
+
+```ts
+import { rootReducer } from "../../src/core/store";
+import type { Action } from "nai-store";
+
+function reduce(seed: Partial<RootState>, action: Action): RootState {
+  return rootReducer(seed as RootState, action);
+}
+```
+
+The partial seed is deliberate: `persist/loaded` spreads `current` and only
+rewrites the four branch-scoped keys, so the slices these cases do not name are
+never read.
+
+Run: `npx vitest run tests/core/persist-loaded.test.ts`
+Expected: PASS. Then confirm the test has teeth: temporarily change the reducer
+line to `world: data.world ? { ...current.world, ...data.world } : current.world`
+and re-run — the first case must FAIL on `entitiesById`. Revert.
+
+- [ ] **Step 9: Build, format, commit**
 
 ```bash
 npm run build && npm run format
@@ -1684,16 +1791,20 @@ git commit -m "feat(persistence): rehydrate branch state on history navigation
 Undo and redo now move the World, Foundation and story fields with the story.
 The onHistoryNavigated registration moves out of bootstrap-effects: the hooks
 API holds one callback per hook name, so two registrations meant one silently
-replacing the other. A source guard keeps it that way."
+replacing the other. A source guard keeps it that way, and persist/loaded's
+replace semantics — the property the whole scheme rests on — get a direct
+reducer test."
 ```
 
 ---
 
-### Task 7: Changelog
+### Task 7: Changelog and stale docs
 
 **Files:**
 
 - Modify: `CHANGELOG.md`
+- Modify: `CLAUDE.md`
+- Modify: `.prettierignore`
 
 - [ ] **Step 1: Add the bullet**
 
@@ -1712,7 +1823,42 @@ Scene work. Append to that list:
 - **Story Engine's saved state does not carry over from 0.14.x.** The storage layout changed so that undo can move the World, and Story Engine is still alpha, so there is no migration. Your lorebook, Memory and Author's Note are untouched — only Story Engine's own record of which entries it manages resets. The Import Wizard picks them back up.
 ```
 
-- [ ] **Step 3: Verify and commit**
+- [ ] **Step 3: Fix the stale architecture note**
+
+`CLAUDE.md:47` still documents the retired blob:
+
+```markdown
+- Data persisted via `api.v1.storyStorage` under key `"kse-persist"`
+```
+
+That key no longer exists. Replace the line with:
+
+```markdown
+- **Persistence is split by what the data belongs to.** Branch-scoped state —
+  `world`, `foundation`, and story fields — lives in `api.v1.historyStorage`,
+  sharded one record per entity/group/field behind an `index` record, so undo
+  and redo move the World with the story (`src/core/store/persistence/`). Chat
+  follows the writer rather than the branch and stays in `api.v1.storyStorage`
+  under `STORAGE_KEYS.CHAT`. Deleting a record means rewriting the index, never
+  `historyStorage.remove()` — a removal uncovers the ancestor node's copy and
+  resurrects it.
+```
+
+- [ ] **Step 4: Stop the workflow's own artifacts failing the format check**
+
+`.superpowers/sdd/` holds per-task briefs and reports. It is gitignored but not
+prettier-ignored, so `npx prettier --check .` — the plan's own final
+verification command — fails on scratch markdown that was never authored to a
+style. Append to `.prettierignore`:
+
+```
+# Subagent-driven-development scratch (briefs, reports, review diffs). Gitignored
+# already; prettier still walks it and fails the repo-wide --check on notes that
+# were never authored to a style.
+.superpowers/
+```
+
+- [ ] **Step 5: Verify and commit**
 
 Run: `npm run format && npx prettier --check .`
 Expected: "All matched files use Prettier code style!"
@@ -1720,7 +1866,7 @@ Expected: "All matched files use Prettier code style!"
 Do **not** bump `project.yaml` — it is already at `0.15.0` for this branch.
 
 ```bash
-git add CHANGELOG.md
+git add CHANGELOG.md CLAUDE.md .prettierignore
 git commit -m "docs: note branch-scoped state and the 0.14.x reset"
 ```
 
