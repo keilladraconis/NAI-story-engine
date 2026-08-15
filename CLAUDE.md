@@ -44,7 +44,14 @@ Do not also enable the superpowers plugin in `.claude/settings.json` — the plu
 - `slices/foundation.ts` — Shape, intent, ATTG, style fields
 - `slices/ui.ts` — Edit modes, lorebook selection state
 - `slices/runtime.ts` — Generation queue status, GenX state
-- Data persisted via `api.v1.storyStorage` under key `"kse-persist"`
+- **Persistence is split by what the data belongs to.** Branch-scoped state —
+  `world`, `foundation`, and story fields — lives in `api.v1.historyStorage`,
+  sharded one record per entity/group/field behind an `index` record, so undo
+  and redo move the World with the story (`src/core/store/persistence/`). Chat
+  follows the writer rather than the branch and stays in `api.v1.storyStorage`
+  under `STORAGE_KEYS.CHAT`. Deleting a record means rewriting the index, never
+  `historyStorage.remove()` — a removal uncovers the ancestor node's copy and
+  resurrects it.
 
 **Config:** `src/config/field-definitions.ts` — `FIELD_CONFIGS` array defines all field metadata, layouts, and generation prompts. Uses `FieldID` enum and `DulfsFieldID` union type throughout.
 

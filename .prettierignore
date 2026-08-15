@@ -15,3 +15,8 @@ dist/
 # Hand-written probe scripts. Prettier has no parser for .naiscript, and
 # `prettier -w .` errors out on them rather than skipping.
 *.naiscript
+
+# Subagent-driven-development scratch (briefs, reports, review diffs). Gitignored
+# already; prettier still walks it and fails the repo-wide --check on notes that
+# were never authored to a style.
+.superpowers/
