@@ -57,23 +57,28 @@ describe("history fake", () => {
     expect(child).toBeLessThan(parent);
   });
 
-  it("getOrDefault falls back for a node off the current chain", async () => {
-    // Same rule as get/has/list: a node that is not an ancestor of the cursor
-    // is not addressable, so the fallback wins even though the value exists.
+  it("getOrDefault falls back for an EXPLICIT node off the current chain", async () => {
+    // The reachability gate only shows itself when an explicit node id is
+    // passed. Calling getOrDefault(key, fallback) with no node makes target
+    // equal the cursor, which is always reachable — such a test passes with or
+    // without the gate and proves nothing. Two siblings from a common root is
+    // what distinguishes them: ungated, lookup() walks the SIBLING's own
+    // ancestor chain and returns its real value.
     const root = h.current();
-    h.push();
-    await api.v1.historyStorage.set("k", "on-the-branch");
+    const left = h.push();
+    await api.v1.historyStorage.set("k", "left-only");
     h.goto(root);
-    expect(await api.v1.historyStorage.getOrDefault("k", "fallback")).toBe(
-      "fallback",
-    );
+    h.push(); // now on the right-hand sibling
+    expect(
+      await api.v1.historyStorage.getOrDefault("k", "fallback", left),
+    ).toBe("fallback");
   });
 
-  it("getOrDefault returns an inherited value when the node IS reachable", async () => {
-    await api.v1.historyStorage.set("k", "from-parent");
-    h.push();
-    expect(await api.v1.historyStorage.getOrDefault("k", "fallback")).toBe(
-      "from-parent",
-    );
+  it("getOrDefault returns an inherited value for a reachable explicit node", async () => {
+    await api.v1.historyStorage.set("k", "from-root");
+    const child = h.push();
+    expect(
+      await api.v1.historyStorage.getOrDefault("k", "fallback", child),
+    ).toBe("from-root");
   });
 });
