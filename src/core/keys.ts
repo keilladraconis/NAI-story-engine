@@ -10,6 +10,11 @@
 export const STORAGE_KEYS = {
   // Core persistence blob.
   PERSIST: "kse-persist",
+  // Chat sessions — storyStorage, not historyStorage: brainstorms follow the
+  // writer, not the branch (design §6.1). The World, Foundation and story
+  // fields live in historyStorage under the keyspace in
+  // src/core/store/persistence/keyspace.ts.
+  CHAT: "kse-chat",
   // Setting field.
   SETTING: "kse-setting",
   // Forge guidance draft.
