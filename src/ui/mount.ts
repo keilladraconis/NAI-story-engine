@@ -25,7 +25,7 @@ import {
   migrateLorebookCategories,
   registerLorebookSyncHooks,
 } from "../core/store/effects/lorebook-sync";
-import { migrateBrainstormToChat } from "../core/store/migrations/brainstorm-to-chat";
+import { loadBranchState } from "../core/store/persistence/history-store";
 import { loadJournal } from "../core/generation-journal";
 import { STORAGE_KEYS } from "../core/keys";
 import { hydrateComposerDrafts } from "./panels/chat/composer-draft";
@@ -154,16 +154,24 @@ export async function start(): Promise<void> {
 
   registerEffects(store, genX);
 
-  // ── Persistence + migrations ─────────────────────────────────────────────
-  const persisted = await api.v1.storyStorage.get(STORAGE_KEYS.PERSIST);
-  const migrated = migrateBrainstormToChat(persisted ?? {});
-  if (migrated.touched) {
-    await api.v1.storyStorage.set(STORAGE_KEYS.PERSIST, migrated.data);
-    api.v1.ui.toast("Brainstorm chats migrated to new chat system.", {
-      type: "info",
-    });
-  }
-  if (persisted) store.dispatch(persistedDataLoaded(migrated.data));
+  // ── Persistence ───────────────────────────────────────────────────────────
+  // Branch-scoped state comes from historyStorage at the current node; chat
+  // follows the writer and stays in storyStorage. No migration path: Story
+  // Engine is alpha and upgrading drops Engine state — previously managed
+  // lorebook entries simply become unmanaged, and the Import wizard's Bind is
+  // the way back.
+  const [branch, chat] = await Promise.all([
+    loadBranchState(),
+    api.v1.storyStorage.get(STORAGE_KEYS.CHAT),
+  ]);
+  store.dispatch(
+    persistedDataLoaded({
+      story: branch.story,
+      world: branch.world,
+      foundation: branch.foundation,
+      ...(chat ? { chat } : {}),
+    }),
+  );
 
   // After persistedDataLoaded so the prune sees the real chat list, and before
   // register() so the composer's first render already carries its unsent text.

@@ -4,17 +4,10 @@ import type { ChatSliceState } from "./slices/chat";
 import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
 import { storySlice, initialStoryState } from "./slices/story";
-import { worldSlice, initialWorldState } from "./slices/world";
+import { worldSlice } from "./slices/world";
 import { foundationSlice, initialFoundationState } from "./slices/foundation";
-import { forgeSlice, initialForgeState } from "./slices/forge";
-import type { ForgeSliceState } from "./slices/forge";
-import {
-  RootState,
-  StoryState,
-  WorldState,
-  WorldEntity,
-  FoundationState,
-} from "./types";
+import { forgeSlice } from "./slices/forge";
+import { RootState, StoryState, WorldState, FoundationState } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Persisted data loaded action
@@ -25,7 +18,6 @@ export interface PersistedData {
   chat?: ChatSliceState;
   world?: WorldState;
   foundation?: FoundationState;
-  forge?: ForgeSliceState;
 }
 
 const PERSISTED_DATA_LOADED = "persist/loaded";
@@ -35,45 +27,6 @@ export const persistedDataLoaded = (data: PersistedData) => ({
   payload: data,
 });
 persistedDataLoaded.type = PERSISTED_DATA_LOADED;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// World state migration (v11 entities[] → v12 entitiesById/entityIds)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function backfillLifecycle(e: WorldEntity): WorldEntity {
-  return e.lifecycle
-    ? e
-    : { ...e, lifecycle: e.lorebookEntryId ? "live" : "draft" };
-}
-
-export function migrateWorldState(
-  raw: WorldState | (Record<string, unknown> & { entities?: WorldEntity[] }),
-): WorldState {
-  // v12+ format: already has entitiesById
-  if ("entitiesById" in raw && raw.entitiesById) {
-    const src = raw as WorldState;
-    const entitiesById: Record<string, WorldEntity> = {};
-    for (const [id, e] of Object.entries(src.entitiesById)) {
-      entitiesById[id] = backfillLifecycle(e);
-    }
-    return { ...initialWorldState, ...src, entitiesById };
-  }
-  // v11 format: has entities array — convert
-  const entities = (raw as { entities?: WorldEntity[] }).entities ?? [];
-  const entitiesById: Record<string, WorldEntity> = {};
-  const entityIds: string[] = [];
-  for (const e of entities) {
-    const filled = backfillLifecycle(e);
-    entitiesById[filled.id] = filled;
-    entityIds.push(filled.id);
-  }
-  return {
-    ...initialWorldState,
-    groups: (raw as { groups?: WorldState["groups"] }).groups ?? [],
-    entitiesById,
-    entityIds,
-  };
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root reducer with persist/loaded interception
@@ -100,15 +53,10 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
         ? { ...initialStoryState, ...data.story }
         : current.story,
       chat: data.chat ?? current.chat,
-      world: data.world
-        ? migrateWorldState(data.world as WorldState)
-        : current.world,
+      world: data.world ?? current.world,
       foundation: data.foundation
         ? { ...initialFoundationState, ...data.foundation }
         : current.foundation,
-      forge: data.forge
-        ? { ...initialForgeState, ...data.forge }
-        : current.forge,
     };
   }
 
