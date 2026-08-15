@@ -22,10 +22,12 @@ export function registerEffects(store: Store<RootState>, genX: GenX): void {
   registerGenerationEngineEffects(subscribeEffect, dispatch, getState, genX);
   registerLorebookSyncEffects(subscribeEffect, dispatch, getState);
   registerLorebookGenerationEffects(subscribeEffect, dispatch, getState);
-  registerAutosaveEffects(subscribeEffect, getState);
+  const autosave = registerAutosaveEffects(subscribeEffect, getState);
   registerForgeChatEffects(subscribeEffect, dispatch, getState);
   registerFoundationEffects(subscribeEffect, dispatch, getState);
   registerSummaryGenerationEffects(subscribeEffect, dispatch, getState);
   registerBootstrapEffects(subscribeEffect, dispatch, getState);
-  registerHistorySyncEffects(dispatch);
+  // Navigation must flush autosave before it replaces the store, so history-sync
+  // needs the handle registerAutosaveEffects returns.
+  registerHistorySyncEffects(dispatch, autosave);
 }
