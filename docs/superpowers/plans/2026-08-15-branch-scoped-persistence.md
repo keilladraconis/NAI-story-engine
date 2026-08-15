@@ -252,7 +252,12 @@ export function installHistoryFake(): HistoryFake {
     }),
     getOrDefault: vi.fn(
       async (key: string, fallback: unknown, node?: number) => {
-        const v = lookup(key, node ?? cursor);
+        // Same reachability gate as get/has/list. Without it a read against a
+        // node off the current ancestor chain would walk that node's own chain
+        // and hand back real data where the backend returns nothing.
+        const target = node ?? cursor;
+        if (!reachable(target)) return fallback;
+        const v = lookup(key, target);
         return v === undefined ? fallback : v;
       },
     ),
