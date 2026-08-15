@@ -1052,8 +1052,10 @@ git commit -m "feat(persistence): add the historyStorage adapter"
 - Consumes: `toRecords` (Task 2); `captureNode`, `saveRecords` (Task 3).
 - Produces: `registerAutosaveEffects(subscribeEffect, getState)` — same signature as today, so `src/core/store/register-effects.ts` needs no change.
 
-Chat moves to its own `storyStorage` key. In `src/core/keys.ts`, replace the
-`PERSIST` entry with:
+Chat moves to its own `storyStorage` key. In `src/core/keys.ts`, **add** the new
+entry alongside the existing `PERSIST` one — do not remove `PERSIST` yet, because
+`mount.ts` still reads it and Task 5 is what rewires that. Every task must leave
+the tree typechecking.
 
 ```ts
   // Chat sessions — storyStorage, not historyStorage: brainstorms follow the
@@ -1239,16 +1241,11 @@ export function registerAutosaveEffects(
 }
 ```
 
-- [ ] **Step 4: Update the key constant**
+- [ ] **Step 4: Add the key constant**
 
-In `src/core/keys.ts`, replace:
-
-```ts
-  // Core persistence blob.
-  PERSIST: "kse-persist",
-```
-
-with:
+In `src/core/keys.ts`, add this entry to `STORAGE_KEYS`, directly beneath the
+existing `PERSIST` line. Leave `PERSIST` in place — `mount.ts` still reads it
+until Task 5:
 
 ```ts
   // Chat sessions — storyStorage, not historyStorage: brainstorms follow the
@@ -1258,11 +1255,12 @@ with:
   CHAT: "kse-chat",
 ```
 
-- [ ] **Step 5: Run the test**
+- [ ] **Step 5: Run the tests and typecheck**
 
-Run: `npx vitest run tests/core/autosave.test.ts`
-Expected: PASS, 5 tests. `npx tsc --noEmit` will still fail — `mount.ts` refers
-to `STORAGE_KEYS.PERSIST`, and Task 5 fixes it. That is expected here.
+Run: `npx vitest run tests/core/autosave.test.ts && npx tsc --noEmit && npm test`
+Expected: the new file's 5 tests pass, tsc is clean, and the full suite is green.
+The old `kse-persist` blob is no longer written, but `mount.ts` still reads it
+and simply finds nothing — harmless, and Task 5 removes the read.
 
 - [ ] **Step 6: Commit**
 
@@ -1286,7 +1284,19 @@ git commit -m "feat(persistence): shard autosave into branch-scoped records"
 - Consumes: `loadBranchState` (Task 3), `STORAGE_KEYS.CHAT` (Task 4).
 - Produces: `PersistedData` narrowed to `{ story?; chat?; world?; foundation? }`.
 
-- [ ] **Step 1: Narrow PersistedData and delete the world migration**
+- [ ] **Step 1: Retire the PERSIST key**
+
+In `src/core/keys.ts`, delete the now-unused entry:
+
+```ts
+  // Core persistence blob.
+  PERSIST: "kse-persist",
+```
+
+`noUnusedLocals` does not catch an unused object property, so this one is on
+you: after Step 3 nothing reads it.
+
+- [ ] **Step 2: Narrow PersistedData and delete the world migration**
 
 In `src/core/store/index.ts`:
 
@@ -1306,7 +1316,7 @@ In `src/core/store/index.ts`:
    `initialForgeState` and the `ForgeSliceState` type import are the ones to
    check.
 
-- [ ] **Step 2: Delete the brainstorm migration**
+- [ ] **Step 3: Delete the brainstorm migration**
 
 ```bash
 git rm src/core/store/migrations/brainstorm-to-chat.ts
@@ -1314,7 +1324,7 @@ ls tests | grep -i brainstorm   # delete any test for it too, with git rm
 rmdir src/core/store/migrations 2>/dev/null || true
 ```
 
-- [ ] **Step 3: Rewire the load in mount.ts**
+- [ ] **Step 4: Rewire the load in mount.ts**
 
 In `src/ui/mount.ts`, replace this block:
 
@@ -1357,26 +1367,26 @@ Then fix the imports at the top of the file: remove
 and add
 `import { loadBranchState } from "../core/store/persistence/history-store";`.
 
-- [ ] **Step 4: Typecheck**
+- [ ] **Step 5: Typecheck**
 
 Run: `npx tsc --noEmit`
 Expected: clean. Any error naming `PERSIST`, `migrateWorldState`, or
-`migrateBrainstormToChat` is a leftover from steps 1–3.
+`migrateBrainstormToChat` is a leftover from steps 1–4.
 
-- [ ] **Step 5: Full suite**
+- [ ] **Step 6: Full suite**
 
 Run: `npm test`
 Expected: green. If a test imports `migrateWorldState` or the brainstorm
 migration, delete that test — the code it covered is gone by design, not by
 accident.
 
-- [ ] **Step 6: Build and format**
+- [ ] **Step 7: Build and format**
 
 Run: `npm run build && npm run format`
 Then: `git checkout -- external/ project.yaml`
 Expected: build succeeds.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add -A
