@@ -401,6 +401,31 @@ describe("history fake", () => {
     const child = h.push();
     expect(child).toBeLessThan(parent);
   });
+
+  it("getOrDefault falls back for an EXPLICIT node off the current chain", async () => {
+    // The reachability gate only shows itself when an explicit node id is
+    // passed. Calling getOrDefault(key, fallback) with no node makes target
+    // equal the cursor, which is always reachable — such a test passes with or
+    // without the gate and proves nothing. Two siblings from a common root is
+    // what distinguishes them: ungated, lookup() walks the SIBLING's own
+    // ancestor chain and returns its real value.
+    const root = h.current();
+    const left = h.push();
+    await api.v1.historyStorage.set("k", "left-only");
+    h.goto(root);
+    h.push(); // now on the right-hand sibling
+    expect(
+      await api.v1.historyStorage.getOrDefault("k", "fallback", left),
+    ).toBe("fallback");
+  });
+
+  it("getOrDefault returns an inherited value for a reachable explicit node", async () => {
+    await api.v1.historyStorage.set("k", "from-root");
+    const child = h.push();
+    expect(
+      await api.v1.historyStorage.getOrDefault("k", "fallback", child),
+    ).toBe("from-root");
+  });
 });
 ```
 
