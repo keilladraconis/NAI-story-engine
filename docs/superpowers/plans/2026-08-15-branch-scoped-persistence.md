@@ -1677,8 +1677,8 @@ Expected: PASS, 6 tests.
 
 - [ ] **Step 8: Pin the reducer's replace semantics**
 
-The test above asserts on the dispatched *payload*. Nothing yet asserts that the
-reducer *applying* it replaces rather than merges — and that line
+The test above asserts on the dispatched _payload_. Nothing yet asserts that the
+reducer _applying_ it replaces rather than merges — and that line
 (`src/core/store/index.ts`, `world: data.world ?? current.world`) is what the
 whole phase rests on. A future session that "fixes" it to
 `{ ...current.world, ...data.world }` would keep all 625 tests green while
@@ -1691,7 +1691,11 @@ import { describe, it, expect } from "vitest";
 import { persistedDataLoaded } from "../../src/core/store";
 import { initialWorldState } from "../../src/core/store/slices/world";
 import { initialStoryState } from "../../src/core/store/slices/story";
-import type { RootState, WorldEntity, WorldState } from "../../src/core/store/types";
+import type {
+  RootState,
+  WorldEntity,
+  WorldState,
+} from "../../src/core/store/types";
 
 function entity(id: string): WorldEntity {
   return {
@@ -1725,7 +1729,10 @@ describe("persist/loaded replaces branch-scoped slices", () => {
     const before = {
       story: {
         ...initialStoryState,
-        fields: { ...initialStoryState.fields, storyPrompt: "from a dead branch" },
+        fields: {
+          ...initialStoryState.fields,
+          storyPrompt: "from a dead branch",
+        },
       },
     } as RootState;
     const after = reduce(
@@ -1795,6 +1802,52 @@ replacing the other. A source guard keeps it that way, and persist/loaded's
 replace semantics — the property the whole scheme rests on — get a direct
 reducer test."
 ```
+
+---
+
+### Task 6b: Close the two navigation races (added after review)
+
+Task 6's review reproduced two data-loss paths on the exact interaction the task
+exists to make correct. Both are fixed here rather than folded into Task 6, so
+the branch keeps an honest record of what the first cut missed.
+
+**Files:**
+
+- Modify: `src/core/store/effects/autosave.ts` — `registerAutosaveEffects` returns
+  an `AutosaveHandle { flush }` instead of `void`; the timer body becomes a
+  shared `flush()`.
+- Modify: `src/core/store/effects/history-sync.ts` — takes the handle, `await`s
+  `autosave.flush()` before `loadBranchState`, and guards re-entry with a
+  generation counter.
+- Modify: `src/core/store/register-effects.ts` — threads the handle through.
+- Test: `tests/core/history-sync.test.ts`.
+
+**1. A pending autosave flush clobbered the node you navigated away from.**
+Autosave stamps `pendingNode` at dispatch but reads `getState()` 2 s later, and
+`persist/loaded` does not match its predicate — so a rehydrate landing inside the
+debounce window made the flush write post-navigation state onto the
+pre-navigation node. An entity forged at N1 and then undone was erased from N1
+permanently; redo did not bring it back. The fix is to **flush, not cancel**:
+cancelling would lose the entity too, since it was genuinely created at N1 and
+merely unwritten. Flushing first puts the pre-navigation state on the node it
+actually describes, which is what `pendingNode` is for.
+
+**2. Two navigations raced and the wrong branch's World stuck.** `loadBranchState`
+fans out over the target node's index, so a rich node's read can resolve after a
+later, emptier one's — leaving the World of a node the writer only passed
+through. Compounded by (1): the next Engine edit then persists that wrong World
+onto the current node. A generation counter checked after the `await` drops
+superseded reads. This is the shape CLAUDE.md's idempotence rule names
+directly — "refuse re-entry in the handler or effect when the work spans an
+`await`".
+
+**3. Nothing failed if the `register-effects.ts` wiring was deleted** — `tsc` and
+all 633 tests stayed green, because the source guard only proves the registration
+literal exists somewhere. The guard block gains a second case asserting
+`register-effects.ts` contains `registerHistorySyncEffects(`.
+
+Full step-by-step instructions, including the two teeth checks, are in
+`.superpowers/sdd/2026-08-15-branch-scoped-persistence/task-6-fix-brief.md`.
 
 ---
 
