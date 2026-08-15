@@ -42,7 +42,12 @@ const sliceReducer = combineReducers({
   forge: forgeSlice.reducer,
 });
 
-function rootReducer(state: RootState | undefined, action: Action): RootState {
+/** Exported for tests: the persist/loaded replace semantics are load-bearing
+ *  and deserve a direct test rather than one mediated by the store singleton. */
+export function rootReducer(
+  state: RootState | undefined,
+  action: Action,
+): RootState {
   if (action.type === PERSISTED_DATA_LOADED) {
     const data = action.payload as PersistedData;
     const current = state ?? sliceReducer(undefined, { type: "@@INIT" });

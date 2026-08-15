@@ -6,7 +6,6 @@ import {
 } from "../../utils/config";
 import {
   bootstrapRequested,
-  documentHistoryNavigated,
   generationSubmitted,
   requestQueued,
 } from "../index";
@@ -97,14 +96,6 @@ export function registerBootstrapEffects(
   dispatch: AppDispatch,
   getState: () => RootState,
 ): void {
-  // Undo/redo/jump changes the document out from under the opening-scene card,
-  // which only shows while the story is still blank. Surface history navigation
-  // as a Redux signal so the card's watcher re-derives — undoing the opening
-  // brings it back.
-  api.v1.hooks.register("onHistoryNavigated", () => {
-    dispatch(documentHistoryNavigated());
-  });
-
   // Stage 1 — "Opening Scene". User-triggered from the Opening Scene modal,
   // which carries the writer's direction; does NOT auto-chain into Continue.
   subscribeEffect(matchesAction(bootstrapRequested), (action) => {
