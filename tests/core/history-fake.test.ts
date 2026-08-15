@@ -56,4 +56,24 @@ describe("history fake", () => {
     const child = h.push();
     expect(child).toBeLessThan(parent);
   });
+
+  it("getOrDefault falls back for a node off the current chain", async () => {
+    // Same rule as get/has/list: a node that is not an ancestor of the cursor
+    // is not addressable, so the fallback wins even though the value exists.
+    const root = h.current();
+    h.push();
+    await api.v1.historyStorage.set("k", "on-the-branch");
+    h.goto(root);
+    expect(await api.v1.historyStorage.getOrDefault("k", "fallback")).toBe(
+      "fallback",
+    );
+  });
+
+  it("getOrDefault returns an inherited value when the node IS reachable", async () => {
+    await api.v1.historyStorage.set("k", "from-parent");
+    h.push();
+    expect(await api.v1.historyStorage.getOrDefault("k", "fallback")).toBe(
+      "from-parent",
+    );
+  });
 });
