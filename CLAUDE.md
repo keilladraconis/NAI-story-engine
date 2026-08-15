@@ -40,7 +40,7 @@ Do not also enable the superpowers plugin in `.claude/settings.json` — the plu
 
 - `slices/story.ts` — Field contents and World Entry items (DULFS)
 - `slices/world.ts` — `WorldEntity` records, `WorldGroup` (Threads), forge loop flag
-- `slices/brainstorm.ts` — Chat messages
+- `slices/chat.ts` — Chat messages (brainstorm and forge sessions)
 - `slices/foundation.ts` — Shape, intent, ATTG, style fields
 - `slices/ui.ts` — Edit modes, lorebook selection state
 - `slices/runtime.ts` — Generation queue status, GenX state
