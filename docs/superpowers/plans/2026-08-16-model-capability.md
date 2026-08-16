@@ -373,6 +373,9 @@ Claude-Session: https://claude.ai/code/session_01CQDYqXGmyq3Hwp13mMigxY"
 - Modify: `src/core/utils/lorebook-strategy.ts:246, 276` (and the style append at `:241`)
 - Modify: `src/core/utils/summary-strategy.ts:111, 130, 149, 207` (and the style appends at `:107, 145, 203`)
 - Modify: `src/core/utils/forge-chat-strategy.ts:302`
+- Modify: `src/core/store/effects/summary-generation.ts:69, 104, 138, 254` — the
+  **outer** params for the same three summary strategies (see the sampler-leak
+  note below; these are not optional)
 - Test: `tests/core/utils/instruct-callsites.test.ts`
 
 **Interfaces:**
@@ -395,6 +398,26 @@ is prose someone reads and stays `"creative"`. Do not flip anything not listed.
 That is six functions across five conceptual callsites — `buildLorebookKeysPayload`
 is the non-factory twin of the keys factory and must move with it, or the two paths
 disagree about which model writes keys.
+
+**The sampler leak: why `summary-generation.ts` must flip too.** Each of the three
+summary strategies builds params **twice** — once in the factory
+(`summary-strategy.ts`) and once at the dispatch site
+(`summary-generation.ts:69, 104, 138, 254`). `generation-engine` merges them
+per-key: `apiParams = { ...outer }` then `Object.assign(apiParams, factory.params)`.
+Factory keys win, but keys the factory does not set **survive from the outer
+object**. So flipping only the factory produces a mongrel whenever Xialong Mode is
+on:
+
+| source                    | contributes                                                     |
+| ------------------------- | --------------------------------------------------------------- |
+| outer, still `"creative"` | `model: xialong-v1`, `top_k: 250`, `top_p: 0.95` (no `min_p`)   |
+| factory, now `"instruct"` | `model: glm-4-6`, `min_p: 0.05`                                 |
+| **merged, actually sent** | `model: glm-4-6` **plus Xialong's `top_k`/`top_p`** and `min_p` |
+
+GLM ends up sampling under a configuration neither branch intends, and
+`Object.assign` cannot clear `top_k`/`top_p` because the factory never mentions
+them. Flip all four outer calls to `"instruct"` in the same commit. They carry no
+style append — only the `buildModelParams` argument changes.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -501,6 +524,25 @@ describe("extraction callsites stay on the instruct model", () => {
   });
 });
 ```
+
+**Also retire the Task 2 source-grep.** `model-capability.test.ts` currently
+asserts that `generation-engine.ts` contains the string `apiParams.model` — which
+passes if the string appears in a comment and never ties the value to the
+`countUncachedInputTokens` argument. Now that a real instruct callsite exists, test
+the chain instead. `tests/setup.ts:34` already mocks `countUncachedInputTokens` as a
+`vi.fn`, and `tests/core/store/effects/generation-engine-continuation.test.ts` shows
+how to drive `registerGenerationEngineEffects` against a stub GenX. Add one case
+that submits a flipped strategy and asserts the counted model:
+
+```ts
+expect(vi.mocked(api.v1.script.countUncachedInputTokens).mock.calls[0][1]).toBe(
+  "glm-4-6",
+);
+```
+
+Then delete the two `expect(src)…` assertions from `model-capability.test.ts`. If
+driving the engine turns out to cost more than ~50 lines, keep the grep and say so
+in your report rather than sinking the task into harness work.
 
 Add a sixth case for `buildForgeCleanupStrategy` (`forge-chat-strategy.ts:269`).
 Read its signature and the fixture in
@@ -665,6 +707,19 @@ the thing no unit test can reach:
 - **Deleting the now-unreachable `XIALONG_STYLE.lorebookKeys` / `.summary`
   constants.** Dead prompt text is harmless and `prompts.test.ts` may assert on it;
   removing prompts is its own change.
+- **The `"[ Style"` entry in the keys factory's inline stop list
+  (`lorebook-strategy.ts:253`).** After the flip it guards against a token GLM is
+  no longer primed to emit. A stop that never fires costs nothing, and deleting it
+  would make the diff harder to read against this plan. Note that
+  `LOREBOOK_CHAIN_STOPS` — which also contains `"\n[ Style"` — is **not** affected
+  at all: its three consumers are lorebook content, refine, and output trimming,
+  none of which this phase flips.
+- **`buildModelParams`'s spread order**, where `...rest` lets a caller override the
+  Xialong `top_k`/`top_p` while `min_p` is unconditionally stripped. No caller in
+  `src/` passes either, so there is no reachable bug — and "fixing" it means
+  deciding what a deliberate `top_k` from a caller _should_ do, which nobody has
+  had cause to express. Deciding that under cover of this phase would be inventing
+  intent. Leave it for a cleanup with its own test.
 - **Making `chat-strategy` and `lorebook-strategy`'s direct `isXialongMode()` calls
   capability-aware.** Both sit on callsites that stay creative, so the global read
   is still the right answer there. It stops being right only if one of those
