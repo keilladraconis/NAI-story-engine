@@ -17,6 +17,12 @@ All notable changes to this project will be documented in this file.
 - **Continue Scene is gone.** Extending the story a paragraph at a time from the sidebar was heavy-handed for what it did, and continuing a scene is what the editor is for. Writing the opening from your Foundation is unchanged; once there is prose on the page, Story Engine steps back and leaves the writing to you.
 - **Story Engine's saved state does not carry over from 0.14.x.** The storage layout changed so that undo can move the World, and Story Engine is still alpha, so there is no migration — on the first open after upgrading, the World, the Foundation and your saved brainstorms are all empty (they move to new storage locations, not to a converted version of the old one). Your story text, lorebook, Memory and Author's Note are untouched; what resets is Story Engine's own record of which entries it manages, and the Import Wizard picks that back up.
 
+## [0.14.2] - 2026-08-16
+
+### Changed
+
+- **The ⚡ turns into a quill when it will refine.** The generate buttons that adapt to what's already there — the Foundation fields (Intent, Story Contract, ATTG, Style) and an entity's lorebook Content — now show a quill instead of the bolt once the field has content, and their tooltip reads "Refine" rather than "Generate". The bolt stays for a press that writes something new, so you can tell which of the two a button will do before you press it. Shape, entity summaries, keys and the card regen bolt only ever generate, and are unchanged.
+
 ## [0.14.1] - 2026-08-14
 
 ### Changed
