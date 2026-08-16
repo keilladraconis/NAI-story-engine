@@ -1,19 +1,24 @@
 // One Foundation field row: label + derived display text + an actions row
-// (optional Sync toggle, Zap, Edit). The Zap adapts: empty field generates,
-// filled field refines (decideFieldAction), except Shape which is generate-only
+// (optional Sync toggle, generate/refine button, Edit). That button adapts:
+// empty field generates (⚡), filled field refines (quill) — decideFieldAction
+// picks both the glyph and the dispatch — except Shape which is generate-only
 // (descriptor.hasRefine === false). While a matching foundation request is
-// queued/active the Zap is disabled and dimmed. All differences come from the
+// queued/active the button is disabled and dimmed. All differences come from the
 // descriptor — one render path.
 
 import { useSlice, useStream } from "../../bridge";
 import { T, SP } from "../../style";
-import { Zap, Edit, ToggleLeft, ToggleRight } from "nai:icons/feather";
+import { Edit, ToggleLeft, ToggleRight } from "nai:icons/feather";
 import {
   store,
   uiChatRefineRequested,
   uiEditableActivate,
 } from "../../../core/store";
 import { decideFieldAction } from "../chat/chat-actions";
+import {
+  GenerateButton,
+  type GenerateMode,
+} from "../../components/GenerateButton";
 import { type FieldDescriptor, isFoundationGenerating } from "./fields";
 
 const ICON_SIZE = 16;
@@ -31,6 +36,13 @@ export function FieldCard(props: { descriptor: FieldDescriptor }) {
   const syncEnabled = useSlice((s) =>
     d.syncEnabled ? d.syncEnabled(s) : false,
   );
+  // Which action a press will take, subscribed so the glyph follows the field's
+  // content live. onZap re-reads the store at click time rather than closing
+  // over this, so the dispatch is decided from state as it is when pressed.
+  const refineSource = useSlice((s) => (d.hasRefine ? d.refineSource(s) : ""));
+  const mode: GenerateMode = d.hasRefine
+    ? decideFieldAction(refineSource)
+    : "generate";
 
   const onZap = () => {
     if (generating) return;
@@ -82,19 +94,13 @@ export function FieldCard(props: { descriptor: FieldDescriptor }) {
               )}
             </button>
           ) : null}
-          <button
-            title={generating ? "Generating…" : "Generate"}
+          <GenerateButton
+            mode={mode}
+            title="Generate"
+            pending={generating}
+            size={ICON_SIZE}
             onClick={onZap}
-            disabled={generating}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: generating ? "default" : "pointer",
-              opacity: generating ? 0.4 : 1,
-            }}
-          >
-            <Zap size={ICON_SIZE} />
-          </button>
+          />
           <button
             title="Edit"
             onClick={() => store.dispatch(uiEditableActivate({ id: d.id }))}

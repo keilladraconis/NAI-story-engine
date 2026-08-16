@@ -2,8 +2,10 @@
 // Category, name, summary, lorebook content, keys, Always-On, Delete, Save.
 // Save promotes a draft to a live lorebook entry, propagates a name change into
 // other entities' summaries, and flushes content/keys/always-on to the lorebook.
-// The 3 generate zap buttons stream into the pane (unsolved in JSX) and render
-// disabled; the card's regen bolt already generates for live entities.
+// The 3 generate buttons stream into the pane (unsolved in JSX) and render
+// disabled; the card's regen bolt already generates for live entities. Content
+// is the one that adapts: blank content generates (⚡), populated content opens a
+// refine (quill), decided by the same decideFieldAction the Foundation cards use.
 
 import { useSlice, useStream } from "../../bridge";
 import { useDraftField } from "../../hooks";
@@ -43,9 +45,10 @@ import {
 } from "../../../core/keys";
 import { isRequestActive } from "./world-select";
 import { ConfirmButton } from "../../components/ConfirmButton";
+import { GenerateButton } from "../../components/GenerateButton";
+import { decideFieldAction } from "../chat/chat-actions";
 import {
   ArrowLeft,
-  Zap,
   User,
   Cpu,
   MapPin,
@@ -94,12 +97,6 @@ const sectionLabel = {
   fontWeight: "bold",
   color: T.textHeadings,
 } as const;
-const genZapStyle = (pending: boolean) => ({
-  background: "none",
-  border: "none",
-  cursor: pending ? "default" : "pointer",
-  opacity: pending ? 0.4 : 1,
-});
 
 /** Resolve, or create+bind, the lorebook entry for this entity. Idempotent —
  *  returns the existing id for live entities, lazily promotes drafts. */
@@ -375,6 +372,10 @@ export function EntityEditPane(props: { entityId: string }) {
     })();
   };
 
+  // One decision for the content button's glyph, tooltip and handler, so the
+  // quill can never sit over a generate dispatch (or vice versa).
+  const contentMode = decideFieldAction(content.value);
+
   const onDelete = () => {
     store.dispatch(entityDeleted({ entityId }));
     close();
@@ -463,14 +464,13 @@ export function EntityEditPane(props: { entityId: string }) {
       {/* Summary */}
       <div style={sectionRow}>
         <span style={sectionLabel}>Summary</span>
-        <button
-          title={summaryGen.pending ? "Generating…" : "Generate summary"}
+        <GenerateButton
+          mode="generate"
+          title="Generate summary"
+          pending={summaryGen.pending}
+          size={ICON_SIZE}
           onClick={summaryGen.onGenerate}
-          disabled={summaryGen.pending}
-          style={genZapStyle(summaryGen.pending)}
-        >
-          <Zap size={ICON_SIZE} />
-        </button>
+        />
       </div>
       <textarea
         placeholder="Brief description of this entity…"
@@ -497,24 +497,18 @@ export function EntityEditPane(props: { entityId: string }) {
       >
         <div style={sectionRow}>
           <span style={sectionLabel}>Content</span>
-          <button
-            title={
-              contentGen.pending
-                ? "Generating…"
-                : content.value.trim()
-                  ? "Refine content"
-                  : "Generate content"
-            }
-            // `disabled` does not cover the refine branch — contentGen.pending
+          <GenerateButton
+            mode={contentMode}
+            title="Generate content"
+            // `pending` does not cover the refine branch — contentGen.pending
             // only goes true on the generate branch, so refine is never dimmed.
-            onClick={
-              content.value.trim() ? onRefineContent : contentGen.onGenerate
-            }
+            pending={contentGen.pending}
             disabled={loading || contentGen.pending}
-            style={genZapStyle(contentGen.pending)}
-          >
-            <Zap size={ICON_SIZE} />
-          </button>
+            size={ICON_SIZE}
+            onClick={
+              contentMode === "refine" ? onRefineContent : contentGen.onGenerate
+            }
+          />
         </div>
         <textarea
           placeholder="Lorebook content…"
@@ -534,14 +528,13 @@ export function EntityEditPane(props: { entityId: string }) {
             onInput={(e) => keys.setValue(e.target.value ?? "")}
             style={{ ...inputStyle, flex: 1 }}
           />
-          <button
-            title={keysGen.pending ? "Generating…" : "Generate keys"}
+          <GenerateButton
+            mode="generate"
+            title="Generate keys"
+            pending={keysGen.pending}
+            size={ICON_SIZE}
             onClick={keysGen.onGenerate}
-            disabled={keysGen.pending}
-            style={genZapStyle(keysGen.pending)}
-          >
-            <Zap size={ICON_SIZE} />
-          </button>
+          />
           <button
             title="Always On"
             onClick={() => setAlwaysOn((v) => !v)}

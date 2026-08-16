@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.2] - 2026-08-16
+
+### Changed
+
+- **The ⚡ turns into a quill when it will refine.** The generate buttons that adapt to what's already there — the Foundation fields (Intent, Story Contract, ATTG, Style) and an entity's lorebook Content — now show a quill instead of the bolt once the field has content, and their tooltip reads "Refine" rather than "Generate". The bolt stays for a press that writes something new, so you can tell which of the two a button will do before you press it. Shape, entity summaries, keys and the card regen bolt only ever generate, and are unchanged.
+
 ## [0.14.1] - 2026-08-14
 
 ### Changed
