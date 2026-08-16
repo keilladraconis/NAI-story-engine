@@ -45,11 +45,16 @@ Do not also enable the superpowers plugin in `.claude/settings.json` — the plu
 - `slices/ui.ts` — Edit modes, lorebook selection state
 - `slices/runtime.ts` — Generation queue status, GenX state
 - **Persistence is split by what the data belongs to.** Branch-scoped state —
-  `world`, `foundation`, and story fields — lives in `api.v1.historyStorage`,
-  sharded one record per entity/group/field behind an `index` record, so undo
-  and redo move the World with the story (`src/core/store/persistence/`). Chat
-  follows the writer rather than the branch and stays in `api.v1.storyStorage`
-  under `STORAGE_KEYS.CHAT`. Deleting a record means rewriting the index, never
+  `world` and story fields — lives in `api.v1.historyStorage`, sharded one
+  record per entity/group/field behind an `index` record, so undo and redo move
+  the World with the story (`src/core/store/persistence/`). Story-scoped state
+  stays in `api.v1.storyStorage`: `chat` under `STORAGE_KEYS.CHAT`, because
+  brainstorms follow the writer rather than the branch, and `foundation` under
+  `STORAGE_KEYS.FOUNDATION`, because it is the story's premise rather than a
+  property of a point in it — and because its ATTG/Style mirror into Memory and
+  Author's Note, which undo does not move either. Branch-scoping the Foundation
+  meant undo reverted what the writer saw while Memory kept the newer text the
+  model actually read. Deleting a branch record means rewriting the index, never
   `historyStorage.remove()` — a removal uncovers the ancestor node's copy and
   resurrects it.
 

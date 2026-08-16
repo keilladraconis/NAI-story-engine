@@ -427,12 +427,12 @@ story is already a single copy operation in the editor.
 
 ### 6.1 Storage scoping
 
-| storage          | holds                                                                                             | why                                                     |
-| ---------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `historyStorage` | World entities, threads, foundation, DULFS lists, watermark, intent queue, lorebook write-records | derived from or about the story; must follow the branch |
-| `storyStorage`   | chat sessions (brainstorm, forge, refine), lorebook original snapshots                            | follows the writer, not the branch                      |
-| `tempStorage`    | in-flight pass state                                                                              | must not survive a reload half-applied                  |
-| —                | `ui`, `runtime` slices                                                                            | ephemeral, not persisted                                |
+| storage          | holds                                                                                 | why                                                       |
+| ---------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `historyStorage` | World entities, threads, DULFS lists, watermark, intent queue, lorebook write-records | derived from the story at a point; must follow the branch |
+| `storyStorage`   | chat sessions (brainstorm, forge, refine), foundation, lorebook original snapshots    | about the story as a whole, or about the writer           |
+| `tempStorage`    | in-flight pass state                                                                  | must not survive a reload half-applied                    |
+| —                | `ui`, `runtime` slices                                                                | ephemeral, not persisted                                  |
 
 `historyStorage.get()` searches ancestor nodes until it finds a value — copy-on-write
 inheritance along the history DAG. This gives branch-correct state with no journal,
@@ -474,9 +474,16 @@ t:<id>         Thread
 lb:<entryId>   what the loop last wrote to that lorebook entry
 watermark      last observed sectionId
 queue          pending intents
-foundation     ATTG, style, shape, intent, contract, intensity
 f:<fieldId>    DULFS item lists
 ```
+
+**Foundation moved to `storyStorage` during phase 2** (it is listed above under
+`storyStorage`, not in this keyspace). It was branch-scoped in the original
+design, and that was wrong twice over: Shape, Intent and Contract describe the
+whole story rather than a point in it, and ATTG/Style mirror into Memory and
+Author's Note, which are themselves story-global. Branch-scoping produced a
+visible split — undo reverted the Foundation the writer saw while Memory kept
+the newer text the model actually read.
 
 No namespace prefix — script storage is already sandboxed. The discriminators that
 remain (`e:`, `t:`, `lb:`) exist because entity ids and lorebook entry ids are both

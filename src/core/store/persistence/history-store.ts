@@ -14,10 +14,9 @@
 // Nothing here removes a record key — see keyspace.ts for why deletion is an
 // index write.
 
-import type { StoryState, WorldState, FoundationState } from "../types";
+import type { StoryState, WorldState } from "../types";
 import {
   INDEX_KEY,
-  FOUNDATION_KEY,
   STORY_FLAGS_KEY,
   entityKey,
   groupKey,
@@ -46,7 +45,6 @@ export async function saveRecords(
 export async function loadBranchState(nodeId?: number): Promise<{
   story: StoryState;
   world: WorldState;
-  foundation: FoundationState;
 }> {
   const node = nodeId ?? (await captureNode());
   const index = (await api.v1.historyStorage.get(INDEX_KEY, node)) as
@@ -55,7 +53,6 @@ export async function loadBranchState(nodeId?: number): Promise<{
   if (!index) return applyRecords(undefined, {});
 
   const keys = [
-    FOUNDATION_KEY,
     STORY_FLAGS_KEY,
     ...index.entityIds.map(entityKey),
     ...index.groupIds.map(groupKey),

@@ -8,7 +8,6 @@ import {
 import { toRecords } from "../../src/core/store/persistence/keyspace";
 import { initialStoryState } from "../../src/core/store/slices/story";
 import { initialWorldState } from "../../src/core/store/slices/world";
-import { initialFoundationState } from "../../src/core/store/slices/foundation";
 import type { RootState, WorldEntity } from "../../src/core/store/types";
 
 function entity(id: string, name: string): WorldEntity {
@@ -27,7 +26,6 @@ function stateWith(ids: string[]): RootState {
   return {
     story: initialStoryState,
     world: { ...initialWorldState, entitiesById, entityIds: ids },
-    foundation: initialFoundationState,
   } as RootState;
 }
 
@@ -47,7 +45,6 @@ describe("history-store", () => {
   it("returns pristine state at a node that has never been written", async () => {
     const out = await loadBranchState();
     expect(out.world).toEqual(initialWorldState);
-    expect(out.foundation).toEqual(initialFoundationState);
   });
 
   it("inherits a parent's records at a child node", async () => {

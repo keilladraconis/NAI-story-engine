@@ -9,10 +9,17 @@
 /** storyStorage keys accessed directly via `storyStorage.get/set`. */
 export const STORAGE_KEYS = {
   // Chat sessions — storyStorage, not historyStorage: brainstorms follow the
-  // writer, not the branch (design §6.1). The World, Foundation and story
-  // fields live in historyStorage under the keyspace in
+  // writer, not the branch (design §6.1). The World and story fields live in
+  // historyStorage under the keyspace in
   // src/core/store/persistence/keyspace.ts.
   CHAT: "kse-chat",
+  // Foundation — storyStorage too. It is the story's premise, not a property of
+  // any one point in it: Shape, Intent and Contract describe the whole thing,
+  // and ATTG/Style mirror into Memory and Author's Note, which are themselves
+  // story-global. Branch-scoping it made undo revert the Foundation while
+  // Memory kept the newer text, so what the writer saw and what reached the
+  // model disagreed.
+  FOUNDATION: "kse-foundation",
   // Setting field.
   SETTING: "kse-setting",
   // Forge guidance draft.

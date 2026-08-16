@@ -11,6 +11,12 @@
 // never read. The orphaned record is harmless; it is unreachable from any
 // branch that does not name it.
 //
+// Foundation is deliberately NOT here. It is the story's premise rather than a
+// property of a point in it, and its ATTG/Style mirror into Memory and Author's
+// Note, which are story-global — branch-scoping it made undo revert what the
+// writer saw while Memory kept what the model actually read. It lives in
+// storyStorage under STORAGE_KEYS.FOUNDATION, next to chat.
+//
 // Pure by construction: no api.v1 calls, no promises, no store access.
 
 import type {
@@ -20,11 +26,9 @@ import type {
   WorldEntity,
   WorldGroup,
   StoryField,
-  FoundationState,
 } from "../types";
 import { initialStoryState } from "../slices/story";
 import { initialWorldState } from "../slices/world";
-import { initialFoundationState } from "../slices/foundation";
 
 export type PersistIndex = {
   entityIds: string[];
@@ -35,7 +39,6 @@ export type PersistIndex = {
 export type PersistRecords = Record<string, unknown>;
 
 export const INDEX_KEY = "index";
-export const FOUNDATION_KEY = "foundation";
 export const STORY_FLAGS_KEY = "story-flags";
 
 // Entity ids, group ids and field ids share one flat keyspace, and the first
@@ -55,7 +58,6 @@ export function buildIndex(state: RootState): PersistIndex {
 export function toRecords(state: RootState): PersistRecords {
   const records: PersistRecords = {
     [INDEX_KEY]: buildIndex(state),
-    [FOUNDATION_KEY]: state.foundation,
     [STORY_FLAGS_KEY]: {
       attgEnabled: state.story.attgEnabled,
       styleEnabled: state.story.styleEnabled,
@@ -77,13 +79,9 @@ export function toRecords(state: RootState): PersistRecords {
 export function applyRecords(
   index: PersistIndex | undefined,
   records: PersistRecords,
-): { story: StoryState; world: WorldState; foundation: FoundationState } {
+): { story: StoryState; world: WorldState } {
   if (!index) {
-    return {
-      story: initialStoryState,
-      world: initialWorldState,
-      foundation: initialFoundationState,
-    };
+    return { story: initialStoryState, world: initialWorldState };
   }
 
   const entitiesById: Record<string, WorldEntity> = {};
@@ -110,7 +108,6 @@ export function applyRecords(
   }
 
   const flags = (records[STORY_FLAGS_KEY] ?? {}) as Partial<StoryState>;
-  const foundation = records[FOUNDATION_KEY] as FoundationState | undefined;
 
   return {
     story: {
@@ -124,8 +121,5 @@ export function applyRecords(
       styleEnabled: flags.styleEnabled ?? initialStoryState.styleEnabled,
     },
     world: { ...initialWorldState, entitiesById, entityIds, groups },
-    foundation: foundation
-      ? { ...initialFoundationState, ...foundation }
-      : initialFoundationState,
   };
 }

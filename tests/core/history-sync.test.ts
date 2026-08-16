@@ -129,6 +129,20 @@ describe("history-sync", () => {
       { payload: Record<string, unknown> } | undefined;
     expect(loaded?.payload).not.toHaveProperty("chat");
   });
+
+  it("does not touch the Foundation — undo does not rewrite the premise", async () => {
+    // Foundation is story-scoped: Shape, Intent and Contract describe the whole
+    // story, and ATTG/Style mirror into Memory and Author's Note, which undo
+    // does not move either. Rehydrating it here would revert what the writer
+    // sees while Memory kept the newer text the model actually reads.
+    registerHistorySyncEffects((a: Action) => {
+      dispatched.push(a);
+    }, NO_AUTOSAVE);
+    await registeredHook()({ nodeId: h.current() });
+    const loaded = dispatched.find((a) => a.type === "persist/loaded") as
+      { payload: Record<string, unknown> } | undefined;
+    expect(loaded?.payload).not.toHaveProperty("foundation");
+  });
 });
 
 /** Drives the real autosave effect with a state the test can swap out, the way

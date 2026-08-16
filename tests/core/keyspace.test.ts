@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   INDEX_KEY,
-  FOUNDATION_KEY,
   STORY_FLAGS_KEY,
   entityKey,
   groupKey,
@@ -92,20 +91,11 @@ describe("toRecords", () => {
     // The fixture replaces story.fields wholesale, so only its one field is
     // present — the seeded skeleton is not merged in by toRecords.
     expect(Object.keys(r).sort()).toEqual(
-      [
-        INDEX_KEY,
-        FOUNDATION_KEY,
-        STORY_FLAGS_KEY,
-        "e:e1",
-        "t:g1",
-        "f:dramatisPersonae",
-      ].sort(),
+      [INDEX_KEY, STORY_FLAGS_KEY, "e:e1", "t:g1", "f:dramatisPersonae"].sort(),
     );
     expect(r["e:e1"]).toEqual(entity("e1", "Ada"));
-    expect(r[FOUNDATION_KEY]).toEqual({
-      ...initialFoundationState,
-      intent: "a premise",
-    });
+    // Foundation is deliberately absent: it is story-scoped, not branch-scoped.
+    expect(Object.keys(r)).not.toContain("foundation");
     expect(r[STORY_FLAGS_KEY]).toEqual({
       attgEnabled: true,
       styleEnabled: false,
@@ -125,14 +115,12 @@ describe("applyRecords", () => {
       s.story.fields.dramatisPersonae,
     );
     expect(out.story.attgEnabled).toBe(true);
-    expect(out.foundation.intent).toBe("a premise");
   });
 
   it("returns pristine state when there is no index at this node", () => {
     const out = applyRecords(undefined, {});
     expect(out.world).toEqual(initialWorldState);
     expect(out.story).toEqual(initialStoryState);
-    expect(out.foundation).toEqual(initialFoundationState);
   });
 
   it("ignores a record the index does not name — this is how deletion works", () => {

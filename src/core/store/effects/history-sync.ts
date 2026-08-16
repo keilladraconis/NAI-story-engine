@@ -42,14 +42,12 @@ export function registerHistorySyncEffects(
     // Replace, never merge: an entity created on the branch we just left must
     // disappear, and applyRecords always returns a complete world — empty when
     // the target node carries no index — so the reducer's replace is total.
+    //
+    // Neither chat nor foundation appears here, for the same reason: both are
+    // story-scoped. Undo moves the World and the story fields; it does not
+    // rewrite the premise or hide the conversation that produced it.
     const branch = await loadBranchState(nodeId);
     if (mine !== generation) return;
-    dispatch(
-      persistedDataLoaded({
-        story: branch.story,
-        world: branch.world,
-        foundation: branch.foundation,
-      }),
-    );
+    dispatch(persistedDataLoaded({ story: branch.story, world: branch.world }));
   });
 }

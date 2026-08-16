@@ -7,9 +7,15 @@ import { captureNode, saveRecords } from "../persistence/history-store";
 const AUTOSAVE_DELAY_MS = 2000;
 
 /** Slices whose actions mean "persist something". `ui` and `runtime` are
- *  ephemeral; `forge` has never been written and stays in memory. */
-const BRANCH_PREFIXES = ["story/", "world/", "foundation/"];
-const CHAT_PREFIX = "chat/";
+ *  ephemeral; `forge` has never been written and stays in memory.
+ *
+ *  Two destinations, and which one a slice uses is a claim about what the data
+ *  belongs to. `story` and `world` are derived from the prose at a particular
+ *  point, so they are branch-scoped and go to historyStorage at a captured
+ *  node. `chat` and `foundation` describe the writer and the story as a whole,
+ *  so they go to storyStorage and are untouched by undo. */
+const BRANCH_PREFIXES = ["story/", "world/"];
+const STORY_PREFIXES = ["chat/", "foundation/"];
 
 /** Handle for callers that must get the pending write onto disk before the
  *  store changes underneath it. history-sync is the only one: navigation
@@ -51,8 +57,11 @@ export function registerAutosaveEffects(
     pendingNode = null;
     try {
       const state = getState();
-      // Chat follows the writer, not the branch.
+      // Story-scoped: these follow the writer, not the branch. Written on every
+      // flush regardless of what triggered it — they are always current, so
+      // there is no node to get wrong.
       await api.v1.storyStorage.set(STORAGE_KEYS.CHAT, state.chat);
+      await api.v1.storyStorage.set(STORAGE_KEYS.FOUNDATION, state.foundation);
       if (node !== null) {
         await saveRecords(toRecords(state), await node);
       }
@@ -64,7 +73,7 @@ export function registerAutosaveEffects(
   subscribeEffect(
     (action) =>
       BRANCH_PREFIXES.some((p) => action.type.startsWith(p)) ||
-      action.type.startsWith(CHAT_PREFIX),
+      STORY_PREFIXES.some((p) => action.type.startsWith(p)),
     (action) => {
       const branchScoped = BRANCH_PREFIXES.some((p) =>
         action.type.startsWith(p),

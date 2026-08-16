@@ -103,6 +103,21 @@ describe("autosave", () => {
     );
   });
 
+  it("writes the Foundation to storyStorage, never to historyStorage", async () => {
+    // Foundation is the story's premise, not a property of a point in it. If it
+    // ever lands in historyStorage, undo starts reverting it while Memory and
+    // Author's Note — which is what actually reaches the model — keep the newer
+    // text.
+    const { fire } = harness(baseState());
+    fire("foundation/intentSet");
+    await vi.runAllTimersAsync();
+    expect(api.v1.storyStorage.set).toHaveBeenCalledWith(
+      "kse-foundation",
+      expect.anything(),
+    );
+    expect(api.v1.historyStorage.set).not.toHaveBeenCalled();
+  });
+
   it("ignores actions from slices it does not persist", async () => {
     const { fire } = harness(baseState(["a"]));
     fire("ui/uiEditableActivate");
