@@ -19,7 +19,6 @@ import {
 } from "../index";
 import { getHandler } from "./generation-handlers";
 import { recordEntry, JournalEntry } from "../../generation-journal";
-import { getModel } from "../../utils/config";
 import { stripThinkingTags } from "../../utils/tag-parser";
 import { messageUpdated } from "../slices/chat";
 import { clearStream } from "../stream-buffer";
@@ -217,7 +216,7 @@ export function registerGenerationEngineEffects(
         if (result.params) Object.assign(apiParams, result.params);
         const uncached = await api.v1.script.countUncachedInputTokens(
           result.messages,
-          await getModel(),
+          apiParams.model,
         );
         pendingUncached = uncached;
         api.v1.log(
@@ -229,7 +228,7 @@ export function registerGenerationEngineEffects(
       resolvedMessages = messages;
       const uncached = await api.v1.script.countUncachedInputTokens(
         messages,
-        await getModel(),
+        apiParams.model,
       );
       pendingUncached = uncached;
       api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);

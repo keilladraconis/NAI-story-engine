@@ -35,25 +35,40 @@ export async function isXialongMode(): Promise<boolean> {
   return Boolean(await api.v1.config.get("xialong_mode"));
 }
 
+/** What a generation needs from a model.
+ *
+ *  `glm-4-6` follows instructions markedly more reliably; `xialong-v1` is a
+ *  creative-writing fine-tune of it. Splitting the two means `xialong_mode`
+ *  finally says what it always meant — use Xialong for prose — rather than
+ *  "use Xialong for literally every call, including comma-separated key lists".
+ *
+ *  Everything defaults to "creative", so a callsite that does not care keeps
+ *  exactly the behaviour it had before this existed. */
+export type Capability = "creative" | "instruct";
+
 /**
- * Read the configured model. Returns xialong-v1 when Xialong Mode is on,
- * glm-4-6 otherwise.
+ * The single answer to "which model, and is it Xialong". Everything that varies
+ * by model resolves here — params AND message shaping — so a callsite cannot
+ * end up on GLM while still being handed Xialong style guidance.
  */
-export async function getModel(): Promise<string> {
-  return (await isXialongMode()) ? XIALONG_MODEL : GLM_MODEL;
+export async function resolveModel(
+  capability: Capability = "creative",
+): Promise<{ model: string; xialong: boolean }> {
+  const xialong = capability === "creative" && (await isXialongMode());
+  return { model: xialong ? XIALONG_MODEL : GLM_MODEL, xialong };
 }
 
 /**
- * Build generation params adapted for the active model.
- * When Xialong Mode is on: removes min_p, adds top_k: 250, top_p: 0.95.
- * When off: passes base params through with glm-4-6 as the model.
+ * Build generation params for the active model and capability.
+ * Xialong (creative only): removes min_p, adds top_k: 250, top_p: 0.95.
+ * Otherwise passes base params through with glm-4-6.
  */
 export async function buildModelParams(
   base: Omit<GenerationParams, "model">,
+  capability: Capability = "creative",
 ): Promise<GenerationParams> {
-  const useXialong = await isXialongMode();
-  const model = useXialong ? XIALONG_MODEL : GLM_MODEL;
-  if (useXialong) {
+  const { model, xialong } = await resolveModel(capability);
+  if (xialong) {
     const { min_p: _min_p, ...rest } = base;
     return { model, top_k: 250, top_p: 0.95, ...rest };
   }
@@ -62,13 +77,16 @@ export async function buildModelParams(
 
 /**
  * Append a Xialong style guidance message immediately before the assistant
- * prefill. Only adds the message when Xialong Mode is active.
+ * prefill — only when this call is actually going to Xialong. An instruct call
+ * never gets one, whatever xialong_mode says.
  */
 export async function appendXialongStyleMessage(
   messages: Message[],
   styleBlock: string,
+  capability: Capability = "creative",
 ): Promise<void> {
-  if (await isXialongMode()) {
+  const { xialong } = await resolveModel(capability);
+  if (xialong) {
     messages.push({ role: "user", content: styleBlock });
   }
 }
