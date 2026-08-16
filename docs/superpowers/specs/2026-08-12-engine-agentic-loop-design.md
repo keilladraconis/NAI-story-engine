@@ -812,6 +812,50 @@ list()      = ["marker-1","shared"]
   reads `MISSING` after navigating away. This is the behaviour the whole persistence
   model in §6 rests on, now measured rather than inferred.
 
+### 12.1.1 Resolved: writes to an off-path node land; reads from one do not
+
+Measured with `tools/offpath-write-probe.naiscript`, added because §12.1 above only
+ever wrote **at the cursor**. The flush-on-navigate fix (phase 2) depends on the
+opposite: `onHistoryNavigated` fires _after_ the cursor has moved, so the node the
+engine flushes to is the one the writer just left — a child of the current node, not
+an ancestor. Whether such a write lands was never measured, and the test fake
+happens to allow it.
+
+```
+armed at node 1544093774474302
+navigated undo: nodeId=2024084101038180, current=2024084101038180
+
+cursor 2024084101038180, armed 1544093774474302
+ancestry [2024084101038180,758058151030482,835715845282904, … ]
+armed is off-path (good)
+immediate read-back = MISSING
+
+navigated redo: nodeId=1544093774474302, current=1544093774474302
+
+--- verify at node 1544093774474302 ---
+armed 1544093774474302 is on the chain (+0)
+get(key)            = writtenAt 1544093774474302
+get(key, armedNode) = writtenAt 1544093774474302
+verdict: OFF-PATH WRITES LAND.
+```
+
+- **`set(key, value, node)` honours the node argument even when `node` is not an
+  ancestor of the cursor.** The armed node is absent from the 12-entry ancestry, and
+  the value was still there after redoing back to it.
+- **Reads and writes have different rules.** `get(key, armedNode)` immediately after
+  that successful write returned `MISSING`, then returned the value once the cursor
+  could see the node. So the read gate is about the _cursor's_ position at call time,
+  not about whether the data exists.
+- **Flush-on-navigate is therefore sound**, and `tests/helpers/history-fake.ts` is
+  right to gate `get`/`has`/`list`/`getOrDefault` on reachability while leaving `set`
+  ungated. That asymmetry is now measured rather than accidental — do not "fix" it by
+  gating `set`.
+
+Only the FORWARD case (the armed node is a redo target) was exercised, because that
+is the one the engine actually hits on every undo. The ABANDONED case — the writer
+undoes and then forks away, orphaning the node — is untested and does not matter:
+state written to an orphaned node is unreachable from any branch regardless.
+
 **`onHistoryNavigated` delivers `nodeId` as a `number`**, matching `currentNodeId()`,
 so no normalisation is needed anywhere. The `.d.ts` declares it `string`
 (`OnHistoryNavigated`) and is simply wrong.

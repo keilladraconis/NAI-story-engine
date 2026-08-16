@@ -35,6 +35,22 @@ describe("history fake", () => {
     expect(await api.v1.historyStorage.get("only-here")).toBeUndefined();
   });
 
+  it("lands a write aimed at a node the cursor cannot see", async () => {
+    // Measured against the live backend (§12.1.1) and load-bearing: on undo the
+    // engine flushes to the node the writer just left, which is a redo target,
+    // not an ancestor. Reads and writes are asymmetric — the write lands, but
+    // reading it back only works once the cursor can see that node.
+    const parent = h.current();
+    const child = h.push();
+    h.goto(parent);
+
+    await api.v1.historyStorage.set("late", "flushed", child);
+    expect(await api.v1.historyStorage.get("late", child)).toBeUndefined();
+
+    h.goto(child);
+    expect(await api.v1.historyStorage.get("late", child)).toBe("flushed");
+  });
+
   it("does not leak between sibling branches", async () => {
     const root = h.current();
     h.push();

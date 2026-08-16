@@ -11,9 +11,18 @@ export type HistoryFake = {
  *
  *  The behaviours that matter, all measured against the live backend (design
  *  §12.1): writes land at exactly one node; get/list search ancestors until a
- *  value is found; a node off the current path is not addressable; node ids are
+ *  value is found; a node off the current path is not readable; node ids are
  *  opaque and unordered — this fake deliberately hands out DESCENDING ids so a
- *  test that sorts them or assumes ordering fails loudly. */
+ *  test that sorts them or assumes ordering fails loudly.
+ *
+ *  READS AND WRITES ARE DELIBERATELY ASYMMETRIC. `get`/`has`/`list`/
+ *  `getOrDefault` are gated on `reachable()`; `set` is not. That is not an
+ *  oversight — it is measured (§12.1.1). A write aimed at a node off the current
+ *  path lands, and is readable again once the cursor can see that node; a read
+ *  aimed at the same node returns nothing while the cursor cannot. The engine
+ *  depends on it: flush-on-navigate writes to the node the writer just left,
+ *  which after an undo is a redo target rather than an ancestor. Do not add a
+ *  reachability gate to `set`. */
 export function installHistoryFake(): HistoryFake {
   // node id -> parent id (undefined for the root)
   const parents = new Map<number, number | undefined>();
@@ -65,6 +74,7 @@ export function installHistoryFake(): HistoryFake {
       return lookup(key, target);
     }),
     set: vi.fn(async (key: string, value: unknown, node?: number) => {
+      // No reachability gate, on purpose — see the asymmetry note above.
       at(node ?? cursor).set(key, value);
     }),
     remove: vi.fn(async (key: string, node?: number) => {
