@@ -596,6 +596,32 @@ callsites with zero churn. `xialong_mode` comes to mean "use Xialong for creativ
 work," which is closer to what it already means in spirit; it simply had no way to
 express the distinction.
 
+**Implemented in phase 3, with three corrections to the above.**
+
+1. **The capability had to be threaded through `appendXialongStyleMessage`, not just
+   `buildModelParams`.** The style block gated on the global `xialong_mode`, so an
+   instruct callsite would have received Xialong prose guidance for a model it was
+   not using. Both now route through a shared `resolveModel(capability)`, which is
+   the only place either question is answered.
+2. **`countUncachedInputTokens` resolved the model a second time** via `getModel()`.
+   With per-request models that accounts a request against a tokeniser it is not
+   using — and the loop's pacing reads that instrumentation. It now reads
+   `params.model`, and `getModel()` is gone.
+3. **Params are built twice for some strategies** — once at the dispatch site, once
+   in the `messageFactory` — and the two are merged **per key**, so keys the factory
+   does not set survive from the outer object. `nai-gen-x` performs that merge for
+   the first request (`params = { ...params, ...resolved.params }`) and
+   `generation-engine`'s own `Object.assign` governs the token count and any
+   continuation. Flipping only the factory therefore produced a request carrying the
+   instruct model **and** the creative branch's `top_k`/`top_p`. Any future capability
+   change must move both halves together.
+
+The five extraction callsites (lorebook keys, entity summaries, thread summaries,
+forge cleanup) were flipped to `"instruct"` in the same phase rather than left for
+the loop, so the parameter ships exercised rather than dormant. Everything a reader
+sees — bootstrap, lorebook content, chat, forge chat, the Foundation fields — stays
+`"creative"`.
+
 A single loop pass is therefore not a single model, and needs no new plumbing:
 `params` is already per-strategy and `GenerationStrategy` supports a
 `messageFactory`.

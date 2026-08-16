@@ -319,8 +319,10 @@ describe("summary dispatch sites resolve the instruct model", () => {
     vi.mocked(api.v1.lorebook.entry).mockReset();
     vi.mocked(api.v1.lorebook.entry).mockResolvedValue({
       id: "lb-1",
+      displayName: "Ada",
       text: "rich lore",
-    } as never);
+      keys: [],
+    });
   });
 
   function expectInstruct(params: GenerationParams) {

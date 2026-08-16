@@ -120,6 +120,26 @@ describe("extraction callsites stay on the instruct model", () => {
     expect(styleBlocks(messages)).toEqual([]);
   });
 
+  it("keeps the no-entry early return on GLM too", async () => {
+    // createEntitySummaryFromLorebookFactory bails with empty messages when the
+    // entity has no bound entry, and that path builds its own params. Every
+    // other case here sets lorebookEntryId, so without this the early return is
+    // flipped but unguarded — a regression would send Xialong params with no
+    // messages at all.
+    const unbound = () => {
+      const s = makeState();
+      delete s.world.entitiesById.e1.lorebookEntryId;
+      return s;
+    };
+    const { messages, params } = await createEntitySummaryFromLorebookFactory(
+      unbound,
+      "e1",
+    )();
+    expect(messages).toEqual([]);
+    expect(params?.model).toBe("glm-4-6");
+    expect(params?.top_k).toBeUndefined();
+  });
+
   it("generates a thread summary on GLM, with no style block", async () => {
     const { messages, params } = await createThreadSummaryFactory(
       getState,

@@ -402,8 +402,11 @@ disagree about which model writes keys.
 **The sampler leak: why `summary-generation.ts` must flip too.** Each of the three
 summary strategies builds params **twice** — once in the factory
 (`summary-strategy.ts`) and once at the dispatch site
-(`summary-generation.ts:69, 104, 138, 254`). `generation-engine` merges them
-per-key: `apiParams = { ...outer }` then `Object.assign(apiParams, factory.params)`.
+(`summary-generation.ts:69, 104, 138, 254`). the two are merged
+per-key: `nai-gen-x` does it for the first request
+(`params = { ...params, ...resolved.params }`), and `generation-engine`'s own
+`apiParams = { ...outer }` / `Object.assign(apiParams, factory.params)` governs the
+token count and any continuation. Same semantics either way.
 Factory keys win, but keys the factory does not set **survive from the outer
 object**. So flipping only the factory produces a mongrel whenever Xialong Mode is
 on:

@@ -123,9 +123,9 @@ describe("appendXialongStyleMessage", () => {
 // one the runtime actually has. Both merge into the namespace, and the vendored
 // declaration is the one `Parameters<>` picks, so name the real shape here to
 // read the model argument off the recorded calls.
-const countTokens = vi.mocked<(messages: Message[], model: string) => number>(
-  api.v1.script.countUncachedInputTokens,
-);
+const countTokens = vi.mocked<
+  (messages: Message[], model: string) => Promise<number>
+>(api.v1.script.countUncachedInputTokens);
 
 describe("the model is resolved exactly once per request", () => {
   beforeEach(() => {
