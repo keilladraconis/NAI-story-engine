@@ -299,11 +299,14 @@ export function buildForgeCleanupStrategy(
 
     return {
       messages,
-      params: await buildModelParams({
-        max_tokens: 400,
-        temperature: 0.6,
-        min_p: 0.05,
-      }),
+      params: await buildModelParams(
+        {
+          max_tokens: 400,
+          temperature: 0.6,
+          min_p: 0.05,
+        },
+        "instruct",
+      ),
     };
   };
 

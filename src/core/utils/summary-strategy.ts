@@ -104,15 +104,22 @@ export function createEntitySummaryFactory(
     const userContent = `Generate a summary for ${nameLabel} (${categoryLabel}).`;
 
     messages.push({ role: "user", content: userContent });
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.summary);
+    await appendXialongStyleMessage(
+      messages,
+      XIALONG_STYLE.summary,
+      "instruct",
+    );
 
     return {
       messages,
-      params: await buildModelParams({
-        max_tokens: 150,
-        temperature: 0.9,
-        min_p: 0.05,
-      }),
+      params: await buildModelParams(
+        {
+          max_tokens: 150,
+          temperature: 0.9,
+          min_p: 0.05,
+        },
+        "instruct",
+      ),
     };
   };
 }
@@ -127,7 +134,7 @@ export function createEntitySummaryFromLorebookFactory(
     if (!entity?.lorebookEntryId) {
       return {
         messages: [],
-        params: await buildModelParams({ max_tokens: 150 }),
+        params: await buildModelParams({ max_tokens: 150 }, "instruct"),
       };
     }
 
@@ -142,15 +149,22 @@ export function createEntitySummaryFromLorebookFactory(
       },
     ];
 
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.summary);
+    await appendXialongStyleMessage(
+      messages,
+      XIALONG_STYLE.summary,
+      "instruct",
+    );
 
     return {
       messages,
-      params: await buildModelParams({
-        max_tokens: 150,
-        temperature: 0.8,
-        min_p: 0.05,
-      }),
+      params: await buildModelParams(
+        {
+          max_tokens: 150,
+          temperature: 0.8,
+          min_p: 0.05,
+        },
+        "instruct",
+      ),
     };
   };
 }
@@ -200,15 +214,22 @@ export function createThreadSummaryFactory(
     userLines.push("Generate a summary describing this thread's dynamic.");
 
     messages.push({ role: "user", content: userLines.join("\n") });
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.summary);
+    await appendXialongStyleMessage(
+      messages,
+      XIALONG_STYLE.summary,
+      "instruct",
+    );
 
     return {
       messages,
-      params: await buildModelParams({
-        max_tokens: 100,
-        temperature: 0.9,
-        min_p: 0.05,
-      }),
+      params: await buildModelParams(
+        {
+          max_tokens: 100,
+          temperature: 0.9,
+          min_p: 0.05,
+        },
+        "instruct",
+      ),
     };
   };
 }

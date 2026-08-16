@@ -66,11 +66,14 @@ export function registerSummaryGenerationEffects(
         generationSubmitted({
           requestId,
           messageFactory: createEntitySummaryFactory(getState, entityId),
-          params: await buildModelParams({
-            max_tokens: 150,
-            temperature: 0.9,
-            min_p: 0.05,
-          }),
+          params: await buildModelParams(
+            {
+              max_tokens: 150,
+              temperature: 0.9,
+              min_p: 0.05,
+            },
+            "instruct",
+          ),
           target: { type: "entitySummary", entityId },
           prefillBehavior: "trim",
         }),
@@ -101,11 +104,14 @@ export function registerSummaryGenerationEffects(
           getState,
           entity.id,
         ),
-        params: await buildModelParams({
-          max_tokens: 150,
-          temperature: 0.8,
-          min_p: 0.05,
-        }),
+        params: await buildModelParams(
+          {
+            max_tokens: 150,
+            temperature: 0.8,
+            min_p: 0.05,
+          },
+          "instruct",
+        ),
         target: { type: "entitySummaryBind", entityId: entity.id },
         prefillBehavior: "trim",
       }),
@@ -135,11 +141,14 @@ export function registerSummaryGenerationEffects(
             getState,
             entity.id,
           ),
-          params: await buildModelParams({
-            max_tokens: 150,
-            temperature: 0.8,
-            min_p: 0.05,
-          }),
+          params: await buildModelParams(
+            {
+              max_tokens: 150,
+              temperature: 0.8,
+              min_p: 0.05,
+            },
+            "instruct",
+          ),
           target: { type: "entitySummaryBind", entityId: entity.id },
           prefillBehavior: "trim",
         }),
@@ -251,11 +260,14 @@ export function registerSummaryGenerationEffects(
         generationSubmitted({
           requestId,
           messageFactory: createThreadSummaryFactory(getState, groupId),
-          params: await buildModelParams({
-            max_tokens: 100,
-            temperature: 0.9,
-            min_p: 0.05,
-          }),
+          params: await buildModelParams(
+            {
+              max_tokens: 100,
+              temperature: 0.9,
+              min_p: 0.05,
+            },
+            "instruct",
+          ),
           target: { type: "threadSummary", groupId },
           prefillBehavior: "trim",
         }),

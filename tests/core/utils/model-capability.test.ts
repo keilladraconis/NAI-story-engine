@@ -1,11 +1,15 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { Store } from "nai-store";
+import type { GenX } from "nai-gen-x";
 import {
   resolveModel,
   buildModelParams,
   appendXialongStyleMessage,
 } from "../../../src/core/utils/config";
+import { makeTestStore } from "../store/helpers/store-helpers";
+import { registerGenerationEngineEffects } from "../../../src/core/store/effects/generation-engine";
+import { generationSubmitted } from "../../../src/core/store/slices/ui";
+import type { RootState, AppDispatch } from "../../../src/core/store/types";
 
 /** xialong_mode is the only config key these functions read. */
 function xialongMode(on: boolean) {
@@ -114,17 +118,57 @@ describe("appendXialongStyleMessage", () => {
   });
 });
 
+// external/script-types.d.ts still declares the single-argument form of
+// countUncachedInputTokens; src/type-overrides.d.ts adds the (messages, model)
+// one the runtime actually has. Both merge into the namespace, and the vendored
+// declaration is the one `Parameters<>` picks, so name the real shape here to
+// read the model argument off the recorded calls.
+const countTokens = vi.mocked<(messages: Message[], model: string) => number>(
+  api.v1.script.countUncachedInputTokens,
+);
+
 describe("the model is resolved exactly once per request", () => {
-  it("generation-engine counts tokens against params.model", () => {
-    // countUncachedInputTokens must be told the model the request is actually
-    // using. Re-deriving it from global config means an instruct request is
-    // accounted against Xialong's tokeniser — and phase 4's pacing reads this
+  beforeEach(() => {
+    vi.mocked(api.v1.config.get).mockReset();
+    countTokens.mockClear();
+  });
+
+  it("counts an instruct request's tokens against the model it actually uses", async () => {
+    // countUncachedInputTokens must be told the model the request is really
+    // using. Re-deriving it from global config would account an instruct
+    // request against Xialong's tokeniser — and phase 4's pacing reads this
     // instrumentation.
-    const src = readFileSync(
-      join(__dirname, "../../../src/core/store/effects/generation-engine.ts"),
-      "utf8",
+    xialongMode(true);
+    const store = makeTestStore();
+    const generate = vi.fn(
+      async (
+        messages: Message[] | (() => Promise<{ messages: Message[] }>),
+      ) => {
+        if (typeof messages === "function") await messages();
+        return { choices: [{ text: "ok", finish_reason: "stop" }] };
+      },
     );
-    expect(src).not.toContain("getModel()");
-    expect(src).toContain("apiParams.model");
+    registerGenerationEngineEffects(
+      store.subscribeEffect as Store<RootState>["subscribeEffect"],
+      store.dispatch as AppDispatch,
+      store.getState as () => RootState,
+      { generate } as unknown as GenX,
+    );
+
+    store.dispatch(
+      generationSubmitted({
+        requestId: "instruct-req",
+        messageFactory: async () => ({
+          messages: [{ role: "user", content: "list the keys" }],
+          params: await buildModelParams({ max_tokens: 64 }, "instruct"),
+        }),
+        params: await buildModelParams({ max_tokens: 64 }, "instruct"),
+        target: { type: "entitySummary", entityId: "e1" },
+        prefillBehavior: "trim",
+      }),
+    );
+
+    await vi.waitFor(() => expect(countTokens).toHaveBeenCalled());
+    expect(countTokens.mock.calls[0][1]).toBe("glm-4-6");
   });
 });

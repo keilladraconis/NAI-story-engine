@@ -238,17 +238,24 @@ export const createLorebookKeysFactory = (
       },
     ];
 
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.lorebookKeys);
+    await appendXialongStyleMessage(
+      messages,
+      XIALONG_STYLE.lorebookKeys,
+      "instruct",
+    );
     messages.push({ role: "assistant", content: `REJECTED:\n` });
 
     return {
       messages,
-      params: await buildModelParams({
-        max_tokens: 256,
-        temperature: 0.8,
-        min_p: 0.1,
-        stop: ["\n---", "---", "\n***", "\n⁂", "[ Style", "</think>"],
-      }),
+      params: await buildModelParams(
+        {
+          max_tokens: 256,
+          temperature: 0.8,
+          min_p: 0.1,
+          stop: ["\n---", "---", "\n***", "\n⁂", "[ Style", "</think>"],
+        },
+        "instruct",
+      ),
       contextPinning: { head: 1, tail: 3 },
     };
   };
@@ -273,7 +280,7 @@ export const buildLorebookKeysPayload = async (
   return {
     requestId,
     messageFactory: createLorebookKeysFactory(getState, entryId),
-    params: await buildModelParams({ max_tokens: 256 }),
+    params: await buildModelParams({ max_tokens: 256 }, "instruct"),
     target: { type: "lorebookKeys", entryId },
     prefillBehavior: "keep",
     assistantPrefill: `REJECTED:\n`,
