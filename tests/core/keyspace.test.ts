@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   INDEX_KEY,
-  STORY_FLAGS_KEY,
   entityKey,
   groupKey,
   fieldKey,
@@ -29,7 +28,6 @@ function state(over: Partial<RootState> = {}): RootState {
     story: {
       ...initialStoryState,
       fields: { dramatisPersonae: { id: "dramatisPersonae", content: "Ada" } },
-      attgEnabled: true,
     },
     world: {
       ...initialWorldState,
@@ -91,15 +89,11 @@ describe("toRecords", () => {
     // The fixture replaces story.fields wholesale, so only its one field is
     // present — the seeded skeleton is not merged in by toRecords.
     expect(Object.keys(r).sort()).toEqual(
-      [INDEX_KEY, STORY_FLAGS_KEY, "e:e1", "t:g1", "f:dramatisPersonae"].sort(),
+      [INDEX_KEY, "e:e1", "t:g1", "f:dramatisPersonae"].sort(),
     );
     expect(r["e:e1"]).toEqual(entity("e1", "Ada"));
     // Foundation is deliberately absent: it is story-scoped, not branch-scoped.
     expect(Object.keys(r)).not.toContain("foundation");
-    expect(r[STORY_FLAGS_KEY]).toEqual({
-      attgEnabled: true,
-      styleEnabled: false,
-    });
   });
 });
 
@@ -114,7 +108,6 @@ describe("applyRecords", () => {
     expect(out.story.fields.dramatisPersonae).toEqual(
       s.story.fields.dramatisPersonae,
     );
-    expect(out.story.attgEnabled).toBe(true);
   });
 
   it("returns pristine state when there is no index at this node", () => {

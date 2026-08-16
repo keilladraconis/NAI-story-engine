@@ -4,8 +4,6 @@ import { FIELD_CONFIGS } from "../../../config/field-definitions";
 
 export const initialStoryState: StoryState = {
   fields: {},
-  attgEnabled: false,
-  styleEnabled: false,
 };
 
 // Initialize fields from config
@@ -46,15 +44,7 @@ export const storySlice = createSlice({
         },
       };
     },
-    attgToggled: (state) => ({
-      ...state,
-      attgEnabled: !state.attgEnabled,
-    }),
-    styleToggled: (state) => ({
-      ...state,
-      styleEnabled: !state.styleEnabled,
-    }),
   },
 });
 
-export const { fieldUpdated, attgToggled, styleToggled } = storySlice.actions;
+export const { fieldUpdated } = storySlice.actions;

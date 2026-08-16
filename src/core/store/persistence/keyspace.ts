@@ -39,7 +39,6 @@ export type PersistIndex = {
 export type PersistRecords = Record<string, unknown>;
 
 export const INDEX_KEY = "index";
-export const STORY_FLAGS_KEY = "story-flags";
 
 // Entity ids, group ids and field ids share one flat keyspace, and the first
 // two are UUIDs — the prefix is what keeps them apart.
@@ -58,10 +57,6 @@ export function buildIndex(state: RootState): PersistIndex {
 export function toRecords(state: RootState): PersistRecords {
   const records: PersistRecords = {
     [INDEX_KEY]: buildIndex(state),
-    [STORY_FLAGS_KEY]: {
-      attgEnabled: state.story.attgEnabled,
-      styleEnabled: state.story.styleEnabled,
-    },
   };
   for (const id of state.world.entityIds) {
     const entity = state.world.entitiesById[id];
@@ -107,8 +102,6 @@ export function applyRecords(
     if (record) fields[id] = record;
   }
 
-  const flags = (records[STORY_FLAGS_KEY] ?? {}) as Partial<StoryState>;
-
   return {
     story: {
       ...initialStoryState,
@@ -117,8 +110,6 @@ export function applyRecords(
       // (brainstorm, attg, style); a record missing for one of those must not
       // leave `story.fields.attg` undefined for the UI to trip over.
       fields: { ...initialStoryState.fields, ...fields },
-      attgEnabled: flags.attgEnabled ?? initialStoryState.attgEnabled,
-      styleEnabled: flags.styleEnabled ?? initialStoryState.styleEnabled,
     },
     world: { ...initialWorldState, entitiesById, entityIds, groups },
   };

@@ -34,8 +34,6 @@ export interface StoryField {
 
 export interface StoryState {
   fields: Record<string, StoryField>;
-  attgEnabled: boolean;
-  styleEnabled: boolean;
 }
 
 export interface LorebookUIState {
