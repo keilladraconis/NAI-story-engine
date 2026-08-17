@@ -17,6 +17,7 @@ import {
   uiUserPresenceConfirmed,
 } from "../../core/store";
 import { useSlice } from "../bridge";
+import { useTick } from "../hooks";
 import { SP, T } from "../style";
 import { derive, storeSignature, type WidgetMode } from "./header-model";
 import { Play, X, Clock, Zap } from "nai:icons/feather";
@@ -28,44 +29,10 @@ const TICK_IDLE_MS = 5000;
 
 const ICON_SIZE = 13;
 
-/**
- * Re-renders the caller every `delayMs`. The header shows two things the store
- * does not hold — `getAllowedOutput()` and a wall-clock countdown — so it needs
- * a heartbeat as well as a store subscription.
- *
- * Self-rescheduling rather than an interval: api.v1.timers has no setInterval,
- * and one chain per effect run means a changed delay cannot leave a second
- * chain ticking alongside the first.
- */
-function useTick(delayMs: number): void {
-  const [, setTick] = useState(0);
-
-  useEffect(() => {
-    let stopped = false;
-    let pending: number | null = null;
-
-    const arm = () => {
-      void api.v1.timers
-        .setTimeout(() => {
-          if (stopped) return;
-          pending = null;
-          setTick((n) => n + 1);
-          arm();
-        }, delayMs)
-        .then((id: number) => {
-          // The creation promise can resolve after cleanup ran; clear it if so.
-          if (stopped) void api.v1.timers.clearTimeout(id);
-          else pending = id;
-        });
-    };
-    arm();
-
-    return () => {
-      stopped = true;
-      if (pending !== null) void api.v1.timers.clearTimeout(pending);
-    };
-  }, [delayMs]);
-}
+// The header shows two things the store does not hold — `getAllowedOutput()` and
+// a wall-clock countdown — so it needs `useTick`'s heartbeat (src/ui/hooks.ts)
+// as well as a store subscription. The HUD needs the same thing for the budget,
+// which is why the hook lives in hooks.ts rather than here.
 
 // Every branch spreads this, so the widget keeps one silhouette across all four
 // states and only its colour changes. The border box is part of that silhouette

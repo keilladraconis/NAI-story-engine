@@ -2,11 +2,13 @@
 //
 // `start()` is the single entry point (called from src/index.ts). It wires the
 // store (GenX, effects, persistence, lorebook sync), then registers
-// the sidebar panel — and, when enabled, the Generation Journal panel — in ONE
-// `api.v1.ui.register()` call (NAI requires a single call; multiple overwrite
-// each other). All UI is Preact rendered into a jsx part.
+// the sidebar panel and the Engine HUD — and, when enabled, the Generation
+// Journal panel — in ONE `api.v1.ui.register()` call (NAI requires a single
+// call; multiple overwrite each other). All UI is Preact rendered into a jsx
+// part.
 
 import { App } from "./App";
+import { Hud } from "./hud/Hud";
 import { JournalPanel } from "./panels/journal/JournalPanel";
 import { GenX } from "nai-gen-x";
 
@@ -86,6 +88,27 @@ function buildSidebarPanel(hasDocumentContent: boolean): UIExtension {
     name: "Story Engine",
     iconId: "lightning",
     content: [buildRoot(jsxPart)],
+  });
+}
+
+// The Engine HUD (design §9.1): one modeline, always registered. A scriptPanel
+// can be minimized but never dismissed, which is what lets the HUD carry the
+// trust burden — the Engine can never be quietly running behind a surface the
+// writer closed and forgot. Registered unconditionally for the same reason: with
+// `engine_enabled` off the line simply reports a loop that never moves, and the
+// writer can still see that nothing is happening.
+function buildHudPanel(): UIExtension {
+  const jsxPart = api.v1.ui.part.jsx({
+    id: "kse-jsx-hud-root",
+    onMount: (elem) => {
+      render(h(Hud, null), elem);
+    },
+  });
+
+  return scriptPanel({
+    id: "kse-hud",
+    name: "Engine HUD",
+    content: [jsxPart],
   });
 }
 
@@ -193,7 +216,10 @@ export async function start(): Promise<void> {
 
   // ── Panels (single register call) ────────────────────────────────────────
   const hasDocumentContent = (await api.v1.document.sectionIds()).length > 0;
-  const panels: UIExtension[] = [buildSidebarPanel(hasDocumentContent)];
+  const panels: UIExtension[] = [
+    buildSidebarPanel(hasDocumentContent),
+    buildHudPanel(),
+  ];
 
   const journalEnabled = await api.v1.config.get("generation_journal");
   if (journalEnabled) {
