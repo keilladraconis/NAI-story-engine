@@ -777,10 +777,26 @@ building and using them.
 refused one is debited nothing.** Retry is therefore safe, and §3.4 uses bounded
 backoff.
 
-The refusal surfaces as a bare `Error`: `message` is
-`"A generation is already in progress"`, `name` is `"Error"`, and there is no status
-code, error code, or subclass. Message matching is the only classifier available —
-this part is unchanged and still shapes §3.4's default-deny rule.
+The refusal carries `message` = `"A generation is already in progress"` and `name` =
+`"Error"`, with no status code, error code, or subclass. Message matching is the only
+classifier available — this part is unchanged and still shapes §3.4's default-deny
+rule.
+
+**It is not necessarily a real `Error` instance, and a classifier must not require
+one.** Read the probe output below carefully: `describeError` enumerates
+`Object.getOwnPropertyNames` and filters only `stack`, yet `name` appears. On a
+genuine `new Error(msg)` the own properties are `stack` and `message` — `name` is
+inherited from `Error.prototype` and would not be listed. Its presence is evidence
+the rejection is an error-_shaped_ object rather than an `Error`. That is also what
+you would expect of a value crossing the host↔QuickJS boundary, where the sandbox
+realm has its own `Error` constructor.
+
+So `error instanceof Error` is the wrong gate: it would return false for a genuine
+refusal, which classifies it non-retryable, which counts it toward the stall
+threshold — and `⚠` would light during ordinary writing, the one thing §9.1
+forbids. Read the message off anything that carries a string one. This widens what
+can be _read_, never what counts as retryable: the message match stays the only
+thing that returns true.
 
 **History, because it explains the shape of §3.4.** The probe originally measured a
 refusal being charged its full `max_tokens`:
