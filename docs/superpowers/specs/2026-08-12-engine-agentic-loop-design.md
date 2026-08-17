@@ -676,14 +676,21 @@ time; it never narrates individual actions.
 ◉  14¶  ⚑5  ✎23  ▮▮▮▯  ⚡
 ```
 
-| slot       | reads                                                            | what watching it teaches                        |
-| ---------- | ---------------------------------------------------------------- | ----------------------------------------------- |
-| state      | `◉` watching · `◐` reading · `✎` acting · `⏸` held · `⚠` stalled | whether it's alive, and what it's doing         |
-| backlog    | unread paragraphs since the watermark                            | climbing = falling behind                       |
-| threads    | count of open threads                                            | context pressure — climbing means go close some |
-| touched    | entities revised on this branch                                  | activity level                                  |
-| budget     | remaining output bucket                                          | why it's quiet when it's quiet                  |
-| ⚡ (`zap`) | **the one control** — run a pass now                             | —                                               |
+| slot  | reads                                                            | what watching it teaches                |
+| ----- | ---------------------------------------------------------------- | --------------------------------------- |
+| state | `◉` watching · `◐` reading · `✎` acting · `⏸` held · `⚠` stalled | whether it's alive, and what it's doing |
+
+The machine has six phases and this table names five icons. `assessing` **and**
+`triaging` both read as `◐`: both are the pass deciding, and neither writes
+anything to the World. `✎` is reserved for the phase that does, so the pencil
+never claims a change that did not happen. (Settled in phase 4; the mapping lives
+in `deriveHud`'s `stateOf`.)
+
+| backlog | unread paragraphs since the watermark | climbing = falling behind |
+| threads | count of open threads | context pressure — climbing means go close some |
+| touched | entities revised on this branch | activity level |
+| budget | remaining output bucket | why it's quiet when it's quiet |
+| ⚡ (`zap`) | **the one control** — run a pass now | — |
 
 `⚠` means the loop cannot make progress at all. Ordinary concurrency refusals
 (§3.4) are routine and stay invisible — surfacing them would train the writer to
