@@ -19,9 +19,13 @@
 import type { RootState } from "../../core/store";
 import { canStartPass, type LoopPhase } from "../../core/engine/loop-machine";
 
-/** The state slot's five readings (§9.1): `◉` watching · `◐` reading · `✎`
- *  acting · `⏸` held · `⚠` stalled. Five readings over six phases — see
- *  `stateOf`. Names, not glyphs; the icons live in the component. */
+/** The state slot's readings. §9.1 names five — `◉` watching · `◐` reading ·
+ *  `✎` acting · `⏸` held · `⚠` stalled — over six machine phases, so `stateOf`
+ *  folds two of them together. `off` is a sixth reading the design had no way to
+ *  express: without it a switched-off Engine reads identically to an idle one,
+ *  on the slot whose entire job is saying whether it is alive.
+ *
+ *  Names, not glyphs; the icons live in the component. */
 export type HudState =
   "off" | "watching" | "reading" | "acting" | "held" | "stalled";
 
@@ -113,8 +117,6 @@ export function deriveHud(state: RootState, inputs: HudInputs): HudModel {
   const { engine, world } = state;
 
   return {
-    // Off outranks every phase: a switched-off Engine is not watching, however
-    // the machine's last pass left it.
     // Off outranks every phase: a switched-off Engine is not watching, however
     // the machine's last pass left it. Without this the slot reads `watching`
     // for both "alive and waiting" and "not running" — and the slot whose whole
