@@ -4,7 +4,13 @@
 // Fixed slots, always present, always in the same position, read as a shape
 // rather than parsed as words:
 //
-//   ◉  14¶  ⚑5  ✎23  ▮▮▮▯  ⚡
+//   ◉  14¶  ⚑5  ∆23  ▮▮▮▯  ⚡
+//
+// §9.1's own example line spends ✎ twice — once as the acting state, once as
+// the touched count — which reads as two pencils on a line meant to be read as
+// a shape. The state slot keeps the pencil (it is the state §9.1 names) and
+// touched takes ∆: it is a count of changes, and the two slots can no longer be
+// confused for each other at a glance.
 //
 // It never narrates individual actions — the journal and the log do that. What it
 // rewards is watching it over time, which is why every slot is drawn on every
@@ -44,6 +50,7 @@ import {
   BookOpen,
   Edit3,
   Eye,
+  EyeOff,
   Pause,
   Zap,
 } from "nai:icons/feather";
@@ -62,6 +69,11 @@ const TICK_MS = 5000;
 const STATE_ICONS: ReadonlyArray<
   readonly [HudState, IconComponent, string, string]
 > = [
+  // Off is first because it outranks every phase: the setting is off, so
+  // whatever the machine's last pass left behind is not what the writer needs
+  // to know. EyeOff rather than a dimmed Eye — "not running" and "running,
+  // nothing to do" must not be two shades of the same glyph.
+  ["off", EyeOff, T.textDisabled, "Off — the Engine is not running"],
   ["watching", Eye, T.text, "Watching — nothing new to read"],
   [
     "reading",
@@ -194,7 +206,7 @@ export function Hud() {
         {`⚑${model.threads}`}
       </span>
       <span style={slot} title="Entities revised on this branch">
-        {`✎${model.touched}`}
+        {`∆${model.touched}`}
       </span>
       <BudgetBars filled={model.budgetBars} allowedOutput={allowedOutput} />
       {/* Never disabled, never debounced: the dispatch is the whole handler and

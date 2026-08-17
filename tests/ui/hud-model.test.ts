@@ -21,12 +21,15 @@ import type { WorldGroup, WorldState } from "../../src/core/store/types";
 
 const INPUTS: HudInputs = { allowedOutput: OUTPUT_BUCKET };
 
+/** Enabled by default: these cases are about what the machine's phases read as,
+ *  and an Engine that is switched off reads "off" regardless of phase. The
+ *  "switched off" describe below is where that is exercised. */
 function state(
-  engine: Partial<LoopState> = {},
+  engine: Partial<LoopState & { enabled: boolean }> = {},
   world: Partial<WorldState> = {},
 ): RootState {
   return {
-    engine: { ...initialLoopState, ...engine },
+    engine: { ...initialLoopState, enabled: true, ...engine },
     world: { ...initialWorldState, ...world },
   } as RootState;
 }
@@ -273,5 +276,35 @@ describe("the loop phase is read only by hud-model", () => {
       .filter((f) => readFileSync(f, "utf8").includes("genx"))
       .map((f) => relative(UI_DIR, f));
     expect(withGenx).toEqual([]);
+  });
+});
+
+describe("deriveHud — switched off", () => {
+  it("reads off rather than watching when the Engine is disabled", () => {
+    // The slot whose whole job is "whether it's alive" must be able to say no.
+    // Reading `watching` for a disabled Engine makes "alive and idle" and "not
+    // running" the same line, on the surface §9.1 builds to carry trust.
+    const m = deriveHud(state({ enabled: false }), INPUTS);
+    expect(m.stateIcon).toBe("off");
+  });
+
+  it("reads off whatever phase the last pass left behind", () => {
+    for (const phase of ALL_PHASES) {
+      expect(
+        deriveHud(state({ enabled: false, phase }), INPUTS).stateIcon,
+      ).toBe("off");
+    }
+  });
+
+  it("makes the zap read unavailable while off", () => {
+    // The effect refuses the pass for the same reason, so appearance and
+    // behaviour agree — off means off, including for the manual control.
+    expect(deriveHud(state({ enabled: false }), INPUTS).zapEnabled).toBe(false);
+  });
+
+  it("moves the signature when the setting changes", () => {
+    expect(hudSignature(state({ enabled: false }))).not.toBe(
+      hudSignature(state({ enabled: true })),
+    );
   });
 });

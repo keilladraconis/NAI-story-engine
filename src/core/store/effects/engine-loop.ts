@@ -59,7 +59,11 @@ import {
   type TriageManifest,
 } from "../../engine/triage-strategy";
 import { captureNode, saveRecords } from "../persistence/history-store";
-import { engineBacklogObserved, engineLoopEvent } from "../slices/engine";
+import {
+  engineBacklogObserved,
+  engineEnabledChanged,
+  engineLoopEvent,
+} from "../slices/engine";
 import { FIELD_CONFIGS } from "../../../config/field-definitions";
 
 /** Everything the loop needs from the app, as one object so the pass body can
@@ -379,7 +383,16 @@ export function registerEngineLoopEffects(deps: EngineLoopDeps): void {
 
   // The ⚡. The guard is inside runPass, where a press that arrives before the
   // re-render can still reach it.
+  //
+  // It also honours `engine_enabled`. §9.1 says the ⚡ bypasses the *wakeup* —
+  // which is what a hand-writing writer needs, since no generation means no
+  // wakeup — not the writer's decision to switch the Engine off. Off means off,
+  // including for the manual control; otherwise the one setting that stops the
+  // Engine spending budget has a button next to it that spends it anyway.
   deps.subscribeEffect(matchesAction(enginePassRequested), async () => {
+    const settings = await readEngineSettings();
+    deps.dispatch(engineEnabledChanged({ enabled: settings.enabled }));
+    if (!settings.enabled) return;
     await runPass();
   });
 
@@ -413,6 +426,9 @@ export function registerEngineLoopEffects(deps: EngineLoopDeps): void {
       pending = true;
 
       const settings = await readEngineSettings();
+      // Mirror it so the HUD's state slot can say "off" rather than reading
+      // identically to idle.
+      deps.dispatch(engineEnabledChanged({ enabled: settings.enabled }));
       if (!settings.enabled) {
         pending = false;
         return;

@@ -22,7 +22,8 @@ import { canStartPass, type LoopPhase } from "../../core/engine/loop-machine";
 /** The state slot's five readings (§9.1): `◉` watching · `◐` reading · `✎`
  *  acting · `⏸` held · `⚠` stalled. Five readings over six phases — see
  *  `stateOf`. Names, not glyphs; the icons live in the component. */
-export type HudState = "watching" | "reading" | "acting" | "held" | "stalled";
+export type HudState =
+  "off" | "watching" | "reading" | "acting" | "held" | "stalled";
 
 export type HudModel = {
   /** Semantic mode for the state slot, NOT a glyph. */
@@ -112,7 +113,14 @@ export function deriveHud(state: RootState, inputs: HudInputs): HudModel {
   const { engine, world } = state;
 
   return {
-    stateIcon: stateOf(engine.phase),
+    // Off outranks every phase: a switched-off Engine is not watching, however
+    // the machine's last pass left it.
+    // Off outranks every phase: a switched-off Engine is not watching, however
+    // the machine's last pass left it. Without this the slot reads `watching`
+    // for both "alive and waiting" and "not running" — and the slot whose whole
+    // job is "whether it's alive" cannot be the one that cannot say no, on the
+    // surface §9.1 builds to carry trust.
+    stateIcon: engine.enabled ? stateOf(engine.phase) : "off",
     backlog: engine.backlog,
     // `world.groups.length` — `Thread` replacing `WorldGroup` is phase 5.
     threads: world.groups.length,
@@ -122,7 +130,9 @@ export function deriveHud(state: RootState, inputs: HudInputs): HudModel {
     // present, always in the same position).
     touched: engine.touched,
     budgetBars: budgetBarsOf(inputs.allowedOutput),
-    zapEnabled: canStartPass(engine),
+    // The ⚡ is inert when the Engine is off — the effect refuses the pass for
+    // the same reason, so the appearance and the behaviour agree.
+    zapEnabled: engine.enabled && canStartPass(engine),
   };
 }
 
@@ -136,6 +146,9 @@ export function hudSignature(state: RootState): string {
   const { engine, world } = state;
   return [
     engine.phase,
+    // Covers the state slot's "off" reading and the ⚡'s appearance — without it
+    // toggling the setting leaves a stale line until something else repaints.
+    engine.enabled ? "1" : "0",
     engine.backlog,
     engine.touched,
     world.groups.length,
