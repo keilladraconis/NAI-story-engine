@@ -8,9 +8,19 @@
 // store/effects/engine-loop.ts owns every side effect and feeds events in here.
 // That split is what makes the whole lifecycle table-testable headless.
 //
-// A single failure is NOT a stall. Concurrency refusals are routine (§3.4) and
-// surfacing them would train the writer to ignore the one slot that should mean
-// something, so `stalled` needs a run of them.
+// Two rules keep `stalled` meaning something. It is the HUD's `⚠`, and §9.1 is
+// explicit that ordinary collisions with the writer stay invisible — a slot that
+// lights up routinely is a slot the writer learns to ignore.
+//
+//   1. A RETRYABLE failure never counts. A concurrency refusal means the writer
+//      is generating, which is normal and self-clearing (§3.4). The signal for
+//      "colliding constantly" is the backlog climbing against a full budget,
+//      which §9.1 lists as a compound reading — not `⚠`.
+//   2. The counter clears when a pass COMPLETES, not when one starts. Clearing
+//      it on `assessed` looks equivalent and is not: assessment is pure string
+//      work that cannot fail, so every pass would reset the counter on its way
+//      to the triage that keeps failing, and the count would oscillate 0↔1
+//      forever without ever reaching the threshold.
 
 export type LoopPhase =
   "idle" | "assessing" | "triaging" | "acting" | "held" | "stalled";
@@ -38,10 +48,12 @@ export type LoopEvent =
   | { type: "triaged"; intents: Intent[] }
   | { type: "drained" }
   | { type: "budgetExhausted" }
-  | { type: "failed" };
+  /** `retryable` comes from refusal.ts's classifier. True means a routine
+   *  concurrency collision, which must not count toward a stall. */
+  | { type: "failed"; retryable: boolean };
 
-/** Enough consecutive failures that something is genuinely wrong rather than a
- *  routine collision with the writer's own generation. */
+/** Enough consecutive non-retryable failures that something is genuinely wrong.
+ *  Retryable ones never get here. */
 const STALL_THRESHOLD = 4;
 
 export const initialLoopState: LoopState = {
@@ -71,28 +83,40 @@ export function loopReducer(state: LoopState, event: LoopEvent): LoopState {
       return canStartPass(state) ? { ...state, phase: "assessing" } : state;
 
     case "assessed": {
-      const cleared = {
-        ...state,
-        backlog: event.backlog,
-        consecutiveFailures: 0,
-      };
-      // Nothing new worth a generation: end the pass having spent nothing.
-      if (event.backlog === 0) return { ...cleared, phase: "idle" };
-      return { ...cleared, phase: "triaging" };
+      const assessed = { ...state, backlog: event.backlog };
+      // Nothing new worth a generation: the pass ends here having spent
+      // nothing, and ending is completing — so the counter clears.
+      if (event.backlog === 0) {
+        return { ...assessed, phase: "idle", consecutiveFailures: 0 };
+      }
+      // Still mid-pass. Deliberately does NOT clear consecutiveFailures: see
+      // rule 2 in the header.
+      return { ...assessed, phase: "triaging" };
     }
 
     case "triaged":
+      // Triage returned, so the pass got past the step that actually fails.
       return event.intents.length === 0
-        ? { ...state, phase: "idle", queued: 0 }
-        : { ...state, phase: "acting", queued: event.intents.length };
+        ? { ...state, phase: "idle", queued: 0, consecutiveFailures: 0 }
+        : {
+            ...state,
+            phase: "acting",
+            queued: event.intents.length,
+            consecutiveFailures: 0,
+          };
 
     case "drained":
-      return { ...state, phase: "idle", queued: 0 };
+      return { ...state, phase: "idle", queued: 0, consecutiveFailures: 0 };
 
     case "budgetExhausted":
+      // Not a failure — a legitimate hold. Leaves the counter alone in both
+      // directions.
       return { ...state, phase: "held" };
 
     case "failed": {
+      // A routine collision is not evidence of anything. Rest, and let the
+      // backlog carry the signal.
+      if (event.retryable) return { ...state, phase: "idle" };
       const consecutiveFailures = state.consecutiveFailures + 1;
       return {
         ...state,

@@ -717,6 +717,9 @@ Claude-Session: https://claude.ai/code/session_01CQDYqXGmyq3Hwp13mMigxY"
 **Interfaces:**
 
 - Produces: `isConcurrencyRefusal(error: unknown): boolean`; `backoffMs(attempt: number): number | null` (null = give up, requeue for the next wakeup); `MAX_ATTEMPTS`.
+- Consumed by: Task 7, which passes the result straight through as the `failed`
+  event's `retryable` flag. `retryable: true` never counts toward a stall — see
+  Task 1's header comment for why.
 
 Design §3.4: the refusal is a bare `Error` with
 `message: "A generation is already in progress"` — no status code, no subclass — so
@@ -954,6 +957,11 @@ press arriving before the re-render still gets through.
 refused must leave the watermark where it was, or the prose it never read is lost
 permanently.
 
+**Emit `failed` with `retryable` set from `isConcurrencyRefusal`** (Task 4), never
+hardcoded. The machine relies on that flag to keep routine collisions out of the
+`⚠` slot; passing `false` for everything would light it up during ordinary
+writing, and `true` for everything would make it unreachable.
+
 Tests: a full pass advances the watermark and enqueues; a refused triage leaves the
 watermark untouched and the queue unchanged; a second `passRequested` mid-pass is a
 no-op; budget below the triage reserve produces `held` without a generation.
@@ -981,7 +989,12 @@ too: `src/ui/hud/` must contain no reference to `genx`.
 
 Slots per §9.1: state · backlog · threads · touched · budget · ⚡.
 
-- `⚠` (stalled) only when the machine says `stalled`. Routine refusals never reach it.
+- `⚠` (stalled) only when the machine says `stalled`. Routine refusals never reach
+  it — the machine drops them before the counter. The reading for "colliding
+  constantly" is the backlog climbing against a full budget (§9.1), which is a
+  compound reading across two slots and needs no state of its own.
+- `held` and `stalled` do not clear on their own; they clear when the next pass
+  gets somewhere. Do not render them as transient.
 - `zapEnabled` mirrors `canStartPass` — but is presentation only; the real guard is Task 7's.
 
 ---

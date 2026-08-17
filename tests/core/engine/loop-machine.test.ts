@@ -81,29 +81,68 @@ describe("loopReducer — the conditions the HUD shows", () => {
     );
   });
 
-  it("stalls only after repeated failures, not after one", () => {
-    // A single refusal is routine (§3.4) and must never reach the HUD.
-    let s = run([{ type: "passRequested" }, { type: "failed" }]);
+  it("stalls only after repeated real failures, not after one", () => {
+    let s = run([
+      { type: "passRequested" },
+      { type: "failed", retryable: false },
+    ]);
     expect(s.phase).toBe("idle");
     expect(s.consecutiveFailures).toBe(1);
 
     for (let i = 0; i < 3; i++) {
       s = loopReducer(loopReducer(s, { type: "passRequested" }), {
         type: "failed",
+        retryable: false,
       });
     }
     expect(s.phase).toBe("stalled");
   });
 
-  it("clears the stall as soon as a pass gets past assessment", () => {
+  it("never stalls on collisions with the writer, however many there are", () => {
+    // A concurrency refusal means the writer is generating — normal, and
+    // self-clearing. §9.1 says the signal for colliding constantly is the
+    // backlog climbing against a full budget, not the ⚠ slot.
+    let s = initialLoopState;
+    for (let i = 0; i < 20; i++) {
+      s = loopReducer(loopReducer(s, { type: "passRequested" }), {
+        type: "failed",
+        retryable: true,
+      });
+    }
+    expect(s.phase).toBe("idle");
+    expect(s.consecutiveFailures).toBe(0);
+  });
+
+  it("counts failures across passes — assessment starting does not clear them", () => {
+    // The trap: assessment is pure string work that cannot fail, so clearing
+    // the counter when a pass STARTS means a loop whose triage always fails
+    // oscillates 0↔1 forever and ⚠ never lights.
+    let s = initialLoopState;
+    for (let i = 0; i < 4; i++) {
+      s = run(
+        [
+          { type: "passRequested" },
+          { type: "assessed", backlog: 5, candidateIds: [] },
+          { type: "failed", retryable: false },
+        ],
+        s,
+      );
+    }
+    expect(s.phase).toBe("stalled");
+  });
+
+  it("clears the stall only when a pass completes", () => {
     let s = initialLoopState;
     for (let i = 0; i < 4; i++) {
       s = loopReducer(loopReducer(s, { type: "passRequested" }), {
         type: "failed",
+        retryable: false,
       });
     }
     expect(s.phase).toBe("stalled");
 
+    // Getting as far as triage is not completing — the step that fails is
+    // triage itself, so the counter must survive until it returns.
     s = run(
       [
         { type: "passRequested" },
@@ -112,6 +151,10 @@ describe("loopReducer — the conditions the HUD shows", () => {
       s,
     );
     expect(s.phase).toBe("triaging");
+    expect(s.consecutiveFailures).toBe(4);
+
+    s = loopReducer(s, { type: "triaged", intents: [] });
+    expect(s.phase).toBe("idle");
     expect(s.consecutiveFailures).toBe(0);
   });
 });
