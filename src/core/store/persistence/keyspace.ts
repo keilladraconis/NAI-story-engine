@@ -17,6 +17,11 @@
 // writer saw while Memory kept what the model actually read. It lives in
 // storyStorage under STORAGE_KEYS.FOUNDATION, next to chat.
 //
+// The Engine loop's own records — `watermark` and `queue` — are branch-scoped
+// too and share this node space, but they are not store slices: the engine
+// effect reads and writes them directly through history-store, so they appear
+// in neither toRecords nor applyRecords. See src/core/engine/intents.ts.
+//
 // Pure by construction: no api.v1 calls, no promises, no store access.
 
 import type {
