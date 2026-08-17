@@ -16,6 +16,7 @@ import { initialFoundationState } from "../../src/core/store/slices/foundation";
 import { initialUIState } from "../../src/core/store/slices/ui";
 import { initialRuntimeState } from "../../src/core/store/slices/runtime";
 import { initialForgeState } from "../../src/core/store/slices/forge";
+import { initialEngineState } from "../../src/core/store/slices/engine";
 import type { RootState, WorldEntity } from "../../src/core/store/types";
 import type { Action } from "nai-store";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -42,6 +43,7 @@ function stateWith(ids: string[]): RootState {
     ui: initialUIState,
     runtime: initialRuntimeState,
     forge: initialForgeState,
+    engine: initialEngineState,
   };
 }
 

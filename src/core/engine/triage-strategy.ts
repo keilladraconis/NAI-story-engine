@@ -62,6 +62,21 @@ export type TriageInput = {
   assessment: Assessment;
 };
 
+/** Triage's whole output allowance (§3.3). Also the effect's budget reserve:
+ *  the reserve only has to cover actual consumption, and triage is the one
+ *  generation a pass spends — drain costs nothing until phase 6 executes. */
+export const TRIAGE_MAX_TOKENS = 200;
+
+/** The params for the triage call. Exported because genX takes a params object
+ *  at submit time as well as the one the factory resolves later, and the two
+ *  must not drift into different models or different ceilings. */
+export function triageParams(): Promise<GenerationParams> {
+  return buildModelParams(
+    { max_tokens: TRIAGE_MAX_TOKENS, temperature: 0.3 },
+    "instruct",
+  );
+}
+
 /** Character budget for the volatile prose block, roughly 3k tokens.
  *
  *  `assess` returns the whole document when the watermark is gone (an undo or a
@@ -127,13 +142,7 @@ export function createTriageFactory(input: TriageInput): MessageFactory {
 
     messages.push({ role: "user", content: TRIAGE_INSTRUCTION });
 
-    return {
-      messages,
-      params: await buildModelParams(
-        { max_tokens: 200, temperature: 0.3 },
-        "instruct",
-      ),
-    };
+    return { messages, params: await triageParams() };
   };
 }
 

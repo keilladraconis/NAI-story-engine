@@ -1,4 +1,5 @@
-// The Engine's trigger: the single onGenerationRequested registration.
+// The Engine's loop: the single onGenerationRequested registration, and the
+// pass that registration wakes.
 //
 // api.v1.hooks.register holds ONE callback per hook name, so this is the only
 // place in the codebase that may register this hook — a second registration
@@ -34,17 +35,40 @@
 // cancellation-flag pattern for the same reason). Nothing here ever cancels a
 // wakeup — the `pending` flag below is the whole of the bookkeeping.
 
-import type { Store } from "nai-store";
+import { matchesAction, type Store } from "nai-store";
 import type { GenX } from "nai-gen-x";
-import type { AppDispatch, RootState } from "../types";
+import type { AppDispatch, RootState, WorldEntity } from "../types";
+import { assess } from "../../engine/assess";
+import { canStartPass, type Intent } from "../../engine/loop-machine";
+import {
+  dedupe,
+  intentKey,
+  QUEUE_KEY,
+  WATERMARK_KEY,
+} from "../../engine/intents";
+import {
+  backoffMs,
+  isConcurrencyRefusal,
+  MAX_ATTEMPTS,
+} from "../../engine/refusal";
+import {
+  createTriageFactory,
+  parseTriage,
+  triageParams,
+  TRIAGE_MAX_TOKENS,
+  type TriageManifest,
+} from "../../engine/triage-strategy";
+import { captureNode, saveRecords } from "../persistence/history-store";
+import { engineBacklogObserved, engineLoopEvent } from "../slices/engine";
+import { FIELD_CONFIGS } from "../../../config/field-definitions";
 
 /** Everything the loop needs from the app, as one object so the pass body can
  *  reach for another dependency without reshuffling an argument list.
  *
- *  Only the trigger exists today; the fields are what the pass in Task 7 drives
- *  — `subscribeEffect` for the HUD's manual ⚡ request, `dispatch` to mirror
- *  LoopState into the store, `getState` for the World the manifest is built
- *  from, and `genX` for the one triage generation a pass spends. */
+ *  `subscribeEffect` carries the HUD's manual ⚡ request, `dispatch` mirrors
+ *  LoopState into the store, `getState` supplies the World the manifest is
+ *  built from and the machine state the re-entry guard reads, and `genX` runs
+ *  the one triage generation a pass spends. */
 export type EngineLoopDeps = {
   subscribeEffect: Store<RootState>["subscribeEffect"];
   dispatch: AppDispatch;
@@ -93,24 +117,278 @@ export async function readEngineSettings(): Promise<EngineSettings> {
   };
 }
 
-// ─────────────────────────── SEAM: the pass body ───────────────────────────
+// ───────────────────────────────── The pass ─────────────────────────────────
 //
-// Task 7 replaces this body with the real pass: check canStartPass, read the
-// sections past the watermark, assess, triage through genX, dedupe into the
-// queue, persist watermark and queue, and mirror LoopState into the store. It
-// keeps this signature and this callsite — the trigger above does not change.
+// Everything with a side effect lives below this line: reading the document,
+// reading and writing the two branch-scoped records, spending the one triage
+// generation, and mirroring the machine into the store. The machine, assess,
+// dedupe, the refusal classifier and the triage parser are all pure and are
+// tested without any of this.
 //
-// Until then the wakeup is observable and free.
-async function runPass(_deps: EngineLoopDeps): Promise<void> {
-  api.v1.log("[engine] wakeup fired");
+// Five rules are load-bearing and each is a way this goes quietly wrong:
+//
+//   1. The watermark advances ONLY on a completed pass. A failed or refused
+//      pass that moved it would mark prose the Engine never read as seen, and
+//      unlike a dropped intent that is unrecoverable.
+//   2. `engine_min_prose` gates BEFORE the machine starts, because the machine
+//      only ends a pass early at `backlog === 0` and any positive backlog goes
+//      on to spend the generation. Faking `assessed { backlog: 0 }` instead
+//      would terminate correctly and lie to the HUD about how far behind the
+//      Engine is — so the skip reports the real number via
+//      `engineBacklogObserved` and dispatches no machine event at all.
+//   3. `retryable` comes from the classifier, never from the callsite. Hardcode
+//      false and ordinary writing lights the HUD's ⚠; hardcode true and ⚠
+//      becomes unreachable.
+//   4. `watermark` and `queue` are two records, never one blob — historyStorage
+//      is copy-on-write per key per node (§6.2), the watermark moves every pass
+//      and the queue usually does not, and merging them would snapshot the
+//      queue onto every node the watermark touches.
+//   5. The node is captured at the START of the pass and passed to every write
+//      (§6.3). Triage takes seconds, the writer keeps typing, and a `set()`
+//      without an explicit node has been measured landing two nodes away.
+
+/** The HUD's ⚡: run a pass now. Carries no payload — everything the pass needs
+ *  it reads for itself — and is ignored while one is already running. */
+const ENGINE_PASS_REQUESTED = "engine/passRequested";
+export const enginePassRequested = () => ({
+  type: ENGINE_PASS_REQUESTED as typeof ENGINE_PASS_REQUESTED,
+  payload: undefined,
+});
+enginePassRequested.type = ENGINE_PASS_REQUESTED;
+
+/** The watermark record: the last section id the Engine has read on this
+ *  branch, or null on a branch it has never looked at. */
+async function readWatermark(nodeId: number): Promise<number | null> {
+  const value: unknown = await api.v1.historyStorage.get(WATERMARK_KEY, nodeId);
+  return typeof value === "number" ? value : null;
+}
+
+/** The queue record. Persisted JSON is trusted no further than its shape: a
+ *  missing or malformed record reads as an empty queue rather than throwing
+ *  inside the pass it was meant to feed. */
+async function readQueue(nodeId: number): Promise<Intent[]> {
+  const value: unknown = await api.v1.historyStorage.get(QUEUE_KEY, nodeId);
+  return Array.isArray(value) ? (value as Intent[]) : [];
+}
+
+/** What triage is allowed to name: the entities the new prose plausibly
+ *  mentions, plus every thread the story has open.
+ *
+ *  NOT every live entity. Assess is deliberately generous and triage's
+ *  precision is what makes that affordable; a manifest of the whole World would
+ *  grow the stable prefix without bound and cost input tokens on every pass
+ *  forever. The trade is real in the other direction too — `parseTriage` drops
+ *  any name the manifest does not list, so what is left out here is what triage
+ *  can never say. */
+function buildManifest(
+  state: RootState,
+  candidateIds: string[],
+): TriageManifest {
+  const label = (entity: WorldEntity): string =>
+    FIELD_CONFIGS.find((c) => c.id === entity.categoryId)?.label ?? "";
+
+  const entities = candidateIds
+    .map((id) => state.world.entitiesById[id])
+    .filter((entity): entity is WorldEntity => entity !== undefined)
+    .map((entity) => ({
+      id: entity.id,
+      name: entity.name,
+      category: label(entity),
+      summary: entity.summary,
+    }));
+
+  // Every group, not only the open ones: WorldGroup has no status until threads
+  // land in phase 5. Triage may name one already retired; dedupe bounds the
+  // repeat and drain only logs, so it is inert until phase 6.
+  const threads = state.world.groups.map((group) => ({
+    id: group.id,
+    title: group.title,
+    summary: group.summary,
+  }));
+
+  return { entities, threads };
+}
+
+/** The one generation a pass spends, with the bounded backoff from §3.4.
+ *
+ *  Attempts are numbered from 1 (refusal.ts's contract): `backoffMs(0)` is null,
+ *  so a loop counting from 0 would perform no retries at all instead of failing
+ *  loudly.
+ *
+ *  `maxRetries: 0` is not a detail. GenX's own transient-error handler treats
+ *  "in progress" as retryable and would otherwise sit on the refusal for five
+ *  attempts of exponential backoff — over a minute of a pass holding its node
+ *  and its re-entry guard, inside a loop whose whole retry policy is supposed to
+ *  be "a few hundred milliseconds, then hand the work back to the next wakeup". */
+async function generateTriage(
+  genX: GenX,
+  manifest: TriageManifest,
+  assessment: ReturnType<typeof assess>,
+): Promise<string> {
+  const params = { ...(await triageParams()), maxRetries: 0 };
+
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const response = await genX.generate(
+        createTriageFactory({ manifest, assessment }),
+        { ...params, taskId: `engine-triage-${api.v1.uuid()}` },
+        undefined,
+        "background",
+        await api.v1.createCancellationSignal(),
+      );
+      return response.choices?.[0]?.text ?? "";
+    } catch (error) {
+      // Only a recognised collision is worth waiting on. Everything else —
+      // recognised or not — is handed to the caller, which asks the same
+      // classifier what to tell the machine.
+      const wait = isConcurrencyRefusal(error) ? backoffMs(attempt) : null;
+      if (wait === null) throw error;
+      api.v1.log(
+        `[engine] triage refused, retry ${attempt}/${MAX_ATTEMPTS - 1} in ${wait}ms`,
+      );
+      await api.v1.timers.sleep(wait);
+    }
+  }
+}
+
+/** Build the pass, with its own re-entry guard.
+ *
+ *  The guard is a closure variable rather than a module global (CLAUDE.md: no
+ *  singletons) and it is claimed synchronously, before the first await —
+ *  `canStartPass` alone cannot cover the window between reading the document
+ *  and the machine leaving `idle`, and `disabled` on the ⚡ covers nothing at
+ *  all. Both entry points, the wakeup and the ⚡, share this one runner.
+ *
+ *  Exported for tests: the pass is worth driving directly, without a hook
+ *  registration in the way. */
+export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
+  const { dispatch, getState, genX } = deps;
+  let inFlight = false;
+
+  return async function runPass(): Promise<void> {
+    if (inFlight) return;
+    // The machine's own answer to "may a pass start", checked here rather than
+    // in whatever pressed the button.
+    if (!canStartPass(getState().engine)) return;
+    inFlight = true;
+
+    try {
+      // Captured first, before anything that can await, and handed to every
+      // write below (§6.3). Nothing else in the pass may read "current" again.
+      const nodeId = await captureNode();
+
+      const { minProse } = await readEngineSettings();
+      const [watermark, queue, sections] = await Promise.all([
+        readWatermark(nodeId),
+        readQueue(nodeId),
+        api.v1.document.scan(),
+      ]);
+
+      const sectionIds = sections.map((s) => s.sectionId);
+      const assessment = assess({
+        sectionIds,
+        watermark,
+        textBySection: new Map(
+          sections.map((s) => [s.sectionId, s.section.text]),
+        ),
+        entities: Object.values(getState().world.entitiesById),
+      });
+
+      // Rule 2. A positive backlog under the threshold is real unread prose:
+      // report it, start nothing, spend nothing. At the default of 1 this is a
+      // no-op and a genuinely empty backlog falls through to the machine, which
+      // ends the pass at `assessed` having generated nothing.
+      if (assessment.backlog > 0 && assessment.backlog < minProse) {
+        dispatch(engineBacklogObserved({ backlog: assessment.backlog }));
+        api.v1.log(
+          `[engine] ${assessment.backlog} new paragraph(s), below engine_min_prose=${minProse} — skipping`,
+        );
+        return;
+      }
+
+      dispatch(engineLoopEvent({ type: "passRequested" }));
+      dispatch(
+        engineLoopEvent({
+          type: "assessed",
+          backlog: assessment.backlog,
+          candidateIds: assessment.candidateIds,
+        }),
+      );
+      if (assessment.backlog === 0) return;
+
+      // The reserve is the triage call itself — drain spends nothing this
+      // phase. Checked here rather than left to GenX, which would park the pass
+      // waiting for the bucket to refill instead of reporting a hold.
+      if (api.v1.script.getAllowedOutput() < TRIAGE_MAX_TOKENS) {
+        dispatch(engineLoopEvent({ type: "budgetExhausted" }));
+        api.v1.log("[engine] holding — budget below the triage reserve");
+        return;
+      }
+
+      const manifest = buildManifest(getState(), assessment.candidateIds);
+      const intents = parseTriage(
+        await generateTriage(genX, manifest, assessment),
+        manifest,
+      );
+      dispatch(engineLoopEvent({ type: "triaged", intents }));
+
+      // Rule 1: the pass got its answer, so the prose behind it has been read.
+      // Rule 4: its own record, its own write.
+      const lastSection = sectionIds[sectionIds.length - 1];
+      await saveRecords({ [WATERMARK_KEY]: lastSection }, nodeId);
+
+      if (intents.length === 0) return;
+
+      const enqueued = dedupe(queue, intents);
+      await saveRecords({ [QUEUE_KEY]: enqueued }, nodeId);
+
+      // Drain, phase-4 edition: log what phase 6 will run, then clear. Nothing
+      // here writes a lorebook entry, creates a group, or retires anything.
+      //
+      // The clear is what keeps the record honest. Dedupe bounds one
+      // commitment's repeats, not the queue's length, and nothing in this phase
+      // executes anything — an append-only queue would grow all session and be
+      // copied onto every node that writes, while claiming work is pending that
+      // nothing will ever do. Nothing real is lost: the watermark has already
+      // moved past the prose these intents came from. Phase 6 turns this into
+      // execute-then-clear, and the write above is what lets a reload between
+      // the two find the queue rather than nothing (§11).
+      for (const intent of enqueued) {
+        api.v1.log(`[engine] intent (not executed): ${intentKey(intent)}`);
+      }
+      await saveRecords({ [QUEUE_KEY]: [] }, nodeId);
+      dispatch(engineLoopEvent({ type: "drained" }));
+    } catch (error) {
+      // Rule 3. The classifier decides, not this callsite.
+      const retryable = isConcurrencyRefusal(error);
+      api.v1.log(
+        `[engine] pass failed (retryable=${retryable}):`,
+        error instanceof Error ? error.message : String(error),
+      );
+      dispatch(engineLoopEvent({ type: "failed", retryable }));
+    } finally {
+      // Released even on the paths that return early, or the Engine would wake
+      // exactly once per session.
+      inFlight = false;
+    }
+  };
 }
 
 export function registerEngineLoopEffects(deps: EngineLoopDeps): void {
+  const runPass = createEnginePass(deps);
+
+  // The ⚡. The guard is inside runPass, where a press that arrives before the
+  // re-render can still reach it.
+  deps.subscribeEffect(matchesAction(enginePassRequested), async () => {
+    await runPass();
+  });
+
   // True from the moment a wakeup is armed until it fires. The window closes
   // when the pass STARTS, not when it finishes: "at most once per delay window"
   // is a statement about the timer, and a pass that outlives its own window has
-  // Task 7's canStartPass re-entry guard underneath it. Holding the flag across
-  // the pass instead would drop wakeups for prose written while it ran.
+  // the pass's own canStartPass and in-flight guards underneath it. Holding the
+  // flag across the pass instead would drop wakeups for prose written while it
+  // ran.
   let pending = false;
 
   api.v1.hooks.register(
@@ -118,6 +396,16 @@ export function registerEngineLoopEffects(deps: EngineLoopDeps): void {
     async ({ scriptInitiated }) => {
       // The Engine's own generations must not wake the Engine.
       if (scriptInitiated) return;
+
+      // GenX registers this same hook in its constructor to notice the writer
+      // generating and unpark a task waiting on the budget — and one callback
+      // per hook name means this registration silently replaced it. Forward the
+      // call rather than leave a script generation parked until someone finds
+      // the header's Continue button. Ahead of the `pending` check on purpose:
+      // every user generation is a user interaction, not just the first of a
+      // burst.
+      deps.genX.userInteraction();
+
       // Claimed BEFORE the config read, not after: two generations dispatched
       // in the same tick both reach the await, and a flag set on the far side
       // of it would arm two wakeups for one burst.
@@ -132,7 +420,7 @@ export function registerEngineLoopEffects(deps: EngineLoopDeps): void {
 
       void api.v1.timers.setTimeout(async () => {
         pending = false;
-        await runPass(deps);
+        await runPass();
       }, settings.delayMs);
     },
   );

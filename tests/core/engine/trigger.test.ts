@@ -5,16 +5,20 @@ import {
   ENGINE_DEFAULTS,
   type EngineLoopDeps,
 } from "../../../src/core/store/effects/engine-loop";
+import { initialEngineState } from "../../../src/core/store/slices/engine";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-/** The trigger touches none of these — it hands them straight to the pass body
- *  Task 7 fills in — so a stub with the right shape is all a test needs. */
+/** The trigger hands all of these to the pass, and calls exactly one of them
+ *  itself — `genX.userInteraction`, which it forwards because registering this
+ *  hook replaced GenX's own registration of it. Everything else is a stub. */
 const DEPS = {
   subscribeEffect: (() => () => {}) as EngineLoopDeps["subscribeEffect"],
   dispatch: (() => {}) as EngineLoopDeps["dispatch"],
-  getState: (() => ({})) as unknown as EngineLoopDeps["getState"],
-  genX: {} as EngineLoopDeps["genX"],
+  getState: (() => ({
+    engine: initialEngineState,
+  })) as unknown as EngineLoopDeps["getState"],
+  genX: { userInteraction: vi.fn() } as unknown as EngineLoopDeps["genX"],
 } satisfies EngineLoopDeps;
 
 type GenerationRequest = {

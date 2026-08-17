@@ -200,4 +200,7 @@ export interface RootState {
   world: WorldState;
   foundation: FoundationState;
   forge: import("./slices/forge").ForgeSliceState;
+  /** The Engine loop's own state, mirrored from the pass machine so the HUD can
+   *  subscribe. Not persisted: a pass is a moment, not a fact about the story. */
+  engine: import("./slices/engine").EngineSliceState;
 }

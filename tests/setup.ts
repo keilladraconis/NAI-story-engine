@@ -147,6 +147,7 @@ const apiMock = {
     },
     document: {
       sectionIds: vi.fn().mockResolvedValue([]),
+      scan: vi.fn().mockResolvedValue([]),
       history: {
         currentNodeId: vi.fn().mockResolvedValue(1),
         nodeState: vi.fn().mockResolvedValue(undefined),

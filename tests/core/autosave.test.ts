@@ -8,6 +8,7 @@ import { initialFoundationState } from "../../src/core/store/slices/foundation";
 import { initialUIState } from "../../src/core/store/slices/ui";
 import { initialRuntimeState } from "../../src/core/store/slices/runtime";
 import { initialForgeState } from "../../src/core/store/slices/forge";
+import { initialEngineState } from "../../src/core/store/slices/engine";
 import type { RootState, WorldEntity } from "../../src/core/store/types";
 import type { Action } from "nai-store";
 
@@ -71,6 +72,7 @@ function baseState(entityIds: string[] = []): RootState {
     runtime: initialRuntimeState,
     forge: initialForgeState,
     chat: { chats: [], activeChatId: null },
+    engine: initialEngineState,
   } as RootState;
 }
 

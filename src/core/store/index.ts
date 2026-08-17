@@ -7,6 +7,7 @@ import { storySlice, initialStoryState } from "./slices/story";
 import { worldSlice } from "./slices/world";
 import { foundationSlice, initialFoundationState } from "./slices/foundation";
 import { forgeSlice } from "./slices/forge";
+import { engineSlice } from "./slices/engine";
 import { RootState, StoryState, WorldState, FoundationState } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ const sliceReducer = combineReducers({
   world: worldSlice.reducer,
   foundation: foundationSlice.reducer,
   forge: forgeSlice.reducer,
+  engine: engineSlice.reducer,
 });
 
 /** Exported for tests: the persist/loaded replace semantics are load-bearing
@@ -82,8 +84,12 @@ export * from "./slices/story";
 export * from "./slices/world";
 export * from "./slices/foundation";
 export * from "./slices/forge";
+export * from "./slices/engine";
 export {
   forgeChatContinueRequested,
   entityDiscardRequested,
   forgeChatNewSessionRequested,
 } from "./effects/forge-chat-effects";
+// The HUD's ⚡ dispatches this; the engine effect runs the pass. The real
+// re-entry guard is in the effect, not in the button (CLAUDE.md).
+export { enginePassRequested } from "./effects/engine-loop";
