@@ -1,6 +1,6 @@
 # The Engine — an agentic loop that lives alongside the writer
 
-**Status:** design approved, not yet planned
+**Status:** design approved; §14 phases 1–4 shipped in 0.15.0, phases 5–6 outstanding
 **Target version:** 0.15.0
 **Branch:** `claude/story-engine-agentic-loop-ti2pgk`
 
@@ -1056,9 +1056,109 @@ Nothing in §12 is still unknown, so the plan starts with real work.
 4. **Loop harness + HUD, triage only.** Trigger, state machine, pacing, collision
    recovery — with triage producing intents that are logged but not executed. The
    HUD makes this observable, which is why it comes early rather than last.
+   **Shipped — see §14.1 for what that phase does and does not include.**
 5. **`Thread` replacing `WorldGroup`**, including `advancedConditions`
    construction and the §4.5 controls.
 6. **Actions.** Revise, open, retire, condense — plus §7 reconciliation.
+
+### 14.1 Phase 4 as built
+
+The loop runs end to end and executes nothing. A wakeup fires, the pass reads the
+prose past its watermark, spends one triage generation, turns the answer into
+intents, persists them, writes them to the log, and clears them. The HUD reports
+all of it. `engine_enabled` defaults to `false`, so a writer who has not opted in
+sees the modeline and nothing else — which is the honest default for a phase whose
+whole output is a log line.
+
+**What is true now.**
+
+- The three settings that exist are `engine_enabled` (false), `engine_delay_ms`
+  (8000) and `engine_min_prose` (1). They live in NovelAI's script config;
+  surfacing them in Setup (§9.2) is a Setup-tab change and did not happen here.
+- The `engine_min_prose` gate lives in the effect, **before** the machine is told a
+  pass was requested. The machine ends a pass at `assessed` only on a zero backlog,
+  so a threshold inside it would either spend the generation anyway or report zero
+  unread paragraphs when there are several — and that number is exactly what §9.1
+  wants read against the budget. The gate skips only a backlog that is positive and
+  below the threshold, so genuinely-nothing-new still flows through the machine and
+  terminates there at zero cost.
+- The watermark advances on one line only, after triage has returned. Every early
+  exit — threshold, hold, refusal, failure — leaves it where it was, because prose
+  the Engine never read must not be skipped permanently.
+- `⚠ stalled` counts only failures the classifier did not recognise, and the
+  counter clears when a pass **completes** (`triaged`, `drained`, or a zero-backlog
+  `assessed`), not when one merely starts. Clearing it at `assessed` — which is
+  where the first draft put it — makes `⚠` unreachable in practice, since
+  assessment is pure string work that cannot fail: the counter would oscillate 0↔1
+  through exactly the condition the slot exists to report.
+- The loop's state is mirrored into the store but **not persisted**. A pass is a
+  moment, not a fact about the story, so every session starts at `idle` with an
+  empty backlog. The watermark and the queue are persisted, branch-scoped, as two
+  separate records (§6.2).
+- `assessing` is effectively never observable — the whole pass is one async
+  function and only `triaging` lasts long enough to paint. Do not design a HUD slot
+  around seeing it. `backlog` can also move without `phase` moving, which is what
+  the threshold skip does.
+- The wakeup is never cancelled. §3.1 points at autosave's cancellation-flag
+  pattern; a `pending` boolean turned out to be the whole of the bookkeeping, since
+  nothing in the design ever wants to un-arm a wakeup that has already been armed.
+- Triage's new-prose block is clamped to the last ~12k characters, cut on a
+  paragraph boundary. §3.3 is right that input tokens are cheap, but a watermark
+  the document no longer contains makes `assess` return the entire document by
+  design (correctly — re-reading beats skipping), and an unclamped prompt would
+  hand a whole novel to a 200-token call.
+
+**What phase 4 deliberately left.**
+
+- **Executing anything.** Drain logs one line per intent and then clears the
+  persisted queue. Clearing is not laziness: dedupe bounds one commitment's
+  repeats, not the queue's length, so an append-only queue nothing drains would
+  grow all session, copy onto every node that writes, and claim pending work that
+  nothing will ever do. Phase 6 turns this into execute-then-clear; the enqueue
+  write before it is what lets a reload between the two find the queue (§11).
+- **Two of the three jobs §3.2 gives `assess`.** It matches entity **names**
+  against the new prose and nothing else. Lorebook **key** matching would widen
+  candidate detection, but it needs a lorebook read that only the effect has, so it
+  belongs with the effect rather than in the pure function. And it enqueues no
+  `condense` intents: condense is an action, every action is phase 6, and there is
+  no threshold setting to compare against — so `Intent`'s `condense` kind is tested
+  but has no producer yet. Neither omission is inert forever; both are phase-6
+  work, and §3.2's description of `assess` is ahead of the code until then.
+- **Open-thread filtering in the manifest.** `WorldGroup` has no `status`, so
+  triage is shown every group and may `RETIRE` one already retired. Dedupe bounds
+  the repeat and drain only logs, so it is inert this phase; phase 5's `Thread`
+  (§4.1) is what fixes it, and phase 6 is when it would otherwise matter.
+- **`lb:<entryId>` write-records** (§6.2) and **`createCancellationSignal` for
+  stopping the Engine** (§3.4). Nothing writes a lorebook entry, and there is
+  nothing expensive to cancel while drain only logs.
+
+**Where the build corrected this document.**
+
+- **§9.1's state slot needed a sixth reading: "off".** Five readings cannot express
+  a switched-off Engine — the loop simply never moves, so the slot whose entire job
+  is _whether it's alive_ rendered "idle" and "not running at all" identically, on
+  the one surface built to carry trust. `engine_enabled` is now mirrored into the
+  engine slice (config reads are async and a component cannot await) and outranks
+  every phase. `EyeOff`, not a dimmed `Eye`: not-running and running-with-nothing-
+  to-do must not be two shades of one glyph.
+- **The ⚡ honours `engine_enabled`.** §9.1 says it bypasses the _wakeup_, which is
+  what a hand-writing writer needs; it does not say it bypasses the writer's
+  decision to switch the Engine off. As first built it ran a full pass, triage
+  generation included, with the Engine off — the one setting that stops the Engine
+  spending budget had a button beside it that spent it anyway. Off means off,
+  including for the manual control.
+- **§9.1 spent `✎` twice** — as the acting state and as the touched count — on a
+  line whose whole premise is being read as a shape. The state slot keeps the
+  pencil, since that is the state §9.1 names; touched draws `∆`, being a count of
+  changes. §9.1's example line is therefore `◉ 14¶ ⚑5 ∆23 ▮▮▮▯ ⚡`.
+- **§3.1 still names two `project.yaml` settings that do not exist**: the thread cap
+  (§4.5, default 8) and the condense threshold (§5.1). Neither had a home in this
+  phase. The cap is partly a _prompt_ obligation — it extends `TRIAGE_SYSTEM` — and
+  belongs with Threads in phase 5; the threshold belongs with the actions, in
+  phase 6. Read that sentence as a plan, not as a description of the config.
+- **The HUD is the second entry in the single `api.v1.ui.register()` call**, not the
+  third: the journal panel is conditional on `generation_journal` and is pushed
+  after it. The invariant that matters — one call, ever — holds.
 
 ## 15. Versioning
 
