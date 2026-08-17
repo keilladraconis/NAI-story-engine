@@ -949,6 +949,22 @@ and mirror `LoopState` into the store so the HUD can subscribe.
 `drained`, and stop. Do not write a lorebook entry, create a group, or retire
 anything — that is phase 6.
 
+**Drain clears the persisted queue after logging.** Dedupe bounds a single
+commitment's repeats, not the queue's total length, and nothing in this phase
+executes anything — so a queue that is only ever appended to grows for the whole
+session and is copied onto every node that writes. Holding work forever that
+nothing will do is also a lie: the queue is meant to say "not yet done". Clearing
+loses nothing real, because the watermark has advanced past the prose those
+intents came from and phase 4 was never going to act on them. Phase 6 changes
+this to execute-then-clear.
+
+**Write `watermark` and `queue` as two separate records, never one blob.**
+`EngineRecord` is one type spanning two keys for convenience. historyStorage is
+copy-on-write _per key per node_ (§6.2), and the watermark moves every pass while
+the queue usually does not — merging them would snapshot the queue onto every node
+the watermark touches, which is the exact cost the sharded keyspace exists to
+avoid.
+
 **Re-entry guard lives here, not in the button.** `canStartPass` is checked in the
 effect before a pass starts. CLAUDE.md: `disabled` is a render-time value and a
 press arriving before the re-render still gets through.
