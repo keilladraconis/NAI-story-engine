@@ -113,9 +113,9 @@ therefore no wakeup, and that is deliberate — see §1.2. The manual trigger in
 covers the case where such a writer does want a pass.
 
 `onGenerationRequested` is documented at `external/script-types.d.ts:3989`. The
-project currently registers exactly one hook (`onHistoryNavigated`,
-`src/core/store/effects/bootstrap-effects.ts:171`), so this surface is otherwise
-unused.
+project registers exactly one other hook (`onHistoryNavigated`, whose single home
+is `src/core/store/effects/history-sync.ts` since phase 2), so this surface is
+otherwise unused.
 
 ### 3.2 Per-firing state machine
 

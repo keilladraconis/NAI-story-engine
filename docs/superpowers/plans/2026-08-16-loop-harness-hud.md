@@ -973,6 +973,15 @@ press arriving before the re-render still gets through.
 refused must leave the watermark where it was, or the prose it never read is lost
 permanently.
 
+**`engine_min_prose` gates BEFORE `passRequested`, in the effect.** The machine
+ends a pass at `assessed` only when `backlog === 0`; any positive backlog goes to
+`triaging` and spends the generation. So the threshold cannot live in the machine.
+Do **not** take the shortcut of dispatching `assessed` with `backlog: 0` when the
+real backlog is below the threshold — it terminates correctly and makes the HUD's
+backlog slot report zero unread paragraphs when there are several, which is
+exactly the number §9.1 wants read against the budget. At the default of 1 the
+setting is a no-op, so this would bite only a writer who raised it, and silently.
+
 **The manifest is `assessment.candidateIds` plus the story's groups — not every
 live entity.** Assess is deliberately generous, and triage's precision is what
 makes that affordable; a manifest of every entity grows the stable prefix without
