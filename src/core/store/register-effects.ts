@@ -12,6 +12,7 @@ import { registerFoundationEffects } from "./effects/foundation-effects";
 import { registerSummaryGenerationEffects } from "./effects/summary-generation";
 import { registerBootstrapEffects } from "./effects/bootstrap-effects";
 import { registerHistorySyncEffects } from "./effects/history-sync";
+import { registerEngineLoopEffects } from "./effects/engine-loop";
 
 export { syncEratoCompatibility } from "./effects/lorebook-sync";
 
@@ -30,4 +31,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX): void {
   // Navigation must flush autosave before it replaces the store, so history-sync
   // needs the handle registerAutosaveEffects returns.
   registerHistorySyncEffects(dispatch, autosave);
+  // The Engine's wakeup. Off unless engine_enabled says otherwise, so
+  // registering it costs nothing until the writer opts in.
+  registerEngineLoopEffects({ subscribeEffect, dispatch, getState, genX });
 }
