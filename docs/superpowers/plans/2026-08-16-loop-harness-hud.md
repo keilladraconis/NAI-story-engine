@@ -973,6 +973,17 @@ press arriving before the re-render still gets through.
 refused must leave the watermark where it was, or the prose it never read is lost
 permanently.
 
+**The manifest is `assessment.candidateIds` plus the story's groups — not every
+live entity.** Assess is deliberately generous, and triage's precision is what
+makes that affordable; a manifest of every entity grows the stable prefix without
+bound and costs input tokens on every pass forever. `parseTriage` drops any name
+the manifest does not list, so a too-narrow manifest silently caps what triage can
+ever say — this is a real decision, not a detail.
+
+**Attempt numbering starts at 1** (Task 4's contract). `backoffMs(0)` returns
+`null`, so a loop written `for (let attempt = 0; ...)` performs no retries at all
+rather than failing loudly.
+
 **Emit `failed` with `retryable` set from `isConcurrencyRefusal`** (Task 4), never
 hardcoded. The machine relies on that flag to keep routine collisions out of the
 `⚠` slot; passing `false` for everything would light it up during ordinary
@@ -1090,6 +1101,15 @@ Then in a **scratch story**, with `engine_enabled` on:
 - **`lb:<entryId>` write-records** (§6.2). Nothing writes lorebook entries yet.
 - **`createCancellationSignal`** for stopping the Engine (§3.4). There is nothing
   expensive to cancel while drain only logs.
+- **Filtering the manifest's threads to _open_ ones.** `WorldGroup` has no
+  `status` — §4.1's `Thread` does, and that is phase 5. Until then triage sees
+  every group and may `RETIRE` one already retired. Dedupe bounds the repeat and
+  drain only logs, so it is inert this phase; it becomes real in phase 6 and
+  phase 5 is what fixes it.
+- **§4.5's thread cap and §5.1's condense threshold.** Neither has a home in this
+  phase: the cap is partly a prompt obligation (it extends `TRIAGE_SYSTEM`) and
+  belongs with Threads in phase 5, and condense is an action, so its threshold
+  belongs with the actions in phase 6.
 - **Two jobs §3.2 attributes to assess that this phase does not do.** Matching
   lorebook _keys_ as well as entity names would widen candidate detection —
   worth doing, but it needs the lorebook read that only the effect has, so it is
