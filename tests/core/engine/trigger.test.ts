@@ -120,6 +120,29 @@ describe("engine trigger", () => {
     expect(wakeups()).toEqual([]);
   });
 
+  it("forwards the user's generation to GenX, which lost this hook to us", async () => {
+    // api.v1.hooks.register holds one callback per hook name, and GenX
+    // registers this same hook in its constructor (initBudgetListener) to
+    // unpark tasks waiting on budget. mount.ts builds GenX before
+    // registerEffects, so our registration replaces it — forwarding is the
+    // only thing keeping budget-parked generations from hanging forever.
+    // Nothing in src/ reveals the collision; it lives in node_modules, which
+    // the source guard below does not scan.
+    vi.mocked(DEPS.genX.userInteraction).mockClear();
+    registerEngineLoopEffects(DEPS);
+    await registeredHook()(generation());
+    expect(DEPS.genX.userInteraction).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not forward a script-initiated generation to GenX", async () => {
+    // Matching GenX's own filter: its budget listener only unparks on a real
+    // user interaction, and the Engine's own calls are not one.
+    vi.mocked(DEPS.genX.userInteraction).mockClear();
+    registerEngineLoopEffects(DEPS);
+    await registeredHook()(generation(true));
+    expect(DEPS.genX.userInteraction).not.toHaveBeenCalled();
+  });
+
   it("arms nothing when the Engine is disabled", async () => {
     configure({ engine_enabled: false });
     registerEngineLoopEffects(DEPS);

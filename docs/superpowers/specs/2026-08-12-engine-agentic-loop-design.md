@@ -114,8 +114,25 @@ covers the case where such a writer does want a pass.
 
 `onGenerationRequested` is documented at `external/script-types.d.ts:3989`. The
 project registers exactly one other hook (`onHistoryNavigated`, whose single home
-is `src/core/store/effects/history-sync.ts` since phase 2), so this surface is
-otherwise unused.
+is `src/core/store/effects/history-sync.ts` since phase 2).
+
+**But `onGenerationRequested` is not unused — `nai-gen-x` registers it too**, in
+its constructor's `initBudgetListener`, to call `userInteraction()` and unpark
+tasks waiting on budget. `mount.ts` builds GenX before `registerEffects`, so the
+Engine's registration **replaces** it. The trigger therefore forwards
+`genX.userInteraction()` for non-`scriptInitiated` generations, matching GenX's
+own filter; without it, budget-parked generations wait forever.
+
+This was found in phase 4 by an implementer reading `node_modules`, not by the
+source-scan guard — which only walks `src/`. A grep of the project for a hook
+name is not sufficient evidence that a hook is free; the dependencies register
+hooks too, and the API's one-callback-per-name rule does not care which side of
+`node_modules` the second registration is on.
+
+`nai-gen-x` also retries this hook's refusal itself: `isTransientError` matches
+`"in progress"` and retries five times with exponential backoff (~62s) before the
+caller sees anything, which would defeat §3.4's bounded backoff entirely. Engine
+generations pass `maxRetries: 0` so the policy in `refusal.ts` is the only one.
 
 ### 3.2 Per-firing state machine
 
