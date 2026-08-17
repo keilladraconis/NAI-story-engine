@@ -1074,3 +1074,14 @@ Then in a **scratch story**, with `engine_enabled` on:
 - **`lb:<entryId>` write-records** (§6.2). Nothing writes lorebook entries yet.
 - **`createCancellationSignal`** for stopping the Engine (§3.4). There is nothing
   expensive to cancel while drain only logs.
+- **Two jobs §3.2 attributes to assess that this phase does not do.** Matching
+  lorebook _keys_ as well as entity names would widen candidate detection —
+  worth doing, but it needs the lorebook read that only the effect has, so it is
+  a Task 7 enhancement rather than part of the pure function, and name matching
+  is the larger share of the signal. Enqueuing condense intents past the §5.1
+  threshold is skipped because condense is an action and every action is phase
+  6; enqueuing one now would put an intent in the queue that nothing can drain.
+- **Clamping `newText`.** When the watermark is gone, assess returns the whole
+  document by design. Capping the prompt is a size policy that belongs to
+  whoever builds the prompt (Task 5/7), not to the definition of what counts as
+  new — see Task 2's report.
