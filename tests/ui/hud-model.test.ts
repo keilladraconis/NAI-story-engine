@@ -256,6 +256,26 @@ describe("the loop phase is read only by hud-model", () => {
     expect(offenders('"triaging"')).toEqual([]);
   });
 
+  it("no other file destructures phase off the engine slice", () => {
+    // The literal `engine.phase` scan above is escapable, and this is how:
+    //   const { phase } = store.getState().engine;
+    // then a branch on any phase name that HudState also uses — `acting`,
+    // `held`, `stalled` — which the scan above deliberately does not catch,
+    // because those are legitimate HudState names in the component.
+    //
+    // So catch the destructuring instead of the branch. Reaching `phase` out of
+    // the engine slice at all is the thing only deriveHud may do.
+    const destructures = sourceFiles(UI_DIR)
+      .filter((f) => !f.endsWith(join("hud", "hud-model.ts")))
+      .filter((f) =>
+        /\{[^}]*\bphase\b[^}]*\}\s*=\s*[^;]*\bengine\b/.test(
+          readFileSync(f, "utf8"),
+        ),
+      )
+      .map((f) => relative(UI_DIR, f));
+    expect(destructures).toEqual([]);
+  });
+
   it("no other file under src/ui imports the loop machine", () => {
     expect(offenders("engine/loop-machine")).toEqual([]);
   });

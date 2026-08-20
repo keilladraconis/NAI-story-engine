@@ -67,17 +67,22 @@ describe("Hud.tsx renders every state, and swaps no component types", () => {
     expect(src).toMatch(/display:\s*props\.state === state \?/);
   });
 
-  it("renders no element behind a ternary", () => {
-    // The failure mode this file exists for: `{cond ? <A/> : <B/>}` at a fixed
-    // position. Any JSX element in a conditional branch trips this, which also
-    // catches the milder `{cond ? <span/> : null}` — the HUD's slots are all
-    // always present by design (§9.1: fixed slots, always in the same position).
+  it("renders no element behind a condition", () => {
+    // The failure mode this file exists for: an element that is present in some
+    // renders and absent in others, at a fixed position. Every render here is
+    // detached — a store subscription and a 5s tick — which is exactly when the
+    // old node is left behind. The HUD's slots are all always present by design
+    // (§9.1: fixed slots, always in the same position).
     //
-    // The optional `(` is not decoration: prettier wraps a multi-line ternary as
-    // `? (\n  <Icon />\n) : (` , so a scan for `? <` alone passes the exact
-    // regression this test is for. It did, on the first attempt.
+    // BOTH idioms, and the second is the more common one. A scan for the
+    // ternary alone passed `{cond && <AlertTriangle/>}` — verified, and it is
+    // what a future edit would most likely reach for.
+    //
+    // The optional `(` is not decoration either: prettier wraps a multi-line
+    // ternary as `? (\n  <Icon />\n) : (` , so a scan for `? <` alone passes the
+    // exact regression this test is for. It did, on the first attempt.
     const offenders = [
-      ...code(hudSrc()).matchAll(/[?:]\s*\(?\s*<[A-Za-z]/g),
+      ...code(hudSrc()).matchAll(/(?:[?:]|&&|\|\|)\s*\(?\s*<[A-Za-z]/g),
     ].map((m) => m[0]);
     expect(offenders).toEqual([]);
   });

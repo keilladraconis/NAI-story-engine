@@ -95,27 +95,47 @@ export function loopReducer(state: LoopState, event: LoopEvent): LoopState {
     }
 
     case "triaged":
-      // Triage returned, so the pass got past the step that actually fails.
+      // Triage returned, so the pass got past the step that actually fails —
+      // and the backlog it was assessing has now been read. Zeroing it here is
+      // what makes the slot mean "unread" rather than "however much the last
+      // generation produced": a wakeup only fires after a generation, so a
+      // backlog that merely carried forward would never once read 0 in normal
+      // use, and the writer could not tell "kept up" from "three behind".
       return event.intents.length === 0
-        ? { ...state, phase: "idle", queued: 0, consecutiveFailures: 0 }
+        ? {
+            ...state,
+            phase: "idle",
+            queued: 0,
+            backlog: 0,
+            consecutiveFailures: 0,
+          }
         : {
             ...state,
             phase: "acting",
             queued: event.intents.length,
+            backlog: 0,
             consecutiveFailures: 0,
           };
 
     case "drained":
-      return { ...state, phase: "idle", queued: 0, consecutiveFailures: 0 };
+      return {
+        ...state,
+        phase: "idle",
+        queued: 0,
+        backlog: 0,
+        consecutiveFailures: 0,
+      };
 
     case "budgetExhausted":
       // Not a failure — a legitimate hold. Leaves the counter alone in both
-      // directions.
+      // directions, and leaves `backlog` standing: nothing was read, so the
+      // climb is exactly the signal §9.1 wants read against the budget slot.
       return { ...state, phase: "held" };
 
     case "failed": {
       // A routine collision is not evidence of anything. Rest, and let the
-      // backlog carry the signal.
+      // backlog carry the signal — it stays where assessment left it, because
+      // a pass that failed read nothing.
       if (event.retryable) return { ...state, phase: "idle" };
       const consecutiveFailures = state.consecutiveFailures + 1;
       return {

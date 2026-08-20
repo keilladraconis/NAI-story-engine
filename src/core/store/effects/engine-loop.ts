@@ -38,7 +38,7 @@
 import { matchesAction, type Store } from "nai-store";
 import type { GenX } from "nai-gen-x";
 import type { AppDispatch, RootState, WorldEntity } from "../types";
-import { assess } from "../../engine/assess";
+import { assess, type Watermark } from "../../engine/assess";
 import { canStartPass, type Intent } from "../../engine/loop-machine";
 import {
   dedupe,
@@ -133,7 +133,11 @@ export async function readEngineSettings(): Promise<EngineSettings> {
 //
 //   1. The watermark advances ONLY on a completed pass. A failed or refused
 //      pass that moved it would mark prose the Engine never read as seen, and
-//      unlike a dropped intent that is unrecoverable.
+//      unlike a dropped intent that is unrecoverable. It records an OFFSET as
+//      well as a section id for the same reason from the other direction:
+//      generation resumes INSIDE a section, so a section id alone marks
+//      everything later appended to that paragraph as read (see assess.ts's
+//      `Watermark`).
 //   2. `engine_min_prose` gates BEFORE the machine starts, because the machine
 //      only ends a pass early at `backlog === 0` and any positive backlog goes
 //      on to spend the generation. Faking `assessed { backlog: 0 }` instead
@@ -160,11 +164,20 @@ export const enginePassRequested = () => ({
 });
 enginePassRequested.type = ENGINE_PASS_REQUESTED;
 
-/** The watermark record: the last section id the Engine has read on this
- *  branch, or null on a branch it has never looked at. */
-async function readWatermark(nodeId: number): Promise<number | null> {
+/** The watermark record: how far the Engine has read on this branch — which
+ *  section, and how much of it — or null on a branch it has never looked at.
+ *
+ *  Anything that is not that shape reads as null, which re-reads the branch. The
+ *  0.15 alpha wrote a bare section id here (Story Engine is alpha, so there is
+ *  no migration); a bare number therefore lands on the same path a dangling
+ *  watermark already takes, and costs input tokens rather than skipped prose. */
+async function readWatermark(nodeId: number): Promise<Watermark | null> {
   const value: unknown = await api.v1.historyStorage.get(WATERMARK_KEY, nodeId);
-  return typeof value === "number" ? value : null;
+  if (typeof value !== "object" || value === null) return null;
+  const { sectionId, offset } = value as Partial<Watermark>;
+  return typeof sectionId === "number" && typeof offset === "number"
+    ? { sectionId, offset }
+    : null;
 }
 
 /** The queue record. Persisted JSON is trusted no further than its shape: a
@@ -238,7 +251,12 @@ async function generateTriage(
         { ...params, taskId: `engine-triage-${api.v1.uuid()}` },
         undefined,
         "background",
-        await api.v1.createCancellationSignal(),
+        // No cancellation signal. One is only worth creating when something can
+        // cancel it, and nothing does this phase — the plan lists
+        // createCancellationSignal as out of scope, and a signal created per
+        // attempt that no one holds is weight, not a capability. §3.4 wants it
+        // for the writer explicitly stopping the Engine, which arrives with the
+        // actions that are expensive enough to be worth stopping.
       );
       return response.choices?.[0]?.text ?? "";
     } catch (error) {
@@ -281,7 +299,20 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // write below (§6.3). Nothing else in the pass may read "current" again.
       const nodeId = await captureNode();
 
-      const { minProse } = await readEngineSettings();
+      const { enabled, minProse } = await readEngineSettings();
+      // The single home of "off means off". Checked here rather than at each
+      // entry point because there are two — the wakeup timer and the ⚡ — and a
+      // rule with two homes is a rule that will end up with one.
+      //
+      // The timer path needs it because `enabled` is read when the wakeup is
+      // ARMED: a writer who generates and then switches the Engine off inside
+      // the delay window would otherwise still get a full pass, triage
+      // generation included. The ⚡ needs it because §9.1 says it bypasses the
+      // *wakeup*, not the writer's decision to switch the Engine off.
+      if (!enabled) {
+        deps.dispatch(engineEnabledChanged({ enabled: false }));
+        return;
+      }
       const [watermark, queue, sections] = await Promise.all([
         readWatermark(nodeId),
         readQueue(nodeId),
@@ -297,6 +328,12 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
         ),
         entities: Object.values(getState().world.entitiesById),
       });
+
+      // Measured from the SAME scan assess just read, not from a later one.
+      // The offset's whole job is to say how much of that section this pass
+      // saw; re-reading the document to compute it would silently mark prose
+      // written during triage as read.
+      const reached = sections[sections.length - 1];
 
       // Rule 2. A positive backlog under the threshold is real unread prose:
       // report it, start nothing, spend nothing. At the default of 1 this is a
@@ -338,8 +375,11 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
 
       // Rule 1: the pass got its answer, so the prose behind it has been read.
       // Rule 4: its own record, its own write.
-      const lastSection = sectionIds[sectionIds.length - 1];
-      await saveRecords({ [WATERMARK_KEY]: lastSection }, nodeId);
+      const advanced: Watermark = {
+        sectionId: reached.sectionId,
+        offset: reached.section.text.length,
+      };
+      await saveRecords({ [WATERMARK_KEY]: advanced }, nodeId);
 
       if (intents.length === 0) return;
 
@@ -381,18 +421,20 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
 export function registerEngineLoopEffects(deps: EngineLoopDeps): void {
   const runPass = createEnginePass(deps);
 
-  // The ⚡. The guard is inside runPass, where a press that arrives before the
-  // re-render can still reach it.
-  //
-  // It also honours `engine_enabled`. §9.1 says the ⚡ bypasses the *wakeup* —
-  // which is what a hand-writing writer needs, since no generation means no
-  // wakeup — not the writer's decision to switch the Engine off. Off means off,
-  // including for the manual control; otherwise the one setting that stops the
-  // Engine spending budget has a button next to it that spends it anyway.
+  // Read the setting once at startup. Without this the slice's `enabled: false`
+  // stands until the writer generates or presses ⚡ — so someone who opted in
+  // opens their story and reads "Off — the Engine is not running", which is a
+  // glyph and a tooltip asserting a fact that is not true. Fire-and-forget: the
+  // HUD repaints from the store when it lands.
+  void readEngineSettings().then(({ enabled }) => {
+    deps.dispatch(engineEnabledChanged({ enabled }));
+  });
+
+  // The ⚡. Both of its guards live inside runPass: the in-flight/canStartPass
+  // check, because a press arriving before the re-render that would disable the
+  // button still reaches here; and the `engine_enabled` check, so off means off
+  // for the manual control too.
   deps.subscribeEffect(matchesAction(enginePassRequested), async () => {
-    const settings = await readEngineSettings();
-    deps.dispatch(engineEnabledChanged({ enabled: settings.enabled }));
-    if (!settings.enabled) return;
     await runPass();
   });
 

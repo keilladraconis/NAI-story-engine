@@ -9,6 +9,7 @@
 //
 // Phase 4 only enqueues and logs. Phase 6 drains.
 
+import type { Watermark } from "./assess";
 import type { Intent } from "./loop-machine";
 
 /** Singleton records, read directly rather than through the index — see
@@ -22,7 +23,7 @@ export const QUEUE_KEY = "queue";
 /** The loop's branch-scoped state, as the effect holds it in memory. Persisted
  *  as the two records above, one key each. */
 export type EngineRecord = {
-  watermark: number | null;
+  watermark: Watermark | null;
   queue: Intent[];
 };
 

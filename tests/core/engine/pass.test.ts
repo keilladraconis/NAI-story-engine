@@ -11,6 +11,7 @@ import type { RootState, WorldEntity } from "../../../src/core/store/types";
 import { persistedDataLoaded } from "../../../src/core/store";
 import { initialWorldState } from "../../../src/core/store/slices/world";
 import { QUEUE_KEY, WATERMARK_KEY } from "../../../src/core/engine/intents";
+import { engineEnabledChanged } from "../../../src/core/store/slices/engine";
 import { MAX_ATTEMPTS } from "../../../src/core/engine/refusal";
 import {
   installHistoryFake,
@@ -84,6 +85,18 @@ function harness(entities: WorldEntity[] = [entity("e1", "Ada")]): Harness {
   };
 }
 
+/** The NEW PROSE block triage was actually shown by the pass's first call.
+ *  What a watermark is for is exactly what reaches this string. */
+async function proseShownTo(h: Harness): Promise<string> {
+  const factory = h.generate.mock.calls[0][0] as () => Promise<{
+    messages: Message[];
+  }>;
+  const block = (await factory()).messages
+    .map((m) => m.content ?? "")
+    .find((content) => content.startsWith("=== NEW PROSE ==="));
+  return (block ?? "").replace("=== NEW PROSE ===\n", "");
+}
+
 /** Reply with a triage response. */
 function triageReturns(h: Harness, text: string): void {
   h.generate.mockResolvedValue({
@@ -97,6 +110,39 @@ function triageRejects(h: Harness, error: unknown): void {
 }
 
 const REFUSAL = new Error("A generation is already in progress");
+
+/** Let every pending microtask chain run. The ⚡ effect is fire-and-forget, so
+ *  there is no promise to await — one macrotask turn drains the awaits behind
+ *  it, and asserting that nothing happened needs them all drained. */
+function settle(): Promise<void> {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+}
+
+/** Register the effects, deliver a user generation, and hand back the wakeup
+ *  callback WITHOUT running it — so a test can change the world in the gap
+ *  between arming the timer and its firing, which is the writer's 8 seconds. */
+async function armWakeup(h: Harness): Promise<() => Promise<void>> {
+  let wakeup: (() => Promise<void>) | undefined;
+  vi.mocked(api.v1.timers.setTimeout).mockImplementationOnce((cb) => {
+    wakeup = cb as () => Promise<void>;
+    return Promise.resolve(1);
+  });
+
+  registerEngineLoopEffects(h.deps);
+  const hook = vi
+    .mocked(api.v1.hooks.register)
+    .mock.calls.filter((c) => c[0] === "onGenerationRequested")
+    .pop()?.[1] as (p: {
+    continuityId: string;
+    model: string;
+    scriptInitiated: boolean;
+  }) => Promise<void>;
+
+  await hook({ continuityId: "c1", model: "glm-4-6", scriptInitiated: false });
+  if (!wakeup) throw new Error("no wakeup was armed");
+  const fire = wakeup;
+  return () => fire();
+}
 
 function configure(values: Record<string, unknown>): void {
   vi.mocked(api.v1.config.get).mockImplementation(async (key: string) =>
@@ -133,12 +179,17 @@ describe("the pass", () => {
 
   // ─────────────────────────── a completed pass ───────────────────────────
 
-  it("advances the watermark to the last section it read", async () => {
+  it("advances the watermark to the last section it read, and how much of it", async () => {
+    // Not just WHICH section: NovelAI resumes generation inside a section at a
+    // character offset, so the last paragraph is routinely extended in place.
     const h = harness();
     triageReturns(h, "REVISE Ada");
     await h.runPass();
 
-    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toBe(sectionIdAt(1));
+    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toEqual({
+      sectionId: sectionIdAt(1),
+      offset: "Ada pocketed the letter.".length,
+    });
   });
 
   it("advances the watermark even when triage names nothing", async () => {
@@ -148,7 +199,10 @@ describe("the pass", () => {
     triageReturns(h, "");
     await h.runPass();
 
-    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toBe(sectionIdAt(1));
+    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toEqual({
+      sectionId: sectionIdAt(1),
+      offset: "Ada pocketed the letter.".length,
+    });
     expect(h.store.getState().engine.phase).toBe("idle");
   });
 
@@ -158,9 +212,56 @@ describe("the pass", () => {
     await h.runPass();
 
     documentOf("The lock clicked.", "Ada pocketed the letter.", "Rain again.");
+    h.generate.mockClear();
     await h.runPass();
 
-    expect(h.store.getState().engine.backlog).toBe(1);
+    expect(await proseShownTo(h)).toBe("Rain again.");
+  });
+
+  it("reads a last paragraph that was EXTENDED IN PLACE", async () => {
+    // The failure this shape exists for. A generation resumes inside the
+    // trailing section, so the sentence that finishes it belongs to a section
+    // the previous pass already watermarked. With a bare section id it is never
+    // read — not on this pass, and not on any later one.
+    const h = harness();
+    triageReturns(h, "");
+    await h.runPass();
+
+    documentOf(
+      "The lock clicked.",
+      "Ada pocketed the letter. She slid it under the floorboard.",
+      "Then she opened the window.",
+    );
+    h.generate.mockClear();
+    await h.runPass();
+
+    const prose = await proseShownTo(h);
+    expect(prose).toContain("She slid it under the floorboard.");
+    expect(prose).toContain("Then she opened the window.");
+    // ...and nothing it had already read.
+    expect(prose).not.toContain("Ada pocketed the letter.");
+    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toEqual({
+      sectionId: sectionIdAt(2),
+      offset: "Then she opened the window.".length,
+    });
+  });
+
+  it("treats a legacy bare-number watermark as unseen", async () => {
+    // Alpha, so no migration: a watermark of the old shape reads as null and
+    // the branch is re-read. That costs input tokens; the alternative is
+    // skipping prose nobody has looked at.
+    await api.v1.historyStorage.set(
+      WATERMARK_KEY,
+      sectionIdAt(1),
+      history.current(),
+    );
+    const h = harness();
+    triageReturns(h, "");
+    await h.runPass();
+
+    const prose = await proseShownTo(h);
+    expect(prose).toContain("The lock clicked.");
+    expect(prose).toContain("Ada pocketed the letter.");
   });
 
   it("enqueues what triage named, logs it, and clears the queue", async () => {
@@ -193,12 +294,26 @@ describe("the pass", () => {
     triageReturns(h, "REVISE Ada");
     await h.runPass();
 
+    // backlog 0, not 2: the pass READ those two paragraphs. The slot means
+    // "unread", and a wakeup only fires after a generation — so a backlog that
+    // merely carried forward would never once read 0 in normal use, and the
+    // writer could not tell "kept up" from "two behind".
     expect(h.store.getState().engine).toMatchObject({
       phase: "idle",
-      backlog: 2,
+      backlog: 0,
       queued: 0,
       consecutiveFailures: 0,
     });
+  });
+
+  it("leaves the backlog standing when the pass did not read it", async () => {
+    // A refused pass read nothing, so the paragraphs are still unread and the
+    // climb is exactly the signal §9.1 wants against the budget slot.
+    const h = harness();
+    triageRejects(h, REFUSAL);
+    await h.runPass();
+
+    expect(h.store.getState().engine.backlog).toBe(2);
   });
 
   it("writes the watermark and the queue as two separate records", async () => {
@@ -320,7 +435,10 @@ describe("the pass", () => {
     vi.mocked(api.v1.script.getAllowedOutput).mockReturnValue(2048);
     await h.runPass();
     expect(h.store.getState().engine.phase).toBe("idle");
-    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toBe(sectionIdAt(1));
+    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toEqual({
+      sectionId: sectionIdAt(1),
+      offset: "Ada pocketed the letter.".length,
+    });
   });
 
   // ───────────────────────── refusal and failure ──────────────────────────
@@ -421,6 +539,72 @@ describe("the pass", () => {
     h.store.dispatch(enginePassRequested());
 
     await vi.waitFor(() => expect(h.generate).toHaveBeenCalledTimes(1));
+  });
+
+  // ───────────────────────────── the off switch ───────────────────────────
+  //
+  // `engine_enabled` is the one setting that stops the Engine spending output
+  // budget, so it is checked in exactly ONE place — inside the pass, which every
+  // entry point goes through. Checking it at each entry point instead is how a
+  // path gets missed: the wakeup's own check happens when the timer is ARMED,
+  // and the writer has the whole delay window to change their mind.
+
+  it("spends nothing when the Engine is switched off", async () => {
+    configure({ engine_enabled: false });
+    const h = harness();
+    triageReturns(h, "REVISE Ada");
+
+    await h.runPass();
+
+    expect(h.generate).not.toHaveBeenCalled();
+    expect(vi.mocked(api.v1.historyStorage.set)).not.toHaveBeenCalled();
+    expect(h.store.getState().engine.phase).toBe("idle");
+  });
+
+  it("tells the HUD the Engine is off, from the pass that refused", async () => {
+    configure({ engine_enabled: false });
+    const h = harness();
+    h.store.dispatch(engineEnabledChanged({ enabled: true }));
+
+    await h.runPass();
+
+    expect(h.store.getState().engine.enabled).toBe(false);
+  });
+
+  it("refuses the ⚡ while the Engine is off", async () => {
+    configure({ engine_enabled: false });
+    const h = harness();
+    triageReturns(h, "REVISE Ada");
+    registerEngineLoopEffects(h.deps);
+
+    h.store.dispatch(enginePassRequested());
+    await settle();
+
+    expect(h.generate).not.toHaveBeenCalled();
+  });
+
+  it("refuses a wakeup switched off inside its own delay window", async () => {
+    // Armed while the Engine was on, fired after the writer turned it off. The
+    // arming check cannot cover this — 8 seconds is plenty of time to change
+    // your mind, and the callback runs on the far side of it.
+    const h = harness();
+    triageReturns(h, "REVISE Ada");
+    const fire = await armWakeup(h);
+
+    configure({ engine_enabled: false });
+    await fire();
+
+    expect(h.generate).not.toHaveBeenCalled();
+  });
+
+  it("still runs a wakeup that is left switched on", async () => {
+    const h = harness();
+    triageReturns(h, "");
+    const fire = await armWakeup(h);
+
+    await fire();
+
+    expect(h.generate).toHaveBeenCalledTimes(1);
   });
 });
 

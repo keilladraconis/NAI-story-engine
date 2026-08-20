@@ -11,7 +11,7 @@
 import type { WorldEntity } from "../store/types";
 
 export type Assessment = {
-  /** Sections past the watermark. */
+  /** Unread paragraphs — the pieces of prose below, counted. */
   backlog: number;
   /** Their text, joined — the volatile tail of the triage prompt. */
   newText: string;
@@ -19,10 +19,26 @@ export type Assessment = {
   candidateIds: string[];
 };
 
+/** How far the Engine has read: which section, and how much of it.
+ *
+ *  The offset is not bookkeeping — it is the whole point. NovelAI resumes
+ *  generation INSIDE a section at a character offset (`GenerationPosition` is
+ *  `{ sectionId, offset }`), so the trailing paragraph is routinely extended in
+ *  place rather than replaced. A watermark that recorded only the section id
+ *  would mark that extension as read the moment the section was, and everything
+ *  appended to it would be skipped permanently — on this pass and on every later
+ *  one. That is the exact loss the "advance only on a completed pass" rule
+ *  exists to prevent, arriving by a different door. */
+export type Watermark = {
+  sectionId: number;
+  /** The section's character length when it was read. */
+  offset: number;
+};
+
 export type AssessInput = {
   sectionIds: number[];
-  /** The last section observed, or null on a branch never assessed. */
-  watermark: number | null;
+  /** How far the last completed pass read, or null on a branch never assessed. */
+  watermark: Watermark | null;
   textBySection: Map<number, string>;
   entities: WorldEntity[];
 };
@@ -54,13 +70,31 @@ export function assess(input: AssessInput): Assessment {
   // A watermark the document no longer contains means the writer undid or
   // deleted past it. Treat everything as unseen: re-reading is cheap, and
   // skipping prose because of a dangling id loses commitments silently.
-  const at = watermark === null ? -1 : sectionIds.indexOf(watermark);
-  const fresh = sectionIds.slice(at + 1);
+  const at = watermark === null ? -1 : sectionIds.indexOf(watermark.sectionId);
 
-  const newText = fresh
-    .map((id) => textBySection.get(id) ?? "")
-    .filter((t) => t.length > 0)
-    .join("\n\n");
+  // The tail first: what was appended to the watermarked section since it was
+  // read. `slice` past the end yields "" rather than a negative window, so a
+  // section the writer SHORTENED contributes nothing rather than re-reading
+  // backwards.
+  const tail =
+    watermark === null || at === -1
+      ? ""
+      : (textBySection.get(watermark.sectionId) ?? "").slice(watermark.offset);
+
+  const fresh = sectionIds
+    .slice(at + 1)
+    .map((id) => textBySection.get(id) ?? "");
+
+  // The tail joins ahead of the sections that follow it — document order, which
+  // is the payload of this string rather than a detail of it.
+  const pieces = [tail, ...fresh]
+    .map((text) => text.trim())
+    // What contributes no text is not unread prose. Counting it would clear
+    // `engine_min_prose` on a run of blank paragraphs and spend the pass's one
+    // generation on an empty NEW PROSE block.
+    .filter((text) => text.length > 0);
+
+  const newText = pieces.join("\n\n");
 
   const candidateIds = entities
     .filter((e) => {
@@ -70,5 +104,5 @@ export function assess(input: AssessInput): Assessment {
     })
     .map((e) => e.id);
 
-  return { backlog: fresh.length, newText, candidateIds };
+  return { backlog: pieces.length, newText, candidateIds };
 }

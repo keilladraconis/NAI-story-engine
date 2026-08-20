@@ -1160,6 +1160,36 @@ whole output is a log line.
   third: the journal panel is conditional on `generation_journal` and is pushed
   after it. The invariant that matters — one call, ever — holds.
 
+**Corrected after the whole-phase review.** Four things the first cut got wrong,
+all found by reading the code rather than the tests:
+
+- **The watermark is `{ sectionId, offset }`, not a section id.** `GenerationPosition`
+  is `{ sectionId, offset }` — NovelAI resumes generation _inside_ a section, so the
+  trailing paragraph is routinely extended in place. A section-id watermark
+  permanently skipped everything appended to the section it named: a pass ends on a
+  paragraph that stops mid-sentence, the model finishes that sentence and opens two
+  more, and the finished sentence is never read on any later pass. `assess` now
+  yields the tail beyond `offset` before the sections that follow.
+- **`engine_enabled` is checked in `runPass`, once.** It was checked when the wakeup
+  was _armed_ and again in the ⚡'s subscription, and tested in neither — deleting
+  the ⚡'s check left all 823 tests green. Two homes for one rule is one home too
+  many: the timer path let a writer who switched the Engine off inside the delay
+  window still buy a full pass.
+- **A completed pass zeros the backlog.** `triaged` and `drained` carried it forward,
+  so the slot reported "paragraphs in the last generation" under a tooltip promising
+  "unread" — and since a wakeup only fires after a generation, it never once read 0.
+  `failed` and `budgetExhausted` still leave it standing: those passes read nothing,
+  and the climb is the signal §9.1 wants.
+- **The setting is read at startup.** Otherwise a writer who had opted in opened
+  their story to "Off — the Engine is not running" until they generated.
+
+**Left for later, deliberately.** A triage call that GenX blocks on _input_ budget
+can leave the queue in `waiting_for_user`, which the header renders as a "Continue"
+widget — and §3.5 is explicit that a background loop has no business demanding a
+Continue click. The Engine's pre-check is output-only. Narrow, and the fix is a
+question about how the Engine's tasks are queued in GenX rather than a patch to the
+pass, so it wants its own thinking alongside the actions in phase 6.
+
 ## 15. Versioning
 
 **0.15.0** — minor. Under the alpha lock (major pinned at 0), minor covers
