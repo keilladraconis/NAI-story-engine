@@ -122,7 +122,7 @@ export function deriveHud(state: RootState, inputs: HudInputs): HudModel {
     // for both "alive and waiting" and "not running" — and the slot whose whole
     // job is "whether it's alive" cannot be the one that cannot say no, on the
     // surface §9.1 builds to carry trust.
-    stateIcon: engine.enabled ? stateOf(engine.phase) : "off",
+    stateIcon: engine.settings.enabled ? stateOf(engine.phase) : "off",
     backlog: engine.backlog,
     // `world.groups.length` — `Thread` replacing `WorldGroup` is phase 5.
     threads: world.groups.length,
@@ -134,7 +134,7 @@ export function deriveHud(state: RootState, inputs: HudInputs): HudModel {
     budgetBars: budgetBarsOf(inputs.allowedOutput),
     // The ⚡ is inert when the Engine is off — the effect refuses the pass for
     // the same reason, so the appearance and the behaviour agree.
-    zapEnabled: engine.enabled && canStartPass(engine),
+    zapEnabled: engine.settings.enabled && canStartPass(engine),
   };
 }
 
@@ -150,7 +150,7 @@ export function hudSignature(state: RootState): string {
     engine.phase,
     // Covers the state slot's "off" reading and the ⚡'s appearance — without it
     // toggling the setting leaves a stale line until something else repaints.
-    engine.enabled ? "1" : "0",
+    engine.settings.enabled ? "1" : "0",
     engine.backlog,
     engine.touched,
     world.groups.length,

@@ -6,7 +6,7 @@ createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories
 memoryLimit: 8
-updatedAt: 1786940313
+updatedAt: 1787322786
 config:
   - name: xialong_mode
     prettyName: Xialong Mode
@@ -49,23 +49,6 @@ config:
       managed lorebook entries are automatically migrated.
     type: boolean
     default: false
-  - name: engine_enabled
-    prettyName: Engine
-    description: Wake the Engine after each generation to maintain the World.
-    type: boolean
-    default: false
-  - name: engine_delay_ms
-    prettyName: Engine delay (ms)
-    description: >-
-      How long after a generation starts the Engine reads what was written.
-    type: number
-    default: 8000
-  - name: engine_min_prose
-    prettyName: Engine minimum new paragraphs
-    description: >-
-      Skip a pass when fewer than this many new paragraphs have appeared.
-    type: number
-    default: 1
   - name: story_engine_debug
     prettyName: Story Engine Debug
     description: Enable debug logging for Story Engine

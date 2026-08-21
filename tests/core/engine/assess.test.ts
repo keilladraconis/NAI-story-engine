@@ -81,8 +81,8 @@ describe("assess — newText", () => {
       }),
     );
     // Only what contributes text counts. A section we could not read gives
-    // triage nothing to look at, and counting it clears `engine_min_prose` and
-    // spends a generation on prose that is not in the prompt.
+    // triage nothing to look at, and counting it clears the minimum-new-prose
+    // gate and spends a generation on prose that is not in the prompt.
     expect(a.backlog).toBe(1);
     expect(a.newText).toBe("Rain again.");
   });

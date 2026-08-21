@@ -95,8 +95,8 @@ function buildSidebarPanel(hasDocumentContent: boolean): UIExtension {
 // can be minimized but never dismissed, which is what lets the HUD carry the
 // trust burden — the Engine can never be quietly running behind a surface the
 // writer closed and forgot. Registered unconditionally for the same reason: with
-// `engine_enabled` off the line simply reports a loop that never moves, and the
-// writer can still see that nothing is happening.
+// the Engine switched off the line simply reports a loop that never moves, and
+// the writer can still see that nothing is happening.
 function buildHudPanel(): UIExtension {
   const jsxPart = api.v1.ui.part.jsx({
     id: "kse-jsx-hud-root",

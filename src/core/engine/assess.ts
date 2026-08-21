@@ -90,8 +90,8 @@ export function assess(input: AssessInput): Assessment {
   const pieces = [tail, ...fresh]
     .map((text) => text.trim())
     // What contributes no text is not unread prose. Counting it would clear
-    // `engine_min_prose` on a run of blank paragraphs and spend the pass's one
-    // generation on an empty NEW PROSE block.
+    // the minimum-new-prose gate on a run of blank paragraphs and spend the
+    // pass's one generation on an empty NEW PROSE block.
     .filter((text) => text.length > 0);
 
   const newText = pieces.join("\n\n");

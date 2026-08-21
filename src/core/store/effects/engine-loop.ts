@@ -39,6 +39,7 @@ import { matchesAction, type Store } from "nai-store";
 import type { GenX } from "nai-gen-x";
 import type { AppDispatch, RootState, WorldEntity } from "../types";
 import { assess, type Watermark } from "../../engine/assess";
+import { readEngineSettings } from "../../engine/settings";
 import { canStartPass, type Intent } from "../../engine/loop-machine";
 import {
   dedupe,
@@ -61,8 +62,8 @@ import {
 import { captureNode, saveRecords } from "../persistence/history-store";
 import {
   engineBacklogObserved,
-  engineEnabledChanged,
   engineLoopEvent,
+  engineSettingsChanged,
 } from "../slices/engine";
 import { FIELD_CONFIGS } from "../../../config/field-definitions";
 
@@ -79,47 +80,6 @@ export type EngineLoopDeps = {
   getState: () => RootState;
   genX: GenX;
 };
-
-/** Fallbacks for the project.yaml entries, so a config read that returns
- *  nothing behaves like a fresh install rather than NaN milliseconds.
- *
- *  `enabled` is false on purpose: a loop that only logs has not earned the
- *  right to spend the script's output budget on every generation. */
-export const ENGINE_DEFAULTS = {
-  enabled: false,
-  delayMs: 8000,
-  minProse: 1,
-} as const;
-
-export type EngineSettings = {
-  enabled: boolean;
-  delayMs: number;
-  minProse: number;
-};
-
-/** api.v1.config.get is typed `Promise<any>` and the value comes from user
- *  settings, so it is validated rather than trusted. */
-async function readBoolean(key: string, fallback: boolean): Promise<boolean> {
-  const value: unknown = await api.v1.config.get(key);
-  return typeof value === "boolean" ? value : fallback;
-}
-
-async function readNumber(key: string, fallback: number): Promise<number> {
-  const value: unknown = await api.v1.config.get(key);
-  return typeof value === "number" && Number.isFinite(value) && value >= 0
-    ? value
-    : fallback;
-}
-
-/** The Engine's runtime settings, read fresh each time so toggling the Engine
- *  takes effect on the next generation rather than the next session. */
-export async function readEngineSettings(): Promise<EngineSettings> {
-  return {
-    enabled: await readBoolean("engine_enabled", ENGINE_DEFAULTS.enabled),
-    delayMs: await readNumber("engine_delay_ms", ENGINE_DEFAULTS.delayMs),
-    minProse: await readNumber("engine_min_prose", ENGINE_DEFAULTS.minProse),
-  };
-}
 
 // ───────────────────────────────── The pass ─────────────────────────────────
 //
@@ -138,7 +98,8 @@ export async function readEngineSettings(): Promise<EngineSettings> {
 //      generation resumes INSIDE a section, so a section id alone marks
 //      everything later appended to that paragraph as read (see assess.ts's
 //      `Watermark`).
-//   2. `engine_min_prose` gates BEFORE the machine starts, because the machine
+//   2. The minimum-new-prose setting gates BEFORE the machine starts, because
+//      the machine
 //      only ends a pass early at `backlog === 0` and any positive backlog goes
 //      on to spend the generation. Faking `assessed { backlog: 0 }` instead
 //      would terminate correctly and lie to the HUD about how far behind the
@@ -299,7 +260,14 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // write below (§6.3). Nothing else in the pass may read "current" again.
       const nodeId = await captureNode();
 
-      const { enabled, minProse } = await readEngineSettings();
+      const settings = await readEngineSettings();
+      // Mirrored on EVERY pass, not only the refusing one: the store is what the
+      // HUD and the Setup form render from, and a story opened in a second tab —
+      // or edited from the form and then reloaded — has settings the store has
+      // never seen. Identity-checked in the reducer, so an unchanged read costs
+      // no repaint.
+      dispatch(engineSettingsChanged(settings));
+
       // The single home of "off means off". Checked here rather than at each
       // entry point because there are two — the wakeup timer and the ⚡ — and a
       // rule with two homes is a rule that will end up with one.
@@ -309,10 +277,8 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // the delay window would otherwise still get a full pass, triage
       // generation included. The ⚡ needs it because §9.1 says it bypasses the
       // *wakeup*, not the writer's decision to switch the Engine off.
-      if (!enabled) {
-        deps.dispatch(engineEnabledChanged({ enabled: false }));
-        return;
-      }
+      if (!settings.enabled) return;
+      const { minProse } = settings;
       const [watermark, queue, sections] = await Promise.all([
         readWatermark(nodeId),
         readQueue(nodeId),
@@ -342,7 +308,7 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       if (assessment.backlog > 0 && assessment.backlog < minProse) {
         dispatch(engineBacklogObserved({ backlog: assessment.backlog }));
         api.v1.log(
-          `[engine] ${assessment.backlog} new paragraph(s), below engine_min_prose=${minProse} — skipping`,
+          `[engine] ${assessment.backlog} new paragraph(s), below the minimum of ${minProse} — skipping`,
         );
         return;
       }
@@ -426,14 +392,14 @@ export function registerEngineLoopEffects(deps: EngineLoopDeps): void {
   // opens their story and reads "Off — the Engine is not running", which is a
   // glyph and a tooltip asserting a fact that is not true. Fire-and-forget: the
   // HUD repaints from the store when it lands.
-  void readEngineSettings().then(({ enabled }) => {
-    deps.dispatch(engineEnabledChanged({ enabled }));
+  void readEngineSettings().then((settings) => {
+    deps.dispatch(engineSettingsChanged(settings));
   });
 
   // The ⚡. Both of its guards live inside runPass: the in-flight/canStartPass
   // check, because a press arriving before the re-render that would disable the
-  // button still reaches here; and the `engine_enabled` check, so off means off
-  // for the manual control too.
+  // button still reaches here; and the enabled check, so off means off for the
+  // manual control too.
   deps.subscribeEffect(matchesAction(enginePassRequested), async () => {
     await runPass();
   });
@@ -461,16 +427,17 @@ export function registerEngineLoopEffects(deps: EngineLoopDeps): void {
       // burst.
       deps.genX.userInteraction();
 
-      // Claimed BEFORE the config read, not after: two generations dispatched
+      // Claimed BEFORE the settings read, not after: two generations dispatched
       // in the same tick both reach the await, and a flag set on the far side
       // of it would arm two wakeups for one burst.
       if (pending) return;
       pending = true;
 
       const settings = await readEngineSettings();
-      // Mirror it so the HUD's state slot can say "off" rather than reading
-      // identically to idle.
-      deps.dispatch(engineEnabledChanged({ enabled: settings.enabled }));
+      // Mirror them so the HUD's state slot can say "off" rather than reading
+      // identically to idle, and so the Setup form shows what is actually
+      // stored rather than the defaults the slice started at.
+      deps.dispatch(engineSettingsChanged(settings));
       if (!settings.enabled) {
         pending = false;
         return;

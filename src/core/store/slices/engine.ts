@@ -6,14 +6,17 @@
 // `assessed` or `failed` mean. The effect dispatches events; the store is the
 // projection.
 //
-// One action is not a machine event. `engineBacklogObserved` records how far
-// behind the Engine is WITHOUT starting or advancing a pass, which is what the
-// `engine_min_prose` gate needs: below the threshold no pass runs, and the HUD
-// must still show the paragraphs nobody has read rather than the zero a faked
-// `assessed` would leave behind (plan, Task 7). It touches `backlog` only —
-// never `phase` — so it cannot move the lifecycle from outside the machine.
+// Two actions are not machine events. `engineSettingsChanged` carries the
+// settings the effect last read from storage, and `engineBacklogObserved`
+// records how far behind the Engine is WITHOUT starting or advancing a pass,
+// which is what the minimum-new-prose gate needs: below the threshold no pass
+// runs, and the HUD must still show the paragraphs nobody has read rather than
+// the zero a faked `assessed` would leave behind (plan, Task 7). It touches
+// `backlog` only — never `phase` — so it cannot move the lifecycle from outside
+// the machine.
 
 import { createSlice } from "nai-store";
+import { ENGINE_DEFAULTS, type EngineSettings } from "../../engine/settings";
 import {
   initialLoopState,
   loopReducer,
@@ -22,35 +25,50 @@ import {
 } from "../../engine/loop-machine";
 
 /** The machine's state plus one thing the machine has no business knowing: the
- *  `engine_enabled` setting. It lives here rather than in `LoopState` so the
- *  reducer stays a pure lifecycle, and here rather than as a HUD input because
- *  `api.v1.config.get` is async and a component cannot await — mirroring it into
- *  the store lets the HUD read it synchronously and repaint when it changes. */
-export type EngineSliceState = LoopState & { enabled: boolean };
+ *  Engine's settings. They live beside `LoopState` rather than inside it so the
+ *  reducer stays a pure lifecycle, and in the store rather than as a component
+ *  read because `readEngineSettings` is async and a component cannot await —
+ *  mirroring them here lets the HUD and the Setup form read them synchronously
+ *  and repaint when they change. */
+export type EngineSliceState = LoopState & { settings: EngineSettings };
 
 export const initialEngineState: EngineSliceState = {
   ...initialLoopState,
-  // Matches ENGINE_DEFAULTS.enabled. The HUD reads "off" until the effect has
-  // read the real setting, which is the honest reading before we know.
-  enabled: false,
+  // The defaults — Engine off — until the effect's startup read lands. That is
+  // the honest reading before we know, and it is corrected within a tick.
+  settings: ENGINE_DEFAULTS,
 };
+
+/** Whether two settings objects say the same thing, so a re-read that changed
+ *  nothing returns the same state and the HUD does not repaint for it. */
+function same(a: EngineSettings, b: EngineSettings): boolean {
+  return (
+    a.enabled === b.enabled &&
+    a.delayMs === b.delayMs &&
+    a.minProse === b.minProse
+  );
+}
 
 export const engineSlice = createSlice({
   name: "engine",
   initialState: initialEngineState,
   reducers: {
     /** Fold one machine event. The effect owns which events happen and when.
-     *  `enabled` is carried across untouched — it is not part of the machine. */
+     *  `settings` is carried across untouched — not part of the machine. */
     engineLoopEvent: (state, payload: LoopEvent) => ({
       ...loopReducer(state, payload),
-      enabled: state.enabled,
+      settings: state.settings,
     }),
 
-    /** The `engine_enabled` setting, as the effect last read it. */
-    engineEnabledChanged: (state, payload: { enabled: boolean }) =>
-      state.enabled === payload.enabled
-        ? state
-        : { ...state, enabled: payload.enabled },
+    /** The whole settings object, as the effect last read it — or as the Setup
+     *  form just wrote it.
+     *
+     *  The WHOLE object on purpose. An action carrying `enabled` alone (which is
+     *  what this was) leaves `delayMs` and `minProse` at their defaults forever,
+     *  because no other code path ever dispatches them: a writer whose story has
+     *  3000/4 saved would open the Setup form and read 8000/1. */
+    engineSettingsChanged: (state, payload: EngineSettings) =>
+      same(state.settings, payload) ? state : { ...state, settings: payload },
 
     /** How much unread prose there is, as of a pass that never started. */
     engineBacklogObserved: (state, payload: { backlog: number }) =>
@@ -61,5 +79,5 @@ export const engineSlice = createSlice({
 });
 
 export const engineSliceReducer = engineSlice.reducer;
-export const { engineLoopEvent, engineBacklogObserved, engineEnabledChanged } =
+export const { engineLoopEvent, engineBacklogObserved, engineSettingsChanged } =
   engineSlice.actions;

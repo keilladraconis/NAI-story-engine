@@ -15,6 +15,7 @@ import {
   type LoopPhase,
   type LoopState,
 } from "../../src/core/engine/loop-machine";
+import { ENGINE_DEFAULTS } from "../../src/core/engine/settings";
 import { initialWorldState } from "../../src/core/store/slices/world";
 import type { RootState } from "../../src/core/store";
 import type { WorldGroup, WorldState } from "../../src/core/store/types";
@@ -23,13 +24,22 @@ const INPUTS: HudInputs = { allowedOutput: OUTPUT_BUCKET };
 
 /** Enabled by default: these cases are about what the machine's phases read as,
  *  and an Engine that is switched off reads "off" regardless of phase. The
- *  "switched off" describe below is where that is exercised. */
+ *  "switched off" describe below is where that is exercised.
+ *
+ *  `enabled` is spelled flat here and folded into the slice's `settings` object,
+ *  so the cases below stay about the one field they are testing rather than
+ *  restating the whole settings record. */
 function state(
-  engine: Partial<LoopState & { enabled: boolean }> = {},
+  engine: Partial<LoopState> & { enabled?: boolean } = {},
   world: Partial<WorldState> = {},
 ): RootState {
+  const { enabled = true, ...loop } = engine;
   return {
-    engine: { ...initialLoopState, enabled: true, ...engine },
+    engine: {
+      ...initialLoopState,
+      ...loop,
+      settings: { ...ENGINE_DEFAULTS, enabled },
+    },
     world: { ...initialWorldState, ...world },
   } as RootState;
 }

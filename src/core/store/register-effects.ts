@@ -31,7 +31,7 @@ export function registerEffects(store: Store<RootState>, genX: GenX): void {
   // Navigation must flush autosave before it replaces the store, so history-sync
   // needs the handle registerAutosaveEffects returns.
   registerHistorySyncEffects(dispatch, autosave);
-  // The Engine's wakeup. Off unless engine_enabled says otherwise, so
+  // The Engine's wakeup. Off unless the story's settings say otherwise, so
   // registering it costs nothing until the writer opts in.
   registerEngineLoopEffects({ subscribeEffect, dispatch, getState, genX });
 }

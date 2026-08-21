@@ -11,7 +11,12 @@ import type { RootState, WorldEntity } from "../../../src/core/store/types";
 import { persistedDataLoaded } from "../../../src/core/store";
 import { initialWorldState } from "../../../src/core/store/slices/world";
 import { QUEUE_KEY, WATERMARK_KEY } from "../../../src/core/engine/intents";
-import { engineEnabledChanged } from "../../../src/core/store/slices/engine";
+import { engineSettingsChanged } from "../../../src/core/store/slices/engine";
+import {
+  ENGINE_DEFAULTS,
+  type EngineSettings,
+} from "../../../src/core/engine/settings";
+import { STORAGE_KEYS } from "../../../src/core/keys";
 import { MAX_ATTEMPTS } from "../../../src/core/engine/refusal";
 import {
   installHistoryFake,
@@ -144,9 +149,13 @@ async function armWakeup(h: Harness): Promise<() => Promise<void>> {
   return () => fire();
 }
 
-function configure(values: Record<string, unknown>): void {
-  vi.mocked(api.v1.config.get).mockImplementation(async (key: string) =>
-    key in values ? values[key] : undefined,
+/** Put the Engine's settings where the pass now reads them: one storyStorage
+ *  record, not three `api.v1.config` entries. Everything not named takes its
+ *  default, which is what a real record written by the Setup form looks like. */
+function configure(settings: Partial<EngineSettings> = {}): void {
+  const stored: EngineSettings = { ...ENGINE_DEFAULTS, ...settings };
+  vi.mocked(api.v1.storyStorage.get).mockImplementation(async (key: string) =>
+    key === STORAGE_KEYS.ENGINE_SETTINGS ? stored : null,
   );
 }
 
@@ -163,7 +172,7 @@ let history: HistoryFake;
 describe("the pass", () => {
   beforeEach(() => {
     history = installHistoryFake();
-    configure({ engine_enabled: true });
+    configure({ enabled: true });
     documentOf("The lock clicked.", "Ada pocketed the letter.");
     vi.mocked(api.v1.log).mockClear();
     vi.mocked(api.v1.script.getAllowedOutput).mockReturnValue(2048);
@@ -173,8 +182,8 @@ describe("the pass", () => {
 
   afterEach(() => {
     history.reset();
-    vi.mocked(api.v1.config.get).mockReset();
-    vi.mocked(api.v1.config.get).mockResolvedValue(undefined);
+    vi.mocked(api.v1.storyStorage.get).mockReset();
+    vi.mocked(api.v1.storyStorage.get).mockResolvedValue(null);
   });
 
   // ─────────────────────────── a completed pass ───────────────────────────
@@ -383,12 +392,12 @@ describe("the pass", () => {
 
   // ─────────────────────────── the prose threshold ────────────────────────
 
-  it("skips the pass below engine_min_prose without lying about the backlog", async () => {
+  it("skips the pass below the minimum without lying about the backlog", async () => {
     // The shortcut this rules out is dispatching `assessed { backlog: 0 }`: it
     // terminates correctly and tells the HUD there is nothing to read when
     // there are two unread paragraphs — the exact number §9.1 wants weighed
     // against the budget.
-    configure({ engine_enabled: true, engine_min_prose: 4 });
+    configure({ enabled: true, minProse: 4 });
     const h = harness();
     triageReturns(h, "REVISE Ada");
 
@@ -401,7 +410,7 @@ describe("the pass", () => {
   });
 
   it("runs the pass once the backlog reaches the threshold", async () => {
-    configure({ engine_enabled: true, engine_min_prose: 2 });
+    configure({ enabled: true, minProse: 2 });
     const h = harness();
     triageReturns(h, "");
     await h.runPass();
@@ -543,14 +552,14 @@ describe("the pass", () => {
 
   // ───────────────────────────── the off switch ───────────────────────────
   //
-  // `engine_enabled` is the one setting that stops the Engine spending output
+  // `enabled` is the one setting that stops the Engine spending output
   // budget, so it is checked in exactly ONE place — inside the pass, which every
   // entry point goes through. Checking it at each entry point instead is how a
   // path gets missed: the wakeup's own check happens when the timer is ARMED,
   // and the writer has the whole delay window to change their mind.
 
   it("spends nothing when the Engine is switched off", async () => {
-    configure({ engine_enabled: false });
+    configure({ enabled: false });
     const h = harness();
     triageReturns(h, "REVISE Ada");
 
@@ -562,17 +571,38 @@ describe("the pass", () => {
   });
 
   it("tells the HUD the Engine is off, from the pass that refused", async () => {
-    configure({ engine_enabled: false });
+    configure({ enabled: false });
     const h = harness();
-    h.store.dispatch(engineEnabledChanged({ enabled: true }));
+    h.store.dispatch(
+      engineSettingsChanged({ ...ENGINE_DEFAULTS, enabled: true }),
+    );
 
     await h.runPass();
 
-    expect(h.store.getState().engine.enabled).toBe(false);
+    expect(h.store.getState().engine.settings.enabled).toBe(false);
+  });
+
+  it("mirrors the stored settings into the store at startup", async () => {
+    // Without this the slice's defaults stand until the writer generates or
+    // presses ⚡ — so someone who opted in opens their story and reads "Off —
+    // the Engine is not running", a glyph and a tooltip asserting a fact that is
+    // not true. The WHOLE record, not just `enabled`: the Setup form renders
+    // from this, and nothing else ever dispatches the other two fields.
+    configure({ enabled: true, delayMs: 3000, minProse: 4 });
+    const h = harness();
+
+    registerEngineLoopEffects(h.deps);
+    await settle();
+
+    expect(h.store.getState().engine.settings).toEqual({
+      enabled: true,
+      delayMs: 3000,
+      minProse: 4,
+    });
   });
 
   it("refuses the ⚡ while the Engine is off", async () => {
-    configure({ engine_enabled: false });
+    configure({ enabled: false });
     const h = harness();
     triageReturns(h, "REVISE Ada");
     registerEngineLoopEffects(h.deps);
@@ -591,7 +621,7 @@ describe("the pass", () => {
     triageReturns(h, "REVISE Ada");
     const fire = await armWakeup(h);
 
-    configure({ engine_enabled: false });
+    configure({ enabled: false });
     await fire();
 
     expect(h.generate).not.toHaveBeenCalled();
@@ -611,12 +641,12 @@ describe("the pass", () => {
 describe("the trigger's other job", () => {
   beforeEach(() => {
     vi.mocked(api.v1.hooks.register).mockClear();
-    configure({ engine_enabled: false });
+    configure({ enabled: false });
   });
 
   afterEach(() => {
-    vi.mocked(api.v1.config.get).mockReset();
-    vi.mocked(api.v1.config.get).mockResolvedValue(undefined);
+    vi.mocked(api.v1.storyStorage.get).mockReset();
+    vi.mocked(api.v1.storyStorage.get).mockResolvedValue(null);
   });
 
   it("forwards a user generation to GenX, whose own hook this one replaced", async () => {
