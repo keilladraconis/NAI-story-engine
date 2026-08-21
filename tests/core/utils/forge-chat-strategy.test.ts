@@ -41,7 +41,7 @@ function makeState(over: Partial<RootState> = {}): RootState {
       attgSyncEnabled: false,
       styleSyncEnabled: false,
     },
-    world: { groups: [], entitiesById: {}, entityIds: [] },
+    world: { threads: [], entitiesById: {}, entityIds: [] },
     story: { fields: {}, attgEnabled: false, styleEnabled: false },
     ui: {
       activeEditId: null,
@@ -157,7 +157,7 @@ describe("buildForgeChatStrategy", () => {
     const getState = () =>
       makeState({
         world: {
-          groups: [],
+          threads: [],
           entitiesById: {
             d1: makeEntity({
               id: "d1",
@@ -182,7 +182,7 @@ describe("buildForgeChatStrategy", () => {
     const getState = () =>
       makeState({
         world: {
-          groups: [],
+          threads: [],
           entitiesById: {
             l1: makeEntity({
               id: "l1",
@@ -417,7 +417,7 @@ describe("buildForgeChatStrategy briefing anchoring", () => {
     const getState = () =>
       makeState({
         world: {
-          groups: [],
+          threads: [],
           entitiesById: {
             l1: makeEntity({
               id: "l1",
@@ -447,7 +447,7 @@ describe("buildForgeChatStrategy briefing anchoring", () => {
     const getState = () =>
       makeState({
         world: {
-          groups: [],
+          threads: [],
           entitiesById: {
             d1: makeEntity({
               id: "d1",

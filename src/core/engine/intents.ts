@@ -41,7 +41,7 @@ export function intentKey(intent: Intent): string {
       // thread arrives spelled differently across passes.
       return `open:${intent.subject.trim().toLowerCase()}`;
     case "retire":
-      return `retire:${intent.groupId}`;
+      return `retire:${intent.threadId}`;
     case "condense":
       return `condense:${intent.entryId}`;
   }

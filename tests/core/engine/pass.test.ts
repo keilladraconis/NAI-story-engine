@@ -297,7 +297,7 @@ describe("the pass", () => {
 
   it("enqueues what triage named and clears the queue", async () => {
     // Drain LOGS in this phase — behind `story_engine_debug`, which the
-    // describe below covers. Nothing writes a lorebook entry, creates a group
+    // describe below covers. Nothing writes a lorebook entry, creates a thread
     // or retires anything, and the queue is cleared rather than held because
     // nothing will ever come back for it.
     const h = harness();

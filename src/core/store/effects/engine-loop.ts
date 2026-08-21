@@ -201,13 +201,16 @@ function buildManifest(
       summary: entity.summary,
     }));
 
-  // Every group, not only the open ones: WorldGroup has no status until threads
-  // land in phase 5. Triage may name one already retired; dedupe bounds the
-  // repeat and drain only logs, so it is inert until phase 6.
-  const threads = state.world.groups.map((group) => ({
-    id: group.id,
-    title: group.title,
-    summary: group.summary,
+  // Every thread, not only the open ones. `status` exists as of phase 5 but
+  // nothing sets it to "satisfied" yet — retirement is phase 6 — so filtering
+  // on it here would be filtering on a field that is always "open". Triage may
+  // name one already retired; dedupe bounds the repeat and drain only logs, so
+  // it is inert until phase 6. Task 5 is where the manifest learns about the
+  // cap and each thread's horizon.
+  const threads = state.world.threads.map((thread) => ({
+    id: thread.id,
+    title: thread.title,
+    text: thread.text,
   }));
 
   return { entities, threads };
@@ -381,7 +384,7 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       await saveRecords({ [QUEUE_KEY]: enqueued }, nodeId);
 
       // Drain, phase-4 edition: log what phase 6 will run, then clear. Nothing
-      // here writes a lorebook entry, creates a group, or retires anything.
+      // here writes a lorebook entry, creates a thread, or retires anything.
       //
       // The clear is what keeps the record honest. Dedupe bounds one
       // commitment's repeats, not the queue's length, and nothing in this phase

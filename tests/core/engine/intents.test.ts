@@ -9,7 +9,7 @@ import type { Intent } from "../../../src/core/engine/loop-machine";
 import {
   INDEX_KEY,
   entityKey,
-  groupKey,
+  threadKey,
   fieldKey,
 } from "../../../src/core/store/persistence/keyspace";
 
@@ -24,13 +24,13 @@ describe("intentKey", () => {
   });
 
   it("gives every kind its own key for one shared id string", () => {
-    // Entity ids, group ids and lorebook entry ids are all UUIDs from the same
+    // Entity ids, thread ids and lorebook entry ids are all UUIDs from the same
     // generator, so "same string, different kind" is reachable in practice.
     // Four kinds naming "x" must be four distinct pieces of work.
     const keys = [
       intentKey({ kind: "revise", entityId: "x" }),
       intentKey({ kind: "open", subject: "x" }),
-      intentKey({ kind: "retire", groupId: "x" }),
+      intentKey({ kind: "retire", threadId: "x" }),
       intentKey({ kind: "condense", entryId: "x" }),
     ];
     expect(new Set(keys).size).toBe(4);
@@ -128,7 +128,7 @@ describe("record keys", () => {
     const others = [
       INDEX_KEY,
       entityKey("x"),
-      groupKey("x"),
+      threadKey("x"),
       fieldKey("x"),
       WATERMARK_KEY,
       QUEUE_KEY,

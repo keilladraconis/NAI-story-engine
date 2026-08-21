@@ -23,7 +23,7 @@ function chat(over: Partial<Chat> = {}): Chat {
 function state(chats: Chat[]): RootState {
   return {
     chat: { chats, activeChatId: null, refineChat: null },
-    world: { groups: [], entitiesById: {}, entityIds: [] },
+    world: { threads: [], entitiesById: {}, entityIds: [] },
     forge: {
       tombstonesByChatId: {},
       pendingScrubByChatId: {},
@@ -110,7 +110,7 @@ function forgeState(opts: {
       activeChatId: "f1",
       refineChat: null,
     },
-    world: { groups: [], entitiesById, entityIds: Object.keys(entitiesById) },
+    world: { threads: [], entitiesById, entityIds: Object.keys(entitiesById) },
     forge: {
       tombstonesByChatId: {},
       pendingScrubByChatId: {},

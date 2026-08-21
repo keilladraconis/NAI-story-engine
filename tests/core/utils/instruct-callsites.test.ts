@@ -30,7 +30,9 @@ function makeState(): RootState {
         },
       },
       entityIds: ["e1"],
-      groups: [{ id: "g1", title: "A thread", summary: "", entityIds: ["e1"] }],
+      threads: [
+        { id: "g1", title: "A thread", summary: "", entityIds: ["e1"] },
+      ],
     },
     foundation: {
       shape: null,

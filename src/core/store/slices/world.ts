@@ -1,9 +1,25 @@
 import { createSlice } from "nai-store";
-import { WorldState, WorldGroup, WorldEntity } from "../types";
+import {
+  WorldState,
+  ThreadDraft,
+  ThreadHorizon,
+  ThreadStatus,
+  WorldEntity,
+} from "../types";
 import { DulfsFieldID } from "../../../config/field-definitions";
 
+/** A thread created without an explicit horizon is a plot thread: the middle
+ *  rung, and the one a commitment noticed mid-story almost always is. Guessing
+ *  "arc" would over-hold context for a passing promise; guessing "point" would
+ *  let a real subplot decay out of reach. */
+export const DEFAULT_THREAD_HORIZON: ThreadHorizon = "plot";
+
+/** Threads are created because something is unresolved; nothing creates a
+ *  satisfied one. */
+export const DEFAULT_THREAD_STATUS: ThreadStatus = "open";
+
 export const initialWorldState: WorldState = {
-  groups: [],
+  threads: [],
   entitiesById: {},
   entityIds: [],
 };
@@ -43,9 +59,9 @@ export const worldSlice = createSlice({
         ...state,
         entitiesById: rest,
         entityIds: state.entityIds.filter((id) => id !== payload.entityId),
-        groups: state.groups.map((g) => ({
-          ...g,
-          entityIds: g.entityIds.filter((id) => id !== payload.entityId),
+        threads: state.threads.map((t) => ({
+          ...t,
+          entityIds: t.entityIds.filter((id) => id !== payload.entityId),
         })),
       };
     },
@@ -179,60 +195,75 @@ export const worldSlice = createSlice({
       };
     },
 
-    // Group (Thread) management
-    groupCreated: (state, payload: { group: WorldGroup }) => ({
+    // Thread management
+    //
+    // Defaults land here rather than at the callsites. `horizon` and `status`
+    // are new in phase 5 and every existing creator (the Forge's [THREAD]
+    // command, the World's "+ New Thread") predates them; defaulting in the
+    // reducer means none of them can ship a thread with the fields missing,
+    // and a future creator gets the same treatment for free. Tasks 2 and 3
+    // both branch on `horizon`, so a silently-undefined one is the failure
+    // mode worth spending an invariant on.
+    threadCreated: (state, payload: { thread: ThreadDraft }) => ({
       ...state,
-      groups: [...state.groups, payload.group],
+      threads: [
+        ...state.threads,
+        {
+          ...payload.thread,
+          horizon: payload.thread.horizon ?? DEFAULT_THREAD_HORIZON,
+          status: payload.thread.status ?? DEFAULT_THREAD_STATUS,
+        },
+      ],
     }),
 
-    groupDeleted: (state, payload: { groupId: string }) => ({
+    threadDeleted: (state, payload: { threadId: string }) => ({
       ...state,
-      groups: state.groups.filter((g) => g.id !== payload.groupId),
+      threads: state.threads.filter((t) => t.id !== payload.threadId),
     }),
 
-    groupRenamed: (state, payload: { groupId: string; title: string }) => ({
+    threadRenamed: (state, payload: { threadId: string; title: string }) => ({
       ...state,
-      groups: state.groups.map((g) =>
-        g.id === payload.groupId ? { ...g, title: payload.title } : g,
+      threads: state.threads.map((t) =>
+        t.id === payload.threadId ? { ...t, title: payload.title } : t,
       ),
     }),
 
-    groupSummaryUpdated: (
+    threadTextUpdated: (
       state,
-      payload: { groupId: string; summary: string },
+      payload: { threadId: string; text: string },
     ) => ({
       ...state,
-      groups: state.groups.map((g) =>
-        g.id === payload.groupId ? { ...g, summary: payload.summary } : g,
+      threads: state.threads.map((t) =>
+        t.id === payload.threadId ? { ...t, text: payload.text } : t,
       ),
     }),
 
-    entityGroupToggled: (
+    threadMemberToggled: (
       state,
-      payload: { groupId: string; entityId: string },
+      payload: { threadId: string; entityId: string },
     ) => ({
       ...state,
-      groups: state.groups.map((g) => {
-        if (g.id !== payload.groupId) return g;
-        const isMember = g.entityIds.includes(payload.entityId);
+      threads: state.threads.map((t) => {
+        if (t.id !== payload.threadId) return t;
+        const isMember = t.entityIds.includes(payload.entityId);
         return {
-          ...g,
+          ...t,
           entityIds: isMember
-            ? g.entityIds.filter((id) => id !== payload.entityId)
-            : [...g.entityIds, payload.entityId],
+            ? t.entityIds.filter((id) => id !== payload.entityId)
+            : [...t.entityIds, payload.entityId],
         };
       }),
     }),
 
-    groupLorebookEntrySet: (
+    threadLorebookEntrySet: (
       state,
-      payload: { groupId: string; entryId: string | undefined },
+      payload: { threadId: string; entryId: string | undefined },
     ) => ({
       ...state,
-      groups: state.groups.map((g) =>
-        g.id === payload.groupId
-          ? { ...g, lorebookEntryId: payload.entryId }
-          : g,
+      threads: state.threads.map((t) =>
+        t.id === payload.threadId
+          ? { ...t, lorebookEntryId: payload.entryId }
+          : t,
       ),
     }),
 
@@ -251,10 +282,10 @@ export const {
   entityBound,
   entitiesBoundBatch,
   entityUnbound,
-  groupCreated,
-  groupDeleted,
-  groupRenamed,
-  groupSummaryUpdated,
-  entityGroupToggled,
-  groupLorebookEntrySet,
+  threadCreated,
+  threadDeleted,
+  threadRenamed,
+  threadTextUpdated,
+  threadMemberToggled,
+  threadLorebookEntrySet,
 } = worldSlice.actions;

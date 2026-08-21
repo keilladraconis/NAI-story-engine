@@ -2,7 +2,7 @@
 // SEGA start/stop, add-entity, add-thread, clear-confirm) + body
 // (Threads then loose entity cards). Body recomputed in render via
 // selectWorldBody from store-owned refs. add-entity creates a draft and opens
-// the edit pane; add-thread creates an empty group and opens ThreadEditPane.
+// the edit pane; add-thread creates an empty thread and opens ThreadEditPane.
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
@@ -13,7 +13,7 @@ import {
   worldCleared,
   entityForged,
   uiEditableActivate,
-  groupCreated,
+  threadCreated,
 } from "../../../core/store";
 import { FieldID } from "../../../config/field-definitions";
 import { selectWorldBody } from "./world-select";
@@ -40,16 +40,16 @@ const ICON_BTN = {
 
 export function World() {
   const entitiesById = useSlice((s) => s.world.entitiesById);
-  const groups = useSlice((s) => s.world.groups);
+  const threads = useSlice((s) => s.world.threads);
   const worldExpanded = useSlice((s) => s.ui.worldExpanded ?? true);
   const segaRunning = useSlice((s) => s.runtime.segaRunning);
   const [collapsed, setCollapsed] = useState(false);
 
-  const { groups: visibleGroups, loose } = selectWorldBody(
+  const { threads: visibleThreads, loose } = selectWorldBody(
     entitiesById,
-    groups,
+    threads,
   );
-  const isEmpty = visibleGroups.length === 0 && loose.length === 0;
+  const isEmpty = visibleThreads.length === 0 && loose.length === 0;
 
   const onAddEntity = () => {
     const id = api.v1.uuid();
@@ -70,7 +70,7 @@ export function World() {
   const onAddThread = () => {
     const id = api.v1.uuid();
     store.dispatch(
-      groupCreated({ group: { id, title: "", summary: "", entityIds: [] } }),
+      threadCreated({ thread: { id, title: "", text: "", entityIds: [] } }),
     );
     store.dispatch(uiEditableActivate({ id }));
   };
@@ -133,8 +133,8 @@ export function World() {
 
       {!collapsed ? (
         <div style={{ display: "flex", flexDirection: "column", gap: SP.xs }}>
-          {visibleGroups.map((g) => (
-            <ThreadItem key={g.id} groupId={g.id} />
+          {visibleThreads.map((t) => (
+            <ThreadItem key={t.id} threadId={t.id} />
           ))}
           {loose.map((e) => (
             <EntityCard key={e.id} entityId={e.id} />

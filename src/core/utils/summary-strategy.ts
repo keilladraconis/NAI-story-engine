@@ -171,11 +171,11 @@ export function createEntitySummaryFromLorebookFactory(
 
 export function createThreadSummaryFactory(
   getState: () => RootState,
-  groupId: string,
+  threadId: string,
 ): MessageFactory {
   return async () => {
     const state = getState();
-    const group = state.world.groups.find((g) => g.id === groupId);
+    const thread = state.world.threads.find((t) => t.id === threadId);
     const { foundation } = state;
 
     const messages: Message[] = [];
@@ -196,7 +196,7 @@ export function createThreadSummaryFactory(
       });
     }
 
-    const members = (group?.entityIds ?? [])
+    const members = (thread?.entityIds ?? [])
       .map((id) => state.world.entitiesById[id])
       .filter((e): e is NonNullable<typeof e> => e !== undefined);
 
@@ -204,7 +204,7 @@ export function createThreadSummaryFactory(
       .map((e) => (e.summary ? `- ${e.name}: ${e.summary}` : `- ${e.name}`))
       .join("\n");
 
-    const titleLabel = group?.title ? `"${group.title}"` : "this thread";
+    const titleLabel = thread?.title ? `"${thread.title}"` : "this thread";
 
     const userLines: string[] = [];
     userLines.push(`Thread: ${titleLabel}`);

@@ -6,7 +6,7 @@
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
-import { store, groupDeleted, uiEditableActivate } from "../../../core/store";
+import { store, threadDeleted, uiEditableActivate } from "../../../core/store";
 import { isForgeDraft } from "../../../core/store/selectors/forge";
 import { EntityCard } from "./EntityCard";
 import { ConfirmButton } from "../../components/ConfirmButton";
@@ -19,15 +19,17 @@ import {
 
 const ICON_SIZE = 16;
 
-export function ThreadItem(props: { groupId: string }) {
-  const { groupId } = props;
-  const group = useSlice((s) => s.world.groups.find((g) => g.id === groupId));
+export function ThreadItem(props: { threadId: string }) {
+  const { threadId } = props;
+  const thread = useSlice((s) =>
+    s.world.threads.find((t) => t.id === threadId),
+  );
   const entitiesById = useSlice((s) => s.world.entitiesById);
   const [collapsed, setCollapsed] = useState(false);
 
-  if (!group) return null;
+  if (!thread) return null;
 
-  const memberIds = group.entityIds.filter((id) => {
+  const memberIds = thread.entityIds.filter((id) => {
     const e = entitiesById[id];
     return !!e && !isForgeDraft(e);
   });
@@ -64,7 +66,7 @@ export function ThreadItem(props: { groupId: string }) {
         </button>
         <Layers size={ICON_SIZE} />
         <button
-          onClick={() => store.dispatch(uiEditableActivate({ id: groupId }))}
+          onClick={() => store.dispatch(uiEditableActivate({ id: threadId }))}
           style={{
             flex: 1,
             textAlign: "left",
@@ -75,7 +77,7 @@ export function ThreadItem(props: { groupId: string }) {
             padding: 0,
           }}
         >
-          {group.title || "New Thread"}
+          {thread.title || "New Thread"}
         </button>
         {/* Deferred: thread lorebook sync — shown disabled. */}
         <button
@@ -92,7 +94,7 @@ export function ThreadItem(props: { groupId: string }) {
         </button>
         <ConfirmButton
           title="Delete thread"
-          onConfirm={() => store.dispatch(groupDeleted({ groupId }))}
+          onConfirm={() => store.dispatch(threadDeleted({ threadId }))}
         />
       </div>
       {!collapsed ? (
@@ -105,7 +107,7 @@ export function ThreadItem(props: { groupId: string }) {
           }}
         >
           {memberIds.map((id) => (
-            <EntityCard key={`${groupId}:${id}`} entityId={id} />
+            <EntityCard key={`${threadId}:${id}`} entityId={id} />
           ))}
         </div>
       ) : null}

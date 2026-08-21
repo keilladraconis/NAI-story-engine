@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   INDEX_KEY,
   entityKey,
-  groupKey,
+  threadKey,
   fieldKey,
   buildIndex,
   toRecords,
@@ -33,7 +33,7 @@ function state(over: Partial<RootState> = {}): RootState {
       ...initialWorldState,
       entitiesById: { e1: entity("e1", "Ada") },
       entityIds: ["e1"],
-      groups: [
+      threads: [
         {
           id: "g1",
           title: "The Guild",
@@ -52,7 +52,7 @@ describe("key builders", () => {
     // Entity ids and lorebook entry ids are both UUIDs; the prefix is what
     // keeps them apart in one flat keyspace.
     expect(entityKey("x")).toBe("e:x");
-    expect(groupKey("x")).toBe("t:x");
+    expect(threadKey("x")).toBe("t:x");
     expect(fieldKey("x")).toBe("f:x");
   });
 });
@@ -61,12 +61,12 @@ describe("buildIndex", () => {
   it("names every record the state carries", () => {
     expect(buildIndex(state())).toEqual({
       entityIds: ["e1"],
-      groupIds: ["g1"],
+      threadIds: ["g1"],
       fieldIds: ["dramatisPersonae"],
     });
   });
 
-  it("has no entities or groups for a pristine store", () => {
+  it("has no entities or threads for a pristine store", () => {
     // NOTE: initialStoryState.fields is NOT empty. story.ts seeds it at module
     // load with every non-list FIELD_CONFIG (brainstorm, attg, style), so a
     // pristine store already names those three fields.
@@ -77,14 +77,14 @@ describe("buildIndex", () => {
     } as RootState;
     const index = buildIndex(empty);
     expect(index.entityIds).toEqual([]);
-    expect(index.groupIds).toEqual([]);
+    expect(index.threadIds).toEqual([]);
     expect(index.fieldIds).toEqual(Object.keys(initialStoryState.fields));
     expect(index.fieldIds.length).toBeGreaterThan(0);
   });
 });
 
 describe("toRecords", () => {
-  it("writes one record per entity, group and field, plus the singletons", () => {
+  it("writes one record per entity, thread and field, plus the singletons", () => {
     const r = toRecords(state());
     // The fixture replaces story.fields wholesale, so only its one field is
     // present — the seeded skeleton is not merged in by toRecords.
@@ -104,7 +104,7 @@ describe("applyRecords", () => {
     const out = applyRecords(records[INDEX_KEY] as never, records);
     expect(out.world.entitiesById).toEqual(s.world.entitiesById);
     expect(out.world.entityIds).toEqual(["e1"]);
-    expect(out.world.groups).toEqual(s.world.groups);
+    expect(out.world.threads).toEqual(s.world.threads);
     expect(out.story.fields.dramatisPersonae).toEqual(
       s.story.fields.dramatisPersonae,
     );
@@ -121,7 +121,7 @@ describe("applyRecords", () => {
     // historyStorage has no way to delete it branch-locally), but the index at
     // this node no longer names it, so the entity is gone.
     const records = toRecords(state());
-    const index = { entityIds: [], groupIds: ["g1"], fieldIds: [] };
+    const index = { entityIds: [], threadIds: ["g1"], fieldIds: [] };
     const out = applyRecords(index, records);
     expect(out.world.entityIds).toEqual([]);
     expect(out.world.entitiesById).toEqual({});
@@ -129,7 +129,7 @@ describe("applyRecords", () => {
 
   it("skips an id the index names but whose record is missing", () => {
     const out = applyRecords(
-      { entityIds: ["ghost"], groupIds: [], fieldIds: [] },
+      { entityIds: ["ghost"], threadIds: [], fieldIds: [] },
       {},
     );
     expect(out.world.entityIds).toEqual([]);
@@ -142,7 +142,7 @@ describe("applyRecords", () => {
       "e:b": entity("b", "B"),
     };
     const out = applyRecords(
-      { entityIds: ["b", "a"], groupIds: [], fieldIds: [] },
+      { entityIds: ["b", "a"], threadIds: [], fieldIds: [] },
       records,
     );
     expect(out.world.entityIds).toEqual(["b", "a"]);

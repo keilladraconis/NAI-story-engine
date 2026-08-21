@@ -26,9 +26,9 @@ const MANIFEST: TriageManifest = {
     {
       id: "g1",
       title: "The hidden letter",
-      summary: "Ada pocketed a letter she has not read.",
+      text: "Ada pocketed a letter she has not read.",
     },
-    { id: "g2", title: "Debt to the Syndicate", summary: "" },
+    { id: "g2", title: "Debt to the Syndicate", text: "" },
   ],
 };
 
@@ -49,7 +49,7 @@ describe("parseTriage — the three commands", () => {
 
   it("maps RETIRE back to a thread id", () => {
     expect(parseTriage("RETIRE The hidden letter", MANIFEST)).toEqual([
-      { kind: "retire", groupId: "g1" },
+      { kind: "retire", threadId: "g1" },
     ]);
   });
 
@@ -62,7 +62,7 @@ describe("parseTriage — the three commands", () => {
     expect(parseTriage(text, MANIFEST)).toEqual([
       { kind: "revise", entityId: "e2" },
       { kind: "open", subject: "the debt comes due at midwinter" },
-      { kind: "retire", groupId: "g2" },
+      { kind: "retire", threadId: "g2" },
     ]);
   });
 });
@@ -102,7 +102,7 @@ describe("parseTriage — untrusted text", () => {
     );
     // The verb still has to be capitals; only the name is forgiving.
     expect(parseTriage(text, MANIFEST)).toEqual([
-      { kind: "retire", groupId: "g1" },
+      { kind: "retire", threadId: "g1" },
     ]);
   });
 
@@ -150,7 +150,7 @@ describe("parseTriage — untrusted text", () => {
     expect(parseTriage(text, MANIFEST)).toEqual([
       { kind: "revise", entityId: "e1" },
       { kind: "open", subject: "the buried letter" },
-      { kind: "retire", groupId: "g1" },
+      { kind: "retire", threadId: "g1" },
     ]);
   });
 
@@ -170,7 +170,7 @@ describe("parseTriage — untrusted text", () => {
     ].join("\n");
     expect(parseTriage(text, MANIFEST)).toEqual([
       { kind: "revise", entityId: "e1" },
-      { kind: "retire", groupId: "g1" },
+      { kind: "retire", threadId: "g1" },
       { kind: "open", subject: "the letter is still sealed" },
     ]);
   });

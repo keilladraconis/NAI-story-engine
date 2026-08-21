@@ -1,8 +1,8 @@
-// ThreadEditPane — edit pane for a WorldGroup (Thread), counterpart to
-// EntityEditPane and SUI's SeThreadEditPane. Title + summary are local drafts
-// committed on Save (groupRenamed + groupSummaryUpdated); the summary has a
-// generate zap that streams into the draft via the shared stream-buffer.
-// Membership toggles dispatch entityGroupToggled immediately (not part of the
+// ThreadEditPane — edit pane for a Thread, counterpart to EntityEditPane and
+// SUI's SeThreadEditPane. Title + text are local drafts committed on Save
+// (threadRenamed + threadTextUpdated); the text has a generate zap that
+// streams into the draft via the shared stream-buffer.
+// Membership toggles dispatch threadMemberToggled immediately (not part of the
 // draft). No Delete (that lives on the ThreadItem card) and no lorebook toggle
 // (a later slice) — matching SUI scope.
 
@@ -11,9 +11,9 @@ import { useDraftField } from "../../hooks";
 import { T, SP } from "../../style";
 import {
   store,
-  groupRenamed,
-  groupSummaryUpdated,
-  entityGroupToggled,
+  threadRenamed,
+  threadTextUpdated,
+  threadMemberToggled,
   uiThreadSummaryGenerationRequested,
   uiEditableDeactivate,
 } from "../../../core/store";
@@ -46,7 +46,7 @@ const genZapStyle = (pending: boolean) =>
 
 // One membership row.
 function MemberToggle(props: {
-  groupId: string;
+  threadId: string;
   entityId: string;
   name: string;
   isMember: boolean;
@@ -55,8 +55,8 @@ function MemberToggle(props: {
     <button
       onClick={() =>
         store.dispatch(
-          entityGroupToggled({
-            groupId: props.groupId,
+          threadMemberToggled({
+            threadId: props.threadId,
             entityId: props.entityId,
           }),
         )
@@ -87,16 +87,18 @@ function MemberToggle(props: {
   );
 }
 
-export function ThreadEditPane(props: { groupId: string }) {
-  const { groupId } = props;
-  const group = useSlice((s) => s.world.groups.find((g) => g.id === groupId));
+export function ThreadEditPane(props: { threadId: string }) {
+  const { threadId } = props;
+  const thread = useSlice((s) =>
+    s.world.threads.find((t) => t.id === threadId),
+  );
   const entitiesById = useSlice((s) => s.world.entitiesById);
 
-  const title = useDraftField(group?.title ?? "");
-  const summary = useDraftField(group?.summary ?? "");
+  const title = useDraftField(thread?.title ?? "");
+  const text = useDraftField(thread?.text ?? "");
 
-  const reqId = `se-thread-summary-${groupId}`;
-  const bufferKey = `thread-summary:${groupId}`;
+  const reqId = `se-thread-summary-${threadId}`;
+  const bufferKey = `thread-summary:${threadId}`;
   const pending = useSlice((s) => isRequestActive(s.runtime, reqId));
   const live = useStream(bufferKey);
   const genRef = useRef(false);
@@ -113,29 +115,27 @@ export function ThreadEditPane(props: { groupId: string }) {
   // handler cleared the buffer, so nothing stages).
   useEffect(() => {
     if (!genRef.current || pending) return;
-    if (live !== undefined) summary.setValue(live);
+    if (live !== undefined) text.setValue(live);
     clearStream(bufferKey);
     genRef.current = false;
   }, [pending, live]);
 
-  if (!group) return null;
+  if (!thread) return null;
 
   const onGenerate = () => {
     if (pending || genRef.current) return;
     genRef.current = true;
     clearStream(bufferKey);
     store.dispatch(
-      uiThreadSummaryGenerationRequested({ groupId, requestId: reqId }),
+      uiThreadSummaryGenerationRequested({ threadId, requestId: reqId }),
     );
   };
 
   const close = () => store.dispatch(uiEditableDeactivate());
 
   const onSave = () => {
-    store.dispatch(groupRenamed({ groupId, title: title.value.trim() }));
-    store.dispatch(
-      groupSummaryUpdated({ groupId, summary: summary.value.trim() }),
-    );
+    store.dispatch(threadRenamed({ threadId, title: title.value.trim() }));
+    store.dispatch(threadTextUpdated({ threadId, text: text.value.trim() }));
     close();
   };
 
@@ -195,9 +195,9 @@ export function ThreadEditPane(props: { groupId: string }) {
       </div>
       <textarea
         placeholder="What is this thread's dynamic?"
-        value={live ?? summary.value}
+        value={live ?? text.value}
         disabled={pending}
-        onInput={(e) => summary.setValue(e.target.value ?? "")}
+        onInput={(e) => text.setValue(e.target.value ?? "")}
         style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }}
       />
 
@@ -219,10 +219,10 @@ export function ThreadEditPane(props: { groupId: string }) {
             {members.map((e) => (
               <MemberToggle
                 key={e.id}
-                groupId={groupId}
+                threadId={threadId}
                 entityId={e.id}
                 name={e.name}
-                isMember={group.entityIds.includes(e.id)}
+                isMember={thread.entityIds.includes(e.id)}
               />
             ))}
           </div>

@@ -10,20 +10,20 @@ import {
   lorebookContentRequestId,
   lorebookKeysRequestId,
 } from "../../../core/keys";
-import type { RootState, WorldEntity, WorldGroup } from "../../../core/store";
+import type { RootState, WorldEntity, Thread } from "../../../core/store";
 
 /** Visible World body: every thread (including empty ones, so they stay
- *  editable/deletable from their card), plus loose (ungrouped, non-forge-draft)
+ *  editable/deletable from their card), plus loose (unthreaded, non-forge-draft)
  *  entities. A thread's own member list still hides forge drafts (ThreadItem). */
 export function selectWorldBody(
   entitiesById: Record<string, WorldEntity>,
-  groups: WorldGroup[],
-): { groups: WorldGroup[]; loose: WorldEntity[] } {
-  const grouped = new Set(groups.flatMap((g) => g.entityIds));
+  threads: Thread[],
+): { threads: Thread[]; loose: WorldEntity[] } {
+  const threaded = new Set(threads.flatMap((t) => t.entityIds));
   const loose = Object.values(entitiesById).filter(
-    (e) => !grouped.has(e.id) && !isForgeDraft(e),
+    (e) => !threaded.has(e.id) && !isForgeDraft(e),
   );
-  return { groups, loose };
+  return { threads, loose };
 }
 
 /** The four request ids that represent in-flight work for an entity — all keyed

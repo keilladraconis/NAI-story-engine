@@ -8,6 +8,10 @@ import type {
   RootState,
   WorldEntity,
 } from "../../../../../src/core/store/types";
+import {
+  worldSlice,
+  initialWorldState,
+} from "../../../../../src/core/store/slices/world";
 import { FieldID } from "../../../../../src/config/field-definitions";
 import type { ForgeSegment } from "../../../../../src/core/chat-types/types";
 
@@ -46,7 +50,7 @@ function makeState(
   const entitiesById: Record<string, WorldEntity> = {};
   for (const e of entities) entitiesById[e.id] = e;
   return {
-    world: { groups: [], entitiesById, entityIds: entities.map((e) => e.id) },
+    world: { threads: [], entitiesById, entityIds: entities.map((e) => e.id) },
     forge: { tombstonesByChatId, pendingScrubByChatId: {} },
   } as unknown as RootState;
 }
@@ -568,5 +572,43 @@ describe("forgeCleanupHandler.completion — reviseOnly", () => {
     expect(
       dispatch.mock.calls.filter(([a]) => a.type === "world/entityForged"),
     ).toHaveLength(0);
+  });
+});
+
+describe("forgeChatHandler.completion — THREAD", () => {
+  it("lands a thread with the default horizon and status, not undefined", async () => {
+    const dispatch = vi.fn();
+    const ctx: CompletionContext<ForgeChatTarget> = {
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState: () =>
+        makeState([
+          makeEntity({ id: "e1", name: "Ada" }),
+          makeEntity({ id: "e2", name: "Bram" }),
+        ]),
+      dispatch,
+      accumulatedText:
+        '[THREAD "The hidden letter" | "Ada", "Bram" | Ada pocketed a letter she has not read]',
+      generationSucceeded: true,
+    };
+    await forgeChatHandler.completion(ctx);
+
+    const created = dispatch.mock.calls.find(
+      ([a]) => a.type === "world/threadCreated",
+    );
+    expect(created).toBeDefined();
+
+    // Asserted through the reducer, because that is where the defaults live.
+    // The Forge's grammar has no vocabulary for horizon or status, so its
+    // payload legitimately omits both — and the thread must still land
+    // complete. Tasks 2 and 3 branch on `horizon`; an undefined one would not
+    // throw, it would just quietly pick the wrong condition range forever.
+    const state = worldSlice.reducer(initialWorldState, created![0]);
+    expect(state.threads).toHaveLength(1);
+    expect(state.threads[0].horizon).toBe("plot");
+    expect(state.threads[0].status).toBe("open");
+    expect(state.threads[0].text).toBe(
+      "Ada pocketed a letter she has not read",
+    );
+    expect(state.threads[0].entityIds).toEqual(["e1", "e2"]);
   });
 });

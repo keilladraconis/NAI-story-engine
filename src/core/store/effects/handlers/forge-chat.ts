@@ -9,7 +9,7 @@ import {
   entitySummaryUpdated,
   entityEdited,
   entityDeleted,
-  groupCreated,
+  threadCreated,
 } from "../../slices/world";
 import {
   messageAppended,
@@ -18,7 +18,7 @@ import {
   forgeSegmentsSet,
 } from "../../slices/chat";
 import { tombstoneAdded } from "../../slices/forge";
-import { WorldEntity, WorldGroup, RootState, AppDispatch } from "../../types";
+import { WorldEntity, ThreadDraft, RootState, AppDispatch } from "../../types";
 import {
   walkForgeLines,
   canonicalizeForgeCommands,
@@ -270,8 +270,8 @@ function executeForgeCommand(
     case "THREAD": {
       const state = getState();
       if (
-        state.world.groups.find(
-          (g) => g.title.toLowerCase() === cmd.title.toLowerCase(),
+        state.world.threads.find(
+          (t) => t.title.toLowerCase() === cmd.title.toLowerCase(),
         )
       ) {
         return {
@@ -292,13 +292,16 @@ function executeForgeCommand(
           reason: "needs ≥2 members",
         };
       }
-      const group: WorldGroup = {
+      // No horizon or status: `threadCreated` defaults them (world.ts). The
+      // Forge's grammar has no vocabulary for either, and inventing one here
+      // would put the default in a second place.
+      const thread: ThreadDraft = {
         id: api.v1.uuid(),
         title: cmd.title,
-        summary: cmd.description,
+        text: cmd.description,
         entityIds: memberIds,
       };
-      dispatch(groupCreated({ group }));
+      dispatch(threadCreated({ thread }));
       return { kind: "THREAD", status: "applied", name: cmd.title };
     }
 

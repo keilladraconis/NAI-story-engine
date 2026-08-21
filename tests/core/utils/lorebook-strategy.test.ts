@@ -17,7 +17,7 @@ const ENTRY_ID = "entry-1";
 
 const getState = () =>
   ({
-    world: { entitiesById: {}, entityIds: [], groups: [] },
+    world: { entitiesById: {}, entityIds: [], threads: [] },
     ui: { lorebook: { selectedEntryId: null } },
   }) as unknown as RootState;
 

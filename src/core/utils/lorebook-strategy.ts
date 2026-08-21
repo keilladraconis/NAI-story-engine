@@ -86,13 +86,13 @@ async function resolveDisplayName(
   return liveName || entryDisplayName || entity?.name || "Unnamed Entry";
 }
 
-/** Format the Threads (groups) an entity belongs to as context text. */
-function formatEntityGroups(state: RootState, entityId: string): string {
-  const groups = state.world.groups.filter((g) =>
-    g.entityIds.includes(entityId),
+/** Format the Threads an entity belongs to as context text. */
+function formatEntityThreads(state: RootState, entityId: string): string {
+  const threads = state.world.threads.filter((t) =>
+    t.entityIds.includes(entityId),
   );
-  if (groups.length === 0) return "";
-  return groups.map((g) => `- ${g.title}: ${g.summary}`).join("\n");
+  if (threads.length === 0) return "";
+  return threads.map((t) => `- ${t.title}: ${t.text}`).join("\n");
 }
 
 // --- Factory Builders for JIT Strategy Building ---
@@ -107,7 +107,7 @@ function formatEntityGroups(state: RootState, entityId: string): string {
  * Volatile tail structure (after `buildStoryEnginePrefix`):
  *   - Archivist instructions (LOREBOOK_GENERATE_PROMPT, name-personalized)
  *   - Category template (conditional)
- *   - Thread groups for this entity (conditional)
+ *   - Thread threads for this entity (conditional)
  *   - User entity summary (immediate context before prefill)
  *   - Xialong style block (Xialong mode only)
  *   - Assistant Name / Type / Setting prefill
@@ -166,9 +166,9 @@ export const createLorebookContentFactory = (
       messages.push({ role: "system", content: `TEMPLATE:\n${template}` });
     }
 
-    const groupContext = entity ? formatEntityGroups(state, entity.id) : "";
-    if (groupContext) {
-      messages.push({ role: "system", content: `[GROUPS]\n${groupContext}` });
+    const threadContext = entity ? formatEntityThreads(state, entity.id) : "";
+    if (threadContext) {
+      messages.push({ role: "system", content: `[GROUPS]\n${threadContext}` });
     }
 
     messages.push({
@@ -217,13 +217,13 @@ export const createLorebookKeysFactory = (
 
     const prefix = await buildStoryEnginePrefix(getState);
 
-    // Thread (group) context for this entry
+    // Thread (thread) context for this entry
     const state = getState();
     const entity = findEntityForEntry(state, entryId);
-    const groupContext = entity ? formatEntityGroups(state, entity.id) : "";
+    const threadContext = entity ? formatEntityThreads(state, entity.id) : "";
 
-    const contextContent = groupContext
-      ? `${entryText}\n\n${groupContext}`
+    const contextContent = threadContext
+      ? `${entryText}\n\n${threadContext}`
       : entryText;
 
     const messages: Message[] = [

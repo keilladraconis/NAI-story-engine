@@ -28,7 +28,7 @@ export type LoopPhase =
 export type Intent =
   | { kind: "revise"; entityId: string }
   | { kind: "open"; subject: string }
-  | { kind: "retire"; groupId: string }
+  | { kind: "retire"; threadId: string }
   | { kind: "condense"; entryId: string };
 
 export type LoopState = {

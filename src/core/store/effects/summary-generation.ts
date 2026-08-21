@@ -242,7 +242,7 @@ export function registerSummaryGenerationEffects(
   subscribeEffect(
     matchesAction(uiThreadSummaryGenerationRequested),
     async (action) => {
-      const { groupId, requestId } = action.payload;
+      const { threadId, requestId } = action.payload;
       const rt = getState().runtime;
       const alreadyTracked =
         rt.activeRequest?.id === requestId ||
@@ -252,14 +252,14 @@ export function registerSummaryGenerationEffects(
           requestQueued({
             id: requestId,
             type: "threadSummary",
-            targetId: groupId,
+            targetId: threadId,
           }),
         );
       }
       dispatch(
         generationSubmitted({
           requestId,
-          messageFactory: createThreadSummaryFactory(getState, groupId),
+          messageFactory: createThreadSummaryFactory(getState, threadId),
           params: await buildModelParams(
             {
               max_tokens: 100,
@@ -268,7 +268,7 @@ export function registerSummaryGenerationEffects(
             },
             "instruct",
           ),
-          target: { type: "threadSummary", groupId },
+          target: { type: "threadSummary", threadId },
           prefillBehavior: "trim",
         }),
       );

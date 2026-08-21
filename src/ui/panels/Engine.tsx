@@ -1,7 +1,7 @@
 // Engine tab body: the World and the Forge, plus the entity and thread edit
 // panes. Swaps between the Forge + World stack and whichever pane the shared
 // ui.activeEditId singleton names — routed by membership over entitiesById and
-// world.groups. Foundation field ids belong to the Setup tab (Setup.tsx), which
+// world.threads. Foundation field ids belong to the Setup tab (Setup.tsx), which
 // also owns the Import wizard.
 //
 // The header lives above this tree, rendered by App alongside the tab bar.
@@ -19,14 +19,14 @@ export function Engine() {
     editId ? !!s.world.entitiesById[editId] : false,
   );
   const isThread = useSlice((s) =>
-    editId ? s.world.groups.some((g) => g.id === editId) : false,
+    editId ? s.world.threads.some((t) => t.id === editId) : false,
   );
 
   if (editId && isEntity) {
     return <EntityEditPane entityId={editId} />;
   }
   if (editId && isThread) {
-    return <ThreadEditPane groupId={editId} />;
+    return <ThreadEditPane threadId={editId} />;
   }
 
   return (

@@ -18,7 +18,7 @@ import {
 import { ENGINE_DEFAULTS } from "../../src/core/engine/settings";
 import { initialWorldState } from "../../src/core/store/slices/world";
 import type { RootState } from "../../src/core/store";
-import type { WorldGroup, WorldState } from "../../src/core/store/types";
+import type { Thread, WorldState } from "../../src/core/store/types";
 
 const INPUTS: HudInputs = { allowedOutput: OUTPUT_BUCKET };
 
@@ -44,8 +44,15 @@ function state(
   } as RootState;
 }
 
-function group(id: string): WorldGroup {
-  return { id, title: id, summary: "", entityIds: [] };
+function thread(id: string): Thread {
+  return {
+    id,
+    title: id,
+    text: "",
+    horizon: "plot",
+    entityIds: [],
+    status: "open",
+  };
 }
 
 const ALL_PHASES: LoopPhase[] = [
@@ -150,10 +157,10 @@ describe("deriveHud — the counting slots", () => {
     expect(deriveHud(state({ backlog: 14 }), INPUTS).backlog).toBe(14);
   });
 
-  it("counts threads as world.groups.length", () => {
-    // `Thread` replacing `WorldGroup` is phase 5.
+  it("counts threads as world.threads.length", () => {
+    // `Thread` replacing `Thread` is phase 5.
     const m = deriveHud(
-      state({}, { groups: [group("a"), group("b"), group("c")] }),
+      state({}, { threads: [thread("a"), thread("b"), thread("c")] }),
       INPUTS,
     );
     expect(m.threads).toBe(3);
@@ -221,7 +228,7 @@ describe("hudSignature", () => {
     expect(hudSignature(state({ phase: "acting" }))).not.toBe(base);
     expect(hudSignature(state({ backlog: 3 }))).not.toBe(base);
     expect(hudSignature(state({ touched: 1 }))).not.toBe(base);
-    expect(hudSignature(state({}, { groups: [group("a")] }))).not.toBe(base);
+    expect(hudSignature(state({}, { threads: [thread("a")] }))).not.toBe(base);
   });
 
   it("ignores store churn the modeline has no slot for", () => {

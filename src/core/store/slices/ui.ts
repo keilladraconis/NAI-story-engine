@@ -64,7 +64,7 @@ export const uiSlice = createSlice({
     generationSubmitted: (state, _strategy: any) => state,
     uiCancelRequest: (state, _payload: { requestId: string }) => state,
     // Editable singleton — at most one editor active at a time. `id` is an
-    // entity id, a world group id, or a Foundation field id ("shape", "intent",
+    // entity id, a Thread id, or a Foundation field id ("shape", "intent",
     // …); the Setup and Engine tabs route the open pane by membership.
     uiEditableActivate: (state, payload: { id: string }) => ({
       ...state,
@@ -124,7 +124,7 @@ export const uiSlice = createSlice({
     ) => state,
     uiThreadSummaryGenerationRequested: (
       state,
-      _payload: { groupId: string; requestId: string },
+      _payload: { threadId: string; requestId: string },
     ) => state,
   },
 });

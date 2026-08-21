@@ -33,7 +33,7 @@ function stateWith(
   return {
     chat: { chats: [], activeChatId: null, refineChat: null },
     world: {
-      groups: [],
+      threads: [],
       entitiesById,
       entityIds: entities.map((e) => e.id),
     },

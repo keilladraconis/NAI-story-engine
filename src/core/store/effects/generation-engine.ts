@@ -54,7 +54,7 @@ function targetToQueueEntry(target: GenerationStrategy["target"]): {
     case "entitySummaryBind":
       return { type: "entitySummaryBind", targetId: target.entityId };
     case "threadSummary":
-      return { type: "threadSummary", targetId: target.groupId };
+      return { type: "threadSummary", targetId: target.threadId };
     case "bootstrap":
       return { type: "bootstrap", targetId: "bootstrap" };
   }
@@ -151,7 +151,7 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
     case "entitySummaryBind":
       return `entity-summary-bind:${target.entityId.slice(0, 8)}`;
     case "threadSummary":
-      return `thread-summary:${target.groupId.slice(0, 8)}`;
+      return `thread-summary:${target.threadId.slice(0, 8)}`;
     case "bootstrap":
       return "bootstrap";
     case "chat":

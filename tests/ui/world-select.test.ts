@@ -6,7 +6,7 @@ import {
   entityBorderKind,
   isRequestActive,
 } from "../../src/ui/panels/world/world-select";
-import type { WorldEntity, WorldGroup, RootState } from "../../src/core/store";
+import type { WorldEntity, Thread, RootState } from "../../src/core/store";
 
 const ent = (id: string, over: Partial<WorldEntity> = {}): WorldEntity => ({
   id,
@@ -17,45 +17,47 @@ const ent = (id: string, over: Partial<WorldEntity> = {}): WorldEntity => ({
   ...over,
 });
 
-const group = (id: string, entityIds: string[]): WorldGroup => ({
+const thread = (id: string, entityIds: string[]): Thread => ({
   id,
   title: id,
-  summary: "",
+  text: "",
+  horizon: "plot",
   entityIds,
+  status: "open",
 });
 
 describe("selectWorldBody", () => {
-  it("loose = live + manual-draft, ungrouped; forge drafts hidden", () => {
+  it("loose = live + manual-draft, unthreaded; forge drafts hidden", () => {
     const entitiesById = {
       a: ent("a"),
       b: ent("b", { lifecycle: "draft" }), // manual draft (no sourceChatId) → visible
       c: ent("c", { lifecycle: "draft", sourceChatId: "chat1" }), // forge draft → hidden
     };
-    const { groups, loose } = selectWorldBody(entitiesById, []);
-    expect(groups).toEqual([]);
+    const { threads, loose } = selectWorldBody(entitiesById, []);
+    expect(threads).toEqual([]);
     expect(loose.map((e) => e.id).sort()).toEqual(["a", "b"]);
   });
 
-  it("grouped entities are excluded from loose", () => {
+  it("threaded entities are excluded from loose", () => {
     const entitiesById = { a: ent("a"), b: ent("b") };
-    const { groups, loose } = selectWorldBody(entitiesById, [
-      group("g1", ["a"]),
+    const { threads, loose } = selectWorldBody(entitiesById, [
+      thread("g1", ["a"]),
     ]);
-    expect(groups.map((g) => g.id)).toEqual(["g1"]);
+    expect(threads.map((g) => g.id)).toEqual(["g1"]);
     expect(loose.map((e) => e.id)).toEqual(["b"]);
   });
 
-  it("keeps an empty group (rendered so it stays editable/deletable)", () => {
-    const { groups } = selectWorldBody({}, [group("g", [])]);
-    expect(groups.map((g) => g.id)).toEqual(["g"]);
+  it("keeps an empty thread (rendered so it stays editable/deletable)", () => {
+    const { threads } = selectWorldBody({}, [thread("g", [])]);
+    expect(threads.map((g) => g.id)).toEqual(["g"]);
   });
 
-  it("keeps a group whose only members are forge drafts (its own list hides them)", () => {
+  it("keeps a thread whose only members are forge drafts (its own list hides them)", () => {
     const entitiesById = {
       d: ent("d", { lifecycle: "draft", sourceChatId: "c" }),
     };
     expect(
-      selectWorldBody(entitiesById, [group("g", ["d"])]).groups.map(
+      selectWorldBody(entitiesById, [thread("g", ["d"])]).threads.map(
         (g) => g.id,
       ),
     ).toEqual(["g"]);

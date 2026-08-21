@@ -30,7 +30,7 @@ function makeState(
       styleSyncEnabled: false,
     },
     world: {
-      groups: [],
+      threads: [],
       entitiesById: {},
       entityIds: [],
     },

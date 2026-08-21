@@ -110,7 +110,7 @@ export interface GenerationStrategy {
       }
     | { type: "entitySummary"; entityId: string }
     | { type: "entitySummaryBind"; entityId: string }
-    | { type: "threadSummary"; groupId: string }
+    | { type: "threadSummary"; threadId: string }
     | { type: "bootstrap" };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
@@ -134,13 +134,38 @@ export interface RuntimeState {
 
 // World Types (v13)
 
-export interface WorldGroup {
+/** How far out a thread's terminus sits. An attribute, not three categories:
+ *  arc, plot and unresolved point differ in scope and lifetime, not in kind —
+ *  all three are "something is open and wants closing". Splitting them would
+ *  mean three prompts, three sidebar sections and permanent arguments about
+ *  whether a hidden letter is a plot or a point. One attribute drives the
+ *  differences that genuinely exist: condition range, whether it gets a pacing
+ *  gate, and how eagerly triage proposes retiring it. */
+export type ThreadHorizon = "arc" | "plot" | "point";
+
+/** Satisfaction is a flag flip, not a deletion — the entry is disabled rather
+ *  than the model being told the plot is over. */
+export type ThreadStatus = "open" | "satisfied";
+
+export interface Thread {
   id: string;
   title: string; // display name — e.g. "Thieves' Guild Inner Circle"
-  summary: string; // narrative description — fed into [GROUPS] generation context
-  entityIds: string[];
-  lorebookEntryId?: string; // optional: group summary synced as a lorebook entry
+  /** The reminder prose injected when the thread's condition fires — not a
+   *  description of a grouping. Also fed into [GROUPS] generation context. */
+  text: string;
+  horizon: ThreadHorizon;
+  entityIds: string[]; // the cast the thread drags into context
+  lorebookEntryId?: string; // optional: thread text synced as a lorebook entry
+  status: ThreadStatus;
 }
+
+/** A thread as a callsite hands it to `threadCreated`. `horizon` and `status`
+ *  are the reducer's to default (see slices/world.ts), so no callsite — the
+ *  Forge's [THREAD] command, the World's "+ New Thread", triage in a later
+ *  phase — has to remember them, and none of them can disagree about what the
+ *  default is. */
+export type ThreadDraft = Omit<Thread, "horizon" | "status"> &
+  Partial<Pick<Thread, "horizon" | "status">>;
 
 export type EntityLifecycle = "draft" | "live";
 
@@ -157,7 +182,7 @@ export interface WorldEntity {
 }
 
 export interface WorldState {
-  groups: WorldGroup[];
+  threads: Thread[];
   entitiesById: Record<string, WorldEntity>;
   entityIds: string[];
 }

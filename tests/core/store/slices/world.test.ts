@@ -8,13 +8,17 @@ import {
   entityBound,
   entitiesBoundBatch,
   entityUnbound,
-  groupCreated,
-  groupDeleted,
-  groupRenamed,
-  groupSummaryUpdated,
-  entityGroupToggled,
+  threadCreated,
+  threadDeleted,
+  threadRenamed,
+  threadTextUpdated,
+  threadMemberToggled,
 } from "../../../../src/core/store/slices/world";
-import { WorldState, WorldEntity } from "../../../../src/core/store/types";
+import {
+  Thread,
+  WorldState,
+  WorldEntity,
+} from "../../../../src/core/store/types";
 import {
   FieldID,
   DulfsFieldID,
@@ -26,7 +30,7 @@ const reduce = (
 ) => worldSlice.reducer(state, action as any);
 
 const makeState = (overrides: Partial<WorldState> = {}): WorldState => ({
-  groups: [],
+  threads: [],
   entitiesById: {},
   entityIds: [],
   ...overrides,
@@ -40,71 +44,95 @@ const ENTITY: WorldEntity = {
   lifecycle: "live" as const,
 };
 
-const GROUP = {
-  id: "g1",
+const THREAD: Thread = {
+  id: "t1",
   title: "Main Circle",
-  summary: "Core cast",
+  text: "Core cast",
+  horizon: "plot",
   entityIds: [],
+  status: "open",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Group (Thread) actions
+// Thread actions
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("groupCreated", () => {
-  it("adds a group", () => {
-    const state = reduce(makeState(), groupCreated({ group: GROUP }));
-    expect(state.groups).toHaveLength(1);
-    expect(state.groups[0].title).toBe("Main Circle");
+describe("threadCreated", () => {
+  it("adds a thread", () => {
+    const state = reduce(makeState(), threadCreated({ thread: THREAD }));
+    expect(state.threads).toHaveLength(1);
+    expect(state.threads[0].title).toBe("Main Circle");
+  });
+
+  it("defaults horizon and status when the payload omits them", () => {
+    const state = reduce(
+      makeState(),
+      threadCreated({
+        thread: { id: "t2", title: "Bare", text: "", entityIds: [] },
+      }),
+    );
+    expect(state.threads[0].horizon).toBe("plot");
+    expect(state.threads[0].status).toBe("open");
+  });
+
+  it("keeps an explicit horizon and status", () => {
+    const state = reduce(
+      makeState(),
+      threadCreated({
+        thread: { ...THREAD, horizon: "arc", status: "satisfied" },
+      }),
+    );
+    expect(state.threads[0].horizon).toBe("arc");
+    expect(state.threads[0].status).toBe("satisfied");
   });
 });
 
-describe("groupDeleted", () => {
-  it("removes a group by id", () => {
+describe("threadDeleted", () => {
+  it("removes a thread by id", () => {
     const state = reduce(
-      makeState({ groups: [GROUP] }),
-      groupDeleted({ groupId: "g1" }),
+      makeState({ threads: [THREAD] }),
+      threadDeleted({ threadId: "t1" }),
     );
-    expect(state.groups).toHaveLength(0);
+    expect(state.threads).toHaveLength(0);
   });
 });
 
-describe("groupRenamed", () => {
-  it("renames a group by id", () => {
+describe("threadRenamed", () => {
+  it("renames a thread by id", () => {
     const state = reduce(
-      makeState({ groups: [GROUP] }),
-      groupRenamed({ groupId: "g1", title: "Inner Ring" }),
+      makeState({ threads: [THREAD] }),
+      threadRenamed({ threadId: "t1", title: "Inner Ring" }),
     );
-    expect(state.groups[0].title).toBe("Inner Ring");
+    expect(state.threads[0].title).toBe("Inner Ring");
   });
 });
 
-describe("groupSummaryUpdated", () => {
-  it("updates the group summary", () => {
+describe("threadTextUpdated", () => {
+  it("updates the thread text", () => {
     const state = reduce(
-      makeState({ groups: [GROUP] }),
-      groupSummaryUpdated({ groupId: "g1", summary: "Bound by oaths" }),
+      makeState({ threads: [THREAD] }),
+      threadTextUpdated({ threadId: "t1", text: "Bound by oaths" }),
     );
-    expect(state.groups[0].summary).toBe("Bound by oaths");
+    expect(state.threads[0].text).toBe("Bound by oaths");
   });
 });
 
-describe("entityGroupToggled", () => {
-  it("adds entity to group when not a member", () => {
+describe("threadMemberToggled", () => {
+  it("adds entity to thread when not a member", () => {
     const state = reduce(
-      makeState({ groups: [GROUP] }),
-      entityGroupToggled({ groupId: "g1", entityId: "e1" }),
+      makeState({ threads: [THREAD] }),
+      threadMemberToggled({ threadId: "t1", entityId: "e1" }),
     );
-    expect(state.groups[0].entityIds).toContain("e1");
+    expect(state.threads[0].entityIds).toContain("e1");
   });
 
-  it("removes entity from group when already a member", () => {
-    const groupWithMember = { ...GROUP, entityIds: ["e1"] };
+  it("removes entity from thread when already a member", () => {
+    const threadWithMember = { ...THREAD, entityIds: ["e1"] };
     const state = reduce(
-      makeState({ groups: [groupWithMember] }),
-      entityGroupToggled({ groupId: "g1", entityId: "e1" }),
+      makeState({ threads: [threadWithMember] }),
+      threadMemberToggled({ threadId: "t1", entityId: "e1" }),
     );
-    expect(state.groups[0].entityIds).not.toContain("e1");
+    expect(state.threads[0].entityIds).not.toContain("e1");
   });
 });
 
@@ -122,19 +150,19 @@ describe("entityForged", () => {
 });
 
 describe("entityDeleted", () => {
-  it("removes the entity and cleans up group membership", () => {
-    const groupWithMember = { ...GROUP, entityIds: ["e1"] };
+  it("removes the entity and cleans up thread membership", () => {
+    const threadWithMember = { ...THREAD, entityIds: ["e1"] };
     const state = reduce(
       makeState({
         entitiesById: { e1: ENTITY },
         entityIds: ["e1"],
-        groups: [groupWithMember],
+        threads: [threadWithMember],
       }),
       entityDeleted({ entityId: "e1" }),
     );
     expect(state.entityIds).toHaveLength(0);
     expect(state.entitiesById["e1"]).toBeUndefined();
-    expect(state.groups[0].entityIds).toHaveLength(0);
+    expect(state.threads[0].entityIds).toHaveLength(0);
   });
 });
 

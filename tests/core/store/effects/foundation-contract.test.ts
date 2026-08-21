@@ -26,7 +26,7 @@ const state = {
     style: "",
   },
   chat: { chats: [], activeChatId: null },
-  world: { entitiesById: {}, entityIds: [], groups: [] },
+  world: { entitiesById: {}, entityIds: [], threads: [] },
   story: { fields: {}, items: {} },
   runtime: { queue: [], activeRequest: null, sega: { activeRequestIds: [] } },
 } as unknown as RootState;

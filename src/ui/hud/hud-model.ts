@@ -124,8 +124,9 @@ export function deriveHud(state: RootState, inputs: HudInputs): HudModel {
     // surface §9.1 builds to carry trust.
     stateIcon: engine.settings.enabled ? stateOf(engine.phase) : "off",
     backlog: engine.backlog,
-    // `world.groups.length` — `Thread` replacing `WorldGroup` is phase 5.
-    threads: world.groups.length,
+    // Every thread, open or satisfied: nothing sets `satisfied` until phase 6,
+    // so filtering on status here would filter on a constant.
+    threads: world.threads.length,
     // Honest 0 for the whole of this phase: nothing revises anything until
     // phase 6. A permanent 0 is correct information, and a slot that appears
     // later is a modeline that changes shape (§9.1: fixed slots, always
@@ -153,6 +154,6 @@ export function hudSignature(state: RootState): string {
     engine.settings.enabled ? "1" : "0",
     engine.backlog,
     engine.touched,
-    world.groups.length,
+    world.threads.length,
   ].join("|");
 }

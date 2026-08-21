@@ -29,7 +29,7 @@ import type {
   StoryState,
   WorldState,
   WorldEntity,
-  WorldGroup,
+  Thread,
   StoryField,
 } from "../types";
 import { initialStoryState } from "../slices/story";
@@ -37,7 +37,7 @@ import { initialWorldState } from "../slices/world";
 
 export type PersistIndex = {
   entityIds: string[];
-  groupIds: string[];
+  threadIds: string[];
   fieldIds: string[];
 };
 
@@ -45,16 +45,19 @@ export type PersistRecords = Record<string, unknown>;
 
 export const INDEX_KEY = "index";
 
-// Entity ids, group ids and field ids share one flat keyspace, and the first
-// two are UUIDs — the prefix is what keeps them apart.
+// Entity ids, thread ids and field ids share one flat keyspace, and the first
+// two are UUIDs — the prefix is what keeps them apart. `t:` was chosen in
+// phase 2 for what these records were going to be called, not for what they
+// were called then, so phase 5's rename to `Thread` cost no key change and
+// moved no record.
 export const entityKey = (id: string): string => `e:${id}`;
-export const groupKey = (id: string): string => `t:${id}`;
+export const threadKey = (id: string): string => `t:${id}`;
 export const fieldKey = (id: string): string => `f:${id}`;
 
 export function buildIndex(state: RootState): PersistIndex {
   return {
     entityIds: [...state.world.entityIds],
-    groupIds: state.world.groups.map((g) => g.id),
+    threadIds: state.world.threads.map((t) => t.id),
     fieldIds: Object.keys(state.story.fields),
   };
 }
@@ -67,8 +70,8 @@ export function toRecords(state: RootState): PersistRecords {
     const entity = state.world.entitiesById[id];
     if (entity) records[entityKey(id)] = entity;
   }
-  for (const group of state.world.groups) {
-    records[groupKey(group.id)] = group;
+  for (const thread of state.world.threads) {
+    records[threadKey(thread.id)] = thread;
   }
   for (const [id, field] of Object.entries(state.story.fields)) {
     records[fieldKey(id)] = field;
@@ -95,10 +98,10 @@ export function applyRecords(
     entityIds.push(id);
   }
 
-  const groups: WorldGroup[] = [];
-  for (const id of index.groupIds) {
-    const record = records[groupKey(id)] as WorldGroup | undefined;
-    if (record) groups.push(record);
+  const threads: Thread[] = [];
+  for (const id of index.threadIds) {
+    const record = records[threadKey(id)] as Thread | undefined;
+    if (record) threads.push(record);
   }
 
   const fields: Record<string, StoryField> = {};
@@ -116,6 +119,6 @@ export function applyRecords(
       // leave `story.fields.attg` undefined for the UI to trip over.
       fields: { ...initialStoryState.fields, ...fields },
     },
-    world: { ...initialWorldState, entitiesById, entityIds, groups },
+    world: { ...initialWorldState, entitiesById, entityIds, threads },
   };
 }

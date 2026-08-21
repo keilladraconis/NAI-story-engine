@@ -86,7 +86,7 @@ describe("buildChatStrategy", () => {
       ({
         chat: { chats: [], activeChatId: null, refineChat: refine },
         foundation: {},
-        world: { entitiesById: {}, entityIds: [], groups: [] },
+        world: { entitiesById: {}, entityIds: [], threads: [] },
         brainstorm: { chats: [], currentChatIndex: 0 },
       }) as unknown as RootState;
     const budget = refineBudgetFor("lorebookContent");

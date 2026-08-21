@@ -45,7 +45,8 @@ export type TriageEntity = {
 export type TriageThread = {
   id: string;
   title: string;
-  summary: string;
+  /** The thread's reminder prose — `Thread.text`. */
+  text: string;
 };
 
 /** The manifest is both halves of the contract: it is rendered into the prompt,
@@ -104,8 +105,8 @@ function formatEntities(entities: TriageEntity[]): string {
 
 function formatThreads(threads: TriageThread[]): string {
   const lines = threads.map((t) => {
-    const summary = t.summary.trim();
-    return `- ${t.title}${summary ? `: ${summary}` : ""}`;
+    const text = t.text.trim();
+    return `- ${t.title}${text ? `: ${text}` : ""}`;
   });
   return `=== OPEN THREADS ===\n${lines.join("\n")}`;
 }
@@ -238,8 +239,8 @@ export function parseTriage(text: string, manifest: TriageManifest): Intent[] {
         intents.push({ kind: "open", subject: argument });
         break;
       case "RETIRE": {
-        const groupId = threadIds.get(normalize(argument));
-        if (groupId) intents.push({ kind: "retire", groupId });
+        const threadId = threadIds.get(normalize(argument));
+        if (threadId) intents.push({ kind: "retire", threadId });
         break;
       }
     }

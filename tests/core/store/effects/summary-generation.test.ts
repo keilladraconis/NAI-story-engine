@@ -267,7 +267,7 @@ describe("uiThreadSummaryGenerationRequested effect", () => {
     const { fire, dispatch } = makeHarness(makeState());
     await fire(
       uiThreadSummaryGenerationRequested({
-        groupId: "g1",
+        threadId: "g1",
         requestId: "se-thread-summary-g1",
       }),
     );
@@ -296,7 +296,7 @@ describe("uiThreadSummaryGenerationRequested effect", () => {
     const { fire, dispatch } = makeHarness(state);
     await fire(
       uiThreadSummaryGenerationRequested({
-        groupId: "g1",
+        threadId: "g1",
         requestId: "se-thread-summary-g1",
       }),
     );
@@ -362,7 +362,7 @@ describe("summary dispatch sites resolve the instruct model", () => {
     const { fire, submittedParams } = makeHarness(makeState());
     await fire(
       uiThreadSummaryGenerationRequested({
-        groupId: "g1",
+        threadId: "g1",
         requestId: "se-thread-summary-g1",
       }),
     );

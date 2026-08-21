@@ -18,7 +18,7 @@ import type { StoryState, WorldState } from "../types";
 import {
   INDEX_KEY,
   entityKey,
-  groupKey,
+  threadKey,
   fieldKey,
   applyRecords,
   type PersistIndex,
@@ -53,7 +53,7 @@ export async function loadBranchState(nodeId?: number): Promise<{
 
   const keys = [
     ...index.entityIds.map(entityKey),
-    ...index.groupIds.map(groupKey),
+    ...index.threadIds.map(threadKey),
     ...index.fieldIds.map(fieldKey),
   ];
 
