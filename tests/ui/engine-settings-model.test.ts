@@ -34,6 +34,7 @@ const CONFIGURED: EngineSettings = {
   enabled: true,
   delayMs: 3000,
   minProse: 4,
+  threadCap: 5,
 };
 
 /** The delay's bounds in the unit the box shows them in: 1s and 300s. Derived,
@@ -198,10 +199,12 @@ describe("the other settings are carried across untouched", () => {
     const afterDelay = resolveTypedSetting(CONFIGURED, "delayMs", "9");
     expect(afterDelay.enabled).toBe(true);
     expect(afterDelay.minProse).toBe(CONFIGURED.minProse);
+    expect(afterDelay.threadCap).toBe(CONFIGURED.threadCap);
 
     const afterProse = resolveTypedSetting(CONFIGURED, "minProse", "9");
     expect(afterProse.enabled).toBe(true);
     expect(afterProse.delayMs).toBe(CONFIGURED.delayMs);
+    expect(afterProse.threadCap).toBe(CONFIGURED.threadCap);
   });
 
   it("returns a whole settings object, which is what the save writes", () => {
@@ -209,6 +212,6 @@ describe("the other settings are carried across untouched", () => {
     // field here would be a field wiped in storage.
     expect(
       Object.keys(resolveTypedSetting(CONFIGURED, "delayMs", "9")).sort(),
-    ).toEqual(["delayMs", "enabled", "minProse"]);
+    ).toEqual(["delayMs", "enabled", "minProse", "threadCap"]);
   });
 });

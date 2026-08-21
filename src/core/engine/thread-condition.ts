@@ -16,33 +16,8 @@
 // house style: every shape below is read off `external/script-types.d.ts`.
 
 import { nameKey } from "../store/effects/handlers/lorebook";
-import type { Thread, ThreadHorizon, WorldEntity } from "../store/types";
-
-/** How far back a horizon looks for its subject, in **characters** (the unit
- *  `LorebookAdvancedConditionKey.range` is documented in, and only meaningful
- *  for `'story'`).
- *
- *  Read against an ordinary prose paragraph of ~400 characters (~65 words),
- *  which is what NovelAI's own editor produces at a comfortable line:
- *
- *    point — 1000 chars ≈ 2–3 paragraphs. An unresolved detail is expected to
- *      be picked up inside the same beat; if the prose has walked away from it
- *      for a couple of paragraphs it is already being dropped.
- *    plot  — 4000 chars ≈ 10 paragraphs, about one scene. A subplot survives a
- *      scene that is not about it, and is forgotten once a whole scene has gone
- *      by without it.
- *    arc   — 12000 chars ≈ 30 paragraphs, several scenes. An arc is allowed to
- *      go quiet for a chapter; nagging about it every scene is the blanket
- *      always-on this construction exists to replace.
- *
- *  The ratios matter more than the absolutes: a point decays ~12x faster than
- *  an arc, so the three horizons produce visibly different behaviour rather
- *  than three spellings of the same one. */
-export const THREAD_RANGE_CHARS: Record<ThreadHorizon, number> = {
-  point: 1000,
-  plot: 4000,
-  arc: 12000,
-};
+import { THREAD_RANGE_CHARS } from "./thread-horizon";
+import type { Thread, WorldEntity } from "../store/types";
 
 /** The strings whose presence in recent prose means "this thread is still
  *  alive". Exported for the tests and for phase 6, which will want to show a

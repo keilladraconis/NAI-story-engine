@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   worldSlice,
+  initialWorldState,
   entityForged,
   entityDeleted,
   entitySummaryUpdated,
@@ -16,9 +17,16 @@ import {
 } from "../../../../src/core/store/slices/world";
 import {
   Thread,
+  ThreadHorizon,
   WorldState,
   WorldEntity,
 } from "../../../../src/core/store/types";
+import { persistedDataLoaded, rootReducer } from "../../../../src/core/store";
+import { engineSettingsChanged } from "../../../../src/core/store/slices/engine";
+import {
+  ENGINE_DEFAULTS,
+  type EngineSettings,
+} from "../../../../src/core/engine/settings";
 import {
   FieldID,
   DulfsFieldID,
@@ -84,6 +92,123 @@ describe("threadCreated", () => {
     );
     expect(state.threads[0].horizon).toBe("arc");
     expect(state.threads[0].status).toBe("satisfied");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The cap
+//
+// Through `rootReducer`, not `worldSlice.reducer`: the cap value lives in the
+// engine slice (it is one of the Engine's per-story settings, already mirrored
+// into the store by phase 4b) and a slice reducer cannot see another slice, so
+// the root is the only reducer that can hold this invariant. It is still a
+// reducer invariant — no callsite can dispatch its way around it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const thread = (id: string, horizon: ThreadHorizon = "plot"): Thread => ({
+  id,
+  title: id,
+  text: "",
+  horizon,
+  entityIds: [],
+  status: "open",
+});
+
+/** A store state with `threads` already in it, as a branch load leaves it. */
+function withThreads(threads: Thread[], settings?: Partial<EngineSettings>) {
+  let state = rootReducer(undefined, { type: "@@INIT" });
+  if (settings) {
+    state = rootReducer(
+      state,
+      engineSettingsChanged({ ...ENGINE_DEFAULTS, ...settings }),
+    );
+  }
+  return rootReducer(
+    state,
+    persistedDataLoaded({ world: { ...initialWorldState, threads } }),
+  );
+}
+
+const threadIds = (state: { world: WorldState }): string[] =>
+  state.world.threads.map((t) => t.id);
+
+describe("the thread cap", () => {
+  it("displaces rather than adds once the cap is reached", () => {
+    const before = withThreads(
+      Array.from({ length: 8 }, (_, i) => thread(`t${i}`)),
+    );
+    const after = rootReducer(before, threadCreated({ thread: THREAD }));
+    expect(after.world.threads).toHaveLength(8);
+    expect(threadIds(after)).toContain("t1");
+    expect(threadIds(after)).not.toContain("t0");
+  });
+
+  it("adds without displacing while there is room", () => {
+    const before = withThreads([thread("a"), thread("b")]);
+    const after = rootReducer(before, threadCreated({ thread: THREAD }));
+    expect(threadIds(after)).toEqual(["a", "b", "t1"]);
+  });
+
+  it("uses the cap this story is set to, not the default", () => {
+    const before = withThreads([thread("a"), thread("b"), thread("c")], {
+      threadCap: 2,
+    });
+    const after = rootReducer(before, threadCreated({ thread: THREAD }));
+    expect(threadIds(after)).toEqual(["c", "t1"]);
+  });
+
+  it("cannot be dispatched around: the Forge and the World panel share it", () => {
+    // Both create threads through this one action, which is the point of the
+    // invariant living here rather than in either of them.
+    let state = withThreads([], { threadCap: 2 });
+    for (const id of ["a", "b", "c", "d"]) {
+      state = rootReducer(state, threadCreated({ thread: thread(id) }));
+    }
+    expect(threadIds(state)).toEqual(["c", "d"]);
+  });
+
+  it("leaves a branch load alone, however many threads it carries", () => {
+    // Navigating history is not creating a thread. Trimming here would delete
+    // a writer's threads for the crime of pressing undo.
+    const state = withThreads(
+      Array.from({ length: 12 }, (_, i) => thread(`t${i}`)),
+      { threadCap: 3 },
+    );
+    expect(state.world.threads).toHaveLength(12);
+  });
+
+  it("does not trim on any other thread action", () => {
+    const before = withThreads(
+      Array.from({ length: 12 }, (_, i) => thread(`t${i}`)),
+      { threadCap: 3 },
+    );
+    const after = rootReducer(
+      before,
+      threadRenamed({ threadId: "t0", title: "renamed" }),
+    );
+    expect(after.world.threads).toHaveLength(12);
+    expect(after.world.threads[0].title).toBe("renamed");
+  });
+
+  it("touches nothing but the thread list when it displaces", () => {
+    const before = withThreads([thread("a"), thread("b")], { threadCap: 2 });
+    const after = rootReducer(before, threadCreated({ thread: THREAD }));
+    expect(after.world.threads).toHaveLength(2);
+    expect(after.world.entitiesById).toBe(before.world.entitiesById);
+    expect(after.world.entityIds).toBe(before.world.entityIds);
+    expect(after.story).toBe(before.story);
+    expect(after.engine).toBe(before.engine);
+  });
+
+  it("mirrors a cap-only settings change into the store", () => {
+    // The engine slice returns the same object when a re-read changed nothing,
+    // so a settings comparison that forgot `threadCap` would leave the cap at
+    // whatever it was when the delay last moved.
+    const state = rootReducer(
+      rootReducer(undefined, { type: "@@INIT" }),
+      engineSettingsChanged({ ...ENGINE_DEFAULTS, threadCap: 3 }),
+    );
+    expect(state.engine.settings.threadCap).toBe(3);
   });
 });
 

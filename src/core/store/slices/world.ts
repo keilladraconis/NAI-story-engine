@@ -204,6 +204,14 @@ export const worldSlice = createSlice({
     // and a future creator gets the same treatment for free. Tasks 2 and 3
     // both branch on `horizon`, so a silently-undefined one is the failure
     // mode worth spending an invariant on.
+    //
+    // **The thread cap is enforced on this action, one level up.** It is a
+    // reducer invariant like one-entity-per-lorebook-entry above, but the cap
+    // is an Engine setting mirrored into the engine slice, and a slice reducer
+    // cannot read another slice — so `rootReducer` (store/index.ts) runs the
+    // append through `enforceThreadCap` and may drop the weakest thread to
+    // make room. Nothing that dispatches this can opt out; see
+    // `src/core/engine/thread-cap.ts` for which thread gives way and why.
     threadCreated: (state, payload: { thread: ThreadDraft }) => ({
       ...state,
       threads: [

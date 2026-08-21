@@ -1,4 +1,4 @@
-// The Engine's three settings, and the storyStorage record that holds them.
+// The Engine's settings, and the storyStorage record that holds them.
 //
 // They used to be `project.yaml` entries read through `api.v1.config.get`. That
 // API is read-only — `get`, no `set` — so a Setup-tab control could never write
@@ -7,7 +7,7 @@
 // writer steering an autonomous story, and the same person may hand-write the
 // next one.
 //
-// One record, not three keys. All three are read together on every pass and
+// One record, not one key per setting. All three are read together on every pass and
 // written together from one form, and storyStorage has none of historyStorage's
 // copy-on-write-per-key reason to shard (see intents.ts, where the watermark and
 // the queue are deliberately kept apart for exactly that reason).
@@ -27,6 +27,10 @@ export type EngineSettings = {
   enabled: boolean;
   delayMs: number;
   minProse: number;
+  /** How many Threads a story may hold at once (§4.5). Enforced where it
+   *  cannot be bypassed — the reducer, see `src/core/engine/thread-cap.ts` —
+   *  rather than at the callsites that create threads. */
+  threadCap: number;
 };
 
 /** What a story that has never been configured gets.
@@ -38,6 +42,7 @@ export const ENGINE_DEFAULTS: EngineSettings = {
   enabled: false,
   delayMs: 8000,
   minProse: 1,
+  threadCap: 8,
 };
 
 // ───────────────────────────────── the bounds ─────────────────────────────────
@@ -74,6 +79,23 @@ export const MIN_PROSE_MIN = 1;
  *  the thousands defers the pass indefinitely and then sends a chapter as input.
  *  A hundred paragraphs is already several scenes. */
 export const MIN_PROSE_MAX = 100;
+
+/** Below 1 no thread may exist at all: the Forge's `[THREAD]` command and the
+ *  World's "+ New Thread" would both accept a click and leave nothing behind,
+ *  which reads as a broken feature rather than as a setting. 1 is the smallest
+ *  cap the mechanism still works at — each new commitment displaces the last. */
+export const THREAD_CAP_MIN = 1;
+
+/** A cap has to be low enough to still be capping. Every thread is a lorebook
+ *  entry whose reminder prose injects when the story stops carrying it
+ *  (`thread-condition.ts`), and phase 5's triage manifest lists every thread on
+ *  every pass — so the ceiling is where the cap stops being proliferation
+ *  control and becomes permission to poison the context the Engine exists to
+ *  improve. Forty simultaneous reminders is on the order of two to three
+ *  thousand tokens of injection, a third of an Erato context, plus forty lines
+ *  in the prompt of every pass. It is also five times the default, so a writer
+ *  who genuinely runs a crowded story has room to say so. */
+export const THREAD_CAP_MAX = 40;
 
 /** A stored record as it may actually be: every field optional, every field of
  *  unknown type. `storyStorage.get` is typed `Promise<any>`, so the shape is
@@ -140,6 +162,17 @@ export function normalizeEngineSettings(value: unknown): EngineSettings {
       MIN_PROSE_MIN,
       MIN_PROSE_MAX,
       Math.ceil,
+    ),
+    // Rounded DOWN, the mirror of `minProse` and for the same reason: the cap
+    // admits a thread while the list is shorter than it, so 8.5 already behaves
+    // as 8. Rounding down normalises the number without changing what it does;
+    // rounding up would quietly raise the ceiling by one.
+    threadCap: readNumber(
+      record.threadCap,
+      ENGINE_DEFAULTS.threadCap,
+      THREAD_CAP_MIN,
+      THREAD_CAP_MAX,
+      Math.floor,
     ),
   };
 }

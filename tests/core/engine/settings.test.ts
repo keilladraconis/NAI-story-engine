@@ -13,6 +13,8 @@ import {
   ENGINE_DEFAULTS,
   MIN_PROSE_MAX,
   MIN_PROSE_MIN,
+  THREAD_CAP_MAX,
+  THREAD_CAP_MIN,
   readEngineSettings,
   writeEngineSettings,
   type EngineSettings,
@@ -67,14 +69,14 @@ describe("readEngineSettings — nothing there", () => {
     ["null", null],
     ["a string", "enabled"],
     ["a number", 8000],
-    ["an array", [true, 8000, 1]],
+    ["an array", [true, 8000, 1, 8]],
   ])("returns the defaults when the slot holds %s", async (_label, value) => {
     stored(value);
     expect(await readEngineSettings()).toEqual(ENGINE_DEFAULTS);
   });
 
   it("reads the bare key, never the `story:` routing prefix", async () => {
-    stored({ enabled: true, delayMs: 3000, minProse: 2 });
+    stored({ enabled: true, delayMs: 3000, minProse: 2, threadCap: 4 });
     await readEngineSettings();
     expect(vi.mocked(api.v1.storyStorage.get)).toHaveBeenCalledWith(
       STORAGE_KEYS.ENGINE_SETTINGS,
@@ -90,24 +92,36 @@ describe("readEngineSettings — a partial record", () => {
       enabled: true,
       delayMs: ENGINE_DEFAULTS.delayMs,
       minProse: ENGINE_DEFAULTS.minProse,
+      threadCap: ENGINE_DEFAULTS.threadCap,
     });
   });
 
+  it("keeps a record written before threads had a cap", async () => {
+    // No migration (CLAUDE.md): a v0.14 record has no `threadCap`, and the
+    // read is what supplies one rather than a rewrite of the slot.
+    stored({ enabled: true, delayMs: 3000, minProse: 2 });
+    expect((await readEngineSettings()).threadCap).toBe(
+      ENGINE_DEFAULTS.threadCap,
+    );
+  });
+
   it("fills a missing `enabled` with off rather than guessing on", async () => {
-    stored({ delayMs: 3000, minProse: 2 });
+    stored({ delayMs: 3000, minProse: 2, threadCap: 5 });
     expect(await readEngineSettings()).toEqual({
       enabled: false,
       delayMs: 3000,
       minProse: 2,
+      threadCap: 5,
     });
   });
 
   it("takes a valid record whole", async () => {
-    stored({ enabled: true, delayMs: 3000, minProse: 4 });
+    stored({ enabled: true, delayMs: 3000, minProse: 4, threadCap: 12 });
     expect(await readEngineSettings()).toEqual({
       enabled: true,
       delayMs: 3000,
       minProse: 4,
+      threadCap: 12,
     });
   });
 
@@ -125,7 +139,7 @@ describe("readEngineSettings — hostile values", () => {
     ["a number", 1],
     ["null", null],
   ])("defaults `enabled` when it is %s", async (_label, value) => {
-    stored({ enabled: value, delayMs: 3000, minProse: 2 });
+    stored({ enabled: value, delayMs: 3000, minProse: 2, threadCap: 8 });
     expect((await readEngineSettings()).enabled).toBe(ENGINE_DEFAULTS.enabled);
   });
 
@@ -197,14 +211,59 @@ describe("readEngineSettings — hostile values", () => {
     );
   });
 
+  it.each([
+    ["zero", 0],
+    ["negative", -2],
+  ])(
+    "raises a `threadCap` of %s to 1 — a cap of zero makes [THREAD] a silent no-op",
+    async (_label, value) => {
+      stored({ threadCap: value });
+      expect((await readEngineSettings()).threadCap).toBe(THREAD_CAP_MIN);
+    },
+  );
+
+  it("lowers a `threadCap` that has stopped capping to the ceiling", async () => {
+    stored({ threadCap: 5000 });
+    expect((await readEngineSettings()).threadCap).toBe(THREAD_CAP_MAX);
+  });
+
+  it("rounds a fractional `threadCap` DOWN to the count it actually allows", async () => {
+    // The gate admits a new thread while the list is shorter than the cap, so
+    // 8.5 already behaves as 8. Rounding down normalises the number without
+    // changing what it does; rounding up would quietly raise the ceiling.
+    stored({ threadCap: 8.5 });
+    expect((await readEngineSettings()).threadCap).toBe(8);
+  });
+
+  it.each([
+    ["NaN", Number.NaN],
+    ["Infinity", Number.POSITIVE_INFINITY],
+    ["a string that looks like a number", "8"],
+    ["a boolean", true],
+    ["null", null],
+  ])("defaults `threadCap` when it is %s", async (_label, value) => {
+    stored({ threadCap: value });
+    expect((await readEngineSettings()).threadCap).toBe(
+      ENGINE_DEFAULTS.threadCap,
+    );
+  });
+
   it("never returns a settings object a pass cannot use", async () => {
-    stored({ enabled: "yes", delayMs: -0, minProse: Number.NaN });
+    stored({
+      enabled: "yes",
+      delayMs: -0,
+      minProse: Number.NaN,
+      threadCap: Number.POSITIVE_INFINITY,
+    });
     const settings = await readEngineSettings();
     expect(typeof settings.enabled).toBe("boolean");
     expect(settings.delayMs).toBeGreaterThanOrEqual(DELAY_MS_MIN);
     expect(settings.delayMs).toBeLessThanOrEqual(DELAY_MS_MAX);
     expect(settings.minProse).toBeGreaterThanOrEqual(MIN_PROSE_MIN);
     expect(Number.isInteger(settings.minProse)).toBe(true);
+    expect(settings.threadCap).toBeGreaterThanOrEqual(THREAD_CAP_MIN);
+    expect(settings.threadCap).toBeLessThanOrEqual(THREAD_CAP_MAX);
+    expect(Number.isInteger(settings.threadCap)).toBe(true);
   });
 });
 
@@ -214,13 +273,19 @@ describe("writeEngineSettings", () => {
       enabled: true,
       delayMs: 12_000,
       minProse: 3,
+      threadCap: 5,
     };
     await writeEngineSettings(next);
     expect(await readEngineSettings()).toEqual(next);
   });
 
   it("writes one record under the Engine's key, not three", async () => {
-    await writeEngineSettings({ enabled: true, delayMs: 12_000, minProse: 3 });
+    await writeEngineSettings({
+      enabled: true,
+      delayMs: 12_000,
+      minProse: 3,
+      threadCap: 5,
+    });
     const keys = vi
       .mocked(api.v1.storyStorage.set)
       .mock.calls.map((call) => call[0]);
@@ -232,11 +297,13 @@ describe("writeEngineSettings", () => {
       enabled: true,
       delayMs: -1,
       minProse: 0,
+      threadCap: 999,
     });
     expect(slots.get(STORAGE_KEYS.ENGINE_SETTINGS)).toEqual({
       enabled: true,
       delayMs: DELAY_MS_MIN,
       minProse: MIN_PROSE_MIN,
+      threadCap: THREAD_CAP_MAX,
     });
   });
 });

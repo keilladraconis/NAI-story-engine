@@ -605,8 +605,8 @@ describe("the pass", () => {
     // presses ⚡ — so someone who opted in opens their story and reads "Off —
     // the Engine is not running", a glyph and a tooltip asserting a fact that is
     // not true. The WHOLE record, not just `enabled`: the Setup form renders
-    // from this, and nothing else ever dispatches the other two fields.
-    configure({ enabled: true, delayMs: 3000, minProse: 4 });
+    // from this, and nothing else ever dispatches the other fields.
+    configure({ enabled: true, delayMs: 3000, minProse: 4, threadCap: 3 });
     const h = harness();
 
     registerEngineLoopEffects(h.deps);
@@ -616,6 +616,7 @@ describe("the pass", () => {
       enabled: true,
       delayMs: 3000,
       minProse: 4,
+      threadCap: 3,
     });
   });
 

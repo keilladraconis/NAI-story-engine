@@ -4,11 +4,12 @@ import type { ChatSliceState } from "./slices/chat";
 import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
 import { storySlice, initialStoryState } from "./slices/story";
-import { worldSlice } from "./slices/world";
+import { worldSlice, threadCreated } from "./slices/world";
 import { foundationSlice, initialFoundationState } from "./slices/foundation";
 import { forgeSlice } from "./slices/forge";
 import { engineSlice } from "./slices/engine";
 import { RootState, StoryState, WorldState, FoundationState } from "./types";
+import { enforceThreadCap } from "../engine/thread-cap";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Persisted data loaded action
@@ -67,7 +68,31 @@ export function rootReducer(
     };
   }
 
-  return sliceReducer(state, action);
+  const next = sliceReducer(state, action);
+
+  // The thread cap (§4.5), enforced where no callsite can dispatch around it —
+  // the same argument as one-entity-per-lorebook-entry in slices/world.ts, one
+  // level up. It is here rather than inside `threadCreated` because the cap is
+  // one of the Engine's per-story settings and phase 4b already mirrored those
+  // into the engine slice: a slice reducer cannot read another slice, and the
+  // root is the only reducer that sees both. Mirroring the number a second time
+  // into `WorldState` would have put a storyStorage setting inside the
+  // branch-persisted world, where `applyRecords` resets it on every undo.
+  //
+  // Only on a create. Lowering the cap deletes nothing by itself, and a branch
+  // load is not a create — trimming there would spend a writer's threads on
+  // pressing undo.
+  if (action.type === threadCreated.type) {
+    const threads = enforceThreadCap(
+      next.world.threads,
+      next.engine.settings.threadCap,
+    );
+    if (threads !== next.world.threads) {
+      return { ...next, world: { ...next.world, threads } };
+    }
+  }
+
+  return next;
 }
 
 // nai-store logs `NAISTORE <action>` on EVERY dispatch when this is on, which is

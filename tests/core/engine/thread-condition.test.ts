@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   buildThreadCondition,
   threadSubjects,
-  THREAD_RANGE_CHARS,
 } from "../../../src/core/engine/thread-condition";
+import { THREAD_RANGE_CHARS } from "../../../src/core/engine/thread-horizon";
 import { nameKey } from "../../../src/core/store/effects/handlers/lorebook";
 import type { Thread, WorldEntity } from "../../../src/core/store/types";
 

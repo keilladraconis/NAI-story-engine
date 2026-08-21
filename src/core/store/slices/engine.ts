@@ -45,7 +45,8 @@ function same(a: EngineSettings, b: EngineSettings): boolean {
   return (
     a.enabled === b.enabled &&
     a.delayMs === b.delayMs &&
-    a.minProse === b.minProse
+    a.minProse === b.minProse &&
+    a.threadCap === b.threadCap
   );
 }
 
