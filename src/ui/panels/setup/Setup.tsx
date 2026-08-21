@@ -25,10 +25,10 @@ import { FIELD_DESCRIPTORS } from "../foundation/fields";
 import { ImportWizard } from "../import/ImportWizard";
 import { BootstrapButton } from "./BootstrapButton";
 import { BrainstormCta } from "./BrainstormCta";
+import { EngineSettings } from "./EngineSettings";
+import { SectionHeader } from "./SectionHeader";
 import { deriveSetup, setupSignature } from "./setup-model";
-import { ChevronDown, ChevronRight, Download } from "nai:icons/feather";
-
-const ICON_SIZE = 14;
+import { Download } from "nai:icons/feather";
 
 function importButtonStyle(disabled: boolean): Record<string, string | number> {
   return {
@@ -46,25 +46,6 @@ function importButtonStyle(disabled: boolean): Record<string, string | number> {
     fontSize: "0.85em",
     opacity: disabled ? 0.4 : 1,
   };
-}
-
-/** Both chevrons stay mounted and toggle via `display`. Swapping one component
- *  type for another at a fixed position leaves the old svg behind when the
- *  re-render arrives from a store subscription rather than a JSX event handler,
- *  and every render here is store-driven. Same workaround as ConfirmButton. */
-function Chevron(props: { open: boolean }) {
-  return (
-    <Fragment>
-      <ChevronDown
-        size={ICON_SIZE}
-        style={{ display: props.open ? "inline-flex" : "none" }}
-      />
-      <ChevronRight
-        size={ICON_SIZE}
-        style={{ display: props.open ? "none" : "inline-flex" }}
-      />
-    </Fragment>
-  );
 }
 
 export function Setup(props: {
@@ -118,29 +99,15 @@ export function Setup(props: {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: SP.md }}>
-        <button
-          onClick={() =>
+        <SectionHeader
+          label="Foundation"
+          open={model.foundationOpen}
+          onToggle={() =>
             store.dispatch(
               foundationExpansionSet({ expanded: !model.foundationOpen }),
             )
           }
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: SP.sm,
-            alignSelf: "flex-start",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: T.textHeadings,
-            fontFamily: T.fontDefault,
-            fontWeight: "bold",
-            padding: 0,
-          }}
-        >
-          <Chevron open={model.foundationOpen} />
-          Foundation
-        </button>
+        />
         <div style={{ display: model.foundationOpen ? "block" : "none" }}>
           <Foundation />
         </div>
@@ -149,6 +116,10 @@ export function Setup(props: {
       <div style={{ display: model.showBootstrap ? "block" : "none" }}>
         <BootstrapButton disabled={model.bootstrapDisabled} />
       </div>
+
+      {/* Last on the tab: the Engine is a tuning surface, not a step in the
+          staged nudge above it, and it is the only way to switch the Engine on. */}
+      <EngineSettings />
     </div>
   );
 }
