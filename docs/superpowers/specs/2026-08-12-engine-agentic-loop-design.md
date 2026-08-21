@@ -338,10 +338,16 @@ Plain keyword keys are **structurally wrong** for this job. A dropped Chekhov's 
 goes unmentioned; an entry keyed on "pistol" therefore never fires, so the thing
 whose symptom is absence can never trigger on presence.
 
-`LorebookEntry.advancedConditions` (`external/script-types.d.ts:308`) supports
+`LorebookEntry.advancedConditions` (`external/script-types.d.ts:324`) supports
 composable `and` / `or` / `not`, key-presence searches scoped to `story` within a
 character range, another entry being active, and equations over `paragraphCount` /
-`characterCount` / `currentStep`. The core construction is:
+`characterCount` / `currentStep`. It is a `LorebookCondition[]`, and the `.d.ts`
+does not say how the members of that array combine — so a thread emits exactly
+**one** condition and spells its composition out with `and` / `or` / `not` rather
+than leaning on an unverified rule. (`LorebookCondition` has eleven members, not
+the six this section originally listed: `and`, `or`, `not`, `key`, `lore`,
+`equation`, `model`, `random`, `storymode`, `string`, `true`.) The core
+construction is:
 
 ```
 not( key <subject> in ['story'] within range N )
@@ -352,13 +358,39 @@ precisely when the model has stopped carrying it. This inverts the cost model �
 threads are free while they are being honoured, and only spend context when they
 are being neglected.
 
-Supporting constructions:
+`<subject>` is **the cast's names, plus the title** — `nameKey`'d, so the probe and
+the participants' own entry keys can never disagree about what counts as a mention.
+Entity names are the only strings we can expect in prose verbatim; a title is prose
+and will rarely appear as written, so it rides along inside an `or` where a title
+that never matches costs nothing. `range` scales with `horizon`: **1000 / 4000 /
+12000 characters** for point / plot / arc — roughly a beat, a scene, and a chapter
+against NovelAI's ~400-character paragraph.
 
-- `range` scales with `horizon` (a point decays fast, an arc slowly).
-- `{type: "lore", entryId}` gates a thread on a participant being on stage.
-- `paragraphCount` equations give arc-horizon ends a pacing gate.
+**Correction: there is no `lore` gate, and the sketch that wanted one was
+self-contradictory.** This section originally offered `{type: "lore", entryId}` to
+gate a thread on a participant being on stage. With the cast as the subject that
+gate defeats itself: a participant's entry is active _because_ its name — the very
+string this detector probes for — appeared in context, so `and( lore(X), not(key X
+within range N) )` is a contradiction whenever the entry's search range covers `N`.
+`LorebookEntry` exposes no search-range field, so a script cannot even tell which
+way it resolves. §4.1's "`entityIds` is load-bearing" claim survives by the other
+mechanism: the cast is load-bearing **as the subject**, which is the same
+information with the polarity a forgetting detector actually needs.
 
-None of `advancedConditions` is used anywhere in `src/` today.
+A thread with no participants is §4.1's degenerate case and still gets a usable
+condition from its title alone; when that title never matches, the negation is
+always true and the thread degrades to the always-on it had before this phase —
+never to silence. Neither cast nor title emits `{type: "true"}` rather than a probe
+for the empty string.
+
+**The `paragraphCount` pacing gate for arc horizons is deferred to phase 6.**
+`Thread` carries no anchor — no timestamp, no mention position — so the only gate
+expressible today is a global stripe (`paragraphCount % 20 < 3`) that fires _every_
+arc thread in the same paragraphs and cannot express "since this thread last fired".
+Phase 6 owns the Engine acting, so it can record a per-thread anchor when it opens
+or renews a thread; only then does the equation have a meaningful left-hand side.
+
+Nothing in `src/` used `advancedConditions` before `src/core/engine/thread-condition.ts`.
 
 ### 4.4 Retirement
 
@@ -382,7 +414,10 @@ Three controls:
 - Triage must **justify** a new thread against the cap, and displace rather than
   add when at the ceiling.
 - A **paragraph-count expiry**, so an end the story quietly abandoned ages out
-  instead of accumulating forever.
+  instead of accumulating forever. This wants the same per-thread anchor the arc
+  pacing gate wants and §4.3 does not have: "how long since this thread was last
+  touched" is not answerable from a `Thread` as specified. Whatever supplies it
+  serves both.
 
 ## 5. Entity revision
 
