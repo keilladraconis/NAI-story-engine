@@ -43,6 +43,19 @@ function stateIconTable(): string {
   return (block as RegExpExecArray)[0];
 }
 
+/** The names imported from the feather set — every icon the line can draw. */
+function featherImports(): string[] {
+  // `[^{}]*` and not `[\s\S]*?`: a lazy any-character match starts at the
+  // FIRST `import {` in the file and runs all the way to this one, which
+  // reports every module the HUD imports as an icon.
+  const block = /import \{([^{}]*)\} from "nai:icons\/feather";/.exec(hudSrc());
+  expect(block).not.toBeNull();
+  return (block as RegExpExecArray)[1]
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0);
+}
+
 describe("Hud.tsx renders every state, and swaps no component types", () => {
   it("mounts one icon per HudState and toggles display", () => {
     // CLAUDE.md: never swap a component TYPE at a fixed position — a re-render
@@ -85,6 +98,58 @@ describe("Hud.tsx renders every state, and swaps no component types", () => {
       ...code(hudSrc()).matchAll(/(?:[?:]|&&|\|\|)\s*\(?\s*<[A-Za-z]/g),
     ].map((m) => m[0]);
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("Hud.tsx is a line of icons with tooltips, not glyphs", () => {
+  it("draws no icon twice", () => {
+    // The writer's complaint was that the glyphs were hard to comprehend, and
+    // the repair is icons — which only works while each icon means exactly one
+    // thing. §9.1's own example line spends the pencil twice, once as the
+    // acting state and once as the touched count; two pencils on a line meant
+    // to be read as a shape is the thing this test refuses.
+    const imported = featherImports();
+    expect(imported.length).toBeGreaterThan(1);
+
+    const body = code(hudSrc()).replace(
+      /import \{[^{}]*\} from "nai:icons\/feather";/,
+      "",
+    );
+    for (const name of imported) {
+      const uses = [...body.matchAll(new RegExp(`\\b${name}\\b`, "g"))];
+      expect([name, uses.length]).toEqual([name, 1]);
+    }
+  });
+
+  it("gives every count slot a tooltip that says what its number means", () => {
+    // A modeline teaches nothing on its own: the tooltip is the only place its
+    // vocabulary can be learned, so a slot without one is a number nobody can
+    // decode. Each title must name its own model field, so a copy-pasted slot
+    // cannot end up explaining the one next to it.
+    const src = code(hudSrc());
+    for (const field of ["backlog", "threads", "touched"]) {
+      expect(src).toMatch(
+        new RegExp(`title=\\{\`[^\`]*\\$\\{model\\.${field}\\}[^\`]*\`\\}`),
+      );
+    }
+    // …and the two slots that are not counts carry one too.
+    expect(src).toMatch(/title=\{`Output budget/);
+    expect(src).toMatch(/title="Run a pass now"/);
+  });
+
+  it("spends no bare unicode on a count", () => {
+    // `12¶ ⚑5 ∆0` is the line as it read before this: feather icons for the
+    // state and unadorned unicode for the counts, and the unicode half is the
+    // half nobody could read.
+    expect(code(hudSrc())).not.toMatch(/[¶⚑∆]/);
+  });
+
+  it("keeps the budget as four bars", () => {
+    // The one slot that reports a LEVEL rather than a count. No single icon can
+    // show how full something is, so this one stays a gauge.
+    const src = code(hudSrc());
+    expect(src).toContain("BAR_SLOTS.map(");
+    expect(src).toMatch(/length: BUDGET_BARS/);
   });
 });
 

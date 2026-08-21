@@ -19,7 +19,14 @@
 //      `normalizeEngineSettings`) and dispatches, displays and stores that one
 //      value. Dispatch what was typed instead and the form shows one number
 //      while the loop uses another.
-//   3. **Typing dispatches nothing.** The number fields draft locally on
+//   3. **The box speaks seconds; storage keeps milliseconds.** The delay is
+//      typed and shown in seconds, and every conversion in both directions goes
+//      through `engine-settings-model.ts` — `resolveTypedSetting` on the way in,
+//      `draftFor` on the way out, and `toTyped` for the bounds in the label's
+//      help and the input's own `min`/`max`. Nothing here divides or multiplies
+//      by a thousand itself; a conversion applied in one direction only is a box
+//      that shows a number the loop is not using.
+//   4. **Typing dispatches nothing.** The number fields draft locally on
 //      `onInput` (never `onChange`, which fires on blur and leaves anything
 //      reading before it a keystroke behind) and commit when the field loses
 //      focus. A dispatch per keystroke is reducer overhead for a value nobody
@@ -47,7 +54,9 @@ import {
 import { SP, T } from "../../style";
 import { SectionHeader } from "./SectionHeader";
 import {
+  draftFor,
   resolveTypedSetting,
+  toTyped,
   type NumericSetting,
 } from "./engine-settings-model";
 import { ToggleLeft, ToggleRight } from "nai:icons/feather";
@@ -74,6 +83,11 @@ function NumberField(props: {
   value: string;
   min: number;
   max: number;
+  /** The stepper's increment. `"any"` on the delay, because seconds are
+   *  fractional and a step of 1 would mark 4.5 invalid in a field that accepts
+   *  it. The commit path does the real work either way — these attributes clamp
+   *  nothing typed. */
+  step: string;
   onInput: (value: string) => void;
   onCommit: () => void;
 }) {
@@ -85,6 +99,7 @@ function NumberField(props: {
           type="number"
           min={props.min}
           max={props.max}
+          step={props.step}
           value={props.value}
           // onInput, never onChange: `change` only fires when the field
           // commits — i.e. on blur — so anything reading this state before then
@@ -108,16 +123,19 @@ export function EngineSettings() {
   const settings = useSlice((s) => s.engine.settings);
 
   const [open, setOpen] = useState(false);
-  const [delayDraft, setDelayDraft] = useState(String(settings.delayMs));
-  const [proseDraft, setProseDraft] = useState(String(settings.minProse));
+  const [delayDraft, setDelayDraft] = useState(draftFor(settings, "delayMs"));
+  const [proseDraft, setProseDraft] = useState(draftFor(settings, "minProse"));
 
   // The drafts follow the store, which moves under this form twice: the startup
   // read lands a tick after mount, and each commit's own dispatch comes back
   // through here carrying the clamped number. That second path is what makes
   // "what you see is what is stored" true for a value that was clamped.
-  useEffect(() => setDelayDraft(String(settings.delayMs)), [settings.delayMs]);
   useEffect(
-    () => setProseDraft(String(settings.minProse)),
+    () => setDelayDraft(draftFor(settings, "delayMs")),
+    [settings.delayMs],
+  );
+  useEffect(
+    () => setProseDraft(draftFor(settings, "minProse")),
     [settings.minProse],
   );
 
@@ -147,7 +165,7 @@ export function EngineSettings() {
     // Shown before the write lands, and shown even when the write is a no-op —
     // a field left holding "abc" or an out-of-range number after the value it
     // set is neither is the one thing this form must never do.
-    show(String(resolveTypedSetting(settings, field, draft)[field]));
+    show(draftFor(resolveTypedSetting(settings, field, draft), field));
     save((current) => resolveTypedSetting(current, field, draft));
   };
 
@@ -217,11 +235,12 @@ export function EngineSettings() {
         </span>
 
         <NumberField
-          label="Delay (ms)"
-          help={`How long after a generation starts the Engine looks. ${DELAY_MS_MIN}–${DELAY_MS_MAX}.`}
+          label="Delay (seconds)"
+          help={`How long after a generation starts the Engine looks. ${toTyped("delayMs", DELAY_MS_MIN)}–${toTyped("delayMs", DELAY_MS_MAX)}.`}
           value={delayDraft}
-          min={DELAY_MS_MIN}
-          max={DELAY_MS_MAX}
+          min={toTyped("delayMs", DELAY_MS_MIN)}
+          max={toTyped("delayMs", DELAY_MS_MAX)}
+          step="any"
           onInput={setDelayDraft}
           onCommit={() => commit("delayMs", delayDraft, setDelayDraft)}
         />
@@ -232,6 +251,7 @@ export function EngineSettings() {
           value={proseDraft}
           min={MIN_PROSE_MIN}
           max={MIN_PROSE_MAX}
+          step="1"
           onInput={setProseDraft}
           onCommit={() => commit("minProse", proseDraft, setProseDraft)}
         />

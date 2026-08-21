@@ -116,6 +116,30 @@ export type EngineLoopDeps = {
 //      (§6.3). Triage takes seconds, the writer keeps typing, and a `set()`
 //      without an explicit node has been measured landing two nodes away.
 
+/** The Engine's account of itself, behind `story_engine_debug`.
+ *
+ *  §9.1's HUD is the always-on surface; these lines are the detail behind it, and
+ *  with the flag off the Engine is silent. Reusing the existing debug flag rather
+ *  than adding an `engine_log` is the point of this work — `api.v1.config` is the
+ *  presentation that "suits power users only", so the settings that left it are
+ *  not to be replaced by new ones.
+ *
+ *  **Read once, where the pass is built.** `api.v1.config` is read-only and a
+ *  `project.yaml` entry cannot change mid-session, so a read per line would ask
+ *  the same question five times a pass and answer it identically. The promise is
+ *  the read; every line awaits the same one. */
+type EngineLog = (...messages: unknown[]) => Promise<void>;
+
+function createEngineLog(): EngineLog {
+  const debug: Promise<boolean> = api.v1.config
+    .get("story_engine_debug")
+    .then((value: unknown) => value === true);
+
+  return async (...messages) => {
+    if (await debug) api.v1.log(...messages);
+  };
+}
+
 /** The HUD's ⚡: run a pass now. Carries no payload — everything the pass needs
  *  it reads for itself — and is ignored while one is already running. */
 const ENGINE_PASS_REQUESTED = "engine/passRequested";
@@ -202,6 +226,7 @@ async function generateTriage(
   genX: GenX,
   manifest: TriageManifest,
   assessment: ReturnType<typeof assess>,
+  log: EngineLog,
 ): Promise<string> {
   const params = { ...(await triageParams()), maxRetries: 0 };
 
@@ -226,7 +251,7 @@ async function generateTriage(
       // classifier what to tell the machine.
       const wait = isConcurrencyRefusal(error) ? backoffMs(attempt) : null;
       if (wait === null) throw error;
-      api.v1.log(
+      await log(
         `[engine] triage refused, retry ${attempt}/${MAX_ATTEMPTS - 1} in ${wait}ms`,
       );
       await api.v1.timers.sleep(wait);
@@ -246,6 +271,7 @@ async function generateTriage(
  *  registration in the way. */
 export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
   const { dispatch, getState, genX } = deps;
+  const log = createEngineLog();
   let inFlight = false;
 
   return async function runPass(): Promise<void> {
@@ -307,7 +333,7 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // ends the pass at `assessed` having generated nothing.
       if (assessment.backlog > 0 && assessment.backlog < minProse) {
         dispatch(engineBacklogObserved({ backlog: assessment.backlog }));
-        api.v1.log(
+        await log(
           `[engine] ${assessment.backlog} new paragraph(s), below the minimum of ${minProse} — skipping`,
         );
         return;
@@ -328,13 +354,13 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // waiting for the bucket to refill instead of reporting a hold.
       if (api.v1.script.getAllowedOutput() < TRIAGE_MAX_TOKENS) {
         dispatch(engineLoopEvent({ type: "budgetExhausted" }));
-        api.v1.log("[engine] holding — budget below the triage reserve");
+        await log("[engine] holding — budget below the triage reserve");
         return;
       }
 
       const manifest = buildManifest(getState(), assessment.candidateIds);
       const intents = parseTriage(
-        await generateTriage(genX, manifest, assessment),
+        await generateTriage(genX, manifest, assessment, log),
         manifest,
       );
       dispatch(engineLoopEvent({ type: "triaged", intents }));
@@ -364,18 +390,21 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // execute-then-clear, and the write above is what lets a reload between
       // the two find the queue rather than nothing (§11).
       for (const intent of enqueued) {
-        api.v1.log(`[engine] intent (not executed): ${intentKey(intent)}`);
+        await log(`[engine] intent (not executed): ${intentKey(intent)}`);
       }
       await saveRecords({ [QUEUE_KEY]: [] }, nodeId);
       dispatch(engineLoopEvent({ type: "drained" }));
     } catch (error) {
       // Rule 3. The classifier decides, not this callsite.
       const retryable = isConcurrencyRefusal(error);
-      api.v1.log(
+      // The machine first, the account of it second: the HUD is the always-on
+      // surface and the log is opt-in, so nothing the log does may come between
+      // a failure and the slot that reports it.
+      dispatch(engineLoopEvent({ type: "failed", retryable }));
+      await log(
         `[engine] pass failed (retryable=${retryable}):`,
         error instanceof Error ? error.message : String(error),
       );
-      dispatch(engineLoopEvent({ type: "failed", retryable }));
     } finally {
       // Released even on the paths that return early, or the Engine would wake
       // exactly once per session.

@@ -4,13 +4,24 @@
 // Fixed slots, always present, always in the same position, read as a shape
 // rather than parsed as words:
 //
-//   ◉  14¶  ⚑5  ∆23  ▮▮▮▯  ⚡
+//   [eye] [lines]14 [flag]5 [commit]23 ▮▮▮▯ ⚡
 //
-// §9.1's own example line spends ✎ twice — once as the acting state, once as
-// the touched count — which reads as two pencils on a line meant to be read as
-// a shape. The state slot keeps the pencil (it is the state §9.1 names) and
-// touched takes ∆: it is a count of changes, and the two slots can no longer be
-// confused for each other at a glance.
+// Every slot is a feather icon and a number, and every slot carries a `title`
+// saying in words what its number means. The line started out mixing icons for
+// the state with bare unicode for the counts — `12¶ ⚑5 ∆0` — and the unicode
+// half was unreadable: a modeline teaches nothing on its own, so the tooltip is
+// the only place its vocabulary can be learned. Icons and tooltips are what make
+// it teachable without turning it into a sentence.
+//
+// NO ICON APPEARS TWICE. §9.1's own example line spends ✎ once as the acting
+// state and again as the touched count, which reads as two pencils on a line
+// meant to be read as a shape. The state slot keeps the pencil (it is the state
+// §9.1 names) and touched takes `GitCommit` — a recorded change, and a
+// silhouette nothing else on the line shares. `hud-source.test.ts` counts the
+// uses of every icon this file imports, so a second one cannot creep back in.
+//
+// The budget stays four bars rather than becoming a sixth icon: it is the one
+// slot that reports a LEVEL, and no single glyph can show how full something is.
 //
 // It never narrates individual actions — the journal and the log do that. What it
 // rewards is watching it over time, which is why every slot is drawn on every
@@ -47,10 +58,13 @@ import {
 } from "./hud-model";
 import {
   AlertTriangle,
+  AlignLeft,
   BookOpen,
   Edit3,
   Eye,
   EyeOff,
+  Flag,
+  GitCommit,
   Pause,
   Zap,
 } from "nai:icons/feather";
@@ -135,6 +149,26 @@ function StateIcon(props: { state: HudState }) {
   );
 }
 
+/** One count: an icon, its number, and the tooltip that says what the number
+ *  means. All three together — the icon is what the eye finds, the number is the
+ *  reading, and the tooltip is the only teacher this line has.
+ *
+ *  Written once rather than three times so a fourth count cannot arrive with a
+ *  different spacing, a different icon size, or no tooltip at all. */
+function CountSlot(props: {
+  icon: IconComponent;
+  value: number;
+  title: string;
+}) {
+  const Icon = props.icon;
+  return (
+    <span style={slot} title={props.title}>
+      <Icon size={ICON_SIZE} />
+      {props.value}
+    </span>
+  );
+}
+
 function BudgetBars(props: { filled: number; allowedOutput: number }) {
   return (
     <span
@@ -196,18 +230,21 @@ export function Hud() {
       }}
     >
       <StateIcon state={model.stateIcon} />
-      <span
-        style={slot}
-        title="Unread paragraphs — climbing means falling behind"
-      >
-        {`${model.backlog}¶`}
-      </span>
-      <span style={slot} title="Open threads — context pressure">
-        {`⚑${model.threads}`}
-      </span>
-      <span style={slot} title="Entities revised on this branch">
-        {`∆${model.touched}`}
-      </span>
+      <CountSlot
+        icon={AlignLeft}
+        value={model.backlog}
+        title={`Backlog — ${model.backlog} new paragraph(s) the Engine has not read yet; climbing means it is falling behind`}
+      />
+      <CountSlot
+        icon={Flag}
+        value={model.threads}
+        title={`Threads — ${model.threads} open thread(s) the story is carrying; context pressure`}
+      />
+      <CountSlot
+        icon={GitCommit}
+        value={model.touched}
+        title={`Touched — ${model.touched} entity revision(s) the Engine has made on this branch`}
+      />
       <BudgetBars filled={model.budgetBars} allowedOutput={allowedOutput} />
       {/* Never disabled, never debounced: the dispatch is the whole handler and
           the pass effect owns the refusal. */}

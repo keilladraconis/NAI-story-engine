@@ -159,6 +159,22 @@ function configure(settings: Partial<EngineSettings> = {}): void {
   );
 }
 
+/** `story_engine_debug`, as `api.v1.config` answers it.
+ *
+ *  Set BEFORE `harness()`: the pass reads this flag once, where it is built, so
+ *  a value set afterwards would arrive too late — which is the arrangement, not
+ *  an accident. A `project.yaml` entry cannot change mid-session. */
+function debugLogging(enabled: boolean): void {
+  vi.mocked(api.v1.config.get).mockImplementation(async (key: string) =>
+    key === "story_engine_debug" ? enabled : undefined,
+  );
+}
+
+/** Every line the Engine actually logged. */
+function logged(): string[] {
+  return vi.mocked(api.v1.log).mock.calls.map((c) => String(c[0]));
+}
+
 /** Every value written to a record key, oldest first. */
 function writesTo(key: string): unknown[] {
   return vi
@@ -175,6 +191,10 @@ describe("the pass", () => {
     configure({ enabled: true });
     documentOf("The lock clicked.", "Ada pocketed the letter.");
     vi.mocked(api.v1.log).mockClear();
+    // Off unless a test says otherwise — the default a writer who never opened
+    // the script config has, and the state in which the HUD is the whole
+    // surface.
+    debugLogging(false);
     vi.mocked(api.v1.script.getAllowedOutput).mockReturnValue(2048);
     // The bounded backoff is tested by its call count, not by wall clock.
     vi.mocked(api.v1.timers.sleep).mockResolvedValue(undefined);
@@ -184,6 +204,8 @@ describe("the pass", () => {
     history.reset();
     vi.mocked(api.v1.storyStorage.get).mockReset();
     vi.mocked(api.v1.storyStorage.get).mockResolvedValue(null);
+    vi.mocked(api.v1.config.get).mockReset();
+    vi.mocked(api.v1.config.get).mockResolvedValue(undefined);
   });
 
   // ─────────────────────────── a completed pass ───────────────────────────
@@ -273,10 +295,11 @@ describe("the pass", () => {
     expect(prose).toContain("Ada pocketed the letter.");
   });
 
-  it("enqueues what triage named, logs it, and clears the queue", async () => {
-    // Drain LOGS in this phase. Nothing writes a lorebook entry, creates a
-    // group or retires anything — and the queue is cleared rather than held,
-    // because nothing will ever come back for it.
+  it("enqueues what triage named and clears the queue", async () => {
+    // Drain LOGS in this phase — behind `story_engine_debug`, which the
+    // describe below covers. Nothing writes a lorebook entry, creates a group
+    // or retires anything, and the queue is cleared rather than held because
+    // nothing will ever come back for it.
     const h = harness();
     triageReturns(h, "REVISE Ada\nOPEN the sealed letter");
     await h.runPass();
@@ -288,11 +311,6 @@ describe("the pass", () => {
       ],
       [],
     ]);
-    const logged = vi.mocked(api.v1.log).mock.calls.map((c) => String(c[0]));
-    expect(logged).toContain("[engine] intent (not executed): revise:e1");
-    expect(logged).toContain(
-      "[engine] intent (not executed): open:the sealed letter",
-    );
     expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
     expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
     expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
@@ -635,6 +653,118 @@ describe("the pass", () => {
     await fire();
 
     expect(h.generate).toHaveBeenCalledTimes(1);
+  });
+
+  // ───────────────────── the log, behind story_engine_debug ─────────────────────
+  //
+  // §9.1's HUD is the always-on surface and these lines are the detail behind
+  // it. With the flag off the Engine is silent — no new logging surface was
+  // added and no new config entry either; the one that already exists is what
+  // opens it. Every assertion below is about the SAME pass doing the same work,
+  // so a gate that also gated the work would fail here rather than pass quietly.
+
+  describe("its log", () => {
+    it("says nothing at all with the flag off", async () => {
+      debugLogging(false);
+      const h = harness();
+      triageReturns(h, "REVISE Ada\nOPEN the sealed letter");
+
+      await h.runPass();
+
+      expect(api.v1.log).not.toHaveBeenCalled();
+      // …and the pass did everything it does. The flag gates the account of the
+      // work, never the work.
+      expect(writesTo(QUEUE_KEY)).toEqual([
+        [
+          { kind: "revise", entityId: "e1" },
+          { kind: "open", subject: "the sealed letter" },
+        ],
+        [],
+      ]);
+    });
+
+    it("names every intent with the flag on", async () => {
+      debugLogging(true);
+      const h = harness();
+      triageReturns(h, "REVISE Ada\nOPEN the sealed letter");
+
+      await h.runPass();
+
+      expect(logged()).toContain("[engine] intent (not executed): revise:e1");
+      expect(logged()).toContain(
+        "[engine] intent (not executed): open:the sealed letter",
+      );
+    });
+
+    it("gates the skip line too, not only the drain", async () => {
+      // The five callsites are one gate, not one gate and four survivors. This
+      // is the pass that spends nothing: two new paragraphs under a minimum of
+      // five.
+      configure({ enabled: true, minProse: 5 });
+      debugLogging(false);
+      await harness().runPass();
+      expect(api.v1.log).not.toHaveBeenCalled();
+
+      debugLogging(true);
+      await harness().runPass();
+      expect(logged()).toContain(
+        "[engine] 2 new paragraph(s), below the minimum of 5 — skipping",
+      );
+    });
+
+    it("gates the budget hold too", async () => {
+      vi.mocked(api.v1.script.getAllowedOutput).mockReturnValue(10);
+
+      debugLogging(false);
+      await harness().runPass();
+      expect(api.v1.log).not.toHaveBeenCalled();
+
+      debugLogging(true);
+      await harness().runPass();
+      expect(logged()).toContain(
+        "[engine] holding — budget below the triage reserve",
+      );
+    });
+
+    it("gates the failure line, which is the one that reports ⚠", async () => {
+      debugLogging(false);
+      const quiet = harness();
+      triageRejects(quiet, new Error("nope"));
+      await quiet.runPass();
+      expect(api.v1.log).not.toHaveBeenCalled();
+      // The HUD still hears about it: the machine is mirrored into the store
+      // whatever the log is doing.
+      expect(quiet.store.getState().engine.phase).toBe("idle");
+      expect(quiet.store.getState().engine.consecutiveFailures).toBe(1);
+
+      debugLogging(true);
+      const loud = harness();
+      triageRejects(loud, new Error("nope"));
+      await loud.runPass();
+      expect(logged()).toContain("[engine] pass failed (retryable=false):");
+    });
+
+    it("reads the flag once, where the pass is built", async () => {
+      // Not once per line and not once per pass: `api.v1.config` is read-only
+      // and a `project.yaml` entry cannot change mid-session, so five reads a
+      // pass would ask the same question and get the same answer.
+      // TWO intents, so the pass emits two lines, and TWO passes: one read for
+      // five lines is the claim, and a flag read per line or per pass both show
+      // up as more than one read here. A single-intent pass would pass this
+      // test against a per-line read — verified, which is why it names two.
+      debugLogging(true);
+      const h = harness();
+      triageReturns(h, "REVISE Ada\nOPEN the sealed letter");
+
+      await h.runPass();
+      await h.runPass();
+
+      expect(logged().length).toBe(2);
+      const reads = vi
+        .mocked(api.v1.config.get)
+        .mock.calls.filter((c) => c[0] === "story_engine_debug");
+      expect(reads.length).toBe(1);
+    });
   });
 });
 

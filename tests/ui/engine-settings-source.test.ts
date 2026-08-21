@@ -194,6 +194,49 @@ describe("the section swaps no component types", () => {
   });
 });
 
+describe("the box speaks seconds; storage keeps milliseconds", () => {
+  // The hazard Task 3 named: the conversion has to land in BOTH directions, or
+  // the form breaks the one guarantee it was built around — the number left in
+  // the box is the number in use. The behaviour is proved in
+  // `engine-settings-model.test.ts`; what is held here is that the component
+  // actually goes through those two functions instead of rolling its own.
+  it("labels the delay in seconds, not milliseconds", () => {
+    const src = sectionSrc();
+    expect(src).toContain('label="Delay (seconds)"');
+    expect(src).not.toContain("Delay (ms)");
+  });
+
+  it("never converts a unit itself", () => {
+    // No `/ 1000`, no `* 1000`, and no raw `String(settings.delayMs)` — every
+    // conversion is `toTyped`/`draftFor`, so the two directions read one table.
+    const src = code(sectionSrc());
+    expect(src).not.toContain("1000");
+    expect(src).not.toMatch(/String\(settings\./);
+  });
+
+  it("fills both boxes from the stored value, converted back", () => {
+    // Initial state, the effect that follows the store (which is what shows a
+    // clamped number), and the commit that writes the box after a blur.
+    const src = code(sectionSrc());
+    expect(src).toMatch(/useState\(draftFor\(settings, "delayMs"\)\)/);
+    expect(src).toMatch(/useState\(draftFor\(settings, "minProse"\)\)/);
+    expect(src).toMatch(/setDelayDraft\(draftFor\(settings, "delayMs"\)\)/);
+    expect(src).toMatch(/setProseDraft\(draftFor\(settings, "minProse"\)\)/);
+    // The commit shows the RESOLVED settings converted back, not the draft.
+    expect(src).toMatch(
+      /show\(draftFor\(resolveTypedSetting\(settings, field, draft\), field\)\)/,
+    );
+  });
+
+  it("prints the delay's bounds in seconds, from the ms bounds", () => {
+    // Interpolated, never restated: a bound that moves in `settings.ts` moves in
+    // the help text and in the input's own min/max with it.
+    const src = code(sectionSrc());
+    expect(src).toContain('toTyped("delayMs", DELAY_MS_MIN)');
+    expect(src).toContain('toTyped("delayMs", DELAY_MS_MAX)');
+  });
+});
+
 describe("the section is on the Setup tab", () => {
   it("is imported and mounted by Setup.tsx", () => {
     // Without this the settings have no surface at all: `project.yaml` lost the
