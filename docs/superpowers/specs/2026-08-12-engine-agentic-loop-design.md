@@ -80,12 +80,17 @@ the delay.
 The `scriptInitiated` filter is load-bearing: without it the Engine's own
 generations would re-arm the wakeup and drive themselves in a loop.
 
-The delay and the prose threshold are new `project.yaml` entries, joining the
-thread cap (§4.5, default 8) and the condense threshold (§5.1). This is consistent
-with the prompt policy in CLAUDE.md: `project.yaml` carries runtime settings only,
-never prompts. The triage prompt and every other Engine prompt is an exported
-constant in `src/core/utils/prompts.ts`. Per §9.2 these settings are surfaced in the
-Setup tab rather than left in NovelAI's script config.
+The delay and the prose threshold are **not** `project.yaml` entries. `api.v1.config`
+is read-only, so nothing the writer can see is able to write one; both settings, and
+the on/off switch with them, live in Story Engine's own `storyStorage` record
+(`src/core/engine/settings.ts`) and are set in the Setup tab's **Engine** section
+(§9.2) — done, not planned. That makes them **per story**, which §14.1 records as a
+consequence of the constraint rather than a preference. The thread cap (§4.5,
+default 8) and the condense threshold (§5.1) still have no home; when they arrive
+they belong in the same record, for the same reason. The prompt policy in CLAUDE.md
+is untouched by any of this: `project.yaml` carries runtime settings only, never
+prompts, and the triage prompt and every other Engine prompt is an exported constant
+in `src/core/utils/prompts.ts`.
 
 **Why a delay from generation start**, rather than tracking whether one of the
 writer's generations is currently in flight. The delay lands the pass in the window
@@ -371,8 +376,9 @@ Unbounded growth would slowly poison the context the Engine exists to improve.
 
 Three controls:
 
-- A **cap** on simultaneously-open threads, enforced in the reducer. A
-  `project.yaml` setting, **default 8**.
+- A **cap** on simultaneously-open threads, enforced in the reducer. A setting,
+  **default 8** — and per §3.1 a setting now means the Engine's own per-story
+  record, not a `project.yaml` entry.
 - Triage must **justify** a new thread against the cap, and displace rather than
   add when at the ceiling.
 - A **paragraph-count expiry**, so an end the story quietly abandoned ages out
@@ -415,7 +421,8 @@ survive; repetition, superseded detail, and accumulated hedging do not.
 **Triggering it needs no model.** An entry's length is measurable in `assess`, which
 is free, so an entry crossing a configurable size threshold enqueues a condense
 intent directly — triage is never spent noticing that something is long. The
-threshold is a `project.yaml` setting.
+threshold is a setting in the Engine's own per-story record (§3.1), not a
+`project.yaml` entry.
 
 Condense obeys every rule revision does: read-then-write against the live entry, the
 write-once original preserved (§5.2), and the same `lb:<entryId>` record so history
@@ -735,10 +742,14 @@ Engine's states with the generation queue's is how the two surfaces drift.
 `Setup | Engine | Chat`, with **Setup leftmost and first**.
 
 - **Setup** — all of Foundation, plus **bootstrap** (Opening Scene / Continue Scene)
-  and the **Import wizard**, plus user-facing configuration as it accumulates:
-  `project.yaml` settings surfaced properly rather than left in NovelAI's script
-  config, whose UX suits power users only. Includes a small CTA beneath Intensity
-  that opens a brainstorm chat about the story.
+  and the **Import wizard**, plus user-facing configuration as it accumulates,
+  surfaced properly rather than left in NovelAI's script config, whose UX suits
+  power users only. **Done for the Engine's three settings**, which sit in a
+  collapsible **Engine** section at the bottom of the tab. They are not
+  `project.yaml` entries any more and could not be: `api.v1.config` is read-only, so
+  anything the Setup tab can change has to live in Story Engine's own storage, which
+  makes it per story (§14.1). Setup also includes a small CTA beneath Intensity that
+  opens a brainstorm chat about the story.
 - **Engine** — World, Threads, the Forge, loop status detail, and the journal.
   The Engine's domain: what exists, and what the Engine has done to it. The Forge
   lives here because under the new division it is the instrument that seeds this
@@ -757,9 +768,10 @@ already reads `hasDocumentContent` before `register()` and passes it to `App` so
 bootstrap button's first paint is correct, so the signal exists and needs no new
 plumbing.
 
-Named "Setup" rather than "Config" deliberately: everything in it is history-scoped
-and branch-local, while NovelAI's own script config is global and account-level.
-Labelling a branch-local surface "Config" would mislead on both counts.
+Named "Setup" rather than "Config" deliberately: everything in it belongs to the
+story in front of the writer — branch-local, or story-scoped like the Foundation and
+the Engine's settings — while NovelAI's own script config is global and
+account-level. Labelling a story-local surface "Config" would mislead on both counts.
 
 ## 10. No migrations
 
@@ -1066,16 +1078,18 @@ Nothing in §12 is still unknown, so the plan starts with real work.
 The loop runs end to end and executes nothing. A wakeup fires, the pass reads the
 prose past its watermark, spends one triage generation, turns the answer into
 intents, persists them, writes them to the log, and clears them. The HUD reports
-all of it. `engine_enabled` defaults to `false`, so a writer who has not opted in
-sees the modeline and nothing else — which is the honest default for a phase whose
-whole output is a log line.
+all of it. The Engine defaults to **off**, so a writer who has not opted in sees the
+modeline and nothing else — which is the honest default for a phase whose whole
+output is a log line.
 
 **What is true now.**
 
-- The three settings that exist are `engine_enabled` (false), `engine_delay_ms`
-  (8000) and `engine_min_prose` (1). They live in NovelAI's script config;
-  surfacing them in Setup (§9.2) is a Setup-tab change and did not happen here.
-- The `engine_min_prose` gate lives in the effect, **before** the machine is told a
+- The three settings that exist are **enabled** (false), the **delay** (8 s) and the
+  **minimum new paragraphs** (1). They began as `project.yaml` entries
+  (`engine_enabled`, `engine_delay_ms`, `engine_min_prose`) and no longer are:
+  they live in Story Engine's own per-story storage and are set in Setup's **Engine**
+  section (§9.2). See "The settings moved into Setup, and why they had to" below.
+- The minimum-prose gate lives in the effect, **before** the machine is told a
   pass was requested. The machine ends a pass at `assessed` only on a zero backlog,
   so a threshold inside it would either spend the generation anyway or report zero
   unread paragraphs when there are several — and that number is exactly what §9.1
@@ -1137,11 +1151,10 @@ whole output is a log line.
 - **§9.1's state slot needed a sixth reading: "off".** Five readings cannot express
   a switched-off Engine — the loop simply never moves, so the slot whose entire job
   is _whether it's alive_ rendered "idle" and "not running at all" identically, on
-  the one surface built to carry trust. `engine_enabled` is now mirrored into the
-  engine slice (config reads are async and a component cannot await) and outranks
-  every phase. `EyeOff`, not a dimmed `Eye`: not-running and running-with-nothing-
+  the one surface built to carry trust. The enabled setting is now mirrored into the
+  engine slice (a component cannot await a storage read) and outranks every phase. `EyeOff`, not a dimmed `Eye`: not-running and running-with-nothing-
   to-do must not be two shades of one glyph.
-- **The ⚡ honours `engine_enabled`.** §9.1 says it bypasses the _wakeup_, which is
+- **The ⚡ honours the off switch.** §9.1 says it bypasses the _wakeup_, which is
   what a hand-writing writer needs; it does not say it bypasses the writer's
   decision to switch the Engine off. As first built it ran a full pass, triage
   generation included, with the Engine off — the one setting that stops the Engine
@@ -1151,11 +1164,13 @@ whole output is a log line.
   line whose whole premise is being read as a shape. The state slot keeps the
   pencil, since that is the state §9.1 names; touched draws `∆`, being a count of
   changes. §9.1's example line is therefore `◉ 14¶ ⚑5 ∆23 ▮▮▮▯ ⚡`.
-- **§3.1 still names two `project.yaml` settings that do not exist**: the thread cap
-  (§4.5, default 8) and the condense threshold (§5.1). Neither had a home in this
-  phase. The cap is partly a _prompt_ obligation — it extends `TRIAGE_SYSTEM` — and
-  belongs with Threads in phase 5; the threshold belongs with the actions, in
-  phase 6. Read that sentence as a plan, not as a description of the config.
+- **§3.1 still names two settings that do not exist**: the thread cap (§4.5,
+  default 8) and the condense threshold (§5.1). Neither had a home in this phase.
+  The cap is partly a _prompt_ obligation — it extends `TRIAGE_SYSTEM` — and belongs
+  with Threads in phase 5; the threshold belongs with the actions, in phase 6. Read
+  that sentence as a plan, not as a description of what is configurable today. (§3.1
+  said `project.yaml` at the time; where such a setting would now live is settled
+  below.)
 - **The HUD is the second entry in the single `api.v1.ui.register()` call**, not the
   third: the journal panel is conditional on `generation_journal` and is pushed
   after it. The invariant that matters — one call, ever — holds.
@@ -1170,7 +1185,7 @@ all found by reading the code rather than the tests:
   paragraph that stops mid-sentence, the model finishes that sentence and opens two
   more, and the finished sentence is never read on any later pass. `assess` now
   yields the tail beyond `offset` before the sections that follow.
-- **`engine_enabled` is checked in `runPass`, once.** It was checked when the wakeup
+- **Enabled is checked in `runPass`, once.** It was checked when the wakeup
   was _armed_ and again in the ⚡'s subscription, and tested in neither — deleting
   the ⚡'s check left all 823 tests green. Two homes for one rule is one home too
   many: the timer path let a writer who switched the Engine off inside the delay
@@ -1182,6 +1197,77 @@ all found by reading the code rather than the tests:
   and the climb is the signal §9.1 wants.
 - **The setting is read at startup.** Otherwise a writer who had opted in opened
   their story to "Off — the Engine is not running" until they generated.
+
+**The settings moved into Setup, and why they had to.** Phase 4 left the three
+settings in NovelAI's script config and called surfacing them a Setup-tab change.
+It is not only that — the move was forced, and the constraint chose the shape:
+
+- **`api.v1.config` is read-only.** It has `get` and no `set`, so no control the
+  writer can see is able to write a `project.yaml` entry. A Setup-tab toggle that
+  reads its value out of the script config could never store the writer's answer.
+  The settings therefore live in Story Engine's own `storyStorage` record
+  (`STORAGE_KEYS.ENGINE_SETTINGS`, `src/core/engine/settings.ts`) — which makes
+  them **per story**. That is the right granularity on its own terms (§1.2: the
+  writer steering an autonomous story may hand-write the next one), but it was the
+  read-only API that settled it, not the argument. `project.yaml` lost
+  `engine_enabled`, `engine_delay_ms` and `engine_min_prose` and gained nothing.
+- **The store must mirror the whole record, not the field the HUD happens to
+  read.** The slice mirrored `enabled` alone, because `enabled` was all the HUD
+  needed. A form rendering from the store needs all three, and no code path
+  dispatched the other two — so a story with a saved delay of 3 s would have shown
+  8 s in the form forever. `engineEnabledChanged` became `engineSettingsChanged`
+  carrying the whole `EngineSettings`, dispatched at the startup read, on every
+  pass, at the generation hook, and by the form immediately after it writes.
+  Widening the state without widening the action is a mirror that silently only
+  reflects part of the room.
+- **A stored setting is JSON an older version wrote, so every read normalises it,
+  and the split is the whole policy**: a finite number outside its range is
+  **clamped** (intent expressed too far), a value that is not a number at all is
+  **defaulted** (no intent to preserve). The form applies the same split with one
+  deliberate exception — an emptied box leaves the setting exactly where it was
+  rather than resetting it to the default, because the writer had a good value and
+  did not ask to lose it.
+- **The box speaks seconds; storage keeps milliseconds.** `delayMs` is what the
+  timer takes and `8000` is not what a writer types, so the label reads
+  **Delay (seconds)** and every conversion, both directions, goes through one model
+  module. A conversion applied in one direction only is a field showing a number
+  the loop is not using — which is why the test that cannot pass with the
+  conversion in one place (the round trip) is the one that matters.
+
+**§9.1's unicode counts proved unreadable in use, and the modeline survived the
+fix.** The line mixed feather icons for the state with bare glyphs for the counts —
+`12¶ ⚑5 ∆0` — and the glyph half taught nothing: a modeline has no room to explain
+itself, so a reader who does not already know what `∆` counts never finds out. Each
+count is now a feather icon with a `title` naming what its number means
+(`AlignLeft` for the backlog, `Flag` for threads — the icon `⚑` was standing in for
+— and `GitCommit` for touched, a recorded change and a silhouette nothing else on
+the line shares). No icon appears twice, which is what §9.1's own example line got
+wrong by spending `✎` on both the acting state and the touched count; a source scan
+counts every icon the file imports so a second use cannot creep back. The budget
+keeps its four bars, because it is the one slot reporting a **level** and no single
+glyph shows how full something is. **The form was kept deliberately**: this was a
+legibility fix, not a redesign — fixed slots, same positions, same density, still
+read as a shape and never as a sentence. The example line is now
+`[Eye] [AlignLeft]14 [Flag]5 [GitCommit]0 ▮▮▮▯ ⚡`.
+
+**`story_engine_debug` gates the Engine's log lines, and the HUD is what is always
+on.** All five `api.v1.log` callsites in `engine-loop.ts` are behind the existing
+debug flag rather than a new `engine_log` entry: the point of this work was fewer
+script-config options, and the Engine's log is debug detail by nature. With the flag
+off the Engine is silent and the HUD is the entire surface; with it on the log is
+the detailed account behind it. The flag is read **once**, where the pass is built —
+`createEnginePass` is synchronous, so what is built once is the _promise_, and every
+line awaits it. `generateTriage` is a free function and takes the logger as a
+parameter; a module global and a per-line config read are the two obvious readings
+and CLAUDE.md forbids both.
+
+**Gating a previously-synchronous log reorders what follows it.** The failure path
+logged and then dispatched. Putting the flag's `await` in front of the log put it in
+front of the dispatch the HUD's `⚠` depends on — so a failure could reach the opt-in
+log before it reached the always-on surface whose whole job is reporting it. The
+order is now dispatch-then-log, and the rule generalises: wherever `api.v1.log` was
+being called synchronously, gating it is a reordering and not merely a suppression.
+Check what runs after it before assuming otherwise.
 
 **Left for later, deliberately.** A triage call that GenX blocks on _input_ budget
 can leave the queue in `waiting_for_user`, which the header renders as a "Continue"
