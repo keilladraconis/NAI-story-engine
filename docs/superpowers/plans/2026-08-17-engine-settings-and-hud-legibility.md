@@ -99,9 +99,18 @@ The effect stops reading `api.v1.config` for its three settings and calls the ne
 `engine_min_prose` from `project.yaml`. **Leave `story_engine_debug`.**
 
 The slice currently mirrors `enabled` alone. It now holds the whole settings
-object, so the Setup form can render from the store and repaint when a pass
-re-reads. Keep `EngineSliceState = LoopState & { settings: EngineSettings }` —
-settings are not part of the machine and must not enter `loopReducer`.
+object, so the Setup form can render from the store. Keep
+`EngineSliceState = LoopState & { settings: EngineSettings }` — settings are not
+part of the machine and must not enter `loopReducer`.
+
+**`engineEnabledChanged` must be replaced, not widened by implication.** All
+three of its dispatch sites (`engine-loop.ts` — the startup read, the pass's
+disabled early-return, and the generation hook) carry `{ enabled }` only. Grow
+the slice without changing them and `delayMs`/`minProse` never update from
+storage at all: a writer whose story has 3000/4 saved sees 8000/1 in the form
+forever, because no code path ever dispatches those two fields. Introduce an
+action carrying the **whole** `EngineSettings` and use it at every site that
+reads settings.
 
 **The existing tests configure these through `api.v1.config.get`.** They will
 need to seed `storyStorage` instead. That is a moved goalpost, not a weakening —
@@ -144,6 +153,11 @@ Contents, in this order:
 
 **Rules with history, all in CLAUDE.md:**
 
+- **The save must dispatch the whole-settings action**, immediately after
+  `writeEngineSettings`. Without it the writer flips the toggle, the store still
+  says off, and the HUD keeps asserting "Off — the Engine is not running" until
+  the next generation — which is the bug `5f71191` already fixed once from the
+  other direction.
 - **`onInput`, never `onChange`**, for the number fields. `change` fires on blur,
   so anything reading state before blur sees the pre-edit value.
 - **Never dispatch in an input handler** — reducer overhead at keystroke
