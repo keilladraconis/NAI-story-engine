@@ -22,6 +22,14 @@ export const STORAGE_KEYS = {
   FOUNDATION: "kse-foundation",
   // Setting field.
   SETTING: "kse-setting",
+  // Engine settings — one record holding all three, in storyStorage rather than
+  // historyStorage because "is the Engine on" is a property of the story, not of
+  // a point in it: undoing three paragraphs must not switch the Engine off. Not
+  // in project.yaml either, because api.v1.config is read-only (`get`, no `set`)
+  // and the Setup tab has to be able to write these back — which is what makes
+  // them per story. Read and written through src/core/engine/settings.ts, never
+  // raw: the slot is validated on every read.
+  ENGINE_SETTINGS: "kse-engine",
   // Forge guidance draft.
   FORGE_GUIDANCE_UI: "se-forge-guidance",
   // Opening Scene direction draft (the modal's textarea).
