@@ -119,10 +119,12 @@ export type EngineLoopDeps = {
 /** The Engine's account of itself, behind `story_engine_debug`.
  *
  *  §9.1's HUD is the always-on surface; these lines are the detail behind it, and
- *  with the flag off the Engine is silent. Reusing the existing debug flag rather
- *  than adding an `engine_log` is the point of this work — `api.v1.config` is the
- *  presentation that "suits power users only", so the settings that left it are
- *  not to be replaced by new ones.
+ *  with the flag off the Engine is silent.
+ *
+ *  This flag gates ONLY Story Engine's own output. nai-store's dispatch firehose
+ *  has its own switch (`store_action_log`, see `core/store/index.ts`) because the
+ *  two shared one at first, and sharing meant reading what the Engine decided
+ *  required turning on many lines per keystroke that buried it.
  *
  *  **Read once, where the pass is built.** `api.v1.config` is read-only and a
  *  `project.yaml` entry cannot change mid-session, so a read per line would ask

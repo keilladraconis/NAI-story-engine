@@ -70,9 +70,14 @@ export function rootReducer(
   return sliceReducer(state, action);
 }
 
-const debug = (await api.v1.config.get("story_engine_debug")) || false;
+// nai-store logs `NAISTORE <action>` on EVERY dispatch when this is on, which is
+// many lines per keystroke. It has its own setting rather than riding on
+// story_engine_debug: that flag also gates the Engine's log lines, and sharing
+// one switch meant reading what the Engine decided required turning on a
+// firehose that buried it.
+const logActions = (await api.v1.config.get("store_action_log")) || false;
 
-export const store = createStore<RootState>(rootReducer, debug);
+export const store = createStore<RootState>(rootReducer, logActions);
 
 // Export types
 export * from "./types";
