@@ -1,8 +1,16 @@
-// One Thread card: a per-thread collapse chevron + layers icon + title button
-// (opens ThreadEditPane) + disabled lorebook toggle (deferred) + two-click
-// confirm delete + member entity cards. Members exclude forge drafts (render in
-// their forge chat). worldExpanded drives each member card's summary; the
-// chevron collapses this thread's own member list independently.
+// One Thread card: a per-thread collapse chevron + layers icon + status icon +
+// title button (opens ThreadEditPane) + disabled lorebook toggle (deferred) +
+// two-click confirm delete + member entity cards. Members exclude forge drafts
+// (render in their forge chat). worldExpanded drives each member card's
+// summary; the chevron collapses this thread's own member list independently.
+//
+// **Status is a slot, not a section.** Every row carries the indicator, in the
+// same position, whatever the status — §9.1's instinct for the HUD applies to a
+// column too: a reader scans a shape rather than decoding one. Sorting the
+// satisfied threads to the bottom, or hiding them behind a filter, would move
+// rows under the finger reaching for them and hide the ones a writer has to
+// find to reopen. The title recedes with the icon, because one 16px glyph is a
+// weak signal in a list and the pair reads finished at arm's length.
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
@@ -10,6 +18,7 @@ import { store, threadDeleted, uiEditableActivate } from "../../../core/store";
 import { isForgeDraft } from "../../../core/store/selectors/forge";
 import { EntityCard } from "./EntityCard";
 import { ConfirmButton } from "../../components/ConfirmButton";
+import { ThreadStatusIcon } from "./ThreadStatusIcon";
 import {
   Layers,
   ToggleLeft,
@@ -28,6 +37,8 @@ export function ThreadItem(props: { threadId: string }) {
   const [collapsed, setCollapsed] = useState(false);
 
   if (!thread) return null;
+
+  const satisfied = thread.status === "satisfied";
 
   const memberIds = thread.entityIds.filter((id) => {
     const e = entitiesById[id];
@@ -65,6 +76,7 @@ export function ThreadItem(props: { threadId: string }) {
           )}
         </button>
         <Layers size={ICON_SIZE} />
+        <ThreadStatusIcon status={thread.status} size={ICON_SIZE} />
         <button
           onClick={() => store.dispatch(uiEditableActivate({ id: threadId }))}
           style={{
@@ -74,6 +86,7 @@ export function ThreadItem(props: { threadId: string }) {
             border: "none",
             cursor: "pointer",
             color: T.textHeadings,
+            opacity: satisfied ? 0.55 : 1,
             padding: 0,
           }}
         >
