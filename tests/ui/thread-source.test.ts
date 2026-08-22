@@ -17,6 +17,7 @@ const WORLD_DIR = join(__dirname, "../../src/ui/panels/world");
 const ICON = join(WORLD_DIR, "ThreadStatusIcon.tsx");
 const ITEM = join(WORLD_DIR, "ThreadItem.tsx");
 const PANE = join(WORLD_DIR, "ThreadEditPane.tsx");
+const SELECT = join(WORLD_DIR, "world-select.ts");
 
 const read = (file: string) => readFileSync(file, "utf8");
 
@@ -75,8 +76,8 @@ describe("a satisfied thread reads as satisfied in the World list", () => {
     const uses = [...src.matchAll(/<ThreadStatusIcon\b/g)];
     expect(uses.length).toBe(1);
     expect(src).toMatch(/<ThreadStatusIcon\s+status=\{thread\.status\}/);
-    // …and it is not behind a condition of any kind.
-    expect(conditionalElements(read(ITEM))).not.toContain("<ThreadStatusIcon");
+    // …and it is not behind a condition of any kind. Both idioms, and the
+    // optional `(` for prettier's multi-line ternary wrapping.
     expect(
       [...src.matchAll(/(?:[?:]|&&|\|\|)\s*\(?\s*<ThreadStatusIcon/g)].length,
     ).toBe(0);
@@ -92,13 +93,16 @@ describe("a satisfied thread reads as satisfied in the World list", () => {
   });
 
   it("shows status without filtering or reordering the list", () => {
-    // The brief's requirement, and the reason it is a requirement: a filter or
-    // a second section hides threads the writer has to be able to see to
-    // reopen, and moves rows under the finger that is reaching for them.
-    const src = code(read(ITEM));
-    expect(src).not.toMatch(/\.filter\([^)]*status/);
-    expect(src).not.toMatch(/\.sort\(/);
-    expect(code(read(join(WORLD_DIR, "World.tsx")))).not.toContain("status");
+    // The requirement, and the reason it is one: a filter or a second section
+    // hides threads the writer has to be able to see in order to reopen them,
+    // and a sort moves rows under the finger reaching for them. Scanned across
+    // all three files that could do it — the row, the panel that lists the
+    // rows, and the selector that hands the panel its order.
+    for (const file of [ITEM, join(WORLD_DIR, "World.tsx"), SELECT]) {
+      const src = code(read(file));
+      expect(src).not.toMatch(/(?:filter|sort|reverse)\([^)]*status/);
+      expect(src).not.toMatch(/\.sort\(/);
+    }
   });
 });
 
