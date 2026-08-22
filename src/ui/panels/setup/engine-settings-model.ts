@@ -1,4 +1,4 @@
-// What a typed number means, for the Engine section's two number fields.
+// What a typed number means, for the Engine section's number fields.
 //
 // The storage module already decides what a *stored* value means
 // (`normalizeEngineSettings`): a finite number outside its range is intent
@@ -33,17 +33,29 @@ import {
   type EngineSettings,
 } from "../../../core/engine/settings";
 
-/** The numeric settings — the two the form exposes as text a writer can type
- *  anything into. `enabled` is a button and has no draft. */
-export type NumericSetting = "delayMs" | "minProse";
+/** The numeric settings — the ones the form exposes as text a writer can type
+ *  anything into. `enabled` is a button and has no draft.
+ *
+ *  A value, not just a type, and the form builds one field per entry: a numeric
+ *  setting that is in `EngineSettings` but not in here is a setting reachable
+ *  only by hand-editing storyStorage, which is exactly what §3.1 moved these
+ *  settings out of read-only `project.yaml` to avoid. `threadCap` shipped that
+ *  way for one task; `engine-settings-model.test.ts` derives the list from
+ *  `ENGINE_DEFAULTS` so the next one cannot. */
+export const NUMERIC_SETTINGS = ["delayMs", "minProse", "threadCap"] as const;
+
+export type NumericSetting = (typeof NUMERIC_SETTINGS)[number];
 
 /** How many stored units one typed unit is worth. The delay is typed in seconds
- *  and stored in milliseconds; the paragraph count is a count either way, and
- *  saying so with a 1 keeps it inside the same table rather than as a special
- *  case somewhere else. */
+ *  and stored in milliseconds; the paragraph count and the thread cap are counts
+ *  either way, and saying so with a 1 keeps them inside the same table rather
+ *  than as special cases somewhere else. A `Record` so a new numeric setting
+ *  cannot be added without an answer here — the failure it prevents is a count
+ *  quietly scaled by a thousand and clamped to its ceiling. */
 const STORED_PER_TYPED: Record<NumericSetting, number> = {
   delayMs: 1000,
   minProse: 1,
+  threadCap: 1,
 };
 
 /** A stored value in the unit the box shows it in — 8000ms → 8. */
@@ -93,9 +105,9 @@ export function resolveTypedSetting(
   const intended =
     text === "" || !Number.isFinite(typed) ? settings[field] : typed;
 
-  return normalizeEngineSettings(
-    field === "delayMs"
-      ? { ...settings, delayMs: intended }
-      : { ...settings, minProse: intended },
-  );
+  // Spread, not a per-field branch: an arm per setting is an arm to forget, and
+  // the one that was forgotten is why `threadCap` had no control. Every field is
+  // a number here, and `normalizeEngineSettings` is what decides whether this
+  // one is usable.
+  return normalizeEngineSettings({ ...settings, [field]: intended });
 }

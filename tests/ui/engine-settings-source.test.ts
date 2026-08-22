@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { NUMERIC_SETTINGS } from "../../src/ui/panels/setup/engine-settings-model";
 
 const SETUP_DIR = join(__dirname, "../../src/ui/panels/setup");
 const SECTION = join(SETUP_DIR, "EngineSettings.tsx");
@@ -251,5 +252,34 @@ describe("the section is on the Setup tab", () => {
     expect(src.indexOf("<EngineSettings />")).toBeGreaterThan(
       src.indexOf("<BootstrapButton"),
     );
+  });
+});
+
+describe("every numeric setting has a field", () => {
+  it("builds one NumberField per numeric setting, and commits each by name", () => {
+    // The defect: `threadCap` arrived with a default, bounds and a reducer
+    // enforcing it, and no control at all — adjustable only by hand-editing
+    // storyStorage, which is the one thing §3.1 moved these settings out of
+    // read-only `project.yaml` to make impossible. Counted against the model's
+    // own list, so the next numeric setting fails here rather than shipping
+    // unreachable.
+    const src = code(sectionSrc());
+    const fields = [...src.matchAll(/<NumberField\b/g)];
+    expect(fields.length).toBe(NUMERIC_SETTINGS.length);
+
+    for (const field of NUMERIC_SETTINGS) {
+      expect(src).toContain(`commit("${field}"`);
+      expect(src).toContain(`draftFor(settings, "${field}")`);
+    }
+  });
+
+  it("prints the cap's bounds from settings.ts, in the unit it is stored in", () => {
+    // A count, not a duration: nothing here converts it, and the two bounds are
+    // interpolated rather than restated so moving one in `settings.ts` moves
+    // the help text and the input's own min/max with it.
+    const src = code(sectionSrc());
+    expect(src).toContain("THREAD_CAP_MIN");
+    expect(src).toContain("THREAD_CAP_MAX");
+    expect(src).not.toContain('toTyped("threadCap"');
   });
 });

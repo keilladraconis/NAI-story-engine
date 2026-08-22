@@ -15,6 +15,7 @@
 // and the round trip below fails if either one of them stops converting.
 import { describe, it, expect } from "vitest";
 import {
+  NUMERIC_SETTINGS,
   draftFor,
   resolveTypedSetting,
   toTyped,
@@ -25,6 +26,8 @@ import {
   ENGINE_DEFAULTS,
   MIN_PROSE_MAX,
   MIN_PROSE_MIN,
+  THREAD_CAP_MAX,
+  THREAD_CAP_MIN,
   type EngineSettings,
 } from "../../src/core/engine/settings";
 
@@ -213,5 +216,68 @@ describe("the other settings are carried across untouched", () => {
     expect(
       Object.keys(resolveTypedSetting(CONFIGURED, "delayMs", "9")).sort(),
     ).toEqual(["delayMs", "enabled", "minProse", "threadCap"]);
+  });
+});
+
+describe("every numeric setting the Engine has is a field a writer can reach", () => {
+  it("names all of them, so none can ship reachable only by hand-editing storage", () => {
+    // The defect this test exists for: `threadCap` landed in `EngineSettings`
+    // with a default, bounds and a reducer enforcing it, and no control — so
+    // the one thing §3.1 moved these settings out of `project.yaml` FOR (that a
+    // form could write them, which `api.v1.config` can never do) did not happen
+    // for it. Derived from the settings object rather than restated, so the
+    // next numeric setting fails here on the day it is added instead of
+    // shipping unreachable.
+    const numeric = (
+      Object.keys(ENGINE_DEFAULTS) as (keyof EngineSettings)[]
+    ).filter((key) => typeof ENGINE_DEFAULTS[key] === "number");
+    expect([...NUMERIC_SETTINGS].sort()).toEqual([...numeric].sort());
+  });
+});
+
+describe("the thread cap is a count, not a duration", () => {
+  it("is typed and shown in the one unit it has", () => {
+    // The hazard the delay introduced: a seconds/milliseconds transform sitting
+    // in the shared conversion table, applied to every numeric setting. A cap
+    // of 8 that stored 8000 would clamp to 40 and come back as 40.
+    expect(toTyped("threadCap", 12)).toBe(12);
+    expect(draftFor(CONFIGURED, "threadCap")).toBe("5");
+    expect(draftFor(ENGINE_DEFAULTS, "threadCap")).toBe("8");
+
+    const stored = resolveTypedSetting(CONFIGURED, "threadCap", "12");
+    expect(stored.threadCap).toBe(12);
+    expect(draftFor(stored, "threadCap")).toBe("12");
+  });
+
+  it("is clamped, not rejected, when it is out of range", () => {
+    expect(resolveTypedSetting(CONFIGURED, "threadCap", "0").threadCap).toBe(
+      THREAD_CAP_MIN,
+    );
+    expect(resolveTypedSetting(CONFIGURED, "threadCap", "500").threadCap).toBe(
+      THREAD_CAP_MAX,
+    );
+  });
+
+  it("admits what a fractional cap already admits", () => {
+    // `normalizeEngineSettings` floors the cap because the reducer admits a
+    // thread while the list is shorter than it — 8.5 already behaves as 8.
+    expect(resolveTypedSetting(CONFIGURED, "threadCap", "8.5").threadCap).toBe(
+      8,
+    );
+  });
+
+  it("treats an empty box as no request, not as a cap of zero", () => {
+    for (const text of ["", "   ", "abc"]) {
+      expect(resolveTypedSetting(CONFIGURED, "threadCap", text).threadCap).toBe(
+        CONFIGURED.threadCap,
+      );
+    }
+  });
+
+  it("never moves the field it was not asked about", () => {
+    const after = resolveTypedSetting(CONFIGURED, "threadCap", "9");
+    expect(after.enabled).toBe(true);
+    expect(after.delayMs).toBe(CONFIGURED.delayMs);
+    expect(after.minProse).toBe(CONFIGURED.minProse);
   });
 });

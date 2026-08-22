@@ -1,11 +1,14 @@
 // The Engine section — the only way to switch the Engine on.
 //
-// The three settings behind it used to be `project.yaml` entries, which
+// The settings behind it used to be `project.yaml` entries, which
 // `api.v1.config` can only read; they now live in Story Engine's own storage,
 // per story (see `src/core/engine/settings.ts`). This section is what writes
-// them.
+// them — every one of them. A numeric setting with no field here is reachable
+// only by hand-editing storyStorage, which is the presentation these settings
+// left `project.yaml` to escape; `NUMERIC_SETTINGS` is the list, and
+// `engine-settings-source.test.ts` counts the fields against it.
 //
-// Three rules hold this file together, and each of them has cost this project a
+// Four rules hold this file together, and each of them has cost this project a
 // bug:
 //
 //   1. **Every commit dispatches `engineSettingsChanged` straight after
@@ -47,6 +50,8 @@ import {
   DELAY_MS_MIN,
   MIN_PROSE_MAX,
   MIN_PROSE_MIN,
+  THREAD_CAP_MAX,
+  THREAD_CAP_MIN,
   normalizeEngineSettings,
   writeEngineSettings,
   type EngineSettings,
@@ -125,6 +130,7 @@ export function EngineSettings() {
   const [open, setOpen] = useState(false);
   const [delayDraft, setDelayDraft] = useState(draftFor(settings, "delayMs"));
   const [proseDraft, setProseDraft] = useState(draftFor(settings, "minProse"));
+  const [capDraft, setCapDraft] = useState(draftFor(settings, "threadCap"));
 
   // The drafts follow the store, which moves under this form twice: the startup
   // read lands a tick after mount, and each commit's own dispatch comes back
@@ -137,6 +143,10 @@ export function EngineSettings() {
   useEffect(
     () => setProseDraft(draftFor(settings, "minProse")),
     [settings.minProse],
+  );
+  useEffect(
+    () => setCapDraft(draftFor(settings, "threadCap")),
+    [settings.threadCap],
   );
 
   // Commits run one at a time, in order, each computed from the store as it is
@@ -256,8 +266,20 @@ export function EngineSettings() {
           onCommit={() => commit("minProse", proseDraft, setProseDraft)}
         />
 
+        <NumberField
+          label="Thread limit"
+          help={`How many Threads this story may hold. At the limit a new Thread displaces the weakest one — satisfied first, then the shortest horizon, then the oldest — rather than adding. Its lorebook entry stays in your lorebook. ${THREAD_CAP_MIN}–${THREAD_CAP_MAX}.`}
+          value={capDraft}
+          min={THREAD_CAP_MIN}
+          max={THREAD_CAP_MAX}
+          step="1"
+          onInput={setCapDraft}
+          onCommit={() => commit("threadCap", capDraft, setCapDraft)}
+        />
+
         <span style={HELP_STYLE}>
-          Both take effect on the next generation. A number outside its range is
+          The delay and the minimum take effect on the next generation, the
+          Thread limit on the next Thread created. A number outside its range is
           clamped, and one that is not a number at all leaves the setting alone
           — either way the number left in the box is the number in use.
         </span>
