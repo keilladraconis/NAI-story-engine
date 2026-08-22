@@ -419,6 +419,23 @@ Three controls:
   touched" is not answerable from a `Thread` as specified. Whatever supplies it
   serves both.
 
+**The cap counts every thread, and prefers to spend a satisfied one.** This section
+originally said "simultaneously-**open** threads", which reads as a cap satisfied
+threads sit outside — and then satisfied threads accumulate beside it without
+bound, while "displace a satisfied one first" becomes vacuous, since at an
+open-only ceiling every candidate is open. Enforcement is over the whole list with
+satisfied threads first in the displacement order, which makes it behave as an
+open-thread cap exactly when there is a satisfied thread to spend.
+
+**A displaced thread leaves a live orphan, and phase 5 ships that wart.** Dropping
+a thread from the store does not touch its lorebook entry, which survives unmanaged
+and **still enabled** — so it goes on injecting its reminder forever, which is the
+proliferation this section exists to prevent, arriving by the door the control
+opens. §5.2 forbids destroying the writer's lorebook, so the fix is not a delete;
+it is §7 reconciliation deciding what an unmanaged former thread means, and that is
+phase 6. Until then a displacement is visible in the writer's lorebook and the
+changelog has to say so.
+
 ## 5. Entity revision
 
 **Read-then-write, always.** The revision step fetches the entry's live text
