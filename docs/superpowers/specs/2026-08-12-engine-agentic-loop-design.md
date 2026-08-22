@@ -431,18 +431,20 @@ open-only ceiling every candidate is open. Enforcement is over the whole list wi
 satisfied threads first in the displacement order, which makes it behave as an
 open-thread cap exactly when there is a satisfied thread to spend.
 
-**A displaced thread leaves a live orphan, and phase 5 ships that wart.** Dropping
-a thread from the store does not touch its lorebook entry, which survives unmanaged
-and **still enabled** — so it goes on injecting its reminder forever, which is the
-proliferation this section exists to prevent, arriving by the door the control
-opens. **The cap bounds the list, not the context** — so a story that repeatedly
-hits the ceiling accumulates strictly more always-on injections than the cap ever
-permitted threads, and proliferation control increases proliferation. §5.2 forbids
-destroying the writer's lorebook, so the fix is not a delete; it is §7
-reconciliation deciding what an unmanaged former thread means. That makes
-reconciliation a **requirement** of phase 6 rather than a nicety, not merely the
-place this wart gets tidied. Until then a displacement is visible in the writer's
-lorebook and the changelog has to say so.
+**Once threads have entries, a displaced thread will leave a live orphan.**
+Dropping a thread from the store does not touch its lorebook entry, which would
+survive unmanaged and **still enabled** — going on injecting its reminder forever,
+which is the proliferation this section exists to prevent, arriving by the door the
+control opens. **The cap bounds the list, not the context**, so a story that
+repeatedly hit the ceiling would accumulate strictly more always-on injections than
+the cap ever permitted threads: proliferation control increasing proliferation.
+
+This is future tense, and an earlier draft of this paragraph got that wrong. It is
+**not** a phase-5 wart — `threadLorebookEntrySet` has no caller and never had one,
+so no thread has ever had an entry and a displacement in phase 5 leaves nothing
+behind. It becomes real the moment phase 6 binds a thread to an entry, which is why
+§5.2 forbidding a delete makes §7 reconciliation a **requirement of phase 6 rather
+than a nicety** — it has to land in the same phase as the binding, not after it.
 
 ## 5. Entity revision
 
@@ -1364,8 +1366,10 @@ resets it on every history navigation, so the cap would revert to 8 on undo.
 **What this phase deliberately does not do.** It does not attach a condition to an
 entry, does not disable a satisfied thread's entry (§4.4's flag flip has no caller,
 so satisfaction sets a flag only the writer and the cap read), does not expire
-anything, and does not reconcile the lorebook entry a displacement leaves behind.
-All four are phase 6.
+anything, and does not bind a thread to a lorebook entry at all — so §7's
+reconciliation has nothing yet to reconcile. All four are phase 6, and the binding
+and the reconciliation have to arrive together: a displacement is free only while
+there is no entry behind the thread.
 
 **Where the build corrected this document.**
 
@@ -1403,9 +1407,11 @@ All four are phase 6.
   setting with no control, and Task 4's own file list omitted the actions it needed
   (`threadHorizonSet`, `threadStatusSet` did not exist and no task created them).
   Both are the same failure: the plan named the module and forgot the surface that
-  reaches it. `NumericSetting` is now a value list the form maps over, with a test
-  deriving it from `ENGINE_DEFAULTS`, because a bare type union gives a test nothing
-  to count — which is how a setting stayed unreachable for a whole task.
+  reaches it. `NumericSetting` is now backed by a value list, `NUMERIC_SETTINGS`, with one
+  test deriving it from `ENGINE_DEFAULTS` and another counting the form's
+  `NumberField`s against its length. The form still spells its three fields out —
+  the list is what makes them _countable_, which a bare type union never was, and
+  that is how a setting stayed unreachable for a whole task.
 - **A pre-existing defect fixed in passing.** `MemberToggle` in `ThreadEditPane`
   swapped `ToggleRight`/`ToggleLeft` at a fixed position, and its re-render is
   detached — the click dispatches, and the row repaints from the `useSlice`
