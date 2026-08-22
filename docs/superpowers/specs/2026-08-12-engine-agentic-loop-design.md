@@ -412,7 +412,11 @@ Three controls:
   **default 8** — and per §3.1 a setting now means the Engine's own per-story
   record, not a `project.yaml` entry.
 - Triage must **justify** a new thread against the cap, and displace rather than
-  add when at the ceiling.
+  add when at the ceiling. **"Justify" cannot mean "gate".** The reducer displaces
+  whatever triage answers, and a prompt cannot refuse a create — so the only
+  enforceable reading is that triage is _shown the price and asked to weigh it_:
+  the manifest carries the fill, the ceiling, and the title of the thread the
+  next `OPEN` would cost. Phase 6 must not build against the stronger reading.
 - A **paragraph-count expiry**, so an end the story quietly abandoned ages out
   instead of accumulating forever. This wants the same per-thread anchor the arc
   pacing gate wants and §4.3 does not have: "how long since this thread was last
@@ -431,10 +435,14 @@ open-thread cap exactly when there is a satisfied thread to spend.
 a thread from the store does not touch its lorebook entry, which survives unmanaged
 and **still enabled** — so it goes on injecting its reminder forever, which is the
 proliferation this section exists to prevent, arriving by the door the control
-opens. §5.2 forbids destroying the writer's lorebook, so the fix is not a delete;
-it is §7 reconciliation deciding what an unmanaged former thread means, and that is
-phase 6. Until then a displacement is visible in the writer's lorebook and the
-changelog has to say so.
+opens. **The cap bounds the list, not the context** — so a story that repeatedly
+hits the ceiling accumulates strictly more always-on injections than the cap ever
+permitted threads, and proliferation control increases proliferation. §5.2 forbids
+destroying the writer's lorebook, so the fix is not a delete; it is §7
+reconciliation deciding what an unmanaged former thread means. That makes
+reconciliation a **requirement** of phase 6 rather than a nicety, not merely the
+place this wart gets tidied. Until then a displacement is visible in the writer's
+lorebook and the changelog has to say so.
 
 ## 5. Entity revision
 
@@ -1194,6 +1202,12 @@ output is a log line.
   triage is shown every group and may `RETIRE` one already retired. Dedupe bounds
   the repeat and drain only logs, so it is inert this phase; phase 5's `Thread`
   (§4.1) is what fixes it, and phase 6 is when it would otherwise matter.
+  **Superseded — and "filtering" was the wrong fix.** §4.5's cap counts every
+  thread, so a manifest that hid the satisfied ones would show triage a fill the
+  reducer disagrees with, and would hide the cheapest slot it has to spend. Phase
+  5 **marks** instead: a satisfied thread is listed with its status and without
+  its reminder prose, and the prompt is told a settled thread is settled. Read
+  this bullet as history, not as an instruction to a later phase.
 - **`lb:<entryId>` write-records** (§6.2) and **`createCancellationSignal` for
   stopping the Engine** (§3.4). Nothing writes a lorebook entry, and there is
   nothing expensive to cancel while drain only logs.
