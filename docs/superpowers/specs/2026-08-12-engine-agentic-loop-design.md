@@ -1342,6 +1342,76 @@ Continue click. The Engine's pre-check is output-only. Narrow, and the fix is a
 question about how the Engine's tasks are queued in GenX rather than a patch to the
 pass, so it wants its own thinking alongside the actions in phase 6.
 
+### 14.2 Phase 5 as built
+
+`WorldGroup` is gone and `Thread` has taken its place, with a horizon, a status, and
+a cap. The forgetting detector is built, tested, and **wired to nothing**: nothing in
+`src/` calls `buildThreadCondition`, nothing dispatches `threadLorebookEntrySet`, and
+a thread card's lorebook toggle still renders disabled. A writer's lorebook therefore
+behaves exactly as it did before this phase. That is the shape phase 4 shipped in too
+— the mechanism first, the wiring after — and for the same reason: the wiring is
+where the writer's own data is at risk, so it goes in a phase whose whole subject is
+acting.
+
+The cap is the one thing here that does bite. It is enforced in `rootReducer` rather
+than in `threadCreated`, because the cap is one of the Engine's per-story settings and
+a slice reducer cannot read another slice; the root is the only reducer that sees
+both. Mirroring the number a second time into `WorldState` was the obvious
+alternative and the wrong one — that would put a storyStorage setting inside the
+branch-persisted world, where `applyRecords`' `{...initialWorldState}` silently
+resets it on every history navigation, so the cap would revert to 8 on undo.
+
+**What this phase deliberately does not do.** It does not attach a condition to an
+entry, does not disable a satisfied thread's entry (§4.4's flag flip has no caller,
+so satisfaction sets a flag only the writer and the cap read), does not expire
+anything, and does not reconcile the lorebook entry a displacement leaves behind.
+All four are phase 6.
+
+**Where the build corrected this document.**
+
+- **§4.3's `lore` gate contradicts §4.3's own detector.** Recorded in full in that
+  section. The short version: a participant's entry is active _because_ its name
+  appeared, and the detector fires on that name _not_ appearing, so
+  `and( lore(X), not(key X within N) )` is a contradiction whenever the entry's
+  search range covers `N` — and `LorebookEntry` exposes no search-range field, so a
+  script cannot tell which way it resolves. §4.1's "`entityIds` is load-bearing"
+  survives through the subject keys instead of through a gate.
+- **The `Thread` type carries no anchor**, and two separate pieces of the design
+  wanted the same missing field. §4.3's arc pacing gate needs "how long since this
+  thread last fired"; §4.5's expiry needs "how long since the story last touched
+  it". Neither is answerable from a `Thread` as specified, and the honest response
+  was to build the half that _is_ decidable — the policy, per horizon — and leave
+  the anchor to the phase that first has an event worth anchoring to. So
+  `isThreadExpired` ships with no caller, taking the count from whoever eventually
+  has one. A field written by nobody would have persisted a zero that reads as
+  "abandoned since paragraph 0".
+- **`displacementOrder(threads)[0]` is not the price of a create.** The plan said
+  triage could name the victim from the ordering's first element, and that is right
+  only when the list sits exactly at the cap. When the cap has been _lowered_ under
+  an already-legal list — the case §4.5's "lowering deletes nothing by itself, but
+  bites in full on the next create" deliberately produces — a create costs
+  `n + 1 − cap` threads, so quoting one name understates the price for precisely the
+  scenario the lowering path exists to handle. `displacedByNextThread` answers it,
+  from the same ordering the reducer enforces.
+- **`thread-horizon.ts` exists to break an import cycle, not for tidiness.**
+  `thread-condition.ts` imports `nameKey` from the lorebook generation handler, and
+  that subtree carries nine import cycles of its own. Reaching through it for the
+  range constants would have pulled the whole thing into `rootReducer`, where the cap
+  is enforced, and closed one of those cycles back onto the store. A table of
+  constants with no dependencies can sit under both.
+- **The plan's file lists were short twice, in the same way.** Task 3 added a
+  setting with no control, and Task 4's own file list omitted the actions it needed
+  (`threadHorizonSet`, `threadStatusSet` did not exist and no task created them).
+  Both are the same failure: the plan named the module and forgot the surface that
+  reaches it. `NumericSetting` is now a value list the form maps over, with a test
+  deriving it from `ENGINE_DEFAULTS`, because a bare type union gives a test nothing
+  to count — which is how a setting stayed unreachable for a whole task.
+- **A pre-existing defect fixed in passing.** `MemberToggle` in `ThreadEditPane`
+  swapped `ToggleRight`/`ToggleLeft` at a fixed position, and its re-render is
+  detached — the click dispatches, and the row repaints from the `useSlice`
+  subscription rather than from the click's own render. That is exactly the case
+  CLAUDE.md's rule names, sitting in the file before this phase touched it.
+
 ## 15. Versioning
 
 **0.15.0** — minor. Under the alpha lock (major pinned at 0), minor covers
