@@ -34,8 +34,11 @@ export type HudModel = {
   stateIcon: HudState;
   /** Unread paragraphs past the watermark. Climbing = falling behind. */
   backlog: number;
-  /** Open threads — context pressure. */
+  /** Open threads — context pressure, and the number the slot draws. */
   threads: number;
+  /** Every thread, satisfied ones included — what the cap counts (§4.5). The
+   *  tooltip says both; the slot draws only `threads`. */
+  threadsTotal: number;
   /** Entities revised on this branch. Always 0 until phase 6 executes intents. */
   touched: number;
   /** Filled bars out of `BUDGET_BARS`. See `budgetBarsOf`. */
@@ -124,9 +127,19 @@ export function deriveHud(state: RootState, inputs: HudInputs): HudModel {
     // surface §9.1 builds to carry trust.
     stateIcon: engine.settings.enabled ? stateOf(engine.phase) : "off",
     backlog: engine.backlog,
-    // Every thread, open or satisfied: nothing sets `satisfied` until phase 6,
-    // so filtering on status here would filter on a constant.
-    threads: world.threads.length,
+    // OPEN threads, which is what §9.1 says this slot counts: context
+    // pressure, "climbing means go close some". A comment here used to say
+    // nothing sets `satisfied` until phase 6, so filtering on status would
+    // filter on a constant — phase 5's own status control made that false, and
+    // counting every thread left the slot unmoved by the one action it asks
+    // for. §4.4 retires a satisfied thread by disabling its entry, so it costs
+    // no context and does not belong in a pressure reading.
+    //
+    // The whole list rides along for the tooltip rather than replacing this
+    // number: the cap counts satisfied threads and the slot does not, and one
+    // number cannot be both without the label lying about one of them.
+    threads: world.threads.filter((t) => t.status === "open").length,
+    threadsTotal: world.threads.length,
     // Honest 0 for the whole of this phase: nothing revises anything until
     // phase 6. A permanent 0 is correct information, and a slot that appears
     // later is a modeline that changes shape (§9.1: fixed slots, always
@@ -154,6 +167,9 @@ export function hudSignature(state: RootState): string {
     engine.settings.enabled ? "1" : "0",
     engine.backlog,
     engine.touched,
+    // Both numbers the thread slot reads. The length alone would hold still
+    // when a thread is satisfied — which changes the number on the line.
+    world.threads.filter((t) => t.status === "open").length,
     world.threads.length,
   ].join("|");
 }

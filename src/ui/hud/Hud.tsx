@@ -238,7 +238,7 @@ export function Hud() {
       <CountSlot
         icon={Flag}
         value={model.threads}
-        title={`Threads — ${model.threads} open thread(s) the story is carrying; context pressure`}
+        title={`Threads — ${model.threads} open of ${model.threadsTotal} the story is carrying; context pressure, so climbing means go close some`}
       />
       <CountSlot
         icon={GitCommit}

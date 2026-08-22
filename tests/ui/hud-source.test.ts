@@ -137,6 +137,18 @@ describe("Hud.tsx is a line of icons with tooltips, not glyphs", () => {
     expect(src).toMatch(/title="Run a pass now"/);
   });
 
+  it("says `open` on the thread slot, and where the rest of the list went", () => {
+    // The label and the number have to agree. The tooltip read "N open
+    // thread(s)" over a count of every thread, satisfied ones included — so
+    // marking one satisfied, the single action the slot asks for, moved it by
+    // zero. The number is now the open ones; the total rides in the same
+    // sentence, because the cap counts that instead.
+    const src = code(hudSrc());
+    expect(src).toMatch(
+      /\$\{model\.threads\} open of \$\{model\.threadsTotal\}/,
+    );
+  });
+
   it("spends no bare unicode on a count", () => {
     // `12¶ ⚑5 ∆0` is the line as it read before this: feather icons for the
     // state and unadorned unicode for the counts, and the unicode half is the

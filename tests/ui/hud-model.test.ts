@@ -18,7 +18,11 @@ import {
 import { ENGINE_DEFAULTS } from "../../src/core/engine/settings";
 import { initialWorldState } from "../../src/core/store/slices/world";
 import type { RootState } from "../../src/core/store";
-import type { Thread, WorldState } from "../../src/core/store/types";
+import type {
+  Thread,
+  ThreadStatus,
+  WorldState,
+} from "../../src/core/store/types";
 
 const INPUTS: HudInputs = { allowedOutput: OUTPUT_BUCKET };
 
@@ -44,14 +48,17 @@ function state(
   } as RootState;
 }
 
-function thread(id: string): Thread {
+/** `status` is a parameter, not a constant. It was hardcoded to "open", which
+ *  meant no case in this file could tell "count every thread" apart from "count
+ *  the open ones" — the two readings the slot had to choose between. */
+function thread(id: string, status: ThreadStatus = "open"): Thread {
   return {
     id,
     title: id,
     text: "",
     horizon: "plot",
     entityIds: [],
-    status: "open",
+    status,
   };
 }
 
@@ -157,13 +164,49 @@ describe("deriveHud — the counting slots", () => {
     expect(deriveHud(state({ backlog: 14 }), INPUTS).backlog).toBe(14);
   });
 
-  it("counts threads as world.threads.length", () => {
-    // `Thread` replacing `Thread` is phase 5.
+  it("counts the OPEN threads, which is what the slot says it counts", () => {
+    // §9.1 defines this slot as context pressure — "climbing means go close
+    // some" — and §4.4 retires a satisfied thread by disabling its entry, so a
+    // satisfied thread costs no context. A number that counted them anyway
+    // would not move when the writer did the one thing the slot asks for.
     const m = deriveHud(
-      state({}, { threads: [thread("a"), thread("b"), thread("c")] }),
+      state(
+        {},
+        {
+          threads: [
+            thread("a"),
+            thread("b", "satisfied"),
+            thread("c"),
+            thread("d", "satisfied"),
+          ],
+        },
+      ),
       INPUTS,
     );
-    expect(m.threads).toBe(3);
+    expect(m.threads).toBe(2);
+  });
+
+  it("also carries the whole list, because that is what the cap counts", () => {
+    // The cap (§4.5) is over every thread, satisfied ones included, and the
+    // tooltip says both — "2 open of 4 the story is carrying". The slot shows
+    // one number; the sentence is where the other belongs.
+    const m = deriveHud(
+      state({}, { threads: [thread("a"), thread("b", "satisfied")] }),
+      INPUTS,
+    );
+    expect(m.threads).toBe(1);
+    expect(m.threadsTotal).toBe(2);
+  });
+
+  it("reads 0 open once every thread is satisfied", () => {
+    // The phase-4 defect this repeats otherwise: a counter that never reads 0
+    // however much work the writer does.
+    const m = deriveHud(
+      state({}, { threads: [thread("a", "satisfied")] }),
+      INPUTS,
+    );
+    expect(m.threads).toBe(0);
+    expect(m.threadsTotal).toBe(1);
   });
 
   it("renders touched honestly as 0 for the whole of this phase", () => {
@@ -229,6 +272,12 @@ describe("hudSignature", () => {
     expect(hudSignature(state({ backlog: 3 }))).not.toBe(base);
     expect(hudSignature(state({ touched: 1 }))).not.toBe(base);
     expect(hudSignature(state({}, { threads: [thread("a")] }))).not.toBe(base);
+    // Satisfying a thread moves the slot, so it has to move the signature —
+    // the list length is unchanged, and a signature reading only that would
+    // leave the line stale until something else repainted it.
+    expect(
+      hudSignature(state({}, { threads: [thread("a", "satisfied")] })),
+    ).not.toBe(hudSignature(state({}, { threads: [thread("a")] })));
   });
 
   it("ignores store churn the modeline has no slot for", () => {
