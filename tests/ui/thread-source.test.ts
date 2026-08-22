@@ -33,6 +33,35 @@ function code(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 }
 
+/** The feather icons a file imports. Read off the import rather than listed
+ *  here, so a scan cannot go quietly out of date when a file swaps a glyph. */
+function featherIcons(src: string): string[] {
+  const imports = /import \{([^{}]*)\} from "nai:icons\/feather";/.exec(src);
+  expect(imports).not.toBeNull();
+  return (imports as RegExpExecArray)[1]
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0);
+}
+
+/** Icons rendered behind a conditional operator — the shape CLAUDE.md forbids,
+ *  narrowed to the elements it actually bites on.
+ *
+ *  Narrowed on purpose: `{collapsed ? null : <div>…</div>}` mounts or unmounts a
+ *  subtree, which is not the defect. The defect is one component TYPE giving way
+ *  to another at a FIXED position, and in these files every such pair is a pair
+ *  of icons. */
+function conditionalIcons(src: string): string[] {
+  const body = code(src);
+  const icons = featherIcons(src);
+  if (icons.length === 0) return [];
+  const pattern = new RegExp(
+    `(?:[?:]|&&|\\|\\|)\\s*\\(?\\s*<(${icons.join("|")})\\b`,
+    "g",
+  );
+  return [...body.matchAll(pattern)].map((m) => m[1]);
+}
+
 /** Every element rendered behind a conditional operator. Both idioms, and the
  *  optional `(` because prettier wraps a multi-line ternary as
  *  `? (\n  <Icon />\n) : (` — a scan for `? <` alone passes the regression it
@@ -228,6 +257,47 @@ describe("both thread creators go through the one action", () => {
       const src = code(read(file));
       expect(src).not.toContain("enforceThreadCap");
       expect(src).not.toContain("displacementOrder");
+    }
+  });
+});
+
+describe("the World panel and the thread row swap no icon types", () => {
+  // Pre-existing, in a file this phase edited: the expand/collapse-all icon,
+  // the S.E.G.A. icon and the row's chevron each replaced one component type
+  // with another at a fixed position. §14.2 fixed `MemberToggle` two files away
+  // on exactly this argument, so these are the same rule's remaining cases.
+  it("renders no icon behind a conditional", () => {
+    for (const file of [PANEL, ITEM]) {
+      expect(conditionalIcons(read(file))).toEqual([]);
+    }
+  });
+
+  it("mounts every variant and lets `display` pick", () => {
+    // The World panel's two pairs: expanded/collapsed, and S.E.G.A. running or
+    // not. Both conditions come from `useSlice`, so the repaint arrives from a
+    // store subscription rather than from the click's own render — the case
+    // where the old svg is left behind.
+    const panel = code(read(PANEL));
+    for (const [icon, when] of [
+      ["Minimize2", "worldExpanded"],
+      ["Maximize2", "worldExpanded"],
+      ["FastForward", "segaRunning"],
+      ["PlayCircle", "segaRunning"],
+    ]) {
+      expect(panel).toMatch(
+        new RegExp(`<${icon}[^>]*display: ${when} \\?`, "s"),
+      );
+    }
+
+    // The row's chevron is driven by its own `useState` from its own click, so
+    // its render is attached and no failure could be constructed — but a
+    // component's structure should not depend on which callback happens to
+    // repaint it today, and phase 6 gives the World plenty of detached renders.
+    const item = code(read(ITEM));
+    for (const icon of ["ChevronDown", "ChevronRight"]) {
+      expect(item).toMatch(
+        new RegExp(`<${icon}[^>]*display: collapsed \\?`, "s"),
+      );
     }
   });
 });

@@ -4,6 +4,13 @@
 // selectWorldBody from store-owned refs. add-entity creates a draft and opens
 // the edit pane; add-thread creates an empty thread and opens ThreadEditPane.
 //
+// **Every icon variant stays mounted and toggles `display`.** Swapping one
+// component type for another at a fixed position leaves both svgs in the DOM
+// when the re-render arrives detached — and every condition on this row comes
+// from `useSlice`, so every repaint here is detached: S.E.G.A. finishing turns
+// its own icon back with no press anywhere near it. Same workaround as
+// `ThreadStatusIcon`, `ConfirmButton` and `Header.tsx`'s WidgetIcon.
+//
 // **add-thread carries the cap, and refuses rather than displaces.** The
 // reducer's `enforceThreadCap` drops the weakest thread to make room for a new
 // one, which is the right trade for triage — the Engine chose to spend
@@ -117,6 +124,9 @@ export function World() {
           <Globe size={ICON_SIZE} />
           <span style={{ fontWeight: "bold" }}>World</span>
         </button>
+        {/* Both icons mounted, `display` picks — see the rule at the top of
+            this file. `worldExpanded` is store state, so this row repaints from
+            the subscription rather than from the click. */}
         <button
           title={worldExpanded ? "Collapse all" : "Expand all"}
           onClick={() =>
@@ -124,22 +134,30 @@ export function World() {
           }
           style={ICON_BTN}
         >
-          {worldExpanded ? (
-            <Minimize2 size={ICON_SIZE} />
-          ) : (
-            <Maximize2 size={ICON_SIZE} />
-          )}
+          <Minimize2
+            size={ICON_SIZE}
+            style={{ display: worldExpanded ? "inline-flex" : "none" }}
+          />
+          <Maximize2
+            size={ICON_SIZE}
+            style={{ display: worldExpanded ? "none" : "inline-flex" }}
+          />
         </button>
+        {/* Same again, and more so: S.E.G.A. finishing turns this icon back
+            with no press anywhere near it. */}
         <button
           title="S.E.G.A."
           onClick={() => store.dispatch(segaToggled())}
           style={{ ...ICON_BTN, color: segaRunning ? T.warning : T.text }}
         >
-          {segaRunning ? (
-            <FastForward size={ICON_SIZE} />
-          ) : (
-            <PlayCircle size={ICON_SIZE} />
-          )}
+          <FastForward
+            size={ICON_SIZE}
+            style={{ display: segaRunning ? "inline-flex" : "none" }}
+          />
+          <PlayCircle
+            size={ICON_SIZE}
+            style={{ display: segaRunning ? "none" : "inline-flex" }}
+          />
         </button>
         <button title="Add entity" onClick={onAddEntity} style={ICON_BTN}>
           <Plus size={ICON_SIZE} />

@@ -69,11 +69,19 @@ export function ThreadItem(props: { threadId: string }) {
             padding: 0,
           }}
         >
-          {collapsed ? (
-            <ChevronRight size={ICON_SIZE} />
-          ) : (
-            <ChevronDown size={ICON_SIZE} />
-          )}
+          {/* Both mounted, `display` picks. This one is driven by local state
+              from its own click, so its render is attached and no failure could
+              be constructed today — but the structure should not depend on
+              which callback happens to repaint it, and phase 6 gives the World
+              plenty of detached renders. */}
+          <ChevronRight
+            size={ICON_SIZE}
+            style={{ display: collapsed ? "inline-flex" : "none" }}
+          />
+          <ChevronDown
+            size={ICON_SIZE}
+            style={{ display: collapsed ? "none" : "inline-flex" }}
+          />
         </button>
         <Layers size={ICON_SIZE} />
         <ThreadStatusIcon status={thread.status} size={ICON_SIZE} />
