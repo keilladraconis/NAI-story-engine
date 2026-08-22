@@ -51,10 +51,21 @@ export async function loadBranchState(nodeId?: number): Promise<{
 
   if (!index) return applyRecords(undefined, {});
 
+  // Every list defaulted, because the index is JSON some earlier build wrote
+  // and this load is not in a position to fail. `loadBranchState` is awaited
+  // inside `Promise.all` in mount.ts, reached from a bare `void start()` — a
+  // throw here rejects unobserved and nothing mounts at all: no sidebar, no
+  // HUD, no error a writer can see. An index from before phase 5's rename
+  // carries `groupIds` and no `threadIds`, which is exactly that throw.
+  //
+  // Not a migration (alpha; §10): a list the index does not carry is a list
+  // this branch has none of, which is what "the state is dropped" means. It is
+  // still a partial load rather than an empty one — whatever the index DOES
+  // name comes back.
   const keys = [
-    ...index.entityIds.map(entityKey),
-    ...index.threadIds.map(threadKey),
-    ...index.fieldIds.map(fieldKey),
+    ...(index.entityIds ?? []).map(entityKey),
+    ...(index.threadIds ?? []).map(threadKey),
+    ...(index.fieldIds ?? []).map(fieldKey),
   ];
 
   const values = await Promise.all(

@@ -9,7 +9,11 @@ import {
   applyRecords,
 } from "../../src/core/store/persistence/keyspace";
 import { initialStoryState } from "../../src/core/store/slices/story";
-import { initialWorldState } from "../../src/core/store/slices/world";
+import {
+  DEFAULT_THREAD_HORIZON,
+  DEFAULT_THREAD_STATUS,
+  initialWorldState,
+} from "../../src/core/store/slices/world";
 import { initialFoundationState } from "../../src/core/store/slices/foundation";
 import type { RootState, WorldEntity } from "../../src/core/store/types";
 
@@ -37,7 +41,9 @@ function state(over: Partial<RootState> = {}): RootState {
         {
           id: "g1",
           title: "The Guild",
-          summary: "unsettled",
+          text: "unsettled",
+          horizon: "plot",
+          status: "open",
           entityIds: ["e1"],
         },
       ],
@@ -146,5 +152,64 @@ describe("applyRecords", () => {
       records,
     );
     expect(out.world.entityIds).toEqual(["b", "a"]);
+  });
+});
+
+describe("applyRecords defends the store from a record it did not write", () => {
+  // This is the ONE path by which a `Thread` enters the store without passing
+  // through `threadCreated`'s defaults, and the records are JSON an earlier
+  // build of this branch wrote. Alpha means no migration — it does not mean a
+  // `TypeError` on load. Both defences below drop or default; neither converts.
+
+  it("defaults a thread record written before horizon and status existed", () => {
+    // `statusOption(undefined).help` and `horizonOption(undefined).help` throw
+    // on `undefined.help`, in the World list and in the edit pane — so a record
+    // from an earlier build of this branch would reach the UI and take it down.
+    const out = applyRecords(
+      { entityIds: [], threadIds: ["g1"], fieldIds: [] },
+      { "t:g1": { id: "g1", title: "The Guild", text: "", entityIds: [] } },
+    );
+    expect(out.world.threads).toEqual([
+      {
+        id: "g1",
+        title: "The Guild",
+        text: "",
+        entityIds: [],
+        horizon: DEFAULT_THREAD_HORIZON,
+        status: DEFAULT_THREAD_STATUS,
+      },
+    ]);
+  });
+
+  it("keeps what a record does carry", () => {
+    const out = applyRecords(
+      { entityIds: [], threadIds: ["g1"], fieldIds: [] },
+      {
+        "t:g1": {
+          id: "g1",
+          title: "The Guild",
+          text: "",
+          entityIds: [],
+          horizon: "arc",
+          status: "satisfied",
+        },
+      },
+    );
+    expect(out.world.threads[0].horizon).toBe("arc");
+    expect(out.world.threads[0].status).toBe("satisfied");
+  });
+
+  it("reads an index that names no threads at all", () => {
+    // An index written before phase 5's rename carries `groupIds` and no
+    // `threadIds`. Reading it must yield a world with no threads, not a throw
+    // on `undefined.map` — the load is awaited by `start()`, and a rejection
+    // there mounts no sidebar, no HUD and no error.
+    const out = applyRecords(
+      { groupIds: ["g1"] } as unknown as Parameters<typeof applyRecords>[0],
+      { "t:g1": { id: "g1", title: "The Guild", text: "", entityIds: [] } },
+    );
+    expect(out.world.threads).toEqual([]);
+    expect(out.world.entityIds).toEqual([]);
+    expect(out.story.fields).toEqual(initialStoryState.fields);
   });
 });

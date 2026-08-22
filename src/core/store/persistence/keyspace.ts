@@ -33,8 +33,16 @@ import type {
   StoryField,
 } from "../types";
 import { initialStoryState } from "../slices/story";
-import { initialWorldState } from "../slices/world";
+import {
+  DEFAULT_THREAD_HORIZON,
+  DEFAULT_THREAD_STATUS,
+  initialWorldState,
+} from "../slices/world";
 
+/** The index as this build writes it. A record READ back may be missing a list
+ *  entirely — it is JSON an earlier build of this branch wrote, and phase 5
+ *  renamed `groupIds` to `threadIds` — so both readers default every list
+ *  rather than trusting the type. See `applyRecords` and `loadBranchState`. */
 export type PersistIndex = {
   entityIds: string[];
   threadIds: string[];
@@ -89,7 +97,7 @@ export function applyRecords(
 
   const entitiesById: Record<string, WorldEntity> = {};
   const entityIds: string[] = [];
-  for (const id of index.entityIds) {
+  for (const id of index.entityIds ?? []) {
     const record = records[entityKey(id)] as WorldEntity | undefined;
     // An id the index names but whose record never landed: skip it rather than
     // seed a hole the UI would have to defend against.
@@ -98,14 +106,25 @@ export function applyRecords(
     entityIds.push(id);
   }
 
+  // This is the only path by which a `Thread` enters the store without passing
+  // through `threadCreated`, which is where `horizon` and `status` are
+  // defaulted — so it defaults them too, from the same constants. A record
+  // written before phase 5 added the fields otherwise reaches the UI as a
+  // thread whose status is `undefined`, and `statusOption(undefined).help` in
+  // the World list throws on the spot.
   const threads: Thread[] = [];
-  for (const id of index.threadIds) {
-    const record = records[threadKey(id)] as Thread | undefined;
-    if (record) threads.push(record);
+  for (const id of index.threadIds ?? []) {
+    const record = records[threadKey(id)] as Partial<Thread> | undefined;
+    if (!record) continue;
+    threads.push({
+      ...(record as Thread),
+      horizon: record.horizon ?? DEFAULT_THREAD_HORIZON,
+      status: record.status ?? DEFAULT_THREAD_STATUS,
+    });
   }
 
   const fields: Record<string, StoryField> = {};
-  for (const id of index.fieldIds) {
+  for (const id of index.fieldIds ?? []) {
     const record = records[fieldKey(id)] as StoryField | undefined;
     if (record) fields[id] = record;
   }

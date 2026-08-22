@@ -102,3 +102,47 @@ describe("history-store", () => {
     expect(api.v1.historyStorage.remove).not.toHaveBeenCalled();
   });
 });
+
+describe("history-store survives an index it did not write", () => {
+  let h: HistoryFake;
+  beforeEach(() => {
+    h = installHistoryFake();
+  });
+
+  it("loads a pre-rename index instead of throwing on it", async () => {
+    // An index written by an earlier build of this branch carries `groupIds`
+    // and no `threadIds`. `index.threadIds.map(...)` on that is a TypeError,
+    // and nothing catches it: `loadBranchState` is awaited inside `Promise.all`
+    // in mount.ts, which `start()` is called from as a bare `void start()`. The
+    // whole script fails to mount — no sidebar, no HUD, no visible error.
+    //
+    // Alpha means no migration. It does not mean a crash: the plan and the
+    // CHANGELOG both promise the state is DROPPED, and this is what dropping
+    // looks like.
+    const node = h.current();
+    await api.v1.historyStorage.set("index", { groupIds: ["g1"] }, node);
+    await api.v1.historyStorage.set(
+      "t:g1",
+      { id: "g1", title: "The Guild", text: "", entityIds: [] },
+      node,
+    );
+
+    const out = await loadBranchState();
+    expect(out.world.threads).toEqual([]);
+    expect(out.world.entityIds).toEqual([]);
+  });
+
+  it("still loads the entities an index does name when a list is missing", async () => {
+    // A partial index is a partial load, not an empty one — whatever it names
+    // comes back.
+    const node = h.current();
+    const records = toRecords(stateWith(["a"]));
+    for (const [key, value] of Object.entries(records)) {
+      await api.v1.historyStorage.set(key, value, node);
+    }
+    await api.v1.historyStorage.set("index", { entityIds: ["a"] }, node);
+
+    const out = await loadBranchState();
+    expect(out.world.entityIds).toEqual(["a"]);
+  });
+});
