@@ -1,4 +1,5 @@
-// The words the World's thread surfaces put on a horizon and a status.
+// The words the World's thread surfaces put on a horizon, a status, and the
+// add-thread control's standing against the cap.
 //
 // A `.ts` module rather than a const block inside `ThreadEditPane.tsx` for one
 // reason: vitest here is `environment: "node"` over `tests/**/*.test.ts`, so a
@@ -12,6 +13,7 @@
 // module the bundler provides; importing it into a module vitest collects would
 // break the tests that exist to hold this file.
 
+import { effectiveCap } from "../../../core/engine/thread-cap";
 import {
   PARAGRAPH_CHARS,
   THREAD_RANGE_CHARS,
@@ -124,4 +126,51 @@ export function statusOption(status: ThreadStatus): StatusOption {
  *  tap debounce it forbids. */
 export function nextStatus(status: ThreadStatus): ThreadStatus {
   return status === "open" ? "satisfied" : "open";
+}
+
+// ─────────────────────── the World's add-thread control ───────────────────────
+
+export type ThreadAddModel = {
+  /** Whether pressing would create a thread. Presentation AND the handler's
+   *  own refusal read this — see `World.tsx`, where the press returns early on
+   *  it. `disabled` alone would not do: it is a render-time value, and the
+   *  reducer's cap is the backstop underneath both (CLAUDE.md). */
+  enabled: boolean;
+  /** Where the writer stands, drawn beside the icon on every render: `"3/8"`. */
+  count: string;
+  /** The button's tooltip. At the ceiling it says why the press did nothing and
+   *  what to do about it — the limit lives on another tab, so nothing else on
+   *  this panel can say so. */
+  title: string;
+};
+
+/** What the World header's add-thread button reads as, given the list and the
+ *  cap.
+ *
+ *  **The cap displaces; this control refuses.** §4.5's cap was designed against
+ *  *triage* opening threads, where dropping the weakest is a trade the Engine
+ *  chose to make. A writer pressing "+" has chosen nothing yet, and one
+ *  unconfirmed click destroying a thread they authored is not that trade —
+ *  deleting a thread on the same panel takes two clicks. So the reducer's
+ *  invariant stays exactly as it is (it is the backstop for the Forge's
+ *  `[THREAD]` and for triage in phase 6, and nothing can dispatch around it),
+ *  and the hand create is refused here, visibly, before it reaches the reducer.
+ *
+ *  `effectiveCap` rather than the raw setting, so the number the button shows
+ *  is the number `enforceThreadCap` enforces — a cap of 8.5 admits 8 in both
+ *  places, and a 0 arriving from anywhere reads as 1 in both. */
+export function threadAddModel(
+  threadCount: number,
+  cap: number,
+): ThreadAddModel {
+  const limit = effectiveCap(cap);
+  const count = `${threadCount}/${limit}`;
+  const enabled = threadCount < limit;
+  return {
+    enabled,
+    count,
+    title: enabled
+      ? `Add thread (${count})`
+      : `Thread limit reached (${count}) — mark one satisfied and delete it, or raise the limit in Setup → Engine`,
+  };
 }

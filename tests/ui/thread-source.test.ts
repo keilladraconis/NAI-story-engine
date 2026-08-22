@@ -17,7 +17,12 @@ const WORLD_DIR = join(__dirname, "../../src/ui/panels/world");
 const ICON = join(WORLD_DIR, "ThreadStatusIcon.tsx");
 const ITEM = join(WORLD_DIR, "ThreadItem.tsx");
 const PANE = join(WORLD_DIR, "ThreadEditPane.tsx");
+const PANEL = join(WORLD_DIR, "World.tsx");
 const SELECT = join(WORLD_DIR, "world-select.ts");
+const FORGE = join(
+  __dirname,
+  "../../src/core/store/effects/handlers/forge-chat.ts",
+);
 
 const read = (file: string) => readFileSync(file, "utf8");
 
@@ -158,5 +163,71 @@ describe("the edit pane offers the horizon as a choice, like a category", () => 
     const src = code(read(PANE));
     expect(src).toMatch(/\.help/);
     expect(HORIZON_OPTIONS.length).toBeGreaterThan(1);
+  });
+});
+
+describe("the World panel refuses a hand create at the cap", () => {
+  // The reducer displaces the weakest thread to make room, which is §4.5's
+  // trade for *triage* — the Engine chose to spend something. A writer pressing
+  // "+" has chosen nothing, and one unconfirmed click destroying an authored
+  // thread is the opposite of the two-click confirm the delete on the same
+  // panel asks for. The reducer invariant stays (it is the backstop for the
+  // Forge and for phase 6's triage); the refusal is here.
+  it("reads its whole appearance off the model, so the panel states no second cap", () => {
+    const src = code(read(PANEL));
+    expect(src).toContain("threadAddModel(");
+    expect(src).toMatch(/title=\{addThread\.title\}/);
+    expect(src).toContain("{addThread.count}");
+    // The old literal, which said nothing about where the writer stands.
+    expect(src).not.toContain('title="Add thread"');
+  });
+
+  it("refuses in the handler, not in a `disabled` prop", () => {
+    // CLAUDE.md: `disabled` is a render-time value, so a press arriving before
+    // the re-render that sets it still gets through — and a disabled button
+    // swallows the hover that shows the tooltip explaining why nothing
+    // happened. `aria-disabled` says unavailable without either cost.
+    const src = code(read(PANEL));
+    expect(src).toMatch(/if \(!addThread\.enabled\) return;/);
+    expect(src).toMatch(/aria-disabled=\{!addThread\.enabled\}/);
+    expect(src).not.toMatch(/(?<!aria-)disabled=\{/);
+  });
+
+  it("keeps the count visible before the ceiling, not only at it", () => {
+    // "Show the writer where they stand" — the limit lives on the Setup tab,
+    // so a panel that only spoke up at the boundary would be the first mention
+    // of a number that has been true all along. `count` is rendered
+    // unconditionally, never behind a ternary.
+    const src = code(read(PANEL));
+    expect(
+      [...src.matchAll(/(?:[?:]|&&|\|\|)\s*\{?\s*addThread\.count/g)].length,
+    ).toBe(0);
+  });
+
+  it("counts every thread the cap counts, not the ones the body renders", () => {
+    // `selectWorldBody` drops a forge draft's thread from the list; the reducer
+    // counts it all the same, so reading `visibleThreads.length` here would
+    // promise room the create does not have.
+    const src = code(read(PANEL));
+    expect(src).toMatch(/threadAddModel\(threads\.length, threadCap\)/);
+  });
+});
+
+describe("both thread creators go through the one action", () => {
+  // What the reducer-level cap test in `tests/core/store/slices/world.test.ts`
+  // asserts about repeated creates is only worth anything if these two are in
+  // fact the callsites. That test cannot see them; this can.
+  it("names the World panel and the Forge, and nothing else", () => {
+    for (const file of [PANEL, FORGE]) {
+      expect(code(read(file))).toMatch(/dispatch\(\s*threadCreated\(/);
+    }
+  });
+
+  it("leaves the cap to the reducer — neither trims the list itself", () => {
+    for (const file of [PANEL, FORGE]) {
+      const src = code(read(file));
+      expect(src).not.toContain("enforceThreadCap");
+      expect(src).not.toContain("displacementOrder");
+    }
   });
 });

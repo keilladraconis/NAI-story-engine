@@ -159,9 +159,13 @@ describe("the thread cap", () => {
     expect(threadIds(after)).toEqual(["c", "t1"]);
   });
 
-  it("cannot be dispatched around: the Forge and the World panel share it", () => {
-    // Both create threads through this one action, which is the point of the
-    // invariant living here rather than in either of them.
+  it("holds across a run of creates, whichever callsite dispatched them", () => {
+    // The invariant is on the action, not on a caller — which is the whole
+    // reason it lives here rather than in the Forge's [THREAD] handler or in
+    // the World panel. That the Forge and the World panel are in fact the two
+    // callsites is a source-level fact this test cannot see;
+    // `tests/ui/thread-source.test.ts` names them and checks neither trims the
+    // list itself.
     let state = withThreads([], { threadCap: 2 });
     for (const id of ["a", "b", "c", "d"]) {
       state = rootReducer(state, threadCreated({ thread: thread(id) }));

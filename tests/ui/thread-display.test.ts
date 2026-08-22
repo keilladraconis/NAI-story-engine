@@ -16,6 +16,7 @@ import {
   horizonQuietParagraphs,
   nextStatus,
   statusOption,
+  threadAddModel,
 } from "../../src/ui/panels/world/thread-display";
 import {
   PARAGRAPH_CHARS,
@@ -142,5 +143,51 @@ describe("nextStatus", () => {
     // rendered state sends the same value, and lands the same value.
     const rendered: ThreadStatus = "open";
     expect(nextStatus(rendered)).toBe(nextStatus(rendered));
+  });
+});
+
+describe("the World's add-thread control at the limit", () => {
+  it("counts where the writer stands, on every render and not only at the top", () => {
+    // §4.5's cap was written against *triage* opening threads, where displacing
+    // the weakest is a trade the Engine chose to make. A writer pressing "+"
+    // has chosen nothing, so the count has to be visible before the press, not
+    // explained after it.
+    expect(threadAddModel(0, 8).count).toBe("0/8");
+    expect(threadAddModel(3, 8).count).toBe("3/8");
+    expect(threadAddModel(8, 8).count).toBe("8/8");
+  });
+
+  it("is available while there is room and refuses at the ceiling", () => {
+    expect(threadAddModel(7, 8).enabled).toBe(true);
+    expect(threadAddModel(8, 8).enabled).toBe(false);
+    // Over the ceiling is reachable — lowering the limit deletes nothing — and
+    // must refuse just as hard.
+    expect(threadAddModel(12, 8).enabled).toBe(false);
+  });
+
+  it("states the same ceiling the reducer enforces", () => {
+    // Not a second reading of the setting. `effectiveCap` is what
+    // `enforceThreadCap` floors and clamps with, so a cap of 8.5 admits 8 in
+    // both places and the button cannot promise room the reducer will not give.
+    expect(threadAddModel(8, 8.5).enabled).toBe(false);
+    expect(threadAddModel(8, 8.5).count).toBe("8/8");
+    expect(threadAddModel(0, 0).enabled).toBe(true);
+    expect(threadAddModel(1, 0).count).toBe("1/1");
+  });
+
+  it("says what a refused press means and what to do about it", () => {
+    // The tooltip is the only teacher an icon button has, and the limit lives
+    // on another tab — so the tooltip has to name it. Compare the delete on a
+    // thread row, which asks for a second click before it destroys one.
+    const full = threadAddModel(8, 8).title;
+    expect(full).toMatch(/limit/i);
+    expect(full).toContain("8/8");
+    expect(full).toMatch(/Setup/);
+    expect(full).toMatch(/satisfied|delete/i);
+
+    const room = threadAddModel(3, 8).title;
+    expect(room).toMatch(/add/i);
+    expect(room).toContain("3/8");
+    expect(room).not.toMatch(/limit reached/i);
   });
 });
