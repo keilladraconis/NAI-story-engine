@@ -29,6 +29,8 @@ import type { MessageFactory } from "nai-gen-x";
 import type { Assessment } from "./assess";
 import type { Intent } from "./loop-machine";
 import { dedupe } from "./intents";
+import { displacedByNextThread, effectiveCap } from "./thread-cap";
+import type { ThreadHorizon, ThreadStatus } from "../store/types";
 import { TRIAGE_SYSTEM, TRIAGE_INSTRUCTION } from "../utils/prompts";
 import { buildModelParams } from "../utils/config";
 
@@ -47,6 +49,13 @@ export type TriageThread = {
   title: string;
   /** The thread's reminder prose — `Thread.text`. */
   text: string;
+  /** Scale, which is most of what makes one commitment worth more than
+   *  another when the list is full (§4.5). */
+  horizon: ThreadHorizon;
+  /** Satisfied threads are listed, not filtered out. They hold a slot — the
+   *  cap counts every thread — so hiding them would leave the fill triage is
+   *  shown disagreeing with the fill the reducer enforces. */
+  status: ThreadStatus;
 };
 
 /** The manifest is both halves of the contract: it is rendered into the prompt,
@@ -56,6 +65,11 @@ export type TriageThread = {
 export type TriageManifest = {
   entities: TriageEntity[];
   threads: TriageThread[];
+  /** How many threads the story allows at once — the Engine's `threadCap`
+   *  setting, unnormalised, exactly as it was read. `formatThreads` puts it
+   *  through `effectiveCap` so the number the model is shown is the one the
+   *  reducer will apply. */
+  threadCap: number;
 };
 
 export type TriageInput = {
@@ -103,12 +117,48 @@ function formatEntities(entities: TriageEntity[]): string {
   return `=== KNOWN ENTITIES ===\n${lines.join("\n")}`;
 }
 
-function formatThreads(threads: TriageThread[]): string {
+/** The thread list, its ceiling, and — when the ceiling is reached — the price
+ *  of the next `OPEN`.
+ *
+ *  Three decisions live here.
+ *
+ *  **The heading counts every thread, not the open ones.** §4.5's cap is over
+ *  the whole list and prefers to spend a satisfied one; a heading that counted
+ *  only open threads would tell the model it had room the reducer does not
+ *  agree it has. Satisfied threads are listed for the same reason, marked, and
+ *  **without their reminder prose** — a settled commitment has nothing left to
+ *  remind anyone of, but it still holds the slot that makes it the cheapest
+ *  thing to spend.
+ *
+ *  **The manifest names the victim; the model does not nominate one.** The
+ *  reducer enforces the cap whatever triage says, so a nomination would be an
+ *  answer nothing consumes — and carrying it back would need syntax `OPEN` does
+ *  not have, which `parseTriage` would drop in silence when the model got it
+ *  wrong. `displacedByNextThread` is the same function the reducer's
+ *  `enforceThreadCap` orders by, so the price quoted here is the price paid.
+ *
+ *  **Nothing is said about what displacement does to the writer's lorebook.**
+ *  It leaves the entry behind, unmanaged and still enabled (§4.5, §7); a prompt
+ *  that promised otherwise would be promising something phase 6 owns. */
+function formatThreads(threads: TriageThread[], threadCap: number): string {
+  const cap = effectiveCap(threadCap);
   const lines = threads.map((t) => {
-    const text = t.text.trim();
-    return `- ${t.title}${text ? `: ${text}` : ""}`;
+    const satisfied = t.status === "satisfied";
+    const tags = satisfied ? `${t.horizon}, satisfied` : t.horizon;
+    const text = satisfied ? "" : t.text.trim();
+    return `- ${t.title} [${tags}]${text ? `: ${text}` : ""}`;
   });
-  return `=== OPEN THREADS ===\n${lines.join("\n")}`;
+
+  const displaced = displacedByNextThread(threads, cap);
+  if (displaced.length > 0) {
+    lines.push(
+      `The list is full. Opening another displaces: ${displaced
+        .map((t) => t.title)
+        .join(", ")}`,
+    );
+  }
+
+  return `=== THREADS (${threads.length} of ${cap}) ===\n${lines.join("\n")}`;
 }
 
 export function createTriageFactory(input: TriageInput): MessageFactory {
@@ -128,7 +178,7 @@ export function createTriageFactory(input: TriageInput): MessageFactory {
     if (manifest.threads.length > 0) {
       messages.push({
         role: "assistant",
-        content: formatThreads(manifest.threads),
+        content: formatThreads(manifest.threads, manifest.threadCap),
       });
     }
 

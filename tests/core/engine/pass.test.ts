@@ -7,7 +7,11 @@ import {
   type EngineLoopDeps,
 } from "../../../src/core/store/effects/engine-loop";
 import { rootReducer } from "../../../src/core/store";
-import type { RootState, WorldEntity } from "../../../src/core/store/types";
+import type {
+  RootState,
+  Thread,
+  WorldEntity,
+} from "../../../src/core/store/types";
 import { persistedDataLoaded } from "../../../src/core/store";
 import { initialWorldState } from "../../../src/core/store/slices/world";
 import { QUEUE_KEY, WATERMARK_KEY } from "../../../src/core/engine/intents";
@@ -58,7 +62,22 @@ type Harness = {
   runPass: () => Promise<void>;
 };
 
-function harness(entities: WorldEntity[] = [entity("e1", "Ada")]): Harness {
+function thread(id: string, over: Partial<Thread> = {}): Thread {
+  return {
+    id,
+    title: id,
+    text: `The commitment called ${id}.`,
+    horizon: "plot",
+    entityIds: [],
+    status: "open",
+    ...over,
+  };
+}
+
+function harness(
+  entities: WorldEntity[] = [entity("e1", "Ada")],
+  threads: Thread[] = [],
+): Harness {
   const store = createStore<RootState>(rootReducer);
   store.dispatch(
     persistedDataLoaded({
@@ -66,6 +85,7 @@ function harness(entities: WorldEntity[] = [entity("e1", "Ada")]): Harness {
         ...initialWorldState,
         entityIds: entities.map((e) => e.id),
         entitiesById: Object.fromEntries(entities.map((e) => [e.id, e])),
+        threads,
       },
     }),
   );
@@ -390,6 +410,32 @@ describe("the pass", () => {
       .join("\n");
     expect(text).toContain("Ada");
     expect(text).not.toContain("Brennan");
+  });
+
+  it("shows triage the cap, each thread's horizon, and what an OPEN costs", async () => {
+    // §4.5: triage cannot justify a new thread against a ceiling it was never
+    // told about, and it must not be left inventing its own answer to which
+    // thread a create would take.
+    configure({ enabled: true, threadCap: 2 });
+    const h = harness(
+      [entity("e1", "Ada")],
+      [thread("Older debt", { horizon: "arc" }), thread("A dropped glove")],
+    );
+    triageReturns(h, "");
+    await h.runPass();
+
+    const factory = h.generate.mock.calls[0][0] as () => Promise<{
+      messages: Message[];
+    }>;
+    const block = (await factory()).messages
+      .map((m) => m.content ?? "")
+      .find((c) => c.startsWith("=== THREADS"));
+    expect(block).toContain("=== THREADS (2 of 2) ===");
+    expect(block).toContain("- Older debt [arc]:");
+    expect(block).toContain("- A dropped glove [plot]:");
+    expect(block).toContain(
+      "The list is full. Opening another displaces: A dropped glove",
+    );
   });
 
   // ──────────────────────── nothing new to look at ────────────────────────

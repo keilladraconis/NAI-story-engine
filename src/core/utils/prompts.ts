@@ -740,6 +740,14 @@ export function buildOpeningDirectionPrompt(guidance: string): string {
 // "Verb in capitals" is load-bearing, not cosmetic: parseTriage refuses a
 // lowercase verb, which is what stops a chatty sentence like "Open the door"
 // from being read as a command.
+//
+// §4.5 asks triage to justify a new thread against the cap. That is a rule
+// here, not a grammar: the numbers — how many threads are held, how many the
+// story allows, which one the next OPEN would cost — are data, and they arrive
+// in the manifest triage is shown (`triage-strategy.ts`). OPEN gains no syntax
+// to carry a nomination back, because parseTriage drops what it cannot map and
+// the reducer enforces the cap whatever triage says: an answer nothing consumes
+// is not worth a new way to be silently dropped.
 
 export const TRIAGE_SYSTEM = `You are the triage pass of a story engine. You read the prose a writer has just produced and answer one question: what in the recorded World now needs attention?
 
@@ -756,6 +764,9 @@ RULES:
 - Act only on what the NEW PROSE establishes. Not on what the manifest already records, not on what you expect to happen next.
 - REVISE and RETIRE may name only something the manifest lists. If it is not listed, say nothing about it.
 - A permanent change to a person, place, or thing is a REVISE of that entity. OPEN is for a commitment that wants closing later.
+- Threads are a fixed number of slots. The THREADS heading gives how many the story holds and how many it allows; when the list is full it also names the thread your next OPEN would displace. That is what the new thread costs, and the choice of which one goes is already made — do not argue with it or offer a different one.
+- At the limit, emit OPEN only if the commitment you are naming matters more to the story than the one it would cost. A passing detail is not worth an arc. When it is not worth it, say nothing — the commitment stays in the prose and a later pass can raise it again.
+- Never RETIRE a thread to make room. RETIRE means the prose settled it. A thread already marked "satisfied" is settled — say nothing about it.
 - One command per line. Verb in capitals, then the name or subject. No quotes, no bullets, no numbering, no explanation after the name.
 - Most passes need nothing. Emitting no commands at all is a correct and common answer — say nothing rather than find something.`;
 

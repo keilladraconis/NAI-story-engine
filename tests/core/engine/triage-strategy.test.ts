@@ -27,12 +27,57 @@ const MANIFEST: TriageManifest = {
       id: "g1",
       title: "The hidden letter",
       text: "Ada pocketed a letter she has not read.",
+      horizon: "plot",
+      status: "open",
     },
-    { id: "g2", title: "Debt to the Syndicate", text: "" },
+    {
+      id: "g2",
+      title: "Debt to the Syndicate",
+      text: "",
+      horizon: "arc",
+      status: "open",
+    },
   ],
+  threadCap: 8,
 };
 
-const EMPTY_MANIFEST: TriageManifest = { entities: [], threads: [] };
+const EMPTY_MANIFEST: TriageManifest = {
+  entities: [],
+  threads: [],
+  threadCap: 8,
+};
+
+/** A manifest whose thread list is `count` long, with an optional override on
+ *  the first entry — the cap cases are all about the list's shape, not its
+ *  prose. */
+function threaded(
+  count: number,
+  threadCap: number,
+  over: Partial<TriageManifest["threads"][number]> = {},
+): TriageManifest {
+  const threads = Array.from({ length: count }, (_, i) => ({
+    id: `t${i}`,
+    title: `Thread ${i}`,
+    text: `The ${i}th commitment.`,
+    horizon: "plot" as const,
+    status: "open" as const,
+    ...(i === 0 ? over : {}),
+  }));
+  return { entities: [], threads, threadCap };
+}
+
+/** The manifest block triage was actually shown, minus the prose and the ask. */
+async function threadBlock(manifest: TriageManifest): Promise<string> {
+  const { messages } = await createTriageFactory({
+    manifest,
+    assessment: assessment(),
+  })();
+  return (
+    messages
+      .map((m) => m.content ?? "")
+      .find((c) => c.startsWith("=== THREADS")) ?? ""
+  );
+}
 
 describe("parseTriage — the three commands", () => {
   it("maps REVISE back to an entity id", () => {
@@ -191,6 +236,107 @@ describe("parseTriage — untrusted text", () => {
   });
 });
 
+describe("the manifest states the cap triage has to justify against", () => {
+  it("gives the fill and the ceiling in the threads heading", async () => {
+    const block = await threadBlock(threaded(3, 8));
+    expect(block.split("\n")[0]).toBe("=== THREADS (3 of 8) ===");
+  });
+
+  it("carries each thread's horizon", async () => {
+    const block = await threadBlock(MANIFEST);
+    expect(block).toContain(
+      "- The hidden letter [plot]: Ada pocketed a letter she has not read.",
+    );
+    expect(block).toContain("- Debt to the Syndicate [arc]");
+  });
+
+  it("marks a satisfied thread and spends no tokens on its reminder", async () => {
+    // A settled commitment has nothing left to remind anyone of; what it still
+    // has is a slot, which is the only reason it is listed at all.
+    const block = await threadBlock(
+      threaded(2, 8, { status: "satisfied", text: "Long since settled." }),
+    );
+    expect(block).toContain("- Thread 0 [plot, satisfied]");
+    expect(block).not.toContain("Long since settled.");
+  });
+
+  it("names nothing while there is room", async () => {
+    const block = await threadBlock(threaded(3, 8));
+    expect(block).not.toContain("displaces");
+    expect(block).not.toContain("full");
+  });
+
+  it("names the thread the next OPEN would cost, once the list is full", async () => {
+    const block = await threadBlock(threaded(3, 3));
+    expect(block).toContain(
+      "The list is full. Opening another displaces: Thread 0",
+    );
+  });
+
+  it("nominates the victim the reducer would actually take", async () => {
+    // Not the oldest: a satisfied thread goes first whatever its age, and the
+    // model must not be left to invent its own answer to that.
+    const full = threaded(3, 3);
+    const block = await threadBlock({
+      ...full,
+      threads: full.threads.map((t, i) =>
+        i === 2 ? { ...t, status: "satisfied" as const } : t,
+      ),
+    });
+    expect(block).toContain("displaces: Thread 2");
+    expect(block).not.toContain("displaces: Thread 0");
+  });
+
+  it("names every thread a create would cost after the cap was lowered", async () => {
+    const block = await threadBlock(threaded(4, 2));
+    expect(block).toContain(
+      "The list is full. Opening another displaces: Thread 0, Thread 1, Thread 2",
+    );
+  });
+
+  it("keeps the whole manifest in one message ahead of the prose", async () => {
+    // The stable prefix is the point (§8): a cap line in its own message after
+    // the prose would break the shared prefix on every pass.
+    const { messages } = await createTriageFactory({
+      manifest: threaded(3, 3),
+      assessment: assessment(),
+    })();
+    const contents = messages.map((m) => m.content ?? "");
+    expect(contents.filter((c) => c.includes("=== THREADS"))).toHaveLength(1);
+    expect(
+      contents.findIndex((c) => c.includes("The list is full")),
+    ).toBeLessThan(contents.findIndex((c) => c.includes("=== NEW PROSE ===")));
+  });
+});
+
+describe("parseTriage — the wire format did not change", () => {
+  it("still reads a bare OPEN, cap or no cap", () => {
+    expect(parseTriage("OPEN the letter Ada took", threaded(3, 3))).toEqual([
+      { kind: "open", subject: "the letter Ada took" },
+    ]);
+  });
+
+  it("keeps the subject when the model justifies the cost after it", () => {
+    // Being told what an OPEN costs is an invitation to explain the trade. The
+    // existing separator tolerance is what stops that becoming a dropped line —
+    // which is why OPEN gained no syntax to carry the justification in.
+    const text = [
+      "OPEN the sealed letter — worth more than Thread 0",
+      "OPEN the debt at midwinter | displaces Thread 0",
+    ].join("\n");
+    expect(parseTriage(text, threaded(3, 3))).toEqual([
+      { kind: "open", subject: "the sealed letter" },
+      { kind: "open", subject: "the debt at midwinter" },
+    ]);
+  });
+
+  it("still resolves RETIRE against a thread the manifest lists", () => {
+    expect(parseTriage("RETIRE Thread 1", threaded(3, 3))).toEqual([
+      { kind: "retire", threadId: "t1" },
+    ]);
+  });
+});
+
 function assessment(over: Partial<Assessment> = {}): Assessment {
   return {
     backlog: 2,
@@ -295,7 +441,8 @@ describe("createTriageFactory", () => {
     })();
     const text = messages.map((m) => m.content ?? "").join("\n");
     expect(text).not.toContain("KNOWN ENTITIES");
-    expect(text).not.toContain("OPEN THREADS");
+    // No threads means no ceiling worth stating: an OPEN costs nothing.
+    expect(text).not.toContain("=== THREADS");
     // The new prose and the ask survive on their own.
     expect(text).toContain("turned the key");
   });

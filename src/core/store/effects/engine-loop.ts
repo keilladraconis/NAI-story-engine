@@ -187,6 +187,7 @@ async function readQueue(nodeId: number): Promise<Intent[]> {
 function buildManifest(
   state: RootState,
   candidateIds: string[],
+  threadCap: number,
 ): TriageManifest {
   const label = (entity: WorldEntity): string =>
     FIELD_CONFIGS.find((c) => c.id === entity.categoryId)?.label ?? "";
@@ -201,19 +202,20 @@ function buildManifest(
       summary: entity.summary,
     }));
 
-  // Every thread, not only the open ones. `status` exists as of phase 5 but
-  // nothing sets it to "satisfied" yet — retirement is phase 6 — so filtering
-  // on it here would be filtering on a field that is always "open". Triage may
-  // name one already retired; dedupe bounds the repeat and drain only logs, so
-  // it is inert until phase 6. Task 5 is where the manifest learns about the
-  // cap and each thread's horizon.
+  // Every thread, not only the open ones, and `status` rides along rather than
+  // filtering: §4.5's cap is over the whole list, so a manifest that hid the
+  // satisfied ones would show triage a fill the reducer does not agree with.
+  // The prompt marks them instead, which also tells the model that the cheapest
+  // slot to spend is already standing (`triage-strategy.ts`).
   const threads = state.world.threads.map((thread) => ({
     id: thread.id,
     title: thread.title,
     text: thread.text,
+    horizon: thread.horizon,
+    status: thread.status,
   }));
 
-  return { entities, threads };
+  return { entities, threads, threadCap };
 }
 
 /** The one generation a pass spends, with the bounded backoff from §3.4.
@@ -363,7 +365,11 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
         return;
       }
 
-      const manifest = buildManifest(getState(), assessment.candidateIds);
+      const manifest = buildManifest(
+        getState(),
+        assessment.candidateIds,
+        settings.threadCap,
+      );
       const intents = parseTriage(
         await generateTriage(genX, manifest, assessment, log),
         manifest,

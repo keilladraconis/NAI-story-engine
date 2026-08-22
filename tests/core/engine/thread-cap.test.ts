@@ -8,7 +8,9 @@ import { describe, it, expect } from "vitest";
 import {
   EXPIRY_WINDOWS,
   THREAD_EXPIRY_PARAGRAPHS,
+  displacedByNextThread,
   displacementOrder,
+  effectiveCap,
   enforceThreadCap,
   isThreadExpired,
 } from "../../../src/core/engine/thread-cap";
@@ -187,6 +189,74 @@ describe("enforceThreadCap — room for the newest", () => {
   it("has nothing to do with an empty list", () => {
     const threads: Thread[] = [];
     expect(enforceThreadCap(threads, 8)).toBe(threads);
+  });
+});
+
+describe("effectiveCap — the cap as the reducer applies it", () => {
+  it.each([
+    [0, 1],
+    [-5, 1],
+    [Number.NaN, 1],
+    [2.9, 2],
+    [8, 8],
+  ])("reads %s as %s", (given, expected) => {
+    expect(effectiveCap(given)).toBe(expected);
+  });
+});
+
+describe("displacedByNextThread — what the next OPEN costs", () => {
+  it("costs nothing while there is room", () => {
+    expect(displacedByNextThread([thread("a"), thread("b")], 8)).toEqual([]);
+  });
+
+  it("names the weakest thread once the list is exactly full", () => {
+    const threads = [thread("arc", "arc"), thread("point", "point")];
+    expect(ids(displacedByNextThread(threads, 2))).toEqual(["point"]);
+  });
+
+  it("prefers to spend a satisfied thread, whatever its horizon", () => {
+    const threads = [
+      thread("point", "point"),
+      thread("done", "arc", "satisfied"),
+    ];
+    expect(ids(displacedByNextThread(threads, 2))).toEqual(["done"]);
+  });
+
+  it("names every thread a create would cost after the cap was lowered", () => {
+    const threads = [
+      thread("a", "arc"),
+      thread("b", "plot"),
+      thread("c", "point"),
+      thread("d", "plot"),
+    ];
+    // 4 held, 2 allowed: the newcomer takes one slot and three must go.
+    expect(ids(displacedByNextThread(threads, 2))).toEqual(["c", "b", "d"]);
+  });
+
+  it("agrees with the reducer, for every cap over the same list", () => {
+    // The whole point of the nomination: what the manifest tells a model its
+    // next OPEN would cost has to be what enforceThreadCap actually takes. Two
+    // implementations of that would drift, so this asserts they are one.
+    const threads = [
+      thread("a", "arc"),
+      thread("b", "point", "satisfied"),
+      thread("c", "plot"),
+      thread("d", "point"),
+    ];
+    const newcomer = thread("newest", "plot");
+    for (const cap of [1, 2, 3, 4, 5, 8]) {
+      const survivors = new Set(
+        ids(enforceThreadCap([...threads, newcomer], cap)),
+      );
+      const dropped = ids(threads).filter((id) => !survivors.has(id));
+      expect(ids(displacedByNextThread(threads, cap)).sort()).toEqual(
+        dropped.sort(),
+      );
+    }
+  });
+
+  it("costs nothing on an empty list", () => {
+    expect(displacedByNextThread([], 1)).toEqual([]);
   });
 });
 

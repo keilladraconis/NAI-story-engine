@@ -25,7 +25,18 @@
 // long ago the prose last mentioned either.
 
 import { PARAGRAPH_CHARS, THREAD_RANGE_CHARS } from "./thread-horizon";
-import type { Thread, ThreadHorizon } from "../store/types";
+import type { Thread, ThreadHorizon, ThreadStatus } from "../store/types";
+
+/** The two fields the displacement order actually reads.
+ *
+ *  Generic rather than `Thread` because the reducer is not the only caller any
+ *  more: the triage manifest carries a projection of a thread — id, title,
+ *  text, horizon, status — and it has to be able to tell a model which thread
+ *  its next `OPEN` would cost. A second implementation of the ordering for the
+ *  prompt's benefit is a second implementation that will disagree with the one
+ *  the reducer enforces, and a prompt that names the wrong victim is worse than
+ *  one that names none. */
+export type Displaceable = { horizon: ThreadHorizon; status: ThreadStatus };
 
 /** How readily a horizon is given up, ascending. A point is a detail the story
  *  was expected to pick up in the same beat; an arc is its spine. Sacrificing
@@ -52,11 +63,11 @@ const HORIZON_WEIGHT: Record<ThreadHorizon, number> = {
  *     actually stopped caring about, and those are only loosely related.
  *
  *  Exported because the ordering is the decision — the reducer only consumes
- *  its first element, but phase 6's triage prompt has to be able to tell a
- *  model which thread its next `OPEN` would displace.
+ *  its first element, but the triage prompt has to be able to tell a model
+ *  which thread its next `OPEN` would displace (`displacedByNextThread`).
  *
  *  Sorts a copy: the caller's array is store state. */
-export function displacementOrder(threads: Thread[]): Thread[] {
+export function displacementOrder<T extends Displaceable>(threads: T[]): T[] {
   return threads
     .map((thread, index) => ({ thread, index }))
     .sort(
@@ -67,6 +78,38 @@ export function displacementOrder(threads: Thread[]): Thread[] {
         a.index - b.index,
     )
     .map((entry) => entry.thread);
+}
+
+/** The cap as everything downstream must read it.
+ *
+ *  `Math.max(1, …)` rather than trusting the caller: the settings floor makes a
+ *  cap below 1 unreachable through the form, but a zero arriving from anywhere
+ *  else would empty the world on every create. `Math.floor` for the same reason
+ *  `normalizeEngineSettings` floors — a cap of 8.5 admits 8.
+ *
+ *  Exported so the triage prompt states the same ceiling the reducer enforces
+ *  rather than a rounded-differently copy of it. */
+export function effectiveCap(cap: number): number {
+  return Math.max(1, Math.floor(cap) || 1);
+}
+
+/** Which threads a create would cost right now — empty while there is room.
+ *
+ *  `threads` is the list as it stands, WITHOUT the newcomer: this answers the
+ *  question before the create, which is the question triage is asked (§4.5,
+ *  "justify a new thread against the cap"). `enforceThreadCap` answers the same
+ *  question after, from the same ordering, so the two cannot disagree about who
+ *  goes — `thread-cap.test.ts` asserts that against the reducer directly.
+ *
+ *  More than one name comes back only when the cap has been lowered under a
+ *  list that was already legal, which is exactly when a create brings the list
+ *  all the way down rather than draining it one at a time. */
+export function displacedByNextThread<T extends Displaceable>(
+  threads: T[],
+  cap: number,
+): T[] {
+  const overflow = threads.length + 1 - effectiveCap(cap);
+  return overflow <= 0 ? [] : displacementOrder(threads).slice(0, overflow);
 }
 
 /** The thread list as it should stand after a create, given the cap.
@@ -92,11 +135,7 @@ export function displacementOrder(threads: Thread[]): Thread[] {
  *  Returns the same array when nothing has to give way, so the reducer can hand
  *  it straight back and subscribers do not repaint for an unchanged list. */
 export function enforceThreadCap(threads: Thread[], cap: number): Thread[] {
-  // `Math.max(1, …)` rather than trusting the caller: the settings floor makes
-  // a cap below 1 unreachable through the form, but a zero arriving from
-  // anywhere else would empty the world on every create. `Math.floor` for the
-  // same reason `normalizeEngineSettings` floors — a cap of 8.5 admits 8.
-  const limit = Math.max(1, Math.floor(cap) || 1);
+  const limit = effectiveCap(cap);
   if (threads.length <= limit) return threads;
 
   const newest = threads[threads.length - 1];
