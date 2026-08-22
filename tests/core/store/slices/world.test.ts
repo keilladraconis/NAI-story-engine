@@ -14,6 +14,8 @@ import {
   threadRenamed,
   threadTextUpdated,
   threadMemberToggled,
+  threadHorizonSet,
+  threadStatusSet,
 } from "../../../../src/core/store/slices/world";
 import {
   Thread,
@@ -188,6 +190,16 @@ describe("the thread cap", () => {
     );
     expect(after.world.threads).toHaveLength(12);
     expect(after.world.threads[0].title).toBe("renamed");
+
+    // The two actions phase 5 adds go the same way: editing a thread over an
+    // over-full list (a cap lowered after the fact, or a branch load) must not
+    // silently spend one of the writer's threads.
+    for (const action of [
+      threadHorizonSet({ threadId: "t0", horizon: "arc" }),
+      threadStatusSet({ threadId: "t0", status: "satisfied" }),
+    ]) {
+      expect(rootReducer(before, action).world.threads).toHaveLength(12);
+    }
   });
 
   it("touches nothing but the thread list when it displaces", () => {
@@ -258,6 +270,96 @@ describe("threadMemberToggled", () => {
       threadMemberToggled({ threadId: "t1", entityId: "e1" }),
     );
     expect(state.threads[0].entityIds).not.toContain("e1");
+  });
+});
+
+describe("threadHorizonSet", () => {
+  it("sets the horizon of the thread named, and nothing else about it", () => {
+    const state = reduce(
+      makeState({ threads: [{ ...THREAD, entityIds: ["e1"] }] }),
+      threadHorizonSet({ threadId: "t1", horizon: "arc" }),
+    );
+    expect(state.threads[0]).toEqual({
+      ...THREAD,
+      entityIds: ["e1"],
+      horizon: "arc",
+    });
+  });
+
+  it("leaves the other threads where they were", () => {
+    const other: Thread = { ...THREAD, id: "t2", horizon: "point" };
+    const state = reduce(
+      makeState({ threads: [THREAD, other] }),
+      threadHorizonSet({ threadId: "t1", horizon: "arc" }),
+    );
+    expect(state.threads.map((t) => t.horizon)).toEqual(["arc", "point"]);
+  });
+
+  it("is a setter, not a cycle: the same payload twice lands the same value", () => {
+    // Idempotence is the guard, not a tap window (CLAUDE.md). The pane sends
+    // the horizon it means, so a second press of the same button cannot walk
+    // the value on to the next one.
+    const once = reduce(
+      makeState({ threads: [THREAD] }),
+      threadHorizonSet({ threadId: "t1", horizon: "point" }),
+    );
+    const twice = reduce(
+      once,
+      threadHorizonSet({ threadId: "t1", horizon: "point" }),
+    );
+    expect(twice.threads).toEqual(once.threads);
+  });
+
+  it("no-ops on an id no thread has", () => {
+    const state = reduce(
+      makeState({ threads: [THREAD] }),
+      threadHorizonSet({ threadId: "nope", horizon: "arc" }),
+    );
+    expect(state.threads).toEqual([THREAD]);
+  });
+});
+
+describe("threadStatusSet", () => {
+  it("marks a thread satisfied without touching the rest of it", () => {
+    const state = reduce(
+      makeState({ threads: [{ ...THREAD, entityIds: ["e1"] }] }),
+      threadStatusSet({ threadId: "t1", status: "satisfied" }),
+    );
+    expect(state.threads[0]).toEqual({
+      ...THREAD,
+      entityIds: ["e1"],
+      status: "satisfied",
+    });
+  });
+
+  it("reopens a satisfied thread", () => {
+    const satisfied: Thread = { ...THREAD, status: "satisfied" };
+    const state = reduce(
+      makeState({ threads: [satisfied] }),
+      threadStatusSet({ threadId: "t1", status: "open" }),
+    );
+    expect(state.threads[0].status).toBe("open");
+  });
+
+  it("is a setter, not a toggle: the same payload twice lands the same value", () => {
+    const once = reduce(
+      makeState({ threads: [THREAD] }),
+      threadStatusSet({ threadId: "t1", status: "satisfied" }),
+    );
+    const twice = reduce(
+      once,
+      threadStatusSet({ threadId: "t1", status: "satisfied" }),
+    );
+    expect(twice.threads[0].status).toBe("satisfied");
+    expect(twice.threads).toEqual(once.threads);
+  });
+
+  it("no-ops on an id no thread has", () => {
+    const state = reduce(
+      makeState({ threads: [THREAD] }),
+      threadStatusSet({ threadId: "nope", status: "satisfied" }),
+    );
+    expect(state.threads).toEqual([THREAD]);
   });
 });
 

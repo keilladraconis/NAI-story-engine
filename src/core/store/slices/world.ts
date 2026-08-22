@@ -229,6 +229,14 @@ export const worldSlice = createSlice({
       threads: state.threads.filter((t) => t.id !== payload.threadId),
     }),
 
+    // `threadRenamed`, `threadMemberToggled` and `threadHorizonSet` are the
+    // three actions a thread's forgetting detector is built from:
+    // `buildThreadCondition` (src/core/engine/thread-condition.ts) reads
+    // `title` for its fallback probe, the members' names for the real one, and
+    // `horizon` for the range. Nothing writes `advancedConditions` yet — §7
+    // reconciliation is phase 6 — but whatever does must rebuild on all three
+    // of them, or a renamed thread goes on probing for a name the prose no
+    // longer uses and fires forever.
     threadRenamed: (state, payload: { threadId: string; title: string }) => ({
       ...state,
       threads: state.threads.map((t) =>
@@ -263,6 +271,36 @@ export const worldSlice = createSlice({
       }),
     }),
 
+    /** The horizon is a *set*, never a cycle: the pane sends the horizon its
+     *  button means, so a second press of the same button is the same value
+     *  rather than a step on to the next one. That is what "design intents to
+     *  be idempotent" buys where a debounce is forbidden. */
+    threadHorizonSet: (
+      state,
+      payload: { threadId: string; horizon: ThreadHorizon },
+    ) => ({
+      ...state,
+      threads: state.threads.map((t) =>
+        t.id === payload.threadId ? { ...t, horizon: payload.horizon } : t,
+      ),
+    }),
+
+    /** Satisfaction is a flag, and flipping it is all this does. §4.4 retires a
+     *  satisfied thread by disabling its lorebook entry, which is the Engine
+     *  acting and therefore phase 6; until then the flag is what the writer
+     *  sets, what the World list reads, and what the cap spends first
+     *  (`displacementOrder`). A setter for the same reason as the horizon
+     *  above: a toggle would make two presses mean nothing. */
+    threadStatusSet: (
+      state,
+      payload: { threadId: string; status: ThreadStatus },
+    ) => ({
+      ...state,
+      threads: state.threads.map((t) =>
+        t.id === payload.threadId ? { ...t, status: payload.status } : t,
+      ),
+    }),
+
     threadLorebookEntrySet: (
       state,
       payload: { threadId: string; entryId: string | undefined },
@@ -295,5 +333,7 @@ export const {
   threadRenamed,
   threadTextUpdated,
   threadMemberToggled,
+  threadHorizonSet,
+  threadStatusSet,
   threadLorebookEntrySet,
 } = worldSlice.actions;
