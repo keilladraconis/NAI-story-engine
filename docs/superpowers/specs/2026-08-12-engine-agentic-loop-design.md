@@ -1412,6 +1412,20 @@ there is no entry behind the thread.
   `NumberField`s against its length. The form still spells its three fields out —
   the list is what makes them _countable_, which a bare type union never was, and
   that is how a setting stayed unreachable for a whole task.
+- **The detector cannot resolve its own subjects, so it does not try.** The plan
+  had `buildThreadCondition(thread, entities: WorldEntity[])` resolve the cast
+  through `entity.name`. But the entry a thread's detector probes for is keyed on
+  `lorebookEntry.displayName`, and CLAUDE.md's DRAFT > LOREBOOK > STATE order
+  exists precisely because writers rename entries in their own lorebook and Story
+  Engine does not chase the move — so `entity.name` is the layer allowed to be
+  stale, and a probe built from it watches for a string the prose no longer uses,
+  never matches, and fires forever: the always-on entry the detector exists to
+  replace. `resolveDisplayName` is the canonical resolution and it is async,
+  while this module is pure. So the caller resolves, and the signature says so:
+  `ThreadMember = {id, displayName}`, which a `WorldEntity` does not satisfy.
+  Phase 6 gets a type error rather than a comment it can trust past its
+  expiry.
+
 - **A pre-existing defect fixed in passing.** `MemberToggle` in `ThreadEditPane`
   swapped `ToggleRight`/`ToggleLeft` at a fixed position, and its re-render is
   detached — the click dispatches, and the row repaints from the `useSlice`

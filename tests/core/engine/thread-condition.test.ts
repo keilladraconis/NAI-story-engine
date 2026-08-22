@@ -2,23 +2,21 @@ import { describe, it, expect } from "vitest";
 import {
   buildThreadCondition,
   threadSubjects,
+  type ThreadMember,
 } from "../../../src/core/engine/thread-condition";
 import { THREAD_RANGE_CHARS } from "../../../src/core/engine/thread-horizon";
 import { nameKey } from "../../../src/core/store/effects/handlers/lorebook";
 import type { Thread, WorldEntity } from "../../../src/core/store/types";
 
-function entity(id: string, name: string): WorldEntity {
-  return {
-    id,
-    categoryId: "dramatisPersonae" as WorldEntity["categoryId"],
-    lifecycle: "live",
-    name,
-    summary: "",
-  };
+/** A member as the CALLER must hand it over: an id and the name the member's
+ *  lorebook entry is actually keyed on. Not a `WorldEntity` — that is the
+ *  point of the signature (see below). */
+function member(id: string, displayName: string): ThreadMember {
+  return { id, displayName };
 }
 
-const ADA = entity("e1", "Ada");
-const BRENNAN = entity("e2", "Brennan");
+const ADA = member("e1", "Ada");
+const BRENNAN = member("e2", "Brennan");
 const CAST = [ADA, BRENNAN];
 
 /** A thread as the Forge's [THREAD] command lands one: a prose title, a cast,
@@ -90,7 +88,7 @@ describe("buildThreadCondition — the shape", () => {
       entityIds: ["e1", "e2", "e3"],
     });
     expect(
-      buildThreadCondition(big, [...CAST, entity("e3", "Céline")]),
+      buildThreadCondition(big, [...CAST, member("e3", "Céline")]),
     ).toHaveLength(1);
   });
 });
@@ -133,7 +131,7 @@ describe("threadSubjects — what the detector watches for", () => {
 
   it("keeps the thread's member order and ignores non-members", () => {
     const t = thread({ title: "", entityIds: ["e2", "e1"] });
-    expect(threadSubjects(t, [...CAST, entity("e9", "Nobody")])).toEqual([
+    expect(threadSubjects(t, [...CAST, member("e9", "Nobody")])).toEqual([
       "brennan",
       "ada",
     ]);
@@ -145,12 +143,38 @@ describe("threadSubjects — what the detector watches for", () => {
   });
 
   it("drops a nameless draft member rather than probing for nothing", () => {
-    const draft: WorldEntity = {
-      ...entity("e3", "   "),
-      lifecycle: "draft",
-    };
+    const draft = member("e3", "   ");
     const t = thread({ title: "", entityIds: ["e1", "e3"] });
     expect(threadSubjects(t, [...CAST, draft])).toEqual(["ada"]);
+  });
+
+  it("probes the name the CALLER resolved, not a Redux name it went and found", () => {
+    // CLAUDE.md's resolution order is DRAFT > LOREBOOK > STATE for exactly this
+    // field: a writer who renames "Ada" to "Ada Lovelace" in their own lorebook
+    // has moved the string the entry is keyed on, and Story Engine does not
+    // chase that move — `entity.name` still says "Ada". The detector probes for
+    // a mention, so it has to probe for the entry's name; the caller is the one
+    // that can resolve it (`resolveDisplayName` is async, and this is pure).
+    //
+    // The signature is what enforces that. `WorldEntity` has `name`, not
+    // `displayName`, so a phase-6 caller cannot hand this the world and get a
+    // detector quietly watching for the wrong string — it gets a type error.
+    const renamed = member("e1", "Ada Lovelace");
+    const t = thread({ title: "", entityIds: ["e1"] });
+    expect(threadSubjects(t, [renamed])).toEqual(["ada lovelace"]);
+
+    const stale: WorldEntity = {
+      id: "e1",
+      categoryId: "dramatisPersonae" as WorldEntity["categoryId"],
+      lifecycle: "live",
+      name: "Ada",
+      summary: "",
+    };
+    // Checked by `npx tsc --noEmit` (tests are in the project), not at runtime:
+    // a `WorldEntity` has `name`, so it cannot stand in for a resolved member.
+    // @ts-expect-error a WorldEntity is not a resolved subject
+    const rejected: ThreadMember = stale;
+    void rejected;
   });
 
   it("dedupes a title that repeats a member's name", () => {
@@ -171,7 +195,7 @@ describe("threadSubjects — hostile names", () => {
   const hostile = ["C++", "(redacted)", "/Ada/", "Kel$er [II]", "a|b"];
 
   it.each(hostile)("passes %s through as the entry's own key", (name) => {
-    const e = entity("e7", name);
+    const e = member("e7", name);
     const t = thread({ title: "", entityIds: ["e7"] });
 
     const subjects = threadSubjects(t, [e]);

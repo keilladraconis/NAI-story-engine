@@ -8,16 +8,43 @@
 // the probe inverts the cost model: a thread is silent while it is alive in the
 // prose and injects precisely when the model has stopped carrying it.
 //
-// Pure. The caller hands over the thread and the entities to resolve its cast
-// against; nothing here reads `api.v1` or the store, and nothing here writes the
-// result onto a lorebook entry — that is phase 6's.
+// Pure. The caller hands over the thread and its cast WITH THE NAMES ALREADY
+// RESOLVED (see `ThreadMember`); nothing here reads `api.v1` or the store, and
+// nothing here writes the result onto a lorebook entry — that is phase 6's.
 //
 // Nothing in `src/` used `advancedConditions` before this file, so there is no
 // house style: every shape below is read off `external/script-types.d.ts`.
 
 import { nameKey } from "../store/effects/handlers/lorebook";
 import { THREAD_RANGE_CHARS } from "./thread-horizon";
-import type { Thread, WorldEntity } from "../store/types";
+import type { Thread } from "../store/types";
+
+/** One member of a thread's cast, as the CALLER must hand it over: an id, and
+ *  the name that member's lorebook entry is actually keyed on.
+ *
+ *  **Not a `WorldEntity`, and the difference is the whole point.** The detector
+ *  probes for a mention, and what the entry is keyed on is written from
+ *  `lorebookEntry.displayName` (`handlers/lorebook.ts`) — which a writer may
+ *  have renamed in their own lorebook, a move Story Engine deliberately does
+ *  not chase (CLAUDE.md). `entity.name` is the LAST of CLAUDE.md's three
+ *  layers, DRAFT > LOREBOOK > STATE, so resolving from it is resolving from the
+ *  one that is allowed to be stale. `resolveDisplayName` in
+ *  `utils/lorebook-strategy.ts` is the canonical resolution and it is async,
+ *  which is exactly why it cannot happen in here: this module is pure, and
+ *  making it async to fetch names would put an `api.v1` call under the
+ *  condition builder.
+ *
+ *  So the resolution is the caller's, and the type is what makes that
+ *  unavoidable. `WorldEntity` has `name`, not `displayName`, so phase 6 cannot
+ *  pass the world straight in and end up with a detector watching for a string
+ *  the entry no longer carries — it gets a type error instead of a thread that
+ *  reminds forever. */
+export type ThreadMember = {
+  id: string;
+  /** The resolved name — `resolveDisplayName`'s answer for this member's entry,
+   *  not `WorldEntity.name`. */
+  displayName: string;
+};
 
 /** The strings whose presence in recent prose means "this thread is still
  *  alive". Exported for the tests and for phase 6, which will want to show a
@@ -25,11 +52,14 @@ import type { Thread, WorldEntity } from "../store/types";
  *
  *  **Decision 1 — the subject is the cast's names, plus the title.**
  *
- *  Entity names are the only strings we can expect to appear in prose verbatim:
+ *  Member names are the only strings we can expect to appear in prose verbatim:
  *  they are proper nouns, and the writer's own entries are keyed on exactly
- *  this string already (`nameKey` — trim + lowercase, shared with the entry so
- *  the detector and the entry can never disagree about what counts as a
- *  mention; that is why it is imported rather than re-spelled).
+ *  this string already. `nameKey` is imported rather than re-spelled so that
+ *  the detector and the entry normalise a name the same way — trim and
+ *  lowercase. That is all it buys. It does NOT make the two agree about WHICH
+ *  string: the entry's key is written from `lorebookEntry.displayName`, and a
+ *  `WorldEntity.name` can have drifted from it. Which string this probes for is
+ *  settled by the caller, per `ThreadMember` above.
  *
  *  The title is included but not relied on. A title is prose — "The hidden
  *  letter" will rarely appear as written — and a thread whose only subject never
@@ -42,9 +72,18 @@ import type { Thread, WorldEntity } from "../store/types";
  *  inherited baggage — the cast is the subject.
  *
  *  Members are resolved through `thread.entityIds` against the supplied list, in
- *  the thread's own member order, so a caller may pass the whole world just as
- *  well as the participants. An id with no entity is skipped rather than
- *  guessed at.
+ *  the thread's own member order, so a caller may pass every resolved member of
+ *  the world just as well as this thread's. An id no member answers to is
+ *  skipped rather than guessed at.
+ *
+ *  **What phase 6 must do with this.** Build the `ThreadMember[]` from the
+ *  lorebook — `resolveDisplayName`'s order, entry `displayName` ahead of
+ *  `entity.name` — and rebuild the condition whenever a name it probes for
+ *  changes, alongside the three actions `slices/world.ts` already names
+ *  (`threadRenamed`, `threadMemberToggled`, `threadHorizonSet`). A condition
+ *  built from a stale name probes for a string the prose no longer uses, never
+ *  matches, and so fires forever: the always-on entry this detector exists to
+ *  replace, arriving by the door it opened.
  *
  *  Blank subjects are dropped: an empty key would be a lie in whichever
  *  direction NovelAI resolves it (matching everywhere, or nowhere). Draft
@@ -58,13 +97,13 @@ import type { Thread, WorldEntity } from "../store/types";
  *  same key the entry itself carries, whatever NovelAI makes of them. */
 export function threadSubjects(
   thread: Thread,
-  entities: WorldEntity[],
+  members: ThreadMember[],
 ): string[] {
-  const byId = new Map(entities.map((e) => [e.id, e]));
+  const byId = new Map(members.map((m) => [m.id, m]));
   const names = thread.entityIds
     .map((id) => byId.get(id))
-    .filter((e): e is WorldEntity => e !== undefined)
-    .map((e) => e.name);
+    .filter((m): m is ThreadMember => m !== undefined)
+    .map((m) => m.displayName);
 
   const seen = new Set<string>();
   const subjects: string[] = [];
@@ -123,10 +162,10 @@ export function threadSubjects(
  *  resolved" would spend context asserting a negative. */
 export function buildThreadCondition(
   thread: Thread,
-  entities: WorldEntity[],
+  members: ThreadMember[],
 ): LorebookCondition[] {
   const range = THREAD_RANGE_CHARS[thread.horizon];
-  const subjects = threadSubjects(thread, entities);
+  const subjects = threadSubjects(thread, members);
 
   if (subjects.length === 0) return [{ type: "true" }];
 
