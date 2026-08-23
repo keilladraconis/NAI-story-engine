@@ -733,6 +733,18 @@ the loop, so the parameter ships exercised rather than dormant. Everything a rea
 sees — bootstrap, lorebook content, chat, forge chat, the Foundation fields — stays
 `"creative"`.
 
+**Corrected in phase 6: the split is by what dominates the task, not by output
+surface.** Read literally, the list above sends the Engine's entry rewrite to the
+creative model, because a lorebook entry is lorebook content. That is the wrong
+answer, and the list is only wrong because it was written in phase 3 when every
+lorebook-content callsite was hand-driven — a writer asking for an entry to be
+invented from a summary, and reading it before it lands. A revise and a condense
+are neither: they transform a document the writer already owns, under a rule about
+what an entry may say, **unattended**. Fidelity dominates voice, and the creative
+fine-tune's failure mode is embellishment — invented specifics in an entry nobody
+watched being written. Both go to `"instruct"`. The hand-driven Generate Content
+button stays creative and is unchanged.
+
 A single loop pass is therefore not a single model, and needs no new plumbing:
 `params` is already per-strategy and `GenerationStrategy` supports a
 `messageFactory`.
@@ -783,6 +795,14 @@ in `deriveHud`'s `stateOf`.)
 | backlog | unread paragraphs since the watermark | climbing = falling behind |
 | threads | count of open threads | context pressure — climbing means go close some |
 | touched | entities revised on this branch | activity level |
+
+**As built, `touched` is a session count, not a branch count.** The engine slice is
+in-memory and never rehydrated, so a counter fed from what the drain executed
+survives a branch switch, does not survive a reload, and does not move with undo —
+three ways to disagree with "on this branch". The branch-truthful number is the
+count of `lb:<entryId>` records at the current node, which §7's reconciliation
+already walks at every navigation; recomputing it there is what makes the slot mean
+what this table says.
 | budget | remaining output bucket | why it's quiet when it's quiet |
 | ⚡ (`zap`) | **the one control** — run a pass now | — |
 

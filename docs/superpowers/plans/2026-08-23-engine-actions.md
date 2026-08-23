@@ -232,6 +232,22 @@ is the failure mode.
 
 ### Task 4: Condense, and the threshold that triggers it
 
+**Task 3 handoff.** `DrainDeps` is now `{dispatch, getState, nodeId, newText, genX,
+log}` — `newText` as well as `genX`, because an entry rewrite is a function of what
+the story newly made true and the drain cannot derive that. Reuse from Task 3:
+`buildLorebookPrefillFromEntry`, `composeRevision`'s truncation contract (**trim,
+never continue** — the hand path's `LOREBOOK_CONTENT_MAX_CALLS = 4` would spend 4096
+out of a 2048/240s bucket), the door, and `"instruct"` (see §8's phase-6 correction —
+same reasoning, same answer). **Do not** reuse `buildLorebookContentPayload`; what is
+reusable is the entry-text conventions, not the strategy. An earlier draft of this
+plan said "do not invent a second idiom" while pointing at a path Task 3 then proved
+unusable — that tension is resolved this way.
+
+**A condense counts as touched.** `revisionsIn` currently filters `kind === "revise"`
+only, and Task 3 left the question open. §9.1's slot is "activity level" and a
+condense is an entry rewrite the writer would want to know happened; count it, and
+widen `revisionsIn` rather than adding a second counter.
+
 **Files:** modify `src/core/utils/prompts.ts`, `src/core/engine/settings.ts`,
 `src/ui/panels/setup/EngineSettings.tsx`, `src/ui/panels/setup/engine-settings-model.ts`,
 `src/core/engine/assess.ts`, `src/core/engine/execute.ts`; tests.
@@ -347,6 +363,18 @@ state and does not revert what the Engine _did_. On `onHistoryNavigated` (whose
 Keep `reconcile.ts` pure — the decision, not the I/O. §7 is explicit that the
 stored copy answers "what did we do", never "what does it say", so read-then-write
 survives.
+
+**Recompute `touched` from the `lb:` records.** §9.1 calls it "entities revised on
+this branch"; as built it is a session count that survives a branch switch, dies on
+reload, and does not move with undo. You are already walking
+`listLorebookWriteRecords(nodeId)` at every navigation, so the branch-truthful number
+is free here. In scope.
+
+**Key off the `lb:` record, never the snapshot.** Task 1 takes the §5.2 snapshot
+_before_ the edit runs, deliberately — so a revise whose generation was refused or
+unusable leaves a storyStorage original for an entry that was never modified.
+Harmless for restore (it restores to itself), but it means "has a snapshot" is not a
+proxy for "the Engine has touched this entry". The record is.
 
 **Decide, consciously, whether the retire flag flip is reconcilable.** A retire
 writes no text, so Task 1 records no fingerprint and §7 has nothing to compare —
