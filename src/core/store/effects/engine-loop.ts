@@ -38,11 +38,17 @@
 import { matchesAction, type Store } from "nai-store";
 import type { GenX } from "nai-gen-x";
 import type { AppDispatch, RootState, WorldEntity } from "../types";
-import { assess, type Watermark } from "../../engine/assess";
+import {
+  assess,
+  oversizedEntries,
+  type EntrySize,
+  type Watermark,
+} from "../../engine/assess";
 import { readEngineSettings } from "../../engine/settings";
 import { canStartPass, type Intent } from "../../engine/loop-machine";
 import { dedupe, QUEUE_KEY, WATERMARK_KEY } from "../../engine/intents";
 import { drain, revisionsIn } from "../../engine/execute";
+import { readCondenseMark, worthCondensing } from "../../engine/condense";
 import {
   backoffMs,
   isConcurrencyRefusal,
@@ -212,6 +218,59 @@ function buildManifest(
   }));
 
   return { entities, threads, threadCap };
+}
+
+/** §5.1's trigger: the one entry, if any, this pass should offer to condense.
+ *
+ *  Free — no generation, just a lorebook read and some arithmetic — which is
+ *  the whole reason the intent is enqueued here rather than proposed by triage.
+ *  Three decisions are worth stating, because each one is a way this goes
+ *  wrong:
+ *
+ *  **Only entries the Engine manages.** An oversized lorebook entry no entity
+ *  of ours is bound to is the writer's own document; it is not sprawl the
+ *  Engine's revisions created, and rewriting it is not something switching the
+ *  loop on asks for. Disabled entries are skipped too: they inject nothing, so
+ *  compacting one is a lossy rewrite with nothing to gain (§5.1's whole case is
+ *  the context a bloated entry crowds out).
+ *
+ *  **At most one per pass.** §3.3 affords one entry rewrite per pass, so
+ *  enqueueing every oversized entry at once would not condense them any faster
+ *  — it would leave the NEXT pass's revise queued behind a FIFO backlog of
+ *  maintenance work for as many passes as there are long entries. The
+ *  counterweight would starve the revisions it is a counterweight to. The
+ *  longest entry is the one taken, being the one costing the most context; the
+ *  rest are found again next pass, and §3.3 is explicit that a queued action is
+ *  safe indefinitely.
+ *
+ *  **The mark, not just the length.** The trigger is otherwise memoryless, and
+ *  an entry whose facts genuinely do not fit under the threshold would be
+ *  offered on every pass forever. `worthCondensing` wants a paragraph of growth
+ *  since the last attempt — and the walk continues past a blocked entry rather
+ *  than stopping, or the largest permanently-blocked entry would hide every
+ *  other one behind it. */
+async function nextCondense(
+  state: RootState,
+  thresholdChars: number,
+): Promise<Intent[]> {
+  const managed = new Set(
+    Object.values(state.world.entitiesById)
+      .map((entity) => entity.lorebookEntryId)
+      .filter((id): id is string => id !== undefined),
+  );
+  if (managed.size === 0) return [];
+
+  const sizes: EntrySize[] = (await api.v1.lorebook.entries())
+    .filter((entry) => managed.has(entry.id) && entry.enabled !== false)
+    .map((entry) => ({ entryId: entry.id, length: (entry.text ?? "").length }));
+
+  for (const size of oversizedEntries(sizes, thresholdChars)) {
+    const mark = await readCondenseMark(size.entryId);
+    if (worthCondensing(size.length, mark)) {
+      return [{ kind: "condense", entryId: size.entryId }];
+    }
+  }
+  return [];
 }
 
 /** The one generation a pass spends, with the bounded backoff from §3.4.
@@ -417,6 +476,14 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
         manifest,
       );
 
+      // §5.1's condense, appended AFTER what triage named rather than before
+      // it. Both cost 1024 and the drain is FIFO among costly intents, so the
+      // order here decides which one a pass with room for exactly one rewrite
+      // spends it on — and a revise records something the story has just made
+      // true, while a condense tidies something that has been long for a while
+      // and will still be long next pass.
+      const condense = await nextCondense(getState(), settings.condenseAtChars);
+
       // What the pass is about to act on: what triage just named, PLUS anything
       // an earlier pass deferred for budget. The machine is told this rather
       // than `intents` alone, and it has to be: once the drain can defer, a
@@ -424,7 +491,7 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // machine the empty `intents` would leave the HUD reading `idle` through
       // a drain that is editing the writer's lorebook. `acting` is the one
       // phase §9.1 spends the pencil on, so it must not be skipped.
-      const enqueued = dedupe(queue, intents);
+      const enqueued = dedupe(queue, [...intents, ...condense]);
       dispatch(engineLoopEvent({ type: "triaged", intents: enqueued }));
 
       // Rule 1: the pass got its answer, so the prose behind it has been read.

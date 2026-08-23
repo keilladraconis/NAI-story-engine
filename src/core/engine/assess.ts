@@ -1,4 +1,5 @@
-// The free half of a pass: what is new, and who might be in it.
+// The free half of a pass: what is new, who might be in it, and what has grown
+// too long.
 //
 // Pure string work over sections the caller has already read. No generation, so
 // this can end a pass at zero cost — which is what makes triage affordable to
@@ -7,6 +8,14 @@
 // Candidate matching is cheap and generous on purpose. Precision is triage's
 // job. A false candidate costs a few input tokens in the manifest; a missed one
 // costs a commitment nobody ever notices.
+//
+// `oversizedEntries` at the bottom is §5.1's trigger, and it is here for the
+// same reason everything else in this file is: it decides something for free.
+// An entry's length needs no model, so a condense is enqueued directly and
+// triage is never spent noticing that something is long. It takes LENGTHS
+// rather than entries, so this file still touches no api.v1 — reading the
+// lorebook is the effect's job (the same split §14.1 recorded for key
+// matching).
 
 import type { WorldEntity } from "../store/types";
 
@@ -105,4 +114,34 @@ export function assess(input: AssessInput): Assessment {
     .map((e) => e.id);
 
   return { backlog: pieces.length, newText, candidateIds };
+}
+
+// ─────────────────────── the free condense trigger (§5.1) ───────────────────────
+
+/** One measurable lorebook entry: which, and how long its text is. */
+export type EntrySize = {
+  entryId: string;
+  /** `LorebookEntry.text.length`, in characters — the unit `condenseAtChars`
+   *  and `PARAGRAPH_CHARS` are both in. */
+  length: number;
+};
+
+/** The entries past the threshold, **longest first**.
+ *
+ *  Strictly past it: an entry sitting exactly on the threshold is not over it,
+ *  so the setting reads as "the longest an entry may be" rather than "the first
+ *  length that is too long".
+ *
+ *  Sorted rather than returned in whatever order the lorebook lists them,
+ *  because the caller acts on one per pass (§3.3 affords one entry rewrite) and
+ *  the longest entry is both the one costing the most context and the one with
+ *  the most to compact. An arbitrary order would make which entry gets tidied
+ *  first a property of the lorebook's internal ordering. */
+export function oversizedEntries(
+  sizes: readonly EntrySize[],
+  thresholdChars: number,
+): EntrySize[] {
+  return sizes
+    .filter((size) => size.length > thresholdChars)
+    .sort((a, b) => b.length - a.length);
 }

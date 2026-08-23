@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { assess } from "../../../src/core/engine/assess";
+import {
+  assess,
+  oversizedEntries,
+  type EntrySize,
+} from "../../../src/core/engine/assess";
 import type { WorldEntity } from "../../../src/core/store/types";
 
 function entity(id: string, name: string): WorldEntity {
@@ -283,5 +287,45 @@ describe("assess — candidates", () => {
       }),
     );
     expect(a.candidateIds).toEqual([]);
+  });
+});
+
+// ─────────────────────── the free condense trigger (§5.1) ───────────────────────
+
+describe("oversizedEntries", () => {
+  const sizes: EntrySize[] = [
+    { entryId: "small", length: 500 },
+    { entryId: "huge", length: 4000 },
+    { entryId: "big", length: 2400 },
+    { entryId: "exactly", length: 2000 },
+  ];
+
+  it("names every entry past the threshold, largest first", () => {
+    // Largest first because the pass acts on one per firing: the entry costing
+    // the most context is the one worth the pass's single entry rewrite.
+    expect(oversizedEntries(sizes, 2000).map((e) => e.entryId)).toEqual([
+      "huge",
+      "big",
+    ]);
+  });
+
+  it("leaves an entry sitting exactly on the threshold alone", () => {
+    // "Crossing" a size, not reaching it — so the setting reads as the longest
+    // an entry is allowed to be rather than the first length that is too long.
+    expect(oversizedEntries(sizes, 2000).map((e) => e.entryId)).not.toContain(
+      "exactly",
+    );
+  });
+
+  it("names nothing when nothing has grown", () => {
+    expect(oversizedEntries(sizes, 10_000)).toEqual([]);
+    expect(oversizedEntries([], 2000)).toEqual([]);
+  });
+
+  it("costs no generation at all", () => {
+    // §5.1's whole point: an entry's length is measurable for free, so triage
+    // is never spent noticing that something is long. Pure string arithmetic —
+    // this file imports no api.v1 and the function takes lengths, not entries.
+    expect(oversizedEntries(sizes, 100)).toHaveLength(4);
   });
 });

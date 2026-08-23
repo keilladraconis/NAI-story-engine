@@ -484,6 +484,173 @@ describe("the pass", () => {
     expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
   });
 
+  // ─────────────────────── the free condense trigger ───────────────────────
+
+  /** A managed entity whose lorebook entry has sprawled. */
+  function bloated(chars: number): string {
+    return `Ada\nType: Character\n\n${"She is a locksmith of some skill. ".repeat(Math.ceil(chars / 33))}`;
+  }
+
+  /** Triage says nothing, then the model returns a compaction. */
+  function triageThenCompaction(h: Harness, body: string): void {
+    h.generate
+      .mockResolvedValueOnce({
+        choices: [{ text: "", index: 0, token_ids: [] }],
+      })
+      .mockResolvedValue({
+        choices: [
+          { text: body, index: 0, token_ids: [], finish_reason: "stop" },
+        ],
+      });
+  }
+
+  it("condenses an entry that has outgrown the threshold, without asking triage", async () => {
+    // §5.1: an entry's length is measurable in assess, which is free, so the
+    // intent is enqueued directly. Triage returns nothing here and the pass
+    // still acts.
+    installStoryStorageFake();
+    configure({ enabled: true, condenseAtChars: 800 });
+    const lorebook = installLorebookFake();
+    const text = bloated(1600);
+    lorebook.seed({ id: "lb-ada", displayName: "Ada", text, enabled: true });
+    const h = harness([{ ...entity("e1", "Ada"), lorebookEntryId: "lb-ada" }]);
+    triageThenCompaction(h, "A locksmith of some skill. ".repeat(30));
+
+    await h.runPass();
+
+    expect(lorebook.read("lb-ada")?.text).toContain(
+      "A locksmith of some skill.",
+    );
+    expect((lorebook.read("lb-ada")?.text ?? "").length).toBeLessThan(
+      text.length,
+    );
+    expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
+  });
+
+  it("offers one entry per pass, so a World full of long entries cannot bury the revises", async () => {
+    // The drain affords one entry rewrite per pass (§3.3). Enqueueing every
+    // oversized entry at once would leave the next pass's revise queued behind
+    // a backlog of maintenance work, in FIFO, for as many passes as there are
+    // long entries — the counterweight starving what it is a counterweight to.
+    installStoryStorageFake();
+    configure({ enabled: true, condenseAtChars: 800 });
+    const lorebook = installLorebookFake();
+    lorebook.seed({
+      id: "lb-small",
+      displayName: "Ada",
+      text: bloated(1000),
+      enabled: true,
+    });
+    lorebook.seed({
+      id: "lb-large",
+      displayName: "Brennan",
+      text: bloated(3000),
+      enabled: true,
+    });
+    const h = harness([
+      { ...entity("e1", "Ada"), lorebookEntryId: "lb-small" },
+      { ...entity("e2", "Brennan"), lorebookEntryId: "lb-large" },
+    ]);
+    triageThenCompaction(h, "A locksmith of some skill. ".repeat(40));
+
+    await h.runPass();
+
+    // The longest one — the entry costing the most context.
+    expect(writesTo(QUEUE_KEY)[0]).toEqual([
+      { kind: "condense", entryId: "lb-large" },
+    ]);
+  });
+
+  it("queues a condense behind what triage named", async () => {
+    // Maintenance is safe indefinitely (§3.3: prose does not un-happen), while
+    // a revise records something the story just made true. FIFO in the drain
+    // then means the revise is the one that gets the pass's rewrite.
+    installStoryStorageFake();
+    configure({ enabled: true, condenseAtChars: 800 });
+    const lorebook = installLorebookFake();
+    lorebook.seed({
+      id: "lb-ada",
+      displayName: "Ada",
+      text: bloated(1600),
+      enabled: true,
+    });
+    const h = harness([{ ...entity("e1", "Ada"), lorebookEntryId: "lb-ada" }]);
+    h.generate.mockResolvedValue({
+      choices: [
+        { text: "REVISE Ada", index: 0, token_ids: [], finish_reason: "stop" },
+      ],
+    });
+
+    await h.runPass();
+
+    expect(writesTo(QUEUE_KEY)[0]).toEqual([
+      { kind: "revise", entityId: "e1" },
+      { kind: "condense", entryId: "lb-ada" },
+    ]);
+  });
+
+  it("leaves a long entry no entity of ours is bound to alone", async () => {
+    // The Engine condenses what it manages. A lorebook the writer keeps by hand
+    // is not sprawl the Engine created, and rewriting it is not something they
+    // asked for by switching the loop on.
+    installStoryStorageFake();
+    configure({ enabled: true, condenseAtChars: 800 });
+    const lorebook = installLorebookFake();
+    lorebook.seed({
+      id: "lb-theirs",
+      displayName: "The Guild",
+      text: bloated(4000),
+      enabled: true,
+    });
+    const h = harness([entity("e1", "Ada")]);
+    triageReturns(h, "");
+
+    await h.runPass();
+
+    expect(h.generate).toHaveBeenCalledTimes(1);
+    expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
+  });
+
+  it("leaves a disabled entry alone, because it is costing no context", async () => {
+    // A retired thread's entry, or one the writer switched off: it injects
+    // nothing, so compacting it is a lossy rewrite with nothing to gain.
+    installStoryStorageFake();
+    configure({ enabled: true, condenseAtChars: 800 });
+    const lorebook = installLorebookFake();
+    lorebook.seed({
+      id: "lb-ada",
+      displayName: "Ada",
+      text: bloated(4000),
+      enabled: false,
+    });
+    const h = harness([{ ...entity("e1", "Ada"), lorebookEntryId: "lb-ada" }]);
+    triageReturns(h, "");
+
+    await h.runPass();
+
+    expect(h.generate).toHaveBeenCalledTimes(1);
+    expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
+  });
+
+  it("reads the threshold from the setting, not from a constant", async () => {
+    installStoryStorageFake();
+    configure({ enabled: true, condenseAtChars: 4000 });
+    const lorebook = installLorebookFake();
+    lorebook.seed({
+      id: "lb-ada",
+      displayName: "Ada",
+      text: bloated(1600),
+      enabled: true,
+    });
+    const h = harness([{ ...entity("e1", "Ada"), lorebookEntryId: "lb-ada" }]);
+    triageReturns(h, "");
+
+    await h.runPass();
+
+    expect(h.generate).toHaveBeenCalledTimes(1);
+    expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
+  });
+
   it("mirrors the machine into the store for the HUD to read", async () => {
     const h = harness();
     triageReturns(h, "REVISE Ada");
