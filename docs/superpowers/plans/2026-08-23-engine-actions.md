@@ -184,6 +184,15 @@ an upstream change, say so and make the failure visible instead.
 
 ### Task 3: Revise
 
+**Task 2 handoff.** `drain(queue, deps)` and `execute(intent, deps)` exist;
+`DrainDeps` is `{dispatch, getState, nodeId, log}` and **you must add `genX: GenX`
+to it** and thread it from `createEnginePass` — Task 2 left it out rather than ship
+a dead field. `INTENT_MAX_TOKENS` already prices revise at 1024 and the per-intent
+budget check already enforces it, so your arm inherits the pacing; do not
+re-implement it. `execute` returns `"executed" | "skipped"`, and `executed` is what
+`LoopState.touched` reads — Task 3 is its first writer, so the "Always 0 until
+phase 6" comment in `loop-machine.ts` is yours to correct.
+
 **Files:** modify `src/core/utils/prompts.ts`, `src/core/engine/execute.ts`;
 create a strategy module if the shape warrants it; tests.
 

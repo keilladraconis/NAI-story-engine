@@ -186,6 +186,15 @@ lorebook entry rewrite and can consume half the bucket on its own, while triage,
 opening a thread, and retiring one are cheap or free. So entry rewrites are the
 scarce operation and everything else is nearly incidental.
 
+**Two corrections the drain forced.** The budget must be re-read **per intent**, not
+once before the drain starts: after a 1024-token rewrite the bucket has moved, and a
+single reading spends twice out of a bucket that covers one. And the drain rule as
+originally written — keep going while the allowance stays above a triage reserve —
+would block a **free** retire behind an unaffordable revise, contradicting this
+table's own zero-cost row. Costly intents defer in FIFO order so cheap work cannot
+starve the scarce operation; zero-cost intents are exempt, because a resolved plot
+left in the writer's context costs them something and costs us nothing to remove.
+
 **Therefore: triage runs hot, actions run cold.** This is not merely affordable, it
 is the correct asymmetry. A commitment never noticed is lost permanently, whereas a
 queued action is safe indefinitely — a thread's condition does not fire until its
@@ -1359,6 +1368,31 @@ widget — and §3.5 is explicit that a background loop has no business demandin
 Continue click. The Engine's pre-check is output-only. Narrow, and the fix is a
 question about how the Engine's tasks are queued in GenX rather than a patch to the
 pass, so it wants its own thinking alongside the actions in phase 6.
+
+**Resolved in phase 6: it cannot be fixed from this side, and the queuing framing
+above is wrong.** Four facts in `nai-gen-x` close every route. `ensureBudget` parks
+unconditionally and ignores `behaviour`, and the status belongs to the GenX
+_instance_ rather than the task, so no per-task opt-out exists. A parked task cannot
+be abandoned — `waitForAllowedInput`/`waitForAllowedOutput` take a token count and
+no signal, GenX re-reads `signal.cancelled` only _after_ they resolve, and
+`cancelQueued` is a no-op once a task is executing; abandoning is precisely what
+§3.5 wants and precisely what is unavailable. `userInteraction()` only relabels the
+status and lets the same await continue. And a pre-check in the pass cannot predict
+the park at all: GenX compares _total_ input tokens against `getAllowedInput()`, the
+_uncached_ allowance, so any reserve either reproduces that mismatch — holding
+forever on a prefix the backend has cached, and the layered prefix is the entire
+point of the triage prompt — or uses the honest `countUncachedInputTokens` and
+fails to predict GenX.
+
+A second GenX instance whose `onStateChange` is never mirrored into the store does
+work, and was rejected: it costs the serialisation that keeps the Engine from
+colliding with SEGA and the Forge, and adds a second `onGenerationRequested`
+registration to a codebase where one-callback-per-hook has already bitten twice.
+
+The residual is a Continue widget that appears only while the Engine is genuinely
+blocked, clears on the writer's next generation, and does the right thing if
+pressed. **Closing it needs an upstream change: a per-task "do not park" that
+rejects instead of waiting.**
 
 ### 14.2 Phase 5 as built
 
