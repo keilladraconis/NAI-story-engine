@@ -209,9 +209,9 @@ describe("deriveHud — the counting slots", () => {
     expect(m.threadsTotal).toBe(1);
   });
 
-  it("renders touched honestly as 0 for the whole of this phase", () => {
-    // Nothing revises anything until phase 6. A permanent 0 is correct
-    // information; hiding the slot would change the modeline's shape.
+  it("passes the revision count straight through", () => {
+    // Zero until the drain's revise arm landed (phase 6, Task 3), and still
+    // the honest reading on a session that has revised nothing.
     expect(deriveHud(state(), INPUTS).touched).toBe(0);
     expect(deriveHud(state({ touched: 23 }), INPUTS).touched).toBe(23);
   });

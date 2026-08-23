@@ -37,7 +37,18 @@ export type LoopState = {
   backlog: number;
   /** Intents enqueued by the last pass. Phase 4 logs these; phase 6 runs them. */
   queued: number;
-  /** Entities revised on this branch. Always 0 until phase 6. */
+  /** Entity entries the Engine has rewritten — §9.1's `∆`.
+   *
+   *  Counted from the drain's own `executed` list (`revisionsIn`), so a
+   *  declined or skipped revise never lands here: this is writes, not
+   *  attempts.
+   *
+   *  §9.1 words it as "on this branch", and this counter is not that — it lives
+   *  in memory and accumulates for the session, so it neither survives a reload
+   *  nor moves with an undo. The branch-truthful answer is the number of `lb:`
+   *  records at the current node, which §7's reconciliation already walks; that
+   *  is where recomputing it belongs (phase 6, Task 7) rather than here, where
+   *  the machine would have to become async to ask. */
   touched: number;
   consecutiveFailures: number;
 };
@@ -47,6 +58,11 @@ export type LoopEvent =
   | { type: "assessed"; backlog: number; candidateIds: string[] }
   | { type: "triaged"; intents: Intent[] }
   | { type: "drained" }
+  /** How many entity entries the drain rewrote. Separate from `drained`
+   *  because a drain that ran out of budget mid-queue reports
+   *  `budgetExhausted` instead and may still have revised something first —
+   *  hanging the count on one of them would lose it on the other. */
+  | { type: "revised"; count: number }
   | { type: "budgetExhausted" }
   /** `retryable` comes from refusal.ts's classifier. True means a routine
    *  concurrency collision, which must not count toward a stall. */
@@ -116,6 +132,13 @@ export function loopReducer(state: LoopState, event: LoopEvent): LoopState {
             backlog: 0,
             consecutiveFailures: 0,
           };
+
+    case "revised":
+      // Identity when there is nothing to add: the HUD subscribes to this
+      // slice, and every pass would otherwise repaint it for a zero.
+      return event.count === 0
+        ? state
+        : { ...state, touched: state.touched + event.count };
 
     case "drained":
       return {

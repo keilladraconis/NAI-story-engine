@@ -31,6 +31,28 @@ export function trimStopTail(text: string, stops: string[]): string {
   return text;
 }
 
+/** True when the sampler stopped because it ran out of room rather than because
+ *  the model finished. The two spellings are both observed in the wild, so the
+ *  question is asked in one place — every caller that has to decide "is this
+ *  text cut off" reads the same answer. */
+export function isTruncated(finishReason: string | undefined): boolean {
+  return finishReason === "length" || finishReason === "max_tokens";
+}
+
+/** Prepend the erato "----\n" divider to non-empty content when erato mode is on
+ *  and it isn't already prefixed.
+ *
+ *  Lives here rather than beside one of its callers because three of them are
+ *  now unrelated — the entity edit pane's Save, the lorebook completion handler,
+ *  and the Engine's own entry rewrite — and an entry that loses its divider
+ *  because one of them forgot is a silent formatting regression for exactly the
+ *  writers who turned the setting on. */
+export function applyEratoPrefix(content: string, erato: boolean): string {
+  if (content && erato && !content.startsWith("----\n"))
+    return "----\n" + content;
+  return content;
+}
+
 export async function isXialongMode(): Promise<boolean> {
   return Boolean(await api.v1.config.get("xialong_mode"));
 }

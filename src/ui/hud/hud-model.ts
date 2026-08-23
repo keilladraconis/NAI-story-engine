@@ -39,7 +39,8 @@ export type HudModel = {
   /** Every thread, satisfied ones included — what the cap counts (§4.5). The
    *  tooltip says both; the slot draws only `threads`. */
   threadsTotal: number;
-  /** Entities revised on this branch. Always 0 until phase 6 executes intents. */
+  /** Entity entries the Engine has rewritten — see `LoopState.touched` for why
+   *  this is a session count rather than the branch count §9.1 words it as. */
   touched: number;
   /** Filled bars out of `BUDGET_BARS`. See `budgetBarsOf`. */
   budgetBars: number;
@@ -140,10 +141,11 @@ export function deriveHud(state: RootState, inputs: HudInputs): HudModel {
     // number cannot be both without the label lying about one of them.
     threads: world.threads.filter((t) => t.status === "open").length,
     threadsTotal: world.threads.length,
-    // Honest 0 for the whole of this phase: nothing revises anything until
-    // phase 6. A permanent 0 is correct information, and a slot that appears
-    // later is a modeline that changes shape (§9.1: fixed slots, always
-    // present, always in the same position).
+    // Entity entries the Engine has rewritten this session. Zero until the
+    // drain's revise arm landed, and still zero on any session that revised
+    // nothing — which is why the slot is always drawn rather than appearing
+    // when it becomes non-zero (§9.1: fixed slots, always present, always in
+    // the same position).
     touched: engine.touched,
     budgetBars: budgetBarsOf(inputs.allowedOutput),
     // The ⚡ is inert when the Engine is off — the effect refuses the pass for

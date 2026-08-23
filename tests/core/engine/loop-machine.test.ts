@@ -12,6 +12,47 @@ function run(events: LoopEvent[], from: LoopState = initialLoopState) {
   return events.reduce(loopReducer, from);
 }
 
+describe("loopReducer — touched", () => {
+  it("counts the revisions a drain made", () => {
+    // §9.1's ∆. Phase 6 Task 3 is its first writer: before revise executed,
+    // nothing in the loop ever changed an entity's entry.
+    const s = run([
+      { type: "passRequested" },
+      { type: "assessed", backlog: 4, candidateIds: [] },
+      { type: "triaged", intents: [{ kind: "revise", entityId: "e1" }] },
+      { type: "revised", count: 1 },
+      { type: "drained" },
+    ]);
+    expect(s.touched).toBe(1);
+  });
+
+  it("accumulates across passes rather than reporting the last one", () => {
+    const s = run([
+      { type: "revised", count: 2 },
+      { type: "revised", count: 1 },
+    ]);
+    expect(s.touched).toBe(3);
+  });
+
+  it("returns the same state for a drain that revised nothing", () => {
+    // Identity, not a copy: the HUD subscribes to this slice and a new object
+    // is a repaint for a pass that changed nothing.
+    const before = initialLoopState;
+    expect(loopReducer(before, { type: "revised", count: 0 })).toBe(before);
+  });
+
+  it("leaves the phase alone — it is a count, not a lifecycle step", () => {
+    const acting = run([
+      { type: "passRequested" },
+      { type: "assessed", backlog: 4, candidateIds: [] },
+      { type: "triaged", intents: [{ kind: "revise", entityId: "e1" }] },
+    ]);
+    expect(loopReducer(acting, { type: "revised", count: 1 }).phase).toBe(
+      "acting",
+    );
+  });
+});
+
 describe("loopReducer — the happy path", () => {
   it("walks assess → triage → drain → idle", () => {
     const s1 = loopReducer(initialLoopState, { type: "passRequested" });

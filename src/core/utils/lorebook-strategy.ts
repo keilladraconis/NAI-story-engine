@@ -296,17 +296,31 @@ export const buildLorebookPrefill = async (
   entryId: string,
 ): Promise<string> => {
   const entry = await api.v1.lorebook.entry(entryId);
-  if (!entry) return "";
+  return entry ? buildLorebookPrefillFromEntry(getState, entry) : "";
+};
 
+/**
+ * The same prefill, from an entry the caller has ALREADY read.
+ *
+ * The Engine's revise (design §5) is handed the live entry by the write door
+ * and may not fetch it again — read-then-write is the door's property, and a
+ * second read is a second answer to "what does this entry say". Splitting the
+ * fetch off keeps one implementation of the Name/Type/Setting header rather
+ * than a copy that drifts.
+ */
+export const buildLorebookPrefillFromEntry = async (
+  getState: () => RootState,
+  entry: LorebookEntry,
+): Promise<string> => {
   const state = getState();
   const displayName = await resolveDisplayName(
     state,
-    entryId,
+    entry.id,
     entry.displayName,
   );
   const categoryName = await resolveCategoryName(
     state,
-    entryId,
+    entry.id,
     entry.category,
   );
   const entryType = getEntryType(categoryName);

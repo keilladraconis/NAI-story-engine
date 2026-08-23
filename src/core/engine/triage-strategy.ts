@@ -101,7 +101,10 @@ export function triageParams(): Promise<GenerationParams> {
  *  read, and the newest writing is what triage exists to notice. */
 const NEW_PROSE_LIMIT = 12000;
 
-function clampProse(text: string): string {
+/** Exported for the revise prompt (§5), which must be shown the SAME window of
+ *  prose triage read. Two clamps would let a revise act on prose triage never
+ *  saw, or miss the sentence that caused the intent. */
+export function clampProse(text: string): string {
   if (text.length <= NEW_PROSE_LIMIT) return text;
   const tail = text.slice(-NEW_PROSE_LIMIT);
   // Open on a paragraph, not on half a sentence.

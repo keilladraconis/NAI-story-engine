@@ -42,7 +42,7 @@ import { assess, type Watermark } from "../../engine/assess";
 import { readEngineSettings } from "../../engine/settings";
 import { canStartPass, type Intent } from "../../engine/loop-machine";
 import { dedupe, QUEUE_KEY, WATERMARK_KEY } from "../../engine/intents";
-import { drain } from "../../engine/execute";
+import { drain, revisionsIn } from "../../engine/execute";
 import {
   backoffMs,
   isConcurrencyRefusal,
@@ -450,13 +450,28 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // node that writes. A deferred intent is the one exception, and §3.3 is
       // explicit about why — prose does not un-happen, so the work is still
       // wanted and rediscovering it would cost another triage call.
-      const { remaining } = await drain(enqueued, {
+      const { executed, remaining } = await drain(enqueued, {
         dispatch,
         getState,
         nodeId,
+        // The same prose triage was shown, from the same assessment. A revise
+        // rewrites an entry to carry what the story has NEWLY made true (§5),
+        // so re-deriving it here — or handing the drain the whole document —
+        // would be a different question than the one triage answered.
+        newText: assessment.newText,
+        genX,
         log,
       });
       await saveRecords({ [QUEUE_KEY]: remaining }, nodeId);
+
+      // §9.1's ∆, and the first phase in which it can be anything but zero.
+      // Dispatched before the resting event rather than folded into it: a drain
+      // that revised something AND ran out of budget reports `budgetExhausted`,
+      // so a count carried on `drained` alone would be lost exactly when the
+      // Engine was busiest.
+      const revised = revisionsIn(executed);
+      if (revised > 0)
+        dispatch(engineLoopEvent({ type: "revised", count: revised }));
 
       // A drain that ran out of budget mid-queue is `held`, not done: §9.1's
       // ⏸ says "the budget cannot cover the next step", which is exactly what

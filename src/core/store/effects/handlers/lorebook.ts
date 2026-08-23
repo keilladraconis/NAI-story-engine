@@ -7,7 +7,11 @@ import {
   CompletionContext,
 } from "../generation-handlers";
 import { buildLorebookPrefill } from "../../../utils/lorebook-strategy";
-import { LOREBOOK_CHAIN_STOPS, trimStopTail } from "../../../utils/config";
+import {
+  applyEratoPrefix,
+  LOREBOOK_CHAIN_STOPS,
+  trimStopTail,
+} from "../../../utils/config";
 import { segaKeysCompleted } from "../../slices/runtime";
 import { stripThinkingTags } from "../../../utils/tag-parser";
 import { RootState } from "../../types";
@@ -89,10 +93,7 @@ export const lorebookContentHandler: GenerationHandlers<LorebookContentTarget> =
 
         // Erato compatibility: prepend separator if needed
         const erato = (await api.v1.config.get("erato_compatibility")) || false;
-        const finalContent =
-          erato && !fullContent.startsWith("----\n")
-            ? "----\n" + fullContent
-            : fullContent;
+        const finalContent = applyEratoPrefix(fullContent, Boolean(erato));
 
         // Update lorebook entry with generated content
         await api.v1.lorebook.updateEntry(entryId, {

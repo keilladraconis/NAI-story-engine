@@ -7,22 +7,32 @@
 // snapshot, which is the one promise made to a writer whose lorebook is being
 // edited by a machine.
 //
-// Phase 6, Task 2 executes RETIRE and nothing else, deliberately: §3.3 prices it
+// Phase 6 fills the arms in price order. Task 2 took RETIRE, which §3.3 prices
 // at zero output tokens, so the skeleton — the branch, the budget policy, the
-// queue write-back — is provable end to end before Tasks 3–5 introduce actions
-// that cost 1024. The other three arms log exactly what phase 4 logged.
+// queue write-back — was provable end to end before anything cost 1024. Task 3
+// adds REVISE, the first arm that spends a generation. OPEN and CONDENSE still
+// log exactly what phase 4 logged.
 //
 // The switch has no `default`, and `INTENT_MAX_TOKENS` is a `Record` over the
 // union's `kind`. A fifth intent is therefore two compile errors — a missing arm
 // and a missing price — rather than an action that silently costs nothing and
 // silently does nothing. `intentKey` in intents.ts is the house precedent.
 
+import type { GenX } from "nai-gen-x";
 import type { AppDispatch, RootState } from "../store/types";
 import type { Intent } from "./loop-machine";
 import { intentKey } from "./intents";
 import { writeLorebookEntry } from "./lorebook-write";
+import { isConcurrencyRefusal } from "./refusal";
+import {
+  composeRevision,
+  createReviseFactory,
+  reviseParams,
+  REVISE_MAX_TOKENS,
+} from "./revise-strategy";
 import { threadStatusSet } from "../store/slices/world";
 import { TRIAGE_MAX_TOKENS } from "./triage-strategy";
+import { buildLorebookPrefillFromEntry } from "../utils/lorebook-strategy";
 
 /** What the pass hands the drain.
  *
@@ -38,6 +48,14 @@ export type DrainDeps = {
   dispatch: AppDispatch;
   getState: () => RootState;
   nodeId: number;
+  /** The prose the pass assessed — everything past the watermark, exactly as
+   *  triage was shown it. A revision is a function of what the story has newly
+   *  made true (§5), so the drain cannot derive it and must be handed it. */
+  newText: string;
+  /** The pass's generation queue. Injected rather than reached for (CLAUDE.md:
+   *  no singletons), and the same instance triage used, so the Engine's own
+   *  calls stay serialised behind one queue. */
+  genX: GenX;
   log: (...messages: unknown[]) => Promise<void>;
 };
 
@@ -76,7 +94,10 @@ export type DrainOutcome = {
 export const INTENT_MAX_TOKENS: Record<Intent["kind"], number> = {
   retire: 0,
   open: 150,
-  revise: 1024,
+  // The revise arm's own ceiling, imported rather than restated: the number
+  // the drain refuses to start without must be the number `max_tokens` then
+  // bounds the call at, or the pass promises one price and pays another.
+  revise: REVISE_MAX_TOKENS,
   condense: 1024,
 };
 
@@ -146,16 +167,99 @@ async function retire(
   return "executed";
 }
 
+/** §5's entry rewrite: the entry as it stands, plus the prose that changed it,
+ *  becomes the entry as it stands now.
+ *
+ *  **The generation happens INSIDE the door's producer callback**, which is the
+ *  whole shape of this function. The door hands over the live entry and takes a
+ *  patch back, so the prompt is necessarily built from what the entry says at
+ *  the moment of writing — §5's read-then-write is structural here rather than
+ *  remembered. It also means the §5.2 snapshot is already taken before the
+ *  model is asked anything, so a refusal, a decline, or a crash mid-generation
+ *  can never leave a rewritten entry with no original behind it.
+ *
+ *  The Engine does NOT reuse `buildLorebookContentStrategy` for this. That path
+ *  resolves the live entry inside its own message factory and its completion
+ *  handler calls `updateEntry` directly, so a revise built on it would write
+ *  around the door — no snapshot, no `lb:` record, nothing for §7 to reconcile.
+ *  `revise-strategy.ts` returns text to its caller instead, and the caller is
+ *  the door.
+ *
+ *  Three ways this consumes the intent without spending anything: the entity is
+ *  gone, the entity is a draft with no entry to rewrite, or the writer deleted
+ *  the entry (the door declines, and never recreates it — §6.2.1's uncovered
+ *  ancestor, by another route). A refused or unusable generation also declines,
+ *  and `written` is what tells the two apart from a write. */
+async function revise(
+  entityId: string,
+  deps: DrainDeps,
+): Promise<IntentResult> {
+  const entity = deps.getState().world.entitiesById[entityId];
+  if (!entity) return "skipped";
+
+  const entryId = entity.lorebookEntryId;
+  if (!entryId) {
+    // A draft the writer never cast. Casting one here would create a lorebook
+    // entry the writer did not ask for, which is not what REVISE means.
+    await deps.log(
+      `[engine] revise ${entity.name}: no lorebook entry, skipped`,
+    );
+    return "skipped";
+  }
+
+  const { written } = await writeLorebookEntry(
+    { entryId, nodeId: deps.nodeId },
+    async (live) => {
+      const prefill = await buildLorebookPrefillFromEntry(deps.getState, live);
+      const response = await deps.genX.generate(
+        createReviseFactory({ entry: live, prefill, newText: deps.newText }),
+        {
+          ...(await reviseParams()),
+          // GenX's own transient-error handler treats "in progress" as
+          // retryable and would sit on a collision for five backoffs, holding
+          // the pass, its node and its re-entry guard. The drain requeues a
+          // refused revise instead — see `drain`.
+          maxRetries: 0,
+          taskId: `engine-revise-${api.v1.uuid()}`,
+        },
+        undefined,
+        "background",
+      );
+
+      const choice = response.choices?.[0];
+      const text = await composeRevision(
+        prefill,
+        choice?.text ?? "",
+        choice?.finish_reason,
+      );
+      if (!text) {
+        // Declining leaves the entry exactly as it was. Writing an empty or
+        // half-finished revision would DELETE the writer's entry, because a
+        // revision replaces rather than appends.
+        await deps.log(
+          `[engine] revise ${entity.name}: nothing usable in the response, entry left alone`,
+        );
+        return null;
+      }
+      return { text };
+    },
+  );
+
+  return written ? "executed" : "skipped";
+}
+
 /** The branch. One arm per intent kind, no `default`. */
 async function execute(intent: Intent, deps: DrainDeps): Promise<IntentResult> {
   switch (intent.kind) {
     case "retire":
       return retire(intent.threadId, deps);
 
-    // Tasks 3–5. Logged exactly as phase 4 logged them, so the line a writer
+    case "revise":
+      return revise(intent.entityId, deps);
+
+    // Tasks 4–5. Logged exactly as phase 4 logged them, so the line a writer
     // with `story_engine_debug` on already knows does not change meaning
     // underneath them while the arms are still stubs.
-    case "revise":
     case "open":
     case "condense":
       await deps.log(`[engine] intent (not executed): ${intentKey(intent)}`);
@@ -206,11 +310,41 @@ export async function drain(
       continue;
     }
 
-    if ((await execute(intent, deps)) === "executed") {
-      executed.push(intent);
-      await deps.log(`[engine] executed ${intentKey(intent)}`);
+    try {
+      if ((await execute(intent, deps)) === "executed") {
+        executed.push(intent);
+        await deps.log(`[engine] executed ${intentKey(intent)}`);
+      }
+    } catch (error) {
+      // A failure nobody recognises belongs to the pass: it owns the classifier
+      // and the stall counter (§9.1's ⚠), and a drain that swallowed real
+      // faults would leave that slot permanently dark while the Engine did
+      // nothing every pass.
+      if (!isConcurrencyRefusal(error)) throw error;
+
+      // A collision is routine and self-clearing (§3.4). The work is still
+      // wanted — prose does not un-happen (§3.3) — so the intent is requeued
+      // rather than consumed, and the drain stops paying for costly work while
+      // the writer is plainly mid-generation. Free intents still run: a retire
+      // spends no generation and so cannot collide with one.
+      blocked = true;
+      remaining.push(intent);
+      await deps.log(
+        `[engine] ${intentKey(intent)} collided with the writer — requeued`,
+      );
     }
   }
 
   return { executed, remaining };
+}
+
+/** How many entity revisions a drain actually made — `LoopState.touched`, and
+ *  §9.1's `∆`.
+ *
+ *  Lives here rather than at the pass, because "what counts as touching an
+ *  entity" is a property of the arms: only a revise rewrites an entity's entry,
+ *  and only one that WROTE reaches `executed`. A declined or skipped revise
+ *  never does, so the count is writes and not attempts. */
+export function revisionsIn(executed: Intent[]): number {
+  return executed.filter((intent) => intent.kind === "revise").length;
 }

@@ -370,6 +370,81 @@ describe("the pass", () => {
     expect(h.store.getState().engine.phase).toBe("idle");
   });
 
+  it("executes a revise against the writer's lorebook, and counts it", async () => {
+    // The pass has to hand the drain two things it did not need for a retire:
+    // the generation queue, and the prose the pass assessed. Drop either and
+    // the revise cannot happen at all.
+    const story = installStoryStorageFake();
+    configure({ enabled: true });
+    const lorebook = installLorebookFake();
+    lorebook.seed({
+      id: "lb-ada",
+      displayName: "Ada",
+      text: "A locksmith with two hands.",
+      enabled: true,
+    });
+    const h = harness([{ ...entity("e1", "Ada"), lorebookEntryId: "lb-ada" }]);
+    h.generate
+      .mockResolvedValueOnce({
+        choices: [{ text: "REVISE Ada", index: 0, token_ids: [] }],
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            text: "Left hand gone below the wrist.",
+            index: 0,
+            token_ids: [],
+            finish_reason: "stop",
+          },
+        ],
+      });
+
+    await h.runPass();
+
+    expect(lorebook.read("lb-ada")?.text).toContain(
+      "Left hand gone below the wrist.",
+    );
+    // §5.2's original, kept before the model was asked anything.
+    expect(story.get(lorebookOriginalKey("lb-ada"))).toMatchObject({
+      text: "A locksmith with two hands.",
+    });
+    // §9.1's ∆ leaves 0 for the first time.
+    expect(h.store.getState().engine.touched).toBe(1);
+    expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
+    expect(h.store.getState().engine.phase).toBe("idle");
+  });
+
+  it("shows the revise the same prose it showed triage", async () => {
+    installStoryStorageFake();
+    configure({ enabled: true });
+    const lorebook = installLorebookFake();
+    lorebook.seed({
+      id: "lb-ada",
+      displayName: "Ada",
+      text: "x",
+      enabled: true,
+    });
+    const h = harness([{ ...entity("e1", "Ada"), lorebookEntryId: "lb-ada" }]);
+    triageReturns(h, "REVISE Ada");
+
+    await h.runPass();
+
+    const factory = h.generate.mock.calls[1][0] as () => Promise<{
+      messages: Message[];
+    }>;
+    const shown = (await factory()).messages
+      .map((m) => m.content ?? "")
+      .join("\n");
+    expect(shown).toContain("Ada pocketed the letter.");
+  });
+
+  it("leaves the count alone on a pass that revised nothing", async () => {
+    const h = harness();
+    triageReturns(h, "");
+    await h.runPass();
+    expect(h.store.getState().engine.touched).toBe(0);
+  });
+
   it("writes back what the budget could not afford, and holds", async () => {
     // Enough for triage (200) and nowhere near a 1024-token rewrite. Drop the
     // drain's budget check and the revise is consumed and lost instead.
@@ -810,7 +885,11 @@ describe("the pass", () => {
 
       await h.runPass();
 
-      expect(logged()).toContain("[engine] intent (not executed): revise:e1");
+      // The revise reaches its arm and finds a draft entity with no entry to
+      // rewrite; open is still a stub.
+      expect(logged()).toContain(
+        "[engine] revise Ada: no lorebook entry, skipped",
+      );
       expect(logged()).toContain(
         "[engine] intent (not executed): open:the sealed letter",
       );

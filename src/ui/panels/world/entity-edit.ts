@@ -3,20 +3,15 @@
 
 import type { WorldEntity } from "../../../core/store";
 
+// The erato divider moved to core when the Engine gained a third caller for it.
+export { applyEratoPrefix } from "../../../core/utils/config";
+
 /** Split a comma string into trimmed, non-empty keys. */
 export function parseKeys(raw: string): string[] {
   return raw
     .split(",")
     .map((k) => k.trim())
     .filter((k) => k.length > 0);
-}
-
-/** Prepend the erato "----\n" divider to non-empty content when erato mode is on
- *  and it isn't already prefixed. */
-export function applyEratoPrefix(content: string, erato: boolean): string {
-  if (content && erato && !content.startsWith("----\n"))
-    return "----\n" + content;
-  return content;
 }
 
 /** Replace `oldName` with `newName` (case-insensitive) in every OTHER entity's

@@ -771,3 +771,44 @@ RULES:
 - Most passes need nothing. Emitting no commands at all is a correct and common answer — say nothing rather than find something.`;
 
 export const TRIAGE_INSTRUCTION = `What in the World needs attention after the new prose above? Emit only the commands that prose justifies, one per line — or nothing at all.`;
+
+/** The Engine's entry rewrite (design §5).
+ *
+ *  The whole prompt turns on one distinction the spec makes and the model does
+ *  not naturally hold: **a lorebook entry describes a subject, it does not
+ *  record events.** §5 files a consequence — a death, a spent item, a lost hand
+ *  — as a REVISE of the subject's own entry precisely because it is permanent
+ *  and wants keeping forever, and an entry keyed on a name fires when that name
+ *  is mentioned. An entry that reads as an event log fires the wrong text at the
+ *  wrong moment: the model is reminded of a scene instead of told who this is.
+ *
+ *  So the rules are written to make the distinction DO something — the entry is
+ *  rewritten in the present, the event is allowed in only as the state it left
+ *  behind — rather than to restate it. Two more rules carry the rest of the
+ *  risk: the revision REPLACES the entry, so omission is deletion; and only the
+ *  new prose may add facts, because an unattended rewrite that invents is a
+ *  fabrication the writer never sees happen. */
+export const ENGINE_REVISE_SYSTEM = `You are the archivist of a story engine. You maintain one lorebook entry at a time: a standing description of its subject, which the model writing this story is shown whenever that subject is mentioned.
+
+You are given the entry as it currently stands and the prose the writer has just produced. You return the entry rewritten so it describes the subject as the story has now left them.
+
+WHAT AN ENTRY IS:
+- A description of a subject as it stands. Not a history, not a recap, not a log of scenes.
+- Written in the present, from no one's point of view. It says what is true of this subject, not what happened in a chapter.
+
+HOW A CHANGE ENTERS AN ENTRY:
+- An event in the prose matters only as the condition it left behind. Record the condition, not the event.
+- "The press took her left hand" becomes "Left hand gone below the wrist; works one-handed, braces against a bench vice." It does not become "In the winter she lost her hand to a press."
+- A death is written as a dead subject — what they were, what they left, who is answerable for them — not as an account of the dying.
+- Something spent, broken, given away or destroyed is written as gone, and what standing in its place.
+- Never name a chapter, a scene, a page, a date, or a sequence of events. Never write "recently", "now", "at this point", "in the story", "the narrative", "the reader", "the protagonist".
+
+RULES:
+- Your reply REPLACES the entry. Everything about the subject that is still true must be carried across. What you leave out is deleted.
+- Only the new prose may add facts. Do not infer, extrapolate, foreshadow, or fill a gap with something plausible. If the prose does not establish it, it does not go in.
+- When the prose contradicts the entry, the prose wins — rewrite the contradicted part rather than adding a caveat beside it.
+- Keep the entry's own shape: same headings, same fields, same order, same register. You are revising a document, not replacing it with your own.
+- Do not grow the entry to show your work. Prefer replacing a sentence over appending one. An entry that is longer for no new fact is a worse entry.
+- Return the entry body and nothing else — no preamble, no commentary, no explanation of what you changed, no markdown fences.`;
+
+export const ENGINE_REVISE_INSTRUCTION = `Rewrite the entry above so it describes its subject as the new prose has left them. Carry across everything still true, change only what the prose changed, and return the entry and nothing else.`;
