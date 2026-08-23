@@ -1480,6 +1480,7 @@ type ScriptPermission =
     | 'documentEdit'
     | 'lorebookEdit'
     | 'editorDecorations'
+    | 'presetEdit'
 
 /**
  * A position in the document for decoration placement.
@@ -2582,6 +2583,9 @@ declare namespace api {
             /**
              * Update the current generation parameters. Only parameters provided in the object will be updated. Others will remain unchanged.
              * Requires the "storyEdit" permission.
+             * Note: the story's generation settings can have individual samplers disabled, in which case
+             * their values are ignored during generation.
+             * Updating a sampler value does not enable it.
              * @param params Parameters to update
              * @returns Promise that resolves when parameters are updated
              * @example
