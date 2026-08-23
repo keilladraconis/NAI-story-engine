@@ -3,7 +3,8 @@
 // api.v1.hooks.register holds ONE callback per hook name, so this is the only
 // place in the codebase that may register this hook — bootstrap-effects.ts used
 // to, for historyEpoch, and that job moved here rather than competing for the
-// slot.
+// slot. §7's reconciliation lands here for the same reason: it is a third thing
+// that happens on a navigation, not a second callback that could have it.
 //
 // The hook fires only on explicit navigation (undo/redo/retry/jump), never for
 // nodes created by ordinary editing or generation, so this is a
@@ -11,12 +12,115 @@
 //
 // nodeId arrives as a number despite the .d.ts declaring string — corrected in
 // src/type-overrides.d.ts, measured in design §12.1.
+//
+// Four things happen, in this order (§7's list, plus the flush phase 2 needed):
+//
+//   1. Re-derive anything keyed off document content.
+//   2. Flush autosave onto the node it describes, before that node's state is
+//      replaced underneath it.
+//   3. Reload the branch-scoped slices at the target node and replace.
+//   4. Reconcile the lorebook against the branch (§7).
+//
+// The watermark is not a step here, and §7's step 2 ("recompute the watermark")
+// is answered elsewhere rather than built: `assess` treats a watermark whose
+// section the document no longer holds as no watermark at all and re-reads the
+// branch from the start. That is the same correction made lazily, at the one
+// place that can act on it, and it also covers the branch the writer edited
+// rather than navigated.
 
-import type { AppDispatch } from "../types";
+import type { AppDispatch, RootState } from "../types";
 import { persistedDataLoaded } from "../index";
 import { documentHistoryNavigated } from "../slices/runtime";
 import { loadBranchState } from "../persistence/history-store";
+import { createEngineLog, type EngineLog } from "../../engine/log";
+import {
+  listLorebookWriteRecords,
+  writeLorebookEntry,
+} from "../../engine/lorebook-write";
+import {
+  reconcileThreadEntries,
+  reconcileWriteRecords,
+  touchedOnBranch,
+} from "../../engine/reconcile";
+import { SE_THREAD_CATEGORY } from "../../engine/thread-bind";
+import { engineTouchedRecounted } from "../slices/engine";
 import type { AutosaveHandle } from "./autosave";
+
+/** §7, performed: the decisions live in `reconcile.ts`, the I/O lives here.
+ *
+ *  **Nothing is read from a Redux slice.** The World this reconciles against is
+ *  the one `loadBranchState` just returned for the target node, handed in — not
+ *  `getState()`, which is a dispatch away from being the same thing and would
+ *  make this depend on a reducer having already run.
+ *
+ *  **No settings read, and no Engine on/off check.** Everything below is scoped
+ *  to entries the Engine's own category or the branch's own threads name, so a
+ *  story the Engine never ran in has nothing to reconcile and this costs two
+ *  lorebook reads. Gating it on `enabled` would instead mean a writer who
+ *  switched the Engine off kept a lorebook that no longer follows their undo —
+ *  the same argument that registers the thread-condition effects unconditionally.
+ *
+ *  **Every write goes through Task 1's door**, including this one: the flip
+ *  takes the §5.2 snapshot on the way through, which for a thread entry is the
+ *  first snapshot it has ever had (creation deliberately bypasses the door,
+ *  having no live text to read).
+ *
+ *  Errors are logged rather than thrown. This runs inside a fire-and-forget hook
+ *  where a rejection has nowhere to land, and a failed reconciliation leaves the
+ *  lorebook exactly as the writer's last navigation left it. */
+async function reconcileLorebook(
+  nodeId: number,
+  world: RootState["world"],
+  dispatch: AppDispatch,
+  log: EngineLog,
+  stillCurrent: () => boolean,
+): Promise<void> {
+  const [records, entries, categories] = await Promise.all([
+    listLorebookWriteRecords(nodeId),
+    api.v1.lorebook.entries(),
+    api.v1.lorebook.categories(),
+  ]);
+  // A held Ctrl+Z fires this per node it passes through, and each one would
+  // otherwise write the flags its own node implies. Only the navigation the
+  // writer actually landed on may act.
+  if (!stillCurrent()) return;
+
+  // §9.1's ∆, recounted from the branch. Free here — the records are already
+  // read — and it is the number that slot has always claimed to be.
+  const reconciled = reconcileWriteRecords(records, entries);
+  dispatch(engineTouchedRecounted({ touched: touchedOnBranch(reconciled) }));
+  for (const { entryId, verdict } of reconciled) {
+    // Reported, never acted on. §7 words the matching case as "can be brought
+    // in line with the branch", which the record cannot do: it holds a
+    // fingerprint rather than the text, deliberately (Task 1), so there is no
+    // branch version to put back. See `reconcile.ts`.
+    await log(`[engine] ${entryId} is ${verdict} at this node`);
+  }
+
+  // Found, never created: `ensureNamedCategory` would mint `SE: Threads` in the
+  // lorebook of a writer who has never switched the Engine on.
+  //
+  // The `?? ""` is load-bearing rather than defensive. `LorebookEntry.category`
+  // is optional, so an uncategorised entry carries `undefined` — and in a
+  // lorebook with no `SE: Threads` category, `entry.category === undefined`
+  // would match every loose entry the writer owns and switch all of them off.
+  const threadCategory =
+    categories.find((c) => c.name === SE_THREAD_CATEGORY)?.id ?? "";
+  const flips = reconcileThreadEntries({
+    entries,
+    threadCategoryIds: entries
+      .filter((entry) => entry.category === threadCategory)
+      .map((entry) => entry.id),
+    threads: world.threads,
+  });
+
+  for (const { entryId, enabled } of flips) {
+    await writeLorebookEntry({ entryId, nodeId }, () => ({ enabled }));
+    await log(
+      `[engine] thread entry ${entryId} ${enabled ? "re-enabled" : "disabled"} — the branch says so`,
+    );
+  }
+}
 
 export function registerHistorySyncEffects(
   dispatch: AppDispatch,
@@ -28,8 +132,14 @@ export function registerHistorySyncEffects(
   // writer is looking at is the one they navigated *through*.
   let generation = 0;
 
+  // Built once, not per navigation: the flag is read from `api.v1.config`,
+  // which cannot change mid-session, and a logger per Ctrl+Z would ask the same
+  // question on every keypress.
+  const log = createEngineLog();
+
   api.v1.hooks.register("onHistoryNavigated", async ({ nodeId }) => {
     const mine = ++generation;
+    const stillCurrent = () => mine === generation;
 
     // Re-derive anything keyed off document content (the opening-scene card).
     dispatch(documentHistoryNavigated());
@@ -47,7 +157,22 @@ export function registerHistorySyncEffects(
     // story-scoped. Undo moves the World and the story fields; it does not
     // rewrite the premise or hide the conversation that produced it.
     const branch = await loadBranchState(nodeId);
-    if (mine !== generation) return;
+    if (!stillCurrent()) return;
     dispatch(persistedDataLoaded({ story: branch.story, world: branch.world }));
+
+    // §7. After the replace rather than before it: the writer's World repaints
+    // on the fast path, and the lorebook — which nothing on screen is waiting
+    // for — is put right behind it.
+    try {
+      await reconcileLorebook(
+        nodeId,
+        branch.world,
+        dispatch,
+        log,
+        stillCurrent,
+      );
+    } catch (error) {
+      await log("[engine] reconciliation failed:", error);
+    }
   });
 }

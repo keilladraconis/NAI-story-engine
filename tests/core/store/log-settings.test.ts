@@ -26,8 +26,16 @@ function reads(src: string, key: string): boolean {
 
 const storeSrc = () =>
   code(readFileSync(join(SRC, "core/store/index.ts"), "utf8"));
+// The Engine's logger has one home (`core/engine/log.ts`) — the pass is no
+// longer the only thing that speaks, since §7's reconciliation logs from the
+// navigation handler.
 const engineSrc = () =>
-  code(readFileSync(join(SRC, "core/store/effects/engine-loop.ts"), "utf8"));
+  code(readFileSync(join(SRC, "core/engine/log.ts"), "utf8"));
+const engineCallerSrcs = () =>
+  [
+    "core/store/effects/engine-loop.ts",
+    "core/store/effects/history-sync.ts",
+  ].map((f) => code(readFileSync(join(SRC, f), "utf8")));
 
 describe("the logging switches are separate", () => {
   it("the store's action firehose reads store_action_log, not the debug flag", () => {
@@ -40,6 +48,15 @@ describe("the logging switches are separate", () => {
     const src = engineSrc();
     expect(reads(src, "story_engine_debug")).toBe(true);
     expect(src).not.toContain("store_action_log");
+  });
+
+  it("nothing that logs reaches for a flag of its own", () => {
+    // One home means one answer to "is the Engine allowed to talk". A caller
+    // reading the flag itself would be a second one, and the pair would drift.
+    for (const src of engineCallerSrcs()) {
+      expect(reads(src, "story_engine_debug")).toBe(false);
+      expect(src).not.toContain("store_action_log");
+    }
   });
 
   it("both settings exist in project.yaml and default to off", () => {

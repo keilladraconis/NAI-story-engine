@@ -76,9 +76,30 @@ export const engineSlice = createSlice({
       state.backlog === payload.backlog
         ? state
         : { ...state, backlog: payload.backlog },
+
+    /** §9.1's `∆`, recounted from the branch rather than accumulated from the
+     *  session — the `lb:` records at the node just navigated to (§7).
+     *
+     *  A set, not an increment, and the third action here that is not a machine
+     *  event for the same reason as the other two: it touches `touched` only,
+     *  never `phase`, so it cannot move the lifecycle from outside the machine.
+     *  The machine's own `revised` event stays and stays an increment — it is
+     *  the live reading between navigations, and this is the correction to the
+     *  truth whenever the branch moves under it.
+     *
+     *  Identity when the number has not changed: navigation is a gesture a
+     *  writer repeats, and the HUD subscribes to this slice. */
+    engineTouchedRecounted: (state, payload: { touched: number }) =>
+      state.touched === payload.touched
+        ? state
+        : { ...state, touched: payload.touched },
   },
 });
 
 export const engineSliceReducer = engineSlice.reducer;
-export const { engineLoopEvent, engineBacklogObserved, engineSettingsChanged } =
-  engineSlice.actions;
+export const {
+  engineLoopEvent,
+  engineBacklogObserved,
+  engineSettingsChanged,
+  engineTouchedRecounted,
+} = engineSlice.actions;

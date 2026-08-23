@@ -70,6 +70,7 @@ import {
 } from "../slices/engine";
 import { threadAnchorSet } from "../slices/world";
 import { FIELD_CONFIGS } from "../../../config/field-definitions";
+import { createEngineLog, type EngineLog } from "../../engine/log";
 
 /** Everything the loop needs from the app, as one object so the pass body can
  *  reach for another dependency without reshuffling an argument list.
@@ -119,32 +120,6 @@ export type EngineLoopDeps = {
 //   5. The node is captured at the START of the pass and passed to every write
 //      (§6.3). Triage takes seconds, the writer keeps typing, and a `set()`
 //      without an explicit node has been measured landing two nodes away.
-
-/** The Engine's account of itself, behind `story_engine_debug`.
- *
- *  §9.1's HUD is the always-on surface; these lines are the detail behind it, and
- *  with the flag off the Engine is silent.
- *
- *  This flag gates ONLY Story Engine's own output. nai-store's dispatch firehose
- *  has its own switch (`store_action_log`, see `core/store/index.ts`) because the
- *  two shared one at first, and sharing meant reading what the Engine decided
- *  required turning on many lines per keystroke that buried it.
- *
- *  **Read once, where the pass is built.** `api.v1.config` is read-only and a
- *  `project.yaml` entry cannot change mid-session, so a read per line would ask
- *  the same question five times a pass and answer it identically. The promise is
- *  the read; every line awaits the same one. */
-type EngineLog = (...messages: unknown[]) => Promise<void>;
-
-function createEngineLog(): EngineLog {
-  const debug: Promise<boolean> = api.v1.config
-    .get("story_engine_debug")
-    .then((value: unknown) => value === true);
-
-  return async (...messages) => {
-    if (await debug) api.v1.log(...messages);
-  };
-}
 
 /** The HUD's ⚡: run a pass now. Carries no payload — everything the pass needs
  *  it reads for itself — and is ignored while one is already running. */

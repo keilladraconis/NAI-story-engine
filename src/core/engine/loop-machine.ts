@@ -43,12 +43,16 @@ export type LoopState = {
    *  declined or skipped revise never lands here: this is writes, not
    *  attempts.
    *
-   *  §9.1 words it as "on this branch", and this counter is not that — it lives
-   *  in memory and accumulates for the session, so it neither survives a reload
-   *  nor moves with an undo. The branch-truthful answer is the number of `lb:`
-   *  records at the current node, which §7's reconciliation already walks; that
-   *  is where recomputing it belongs (phase 6, Task 7) rather than here, where
-   *  the machine would have to become async to ask. */
+   *  §9.1 words it as "on this branch", and the increment alone is not that —
+   *  it lives in memory and accumulates for the session. So it is a live
+   *  reading between navigations, and §7's reconciliation corrects it to the
+   *  branch's truth whenever the branch moves: `touchedOnBranch` counts the
+   *  `lb:` records at the node just navigated to and `engineTouchedRecounted`
+   *  sets this. That recount belongs there rather than here, where the machine
+   *  would have to become async to ask.
+   *
+   *  What is still session-shaped is a RELOAD, which resets this to 0 and is
+   *  corrected only by the first navigation afterwards. */
   touched: number;
   consecutiveFailures: number;
 };

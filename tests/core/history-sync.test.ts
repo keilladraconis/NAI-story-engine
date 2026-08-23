@@ -17,8 +17,27 @@ import { initialUIState } from "../../src/core/store/slices/ui";
 import { initialRuntimeState } from "../../src/core/store/slices/runtime";
 import { initialForgeState } from "../../src/core/store/slices/forge";
 import { initialEngineState } from "../../src/core/store/slices/engine";
-import type { RootState, WorldEntity } from "../../src/core/store/types";
-import type { Action } from "nai-store";
+import type {
+  RootState,
+  Thread,
+  WorldEntity,
+} from "../../src/core/store/types";
+import { SE_THREAD_CATEGORY } from "../../src/core/engine/thread-bind";
+import {
+  fingerprintEntryText,
+  lorebookRecordKey,
+} from "../../src/core/engine/lorebook-write";
+import { lorebookOriginalKey } from "../../src/core/keys";
+import {
+  installLorebookFake,
+  type LorebookFake,
+} from "../helpers/lorebook-fake";
+import {
+  installStoryStorageFake,
+  type StoryStorageFake,
+} from "../helpers/story-storage-fake";
+import { createStore, type Action, type Store } from "nai-store";
+import { rootReducer } from "../../src/core/store";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -167,6 +186,289 @@ function autosaveHarness(getState: () => RootState) {
     },
   };
 }
+
+describe("history-sync — §7 reconciliation", () => {
+  let h: HistoryFake;
+  let lorebook: LorebookFake;
+  let story: StoryStorageFake;
+  let dispatched: Action[];
+  /** A real store as well as the action log: `touched` has to land in the
+   *  slice, not merely be dispatched at it. */
+  let store: Store<RootState>;
+
+  /** A world carrying threads, as loadBranchState will hand it back. */
+  function stateWithThreads(threads: Thread[]): RootState {
+    return {
+      ...stateWith([]),
+      world: { ...initialWorldState, threads },
+    };
+  }
+
+  function thread(over: Partial<Thread> = {}): Thread {
+    return {
+      id: "t1",
+      title: "The hidden letter",
+      text: "Ada has not told Brennan.",
+      horizon: "plot",
+      entityIds: [],
+      status: "open",
+      anchorParagraph: null,
+      ...over,
+    };
+  }
+
+  function record(a: Action): void {
+    dispatched.push(a);
+    store.dispatch(a);
+  }
+
+  async function navigate(node: number): Promise<void> {
+    registerHistorySyncEffects(record, NO_AUTOSAVE);
+    h.goto(node);
+    await registeredHook()({ nodeId: node });
+  }
+
+  /** The `SE: Threads` category, as a story the Engine has run in holds it. */
+  async function threadCategory(): Promise<string> {
+    return api.v1.lorebook.createCategory({
+      id: "cat-threads",
+      name: SE_THREAD_CATEGORY,
+    });
+  }
+
+  beforeEach(() => {
+    h = installHistoryFake();
+    lorebook = installLorebookFake();
+    story = installStoryStorageFake();
+    dispatched = [];
+    store = createStore<RootState>(rootReducer);
+    vi.mocked(api.v1.hooks.register).mockClear();
+  });
+
+  it("re-enables the entry of a thread the branch still holds open", async () => {
+    // The undo §7 exists for. The pass retired the thread at the child node —
+    // the `t:` record says satisfied and the lorebook entry is disabled — and
+    // the writer undid past it. historyStorage reverted what the Engine
+    // believes; the lorebook did not revert what it did.
+    const root = h.current();
+    await threadCategory();
+    lorebook.seed({
+      id: "lb-t1",
+      displayName: "The hidden letter",
+      category: "cat-threads",
+      enabled: false,
+    });
+    await saveRecords(
+      toRecords(stateWithThreads([thread({ lorebookEntryId: "lb-t1" })])),
+      root,
+    );
+    h.push();
+
+    await navigate(root);
+
+    expect(lorebook.read("lb-t1")?.enabled).toBe(true);
+  });
+
+  it("disables a thread entry no thread on this branch answers for", async () => {
+    // Two shapes at once: a thread opened on a branch the writer navigated away
+    // from, and §4.5's orphan — the entry a cap displacement left behind, which
+    // no thread will ever name again. Both go on injecting a reminder for a
+    // commitment this branch has never heard of.
+    const root = h.current();
+    await threadCategory();
+    lorebook.seed({
+      id: "lb-gone",
+      displayName: "A commitment from another branch",
+      category: "cat-threads",
+      enabled: true,
+    });
+    await saveRecords(toRecords(stateWithThreads([])), root);
+
+    await navigate(root);
+
+    expect(lorebook.read("lb-gone")?.enabled).toBe(false);
+  });
+
+  it("disables rather than deletes, and snapshots on the way through", async () => {
+    // §5.2: the writer's lorebook is never destroyed, and the flip goes through
+    // Task 1's door like every other Engine write — which is the first §5.2
+    // snapshot a thread entry has ever had, creation having bypassed the door.
+    const root = h.current();
+    await threadCategory();
+    lorebook.seed({
+      id: "lb-gone",
+      displayName: "Orphan",
+      text: "Somebody promised something.",
+      category: "cat-threads",
+      enabled: true,
+    });
+    await saveRecords(toRecords(stateWithThreads([])), root);
+
+    await navigate(root);
+
+    expect(lorebook.read("lb-gone")?.text).toBe("Somebody promised something.");
+    expect(story.get(lorebookOriginalKey("lb-gone"))).toMatchObject({
+      enabled: true,
+    });
+  });
+
+  it("writes nothing when the branch and the lorebook already agree", async () => {
+    const root = h.current();
+    await threadCategory();
+    lorebook.seed({
+      id: "lb-t1",
+      category: "cat-threads",
+      enabled: true,
+    });
+    await saveRecords(
+      toRecords(stateWithThreads([thread({ lorebookEntryId: "lb-t1" })])),
+      root,
+    );
+
+    await navigate(root);
+
+    expect(lorebook.updates()).toEqual([]);
+  });
+
+  it("leaves the writer's own lorebook alone", async () => {
+    // Nothing outside the Engine's own category and the branch's own threads is
+    // reconciled — including an entity entry the Engine revised, which §7 can
+    // classify and cannot put back.
+    const root = h.current();
+    lorebook.seed({ id: "mine", text: "Ada is a locksmith.", enabled: true });
+    await api.v1.historyStorage.set(
+      lorebookRecordKey("mine"),
+      {
+        entryId: "mine",
+        textFingerprint: fingerprintEntryText("something else"),
+      },
+      root,
+    );
+    await saveRecords(toRecords(stateWithThreads([])), root);
+
+    await navigate(root);
+
+    expect(lorebook.updates()).toEqual([]);
+    expect(lorebook.read("mine")?.enabled).toBe(true);
+  });
+
+  it("never creates the thread category in a lorebook that has none", async () => {
+    // A writer who has never switched the Engine on must not find an `SE:
+    // Threads` category in their lorebook because they pressed undo.
+    const root = h.current();
+    await saveRecords(toRecords(stateWithThreads([])), root);
+
+    await navigate(root);
+
+    expect(lorebook.categories()).toEqual([]);
+  });
+
+  it("recounts touched from the records at the node", async () => {
+    // §9.1's ∆, as a branch count rather than a session one. Two records, one
+    // of them for an entry the writer has since deleted — which is no longer an
+    // entry the Engine has rewritten.
+    const root = h.current();
+    lorebook.seed({ id: "a", text: "ours", enabled: true });
+    for (const [id, text] of [
+      ["a", "ours"],
+      ["deleted", "gone"],
+    ]) {
+      await api.v1.historyStorage.set(
+        lorebookRecordKey(id),
+        { entryId: id, textFingerprint: fingerprintEntryText(text) },
+        root,
+      );
+    }
+    await saveRecords(toRecords(stateWithThreads([])), root);
+
+    await navigate(root);
+
+    expect(store.getState().engine.touched).toBe(1);
+  });
+
+  it("counts an entry the writer edited after we wrote it", async () => {
+    // `theirs` still counts: the writer editing our revision afterwards does
+    // not un-revise it, and §9.1's slot is an activity level.
+    const root = h.current();
+    lorebook.seed({ id: "a", text: "they rewrote this", enabled: true });
+    await api.v1.historyStorage.set(
+      lorebookRecordKey("a"),
+      { entryId: "a", textFingerprint: fingerprintEntryText("what we wrote") },
+      root,
+    );
+    await saveRecords(toRecords(stateWithThreads([])), root);
+
+    await navigate(root);
+
+    expect(store.getState().engine.touched).toBe(1);
+  });
+
+  it("does not flip flags for a navigation a later one has superseded", async () => {
+    // A held Ctrl+Z fires the hook per node it passes through, and the check
+    // before the rehydrate is not enough on its own: reconciliation reads the
+    // lorebook, which is three awaits during which the writer keeps pressing.
+    // A navigation overtaken inside that window would write the flags its own
+    // node implies over the ones the writer actually landed on.
+    const root = h.current();
+    await threadCategory();
+    lorebook.seed({ id: "lb-t1", category: "cat-threads", enabled: true });
+    await saveRecords(
+      toRecords(
+        stateWithThreads([
+          thread({ lorebookEntryId: "lb-t1", status: "satisfied" }),
+        ]),
+      ),
+      root,
+    );
+    const child = h.push();
+    await saveRecords(
+      toRecords(stateWithThreads([thread({ lorebookEntryId: "lb-t1" })])),
+      child,
+    );
+
+    // Park the FIRST reconciliation inside its lorebook read, so the second
+    // navigation starts while it is still in there.
+    const realEntries = api.v1.lorebook.entries;
+    let release = (): void => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let parked = false;
+    api.v1.lorebook.entries = (async () => {
+      if (!parked) {
+        parked = true;
+        await gate;
+      }
+      return realEntries();
+    }) as typeof api.v1.lorebook.entries;
+
+    registerHistorySyncEffects(record, NO_AUTOSAVE);
+    const hook = registeredHook();
+    const overtaken = hook({ nodeId: root });
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+    await hook({ nodeId: child });
+    release();
+    await overtaken;
+
+    // The child says the thread is open and the entry already is, so the
+    // navigation the writer landed on writes nothing. The one the Engine was
+    // still inside would have disabled it.
+    expect(lorebook.updates()).toEqual([]);
+    expect(lorebook.read("lb-t1")?.enabled).toBe(true);
+  });
+
+  it("survives a lorebook that throws", async () => {
+    // Fire-and-forget hook: a rejection has nowhere to land, and the rehydrate
+    // that ran before it must not be undone by a failed reconciliation.
+    const root = h.current();
+    await threadCategory();
+    lorebook.seed({ id: "lb-gone", category: "cat-threads", enabled: true });
+    lorebook.failNextUpdate(new Error("lorebook is busy"));
+    await saveRecords(toRecords(stateWithThreads([])), root);
+
+    await expect(navigate(root)).resolves.toBeUndefined();
+  });
+});
 
 describe("history-sync × autosave", () => {
   let h: HistoryFake;
