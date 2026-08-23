@@ -554,7 +554,7 @@ The `historyStorage` keyspace (the `storyStorage` side keeps chat and the write-
 lorebook originals from §5.2):
 
 ```
-index          { entityIds[], threadIds[] }   — authoritative for existence (§6.2.1)
+index          { entityIds[], threadIds[], fieldIds[] }  — authoritative for existence (§6.2.1)
 e:<id>         WorldEntity
 t:<id>         Thread
 lb:<entryId>   what the loop last wrote to that lorebook entry
@@ -570,6 +570,13 @@ whole story rather than a point in it, and ATTG/Style mirror into Memory and
 Author's Note, which are themselves story-global. Branch-scoping produced a
 visible split — undo reverted the Foundation the writer saw while Memory kept
 the newer text the model actually read.
+
+The `storyStorage` side of §6.1's table had no key named for it anywhere in this
+document. It is `kse-lb-original-<entryId>`, one record per entry, written with
+`setIfAbsent` so write-once is a property of the API call rather than of a
+read-then-write a later caller can get wrong. It holds the whole `LorebookEntry`,
+not just its text, so a future restore can put back `enabled`, `keys` and
+`forceActivation` too.
 
 No namespace prefix — script storage is already sandboxed. The discriminators that
 remain (`e:`, `t:`, `lb:`) exist because entity ids and lorebook entry ids are both
@@ -597,7 +604,16 @@ sibling branch keeps its own index and its own entity. No tombstones are needed,
 and the orphaned `e:<id>` record left behind is harmless because nothing reads a
 record the index does not name.
 
-This makes the index authoritative for existence, and `list()` diagnostic only.
+This makes the index authoritative for existence, and `list()` diagnostic only —
+**for the record kinds the index names.** That qualifier was missing and the blanket
+claim is too strong. The index earns its authority because `remove()` cannot express
+a branch-local deletion, so existence needs a separate answer; a record kind that is
+never deleted has nothing for an index to be authoritative about. `lb:<entryId>` is
+exactly that kind — the Engine writes write-records and never removes one — so §7
+enumerates them with `list()`, whose ancestor inheritance is the semantics it wants
+(a write two nodes back is still ours on this branch). Adding entry ids to the index
+would put a lorebook concern inside the record that governs the World's existence.
+
 Load reads the index, then fans out to the named record keys with `Promise.all`.
 
 **Corollary: never call `historyStorage.remove()` on a record key.** It reads as

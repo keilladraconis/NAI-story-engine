@@ -108,11 +108,29 @@ things in a fixed order:
    §7 is explicit that this record is consulted to answer _what did we do_, never
    _what does it say_.
 
-**Interfaces (Tasks 2–4 depend on these — name them carefully):**
+**Interfaces — AS BUILT.** Task 1 has landed; these are the real signatures.
 
-- Consumes: nothing from earlier tasks.
-- Produces: a function the executor calls with an entry id, a node id, and the new
-  text; and a reader for the `lb:` record that Task 7 uses.
+```ts
+export async function writeLorebookEntry(
+  target: { entryId: string; nodeId: number },
+  edit: (live: LorebookEntry) => Partial<LorebookEntry> | null | Promise<...>,
+): Promise<{ written: boolean; record: LorebookWriteRecord | null }>;
+
+export async function readLorebookWriteRecord(entryId, nodeId): Promise<LorebookWriteRecord | null>;
+export async function listLorebookWriteRecords(nodeId): Promise<LorebookWriteRecord[]>;
+export function fingerprintEntryText(text: string | undefined): string;
+export const lorebookRecordKey = (entryId: string) => `lb:${entryId}`;
+```
+
+**It takes a producer callback, not finished text**, and a `Partial<LorebookEntry>`
+patch, not a string. The original brief said "the new text", which was wrong twice:
+a caller holding finished text must already have read the entry (defeating §5's
+read-then-write), and a text-only door cannot carry the retire flag flip. The door
+hands the live entry _to_ the caller and takes its patch back, so there is no way to
+write through it without having been given what the entry currently says. Returning
+`null` declines the write — which a refused generation needs, or a refusal blanks an
+entry. The `lb:` record stores a **fingerprint, not the text**, so nothing can read
+the record to answer "what does it say"; §7's question is pure equality.
 
 Read `src/core/store/persistence/history-store.ts` for how this codebase reaches
 historyStorage, and `src/core/engine/intents.ts` for the singleton-record pattern
@@ -131,11 +149,18 @@ then clears** — and the comment at the clear site already says so; read it, it
 explains why the queue is written before the drain.
 
 **Retire is the whole of this task's action work**, deliberately. §3.3 prices it
-at **0 output tokens** — it is `updateEntry(id, {enabled: false})`, the flag flip
-§4.4 describes — so the executor's skeleton can be proven end to end without
+at **0 output tokens** — it is the `{enabled: false}` flag flip §4.4 describes — so
+the executor's skeleton can be proven end to end without
 touching the budget arithmetic that Tasks 3 and 4 depend on. §4.4's reasoning
 matters and belongs in a comment: the model is never _told_ a plot is over,
 because that spends context asserting a negative; the reminder is simply removed.
+
+**Retire goes through Task 1's door** — `writeLorebookEntry(target, () => ({ enabled:
+false }))`, never `api.v1.lorebook.updateEntry` directly. An earlier draft of this
+plan described a text-only door, which retire could not pass through; that would
+have left a disabled entry with no §5.2 snapshot, so a later revise would snapshot
+it with `enabled: false` recorded as the writer's original and a restore would leave
+their entry switched off.
 
 **The budget is the hard part.** §3.3: triage costs ~150, an entry rewrite up to
 1024, and the bucket is 2048 per 240s. The pass already reserves the triage call
@@ -171,8 +196,22 @@ same job. Note `LOREBOOK_CONTENT_MAX_CALLS` and the continuation behaviour the
 0.14.0 changelog describes ("generated text no longer stops mid-sentence"); a
 revision that truncates mid-word is the same defect.
 
-**Read-then-write is not optional** (§5) and Task 1 owns it — do not read the
+**Read-then-write is not optional** (§5) and Task 1's door owns it — do not read the
 entry yourself.
+
+**The existing pipeline cannot be reused as-is, and this is the task's main design
+problem.** `createLorebookContentFactory` reads the live entry _itself_, inside the
+message factory (`lorebook-strategy.ts:120`), and the completion handler then writes
+`updateEntry` **directly** (`effects/handlers/lorebook.ts:98` and again at `:107` for
+keys). A revise built on that path bypasses the door entirely — no §5.2 snapshot, no
+`lb:` record, so §7 has nothing to reconcile and §5.2's promise is silently broken
+for exactly the writes the Engine makes on its own.
+
+You must pick one and justify it: route that handler's write through
+`writeLorebookEntry`, or give the Engine a strategy that **returns** text to its
+caller instead of self-writing. Routing the shared handler affects the hand-driven
+Generate Content button too — decide whether that is a bug fix (those writes get
+snapshots as well) or a scope increase, and say which.
 
 §5's other claim to honour: **consequences are revisions, not threads.** A
 character dying is a permanent fact belonging in that character's own entry, keyed
@@ -299,6 +338,15 @@ state and does not revert what the Engine _did_. On `onHistoryNavigated` (whose
 Keep `reconcile.ts` pure — the decision, not the I/O. §7 is explicit that the
 stored copy answers "what did we do", never "what does it say", so read-then-write
 survives.
+
+**Decide, consciously, whether the retire flag flip is reconcilable.** A retire
+writes no text, so Task 1 records no fingerprint and §7 has nothing to compare —
+undo past a pass that retired a thread and the `t:` record reverts (the thread is
+open again) while its lorebook entry stays disabled. That is precisely the "the
+lorebook does not revert what the Engine _did_" problem §7 exists to solve, and §7's
+text does not notice it. Task 1 deliberately left the record text-only rather than
+setting this policy for you; widening it to carry a nullable `enabled` is a
+five-line change if you want the flip reconciled.
 
 **Also handle the displaced-thread orphan** (§4.5): a thread the cap displaced
 leaves an entry that is unmanaged and still enabled. §5.2 forbids deleting it.
