@@ -49,6 +49,22 @@ export const EDIT_PANE_CONTENT = "kse-edit-content";
 export const LB_CONTENT_DRAFT = "lb-draft-content";
 export const LB_KEYS_DRAFT = "lb-draft-keys";
 
+// The write-once original of a lorebook entry the Engine has edited (design
+// §5.2). storyStorage, not historyStorage: it is about the story as a whole,
+// and an original that moved with the branch would be missing on exactly the
+// branch the writer wants it back on.
+//
+// One key per entry rather than one blob, because the record is written with
+// `storyStorage.setIfAbsent` — write-once is then a property of the API call
+// rather than of a read-then-write the next caller can get wrong, and a blob
+// would have to be rewritten whole on every first touch.
+//
+// Written only by `src/core/engine/lorebook-write.ts`, and read by nothing yet:
+// §5.2 is explicit that the loop never consults the snapshot, so this key
+// exists for a restore surface a later phase builds.
+export const lorebookOriginalKey = (entryId: string): string =>
+  `kse-lb-original-${entryId}`;
+
 // Generation-request tracking ids for an entity — all keyed by the ENTITY id (the
 // generation TARGET stays the lorebook entry; these are only the tracking tokens).
 // The card regen bolt, the edit pane, and SEGA all build ids from these, so a
