@@ -411,6 +411,30 @@ this". The section designs the condition in complete detail and is silent on wha
 activates the entry carrying it; that silence would have shipped a detector that
 never fires.
 
+**"Since this thread last fired" is unobtainable, not merely deferred.** Phase 5
+deferred the pacing gate for an anchor that would give the equation a meaningful
+left-hand side; phase 6 built the anchor and the honest reading is weaker than that
+sentence promised. Nothing reports a lorebook activation back to a script, so what
+the anchor buys is _since the Engine last touched this thread_ — enough to suppress
+the real artefact (a detector looking back `range` characters, attached to a thread
+younger than `range/400` paragraphs, reports on prose written before the commitment
+existed), and not enough to pace by firing.
+
+The gate is therefore a **grace period, applied at every horizon rather than only to
+arcs.** The artefact is structural at all three and is exactly `range` long, so the
+grace is exactly `range` long. Arc-only would also have been inert: triage's `OPEN`
+carries no horizon, so every Engine-opened thread is a `plot` by default and every
+`arc` is hand-made and therefore unanchored — the two sets do not intersect except
+when a writer promotes an Engine thread by hand.
+
+It is written `paragraphCount >= anchor + N`, one term with a numeric target — the
+shape the `.d.ts` documents. `paragraphCount - anchor >= N` typechecks and is the
+same predicate, but needs two terms, and the `.d.ts` never says how a term's
+`operator` binds. A second disjunct, `paragraphCount < anchor`, catches undo: the
+`t:` record reverts and the lorebook entry does not, so navigating back past the
+anchoring pass would otherwise gate a thread on a paragraph the branch will not
+reach again. §4.3 accepts degradation to always-on and never to silence.
+
 **The Engine's `open` supplies no cast, so it derives one.** §4.1 calls `entityIds`
 load-bearing and the correction above makes the cast the detector's _subject_ — but
 triage's `OPEN` carries free text and has no syntax for entity ids, so every
@@ -457,7 +481,15 @@ Three controls:
 
 - **Renewal, which this document never defined** despite naming it. An `open` whose
   subject already names a thread renews that thread's anchor instead of creating a
-  second one. Without it §3.3's hot triage defeats this section outright: one
+  second one. **On its own this almost never fires, and that turns expiry into a
+  fixed TTL from creation** — `TRIAGE_SYSTEM` tells the model to act only on what the
+  new prose establishes and not on what the manifest already records, so a thread
+  already listed is precisely what it is instructed not to raise again. Expiry would
+  then retire a thread the story is actively honouring, which is the opposite of
+  "an end the story quietly abandoned". Renewal is therefore also **prose-grounded**:
+  a thread whose cast the pass just read is alive, and its anchor moves. That is free
+  — `assess` already computes those ids — and it is bounded, because only threads the
+  prose actually touched are rewritten onto the node. Without it §3.3's hot triage defeats this section outright: one
   unsettled commitment mints a new thread, a new always-on entry and a cap
   displacement on every pass. A _satisfied_ thread matches and is renewed rather
   than reopened — reopening would re-enable a reminder the Engine deliberately
