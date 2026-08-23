@@ -15,7 +15,7 @@
 // worth testing on its own.
 //
 // **The information this can decide with is thin, and that is the finding.** A
-// `Thread` carries `title`, `text`, `horizon`, `entityIds`, `lorebookEntryId`
+// `Thread` carried `title`, `text`, `horizon`, `entityIds`, `lorebookEntryId`
 // and `status` — no timestamp, no creation index, no record of when the story
 // last touched it. Two of the three signals below are read off the type;
 // the third, age, is read off the *array position*, which is a real signal
@@ -23,6 +23,12 @@
 // persistence index round-trips the order — `persistence/keyspace.ts`) but a
 // weak one: it says which thread is older, never how much older, and never how
 // long ago the prose last mentioned either.
+//
+// Phase 6 added `anchorParagraph`, which answers that question — but only for a
+// thread the ENGINE opened or renewed; one the writer made by hand carries
+// `null`, because nothing on that path knows the branch's paragraph count. So
+// it is a datum expiry can decline on (`isThreadExpired`, below) and not one
+// the displacement order can sort by.
 
 import { PARAGRAPH_CHARS, THREAD_RANGE_CHARS } from "./thread-horizon";
 import type { Thread, ThreadHorizon, ThreadStatus } from "../store/types";
@@ -58,9 +64,13 @@ const HORIZON_WEIGHT: Record<ThreadHorizon, number> = {
  *     manifest. Nothing open should go while one of these is still standing.
  *  2. **Shortest horizon first.** See `HORIZON_WEIGHT`.
  *  3. **Oldest first**, meaning lowest array index. This is the weakest of the
- *     three and the one to replace when a `Thread` finally carries an anchor:
- *     position says which thread was created first, not which the story has
- *     actually stopped caring about, and those are only loosely related.
+ *     three: position says which thread was created first, not which the story
+ *     has actually stopped caring about, and those are only loosely related.
+ *     Phase 6 gave `Thread` the `anchorParagraph` this wanted, but only the
+ *     Engine writes it — a thread the writer made by hand carries `null` — so
+ *     ordering by it would sort the writer's own threads by nothing at all.
+ *     Replacing this key is a decision for whoever makes the anchor
+ *     unconditional, not a mechanical swap.
  *
  *  Exported because the ordering is the decision — the reducer only consumes
  *  its first element, but the triage prompt has to be able to tell a model
@@ -157,10 +167,12 @@ export function enforceThreadCap(threads: Thread[], cap: number): Thread[] {
 // breath that "how long since this thread was last touched" is not answerable
 // from a `Thread` as specified. §4.3 deferred the arc pacing gate for the same
 // missing field. So what lives here is the half that *is* decidable — the
-// policy, per horizon — as a function of a count its caller supplies. Phase 6,
-// which is where the Engine starts acting and therefore where a thread first
-// has an event worth anchoring to, supplies the number; nothing calls this
-// today, exactly as nothing yet calls `buildThreadCondition`.
+// policy, per horizon — as a function of a count its caller supplies. Phase 6's
+// Task 5 added the anchor (`Thread.anchorParagraph`, written when the Engine
+// opens or renews a thread) and `Assessment.paragraphCount` to compare it
+// against, so the count is now derivable — but this still has no caller, and
+// giving it one is Task 6's, because what expiry DOES to a thread is a separate
+// decision from when it applies.
 
 /** How many of its own forgetting windows a thread is given before the story is
  *  taken to have abandoned it.

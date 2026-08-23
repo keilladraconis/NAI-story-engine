@@ -30,6 +30,7 @@ function thread(over: Partial<Thread> = {}): Thread {
     horizon: "plot",
     entityIds: ["e1", "e2"],
     status: "open",
+    anchorParagraph: null,
     ...over,
   };
 }

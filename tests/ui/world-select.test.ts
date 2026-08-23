@@ -24,6 +24,7 @@ const thread = (id: string, entityIds: string[]): Thread => ({
   horizon: "plot",
   entityIds,
   status: "open",
+  anchorParagraph: null,
 });
 
 describe("selectWorldBody", () => {

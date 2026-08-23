@@ -59,6 +59,7 @@ function thread(id: string, status: ThreadStatus = "open"): Thread {
     horizon: "plot",
     entityIds: [],
     status,
+    anchorParagraph: null,
   };
 }
 

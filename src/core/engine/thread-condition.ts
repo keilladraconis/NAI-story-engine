@@ -10,7 +10,8 @@
 //
 // Pure. The caller hands over the thread and its cast WITH THE NAMES ALREADY
 // RESOLVED (see `ThreadMember`); nothing here reads `api.v1` or the store, and
-// nothing here writes the result onto a lorebook entry — that is phase 6's.
+// nothing here writes the result onto a lorebook entry — that is
+// `thread-bind.ts`'s.
 //
 // Nothing in `src/` used `advancedConditions` before this file, so there is no
 // house style: every shape below is read off `external/script-types.d.ts`.
@@ -76,14 +77,14 @@ export type ThreadMember = {
  *  the world just as well as this thread's. An id no member answers to is
  *  skipped rather than guessed at.
  *
- *  **What phase 6 must do with this.** Build the `ThreadMember[]` from the
- *  lorebook — `resolveDisplayName`'s order, entry `displayName` ahead of
- *  `entity.name` — and rebuild the condition whenever a name it probes for
- *  changes, alongside the three actions `slices/world.ts` already names
- *  (`threadRenamed`, `threadMemberToggled`, `threadHorizonSet`). A condition
- *  built from a stale name probes for a string the prose no longer uses, never
- *  matches, and so fires forever: the always-on entry this detector exists to
- *  replace, arriving by the door it opened.
+ *  **What phase 6 did with this.** `thread-bind.ts` builds the
+ *  `ThreadMember[]` from the lorebook through `resolveDisplayName`'s order —
+ *  entry `displayName` ahead of `entity.name` — and rebuilds the condition on
+ *  the three actions `slices/world.ts` names (`threadRenamed`,
+ *  `threadMemberToggled`, `threadHorizonSet`). A condition built from a stale
+ *  name probes for a string the prose no longer uses, never matches, and so
+ *  fires forever: the always-on entry this detector exists to replace, arriving
+ *  by the door it opened.
  *
  *  Blank subjects are dropped: an empty key would be a lie in whichever
  *  direction NovelAI resolves it (matching everywhere, or nowhere). Draft

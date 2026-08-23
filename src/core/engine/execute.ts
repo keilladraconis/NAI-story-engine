@@ -7,14 +7,16 @@
 // snapshot, which is the one promise made to a writer whose lorebook is being
 // edited by a machine.
 //
-// Phase 6 fills the arms in price order. Task 2 took RETIRE, which §3.3 prices
+// Phase 6 filled the arms in price order. Task 2 took RETIRE, which §3.3 prices
 // at zero output tokens, so the skeleton — the branch, the budget policy, the
 // queue write-back — was provable end to end before anything cost 1024. Task 3
 // added REVISE, the first arm that spends a generation, and Task 4 CONDENSE,
 // which §5.1 says is the same price, the same read-then-write, the same door
 // and the same record — so the two arms below are deliberately the same shape,
-// and differ only where §5.1 says they must. OPEN still logs exactly what phase
-// 4 logged.
+// and differ only where §5.1 says they must. Task 5 added OPEN, the only arm
+// that CREATES rather than rewrites: it is the one that hands work to
+// `thread-bind.ts`, because a thread's lorebook entry is a shape rather than a
+// text and the door is not in front of a create (see there).
 //
 // The switch has no `default`, and `INTENT_MAX_TOKENS` is a `Record` over the
 // union's `kind`. A fifth intent is therefore two compile errors — a missing arm
@@ -22,6 +24,7 @@
 // silently does nothing. `intentKey` in intents.ts is the house precedent.
 
 import type { GenX } from "nai-gen-x";
+import type { Assessment } from "./assess";
 import type { AppDispatch, RootState } from "../store/types";
 import type { Intent } from "./loop-machine";
 import { intentKey } from "./intents";
@@ -40,7 +43,23 @@ import {
   CONDENSE_MAX_TOKENS,
   writeCondenseMark,
 } from "./condense";
-import { threadStatusSet } from "../store/slices/world";
+import {
+  composeReminder,
+  createOpenFactory,
+  openParams,
+  OPEN_MAX_TOKENS,
+} from "./open-strategy";
+import {
+  castFromSubject,
+  createThreadEntry,
+  findThreadBySubject,
+} from "./thread-bind";
+import {
+  threadAnchorSet,
+  threadCreated,
+  threadLorebookEntrySet,
+  threadStatusSet,
+} from "../store/slices/world";
 import { TRIAGE_MAX_TOKENS } from "./triage-strategy";
 import { buildLorebookPrefillFromEntry } from "../utils/lorebook-strategy";
 
@@ -58,10 +77,17 @@ export type DrainDeps = {
   dispatch: AppDispatch;
   getState: () => RootState;
   nodeId: number;
-  /** The prose the pass assessed — everything past the watermark, exactly as
-   *  triage was shown it. A revision is a function of what the story has newly
-   *  made true (§5), so the drain cannot derive it and must be handed it. */
-  newText: string;
+  /** What the pass saw, whole — the same value triage was built from.
+   *
+   *  **The assessment rather than a field of it**, which Task 3 predicted and
+   *  Task 5 acts on: this started as `newText` because a revision is a function
+   *  of what the story has newly made true (§5), and the anchor an `open`
+   *  records needs `paragraphCount` as well. Two à-la-carte fields would have
+   *  become three, and each one is a decision about which half of one coherent
+   *  answer the drain is allowed to see. The assessment is already built,
+   *  already passed to triage, and already the definition of "what this pass
+   *  read"; passing it entire is what stops the deps growing a field per arm. */
+  assessment: Assessment;
   /** The pass's generation queue. Injected rather than reached for (CLAUDE.md:
    *  no singletons), and the same instance triage used, so the Engine's own
    *  calls stay serialised behind one queue. */
@@ -103,7 +129,7 @@ export type DrainOutcome = {
  *  task that depends on it. */
 export const INTENT_MAX_TOKENS: Record<Intent["kind"], number> = {
   retire: 0,
-  open: 150,
+  open: OPEN_MAX_TOKENS,
   // Each arm's own ceiling, imported rather than restated: the number the
   // drain refuses to start without must be the number `max_tokens` then bounds
   // the call at, or the pass promises one price and pays another.
@@ -222,7 +248,11 @@ async function revise(
     async (live) => {
       const prefill = await buildLorebookPrefillFromEntry(deps.getState, live);
       const response = await deps.genX.generate(
-        createReviseFactory({ entry: live, prefill, newText: deps.newText }),
+        createReviseFactory({
+          entry: live,
+          prefill,
+          newText: deps.assessment.newText,
+        }),
         {
           ...(await reviseParams()),
           // GenX's own transient-error handler treats "in progress" as
@@ -332,6 +362,107 @@ async function condense(
   return written ? "executed" : "skipped";
 }
 
+/** §4's thread, opened: a commitment the prose raised, recorded with a
+ *  lorebook entry that reminds the story model only once the prose has stopped
+ *  carrying it (§4.3).
+ *
+ *  **A repeat renews rather than opens.** `findThreadBySubject` explains the
+ *  reasoning; what matters here is that the free path comes first, so a
+ *  commitment triage keeps naming costs a dispatch rather than a generation.
+ *
+ *  **The thread is created before its entry, and read back before it is
+ *  bound.** The cap is a reducer invariant (§4.5) enforced one level up in
+ *  `rootReducer`, so what the store kept is the authority on what exists — and
+ *  the entry is built from that rather than from the draft this function sent
+ *  in, which is also how the reducer's `horizon` and `status` defaults reach the
+ *  condition. The other order — entry first, thread second — would leave an
+ *  always-on entry in the writer's lorebook with no thread behind it if
+ *  anything failed in between, which is precisely §4.5's orphan.
+ *
+ *  **Opening at the ceiling displaces, and does not refuse.** §4.5 designed the
+ *  cap for exactly this path: the reducer drops the weakest OTHER thread and
+ *  keeps the newcomer, because a create that silently undid itself would read
+ *  as a broken Engine. The displaced thread's own lorebook entry survives,
+ *  unmanaged and still enabled — §5.2 forbids deleting it and §7's
+ *  reconciliation is where that is answered, so all this does is say so in the
+ *  log. */
+async function open(subject: string, deps: DrainDeps): Promise<IntentResult> {
+  const before = deps.getState().world.threads;
+  const paragraph = deps.assessment.paragraphCount;
+
+  const existing = findThreadBySubject(before, subject);
+  if (existing) {
+    deps.dispatch(threadAnchorSet({ threadId: existing.id, paragraph }));
+    await deps.log(
+      `[engine] open ${subject}: already open as "${existing.title}" — renewed at paragraph ${paragraph}`,
+    );
+    return "executed";
+  }
+
+  const response = await deps.genX.generate(
+    createOpenFactory({ subject, newText: deps.assessment.newText }),
+    {
+      ...(await openParams()),
+      maxRetries: 0,
+      taskId: `engine-open-${api.v1.uuid()}`,
+    },
+    undefined,
+    "background",
+  );
+
+  const choice = response.choices?.[0];
+  const text = composeReminder(choice?.text ?? "", choice?.finish_reason);
+  if (!text) {
+    // Nothing is created. Unlike a revise, which declines a write and leaves an
+    // entry standing, this declines the whole thing — a thread with a blank
+    // reminder is an always-on entry with nothing to say.
+    await deps.log(
+      `[engine] open ${subject}: nothing usable in the response, no thread opened`,
+    );
+    return "skipped";
+  }
+
+  const threadId = api.v1.uuid();
+  deps.dispatch(
+    threadCreated({
+      thread: {
+        id: threadId,
+        // The subject IS the title. Triage wrote it, `intentKey` dedupes on it,
+        // and `findThreadBySubject` renews on it — a title from anywhere else
+        // would break the identity that keeps one commitment to one thread.
+        title: subject.trim(),
+        text,
+        entityIds: castFromSubject(
+          subject,
+          Object.values(deps.getState().world.entitiesById),
+        ),
+        anchorParagraph: paragraph,
+      },
+    }),
+  );
+
+  const state = deps.getState();
+  const created = state.world.threads.find((t) => t.id === threadId);
+  // The cap keeps the newcomer by construction (`enforceThreadCap`), so this is
+  // the invariant holding rather than a case to handle — but an entry created
+  // for a thread the store does not hold is exactly the unmanaged always-on
+  // orphan §4.5 is about, and that is not a risk worth taking on an assertion.
+  if (!created) return "skipped";
+
+  for (const gone of before.filter(
+    (t) => !state.world.threads.some((kept) => kept.id === t.id),
+  )) {
+    // §4.5, §7: the store dropped it, its lorebook entry did not go with it.
+    await deps.log(
+      `[engine] thread cap displaced "${gone.title}" — its lorebook entry ${gone.lorebookEntryId ?? "(none)"} is now unmanaged`,
+    );
+  }
+
+  const entryId = await createThreadEntry(state, created);
+  deps.dispatch(threadLorebookEntrySet({ threadId, entryId }));
+  return "executed";
+}
+
 /** The branch. One arm per intent kind, no `default`. */
 async function execute(intent: Intent, deps: DrainDeps): Promise<IntentResult> {
   switch (intent.kind) {
@@ -344,12 +475,8 @@ async function execute(intent: Intent, deps: DrainDeps): Promise<IntentResult> {
     case "condense":
       return condense(intent.entryId, deps);
 
-    // Task 5. Logged exactly as phase 4 logged it, so the line a writer with
-    // `story_engine_debug` on already knows does not change meaning underneath
-    // them while the arm is still a stub.
     case "open":
-      await deps.log(`[engine] intent (not executed): ${intentKey(intent)}`);
-      return "skipped";
+      return open(intent.subject, deps);
   }
 }
 

@@ -49,6 +49,7 @@ function thread(id: string, over: Partial<Thread> = {}): Thread {
     horizon: "plot",
     entityIds: [],
     status: "open",
+    anchorParagraph: null,
     ...over,
   };
 }
@@ -105,7 +106,12 @@ function harness(
       dispatch: store.dispatch,
       getState: store.getState,
       nodeId: history.current(),
-      newText: "The press took Ada's left hand.",
+      assessment: {
+        backlog: 1,
+        newText: "The press took Ada's left hand.",
+        candidateIds: [],
+        paragraphCount: 90,
+      },
       genX: { generate } as unknown as DrainDeps["genX"],
       log: async (...messages: unknown[]) => {
         logged.push(messages.map(String).join(" "));
@@ -204,21 +210,134 @@ describe("drain — retire", () => {
   });
 });
 
-// ───────────────────────────── the kind Task 5 fills in ─────────────────────
+// ────────────────────────────────── open ──────────────────────────────────
 
-describe("drain — the kind Task 5 fills in", () => {
-  it("logs open without touching the lorebook", async () => {
+const OPEN: Intent = { kind: "open", subject: "the letter under the board" };
+
+describe("drain — open", () => {
+  it("creates the thread and binds a lorebook entry to it", async () => {
+    // `threadLorebookEntrySet` has had no caller since phase 5 built it. This
+    // is it: the thread lands first, the entry is created from the thread the
+    // reducer actually kept, and the id is bound back.
     const h = harness();
-    const queue: Intent[] = [{ kind: "open", subject: "the sealed letter" }];
 
-    const outcome = await drain(queue, h.deps);
+    const outcome = await drain([OPEN], h.deps);
 
-    expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
-    expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
-    expect(outcome.remaining).toEqual([]);
-    expect(logged).toContain(
-      "[engine] intent (not executed): open:the sealed letter",
+    const [thread] = h.store.getState().world.threads;
+    expect(thread.title).toBe("the letter under the board");
+    expect(thread.text).toBe("One-handed now.");
+    expect(thread.lorebookEntryId).toBe(lorebook.created()[0].id);
+    expect(outcome.executed).toEqual([OPEN]);
+  });
+
+  it("gives the entry the forgetting detector, not a set of keys", async () => {
+    const h = harness();
+
+    await drain([OPEN], h.deps);
+
+    const entry = lorebook.created()[0];
+    expect(entry.advancedConditions?.[0].type).toBe("not");
+    expect(entry.forceActivation).toBe(true);
+    expect(entry.text).toBe("One-handed now.");
+  });
+
+  it("anchors the thread at the paragraph the pass read to", async () => {
+    // §4.5's anchor. `assessment.paragraphCount` is the branch's own count, so
+    // undo moves the comparison with it — which is why the anchor is a
+    // paragraph index rather than a clock reading.
+    const h = harness();
+
+    await drain([OPEN], h.deps);
+
+    expect(h.store.getState().world.threads[0].anchorParagraph).toBe(90);
+  });
+
+  it("casts the entities the subject names", async () => {
+    // Without a cast the detector probes only for the title, which is prose and
+    // rarely appears verbatim — so the negation is always true and every
+    // Engine-opened thread would be the always-on entry it exists to replace.
+    const h = harness([], [entity("e1")]);
+
+    await drain(
+      [{ kind: "open", subject: "Ada's promise to the guild" }],
+      h.deps,
     );
+
+    expect(h.store.getState().world.threads[0].entityIds).toEqual(["e1"]);
+  });
+
+  it("asks for §3.3's price and no retries", async () => {
+    const h = harness();
+
+    await drain([OPEN], h.deps);
+
+    const [, options] = h.generate.mock.calls[0];
+    expect(options.max_tokens).toBe(INTENT_MAX_TOKENS.open);
+    expect(options.maxRetries).toBe(0);
+  });
+
+  it("shows the model the prose the pass assessed", async () => {
+    const h = harness();
+
+    await drain([OPEN], h.deps);
+
+    const [factory] = h.generate.mock.calls[0];
+    const { messages } = await factory();
+    const text = messages.map((m: Message) => m.content).join("\n");
+    expect(text).toContain("The press took Ada's left hand.");
+    expect(text).toContain("the letter under the board");
+  });
+
+  it("opens nothing when the model returns nothing usable", async () => {
+    const h = harness();
+    h.generate.mockImplementation(says("   "));
+
+    const outcome = await drain([OPEN], h.deps);
+
+    expect(h.store.getState().world.threads).toEqual([]);
+    expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
+    expect(outcome.executed).toEqual([]);
+    expect(outcome.remaining).toEqual([]);
+  });
+
+  it("renews a thread the subject already names instead of opening a second", async () => {
+    // Triage runs hot (§3.3) and will keep naming the same commitment while it
+    // is unsettled. Dedupe bounds that within one queue; across passes it is
+    // this that stops the World growing a duplicate thread — and a duplicate
+    // lorebook entry — for one commitment.
+    const h = harness([
+      thread("t1", {
+        title: "The Letter Under The Board",
+        lorebookEntryId: ENTRY,
+        anchorParagraph: 4,
+      }),
+    ]);
+
+    const outcome = await drain([OPEN], h.deps);
+
+    expect(h.store.getState().world.threads).toHaveLength(1);
+    expect(h.store.getState().world.threads[0].anchorParagraph).toBe(90);
+    expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
+    expect(h.generate).not.toHaveBeenCalled();
+    expect(outcome.executed).toEqual([OPEN]);
+  });
+
+  it("does not count as an entry rewrite", () => {
+    // §9.1's ∆ is entries the Engine rewrote. Opening a thread writes a new
+    // entry rather than rewriting one of the writer's.
+    expect(revisionsIn([OPEN])).toBe(0);
+  });
+
+  it("requeues an open the writer collided with", async () => {
+    const h = harness();
+    h.generate.mockRejectedValue(
+      new Error("A generation is already in progress"),
+    );
+
+    const outcome = await drain([OPEN], h.deps);
+
+    expect(outcome.remaining).toEqual([OPEN]);
+    expect(h.store.getState().world.threads).toEqual([]);
   });
 });
 
@@ -763,6 +882,7 @@ describe("no Engine action can write around the write door", () => {
     "revise-strategy.ts",
     "condense.ts",
     "triage-strategy.ts",
+    "open-strategy.ts",
   ]) {
     it(`${file} never calls the lorebook API directly`, () => {
       const src = code(readFileSync(join(ENGINE, file), "utf8"));
@@ -773,5 +893,16 @@ describe("no Engine action can write around the write door", () => {
   it("lorebook-write.ts is the one module that does", () => {
     const src = code(readFileSync(join(ENGINE, "lorebook-write.ts"), "utf8"));
     expect(src).toContain("api.v1.lorebook.updateEntry");
+  });
+
+  it("thread-bind.ts creates entries but never rewrites one", () => {
+    // The one module that reaches the lorebook API without going through the
+    // door, and only for the call the door cannot make: `createEntry` invents
+    // an entry, so there is no live text to read first and no original to
+    // snapshot. Every REWRITE it performs — the condition rebuild — goes
+    // through `writeLorebookEntry` like any other Engine edit.
+    const src = code(readFileSync(join(ENGINE, "thread-bind.ts"), "utf8"));
+    expect(src).toContain("api.v1.lorebook.createEntry");
+    expect(src).not.toContain("api.v1.lorebook.updateEntry");
   });
 });

@@ -149,8 +149,14 @@ function lastSentenceEnd(text: string): number {
  *  A sentence boundary and a line boundary are both complete units, and which
  *  one is later depends on what the model was in the middle of — prose, or the
  *  `Age: 34` field lines every entry template opens with. Taking whichever is
- *  further along keeps the most text without ever keeping half of anything. */
-function trimToLastCompleteUnit(text: string): string {
+ *  further along keeps the most text without ever keeping half of anything.
+ *
+ *  Exported for `open-strategy.ts`, which answers a truncated reminder the same
+ *  way for the same reason. A second implementation of "where does this text
+ *  stop being complete" is a second set of edge cases about closing quotes and
+ *  abbreviations, and the one that got it wrong would write half a word into
+ *  the writer's lorebook. */
+export function trimToLastCompleteUnit(text: string): string {
   const cut = Math.max(lastSentenceEnd(text), text.lastIndexOf("\n"));
   return cut <= 0 ? "" : text.slice(0, cut);
 }

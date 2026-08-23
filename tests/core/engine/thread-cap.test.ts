@@ -29,7 +29,15 @@ function thread(
   horizon: ThreadHorizon = "plot",
   status: ThreadStatus = "open",
 ): Thread {
-  return { id, title: id, text: "", horizon, entityIds: [], status };
+  return {
+    id,
+    title: id,
+    text: "",
+    horizon,
+    entityIds: [],
+    status,
+    anchorParagraph: null,
+  };
 }
 
 /** Ids, in list order — every assertion below is about which threads survived

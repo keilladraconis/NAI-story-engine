@@ -521,11 +521,12 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
         dispatch,
         getState,
         nodeId,
-        // The same prose triage was shown, from the same assessment. A revise
-        // rewrites an entry to carry what the story has NEWLY made true (§5),
-        // so re-deriving it here — or handing the drain the whole document —
+        // The same assessment triage was built from, entire. A revise rewrites
+        // an entry to carry what the story has NEWLY made true (§5) and an
+        // `open` anchors a thread at the paragraph it was raised in (§4.5);
+        // re-deriving either here — or handing the drain the whole document —
         // would be a different question than the one triage answered.
-        newText: assessment.newText,
+        assessment,
         genX,
         log,
       });

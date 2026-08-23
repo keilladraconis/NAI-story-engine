@@ -34,6 +34,7 @@ import type {
 } from "../types";
 import { initialStoryState } from "../slices/story";
 import {
+  DEFAULT_THREAD_ANCHOR,
   DEFAULT_THREAD_HORIZON,
   DEFAULT_THREAD_STATUS,
   initialWorldState,
@@ -111,7 +112,9 @@ export function applyRecords(
   // defaulted — so it defaults them too, from the same constants. A record
   // written before phase 5 added the fields otherwise reaches the UI as a
   // thread whose status is `undefined`, and `statusOption(undefined).help` in
-  // the World list throws on the spot.
+  // the World list throws on the spot. Phase 6's `anchorParagraph` defaults
+  // here for the same reason and to the same end: an undefined anchor reaches
+  // expiry as an arithmetic hole rather than as "nobody has anchored this".
   const threads: Thread[] = [];
   for (const id of index.threadIds ?? []) {
     const record = records[threadKey(id)] as Partial<Thread> | undefined;
@@ -120,6 +123,10 @@ export function applyRecords(
       ...(record as Thread),
       horizon: record.horizon ?? DEFAULT_THREAD_HORIZON,
       status: record.status ?? DEFAULT_THREAD_STATUS,
+      // `??`, never `||`: paragraph 0 is a real anchor — a thread opened in the
+      // story's first paragraph — and reading it as missing would hand expiry
+      // an unanchored thread that has in fact been touched.
+      anchorParagraph: record.anchorParagraph ?? DEFAULT_THREAD_ANCHOR,
     });
   }
 

@@ -46,6 +46,37 @@ function input(over: Partial<Parameters<typeof assess>[0]> = {}) {
   };
 }
 
+describe("assess — paragraphCount", () => {
+  // The branch's own paragraph count, which the anchor an Engine-opened thread
+  // records (§4.5) is an index into. Not the same question as `backlog`, and
+  // the two count differently on purpose.
+
+  it("counts every section in the document, however far the watermark is", () => {
+    expect(assess(input()).paragraphCount).toBe(3);
+    expect(assess(input({ watermark: seen(3) })).paragraphCount).toBe(3);
+  });
+
+  it("counts a blank paragraph, where the backlog does not", () => {
+    // A section IS a paragraph (`GenerationPosition.sectionId` is documented as
+    // "the section (paragraph) ID"), so this is the document's own count — the
+    // unit NovelAI's `paragraphCount` condition variable is in, which is what
+    // an anchor has to be comparable against. `backlog` asks a different
+    // question — how much unread PROSE is there — and a blank paragraph is
+    // none.
+    const doc = new Map(DOC).set(4, "   ");
+    const a = assess(input({ sectionIds: [1, 2, 3, 4], textBySection: doc }));
+    expect(a.paragraphCount).toBe(4);
+    expect(a.backlog).toBe(3);
+  });
+
+  it("is zero for an empty document", () => {
+    expect(
+      assess(input({ sectionIds: [], textBySection: new Map() }))
+        .paragraphCount,
+    ).toBe(0);
+  });
+});
+
 describe("assess — backlog", () => {
   it("counts everything when there is no watermark yet", () => {
     expect(assess(input()).backlog).toBe(3);

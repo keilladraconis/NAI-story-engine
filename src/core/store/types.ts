@@ -157,15 +157,38 @@ export interface Thread {
   entityIds: string[]; // the cast the thread drags into context
   lorebookEntryId?: string; // optional: thread text synced as a lorebook entry
   status: ThreadStatus;
+  /** The paragraph the Engine last opened or renewed this thread at, or `null`
+   *  for one nobody has anchored (design §4.3, §4.5).
+   *
+   *  Two deferred features wanted the same missing field: the arc pacing gate
+   *  ("how long since this thread last fired") and expiry ("how long since the
+   *  story last touched it"). It is a paragraph INDEX rather than a timestamp
+   *  because both are specified in paragraphs, and because an index compares
+   *  against the branch's own paragraph count — so undo moves it correctly,
+   *  which no wall clock does.
+   *
+   *  **`null` is not zero, and the difference is a destructive verdict.** A
+   *  thread the writer creates by hand is never anchored: the dispatch is
+   *  synchronous and the count needs a document scan, and a defaulted 0 would
+   *  read as "abandoned since paragraph 0" — which is exactly the persisted lie
+   *  `isThreadExpired`'s comment refuses to reach a verdict on. `null` says
+   *  what is true, survives JSON where `undefined` would vanish from the record
+   *  entirely, and leaves the count untrustworthy in the one direction that
+   *  never destroys anything. */
+  anchorParagraph: number | null;
 }
 
 /** A thread as a callsite hands it to `threadCreated`. `horizon` and `status`
  *  are the reducer's to default (see slices/world.ts), so no callsite — the
- *  Forge's [THREAD] command, the World's "+ New Thread", triage in a later
- *  phase — has to remember them, and none of them can disagree about what the
- *  default is. */
-export type ThreadDraft = Omit<Thread, "horizon" | "status"> &
-  Partial<Pick<Thread, "horizon" | "status">>;
+ *  Forge's [THREAD] command, the World's "+ New Thread", the Engine's own
+ *  `open` — has to remember them, and none of them can disagree about what the
+ *  default is. The Engine is the only caller that passes `anchorParagraph`,
+ *  because it is the only one that knows the paragraph it is acting at. */
+export type ThreadDraft = Omit<
+  Thread,
+  "horizon" | "status" | "anchorParagraph"
+> &
+  Partial<Pick<Thread, "horizon" | "status" | "anchorParagraph">>;
 
 export type EntityLifecycle = "draft" | "live";
 

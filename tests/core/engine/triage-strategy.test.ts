@@ -342,6 +342,7 @@ function assessment(over: Partial<Assessment> = {}): Assessment {
     backlog: 2,
     newText: "Ada turned the key. The letter stayed in her pocket.",
     candidateIds: ["e1"],
+    paragraphCount: 12,
     ...over,
   };
 }

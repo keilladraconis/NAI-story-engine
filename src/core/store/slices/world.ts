@@ -18,6 +18,15 @@ export const DEFAULT_THREAD_HORIZON: ThreadHorizon = "plot";
  *  satisfied one. */
 export const DEFAULT_THREAD_STATUS: ThreadStatus = "open";
 
+/** A thread nobody anchored (§4.5). `null`, never 0: expiry reads the anchor as
+ *  "the paragraph the story last touched this", so a zero would say a thread
+ *  created in chapter nine has been abandoned since chapter one — and expiry is
+ *  a destructive verdict. Only the Engine anchors, because only the Engine
+ *  knows the paragraph count it is acting at; the World's "+ New Thread" and
+ *  the Forge's [THREAD] both dispatch synchronously, where that count is not
+ *  available and guessing it would be worse than admitting it. */
+export const DEFAULT_THREAD_ANCHOR: number | null = null;
+
 export const initialWorldState: WorldState = {
   threads: [],
   entitiesById: {},
@@ -220,6 +229,8 @@ export const worldSlice = createSlice({
           ...payload.thread,
           horizon: payload.thread.horizon ?? DEFAULT_THREAD_HORIZON,
           status: payload.thread.status ?? DEFAULT_THREAD_STATUS,
+          anchorParagraph:
+            payload.thread.anchorParagraph ?? DEFAULT_THREAD_ANCHOR,
         },
       ],
     }),
@@ -233,10 +244,12 @@ export const worldSlice = createSlice({
     // three actions a thread's forgetting detector is built from:
     // `buildThreadCondition` (src/core/engine/thread-condition.ts) reads
     // `title` for its fallback probe, the members' names for the real one, and
-    // `horizon` for the range. Nothing writes `advancedConditions` yet — §7
-    // reconciliation is phase 6 — but whatever does must rebuild on all three
-    // of them, or a renamed thread goes on probing for a name the prose no
-    // longer uses and fires forever.
+    // `horizon` for the range. `registerThreadConditionEffects`
+    // (src/core/engine/thread-bind.ts) subscribes to exactly these three and
+    // rewrites the entry's condition, because a renamed thread whose detector
+    // was not rebuilt goes on probing for a name the prose no longer uses and
+    // fires forever. A fourth action that changed any of the three would have
+    // to be added there too.
     threadRenamed: (state, payload: { threadId: string; title: string }) => ({
       ...state,
       threads: state.threads.map((t) =>
@@ -285,10 +298,12 @@ export const worldSlice = createSlice({
       ),
     }),
 
-    /** Satisfaction is a flag, and flipping it is all this does. §4.4 retires a
-     *  satisfied thread by disabling its lorebook entry, which is the Engine
-     *  acting and therefore phase 6; until then the flag is what the writer
-     *  sets, what the World list reads, and what the cap spends first
+    /** Satisfaction is a flag, and flipping it is all this does. §4.4's
+     *  retirement — disabling the thread's lorebook entry — is the drain's
+     *  (`execute.ts`), which flips this flag second so a failure between the
+     *  two leaves the thread open and the work re-proposed rather than settled
+     *  with its reminder still in context. The flag is also what the writer
+     *  sets by hand, what the World list reads, and what the cap spends first
      *  (`displacementOrder`). A setter for the same reason as the horizon
      *  above: a toggle would make two presses mean nothing. */
     threadStatusSet: (
@@ -298,6 +313,27 @@ export const worldSlice = createSlice({
       ...state,
       threads: state.threads.map((t) =>
         t.id === payload.threadId ? { ...t, status: payload.status } : t,
+      ),
+    }),
+
+    /** The renewal half of §4.5's anchor: the paragraph the Engine last opened
+     *  or renewed this thread at.
+     *
+     *  A setter for the same reason the horizon and the status are — the
+     *  payload carries the paragraph, so a second delivery of the same intent
+     *  writes the same number rather than advancing it (CLAUDE.md: design
+     *  intents to be idempotent). Nothing clears an anchor: a thread that was
+     *  once anchored has been touched, and unlearning that would only ever make
+     *  expiry more eager. */
+    threadAnchorSet: (
+      state,
+      payload: { threadId: string; paragraph: number },
+    ) => ({
+      ...state,
+      threads: state.threads.map((t) =>
+        t.id === payload.threadId
+          ? { ...t, anchorParagraph: payload.paragraph }
+          : t,
       ),
     }),
 
@@ -335,5 +371,6 @@ export const {
   threadMemberToggled,
   threadHorizonSet,
   threadStatusSet,
+  threadAnchorSet,
   threadLorebookEntrySet,
 } = worldSlice.actions;

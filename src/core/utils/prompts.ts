@@ -873,3 +873,49 @@ HOW:
 - Return the entry body and nothing else — no preamble, no commentary, no note about what you removed, no markdown fences.`;
 
 export const ENGINE_CONDENSE_INSTRUCTION = `Rewrite the entry above tighter. Every fact it asserts must survive; only the words spent on them may shrink. Return the entry and nothing else.`;
+
+/** The Engine opening a Thread (design §4).
+ *
+ *  A thread's entry is not a description of a subject — it is the reminder the
+ *  story model is shown when the prose has stopped carrying a commitment
+ *  (§4.3's forgetting detector). So this prompt is written against a different
+ *  failure than the two above, and it is a sharper one: **this text reaches the
+ *  model that writes the story.** A revision is read when a name is mentioned
+ *  and describes what is already true; a reminder arrives precisely when the
+ *  story has drifted, and whatever it says is the nearest instruction in
+ *  context. A reminder that says "she must decide soon" is a hand on the
+ *  writer's wheel.
+ *
+ *  Three rules carry that.
+ *
+ *   1. **State what is outstanding, do not ask for it to be resolved.** The
+ *      same instinct as §4.4's retirement: the model is never told what to do
+ *      with a plot, only what stands. An open commitment written as a standing
+ *      fact is something the story can pick up when it is ready; written as a
+ *      demand it is a scene the model will produce on the spot.
+ *   2. **Name the participants.** The reminder is read cold, several scenes
+ *      after the commitment was made, beside other lorebook entries. A pronoun
+ *      has nothing to attach to there.
+ *   3. **No meta.** "The reader", "the plot", "this thread", "remember that" —
+ *      any of them tells the story model it is a model, in a context window
+ *      that is otherwise prose.
+ *
+ *  Short by instruction as well as by `max_tokens`: this is the one Engine
+ *  output that costs context every time it fires, so a paragraph where a
+ *  sentence would do is a paragraph the recent prose does not get. */
+export const ENGINE_OPEN_SYSTEM = `You are the archivist of a story engine. The writer's story has raised something it has not settled, and you write the one standing note that will be shown to the model writing this story if the prose drifts away from it.
+
+You are given the subject of that commitment and the prose that raised it. You return the note and nothing else.
+
+WHAT THE NOTE IS:
+- One or two sentences, present tense, stating what is outstanding as it stands right now.
+- Written from no one's point of view, the way a lorebook entry is. Not addressed to anyone.
+- Read cold, several scenes later, beside other lorebook entries — so name the people, places and things involved rather than saying "she", "him", or "it".
+
+RULES:
+- State what is unresolved. Never say what should happen next, never suggest how it ends, never ask for it to be dealt with now. This note is shown when the story has moved on; a note that pushes would drag the story back on the spot.
+- Only the prose you were given may put facts in the note. Do not invent a motive, a consequence, or a detail the prose does not establish.
+- Never mention the story, the plot, the reader, the writer, a chapter, a scene, or this note itself. Never write "remember", "note that", "unresolved", "pending", or "thread".
+- No preamble, no title, no heading, no quotation marks, no markdown. The note itself, and nothing else.`;
+
+export const ENGINE_OPEN_INSTRUCTION = `Write the standing note for the commitment named above: one or two sentences, present tense, naming who and what is involved, saying only what is outstanding. Return the note and nothing else.`;

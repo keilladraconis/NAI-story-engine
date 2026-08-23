@@ -16,6 +16,8 @@ import {
   threadMemberToggled,
   threadHorizonSet,
   threadStatusSet,
+  threadAnchorSet,
+  DEFAULT_THREAD_ANCHOR,
 } from "../../../../src/core/store/slices/world";
 import {
   Thread,
@@ -61,6 +63,7 @@ const THREAD: Thread = {
   horizon: "plot",
   entityIds: [],
   status: "open",
+  anchorParagraph: null,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -83,6 +86,38 @@ describe("threadCreated", () => {
     );
     expect(state.threads[0].horizon).toBe("plot");
     expect(state.threads[0].status).toBe("open");
+  });
+
+  it("leaves a thread nobody anchored unanchored, rather than at paragraph 0", () => {
+    // The World's "+ New Thread" cannot know the branch's paragraph count — the
+    // dispatch is synchronous and the count needs a document scan — and a
+    // defaulted 0 would read as "abandoned since the story began", which is a
+    // destructive verdict on a thread the writer just made. `null` says what is
+    // true: nobody has anchored this.
+    const state = reduce(
+      makeState(),
+      threadCreated({
+        thread: { id: "t2", title: "Bare", text: "", entityIds: [] },
+      }),
+    );
+    expect(state.threads[0].anchorParagraph).toBe(DEFAULT_THREAD_ANCHOR);
+    expect(DEFAULT_THREAD_ANCHOR).toBeNull();
+  });
+
+  it("keeps an anchor the Engine recorded at creation", () => {
+    const state = reduce(
+      makeState(),
+      threadCreated({
+        thread: {
+          id: "t2",
+          title: "Bare",
+          text: "",
+          entityIds: [],
+          anchorParagraph: 41,
+        },
+      }),
+    );
+    expect(state.threads[0].anchorParagraph).toBe(41);
   });
 
   it("keeps an explicit horizon and status", () => {
@@ -114,6 +149,7 @@ const thread = (id: string, horizon: ThreadHorizon = "plot"): Thread => ({
   horizon,
   entityIds: [],
   status: "open",
+  anchorParagraph: null,
 });
 
 /** A store state with `threads` already in it, as a branch load leaves it. */
@@ -362,6 +398,32 @@ describe("threadStatusSet", () => {
     const state = reduce(
       makeState({ threads: [THREAD] }),
       threadStatusSet({ threadId: "nope", status: "satisfied" }),
+    );
+    expect(state.threads).toEqual([THREAD]);
+  });
+});
+
+describe("threadAnchorSet", () => {
+  it("records the paragraph the Engine last touched the thread at", () => {
+    const state = reduce(
+      makeState({ threads: [THREAD] }),
+      threadAnchorSet({ threadId: "t1", paragraph: 120 }),
+    );
+    expect(state.threads[0]).toEqual({ ...THREAD, anchorParagraph: 120 });
+  });
+
+  it("moves an anchor that was already set — a renewal, not a first write", () => {
+    const state = reduce(
+      makeState({ threads: [{ ...THREAD, anchorParagraph: 12 }] }),
+      threadAnchorSet({ threadId: "t1", paragraph: 120 }),
+    );
+    expect(state.threads[0].anchorParagraph).toBe(120);
+  });
+
+  it("no-ops on an id no thread has", () => {
+    const state = reduce(
+      makeState({ threads: [THREAD] }),
+      threadAnchorSet({ threadId: "nope", paragraph: 9 }),
     );
     expect(state.threads).toEqual([THREAD]);
   });

@@ -20,6 +20,18 @@ function categoryNameFor(fieldId: DulfsFieldID): string {
 }
 
 /**
+ * Where a Thread's lorebook entry lives (design §4).
+ *
+ * Its own category rather than a DULFS one, because a Thread is not an entity:
+ * it is a commitment with a lifecycle, its entry carries a condition instead of
+ * keys, and a writer scanning their lorebook should be able to see the Engine's
+ * open threads as a group. Named through `SE_CATEGORY_PREFIX` so
+ * `mergeDuplicateCategories` treats it like every other Story Engine category
+ * and never touches one of the writer's own.
+ */
+export const SE_THREAD_CATEGORY = `${SE_CATEGORY_PREFIX}Threads`;
+
+/**
  * Migrate old lorebook category names to new names, then merge any duplicate
  * "SE: " categories left behind by older builds.
  * Safe to call multiple times — skips already-renamed, already-unique categories.
@@ -91,9 +103,15 @@ async function mergeDuplicateCategories(): Promise<void> {
  */
 const inFlightCategories = new Map<string, Promise<string>>();
 
-// Helper: Find or create a category for a field
-export async function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
-  const name = categoryNameFor(fieldId);
+/** Find-or-create by category NAME, with the burst collapsing above.
+ *
+ * Split out from `ensureCategory` when Threads needed a category that is not a
+ * DULFS field: the collapsing is a property of the name, not of what maps to
+ * it, so a second entry point that skipped it would race the first into two
+ * categories with the same name — the exact defect that made
+ * `mergeDuplicateCategories` necessary.
+ */
+export async function ensureNamedCategory(name: string): Promise<string> {
   const pending = inFlightCategories.get(name);
   if (pending) return pending;
 
@@ -104,6 +122,11 @@ export async function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
   } finally {
     inFlightCategories.delete(name);
   }
+}
+
+// Helper: Find or create a category for a field
+export function ensureCategory(fieldId: DulfsFieldID): Promise<string> {
+  return ensureNamedCategory(categoryNameFor(fieldId));
 }
 
 async function findOrCreateCategory(name: string): Promise<string> {
@@ -132,17 +155,27 @@ export async function findCategory(
 
 /**
  * Sync lorebook entries and categories when erato_compatibility is toggled.
- * Reads managed entry IDs from WorldEntities (via lorebookEntryId).
+ * Reads managed entry IDs from WorldEntities and from Threads (both via
+ * lorebookEntryId).
+ *
+ * Threads joined the list in phase 6, when the Engine started binding a thread
+ * to a lorebook entry of its own. They are managed entries like any other —
+ * created with the divider applied (`createThreadEntry`) — so leaving them out
+ * here would mean toggling the setting later fixed every SE entry except the
+ * Engine's own.
  */
 export async function syncEratoCompatibility(
   getState: () => RootState,
 ): Promise<void> {
   const erato = (await api.v1.config.get("erato_compatibility")) || false;
 
-  // Collect managed entry IDs from WorldEntities
+  // Collect managed entry IDs from WorldEntities and Threads
   const entryIds: string[] = [];
   for (const entity of Object.values(getState().world.entitiesById)) {
     if (entity.lorebookEntryId) entryIds.push(entity.lorebookEntryId);
+  }
+  for (const thread of getState().world.threads) {
+    if (thread.lorebookEntryId) entryIds.push(thread.lorebookEntryId);
   }
 
   // Gather unique category IDs from managed entries

@@ -13,6 +13,7 @@ import { registerSummaryGenerationEffects } from "./effects/summary-generation";
 import { registerBootstrapEffects } from "./effects/bootstrap-effects";
 import { registerHistorySyncEffects } from "./effects/history-sync";
 import { registerEngineLoopEffects } from "./effects/engine-loop";
+import { registerThreadConditionEffects } from "../engine/thread-bind";
 
 export { syncEratoCompatibility } from "./effects/lorebook-sync";
 
@@ -34,4 +35,10 @@ export function registerEffects(store: Store<RootState>, genX: GenX): void {
   // The Engine's wakeup. Off unless the story's settings say otherwise, so
   // registering it costs nothing until the writer opts in.
   registerEngineLoopEffects({ subscribeEffect, dispatch, getState, genX });
+  // A thread's forgetting detector is built from its title, its cast and its
+  // horizon (§4.3), so the three actions that change any of them have to
+  // rebuild it — a detector left probing a renamed thread's old name never
+  // matches and reminds forever. Registered whether or not the Engine is on:
+  // the writer can edit a thread the Engine opened before switching it off.
+  registerThreadConditionEffects(subscribeEffect, getState);
 }

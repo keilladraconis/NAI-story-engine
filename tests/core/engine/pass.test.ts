@@ -73,6 +73,7 @@ function thread(id: string, over: Partial<Thread> = {}): Thread {
     horizon: "plot",
     entityIds: [],
     status: "open",
+    anchorParagraph: null,
     ...over,
   };
 }
@@ -319,9 +320,10 @@ describe("the pass", () => {
   });
 
   it("enqueues what triage named and clears the queue", async () => {
-    // Revise and open are Tasks 3 and 5: the drain reaches them, logs them
-    // behind `story_engine_debug` (the describe below covers the gating) and
-    // consumes them. The budget covers both, so nothing is written back.
+    // The queue is written before the drain and re-written after it (§11), so
+    // a reload between the two finds the work. The budget covers both intents,
+    // so what is written back is empty — the revise finds a draft entity with
+    // no entry to rewrite, and the open opens its thread.
     const h = harness();
     triageReturns(h, "REVISE Ada\nOPEN the sealed letter");
     await h.runPass();
@@ -335,7 +337,6 @@ describe("the pass", () => {
     ]);
     expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
     expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
-    expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
   });
 
   // ─────────────────────────────── the drain ───────────────────────────────
@@ -1060,13 +1061,11 @@ describe("the pass", () => {
       await h.runPass();
 
       // The revise reaches its arm and finds a draft entity with no entry to
-      // rewrite; open is still a stub.
+      // rewrite; the open reaches its own and opens a thread.
       expect(logged()).toContain(
         "[engine] revise Ada: no lorebook entry, skipped",
       );
-      expect(logged()).toContain(
-        "[engine] intent (not executed): open:the sealed letter",
-      );
+      expect(logged()).toContain("[engine] executed open:the sealed letter");
     });
 
     it("gates the skip line too, not only the drain", async () => {

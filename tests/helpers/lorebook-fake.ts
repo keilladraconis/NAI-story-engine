@@ -10,6 +10,11 @@ export type LorebookFake = {
   failNextUpdate(error: Error): void;
   /** Every updateEntry patch, in order. */
   updates(): { id: string; patch: Partial<LorebookEntry> }[];
+  /** Every entry created through the API, in order — what the writer's lorebook
+   *  gained that they did not put there. */
+  created(): LorebookEntry[];
+  /** The categories the book holds, as `{id, name}`. */
+  categories(): { id: string; name?: string }[];
 };
 
 /** In-memory `api.v1.lorebook`, entries only.
@@ -20,6 +25,8 @@ export type LorebookFake = {
 export function installLorebookFake(): LorebookFake {
   const entries = new Map<string, LorebookEntry>();
   const applied: { id: string; patch: Partial<LorebookEntry> }[] = [];
+  const minted: LorebookEntry[] = [];
+  const categories = new Map<string, LorebookCategory>();
   let nextFailure: Error | undefined;
 
   api.v1.lorebook = {
@@ -37,6 +44,23 @@ export function installLorebookFake(): LorebookFake {
       entries.set(id, { ...existing, ...patch });
       applied.push({ id, patch });
     }),
+    // Creation is a different act from a write: it invents an entry rather than
+    // editing one the writer owns, so it is the one lorebook call the Engine's
+    // write door does not stand in front of (there is no live entry to read and
+    // no original to snapshot). The fake keeps them apart for the same reason.
+    createEntry: vi.fn(async (entry: Partial<LorebookEntry>) => {
+      const id = entry.id ?? api.v1.uuid();
+      const stored = { ...entry, id } as LorebookEntry;
+      entries.set(id, stored);
+      minted.push(stored);
+      return id;
+    }),
+    categories: vi.fn(async () => [...categories.values()]),
+    createCategory: vi.fn(async (category: Partial<LorebookCategory>) => {
+      const id = category.id ?? api.v1.uuid();
+      categories.set(id, { ...category, id } as LorebookCategory);
+      return id;
+    }),
   } as unknown as typeof api.v1.lorebook;
 
   return {
@@ -51,6 +75,12 @@ export function installLorebookFake(): LorebookFake {
     },
     updates() {
       return applied;
+    },
+    created() {
+      return minted;
+    },
+    categories() {
+      return [...categories.values()];
     },
   };
 }

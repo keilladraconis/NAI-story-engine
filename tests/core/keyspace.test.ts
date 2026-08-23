@@ -12,6 +12,7 @@ import { initialStoryState } from "../../src/core/store/slices/story";
 import {
   DEFAULT_THREAD_HORIZON,
   DEFAULT_THREAD_STATUS,
+  DEFAULT_THREAD_ANCHOR,
   initialWorldState,
 } from "../../src/core/store/slices/world";
 import { initialFoundationState } from "../../src/core/store/slices/foundation";
@@ -45,6 +46,7 @@ function state(over: Partial<RootState> = {}): RootState {
           horizon: "plot",
           status: "open",
           entityIds: ["e1"],
+          anchorParagraph: 7,
         },
       ],
     },
@@ -177,8 +179,50 @@ describe("applyRecords defends the store from a record it did not write", () => 
         entityIds: [],
         horizon: DEFAULT_THREAD_HORIZON,
         status: DEFAULT_THREAD_STATUS,
+        anchorParagraph: DEFAULT_THREAD_ANCHOR,
       },
     ]);
+  });
+
+  it("defaults a thread record written before the anchor existed", () => {
+    // Same shape as the two above, and the same reason: this is the one path a
+    // Thread takes into the store without `threadCreated`'s defaults. An
+    // undefined anchor would reach `isThreadExpired`'s caller as an arithmetic
+    // hole; `null` is the value that says "nobody has anchored this" out loud.
+    const out = applyRecords(
+      { entityIds: [], threadIds: ["g1"], fieldIds: [] },
+      {
+        "t:g1": {
+          id: "g1",
+          title: "The Guild",
+          text: "",
+          entityIds: [],
+          horizon: "arc",
+          status: "open",
+        },
+      },
+    );
+    expect(out.world.threads[0].anchorParagraph).toBe(DEFAULT_THREAD_ANCHOR);
+  });
+
+  it("keeps an anchor the Engine recorded", () => {
+    const out = applyRecords(
+      { entityIds: [], threadIds: ["g1"], fieldIds: [] },
+      {
+        "t:g1": {
+          id: "g1",
+          title: "The Guild",
+          text: "",
+          entityIds: [],
+          horizon: "arc",
+          status: "open",
+          anchorParagraph: 0,
+        },
+      },
+    );
+    // Zero is a real anchor — a thread opened in the first paragraph — and must
+    // survive a `??` that would read it as missing.
+    expect(out.world.threads[0].anchorParagraph).toBe(0);
   });
 
   it("keeps what a record does carry", () => {

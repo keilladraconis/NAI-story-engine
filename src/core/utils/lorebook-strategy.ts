@@ -68,12 +68,28 @@ async function resolveCategoryName(
 }
 
 /**
+ * What `resolveDisplayName` answers when every layer is blank.
+ *
+ * Exported because it is a placeholder rather than a name, and one caller has
+ * to be able to tell the two apart: a thread's forgetting detector probes the
+ * prose for its members' names, and probing for "Unnamed Entry" watches for a
+ * string no story contains — the negation is then always true and the thread
+ * reminds forever (`resolveThreadMembers` in `core/engine/thread-bind.ts`).
+ */
+export const UNNAMED_ENTRY = "Unnamed Entry";
+
+/**
  * Resolve the display name for a lorebook entry. Prefers the unsaved draft
  * in the edit pane (storyStorage EDIT_PANE_TITLE) when this entry is the one
  * currently open, so generation reflects what the user typed even before
  * they click Save. Falls back to the persisted names.
+ *
+ * Exported for the Engine's thread binding, which must resolve a member's name
+ * through the same DRAFT > LOREBOOK > STATE order rather than reading
+ * `entity.name` — the layer CLAUDE.md allows to be stale, because Story Engine
+ * does not chase a rename the writer made in their own lorebook.
  */
-async function resolveDisplayName(
+export async function resolveDisplayName(
   state: RootState,
   entryId: string,
   entryDisplayName: string | undefined,
@@ -83,7 +99,7 @@ async function resolveDisplayName(
   const liveName = isCurrentlySelected
     ? String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "").trim()
     : "";
-  return liveName || entryDisplayName || entity?.name || "Unnamed Entry";
+  return liveName || entryDisplayName || entity?.name || UNNAMED_ENTRY;
 }
 
 /** Format the Threads an entity belongs to as context text. */

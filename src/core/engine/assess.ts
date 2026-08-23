@@ -26,6 +26,18 @@ export type Assessment = {
   newText: string;
   /** Entities the new prose plausibly mentions. */
   candidateIds: string[];
+  /** How many paragraphs the branch holds in total — the position an
+   *  Engine-opened thread's anchor is an index into (§4.5), and the unit
+   *  NovelAI's own `paragraphCount` condition variable is in.
+   *
+   *  **Every section, including the blank ones**, where `backlog` counts only
+   *  the sections carrying prose. The two really are different questions: a
+   *  blank paragraph is not unread writing, but it is a paragraph the document
+   *  and the lorebook's own counter both hold, and an anchor that disagreed
+   *  with them would drift a little further from the truth every time the
+   *  writer left a gap. `GenerationPosition.sectionId` is documented as "the
+   *  section (paragraph) ID", so one section is one paragraph. */
+  paragraphCount: number;
 };
 
 /** How far the Engine has read: which section, and how much of it.
@@ -57,6 +69,24 @@ export type AssessInput = {
  *  group. */
 function escape(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Whether a name is mentioned in a piece of text, whole-word.
+ *
+ *  Exported because two different questions want exactly this answer and must
+ *  not drift into two matchers: which entities the new prose plausibly mentions
+ *  (below), and which entities a triage subject names — the cast an
+ *  Engine-opened thread starts with (`castFromSubject` in `thread-bind.ts`). A
+ *  second implementation would be a second answer to "is Ada in this string",
+ *  and the one that got it wrong would build a thread whose detector watches
+ *  for the wrong person.
+ *
+ *  A blank name matches nothing rather than everything: an empty pattern tests
+ *  true against any string, and draft entities can be nameless. */
+export function mentionsName(text: string, name: string): boolean {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return false;
+  return wholeWord(trimmed).test(text);
 }
 
 /** Whole-word matcher for a name, anchored only where an anchor can exist.
@@ -106,14 +136,15 @@ export function assess(input: AssessInput): Assessment {
   const newText = pieces.join("\n\n");
 
   const candidateIds = entities
-    .filter((e) => {
-      const name = e.name.trim();
-      if (name.length === 0) return false;
-      return wholeWord(name).test(newText);
-    })
+    .filter((e) => mentionsName(newText, e.name))
     .map((e) => e.id);
 
-  return { backlog: pieces.length, newText, candidateIds };
+  return {
+    backlog: pieces.length,
+    newText,
+    candidateIds,
+    paragraphCount: sectionIds.length,
+  };
 }
 
 // ─────────────────────── the free condense trigger (§5.1) ───────────────────────
