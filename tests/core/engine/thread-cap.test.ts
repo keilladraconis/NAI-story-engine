@@ -14,6 +14,7 @@ import {
   enforceThreadCap,
   expiredThreads,
   isThreadExpired,
+  renewedThreads,
 } from "../../../src/core/engine/thread-cap";
 import {
   PARAGRAPH_CHARS,
@@ -380,5 +381,84 @@ describe("expiredThreads — the caller isThreadExpired never had", () => {
 
   it("finds nothing in an empty world", () => {
     expect(expiredThreads([], 500)).toEqual([]);
+  });
+});
+
+describe("renewedThreads — the prose says this one is still alive", () => {
+  const cast = (id: string, entityIds: string[], over: Partial<Thread> = {}) =>
+    ({ ...thread(id), entityIds, ...over }) as Thread;
+
+  const prose = (candidateIds: string[], newText = "") => ({
+    candidateIds,
+    newText,
+  });
+
+  it("renews a thread whose cast the pass just read", () => {
+    expect(ids(renewedThreads([cast("t", ["e1"])], prose(["e1"]), 42))).toEqual(
+      ["t"],
+    );
+  });
+
+  it("leaves a thread the prose said nothing about", () => {
+    expect(renewedThreads([cast("t", ["e1"])], prose(["e2"]), 42)).toEqual([]);
+  });
+
+  it("renews on the title too, because that is what the detector probes for", () => {
+    // `threadSubjects` calls a thread alive when its title OR a cast name is on
+    // the page. Renewing on a narrower rule would let the Engine retire a
+    // thread its own lorebook entry is still treating as alive.
+    const t = cast("t", [], { title: "Ada's debt" });
+    expect(
+      ids(renewedThreads([t], prose([], "Ada's debt came due."), 9)),
+    ).toEqual(["t"]);
+  });
+
+  it("does not renew on a title fragment", () => {
+    const t = cast("t", [], { title: "Ada" });
+    expect(renewedThreads([t], prose([], "Adamant, she left."), 9)).toEqual([]);
+  });
+
+  it("does not renew a satisfied thread", () => {
+    // Expiry never reaches one (`isThreadExpired`), and its entry is disabled,
+    // so the write would buy nothing and cost a record copy per node plus a
+    // rebuild of a condition nothing reads.
+    const t = cast("t", ["e1"], { status: "satisfied" });
+    expect(renewedThreads([t], prose(["e1"]), 42)).toEqual([]);
+  });
+
+  it("does not renew a thread already anchored at this paragraph", () => {
+    // A pass that appends to the trailing section reads new prose without
+    // adding a paragraph, so this repeats. Nothing to move is nothing to write.
+    const t = cast("t", ["e1"], { anchorParagraph: 42 });
+    expect(renewedThreads([t], prose(["e1"]), 42)).toEqual([]);
+  });
+
+  it("anchors a hand-made thread the prose touched, from the evidence", () => {
+    // `null` means "no evidence"; the prose naming its cast IS evidence, and
+    // the anchor lands at the current paragraph rather than at a defaulted 0 —
+    // so the thread gets its whole window from a moment the story demonstrably
+    // carried it.
+    const t = cast("t", ["e1"], { anchorParagraph: null });
+    expect(ids(renewedThreads([t], prose(["e1"]), 42))).toEqual(["t"]);
+  });
+
+  it("renews on any one member of the cast, not all of them", () => {
+    const t = cast("t", ["e1", "e2"], {});
+    expect(ids(renewedThreads([t], prose(["e2"]), 7))).toEqual(["t"]);
+  });
+
+  it("finds nothing when the pass read nothing", () => {
+    expect(renewedThreads([cast("t", ["e1"])], prose([]), 3)).toEqual([]);
+  });
+
+  it("renews a thread whose anchor is behind this paragraph, and one ahead of it", () => {
+    // Ahead happens after an undo: the record moved back, the paragraph count
+    // with it. The anchor follows the prose either way.
+    const behind = cast("a", ["e1"], { anchorParagraph: 1 });
+    const ahead = cast("b", ["e1"], { anchorParagraph: 900 });
+    expect(ids(renewedThreads([behind, ahead], prose(["e1"]), 42))).toEqual([
+      "a",
+      "b",
+    ]);
   });
 });

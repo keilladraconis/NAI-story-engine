@@ -49,7 +49,7 @@ import { canStartPass, type Intent } from "../../engine/loop-machine";
 import { dedupe, QUEUE_KEY, WATERMARK_KEY } from "../../engine/intents";
 import { drain, revisionsIn } from "../../engine/execute";
 import { readCondenseMark, worthCondensing } from "../../engine/condense";
-import { expiredThreads } from "../../engine/thread-cap";
+import { expiredThreads, renewedThreads } from "../../engine/thread-cap";
 import {
   backoffMs,
   isConcurrencyRefusal,
@@ -68,6 +68,7 @@ import {
   engineLoopEvent,
   engineSettingsChanged,
 } from "../slices/engine";
+import { threadAnchorSet } from "../slices/world";
 import { FIELD_CONFIGS } from "../../../config/field-definitions";
 
 /** Everything the loop needs from the app, as one object so the pass body can
@@ -275,6 +276,53 @@ function buildManifest(
  *  have to disable the entry, sort first in `displacementOrder`, and stop triage
  *  proposing it, which is precisely what `satisfied` already does, so it would
  *  be a label with no behaviour behind it. */
+/** §4.5's renewal, as dispatches: every thread the prose this pass read is
+ *  demonstrably still carrying, re-anchored at the branch's paragraph count.
+ *
+ *  **This runs immediately before `expiredRetires`, and the order is the
+ *  mechanism.** Renewal is positive evidence — the story named this thread's
+ *  subject — while expiry is an inference from absence, so a thread the prose
+ *  just touched must not be offered for retirement on the strength of an anchor
+ *  the same pass was about to move. Dispatch is synchronous, `expiredRetires`
+ *  re-reads the state, and the renewed thread's `paragraphsSinceTouched` is
+ *  therefore 0 by the time expiry asks. Renewal wins, with no special case to
+ *  keep in step.
+ *
+ *  **And it runs in the same region of the pass as expiry**, after triage has
+ *  answered, rather than up beside `assess`. Both are free, both read the same
+ *  assessment, and the property worth having is that expiry can never run on
+ *  prose renewal did not get to see. A pass that ends early — below the minimum,
+ *  budget under the triage reserve, triage refused — leaves the watermark where
+ *  it was, so the same prose is re-read next pass and renewal gets its chance
+ *  then (§3.3's "advance only on a completed pass", doing its other job).
+ *
+ *  Nothing is dispatched when nothing moves: `renewedThreads` already drops a
+ *  thread anchored at this very paragraph, so a pass that extends the trailing
+ *  section without adding one writes no record and rebuilds no condition. The
+ *  cost of a renewal that does move is a `t:` record copied onto this node
+ *  (§6.2) and one lorebook condition rebuild — `threadAnchorSet` is the fourth
+ *  rebuild trigger, because the pace gate bakes the anchor into the stored
+ *  condition — which is exactly why only the threads the prose touched are
+ *  renewed rather than all of them. */
+async function renewTouchedThreads(
+  state: RootState,
+  assessment: ReturnType<typeof assess>,
+  dispatch: AppDispatch,
+  log: EngineLog,
+): Promise<void> {
+  const paragraph = assessment.paragraphCount;
+  for (const thread of renewedThreads(
+    state.world.threads,
+    assessment,
+    paragraph,
+  )) {
+    dispatch(threadAnchorSet({ threadId: thread.id, paragraph }));
+    await log(
+      `[engine] thread "${thread.title}" is still in the prose — renewed at paragraph ${paragraph}`,
+    );
+  }
+}
+
 async function expiredRetires(
   state: RootState,
   paragraphCount: number,
@@ -523,6 +571,11 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // true, while a condense tidies something that has been long for a while
       // and will still be long next pass.
       const condense = await nextCondense(getState(), settings.condenseAtChars);
+
+      // §4.5's renewal, before expiry reads the anchors it moves. Free, and
+      // the only thing that keeps expiry from being a fixed TTL from creation
+      // — see `renewTouchedThreads`.
+      await renewTouchedThreads(getState(), assessment, dispatch, log);
 
       // §4.5's expiry, appended last and unordered against the rest: a retire
       // costs 0 output tokens (§3.3) and the drain never defers a free intent,

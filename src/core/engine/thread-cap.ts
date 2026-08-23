@@ -30,6 +30,7 @@
 // it is a datum expiry can decline on (`isThreadExpired`, below) and not one
 // the displacement order can sort by.
 
+import { mentionsName } from "./assess";
 import { PARAGRAPH_CHARS, THREAD_RANGE_CHARS } from "./thread-horizon";
 import type { Thread, ThreadHorizon, ThreadStatus } from "../store/types";
 
@@ -270,5 +271,98 @@ export function expiredThreads(
     (thread) =>
       thread.anchorParagraph !== null &&
       isThreadExpired(thread, paragraphCount - thread.anchorParagraph),
+  );
+}
+
+// ──────────────────────────────── renewal ────────────────────────────────
+//
+// **Expiry without renewal is a fixed TTL from creation, and that is the
+// opposite of what §4.5 asks for.** The section names renewal and, until phase
+// 6's correction, defined it as one thing only: an `open` whose subject already
+// names a thread moves that thread's anchor instead of minting a second one
+// (`findThreadBySubject`, in `thread-bind.ts`). That path almost never fires.
+// `TRIAGE_SYSTEM` tells the model to act on what the new prose establishes and
+// NOT on what the manifest already records — so a thread already on the list is
+// precisely what triage is instructed not to raise again, and the only renewal
+// the Engine had was waiting for an `OPEN` that does not come. Expiry then
+// retires threads the story is actively honouring.
+//
+// So renewal is prose-grounded as well, and this is that half: **a thread whose
+// subject the pass just read is alive, and its anchor moves.** The evidence is
+// free — `assess` already computes `candidateIds` — and it is the same evidence
+// the entry's own detector runs on.
+//
+// **Only the threads the prose actually touched.** Renewing every thread on
+// every pass was the wider reading and it is rejected on the same grounds phase
+// 6 rejected it elsewhere: the anchor rides the `t:<id>` history record and
+// copy-on-write is per key per node (§6.2), so that would copy every thread
+// record onto every node the Engine writes at, and rebuild every thread's
+// lorebook condition every pass (`threadAnchorSet` is a rebuild trigger). What
+// this returns is bounded by what the writer just wrote.
+
+/** What one pass read, as renewal needs to read it: which entities the new
+ *  prose plausibly mentions, and the prose itself.
+ *
+ *  A projection of `Assessment` rather than the thing, so this file stays pure
+ *  and free of the pass's shape — and so a caller cannot hand in the whole
+ *  document where the pass's unread tail was meant. */
+export type ProseRead = {
+  candidateIds: readonly string[];
+  newText: string;
+};
+
+/** The threads whose anchor should move to `paragraph` — those the prose the
+ *  pass just read demonstrates the story is still carrying.
+ *
+ *  **Alive means what the detector means by alive.** `threadSubjects`
+ *  (`thread-condition.ts`) calls a thread alive when its title OR one of its
+ *  cast's names is on the page, and this asks the same question of the same
+ *  prose. A narrower rule here would let the Engine retire a thread whose own
+ *  lorebook entry is still, correctly, staying quiet — the Engine and the entry
+ *  disagreeing about the one fact they are both reading off the page. The cast
+ *  carries it, as §4.1 says; the title rides along and rarely matches, which is
+ *  exactly its role in the detector too.
+ *
+ *  Matched with `mentionsName`, which is `assess`'s own matcher and
+ *  `castFromSubject`'s: "is Ada in this string" has one answer in this codebase.
+ *
+ *  **A satisfied thread is not renewed.** Renewal exists to feed expiry, expiry
+ *  never reaches a satisfied thread (`isThreadExpired`), and its entry is
+ *  already disabled (§4.4) so the pace gate the anchor is baked into governs
+ *  nothing. The write would buy nothing and cost a `t:` record copied onto the
+ *  node plus a rebuilt condition on a disabled entry, every pass its cast is
+ *  mentioned. `findThreadBySubject` does renew a satisfied thread, and the
+ *  asymmetry is deliberate: there the anchor move is a byproduct of not minting
+ *  a duplicate, and it happens once per matching subject rather than on every
+ *  pass.
+ *
+ *  **A thread already anchored here is not renewed either.** A pass that reads
+ *  an extension of the trailing section reads new prose without adding a
+ *  paragraph, so the same count arrives twice; nothing to move is nothing to
+ *  write, and the dispatch would rebuild a condition to the value it already
+ *  holds.
+ *
+ *  **An unanchored thread the prose touched IS anchored**, and this is the one
+ *  place §4.5's "only the Engine's threads age" asymmetry is narrowed. The
+ *  reason that asymmetry exists is that a DEFAULT of 0 would read as "abandoned
+ *  since paragraph 0" and retire the writer's threads on the first pass. This
+ *  is not a default: it is evidence, and the anchor lands at the paragraph the
+ *  story was demonstrably carrying the thread at, so the thread gets its whole
+ *  expiry window from that moment. `null` goes on meaning "we know nothing",
+ *  which is why a hand-made thread the prose never mentions still never ages.
+ *
+ *  Pure, like everything else here: the dispatch and the log are the pass's. */
+export function renewedThreads(
+  threads: Thread[],
+  prose: ProseRead,
+  paragraph: number,
+): Thread[] {
+  const read = new Set(prose.candidateIds);
+  return threads.filter(
+    (thread) =>
+      thread.status !== "satisfied" &&
+      thread.anchorParagraph !== paragraph &&
+      (thread.entityIds.some((id) => read.has(id)) ||
+        mentionsName(prose.newText, thread.title)),
   );
 }

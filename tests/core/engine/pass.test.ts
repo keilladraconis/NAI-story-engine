@@ -721,6 +721,121 @@ describe("the pass", () => {
     expect(logged().join("\n")).toContain("expired");
   });
 
+  // ───────────────────── prose-grounded renewal (§4.5) ─────────────────────
+
+  it("renews a thread whose cast the pass just read", async () => {
+    installStoryStorageFake();
+    configure({ enabled: true });
+    installLorebookFake();
+    documentOf("The lock clicked.", "Ada pocketed the letter.");
+    const h = harness(
+      [entity("e1", "Ada")],
+      [thread("t1", { entityIds: ["e1"], anchorParagraph: 0 })],
+    );
+
+    await h.runPass();
+
+    expect(h.store.getState().world.threads[0].anchorParagraph).toBe(2);
+  });
+
+  it("leaves a thread the prose said nothing about where it was", async () => {
+    installStoryStorageFake();
+    configure({ enabled: true });
+    installLorebookFake();
+    documentOf("The lock clicked.", "Brennan pocketed the letter.");
+    const h = harness(
+      [entity("e1", "Ada")],
+      [thread("t1", { entityIds: ["e1"], anchorParagraph: 0 })],
+    );
+
+    await h.runPass();
+
+    expect(h.store.getState().world.threads[0].anchorParagraph).toBe(0);
+  });
+
+  it("anchors at the branch's paragraph count, not this pass's backlog", async () => {
+    // The same distinction expiry makes: an Engine that has been reading along
+    // has a backlog of one and a branch of hundreds. An anchor recorded as the
+    // backlog would sit near paragraph 0 forever and expire the thread it just
+    // renewed.
+    installStoryStorageFake();
+    configure({ enabled: true });
+    installLorebookFake();
+    documentOf(
+      ...Array.from({ length: 119 }, (_, i) => `Paragraph ${i}.`),
+      "Ada pocketed the letter.",
+    );
+    await api.v1.historyStorage.set(
+      WATERMARK_KEY,
+      { sectionId: sectionIdAt(118), offset: "Paragraph 118.".length },
+      history.current(),
+    );
+    const h = harness(
+      [entity("e1", "Ada")],
+      [thread("t1", { entityIds: ["e1"], anchorParagraph: 0 })],
+    );
+
+    await h.runPass();
+
+    expect(h.store.getState().world.threads[0].anchorParagraph).toBe(120);
+  });
+
+  it("renewal beats expiry in the same pass", async () => {
+    // The whole reason renewal exists. A plot thread anchored at 0 in a
+    // 120-paragraph branch is past its ten windows — but the prose the pass
+    // just read names its cast, so the story is plainly still carrying it and
+    // retiring it would be the opposite of "an end the story quietly
+    // abandoned". Renewal dispatches first and expiry reads the moved anchor,
+    // so this is the ordering rather than a special case.
+    installStoryStorageFake();
+    configure({ enabled: true });
+    const lorebook = installLorebookFake();
+    lorebook.seed({ id: "lb-t1", displayName: "t1", text: "", enabled: true });
+    documentOf(
+      ...Array.from({ length: 119 }, (_, i) => `Paragraph ${i}.`),
+      "Ada pocketed the letter.",
+    );
+    const h = harness(
+      [entity("e1", "Ada")],
+      [
+        thread("t1", {
+          entityIds: ["e1"],
+          anchorParagraph: 0,
+          lorebookEntryId: "lb-t1",
+        }),
+      ],
+    );
+
+    await h.runPass();
+
+    expect(writesTo(QUEUE_KEY)[0] ?? []).toEqual([]);
+    expect(lorebook.read("lb-t1")?.enabled).toBe(true);
+    expect(h.store.getState().world.threads[0].status).toBe("open");
+  });
+
+  it("still expires a thread the prose walked away from while renewing another", async () => {
+    installStoryStorageFake();
+    configure({ enabled: true });
+    installLorebookFake();
+    documentOf(
+      ...Array.from({ length: 119 }, (_, i) => `Paragraph ${i}.`),
+      "Ada pocketed the letter.",
+    );
+    const h = harness(
+      [entity("e1", "Ada"), entity("e2", "Brennan")],
+      [
+        thread("alive", { entityIds: ["e1"], anchorParagraph: 0 }),
+        thread("gone", { entityIds: ["e2"], anchorParagraph: 0 }),
+      ],
+    );
+
+    await h.runPass();
+
+    expect(writesTo(QUEUE_KEY)[0]).toEqual([
+      { kind: "retire", threadId: "gone" },
+    ]);
+  });
+
   it("does not re-enqueue a thread it already retired", async () => {
     // `isThreadExpired` never expires a satisfied thread, so the trigger is
     // self-clearing — no mark of the kind the condense trigger needs.
