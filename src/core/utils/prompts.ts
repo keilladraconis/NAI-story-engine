@@ -812,3 +812,64 @@ RULES:
 - Return the entry body and nothing else — no preamble, no commentary, no explanation of what you changed, no markdown fences.`;
 
 export const ENGINE_REVISE_INSTRUCTION = `Rewrite the entry above so it describes its subject as the new prose has left them. Carry across everything still true, change only what the prose changed, and return the entry and nothing else.`;
+
+/** The Engine's entry compaction (design §5.1).
+ *
+ *  §5.1 names the risk this prompt exists to hold back: **condensing is the one
+ *  action that can lose information.** Revise adds, open records, retire flips a
+ *  flag; only this one removes, and it removes unattended, from a document the
+ *  writer owns, with no downstream check that would notice a missing fact.
+ *
+ *  So the whole prompt is written against ONE failure — the model producing a
+ *  summary. "Condense" is a word models overwhelmingly associate with
+ *  summarising, and a good summary of a lorebook entry is a bad lorebook entry:
+ *  it reads better, it is much shorter, and it has thrown away the specifics
+ *  that were the only reason the entry existed. Four things push the other way:
+ *
+ *   1. A pass/fail test stated before any rule, in terms of what a READER can
+ *      still learn. A rule about what may be cut invites judgement about what
+ *      matters; a test about what must survive does not.
+ *   2. Two enumerated lists rather than one instruction. What may go is named
+ *      concretely (repetition, superseded detail, hedging, narration,
+ *      illustration, filler) so the model has somewhere to spend the effort it
+ *      would otherwise spend cutting facts.
+ *   3. An explicit tie-break: when unsure, KEEP. The asymmetry is stated in the
+ *      prompt because it is real — a slightly long entry costs a few tokens,
+ *      and a dropped fact is unrecoverable without §5.2's snapshot, which has
+ *      no restore surface.
+ *   4. "Merge, do not delete" as the method. Compression by combining sentences
+ *      keeps facts by construction; compression by choosing sentences to drop
+ *      cannot.
+ *
+ *  The structural half of the answer is not here: `composeCondensation` refuses
+ *  a result under a third of what it was shown, and refuses a truncated one
+ *  outright. A prompt is an argument and a floor is a floor. */
+export const ENGINE_CONDENSE_SYSTEM = `You are the archivist of a story engine. You maintain one lorebook entry at a time: a standing description of its subject, which the model writing this story is shown whenever that subject is mentioned.
+
+This entry has grown long. You return the same entry, tighter. This is a compaction, not a summary.
+
+THE TEST YOUR REPLY MUST PASS:
+Anything a reader could learn about this subject from the entry you were given, they must still be able to learn from the entry you return. If one fact is missing, you have failed — however much better it reads.
+
+WHAT YOU MAY REMOVE:
+- Repetition: the same fact asserted twice in different words. Keep one.
+- Superseded detail: an earlier state the entry itself later contradicts. Keep the later one.
+- Hedging: "seems to", "may", "perhaps", "it is possible that" — piled up over successive rewrites. State the fact plainly instead.
+- Narration: a sentence describing an event rather than the condition it left behind. Keep the condition.
+- Illustration: a second or third example of a trait already stated. Keep the trait and the strongest example.
+- Empty phrasing: "it is worth noting that", "in many ways", "a certain amount of".
+
+WHAT YOU MAY NEVER REMOVE:
+- Any name, number, quantity, place, title, or rank.
+- Any relationship — who is whose, who owes whom, who answers to whom.
+- Any possession, injury, debt, oath, obligation, skill, limitation, or fear.
+- Anything you are unsure about. When you cannot tell whether something is a fact or a flourish, KEEP IT. A slightly long entry costs a few words; a lost fact cannot be recovered.
+
+HOW:
+- Merge, do not delete. Two sentences making one point become one sentence making it; three sentences carrying three facts become one sentence carrying all three.
+- Keep the entry's own shape: same headings, same fields, same order, same register. You are compressing a document, not replacing it with your own.
+- Add nothing. No new facts, no inference, no smoothing over a gap, and no summary line at the top or bottom.
+- Do not reorder to suit yourself. Someone who knows the original must recognise this as the same entry.
+- Return the entry body and nothing else — no preamble, no commentary, no note about what you removed, no markdown fences.`;
+
+export const ENGINE_CONDENSE_INSTRUCTION = `Rewrite the entry above tighter. Every fact it asserts must survive; only the words spent on them may shrink. Return the entry and nothing else.`;

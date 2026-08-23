@@ -10,8 +10,11 @@
 // Phase 6 fills the arms in price order. Task 2 took RETIRE, which §3.3 prices
 // at zero output tokens, so the skeleton — the branch, the budget policy, the
 // queue write-back — was provable end to end before anything cost 1024. Task 3
-// adds REVISE, the first arm that spends a generation. OPEN and CONDENSE still
-// log exactly what phase 4 logged.
+// added REVISE, the first arm that spends a generation, and Task 4 CONDENSE,
+// which §5.1 says is the same price, the same read-then-write, the same door
+// and the same record — so the two arms below are deliberately the same shape,
+// and differ only where §5.1 says they must. OPEN still logs exactly what phase
+// 4 logged.
 //
 // The switch has no `default`, and `INTENT_MAX_TOKENS` is a `Record` over the
 // union's `kind`. A fifth intent is therefore two compile errors — a missing arm
@@ -30,6 +33,13 @@ import {
   reviseParams,
   REVISE_MAX_TOKENS,
 } from "./revise-strategy";
+import {
+  composeCondensation,
+  condenseParams,
+  createCondenseFactory,
+  CONDENSE_MAX_TOKENS,
+  writeCondenseMark,
+} from "./condense";
 import { threadStatusSet } from "../store/slices/world";
 import { TRIAGE_MAX_TOKENS } from "./triage-strategy";
 import { buildLorebookPrefillFromEntry } from "../utils/lorebook-strategy";
@@ -94,11 +104,11 @@ export type DrainOutcome = {
 export const INTENT_MAX_TOKENS: Record<Intent["kind"], number> = {
   retire: 0,
   open: 150,
-  // The revise arm's own ceiling, imported rather than restated: the number
-  // the drain refuses to start without must be the number `max_tokens` then
-  // bounds the call at, or the pass promises one price and pays another.
+  // Each arm's own ceiling, imported rather than restated: the number the
+  // drain refuses to start without must be the number `max_tokens` then bounds
+  // the call at, or the pass promises one price and pays another.
   revise: REVISE_MAX_TOKENS,
-  condense: 1024,
+  condense: CONDENSE_MAX_TOKENS,
 };
 
 /** What the drain did with one intent.
@@ -248,6 +258,80 @@ async function revise(
   return written ? "executed" : "skipped";
 }
 
+/** §5.1's compaction: the entry as it stands, said tighter.
+ *
+ *  Structurally a revise — the generation runs INSIDE the door's producer, so
+ *  read-then-write and the §5.2 snapshot are properties of the shape rather
+ *  than things this function remembers — and §5.1 requires that: same price,
+ *  same door, same `lb:` record, so §7 cannot tell the two apart. What is not
+ *  shared is how the answer is judged (`composeCondensation` refuses a summary
+ *  and refuses a truncation) and what happens afterwards.
+ *
+ *  **The mark is what happens afterwards, and it is the whole reason this arm
+ *  is longer than revise's.** The trigger in `assess` fires on length alone, so
+ *  an entry whose facts genuinely do not fit under the threshold would be
+ *  offered again on the very next pass — spending §3.3's one entry rewrite
+ *  every pass, forever, and dropping a little more each time it succeeded. The
+ *  mark records how long the entry was at this ATTEMPT, and `worthCondensing`
+ *  then requires another paragraph of growth before offering it again.
+ *
+ *  Written after the door returns rather than inside the producer, and only
+ *  when the model actually answered: a write that threw, or a collision with
+ *  the writer, leaves no mark and is retried on the next pass. A refusal is
+ *  free (§12.0) and self-clearing (§3.4), so deferring the work a paragraph for
+ *  one would be paying for someone else's timing. */
+async function condense(
+  entryId: string,
+  deps: DrainDeps,
+): Promise<IntentResult> {
+  // No World lookup, unlike revise: the intent names a lorebook entry, not an
+  // entity, because the trigger measures entries. The door's read is the only
+  // existence check there is to make, and the writer deleting the entry between
+  // assessment and the drain is the same declined write as any other.
+  let markTo: number | undefined;
+
+  const { written } = await writeLorebookEntry(
+    { entryId, nodeId: deps.nodeId },
+    async (live) => {
+      const original = live.text ?? "";
+      const prefill = await buildLorebookPrefillFromEntry(deps.getState, live);
+      const response = await deps.genX.generate(
+        createCondenseFactory({ entry: live, prefill }),
+        {
+          ...(await condenseParams()),
+          maxRetries: 0,
+          taskId: `engine-condense-${api.v1.uuid()}`,
+        },
+        undefined,
+        "background",
+      );
+
+      const choice = response.choices?.[0];
+      const text = await composeCondensation(
+        prefill,
+        choice?.text ?? "",
+        choice?.finish_reason,
+        original,
+      );
+
+      // The model answered, so this counts as an attempt either way — at the
+      // length the entry will actually be left at.
+      markTo = text ? text.length : original.length;
+
+      if (!text) {
+        await deps.log(
+          `[engine] condense ${entryId}: nothing usable in the response, entry left alone`,
+        );
+        return null;
+      }
+      return { text };
+    },
+  );
+
+  if (markTo !== undefined) await writeCondenseMark(entryId, markTo);
+  return written ? "executed" : "skipped";
+}
+
 /** The branch. One arm per intent kind, no `default`. */
 async function execute(intent: Intent, deps: DrainDeps): Promise<IntentResult> {
   switch (intent.kind) {
@@ -257,11 +341,13 @@ async function execute(intent: Intent, deps: DrainDeps): Promise<IntentResult> {
     case "revise":
       return revise(intent.entityId, deps);
 
-    // Tasks 4–5. Logged exactly as phase 4 logged them, so the line a writer
-    // with `story_engine_debug` on already knows does not change meaning
-    // underneath them while the arms are still stubs.
-    case "open":
     case "condense":
+      return condense(intent.entryId, deps);
+
+    // Task 5. Logged exactly as phase 4 logged it, so the line a writer with
+    // `story_engine_debug` on already knows does not change meaning underneath
+    // them while the arm is still a stub.
+    case "open":
       await deps.log(`[engine] intent (not executed): ${intentKey(intent)}`);
       return "skipped";
   }
@@ -338,13 +424,22 @@ export async function drain(
   return { executed, remaining };
 }
 
-/** How many entity revisions a drain actually made — `LoopState.touched`, and
+/** How many entry rewrites a drain actually made — `LoopState.touched`, and
  *  §9.1's `∆`.
  *
  *  Lives here rather than at the pass, because "what counts as touching an
- *  entity" is a property of the arms: only a revise rewrites an entity's entry,
- *  and only one that WROTE reaches `executed`. A declined or skipped revise
- *  never does, so the count is writes and not attempts. */
+ *  entry" is a property of the arms: revise and condense are the two that
+ *  rewrite one, and only one that WROTE reaches `executed`. A declined or
+ *  skipped rewrite never does, so the count is writes and not attempts.
+ *
+ *  **A condense counts.** §9.1's slot is an activity level, and a condense is a
+ *  rewrite of the writer's entry — the one action that can lose something, and
+ *  therefore the last one to leave out of the number that says how much the
+ *  Engine has been doing. Widened here rather than given a second counter,
+ *  because the HUD has one slot and two numbers in it would have to be added
+ *  back together to read it. */
 export function revisionsIn(executed: Intent[]): number {
-  return executed.filter((intent) => intent.kind === "revise").length;
+  return executed.filter(
+    (intent) => intent.kind === "revise" || intent.kind === "condense",
+  ).length;
 }

@@ -65,6 +65,27 @@ export const LB_KEYS_DRAFT = "lb-draft-keys";
 export const lorebookOriginalKey = (entryId: string): string =>
   `kse-lb-original-${entryId}`;
 
+// How long a lorebook entry was the last time the Engine ATTEMPTED to condense
+// it (§5.1), in characters. storyStorage, alongside the original snapshot and
+// for the same reason: it is a fact about a lorebook entry, and the lorebook is
+// global story state that does not move with a branch.
+//
+// This is the trigger's memory, and it exists because the trigger is otherwise
+// memoryless: it fires on length alone, so an entry whose facts genuinely do
+// not fit under the threshold would be condensed on every pass forever, each
+// attempt spending §3.3's one entry rewrite and each one dropping a little
+// more. With the mark, an entry must accumulate another paragraph past its last
+// attempt before it is offered again — so a condense happens once per episode
+// of bloat rather than once per pass.
+//
+// Written on a DECLINED attempt as well as a successful one, and the mark is
+// the length of what the entry held at the time either way: a condense the
+// model could not usefully perform is not one to retry three paragraphs early.
+//
+// Written and read only by `src/core/engine/condense.ts`.
+export const lorebookCondensedKey = (entryId: string): string =>
+  `kse-lb-condensed-${entryId}`;
+
 // Generation-request tracking ids for an entity — all keyed by the ENTITY id (the
 // generation TARGET stays the lorebook entry; these are only the tracking tokens).
 // The card regen bolt, the edit pane, and SEGA all build ids from these, so a

@@ -12,12 +12,17 @@ import { initialWorldState } from "../../../src/core/store/slices/world";
 import {
   drain,
   INTENT_MAX_TOKENS,
+  revisionsIn,
   type DrainDeps,
 } from "../../../src/core/engine/execute";
 import type { Intent } from "../../../src/core/engine/loop-machine";
 import { TRIAGE_MAX_TOKENS } from "../../../src/core/engine/triage-strategy";
-import { lorebookOriginalKey } from "../../../src/core/keys";
+import {
+  lorebookCondensedKey,
+  lorebookOriginalKey,
+} from "../../../src/core/keys";
 import { REVISE_MAX_TOKENS } from "../../../src/core/engine/revise-strategy";
+import { CONDENSE_MAX_TOKENS } from "../../../src/core/engine/condense";
 import { lorebookRecordKey } from "../../../src/core/engine/lorebook-write";
 import {
   installHistoryFake,
@@ -199,15 +204,12 @@ describe("drain — retire", () => {
   });
 });
 
-// ───────────────────────────── the other three ─────────────────────────────
+// ───────────────────────────── the kind Task 5 fills in ─────────────────────
 
-describe("drain — the kinds Tasks 4–5 fill in", () => {
-  it("logs open and condense without touching the lorebook", async () => {
+describe("drain — the kind Task 5 fills in", () => {
+  it("logs open without touching the lorebook", async () => {
     const h = harness();
-    const queue: Intent[] = [
-      { kind: "open", subject: "the sealed letter" },
-      { kind: "condense", entryId: "lb1" },
-    ];
+    const queue: Intent[] = [{ kind: "open", subject: "the sealed letter" }];
 
     const outcome = await drain(queue, h.deps);
 
@@ -217,7 +219,6 @@ describe("drain — the kinds Tasks 4–5 fill in", () => {
     expect(logged).toContain(
       "[engine] intent (not executed): open:the sealed letter",
     );
-    expect(logged).toContain("[engine] intent (not executed): condense:lb1");
   });
 });
 
@@ -459,6 +460,184 @@ describe("drain — revise", () => {
   });
 });
 
+// ───────────────────────────────── condense ─────────────────────────────────
+
+const BLOATED_ENTRY = "entity-entry-2";
+
+/** An entry long enough to be worth compacting, and an entity holding it. */
+const SPRAWL = `Ada\nType: Character\n\n${"She is a locksmith of some considerable skill. ".repeat(40)}`;
+
+function condensable(text = SPRAWL) {
+  lorebook.seed({
+    id: BLOATED_ENTRY,
+    displayName: "Ada",
+    text,
+    keys: ["ada"],
+    enabled: true,
+  } as LorebookEntry);
+  return harness(
+    [],
+    [entity("e2", { lorebookEntryId: BLOATED_ENTRY, name: "Ada" })],
+  );
+}
+
+/** A compaction the guards accept: shorter than the entry, nowhere near a
+ *  summary of it. */
+const COMPACTED = "She is a skilled locksmith. ".repeat(30);
+
+const CONDENSE: Intent = { kind: "condense", entryId: BLOATED_ENTRY };
+
+describe("drain — condense", () => {
+  it("rewrites the entry with the compaction the model returned", async () => {
+    const h = condensable();
+    h.generate.mockImplementation(says(COMPACTED));
+
+    const outcome = await drain([CONDENSE], h.deps);
+
+    const text = lorebook.read(BLOATED_ENTRY)?.text ?? "";
+    expect(text).toContain("She is a skilled locksmith.");
+    expect(text.length).toBeLessThan(SPRAWL.length);
+    expect(outcome.executed).toEqual([CONDENSE]);
+    expect(outcome.remaining).toEqual([]);
+  });
+
+  it("goes through the same door a revise does, so §5.2's original survives", async () => {
+    const h = condensable();
+    h.generate.mockImplementation(says(COMPACTED));
+
+    await drain([CONDENSE], h.deps);
+
+    expect(story.get(lorebookOriginalKey(BLOATED_ENTRY))).toMatchObject({
+      id: BLOATED_ENTRY,
+      text: SPRAWL,
+    });
+  });
+
+  it("writes the same lb: record a revise does, so §7 cannot tell them apart", async () => {
+    // §5.1: "the same `lb:<entryId>` record so history reconciliation treats it
+    // identically."
+    const h = condensable();
+    h.generate.mockImplementation(says(COMPACTED));
+
+    await drain([CONDENSE], h.deps);
+
+    expect(
+      await api.v1.historyStorage.get(
+        lorebookRecordKey(BLOATED_ENTRY),
+        h.deps.nodeId,
+      ),
+    ).toMatchObject({ entryId: BLOATED_ENTRY });
+  });
+
+  it("asks for §3.3's price and no retries", async () => {
+    const h = condensable();
+    h.generate.mockImplementation(says(COMPACTED));
+
+    await drain([CONDENSE], h.deps);
+
+    expect(h.generate.mock.calls[0][1]).toMatchObject({
+      max_tokens: CONDENSE_MAX_TOKENS,
+      maxRetries: 0,
+    });
+  });
+
+  it("shows the model the entry as it stands, not what Redux remembers", async () => {
+    const h = condensable("Hand-edited thirty seconds ago. " + SPRAWL);
+    h.generate.mockImplementation(says(COMPACTED));
+
+    await drain([CONDENSE], h.deps);
+
+    const factory = h.generate.mock.calls[0][0] as () => Promise<{
+      messages: Message[];
+    }>;
+    const { messages } = await factory();
+    expect(messages.map((m) => m.content).join("\n")).toContain(
+      "Hand-edited thirty seconds ago.",
+    );
+  });
+
+  it("leaves the entry alone when the answer is a summary rather than a compaction", async () => {
+    // The one failure §5.1 names, arriving as a well-formed two-sentence entry
+    // that reads better than the original and has thrown most of it away.
+    const h = condensable();
+    h.generate.mockImplementation(says("A locksmith."));
+
+    const outcome = await drain([CONDENSE], h.deps);
+
+    expect(lorebook.read(BLOATED_ENTRY)?.text).toBe(SPRAWL);
+    expect(outcome.executed).toEqual([]);
+    expect(outcome.remaining).toEqual([]);
+    expect(logged.join("\n")).toContain("[engine] condense");
+  });
+
+  it("counts as an entry the Engine touched", async () => {
+    // §9.1's ∆ is an activity level, and a condense is a rewrite of the
+    // writer's entry — exactly what they would want to know happened.
+    expect(revisionsIn([CONDENSE, REVISE])).toBe(2);
+    expect(revisionsIn([{ kind: "retire", threadId: "t1" }])).toBe(0);
+  });
+
+  it("marks how long it left the entry, so the next pass does not do it again", async () => {
+    // Without the mark, an entry whose facts do not fit under the threshold is
+    // re-condensed on every pass forever — each attempt spending §3.3's one
+    // entry rewrite, each one dropping a little more.
+    const h = condensable();
+    h.generate.mockImplementation(says(COMPACTED));
+
+    await drain([CONDENSE], h.deps);
+
+    const mark = story.get(lorebookCondensedKey(BLOATED_ENTRY));
+    expect(mark).toBe(lorebook.read(BLOATED_ENTRY)?.text?.length);
+  });
+
+  it("marks a declined attempt too, at the length it found", async () => {
+    // A compaction the model could not usefully produce is not one to retry on
+    // the next pass: it costs the same 1024 tokens to fail again.
+    const h = condensable();
+    h.generate.mockImplementation(says("A locksmith."));
+
+    await drain([CONDENSE], h.deps);
+
+    expect(story.get(lorebookCondensedKey(BLOATED_ENTRY))).toBe(SPRAWL.length);
+  });
+
+  it("marks nothing when the writer collided with it", async () => {
+    // A collision is not an attempt — the model never answered. Marking here
+    // would defer the work by a paragraph of growth for a refusal that costs
+    // nothing and clears on its own (§3.4).
+    const h = condensable();
+    h.generate.mockRejectedValue(
+      new Error("A generation is already in progress"),
+    );
+
+    const outcome = await drain([CONDENSE], h.deps);
+
+    expect(story.get(lorebookCondensedKey(BLOATED_ENTRY))).toBeUndefined();
+    expect(outcome.remaining).toEqual([CONDENSE]);
+  });
+
+  it("skips an entry the writer deleted, without resurrecting it", async () => {
+    const h = harness();
+
+    const outcome = await drain(
+      [{ kind: "condense", entryId: "gone-from-the-book" }],
+      h.deps,
+    );
+
+    expect(h.generate).not.toHaveBeenCalled();
+    expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
+    expect(outcome.executed).toEqual([]);
+    expect(outcome.remaining).toEqual([]);
+  });
+
+  it("lets a failure it does not recognise reach the pass", async () => {
+    const h = condensable();
+    h.generate.mockRejectedValue(new Error("the sky fell"));
+
+    await expect(drain([CONDENSE], h.deps)).rejects.toThrow("the sky fell");
+  });
+});
+
 // ───────────────────────────────── the budget ─────────────────────────────────
 
 describe("drain — the budget", () => {
@@ -515,8 +694,11 @@ describe("drain — the budget", () => {
     const outcome = await drain(queue, h.deps);
 
     expect(outcome.remaining).toEqual([{ kind: "condense", entryId: "lb1" }]);
-    // The first was reached and consumed; the second never was.
-    expect(logged).toContain("[engine] intent (not executed): condense:lb0");
+    // The first was reached — the door read its entry, found the writer had
+    // deleted it and declined — and the second never was.
+    expect(
+      vi.mocked(api.v1.lorebook.entry).mock.calls.map((c) => c[0]),
+    ).toEqual(["lb0"]);
     expect(logged.join("\n")).toContain("[engine] deferring condense:lb1");
   });
 
@@ -579,6 +761,7 @@ describe("no Engine action can write around the write door", () => {
   for (const file of [
     "execute.ts",
     "revise-strategy.ts",
+    "condense.ts",
     "triage-strategy.ts",
   ]) {
     it(`${file} never calls the lorebook API directly`, () => {
