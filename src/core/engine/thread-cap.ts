@@ -161,18 +161,28 @@ export function enforceThreadCap(threads: Thread[], cap: number): Thread[] {
 
 // ──────────────────────────────── expiry ────────────────────────────────
 //
-// **The anchor this needs does not exist, and inventing it was not this task's
-// call.** §4.5 wants a paragraph-count expiry so an end the story quietly
-// abandoned ages out rather than accumulating forever, and admits in the same
-// breath that "how long since this thread was last touched" is not answerable
-// from a `Thread` as specified. §4.3 deferred the arc pacing gate for the same
-// missing field. So what lives here is the half that *is* decidable — the
-// policy, per horizon — as a function of a count its caller supplies. Phase 6's
-// Task 5 added the anchor (`Thread.anchorParagraph`, written when the Engine
-// opens or renews a thread) and `Assessment.paragraphCount` to compare it
-// against, so the count is now derivable — but this still has no caller, and
-// giving it one is Task 6's, because what expiry DOES to a thread is a separate
-// decision from when it applies.
+// **Two halves, and they arrived a task apart.** §4.5 wants a paragraph-count
+// expiry so an end the story quietly abandoned ages out rather than
+// accumulating forever, and admitted in the same breath that "how long since
+// this thread was last touched" was not answerable from a `Thread` as
+// specified. So phase 5 built the half that *was* decidable — the policy, per
+// horizon (`isThreadExpired`), as a function of a count its caller supplies —
+// and phase 6's Task 5 added the anchor (`Thread.anchorParagraph`) and
+// `Assessment.paragraphCount` to compare it against. `expiredThreads` at the
+// bottom is the join, and the pass turns what it returns into §4.4's flag flip.
+//
+// **What expiry does is retire, not delete.** Deleting a thread on a timer
+// destroys the writer's record of a commitment AND leaves its lorebook entry
+// behind — §5.2 forbids removing that — still enabled, still injecting: §4.5's
+// own orphan, arriving by the door that was supposed to prevent it.
+// Retirement instead is the `{enabled: false}` flip of §4.4: reversible by
+// hand, visible in the World list, free at 0 output tokens (§3.3), and it makes
+// the thread the first slot `displacementOrder` reclaims — which is the
+// proliferation control §4.5 asked for. Offering it to triage instead was the
+// third option and is the worst of the three: it spends ~150 tokens asking a
+// model about something this measurement answers for nothing, and the triage
+// prompt forbids the answer anyway ("Never RETIRE a thread to make room. RETIRE
+// means the prose settled it").
 
 /** How many of its own forgetting windows a thread is given before the story is
  *  taken to have abandoned it.
@@ -222,4 +232,43 @@ export function isThreadExpired(
     return false;
   }
   return paragraphsSinceTouched >= THREAD_EXPIRY_PARAGRAPHS[thread.horizon];
+}
+
+/** The threads the story has walked away from, given the branch's paragraph
+ *  count — `isThreadExpired`'s caller, at last.
+ *
+ *  **The null is branched on here, deliberately.** `isThreadExpired` takes a
+ *  number and cannot express "unknown": `paragraphCount - null` is
+ *  `paragraphCount - 0` in JavaScript, which its guard accepts as a perfectly
+ *  good very large count and expires on. So the one datum that must never reach
+ *  it is the one the arithmetic would quietly launder, and the decline lives
+ *  above the arithmetic rather than inside it.
+ *
+ *  **Only the Engine anchors, so only the Engine's threads age.** That
+ *  asymmetry is the right default and a real gap at the same time. Right,
+ *  because expiry silences a reminder and a defaulted 0 would retire every
+ *  hand-made thread on the first pass after it was created, in any story past
+ *  the horizon's window — the worst available failure, arriving without the
+ *  writer doing anything. A gap, because §4.5's proliferation control then does
+ *  not reach the threads a writer creates by hand at all. The fix is not a
+ *  default: it is anchoring on the World's "+ New Thread" too, which needs that
+ *  path to await a document scan before it dispatches. Until then, `null` says
+ *  what is true.
+ *
+ *  Every expired thread, not the first. Retirement is §3.3's zero-token flag
+ *  flip, so there is no budget reason to trickle them out one per pass the way
+ *  `nextCondense` must — and a thread left un-retired for another pass goes on
+ *  injecting a reminder for a commitment the story dropped.
+ *
+ *  Pure, like everything else in this file: what a caller DOES with an expired
+ *  thread (§4.4's flag flip, via a `retire` intent) is the pass's. */
+export function expiredThreads(
+  threads: Thread[],
+  paragraphCount: number,
+): Thread[] {
+  return threads.filter(
+    (thread) =>
+      thread.anchorParagraph !== null &&
+      isThreadExpired(thread, paragraphCount - thread.anchorParagraph),
+  );
 }

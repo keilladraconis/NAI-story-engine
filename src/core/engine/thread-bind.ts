@@ -9,7 +9,7 @@
 //
 // Three things live here, and they are together because they are one contract:
 // what a thread's entry must carry, where that carriage is built from, and the
-// three edits that invalidate it. Splitting the trigger list away from the
+// four edits that invalidate it. Splitting the trigger list away from the
 // builder is how the two drift into disagreeing, and a stale condition is not a
 // visible bug — it is a thread that quietly reminds forever.
 //
@@ -33,6 +33,7 @@ import {
   SE_THREAD_CATEGORY,
 } from "../store/effects/lorebook-sync";
 import {
+  threadAnchorSet,
   threadHorizonSet,
   threadMemberToggled,
   threadRenamed,
@@ -247,17 +248,26 @@ export async function rebuildThreadCondition(
   return written;
 }
 
-/** The three edits a thread's detector is built from (§4.3, phase 5's handoff).
+/** The four edits a thread's condition is built from (§4.3, phase 5's handoff
+ *  plus phase 6's gate).
  *
  *  `threadRenamed` changes the title probe, `threadMemberToggled` changes the
- *  cast the real probes come from, and `threadHorizonSet` changes their range.
- *  Nothing else does: `threadTextUpdated` rewords the reminder, which the
- *  condition never reads, and `threadStatusSet` is answered by the entry's
- *  `enabled` flag rather than by a condition (§4.4).
+ *  cast the real probes come from, `threadHorizonSet` changes their range, and
+ *  `threadAnchorSet` moves the pacing gate the anchor is baked into. Nothing
+ *  else does: `threadTextUpdated` rewords the reminder, which the condition
+ *  never reads, and `threadStatusSet` is answered by the entry's `enabled` flag
+ *  rather than by a condition (§4.4).
  *
- *  **An effect rather than a call at each dispatch site.** The three actions are
+ *  **The anchor is the fourth because the gate stores it, not because the gate
+ *  reads it.** `paceGate` resolves `anchorParagraph` into a literal `target`, so
+ *  a renewal that did not rebuild would leave the entry gating on the paragraph
+ *  the thread was OPENED at — the grace the renewal exists to restart. Baking
+ *  the anchor in is what makes a per-thread left-hand side expressible at all
+ *  (the grammar has no variable for it), and this subscription is its price.
+ *
+ *  **An effect rather than a call at each dispatch site.** Three of the four are
  *  dispatched from the World's edit pane today and from the Forge's [THREAD]
- *  command tomorrow, and a rebuild the caller has to remember is a rebuild that
+ *  command tomorrow, and the fourth from the drain, and a rebuild the caller has to remember is a rebuild that
  *  will be forgotten — leaving a detector probing a name the prose no longer
  *  uses, which fires forever and looks like the Engine having opinions about a
  *  thread nobody mentioned. Subscribing to the actions puts the rule where the
@@ -292,6 +302,9 @@ export function registerThreadConditionEffects(
     rebuild(action.payload.threadId),
   );
   subscribeEffect(matchesAction(threadHorizonSet), (action) =>
+    rebuild(action.payload.threadId),
+  );
+  subscribeEffect(matchesAction(threadAnchorSet), (action) =>
     rebuild(action.payload.threadId),
   );
 }

@@ -1,6 +1,9 @@
 // The forgetting detector: a Thread's `advancedConditions`.
 //
-//   not( key <subject> in ['story'] within range N )
+//   and(
+//     not( key <subject> in ['story'] within range N ),
+//     paragraphCount past the thread's own anchor            // §4.3's gate
+//   )
 //
 // Plain keyword keys are structurally wrong for a commitment (§4.3). A dropped
 // Chekhov's gun goes unmentioned, so an entry keyed on "pistol" never fires —
@@ -17,7 +20,7 @@
 // house style: every shape below is read off `external/script-types.d.ts`.
 
 import { nameKey } from "../store/effects/handlers/lorebook";
-import { THREAD_RANGE_CHARS } from "./thread-horizon";
+import { THREAD_GRACE_PARAGRAPHS, THREAD_RANGE_CHARS } from "./thread-horizon";
 import type { Thread } from "../store/types";
 
 /** One member of a thread's cast, as the CALLER must hand it over: an id, and
@@ -80,8 +83,8 @@ export type ThreadMember = {
  *  **What phase 6 did with this.** `thread-bind.ts` builds the
  *  `ThreadMember[]` from the lorebook through `resolveDisplayName`'s order —
  *  entry `displayName` ahead of `entity.name` — and rebuilds the condition on
- *  the three actions `slices/world.ts` names (`threadRenamed`,
- *  `threadMemberToggled`, `threadHorizonSet`). A condition built from a stale
+ *  the four actions `slices/world.ts` names (`threadRenamed`,
+ *  `threadMemberToggled`, `threadHorizonSet`, `threadAnchorSet`). A condition built from a stale
  *  name probes for a string the prose no longer uses, never matches, and so
  *  fires forever: the always-on entry this detector exists to replace, arriving
  *  by the door it opened.
@@ -145,18 +148,8 @@ export function threadSubjects(
  *  title says so honestly with `{type: "true"}` rather than emitting a probe for
  *  the empty string.
  *
- *  **Decision 4 — the arc pacing gate waits for phase 6.** §4.3 wants
- *  `paragraphCount` equations to pace arc-horizon threads, and this is the wrong
- *  phase for it. `Thread` carries no anchor — no timestamp, no mention position
- *  (Task 1's handoff) — so the only gate expressible here is a global stripe
- *  like `paragraphCount % 20 < 3`, which fires *every* arc thread in the same
- *  paragraphs and cannot say "since this thread last fired". It would also flip
- *  the reminder on and off between consecutive continuations inside one scene,
- *  which is context churn rather than pacing. Phase 6 owns the Engine acting: it
- *  can record a per-thread anchor when it opens or renews a thread, and only
- *  then does the equation have a meaningful left-hand side. Nothing consumes
- *  this value yet, so deferring costs nothing and guessing would bake the guess
- *  into a writer's lorebook.
+ *  **Decision 4 — the pacing gate is a grace period, and it is not arc-only.**
+ *  See `paceGate` below for both halves of that.
  *
  *  `status` is not read here on purpose. Satisfaction is a flag flip on the
  *  entry (§4.4, `enabled: false`), not a condition — telling the model "this is
@@ -165,10 +158,24 @@ export function buildThreadCondition(
   thread: Thread,
   members: ThreadMember[],
 ): LorebookCondition[] {
+  const detector = buildDetector(thread, members);
+  const gate = paceGate(thread);
+
+  if (!detector) return gate ? [gate] : [{ type: "true" }];
+  if (!gate) return [detector];
+  return [{ type: "and", conditions: [detector, gate] }];
+}
+
+/** "The story has stopped mentioning this" — the negated probe, or null when
+ *  the thread offers nothing to probe for. */
+function buildDetector(
+  thread: Thread,
+  members: ThreadMember[],
+): LorebookCondition | null {
   const range = THREAD_RANGE_CHARS[thread.horizon];
   const subjects = threadSubjects(thread, members);
 
-  if (subjects.length === 0) return [{ type: "true" }];
+  if (subjects.length === 0) return null;
 
   const probes: LorebookCondition[] = subjects.map((key) => ({
     type: "key",
@@ -182,5 +189,70 @@ export function buildThreadCondition(
   const alive: LorebookCondition =
     probes.length === 1 ? probes[0] : { type: "or", conditions: probes };
 
-  return [{ type: "not", condition: alive }];
+  return { type: "not", condition: alive };
+}
+
+/** §4.3's pacing gate: "not before the thread has had a fair chance."
+ *
+ *  **What the anchor makes expressible, and what it does not.** §4.3 asks for
+ *  "since this thread last fired", and nothing reports an activation back to a
+ *  script — so that is not obtainable at any price. What phase 6's anchor gives
+ *  is "since the Engine last touched this thread", and the honest gate over it
+ *  is a grace period rather than the duty cycle §4.3 sketched. The
+ *  `paragraphCount % 20 < 3` stripe that section rejected is not built here
+ *  either, and would not be: a per-thread phase shift needs `(p - anchor) % 20`,
+ *  which is three terms of arithmetic in a grammar that never says how a term's
+ *  operator binds.
+ *
+ *  **Single-term equations, both of them.** `terms` is an array of
+ *  `{value, operator?}` and the `.d.ts` documents one example — "characterCount
+ *  > 1000" — with no statement of associativity, precedence, or whether an
+ *  operator applies before or after its own value. The anchor is a literal at
+ *  build time, so `paragraphCount - anchor >= grace` can be written as
+ *  `paragraphCount >= anchor + grace` with the arithmetic already done: the same
+ *  predicate, in the one shape the `.d.ts` actually documents. `target` accepts
+ *  a number, which is what makes that possible.
+ *
+ *  **Why the second disjunct.** `paragraphCount < anchor` cannot happen while
+ *  the branch only grows, and that is the point — it is the escape hatch for
+ *  when it happens anyway. Undo does not revert a lorebook entry (§7 exists
+ *  because of that), so navigating back past the pass that anchored a thread
+ *  leaves its entry gating on a paragraph the branch will not reach again for a
+ *  chapter, and nothing rebuilds it until the Engine next touches the thread.
+ *  Without this disjunct that thread is silent until then. §4.3 accepts a
+ *  degradation to the always-on the detector replaces; it never accepts a
+ *  degradation to silence. It also covers the writer deleting prose, and the
+ *  case where NovelAI's `paragraphCount` turns out not to be counting what
+ *  `api.v1.document.scan()` counts — the same failure, the same escape.
+ *
+ *  **Not arc-only, though §4.3 frames it that way.** The artefact the grace
+ *  suppresses is proportional to the horizon's range and exists at all three,
+ *  and the grace is derived from that range, so the rule is one rule. Arc-only
+ *  would also be inert as built: the Engine's `open` passes no horizon, so every
+ *  thread it anchors is a `plot`, and every arc is one the writer made by hand
+ *  with no anchor to gate on.
+ *
+ *  Null for an unanchored thread — the writer's own "+ New Thread" — which is
+ *  the phase-5 condition unchanged. */
+function paceGate(thread: Thread): LorebookCondition | null {
+  const anchor = thread.anchorParagraph;
+  if (anchor === null) return null;
+
+  return {
+    type: "or",
+    conditions: [
+      {
+        type: "equation",
+        terms: [{ value: "paragraphCount" }],
+        comparison: ">=",
+        target: anchor + THREAD_GRACE_PARAGRAPHS[thread.horizon],
+      },
+      {
+        type: "equation",
+        terms: [{ value: "paragraphCount" }],
+        comparison: "<",
+        target: anchor,
+      },
+    ],
+  };
 }

@@ -590,6 +590,154 @@ describe("the pass", () => {
     ]);
   });
 
+  // ─────────────────────── the free expiry trigger (§4.5) ───────────────────────
+
+  /** A document long enough for a plot thread anchored at 0 to have aged out:
+   *  §4.5's ten forgetting windows are 100 paragraphs for a plot. */
+  function longDocument(paragraphs: number): void {
+    documentOf(
+      ...Array.from({ length: paragraphs }, (_, i) => `Paragraph ${i}.`),
+    );
+  }
+
+  it("retires a thread the story walked away from, without asking triage", async () => {
+    // Expiry is measured, not generated: `isThreadExpired` is free, so the
+    // retire is enqueued directly. Triage says nothing here and the pass still
+    // acts — and retire costs 0 output tokens (§3.3), so it never waits.
+    installStoryStorageFake();
+    configure({ enabled: true });
+    const lorebook = installLorebookFake();
+    lorebook.seed({ id: "lb-t1", displayName: "t1", text: "", enabled: true });
+    longDocument(120);
+    const h = harness(
+      [entity("e1", "Ada")],
+      [thread("t1", { anchorParagraph: 0, lorebookEntryId: "lb-t1" })],
+    );
+
+    await h.runPass();
+
+    expect(lorebook.read("lb-t1")?.enabled).toBe(false);
+    expect(h.store.getState().world.threads[0].status).toBe("satisfied");
+  });
+
+  it("leaves a thread the writer made by hand alone, however long the story runs", async () => {
+    // The asymmetry §4.5 names: no anchor, no expiry. A defaulted 0 would
+    // retire it on the first pass instead.
+    installStoryStorageFake();
+    configure({ enabled: true });
+    const lorebook = installLorebookFake();
+    lorebook.seed({ id: "lb-t1", displayName: "t1", text: "", enabled: true });
+    longDocument(400);
+    const h = harness(
+      [entity("e1", "Ada")],
+      [thread("t1", { anchorParagraph: null, lorebookEntryId: "lb-t1" })],
+    );
+
+    await h.runPass();
+
+    expect(lorebook.read("lb-t1")?.enabled).toBe(true);
+    expect(h.store.getState().world.threads[0].status).toBe("open");
+  });
+
+  it("measures against the branch's whole count, not this pass's backlog", async () => {
+    // `paragraphCount` counts every section; `backlog` counts only the unread
+    // ones. An Engine that has been reading along has a backlog of one and a
+    // branch of hundreds, and expiry is a question about the branch — measuring
+    // it against the backlog would mean nothing ever ages out of a story the
+    // Engine is keeping up with, which is every story it is switched on for.
+    installStoryStorageFake();
+    configure({ enabled: true });
+    const lorebook = installLorebookFake();
+    lorebook.seed({ id: "lb-t1", displayName: "t1", text: "", enabled: true });
+    longDocument(120);
+    await api.v1.historyStorage.set(
+      WATERMARK_KEY,
+      { sectionId: sectionIdAt(118), offset: "Paragraph 118.".length },
+      history.current(),
+    );
+    const h = harness(
+      [entity("e1", "Ada")],
+      [thread("t1", { anchorParagraph: 0, lorebookEntryId: "lb-t1" })],
+    );
+
+    await h.runPass();
+
+    expect(lorebook.read("lb-t1")?.enabled).toBe(false);
+  });
+
+  it("holds a thread still inside its own patience", async () => {
+    installStoryStorageFake();
+    configure({ enabled: true });
+    installLorebookFake();
+    longDocument(60);
+    const h = harness(
+      [entity("e1", "Ada")],
+      [thread("t1", { anchorParagraph: 0 })],
+    );
+
+    await h.runPass();
+
+    expect(writesTo(QUEUE_KEY)[0] ?? []).toEqual([]);
+  });
+
+  it("enqueues every expired thread, because a retire costs nothing", async () => {
+    installStoryStorageFake();
+    configure({ enabled: true });
+    installLorebookFake();
+    longDocument(120);
+    const h = harness(
+      [entity("e1", "Ada")],
+      [
+        thread("t1", { anchorParagraph: 0 }),
+        thread("t2", { anchorParagraph: 0, horizon: "point" }),
+        thread("t3", { anchorParagraph: 0, horizon: "arc" }),
+      ],
+    );
+
+    await h.runPass();
+
+    expect(writesTo(QUEUE_KEY)[0]).toEqual([
+      { kind: "retire", threadId: "t1" },
+      { kind: "retire", threadId: "t2" },
+    ]);
+  });
+
+  it("says expired rather than settled in the log", async () => {
+    // The one place the distinction is observable: `ThreadStatus` has no third
+    // value, so the World will show this thread as satisfied — which an
+    // abandoned commitment is not.
+    installStoryStorageFake();
+    configure({ enabled: true });
+    installLorebookFake();
+    longDocument(120);
+    debugLogging(true);
+    const h = harness(
+      [entity("e1", "Ada")],
+      [thread("t1", { anchorParagraph: 0 })],
+    );
+
+    await h.runPass();
+
+    expect(logged().join("\n")).toContain("expired");
+  });
+
+  it("does not re-enqueue a thread it already retired", async () => {
+    // `isThreadExpired` never expires a satisfied thread, so the trigger is
+    // self-clearing — no mark of the kind the condense trigger needs.
+    installStoryStorageFake();
+    configure({ enabled: true });
+    installLorebookFake();
+    longDocument(120);
+    const h = harness(
+      [entity("e1", "Ada")],
+      [thread("t1", { anchorParagraph: 0, status: "satisfied" })],
+    );
+
+    await h.runPass();
+
+    expect(writesTo(QUEUE_KEY)[0] ?? []).toEqual([]);
+  });
+
   it("leaves a long entry no entity of ours is bound to alone", async () => {
     // The Engine condenses what it manages. A lorebook the writer keeps by hand
     // is not sprawl the Engine created, and rewriting it is not something they

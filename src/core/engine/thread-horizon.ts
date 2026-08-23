@@ -47,3 +47,28 @@ export const THREAD_RANGE_CHARS: Record<ThreadHorizon, number> = {
   plot: 4000,
   arc: 12000,
 };
+
+/** How long a thread is left alone after the Engine anchors it, in
+ *  **paragraphs** — the grace §4.3's pacing gate enforces.
+ *
+ *  One forgetting window, derived from the range above rather than chosen: a
+ *  detector that looks back `range` characters, attached to a thread that has
+ *  existed for fewer paragraphs than that, is answering a question about prose
+ *  written before the commitment was raised at all. Its first verdict is an
+ *  artefact of its own memory being longer than the thread's life, and the
+ *  artefact is exactly `range` long. So the grace is exactly `range` long, and
+ *  the gate's whole effect is to make the detector's first verdict its first
+ *  INFORMED one.
+ *
+ *  `Math.ceil` because a paragraph index is an integer and the point is a half
+ *  paragraph is left of the artefact otherwise: point rounds 2.5 up to 3.
+ *
+ *  The multiple is 1 where `EXPIRY_WINDOWS` is 10 — the same unit, at the two
+ *  ends of a thread's life: one window before the reminder may speak, ten
+ *  before the story is taken to have walked away from it. */
+export const THREAD_GRACE_PARAGRAPHS: Record<ThreadHorizon, number> =
+  Object.freeze({
+    point: Math.ceil(THREAD_RANGE_CHARS.point / PARAGRAPH_CHARS),
+    plot: Math.ceil(THREAD_RANGE_CHARS.plot / PARAGRAPH_CHARS),
+    arc: Math.ceil(THREAD_RANGE_CHARS.arc / PARAGRAPH_CHARS),
+  });

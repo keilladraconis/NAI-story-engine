@@ -49,6 +49,7 @@ import { canStartPass, type Intent } from "../../engine/loop-machine";
 import { dedupe, QUEUE_KEY, WATERMARK_KEY } from "../../engine/intents";
 import { drain, revisionsIn } from "../../engine/execute";
 import { readCondenseMark, worthCondensing } from "../../engine/condense";
+import { expiredThreads } from "../../engine/thread-cap";
 import {
   backoffMs,
   isConcurrencyRefusal,
@@ -249,6 +250,45 @@ function buildManifest(
  *  since the last attempt — and the walk continues past a blocked entry rather
  *  than stopping, or the largest permanently-blocked entry would hide every
  *  other one behind it. */
+/** §4.5's expiry, as intents: every thread the story has walked away from,
+ *  offered to the drain as §4.4's flag flip.
+ *
+ *  **Free, so it is decided here rather than asked of triage.** The same
+ *  argument §5.1 makes for the condense trigger, and here it is stronger: the
+ *  triage prompt forbids the answer outright ("Never RETIRE a thread to make
+ *  room. RETIRE means the prose settled it"), so spending ~150 tokens to ask
+ *  would be spending them on a question the model is instructed to refuse.
+ *
+ *  **Retire, not delete.** `expiredThreads` argues that where the policy lives.
+ *  What is decided HERE is only that the verdict becomes an ordinary intent:
+ *  the drain's retire arm already flips the entry through Task 1's door, flips
+ *  the status second so a failure converges, and `intentKey` already collapses
+ *  a repeat — so expiry adds no new way to write to a writer's lorebook.
+ *
+ *  **No mark, unlike the condense trigger.** That one is memoryless and would
+ *  re-offer the same entry every pass; this one clears itself, because a
+ *  retired thread is `satisfied` and `isThreadExpired` never expires one.
+ *
+ *  The log line says "expired" where the World will say "satisfied". A
+ *  commitment the story abandoned is not one it settled, and `ThreadStatus` has
+ *  no third value to say so — see the report on this task. A third status would
+ *  have to disable the entry, sort first in `displacementOrder`, and stop triage
+ *  proposing it, which is precisely what `satisfied` already does, so it would
+ *  be a label with no behaviour behind it. */
+async function expiredRetires(
+  state: RootState,
+  paragraphCount: number,
+  log: EngineLog,
+): Promise<Intent[]> {
+  const expired = expiredThreads(state.world.threads, paragraphCount);
+  for (const thread of expired) {
+    await log(
+      `[engine] thread "${thread.title}" expired — untouched since paragraph ${thread.anchorParagraph} of ${paragraphCount}, retiring`,
+    );
+  }
+  return expired.map((thread) => ({ kind: "retire", threadId: thread.id }));
+}
+
 async function nextCondense(
   state: RootState,
   thresholdChars: number,
@@ -484,6 +524,15 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // and will still be long next pass.
       const condense = await nextCondense(getState(), settings.condenseAtChars);
 
+      // §4.5's expiry, appended last and unordered against the rest: a retire
+      // costs 0 output tokens (§3.3) and the drain never defers a free intent,
+      // so where it sits in the queue cannot starve it or be starved by it.
+      const expired = await expiredRetires(
+        getState(),
+        assessment.paragraphCount,
+        log,
+      );
+
       // What the pass is about to act on: what triage just named, PLUS anything
       // an earlier pass deferred for budget. The machine is told this rather
       // than `intents` alone, and it has to be: once the drain can defer, a
@@ -491,7 +540,7 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // machine the empty `intents` would leave the HUD reading `idle` through
       // a drain that is editing the writer's lorebook. `acting` is the one
       // phase §9.1 spends the pencil on, so it must not be skipped.
-      const enqueued = dedupe(queue, [...intents, ...condense]);
+      const enqueued = dedupe(queue, [...intents, ...condense, ...expired]);
       dispatch(engineLoopEvent({ type: "triaged", intents: enqueued }));
 
       // Rule 1: the pass got its answer, so the prose behind it has been read.

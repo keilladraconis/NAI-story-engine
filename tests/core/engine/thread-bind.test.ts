@@ -5,6 +5,7 @@ import { createStore, type Store } from "nai-store";
 import { rootReducer, persistedDataLoaded } from "../../../src/core/store";
 import { initialWorldState } from "../../../src/core/store/slices/world";
 import {
+  threadAnchorSet,
   threadRenamed,
   threadMemberToggled,
   threadHorizonSet,
@@ -25,7 +26,10 @@ import {
   resolveThreadMembers,
   SE_THREAD_CATEGORY,
 } from "../../../src/core/engine/thread-bind";
-import { THREAD_RANGE_CHARS } from "../../../src/core/engine/thread-horizon";
+import {
+  THREAD_GRACE_PARAGRAPHS,
+  THREAD_RANGE_CHARS,
+} from "../../../src/core/engine/thread-horizon";
 import { lorebookRecordKey } from "../../../src/core/engine/lorebook-write";
 import { EDIT_PANE_TITLE, lorebookOriginalKey } from "../../../src/core/keys";
 import {
@@ -441,6 +445,21 @@ describe("registerThreadConditionEffects", () => {
       "utf8",
     );
     expect(wiring).toContain("registerThreadConditionEffects(");
+  });
+
+  it("rebuilds when the anchor moves, so the gate follows the renewal", async () => {
+    // The fourth trigger, and it exists because the anchor is BAKED INTO the
+    // stored condition: a renewal that did not rebuild would leave the entry
+    // gating on the paragraph the thread was opened at, which is the grace the
+    // renewal was supposed to restart.
+    const { store, entryId } = await wired();
+
+    store.dispatch(threadAnchorSet({ threadId: "t1", paragraph: 200 }));
+    await settle();
+
+    expect(
+      JSON.stringify(lorebook.read(entryId)?.advancedConditions),
+    ).toContain(String(200 + THREAD_GRACE_PARAGRAPHS.plot));
   });
 
   it("does not rebuild for an edit the condition does not read", async () => {

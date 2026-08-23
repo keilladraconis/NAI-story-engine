@@ -23,6 +23,7 @@ import {
 } from "../../../src/core/keys";
 import { REVISE_MAX_TOKENS } from "../../../src/core/engine/revise-strategy";
 import { CONDENSE_MAX_TOKENS } from "../../../src/core/engine/condense";
+import { THREAD_GRACE_PARAGRAPHS } from "../../../src/core/engine/thread-horizon";
 import { lorebookRecordKey } from "../../../src/core/engine/lorebook-write";
 import {
   installHistoryFake,
@@ -236,9 +237,29 @@ describe("drain — open", () => {
     await drain([OPEN], h.deps);
 
     const entry = lorebook.created()[0];
-    expect(entry.advancedConditions?.[0].type).toBe("not");
+    // The thread is anchored at creation, so §4.3's pacing gate is part of the
+    // condition from the first moment the entry exists: `and(detector, gate)`.
+    const [condition] = entry.advancedConditions ?? [];
+    expect(condition.type).toBe("and");
+    const [detector, gate] =
+      condition.type === "and" ? condition.conditions : [];
+    expect(detector.type).toBe("not");
+    expect(JSON.stringify(gate)).toContain("paragraphCount");
     expect(entry.forceActivation).toBe(true);
     expect(entry.text).toBe("One-handed now.");
+  });
+
+  it("gates the new entry from the paragraph the thread was opened at", async () => {
+    // The grace: a detector with a 4000-character memory attached to a thread
+    // three paragraphs old is reporting on prose written before the commitment
+    // existed. `assessment.paragraphCount` is 90 here.
+    const h = harness();
+
+    await drain([OPEN], h.deps);
+
+    expect(JSON.stringify(lorebook.created()[0].advancedConditions)).toContain(
+      String(90 + THREAD_GRACE_PARAGRAPHS.plot),
+    );
   });
 
   it("anchors the thread at the paragraph the pass read to", async () => {

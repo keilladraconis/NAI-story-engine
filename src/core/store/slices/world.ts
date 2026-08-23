@@ -240,16 +240,16 @@ export const worldSlice = createSlice({
       threads: state.threads.filter((t) => t.id !== payload.threadId),
     }),
 
-    // `threadRenamed`, `threadMemberToggled` and `threadHorizonSet` are the
-    // three actions a thread's forgetting detector is built from:
-    // `buildThreadCondition` (src/core/engine/thread-condition.ts) reads
-    // `title` for its fallback probe, the members' names for the real one, and
-    // `horizon` for the range. `registerThreadConditionEffects`
-    // (src/core/engine/thread-bind.ts) subscribes to exactly these three and
-    // rewrites the entry's condition, because a renamed thread whose detector
-    // was not rebuilt goes on probing for a name the prose no longer uses and
-    // fires forever. A fourth action that changed any of the three would have
-    // to be added there too.
+    // `threadRenamed`, `threadMemberToggled`, `threadHorizonSet` and
+    // `threadAnchorSet` are the four actions a thread's condition is built
+    // from: `buildThreadCondition` (src/core/engine/thread-condition.ts) reads
+    // `title` for its fallback probe, the members' names for the real one,
+    // `horizon` for the range, and `anchorParagraph` for §4.3's pacing gate.
+    // `registerThreadConditionEffects` (src/core/engine/thread-bind.ts)
+    // subscribes to exactly these four and rewrites the entry's condition,
+    // because a renamed thread whose detector was not rebuilt goes on probing
+    // for a name the prose no longer uses and fires forever. A fifth action
+    // that changed any of the four would have to be added there too.
     threadRenamed: (state, payload: { threadId: string; title: string }) => ({
       ...state,
       threads: state.threads.map((t) =>

@@ -12,6 +12,7 @@ import {
   displacementOrder,
   effectiveCap,
   enforceThreadCap,
+  expiredThreads,
   isThreadExpired,
 } from "../../../src/core/engine/thread-cap";
 import {
@@ -320,5 +321,64 @@ describe("isThreadExpired — an end the story walked away from", () => {
     ["Infinity", Number.POSITIVE_INFINITY],
   ])("does not expire on %s", (_label, paragraphs) => {
     expect(isThreadExpired(thread("t", "point"), paragraphs)).toBe(false);
+  });
+});
+
+describe("expiredThreads — the caller isThreadExpired never had", () => {
+  /** A thread the Engine opened: anchored at a paragraph. */
+  const anchored = (
+    id: string,
+    anchorParagraph: number,
+    horizon: ThreadHorizon = "plot",
+    status: ThreadStatus = "open",
+  ): Thread => ({ ...thread(id, horizon, status), anchorParagraph });
+
+  it("measures the count from the thread's own anchor", () => {
+    const threads = [anchored("t", 40)];
+    expect(ids(expiredThreads(threads, 40 + 99))).toEqual([]);
+    expect(ids(expiredThreads(threads, 40 + 100))).toEqual(["t"]);
+  });
+
+  it("declines on an unanchored thread rather than defaulting it to zero", () => {
+    // The asymmetry §4.5 names: only the Engine anchors, so a thread the writer
+    // made by hand carries `null` and never ages. A defaulted 0 would read as
+    // "abandoned since paragraph 0" and retire every hand-made thread in any
+    // story past its horizon's window — on the first pass after it was created.
+    expect(expiredThreads([thread("hand")], 100_000)).toEqual([]);
+  });
+
+  it("branches on the null itself, not through isThreadExpired's guard", () => {
+    // `isThreadExpired` takes a number and cannot express "unknown": handing it
+    // `paragraphCount - null` is `paragraphCount - 0`, which its guard accepts
+    // as a perfectly good large count. The decline has to happen up here.
+    expect(isThreadExpired(thread("hand"), 100_000 - 0)).toBe(true);
+  });
+
+  it("never expires a satisfied thread, however old", () => {
+    expect(
+      expiredThreads([anchored("t", 0, "plot", "satisfied")], 9000),
+    ).toEqual([]);
+  });
+
+  it("declines when the count is behind the anchor, as undo leaves it", () => {
+    expect(expiredThreads([anchored("t", 500)], 100)).toEqual([]);
+  });
+
+  it("returns every thread that has aged out, not just the first", () => {
+    const threads = [anchored("a", 0, "point"), anchored("b", 0, "plot")];
+    expect(ids(expiredThreads(threads, 300))).toEqual(["a", "b"]);
+  });
+
+  it("holds the longer horizons while the shorter ones go", () => {
+    const threads = [
+      anchored("p", 0, "point"),
+      anchored("l", 0, "plot"),
+      anchored("a", 0, "arc"),
+    ];
+    expect(ids(expiredThreads(threads, 100))).toEqual(["p", "l"]);
+  });
+
+  it("finds nothing in an empty world", () => {
+    expect(expiredThreads([], 500)).toEqual([]);
   });
 });

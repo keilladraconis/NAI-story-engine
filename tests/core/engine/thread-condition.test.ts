@@ -4,7 +4,10 @@ import {
   threadSubjects,
   type ThreadMember,
 } from "../../../src/core/engine/thread-condition";
-import { THREAD_RANGE_CHARS } from "../../../src/core/engine/thread-horizon";
+import {
+  THREAD_GRACE_PARAGRAPHS,
+  THREAD_RANGE_CHARS,
+} from "../../../src/core/engine/thread-horizon";
 import { nameKey } from "../../../src/core/store/effects/handlers/lorebook";
 import type { Thread, WorldEntity } from "../../../src/core/store/types";
 
@@ -54,6 +57,28 @@ function asOr(c: LorebookCondition): LorebookCondition[] {
   expect(c.type).toBe("or");
   if (c.type !== "or") throw new Error("not an `or`");
   return c.conditions;
+}
+
+function asAnd(c: LorebookCondition): LorebookCondition[] {
+  expect(c.type).toBe("and");
+  if (c.type !== "and") throw new Error("not an `and`");
+  return c.conditions;
+}
+
+function asEquation(c: LorebookCondition): LorebookAdvancedConditionEquation {
+  expect(c.type).toBe("equation");
+  if (c.type !== "equation") throw new Error("not an `equation`");
+  return c;
+}
+
+/** The detector and the gate, pulled apart from the one condition an anchored
+ *  thread emits. */
+function split(built: LorebookCondition[]): {
+  detector: LorebookCondition;
+  gate: LorebookCondition[];
+} {
+  const [detector, gate] = asAnd(only(built));
+  return { detector, gate: asOr(gate) };
 }
 
 function only(cs: LorebookCondition[]): LorebookCondition {
@@ -235,18 +260,116 @@ describe("buildThreadCondition — what it deliberately does not do", () => {
     expect(json).not.toContain("lb1");
   });
 
-  it("carries no pacing gate — no equation, no `and` — in this phase", () => {
+  it("builds the same condition for a satisfied thread — retirement is a flag flip", () => {
+    expect(buildThreadCondition(thread({ status: "satisfied" }), CAST)).toEqual(
+      buildThreadCondition(thread({ status: "open" }), CAST),
+    );
+  });
+});
+
+describe("buildThreadCondition — the pacing gate (§4.3)", () => {
+  it("leaves an unanchored thread exactly the shape phase 5 shipped", () => {
+    // A thread the writer made by hand carries no anchor, so there is no
+    // left-hand side to build an equation from. The detector alone, and no
+    // `and` wrapping it.
     const json = JSON.stringify(
-      buildThreadCondition(thread({ horizon: "arc" }), CAST),
+      buildThreadCondition(thread({ anchorParagraph: null }), CAST),
     );
     expect(json).not.toContain('"equation"');
     expect(json).not.toContain("paragraphCount");
     expect(json).not.toContain('"and"');
   });
 
-  it("builds the same condition for a satisfied thread — retirement is a flag flip", () => {
-    expect(buildThreadCondition(thread({ status: "satisfied" }), CAST)).toEqual(
-      buildThreadCondition(thread({ status: "open" }), CAST),
+  it("gates an anchored thread on its own anchor, not a global stripe", () => {
+    const { detector, gate } = split(
+      buildThreadCondition(thread({ anchorParagraph: 120 }), CAST),
     );
+
+    // The detector survives untouched underneath: the title and both members.
+    expect(asOr(unwrapNot(detector))).toHaveLength(3);
+
+    const [grace, behind] = gate.map(asEquation);
+    expect(grace.comparison).toBe(">=");
+    expect(grace.target).toBe(120 + THREAD_GRACE_PARAGRAPHS.plot);
+    expect(behind.comparison).toBe("<");
+    expect(behind.target).toBe(120);
+  });
+
+  it("is silent for one of the thread's own forgetting windows", () => {
+    // The grace is the horizon's range, in paragraphs — the window the
+    // detector itself looks back over. Not a number of its own.
+    const cases: [Thread["horizon"], number][] = [
+      ["point", 3],
+      ["plot", 10],
+      ["arc", 30],
+    ];
+    for (const [horizon, grace] of cases) {
+      expect(THREAD_GRACE_PARAGRAPHS[horizon]).toBe(grace);
+      const { gate } = split(
+        buildThreadCondition(thread({ horizon, anchorParagraph: 40 }), CAST),
+      );
+      expect(asEquation(gate[0]).target).toBe(40 + grace);
+    }
+  });
+
+  it("opens the gate when the count is behind the anchor — never silence", () => {
+    // Undo does not revert the stored condition (§7), so an entry can be left
+    // carrying an anchor ahead of the branch it is now on. Without this
+    // disjunct that thread's reminder is switched off forever; with it the
+    // thread degrades to the always-on it had before the gate.
+    const { gate } = split(
+      buildThreadCondition(thread({ anchorParagraph: 900 }), CAST),
+    );
+    const behind = asEquation(gate[1]);
+    expect(behind.terms).toEqual([{ value: "paragraphCount" }]);
+    expect(behind.comparison).toBe("<");
+    expect(behind.target).toBe(900);
+  });
+
+  it("does the arithmetic at build time — one term, no operator", () => {
+    // `terms` is an array and the `.d.ts` never says how a term's operator
+    // binds. The anchor is a literal, so the subtraction is done here and each
+    // equation is the single-term shape the `.d.ts`'s own example documents.
+    const { gate } = split(
+      buildThreadCondition(thread({ anchorParagraph: 7 }), CAST),
+    );
+    for (const equation of gate.map(asEquation)) {
+      expect(equation.terms).toHaveLength(1);
+      expect(equation.terms[0].value).toBe("paragraphCount");
+      expect(equation.terms[0].operator).toBeUndefined();
+      expect(typeof equation.target).toBe("number");
+    }
+  });
+
+  it("gates a title-only thread too", () => {
+    const { detector, gate } = split(
+      buildThreadCondition(thread({ entityIds: [], anchorParagraph: 5 }), CAST),
+    );
+    expect(asKey(unwrapNot(detector)).key).toBe("the hidden letter");
+    expect(gate).toHaveLength(2);
+  });
+
+  it("is the whole condition when there is no subject to probe for", () => {
+    // The `{type: "true"}` case, anchored: nothing to negate, so the gate is
+    // all there is — and it still says "not yet" rather than "always".
+    const built = buildThreadCondition(
+      thread({ title: "   ", entityIds: [], anchorParagraph: 60 }),
+      CAST,
+    );
+    const gate = asOr(only(built));
+    expect(asEquation(gate[0]).target).toBe(70);
+  });
+
+  it("gates an anchored thread of every horizon, not only arcs", () => {
+    // §4.3 frames the gate as arc-only, and as built that would be inert: the
+    // Engine's `open` passes no horizon, so every thread it anchors is a
+    // `plot`, and every arc is hand-made and unanchored.
+    for (const horizon of ["point", "plot", "arc"] as const) {
+      const built = buildThreadCondition(
+        thread({ horizon, anchorParagraph: 12 }),
+        CAST,
+      );
+      expect(JSON.stringify(built)).toContain("paragraphCount");
+    }
   });
 });
