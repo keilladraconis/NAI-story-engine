@@ -744,13 +744,48 @@ arrives as a `number` despite the `.d.ts` declaring `string` (§12.1):
    a section that no longer exists; `nodeState(nodeId).sections` gives the document
    at the target.
 3. For each `lb:<entryId>` record, compare the entry's live text against what we
-   recorded writing. **Matching** means our edit is still the top layer and can be
-   brought in line with the branch. **Differing** means the writer has edited since,
-   and we leave it alone.
+   recorded writing. **Matching** means our edit is still the top layer. **Differing**
+   means somebody else's text is on top, and we leave it alone.
+
+**Three corrections the build forced here.**
+
+"Brought in line with the branch" names an action this design cannot perform. The
+record is a **fingerprint**, deliberately — §7's own rule that it answers _what did
+we do_ and never _what does it say_ is exactly what stops it supplying the branch's
+text. What a matching record can do is classify and count, and that is what it does.
+
+"Differing" also conflates two causes, and must: the writer edited since, or the
+Engine wrote a newer version on a branch we navigated away from. They are
+indistinguishable from the target node, and the only action either could license is
+overwriting text somebody else last wrote.
+
+Step 2, "recompute the watermark", is **not a navigation step** and was never built
+as one. `assess` treats a watermark naming a section the document no longer holds as
+no watermark at all — the same correction, made lazily at the one place that can act
+on it, and it covers the branch the writer _edited_ rather than navigated, which a
+navigation-time recompute would miss.
 
 Step 3 is the only place a stored copy of entry text is consulted, and it is
 consulted to answer "what did we do," never "what does it say." Read-then-write is
 preserved.
+
+**A thread entry's `enabled` is answered by the branch, not by a record.** A retire
+writes no text, so it leaves no fingerprint — and widening the record to carry
+`enabled` would not help, because `historyStorage` inherits along **ancestors**: the
+retire is written at the child node, the writer undoes to the parent, and the record
+is precisely what the target node cannot see. It is visible only at nodes where
+nothing needs reconciling. The branch-truthful authority is the thread's own
+`status`, which rides `t:<id>` and therefore does revert. So the rule is: **a thread
+entry is enabled exactly when a thread on this branch names it and that thread is
+open.** One rule answers three problems — the retire flip undo cannot reach, a thread
+opened on an abandoned branch, and §4.5's displaced orphan. Disabled, never deleted
+(§5.2).
+
+**The displaced orphan is answered twice, and the earlier answer is the better one.**
+§4.5 says reconciliation is where it lives; in fact the displacement itself is where
+the entry is attributably ours, so the `open` arm disables it there and
+reconciliation is the branch-correct backstop that switches it on again if the writer
+navigates back to where the thread still exists.
 
 **There is no Engine-specific undo control.** Undo is a native story-editor control,
 and it already does the right thing: navigating history reverts the Engine's beliefs
