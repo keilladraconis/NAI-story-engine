@@ -25,6 +25,8 @@ import { REVISE_MAX_TOKENS } from "../../../src/core/engine/revise-strategy";
 import { CONDENSE_MAX_TOKENS } from "../../../src/core/engine/condense";
 import { THREAD_GRACE_PARAGRAPHS } from "../../../src/core/engine/thread-horizon";
 import { lorebookRecordKey } from "../../../src/core/engine/lorebook-write";
+import { engineSettingsChanged } from "../../../src/core/store/slices/engine";
+import { ENGINE_DEFAULTS } from "../../../src/core/engine/settings";
 import {
   installHistoryFake,
   type HistoryFake,
@@ -341,6 +343,79 @@ describe("drain — open", () => {
     expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
     expect(h.generate).not.toHaveBeenCalled();
     expect(outcome.executed).toEqual([OPEN]);
+  });
+
+  it("switches off the entry of a thread the cap displaced", async () => {
+    // §4.5's orphan, answered where the information is. The reducer drops the
+    // weakest OTHER thread and cannot touch its lorebook entry, which would
+    // otherwise survive unmanaged and STILL ENABLED — going on injecting a
+    // reminder for a commitment nothing records any more. That is "the cap
+    // bounds the list, not the context": proliferation control increasing
+    // proliferation.
+    const h = harness([thread("old", { lorebookEntryId: ENTRY })]);
+    h.store.dispatch(
+      engineSettingsChanged({ ...ENGINE_DEFAULTS, threadCap: 1 }),
+    );
+    lorebook.seed({
+      id: ENTRY,
+      displayName: "old",
+      text: "Somebody promised something.",
+      enabled: true,
+    });
+
+    await drain([OPEN], h.deps);
+
+    expect(h.store.getState().world.threads.map((t) => t.title)).toEqual([
+      "the letter under the board",
+    ]);
+    expect(lorebook.read(ENTRY)?.enabled).toBe(false);
+  });
+
+  it("disables the orphan rather than deleting it, and snapshots it first", async () => {
+    // §5.2 forbids destroying the writer's lorebook, and §4.4 already
+    // establishes the flag flip as the non-destructive way to stop a reminder.
+    // Through the door, so the original is kept.
+    const h = harness([thread("old", { lorebookEntryId: ENTRY })]);
+    h.store.dispatch(
+      engineSettingsChanged({ ...ENGINE_DEFAULTS, threadCap: 1 }),
+    );
+    lorebook.seed({
+      id: ENTRY,
+      displayName: "old",
+      text: "Somebody promised something.",
+      enabled: true,
+    });
+
+    await drain([OPEN], h.deps);
+
+    expect(lorebook.read(ENTRY)?.text).toBe("Somebody promised something.");
+    expect(story.get(lorebookOriginalKey(ENTRY))).toMatchObject({
+      enabled: true,
+    });
+  });
+
+  it("leaves the threads it did not displace alone", async () => {
+    // The flip is for the thread the cap DROPPED. Every other thread the World
+    // held before this open is still open and still wants its reminder.
+    const h = harness([thread("old", { lorebookEntryId: ENTRY })]);
+    lorebook.seed({ id: ENTRY, displayName: "old", text: "x", enabled: true });
+
+    await drain([OPEN], h.deps);
+
+    expect(h.store.getState().world.threads).toHaveLength(2);
+    expect(lorebook.read(ENTRY)?.enabled).toBe(true);
+  });
+
+  it("displaces a thread that never had an entry without writing anything", async () => {
+    const h = harness([thread("old")]);
+    h.store.dispatch(
+      engineSettingsChanged({ ...ENGINE_DEFAULTS, threadCap: 1 }),
+    );
+
+    await drain([OPEN], h.deps);
+
+    expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
+    expect(h.store.getState().world.threads).toHaveLength(1);
   });
 
   it("does not count as an entry rewrite", () => {

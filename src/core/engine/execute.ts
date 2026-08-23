@@ -452,10 +452,36 @@ async function open(subject: string, deps: DrainDeps): Promise<IntentResult> {
   for (const gone of before.filter(
     (t) => !state.world.threads.some((kept) => kept.id === t.id),
   )) {
-    // §4.5, §7: the store dropped it, its lorebook entry did not go with it.
+    // §4.5's orphan, answered here rather than left to §7. The store dropped
+    // the thread and the reducer cannot touch its lorebook entry, which would
+    // otherwise survive unmanaged and STILL ENABLED — going on injecting a
+    // reminder for a commitment nothing records any more. §4.5 names that
+    // exactly: "the cap bounds the list, not the context", so a story that
+    // repeatedly hit the ceiling would accumulate strictly more always-on
+    // injections than the cap ever permitted threads. Proliferation control
+    // increasing proliferation.
+    //
+    // **Here, because here is where the entry is attributably ours.** We are
+    // holding the thread that owned it. §7's reconciliation covers the same
+    // case from the other side — it disables any `SE: Threads` entry no thread
+    // on the branch names — but it can only attribute by category, and it only
+    // runs when the writer navigates. An orphan left live until the next undo
+    // is an orphan injecting until the next undo.
+    //
+    // **Disabled, never deleted** (§5.2), through the door like every other
+    // Engine write, so the writer's original is snapshotted and one switch in
+    // their own lorebook brings it back. And it is branch-correct rather than
+    // final: navigate back to where the thread still exists and reconciliation
+    // switches it on again, because there the branch still names it.
     await deps.log(
-      `[engine] thread cap displaced "${gone.title}" — its lorebook entry ${gone.lorebookEntryId ?? "(none)"} is now unmanaged`,
+      `[engine] thread cap displaced "${gone.title}" — its lorebook entry ${gone.lorebookEntryId ?? "(none)"} is no longer managed by a thread`,
     );
+    if (gone.lorebookEntryId) {
+      await writeLorebookEntry(
+        { entryId: gone.lorebookEntryId, nodeId: deps.nodeId },
+        () => ({ enabled: false }),
+      );
+    }
   }
 
   const entryId = await createThreadEntry(state, created);
