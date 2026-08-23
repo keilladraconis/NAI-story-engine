@@ -41,12 +41,8 @@ import type { AppDispatch, RootState, WorldEntity } from "../types";
 import { assess, type Watermark } from "../../engine/assess";
 import { readEngineSettings } from "../../engine/settings";
 import { canStartPass, type Intent } from "../../engine/loop-machine";
-import {
-  dedupe,
-  intentKey,
-  QUEUE_KEY,
-  WATERMARK_KEY,
-} from "../../engine/intents";
+import { dedupe, QUEUE_KEY, WATERMARK_KEY } from "../../engine/intents";
+import { drain } from "../../engine/execute";
 import {
   backoffMs,
   isConcurrencyRefusal,
@@ -356,9 +352,55 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       );
       if (assessment.backlog === 0) return;
 
-      // The reserve is the triage call itself — drain spends nothing this
-      // phase. Checked here rather than left to GenX, which would park the pass
-      // waiting for the bucket to refill instead of reporting a hold.
+      // The reserve is the triage call itself; the drain then checks the same
+      // bucket again before each action it runs (`INTENT_MAX_TOKENS`, plus this
+      // same reserve so the NEXT pass can still triage). Checked here rather
+      // than left to GenX, which would park the pass waiting for the bucket to
+      // refill instead of reporting a hold.
+      //
+      // **This check is output-only, and cannot be made complete here (§14.1's
+      // deferred `waiting_for_user` gap).** GenX's `ensureBudget` blocks on
+      // input budget as well, and when it blocks it sets its status to
+      // `waiting_for_user` — which the header renders as a Continue widget, for
+      // work the writer never asked for and which §3.5 says a background loop
+      // has no business demanding. Four facts, read out of
+      // `node_modules/nai-gen-x/src/gen-x.ts`, close every route to fixing it
+      // from this side:
+      //
+      //   1. The park is unconditional and per-instance. `ensureBudget` ignores
+      //      `behaviour`, so a background task parks exactly like a foreground
+      //      one, and the status it sets belongs to the GenX instance rather
+      //      than to the task — there is no per-task opt-out to pass.
+      //   2. A parked task cannot be abandoned. `waitForAllowedInput` and
+      //      `waitForAllowedOutput` take no cancellation signal, and GenX only
+      //      re-reads `signal.cancelled` after they resolve; `cancelQueued` is a
+      //      no-op once the task is the one executing. §3.5 wants the work
+      //      abandoned, and abandoning it is exactly what is unavailable.
+      //   3. The one lever, `userInteraction()`, relabels rather than unparks —
+      //      `waiting_for_user` becomes `waiting_for_budget` and the same await
+      //      continues. (The loop already forwards it on every writer
+      //      generation, below, so the widget does clear when the writer
+      //      generates — which is also the only thing that refills the bucket.)
+      //   4. A pre-check here cannot predict the park either, which is what
+      //      rules out the obvious patch. GenX compares the TOTAL input tokens
+      //      (`Σ tokenizer.encode`) against `getAllowedInput()`, which is the
+      //      UNCACHED allowance. Any reserve we compute must either reproduce
+      //      that mismatch — inheriting spurious holds on a prefix the backend
+      //      has cached, on every pass, forever — or measure the honest
+      //      `countUncachedInputTokens` and fail to predict GenX at all.
+      //
+      // So §14.1's framing ("a question about how the Engine's tasks are queued
+      // in GenX rather than a patch to the pass") has no answer at the queuing
+      // layer: the only queuing-level fix is a second GenX instance whose state
+      // is never mirrored into the store, which would cost the serialisation
+      // that currently keeps the Engine from colliding with SEGA and the Forge,
+      // and would put a second `onGenerationRequested` registration in a
+      // codebase where one callback per hook name has already bitten us twice.
+      // Closing this needs an upstream change — a per-task "do not park" that
+      // rejects instead of waiting — and until then the residual is a Continue
+      // widget that appears only while the Engine is genuinely blocked, clears
+      // on the writer's next generation, and does the right thing if pressed.
+      // Revisit on any nai-gen-x upgrade.
       if (api.v1.script.getAllowedOutput() < TRIAGE_MAX_TOKENS) {
         dispatch(engineLoopEvent({ type: "budgetExhausted" }));
         await log("[engine] holding — budget below the triage reserve");
@@ -374,7 +416,16 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
         await generateTriage(genX, manifest, assessment, log),
         manifest,
       );
-      dispatch(engineLoopEvent({ type: "triaged", intents }));
+
+      // What the pass is about to act on: what triage just named, PLUS anything
+      // an earlier pass deferred for budget. The machine is told this rather
+      // than `intents` alone, and it has to be: once the drain can defer, a
+      // pass that triaged nothing new may still owe a rewrite, and feeding the
+      // machine the empty `intents` would leave the HUD reading `idle` through
+      // a drain that is editing the writer's lorebook. `acting` is the one
+      // phase §9.1 spends the pencil on, so it must not be skipped.
+      const enqueued = dedupe(queue, intents);
+      dispatch(engineLoopEvent({ type: "triaged", intents: enqueued }));
 
       // Rule 1: the pass got its answer, so the prose behind it has been read.
       // Rule 4: its own record, its own write.
@@ -384,27 +435,39 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       };
       await saveRecords({ [WATERMARK_KEY]: advanced }, nodeId);
 
-      if (intents.length === 0) return;
+      if (enqueued.length === 0) return;
 
-      const enqueued = dedupe(queue, intents);
       await saveRecords({ [QUEUE_KEY]: enqueued }, nodeId);
 
-      // Drain, phase-4 edition: log what phase 6 will run, then clear. Nothing
-      // here writes a lorebook entry, creates a thread, or retires anything.
+      // Drain: execute, THEN clear. The write above is what lets a reload
+      // between the two find the queue rather than nothing (§11), and it is
+      // why the queue is persisted before anything runs against it.
       //
-      // The clear is what keeps the record honest. Dedupe bounds one
-      // commitment's repeats, not the queue's length, and nothing in this phase
-      // executes anything — an append-only queue would grow all session and be
-      // copied onto every node that writes, while claiming work is pending that
-      // nothing will ever do. Nothing real is lost: the watermark has already
-      // moved past the prose these intents came from. Phase 6 turns this into
-      // execute-then-clear, and the write above is what lets a reload between
-      // the two find the queue rather than nothing (§11).
-      for (const intent of enqueued) {
-        await log(`[engine] intent (not executed): ${intentKey(intent)}`);
-      }
-      await saveRecords({ [QUEUE_KEY]: [] }, nodeId);
-      dispatch(engineLoopEvent({ type: "drained" }));
+      // Only what the budget could not afford is written back. Everything the
+      // drain reached is forgotten, executed or not: dedupe bounds one
+      // commitment's repeats, not the queue's length, so a queue that kept
+      // what it could not use would grow all session and be copied onto every
+      // node that writes. A deferred intent is the one exception, and §3.3 is
+      // explicit about why — prose does not un-happen, so the work is still
+      // wanted and rediscovering it would cost another triage call.
+      const { remaining } = await drain(enqueued, {
+        dispatch,
+        getState,
+        nodeId,
+        log,
+      });
+      await saveRecords({ [QUEUE_KEY]: remaining }, nodeId);
+
+      // A drain that ran out of budget mid-queue is `held`, not done: §9.1's
+      // ⏸ says "the budget cannot cover the next step", which is exactly what
+      // happened, and `held` is a resting phase so the next wakeup tries again.
+      dispatch(
+        engineLoopEvent(
+          remaining.length > 0
+            ? { type: "budgetExhausted" }
+            : { type: "drained" },
+        ),
+      );
     } catch (error) {
       // Rule 3. The classifier decides, not this callsite.
       const retryable = isConcurrencyRefusal(error);

@@ -26,6 +26,9 @@ import {
   installHistoryFake,
   type HistoryFake,
 } from "../../helpers/history-fake";
+import { installLorebookFake } from "../../helpers/lorebook-fake";
+import { installStoryStorageFake } from "../../helpers/story-storage-fake";
+import { lorebookOriginalKey } from "../../../src/core/keys";
 
 // ─────────────────────────────── the harness ───────────────────────────────
 
@@ -316,10 +319,9 @@ describe("the pass", () => {
   });
 
   it("enqueues what triage named and clears the queue", async () => {
-    // Drain LOGS in this phase — behind `story_engine_debug`, which the
-    // describe below covers. Nothing writes a lorebook entry, creates a thread
-    // or retires anything, and the queue is cleared rather than held because
-    // nothing will ever come back for it.
+    // Revise and open are Tasks 3 and 5: the drain reaches them, logs them
+    // behind `story_engine_debug` (the describe below covers the gating) and
+    // consumes them. The budget covers both, so nothing is written back.
     const h = harness();
     triageReturns(h, "REVISE Ada\nOPEN the sealed letter");
     await h.runPass();
@@ -334,6 +336,77 @@ describe("the pass", () => {
     expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
     expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
     expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────── the drain ───────────────────────────────
+
+  it("executes a retire against the writer's lorebook, then clears the queue", async () => {
+    // The pass no longer logs and forgets: it acts. A drain that cleared the
+    // queue without executing leaves this entry enabled and this thread open.
+    const story = installStoryStorageFake();
+    configure({ enabled: true });
+    const lorebook = installLorebookFake();
+    lorebook.seed({
+      id: "lb-thread",
+      displayName: "The debt",
+      text: "Kael owes the guild.",
+      enabled: true,
+    });
+    const h = harness(
+      [entity("e1", "Ada")],
+      [thread("The debt", { lorebookEntryId: "lb-thread" })],
+    );
+    triageReturns(h, "RETIRE The debt");
+
+    await h.runPass();
+
+    expect(lorebook.read("lb-thread")?.enabled).toBe(false);
+    expect(h.store.getState().world.threads[0].status).toBe("satisfied");
+    // Through the door, so §5.2's original survives the retirement.
+    expect(story.get(lorebookOriginalKey("lb-thread"))).toMatchObject({
+      enabled: true,
+    });
+    expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
+    expect(h.store.getState().engine.phase).toBe("idle");
+  });
+
+  it("writes back what the budget could not afford, and holds", async () => {
+    // Enough for triage (200) and nowhere near a 1024-token rewrite. Drop the
+    // drain's budget check and the revise is consumed and lost instead.
+    vi.mocked(api.v1.script.getAllowedOutput).mockReturnValue(300);
+    const h = harness();
+    triageReturns(h, "REVISE Ada");
+
+    await h.runPass();
+
+    expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([
+      { kind: "revise", entityId: "e1" },
+    ]);
+    expect(h.store.getState().engine.phase).toBe("held");
+  });
+
+  it("drains work an earlier pass deferred, even when triage names nothing new", async () => {
+    // A queue that only drains on passes where triage speaks would strand a
+    // deferred rewrite until the model happened to mention it again.
+    installStoryStorageFake();
+    configure({ enabled: true });
+    const lorebook = installLorebookFake();
+    lorebook.seed({ id: "lb-thread", displayName: "The debt", enabled: true });
+    const h = harness(
+      [entity("e1", "Ada")],
+      [thread("The debt", { lorebookEntryId: "lb-thread" })],
+    );
+    await api.v1.historyStorage.set(
+      QUEUE_KEY,
+      [{ kind: "retire", threadId: "The debt" }],
+      history.current(),
+    );
+    triageReturns(h, "");
+
+    await h.runPass();
+
+    expect(lorebook.read("lb-thread")?.enabled).toBe(false);
+    expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
   });
 
   it("mirrors the machine into the store for the HUD to read", async () => {
