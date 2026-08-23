@@ -316,6 +316,25 @@ cannot trust — read its comment).
 
 ### Task 6: Expiry and the arc pacing gate
 
+**Task 5 handoff.** `DrainDeps` now carries the whole `Assessment` (not `newText`),
+and `Assessment` gained `paragraphCount` — which counts **every** section, unlike
+`backlog`, which filters blank ones; the anchor must be comparable with NovelAI's
+own `paragraphCount` condition variable, which will not be skipping blanks.
+`paragraphsSinceTouched = assessment.paragraphCount - thread.anchorParagraph`.
+
+**`anchorParagraph` is `number | null`, and null must decline at your callsite.**
+`isThreadExpired`'s guard catches non-finite and negative only; a hand-created thread
+has no anchor because the World's "+" and the Forge dispatch synchronously with no
+paragraph count available, and a defaulted 0 would read as "abandoned since paragraph
+0". Branch on the null deliberately.
+
+**Task 5 verified the equation grammar for you**: `terms` accept a literal `value`
+and `target` accepts a number, so `paragraphCount - <anchor literal> >= N` _is_
+expressible and the anchor does make a per-thread left-hand side possible. But that
+bakes the anchor into the stored condition, which makes `threadAnchorSet` a **fourth
+rebuild trigger** — extend `registerThreadConditionEffects` in `thread-bind.ts`
+rather than writing conditions from a second place.
+
 **Files:** modify `src/core/engine/execute.ts` or the pass, `src/core/engine/thread-condition.ts`; tests.
 
 Both were deferred for the anchor Task 5 adds.
@@ -363,6 +382,13 @@ state and does not revert what the Engine _did_. On `onHistoryNavigated` (whose
 Keep `reconcile.ts` pure — the decision, not the I/O. §7 is explicit that the
 stored copy answers "what did we do", never "what does it say", so read-then-write
 survives.
+
+**Task 5 handoff: a thread entry never gets an `lb:` record.** Creation bypasses the
+door deliberately (a create has no live text to read and no original to snapshot),
+and the condition rebuild writes no text. So §7 sees thread entries only through the
+retire flag flip — which is exactly the nullable-`enabled` question below, and it is
+now the _only_ way reconciliation can see a thread entry at all. The displaced-thread
+orphan is real as of Task 5 and is logged by id.
 
 **Recompute `touched` from the `lb:` records.** §9.1 calls it "entities revised on
 this branch"; as built it is a session count that survives a branch switch, dies on

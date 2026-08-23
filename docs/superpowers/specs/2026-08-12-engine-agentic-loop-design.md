@@ -401,6 +401,26 @@ or renews a thread; only then does the equation have a meaningful left-hand side
 
 Nothing in `src/` used `advancedConditions` before `src/core/engine/thread-condition.ts`.
 
+**A thread's entry is `forceActivation: true` and carries no keys, and this section
+never said so.** It is load-bearing, by the identical argument that kills the `lore`
+gate above: a key-activated entry must have one of its keys present to be considered
+at all, and this entry's condition negates exactly the strings it would be keyed on
+— so a keyed thread entry could never fire. Always-on with the condition as the gate
+is the only composition that expresses "inject when the story has stopped mentioning
+this". The section designs the condition in complete detail and is silent on what
+activates the entry carrying it; that silence would have shipped a detector that
+never fires.
+
+**The Engine's `open` supplies no cast, so it derives one.** §4.1 calls `entityIds`
+load-bearing and the correction above makes the cast the detector's _subject_ — but
+triage's `OPEN` carries free text and has no syntax for entity ids, so every
+Engine-opened thread would fall into §4.3's "degenerate case" of a title-only probe
+that never matches, i.e. the always-on entry this whole construction exists to
+replace. The degenerate case is meant to be an edge case, not the normal one. The
+cast is therefore derived by matching the subject against known entity names with
+`assess`'s own whole-word matcher — one answer in the codebase to "is Ada in this
+string".
+
 ### 4.4 Retirement
 
 Satisfaction is a flag flip: `api.v1.lorebook.updateEntry(id, {enabled: false})`.
@@ -427,7 +447,22 @@ Three controls:
   the manifest carries the fill, the ceiling, and the title of the thread the
   next `OPEN` would cost. Phase 6 must not build against the stronger reading.
 - A **paragraph-count expiry**, so an end the story quietly abandoned ages out
-  instead of accumulating forever. This wants the same per-thread anchor the arc
+  instead of accumulating forever. **Not every thread has an anchor to age from.**
+  The writer's own creation paths — the World's "+" and the Forge's `[THREAD]` —
+  dispatch synchronously, where the branch's paragraph count needs a document scan,
+  so a hand-created thread anchors at `null` rather than at a defaulted 0 that would
+  read as "abandoned since paragraph 0". Expiry must branch on the null at its
+  callsite; `isThreadExpired`'s signature takes a number and cannot express
+  "unknown".
+
+- **Renewal, which this document never defined** despite naming it. An `open` whose
+  subject already names a thread renews that thread's anchor instead of creating a
+  second one. Without it §3.3's hot triage defeats this section outright: one
+  unsettled commitment mints a new thread, a new always-on entry and a cap
+  displacement on every pass. A _satisfied_ thread matches and is renewed rather
+  than reopened — reopening would re-enable a reminder the Engine deliberately
+  switched off, on the strength of a model ignoring the "satisfied" tag the manifest
+  showed it. This wants the same per-thread anchor the arc
   pacing gate wants and §4.3 does not have: "how long since this thread was last
   touched" is not answerable from a `Thread` as specified. Whatever supplies it
   serves both.
