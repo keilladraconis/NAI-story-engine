@@ -13,14 +13,21 @@
 // restated, only `normalizeEngineSettings` applies them, so a bound that moves in
 // `settings.ts` moves here with it.
 //
-// This module also owns the ONE unit conversion in the form. The delay is stored
+// This module also owns every unit conversion in the form. The delay is stored
 // in milliseconds — the bounds, the timer and `settings.ts` are all in ms and
 // none of them should learn a second unit — but a writer thinks "about eight
 // seconds", not "8000", and `8000` in a box labelled `ms` is exactly the
 // power-user presentation these settings left `project.yaml` to escape. So the
 // box speaks seconds and storage keeps milliseconds.
 //
-// The conversion is in `resolveTypedSetting` AND in `draftFor`, and it has to be
+// The condense threshold is the second of them, and it is why the note above
+// says "every" rather than "the one": it is stored in characters, because that
+// is what the trigger measures a lorebook entry in, and typed in PARAGRAPHS,
+// because the question a writer is actually answering is how much of their
+// context one entry may eat — and the house already reasons about that in
+// 400-character paragraphs (§4.3, `PARAGRAPH_CHARS`).
+//
+// A conversion is in `resolveTypedSetting` AND in `draftFor`, and it has to be
 // in both or the form breaks the guarantee it was built around: *the number left
 // in the box is the number in use*. One without the other is a box showing
 // `8000` seconds, or a `4` that stores 4ms and comes back as the floor. Both
@@ -32,6 +39,7 @@ import {
   normalizeEngineSettings,
   type EngineSettings,
 } from "../../../core/engine/settings";
+import { PARAGRAPH_CHARS } from "../../../core/engine/thread-horizon";
 
 /** The numeric settings — the ones the form exposes as text a writer can type
  *  anything into. `enabled` is a button and has no draft.
@@ -42,12 +50,18 @@ import {
  *  settings out of read-only `project.yaml` to avoid. `threadCap` shipped that
  *  way for one task; `engine-settings-model.test.ts` derives the list from
  *  `ENGINE_DEFAULTS` so the next one cannot. */
-export const NUMERIC_SETTINGS = ["delayMs", "minProse", "threadCap"] as const;
+export const NUMERIC_SETTINGS = [
+  "delayMs",
+  "minProse",
+  "threadCap",
+  "condenseAtChars",
+] as const;
 
 export type NumericSetting = (typeof NUMERIC_SETTINGS)[number];
 
 /** How many stored units one typed unit is worth. The delay is typed in seconds
- *  and stored in milliseconds; the paragraph count and the thread cap are counts
+ *  and stored in milliseconds; the condense threshold is typed in paragraphs and
+ *  stored in characters; the paragraph count and the thread cap are counts
  *  either way, and saying so with a 1 keeps them inside the same table rather
  *  than as special cases somewhere else. A `Record` so a new numeric setting
  *  cannot be added without an answer here — the failure it prevents is a count
@@ -56,6 +70,7 @@ const STORED_PER_TYPED: Record<NumericSetting, number> = {
   delayMs: 1000,
   minProse: 1,
   threadCap: 1,
+  condenseAtChars: PARAGRAPH_CHARS,
 };
 
 /** A stored value in the unit the box shows it in — 8000ms → 8. */

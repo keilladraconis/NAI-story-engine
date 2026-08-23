@@ -21,6 +21,8 @@ import {
   toTyped,
 } from "../../src/ui/panels/setup/engine-settings-model";
 import {
+  CONDENSE_AT_CHARS_MAX,
+  CONDENSE_AT_CHARS_MIN,
   DELAY_MS_MAX,
   DELAY_MS_MIN,
   ENGINE_DEFAULTS,
@@ -30,6 +32,7 @@ import {
   THREAD_CAP_MIN,
   type EngineSettings,
 } from "../../src/core/engine/settings";
+import { PARAGRAPH_CHARS } from "../../src/core/engine/thread-horizon";
 
 /** A configured story: every field away from its default, so a test that gets
  *  back a default is unambiguously getting back a default. */
@@ -38,6 +41,7 @@ const CONFIGURED: EngineSettings = {
   delayMs: 3000,
   minProse: 4,
   threadCap: 5,
+  condenseAtChars: 1600,
 };
 
 /** The delay's bounds in the unit the box shows them in: 1s and 300s. Derived,
@@ -215,7 +219,13 @@ describe("the other settings are carried across untouched", () => {
     // field here would be a field wiped in storage.
     expect(
       Object.keys(resolveTypedSetting(CONFIGURED, "delayMs", "9")).sort(),
-    ).toEqual(["delayMs", "enabled", "minProse", "threadCap"]);
+    ).toEqual([
+      "condenseAtChars",
+      "delayMs",
+      "enabled",
+      "minProse",
+      "threadCap",
+    ]);
   });
 });
 
@@ -279,5 +289,59 @@ describe("the thread cap is a count, not a duration", () => {
     expect(after.enabled).toBe(true);
     expect(after.delayMs).toBe(CONFIGURED.delayMs);
     expect(after.minProse).toBe(CONFIGURED.minProse);
+  });
+});
+
+describe("the condense threshold is typed in paragraphs and stored in characters", () => {
+  // The second conversion in the table, and the one that proves the table is a
+  // table rather than a special case for the delay. A writer's question about
+  // an entry is "how much of my context is this eating", and the answer the
+  // house already reasons in is paragraphs of prose (§4.3's horizons, 400
+  // characters each) — so the box counts paragraphs and storage keeps the
+  // characters the trigger actually compares against.
+  it("stores what was typed in paragraphs and shows it back in paragraphs", () => {
+    const stored = resolveTypedSetting(CONFIGURED, "condenseAtChars", "6");
+    expect(stored.condenseAtChars).toBe(6 * PARAGRAPH_CHARS);
+    expect(draftFor(stored, "condenseAtChars")).toBe("6");
+  });
+
+  it("shows the default as five paragraphs, not two thousand of something", () => {
+    expect(draftFor(ENGINE_DEFAULTS, "condenseAtChars")).toBe("5");
+  });
+
+  it("converts the bounds the form prints, rather than restating them", () => {
+    expect(toTyped("condenseAtChars", CONDENSE_AT_CHARS_MIN)).toBe(2);
+    expect(toTyped("condenseAtChars", CONDENSE_AT_CHARS_MAX)).toBe(10);
+  });
+
+  it("shows the clamped value, not the one that was typed", () => {
+    const stored = resolveTypedSetting(CONFIGURED, "condenseAtChars", "1");
+    expect(stored.condenseAtChars).toBe(CONDENSE_AT_CHARS_MIN);
+    expect(draftFor(stored, "condenseAtChars")).toBe("2");
+  });
+
+  it("takes a fractional paragraph at its word", () => {
+    // 2.5 paragraphs is 1000 characters — a legitimate thing to mean, and it
+    // lands on a whole character, so nothing rounds it away.
+    const stored = resolveTypedSetting(CONFIGURED, "condenseAtChars", "2.5");
+    expect(stored.condenseAtChars).toBe(1000);
+    expect(draftFor(stored, "condenseAtChars")).toBe("2.5");
+  });
+
+  it("treats an empty box as no request, not as a threshold of zero", () => {
+    for (const text of ["", "   ", "abc"]) {
+      expect(
+        resolveTypedSetting(CONFIGURED, "condenseAtChars", text)
+          .condenseAtChars,
+      ).toBe(CONFIGURED.condenseAtChars);
+    }
+  });
+
+  it("never moves the field it was not asked about", () => {
+    const after = resolveTypedSetting(CONFIGURED, "condenseAtChars", "6");
+    expect(after.enabled).toBe(true);
+    expect(after.delayMs).toBe(CONFIGURED.delayMs);
+    expect(after.minProse).toBe(CONFIGURED.minProse);
+    expect(after.threadCap).toBe(CONFIGURED.threadCap);
   });
 });

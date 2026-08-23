@@ -8,6 +8,8 @@
 // is asserted to come back usable rather than propagated.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
+  CONDENSE_AT_CHARS_MAX,
+  CONDENSE_AT_CHARS_MIN,
   DELAY_MS_MAX,
   DELAY_MS_MIN,
   ENGINE_DEFAULTS,
@@ -19,6 +21,7 @@ import {
   writeEngineSettings,
   type EngineSettings,
 } from "../../../src/core/engine/settings";
+import { PARAGRAPH_CHARS } from "../../../src/core/engine/thread-horizon";
 import { STORAGE_KEYS } from "../../../src/core/keys";
 
 /** A real storyStorage, in a Map. Round-trips go through this rather than
@@ -93,6 +96,7 @@ describe("readEngineSettings — a partial record", () => {
       delayMs: ENGINE_DEFAULTS.delayMs,
       minProse: ENGINE_DEFAULTS.minProse,
       threadCap: ENGINE_DEFAULTS.threadCap,
+      condenseAtChars: ENGINE_DEFAULTS.condenseAtChars,
     });
   });
 
@@ -106,22 +110,30 @@ describe("readEngineSettings — a partial record", () => {
   });
 
   it("fills a missing `enabled` with off rather than guessing on", async () => {
-    stored({ delayMs: 3000, minProse: 2, threadCap: 5 });
+    stored({ delayMs: 3000, minProse: 2, threadCap: 5, condenseAtChars: 2000 });
     expect(await readEngineSettings()).toEqual({
       enabled: false,
       delayMs: 3000,
       minProse: 2,
       threadCap: 5,
+      condenseAtChars: 2000,
     });
   });
 
   it("takes a valid record whole", async () => {
-    stored({ enabled: true, delayMs: 3000, minProse: 4, threadCap: 12 });
+    stored({
+      enabled: true,
+      delayMs: 3000,
+      minProse: 4,
+      threadCap: 12,
+      condenseAtChars: 1600,
+    });
     expect(await readEngineSettings()).toEqual({
       enabled: true,
       delayMs: 3000,
       minProse: 4,
       threadCap: 12,
+      condenseAtChars: 1600,
     });
   });
 
@@ -254,6 +266,7 @@ describe("readEngineSettings — hostile values", () => {
       delayMs: -0,
       minProse: Number.NaN,
       threadCap: Number.POSITIVE_INFINITY,
+      condenseAtChars: "2000",
     });
     const settings = await readEngineSettings();
     expect(typeof settings.enabled).toBe("boolean");
@@ -264,6 +277,11 @@ describe("readEngineSettings — hostile values", () => {
     expect(settings.threadCap).toBeGreaterThanOrEqual(THREAD_CAP_MIN);
     expect(settings.threadCap).toBeLessThanOrEqual(THREAD_CAP_MAX);
     expect(Number.isInteger(settings.threadCap)).toBe(true);
+    expect(settings.condenseAtChars).toBeGreaterThanOrEqual(
+      CONDENSE_AT_CHARS_MIN,
+    );
+    expect(settings.condenseAtChars).toBeLessThanOrEqual(CONDENSE_AT_CHARS_MAX);
+    expect(Number.isInteger(settings.condenseAtChars)).toBe(true);
   });
 });
 
@@ -274,6 +292,7 @@ describe("writeEngineSettings", () => {
       delayMs: 12_000,
       minProse: 3,
       threadCap: 5,
+      condenseAtChars: 1600,
     };
     await writeEngineSettings(next);
     expect(await readEngineSettings()).toEqual(next);
@@ -285,6 +304,7 @@ describe("writeEngineSettings", () => {
       delayMs: 12_000,
       minProse: 3,
       threadCap: 5,
+      condenseAtChars: 1600,
     });
     const keys = vi
       .mocked(api.v1.storyStorage.set)
@@ -298,12 +318,72 @@ describe("writeEngineSettings", () => {
       delayMs: -1,
       minProse: 0,
       threadCap: 999,
+      condenseAtChars: 0,
     });
     expect(slots.get(STORAGE_KEYS.ENGINE_SETTINGS)).toEqual({
       enabled: true,
       delayMs: DELAY_MS_MIN,
       minProse: MIN_PROSE_MIN,
       threadCap: THREAD_CAP_MAX,
+      condenseAtChars: CONDENSE_AT_CHARS_MIN,
     });
+  });
+});
+
+describe("the condense threshold is a size in characters", () => {
+  it("defaults to five of the house paragraph, well clear of a generated entry", async () => {
+    // §5.1's counterweight only makes sense above the size a lorebook entry is
+    // BORN at: the Generate Content button writes one or two paragraphs, and a
+    // threshold under that would mark every fresh entry as sprawl. Five
+    // paragraphs (~500 tokens) is where one entry costs as much context as a
+    // whole scene of the recent prose it is competing with (§4.3).
+    expect(ENGINE_DEFAULTS.condenseAtChars).toBe(5 * PARAGRAPH_CHARS);
+    expect(await readEngineSettings()).toEqual(ENGINE_DEFAULTS);
+  });
+
+  it("keeps the default inside its own bounds", () => {
+    expect(ENGINE_DEFAULTS.condenseAtChars).toBeGreaterThanOrEqual(
+      CONDENSE_AT_CHARS_MIN,
+    );
+    expect(ENGINE_DEFAULTS.condenseAtChars).toBeLessThanOrEqual(
+      CONDENSE_AT_CHARS_MAX,
+    );
+  });
+
+  it.each([0, -1, 10, PARAGRAPH_CHARS])(
+    "raises a threshold of %s that every entry already clears",
+    async (value) => {
+      // A threshold below what an entry is generated at makes every managed
+      // entity a permanent condense candidate, and every pass a rewrite queue
+      // that starves the revises §5 exists for.
+      stored({ condenseAtChars: value });
+      expect((await readEngineSettings()).condenseAtChars).toBe(
+        CONDENSE_AT_CHARS_MIN,
+      );
+    },
+  );
+
+  it("lowers a threshold nothing would ever cross", async () => {
+    stored({ condenseAtChars: 500_000 });
+    expect((await readEngineSettings()).condenseAtChars).toBe(
+      CONDENSE_AT_CHARS_MAX,
+    );
+  });
+
+  it("rounds a fractional threshold to a whole character", async () => {
+    stored({ condenseAtChars: 2000.4 });
+    expect((await readEngineSettings()).condenseAtChars).toBe(2000);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["a string", "2000"],
+    ["NaN", Number.NaN],
+    ["Infinity", Number.POSITIVE_INFINITY],
+  ])("defaults the threshold when it is %s", async (_label, value) => {
+    stored({ condenseAtChars: value });
+    expect((await readEngineSettings()).condenseAtChars).toBe(
+      ENGINE_DEFAULTS.condenseAtChars,
+    );
   });
 });

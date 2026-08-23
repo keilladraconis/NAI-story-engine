@@ -800,7 +800,13 @@ describe("the pass", () => {
     // the Engine is not running", a glyph and a tooltip asserting a fact that is
     // not true. The WHOLE record, not just `enabled`: the Setup form renders
     // from this, and nothing else ever dispatches the other fields.
-    configure({ enabled: true, delayMs: 3000, minProse: 4, threadCap: 3 });
+    configure({
+      enabled: true,
+      delayMs: 3000,
+      minProse: 4,
+      threadCap: 3,
+      condenseAtChars: 1600,
+    });
     const h = harness();
 
     registerEngineLoopEffects(h.deps);
@@ -811,6 +817,7 @@ describe("the pass", () => {
       delayMs: 3000,
       minProse: 4,
       threadCap: 3,
+      condenseAtChars: 1600,
     });
   });
 

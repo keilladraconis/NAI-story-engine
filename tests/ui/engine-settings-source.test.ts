@@ -273,6 +273,17 @@ describe("every numeric setting has a field", () => {
     }
   });
 
+  it("prints the threshold's bounds in paragraphs, from the character bounds", () => {
+    // The second converted setting, and the one that proves the delay's rule
+    // generalised rather than being copied: the bounds are stored in
+    // characters and printed in paragraphs, through the same table, so moving
+    // either bound in `settings.ts` moves the help text and the input's own
+    // min/max with it.
+    const src = code(sectionSrc());
+    expect(src).toContain('toTyped("condenseAtChars", CONDENSE_AT_CHARS_MIN)');
+    expect(src).toContain('toTyped("condenseAtChars", CONDENSE_AT_CHARS_MAX)');
+  });
+
   it("prints the cap's bounds from settings.ts, in the unit it is stored in", () => {
     // A count, not a duration: nothing here converts it, and the two bounds are
     // interpolated rather than restated so moving one in `settings.ts` moves

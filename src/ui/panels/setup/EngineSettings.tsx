@@ -22,13 +22,15 @@
 //      `normalizeEngineSettings`) and dispatches, displays and stores that one
 //      value. Dispatch what was typed instead and the form shows one number
 //      while the loop uses another.
-//   3. **The box speaks seconds; storage keeps milliseconds.** The delay is
-//      typed and shown in seconds, and every conversion in both directions goes
-//      through `engine-settings-model.ts` — `resolveTypedSetting` on the way in,
-//      `draftFor` on the way out, and `toTyped` for the bounds in the label's
-//      help and the input's own `min`/`max`. Nothing here divides or multiplies
-//      by a thousand itself; a conversion applied in one direction only is a box
-//      that shows a number the loop is not using.
+//   3. **A box may speak a different unit than storage keeps.** The delay is
+//      typed and shown in seconds and stored in milliseconds; the condense
+//      threshold is typed in paragraphs and stored in characters. Every
+//      conversion in both directions goes through `engine-settings-model.ts` —
+//      `resolveTypedSetting` on the way in, `draftFor` on the way out, and
+//      `toTyped` for the bounds in the label's help and the input's own
+//      `min`/`max`. Nothing here divides or multiplies by anything itself; a
+//      conversion applied in one direction only is a box that shows a number
+//      the loop is not using.
 //   4. **Typing dispatches nothing.** The number fields draft locally on
 //      `onInput` (never `onChange`, which fires on blur and leaves anything
 //      reading before it a keystroke behind) and commit when the field loses
@@ -46,6 +48,8 @@
 import { useSlice } from "../../bridge";
 import { store, engineSettingsChanged } from "../../../core/store";
 import {
+  CONDENSE_AT_CHARS_MAX,
+  CONDENSE_AT_CHARS_MIN,
   DELAY_MS_MAX,
   DELAY_MS_MIN,
   MIN_PROSE_MAX,
@@ -88,10 +92,10 @@ function NumberField(props: {
   value: string;
   min: number;
   max: number;
-  /** The stepper's increment. `"any"` on the delay, because seconds are
-   *  fractional and a step of 1 would mark 4.5 invalid in a field that accepts
-   *  it. The commit path does the real work either way — these attributes clamp
-   *  nothing typed. */
+  /** The stepper's increment. `"any"` on the delay and the condense threshold,
+   *  because seconds and paragraphs are both fractional and a step of 1 would
+   *  mark 4.5 invalid in a field that accepts it. The commit path does the real
+   *  work either way — these attributes clamp nothing typed. */
   step: string;
   onInput: (value: string) => void;
   onCommit: () => void;
@@ -131,6 +135,9 @@ export function EngineSettings() {
   const [delayDraft, setDelayDraft] = useState(draftFor(settings, "delayMs"));
   const [proseDraft, setProseDraft] = useState(draftFor(settings, "minProse"));
   const [capDraft, setCapDraft] = useState(draftFor(settings, "threadCap"));
+  const [condenseDraft, setCondenseDraft] = useState(
+    draftFor(settings, "condenseAtChars"),
+  );
 
   // The drafts follow the store, which moves under this form twice: the startup
   // read lands a tick after mount, and each commit's own dispatch comes back
@@ -147,6 +154,10 @@ export function EngineSettings() {
   useEffect(
     () => setCapDraft(draftFor(settings, "threadCap")),
     [settings.threadCap],
+  );
+  useEffect(
+    () => setCondenseDraft(draftFor(settings, "condenseAtChars")),
+    [settings.condenseAtChars],
   );
 
   // Commits run one at a time, in order, each computed from the store as it is
@@ -234,14 +245,16 @@ export function EngineSettings() {
 
         <span style={{ fontSize: "0.85em", opacity: 0.8 }}>
           On, the Engine wakes a few seconds after each generation, reads
-          whatever prose has appeared since it last looked, and records what
-          your story has made wrong, left hanging, or settled. That list goes to
-          the script log, and that is where it stops — it does not touch your
-          lorebook, your entities or your Threads. Each pass spends one small
-          generation from the same output budget as everything else, and skips
-          itself when there is nothing new to read. Prose you type yourself
-          wakes nothing, so use the ⚡ on the Engine HUD to run a pass on the
-          spot.
+          whatever prose has appeared since it last looked, and acts on what
+          your story has made wrong, left hanging, or settled: it rewrites the
+          lorebook entry of an entity the prose changed, condenses one that has
+          sprawled, and switches off a Thread the story has resolved. The
+          original text of any entry it edits is kept, but there is no restore
+          button yet — your recourse is the editor's own undo, which moves the
+          World with it. Each pass spends from the same output budget as
+          everything else, and skips itself when there is nothing new to read.
+          Prose you type yourself wakes nothing, so use the ⚡ on the Engine HUD
+          to run a pass on the spot.
         </span>
 
         <NumberField
@@ -277,11 +290,25 @@ export function EngineSettings() {
           onCommit={() => commit("threadCap", capDraft, setCapDraft)}
         />
 
+        <NumberField
+          label="Condense entries over (paragraphs)"
+          help={`How long one lorebook entry may get before the Engine rewrites it tighter, measured in paragraphs of prose — an entry that long is taking that much context away from your story. Condensing is the one thing the Engine does that can lose a detail, so raise this if you would rather it left your entries alone. ${toTyped("condenseAtChars", CONDENSE_AT_CHARS_MIN)}–${toTyped("condenseAtChars", CONDENSE_AT_CHARS_MAX)}.`}
+          value={condenseDraft}
+          min={toTyped("condenseAtChars", CONDENSE_AT_CHARS_MIN)}
+          max={toTyped("condenseAtChars", CONDENSE_AT_CHARS_MAX)}
+          step="any"
+          onInput={setCondenseDraft}
+          onCommit={() =>
+            commit("condenseAtChars", condenseDraft, setCondenseDraft)
+          }
+        />
+
         <span style={HELP_STYLE}>
-          The delay and the minimum take effect on the next generation, the
-          Thread limit on the next Thread created. A number outside its range is
-          clamped, and one that is not a number at all leaves the setting alone
-          — either way the number left in the box is the number in use.
+          The delay, the minimum and the condense threshold take effect on the
+          next generation, the Thread limit on the next Thread created. A number
+          outside its range is clamped, and one that is not a number at all
+          leaves the setting alone — either way the number left in the box is
+          the number in use.
         </span>
       </div>
     </div>

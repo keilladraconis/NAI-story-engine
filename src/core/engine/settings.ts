@@ -7,8 +7,8 @@
 // writer steering an autonomous story, and the same person may hand-write the
 // next one.
 //
-// One record, not one key per setting. All three are read together on every pass and
-// written together from one form, and storyStorage has none of historyStorage's
+// One record, not one key per setting. All of them are read together on every pass
+// and written together from one form, and storyStorage has none of historyStorage's
 // copy-on-write-per-key reason to shard (see intents.ts, where the watermark and
 // the queue are deliberately kept apart for exactly that reason).
 //
@@ -22,6 +22,7 @@
 // a hostile value all yield a settings object a pass can actually use.
 
 import { STORAGE_KEYS } from "../keys";
+import { PARAGRAPH_CHARS } from "./thread-horizon";
 
 export type EngineSettings = {
   enabled: boolean;
@@ -31,6 +32,20 @@ export type EngineSettings = {
    *  cannot be bypassed — the reducer, see `src/core/engine/thread-cap.ts` —
    *  rather than at the callsites that create threads. */
   threadCap: number;
+  /** How long a managed lorebook entry may get, in **characters**, before the
+   *  Engine condenses it (§5.1).
+   *
+   *  Characters because that is the unit the house already reasons entry and
+   *  window sizes in (`THREAD_RANGE_CHARS`, `PARAGRAPH_CHARS`) and the unit
+   *  `LorebookEntry.text` is measurable in for free. Tokens would be truer to
+   *  the context cost this setting protects, but tokenising every entry on
+   *  every pass costs a model and a pass over the whole World to buy a
+   *  refinement of a threshold that is already a judgement call.
+   *
+   *  The Setup box shows it in PARAGRAPHS, since the writer's question is "how
+   *  much of my context is one entry eating"; `engine-settings-model.ts` owns
+   *  that conversion, the same way it owns seconds↔milliseconds. */
+  condenseAtChars: number;
 };
 
 /** What a story that has never been configured gets.
@@ -43,6 +58,13 @@ export const ENGINE_DEFAULTS: EngineSettings = {
   delayMs: 8000,
   minProse: 1,
   threadCap: 8,
+  // Five paragraphs. See CONDENSE_AT_CHARS_MIN/MAX for the ends; the middle is
+  // where one entry starts costing what a whole scene of recent prose costs.
+  // A generated entry is one or two paragraphs, so an entry at five has
+  // roughly tripled since it was written — which is §5.1's sprawl, arrived at
+  // by the revisions §5 keeps adding — and ~500 tokens of standing injection
+  // is a sixth of an Erato context spent on one subject.
+  condenseAtChars: 5 * PARAGRAPH_CHARS,
 };
 
 // ───────────────────────────────── the bounds ─────────────────────────────────
@@ -96,6 +118,26 @@ export const THREAD_CAP_MIN = 1;
  *  in the prompt of every pass. It is also five times the default, so a writer
  *  who genuinely runs a crowded story has room to say so. */
 export const THREAD_CAP_MAX = 40;
+
+/** Below two paragraphs the threshold is under the size entries are BORN at:
+ *  `createLorebookContentFactory` writes them at up to 1024 tokens and a
+ *  typical one lands at one to two paragraphs. Set lower and every managed
+ *  entity is a standing condense candidate the moment it is generated, so every
+ *  pass queues a 1024-token rewrite — and since §3.3's bucket covers one entry
+ *  rewrite per pass, the revises that record what the story actually did queue
+ *  behind maintenance work forever. The counterweight would starve the thing it
+ *  is a counterweight to. */
+export const CONDENSE_AT_CHARS_MIN = 2 * PARAGRAPH_CHARS;
+
+/** Ten paragraphs — about 1024 tokens, which is what a condense may emit
+ *  (`CONDENSE_MAX_TOKENS`, §3.3). At the ceiling the action can still restate
+ *  the entry it was handed; above it, an entry could cross the threshold and
+ *  yet be too long for its own rewrite to reproduce, so every attempt would run
+ *  to the token limit and be refused (`composeCondensation` declines a
+ *  truncated condense). A threshold whose crossings can never be acted on is
+ *  the same silent failure as a delay of a day: the setting reads as on and
+ *  does nothing. */
+export const CONDENSE_AT_CHARS_MAX = 10 * PARAGRAPH_CHARS;
 
 /** A stored record as it may actually be: every field optional, every field of
  *  unknown type. `storyStorage.get` is typed `Promise<any>`, so the shape is
@@ -173,6 +215,17 @@ export function normalizeEngineSettings(value: unknown): EngineSettings {
       THREAD_CAP_MIN,
       THREAD_CAP_MAX,
       Math.floor,
+    ),
+    // Rounded to NEAREST, unlike the two above, because neither direction
+    // changes what the number does: the trigger compares an integer character
+    // count against it, so half a character is not a threshold anyone can
+    // cross either way. Nearest is then simply the smallest correction.
+    condenseAtChars: readNumber(
+      record.condenseAtChars,
+      ENGINE_DEFAULTS.condenseAtChars,
+      CONDENSE_AT_CHARS_MIN,
+      CONDENSE_AT_CHARS_MAX,
+      Math.round,
     ),
   };
 }
