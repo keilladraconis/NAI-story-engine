@@ -100,21 +100,44 @@ async function reconcileLorebook(
   // Found, never created: `ensureNamedCategory` would mint `SE: Threads` in the
   // lorebook of a writer who has never switched the Engine on.
   //
-  // The `?? ""` is load-bearing rather than defensive. `LorebookEntry.category`
-  // is optional, so an uncategorised entry carries `undefined` — and in a
-  // lorebook with no `SE: Threads` category, `entry.category === undefined`
-  // would match every loose entry the writer owns and switch all of them off.
-  const threadCategory =
-    categories.find((c) => c.name === SE_THREAD_CATEGORY)?.id ?? "";
+  // **No category means no category arm at all**, rather than an id nothing can
+  // equal. An earlier form compared against `?? ""` on the reasoning that
+  // `LorebookEntry.category` is optional and an uncategorised entry therefore
+  // carries `undefined` — which was asserted, never established. This codebase
+  // hedges the other way in two other places (`mount.ts`, `forge-chat-effects.ts`
+  // both test `!e.category`), and if the runtime hands back `""` for an
+  // uncategorised entry then every loose entry the writer owns is claimed as a
+  // thread orphan, found nameless, and written `{enabled: false}` — on the
+  // first Ctrl+Z of someone who has never switched the Engine on, since this
+  // runs unconditionally. Two surfaces disagreeing about one runtime fact is
+  // the defect; skipping the arm costs a line and removes the question.
+  //
+  // The other half of §7's union is untouched by this: a thread's own
+  // `lorebookEntryId` still answers for its entry, wherever the writer has
+  // filed it. What the skip gives up is finding an orphan in a story that has
+  // no `SE: Threads` category — and only this phase's `open` creates that
+  // category, so a story without one has never had a thread entry to orphan.
+  const threadCategory = categories.find(
+    (c) => c.name === SE_THREAD_CATEGORY,
+  )?.id;
   const flips = reconcileThreadEntries({
     entries,
-    threadCategoryIds: entries
-      .filter((entry) => entry.category === threadCategory)
-      .map((entry) => entry.id),
+    threadCategoryIds:
+      threadCategory === undefined
+        ? []
+        : entries
+            .filter((entry) => entry.category === threadCategory)
+            .map((entry) => entry.id),
     threads: world.threads,
   });
 
   for (const { entryId, enabled } of flips) {
+    // Re-asked per flip, not only before the loop. Each write is an await, so a
+    // held Ctrl+Z can overtake a reconciliation that has already started
+    // writing — and every flip after that point is a stale node's answer,
+    // landing last and winning. Self-correcting on the next navigation, but the
+    // window is exactly as long as the writer keeps the key down.
+    if (!stillCurrent()) return;
     await writeLorebookEntry({ entryId, nodeId }, () => ({ enabled }));
     await log(
       `[engine] thread entry ${entryId} ${enabled ? "re-enabled" : "disabled"} — the branch says so`,

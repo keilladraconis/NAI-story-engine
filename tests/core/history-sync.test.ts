@@ -457,6 +457,102 @@ describe("history-sync — §7 reconciliation", () => {
     expect(lorebook.read("lb-t1")?.enabled).toBe(true);
   });
 
+  it("touches nothing in a lorebook with no SE: Threads category", async () => {
+    // The unconditional-reconciliation bargain (§14.3) is that a story the
+    // Engine never ran in costs two lorebook reads and nothing else. With no
+    // `SE: Threads` category the id to match against is `""` — and if the
+    // runtime hands back `category: ""` for an uncategorised entry rather than
+    // omitting the field, every loose entry the writer owns is claimed as a
+    // thread orphan, found nameless, and switched off. On the first Ctrl+Z of
+    // someone who has never opened the Engine.
+    //
+    // Which of the two shapes the runtime uses is not established: this file's
+    // own comment asserted `undefined` with no evidence, while `mount.ts` and
+    // `forge-chat-effects.ts` both hedge with `!e.category`. Two surfaces
+    // disagreeing about one runtime fact is the defect, so the category arm is
+    // skipped entirely when there is no category — which costs a line and
+    // removes the question.
+    const root = h.current();
+    lorebook.seed({ id: "lb-loose-1", displayName: "Ada", enabled: true });
+    lorebook.seed({
+      id: "lb-loose-2",
+      displayName: "Brennan",
+      category: "",
+      enabled: true,
+    } as LorebookEntry);
+    await saveRecords(toRecords(stateWithThreads([])), root);
+
+    await navigate(root);
+
+    expect(lorebook.updates()).toEqual([]);
+    expect(lorebook.read("lb-loose-1")?.enabled).toBe(true);
+    expect(lorebook.read("lb-loose-2")?.enabled).toBe(true);
+  });
+
+  it("still answers for an entry the branch's own threads name, category or not", async () => {
+    // Skipping the category arm must not become skipping reconciliation. A
+    // thread's own `lorebookEntryId` is the other half of §7's union, and it
+    // is what catches an entry the writer refiled into a category of their own.
+    const root = h.current();
+    lorebook.seed({
+      id: "lb-t1",
+      displayName: "The hidden letter",
+      category: "cat-mine",
+      enabled: false,
+    });
+    await saveRecords(
+      toRecords(stateWithThreads([thread({ lorebookEntryId: "lb-t1" })])),
+      root,
+    );
+
+    await navigate(root);
+
+    expect(lorebook.read("lb-t1")?.enabled).toBe(true);
+  });
+
+  it("stops flipping flags the moment a later navigation supersedes it", async () => {
+    // The check before the loop is not the whole guard. The loop awaits a
+    // lorebook write per flip, so a held Ctrl+Z can overtake a reconciliation
+    // that has already started writing — and every flip after that point
+    // writes a node the writer has already left.
+    const root = h.current();
+    await threadCategory();
+    lorebook.seed({ id: "lb-a", category: "cat-threads", enabled: true });
+    lorebook.seed({ id: "lb-b", category: "cat-threads", enabled: true });
+    await saveRecords(toRecords(stateWithThreads([])), root);
+    const child = h.push();
+    // The child still holds a thread for lb-b, so the navigation that overtakes
+    // has nothing of its own to write and the assertion is about the stale one.
+    await saveRecords(
+      toRecords(
+        stateWithThreads([thread({ id: "tb", lorebookEntryId: "lb-b" })]),
+      ),
+      child,
+    );
+
+    registerHistorySyncEffects(record, NO_AUTOSAVE);
+    const hook = registeredHook();
+
+    // Start the second navigation from inside the first flip's write.
+    let overtaking: Promise<void> | undefined;
+    const realUpdate = api.v1.lorebook.updateEntry;
+    api.v1.lorebook.updateEntry = (async (
+      id: string,
+      patch: Partial<LorebookEntry>,
+    ) => {
+      overtaking ??= hook({ nodeId: child });
+      return realUpdate(id, patch);
+    }) as typeof api.v1.lorebook.updateEntry;
+
+    await hook({ nodeId: root });
+    await overtaking;
+
+    // One flip landed before the overtake; the second belonged to a node the
+    // writer had already left, and the branch they are on says lb-b is open.
+    expect(lorebook.updates().map((u) => u.id)).toEqual(["lb-a"]);
+    expect(lorebook.read("lb-b")?.enabled).toBe(true);
+  });
+
   it("survives a lorebook that throws", async () => {
     // Fire-and-forget hook: a rejection has nowhere to land, and the rehydrate
     // that ran before it must not be undone by a failed reconciliation.
