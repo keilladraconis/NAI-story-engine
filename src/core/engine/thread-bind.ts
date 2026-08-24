@@ -34,6 +34,7 @@ import {
 } from "../store/effects/lorebook-sync";
 import {
   threadAnchorSet,
+  threadStatusSet,
   threadHorizonSet,
   threadMemberToggled,
   threadRenamed,
@@ -248,6 +249,41 @@ export async function rebuildThreadCondition(
   return written;
 }
 
+/** Apply a thread's `status` to its entry's `enabled` flag.
+ *
+ *  §7's rule, for one thread: **a thread entry is enabled exactly when a thread
+ *  on this branch names it and that thread is open.** `reconcileThreadEntries`
+ *  applies the same rule across the whole World at navigation time; this applies
+ *  it at the moment the status changes, so the two cannot disagree.
+ *
+ *  Without it a writer's own press does nothing they can see. `threadStatusSet`
+ *  is dispatched from `ThreadEditPane`'s status control as well as from the
+ *  drain's retire, and only the drain wrote the flag — so marking a thread
+ *  satisfied by hand left its reminder injecting, and reopening one by hand left
+ *  it silent, until the next undo happened to reconcile it. The Engine's own
+ *  retire already writes the flag before dispatching, which makes this a no-op
+ *  for that path rather than a second writer of the same value.
+ *
+ *  Through the door, like every other Engine rewrite, and writing only
+ *  `enabled` — the entry is the writer's and the Engine touches the least of it
+ *  the job requires. No text, so no `lb:` record: §7 answers this flag from the
+ *  branch's World rather than from a record, which is exactly why it can. */
+export async function applyThreadStatus(
+  getState: () => RootState,
+  threadId: string,
+  nodeId: number,
+): Promise<boolean> {
+  const thread = getState().world.threads.find((t) => t.id === threadId);
+  if (!thread?.lorebookEntryId) return false;
+
+  const enabled = thread.status === "open";
+  const { written } = await writeLorebookEntry(
+    { entryId: thread.lorebookEntryId, nodeId },
+    (live) => (live.enabled === enabled ? null : { enabled }),
+  );
+  return written;
+}
+
 /** The four edits a thread's condition is built from (§4.3, phase 5's handoff
  *  plus phase 6's gate).
  *
@@ -256,7 +292,8 @@ export async function rebuildThreadCondition(
  *  `threadAnchorSet` moves the pacing gate the anchor is baked into. Nothing
  *  else does: `threadTextUpdated` rewords the reminder, which the condition
  *  never reads, and `threadStatusSet` is answered by the entry's `enabled` flag
- *  rather than by a condition (§4.4).
+ *  rather than by a condition (§4.4) — `applyThreadStatus` above, subscribed
+ *  alongside these four.
  *
  *  **The anchor is the fourth because the gate stores it, not because the gate
  *  reads it.** `paceGate` resolves `anchorParagraph` into a literal `target`, so
@@ -307,4 +344,15 @@ export function registerThreadConditionEffects(
   subscribeEffect(matchesAction(threadAnchorSet), (action) =>
     rebuild(action.payload.threadId),
   );
+
+  subscribeEffect(matchesAction(threadStatusSet), (action) => {
+    const { threadId } = action.payload;
+    void (async () => {
+      try {
+        await applyThreadStatus(getState, threadId, await captureNode());
+      } catch (error) {
+        api.v1.log("[engine] thread status flip failed:", error);
+      }
+    })();
+  });
 }

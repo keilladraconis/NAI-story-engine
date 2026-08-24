@@ -10,6 +10,7 @@ import {
   threadMemberToggled,
   threadHorizonSet,
   threadTextUpdated,
+  threadStatusSet,
 } from "../../../src/core/store/slices/world";
 import { uiLorebookEntrySelected } from "../../../src/core/store/slices/ui";
 import type {
@@ -20,6 +21,7 @@ import type {
 import {
   castFromSubject,
   createThreadEntry,
+  applyThreadStatus,
   rebuildThreadCondition,
   registerThreadConditionEffects,
   resolveThreadCondition,
@@ -469,5 +471,64 @@ describe("registerThreadConditionEffects", () => {
     await settle();
 
     expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
+  });
+});
+
+// ──────────────────── the writer's own status press (§4.4, §7) ────────────────────
+
+describe("applyThreadStatus", () => {
+  it("switches the entry off when a thread is marked satisfied by hand", async () => {
+    const store = harness();
+    const entryId = await createThreadEntry(store.getState(), thread());
+    store.dispatch(rebound(entryId));
+    store.dispatch(threadStatusSet({ threadId: "t1", status: "satisfied" }));
+
+    expect(
+      await applyThreadStatus(store.getState, "t1", history.current()),
+    ).toBe(true);
+    expect(lorebook.read(entryId)?.enabled).toBe(false);
+  });
+
+  it("switches the entry back on when a satisfied thread is reopened", async () => {
+    const store = harness([thread({ status: "satisfied" })]);
+    const entryId = await createThreadEntry(store.getState(), thread());
+    store.dispatch(rebound(entryId));
+    await api.v1.lorebook.updateEntry(entryId, { enabled: false });
+    store.dispatch(threadStatusSet({ threadId: "t1", status: "open" }));
+
+    expect(
+      await applyThreadStatus(store.getState, "t1", history.current()),
+    ).toBe(true);
+    expect(lorebook.read(entryId)?.enabled).toBe(true);
+  });
+
+  it("writes nothing when the flag already agrees with the thread", async () => {
+    // The drain's retire writes the flag and THEN dispatches, so the effect it
+    // triggers must be a no-op rather than a second writer of the same value.
+    const store = harness([thread({ status: "satisfied" })]);
+    const entryId = await createThreadEntry(store.getState(), thread());
+    store.dispatch(rebound(entryId));
+    await api.v1.lorebook.updateEntry(entryId, { enabled: false });
+
+    expect(
+      await applyThreadStatus(store.getState, "t1", history.current()),
+    ).toBe(false);
+  });
+
+  it("leaves a hand-made thread with no entry alone", async () => {
+    const store = harness();
+    expect(
+      await applyThreadStatus(store.getState, "t1", history.current()),
+    ).toBe(false);
+  });
+
+  it("is wired to threadStatusSet, so a press in the pane reaches the entry", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/core/engine/thread-bind.ts"),
+      "utf8",
+    );
+    expect(source).toMatch(
+      /subscribeEffect\(\s*matchesAction\(threadStatusSet\)/,
+    );
   });
 });
