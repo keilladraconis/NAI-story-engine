@@ -984,12 +984,13 @@ describe("drain — the budget", () => {
     expect((await drain([REVISE], h.deps)).remaining).toEqual([]);
   });
 
-  it("spends one entry rewrite, not two", async () => {
-    // §3.3's whole asymmetry: "one entry rewrite, or several cheap actions, but
-    // not both." Nothing hardcodes that — it falls out of re-reading the bucket
-    // between actions. The two readings are what a real bucket says before and
-    // after a 1024-token rewrite: 1848 clears 1024 + the 200 reserve, 824 does
-    // not. A drain that read the bucket once would spend both.
+  it("re-reads the bucket between actions rather than once at the start", async () => {
+    // The budget check's own property, and all this test claims: a drain that
+    // read `getAllowedOutput()` once would believe it could afford two 1024
+    // rewrites out of a bucket that covers one. The two readings here are a
+    // bucket that has been debited the full ceiling — which is ONE way a host
+    // might account for a rewrite and not a fact about this one, which is why
+    // the per-pass guarantee is tested separately below and not from here.
     vi.mocked(api.v1.script.getAllowedOutput)
       .mockReturnValueOnce(2048 - TRIAGE_MAX_TOKENS)
       .mockReturnValue(2048 - TRIAGE_MAX_TOKENS - INTENT_MAX_TOKENS.revise);
@@ -1008,6 +1009,102 @@ describe("drain — the budget", () => {
       vi.mocked(api.v1.lorebook.entry).mock.calls.map((c) => c[0]),
     ).toEqual(["lb0"]);
     expect(logged.join("\n")).toContain("[engine] deferring condense:lb1");
+  });
+
+  it("spends one entry rewrite per pass whatever the bucket says", async () => {
+    // §3.3's asymmetry, and the changelog's promise that a pass defers a
+    // rewrite rather than taking it out of the writer's next generation. Left
+    // to the budget check alone that promise rests on the host debiting the
+    // REQUESTED 1024; if it debits what was produced — a rewrite typically
+    // lands at 200–400 — the bucket still clears 1024 + 200 afterwards and the
+    // drain spends three or four. Nothing here has verified which the host
+    // does, so the budget is held at FULL: the check can never be the thing
+    // that stops it, and only the cap can.
+    budget(2048);
+    const h = harness();
+    const queue: Intent[] = [
+      { kind: "condense", entryId: "lb0" },
+      { kind: "condense", entryId: "lb1" },
+      { kind: "revise", entityId: "e1", prose: PASS_PROSE },
+    ];
+
+    const outcome = await drain(queue, h.deps);
+
+    expect(outcome.remaining).toEqual(queue.slice(1));
+    expect(
+      vi.mocked(api.v1.lorebook.entry).mock.calls.map((c) => c[0]),
+    ).toEqual(["lb0"]);
+    expect(logged.join("\n")).toContain(
+      "[engine] deferring condense:lb1 — this pass has already spent its entry rewrite",
+    );
+  });
+
+  it("counts a rewrite it reached, not one that wrote", async () => {
+    // A revision the model returned nothing usable for still SPENT its
+    // generation: the door declined the write, the bucket did not un-debit.
+    // Counting writes rather than attempts would let a pass that declined once
+    // go straight on and start a second 1024-token call.
+    budget(2048);
+    const h = revisable();
+    h.generate.mockImplementation(says(""));
+
+    const outcome = await drain(
+      [REVISE, { kind: "condense", entryId: "lb1" }],
+      h.deps,
+    );
+
+    expect(h.generate).toHaveBeenCalledTimes(1);
+    expect(outcome.executed).toEqual([]);
+    expect(outcome.remaining).toEqual([{ kind: "condense", entryId: "lb1" }]);
+  });
+
+  it("does not count the cheap actions against the rewrite cap", async () => {
+    // The cap is over ENTRY REWRITES, which are the scarce operation. An open
+    // is ~150 tokens and a retire is free, and §3.3 affords several of those
+    // beside one rewrite.
+    budget(2048);
+    lorebook.seed({
+      id: ENTRY,
+      displayName: "The debt",
+      text: "owed",
+      enabled: true,
+    });
+    const h = harness([thread("t1", { lorebookEntryId: ENTRY })], []);
+    const queue: Intent[] = [
+      { kind: "open", subject: "the sealed letter", prose: PASS_PROSE },
+      { kind: "open", subject: "the debt at midwinter", prose: PASS_PROSE },
+      { kind: "retire", threadId: "t1" },
+    ];
+
+    const outcome = await drain(queue, h.deps);
+
+    expect(outcome.executed).toEqual(queue);
+    expect(outcome.remaining).toEqual([]);
+  });
+
+  it("never holds a free action behind the rewrite cap", async () => {
+    // The same exemption the budget check makes, for the same reason: a
+    // resolved plot left in the writer's context costs them something and
+    // costs us nothing to remove.
+    budget(2048);
+    lorebook.seed({
+      id: ENTRY,
+      displayName: "The debt",
+      text: "owed",
+      enabled: true,
+    });
+    const h = harness([thread("t1", { lorebookEntryId: ENTRY })], []);
+    const queue: Intent[] = [
+      { kind: "condense", entryId: "lb0" },
+      { kind: "condense", entryId: "lb1" },
+      { kind: "retire", threadId: "t1" },
+    ];
+
+    const outcome = await drain(queue, h.deps);
+
+    expect(outcome.executed).toEqual([{ kind: "retire", threadId: "t1" }]);
+    expect(outcome.remaining).toEqual([{ kind: "condense", entryId: "lb1" }]);
+    expect(lorebook.read(ENTRY)?.enabled).toBe(false);
   });
 
   it("does not let a cheap action jump the queue ahead of a deferred one", async () => {

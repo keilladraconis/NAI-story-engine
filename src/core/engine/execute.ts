@@ -147,6 +147,37 @@ export const INTENT_MAX_TOKENS: Record<Intent["kind"], number> = {
   condense: CONDENSE_MAX_TOKENS,
 };
 
+/** How many full entry rewrites one pass may start (§3.3).
+ *
+ *  **The budget check alone does not deliver this, and that was an unverified
+ *  assumption.** §3.3 reasons that out of a 2048 bucket with ~150 spent on
+ *  triage, one 1024 rewrite leaves ~870 and a second will not clear
+ *  `1024 + 200` — which is only true if the host debits the REQUESTED
+ *  `max_tokens`. If it debits what was produced, and a rewrite typically lands
+ *  at 200–400 tokens, the bucket clears the check again and again and one pass
+ *  spends three or four. Nothing in this project has measured which the host
+ *  does; §12.0's probe measured refusals, not successes.
+ *
+ *  So the guarantee is made by construction rather than inferred from
+ *  arithmetic. §3.3's "one entry rewrite, or several cheap actions, but not
+ *  both" and the changelog's promise that a pass defers a rewrite rather than
+ *  taking it out of the writer's next generation both hold whichever way the
+ *  host accounts. The budget check stays exactly as it was: it is the tighter
+ *  of the two whenever the bucket is genuinely low, and it is what stops a
+ *  pass starting a rewrite it cannot pay for at all. */
+export const ENTRY_REWRITES_PER_PASS = 1;
+
+/** The intents that spend a full 1024-token entry rewrite.
+ *
+ *  Same two `revisionsIn` counts, and for the same reason: revise and condense
+ *  are the arms that rewrite a lorebook entry, and `open`'s ~150 tokens and
+ *  `retire`'s zero are not what §3.3 calls the scarce operation. One predicate
+ *  rather than two lists, so a fifth intent priced at 1024 cannot be capped
+ *  here and uncounted there. */
+function isEntryRewrite(intent: Intent): boolean {
+  return intent.kind === "revise" || intent.kind === "condense";
+}
+
 /** What the drain did with one intent.
  *
  *  `skipped` is not a failure: the World moved on and the work no longer has a
@@ -537,15 +568,22 @@ async function execute(intent: Intent, deps: DrainDeps): Promise<IntentResult> {
 
 /** Spend the queue, oldest first, for as long as the budget allows.
  *
- *  **One intent per pass or several is a real decision, and this is neither.**
- *  The drain runs as many intents as the bucket can pay for, which is what §3.3
- *  asks for — "drain rate is budget-governed, not fixed" — and it is the
- *  arithmetic rather than a rule that produces §3.3's asymmetry: out of a 2048
- *  bucket with ~150 already spent on triage, one 1024 rewrite leaves ~870,
- *  which still clears the 200-token reserve, and a second would not. "One entry
- *  rewrite, or several cheap actions, but not both" is therefore a consequence
- *  here, not a special case — and it stays true when Tasks 3–4 add the actions
- *  that actually cost 1024, which a hardcoded one-per-pass rule would not.
+ *  **Two gates, and they are not the same gate.** The budget check is §3.3's
+ *  "drain rate is budget-governed, not fixed": the bucket is re-read before
+ *  every intent, so what the pass can afford is decided against what is
+ *  actually left rather than against a reading taken before it started
+ *  spending. The rewrite cap is §3.3's asymmetry — "one entry rewrite, or
+ *  several cheap actions, but not both" — held by construction.
+ *
+ *  This was one gate, and the second is the correction. The asymmetry was left
+ *  to fall out of the arithmetic: 2048 less ~150 for triage leaves ~1900, one
+ *  1024 rewrite leaves ~870, and 870 does not clear `1024 + 200`. Every step of
+ *  that assumes the host debits the REQUESTED `max_tokens`, and nothing has
+ *  established that it does. Debited what it produced instead, a rewrite that
+ *  lands at 300 tokens leaves a bucket that clears the check again — and the
+ *  drain spends three or four rewrites out of a window the writer is also
+ *  drawing on, which is exactly what §3.5 and the changelog promise it will
+ *  not. See `ENTRY_REWRITES_PER_PASS`.
  *
  *  **FIFO among the costly actions, and free actions are never blocked.** When
  *  an intent the budget cannot afford is reached, every later costly intent is
@@ -566,17 +604,32 @@ export async function drain(
   const executed: Intent[] = [];
   const remaining: Intent[] = [];
   let blocked = false;
+  let rewrites = 0;
 
   for (const intent of queue) {
     const cost = INTENT_MAX_TOKENS[intent.kind];
-    if (cost > 0 && (blocked || !affords(cost))) {
+    const rewrite = isEntryRewrite(intent);
+    const capped = rewrite && rewrites >= ENTRY_REWRITES_PER_PASS;
+    if (cost > 0 && (blocked || capped || !affords(cost))) {
       blocked = true;
       remaining.push(intent);
       await deps.log(
-        `[engine] deferring ${intentKey(intent)} — needs ${cost} + ${TRIAGE_MAX_TOKENS} reserve, budget is ${api.v1.script.getAllowedOutput()}`,
+        capped
+          ? `[engine] deferring ${intentKey(intent)} — this pass has already spent its entry rewrite`
+          : `[engine] deferring ${intentKey(intent)} — needs ${cost} + ${TRIAGE_MAX_TOKENS} reserve, budget is ${api.v1.script.getAllowedOutput()}`,
       );
       continue;
     }
+
+    // Counted where the intent is REACHED, not where it writes. A revision the
+    // model returned nothing usable for still spent its generation — the door
+    // declined the write, the backend did not un-debit the tokens — so
+    // counting writes would let a pass that declined once start a second
+    // 1024-token call. The cost of counting attempts is that a rewrite which
+    // exits before generating (its entity deleted, its entry gone) consumes
+    // the pass's slot; that intent was being consumed either way, and the
+    // conservative direction is the one that keeps the promise.
+    if (rewrite) rewrites++;
 
     try {
       if ((await execute(intent, deps)) === "executed") {

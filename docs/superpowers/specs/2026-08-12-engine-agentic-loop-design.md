@@ -1756,6 +1756,21 @@ only for a writer who switched it on in that story.
   until the writer's first undo or redo. Fixing it means recounting on the load
   path, which is `mount.ts` — outside §7 entirely, and outside the handler this
   phase touched.
+- **§3.3's "one entry rewrite per pass" was an unverified assumption, and is
+  now a cap.** The drain checks the bucket before every intent and §3.3
+  reasons the asymmetry out of the arithmetic: 2048 less ~150 for triage, less
+  a 1024 rewrite, leaves ~870, which does not clear `1024 + 200`. Every step of
+  that assumes the host debits the **requested** `max_tokens`. If it debits
+  what was **produced** — a rewrite typically lands at 200–400 — the bucket
+  clears the check again and one pass spends three or four rewrites, breaking
+  §3.5 and the changelog's promise that a pass defers rather than taking the
+  budget out of the writer's next generation. §12.0's probe measured what a
+  **refusal** costs and never established this. `ENTRY_REWRITES_PER_PASS`
+  makes the guarantee structural; the budget check stays, being the tighter of
+  the two whenever the bucket is genuinely low. The cap counts a rewrite the
+  drain **reached**, not one that wrote: a declined revision spent its
+  generation all the same.
+
 - **A hand delete is the third moment §7's rule has, and it was the only one
   with no answer.** `applyThreadStatus` covers a status press and the `open`
   arm covers a cap displacement, both arguing that an orphan left live until
