@@ -1363,6 +1363,19 @@ output is a log line.
 
 **Where the build corrected this document.**
 
+- **A hand-dispatched `threadStatusSet` reached nothing, and `thread-bind.ts`'s own
+  comment said otherwise.** It read "`threadStatusSet` is answered by the entry's
+  `enabled` flag rather than by a condition" — and nothing answered it. The action
+  is dispatched from `ThreadEditPane`'s status control as well as from the drain's
+  retire, and only the drain wrote the flag, so a writer marking a thread satisfied
+  left its reminder injecting and reopening one left it silent until the next
+  navigation happened to reconcile it. An explicit press did nothing the writer
+  could see. `applyThreadStatus` now applies §7's rule for one thread at the moment
+  of change, and declines when the flag already agrees — which makes it a no-op for
+  the Engine's own retire rather than a second authority over the same flag. That
+  distinction is the whole point: one _rule_, applied at two moments, is not two
+  rules.
+
 - **§9.1's state slot needed a sixth reading: "off".** Five readings cannot express
   a switched-off Engine — the loop simply never moves, so the slot whose entire job
   is _whether it's alive_ rendered "idle" and "not running at all" identically, on
@@ -1667,15 +1680,6 @@ only for a writer who switched it on in that story.
   caller, the `open` arm. The lorebook control on a thread card is still disabled,
   and a thread the writer creates has no entry, no anchor, and therefore no
   detector and no expiry until the prose first mentions it.
-- **Reconcile a thread's `enabled` outside a navigation.** `threadStatusSet`
-  dispatched by hand — the writer marking a thread satisfied, or reopening one the
-  Engine retired — does not flip the entry. The branch rule in §7 is the only
-  thing that answers `enabled`, and it runs on `onHistoryNavigated`, so a
-  hand-changed status is corrected at the next undo or redo rather than at the
-  press. Subscribing to the action would be a second authority over the same flag,
-  which is the thing §7's one rule was written to avoid; the honest fix is for the
-  edit pane's own path to go through the same rule, and that is a surface change
-  this phase did not make.
 
 **Where the build corrected this document.**
 
