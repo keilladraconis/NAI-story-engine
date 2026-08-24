@@ -86,7 +86,17 @@ export type DrainDeps = {
    *  become three, and each one is a decision about which half of one coherent
    *  answer the drain is allowed to see. The assessment is already built,
    *  already passed to triage, and already the definition of "what this pass
-   *  read"; passing it entire is what stops the deps growing a field per arm. */
+   *  read"; passing it entire is what stops the deps growing a field per arm.
+   *
+   *  **`newText` is deliberately not read from here, and no arm below may.**
+   *  A drain runs intents this pass raised AND intents an earlier pass
+   *  deferred, and only the first group has anything to do with the prose in
+   *  this field — so an arm taking its input from the running pass rewrites a
+   *  deferred intent's entry against a scene its subject was never in. The
+   *  prose an intent acts on rides on the intent (`Intent` in
+   *  `loop-machine.ts`). `paragraphCount` is a property of the BRANCH rather
+   *  than of any one intent's prose, so the anchor an `open` records is still
+   *  read from here. */
   assessment: Assessment;
   /** The pass's generation queue. Injected rather than reached for (CLAUDE.md:
    *  no singletons), and the same instance triage used, so the Engine's own
@@ -228,6 +238,7 @@ async function retire(
  *  and `written` is what tells the two apart from a write. */
 async function revise(
   entityId: string,
+  prose: string,
   deps: DrainDeps,
 ): Promise<IntentResult> {
   const entity = deps.getState().world.entitiesById[entityId];
@@ -251,7 +262,7 @@ async function revise(
         createReviseFactory({
           entry: live,
           prefill,
-          newText: deps.assessment.newText,
+          newText: prose,
         }),
         {
           ...(await reviseParams()),
@@ -386,7 +397,11 @@ async function condense(
  *  unmanaged and still enabled — §5.2 forbids deleting it and §7's
  *  reconciliation is where that is answered, so all this does is say so in the
  *  log. */
-async function open(subject: string, deps: DrainDeps): Promise<IntentResult> {
+async function open(
+  subject: string,
+  prose: string,
+  deps: DrainDeps,
+): Promise<IntentResult> {
   const before = deps.getState().world.threads;
   const paragraph = deps.assessment.paragraphCount;
 
@@ -400,7 +415,7 @@ async function open(subject: string, deps: DrainDeps): Promise<IntentResult> {
   }
 
   const response = await deps.genX.generate(
-    createOpenFactory({ subject, newText: deps.assessment.newText }),
+    createOpenFactory({ subject, newText: prose }),
     {
       ...(await openParams()),
       maxRetries: 0,
@@ -496,13 +511,13 @@ async function execute(intent: Intent, deps: DrainDeps): Promise<IntentResult> {
       return retire(intent.threadId, deps);
 
     case "revise":
-      return revise(intent.entityId, deps);
+      return revise(intent.entityId, intent.prose, deps);
 
     case "condense":
       return condense(intent.entryId, deps);
 
     case "open":
-      return open(intent.subject, deps);
+      return open(intent.subject, intent.prose, deps);
   }
 }
 

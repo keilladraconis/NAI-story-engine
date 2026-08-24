@@ -111,7 +111,7 @@ function harness(
       nodeId: history.current(),
       assessment: {
         backlog: 1,
-        newText: "The press took Ada's left hand.",
+        newText: PASS_PROSE,
         candidateIds: [],
         paragraphCount: 90,
       },
@@ -121,6 +121,14 @@ function harness(
       },
     },
   };
+}
+
+/** Everything the model was shown by the drain's first generation, joined. */
+async function shownTo(h: Harness): Promise<string> {
+  const factory = h.generate.mock.calls[0][0] as () => Promise<{
+    messages: Message[];
+  }>;
+  return (await factory()).messages.map((m) => m.content ?? "").join("\n");
 }
 
 function budget(tokens: number): void {
@@ -215,7 +223,17 @@ describe("drain — retire", () => {
 
 // ────────────────────────────────── open ──────────────────────────────────
 
-const OPEN: Intent = { kind: "open", subject: "the letter under the board" };
+/** The prose the pass fed the drain, as every harness below assesses it. An
+ *  intent carries its own copy (§3.3's "a queued intent does not go stale"), so
+ *  the two agree for an intent drained on the pass that raised it and diverge
+ *  for one an earlier pass deferred. */
+const PASS_PROSE = "The press took Ada's left hand.";
+
+const OPEN: Intent = {
+  kind: "open",
+  subject: "the letter under the board",
+  prose: PASS_PROSE,
+};
 
 describe("drain — open", () => {
   it("creates the thread and binds a lorebook entry to it", async () => {
@@ -231,6 +249,23 @@ describe("drain — open", () => {
     expect(thread.text).toBe("One-handed now.");
     expect(thread.lorebookEntryId).toBe(lorebook.created()[0].id);
     expect(outcome.executed).toEqual([OPEN]);
+  });
+
+  it("is shown the prose the INTENT carries, not the prose this pass read", async () => {
+    // Worse here than in a revise: an `open` deferred for budget would write
+    // its standing reminder from prose that never raised the commitment, or
+    // come back with nothing to say at all.
+    const h = harness();
+    const deferred: Intent = {
+      kind: "open",
+      subject: "the letter under the board",
+      prose: "She prised the board up and left the letter there.",
+    };
+
+    await drain([deferred], h.deps);
+
+    expect(await shownTo(h)).toContain("She prised the board up");
+    expect(await shownTo(h)).not.toContain(PASS_PROSE);
   });
 
   it("gives the entry the forgetting detector, not a set of keys", async () => {
@@ -282,7 +317,13 @@ describe("drain — open", () => {
     const h = harness([], [entity("e1")]);
 
     await drain(
-      [{ kind: "open", subject: "Ada's promise to the guild" }],
+      [
+        {
+          kind: "open",
+          subject: "Ada's promise to the guild",
+          prose: PASS_PROSE,
+        },
+      ],
       h.deps,
     );
 
@@ -458,7 +499,7 @@ function revisable(
   );
 }
 
-const REVISE: Intent = { kind: "revise", entityId: "e1" };
+const REVISE: Intent = { kind: "revise", entityId: "e1", prose: PASS_PROSE };
 
 describe("drain — revise", () => {
   it("rewrites the entity's entry with what the model returned", async () => {
@@ -469,6 +510,25 @@ describe("drain — revise", () => {
     expect(lorebook.read(ENTITY_ENTRY)?.text).toContain("One-handed now.");
     expect(outcome.executed).toEqual([REVISE]);
     expect(outcome.remaining).toEqual([]);
+  });
+
+  it("is shown the prose the INTENT carries, not the prose this pass read", async () => {
+    // The severe case this field exists for. A revise the budget deferred runs
+    // on a LATER pass, whose `newText` is different prose and whose watermark
+    // has moved past the sentences that raised it — so an arm reading the
+    // pass's prose rewrites the whole entry against a scene the entity was
+    // never in, under a prompt that says what it leaves out is deleted.
+    const h = revisable();
+    const deferred: Intent = {
+      kind: "revise",
+      entityId: "e1",
+      prose: "Ada put her hand into the press.",
+    };
+
+    await drain([deferred], h.deps);
+
+    expect(await shownTo(h)).toContain("Ada put her hand into the press.");
+    expect(await shownTo(h)).not.toContain(PASS_PROSE);
   });
 
   it("keeps the house header, so a revised entry looks like a generated one", async () => {
@@ -871,24 +931,20 @@ describe("drain — the budget", () => {
     budget(500);
     const h = harness();
 
-    const outcome = await drain([{ kind: "revise", entityId: "e1" }], h.deps);
+    const outcome = await drain([REVISE], h.deps);
 
     expect(outcome.executed).toEqual([]);
-    expect(outcome.remaining).toEqual([{ kind: "revise", entityId: "e1" }]);
+    expect(outcome.remaining).toEqual([REVISE]);
   });
 
   it("keeps the triage reserve, not just the action's own cost", async () => {
     // Exactly enough for the rewrite and nothing for the next triage call.
     budget(INTENT_MAX_TOKENS.revise);
     const h = harness();
-    expect(
-      (await drain([{ kind: "revise", entityId: "e1" }], h.deps)).remaining,
-    ).toHaveLength(1);
+    expect((await drain([REVISE], h.deps)).remaining).toHaveLength(1);
 
     budget(INTENT_MAX_TOKENS.revise + TRIAGE_MAX_TOKENS);
-    expect(
-      (await drain([{ kind: "revise", entityId: "e1" }], h.deps)).remaining,
-    ).toEqual([]);
+    expect((await drain([REVISE], h.deps)).remaining).toEqual([]);
   });
 
   it("spends one entry rewrite, not two", async () => {
@@ -923,8 +979,8 @@ describe("drain — the budget", () => {
     budget(500);
     const h = harness();
     const queue: Intent[] = [
-      { kind: "revise", entityId: "e1" },
-      { kind: "open", subject: "the sealed letter" },
+      REVISE,
+      { kind: "open", subject: "the sealed letter", prose: PASS_PROSE },
     ];
 
     const outcome = await drain(queue, h.deps);
@@ -944,15 +1000,12 @@ describe("drain — the budget", () => {
       enabled: true,
     });
     const h = harness([thread("t1", { lorebookEntryId: ENTRY })]);
-    const queue: Intent[] = [
-      { kind: "revise", entityId: "e1" },
-      { kind: "retire", threadId: "t1" },
-    ];
+    const queue: Intent[] = [REVISE, { kind: "retire", threadId: "t1" }];
 
     const outcome = await drain(queue, h.deps);
 
     expect(outcome.executed).toEqual([{ kind: "retire", threadId: "t1" }]);
-    expect(outcome.remaining).toEqual([{ kind: "revise", entityId: "e1" }]);
+    expect(outcome.remaining).toEqual([REVISE]);
     expect(lorebook.read(ENTRY)?.enabled).toBe(false);
   });
 });

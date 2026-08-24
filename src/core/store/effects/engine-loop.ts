@@ -148,10 +148,25 @@ async function readWatermark(nodeId: number): Promise<Watermark | null> {
 
 /** The queue record. Persisted JSON is trusted no further than its shape: a
  *  missing or malformed record reads as an empty queue rather than throwing
- *  inside the pass it was meant to feed. */
+ *  inside the pass it was meant to feed.
+ *
+ *  **The one element-level check is the prose a text-dependent intent must
+ *  carry**, and it is here because this is the only door persisted intents come
+ *  through — `parseTriage` always attaches it, so an intent arriving without
+ *  one was written by an older build or by a hand-edited record. Dropping it is
+ *  the safe direction and the only honest one: the alternative is running a
+ *  full entry rewrite on whatever prose the running pass happens to hold, which
+ *  is precisely the failure the field exists to prevent. The work is lost, and
+ *  losing it costs the writer nothing they can see — triage names an entry the
+ *  story has made wrong again the next time the story says so. */
 async function readQueue(nodeId: number): Promise<Intent[]> {
   const value: unknown = await api.v1.historyStorage.get(QUEUE_KEY, nodeId);
-  return Array.isArray(value) ? (value as Intent[]) : [];
+  if (!Array.isArray(value)) return [];
+  return (value as Intent[]).filter(
+    (intent) =>
+      (intent.kind !== "revise" && intent.kind !== "open") ||
+      (typeof intent.prose === "string" && intent.prose.length > 0),
+  );
 }
 
 /** What triage is allowed to name: the entities the new prose plausibly
@@ -537,6 +552,11 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       const intents = parseTriage(
         await generateTriage(genX, manifest, assessment, log),
         manifest,
+        // The prose that raised whatever triage just named, carried on the
+        // intents whose input it is. A `revise` or an `open` the budget defers
+        // runs on a later pass, past a watermark that has already moved — see
+        // `Intent` in loop-machine.ts.
+        assessment.newText,
       );
 
       // §5.1's condense, appended AFTER what triage named rather than before

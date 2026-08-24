@@ -19,7 +19,10 @@ describe("loopReducer — touched", () => {
     const s = run([
       { type: "passRequested" },
       { type: "assessed", backlog: 4, candidateIds: [] },
-      { type: "triaged", intents: [{ kind: "revise", entityId: "e1" }] },
+      {
+        type: "triaged",
+        intents: [{ kind: "revise", entityId: "e1", prose: "p" }],
+      },
       { type: "revised", count: 1 },
       { type: "drained" },
     ]);
@@ -45,7 +48,10 @@ describe("loopReducer — touched", () => {
     const acting = run([
       { type: "passRequested" },
       { type: "assessed", backlog: 4, candidateIds: [] },
-      { type: "triaged", intents: [{ kind: "revise", entityId: "e1" }] },
+      {
+        type: "triaged",
+        intents: [{ kind: "revise", entityId: "e1", prose: "p" }],
+      },
     ]);
     expect(loopReducer(acting, { type: "revised", count: 1 }).phase).toBe(
       "acting",
@@ -75,7 +81,10 @@ describe("loopReducer — the happy path", () => {
     const s = run([
       { type: "passRequested" },
       { type: "assessed", backlog: 12, candidateIds: [] },
-      { type: "triaged", intents: [{ kind: "revise", entityId: "e1" }] },
+      {
+        type: "triaged",
+        intents: [{ kind: "revise", entityId: "e1", prose: "p" }],
+      },
     ]);
     expect(s.phase).toBe("acting");
     expect(s.queued).toBe(1);
@@ -85,7 +94,10 @@ describe("loopReducer — the happy path", () => {
     const s = run([
       { type: "passRequested" },
       { type: "assessed", backlog: 12, candidateIds: [] },
-      { type: "triaged", intents: [{ kind: "revise", entityId: "e1" }] },
+      {
+        type: "triaged",
+        intents: [{ kind: "revise", entityId: "e1", prose: "p" }],
+      },
       { type: "drained" },
     ]);
     expect(s.phase).toBe("idle");

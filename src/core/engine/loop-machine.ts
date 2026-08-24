@@ -25,9 +25,29 @@
 export type LoopPhase =
   "idle" | "assessing" | "triaging" | "acting" | "held" | "stalled";
 
+/** The queue's unit of work.
+ *
+ *  **Two of the four carry the prose that raised them, and that is not
+ *  duplication.** §3.3 says a queued intent does not go stale because "prose
+ *  does not un-happen" — true of `retire` (settled stays settled) and
+ *  `condense` (length is length), and false of exactly the two whose INPUT is
+ *  defined as the prose since the watermark. An intent the budget defers runs
+ *  on a later pass, whose prose is different and whose watermark has already
+ *  moved past the sentences that motivated it, so a `revise` reading the
+ *  running pass's prose rewrites an entry against a scene its subject was never
+ *  in — under a prompt that says what it leaves out is deleted. Carrying the
+ *  prose is what makes §3.3's sentence true rather than aspirational: the
+ *  payload is self-contained, so deferring it changes nothing about what it
+ *  will do.
+ *
+ *  Bounded by `clampProse` at the one place intents are minted, so a queue
+ *  record holds at most the same window of prose the prompt would have been
+ *  given anyway — never a second, smaller clamp, which would let a revise act
+ *  on prose triage never saw. `retire` and `condense` carry none of it and
+ *  defer for free, which is what deferral was designed for. */
 export type Intent =
-  | { kind: "revise"; entityId: string }
-  | { kind: "open"; subject: string }
+  | { kind: "revise"; entityId: string; prose: string }
+  | { kind: "open"; subject: string; prose: string }
   | { kind: "retire"; threadId: string }
   | { kind: "condense"; entryId: string };
 

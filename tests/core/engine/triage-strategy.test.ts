@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
+  clampProse,
   createTriageFactory,
   parseTriage,
   type TriageManifest,
@@ -47,6 +48,11 @@ const EMPTY_MANIFEST: TriageManifest = {
   threadCap: 8,
 };
 
+/** The prose the pass read, which a `revise` and an `open` carry away with
+ *  them — see `Intent`. Short enough that `clampProse` returns it unchanged, so
+ *  every expectation below can name it as-is. */
+const PROSE = "Ada pocketed the letter and said nothing.";
+
 /** A manifest whose thread list is `count` long, with an optional override on
  *  the first entry — the cap cases are all about the list's shape, not its
  *  prose. */
@@ -81,19 +87,19 @@ async function threadBlock(manifest: TriageManifest): Promise<string> {
 
 describe("parseTriage — the three commands", () => {
   it("maps REVISE back to an entity id", () => {
-    expect(parseTriage("REVISE Ada Vance", MANIFEST)).toEqual([
-      { kind: "revise", entityId: "e1" },
+    expect(parseTriage("REVISE Ada Vance", MANIFEST, PROSE)).toEqual([
+      { kind: "revise", entityId: "e1", prose: PROSE },
     ]);
   });
 
   it("takes OPEN's subject as free text — nothing to match it against", () => {
-    expect(parseTriage("OPEN the letter Ada took", MANIFEST)).toEqual([
-      { kind: "open", subject: "the letter Ada took" },
+    expect(parseTriage("OPEN the letter Ada took", MANIFEST, PROSE)).toEqual([
+      { kind: "open", subject: "the letter Ada took", prose: PROSE },
     ]);
   });
 
   it("maps RETIRE back to a thread id", () => {
-    expect(parseTriage("RETIRE The hidden letter", MANIFEST)).toEqual([
+    expect(parseTriage("RETIRE The hidden letter", MANIFEST, PROSE)).toEqual([
       { kind: "retire", threadId: "g1" },
     ]);
   });
@@ -104,30 +110,67 @@ describe("parseTriage — the three commands", () => {
       "OPEN the debt comes due at midwinter",
       "RETIRE Debt to the Syndicate",
     ].join("\n");
-    expect(parseTriage(text, MANIFEST)).toEqual([
-      { kind: "revise", entityId: "e2" },
-      { kind: "open", subject: "the debt comes due at midwinter" },
+    expect(parseTriage(text, MANIFEST, PROSE)).toEqual([
+      { kind: "revise", entityId: "e2", prose: PROSE },
+      {
+        kind: "open",
+        subject: "the debt comes due at midwinter",
+        prose: PROSE,
+      },
       { kind: "retire", threadId: "g2" },
     ]);
   });
 });
 
+describe("parseTriage — the prose an intent carries", () => {
+  it("gives a revise and an open the prose, and gives the other two none", () => {
+    // §3.3's "a queued intent does not go stale" is true of retire and
+    // condense and false of these two, whose input IS the prose since the
+    // watermark. Carrying it is what makes the sentence true of all four.
+    const intents = parseTriage(
+      "REVISE Ada Vance\nOPEN the letter\nRETIRE The hidden letter",
+      MANIFEST,
+      PROSE,
+    );
+    expect(intents).toEqual([
+      { kind: "revise", entityId: "e1", prose: PROSE },
+      { kind: "open", subject: "the letter", prose: PROSE },
+      { kind: "retire", threadId: "g1" },
+    ]);
+  });
+
+  it("clamps it to the window the prompt would have used anyway", () => {
+    // The queue is a historyStorage record and copy-on-write is per key per
+    // node (§6.2), so an intent that could hold a whole novel would copy one
+    // onto every node it waited on. Clamped at the mint, with `clampProse` —
+    // the same clamp and therefore the same window triage read, never a second
+    // and smaller one.
+    const long = `${"x".repeat(20000)}\n\nAda put her hand into the press.`;
+    const [intent] = parseTriage("REVISE Ada Vance", MANIFEST, long);
+
+    expect(intent).toMatchObject({ kind: "revise", entityId: "e1" });
+    const carried = (intent as { prose: string }).prose;
+    expect(carried.length).toBeLessThan(long.length);
+    expect(carried).toBe(clampProse(long));
+  });
+});
+
 describe("parseTriage — untrusted text", () => {
   it("yields nothing for an empty response, which is the common case", () => {
-    expect(parseTriage("", MANIFEST)).toEqual([]);
-    expect(parseTriage("   \n\n  \n", MANIFEST)).toEqual([]);
+    expect(parseTriage("", MANIFEST, PROSE)).toEqual([]);
+    expect(parseTriage("   \n\n  \n", MANIFEST, PROSE)).toEqual([]);
   });
 
   it("ignores a verb it does not know", () => {
     const text = ["DELETE Ada Vance", "SUMMARIZE Brennan", "REVISE Brennan"];
-    expect(parseTriage(text.join("\n"), MANIFEST)).toEqual([
-      { kind: "revise", entityId: "e2" },
+    expect(parseTriage(text.join("\n"), MANIFEST, PROSE)).toEqual([
+      { kind: "revise", entityId: "e2", prose: PROSE },
     ]);
   });
 
   it("drops a name the manifest does not list rather than guessing", () => {
     const text = ["REVISE Mira Voss", "RETIRE The buried key"].join("\n");
-    expect(parseTriage(text, MANIFEST)).toEqual([]);
+    expect(parseTriage(text, MANIFEST, PROSE)).toEqual([]);
   });
 
   it("drops every REVISE and RETIRE when the manifest is empty", () => {
@@ -136,8 +179,8 @@ describe("parseTriage — untrusted text", () => {
       "RETIRE The hidden letter",
       "OPEN a debt",
     ];
-    expect(parseTriage(text.join("\n"), EMPTY_MANIFEST)).toEqual([
-      { kind: "open", subject: "a debt" },
+    expect(parseTriage(text.join("\n"), EMPTY_MANIFEST, PROSE)).toEqual([
+      { kind: "open", subject: "a debt", prose: PROSE },
     ]);
   });
 
@@ -146,15 +189,15 @@ describe("parseTriage — untrusted text", () => {
       "\n",
     );
     // The verb still has to be capitals; only the name is forgiving.
-    expect(parseTriage(text, MANIFEST)).toEqual([
+    expect(parseTriage(text, MANIFEST, PROSE)).toEqual([
       { kind: "retire", threadId: "g1" },
     ]);
   });
 
   it("tolerates leading and trailing whitespace around a command", () => {
-    expect(parseTriage("   REVISE   Ada Vance   \r\n", MANIFEST)).toEqual([
-      { kind: "revise", entityId: "e1" },
-    ]);
+    expect(
+      parseTriage("   REVISE   Ada Vance   \r\n", MANIFEST, PROSE),
+    ).toEqual([{ kind: "revise", entityId: "e1", prose: PROSE }]);
   });
 
   it("does not read prose as commands", () => {
@@ -163,23 +206,23 @@ describe("parseTriage — untrusted text", () => {
       "I would suggest opening a thread about the letter, and retiring the debt.",
       "Nothing in the world needs attention right now.",
     ].join("\n");
-    expect(parseTriage(text, MANIFEST)).toEqual([]);
+    expect(parseTriage(text, MANIFEST, PROSE)).toEqual([]);
   });
 
   it("requires the verb in capitals, so a prose sentence cannot be a command", () => {
-    expect(parseTriage("Open the door slowly.", MANIFEST)).toEqual([]);
-    expect(parseTriage("revise Ada Vance", MANIFEST)).toEqual([]);
+    expect(parseTriage("Open the door slowly.", MANIFEST, PROSE)).toEqual([]);
+    expect(parseTriage("revise Ada Vance", MANIFEST, PROSE)).toEqual([]);
   });
 
   it("does not fire on a longer word starting with a verb", () => {
     const text = ["REVISED Ada Vance", "OPENING the letter"].join("\n");
-    expect(parseTriage(text, MANIFEST)).toEqual([]);
+    expect(parseTriage(text, MANIFEST, PROSE)).toEqual([]);
   });
 
   it("drops a command with no argument", () => {
     const text = ["REVISE", "OPEN   ", "RETIRE:", "REVISE Brennan"].join("\n");
-    expect(parseTriage(text, MANIFEST)).toEqual([
-      { kind: "revise", entityId: "e2" },
+    expect(parseTriage(text, MANIFEST, PROSE)).toEqual([
+      { kind: "revise", entityId: "e2", prose: PROSE },
     ]);
   });
 
@@ -192,19 +235,19 @@ describe("parseTriage — untrusted text", () => {
       "RETIRE The hidden letter",
       "RETIRE the hidden letter",
     ].join("\n");
-    expect(parseTriage(text, MANIFEST)).toEqual([
-      { kind: "revise", entityId: "e1" },
-      { kind: "open", subject: "the buried letter" },
+    expect(parseTriage(text, MANIFEST, PROSE)).toEqual([
+      { kind: "revise", entityId: "e1", prose: PROSE },
+      { kind: "open", subject: "the buried letter", prose: PROSE },
       { kind: "retire", threadId: "g1" },
     ]);
   });
 
   it("matches a name full of regex metacharacters literally", () => {
-    expect(parseTriage("REVISE C++ (redacted)", MANIFEST)).toEqual([
-      { kind: "revise", entityId: "e3" },
+    expect(parseTriage("REVISE C++ (redacted)", MANIFEST, PROSE)).toEqual([
+      { kind: "revise", entityId: "e3", prose: PROSE },
     ]);
     // ...and does not treat that name as a pattern that matches other text.
-    expect(parseTriage("REVISE C (redacted)", MANIFEST)).toEqual([]);
+    expect(parseTriage("REVISE C (redacted)", MANIFEST, PROSE)).toEqual([]);
   });
 
   it("strips decoration the format never asked for", () => {
@@ -213,10 +256,10 @@ describe("parseTriage — untrusted text", () => {
       "2. RETIRE [The hidden letter]",
       "* OPEN the letter is still sealed.",
     ].join("\n");
-    expect(parseTriage(text, MANIFEST)).toEqual([
-      { kind: "revise", entityId: "e1" },
+    expect(parseTriage(text, MANIFEST, PROSE)).toEqual([
+      { kind: "revise", entityId: "e1", prose: PROSE },
       { kind: "retire", threadId: "g1" },
-      { kind: "open", subject: "the letter is still sealed" },
+      { kind: "open", subject: "the letter is still sealed", prose: PROSE },
     ]);
   });
 
@@ -225,14 +268,14 @@ describe("parseTriage — untrusted text", () => {
       "REVISE Brennan — he is dead now",
       "OPEN the sealed letter | Ada has not read it",
     ].join("\n");
-    expect(parseTriage(text, MANIFEST)).toEqual([
-      { kind: "revise", entityId: "e2" },
-      { kind: "open", subject: "the sealed letter" },
+    expect(parseTriage(text, MANIFEST, PROSE)).toEqual([
+      { kind: "revise", entityId: "e2", prose: PROSE },
+      { kind: "open", subject: "the sealed letter", prose: PROSE },
     ]);
   });
 
   it("survives a response that is only decoration", () => {
-    expect(parseTriage("```\n---\n**\n", MANIFEST)).toEqual([]);
+    expect(parseTriage("```\n---\n**\n", MANIFEST, PROSE)).toEqual([]);
   });
 });
 
@@ -311,9 +354,9 @@ describe("the manifest states the cap triage has to justify against", () => {
 
 describe("parseTriage — the wire format did not change", () => {
   it("still reads a bare OPEN, cap or no cap", () => {
-    expect(parseTriage("OPEN the letter Ada took", threaded(3, 3))).toEqual([
-      { kind: "open", subject: "the letter Ada took" },
-    ]);
+    expect(
+      parseTriage("OPEN the letter Ada took", threaded(3, 3), PROSE),
+    ).toEqual([{ kind: "open", subject: "the letter Ada took", prose: PROSE }]);
   });
 
   it("keeps the subject when the model justifies the cost after it", () => {
@@ -324,14 +367,14 @@ describe("parseTriage — the wire format did not change", () => {
       "OPEN the sealed letter — worth more than Thread 0",
       "OPEN the debt at midwinter | displaces Thread 0",
     ].join("\n");
-    expect(parseTriage(text, threaded(3, 3))).toEqual([
-      { kind: "open", subject: "the sealed letter" },
-      { kind: "open", subject: "the debt at midwinter" },
+    expect(parseTriage(text, threaded(3, 3), PROSE)).toEqual([
+      { kind: "open", subject: "the sealed letter", prose: PROSE },
+      { kind: "open", subject: "the debt at midwinter", prose: PROSE },
     ]);
   });
 
   it("still resolves RETIRE against a thread the manifest lists", () => {
-    expect(parseTriage("RETIRE Thread 1", threaded(3, 3))).toEqual([
+    expect(parseTriage("RETIRE Thread 1", threaded(3, 3), PROSE)).toEqual([
       { kind: "retire", threadId: "t1" },
     ]);
   });

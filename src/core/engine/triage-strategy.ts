@@ -263,10 +263,22 @@ function indexBy<T extends { id: string }>(
 
 /** Read triage's response into intents, resolving every name against the
  *  manifest the model was shown. Lines it cannot resolve are dropped in silence:
- *  the next pass sees the same prose situation and can say it again. */
-export function parseTriage(text: string, manifest: TriageManifest): Intent[] {
+ *  the next pass sees the same prose situation and can say it again.
+ *
+ *  **`prose` is the pass's `newText`, and it rides along on the two intents
+ *  whose input it is** (`Intent` in `loop-machine.ts` argues why). Clamped
+ *  here, at the one place those intents are minted, so the window an intent
+ *  carries is the same window this response was produced from — a second,
+ *  smaller clamp is exactly what `clampProse`'s own comment forbids — and so a
+ *  queue record can never grow past it however long the intent waits. */
+export function parseTriage(
+  text: string,
+  manifest: TriageManifest,
+  prose: string,
+): Intent[] {
   const entityIds = indexBy(manifest.entities, (e) => e.name);
   const threadIds = indexBy(manifest.threads, (t) => t.title);
+  const carried = clampProse(prose);
 
   const intents: Intent[] = [];
   // Split on every line terminator, not just "\n": `.` and `$` in COMMAND both
@@ -283,13 +295,14 @@ export function parseTriage(text: string, manifest: TriageManifest): Intent[] {
     switch (verb) {
       case "REVISE": {
         const entityId = entityIds.get(normalize(argument));
-        if (entityId) intents.push({ kind: "revise", entityId });
+        if (entityId)
+          intents.push({ kind: "revise", entityId, prose: carried });
         break;
       }
       case "OPEN":
         // The only argument with nothing to resolve against — triage is naming
         // a commitment the World does not record yet.
-        intents.push({ kind: "open", subject: argument });
+        intents.push({ kind: "open", subject: argument, prose: carried });
         break;
       case "RETIRE": {
         const threadId = threadIds.get(normalize(argument));

@@ -13,12 +13,24 @@ import {
   fieldKey,
 } from "../../../src/core/store/persistence/keyspace";
 
-const revise = (id: string): Intent => ({ kind: "revise", entityId: id });
-const open = (subject: string): Intent => ({ kind: "open", subject });
+/** The prose the pass that raised these intents read. Identity ignores it —
+ *  `intentKey` is the work, not the request — so it is one constant here. */
+const PROSE = "The press took Ada's left hand.";
+
+const revise = (id: string): Intent => ({
+  kind: "revise",
+  entityId: id,
+  prose: PROSE,
+});
+const open = (subject: string): Intent => ({
+  kind: "open",
+  subject,
+  prose: PROSE,
+});
 
 describe("intentKey", () => {
   it("distinguishes kinds acting on the same subject", () => {
-    expect(intentKey({ kind: "revise", entityId: "x" })).not.toBe(
+    expect(intentKey({ kind: "revise", entityId: "x", prose: PROSE })).not.toBe(
       intentKey({ kind: "condense", entryId: "x" }),
     );
   });
@@ -28,8 +40,8 @@ describe("intentKey", () => {
     // generator, so "same string, different kind" is reachable in practice.
     // Four kinds naming "x" must be four distinct pieces of work.
     const keys = [
-      intentKey({ kind: "revise", entityId: "x" }),
-      intentKey({ kind: "open", subject: "x" }),
+      intentKey({ kind: "revise", entityId: "x", prose: PROSE }),
+      intentKey({ kind: "open", subject: "x", prose: PROSE }),
       intentKey({ kind: "retire", threadId: "x" }),
       intentKey({ kind: "condense", entryId: "x" }),
     ];

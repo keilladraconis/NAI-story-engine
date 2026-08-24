@@ -207,6 +207,11 @@ function writesTo(key: string): unknown[] {
     .map((c) => c[1]);
 }
 
+/** The whole two-paragraph document below, as `assess` joins it: the prose a
+ *  first pass on this branch reads, and therefore the prose the `revise` and
+ *  `open` intents it raises carry away with them (see `Intent`). */
+const WHOLE_DOCUMENT = "The lock clicked.\n\nAda pocketed the letter.";
+
 let history: HistoryFake;
 
 describe("the pass", () => {
@@ -330,8 +335,8 @@ describe("the pass", () => {
 
     expect(writesTo(QUEUE_KEY)).toEqual([
       [
-        { kind: "revise", entityId: "e1" },
-        { kind: "open", subject: "the sealed letter" },
+        { kind: "revise", entityId: "e1", prose: WHOLE_DOCUMENT },
+        { kind: "open", subject: "the sealed letter", prose: WHOLE_DOCUMENT },
       ],
       [],
     ]);
@@ -456,9 +461,80 @@ describe("the pass", () => {
     await h.runPass();
 
     expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([
-      { kind: "revise", entityId: "e1" },
+      { kind: "revise", entityId: "e1", prose: WHOLE_DOCUMENT },
     ]);
     expect(h.store.getState().engine.phase).toBe("held");
+  });
+
+  it("runs a deferred revise against the prose that raised it, not the prose it lands in", async () => {
+    // The severe case. Pass 1 names Ada and cannot pay for the rewrite; pass 2
+    // is a scene Ada is not in, and by then the watermark has moved past the
+    // sentences that made her entry wrong. An arm reading the RUNNING pass's
+    // prose rewrites her whole entry against the harbour, under a prompt that
+    // says what it leaves out is deleted.
+    installStoryStorageFake();
+    configure({ enabled: true });
+    const lorebook = installLorebookFake();
+    lorebook.seed({
+      id: "lb-ada",
+      displayName: "Ada",
+      text: "x",
+      enabled: true,
+    });
+    const h = harness([{ ...entity("e1", "Ada"), lorebookEntryId: "lb-ada" }]);
+
+    vi.mocked(api.v1.script.getAllowedOutput).mockReturnValue(300);
+    triageReturns(h, "REVISE Ada");
+    await h.runPass();
+    expect(h.store.getState().engine.phase).toBe("held");
+
+    documentOf(
+      "The lock clicked.",
+      "Ada pocketed the letter.",
+      "Snow fell on the harbour and nobody came.",
+    );
+    vi.mocked(api.v1.script.getAllowedOutput).mockReturnValue(2048);
+    h.generate.mockClear();
+    triageReturns(h, "");
+    await h.runPass();
+
+    const factory = h.generate.mock.calls[1][0] as () => Promise<{
+      messages: Message[];
+    }>;
+    const shown = (await factory()).messages
+      .map((m) => m.content ?? "")
+      .join("\n");
+    expect(shown).toContain("Ada pocketed the letter.");
+    expect(shown).not.toContain("Snow fell on the harbour");
+  });
+
+  it("drops a persisted revise that carries no prose rather than guessing one", async () => {
+    // A record an older build wrote, or a hand-edited one. There is no honest
+    // prose to run it against and the running pass's is the wrong answer, so
+    // the queue read refuses it — triage names the entry again the next time
+    // the story makes it wrong.
+    installStoryStorageFake();
+    configure({ enabled: true });
+    const lorebook = installLorebookFake();
+    lorebook.seed({
+      id: "lb-ada",
+      displayName: "Ada",
+      text: "x",
+      enabled: true,
+    });
+    const h = harness([{ ...entity("e1", "Ada"), lorebookEntryId: "lb-ada" }]);
+    await api.v1.historyStorage.set(
+      QUEUE_KEY,
+      [{ kind: "revise", entityId: "e1" }],
+      history.current(),
+    );
+    triageReturns(h, "");
+
+    await h.runPass();
+
+    // Triage, and nothing else.
+    expect(h.generate).toHaveBeenCalledTimes(1);
+    expect(lorebook.read("lb-ada")?.text).toBe("x");
   });
 
   it("drains work an earlier pass deferred, even when triage names nothing new", async () => {
@@ -585,7 +661,7 @@ describe("the pass", () => {
     await h.runPass();
 
     expect(writesTo(QUEUE_KEY)[0]).toEqual([
-      { kind: "revise", entityId: "e1" },
+      { kind: "revise", entityId: "e1", prose: WHOLE_DOCUMENT },
       { kind: "condense", entryId: "lb-ada" },
     ]);
   });
@@ -1309,8 +1385,8 @@ describe("the pass", () => {
       // work, never the work.
       expect(writesTo(QUEUE_KEY)).toEqual([
         [
-          { kind: "revise", entityId: "e1" },
-          { kind: "open", subject: "the sealed letter" },
+          { kind: "revise", entityId: "e1", prose: WHOLE_DOCUMENT },
+          { kind: "open", subject: "the sealed letter", prose: WHOLE_DOCUMENT },
         ],
         [],
       ]);
