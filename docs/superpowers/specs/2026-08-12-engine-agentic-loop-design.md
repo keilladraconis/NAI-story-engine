@@ -1762,7 +1762,13 @@ only for a writer who switched it on in that story.
   the navigation handler and from nowhere else, so a story reopened shows `∆0`
   until the writer's first undo or redo. Fixing it means recounting on the load
   path, which is `mount.ts` — outside §7 entirely, and outside the handler this
-  phase touched.
+  phase touched. **The slot's tooltip claimed otherwise and has been corrected.**
+  It read "on this branch", which is a promise the number does not keep three
+  ways at once: it counts intents between navigations and distinct entries
+  after one (so revising one entity three times, then undo and redo, drops it
+  3 → 1 with nothing having changed), it counts condenses as well as revises,
+  and it resets on a reload. This document and the changelog were both honest
+  about all of that; the one surface a writer actually reads was not.
 - **§3.3's "one entry rewrite per pass" was an unverified assumption, and is
   now a cap.** The drain checks the bucket before every intent and §3.3
   reasons the asymmetry out of the arithmetic: 2048 less ~150 for triage, less

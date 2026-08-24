@@ -149,6 +149,25 @@ describe("Hud.tsx is a line of icons with tooltips, not glyphs", () => {
     );
   });
 
+  it("does not promise the rewrite count is a branch count", () => {
+    // Phase 5's finding class, verbatim. Between navigations the number is a
+    // session accumulator fed from the drain — it counts intents, condenses
+    // included, survives a branch switch and dies on a reload — and only a
+    // navigation recounts it from the branch's own `lb:` records, which counts
+    // distinct entries. So revise one entity three times, undo, redo, and it
+    // drops 3 → 1 with nothing having changed. A tooltip claiming "on this
+    // branch" is a slot explaining itself wrongly, which is worse than one
+    // that says nothing.
+    const src = code(hudSrc());
+    const title = /title=\{`Rewrites[^`]*`\}/.exec(src)?.[0] ?? "";
+    expect(title).not.toContain("on this branch");
+    // What it does say: both actions it counts, and when the number changes
+    // meaning under the writer.
+    expect(title).toContain("condenses");
+    expect(title).toContain("since this story was opened");
+    expect(title).toContain("undo or redo");
+  });
+
   it("spends no bare unicode on a count", () => {
     // `12¶ ⚑5 ∆0` is the line as it read before this: feather icons for the
     // state and unadorned unicode for the counts, and the unicode half is the
