@@ -18,9 +18,11 @@ import {
 import type { Intent } from "../../../src/core/engine/loop-machine";
 import { TRIAGE_MAX_TOKENS } from "../../../src/core/engine/triage-strategy";
 import {
+  EDIT_PANE_TITLE,
   lorebookCondensedKey,
   lorebookOriginalKey,
 } from "../../../src/core/keys";
+import { uiLorebookEntrySelected } from "../../../src/core/store/slices/ui";
 import { REVISE_MAX_TOKENS } from "../../../src/core/engine/revise-strategy";
 import { CONDENSE_MAX_TOKENS } from "../../../src/core/engine/condense";
 import { THREAD_GRACE_PARAGRAPHS } from "../../../src/core/engine/thread-horizon";
@@ -531,6 +533,24 @@ describe("drain — revise", () => {
     expect(await shownTo(h)).not.toContain(PASS_PROSE);
   });
 
+  it("writes the committed name as the header, not the pane's half-typed one", async () => {
+    // `EDIT_PANE_TITLE` is mirrored on every keystroke, so it is the name the
+    // writer is part-way through typing. The DRAFT layer exists so a
+    // hand-pressed Generate reflects that; the Engine is the first unattended
+    // caller and inherited it unexamined, which puts `Adal` at the top of an
+    // entry it rewrote while nobody was looking.
+    const h = revisable();
+    h.store.dispatch(
+      uiLorebookEntrySelected({ entryId: ENTITY_ENTRY, categoryId: null }),
+    );
+    story.set(EDIT_PANE_TITLE, "Adal");
+
+    await drain([REVISE], h.deps);
+
+    expect(lorebook.read(ENTITY_ENTRY)?.text).toMatch(/^Ada\nType: Character/);
+    expect(await shownTo(h)).not.toContain("Adal\nType:");
+  });
+
   it("keeps the house header, so a revised entry looks like a generated one", async () => {
     const h = revisable();
 
@@ -763,6 +783,23 @@ const COMPACTED = "She is a skilled locksmith. ".repeat(30);
 const CONDENSE: Intent = { kind: "condense", entryId: BLOATED_ENTRY };
 
 describe("drain — condense", () => {
+  it("writes the committed name as the header, not the pane's half-typed one", async () => {
+    // Same contract as revise's, and worth its own test rather than an
+    // assertion that the two arms look alike: they are deliberately the same
+    // shape, which is exactly how one of them ends up asking a different
+    // question than the other.
+    const h = condensable();
+    h.generate.mockImplementation(says(COMPACTED));
+    h.store.dispatch(
+      uiLorebookEntrySelected({ entryId: BLOATED_ENTRY, categoryId: null }),
+    );
+    story.set(EDIT_PANE_TITLE, "Adal");
+
+    await drain([CONDENSE], h.deps);
+
+    expect(lorebook.read(BLOATED_ENTRY)?.text).toMatch(/^Ada\nType: Character/);
+  });
+
   it("rewrites the entry with the compaction the model returned", async () => {
     const h = condensable();
     h.generate.mockImplementation(says(COMPACTED));

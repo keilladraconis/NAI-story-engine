@@ -129,17 +129,24 @@ describe("resolveThreadMembers — DRAFT > LOREBOOK > STATE", () => {
     expect(members).toEqual([{ id: "e1", displayName: "Adalind" }]);
   });
 
-  it("prefers the open edit pane's unsaved title over both", async () => {
+  it("does NOT take the open edit pane's unsaved title, because nobody is watching", async () => {
+    // The DRAFT layer exists so a HAND-PRESSED Generate reflects what the
+    // writer just typed. `EDIT_PANE_TITLE` is mirrored on every keystroke, so
+    // it is a name part-way through being typed rather than a name — and this
+    // caller turns a name into a `{type: "key"}` probe. A probe for "Ada of"
+    // matches nothing the prose contains, so the negation is always true and
+    // the thread reminds forever: exactly what `UNNAMED_ENTRY` is dropped to
+    // avoid, arriving by another door.
     lorebook.seed({ id: "lb-e1", displayName: "Adalind", text: "" });
     const store = harness();
     store.dispatch(
       uiLorebookEntrySelected({ entryId: "lb-e1", categoryId: null }),
     );
-    story.set(EDIT_PANE_TITLE, "Ada of the Vault");
+    story.set(EDIT_PANE_TITLE, "Ada of");
 
     const members = await resolveThreadMembers(store.getState(), thread());
 
-    expect(members[0].displayName).toBe("Ada of the Vault");
+    expect(members[0].displayName).toBe("Adalind");
   });
 
   it("falls back to the entity's name for a draft with no entry", async () => {

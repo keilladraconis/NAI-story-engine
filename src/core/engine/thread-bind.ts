@@ -85,6 +85,11 @@ export async function resolveThreadMembers(
         state,
         entryId,
         entry?.displayName,
+        // Unattended, and the stakes are the ones this function already
+        // guards for: the name becomes a `{type: "key"}` probe, and a probe
+        // for a half-typed name matches nothing, so the negation is always
+        // true and the thread reminds forever.
+        "unattended",
       );
       return displayName === UNNAMED_ENTRY ? null : { id, displayName };
     }),

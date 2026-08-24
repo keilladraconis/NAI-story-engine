@@ -1756,6 +1756,21 @@ only for a writer who switched it on in that story.
   until the writer's first undo or redo. Fixing it means recounting on the load
   path, which is `mount.ts` — outside §7 entirely, and outside the handler this
   phase touched.
+- **The DRAFT layer of `DRAFT > LOREBOOK > STATE` belongs to an attended
+  caller, and phase 6 is the first unattended one.** `resolveDisplayName`
+  prefers the edit pane's `EDIT_PANE_TITLE` draft, which `EntityEditPane`
+  mirrors on **every keystroke** — so it is not the name the writer chose but
+  the one they are part-way through typing. That is exactly right for a
+  hand-pressed Generate, which is what it was built for, and exactly wrong for
+  a revise, a condense or a thread binding: a half-typed `Adal` becomes the
+  header of an entry the Engine rewrote on its own, or a `{type: "key"}` probe
+  for a string the prose will never contain — which makes the thread remind
+  forever, the failure `resolveThreadMembers` already drops `UNNAMED_ENTRY` to
+  avoid. `resolveDisplayName` now takes a required `NameAudience`; the Engine
+  passes `"unattended"` and starts at LOREBOOK. Required rather than
+  defaulted, because the Engine inherited this layer by there being no question
+  to answer.
+
 - **`syncEratoCompatibility` gained thread entries and has no test coverage.**
   Threads joined its managed-entry walk when the Engine started binding them, since
   otherwise toggling `erato_compatibility` would fix every SE entry except the

@@ -257,7 +257,14 @@ async function revise(
   const { written } = await writeLorebookEntry(
     { entryId, nodeId: deps.nodeId },
     async (live) => {
-      const prefill = await buildLorebookPrefillFromEntry(deps.getState, live);
+      const prefill = await buildLorebookPrefillFromEntry(
+        deps.getState,
+        live,
+        // Nobody is watching this. The edit pane's title draft is mirrored on
+        // every keystroke, so honouring it here would make a half-typed name
+        // the header of an entry the Engine rewrote on its own.
+        "unattended",
+      );
       const response = await deps.genX.generate(
         createReviseFactory({
           entry: live,
@@ -335,7 +342,14 @@ async function condense(
     { entryId, nodeId: deps.nodeId },
     async (live) => {
       const original = live.text ?? "";
-      const prefill = await buildLorebookPrefillFromEntry(deps.getState, live);
+      const prefill = await buildLorebookPrefillFromEntry(
+        deps.getState,
+        live,
+        // Nobody is watching this. The edit pane's title draft is mirrored on
+        // every keystroke, so honouring it here would make a half-typed name
+        // the header of an entry the Engine rewrote on its own.
+        "unattended",
+      );
       const response = await deps.genX.generate(
         createCondenseFactory({ entry: live, prefill }),
         {

@@ -79,26 +79,55 @@ async function resolveCategoryName(
 export const UNNAMED_ENTRY = "Unnamed Entry";
 
 /**
- * Resolve the display name for a lorebook entry. Prefers the unsaved draft
- * in the edit pane (storyStorage EDIT_PANE_TITLE) when this entry is the one
- * currently open, so generation reflects what the user typed even before
- * they click Save. Falls back to the persisted names.
+ * Whether a person is looking at the result of this generation.
+ *
+ * The distinction exists because of the DRAFT layer and nothing else.
+ * `EDIT_PANE_TITLE` is mirrored on **every keystroke**, so it is not "the name
+ * the writer chose" — it is the name they are part-way through typing. That is
+ * exactly right for a button they just pressed and are watching, and exactly
+ * wrong for the Engine, which writes unattended: a pass landing on `Adal`
+ * makes it the entry's header, or builds a thread's forgetting detector out of
+ * a key the prose will never contain — and a detector that never matches
+ * reminds forever, which is the failure `resolveThreadMembers` already guards
+ * against from the other side.
+ *
+ * Required rather than defaulted. The Engine inherited this layer unexamined
+ * because it was the default and there was no question to answer; a caller
+ * that has to say which it is has to notice.
+ */
+export type NameAudience =
+  /** A control the writer pressed and is watching — honour the pane draft. */
+  | "attended"
+  /** The Engine, or anything else writing on its own — committed layers only. */
+  | "unattended";
+
+/**
+ * Resolve the display name for a lorebook entry, DRAFT > LOREBOOK > STATE.
+ *
+ * For an `attended` caller, prefers the unsaved draft in the edit pane
+ * (storyStorage EDIT_PANE_TITLE) when this entry is the one currently open, so
+ * generation reflects what the user typed even before they click Save. An
+ * `unattended` caller skips that layer and starts at LOREBOOK — see
+ * `NameAudience`. Everything below DRAFT is the same for both: the lorebook
+ * entry outranks Redux, because Story Engine does not chase a rename the
+ * writer made in their own lorebook and `entity.name` is the layer CLAUDE.md
+ * allows to be stale.
  *
  * Exported for the Engine's thread binding, which must resolve a member's name
- * through the same DRAFT > LOREBOOK > STATE order rather than reading
- * `entity.name` — the layer CLAUDE.md allows to be stale, because Story Engine
- * does not chase a rename the writer made in their own lorebook.
+ * through this order rather than reading `entity.name` directly.
  */
 export async function resolveDisplayName(
   state: RootState,
   entryId: string,
   entryDisplayName: string | undefined,
+  audience: NameAudience,
 ): Promise<string> {
   const entity = findEntityForEntry(state, entryId);
   const isCurrentlySelected = state.ui.lorebook.selectedEntryId === entryId;
-  const liveName = isCurrentlySelected
-    ? String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "").trim()
-    : "";
+  const liveName =
+    audience === "attended" && isCurrentlySelected
+      ? String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "").trim()
+      : "";
   return liveName || entryDisplayName || entity?.name || UNNAMED_ENTRY;
 }
 
@@ -154,10 +183,12 @@ export const createLorebookContentFactory = (
     // Pull name and summary from live input fields only when this entry is
     // currently open in the edit pane — avoids contaminating SEGA batch
     // generation with stale data from whatever entity was last edited.
+    // A button the writer pressed, and is watching stream in.
     const displayName = await resolveDisplayName(
       state,
       entryId,
       entry.displayName,
+      "attended",
     );
     const isCurrentlySelected = state.ui.lorebook.selectedEntryId === entryId;
     const liveSummary = isCurrentlySelected
@@ -312,7 +343,13 @@ export const buildLorebookPrefill = async (
   entryId: string,
 ): Promise<string> => {
   const entry = await api.v1.lorebook.entry(entryId);
-  return entry ? buildLorebookPrefillFromEntry(getState, entry) : "";
+  // The hand-driven generation handlers are this function's only callers, so
+  // the audience is fixed here rather than passed through. The Engine reads
+  // `buildLorebookPrefillFromEntry` directly, having already been handed the
+  // entry by the write door.
+  return entry
+    ? buildLorebookPrefillFromEntry(getState, entry, "attended")
+    : "";
 };
 
 /**
@@ -327,12 +364,14 @@ export const buildLorebookPrefill = async (
 export const buildLorebookPrefillFromEntry = async (
   getState: () => RootState,
   entry: LorebookEntry,
+  audience: NameAudience,
 ): Promise<string> => {
   const state = getState();
   const displayName = await resolveDisplayName(
     state,
     entry.id,
     entry.displayName,
+    audience,
   );
   const categoryName = await resolveCategoryName(
     state,
