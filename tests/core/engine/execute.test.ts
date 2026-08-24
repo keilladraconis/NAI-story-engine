@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createStore, type Store } from "nai-store";
 import { rootReducer, persistedDataLoaded } from "../../../src/core/store";
@@ -1160,16 +1160,35 @@ describe("no Engine action can write around the write door", () => {
   // and it would pass every test that only checks the entry's text afterwards.
   const ENGINE = join(__dirname, "../../../src/core/engine");
 
-  for (const file of [
-    "execute.ts",
-    "revise-strategy.ts",
-    "condense.ts",
-    "triage-strategy.ts",
-    "open-strategy.ts",
-    // §7's decisions are as pure as the rest: it is handed the lorebook, and
-    // `history-sync.ts` does the reading and the writing.
-    "reconcile.ts",
-  ]) {
+  /** The two modules allowed to name the lorebook API, and why.
+   *
+   *  `lorebook-write.ts` IS the door. `thread-bind.ts` calls `createEntry` and
+   *  `entry`, which the door cannot stand in front of: a create invents an
+   *  entry, so there is no live text to read and no original to snapshot. Every
+   *  REWRITE it performs goes through `writeLorebookEntry` like any other, and
+   *  the test below holds it to that. */
+  const EXEMPT = ["lorebook-write.ts", "thread-bind.ts"];
+
+  /** Every other module in the directory, read rather than listed.
+   *
+   *  **The list used to be six literal filenames**, against a directory of
+   *  sixteen — so a seventh module calling `updateEntry`, which is the exact
+   *  regression this guard exists to catch, passed in silence. A guard whose
+   *  coverage is hand-maintained is a guard that stops covering whatever
+   *  arrives next. */
+  const guarded = readdirSync(ENGINE)
+    .filter((file) => file.endsWith(".ts") && !EXEMPT.includes(file))
+    .sort();
+
+  it("covers the whole directory, so a new module is guarded by existing", () => {
+    // Reading the directory is only a guard if it actually found it. A wrong
+    // path yields an empty list and every assertion below passes vacuously.
+    expect(guarded).toContain("execute.ts");
+    expect(guarded).toContain("reconcile.ts");
+    expect(guarded.length).toBeGreaterThan(10);
+  });
+
+  for (const file of guarded) {
     it(`${file} never calls the lorebook API directly`, () => {
       const src = code(readFileSync(join(ENGINE, file), "utf8"));
       expect(src).not.toContain("api.v1.lorebook");

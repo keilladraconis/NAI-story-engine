@@ -1638,7 +1638,14 @@ only for a writer who switched it on in that story.
   flip, so a retire would bypass it and a later revise would snapshot
   `enabled: false` as the writer's own original. Returning `null` declines the
   write, which is what a refused generation needs. A source scan holds the line:
-  nothing under `src/core/engine` except the door touches `api.v1.lorebook`.
+  **no module under `src/core/engine` writes an existing entry except the
+  door.** Not "nothing touches `api.v1.lorebook`", which this bullet used to
+  say and which the bullet two below it contradicts — `thread-bind.ts` calls
+  `entry()` and `createEntry`. The scan reads the directory rather than a list
+  of filenames, exempting the door and `thread-bind.ts` by name, so a module
+  added tomorrow is guarded by existing; it was six literal filenames against a
+  directory of sixteen, which meant the one regression it exists to catch would
+  arrive in a file it never opened.
 - **The generation happens inside the producer callback**, for revise and
   condense alike. That is what makes read-then-write structural rather than
   remembered: the prompt is necessarily built from the entry the door just read,
