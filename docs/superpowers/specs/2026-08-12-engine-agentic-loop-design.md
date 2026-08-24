@@ -1756,6 +1756,18 @@ only for a writer who switched it on in that story.
   until the writer's first undo or redo. Fixing it means recounting on the load
   path, which is `mount.ts` — outside §7 entirely, and outside the handler this
   phase touched.
+- **A hand delete is the third moment §7's rule has, and it was the only one
+  with no answer.** `applyThreadStatus` covers a status press and the `open`
+  arm covers a cap displacement, both arguing that an orphan left live until
+  the next undo is an orphan injecting until the next undo. `threadDeleted`
+  had no subscriber at all, and it is the worst of the three: after a hand
+  delete nothing will ever name that entry again on any branch, so
+  reconciliation's `SE: Threads` sweep is the only thing that would ever reach
+  it, and only on a navigation. Same rule, same door. The entry id rides on
+  the action's payload because effects run after the reducer and the thread is
+  gone by then — CLAUDE.md's payload rule, here because there is no
+  alternative rather than as a defence against a second press.
+
 - **The DRAFT layer of `DRAFT > LOREBOOK > STATE` belongs to an attended
   caller, and phase 6 is the first unattended one.** `resolveDisplayName`
   prefers the edit pane's `EDIT_PANE_TITLE` draft, which `EntityEditPane`

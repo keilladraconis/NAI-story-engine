@@ -6,6 +6,7 @@ import { rootReducer, persistedDataLoaded } from "../../../src/core/store";
 import { initialWorldState } from "../../../src/core/store/slices/world";
 import {
   threadAnchorSet,
+  threadDeleted,
   threadRenamed,
   threadMemberToggled,
   threadHorizonSet,
@@ -469,6 +470,54 @@ describe("registerThreadConditionEffects", () => {
     expect(
       JSON.stringify(lorebook.read(entryId)?.advancedConditions),
     ).toContain(String(200 + THREAD_GRACE_PARAGRAPHS.plot));
+  });
+
+  it("switches off the entry of a thread deleted by hand", async () => {
+    // The third time this phase makes the same argument, and the worst: after
+    // a hand delete nothing will ever name this entry again on any branch, so
+    // its always-on note goes on injecting forever with no surface in Story
+    // Engine still showing the thread. `applyThreadStatus` and the cap
+    // displacement in the drain both answer it where the entry is
+    // attributably ours; this is the same rule at the same door.
+    const { store, entryId } = await wired();
+
+    store.dispatch(threadDeleted({ threadId: "t1", lorebookEntryId: entryId }));
+    await settle();
+
+    expect(lorebook.read(entryId)?.enabled).toBe(false);
+  });
+
+  it("disables rather than deletes, and snapshots on the way through", async () => {
+    // §5.2: the strongest thing the Engine does to an entry it no longer wants
+    // firing is switch it off, and the door takes the original on the way past
+    // — creation bypasses the door, so this may be that entry's FIRST
+    // snapshot.
+    const { store, entryId } = await wired();
+
+    store.dispatch(threadDeleted({ threadId: "t1", lorebookEntryId: entryId }));
+    await settle();
+
+    expect(lorebook.read(entryId)).toBeDefined();
+    expect(story.get(lorebookOriginalKey(entryId))).toMatchObject({
+      id: entryId,
+    });
+  });
+
+  it("touches the lorebook not at all when the deleted thread had no entry", async () => {
+    // A thread the writer created by hand has no lorebook entry, and a delete
+    // must not become a lorebook call of any kind for it — not a write, and
+    // not the read the door would make before declining one.
+    const { store } = await wired();
+    vi.mocked(api.v1.lorebook.entry).mockClear();
+    vi.mocked(api.v1.lorebook.updateEntry).mockClear();
+
+    store.dispatch(
+      threadDeleted({ threadId: "t1", lorebookEntryId: undefined }),
+    );
+    await settle();
+
+    expect(api.v1.lorebook.entry).not.toHaveBeenCalled();
+    expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
   });
 
   it("does not rebuild for an edit the condition does not read", async () => {

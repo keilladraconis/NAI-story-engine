@@ -34,6 +34,7 @@ import {
 } from "../store/effects/lorebook-sync";
 import {
   threadAnchorSet,
+  threadDeleted,
   threadStatusSet,
   threadHorizonSet,
   threadMemberToggled,
@@ -289,6 +290,38 @@ export async function applyThreadStatus(
   return written;
 }
 
+/** Switch off the entry of a thread that has just been deleted.
+ *
+ *  §7's rule again — a thread entry is enabled exactly when a thread on this
+ *  branch names it and that thread is open — applied at the third moment the
+ *  rule has, and the worst one. `applyThreadStatus` covers a status press and
+ *  the drain's `open` arm covers a cap displacement; a hand delete leaves an
+ *  orphan neither of them sees, and it is the only one nothing will EVER name
+ *  again on any branch. Its always-on note goes on injecting with no surface
+ *  in Story Engine still showing the thread it belonged to.
+ *
+ *  **The entry id comes from the action, not from the World.** Effects run
+ *  after the reducer, so the thread is already gone by the time this is
+ *  called — CLAUDE.md's rule that an intent carries what it needs in its
+ *  payload, for once because there is no alternative rather than as a defence
+ *  against a second press.
+ *
+ *  Disabled, never deleted (§5.2), through the door like every other Engine
+ *  write, so the §5.2 snapshot is taken on the way past and one switch in the
+ *  writer's own lorebook brings the entry back. Reconciliation is the backstop
+ *  rather than the answer: it only runs on a navigation, and an orphan left
+ *  live until the next undo is an orphan injecting until the next undo. */
+export async function disableDeletedThreadEntry(
+  entryId: string | undefined,
+  nodeId: number,
+): Promise<boolean> {
+  if (!entryId) return false;
+  const { written } = await writeLorebookEntry({ entryId, nodeId }, (live) =>
+    live.enabled === false ? null : { enabled: false },
+  );
+  return written;
+}
+
 /** The four edits a thread's condition is built from (§4.3, phase 5's handoff
  *  plus phase 6's gate).
  *
@@ -357,6 +390,17 @@ export function registerThreadConditionEffects(
         await applyThreadStatus(getState, threadId, await captureNode());
       } catch (error) {
         api.v1.log("[engine] thread status flip failed:", error);
+      }
+    })();
+  });
+
+  subscribeEffect(matchesAction(threadDeleted), (action) => {
+    const { lorebookEntryId } = action.payload;
+    void (async () => {
+      try {
+        await disableDeletedThreadEntry(lorebookEntryId, await captureNode());
+      } catch (error) {
+        api.v1.log("[engine] deleted thread's entry not switched off:", error);
       }
     })();
   });

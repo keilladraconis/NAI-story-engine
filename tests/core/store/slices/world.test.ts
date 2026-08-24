@@ -268,7 +268,7 @@ describe("threadDeleted", () => {
   it("removes a thread by id", () => {
     const state = reduce(
       makeState({ threads: [THREAD] }),
-      threadDeleted({ threadId: "t1" }),
+      threadDeleted({ threadId: "t1", lorebookEntryId: undefined }),
     );
     expect(state.threads).toHaveLength(0);
   });

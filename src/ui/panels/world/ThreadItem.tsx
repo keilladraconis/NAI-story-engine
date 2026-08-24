@@ -115,7 +115,17 @@ export function ThreadItem(props: { threadId: string }) {
         </button>
         <ConfirmButton
           title="Delete thread"
-          onConfirm={() => store.dispatch(threadDeleted({ threadId }))}
+          onConfirm={() =>
+            store.dispatch(
+              // The entry id travels with the delete: the effect that switches
+              // the orphaned always-on note off runs after the reducer, by
+              // which time the thread that owned it is gone.
+              threadDeleted({
+                threadId,
+                lorebookEntryId: thread.lorebookEntryId,
+              }),
+            )
+          }
         />
       </div>
       {!collapsed ? (

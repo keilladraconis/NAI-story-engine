@@ -235,7 +235,18 @@ export const worldSlice = createSlice({
       ],
     }),
 
-    threadDeleted: (state, payload: { threadId: string }) => ({
+    // `lorebookEntryId` rides on the payload because the effect cannot get it
+    // any other way: effects run AFTER the reducer, so by then the thread is
+    // gone and with it the only record of which entry it owned. Left behind,
+    // that entry is an always-on note nothing will ever name again on any
+    // branch — §4.5's orphan, arriving through the writer's own delete button.
+    // `string | undefined` rather than optional, so a caller has to answer:
+    // a hand-made thread genuinely has no entry, and the two cases must not be
+    // told apart by whether someone remembered to pass the field.
+    threadDeleted: (
+      state,
+      payload: { threadId: string; lorebookEntryId: string | undefined },
+    ) => ({
       ...state,
       threads: state.threads.filter((t) => t.id !== payload.threadId),
     }),
