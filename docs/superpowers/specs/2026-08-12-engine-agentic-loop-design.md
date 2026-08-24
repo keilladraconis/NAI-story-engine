@@ -1604,6 +1604,161 @@ there is no entry behind the thread.
   subscription rather than from the click's own render. That is exactly the case
   CLAUDE.md's rule names, sitting in the file before this phase touched it.
 
+### 14.3 Phase 6 as built
+
+The Engine acts. The four intents phase 4 logged now execute: an entity's lorebook
+entry is rewritten from the prose that changed it, an oversized entry is condensed,
+a commitment the prose raises opens a thread with a real lorebook entry carrying
+phase 5's forgetting detector, and a thread the prose settles — or one the story
+walked away from — has that entry switched off. History navigation reconciles what
+was written. The Engine is still **off by default**, and everything below happens
+only for a writer who switched it on in that story.
+
+**What is true now.**
+
+- **Every lorebook write the Engine makes goes through one door**
+  (`lorebook-write.ts`): read the live entry, `setIfAbsent` the §5.2 original,
+  apply the patch, record the write at the captured node. The door takes a
+  **producer callback and a `Partial<LorebookEntry>` patch**, not finished text —
+  a caller holding finished text has already read the entry, which defeats §5's
+  read-then-write, and a text-only door could not carry §4.4's `{enabled: false}`
+  flip, so a retire would bypass it and a later revise would snapshot
+  `enabled: false` as the writer's own original. Returning `null` declines the
+  write, which is what a refused generation needs. A source scan holds the line:
+  nothing under `src/core/engine` except the door touches `api.v1.lorebook`.
+- **The generation happens inside the producer callback**, for revise and
+  condense alike. That is what makes read-then-write structural rather than
+  remembered: the prompt is necessarily built from the entry the door just read,
+  and the snapshot exists before the model is asked anything.
+- **A thread's entry is created outside the door, deliberately.** A create has no
+  live text to read and no original to preserve, and the writer's lorebook gained
+  an entry rather than losing one. The condition rebuild does go through the door,
+  and writes no `lb:` record because it writes no text — so §7 sees a thread entry
+  only through its `enabled` flag, which is exactly what the rule in §7 answers
+  from the branch rather than from a record.
+- **The pass gained two free decisions of its own, neither of which spends
+  triage.** §5.1's condense trigger walks the managed, enabled entries, takes the
+  longest one past the threshold, and enqueues one intent — at most one per pass,
+  because §3.3 affords one entry rewrite and enqueueing every oversized entry
+  would leave the next pass's revise behind a FIFO backlog of maintenance. §4.5's
+  expiry walks the threads and enqueues a `retire` for each one whose anchor has
+  fallen far enough behind. Renewal runs immediately before expiry, so a thread
+  the prose just named cannot be retired on the strength of an anchor the same
+  pass was about to move.
+- **Thread entries live in their own `SE: Threads` category**, always on, with no
+  keys, and only the Engine's `open` creates one. `ensureNamedCategory` is called
+  at creation; reconciliation only ever _finds_ that category, since minting it
+  would put an `SE: Threads` in the lorebook of a writer who never switched the
+  Engine on.
+- **Reconciliation is unconditional.** It reads no Engine settings and does not
+  check `enabled`: everything it touches is scoped to the Engine's own category or
+  to entries the branch's own threads name, so a story the Engine never ran in
+  costs two lorebook reads. Gating it on the setting would mean a writer who
+  switched the Engine off kept a lorebook that no longer follows their undo.
+
+**What phase 6 deliberately does not do.**
+
+- **The §5.1 review list and the §5.2 restore control.** The originals are written
+  from the first write and the `lb:` records are written so reconciliation works,
+  and nothing reads either back through a UI. The writer's recourse this phase is
+  the editor's own undo. The review surface generally — anything that shows what
+  the Engine did and offers to unpick it — is a later phase's subject.
+- **Give a hand-made thread an entry.** `createThreadEntry` has exactly one
+  caller, the `open` arm. The lorebook control on a thread card is still disabled,
+  and a thread the writer creates has no entry, no anchor, and therefore no
+  detector and no expiry until the prose first mentions it.
+- **Reconcile a thread's `enabled` outside a navigation.** `threadStatusSet`
+  dispatched by hand — the writer marking a thread satisfied, or reopening one the
+  Engine retired — does not flip the entry. The branch rule in §7 is the only
+  thing that answers `enabled`, and it runs on `onHistoryNavigated`, so a
+  hand-changed status is corrected at the next undo or redo rather than at the
+  press. Subscribing to the action would be a second authority over the same flag,
+  which is the thing §7's one rule was written to avoid; the honest fix is for the
+  edit pane's own path to go through the same rule, and that is a surface change
+  this phase did not make.
+
+**Where the build corrected this document.**
+
+- **The existing full-entry-rewrite path could not be reused, and routing it
+  through the door would have made §7 worse rather than better.**
+  `buildLorebookContentStrategy` resolves the live entry inside its own message
+  factory and its completion handler calls `updateEntry` directly, so a revise
+  built on it would write around the door — no snapshot, no record, §5.2 silently
+  broken for exactly the unattended writes it exists for. The plan offered two
+  resolutions and the second is built: `revise-strategy.ts` and `condense.ts`
+  **return text and never write**, and the caller is the door. Routing the shared
+  handler instead would have made every hand-driven **Generate Content** press
+  claim an `lb:` record, and the record set is what §7 and §9.1's `∆` both mean by
+  "what the Engine wrote": the writer's own generations would have been counted as
+  the Engine's activity and classified `ours`/`theirs` on every navigation, and
+  every later consumer of those records — the §5.1 review list, the §5.2 restore —
+  would have inherited the confusion. The shared handler still writes directly and
+  is unchanged.
+- **Truncation is answered by trimming, never by continuing.** The hand path
+  answers a cut-off entry with up to `LOREBOOK_CONTENT_MAX_CALLS = 4` continuation
+  calls; four of those is 4096 tokens out of §3.3's 2048-per-240s bucket, against a
+  drain that checked it could afford **one** 1024-token rewrite. So a truncated
+  revision is cut back to its last complete sentence or line, and a response with
+  nothing usable in it declines the write outright — a revision replaces rather
+  than appends, so half of one deletes the writer's entry.
+- **§5.1 named condense's risk and specified no floor, so three refusals were
+  built under the prompt.** A result that is **not shorter** than the entry is
+  refused; one under **a third** of the entry's length is refused as a summary
+  rather than a compaction (a real compaction of a bloated entry lands near half;
+  "condense" misread as "summarise" lands an order of magnitude down); and a
+  **truncated** condense is refused outright rather than trimmed — the one
+  deliberate divergence from the revise contract, because a condense that hit the
+  ceiling produced more text than the entry it was shortening and its trimmed tail
+  is pure deletion. There is also a mark, `kse-lb-condensed-<entryId>`, recording
+  how long the entry was at the last _attempt_, declined ones included: the trigger
+  fires on length alone, so an entry whose facts genuinely do not fit under the
+  threshold would otherwise be condensed on every pass forever, each attempt
+  spending the pass's one rewrite and each success dropping a little more.
+- **The pacing gate is written `paragraphCount >= anchor + N`, not
+  `paragraphCount - anchor >= N`.** The two are the same predicate and both
+  typecheck, but the second needs two terms and the `.d.ts` documents one example
+  with no statement of associativity, precedence, or whether a term's `operator`
+  applies before or after its own value. The anchor is a literal at build time, so
+  the arithmetic is done at build time and the equation stays the one shape the
+  `.d.ts` actually documents. This is also why `threadAnchorSet` had to become a
+  fourth rebuild trigger: the anchor is _baked into_ the stored condition, so a
+  renewal that did not rebuild would leave the entry gating on the paragraph the
+  thread was opened at.
+- **`ThreadStatus` has no way to say "abandoned", and expiry writes
+  `satisfied`.** §4.5 asks for an end the story quietly abandoned to age out, and
+  §4.4 gives retirement exactly one vocabulary. So an expired thread is marked
+  with the status meaning the story _settled_ it, and the World shows the writer a
+  check against a commitment nothing resolved. The wart is real and is not worth a
+  third status as things stand: `abandoned` would have to disable the entry, sort
+  first in `displacementOrder`, and stop triage proposing it — which is precisely
+  what `satisfied` already does — so it would be a label with no behaviour behind
+  it, paid for in a persisted enum, a status icon, and a reducer branch. It
+  becomes worth building when something behaves differently for it, and the review
+  surface is the obvious candidate.
+- **`Assessment.paragraphCount` is asserted to match NovelAI's own
+  `paragraphCount`, and that is unverified.** The anchor is compared against the
+  lorebook's condition variable, so the two counters must be counting the same
+  thing. The evidence is the `.d.ts` calling `GenerationPosition.sectionId` "the
+  section (paragraph) ID", and the count is therefore every section
+  `api.v1.document.scan()` returns, blank ones included — where `backlog` filters
+  them. Nothing has confirmed it at runtime, and the scratch-story check is the
+  real test. The pace gate carries an escape for exactly this: its second
+  disjunct, `paragraphCount < anchor`, degrades the thread to always-on rather
+  than to silence if the two counters disagree.
+- **`touched` is branch-truthful only after a navigation.** §9.1 already records
+  that the drain's increment is a session count and that §7's recount is the
+  correction. What is left is a reload: `engineTouchedRecounted` is dispatched from
+  the navigation handler and from nowhere else, so a story reopened shows `∆0`
+  until the writer's first undo or redo. Fixing it means recounting on the load
+  path, which is `mount.ts` — outside §7 entirely, and outside the handler this
+  phase touched.
+- **`syncEratoCompatibility` gained thread entries and has no test coverage.**
+  Threads joined its managed-entry walk when the Engine started binding them, since
+  otherwise toggling `erato_compatibility` would fix every SE entry except the
+  Engine's own. `tests/core/store/effects/lorebook-sync.test.ts` covers
+  `ensureCategory` and `migrateLorebookCategories` and has never covered this
+  function, so the addition is argued rather than tested.
+
 ## 15. Versioning
 
 **0.15.0** — minor. Under the alpha lock (major pinned at 0), minor covers

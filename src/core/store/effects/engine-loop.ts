@@ -197,60 +197,6 @@ function buildManifest(
   return { entities, threads, threadCap };
 }
 
-/** §5.1's trigger: the one entry, if any, this pass should offer to condense.
- *
- *  Free — no generation, just a lorebook read and some arithmetic — which is
- *  the whole reason the intent is enqueued here rather than proposed by triage.
- *  Three decisions are worth stating, because each one is a way this goes
- *  wrong:
- *
- *  **Only entries the Engine manages.** An oversized lorebook entry no entity
- *  of ours is bound to is the writer's own document; it is not sprawl the
- *  Engine's revisions created, and rewriting it is not something switching the
- *  loop on asks for. Disabled entries are skipped too: they inject nothing, so
- *  compacting one is a lossy rewrite with nothing to gain (§5.1's whole case is
- *  the context a bloated entry crowds out).
- *
- *  **At most one per pass.** §3.3 affords one entry rewrite per pass, so
- *  enqueueing every oversized entry at once would not condense them any faster
- *  — it would leave the NEXT pass's revise queued behind a FIFO backlog of
- *  maintenance work for as many passes as there are long entries. The
- *  counterweight would starve the revisions it is a counterweight to. The
- *  longest entry is the one taken, being the one costing the most context; the
- *  rest are found again next pass, and §3.3 is explicit that a queued action is
- *  safe indefinitely.
- *
- *  **The mark, not just the length.** The trigger is otherwise memoryless, and
- *  an entry whose facts genuinely do not fit under the threshold would be
- *  offered on every pass forever. `worthCondensing` wants a paragraph of growth
- *  since the last attempt — and the walk continues past a blocked entry rather
- *  than stopping, or the largest permanently-blocked entry would hide every
- *  other one behind it. */
-/** §4.5's expiry, as intents: every thread the story has walked away from,
- *  offered to the drain as §4.4's flag flip.
- *
- *  **Free, so it is decided here rather than asked of triage.** The same
- *  argument §5.1 makes for the condense trigger, and here it is stronger: the
- *  triage prompt forbids the answer outright ("Never RETIRE a thread to make
- *  room. RETIRE means the prose settled it"), so spending ~150 tokens to ask
- *  would be spending them on a question the model is instructed to refuse.
- *
- *  **Retire, not delete.** `expiredThreads` argues that where the policy lives.
- *  What is decided HERE is only that the verdict becomes an ordinary intent:
- *  the drain's retire arm already flips the entry through Task 1's door, flips
- *  the status second so a failure converges, and `intentKey` already collapses
- *  a repeat — so expiry adds no new way to write to a writer's lorebook.
- *
- *  **No mark, unlike the condense trigger.** That one is memoryless and would
- *  re-offer the same entry every pass; this one clears itself, because a
- *  retired thread is `satisfied` and `isThreadExpired` never expires one.
- *
- *  The log line says "expired" where the World will say "satisfied". A
- *  commitment the story abandoned is not one it settled, and `ThreadStatus` has
- *  no third value to say so — see the report on this task. A third status would
- *  have to disable the entry, sort first in `displacementOrder`, and stop triage
- *  proposing it, which is precisely what `satisfied` already does, so it would
- *  be a label with no behaviour behind it. */
 /** §4.5's renewal, as dispatches: every thread the prose this pass read is
  *  demonstrably still carrying, re-anchored at the branch's paragraph count.
  *
@@ -298,6 +244,31 @@ async function renewTouchedThreads(
   }
 }
 
+/** §4.5's expiry, as intents: every thread the story has walked away from,
+ *  offered to the drain as §4.4's flag flip.
+ *
+ *  **Free, so it is decided here rather than asked of triage.** The same
+ *  argument §5.1 makes for the condense trigger, and here it is stronger: the
+ *  triage prompt forbids the answer outright ("Never RETIRE a thread to make
+ *  room. RETIRE means the prose settled it"), so spending ~150 tokens to ask
+ *  would be spending them on a question the model is instructed to refuse.
+ *
+ *  **Retire, not delete.** `expiredThreads` argues that where the policy lives.
+ *  What is decided HERE is only that the verdict becomes an ordinary intent:
+ *  the drain's retire arm already flips the entry through Task 1's door, flips
+ *  the status second so a failure converges, and `intentKey` already collapses
+ *  a repeat — so expiry adds no new way to write to a writer's lorebook.
+ *
+ *  **No mark, unlike the condense trigger.** That one is memoryless and would
+ *  re-offer the same entry every pass; this one clears itself, because a
+ *  retired thread is `satisfied` and `isThreadExpired` never expires one.
+ *
+ *  The log line says "expired" where the World will say "satisfied". A
+ *  commitment the story abandoned is not one it settled, and `ThreadStatus` has
+ *  no third value to say so — see the report on this task. A third status would
+ *  have to disable the entry, sort first in `displacementOrder`, and stop triage
+ *  proposing it, which is precisely what `satisfied` already does, so it would
+ *  be a label with no behaviour behind it. */
 async function expiredRetires(
   state: RootState,
   paragraphCount: number,
@@ -312,6 +283,35 @@ async function expiredRetires(
   return expired.map((thread) => ({ kind: "retire", threadId: thread.id }));
 }
 
+/** §5.1's trigger: the one entry, if any, this pass should offer to condense.
+ *
+ *  Free — no generation, just a lorebook read and some arithmetic — which is
+ *  the whole reason the intent is enqueued here rather than proposed by triage.
+ *  Three decisions are worth stating, because each one is a way this goes
+ *  wrong:
+ *
+ *  **Only entries the Engine manages.** An oversized lorebook entry no entity
+ *  of ours is bound to is the writer's own document; it is not sprawl the
+ *  Engine's revisions created, and rewriting it is not something switching the
+ *  loop on asks for. Disabled entries are skipped too: they inject nothing, so
+ *  compacting one is a lossy rewrite with nothing to gain (§5.1's whole case is
+ *  the context a bloated entry crowds out).
+ *
+ *  **At most one per pass.** §3.3 affords one entry rewrite per pass, so
+ *  enqueueing every oversized entry at once would not condense them any faster
+ *  — it would leave the NEXT pass's revise queued behind a FIFO backlog of
+ *  maintenance work for as many passes as there are long entries. The
+ *  counterweight would starve the revisions it is a counterweight to. The
+ *  longest entry is the one taken, being the one costing the most context; the
+ *  rest are found again next pass, and §3.3 is explicit that a queued action is
+ *  safe indefinitely.
+ *
+ *  **The mark, not just the length.** The trigger is otherwise memoryless, and
+ *  an entry whose facts genuinely do not fit under the threshold would be
+ *  offered on every pass forever. `worthCondensing` wants a paragraph of growth
+ *  since the last attempt — and the walk continues past a blocked entry rather
+ *  than stopping, or the largest permanently-blocked entry would hide every
+ *  other one behind it. */
 async function nextCondense(
   state: RootState,
   thresholdChars: number,
