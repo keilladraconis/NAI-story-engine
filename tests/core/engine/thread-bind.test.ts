@@ -266,7 +266,7 @@ describe("createThreadEntry", () => {
     const entryId = await createThreadEntry(store.getState(), thread());
 
     expect(lorebook.read(entryId)?.forceActivation).toBe(false);
-    expect(lorebook.read(entryId)?.keys ?? []).toEqual([]);
+    expect(lorebook.read(entryId)?.keys).toEqual([]);
   });
 
   it("never force-activates, however the condition is built", async () => {
