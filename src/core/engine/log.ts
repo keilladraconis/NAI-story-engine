@@ -13,11 +13,10 @@
 // the same question five times a pass and answer it identically. The promise is
 // the read; every line awaits the same one.
 //
-// Its own module because the pass is no longer the only thing that speaks:
-// §7's reconciliation runs from the navigation handler and disables lorebook
-// entries there, which is exactly the kind of detail this flag exists to carry.
-// A second copy of these eight lines would be a second answer to "is the Engine
-// allowed to talk".
+// Its own module rather than a private helper of the pass, because "is the
+// Engine allowed to talk" must have exactly one answer. §7's reconciliation was
+// the second caller and it is gone; a second copy of these eight lines, for
+// whatever speaks next, would be a second answer.
 
 export type EngineLog = (...messages: unknown[]) => Promise<void>;
 

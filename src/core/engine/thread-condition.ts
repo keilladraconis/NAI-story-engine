@@ -222,8 +222,9 @@ function buildDetector(
  *
  *  **Why the second disjunct.** `paragraphCount < anchor` cannot happen while
  *  the branch only grows, and that is the point — it is the escape hatch for
- *  when it happens anyway. Undo does not revert a lorebook entry (§7 exists
- *  because of that), so navigating back past the pass that anchored a thread
+ *  when it happens anyway. Undo does not revert a lorebook entry — and Story
+ *  Engine's own records do not move backwards either — so navigating back past
+ *  the pass that anchored a thread
  *  leaves its entry gating on a paragraph the branch will not reach again for a
  *  chapter, and nothing rebuilds it until the Engine next touches the thread.
  *  Without this disjunct that thread is silent until then. §4.3 accepts a

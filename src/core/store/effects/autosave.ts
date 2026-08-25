@@ -17,18 +17,15 @@ const AUTOSAVE_DELAY_MS = 2000;
 const BRANCH_PREFIXES = ["story/", "world/"];
 const STORY_PREFIXES = ["chat/", "foundation/"];
 
-/** Handle for callers that must get the pending write onto disk before the
- *  store changes underneath it. history-sync is the only one: navigation
- *  replaces every branch-scoped slice, so a debounce still in flight would
- *  otherwise write post-navigation state onto the pre-navigation node. */
-export type AutosaveHandle = {
-  flush: () => Promise<void>;
-};
+// The flush was once handed out as a handle, because navigation replaced every
+// branch-scoped slice and a debounce still in flight would have written
+// post-navigation state onto the node it was leaving. Nothing replaces the store
+// any more, so the only caller is the debounce itself and there is no handle.
 
 export function registerAutosaveEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
   getState: () => RootState,
-): AutosaveHandle {
+): void {
   // Cancellation-flag debounce: avoids storing the async timer ID.
   let _cancel: (() => void) | null = null;
   // Captured when the action is dispatched, NOT when the flush runs. Ordinary
@@ -92,6 +89,4 @@ export function registerAutosaveEffects(
       }, AUTOSAVE_DELAY_MS);
     },
   );
-
-  return { flush };
 }

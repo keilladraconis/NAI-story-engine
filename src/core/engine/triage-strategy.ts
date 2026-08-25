@@ -141,8 +141,8 @@ function formatEntities(entities: TriageEntity[]): string {
  *  `enforceThreadCap` orders by, so the price quoted here is the price paid.
  *
  *  **Nothing is said about what displacement does to the writer's lorebook.**
- *  It leaves the entry behind, unmanaged and still enabled (§4.5, §7); a prompt
- *  that promised otherwise would be promising something phase 6 owns. */
+ *  It leaves the entry behind, unmanaged (§4.5); a prompt that promised
+ *  otherwise would be promising something the `open` arm owns. */
 function formatThreads(threads: TriageThread[], threadCap: number): string {
   const cap = effectiveCap(threadCap);
   const lines = threads.map((t) => {

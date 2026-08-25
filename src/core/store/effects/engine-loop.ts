@@ -5,9 +5,10 @@
 // place in the codebase that may register this hook — a second registration
 // anywhere silently replaces this one and the Engine simply stops waking, with
 // nothing in the UI to explain it. Guarded by a source scan in
-// tests/core/engine/trigger.test.ts, the same way history-sync.ts guards
-// onHistoryNavigated, plus a wiring guard: the source scan alone passes just as
-// happily when nothing calls registerEngineLoopEffects at all.
+// tests/core/engine/trigger.test.ts, plus a wiring guard: the source scan alone
+// passes just as happily when nothing calls registerEngineLoopEffects at all.
+// This is the only hook Story Engine registers — history-sync.ts held the other
+// one, for onHistoryNavigated, and went with §7's reconciliation.
 //
 // Design §3.1. A user generation schedules a ONE-SHOT wakeup a configurable
 // delay later. Three properties carry the whole trigger:

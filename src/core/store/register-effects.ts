@@ -11,7 +11,6 @@ import { registerForgeChatEffects } from "./effects/forge-chat-effects";
 import { registerFoundationEffects } from "./effects/foundation-effects";
 import { registerSummaryGenerationEffects } from "./effects/summary-generation";
 import { registerBootstrapEffects } from "./effects/bootstrap-effects";
-import { registerHistorySyncEffects } from "./effects/history-sync";
 import { registerEngineLoopEffects } from "./effects/engine-loop";
 import { registerThreadConditionEffects } from "../engine/thread-bind";
 
@@ -24,14 +23,11 @@ export function registerEffects(store: Store<RootState>, genX: GenX): void {
   registerGenerationEngineEffects(subscribeEffect, dispatch, getState, genX);
   registerLorebookSyncEffects(subscribeEffect, dispatch, getState);
   registerLorebookGenerationEffects(subscribeEffect, dispatch, getState);
-  const autosave = registerAutosaveEffects(subscribeEffect, getState);
+  registerAutosaveEffects(subscribeEffect, getState);
   registerForgeChatEffects(subscribeEffect, dispatch, getState);
   registerFoundationEffects(subscribeEffect, dispatch, getState);
   registerSummaryGenerationEffects(subscribeEffect, dispatch, getState);
   registerBootstrapEffects(subscribeEffect, dispatch, getState);
-  // Navigation must flush autosave before it replaces the store, so history-sync
-  // needs the handle registerAutosaveEffects returns.
-  registerHistorySyncEffects(dispatch, autosave);
   // The Engine's wakeup. Off unless the story's settings say otherwise, so
   // registering it costs nothing until the writer opts in.
   registerEngineLoopEffects({ subscribeEffect, dispatch, getState, genX });

@@ -243,16 +243,15 @@ export function Hud() {
       <CountSlot
         icon={GitCommit}
         value={model.touched}
-        // "On this branch" was a promise the number does not keep. Between
-        // navigations it is a session accumulator fed from the drain: it
-        // counts INTENTS, condenses as well as revises, survives a branch
-        // switch and resets on a reload. A navigation recounts it from the
-        // `lb:` records at the node, which counts distinct ENTRIES — so
-        // revising one entity three times and then pressing undo and redo
-        // drops it 3 → 1 with nothing having changed. The tooltip says both,
-        // because a slot whose only explanation is wrong is worse than one
-        // with none.
-        title={`Rewrites — ${model.touched} lorebook entry rewrite(s), revises and condenses alike, since this story was opened; undo or redo swaps it for the number of entries rewritten on the branch you land on`}
+        // "On this branch" was a promise the number never kept, and there is no
+        // branch to keep it on any more: Story Engine's records move forward
+        // only. What is left is what it always was between navigations — a
+        // session accumulator fed from the drain, counting INTENTS rather than
+        // distinct entries, condenses as well as revises, reset by a reload and
+        // by nothing else. The tooltip says that and claims nothing further,
+        // because a slot whose only explanation is wrong is worse than one with
+        // none.
+        title={`Rewrites — ${model.touched} lorebook entry rewrite(s), revises and condenses alike, since this story was opened; undo does not take them back`}
       />
       <BudgetBars filled={model.budgetBars} allowedOutput={allowedOutput} />
       {/* Never disabled, never debounced: the dispatch is the whole handler and

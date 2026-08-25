@@ -68,16 +68,14 @@ export type LoopState = {
    *  declined or skipped revise never lands here: this is writes, not
    *  attempts.
    *
-   *  §9.1 words it as "on this branch", and the increment alone is not that —
-   *  it lives in memory and accumulates for the session. So it is a live
-   *  reading between navigations, and §7's reconciliation corrects it to the
-   *  branch's truth whenever the branch moves: `touchedOnBranch` counts the
-   *  `lb:` records at the node just navigated to and `engineTouchedRecounted`
-   *  sets this. That recount belongs there rather than here, where the machine
-   *  would have to become async to ask.
+   *  **A session count, and nothing more.** It lives in memory, accumulates
+   *  from the moment the story was opened, and resets to 0 on a reload. It used
+   *  to be corrected on navigation — §7 recounted it from the `lb:` records at
+   *  the node landed on — and that machinery is gone with the rest of history
+   *  tracking: the Engine's records move forward only, so there is no branch to
+   *  recount against and nothing here to correct.
    *
-   *  What is still session-shaped is a RELOAD, which resets this to 0 and is
-   *  corrected only by the first navigation afterwards. */
+   *  The HUD's tooltip says exactly this, and must keep saying it. */
   touched: number;
   consecutiveFailures: number;
 };

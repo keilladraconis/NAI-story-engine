@@ -3,9 +3,9 @@
 //
 // Phase 5 built the forgetting detector (`thread-condition.ts`) and wired it to
 // nothing: `threadLorebookEntrySet` had no caller and no thread had ever had an
-// entry. This is the wiring, and it is the reason the binding and §7's
-// reconciliation had to land in the same phase — a displacement is free only
-// while there is no entry behind the thread (§4.5).
+// entry. This is the wiring — and once a thread owns an entry, a displacement
+// stops being free (§4.5), which is why every path that drops a thread has to
+// switch its entry off at the moment it drops it.
 //
 // Three things live here, and they are together because they are one contract:
 // what a thread's entry must carry, where that carriage is built from, and the
@@ -247,8 +247,7 @@ export async function createThreadEntry(
  *  are left exactly as they are even when the thread's title changed, for the
  *  same reason `entityCategoryChanged` does not rewrite `entry.category`: the
  *  entry is the writer's, and the Engine touches the least of it that the job
- *  requires. It also means this rewrite is one §7 has nothing to reconcile —
- *  no text was written, so no `lb:` record is either.
+ *  requires. It also means no text was written, so no `lb:` record is either.
  *
  *  Returns whether anything was written, which is what the tests read. */
 export async function rebuildThreadCondition(
@@ -272,23 +271,24 @@ export async function rebuildThreadCondition(
 
 /** Apply a thread's `status` to its entry's `enabled` flag.
  *
- *  §7's rule, for one thread: **a thread entry is enabled exactly when a thread
- *  on this branch names it and that thread is open.** `reconcileThreadEntries`
- *  applies the same rule across the whole World at navigation time; this applies
- *  it at the moment the status changes, so the two cannot disagree.
+ *  **A thread entry is enabled exactly when a thread in the World names it and
+ *  that thread is open**, and this is where that rule is applied for a status
+ *  change. §7 used to apply the same rule across the whole World on every
+ *  navigation, which made this the fast half of a pair; navigation reconciles
+ *  nothing now, so it is the whole of it. A status the entry does not follow is
+ *  a disagreement nothing else will ever come along and settle.
  *
  *  Without it a writer's own press does nothing they can see. `threadStatusSet`
  *  is dispatched from `ThreadEditPane`'s status control as well as from the
  *  drain's retire, and only the drain wrote the flag — so marking a thread
  *  satisfied by hand left its reminder injecting, and reopening one by hand left
- *  it silent, until the next undo happened to reconcile it. The Engine's own
- *  retire already writes the flag before dispatching, which makes this a no-op
- *  for that path rather than a second writer of the same value.
+ *  it silent. The Engine's own retire already writes the flag before
+ *  dispatching, which makes this a no-op for that path rather than a second
+ *  writer of the same value.
  *
  *  Through the door, like every other Engine rewrite, and writing only
  *  `enabled` — the entry is the writer's and the Engine touches the least of it
- *  the job requires. No text, so no `lb:` record: §7 answers this flag from the
- *  branch's World rather than from a record, which is exactly why it can. */
+ *  the job requires. No text, so no `lb:` record. */
 export async function applyThreadStatus(
   getState: () => RootState,
   threadId: string,
@@ -307,13 +307,13 @@ export async function applyThreadStatus(
 
 /** Switch off the entry of a thread that has just been deleted.
  *
- *  §7's rule again — a thread entry is enabled exactly when a thread on this
- *  branch names it and that thread is open — applied at the third moment the
+ *  The same rule again — a thread entry is enabled exactly when a thread in the
+ *  World names it and that thread is open — applied at the third moment the
  *  rule has, and the worst one. `applyThreadStatus` covers a status press and
  *  the drain's `open` arm covers a cap displacement; a hand delete leaves an
  *  orphan neither of them sees, and it is the only one nothing will EVER name
- *  again on any branch. Its always-on note goes on injecting with no surface
- *  in Story Engine still showing the thread it belonged to.
+ *  again. Its always-on note goes on injecting with no surface in Story Engine
+ *  still showing the thread it belonged to.
  *
  *  **The entry id comes from the action, not from the World.** Effects run
  *  after the reducer, so the thread is already gone by the time this is
@@ -323,9 +323,9 @@ export async function applyThreadStatus(
  *
  *  Disabled, never deleted (§5.2), through the door like every other Engine
  *  write, so the §5.2 snapshot is taken on the way past and one switch in the
- *  writer's own lorebook brings the entry back. Reconciliation is the backstop
- *  rather than the answer: it only runs on a navigation, and an orphan left
- *  live until the next undo is an orphan injecting until the next undo. */
+ *  writer's own lorebook brings the entry back. There is no backstop behind
+ *  this: §7's reconciliation was one, and it is gone. Miss the orphan here and
+ *  it injects forever. */
 export async function disableDeletedThreadEntry(
   entryId: string | undefined,
   nodeId: number,

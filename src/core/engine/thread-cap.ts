@@ -140,8 +140,9 @@ export function displacedByNextThread<T extends Displaceable>(
  *
  *  A displaced thread is dropped from the store, not deleted from the lorebook:
  *  §5.2 says the writer's lorebook is never destroyed, and this function could
- *  not touch it anyway. Its entry survives, unmanaged — and still enabled, so
- *  it goes on injecting. That is §7's reconciliation, which is phase 6's.
+ *  not touch it anyway. Its entry survives, unmanaged — and would still be
+ *  enabled, so it would go on injecting. The `open` arm in `execute.ts` is
+ *  where that is answered, and it is the only place that answers it.
  *
  *  Returns the same array when nothing has to give way, so the reducer can hand
  *  it straight back and subscribers do not repaint for an unchanged list. */

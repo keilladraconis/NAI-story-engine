@@ -70,10 +70,11 @@ export function deriveSetup(state: RootState, inputs: SetupInputs): SetupModel {
 }
 
 /** Change-detection key the Setup tab subscribes with. It must cover every
- *  store field deriveSetup reads, plus historyEpoch, which is what moves when
- *  the document is undone. */
+ *  store field deriveSetup reads — and only those. `hasDocumentContent` is not
+ *  among them: it lives outside the store, App owns it, and it reaches the tab
+ *  as a prop, which re-renders the tab on its own. */
 export function setupSignature(state: RootState): string {
-  const { queue, activeRequest, historyEpoch } = state.runtime;
+  const { queue, activeRequest } = state.runtime;
   return [
     // Full composition, not length: a same-size queue with different contents
     // changes what the tab shows.
@@ -87,6 +88,5 @@ export function setupSignature(state: RootState): string {
         : "0",
     foundationFieldsEmpty(state) ? "1" : "0",
     hasBrainstormContent(state.chat.chats) ? "1" : "0",
-    historyEpoch,
   ].join("|");
 }

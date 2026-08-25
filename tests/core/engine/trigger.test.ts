@@ -194,16 +194,27 @@ describe("onGenerationRequested has exactly one home", () => {
     });
   }
 
+  /** Every hook name registered in a file, wrapped call or not.
+   *
+   *  **The pattern used to be the literal `register("onGenerationRequested"`,
+   *  and prettier wraps that call across three lines** — so it matched nothing,
+   *  including the registration it was pointing at, and the guard passed
+   *  vacuously. Same failure the door guard had: a check that finds nothing
+   *  looks exactly like a check that found nothing wrong. */
+  function hooksRegisteredIn(file: string): string[] {
+    return [
+      ...readFileSync(file, "utf8").matchAll(/register\(\s*"(on[A-Za-z]+)"/g),
+    ].map((m) => m[1]);
+  }
+
   it("is registered in engine-loop.ts and nowhere else", () => {
     // api.v1.hooks.register holds one callback per hook name — a second
     // registration silently replaces the first, and the Engine just stops
     // waking with nothing to show for it.
-    const offenders = files(SRC).filter(
-      (f) =>
-        readFileSync(f, "utf8").includes('register("onGenerationRequested"') &&
-        !f.endsWith("engine-loop.ts"),
+    const home = files(SRC).filter((f) =>
+      hooksRegisteredIn(f).includes("onGenerationRequested"),
     );
-    expect(offenders).toEqual([]);
+    expect(home.map((f) => f.split("/").at(-1))).toEqual(["engine-loop.ts"]);
   });
 
   it("is wired into registerEffects", () => {
@@ -215,5 +226,17 @@ describe("onGenerationRequested has exactly one home", () => {
       "utf8",
     );
     expect(wiring).toContain("registerEngineLoopEffects(");
+  });
+
+  it("is the only hook Story Engine registers at all", () => {
+    // Forward-only: Story Engine does not watch document history. §7's
+    // reconciliation held the one `onHistoryNavigated` registration and went
+    // with it, and the World stopped being a projection of the document at the
+    // same time — so a registration reappearing here is not a small addition,
+    // it is history tracking coming back. The card that needed to know the
+    // document changed reads the document instead
+    // (src/ui/panels/setup/use-document-content.ts).
+    const registered = files(SRC).flatMap(hooksRegisteredIn);
+    expect([...new Set(registered)]).toEqual(["onGenerationRequested"]);
   });
 });

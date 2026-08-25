@@ -5,10 +5,10 @@
 // `buildLorebookContentStrategy`: that path's factory reads the live entry
 // itself (`lorebook-strategy.ts`) and its completion handler calls
 // `api.v1.lorebook.updateEntry` directly (`effects/handlers/lorebook.ts`). A
-// revise built on it would bypass Task 1's door — no §5.2 snapshot, no `lb:`
-// record, nothing for §7 to reconcile — for exactly the writes the Engine makes
-// unattended. So the entry arrives here as an argument (the door read it) and
-// the revision leaves here as a string (the door writes it).
+// revise built on it would bypass Task 1's door — no §5.2 snapshot and no `lb:`
+// record — for exactly the writes the Engine makes unattended. So the entry
+// arrives here as an argument (the door read it) and the revision leaves here
+// as a string (the door writes it).
 //
 // Everything else IS the existing idiom, deliberately: the same anchored
 // Name/Type/Setting prefill, the same `LOREBOOK_CHAIN_STOPS`, the same

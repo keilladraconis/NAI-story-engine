@@ -26,16 +26,16 @@ function reads(src: string, key: string): boolean {
 
 const storeSrc = () =>
   code(readFileSync(join(SRC, "core/store/index.ts"), "utf8"));
-// The Engine's logger has one home (`core/engine/log.ts`) — the pass is no
-// longer the only thing that speaks, since §7's reconciliation logs from the
-// navigation handler.
+// The Engine's logger has one home (`core/engine/log.ts`). §7's reconciliation
+// used to speak from the navigation handler as well; it is gone, and the pass
+// is the only caller again — but the rule below is about callers in general,
+// not about how many there happen to be.
 const engineSrc = () =>
   code(readFileSync(join(SRC, "core/engine/log.ts"), "utf8"));
 const engineCallerSrcs = () =>
-  [
-    "core/store/effects/engine-loop.ts",
-    "core/store/effects/history-sync.ts",
-  ].map((f) => code(readFileSync(join(SRC, f), "utf8")));
+  ["core/store/effects/engine-loop.ts"].map((f) =>
+    code(readFileSync(join(SRC, f), "utf8")),
+  );
 
 describe("the logging switches are separate", () => {
   it("the store's action firehose reads store_action_log, not the debug flag", () => {

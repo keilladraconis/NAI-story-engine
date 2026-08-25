@@ -6,14 +6,15 @@
 // `assessed` or `failed` mean. The effect dispatches events; the store is the
 // projection.
 //
-// Two actions are not machine events. `engineSettingsChanged` carries the
+// Two actions are not machine events, and neither touches `phase` — so nothing
+// here can move the lifecycle from outside the machine. `engineSettingsChanged`
+// carries the
 // settings the effect last read from storage, and `engineBacklogObserved`
 // records how far behind the Engine is WITHOUT starting or advancing a pass,
 // which is what the minimum-new-prose gate needs: below the threshold no pass
 // runs, and the HUD must still show the paragraphs nobody has read rather than
 // the zero a faked `assessed` would leave behind (plan, Task 7). It touches
-// `backlog` only — never `phase` — so it cannot move the lifecycle from outside
-// the machine.
+// `backlog` only.
 
 import { createSlice } from "nai-store";
 import { ENGINE_DEFAULTS, type EngineSettings } from "../../engine/settings";
@@ -76,30 +77,9 @@ export const engineSlice = createSlice({
       state.backlog === payload.backlog
         ? state
         : { ...state, backlog: payload.backlog },
-
-    /** §9.1's `∆`, recounted from the branch rather than accumulated from the
-     *  session — the `lb:` records at the node just navigated to (§7).
-     *
-     *  A set, not an increment, and the third action here that is not a machine
-     *  event for the same reason as the other two: it touches `touched` only,
-     *  never `phase`, so it cannot move the lifecycle from outside the machine.
-     *  The machine's own `revised` event stays and stays an increment — it is
-     *  the live reading between navigations, and this is the correction to the
-     *  truth whenever the branch moves under it.
-     *
-     *  Identity when the number has not changed: navigation is a gesture a
-     *  writer repeats, and the HUD subscribes to this slice. */
-    engineTouchedRecounted: (state, payload: { touched: number }) =>
-      state.touched === payload.touched
-        ? state
-        : { ...state, touched: payload.touched },
   },
 });
 
 export const engineSliceReducer = engineSlice.reducer;
-export const {
-  engineLoopEvent,
-  engineBacklogObserved,
-  engineSettingsChanged,
-  engineTouchedRecounted,
-} = engineSlice.actions;
+export const { engineLoopEvent, engineBacklogObserved, engineSettingsChanged } =
+  engineSlice.actions;

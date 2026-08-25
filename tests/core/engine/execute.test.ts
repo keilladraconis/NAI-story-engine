@@ -621,7 +621,7 @@ describe("drain — revise", () => {
     });
   });
 
-  it("records what it wrote, so §7 has something to reconcile", async () => {
+  it("records what it wrote", async () => {
     const h = revisable();
 
     await drain([REVISE], h.deps);
@@ -1242,7 +1242,7 @@ describe("no Engine action can write around the write door", () => {
     // Reading the directory is only a guard if it actually found it. A wrong
     // path yields an empty list and every assertion below passes vacuously.
     expect(guarded).toContain("execute.ts");
-    expect(guarded).toContain("reconcile.ts");
+    expect(guarded).toContain("assess.ts");
     expect(guarded.length).toBeGreaterThan(10);
   });
 
@@ -1256,22 +1256,6 @@ describe("no Engine action can write around the write door", () => {
   it("lorebook-write.ts is the one module that does", () => {
     const src = code(readFileSync(join(ENGINE, "lorebook-write.ts"), "utf8"));
     expect(src).toContain("api.v1.lorebook.updateEntry");
-  });
-
-  it("history-sync.ts reconciles through the door, never around it", () => {
-    // §7 flips `enabled` on thread entries, which is a write to the writer's
-    // lorebook like any other: it takes the §5.2 snapshot on the way through,
-    // and for a thread entry it is the FIRST snapshot that entry has ever had.
-    // Reading the book is fine — that is what reconciliation compares against.
-    const src = code(
-      readFileSync(
-        join(__dirname, "../../../src/core/store/effects/history-sync.ts"),
-        "utf8",
-      ),
-    );
-    expect(src).toContain("writeLorebookEntry(");
-    expect(src).not.toContain("api.v1.lorebook.updateEntry");
-    expect(src).not.toContain("api.v1.lorebook.createEntry");
   });
 
   it("thread-bind.ts creates entries but never rewrites one", () => {

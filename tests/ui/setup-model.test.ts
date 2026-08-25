@@ -191,7 +191,6 @@ describe("setupSignature", () => {
     const variants = [
       state({ queue: [req("bootstrap", "1")] }),
       state({ activeRequest: { ...req("chat", "c"), status: "processing" } }),
-      state({ historyEpoch: 7 }),
       state({}, { importWizardOpen: true }),
       state({}, { foundationExpanded: true }),
       state({}, { foundationExpanded: false }),

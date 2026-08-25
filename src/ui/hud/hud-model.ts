@@ -40,7 +40,7 @@ export type HudModel = {
    *  tooltip says both; the slot draws only `threads`. */
   threadsTotal: number;
   /** Entity entries the Engine has rewritten — see `LoopState.touched` for why
-   *  this is a session count rather than the branch count §9.1 words it as. */
+   *  this is a count for the session and only for the session. */
   touched: number;
   /** Filled bars out of `BUDGET_BARS`. See `budgetBarsOf`. */
   budgetBars: number;

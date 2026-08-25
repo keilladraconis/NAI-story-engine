@@ -254,7 +254,7 @@ async function retire(
  *  The Engine does NOT reuse `buildLorebookContentStrategy` for this. That path
  *  resolves the live entry inside its own message factory and its completion
  *  handler calls `updateEntry` directly, so a revise built on it would write
- *  around the door — no snapshot, no `lb:` record, nothing for §7 to reconcile.
+ *  around the door — no snapshot and no `lb:` record.
  *  `revise-strategy.ts` returns text to its caller instead, and the caller is
  *  the door.
  *
@@ -343,8 +343,8 @@ async function revise(
  *  Structurally a revise — the generation runs INSIDE the door's producer, so
  *  read-then-write and the §5.2 snapshot are properties of the shape rather
  *  than things this function remembers — and §5.1 requires that: same price,
- *  same door, same `lb:` record, so §7 cannot tell the two apart. What is not
- *  shared is how the answer is judged (`composeCondensation` refuses a summary
+ *  same door, same `lb:` record, so nothing downstream can tell the two apart.
+ *  What is not shared is how the answer is judged (`composeCondensation` refuses a summary
  *  and refuses a truncation) and what happens afterwards.
  *
  *  **The mark is what happens afterwards, and it is the whole reason this arm
@@ -445,9 +445,8 @@ async function condense(
  *  cap for exactly this path: the reducer drops the weakest OTHER thread and
  *  keeps the newcomer, because a create that silently undid itself would read
  *  as a broken Engine. The displaced thread's own lorebook entry survives,
- *  unmanaged and still enabled — §5.2 forbids deleting it and §7's
- *  reconciliation is where that is answered, so all this does is say so in the
- *  log. */
+ *  unmanaged and still enabled — §5.2 forbids deleting it — so this arm
+ *  disables it and says so in the log. */
 async function open(
   subject: string,
   prose: string,
@@ -523,27 +522,27 @@ async function open(
   for (const gone of before.filter(
     (t) => !state.world.threads.some((kept) => kept.id === t.id),
   )) {
-    // §4.5's orphan, answered here rather than left to §7. The store dropped
-    // the thread and the reducer cannot touch its lorebook entry, which would
-    // otherwise survive unmanaged and STILL ENABLED — going on injecting a
-    // reminder for a commitment nothing records any more. §4.5 names that
+    // §4.5's orphan, and this is the only place it is answered. The store
+    // dropped the thread and the reducer cannot touch its lorebook entry,
+    // which would otherwise survive unmanaged and STILL ENABLED — going on
+    // injecting a reminder for a commitment nothing records any more. §4.5
+    // names that
     // exactly: "the cap bounds the list, not the context", so a story that
     // repeatedly hit the ceiling would accumulate strictly more always-on
     // injections than the cap ever permitted threads. Proliferation control
     // increasing proliferation.
     //
     // **Here, because here is where the entry is attributably ours.** We are
-    // holding the thread that owned it. §7's reconciliation covers the same
-    // case from the other side — it disables any `SE: Threads` entry no thread
-    // on the branch names — but it can only attribute by category, and it only
-    // runs when the writer navigates. An orphan left live until the next undo
-    // is an orphan injecting until the next undo.
+    // holding the thread that owned it. §7's reconciliation used to cover the
+    // same case from the other side — disabling any `SE: Threads` entry no
+    // thread named — but it could only attribute by category, it only ran on a
+    // navigation, and it is gone with the rest of history tracking. There is no
+    // second pass behind this one: miss the orphan here and it injects forever.
     //
     // **Disabled, never deleted** (§5.2), through the door like every other
     // Engine write, so the writer's original is snapshotted and one switch in
-    // their own lorebook brings it back. And it is branch-correct rather than
-    // final: navigate back to where the thread still exists and reconciliation
-    // switches it on again, because there the branch still names it.
+    // their own lorebook brings it back — which is the whole of the writer's
+    // recourse now that nothing switches it on again on their behalf.
     await deps.log(
       `[engine] thread cap displaced "${gone.title}" — its lorebook entry ${gone.lorebookEntryId ?? "(none)"} is no longer managed by a thread`,
     );
