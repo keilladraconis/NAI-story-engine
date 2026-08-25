@@ -1774,16 +1774,24 @@ only for a writer who switched it on in that story.
   it, paid for in a persisted enum, a status icon, and a reducer branch. It
   becomes worth building when something behaves differently for it, and the review
   surface is the obvious candidate.
-- **`Assessment.paragraphCount` is asserted to match NovelAI's own
-  `paragraphCount`, and that is unverified.** The anchor is compared against the
-  lorebook's condition variable, so the two counters must be counting the same
-  thing. The evidence is the `.d.ts` calling `GenerationPosition.sectionId` "the
-  section (paragraph) ID", and the count is therefore every section
-  `api.v1.document.scan()` returns, blank ones included — where `backlog` filters
-  them. Nothing has confirmed it at runtime, and the scratch-story check is the
-  real test. The pace gate carries an escape for exactly this: its second
-  disjunct, `paragraphCount < anchor`, degrades the thread to always-on rather
-  than to silence if the two counters disagree.
+- **`Assessment.paragraphCount` MATCHES NovelAI's own `paragraphCount` — measured,
+  not assumed.** This shipped as an open assumption: the anchor is compared against
+  the lorebook's condition variable, so the two counters must count the same thing,
+  and the only evidence was the `.d.ts` calling `GenerationPosition.sectionId` "the
+  section (paragraph) ID". `tools/paragraph-count-probe.naiscript` settled it
+  against the runtime — a story of 80 sections, 79 with prose, 13418 characters,
+  and NovelAI answered **80**: `document.scan().length` exactly, the blank section
+  included, which is the reading `assess` uses and not the one `backlog` uses. The
+  unit is right and nothing changes.
+
+  The same run settled what a section is, which had been argued from a doc phrase
+  in one direction and a history-step framing in the other: 0 of 80 sections held a
+  newline, mean length 168 characters. A section is one paragraph.
+
+  The pace gate's second disjunct, `paragraphCount < anchor`, was written as an
+  escape for exactly this risk. It stays — it also covers undo, where the `t:`
+  record reverts and the lorebook entry does not.
+
 - **`touched` is branch-truthful only after a navigation.** §9.1 already records
   that the drain's increment is a session count and that §7's recount is the
   correction. What is left is a reload: `engineTouchedRecounted` is dispatched from

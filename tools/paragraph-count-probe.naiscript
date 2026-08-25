@@ -2,7 +2,7 @@
 compatibilityVersion: naiscript-1.0
 id: 3a7c1f95-6b28-4d03-9e14-c5f8a2b70d61
 name: Paragraph Count Probe
-version: 0.6.0
+version: 0.7.0
 description: Does NovelAI's paragraphCount condition variable count what document.scan() counts?
 memoryLimit: 8
 ---*/
@@ -368,45 +368,53 @@ async function run() {
   log("");
   log("the forgetting detector, against the real matcher:");
 
-  // A word certainly in the prose, and one certainly not.
+  // `range` is "how far back to search in characters" (the .d.ts is explicit),
+  // so the test word must come from the END of the prose. v0.6 took the middle
+  // of the word list — roughly 6700 characters back in this story — and asked a
+  // 4000-character range to find it. It reported the detector broken when the
+  // subject was simply out of range, which is the probe being wrong about the
+  // product for the third time. Take the last long word, and measure at the
+  // production range AND at one large enough to cover the whole document, so
+  // "out of range" and "not matching at all" cannot be confused.
   const words = sections
     .map((sec) => (sec.section.text || "").match(/[A-Za-z]{6,}/g) || [])
     .reduce((a, b) => a.concat(b), []);
   if (words.length === 0) {
     log("  no word of 6+ letters in the prose — skipping");
   } else {
-    const present = words[Math.floor(words.length / 2)].toLowerCase();
+    const present = words[words.length - 1].toLowerCase();
     const absent = "zqxjkv" + SENTINEL.slice(-6).toLowerCase();
+    const WIDE = scanChars + 1000;
 
-    const detector = (key) => [
-      {
-        type: "not",
-        condition: { type: "key", key, in: ["story"], range: 4000 },
-      },
+    const detector = (key, range) => [
+      { type: "not", condition: { type: "key", key, in: ["story"], range } },
     ];
-
-    const onPresent = await reaches(entryId, {
+    const shape = (key, range) => ({
       forceActivation: false,
       keys: [],
-      advancedConditions: detector(present),
-    });
-    const onAbsent = await reaches(entryId, {
-      forceActivation: false,
-      keys: [],
-      advancedConditions: detector(absent),
+      advancedConditions: detector(key, range),
     });
 
-    log(`  subject "${present}" IS in the prose   ${onPresent ? "ACTIVE" : "silent"}   (expect silent)`);
-    log(`  subject "${absent}" is NOT             ${onAbsent ? "ACTIVE" : "silent"}   (expect ACTIVE)`);
+    const onPresent = await reaches(entryId, shape(present, 4000));
+    const onPresentWide = await reaches(entryId, shape(present, WIDE));
+    const onAbsent = await reaches(entryId, shape(absent, WIDE));
+
+    log(`  "${present}" (last word) range 4000    ${onPresent ? "ACTIVE" : "silent"}   (expect silent)`);
+    log(`  "${present}" range ${WIDE}          ${onPresentWide ? "ACTIVE" : "silent"}   (expect silent)`);
+    log(`  "${absent}" range ${WIDE}   ${onAbsent ? "ACTIVE" : "silent"}   (expect ACTIVE)`);
     log("");
-    if (!onPresent && onAbsent) {
+    if (onPresent && !onPresentWide) {
+      log("  DETECTOR WORKS, and `range` really is a character window: the same");
+      log("  subject is found at a wide range and missed at 4000. That is the");
+      log("  mechanism behaving exactly as §4.3 designs it.");
+    } else if (!onPresentWide && onAbsent) {
       log("  DETECTOR WORKS. Quiet while the story carries the subject, and it");
       log("  speaks once the subject goes missing — which is the whole design.");
-    } else if (onPresent && onAbsent) {
+    } else if (onPresentWide && onAbsent) {
       log("  DETECTOR ALWAYS FIRES — the `key` condition is not matching, so");
       log("  `not(...)` is always true. Every thread would remind constantly.");
       log("  Check `in: ['story']` and the range against the .d.ts.");
-    } else if (!onPresent && !onAbsent) {
+    } else if (!onPresentWide && !onAbsent) {
       log("  DETECTOR NEVER FIRES — `not(...)` is always false, so no thread");
       log("  would ever remind. This is the silence §4.3 refuses.");
     } else {
@@ -419,17 +427,24 @@ async function run() {
   log("Now press Clean up.");
 }
 
+/** Sweep the whole category, not just the id the ledger happens to hold.
+ *
+ *  A run that died before writing the ledger — or v0.1, which minted one entry
+ *  per candidate — left entries behind that no later cleanup could name. Every
+ *  probe entry is in this category and nothing else is, so the category IS the
+ *  ledger. */
 async function cleanUp() {
-  const ledger = await api.v1.storyStorage.get(LEDGER);
   report = "";
-  if (ledger && ledger.entryId) {
-    await api.v1.lorebook.removeEntry(ledger.entryId);
-    log("removed the probe entry");
-  }
   const categories = await api.v1.lorebook.categories();
-  const category = categories.find((c) => c.name === CATEGORY);
-  if (category) {
-    await api.v1.lorebook.removeCategory(category.id);
+  const mine = categories.find((c) => c.name === CATEGORY);
+  if (mine) {
+    const all = await api.v1.lorebook.entries();
+    const strays = all.filter((e) => e.category === mine.id);
+    for (const entry of strays) await api.v1.lorebook.removeEntry(entry.id);
+    log(`removed ${strays.length} probe entr${strays.length === 1 ? "y" : "ies"}`);
+  }
+  if (mine) {
+    await api.v1.lorebook.removeCategory(mine.id);
     log(`removed the ${CATEGORY} category`);
   }
   await api.v1.storyStorage.remove(LEDGER);
