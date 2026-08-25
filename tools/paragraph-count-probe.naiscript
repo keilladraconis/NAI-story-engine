@@ -2,7 +2,7 @@
 compatibilityVersion: naiscript-1.0
 id: 3a7c1f95-6b28-4d03-9e14-c5f8a2b70d61
 name: Paragraph Count Probe
-version: 0.4.0
+version: 0.5.0
 description: Does NovelAI's paragraphCount condition variable count what document.scan() counts?
 memoryLimit: 8
 ---*/
@@ -80,6 +80,16 @@ function gate(variable, k) {
  *  `forGeneration: true` because that is the build the writer actually gets, and
  *  the doc warns it can change behaviour — measuring the other one would answer a
  *  question nobody asked. */
+/** Does the entry reach context under this exact shape? */
+async function reaches(entryId, patch) {
+  await api.v1.lorebook.updateEntry(entryId, patch);
+  const messages = await api.v1.buildContext({ forGeneration: true });
+  if (!messages || messages.length === 0) {
+    throw new Error("buildContext returned nothing");
+  }
+  return messages.some((m) => (m.content || "").includes(SENTINEL));
+}
+
 async function holdsAt(entryId, variable, k) {
   await api.v1.lorebook.updateEntry(entryId, {
     advancedConditions: gate(variable, k),
@@ -157,6 +167,89 @@ async function run() {
   log("");
   log("sentinel visible with an always-true gate — the channel works");
 
+  // ── what a section actually is ────────────────────────────────────────────
+  //
+  // The anchor is an index into `document.scan()`, and the design has been
+  // calling those "paragraphs" on the strength of the `.d.ts` glossing
+  // `sectionId` as "the section (paragraph) ID". Elsewhere the same file
+  // describes sections as the unit history steps are keyed by, which is a
+  // different claim. A section holding more than one paragraph would contain a
+  // newline, so this settles it with data rather than with a doc phrase.
+
+  const multiline = sections.filter((sec) =>
+    (sec.section.text || "").trim().includes("\n"),
+  ).length;
+  log("");
+  log(`sections containing a newline: ${multiline} of ${scanTotal}`);
+  log(`mean section length: ${(scanChars / scanTotal).toFixed(0)} chars`);
+  if (multiline > 0) {
+    log("So a section is NOT a paragraph — it can hold several. An anchor");
+    log("counted in sections is not counted in the unit paragraphCount uses.");
+  } else {
+    log("No section holds more than one paragraph in this story.");
+  }
+
+  // ── does forceActivation override the condition? ──────────────────────────
+  //
+  // This is the question the v0.4 control could not separate from "the equation
+  // is broken", because the probe entry was Always On the whole time —
+  // `forceActivation` is documented as "the entry should always be considered
+  // active". If it bypasses conditions, then the entry Story Engine creates for
+  // every thread (thread-bind.ts: forceActivation TRUE plus a condition) is
+  // simply always on, and the forgetting detector phase 5 built does nothing.
+
+  const IMPOSSIBLE = [
+    { type: "equation", terms: [{ value: "characterCount" }], comparison: ">=", target: 1000000 },
+  ];
+
+  log("");
+  log("does Always On override the condition?");
+  const onImpossible = await reaches(entryId, {
+    forceActivation: true,
+    keys: [],
+    advancedConditions: IMPOSSIBLE,
+  });
+  const offImpossible = await reaches(entryId, {
+    forceActivation: false,
+    keys: [],
+    advancedConditions: IMPOSSIBLE,
+  });
+  const offTrue = await reaches(entryId, {
+    forceActivation: false,
+    keys: [],
+    advancedConditions: [{ type: "true" }],
+  });
+  log(`  Always On + impossible condition   ${onImpossible ? "ACTIVE" : "inactive"}`);
+  log(`  not On    + impossible condition   ${offImpossible ? "ACTIVE" : "inactive"}`);
+  log(`  not On    + always-true condition  ${offTrue ? "ACTIVE" : "inactive"}`);
+  log("");
+
+  if (onImpossible && !offImpossible && offTrue) {
+    log("ANSWER: Always On OVERRIDES the condition, and conditions work fine");
+    log("without it. This is a REAL DEFECT in Story Engine, not just the gate:");
+    log("thread-bind.ts sets forceActivation TRUE *and* a condition, so every");
+    log("thread entry is permanently always-on and the forgetting detector");
+    log("phase 5 built never fires. §4.3's composition has to change — drop");
+    log("forceActivation and let the condition alone do the activating.");
+    return;
+  }
+  if (onImpossible && offImpossible) {
+    log("ANSWER: the condition is ignored either way — an impossible gate still");
+    log("reaches context with Always On OFF. Conditions are not being evaluated");
+    log("at all here. Nothing built on advancedConditions can work; read the");
+    log("script log and check the condition shape against the .d.ts.");
+    return;
+  }
+  if (!offTrue) {
+    log("ANSWER: an always-true condition with Always On off does NOT activate,");
+    log("so a condition cannot activate an entry by itself — it can only filter");
+    log("one that some other mechanism already selected. That is phase 5's");
+    log("dead end arriving for real: keys cannot select it (the detector negates");
+    log("them) and Always On overrides it. The detector needs a new design.");
+    return;
+  }
+  log("ANSWER: Always On does not override the condition. Carrying on.");
+
   // ── the control ──────────────────────────────────────────────────────────
   //
   // v0.3 reported 511 and called it a measurement. It was not: the climb loop
@@ -174,6 +267,7 @@ async function run() {
 
   log("");
   log("control: characterCount, whose answer we already know");
+  await api.v1.lorebook.updateEntry(entryId, { forceActivation: false });
   const charLow = await holdsAt(entryId, "characterCount", 1);
   const charAt = await holdsAt(entryId, "characterCount", scanChars);
   const charOver = await holdsAt(entryId, "characterCount", ABSURD);
