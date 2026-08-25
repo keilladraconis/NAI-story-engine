@@ -55,6 +55,15 @@ writer undoes that. This is the accepted cost and the changelog says so plainly.
   absence.
 - **`api.v1.hooks.register` holds ONE callback per hook name.** After Task 1 nothing
   registers `onHistoryNavigated`; do not leave a no-op registration behind.
+  **Corrected by Task 1:** this constraint reads as though the hook's only use was
+  reconciliation. It had two. The second — telling the opening-scene card the
+  document moved — outlives the forward-only decision entirely, and is now answered
+  by a poll (`use-document-content.ts`) that is strictly wider than the event it
+  replaces, since `onHistoryNavigated` never fired for ordinary editing.
+- **Task 1 found every task's file list to be short.** Tests that read a deleted
+  file off disk by path throw `ENOENT` rather than failing an assertion, and a
+  source-scanning guard is easy to miss when grepping for imports. Before deleting
+  anything, `grep -rn "<filename>" tests/` as well as `src/`.
 - **CLAUDE.md is binding**, in particular: no `updateParts`; never swap a
   component's _type_ at a fixed position; `onInput` not `onChange`; `disabled` is
   not a re-entry guard; no singletons.
@@ -132,6 +141,12 @@ entry. That invariant is not about history and stays exactly as it is.
 
 ### Task 3: Persistence goes back to storyStorage
 
+**Task 1 handoff.** `AutosaveHandle` and the `{ flush }` return are **already gone**
+— Task 1 removed the only consumer (the navigation rehydrate), and leaving a handle
+nobody takes across two tasks is the "module with one caller and a comment about
+what it used to do" the Global Constraints forbid. `registerAutosaveEffects` returns
+`void`; `flush` is the debounce's own callee. Do not expect to find the handle.
+
 **Files:** delete `src/core/store/persistence/history-store.ts`,
 `src/core/store/persistence/keyspace.ts`, `tests/core/keyspace.test.ts`,
 `tests/core/history-store.test.ts`; modify `src/core/store/effects/autosave.ts`,
@@ -180,6 +195,12 @@ is now the whole mechanism. Confirm it still behaves that way and leave it.
 
 ### Task 5: The type override and the last threads
 
+**Task 1 handoff: the override goes regardless.** It exists because
+`onHistoryNavigated`'s `nodeId` arrives as a `number` while the `.d.ts` declares
+`string` — but that only ever mattered because history-sync _read_ `nodeId`. Even a
+handler that ignored its params would satisfy the upstream signature, so no
+surviving registration could justify keeping the override.
+
 **Files:** modify `src/type-overrides.d.ts`; sweep for leftovers.
 
 The `onHistoryNavigated` correction exists because that hook's `nodeId` arrives as a
@@ -202,6 +223,14 @@ Large sections describe machinery that no longer exists. They are not deleted �
 this document is the record of how the design was reasoned about, and phases 2, 6
 and their reviews are part of that record. Mark them **superseded**, with the reason,
 the way §4.3 and §14.1's corrections already read.
+
+**Task 1 handoff: two stale comments to sweep**, both predating this plan.
+`triage-strategy.ts` says a displaced thread's entry is left "still enabled" — the
+`open` arm disables it as of phase 6's review. And `trigger.test.ts`'s
+"registered nowhere else" guard was matching a literal string prettier wraps across
+three lines, so it matched **nothing at all** and had been passing vacuously since
+it was written; Task 1 fixed it, but it is the same failure R6-6 found in the door
+guard, and a third instance is worth looking for.
 
 At minimum: **§5.2** (the write-once original), **§6** entire (storage scoping, key
 granularity, the index-as-deletion rule, node capture at dispatch), **§7** (history
