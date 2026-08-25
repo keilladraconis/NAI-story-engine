@@ -121,6 +121,13 @@ covers the case where such a writer does want a pass.
 project registers exactly one other hook (`onHistoryNavigated`, whose single home
 is `src/core/store/effects/history-sync.ts` since phase 2).
 
+**Superseded — it is now the only hook Story Engine registers at all (§6.0).**
+`history-sync.ts` is deleted and nothing took its registration over.
+`tests/core/engine/trigger.test.ts` scans `src/` for every `register("on…")` call
+and asserts the set is exactly `["onGenerationRequested"]`, so a second hook
+cannot arrive quietly — a registration reappearing there is history tracking
+coming back, not a small addition.
+
 **But `onGenerationRequested` is not unused — `nai-gen-x` registers it too**, in
 its constructor's `initBudgetListener`, to call `userInteraction()` and unpark
 tasks waiting on budget. `mount.ts` builds GenX before `registerEffects`, so the
@@ -452,6 +459,15 @@ same predicate, but needs two terms, and the `.d.ts` never says how a term's
 anchoring pass would otherwise gate a thread on a paragraph the branch will not
 reach again. §4.3 accepts degradation to always-on and never to silence.
 
+**Correction: the disjunct stays; its stated reason is superseded (§6.0).** The
+`t:` record does not revert any more — nothing Story Engine records does — so the
+thread and its entry no longer disagree in the way this sentence describes. The
+disjunct is still load-bearing, for the half of the case that survives: an undo
+shortens the document, `paragraphCount` falls below an anchor that is baked into
+the stored condition as a literal, and without the second disjunct the gate would
+be permanently unsatisfiable and the reminder silent forever. Degradation to
+always-on, never to silence, is the rule either way.
+
 **The Engine's `open` supplies no cast, so it derives one.** §4.1 calls `entityIds`
 load-bearing and the correction above makes the cast the detector's _subject_ — but
 triage's `OPEN` carries free text and has no syntax for entity ids, so every
@@ -539,6 +555,15 @@ behind. It becomes real the moment phase 6 binds a thread to an entry, which is 
 §5.2 forbidding a delete makes §7 reconciliation a **requirement of phase 6 rather
 than a nicety** — it has to land in the same phase as the binding, not after it.
 
+**Superseded in its remedy (§6.0): the orphan is answered at the displacement, and
+nothing stands behind it.** Reconciliation did land with the binding, exactly as
+this paragraph demanded, and forward-only then deleted it. The requirement it was
+protecting is met by the earlier and better answer §7 itself identified — the
+`open` arm disables the displaced thread's entry where the displacement happens,
+because that is where the entry is still attributably ours. `execute.ts` says so at
+the callsite, in those words: there is no second pass behind this one, so miss the
+orphan here and it injects forever.
+
 ## 5. Entity revision
 
 **Read-then-write, always.** The revision step fetches the entry's live text
@@ -581,7 +606,10 @@ threshold is a setting in the Engine's own per-story record (§3.1), not a
 
 Condense obeys every rule revision does: read-then-write against the live entry, the
 write-once original preserved (§5.2), and the same `lb:<entryId>` record so history
-reconciliation treats it identically. It is also the same price as a revision (up to
+reconciliation treats it identically. **Partly superseded (§6.0):** read-then-write
+survives and is now the whole of the door, so the sentence's point holds — a
+condense is not a privileged write. The write-once original and the `lb:` record
+are gone with §5.2 and §6.2, so it names two mechanisms that no longer exist. It is also the same price as a revision (up to
 1024 output tokens, §3.3), so it competes for the same scarce slot — which is
 correct, since a condense that never runs and a revision that never runs both leave
 the World wrong.
@@ -594,6 +622,21 @@ the action most worth reviewing in the Engine tab.
 
 ### 5.2 The user's lorebook is never destroyed
 
+**Superseded — Story Engine keeps no copy of what it replaced (§6.0).** The
+write-once snapshot (`kse-lb-original-<entryId>`, one whole `LorebookEntry` per
+touched entry, written with `setIfAbsent`) existed for a user-facing restore that
+was never built, and restoring what the Engine overwrote is now a separate script's
+concern. Nothing ever read a snapshot back, so it was storage spent on a promise —
+and a promise a writer might reasonably have relied on.
+
+The stance this section argued for is unchanged and still right: **edit in place,
+one authoritative entry per subject, no shadow copies, and never a delete.** What
+changed is that there is no net behind it. The changelog says so in those terms
+rather than pointing at copies nothing can reach: the Engine only ever rewrites
+entries it manages, it never deletes one, the strongest thing it does to an entry
+it no longer wants firing is switch it off — and if the text matters, export the
+lorebook.
+
 Story Engine will edit lorebook entries automatically, and the original content of
 any entry it first touches is preserved in storage as a write-once snapshot. That
 snapshot is a user-facing restore only; the loop never consults it and never
@@ -604,7 +647,63 @@ story is already a single copy operation in the editor.
 
 ## 6. Persistence
 
+**§6.1 through §6.3 describe `historyStorage` and are superseded — read §6.0
+first.** They are kept because they are the record of how branch scoping was
+reasoned about, and because §6.2.1 and §6.3 are the two findings that eventually
+argued the approach out. §6.4's store-boundary argument largely survives and is
+marked where it stands.
+
+### 6.0 Forward-only — the contract that replaced §5.2, §6.1–§6.3 and §7
+
+**The World is a notebook, not a projection of the document.** The writer and the
+Engine keep notes about the story; undoing a paragraph does not unlearn what was
+written down. That is one sentence a writer can hold, and it is the contract Story
+Engine implements.
+
+Everything Story Engine records — the World, the story fields, and the Engine's own
+watermark and intent queue — lives in `storyStorage`, one record each, and moves
+forward only. `historyStorage` is not used anywhere. `onHistoryNavigated` is not
+registered. Nothing reverts when the writer undoes, and nothing is reconciled when
+they navigate.
+
+**What it costs the writer.** Two continuations from one point share one World.
+Explore a branch where Ada dies, back out, and the World still says she is dead. An
+entity or a Thread created on a branch that was backed out of is still there, and
+deleting it is how a writer undoes that — the only way. This is an accepted cost,
+not an oversight, and the changelog states it in those terms.
+
+**Why the alternative was abandoned.** Branch scoping answered a real question —
+undo past a character's creation and the character goes with it — at a price the
+rest of the design kept paying: a node captured at dispatch time (§6.3), a keyspace
+whose deletions are index writes because `remove()` means "revert to the parent"
+(§6.2.1), the off-path write question (§12.1.1), reconciliation for a lorebook that
+does not revert (§7), and write-once snapshots (§5.2) for a restore surface nobody
+built. Two whole-phase reviews found defects in that machinery and a third design
+pass was about to add more. The cost was structural and recurring; the benefit was
+one behaviour that deleting an entity already provides.
+
+**The lorebook half went somewhere better.** "Lorebook entries revert with story
+history" needs no World, no entities and no Threads — it needs `lorebook.entries()`
+and `onHistoryNavigated`, and it would work in a story that had never had Story
+Engine installed. It is a separate script, designed separately, and deliberately not
+specified here.
+
+Story Engine's promise narrows honestly: **Story Engine's records move forward;
+your lorebook is your lorebook's business.**
+
 ### 6.1 Storage scoping
+
+**Superseded (§6.0).** `historyStorage` is not used, so the first row is empty and
+its contents have moved down one: the World, the threads, the DULFS lists, the
+watermark and the intent queue are `storyStorage` records — `kse-world` and
+`kse-engine-loop` — beside the chat and Foundation records this table already put
+there. The lorebook write-records and original snapshots do not exist at all
+(§5.2). The `tempStorage` row and the "not persisted" row are untouched, and the
+reasoning behind the two exceptions below survives intact: chat and Foundation were
+story-scoped for reasons that had nothing to do with the branch, and everything
+else has now joined them for a different reason. **"Foundation is branch-local" was
+already wrong when it was written** — phase 2 moved it to `storyStorage` and §6.2
+records the correction — and is doubly moot now.
 
 | storage          | holds                                                                                 | why                                                       |
 | ---------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------- |
@@ -637,6 +736,17 @@ nearest-ancestor-wins means any later write on the current path shadows it, and
 clearing those overrides would require enumerating descendant nodes.
 
 ### 6.2 Key granularity
+
+**Superseded (§6.0).** There is no keyspace. One `storyStorage` record,
+`kse-world`, holds the World and the story fields; one more, `kse-engine-loop`,
+holds the watermark and the queue together. Every argument below is about
+`historyStorage`'s copy-on-write — the reason a single blob was the worst case is
+that it would snapshot the whole World onto every node that took a write — and with
+`historyStorage` gone the argument has no subject. What replaced it is duller: a
+save writes what the store holds, a load hands it back, and what the newest write
+does not carry is gone. `lb:<entryId>` and `kse-lb-original-<entryId>` are not
+written by anything. The Foundation paragraph stands — that correction was never
+about the branch.
 
 Copy-on-write is per key per node, so granularity is a correctness-adjacent
 performance concern rather than a cosmetic one. Today's single `kse-persist` blob
@@ -681,6 +791,17 @@ cost, since an entity's fields tend to change together.
 
 ### 6.2.1 The index is how deletion works
 
+**Superseded (§6.0) — and this section is the best argument in the document for
+why.** There is no index, because there is nothing for one to be authoritative
+about: `storyStorage.set` overwrites, so a record that omits an id has deleted it.
+Keep the section. It is the sharpest statement of what branch-scoped storage
+actually cost — a delete that means "revert to the parent" is a resurrection bug
+that is silent, branch-dependent, and invisible to every test that does not
+navigate — and the qualifier it already carries ("for the record kinds the index
+names") is a second defect found in the same machinery by a later review. The
+corollary at the end is retained as a warning to anyone who reaches for
+`historyStorage` again.
+
 `list()` inherits ancestor keys (§12.1), so the index is not needed merely to
 enumerate the keyspace. It earns its place for a different and more important
 reason: **`remove()` cannot express a branch-local deletion.**
@@ -714,6 +835,15 @@ Load reads the index, then fans out to the named record keys with `Promise.all`.
 
 ### 6.3 Node capture at dispatch time
 
+**Superseded (§6.0).** `captureNode()` went with `history-store.ts`, and nothing in
+`src/` mentions `nodeId` at all any more. The debounced flush has one place to
+write, so it no longer needs to know which node it belongs to — which is most of
+what this discipline cost to maintain. **The measurement stands**, and it is the
+part worth keeping: two adjacent calls genuinely can disagree about "current" (the
+accident recorded at the end of §12.1.1 is the evidence), so any future code that
+writes to `historyStorage` still has to capture its node rather than trust the
+cursor.
+
 Ordinary writing creates history nodes continuously, and `onHistoryNavigated`
 explicitly does not fire for nodes created during normal editing or generation. A
 debounced flush (currently 2000ms) can therefore land after the current node has
@@ -732,6 +862,17 @@ If two adjacent calls can disagree about "current", a 2000ms debounce certainly 
 
 ### 6.4 The store boundary
 
+**Substantially still true — only the store it names has changed (§6.0).** The
+sync/async argument is why there is a load/persist boundary at all, and there still
+is one: `storyStorage` is async, the store is synchronous by construction because
+`useSyncExternalStore` requires it, and `registerAutosaveEffects` is still where the
+two meet. Two things are superseded. Autosave does not split — there is one target,
+so there is no captured node and no second flush path. And the `history:`
+`storageKey` prefix was never built and now has no reason to exist:
+`src/core/keys.ts` covers `story:` alone. CLAUDE.md's rule about where a prefix
+belongs — the binding site, never the key constant — is unchanged and still the
+only rule that surface needs.
+
 `historyStorage` is entirely async; the store is synchronous by construction
 (`src/ui/bridge.ts:21` — `getSnapshot: () => selector(store.getState())`, as
 `useSyncExternalStore` requires). So `historyStorage` is a load/persist boundary, not
@@ -747,6 +888,37 @@ routing rule CLAUDE.md documents, so the constant/prefix convention in
 binding site only, never embedded in the key constant.
 
 ## 7. History navigation and lorebook reconciliation
+
+**Superseded entire (§6.0). None of this is built, and the section is kept as the
+record of the problem branch scoping created for itself.** `onHistoryNavigated` is
+not registered; `reconcile.ts` and `history-sync.ts` are deleted with their suites;
+the `lb:<entryId>` fingerprints step 3 walks are not written (§5.2, §6.2), so there
+is nothing to compare and nothing to classify.
+
+Three of this section's own findings outlived it, which is why it is worth
+re-reading rather than skipping:
+
+- **Step 2 was never a navigation step, and is now the whole mechanism.** `assess`
+  treats a watermark naming a section the document no longer holds as no watermark
+  at all, so an undo past the watermark makes the next pass re-read rather than
+  skip. `tests/core/engine/assess.test.ts` pins it. Nothing else was ever needed.
+- **"Differing" conflates two causes and must.** The writer edited since, or the
+  Engine wrote a newer version on a branch that was navigated away from — and the
+  only action either could license is overwriting text somebody else last wrote.
+  That is the argument that a fingerprint can classify and never repair, and it is
+  why the restore surface these records were accumulating for never had a safe
+  design to begin with.
+- **A thread entry is enabled exactly when a thread in the World names it and that
+  thread is open.** The rule survives; only its enforcement moved. It used to be
+  applied here across the whole World on every navigation, with three eager
+  callsites as the fast half of a pair. There is no pair now — `applyThreadStatus`,
+  the `open` arm's displacement, and `disableDeletedThreadEntry` are the whole of
+  it, and each says so at its callsite.
+
+**"There is no Engine-specific undo control" stands, for a different reason.** Undo
+is the story editor's own and Story Engine adds nothing beside it — but it no longer
+does anything on Story Engine's behalf either. Deleting an entity or a Thread is the
+writer's undo for the World (§6.0).
 
 `historyStorage` reverts what the Engine _believes_, but the lorebook is global story
 state and is not history-scoped — so it does not revert what the Engine _did_. This
@@ -922,6 +1094,19 @@ three ways to disagree with "on this branch". The branch-truthful number is the
 count of `lb:<entryId>` records at the current node, which §7's reconciliation
 already walks at every navigation; recomputing it there is what makes the slot mean
 what this table says.
+
+**Correct in its diagnosis, superseded in its remedy (§6.0).** The paragraph above
+is right, and is now simply the whole truth rather than a defect awaiting a fix: the
+slot is a session count. The remedy it proposes is gone twice over — neither the
+`lb:` records nor the navigation exists — and `engineTouchedRecounted` was deleted
+with its only dispatcher. So the table row's "entities revised on this branch" is
+wrong three ways: the slot counts **intents the drain reached**, not distinct
+entities; it counts condenses as well as revises; and there is no branch. It resets
+on a reload and on nothing else. `Hud.tsx`'s tooltip is the one surface a writer
+actually reads and it now says exactly that — "lorebook entry rewrite(s), revises
+and condenses alike, since this story was opened; undo does not take them back" —
+with `tests/ui/hud-source.test.ts` asserting the phrases "on this branch" and
+"branch you land on" appear nowhere in it.
 | budget | remaining output bucket | why it's quiet when it's quiet |
 | ⚡ (`zap`) | **the one control** — run a pass now | — |
 
@@ -1026,6 +1211,12 @@ resolution for seeding upgraded stories.
 | reload mid-pass                                  | `tempStorage` in-flight state is gone; pass aborts cleanly, queue survives in `historyStorage`  |
 | thread cap reached                               | triage displaces rather than adds (§4.5)                                                        |
 
+**One row is superseded (§6.0).** "Reload mid-pass" says the queue survives in
+`historyStorage`; it survives in `storyStorage`, in `kse-engine-loop` beside the
+watermark. The guarantee is stronger for the move, not weaker: the pre-drain write
+now carries the advanced watermark and the queue in **one** record, so a reload
+between the enqueue and the drain can no longer find half of a pair.
+
 ## 12. Findings and standing risks
 
 Every question this design opened has been answered — the API unknowns empirically,
@@ -1083,6 +1274,14 @@ make the answer immediate.
 
 ### 12.1 Resolved: historyStorage inheritance and the node argument
 
+**True, and no longer load-bearing (§6.0).** Story Engine does not use
+`historyStorage`, so nothing below governs any code in this repository. This is not
+a design decision that turned out wrong — it is a **measurement of the platform**,
+and the measurement stands. It remains the best available description of how
+NovelAI's per-node storage actually behaves, `tools/history-storage-probe.naiscript`
+is kept for that reason, and a future reader — or the separate lorebook-history
+script (§6.0) — will want it. Read it as a platform note.
+
 Measured with `tools/history-storage-probe.naiscript`:
 
 Write at a node, generate (creating a child), write again, check, undo, check:
@@ -1117,6 +1316,23 @@ list()      = ["marker-1","shared"]
   model in §6 rests on, now measured rather than inferred.
 
 ### 12.1.1 Resolved: writes to an off-path node land; reads from one do not
+
+**True, and no longer load-bearing (§6.0)** — the same standing as §12.1, and for
+the same reason. The flush-on-navigate fix this was measured for does not exist, and
+neither does `tests/helpers/history-fake.ts`, whose read/write asymmetry the third
+bullet defends. Everything measured is still true of the platform:
+`set(key, value, node)` honours an off-path node, `get` is gated on the cursor's
+position at call time rather than on whether the data exists, node ids are opaque
+and non-monotonic, and off-path nodes are not addressable.
+`tools/offpath-write-probe.naiscript` is kept.
+
+The `onHistoryNavigated` type override below has been through both halves of its
+life. It was **written** as specified, and the overload resolved exactly as this
+section predicted — no cast anywhere, the fallback never needed. It has since been
+**removed**, because nothing registers the hook; the `countUncachedInputTokens`
+override in the same file is unrelated and stays. The `.d.ts` defect is still a
+defect and should still be reported to NovelAI, and the sketch below is the working
+fix if anything ever needs it again.
 
 Measured with `tools/offpath-write-probe.naiscript`, added because §12.1 above only
 ever wrote **at the cursor**. The flush-on-navigate fix (phase 2) depends on the
@@ -1267,6 +1483,13 @@ Everything decidable is pure and testable headless, consistent with the existing
   record key (§6.2.1) — the resurrection bug is silent and branch-dependent, so it
   wants a test rather than a comment
 
+**Two of those bullets are superseded (§6.0):** the reconciliation decision table,
+and "deletion goes through the index and never calls `historyStorage.remove()`".
+Both covered machinery that no longer exists, and both suites are deleted with it.
+What replaced the second is smaller and duller — `tests/core/story-store.test.ts`
+round-trips the one record and defends hydration — because deletion is now whatever
+the newest write does not carry.
+
 Plus one guard test in the spirit of `tests/ui/countdown.test.ts`, asserting the HUD
 has not become a second reader of generation status.
 
@@ -1298,6 +1521,15 @@ Nothing in §12 is still unknown, so the plan starts with real work.
 5. **`Thread` replacing `WorldGroup`**, including `advancedConditions`
    construction and the §4.5 controls.
 6. **Actions.** Revise, open, retire, condense — plus §7 reconciliation.
+
+**Phase 2, and phase 6's §7 half, are superseded (§6.0).** Item 2 shipped as
+written — the type override, `historyStorage`, the §6.2 keyspace, node capture at
+dispatch, deletion through the index — and has since been removed in its entirety;
+what is left in its place is the `storyStorage` load/persist boundary it replaced,
+one record for the World and one for the loop. The `onHistoryNavigated` correction
+item 2 opens with outlived the handler that needed it by exactly one task and was
+removed with it. Item 6's four actions all shipped and all stand; "plus §7
+reconciliation" shipped, and is gone.
 
 ### 14.1 Phase 4 as built
 
@@ -1334,7 +1566,13 @@ output is a log line.
 - The loop's state is mirrored into the store but **not persisted**. A pass is a
   moment, not a fact about the story, so every session starts at `idle` with an
   empty backlog. The watermark and the queue are persisted, branch-scoped, as two
-  separate records (§6.2).
+  separate records (§6.2). **Superseded in that last sentence only (§6.0):** they
+  are one story-scoped record, `kse-engine-loop`. The split was bought by
+  copy-on-write — the watermark moves every pass and the queue usually does not —
+  and once that stopped paying, what was left argued the other way: both halves are
+  written by the same code at the same two points in a pass and read together at its
+  start, so two records were only a second thing to keep in step. The rest of the
+  bullet is unchanged; a pass is still a moment, not a fact about the story.
 - `assessing` is effectively never observable — the whole pass is one async
   function and only `triaging` lasts long enough to paint. Do not design a HUD slot
   around seeing it. `backlog` can also move without `phase` moving, which is what
@@ -1376,7 +1614,9 @@ output is a log line.
   this bullet as history, not as an instruction to a later phase.
 - **`lb:<entryId>` write-records** (§6.2) and **`createCancellationSignal` for
   stopping the Engine** (§3.4). Nothing writes a lorebook entry, and there is
-  nothing expensive to cancel while drain only logs.
+  nothing expensive to cancel while drain only logs. **The write-records arrived in
+  phase 6 and have gone again (§6.0). `createCancellationSignal` is still not
+  built.**
 
 **Where the build corrected this document.**
 
@@ -1598,6 +1838,11 @@ both. Mirroring the number a second time into `WorldState` was the obvious
 alternative and the wrong one — that would put a storyStorage setting inside the
 branch-persisted world, where `applyRecords`' `{...initialWorldState}` silently
 resets it on every history navigation, so the cap would revert to 8 on undo.
+**The conclusion stands; the reason is superseded (§6.0).** There is no
+branch-persisted world and no navigation rehydrate, so nothing would reset a
+mirrored copy any more. What survives is the plain argument this vivid one was
+standing in front of: a number mirrored into two slices is a number that can
+disagree with itself, and the cap belongs where the Engine's other settings live.
 
 **What this phase deliberately does not do.** It does not attach a condition to an
 entry, does not disable a satisfied thread's entry (§4.4's flag flip has no caller,
@@ -1605,7 +1850,11 @@ so satisfaction sets a flag only the writer and the cap read), does not expire
 anything, and does not bind a thread to a lorebook entry at all — so §7's
 reconciliation has nothing yet to reconcile. All four are phase 6, and the binding
 and the reconciliation have to arrive together: a displacement is free only while
-there is no entry behind the thread.
+there is no entry behind the thread. **Superseded (§6.0).** They did arrive
+together, exactly as this paragraph required, and forward-only then deleted the
+reconciliation and kept the binding. The requirement was real and is answered
+elsewhere: the displacement disables the orphan where it happens (§4.5, §7), which
+was always the better of the two answers.
 
 **Where the build corrected this document.**
 
@@ -1677,6 +1926,28 @@ phase 5's forgetting detector, and a thread the prose settles — or one the sto
 walked away from — has that entry switched off. History navigation reconciles what
 was written. The Engine is still **off by default**, and everything below happens
 only for a writer who switched it on in that story.
+
+**Forward-only removed one of the four things this phase shipped (§6.0), and the
+bullets below are marked here rather than one at a time.** "History navigation
+reconciles what was written" is superseded, and with it: the door's `setIfAbsent`
+of the §5.2 original and its record of the write at a captured node (the door keeps
+only the read — 228 lines to 54); the "**Reconciliation is unconditional**" bullet
+entire, including its two lorebook reads for a story the Engine never ran in; the
+clause in "**A thread's entry is created outside the door**" about §7 seeing a
+thread entry only through its `enabled` flag; "the `lb:` records are written so
+reconciliation works" in the review-list bullet; the phrase "classified
+`ours`/`theirs` on every navigation" in the full-entry-rewrite correction; and the
+"**`touched` is branch-truthful only after a navigation**" bullet, whose remedy is
+answered in §9.1. In the paragraph-count correction, the pace gate's second
+disjunct stays but not for the reason given — see §4.3.
+
+Two of them are worth keeping in view rather than merely crossing out. The
+full-entry-rewrite correction is the argument that the writer's own hand-pressed
+Generate must not be counted as the Engine's activity, and that argument is why the
+HUD's rewrite count means what it means even now that no record backs it. And the
+review-list bullet's honest note — "nothing reads either back through a UI. The
+writer's recourse this phase is the editor's own undo" — is the sentence that made
+the write-once snapshot indefensible once undo stopped moving the World.
 
 **What is true now.**
 
