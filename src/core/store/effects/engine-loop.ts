@@ -52,6 +52,7 @@ import { readCondenseMark, worthCondensing } from "../../engine/condense";
 import { expiredThreads, renewedThreads } from "../../engine/thread-cap";
 import {
   backoffMs,
+  isBudgetHold,
   isConcurrencyRefusal,
   MAX_ATTEMPTS,
 } from "../../engine/refusal";
@@ -368,7 +369,18 @@ async function generateTriage(
   assessment: ReturnType<typeof assess>,
   log: EngineLog,
 ): Promise<string> {
-  const params = { ...(await triageParams()), maxRetries: 0 };
+  // `fastRejection` (GenX 0.5.0): refuse rather than queue or park. §3.5 says a
+  // background loop must not demand a Continue click, and GenX's parked status
+  // is instance-wide — one held Engine call flags the whole queue, which the
+  // header renders as a Continue widget for work the writer never asked for.
+  // Rejecting instead hands the decision back here, where the next wakeup is
+  // the retry. `maxRetries: 0` is now GenX's own default for such a task; it
+  // stays explicit because the reason is ours (see the revise arm).
+  const params = {
+    ...(await triageParams()),
+    maxRetries: 0,
+    fastRejection: true,
+  };
 
   for (let attempt = 1; ; attempt++) {
     try {
@@ -649,7 +661,22 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
         ),
       );
     } catch (error) {
-      // Rule 3. The classifier decides, not this callsite.
+      // A budget hold is not a failure. GenX's `fastRejection` refuses rather
+      // than parking (§3.5), and "the bucket could not cover this" is exactly
+      // what §9.1's ⏸ says — a resting phase the next wakeup retries — where
+      // `failed` lights the ⚠ that means something is wrong. Reporting a
+      // routine hold as a failure would put a warning on the always-on surface
+      // every time the writer ran SEGA.
+      if (isBudgetHold(error)) {
+        dispatch(engineLoopEvent({ type: "budgetExhausted" }));
+        await log("[engine] holding — GenX declined for budget");
+        return;
+      }
+
+      // Rule 3. The classifier decides, not this callsite. A budget hold has
+      // already returned above, so a collision is the only routine outcome that
+      // can still reach here — asking a broader question would be generality
+      // no input can exercise.
       const retryable = isConcurrencyRefusal(error);
       // The machine first, the account of it second: the HUD is the always-on
       // surface and the log is opt-in, so nothing the log does may come between

@@ -1229,3 +1229,34 @@ describe("no Engine action can write around the write door", () => {
     expect(src).not.toContain("api.v1.lorebook.updateEntry");
   });
 });
+
+describe("every Engine generation refuses rather than parks (§3.5)", () => {
+  const SRC = join(__dirname, "../../../src/core/engine");
+
+  // A source scan, because the alternative is a mock that proves GenX was
+  // called with a flag rather than that EVERY call carries it. The failure is
+  // silent and remote: a call without it parks, GenX's parked status is
+  // instance-wide, and the header renders a Continue widget for background work
+  // the writer never asked for.
+  it("execute.ts passes fastRejection on every genX.generate", () => {
+    const src = readFileSync(join(SRC, "execute.ts"), "utf8");
+    const calls = src.split(/genX\.generate\(/).slice(1);
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      // The params object is the second argument; `fastRejection` must appear
+      // before the call's closing depth. Cheap proxy: within the next 900
+      // characters, which comfortably covers the longest param block here.
+      expect(call.slice(0, 900)).toContain("fastRejection: true");
+    }
+  });
+
+  it("the pass's triage params carry it too", () => {
+    // engine-loop builds its params in a helper rather than inline, so the
+    // per-call scan above cannot see them.
+    const src = readFileSync(
+      join(SRC, "../store/effects/engine-loop.ts"),
+      "utf8",
+    );
+    expect(src).toContain("fastRejection: true");
+  });
+});

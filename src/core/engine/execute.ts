@@ -309,6 +309,11 @@ async function revise(
           // the pass, its node and its re-entry guard. The drain requeues a
           // refused revise instead — see `drain`.
           maxRetries: 0,
+          // §3.5: a background loop has no business demanding a Continue click.
+          // Without this GenX parks on a short bucket, and its parked status is
+          // instance-wide — one held Engine call flags the whole queue, which the
+          // header renders as a Continue widget for work nobody asked for.
+          fastRejection: true,
           taskId: `engine-revise-${api.v1.uuid()}`,
         },
         undefined,
@@ -386,6 +391,11 @@ async function condense(
         {
           ...(await condenseParams()),
           maxRetries: 0,
+          // §3.5: a background loop has no business demanding a Continue click.
+          // Without this GenX parks on a short bucket, and its parked status is
+          // instance-wide — one held Engine call flags the whole queue, which the
+          // header renders as a Continue widget for work nobody asked for.
+          fastRejection: true,
           taskId: `engine-condense-${api.v1.uuid()}`,
         },
         undefined,
@@ -464,6 +474,11 @@ async function open(
     {
       ...(await openParams()),
       maxRetries: 0,
+      // §3.5: a background loop has no business demanding a Continue click.
+      // Without this GenX parks on a short bucket, and its parked status is
+      // instance-wide — one held Engine call flags the whole queue, which the
+      // header renders as a Continue widget for work nobody asked for.
+      fastRejection: true,
       taskId: `engine-open-${api.v1.uuid()}`,
     },
     undefined,

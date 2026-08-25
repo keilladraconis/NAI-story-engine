@@ -1552,10 +1552,33 @@ work, and was rejected: it costs the serialisation that keeps the Engine from
 colliding with SEGA and the Forge, and adds a second `onGenerationRequested`
 registration to a codebase where one-callback-per-hook has already bitten twice.
 
-The residual is a Continue widget that appears only while the Engine is genuinely
-blocked, clears on the writer's next generation, and does the right thing if
-pressed. **Closing it needs an upstream change: a per-task "do not park" that
-rejects instead of waiting.**
+**Closed in `nai-gen-x` 0.5.0.** The analysis above is right about the library as
+it stood and wrong about who could fix it: GenX is not NovelAI's, it is this
+project's own package. The change it needed was the one the analysis names — a
+per-task "do not park" — and it now exists as `params.fastRejection`.
+
+It is better than the sketch in two ways. It also refuses `reason: "busy"`
+**before enqueueing**, so the Engine never queues behind a SEGA run either; and the
+budget throw is placed before the `waiting_for_user` broadcast, so the Continue
+widget never flashes rather than merely clearing quickly. The error is **branded**
+(`isFastRejection: true`) rather than relying on `instanceof`, which matters
+because the bundle inlines GenX — the same duplicated-module trap §12.0 recorded
+for the concurrency refusal.
+
+The Engine reads it through `refusal.ts`, which now answers two questions instead
+of one. `"busy"` is the same event as the backend's concurrency refusal arriving
+earlier, so `isConcurrencyRefusal` covers both and the in-pass backoff applies.
+`"budget"` is not a collision and gets `isBudgetHold`: a bucket refills over
+minutes and only while the writer interacts, so waiting inside the pass would hold
+the node and the re-entry guard for nothing. It ends the pass as `budgetExhausted`
+— §9.1's ⏸, a resting phase the next wakeup retries — rather than as `failed`,
+which would light the ⚠ every time the writer ran SEGA.
+
+**The pass keeps its own output pre-check.** It duplicates GenX's decision, which
+would normally argue for deleting it, and it earns its place anyway: `ensureBudget`
+tokenizes every message _before_ it can fast-reject, so the pre-check saves a
+`tokenizer.encode` over the triage prompt's whole layered prefix on every blocked
+wakeup. Worth revisiting if GenX ever short-circuits on output before tokenizing.
 
 ### 14.2 Phase 5 as built
 

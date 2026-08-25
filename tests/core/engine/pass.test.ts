@@ -1477,6 +1477,53 @@ describe("the pass", () => {
       expect(reads.length).toBe(1);
     });
   });
+
+  describe("GenX declines rather than parking (§3.5)", () => {
+    /** GenX 0.5.0's rejection, by shape — the bundle inlines GenX, so nothing may
+     *  depend on the prototype. */
+    const rejected = (reason: string) => ({
+      isFastRejection: true,
+      reason,
+      name: "FastRejectionError",
+      message: `rejected: ${reason}`,
+    });
+
+    it("reads a budget rejection as held, not as a failure", async () => {
+      // ⏸ says "the budget cannot cover the next step", which is exactly what
+      // happened. ⚠ says something is wrong. Reporting a routine hold as a
+      // failure would put a warning on the always-on surface every time the
+      // writer ran SEGA — the outcome §9.1 forbids.
+      const h = harness();
+      triageRejects(h, rejected("budget"));
+
+      await h.runPass();
+
+      expect(h.store.getState().engine.phase).toBe("held");
+      expect(h.store.getState().engine.consecutiveFailures).toBe(0);
+    });
+
+    it("counts a busy rejection as the collision it is, not toward a stall", async () => {
+      // GenX refuses before the call goes out; the backend refuses after. One
+      // event, and neither may march the loop toward `stalled`.
+      const h = harness();
+      triageRejects(h, rejected("busy"));
+
+      await h.runPass();
+
+      expect(h.store.getState().engine.consecutiveFailures).toBe(0);
+    });
+
+    it("still stalls on something genuinely wrong", async () => {
+      // The counter has to survive: a hold that spared everything would remove
+      // the only signal §3.4 has that the loop is broken.
+      const h = harness();
+      triageRejects(h, new Error("the lorebook exploded"));
+
+      await h.runPass();
+
+      expect(h.store.getState().engine.consecutiveFailures).toBe(1);
+    });
+  });
 });
 
 describe("the trigger's other job", () => {

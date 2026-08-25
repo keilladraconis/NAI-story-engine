@@ -24,6 +24,18 @@
 
 const REFUSAL = "generation is already in progress";
 
+/** GenX 0.5.0's fast rejection, read by SHAPE for the same reason the message
+ *  match below is: the bundle inlines GenX, so `instanceof FastRejectionError`
+ *  would fail across a duplicated module. Upstream anticipated that and brands
+ *  the error with `isFastRejection: true` precisely so a consumer can avoid the
+ *  prototype — this reads the brand and the reason, nothing else. */
+function fastRejectionReason(error: unknown): string | null {
+  if (typeof error !== "object" || error === null) return null;
+  const branded = error as { isFastRejection?: unknown; reason?: unknown };
+  if (branded.isFastRejection !== true) return null;
+  return typeof branded.reason === "string" ? branded.reason : null;
+}
+
 /** Total attempts one firing may make: the original call plus its retries. So
  *  `backoffMs` schedules `MAX_ATTEMPTS - 1` waits and then gives up. */
 export const MAX_ATTEMPTS = 3;
@@ -42,11 +54,28 @@ function messageOf(error: unknown): string {
   return "";
 }
 
-/** True only for the backend's concurrency refusal — a routine collision with
- *  the writer, which is self-clearing and must never count toward a stall.
- *  Everything else, recognised or not, is false. */
+/** True for a routine collision with the writer — self-clearing, never a stall,
+ *  and worth waiting a moment for.
+ *
+ *  Two arrivals, one event. The backend refuses a concurrent request after the
+ *  call goes out; GenX's `fastRejection` refuses one *before* it does, when a
+ *  task is already executing or queued. The Engine's response is the same
+ *  either way, so they answer the same question. Everything else, recognised or
+ *  not, is false. */
 export function isConcurrencyRefusal(error: unknown): boolean {
+  if (fastRejectionReason(error) === "busy") return true;
   return messageOf(error).toLowerCase().includes(REFUSAL);
+}
+
+/** True when GenX declined for want of budget rather than queueing behind it.
+ *
+ *  **Not the same as a collision, and the difference is the retry.** A collision
+ *  clears in milliseconds, so `backoffMs` waits and tries again. A bucket
+ *  refills over minutes and only while the writer is interacting (§3.3), so
+ *  waiting inside the pass would hold the node and the re-entry guard for
+ *  nothing. This ends the pass; the next wakeup is the retry. */
+export function isBudgetHold(error: unknown): boolean {
+  return fastRejectionReason(error) === "budget";
 }
 
 /** Delay before retry number `attempt`, or null to give up — at which point the

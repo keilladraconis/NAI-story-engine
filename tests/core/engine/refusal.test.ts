@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  isBudgetHold,
   isConcurrencyRefusal,
   backoffMs,
   MAX_ATTEMPTS,
@@ -145,5 +146,68 @@ describe("backoffMs", () => {
       total += backoffMs(attempt) ?? 0;
     }
     expect(total).toBeLessThanOrEqual(5000);
+  });
+});
+
+// ─────────────────── GenX 0.5.0's fast rejection (§3.5) ───────────────────
+
+/** What GenX throws — reproduced by shape, not imported, because that is how
+ *  the classifier reads it and a test that imported the class would prove the
+ *  prototype path our bundle cannot rely on. */
+const fastRejection = (reason: string, extra: object = {}) => ({
+  isFastRejection: true,
+  reason,
+  name: "FastRejectionError",
+  message: `rejected: ${reason}`,
+  ...extra,
+});
+
+describe("fast rejection", () => {
+  it("reads a busy rejection as the collision it is", () => {
+    // Two arrivals of one event: the backend refuses after the call goes out,
+    // GenX refuses before it does. The Engine's answer is the same.
+    expect(isConcurrencyRefusal(fastRejection("busy"))).toBe(true);
+    expect(isBudgetHold(fastRejection("busy"))).toBe(false);
+  });
+
+  it("reads a budget rejection as a hold, not a collision", () => {
+    // The difference is the retry: a collision clears in milliseconds and is
+    // worth a backoff; a bucket refills over minutes and only while the writer
+    // interacts, so waiting inside the pass would hold the node for nothing.
+    expect(
+      isBudgetHold(fastRejection("budget", { retryAfterMs: 90_000 })),
+    ).toBe(true);
+    expect(isConcurrencyRefusal(fastRejection("budget"))).toBe(false);
+    expect(backoffMs(1)).not.toBeNull();
+  });
+
+  it("leaves a real failure to neither", () => {
+    // The stall counter has to survive: a hold that spared everything would
+    // remove the only signal §3.4 has that the loop is broken.
+    const real = new Error("the lorebook exploded");
+    expect(isConcurrencyRefusal(real)).toBe(false);
+    expect(isBudgetHold(real)).toBe(false);
+  });
+
+  it("reads the brand, never the prototype", () => {
+    // The bundle inlines GenX, so `instanceof FastRejectionError` fails across
+    // a duplicated module — the same trap §12.0 recorded for the concurrency
+    // refusal. Upstream brands the error for exactly this; a plain object
+    // carrying the brand must classify, and a real Error without it must not.
+    expect(isBudgetHold({ isFastRejection: true, reason: "budget" })).toBe(
+      true,
+    );
+    const impostor = new Error("rejected: budget");
+    expect(isBudgetHold(impostor)).toBe(false);
+  });
+
+  it("ignores a brand with no reason, and a reason with no brand", () => {
+    expect(isBudgetHold({ isFastRejection: true })).toBe(false);
+    expect(isBudgetHold({ reason: "budget" })).toBe(false);
+    expect(isBudgetHold({ isFastRejection: "yes", reason: "budget" })).toBe(
+      false,
+    );
+    expect(isBudgetHold(null)).toBe(false);
+    expect(isBudgetHold(undefined)).toBe(false);
   });
 });
