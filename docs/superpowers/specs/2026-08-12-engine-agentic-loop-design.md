@@ -1774,6 +1774,26 @@ only for a writer who switched it on in that story.
   it, paid for in a persisted enum, a status icon, and a reducer branch. It
   becomes worth building when something behaves differently for it, and the review
   surface is the obvious candidate.
+- **The forgetting detector is verified against the real matcher.** Every unit test
+  in the codebase asserts the condition Story Engine _emits_; that NovelAI's matcher
+  agrees with it is a different claim, and nothing had ever checked it. Measured on
+  the same run, one story:
+
+  ```
+  "corner" (last word of the prose)  range 4000    silent   — the subject is on the page
+  "corner"                           range 14418   silent   — still on the page
+  "zqxjkv7c1f95" (in no prose)       range 14418   ACTIVE   — the subject is gone
+  ```
+
+  Quiet while the story carries the subject, speaking once it goes missing. That is
+  §4.1's whole premise, and it now rests on a measurement rather than on a reading
+  of the `.d.ts`.
+
+  `range` is confirmed to be a character window ("how far back to search in
+  characters", and it behaves that way): a subject 6700 characters back is _not_
+  found by a 4000-character probe. So `THREAD_RANGE_CHARS`' 1000 / 4000 / 12000
+  really do buy the beat, the scene and the chapter §4.3 claims for them.
+
 - **`Assessment.paragraphCount` MATCHES NovelAI's own `paragraphCount` — measured,
   not assumed.** This shipped as an open assumption: the anchor is compared against
   the lorebook's condition variable, so the two counters must count the same thing,
