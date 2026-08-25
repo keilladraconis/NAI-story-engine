@@ -2,7 +2,7 @@
 compatibilityVersion: naiscript-1.0
 id: 3a7c1f95-6b28-4d03-9e14-c5f8a2b70d61
 name: Paragraph Count Probe
-version: 0.5.0
+version: 0.6.0
 description: Does NovelAI's paragraphCount condition variable count what document.scan() counts?
 memoryLimit: 8
 ---*/
@@ -141,7 +141,7 @@ async function run() {
     text: SENTINEL,
     keys: [],
     enabled: true,
-    forceActivation: true,
+    forceActivation: false,
     category: categoryId,
     advancedConditions: gate("paragraphCount", 1),
   });
@@ -225,30 +225,27 @@ async function run() {
   log("");
 
   if (onImpossible && !offImpossible && offTrue) {
-    log("ANSWER: Always On OVERRIDES the condition, and conditions work fine");
-    log("without it. This is a REAL DEFECT in Story Engine, not just the gate:");
-    log("thread-bind.ts sets forceActivation TRUE *and* a condition, so every");
-    log("thread entry is permanently always-on and the forgetting detector");
-    log("phase 5 built never fires. §4.3's composition has to change — drop");
-    log("forceActivation and let the condition alone do the activating.");
-    return;
-  }
-  if (onImpossible && offImpossible) {
+    log("ANSWER: Always On OVERRIDES the condition, and a condition activates");
+    log("an entry perfectly well on its own. This is what phases 5 and 6 got");
+    log("wrong — they shipped forceActivation TRUE beside the detector, so it");
+    log("never fired once. Fixed: createThreadEntry now sets it false with no");
+    log("keys, and the condition does the activating. Carrying on.");
+  } else if (onImpossible && offImpossible) {
     log("ANSWER: the condition is ignored either way — an impossible gate still");
     log("reaches context with Always On OFF. Conditions are not being evaluated");
     log("at all here. Nothing built on advancedConditions can work; read the");
     log("script log and check the condition shape against the .d.ts.");
     return;
-  }
-  if (!offTrue) {
+  } else if (!offTrue) {
     log("ANSWER: an always-true condition with Always On off does NOT activate,");
     log("so a condition cannot activate an entry by itself — it can only filter");
     log("one that some other mechanism already selected. That is phase 5's");
     log("dead end arriving for real: keys cannot select it (the detector negates");
     log("them) and Always On overrides it. The detector needs a new design.");
     return;
+  } else {
+    log("ANSWER: Always On does not override the condition. Carrying on.");
   }
-  log("ANSWER: Always On does not override the condition. Carrying on.");
 
   // ── the control ──────────────────────────────────────────────────────────
   //
@@ -358,6 +355,64 @@ async function run() {
     log("~400 for a paragraph. If it is far below that, the variable is counting");
     log("something smaller than a paragraph (lines? sentences?) and the anchor");
     log("must be recorded in THAT unit, not in sections.");
+  }
+
+  // ── the forgetting detector itself ───────────────────────────────────────
+  //
+  // Everything above is about the pacing gate. This is the mechanism the whole
+  // design rests on: `not( key <subject> in ['story'] within range N )`, which
+  // must be SILENT while the subject is on the page and ACTIVE once it is gone.
+  // Nothing had ever exercised it against the real matcher — the unit tests
+  // assert the shape we emit, which is a different claim entirely.
+
+  log("");
+  log("the forgetting detector, against the real matcher:");
+
+  // A word certainly in the prose, and one certainly not.
+  const words = sections
+    .map((sec) => (sec.section.text || "").match(/[A-Za-z]{6,}/g) || [])
+    .reduce((a, b) => a.concat(b), []);
+  if (words.length === 0) {
+    log("  no word of 6+ letters in the prose — skipping");
+  } else {
+    const present = words[Math.floor(words.length / 2)].toLowerCase();
+    const absent = "zqxjkv" + SENTINEL.slice(-6).toLowerCase();
+
+    const detector = (key) => [
+      {
+        type: "not",
+        condition: { type: "key", key, in: ["story"], range: 4000 },
+      },
+    ];
+
+    const onPresent = await reaches(entryId, {
+      forceActivation: false,
+      keys: [],
+      advancedConditions: detector(present),
+    });
+    const onAbsent = await reaches(entryId, {
+      forceActivation: false,
+      keys: [],
+      advancedConditions: detector(absent),
+    });
+
+    log(`  subject "${present}" IS in the prose   ${onPresent ? "ACTIVE" : "silent"}   (expect silent)`);
+    log(`  subject "${absent}" is NOT             ${onAbsent ? "ACTIVE" : "silent"}   (expect ACTIVE)`);
+    log("");
+    if (!onPresent && onAbsent) {
+      log("  DETECTOR WORKS. Quiet while the story carries the subject, and it");
+      log("  speaks once the subject goes missing — which is the whole design.");
+    } else if (onPresent && onAbsent) {
+      log("  DETECTOR ALWAYS FIRES — the `key` condition is not matching, so");
+      log("  `not(...)` is always true. Every thread would remind constantly.");
+      log("  Check `in: ['story']` and the range against the .d.ts.");
+    } else if (!onPresent && !onAbsent) {
+      log("  DETECTOR NEVER FIRES — `not(...)` is always false, so no thread");
+      log("  would ever remind. This is the silence §4.3 refuses.");
+    } else {
+      log("  DETECTOR INVERTED — it fires while the subject is present and goes");
+      log("  quiet when it is absent, which is exactly backwards.");
+    }
   }
 
   log("");

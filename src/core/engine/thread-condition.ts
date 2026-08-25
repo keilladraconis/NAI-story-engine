@@ -18,6 +18,13 @@
 //
 // Nothing in `src/` used `advancedConditions` before this file, so there is no
 // house style: every shape below is read off `external/script-types.d.ts`.
+//
+// **The entry carrying this condition must not be `forceActivation: true`.**
+// Always On overrides `advancedConditions` outright — measured, see
+// `thread-bind.ts`'s `createThreadEntry` — so an always-on entry is one whose
+// detector never fires, which is precisely the blanket always-on this file
+// exists to replace. The condition activates the entry on its own; it needs no
+// keys and no help.
 
 import { nameKey } from "../store/effects/handlers/lorebook";
 import { THREAD_GRACE_PARAGRAPHS, THREAD_RANGE_CHARS } from "./thread-horizon";

@@ -401,15 +401,32 @@ or renews a thread; only then does the equation have a meaningful left-hand side
 
 Nothing in `src/` used `advancedConditions` before `src/core/engine/thread-condition.ts`.
 
-**A thread's entry is `forceActivation: true` and carries no keys, and this section
-never said so.** It is load-bearing, by the identical argument that kills the `lore`
-gate above: a key-activated entry must have one of its keys present to be considered
-at all, and this entry's condition negates exactly the strings it would be keyed on
-— so a keyed thread entry could never fire. Always-on with the condition as the gate
-is the only composition that expresses "inject when the story has stopped mentioning
-this". The section designs the condition in complete detail and is silent on what
-activates the entry carrying it; that silence would have shipped a detector that
-never fires.
+**A thread's entry carries no keys and is NOT always-on: the condition activates it
+by itself.** This section designs the condition in complete detail and is silent on
+what activates the entry carrying it, and that silence cost two phases.
+
+The keys half of the argument is right: a key-activated entry must have one of its
+keys present to be considered at all, and this entry's condition negates exactly the
+strings it would be keyed on — so a keyed thread entry could never fire, which is
+the `lore`-gate contradiction arriving through the keys. Phases 5 and 6 concluded
+from that that the entry had to be `forceActivation: true` with the condition as a
+gate, and shipped it.
+
+**`forceActivation` overrides `advancedConditions`.** Measured against the runtime
+with `tools/paragraph-count-probe.naiscript`, one story, three shapes:
+
+```
+Always On + impossible condition   ACTIVE     — the condition is ignored
+not On    + impossible condition   inactive   — it is evaluated
+not On    + always-true condition  ACTIVE     — it can activate on its own
+```
+
+So the detector never fired once, and every thread entry was the blanket always-on
+this construction exists to replace — inert in the way that looks healthiest, the
+condition present on the entry and correct in every particular and simply never
+consulted. The third row is the option nobody had tested: the remaining composition
+was never "always-on plus a gate", it is the condition activating the entry with
+nothing else involved. `keys: []`, `forceActivation: false`.
 
 **"Since this thread last fired" is unobtainable, not merely deferred.** Phase 5
 deferred the pacing gate for an anchor that would give the equation a meaningful
@@ -1363,6 +1380,17 @@ output is a log line.
 
 **Where the build corrected this document.**
 
+- **The forgetting detector never fired, and the suite was green through two phases
+  and a whole-phase review.** `forceActivation` overrides `advancedConditions` (see
+  §4.3's phase-6 correction for the measurement), and both phases shipped a thread
+  entry that set it beside the detector. The failure has no symptom a test could
+  see: an always-on entry carrying a correct condition is indistinguishable from a
+  working one to anything that inspects the condition, and **two tests asserted the
+  defect as a guarantee**, complete with a comment explaining why it had to be that
+  way. That is the second time on this branch a green, specific, well-commented test
+  was pinning a bug — the first was the DRAFT-name case in the phase-6 review.
+  Nothing in the codebase could have caught either; only the runtime could.
+
 - **A hand-dispatched `threadStatusSet` reached nothing, and `thread-bind.ts`'s own
   comment said otherwise.** It read "`threadStatusSet` is answered by the entry's
   `enabled` flag rather than by a condition" — and nothing answered it. The action
@@ -1665,7 +1693,7 @@ only for a writer who switched it on in that story.
   fallen far enough behind. Renewal runs immediately before expiry, so a thread
   the prose just named cannot be retired on the strength of an anchor the same
   pass was about to move.
-- **Thread entries live in their own `SE: Threads` category**, always on, with no
+- **Thread entries live in their own `SE: Threads` category**, with no
   keys, and only the Engine's `open` creates one. `ensureNamedCategory` is called
   at creation; reconciliation only ever _finds_ that category, since minting it
   would put an `SE: Threads` in the lorebook of a writer who never switched the
