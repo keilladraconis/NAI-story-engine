@@ -2,7 +2,7 @@
 compatibilityVersion: naiscript-1.0
 id: 3a7c1f95-6b28-4d03-9e14-c5f8a2b70d61
 name: Paragraph Count Probe
-version: 0.2.0
+version: 0.3.0
 description: Does NovelAI's paragraphCount condition variable count what document.scan() counts?
 memoryLimit: 8
 ---*/
@@ -21,8 +21,14 @@ memoryLimit: 8
 // TRUE only degrades to the old always-on, which is survivable.)
 //
 // No generation, no output budget. `buildContext()` runs the real context builder
-// and our own `onContextBuilt` hook sees the entry's `active` flag — the answer read
-// directly, rather than inferred from what a model wrote.
+// and RETURNS the messages, so an active entry's text is simply in them.
+//
+// v0.2 read the `active` flag out of an `onContextBuilt` hook instead, and the hook
+// never fired — `buildContext` documents `suppressScriptHooks: 'self' | 'all'`,
+// which only means anything if it normally runs those hooks, so either the typings
+// and the runtime disagree here or a dry-run build skips them. Either way the hook
+// was a dependency this probe never needed: the returned messages are the same
+// answer, read one layer lower, with nothing to fire or miss.
 //
 // METHOD. **One** probe entry, gated on `paragraphCount >= k` in the same
 // single-term shape `paceGate` emits in production. Binary search k by rewriting
@@ -52,13 +58,9 @@ function log(line) {
   void api.v1.ui.updateParts([{ id: "report", text: report }]);
 }
 
-// The hook is how activation is read. `api.v1.hooks.register` holds ONE callback
-// per hook name, so a probe must be the only thing registering it — which it is,
-// running alone in a scratch story.
-let seen = null;
-api.v1.hooks.register("onContextBuilt", (params) => {
-  seen = params.lorebookEntries;
-});
+// A string the story could not contain by accident. Its presence in the built
+// context IS the activation signal.
+const SENTINEL = "PARAGRAPH-COUNT-PROBE-3a7c1f95";
 
 function gate(k) {
   return [
@@ -71,15 +73,20 @@ function gate(k) {
   ];
 }
 
-/** Is `paragraphCount >= k`? Rewrites the probe's gate and rebuilds. */
+/** Is `paragraphCount >= k`? Rewrites the probe's gate, rebuilds, and looks for
+ *  the sentinel in the result. An entry whose condition fails is not inserted, so
+ *  the sentinel's presence and the gate's truth are the same fact.
+ *
+ *  `forGeneration: true` because that is the build the writer actually gets, and
+ *  the doc warns it can change behaviour — measuring the other one would answer a
+ *  question nobody asked. */
 async function holdsAt(entryId, k) {
   await api.v1.lorebook.updateEntry(entryId, { advancedConditions: gate(k) });
-  seen = null;
-  await api.v1.buildContext();
-  if (!seen) throw new Error("onContextBuilt did not fire");
-  const row = seen.find(([id]) => id === entryId);
-  if (!row) throw new Error("the probe entry was not in the built context");
-  return row[1].active === true;
+  const messages = await api.v1.buildContext({ forGeneration: true });
+  if (!messages || messages.length === 0) {
+    throw new Error("buildContext returned nothing");
+  }
+  return messages.some((m) => (m.content || "").includes(SENTINEL));
 }
 
 async function ensureCategory() {
@@ -119,7 +126,7 @@ async function run() {
   const entryId = await api.v1.lorebook.createEntry({
     id: api.v1.uuid(),
     displayName: "paragraphCount probe",
-    text: "paragraphCount probe",
+    text: SENTINEL,
     keys: [],
     enabled: true,
     forceActivation: true,
@@ -127,7 +134,26 @@ async function run() {
     advancedConditions: gate(1),
   });
   await api.v1.storyStorage.set(LEDGER, { entryId });
+
+  // Prove the sentinel channel works before trusting a negative from it. An
+  // always-true gate must be visible; if it is not, every later "no" would be a
+  // false negative and the search would report 0 with total confidence.
+  await api.v1.lorebook.updateEntry(entryId, {
+    advancedConditions: [{ type: "true" }],
+  });
+  const visible = (await api.v1.buildContext({ forGeneration: true })).some(
+    (m) => (m.content || "").includes(SENTINEL),
+  );
+  if (!visible) {
+    log("");
+    log("An unconditional probe entry did NOT reach the built context.");
+    log("Something upstream of the gate is dropping it — a token limit, or");
+    log("lorebook entries not being included in this build. The search would");
+    log("read every gate as false, so it is not run. Press Clean up.");
+    return;
+  }
   log("");
+  log("sentinel visible with an always-true gate — the channel works");
   log("searching…");
 
   // `paragraphCount >= 0` is true of any count and proves nothing, so the search
