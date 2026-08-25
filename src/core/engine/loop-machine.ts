@@ -48,7 +48,12 @@ export type LoopPhase =
 export type Intent =
   | { kind: "revise"; entityId: string; prose: string }
   | { kind: "open"; subject: string; prose: string }
-  | { kind: "retire"; threadId: string }
+  /** `why` is the STATUS to write, not a log label: expiry and triage both
+   *  retire, and telling a writer their abandoned commitment was "satisfied"
+   *  is the one thing the third status exists to stop. It is deliberately not
+   *  part of `intentKey` — the same thread is the same work however it was
+   *  named, and a queue holding both would retire it twice. */
+  | { kind: "retire"; threadId: string; why: "satisfied" | "abandoned" }
   | { kind: "condense"; entryId: string };
 
 export type LoopState = {

@@ -146,9 +146,13 @@ function formatEntities(entities: TriageEntity[]): string {
 function formatThreads(threads: TriageThread[], threadCap: number): string {
   const cap = effectiveCap(threadCap);
   const lines = threads.map((t) => {
-    const satisfied = t.status === "satisfied";
-    const tags = satisfied ? `${t.horizon}, satisfied` : t.horizon;
-    const text = satisfied ? "" : t.text.trim();
+    // Either retired reading is closed and must not be raised again — but the
+    // tag carries the REAL one. Labelling an abandoned thread "satisfied"
+    // would tell the model the story settled something it walked away from,
+    // which is the same lie the third status exists to stop telling the writer.
+    const closed = t.status !== "open";
+    const tags = closed ? `${t.horizon}, ${t.status}` : t.horizon;
+    const text = closed ? "" : t.text.trim();
     return `- ${t.title} [${tags}]${text ? `: ${text}` : ""}`;
   });
 
@@ -306,7 +310,8 @@ export function parseTriage(
         break;
       case "RETIRE": {
         const threadId = threadIds.get(normalize(argument));
-        if (threadId) intents.push({ kind: "retire", threadId });
+        if (threadId)
+          intents.push({ kind: "retire", why: "satisfied", threadId });
         break;
       }
     }

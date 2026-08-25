@@ -228,7 +228,10 @@ export function isThreadExpired(
   thread: Thread,
   paragraphsSinceTouched: number,
 ): boolean {
-  if (thread.status === "satisfied") return false;
+  // Both retired readings, not just `satisfied`: an abandoned thread has
+  // already aged out once and re-expiring it would rewrite the same verdict
+  // onto the same thread on every pass.
+  if (thread.status !== "open") return false;
   if (!Number.isFinite(paragraphsSinceTouched) || paragraphsSinceTouched < 0) {
     return false;
   }
@@ -360,7 +363,7 @@ export function renewedThreads(
   const read = new Set(prose.candidateIds);
   return threads.filter(
     (thread) =>
-      thread.status !== "satisfied" &&
+      thread.status === "open" &&
       thread.anchorParagraph !== paragraph &&
       (thread.entityIds.some((id) => read.has(id)) ||
         mentionsName(prose.newText, thread.title)),

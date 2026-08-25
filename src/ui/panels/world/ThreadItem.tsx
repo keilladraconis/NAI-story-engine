@@ -38,7 +38,9 @@ export function ThreadItem(props: { threadId: string }) {
 
   if (!thread) return null;
 
-  const satisfied = thread.status === "satisfied";
+  // Either retired reading dims the title: the point of the dimming is "this
+  // one is closed", which is true of both.
+  const retired = thread.status !== "open";
 
   const memberIds = thread.entityIds.filter((id) => {
     const e = entitiesById[id];
@@ -94,7 +96,7 @@ export function ThreadItem(props: { threadId: string }) {
             border: "none",
             cursor: "pointer",
             color: T.textHeadings,
-            opacity: satisfied ? 0.55 : 1,
+            opacity: retired ? 0.55 : 1,
             padding: 0,
           }}
         >

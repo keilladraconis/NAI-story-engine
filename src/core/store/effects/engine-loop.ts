@@ -279,7 +279,7 @@ async function renewTouchedThreads(
  *  re-offer the same entry every pass; this one clears itself, because a
  *  retired thread is `satisfied` and `isThreadExpired` never expires one.
  *
- *  The log line says "expired" where the World will say "satisfied". A
+ *  The log line says "expired" and the World now says "Abandoned" too. A
  *  commitment the story abandoned is not one it settled, and `ThreadStatus` has
  *  no third value to say so — see the report on this task. A third status would
  *  have to disable the entry, sort first in `displacementOrder`, and stop triage
@@ -296,7 +296,13 @@ async function expiredRetires(
       `[engine] thread "${thread.title}" expired — untouched since paragraph ${thread.anchorParagraph} of ${paragraphCount}, retiring`,
     );
   }
-  return expired.map((thread) => ({ kind: "retire", threadId: thread.id }));
+  // `abandoned`, not `satisfied`: the story walked away from these, and the
+  // World is about to show the writer a reading of their own commitment.
+  return expired.map((thread) => ({
+    kind: "retire" as const,
+    why: "abandoned" as const,
+    threadId: thread.id,
+  }));
 }
 
 /** §5.1's trigger: the one entry, if any, this pass should offer to condense.

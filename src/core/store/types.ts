@@ -145,7 +145,16 @@ export type ThreadHorizon = "arc" | "plot" | "point";
 
 /** Satisfaction is a flag flip, not a deletion — the entry is disabled rather
  *  than the model being told the plot is over. */
-export type ThreadStatus = "open" | "satisfied";
+/** Three readings, two behaviours.
+ *
+ *  `satisfied` and `abandoned` are identical to every mechanism — both disable
+ *  the entry (§4.4), both sort first for displacement (§4.5), both stop triage
+ *  proposing the thread, and neither can expire again. The distinction is for
+ *  the writer alone, and it is worth a member because the alternative was
+ *  telling them a commitment was *settled* when the story had walked away from
+ *  it: a check mark on a thread they never resolved, asserting something false
+ *  about their own story on the surface built to be scanned. */
+export type ThreadStatus = "open" | "satisfied" | "abandoned";
 
 export interface Thread {
   id: string;

@@ -693,7 +693,11 @@ describe("the pass", () => {
     await h.runPass();
 
     expect(lorebook.read("lb-t1")?.enabled).toBe(false);
-    expect(h.store.getState().world.threads[0].status).toBe("satisfied");
+    // `abandoned`, not `satisfied`. Both switch the entry off and both are
+    // closed to every mechanism, but the World is about to show the writer a
+    // reading of a commitment they never resolved — and a check mark there
+    // would assert something false about their own story.
+    expect(h.store.getState().world.threads[0].status).toBe("abandoned");
   });
 
   it("leaves a thread the writer made by hand alone, however long the story runs", async () => {
@@ -773,8 +777,8 @@ describe("the pass", () => {
     await h.runPass();
 
     expect(writesTo(QUEUE_KEY)[0]).toEqual([
-      { kind: "retire", threadId: "t1" },
-      { kind: "retire", threadId: "t2" },
+      { kind: "retire", why: "abandoned", threadId: "t1" },
+      { kind: "retire", why: "abandoned", threadId: "t2" },
     ]);
   });
 
@@ -908,7 +912,7 @@ describe("the pass", () => {
     await h.runPass();
 
     expect(writesTo(QUEUE_KEY)[0]).toEqual([
-      { kind: "retire", threadId: "gone" },
+      { kind: "retire", why: "abandoned", threadId: "gone" },
     ]);
   });
 

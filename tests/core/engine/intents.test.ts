@@ -42,7 +42,11 @@ describe("intentKey", () => {
     const keys = [
       intentKey({ kind: "revise", entityId: "x", prose: PROSE }),
       intentKey({ kind: "open", subject: "x", prose: PROSE }),
-      intentKey({ kind: "retire", threadId: "x" }),
+      intentKey({
+        kind: "retire" as const,
+        why: "satisfied" as const,
+        threadId: "x",
+      }),
       intentKey({ kind: "condense", entryId: "x" }),
     ];
     expect(new Set(keys).size).toBe(4);

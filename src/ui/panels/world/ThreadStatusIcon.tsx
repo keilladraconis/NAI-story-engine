@@ -13,7 +13,7 @@
 // near it. `ConfirmButton.tsx` and `Header.tsx`'s WidgetIcon are the worked
 // examples.
 
-import { CheckCircle, Circle } from "nai:icons/feather";
+import { CheckCircle, Circle, MinusCircle } from "nai:icons/feather";
 import { T } from "../../style";
 import type { ThreadStatus } from "../../../core/store/types";
 import { statusOption } from "./thread-display";
@@ -23,6 +23,8 @@ export function ThreadStatusIcon(props: {
   size: number;
 }) {
   const satisfied = props.status === "satisfied";
+  const abandoned = props.status === "abandoned";
+  const open = !satisfied && !abandoned;
   return (
     <span
       title={statusOption(props.status).help}
@@ -34,6 +36,9 @@ export function ThreadStatusIcon(props: {
         // satisfied, matching the "on" reading MemberToggle already uses;
         // an open thread is not a warning, so it sits at the dim end rather
         // than in `T.warning`.
+        // Green for satisfied, matching the "on" reading MemberToggle uses.
+        // Abandoned sits at the dim end with open: nothing went wrong, and a
+        // warning colour would read as one — the story simply moved on.
         color: satisfied ? T.midIntensity : T.textDisabled,
       }}
     >
@@ -41,9 +46,16 @@ export function ThreadStatusIcon(props: {
         size={props.size}
         style={{ display: satisfied ? "inline-flex" : "none" }}
       />
+      {/* A struck-through circle: closed like the check, but plainly not the
+          same verdict, so a scan of the column separates a thread the writer
+          resolved from one the story left behind. */}
+      <MinusCircle
+        size={props.size}
+        style={{ display: abandoned ? "inline-flex" : "none" }}
+      />
       <Circle
         size={props.size}
-        style={{ display: satisfied ? "none" : "inline-flex" }}
+        style={{ display: open ? "inline-flex" : "none" }}
       />
     </span>
   );

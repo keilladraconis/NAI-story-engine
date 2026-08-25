@@ -157,12 +157,17 @@ describe("drain — retire", () => {
     });
     const h = harness([thread("t1", { lorebookEntryId: ENTRY })]);
 
-    const outcome = await drain([{ kind: "retire", threadId: "t1" }], h.deps);
+    const outcome = await drain(
+      [{ kind: "retire" as const, why: "satisfied" as const, threadId: "t1" }],
+      h.deps,
+    );
 
     expect(lorebook.read(ENTRY)?.enabled).toBe(false);
     expect(h.store.getState().world.threads[0].status).toBe("satisfied");
     expect(outcome.remaining).toEqual([]);
-    expect(outcome.executed).toEqual([{ kind: "retire", threadId: "t1" }]);
+    expect(outcome.executed).toEqual([
+      { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
+    ]);
   });
 
   it("goes through the write door, so the writer's original is snapshotted", async () => {
@@ -177,7 +182,10 @@ describe("drain — retire", () => {
     });
     const h = harness([thread("t1", { lorebookEntryId: ENTRY })]);
 
-    await drain([{ kind: "retire", threadId: "t1" }], h.deps);
+    await drain(
+      [{ kind: "retire" as const, why: "satisfied" as const, threadId: "t1" }],
+      h.deps,
+    );
 
     expect(story.get(lorebookOriginalKey(ENTRY))).toMatchObject({
       id: ENTRY,
@@ -195,7 +203,10 @@ describe("drain — retire", () => {
     });
     const h = harness([thread("t1", { lorebookEntryId: ENTRY })]);
 
-    await drain([{ kind: "retire", threadId: "t1" }], h.deps);
+    await drain(
+      [{ kind: "retire" as const, why: "satisfied" as const, threadId: "t1" }],
+      h.deps,
+    );
 
     expect(
       await api.v1.historyStorage.get(lorebookRecordKey(ENTRY), h.deps.nodeId),
@@ -205,7 +216,10 @@ describe("drain — retire", () => {
   it("marks a thread with no lorebook entry satisfied and writes nothing", async () => {
     const h = harness([thread("t1")]);
 
-    const outcome = await drain([{ kind: "retire", threadId: "t1" }], h.deps);
+    const outcome = await drain(
+      [{ kind: "retire" as const, why: "satisfied" as const, threadId: "t1" }],
+      h.deps,
+    );
 
     expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
     expect(h.store.getState().world.threads[0].status).toBe("satisfied");
@@ -215,7 +229,16 @@ describe("drain — retire", () => {
   it("skips a thread the World no longer holds, and does not requeue it", async () => {
     const h = harness([]);
 
-    const outcome = await drain([{ kind: "retire", threadId: "gone" }], h.deps);
+    const outcome = await drain(
+      [
+        {
+          kind: "retire" as const,
+          why: "satisfied" as const,
+          threadId: "gone",
+        },
+      ],
+      h.deps,
+    );
 
     expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
     expect(outcome.executed).toEqual([]);
@@ -888,7 +911,11 @@ describe("drain — condense", () => {
     // §9.1's ∆ is an activity level, and a condense is a rewrite of the
     // writer's entry — exactly what they would want to know happened.
     expect(revisionsIn([CONDENSE, REVISE])).toBe(2);
-    expect(revisionsIn([{ kind: "retire", threadId: "t1" }])).toBe(0);
+    expect(
+      revisionsIn([
+        { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
+      ]),
+    ).toBe(0);
   });
 
   it("marks how long it left the entry, so the next pass does not do it again", async () => {
@@ -1075,7 +1102,7 @@ describe("drain — the budget", () => {
     const queue: Intent[] = [
       { kind: "open", subject: "the sealed letter", prose: PASS_PROSE },
       { kind: "open", subject: "the debt at midwinter", prose: PASS_PROSE },
-      { kind: "retire", threadId: "t1" },
+      { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
     ];
 
     const outcome = await drain(queue, h.deps);
@@ -1099,12 +1126,14 @@ describe("drain — the budget", () => {
     const queue: Intent[] = [
       { kind: "condense", entryId: "lb0" },
       { kind: "condense", entryId: "lb1" },
-      { kind: "retire", threadId: "t1" },
+      { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
     ];
 
     const outcome = await drain(queue, h.deps);
 
-    expect(outcome.executed).toEqual([{ kind: "retire", threadId: "t1" }]);
+    expect(outcome.executed).toEqual([
+      { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
+    ]);
     expect(outcome.remaining).toEqual([{ kind: "condense", entryId: "lb1" }]);
     expect(lorebook.read(ENTRY)?.enabled).toBe(false);
   });
@@ -1136,11 +1165,16 @@ describe("drain — the budget", () => {
       enabled: true,
     });
     const h = harness([thread("t1", { lorebookEntryId: ENTRY })]);
-    const queue: Intent[] = [REVISE, { kind: "retire", threadId: "t1" }];
+    const queue: Intent[] = [
+      REVISE,
+      { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
+    ];
 
     const outcome = await drain(queue, h.deps);
 
-    expect(outcome.executed).toEqual([{ kind: "retire", threadId: "t1" }]);
+    expect(outcome.executed).toEqual([
+      { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
+    ]);
     expect(outcome.remaining).toEqual([REVISE]);
     expect(lorebook.read(ENTRY)?.enabled).toBe(false);
   });

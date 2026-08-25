@@ -1786,17 +1786,28 @@ only for a writer who switched it on in that story.
   fourth rebuild trigger: the anchor is _baked into_ the stored condition, so a
   renewal that did not rebuild would leave the entry gating on the paragraph the
   thread was opened at.
-- **`ThreadStatus` has no way to say "abandoned", and expiry writes
-  `satisfied`.** §4.5 asks for an end the story quietly abandoned to age out, and
-  §4.4 gives retirement exactly one vocabulary. So an expired thread is marked
-  with the status meaning the story _settled_ it, and the World shows the writer a
-  check against a commitment nothing resolved. The wart is real and is not worth a
-  third status as things stand: `abandoned` would have to disable the entry, sort
-  first in `displacementOrder`, and stop triage proposing it — which is precisely
-  what `satisfied` already does — so it would be a label with no behaviour behind
-  it, paid for in a persisted enum, a status icon, and a reducer branch. It
-  becomes worth building when something behaves differently for it, and the review
-  surface is the obvious candidate.
+- **`ThreadStatus` says "abandoned" now.** Recorded below as a wart phase 6
+  shipped, and fixed after it: `satisfied` and `abandoned` are indistinguishable
+  to every mechanism — both disable the entry (§4.4), both sort first for
+  displacement (§4.5), both stop triage raising the thread, and neither can
+  expire twice — which is exactly the argument for _not_ adding a member, and it
+  is wrong. The distinction was never for a mechanism. A check mark on a thread
+  the writer never resolved asserts something false about their own story, on the
+  surface §9.1 built to be scanned rather than read.~~
+
+  It cost a field on the retire intent (`why`), because expiry and triage both
+  retire and only the caller knows which verdict it reached. `why` is
+  deliberately absent from `intentKey`: the same thread is the same work however
+  it was named, and a queue holding both spellings would retire it twice. The
+  manifest carries the real tag too — telling the model "satisfied" about an
+  abandoned thread is the same lie in the other direction, and `TRIAGE_SYSTEM`
+  names both readings.
+
+  The pane's control stays a two-way switch. `abandoned` is a verdict the Engine
+  reaches; a writer closing a thread by hand has settled it, and one reopening an
+  abandoned thread means to work on it again. No press should say "I abandoned
+  this".
+
 - **The forgetting detector is verified against the real matcher.** Every unit test
   in the codebase asserts the condition Story Engine _emits_; that NovelAI's matcher
   agrees with it is a different claim, and nothing had ever checked it. Measured on
@@ -1890,12 +1901,18 @@ only for a writer who switched it on in that story.
   defaulted, because the Engine inherited this layer by there being no question
   to answer.
 
-- **`syncEratoCompatibility` gained thread entries and has no test coverage.**
-  Threads joined its managed-entry walk when the Engine started binding them, since
-  otherwise toggling `erato_compatibility` would fix every SE entry except the
-  Engine's own. `tests/core/store/effects/lorebook-sync.test.ts` covers
-  `ensureCategory` and `migrateLorebookCategories` and has never covered this
-  function, so the addition is argued rather than tested.
+- **`syncEratoCompatibility` is tested now.** Threads joined its managed-entry
+  walk when the Engine started binding them — otherwise toggling
+  `erato_compatibility` would fix every SE entry except the Engine's own — and the
+  addition shipped argued rather than tested, because
+  `tests/core/store/effects/lorebook-sync.test.ts` reached `ensureCategory` and
+  `migrateLorebookCategories` and stopped. Seven cases now: the divider added and
+  stripped, a **thread's** entry reached (the phase-6 addition, which was the
+  untested part), an unmanaged entry left alone, the category header following the
+  mode, a stale `lorebookEntryId` surviving the walk, and — the one worth having —
+  **no write at all when the entry already reads the desired way**, since this runs
+  on load and an unconditional rewrite would mark the story dirty every time it
+  opened.
 
 ## 15. Versioning
 

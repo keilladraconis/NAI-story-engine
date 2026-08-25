@@ -220,6 +220,7 @@ function affords(cost: number): boolean {
  *  retired", and the flip is free and idempotent. */
 async function retire(
   threadId: string,
+  why: "satisfied" | "abandoned",
   deps: DrainDeps,
 ): Promise<IntentResult> {
   const thread = deps.getState().world.threads.find((t) => t.id === threadId);
@@ -240,7 +241,7 @@ async function retire(
     );
   }
 
-  deps.dispatch(threadStatusSet({ threadId, status: "satisfied" }));
+  deps.dispatch(threadStatusSet({ threadId, status: why }));
   return "executed";
 }
 
@@ -568,7 +569,7 @@ async function open(
 async function execute(intent: Intent, deps: DrainDeps): Promise<IntentResult> {
   switch (intent.kind) {
     case "retire":
-      return retire(intent.threadId, deps);
+      return retire(intent.threadId, intent.why, deps);
 
     case "revise":
       return revise(intent.entityId, intent.prose, deps);

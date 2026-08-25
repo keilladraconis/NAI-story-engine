@@ -766,7 +766,7 @@ RULES:
 - A permanent change to a person, place, or thing is a REVISE of that entity. OPEN is for a commitment that wants closing later.
 - Threads are a fixed number of slots. The THREADS heading gives how many the story holds and how many it allows; when the list is full it also names the thread your next OPEN would displace. That is what the new thread costs, and the choice of which one goes is already made — do not argue with it or offer a different one.
 - At the limit, emit OPEN only if the commitment you are naming matters more to the story than the one it would cost. A passing detail is not worth an arc. When it is not worth it, say nothing — the commitment stays in the prose and a later pass can raise it again.
-- Never RETIRE a thread to make room. RETIRE means the prose settled it. A thread already marked "satisfied" is settled — say nothing about it.
+- Never RETIRE a thread to make room. RETIRE means the prose settled it. A thread already marked "satisfied" or "abandoned" is closed — say nothing about it.
 - One command per line. Verb in capitals, then the name or subject. No quotes, no bullets, no numbering, no explanation after the name.
 - Most passes need nothing. Emitting no commands at all is a correct and common answer — say nothing rather than find something.`;
 

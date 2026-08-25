@@ -577,6 +577,20 @@ describe("applyThreadStatus", () => {
     expect(lorebook.read(entryId)?.enabled).toBe(true);
   });
 
+  it("switches the entry off for an abandoned thread too", async () => {
+    // §7's rule is "enabled exactly when an OPEN thread names it". An
+    // abandoned thread is closed, so its reminder must stop — writing the
+    // rule against `!== "satisfied"` would leave it injecting forever.
+    const store = harness([thread({ status: "abandoned" })]);
+    const entryId = await createThreadEntry(store.getState(), thread());
+    store.dispatch(rebound(entryId));
+
+    expect(
+      await applyThreadStatus(store.getState, "t1", history.current()),
+    ).toBe(true);
+    expect(lorebook.read(entryId)?.enabled).toBe(false);
+  });
+
   it("writes nothing when the flag already agrees with the thread", async () => {
     // The drain's retire writes the flag and THEN dispatches, so the effect it
     // triggers must be a no-op rather than a second writer of the same value.

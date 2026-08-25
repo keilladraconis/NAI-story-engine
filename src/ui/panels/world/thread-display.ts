@@ -101,9 +101,18 @@ const STATUS_TEXT: Record<ThreadStatus, StatusOption> = {
     id: "satisfied",
     label: "Satisfied",
     // §4.4: the model is never told a plot is over — satisfaction removes the
-    // reminder rather than asserting a negative. Phase 6 is what disables the
-    // entry; until then this is a flag the writer and the cap read.
+    // reminder rather than asserting a negative.
     help: "Satisfied — the story has settled this",
+    action: "Reopen",
+  },
+  abandoned: {
+    id: "abandoned",
+    label: "Abandoned",
+    // Identical to `satisfied` in every mechanism (§4.5's expiry writes it,
+    // and the entry, the cap and triage cannot tell them apart). It exists so
+    // the World does not put a check mark on a commitment the writer never
+    // resolved and call it settled.
+    help: "Abandoned — the story stopped mentioning this, so the Engine stopped reminding you",
     action: "Reopen",
   },
 };
@@ -111,6 +120,7 @@ const STATUS_TEXT: Record<ThreadStatus, StatusOption> = {
 export const STATUS_OPTIONS: readonly StatusOption[] = [
   STATUS_TEXT.open,
   STATUS_TEXT.satisfied,
+  STATUS_TEXT.abandoned,
 ];
 
 export function statusOption(status: ThreadStatus): StatusOption {
@@ -125,6 +135,10 @@ export function statusOption(status: ThreadStatus): StatusOption {
  *  walking back. That is the idempotence CLAUDE.md asks for in place of the
  *  tap debounce it forbids. */
 export function nextStatus(status: ThreadStatus): ThreadStatus {
+  // The control is a two-way switch, not a three-way cycle. `abandoned` is a
+  // verdict the ENGINE reaches; a writer closing a thread by hand has settled
+  // it, and one reopening an abandoned thread means to work on it again. There
+  // is no press that should say "I abandoned this".
   return status === "open" ? "satisfied" : "open";
 }
 

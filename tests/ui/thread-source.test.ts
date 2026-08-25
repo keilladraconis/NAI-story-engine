@@ -81,10 +81,14 @@ describe("the status indicator swaps no component types", () => {
     // moves it from the Engine's own pass, with no press anywhere near it.
     const src = read(ICON);
     expect(src).toContain("<CheckCircle");
+    expect(src).toContain("<MinusCircle");
     expect(src).toContain("<Circle");
 
+    // One `display` toggle per reading, derived from STATUS_OPTIONS rather
+    // than counted by hand — a fourth status must not be able to arrive with
+    // no glyph of its own and silently render as another one.
     const toggles = [
-      ...code(src).matchAll(/display: satisfied \? "[a-z-]+" : "[a-z-]+"/g),
+      ...code(src).matchAll(/display: [a-z]+ \? "[a-z-]+" : "[a-z-]+"/g),
     ];
     expect(toggles.length).toBe(STATUS_OPTIONS.length);
   });
@@ -122,8 +126,10 @@ describe("a satisfied thread reads as satisfied in the World list", () => {
     // too, so the row as a whole reads finished at a glance — a style value,
     // never a swapped element.
     const src = code(read(ITEM));
-    expect(src).toMatch(/const satisfied = thread\.status === "satisfied"/);
-    expect(src).toMatch(/opacity: satisfied \?/);
+    // Either retired reading dims the row: what the dimming says is "closed",
+    // which is true of a thread the writer settled and one the story left.
+    expect(src).toMatch(/const retired = thread\.status !== "open"/);
+    expect(src).toMatch(/opacity: retired \?/);
   });
 
   it("shows status without filtering or reordering the list", () => {

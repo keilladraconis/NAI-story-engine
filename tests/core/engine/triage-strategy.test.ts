@@ -100,7 +100,7 @@ describe("parseTriage — the three commands", () => {
 
   it("maps RETIRE back to a thread id", () => {
     expect(parseTriage("RETIRE The hidden letter", MANIFEST, PROSE)).toEqual([
-      { kind: "retire", threadId: "g1" },
+      { kind: "retire", why: "satisfied", threadId: "g1" },
     ]);
   });
 
@@ -117,7 +117,7 @@ describe("parseTriage — the three commands", () => {
         subject: "the debt comes due at midwinter",
         prose: PROSE,
       },
-      { kind: "retire", threadId: "g2" },
+      { kind: "retire", why: "satisfied", threadId: "g2" },
     ]);
   });
 });
@@ -135,7 +135,7 @@ describe("parseTriage — the prose an intent carries", () => {
     expect(intents).toEqual([
       { kind: "revise", entityId: "e1", prose: PROSE },
       { kind: "open", subject: "the letter", prose: PROSE },
-      { kind: "retire", threadId: "g1" },
+      { kind: "retire", why: "satisfied", threadId: "g1" },
     ]);
   });
 
@@ -190,7 +190,7 @@ describe("parseTriage — untrusted text", () => {
     );
     // The verb still has to be capitals; only the name is forgiving.
     expect(parseTriage(text, MANIFEST, PROSE)).toEqual([
-      { kind: "retire", threadId: "g1" },
+      { kind: "retire", why: "satisfied", threadId: "g1" },
     ]);
   });
 
@@ -238,7 +238,7 @@ describe("parseTriage — untrusted text", () => {
     expect(parseTriage(text, MANIFEST, PROSE)).toEqual([
       { kind: "revise", entityId: "e1", prose: PROSE },
       { kind: "open", subject: "the buried letter", prose: PROSE },
-      { kind: "retire", threadId: "g1" },
+      { kind: "retire", why: "satisfied", threadId: "g1" },
     ]);
   });
 
@@ -258,7 +258,7 @@ describe("parseTriage — untrusted text", () => {
     ].join("\n");
     expect(parseTriage(text, MANIFEST, PROSE)).toEqual([
       { kind: "revise", entityId: "e1", prose: PROSE },
-      { kind: "retire", threadId: "g1" },
+      { kind: "retire", why: "satisfied", threadId: "g1" },
       { kind: "open", subject: "the letter is still sealed", prose: PROSE },
     ]);
   });
@@ -375,7 +375,7 @@ describe("parseTriage — the wire format did not change", () => {
 
   it("still resolves RETIRE against a thread the manifest lists", () => {
     expect(parseTriage("RETIRE Thread 1", threaded(3, 3), PROSE)).toEqual([
-      { kind: "retire", threadId: "t1" },
+      { kind: "retire", why: "satisfied", threadId: "t1" },
     ]);
   });
 });
@@ -489,5 +489,37 @@ describe("createTriageFactory", () => {
     expect(text).not.toContain("=== THREADS");
     // The new prose and the ask survive on their own.
     expect(text).toContain("turned the key");
+  });
+});
+
+describe("the manifest names the real status", () => {
+  it("tags an abandoned thread as abandoned, not as satisfied", async () => {
+    // Both are closed and neither may be raised again, but calling an
+    // abandoned thread "satisfied" tells the model the story settled something
+    // it walked away from — the same lie the third status exists to stop
+    // telling the writer, and TRIAGE_SYSTEM now names both readings.
+    const { messages } = await createTriageFactory({
+      manifest: {
+        entities: [],
+        threads: [
+          {
+            id: "t1",
+            title: "The sealed letter",
+            text: "still unopened",
+            horizon: "plot",
+            status: "abandoned",
+          },
+        ],
+        threadCap: 8,
+      },
+      assessment: assessment(),
+    })();
+
+    const manifest = messages.map((m) => m.content ?? "").join("\n");
+    expect(manifest).toContain("[plot, abandoned]");
+    expect(manifest).not.toContain("[plot, satisfied]");
+    // Closed either way: no reminder prose, because there is nothing left to
+    // remind anyone of.
+    expect(manifest).not.toContain("still unopened");
   });
 });

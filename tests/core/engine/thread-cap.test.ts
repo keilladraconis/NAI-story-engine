@@ -462,3 +462,31 @@ describe("renewedThreads — the prose says this one is still alive", () => {
     ]);
   });
 });
+
+describe("abandoned is closed to every mechanism, and only to the writer is it different", () => {
+  // The third status exists for the World's benefit alone. If any mechanism
+  // could tell it from `satisfied`, that would be a behaviour nobody designed:
+  // an abandoned thread would expire twice, or hold a slot the cap should have
+  // spent, or come back to triage.
+  const abandoned = thread("a", "plot", "abandoned");
+  const satisfied = thread("s", "plot", "satisfied");
+
+  it("never expires again", () => {
+    // It already aged out once. Without this, every later pass rewrites the
+    // same verdict onto the same thread for as long as the story runs.
+    expect(isThreadExpired(abandoned, 10_000)).toBe(false);
+    expect(isThreadExpired(satisfied, 10_000)).toBe(false);
+  });
+
+  it("gives way before an open thread, exactly as satisfied does", () => {
+    const open = thread("o", "plot", "open");
+    expect(displacementOrder([open, abandoned]).map((t) => t.id)).toEqual([
+      "a",
+      "o",
+    ]);
+    expect(displacementOrder([open, satisfied]).map((t) => t.id)).toEqual([
+      "s",
+      "o",
+    ]);
+  });
+});
