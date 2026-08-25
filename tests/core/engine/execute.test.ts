@@ -18,16 +18,11 @@ import {
 } from "../../../src/core/engine/execute";
 import type { Intent } from "../../../src/core/engine/loop-machine";
 import { TRIAGE_MAX_TOKENS } from "../../../src/core/engine/triage-strategy";
-import {
-  EDIT_PANE_TITLE,
-  lorebookCondensedKey,
-  lorebookOriginalKey,
-} from "../../../src/core/keys";
+import { EDIT_PANE_TITLE, lorebookCondensedKey } from "../../../src/core/keys";
 import { uiLorebookEntrySelected } from "../../../src/core/store/slices/ui";
 import { REVISE_MAX_TOKENS } from "../../../src/core/engine/revise-strategy";
 import { CONDENSE_MAX_TOKENS } from "../../../src/core/engine/condense";
 import { THREAD_GRACE_PARAGRAPHS } from "../../../src/core/engine/thread-horizon";
-import { lorebookRecordKey } from "../../../src/core/engine/lorebook-write";
 import { engineSettingsChanged } from "../../../src/core/store/slices/engine";
 import { ENGINE_DEFAULTS } from "../../../src/core/engine/settings";
 import {
@@ -189,10 +184,10 @@ describe("drain — retire", () => {
     ]);
   });
 
-  it("goes through the write door, so the writer's original is snapshotted", async () => {
-    // The whole reason retire may not call updateEntry directly: a bypassed
-    // write leaves no §5.2 snapshot, and a later revise would then record
-    // `enabled: false` as the writer's original.
+  it("flips the flag and touches nothing else in the entry", async () => {
+    // A retire is a switch, not a rewrite: the reminder stops firing and the
+    // writer's own words stay where they left them. The source scan below
+    // proves it went through the door; this proves what it wrote when it did.
     lorebook.seed({
       id: ENTRY,
       displayName: "The debt",
@@ -206,30 +201,14 @@ describe("drain — retire", () => {
       h.deps,
     );
 
-    expect(story.get(lorebookOriginalKey(ENTRY))).toMatchObject({
-      id: ENTRY,
-      enabled: true,
-      text: "owed",
-    });
-  });
-
-  it("writes no lb: record, because a flag flip wrote no text", async () => {
-    lorebook.seed({
-      id: ENTRY,
+    expect(lorebook.updates()).toEqual([
+      { id: ENTRY, patch: { enabled: false } },
+    ]);
+    expect(lorebook.read(ENTRY)).toMatchObject({
       displayName: "The debt",
       text: "owed",
-      enabled: true,
+      enabled: false,
     });
-    const h = harness([thread("t1", { lorebookEntryId: ENTRY })]);
-
-    await drain(
-      [{ kind: "retire" as const, why: "satisfied" as const, threadId: "t1" }],
-      h.deps,
-    );
-
-    expect(
-      await api.v1.historyStorage.get(lorebookRecordKey(ENTRY), h.deps.nodeId),
-    ).toBeUndefined();
   });
 
   it("marks a thread with no lorebook entry satisfied and writes nothing", async () => {
@@ -479,9 +458,6 @@ describe("drain — open", () => {
     await drain([OPEN], h.deps);
 
     expect(lorebook.read(ENTRY)?.text).toBe("Somebody promised something.");
-    expect(story.get(lorebookOriginalKey(ENTRY))).toMatchObject({
-      enabled: true,
-    });
   });
 
   it("leaves the threads it did not displace alone", async () => {
@@ -608,52 +584,6 @@ describe("drain — revise", () => {
     );
   });
 
-  it("goes through the write door: the writer's original is snapshotted first", async () => {
-    // §5.2. Without the door there is no snapshot, and the writer's entry is
-    // overwritten by a machine with nothing kept.
-    const h = revisable("A locksmith with two hands.");
-
-    await drain([REVISE], h.deps);
-
-    expect(story.get(lorebookOriginalKey(ENTITY_ENTRY))).toMatchObject({
-      id: ENTITY_ENTRY,
-      text: "A locksmith with two hands.",
-    });
-  });
-
-  it("records what it wrote", async () => {
-    const h = revisable();
-
-    await drain([REVISE], h.deps);
-
-    const record = await api.v1.historyStorage.get(
-      lorebookRecordKey(ENTITY_ENTRY),
-      h.deps.nodeId,
-    );
-    expect(record).toMatchObject({ entryId: ENTITY_ENTRY });
-  });
-
-  it("snapshots before it writes, never after", async () => {
-    // An entry snapshotted after the rewrite would preserve the Engine's own
-    // output as the writer's original — §5.2 inverted.
-    const h = revisable("original text");
-    const order: string[] = [];
-    vi.mocked(api.v1.storyStorage.setIfAbsent).mockImplementation(
-      async (key: string) => {
-        order.push(`snapshot:${key}`);
-        return true;
-      },
-    );
-    vi.mocked(api.v1.lorebook.updateEntry).mockImplementation(async () => {
-      order.push("write");
-    });
-
-    await drain([REVISE], h.deps);
-
-    expect(order[0]).toBe(`snapshot:${lorebookOriginalKey(ENTITY_ENTRY)}`);
-    expect(order).toContain("write");
-  });
-
   it("shows the model the entry as it stands, not what Redux remembers", async () => {
     // §5's read-then-write: a hand-edit made between triage and the drain is
     // simply part of the input.
@@ -708,12 +638,8 @@ describe("drain — revise", () => {
     expect(outcome.executed).toEqual([]);
     // Consumed, not requeued: triage runs hot and will name it again.
     expect(outcome.remaining).toEqual([]);
-    expect(
-      await api.v1.historyStorage.get(
-        lorebookRecordKey(ENTITY_ENTRY),
-        h.deps.nodeId,
-      ),
-    ).toBeUndefined();
+    // Declined at the door, so nothing reached the lorebook at all.
+    expect(lorebook.updates()).toEqual([]);
   });
 
   it("never writes half a word", async () => {
@@ -860,32 +786,28 @@ describe("drain — condense", () => {
     expect(outcome.remaining).toEqual([]);
   });
 
-  it("goes through the same door a revise does, so §5.2's original survives", async () => {
+  it("reads the entry live, the same way a revise does", async () => {
+    // §5.1: condense obeys every rule revision does, and the one that matters
+    // here is read-then-write — the compaction is built from the entry as it
+    // stands, not from what assessment measured a generation ago.
     const h = condensable();
     h.generate.mockImplementation(says(COMPACTED));
-
-    await drain([CONDENSE], h.deps);
-
-    expect(story.get(lorebookOriginalKey(BLOATED_ENTRY))).toMatchObject({
+    lorebook.seed({
       id: BLOATED_ENTRY,
-      text: SPRAWL,
+      displayName: "Ada",
+      text: `${SPRAWL} And then the writer added a line.`,
+      enabled: true,
     });
-  });
-
-  it("writes the same lb: record a revise does, so §7 cannot tell them apart", async () => {
-    // §5.1: "the same `lb:<entryId>` record so history reconciliation treats it
-    // identically."
-    const h = condensable();
-    h.generate.mockImplementation(says(COMPACTED));
 
     await drain([CONDENSE], h.deps);
 
-    expect(
-      await api.v1.historyStorage.get(
-        lorebookRecordKey(BLOATED_ENTRY),
-        h.deps.nodeId,
-      ),
-    ).toMatchObject({ entryId: BLOATED_ENTRY });
+    const factory = h.generate.mock.calls[0][0] as () => Promise<{
+      messages: Message[];
+    }>;
+    const { messages } = await factory();
+    expect(messages.map((m) => m.content).join("\n")).toContain(
+      "And then the writer added a line.",
+    );
   });
 
   it("asks for §3.3's price and no retries", async () => {
@@ -1212,19 +1134,20 @@ function code(src: string): string {
 }
 
 describe("no Engine action can write around the write door", () => {
-  // The behavioural tests above prove the snapshot happens for the paths they
+  // The behavioural tests above prove read-then-write for the paths they
   // exercise. This proves there is no OTHER path: a revise that called
-  // `updateEntry` itself would take no §5.2 snapshot and write no `lb:` record,
-  // and it would pass every test that only checks the entry's text afterwards.
+  // `updateEntry` itself could build its patch from an entry it read before the
+  // generation started, and it would pass every test that only checks the
+  // entry's text afterwards.
   const ENGINE = join(__dirname, "../../../src/core/engine");
 
   /** The two modules allowed to name the lorebook API, and why.
    *
    *  `lorebook-write.ts` IS the door. `thread-bind.ts` calls `createEntry` and
    *  `entry`, which the door cannot stand in front of: a create invents an
-   *  entry, so there is no live text to read and no original to snapshot. Every
-   *  REWRITE it performs goes through `writeLorebookEntry` like any other, and
-   *  the test below holds it to that. */
+   *  entry, so there is no live text to read first. Every REWRITE it performs
+   *  goes through `writeLorebookEntry` like any other, and the test below holds
+   *  it to that. */
   const EXEMPT = ["lorebook-write.ts", "thread-bind.ts"];
 
   /** Every other module in the directory, read rather than listed.
@@ -1261,9 +1184,9 @@ describe("no Engine action can write around the write door", () => {
   it("thread-bind.ts creates entries but never rewrites one", () => {
     // The one module that reaches the lorebook API without going through the
     // door, and only for the call the door cannot make: `createEntry` invents
-    // an entry, so there is no live text to read first and no original to
-    // snapshot. Every REWRITE it performs — the condition rebuild — goes
-    // through `writeLorebookEntry` like any other Engine edit.
+    // an entry, so there is no live text to read first. Every REWRITE it
+    // performs — the condition rebuild — goes through `writeLorebookEntry` like
+    // any other Engine edit.
     const src = code(readFileSync(join(ENGINE, "thread-bind.ts"), "utf8"));
     expect(src).toContain("api.v1.lorebook.createEntry");
     expect(src).not.toContain("api.v1.lorebook.updateEntry");

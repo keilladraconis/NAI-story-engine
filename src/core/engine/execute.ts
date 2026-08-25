@@ -3,9 +3,9 @@
 // The pass reserves the triage call before spending it and then hands whatever
 // triage produced to `drain`. Everything an intent does to the writer's story
 // happens below this line, and every lorebook write goes through
-// `lorebook-write.ts` — a path that skipped the door would skip the §5.2
-// snapshot, which is the one promise made to a writer whose lorebook is being
-// edited by a machine.
+// `lorebook-write.ts` — a path that skipped the door would be free to build its
+// patch from a copy of the entry it fetched before the generation ran, which is
+// exactly the staleness §5's read-then-write exists to rule out.
 //
 // Phase 6 filled the arms in price order. Task 2 took RETIRE, which §3.3 prices
 // at zero output tokens, so the skeleton — the branch, the budget policy, the
@@ -60,17 +60,15 @@ import { buildLorebookPrefillFromEntry } from "../utils/lorebook-strategy";
 
 /** What the pass hands the drain.
  *
- *  `nodeId` is the node captured at the START of the pass (§6.3) and is passed
- *  through to every write, the same way the pass passes it to `saveRecords`.
- *  Triage takes seconds, the writer keeps typing, and a write without an
- *  explicit node has been measured landing two nodes away.
- *
  *  `log` is the pass's own `story_engine_debug`-gated logger, injected rather
  *  than reached for: the HUD is the always-on surface and the log is opt-in, so
  *  the drain must not acquire a second opinion about whether to speak. */
 export type DrainDeps = {
   dispatch: AppDispatch;
   getState: () => RootState;
+  /** The node the pass started at. Nothing below reads it any more — the door
+   *  writes only to the lorebook now, and the Engine's own records are the next
+   *  thing to stop being branch-scoped. */
   nodeId: number;
   /** What the pass saw, whole — the same value triage was built from.
    *
@@ -225,13 +223,11 @@ async function retire(
 
   if (thread.lorebookEntryId) {
     await writeLorebookEntry(
-      { entryId: thread.lorebookEntryId, nodeId: deps.nodeId },
+      thread.lorebookEntryId,
       // The producer ignores the live entry because a flag flip is not a
-      // function of the text — but it still goes through the door, which is
-      // what takes the §5.2 snapshot. A retire that called `updateEntry`
-      // directly would leave no original, and a later revise would then
-      // snapshot `enabled: false` as the writer's own: restoring it would hand
-      // them their entry back switched off.
+      // function of the text — but it still comes through the door, because
+      // "every Engine write to an entry goes through here" is a rule the
+      // source scan can hold and "every write that reads text" is not.
       () => ({ enabled: false }),
     );
   }
@@ -247,14 +243,13 @@ async function retire(
  *  whole shape of this function. The door hands over the live entry and takes a
  *  patch back, so the prompt is necessarily built from what the entry says at
  *  the moment of writing — §5's read-then-write is structural here rather than
- *  remembered. It also means the §5.2 snapshot is already taken before the
- *  model is asked anything, so a refusal, a decline, or a crash mid-generation
- *  can never leave a rewritten entry with no original behind it.
+ *  remembered. A refusal, a decline, or a crash mid-generation therefore
+ *  leaves the entry exactly as the writer left it.
  *
  *  The Engine does NOT reuse `buildLorebookContentStrategy` for this. That path
  *  resolves the live entry inside its own message factory and its completion
  *  handler calls `updateEntry` directly, so a revise built on it would write
- *  around the door — no snapshot and no `lb:` record.
+ *  around the door, against an entry read before the generation started.
  *  `revise-strategy.ts` returns text to its caller instead, and the caller is
  *  the door.
  *
@@ -281,59 +276,56 @@ async function revise(
     return "skipped";
   }
 
-  const { written } = await writeLorebookEntry(
-    { entryId, nodeId: deps.nodeId },
-    async (live) => {
-      const prefill = await buildLorebookPrefillFromEntry(
-        deps.getState,
-        live,
-        // Nobody is watching this. The edit pane's title draft is mirrored on
-        // every keystroke, so honouring it here would make a half-typed name
-        // the header of an entry the Engine rewrote on its own.
-        "unattended",
-      );
-      const response = await deps.genX.generate(
-        createReviseFactory({
-          entry: live,
-          prefill,
-          newText: prose,
-        }),
-        {
-          ...(await reviseParams()),
-          // GenX's own transient-error handler treats "in progress" as
-          // retryable and would sit on a collision for five backoffs, holding
-          // the pass, its node and its re-entry guard. The drain requeues a
-          // refused revise instead — see `drain`.
-          maxRetries: 0,
-          // §3.5: a background loop has no business demanding a Continue click.
-          // Without this GenX parks on a short bucket, and its parked status is
-          // instance-wide — one held Engine call flags the whole queue, which the
-          // header renders as a Continue widget for work nobody asked for.
-          fastRejection: true,
-          taskId: `engine-revise-${api.v1.uuid()}`,
-        },
-        undefined,
-        "background",
-      );
-
-      const choice = response.choices?.[0];
-      const text = await composeRevision(
+  const written = await writeLorebookEntry(entryId, async (live) => {
+    const prefill = await buildLorebookPrefillFromEntry(
+      deps.getState,
+      live,
+      // Nobody is watching this. The edit pane's title draft is mirrored on
+      // every keystroke, so honouring it here would make a half-typed name
+      // the header of an entry the Engine rewrote on its own.
+      "unattended",
+    );
+    const response = await deps.genX.generate(
+      createReviseFactory({
+        entry: live,
         prefill,
-        choice?.text ?? "",
-        choice?.finish_reason,
+        newText: prose,
+      }),
+      {
+        ...(await reviseParams()),
+        // GenX's own transient-error handler treats "in progress" as
+        // retryable and would sit on a collision for five backoffs, holding
+        // the pass, its node and its re-entry guard. The drain requeues a
+        // refused revise instead — see `drain`.
+        maxRetries: 0,
+        // §3.5: a background loop has no business demanding a Continue click.
+        // Without this GenX parks on a short bucket, and its parked status is
+        // instance-wide — one held Engine call flags the whole queue, which the
+        // header renders as a Continue widget for work nobody asked for.
+        fastRejection: true,
+        taskId: `engine-revise-${api.v1.uuid()}`,
+      },
+      undefined,
+      "background",
+    );
+
+    const choice = response.choices?.[0];
+    const text = await composeRevision(
+      prefill,
+      choice?.text ?? "",
+      choice?.finish_reason,
+    );
+    if (!text) {
+      // Declining leaves the entry exactly as it was. Writing an empty or
+      // half-finished revision would DELETE the writer's entry, because a
+      // revision replaces rather than appends.
+      await deps.log(
+        `[engine] revise ${entity.name}: nothing usable in the response, entry left alone`,
       );
-      if (!text) {
-        // Declining leaves the entry exactly as it was. Writing an empty or
-        // half-finished revision would DELETE the writer's entry, because a
-        // revision replaces rather than appends.
-        await deps.log(
-          `[engine] revise ${entity.name}: nothing usable in the response, entry left alone`,
-        );
-        return null;
-      }
-      return { text };
-    },
-  );
+      return null;
+    }
+    return { text };
+  });
 
   return written ? "executed" : "skipped";
 }
@@ -341,9 +333,9 @@ async function revise(
 /** §5.1's compaction: the entry as it stands, said tighter.
  *
  *  Structurally a revise — the generation runs INSIDE the door's producer, so
- *  read-then-write and the §5.2 snapshot are properties of the shape rather
- *  than things this function remembers — and §5.1 requires that: same price,
- *  same door, same `lb:` record, so nothing downstream can tell the two apart.
+ *  read-then-write is a property of the shape rather than something this
+ *  function remembers — and §5.1 requires that: same price, same door, so
+ *  nothing downstream can tell the two apart.
  *  What is not shared is how the answer is judged (`composeCondensation` refuses a summary
  *  and refuses a truncation) and what happens afterwards.
  *
@@ -370,55 +362,52 @@ async function condense(
   // assessment and the drain is the same declined write as any other.
   let markTo: number | undefined;
 
-  const { written } = await writeLorebookEntry(
-    { entryId, nodeId: deps.nodeId },
-    async (live) => {
-      const original = live.text ?? "";
-      const prefill = await buildLorebookPrefillFromEntry(
-        deps.getState,
-        live,
-        // Nobody is watching this. The edit pane's title draft is mirrored on
-        // every keystroke, so honouring it here would make a half-typed name
-        // the header of an entry the Engine rewrote on its own.
-        "unattended",
-      );
-      const response = await deps.genX.generate(
-        createCondenseFactory({ entry: live, prefill }),
-        {
-          ...(await condenseParams()),
-          maxRetries: 0,
-          // §3.5: a background loop has no business demanding a Continue click.
-          // Without this GenX parks on a short bucket, and its parked status is
-          // instance-wide — one held Engine call flags the whole queue, which the
-          // header renders as a Continue widget for work nobody asked for.
-          fastRejection: true,
-          taskId: `engine-condense-${api.v1.uuid()}`,
-        },
-        undefined,
-        "background",
-      );
+  const written = await writeLorebookEntry(entryId, async (live) => {
+    const original = live.text ?? "";
+    const prefill = await buildLorebookPrefillFromEntry(
+      deps.getState,
+      live,
+      // Nobody is watching this. The edit pane's title draft is mirrored on
+      // every keystroke, so honouring it here would make a half-typed name
+      // the header of an entry the Engine rewrote on its own.
+      "unattended",
+    );
+    const response = await deps.genX.generate(
+      createCondenseFactory({ entry: live, prefill }),
+      {
+        ...(await condenseParams()),
+        maxRetries: 0,
+        // §3.5: a background loop has no business demanding a Continue click.
+        // Without this GenX parks on a short bucket, and its parked status is
+        // instance-wide — one held Engine call flags the whole queue, which the
+        // header renders as a Continue widget for work nobody asked for.
+        fastRejection: true,
+        taskId: `engine-condense-${api.v1.uuid()}`,
+      },
+      undefined,
+      "background",
+    );
 
-      const choice = response.choices?.[0];
-      const text = await composeCondensation(
-        prefill,
-        choice?.text ?? "",
-        choice?.finish_reason,
-        original,
+    const choice = response.choices?.[0];
+    const text = await composeCondensation(
+      prefill,
+      choice?.text ?? "",
+      choice?.finish_reason,
+      original,
+    );
+
+    // The model answered, so this counts as an attempt either way — at the
+    // length the entry will actually be left at.
+    markTo = text ? text.length : original.length;
+
+    if (!text) {
+      await deps.log(
+        `[engine] condense ${entryId}: nothing usable in the response, entry left alone`,
       );
-
-      // The model answered, so this counts as an attempt either way — at the
-      // length the entry will actually be left at.
-      markTo = text ? text.length : original.length;
-
-      if (!text) {
-        await deps.log(
-          `[engine] condense ${entryId}: nothing usable in the response, entry left alone`,
-        );
-        return null;
-      }
-      return { text };
-    },
-  );
+      return null;
+    }
+    return { text };
+  });
 
   if (markTo !== undefined) await writeCondenseMark(entryId, markTo);
   return written ? "executed" : "skipped";
@@ -445,8 +434,8 @@ async function condense(
  *  cap for exactly this path: the reducer drops the weakest OTHER thread and
  *  keeps the newcomer, because a create that silently undid itself would read
  *  as a broken Engine. The displaced thread's own lorebook entry survives,
- *  unmanaged and still enabled — §5.2 forbids deleting it — so this arm
- *  disables it and says so in the log. */
+ *  unmanaged and still enabled — the Engine never deletes an entry — so this
+ *  arm disables it and says so in the log. */
 async function open(
   subject: string,
   prose: string,
@@ -539,18 +528,17 @@ async function open(
     // navigation, and it is gone with the rest of history tracking. There is no
     // second pass behind this one: miss the orphan here and it injects forever.
     //
-    // **Disabled, never deleted** (§5.2), through the door like every other
-    // Engine write, so the writer's original is snapshotted and one switch in
-    // their own lorebook brings it back — which is the whole of the writer's
-    // recourse now that nothing switches it on again on their behalf.
+    // **Disabled, never deleted**, through the door like every other Engine
+    // write. The entry stays in the writer's lorebook and one switch brings it
+    // back — which is the whole of the writer's recourse now that nothing
+    // switches it on again on their behalf.
     await deps.log(
       `[engine] thread cap displaced "${gone.title}" — its lorebook entry ${gone.lorebookEntryId ?? "(none)"} is no longer managed by a thread`,
     );
     if (gone.lorebookEntryId) {
-      await writeLorebookEntry(
-        { entryId: gone.lorebookEntryId, nodeId: deps.nodeId },
-        () => ({ enabled: false }),
-      );
+      await writeLorebookEntry(gone.lorebookEntryId, () => ({
+        enabled: false,
+      }));
     }
   }
 

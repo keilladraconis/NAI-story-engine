@@ -46,8 +46,8 @@ export function installLorebookFake(): LorebookFake {
     }),
     // Creation is a different act from a write: it invents an entry rather than
     // editing one the writer owns, so it is the one lorebook call the Engine's
-    // write door does not stand in front of (there is no live entry to read and
-    // no original to snapshot). The fake keeps them apart for the same reason.
+    // write door does not stand in front of — there is no live entry to read
+    // first. The fake keeps them apart for the same reason.
     createEntry: vi.fn(async (entry: Partial<LorebookEntry>) => {
       const id = entry.id ?? api.v1.uuid();
       const stored = { ...entry, id } as LorebookEntry;

@@ -34,12 +34,7 @@ import {
   THREAD_GRACE_PARAGRAPHS,
   THREAD_RANGE_CHARS,
 } from "../../../src/core/engine/thread-horizon";
-import { lorebookRecordKey } from "../../../src/core/engine/lorebook-write";
-import { EDIT_PANE_TITLE, lorebookOriginalKey } from "../../../src/core/keys";
-import {
-  installHistoryFake,
-  type HistoryFake,
-} from "../../helpers/history-fake";
+import { EDIT_PANE_TITLE } from "../../../src/core/keys";
 import {
   installLorebookFake,
   type LorebookFake,
@@ -75,7 +70,6 @@ function entity(id: string, name: string, over: Partial<WorldEntity> = {}) {
   } as WorldEntity;
 }
 
-let history: HistoryFake;
 let lorebook: LorebookFake;
 let story: StoryStorageFake;
 
@@ -110,7 +104,6 @@ function probes(conditions: LorebookCondition[]): string[] {
 
 beforeEach(() => {
   vi.mocked(api.v1.config.get).mockResolvedValue(false);
-  history = installHistoryFake();
   lorebook = installLorebookFake();
   story = installStoryStorageFake();
 });
@@ -334,7 +327,7 @@ describe("rebuildThreadCondition", () => {
       threadRenamed({ threadId: "t1", title: "The Duke's letter" }),
     );
 
-    await rebuildThreadCondition(store.getState, "t1", history.current());
+    await rebuildThreadCondition(store.getState, "t1");
 
     expect(probes(lorebook.read(entryId)?.advancedConditions ?? [])).toEqual([
       "the duke's letter",
@@ -342,34 +335,22 @@ describe("rebuildThreadCondition", () => {
     ]);
   });
 
-  it("goes through the write door, so §5.2's original exists", async () => {
+  it("writes only the condition, and only through the door", async () => {
+    // The entry is the writer's: a rebuild changes the detector and nothing
+    // else, however far the thread's title has drifted from the entry's.
     const store = harness();
     const entryId = await createThreadEntry(store.getState(), thread());
     store.dispatch(rebound(entryId));
 
-    await rebuildThreadCondition(store.getState, "t1", history.current());
+    await rebuildThreadCondition(store.getState, "t1");
 
-    expect(story.get(lorebookOriginalKey(entryId))).toMatchObject({
-      id: entryId,
-    });
-  });
-
-  it("writes no lb: record, because it wrote no text", async () => {
-    // §7 compares text fingerprints. A condition rebuild changes nothing a
-    // reconciliation could compare, and a record claiming otherwise would tell
-    // §7 the Engine owns prose it never wrote.
-    const store = harness();
-    const entryId = await createThreadEntry(store.getState(), thread());
-    store.dispatch(rebound(entryId));
-
-    await rebuildThreadCondition(store.getState, "t1", history.current());
-
+    expect(api.v1.lorebook.updateEntry).toHaveBeenCalledTimes(1);
     expect(
-      await api.v1.historyStorage.get(
-        lorebookRecordKey(entryId),
-        history.current(),
+      Object.keys(
+        vi.mocked(api.v1.lorebook.updateEntry).mock
+          .calls[0][1] as Partial<LorebookEntry>,
       ),
-    ).toBeUndefined();
+    ).toEqual(["advancedConditions"]);
   });
 
   it("leaves the entry's text alone", async () => {
@@ -378,7 +359,7 @@ describe("rebuildThreadCondition", () => {
     store.dispatch(rebound(entryId));
     store.dispatch(threadTextUpdated({ threadId: "t1", text: "changed" }));
 
-    await rebuildThreadCondition(store.getState, "t1", history.current());
+    await rebuildThreadCondition(store.getState, "t1");
 
     expect(lorebook.read(entryId)?.text).toBe(
       "Ada still has not told Brennan what the letter said.",
@@ -388,7 +369,7 @@ describe("rebuildThreadCondition", () => {
   it("writes nothing for a thread with no entry behind it", async () => {
     const store = harness();
 
-    await rebuildThreadCondition(store.getState, "t1", history.current());
+    await rebuildThreadCondition(store.getState, "t1");
 
     expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
   });
@@ -396,7 +377,7 @@ describe("rebuildThreadCondition", () => {
   it("writes nothing for a thread the World no longer holds", async () => {
     const store = harness();
 
-    await rebuildThreadCondition(store.getState, "gone", history.current());
+    await rebuildThreadCondition(store.getState, "gone");
 
     expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
   });
@@ -511,19 +492,18 @@ describe("registerThreadConditionEffects", () => {
     expect(lorebook.read(entryId)?.enabled).toBe(false);
   });
 
-  it("disables rather than deletes, and snapshots on the way through", async () => {
-    // §5.2: the strongest thing the Engine does to an entry it no longer wants
-    // firing is switch it off, and the door takes the original on the way past
-    // — creation bypasses the door, so this may be that entry's FIRST
-    // snapshot.
+  it("disables rather than deletes", async () => {
+    // The strongest thing the Engine does to an entry it no longer wants
+    // firing is switch it off. The entry stays in the writer's lorebook, and
+    // one switch there brings it back.
     const { store, entryId } = await wired();
 
     store.dispatch(threadDeleted({ threadId: "t1", lorebookEntryId: entryId }));
     await settle();
 
-    expect(lorebook.read(entryId)).toBeDefined();
-    expect(story.get(lorebookOriginalKey(entryId))).toMatchObject({
+    expect(lorebook.read(entryId)).toMatchObject({
       id: entryId,
+      enabled: false,
     });
   });
 
@@ -563,9 +543,7 @@ describe("applyThreadStatus", () => {
     store.dispatch(rebound(entryId));
     store.dispatch(threadStatusSet({ threadId: "t1", status: "satisfied" }));
 
-    expect(
-      await applyThreadStatus(store.getState, "t1", history.current()),
-    ).toBe(true);
+    expect(await applyThreadStatus(store.getState, "t1")).toBe(true);
     expect(lorebook.read(entryId)?.enabled).toBe(false);
   });
 
@@ -576,9 +554,7 @@ describe("applyThreadStatus", () => {
     await api.v1.lorebook.updateEntry(entryId, { enabled: false });
     store.dispatch(threadStatusSet({ threadId: "t1", status: "open" }));
 
-    expect(
-      await applyThreadStatus(store.getState, "t1", history.current()),
-    ).toBe(true);
+    expect(await applyThreadStatus(store.getState, "t1")).toBe(true);
     expect(lorebook.read(entryId)?.enabled).toBe(true);
   });
 
@@ -590,9 +566,7 @@ describe("applyThreadStatus", () => {
     const entryId = await createThreadEntry(store.getState(), thread());
     store.dispatch(rebound(entryId));
 
-    expect(
-      await applyThreadStatus(store.getState, "t1", history.current()),
-    ).toBe(true);
+    expect(await applyThreadStatus(store.getState, "t1")).toBe(true);
     expect(lorebook.read(entryId)?.enabled).toBe(false);
   });
 
@@ -604,16 +578,12 @@ describe("applyThreadStatus", () => {
     store.dispatch(rebound(entryId));
     await api.v1.lorebook.updateEntry(entryId, { enabled: false });
 
-    expect(
-      await applyThreadStatus(store.getState, "t1", history.current()),
-    ).toBe(false);
+    expect(await applyThreadStatus(store.getState, "t1")).toBe(false);
   });
 
   it("leaves a hand-made thread with no entry alone", async () => {
     const store = harness();
-    expect(
-      await applyThreadStatus(store.getState, "t1", history.current()),
-    ).toBe(false);
+    expect(await applyThreadStatus(store.getState, "t1")).toBe(false);
   });
 
   it("is wired to threadStatusSet, so a press in the pane reaches the entry", () => {

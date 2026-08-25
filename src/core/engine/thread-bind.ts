@@ -13,11 +13,10 @@
 // builder is how the two drift into disagreeing, and a stale condition is not a
 // visible bug — it is a thread that quietly reminds forever.
 //
-// **This module creates entries; it never rewrites one.** Creation is not a
-// write in §5.2's sense: there is no live text to read first and no original to
-// preserve, and the writer's lorebook gained an entry rather than losing one.
-// Every rewrite below — the condition rebuild included — goes through
-// `lorebook-write.ts`, so it takes the §5.2 snapshot like any other Engine
+// **This module creates entries; it never rewrites one.** A create is the one
+// lorebook call the door cannot stand in front of: it invents an entry, so
+// there is no live text to read first. Every rewrite below — the condition
+// rebuild included — goes through `lorebook-write.ts` like any other Engine
 // edit. `execute.test.ts`'s source scan holds the line.
 
 import { matchesAction, type Store } from "nai-store";
@@ -42,7 +41,6 @@ import {
   threadMemberToggled,
   threadRenamed,
 } from "../store/slices/world";
-import { captureNode } from "../store/persistence/history-store";
 
 export { SE_THREAD_CATEGORY };
 
@@ -238,22 +236,21 @@ export async function createThreadEntry(
 
 /** Rebuild a thread's condition against the World as it now stands.
  *
- *  Through the write door, like every other Engine rewrite: a rebuild that
- *  called `updateEntry` itself would leave the writer's original unsnapshotted
- *  for an entry the Engine had edited, and §5.2's promise is made per entry
- *  rather than per kind of edit.
+ *  Through the write door, like every other Engine rewrite. There is nothing
+ *  special about a rebuild that would justify a second path to `updateEntry`,
+ *  and "every Engine write goes through the door" is a rule a source scan can
+ *  hold where "every write that needs the live text" is not.
  *
  *  Only `advancedConditions` is written. The entry's `displayName` and `text`
  *  are left exactly as they are even when the thread's title changed, for the
  *  same reason `entityCategoryChanged` does not rewrite `entry.category`: the
  *  entry is the writer's, and the Engine touches the least of it that the job
- *  requires. It also means no text was written, so no `lb:` record is either.
+ *  requires.
  *
  *  Returns whether anything was written, which is what the tests read. */
 export async function rebuildThreadCondition(
   getState: () => RootState,
   threadId: string,
-  nodeId: number,
 ): Promise<boolean> {
   const state = getState();
   const thread = state.world.threads.find((t) => t.id === threadId);
@@ -262,11 +259,9 @@ export async function rebuildThreadCondition(
   if (!thread?.lorebookEntryId) return false;
 
   const advancedConditions = await resolveThreadCondition(state, thread);
-  const { written } = await writeLorebookEntry(
-    { entryId: thread.lorebookEntryId, nodeId },
-    () => ({ advancedConditions }),
-  );
-  return written;
+  return writeLorebookEntry(thread.lorebookEntryId, () => ({
+    advancedConditions,
+  }));
 }
 
 /** Apply a thread's `status` to its entry's `enabled` flag.
@@ -288,21 +283,18 @@ export async function rebuildThreadCondition(
  *
  *  Through the door, like every other Engine rewrite, and writing only
  *  `enabled` — the entry is the writer's and the Engine touches the least of it
- *  the job requires. No text, so no `lb:` record. */
+ *  the job requires. */
 export async function applyThreadStatus(
   getState: () => RootState,
   threadId: string,
-  nodeId: number,
 ): Promise<boolean> {
   const thread = getState().world.threads.find((t) => t.id === threadId);
   if (!thread?.lorebookEntryId) return false;
 
   const enabled = thread.status === "open";
-  const { written } = await writeLorebookEntry(
-    { entryId: thread.lorebookEntryId, nodeId },
-    (live) => (live.enabled === enabled ? null : { enabled }),
+  return writeLorebookEntry(thread.lorebookEntryId, (live) =>
+    live.enabled === enabled ? null : { enabled },
   );
-  return written;
 }
 
 /** Switch off the entry of a thread that has just been deleted.
@@ -321,20 +313,17 @@ export async function applyThreadStatus(
  *  payload, for once because there is no alternative rather than as a defence
  *  against a second press.
  *
- *  Disabled, never deleted (§5.2), through the door like every other Engine
- *  write, so the §5.2 snapshot is taken on the way past and one switch in the
- *  writer's own lorebook brings the entry back. There is no backstop behind
- *  this: §7's reconciliation was one, and it is gone. Miss the orphan here and
- *  it injects forever. */
+ *  Disabled, never deleted, through the door like every other Engine write, so
+ *  the entry stays in the writer's own lorebook and one switch brings it back.
+ *  There is no backstop behind this: §7's reconciliation was one, and it is
+ *  gone. Miss the orphan here and it injects forever. */
 export async function disableDeletedThreadEntry(
   entryId: string | undefined,
-  nodeId: number,
 ): Promise<boolean> {
   if (!entryId) return false;
-  const { written } = await writeLorebookEntry({ entryId, nodeId }, (live) =>
+  return writeLorebookEntry(entryId, (live) =>
     live.enabled === false ? null : { enabled: false },
   );
-  return written;
 }
 
 /** Give a thread its lorebook entry, once, whoever created the thread.
@@ -398,11 +387,6 @@ export async function ensureThreadEntry(
  *  thread nobody mentioned. Subscribing to the actions puts the rule where the
  *  invariant is, the same argument that puts the thread cap in the reducer.
  *
- *  The node is captured before the first `await`, which is as close to dispatch
- *  time as an effect can get (§6.3). The rebuild writes no history record — it
- *  writes no text — so this is belt and braces rather than load-bearing, but the
- *  door refuses to default a node and that refusal is the point of it.
- *
  *  Errors are logged rather than thrown: an effect is fire-and-forget, so a
  *  rejection here has nowhere to land, and a failed rebuild leaves the previous
  *  condition standing rather than a broken one. */
@@ -414,7 +398,7 @@ export function registerThreadConditionEffects(
   const rebuild = (threadId: string): void => {
     void (async () => {
       try {
-        await rebuildThreadCondition(getState, threadId, await captureNode());
+        await rebuildThreadCondition(getState, threadId);
       } catch (error) {
         api.v1.log("[engine] thread condition rebuild failed:", error);
       }
@@ -457,7 +441,7 @@ export function registerThreadConditionEffects(
     const { threadId } = action.payload;
     void (async () => {
       try {
-        await applyThreadStatus(getState, threadId, await captureNode());
+        await applyThreadStatus(getState, threadId);
       } catch (error) {
         api.v1.log("[engine] thread status flip failed:", error);
       }
@@ -468,7 +452,7 @@ export function registerThreadConditionEffects(
     const { lorebookEntryId } = action.payload;
     void (async () => {
       try {
-        await disableDeletedThreadEntry(lorebookEntryId, await captureNode());
+        await disableDeletedThreadEntry(lorebookEntryId);
       } catch (error) {
         api.v1.log("[engine] deleted thread's entry not switched off:", error);
       }

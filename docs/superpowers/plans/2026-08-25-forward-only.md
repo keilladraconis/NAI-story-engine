@@ -173,6 +173,17 @@ say in your report whether anything else used it.
 
 ### Task 4: The Engine's own records
 
+**Task 2 handoff: three of these threads are already pulled.**
+`rebuildThreadCondition`, `applyThreadStatus` and `disableDeletedThreadEntry`
+have **already lost their `nodeId` parameter**, along with the `captureNode()`
+call at each of their three effect callsites — `thread-bind.ts` no longer
+imports `history-store` at all. Task 2 was told not to touch them, but
+`noUnusedParameters` makes that impossible: a trailing parameter whose only use
+was the door's `nodeId` field is a hard `tsc` error the moment the field goes,
+and every task's verification runs `tsc --noEmit`. `DrainDeps.nodeId` **is**
+still there, unread by anything in `execute.ts`, because an unused property of
+an object type is not an error. Expect to find one thread here, not three.
+
 **Files:** modify `src/core/engine/intents.ts`,
 `src/core/store/effects/engine-loop.ts`, `src/core/engine/execute.ts`,
 `src/core/engine/thread-bind.ts`; tests.

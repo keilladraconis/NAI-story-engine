@@ -70,8 +70,8 @@ export type LoopState = {
    *
    *  **A session count, and nothing more.** It lives in memory, accumulates
    *  from the moment the story was opened, and resets to 0 on a reload. It used
-   *  to be corrected on navigation — §7 recounted it from the `lb:` records at
-   *  the node landed on — and that machinery is gone with the rest of history
+   *  to be corrected on navigation — §7 recounted it from the records the
+   *  Engine kept of its own writes — and that machinery is gone with the rest of history
    *  tracking: the Engine's records move forward only, so there is no branch to
    *  recount against and nothing here to correct.
    *

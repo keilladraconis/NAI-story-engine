@@ -49,26 +49,9 @@ export const EDIT_PANE_CONTENT = "kse-edit-content";
 export const LB_CONTENT_DRAFT = "lb-draft-content";
 export const LB_KEYS_DRAFT = "lb-draft-keys";
 
-// The write-once original of a lorebook entry the Engine has edited (design
-// §5.2). storyStorage, not historyStorage: it is about the story as a whole,
-// and an original that moved with the branch would be missing on exactly the
-// branch the writer wants it back on.
-//
-// One key per entry rather than one blob, because the record is written with
-// `storyStorage.setIfAbsent` — write-once is then a property of the API call
-// rather than of a read-then-write the next caller can get wrong, and a blob
-// would have to be rewritten whole on every first touch.
-//
-// Written only by `src/core/engine/lorebook-write.ts`, and read by nothing yet:
-// §5.2 is explicit that the loop never consults the snapshot, so this key
-// exists for a restore surface a later phase builds.
-export const lorebookOriginalKey = (entryId: string): string =>
-  `kse-lb-original-${entryId}`;
-
 // How long a lorebook entry was the last time the Engine ATTEMPTED to condense
-// it (§5.1), in characters. storyStorage, alongside the original snapshot and
-// for the same reason: it is a fact about a lorebook entry, and the lorebook is
-// global story state that does not move with a branch.
+// it (§5.1), in characters. storyStorage: it is a fact about a lorebook entry,
+// and the lorebook is global story state.
 //
 // This is the trigger's memory, and it exists because the trigger is otherwise
 // memoryless: it fires on length alone, so an entry whose facts genuinely do

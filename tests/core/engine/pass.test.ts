@@ -28,7 +28,6 @@ import {
 } from "../../helpers/history-fake";
 import { installLorebookFake } from "../../helpers/lorebook-fake";
 import { installStoryStorageFake } from "../../helpers/story-storage-fake";
-import { lorebookOriginalKey } from "../../../src/core/keys";
 
 // ─────────────────────────────── the harness ───────────────────────────────
 
@@ -349,7 +348,7 @@ describe("the pass", () => {
   it("executes a retire against the writer's lorebook, then clears the queue", async () => {
     // The pass no longer logs and forgets: it acts. A drain that cleared the
     // queue without executing leaves this entry enabled and this thread open.
-    const story = installStoryStorageFake();
+    installStoryStorageFake();
     configure({ enabled: true });
     const lorebook = installLorebookFake();
     lorebook.seed({
@@ -368,10 +367,8 @@ describe("the pass", () => {
 
     expect(lorebook.read("lb-thread")?.enabled).toBe(false);
     expect(h.store.getState().world.threads[0].status).toBe("satisfied");
-    // Through the door, so §5.2's original survives the retirement.
-    expect(story.get(lorebookOriginalKey("lb-thread"))).toMatchObject({
-      enabled: true,
-    });
+    // A switch, not a rewrite: the writer's own words are still there.
+    expect(lorebook.read("lb-thread")?.text).toBe("Kael owes the guild.");
     expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
     expect(h.store.getState().engine.phase).toBe("idle");
   });
@@ -380,7 +377,7 @@ describe("the pass", () => {
     // The pass has to hand the drain two things it did not need for a retire:
     // the generation queue, and the prose the pass assessed. Drop either and
     // the revise cannot happen at all.
-    const story = installStoryStorageFake();
+    installStoryStorageFake();
     configure({ enabled: true });
     const lorebook = installLorebookFake();
     lorebook.seed({
@@ -410,10 +407,6 @@ describe("the pass", () => {
     expect(lorebook.read("lb-ada")?.text).toContain(
       "Left hand gone below the wrist.",
     );
-    // §5.2's original, kept before the model was asked anything.
-    expect(story.get(lorebookOriginalKey("lb-ada"))).toMatchObject({
-      text: "A locksmith with two hands.",
-    });
     // §9.1's ∆ leaves 0 for the first time.
     expect(h.store.getState().engine.touched).toBe(1);
     expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
