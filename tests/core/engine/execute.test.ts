@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createStore, type Store } from "nai-store";
+import { registerThreadConditionEffects } from "../../../src/core/engine/thread-bind";
 import { rootReducer, persistedDataLoaded } from "../../../src/core/store";
 import type {
   RootState,
@@ -88,6 +89,15 @@ function says(text: string, finish_reason = "stop") {
   });
 }
 
+/** Let the fire-and-forget effects behind a dispatch finish.
+ *
+ *  The entry is minted by an effect now, not by the `open` arm, so it appears
+ *  one microtask chain after the drain returns rather than inside it. That is
+ *  the real behaviour and worth asserting through rather than around: a caller
+ *  who reads `world.threads[0].lorebookEntryId` the instant `drain` resolves
+ *  will not see it yet. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 function harness(
   threads: Thread[] = [],
   entities: WorldEntity[] = [],
@@ -102,6 +112,15 @@ function harness(
         entitiesById: Object.fromEntries(entities.map((e) => [e.id, e])),
       },
     }),
+  );
+  // The `open` arm no longer mints the entry itself — one creator serves every
+  // thread, whoever made it (thread-bind.ts). Registering the real effect keeps
+  // these tests end to end rather than asserting against a step the arm stopped
+  // taking.
+  registerThreadConditionEffects(
+    store.subscribeEffect,
+    store.getState,
+    store.dispatch,
   );
   const generate = vi.fn(says("One-handed now."));
   return {
@@ -268,6 +287,7 @@ describe("drain — open", () => {
     const h = harness();
 
     const outcome = await drain([OPEN], h.deps);
+    await settle();
 
     const [thread] = h.store.getState().world.threads;
     expect(thread.title).toBe("the letter under the board");
@@ -297,6 +317,7 @@ describe("drain — open", () => {
     const h = harness();
 
     await drain([OPEN], h.deps);
+    await settle();
 
     const entry = lorebook.created()[0];
     // The thread is anchored at creation, so §4.3's pacing gate is part of the
@@ -320,6 +341,7 @@ describe("drain — open", () => {
     const h = harness();
 
     await drain([OPEN], h.deps);
+    await settle();
 
     expect(JSON.stringify(lorebook.created()[0].advancedConditions)).toContain(
       String(90 + THREAD_GRACE_PARAGRAPHS.plot),

@@ -34,7 +34,9 @@ import {
 } from "../store/effects/lorebook-sync";
 import {
   threadAnchorSet,
+  threadCreated,
   threadDeleted,
+  threadLorebookEntrySet,
   threadStatusSet,
   threadHorizonSet,
   threadMemberToggled,
@@ -335,6 +337,41 @@ export async function disableDeletedThreadEntry(
   return written;
 }
 
+/** Give a thread its lorebook entry, once, whoever created the thread.
+ *
+ *  **One creator, because three callsites make threads.** The World's "+", the
+ *  Forge's `[THREAD]`, and the Engine's `open` arm all dispatch
+ *  `threadCreated`, and until now only the Engine went on to mint an entry — so
+ *  a thread the writer made by hand had no entry, no detector, and no way to
+ *  remind them of anything. The arm no longer creates its own: two creators
+ *  racing the same `threadCreated` is two entries for one thread, and the
+ *  reducer's one-entity-per-entry invariant does not cover threads.
+ *
+ *  **A blank title means a draft, and a draft gets nothing.** The World's "+"
+ *  makes an untitled thread and opens the pane on it; minting an entry there
+ *  would leave an empty always-on entry in the writer's lorebook the moment
+ *  they changed their mind. That is the rule CLAUDE.md already states for
+ *  entities — "+ Add Entity" creates a draft and no entry exists until Save —
+ *  and a thread's Save is what supplies the title. The Forge and the Engine
+ *  both name a thread as they create it, so both get an entry immediately.
+ *
+ *  Idempotent on `lorebookEntryId`: a thread that has one is left alone,
+ *  however many times a rename fires afterwards. */
+export async function ensureThreadEntry(
+  getState: () => RootState,
+  dispatch: Store<RootState>["dispatch"],
+  threadId: string,
+): Promise<boolean> {
+  const state = getState();
+  const thread = state.world.threads.find((t) => t.id === threadId);
+  if (!thread || thread.lorebookEntryId) return false;
+  if (!thread.title.trim()) return false;
+
+  const entryId = await createThreadEntry(state, thread);
+  dispatch(threadLorebookEntrySet({ threadId, entryId }));
+  return true;
+}
+
 /** The four edits a thread's condition is built from (§4.3, phase 5's handoff
  *  plus phase 6's gate).
  *
@@ -372,6 +409,7 @@ export async function disableDeletedThreadEntry(
 export function registerThreadConditionEffects(
   subscribeEffect: Store<RootState>["subscribeEffect"],
   getState: () => RootState,
+  dispatch: Store<RootState>["dispatch"],
 ): void {
   const rebuild = (threadId: string): void => {
     void (async () => {
@@ -394,6 +432,25 @@ export function registerThreadConditionEffects(
   );
   subscribeEffect(matchesAction(threadAnchorSet), (action) =>
     rebuild(action.payload.threadId),
+  );
+
+  // The entry itself, for every thread that has a name. `threadCreated` covers
+  // the Forge and the Engine, which name a thread as they make it;
+  // `threadRenamed` covers the World's "+", where the title arrives on Save.
+  const ensure = (threadId: string): void => {
+    void (async () => {
+      try {
+        await ensureThreadEntry(getState, dispatch, threadId);
+      } catch (error) {
+        api.v1.log("[engine] thread entry creation failed:", error);
+      }
+    })();
+  };
+  subscribeEffect(matchesAction(threadCreated), (action) =>
+    ensure(action.payload.thread.id),
+  );
+  subscribeEffect(matchesAction(threadRenamed), (action) =>
+    ensure(action.payload.threadId),
   );
 
   subscribeEffect(matchesAction(threadStatusSet), (action) => {

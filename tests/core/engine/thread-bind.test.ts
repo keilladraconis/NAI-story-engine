@@ -6,6 +6,7 @@ import { rootReducer, persistedDataLoaded } from "../../../src/core/store";
 import { initialWorldState } from "../../../src/core/store/slices/world";
 import {
   threadAnchorSet,
+  threadCreated,
   threadDeleted,
   threadRenamed,
   threadMemberToggled,
@@ -424,7 +425,11 @@ describe("registerThreadConditionEffects", () => {
     const store = harness();
     const entryId = await createThreadEntry(store.getState(), thread());
     store.dispatch(rebound(entryId));
-    registerThreadConditionEffects(store.subscribeEffect, store.getState);
+    registerThreadConditionEffects(
+      store.subscribeEffect,
+      store.getState,
+      store.dispatch,
+    );
     return { store, entryId };
   }
 
@@ -619,5 +624,79 @@ describe("applyThreadStatus", () => {
     expect(source).toMatch(
       /subscribeEffect\(\s*matchesAction\(threadStatusSet\)/,
     );
+  });
+});
+
+describe("every named thread gets an entry, whoever made it", () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  function wired(threads: Thread[] = []) {
+    const store = harness(threads);
+    registerThreadConditionEffects(
+      store.subscribeEffect,
+      store.getState,
+      store.dispatch,
+    );
+    return store;
+  }
+
+  it("gives the Forge's [THREAD] an entry as soon as it is created", async () => {
+    // The Forge names a thread as it makes it, so there is nothing to wait for.
+    const store = wired();
+    store.dispatch(
+      threadCreated({
+        thread: {
+          id: "t9",
+          title: "The debt",
+          text: "Vesper owes the guild.",
+          entityIds: [],
+        },
+      }),
+    );
+    await settle();
+
+    const [thread] = store.getState().world.threads;
+    expect(thread.lorebookEntryId).toBeDefined();
+    expect(lorebook.read(thread.lorebookEntryId!)?.displayName).toBe(
+      "The debt",
+    );
+  });
+
+  it("gives the World's untitled '+' nothing until it has a name", async () => {
+    // CLAUDE.md's draft rule, for threads: "+ Add Entity" creates a draft and
+    // no entry exists until Save, so cancelling leaves no orphan behind. An
+    // untitled thread minting an always-on entry would leave exactly that.
+    const store = wired();
+    store.dispatch(
+      threadCreated({
+        thread: { id: "t9", title: "", text: "", entityIds: [] },
+      }),
+    );
+    await settle();
+    expect(store.getState().world.threads[0].lorebookEntryId).toBeUndefined();
+
+    // Save supplies the title.
+    store.dispatch(threadRenamed({ threadId: "t9", title: "The debt" }));
+    await settle();
+    expect(store.getState().world.threads[0].lorebookEntryId).toBeDefined();
+  });
+
+  it("mints one entry however many times the title changes", async () => {
+    // The rename subscription is what gives a hand-made thread its entry, so
+    // it fires on every later rename too. Without the idempotence guard a
+    // writer editing a title three times would own three always-on entries.
+    const store = wired();
+    store.dispatch(
+      threadCreated({
+        thread: { id: "t9", title: "First", text: "", entityIds: [] },
+      }),
+    );
+    await settle();
+    store.dispatch(threadRenamed({ threadId: "t9", title: "Second" }));
+    await settle();
+    store.dispatch(threadRenamed({ threadId: "t9", title: "Third" }));
+    await settle();
+
+    expect(lorebook.created()).toHaveLength(1);
   });
 });

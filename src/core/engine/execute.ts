@@ -49,15 +49,10 @@ import {
   openParams,
   OPEN_MAX_TOKENS,
 } from "./open-strategy";
-import {
-  castFromSubject,
-  createThreadEntry,
-  findThreadBySubject,
-} from "./thread-bind";
+import { castFromSubject, findThreadBySubject } from "./thread-bind";
 import {
   threadAnchorSet,
   threadCreated,
-  threadLorebookEntrySet,
   threadStatusSet,
 } from "../store/slices/world";
 import { TRIAGE_MAX_TOKENS } from "./triage-strategy";
@@ -560,8 +555,11 @@ async function open(
     }
   }
 
-  const entryId = await createThreadEntry(state, created);
-  deps.dispatch(threadLorebookEntrySet({ threadId, entryId }));
+  // The entry is not minted here. `registerThreadConditionEffects` subscribes
+  // to `threadCreated` and gives every named thread one — the Forge's and the
+  // writer's as well as this — and two creators racing the same dispatch would
+  // be two entries for one thread. Opening the thread is the work this arm
+  // reports; binding an entry to it is the same job for every creator.
   return "executed";
 }
 

@@ -1734,10 +1734,28 @@ only for a writer who switched it on in that story.
   and nothing reads either back through a UI. The writer's recourse this phase is
   the editor's own undo. The review surface generally — anything that shows what
   the Engine did and offers to unpick it — is a later phase's subject.
-- **Give a hand-made thread an entry.** `createThreadEntry` has exactly one
-  caller, the `open` arm. The lorebook control on a thread card is still disabled,
-  and a thread the writer creates has no entry, no anchor, and therefore no
-  detector and no expiry until the prose first mentions it.
+- **~~Give a hand-made thread an entry.~~ Done after the phase.** There was no
+  reason for the asymmetry beyond `createThreadEntry` having exactly one caller.
+  Three callsites make threads — the World's "+", the Forge's `[THREAD]`, and the
+  `open` arm — and only the third gave its thread an entry, so a thread the writer
+  made had no detector and could remind them of nothing.
+
+  It is one creator now, an effect on `threadCreated` and `threadRenamed`, and the
+  `open` arm no longer mints its own: two creators racing the same dispatch is two
+  entries for one thread, and the one-entity-per-entry reducer invariant does not
+  cover threads. **A blank title means a draft and gets nothing** — the World's "+"
+  opens the pane on an untitled thread, and minting there would leave an empty
+  always-on entry behind the moment the writer changed their mind. That is
+  CLAUDE.md's entity rule ("+ Add Entity" creates a draft; no entry until Save)
+  applied to threads, and a thread's Save is what supplies the title.
+
+  The consequence worth knowing: the entry now appears one microtask after the
+  `open` arm returns rather than inside it, so the arm reports `executed` on the
+  strength of the thread existing. Binding an entry to it is the same job for every
+  creator, and it logs its own failure.
+
+  Still open: the **lorebook sync toggle** on a thread card, which is a different
+  feature from the entry itself and remains disabled.
 
 **Where the build corrected this document.**
 

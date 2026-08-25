@@ -40,5 +40,5 @@ export function registerEffects(store: Store<RootState>, genX: GenX): void {
   // rebuild it — a detector left probing a renamed thread's old name never
   // matches and reminds forever. Registered whether or not the Engine is on:
   // the writer can edit a thread the Engine opened before switching it off.
-  registerThreadConditionEffects(subscribeEffect, getState);
+  registerThreadConditionEffects(subscribeEffect, getState, dispatch);
 }
