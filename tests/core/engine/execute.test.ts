@@ -284,7 +284,9 @@ describe("drain — open", () => {
       condition.type === "and" ? condition.conditions : [];
     expect(detector.type).toBe("not");
     expect(JSON.stringify(gate)).toContain("paragraphCount");
-    expect(entry.forceActivation).toBe(true);
+    // Never always-on: forceActivation overrides advancedConditions, so an
+    // always-on thread entry is one whose detector never fires.
+    expect(entry.forceActivation).toBe(false);
     expect(entry.text).toBe("One-handed now.");
   });
 

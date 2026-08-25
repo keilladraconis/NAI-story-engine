@@ -263,14 +263,33 @@ describe("createThreadEntry", () => {
     // A key-activated entry needs its key present to be considered at all, and
     // the condition negates the very same string — the entry could then never
     // fire, which is §4.3's contradiction arriving through the keys instead of
-    // through a `lore` gate. So the entry is force-activated and the condition
-    // is the gate; it carries no keys of its own for the same reason.
+    // through a `lore` gate. So the entry carries no keys — and it must NOT be
+    // force-activated either: the probe measured `forceActivation` overriding
+    // `advancedConditions` outright, so an always-on thread entry is one whose
+    // detector never fires. The condition does the activating by itself.
     const store = harness();
 
     const entryId = await createThreadEntry(store.getState(), thread());
 
-    expect(lorebook.read(entryId)?.forceActivation).toBe(true);
+    expect(lorebook.read(entryId)?.forceActivation).toBe(false);
     expect(lorebook.read(entryId)?.keys ?? []).toEqual([]);
+  });
+
+  it("never force-activates, however the condition is built", async () => {
+    // The regression this guards is silent and total: an always-on entry with a
+    // detector reads exactly like a working one in every test that inspects the
+    // condition, because the condition IS there — it is just never consulted.
+    // Phases 5 and 6 both shipped that, and two tests asserted it as a
+    // guarantee. Whatever else changes about the shape, this must not come back.
+    for (const t of [
+      thread(),
+      thread({ horizon: "arc", anchorParagraph: 12 }),
+      thread({ entityIds: [], title: "" }),
+    ]) {
+      const store = harness([t]);
+      const entryId = await createThreadEntry(store.getState(), t);
+      expect(lorebook.read(entryId)?.forceActivation).toBe(false);
+    }
   });
 
   it("carries the erato divider when the writer has that on", async () => {

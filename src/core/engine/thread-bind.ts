@@ -178,14 +178,27 @@ export function findThreadBySubject(
  *
  *  Four decisions are baked into the shape below.
  *
- *  **Always on, with the condition as the gate.** A key-activated entry has to
- *  have one of its keys present to be considered at all — and this entry's
- *  condition negates exactly the strings it would be keyed on, so it could then
- *  never fire. That is §4.3's contradiction arriving through the keys instead of
- *  through the `lore` gate that section rejects. `forceActivation` plus an
- *  `advancedConditions` gate is the only composition that expresses "inject when
- *  the story has stopped mentioning this", so the entry carries no keys of its
- *  own.
+ *  **The condition alone activates it: no keys, and NOT always-on.** Measured
+ *  with `tools/paragraph-count-probe.naiscript` against the real runtime, three
+ *  shapes, one story:
+ *
+ *    Always On + impossible condition   ACTIVE     ← the condition is ignored
+ *    not On    + impossible condition   inactive   ← it is evaluated
+ *    not On    + always-true condition  ACTIVE     ← it can activate on its own
+ *
+ *  `forceActivation` **overrides** `advancedConditions`. Phases 5 and 6 shipped
+ *  `forceActivation: true` beside a detector and the detector therefore never
+ *  fired once — every thread entry was the blanket always-on this whole
+ *  construction exists to replace.
+ *
+ *  The reasoning that put it there was sound about keys and wrong about the
+ *  conclusion. A key-activated entry does need one of its keys present to be
+ *  considered, and this entry's condition negates exactly the strings it would
+ *  be keyed on — so keys are indeed unusable here. But the third row above says
+ *  the leftover option is not "always-on plus a gate", it is the condition
+ *  doing the activating with nothing else involved. Hence `keys: []` and
+ *  `forceActivation: false`, which is the only composition that actually
+ *  expresses "inject when the story has stopped mentioning this".
  *
  *  **Its own `SE: Threads` category**, not a DULFS one: a thread is not an
  *  entity, and a writer opening their lorebook should find the Engine's
@@ -215,7 +228,7 @@ export async function createThreadEntry(
     text: applyEratoPrefix(thread.text, Boolean(erato)),
     keys: [],
     enabled: true,
-    forceActivation: true,
+    forceActivation: false,
     advancedConditions,
     category,
   });
