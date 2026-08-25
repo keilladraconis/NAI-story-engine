@@ -2,7 +2,7 @@
 compatibilityVersion: naiscript-1.0
 id: 3a7c1f95-6b28-4d03-9e14-c5f8a2b70d61
 name: Paragraph Count Probe
-version: 0.3.0
+version: 0.4.0
 description: Does NovelAI's paragraphCount condition variable count what document.scan() counts?
 memoryLimit: 8
 ---*/
@@ -62,11 +62,11 @@ function log(line) {
 // context IS the activation signal.
 const SENTINEL = "PARAGRAPH-COUNT-PROBE-3a7c1f95";
 
-function gate(k) {
+function gate(variable, k) {
   return [
     {
       type: "equation",
-      terms: [{ value: "paragraphCount" }],
+      terms: [{ value: variable }],
       comparison: ">=",
       target: k,
     },
@@ -80,8 +80,10 @@ function gate(k) {
  *  `forGeneration: true` because that is the build the writer actually gets, and
  *  the doc warns it can change behaviour — measuring the other one would answer a
  *  question nobody asked. */
-async function holdsAt(entryId, k) {
-  await api.v1.lorebook.updateEntry(entryId, { advancedConditions: gate(k) });
+async function holdsAt(entryId, variable, k) {
+  await api.v1.lorebook.updateEntry(entryId, {
+    advancedConditions: gate(variable, k),
+  });
   const messages = await api.v1.buildContext({ forGeneration: true });
   if (!messages || messages.length === 0) {
     throw new Error("buildContext returned nothing");
@@ -131,7 +133,7 @@ async function run() {
     enabled: true,
     forceActivation: true,
     category: categoryId,
-    advancedConditions: gate(1),
+    advancedConditions: gate("paragraphCount", 1),
   });
   await api.v1.storyStorage.set(LEDGER, { entryId });
 
@@ -154,31 +156,93 @@ async function run() {
   }
   log("");
   log("sentinel visible with an always-true gate — the channel works");
-  log("searching…");
 
-  // `paragraphCount >= 0` is true of any count and proves nothing, so the search
-  // starts at 1. `hi` climbs until the gate fails, which also catches a count far
-  // larger than the document (context-scoped counters can only be smaller, but a
-  // surprise is what this is for).
+  // ── the control ──────────────────────────────────────────────────────────
+  //
+  // v0.3 reported 511 and called it a measurement. It was not: the climb loop
+  // exited at hi = 512 whether the gate FAILED there or the runaway break
+  // tripped, with no way to tell those apart, and the search then treated 512 as
+  // a known-failing bound and converged on 511. 2^9 − 1 is the signature of a
+  // gate that held at every k it was asked.
+  //
+  // So before measuring anything, establish that the equation discriminates at
+  // all — against `characterCount`, whose true value `document.scan()` already
+  // gave us. A gate that cannot answer a question we know the answer to cannot
+  // be trusted with one we do not.
+
+  const ABSURD = 1000000;
+
+  log("");
+  log("control: characterCount, whose answer we already know");
+  const charLow = await holdsAt(entryId, "characterCount", 1);
+  const charAt = await holdsAt(entryId, "characterCount", scanChars);
+  const charOver = await holdsAt(entryId, "characterCount", ABSURD);
+  log(`  >= 1          ${charLow ? "active" : "inactive"}   (expect active)`);
+  log(`  >= ${scanChars}      ${charAt ? "active" : "inactive"}   (expect active)`);
+  log(`  >= ${ABSURD}    ${charOver ? "active" : "inactive"}   (expect INACTIVE)`);
+
+  if (charOver || !charLow) {
+    log("");
+    log("CONTROL FAILED — the equation condition does not discriminate.");
+    if (charOver) {
+      log(`A gate demanding ${ABSURD} characters fired on a ${scanChars}-character`);
+      log("story, so it is TRUE regardless of its target. That means the pacing");
+      log("gate phase 6 bakes into every thread entry gates nothing at all:");
+      log("`paragraphCount >= anchor + grace` is simply always satisfied.");
+      log("");
+      log("Not a disaster — an always-true gate ANDed with the detector leaves");
+      log("the detector doing the work, which is what phase 5 shipped. But the");
+      log("grace window does not exist, and §14.3 must stop claiming it does.");
+    } else {
+      log("A gate demanding 1 character did NOT fire, so the condition is");
+      log("always FALSE and every thread entry is silent — the failure §4.3");
+      log("refuses. Threads would never remind at all.");
+    }
+    log("");
+    log("Either way, paragraphCount cannot be measured this way. Press Clean up.");
+    return;
+  }
+
+  log("  control passed — the equation discriminates");
+
+  // ── the measurement ──────────────────────────────────────────────────────
+
+  log("");
+  log("searching paragraphCount…");
+
+  // Climb until the gate genuinely fails, and say so when it never does rather
+  // than letting a ceiling masquerade as an answer.
+  const CEILING = ABSURD;
   let hi = 1;
-  while (await holdsAt(entryId, hi)) {
-    if (hi > scanTotal * 4 + 100) break;
+  let failed = false;
+  while (hi <= CEILING) {
+    if (!(await holdsAt(entryId, "paragraphCount", hi))) {
+      failed = true;
+      break;
+    }
     hi *= 2;
   }
+  if (!failed) {
+    log("");
+    log(`paragraphCount >= ${CEILING} is still active, yet characterCount`);
+    log("discriminated correctly. The two variables do not behave alike —");
+    log("read the script log and treat paragraphCount as unusable for now.");
+    return;
+  }
+
   let lo = Math.floor(hi / 2);
   while (lo + 1 < hi) {
     const mid = Math.floor((lo + hi) / 2);
-    if (await holdsAt(entryId, mid)) lo = mid;
+    if (await holdsAt(entryId, "paragraphCount", mid)) lo = mid;
     else hi = mid;
   }
-  // `lo` holds and `lo + 1` does not, so the count is exactly `lo` — unless the
-  // gate never held at all, which means a count below 1.
-  const count = (await holdsAt(entryId, 1)) ? lo : 0;
+  const count = (await holdsAt(entryId, "paragraphCount", 1)) ? lo : 0;
 
   log("");
   log(`NovelAI paragraphCount = ${count}`);
   log(`document.scan() total  = ${scanTotal}`);
   log(`document.scan() prose  = ${scanNonEmpty}`);
+  log(`characters             = ${scanChars}`);
   log("");
 
   if (count === scanTotal) {
@@ -196,8 +260,10 @@ async function run() {
     log("direction §4.3 refuses; the anchor needs to be in NovelAI's unit.");
   } else {
     log(`VERDICT: DISAGREES — NovelAI counts ${count - scanTotal} MORE.`);
-    log("Gates open early. Survivable (degrades toward always-on), but the grace");
-    log("window is not the length it claims to be.");
+    log(`That is ${(scanChars / count).toFixed(1)} characters per unit — compare`);
+    log("~400 for a paragraph. If it is far below that, the variable is counting");
+    log("something smaller than a paragraph (lines? sentences?) and the anchor");
+    log("must be recorded in THAT unit, not in sections.");
   }
 
   log("");
