@@ -27,7 +27,7 @@ import {
   migrateLorebookCategories,
   registerLorebookSyncHooks,
 } from "../core/store/effects/lorebook-sync";
-import { loadBranchState } from "../core/store/persistence/history-store";
+import { loadWorldRecord } from "../core/store/persistence/story-store";
 import type { ChatSliceState } from "../core/store/slices/chat";
 import type { FoundationState } from "../core/store/types";
 import { loadJournal } from "../core/generation-journal";
@@ -180,27 +180,27 @@ export async function start(): Promise<void> {
   registerEffects(store, genX);
 
   // ── Persistence ───────────────────────────────────────────────────────────
-  // Branch-scoped state (World, story fields) comes from historyStorage at the
-  // current node; chat and Foundation follow the writer and stay in
-  // storyStorage. No migration path: Story Engine is alpha and upgrading drops
-  // Engine state — previously managed lorebook entries simply become unmanaged,
-  // and the Import wizard's Bind is the way back.
+  // Three storyStorage records, all of them story-scoped: what Story Engine has
+  // recorded moves forward with the writer and does not revert when they undo.
+  // No migration path: Story Engine is alpha and upgrading drops Engine state —
+  // previously managed lorebook entries simply become unmanaged, and the Import
+  // wizard's Bind is the way back.
   // storyStorage.get is typed `any`; name the shapes here rather than letting
-  // them flow unchecked into PersistedData, the way history-store.ts does for
-  // the index.
-  const [branch, chat, foundation] = (await Promise.all([
-    loadBranchState(),
+  // them flow unchecked into PersistedData, the way story-store.ts does for the
+  // World record.
+  const [persisted, chat, foundation] = (await Promise.all([
+    loadWorldRecord(),
     api.v1.storyStorage.get(STORAGE_KEYS.CHAT),
     api.v1.storyStorage.get(STORAGE_KEYS.FOUNDATION),
   ])) as [
-    Awaited<ReturnType<typeof loadBranchState>>,
+    Awaited<ReturnType<typeof loadWorldRecord>>,
     ChatSliceState | null,
     FoundationState | null,
   ];
   store.dispatch(
     persistedDataLoaded({
-      story: branch.story,
-      world: branch.world,
+      story: persisted.story,
+      world: persisted.world,
       ...(chat ? { chat } : {}),
       ...(foundation ? { foundation } : {}),
     }),

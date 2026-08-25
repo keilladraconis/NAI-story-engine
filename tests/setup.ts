@@ -87,15 +87,6 @@ const apiMock = {
       set: vi.fn().mockResolvedValue(undefined),
       remove: vi.fn().mockResolvedValue(undefined),
     },
-    historyStorage: {
-      get: vi.fn().mockResolvedValue(undefined),
-      set: vi.fn().mockResolvedValue(undefined),
-      remove: vi.fn().mockResolvedValue(undefined),
-      has: vi.fn().mockResolvedValue(false),
-      list: vi.fn().mockResolvedValue([]),
-      getOrDefault: vi.fn(async (_k: string, d: unknown) => d),
-      setIfAbsent: vi.fn().mockResolvedValue(false),
-    },
     lorebook: {
       categories: vi.fn().mockResolvedValue([]),
       category: vi.fn(),
@@ -148,11 +139,6 @@ const apiMock = {
     document: {
       sectionIds: vi.fn().mockResolvedValue([]),
       scan: vi.fn().mockResolvedValue([]),
-      history: {
-        currentNodeId: vi.fn().mockResolvedValue(1),
-        nodeState: vi.fn().mockResolvedValue(undefined),
-        previousNodeId: vi.fn().mockResolvedValue(undefined),
-      },
     },
     generate: vi.fn(),
     buildContext: vi.fn().mockResolvedValue([]),

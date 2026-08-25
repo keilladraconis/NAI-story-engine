@@ -140,11 +140,10 @@ describe("parseTriage — the prose an intent carries", () => {
   });
 
   it("clamps it to the window the prompt would have used anyway", () => {
-    // The queue is a historyStorage record and copy-on-write is per key per
-    // node (§6.2), so an intent that could hold a whole novel would copy one
-    // onto every node it waited on. Clamped at the mint, with `clampProse` —
-    // the same clamp and therefore the same window triage read, never a second
-    // and smaller one.
+    // The queue is persisted on every pass, so an intent that could hold a
+    // whole novel would write one on every pass it waited through. Clamped at
+    // the mint, with `clampProse` — the same clamp and therefore the same
+    // window triage read, never a second and smaller one.
     const long = `${"x".repeat(20000)}\n\nAda put her hand into the press.`;
     const [intent] = parseTriage("REVISE Ada Vance", MANIFEST, long);
 

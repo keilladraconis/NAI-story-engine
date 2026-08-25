@@ -7,14 +7,13 @@
 // writer steering an autonomous story, and the same person may hand-write the
 // next one.
 //
-// One record, not one key per setting. All of them are read together on every pass
-// and written together from one form, and storyStorage has none of historyStorage's
-// copy-on-write-per-key reason to shard (see intents.ts, where the watermark and
-// the queue are deliberately kept apart for exactly that reason).
+// One record, not one key per setting. All of them are read together on every
+// pass and written together from one form, so there is nothing a shard would buy
+// — the same argument the loop's own record makes in intents.ts.
 //
-// storyStorage, not historyStorage, for the same reason Foundation lives there:
-// "is the Engine on" is a property of the story, not of a point in it. Undoing
-// three paragraphs must not switch the Engine off.
+// Its own record rather than a corner of the World's: these are the writer's
+// answers to a form, and the World is what the Engine has recorded. Nothing
+// should be able to overwrite "is the Engine on" by saving a character.
 //
 // **The slot is not trusted.** It is JSON some previous version wrote, and once
 // the Setup form lands a writer can reach it through a text field. Every read

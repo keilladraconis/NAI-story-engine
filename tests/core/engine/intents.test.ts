@@ -1,17 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   dedupe,
+  ENGINE_LOOP_KEY,
   intentKey,
-  QUEUE_KEY,
-  WATERMARK_KEY,
 } from "../../../src/core/engine/intents";
 import type { Intent } from "../../../src/core/engine/loop-machine";
-import {
-  INDEX_KEY,
-  entityKey,
-  threadKey,
-  fieldKey,
-} from "../../../src/core/store/persistence/keyspace";
+import { STORAGE_KEYS } from "../../../src/core/keys";
 
 /** The prose the pass that raised these intents read. Identity ignores it —
  *  `intentKey` is the work, not the request — so it is one constant here. */
@@ -136,19 +130,12 @@ describe("dedupe", () => {
   });
 });
 
-describe("record keys", () => {
-  it("do not collide with the branch keyspace they share", () => {
-    // watermark and queue live in the same historyStorage node space as the
-    // index and the e:/t:/f: records, so a name clash would silently overwrite
-    // persisted state rather than fail.
-    const others = [
-      INDEX_KEY,
-      entityKey("x"),
-      threadKey("x"),
-      fieldKey("x"),
-      WATERMARK_KEY,
-      QUEUE_KEY,
-    ];
+describe("the loop's record key", () => {
+  it("does not collide with any other storyStorage record", () => {
+    // Every Story Engine record shares one flat storyStorage keyspace, so a
+    // name clash would silently overwrite persisted state rather than fail.
+    const others = [...Object.values(STORAGE_KEYS), ENGINE_LOOP_KEY];
+    expect(others.length).toBeGreaterThan(5);
     expect(new Set(others).size).toBe(others.length);
   });
 });

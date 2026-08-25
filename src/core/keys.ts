@@ -8,27 +8,27 @@
 
 /** storyStorage keys accessed directly via `storyStorage.get/set`. */
 export const STORAGE_KEYS = {
-  // Chat sessions — storyStorage, not historyStorage: brainstorms follow the
-  // writer, not the branch (design §6.1). The World and story fields live in
-  // historyStorage under the keyspace in
-  // src/core/store/persistence/keyspace.ts.
+  // The World and the story fields — one record, read and written only through
+  // src/core/store/persistence/story-store.ts. Deliberately NOT the pre-0.15
+  // `kse-persist` name: that blob carried a different set of slices, and alpha
+  // does no migrations, so reusing the name would half-read it instead of
+  // starting clean.
+  WORLD: "kse-world",
+  // Chat sessions — their own record because brainstorms follow the writer
+  // rather than the World's shape, and a chat message must not rewrite the
+  // World record on every keystroke's debounce.
   CHAT: "kse-chat",
-  // Foundation — storyStorage too. It is the story's premise, not a property of
-  // any one point in it: Shape, Intent and Contract describe the whole thing,
-  // and ATTG/Style mirror into Memory and Author's Note, which are themselves
-  // story-global. Branch-scoping it made undo revert the Foundation while
-  // Memory kept the newer text, so what the writer saw and what reached the
-  // model disagreed.
+  // Foundation — its own record too. It is the story's premise rather than
+  // something the Engine keeps notes about: Shape, Intent and Contract describe
+  // the whole thing, and ATTG/Style mirror into Memory and Author's Note.
   FOUNDATION: "kse-foundation",
   // Setting field.
   SETTING: "kse-setting",
-  // Engine settings — one record holding all three, in storyStorage rather than
-  // historyStorage because "is the Engine on" is a property of the story, not of
-  // a point in it: undoing three paragraphs must not switch the Engine off. Not
-  // in project.yaml either, because api.v1.config is read-only (`get`, no `set`)
-  // and the Setup tab has to be able to write these back — which is what makes
-  // them per story. Read and written through src/core/engine/settings.ts, never
-  // raw: the slot is validated on every read.
+  // Engine settings — one record holding all of them, rather than project.yaml
+  // entries: api.v1.config is read-only (`get`, no `set`) and the Setup tab has
+  // to be able to write these back, which is what makes them per story. Read
+  // and written through src/core/engine/settings.ts, never raw: the slot is
+  // validated on every read.
   ENGINE_SETTINGS: "kse-engine",
   // Forge guidance draft.
   FORGE_GUIDANCE_UI: "se-forge-guidance",

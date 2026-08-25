@@ -5,23 +5,27 @@
 // single unresolved commitment from growing the queue without bound.
 //
 // Pure by construction — no api.v1, no promises, no store access. The engine
-// effect owns reading and writing the two records below.
+// effect owns reading and writing the record below.
 //
 // Phase 4 only enqueues and logs. Phase 6 drains.
 
 import type { Watermark } from "./assess";
 import type { Intent } from "./loop-machine";
 
-/** Singleton records, read directly rather than through the index — see
- *  keyspace.ts. Branch-scoped: a queue built from one continuation's prose is
- *  meaningless on another, and a watermark is a position in a specific branch.
- *  Two keys, not one record: historyStorage is copy-on-write per key per node,
- *  and the watermark moves on every pass while the queue usually does not. */
-export const WATERMARK_KEY = "watermark";
-export const QUEUE_KEY = "queue";
+/** The loop's own memory: how far it has read, and what it still owes.
+ *
+ *  ONE record holding both, rather than a key each. They are written by the same
+ *  code at the same two points in a pass and read together at its start, so a
+ *  split would only be a second thing to keep in step — a write that advanced
+ *  the watermark without carrying the queue it was triaged from.
+ *
+ *  Story-scoped, like everything else Story Engine records. The watermark needs
+ *  no help to survive an undo: `assess` treats a watermark naming a section the
+ *  document no longer holds as no watermark at all, so undoing past it means the
+ *  next pass re-reads rather than skips. */
+export const ENGINE_LOOP_KEY = "kse-engine-loop";
 
-/** The loop's branch-scoped state, as the effect holds it in memory. Persisted
- *  as the two records above, one key each. */
+/** The loop's persisted state, as the effect holds it in memory. */
 export type EngineRecord = {
   watermark: Watermark | null;
   queue: Intent[];

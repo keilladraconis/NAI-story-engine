@@ -26,10 +26,6 @@ import { THREAD_GRACE_PARAGRAPHS } from "../../../src/core/engine/thread-horizon
 import { engineSettingsChanged } from "../../../src/core/store/slices/engine";
 import { ENGINE_DEFAULTS } from "../../../src/core/engine/settings";
 import {
-  installHistoryFake,
-  type HistoryFake,
-} from "../../helpers/history-fake";
-import {
   installLorebookFake,
   type LorebookFake,
 } from "../../helpers/lorebook-fake";
@@ -66,7 +62,6 @@ function entity(id: string, over: Partial<WorldEntity> = {}): WorldEntity {
   };
 }
 
-let history: HistoryFake;
 let lorebook: LorebookFake;
 let story: StoryStorageFake;
 let logged: string[];
@@ -124,7 +119,6 @@ function harness(
     deps: {
       dispatch: store.dispatch,
       getState: store.getState,
-      nodeId: history.current(),
       assessment: {
         backlog: 1,
         newText: PASS_PROSE,
@@ -152,7 +146,6 @@ function budget(tokens: number): void {
 }
 
 beforeEach(() => {
-  history = installHistoryFake();
   lorebook = installLorebookFake();
   story = installStoryStorageFake();
   logged = [];

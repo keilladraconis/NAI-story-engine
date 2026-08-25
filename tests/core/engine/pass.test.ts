@@ -14,7 +14,10 @@ import type {
 } from "../../../src/core/store/types";
 import { persistedDataLoaded } from "../../../src/core/store";
 import { initialWorldState } from "../../../src/core/store/slices/world";
-import { QUEUE_KEY, WATERMARK_KEY } from "../../../src/core/engine/intents";
+import {
+  ENGINE_LOOP_KEY,
+  type EngineRecord,
+} from "../../../src/core/engine/intents";
 import { engineSettingsChanged } from "../../../src/core/store/slices/engine";
 import {
   ENGINE_DEFAULTS,
@@ -22,12 +25,11 @@ import {
 } from "../../../src/core/engine/settings";
 import { STORAGE_KEYS } from "../../../src/core/keys";
 import { MAX_ATTEMPTS } from "../../../src/core/engine/refusal";
-import {
-  installHistoryFake,
-  type HistoryFake,
-} from "../../helpers/history-fake";
 import { installLorebookFake } from "../../helpers/lorebook-fake";
-import { installStoryStorageFake } from "../../helpers/story-storage-fake";
+import {
+  installStoryStorageFake,
+  type StoryStorageFake,
+} from "../../helpers/story-storage-fake";
 
 // ─────────────────────────────── the harness ───────────────────────────────
 
@@ -174,12 +176,26 @@ async function armWakeup(h: Harness): Promise<() => Promise<void>> {
 
 /** Put the Engine's settings where the pass now reads them: one storyStorage
  *  record, not three `api.v1.config` entries. Everything not named takes its
- *  default, which is what a real record written by the Setup form looks like. */
+ *  default, which is what a real record written by the Setup form looks like.
+ *
+ *  Written INTO the storage fake rather than mocked over `get`. The loop's own
+ *  record lives in the same store now, so a mock that answered for one key and
+ *  `null` for everything else would make the queue unseedable and unreadable. */
 function configure(settings: Partial<EngineSettings> = {}): void {
-  const stored: EngineSettings = { ...ENGINE_DEFAULTS, ...settings };
-  vi.mocked(api.v1.storyStorage.get).mockImplementation(async (key: string) =>
-    key === STORAGE_KEYS.ENGINE_SETTINGS ? stored : null,
-  );
+  story.set(STORAGE_KEYS.ENGINE_SETTINGS, {
+    ...ENGINE_DEFAULTS,
+    ...settings,
+  } satisfies EngineSettings);
+}
+
+/** Seed the loop's record, as a reload mid-queue finds it. */
+function seedLoopRecord(record: Partial<EngineRecord>): void {
+  story.set(ENGINE_LOOP_KEY, { watermark: null, queue: [], ...record });
+}
+
+/** The loop's record as it stands, or undefined if the pass never wrote one. */
+function loopRecord(): Partial<EngineRecord> | undefined {
+  return story.get(ENGINE_LOOP_KEY) as Partial<EngineRecord> | undefined;
 }
 
 /** `story_engine_debug`, as `api.v1.config` answers it.
@@ -198,12 +214,12 @@ function logged(): string[] {
   return vi.mocked(api.v1.log).mock.calls.map((c) => String(c[0]));
 }
 
-/** Every value written to a record key, oldest first. */
-function writesTo(key: string): unknown[] {
+/** Every queue the pass wrote, oldest first. */
+function queueWrites(): unknown[] {
   return vi
-    .mocked(api.v1.historyStorage.set)
-    .mock.calls.filter((c) => c[0] === key)
-    .map((c) => c[1]);
+    .mocked(api.v1.storyStorage.set)
+    .mock.calls.filter((c) => c[0] === ENGINE_LOOP_KEY)
+    .map((c) => (c[1] as EngineRecord).queue);
 }
 
 /** The whole two-paragraph document below, as `assess` joins it: the prose a
@@ -211,11 +227,11 @@ function writesTo(key: string): unknown[] {
  *  `open` intents it raises carry away with them (see `Intent`). */
 const WHOLE_DOCUMENT = "The lock clicked.\n\nAda pocketed the letter.";
 
-let history: HistoryFake;
+let story: StoryStorageFake;
 
 describe("the pass", () => {
   beforeEach(() => {
-    history = installHistoryFake();
+    story = installStoryStorageFake();
     configure({ enabled: true });
     documentOf("The lock clicked.", "Ada pocketed the letter.");
     vi.mocked(api.v1.log).mockClear();
@@ -229,9 +245,6 @@ describe("the pass", () => {
   });
 
   afterEach(() => {
-    history.reset();
-    vi.mocked(api.v1.storyStorage.get).mockReset();
-    vi.mocked(api.v1.storyStorage.get).mockResolvedValue(null);
     vi.mocked(api.v1.config.get).mockReset();
     vi.mocked(api.v1.config.get).mockResolvedValue(undefined);
   });
@@ -245,7 +258,7 @@ describe("the pass", () => {
     triageReturns(h, "REVISE Ada");
     await h.runPass();
 
-    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toEqual({
+    expect(loopRecord()?.watermark).toEqual({
       sectionId: sectionIdAt(1),
       offset: "Ada pocketed the letter.".length,
     });
@@ -258,7 +271,7 @@ describe("the pass", () => {
     triageReturns(h, "");
     await h.runPass();
 
-    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toEqual({
+    expect(loopRecord()?.watermark).toEqual({
       sectionId: sectionIdAt(1),
       offset: "Ada pocketed the letter.".length,
     });
@@ -299,7 +312,7 @@ describe("the pass", () => {
     expect(prose).toContain("Then she opened the window.");
     // ...and nothing it had already read.
     expect(prose).not.toContain("Ada pocketed the letter.");
-    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toEqual({
+    expect(loopRecord()?.watermark).toEqual({
       sectionId: sectionIdAt(2),
       offset: "Then she opened the window.".length,
     });
@@ -309,11 +322,9 @@ describe("the pass", () => {
     // Alpha, so no migration: a watermark of the old shape reads as null and
     // the branch is re-read. That costs input tokens; the alternative is
     // skipping prose nobody has looked at.
-    await api.v1.historyStorage.set(
-      WATERMARK_KEY,
-      sectionIdAt(1),
-      history.current(),
-    );
+    seedLoopRecord({
+      watermark: sectionIdAt(1) as unknown as EngineRecord["watermark"],
+    });
     const h = harness();
     triageReturns(h, "");
     await h.runPass();
@@ -332,14 +343,14 @@ describe("the pass", () => {
     triageReturns(h, "REVISE Ada\nOPEN the sealed letter");
     await h.runPass();
 
-    expect(writesTo(QUEUE_KEY)).toEqual([
+    expect(queueWrites()).toEqual([
       [
         { kind: "revise", entityId: "e1", prose: WHOLE_DOCUMENT },
         { kind: "open", subject: "the sealed letter", prose: WHOLE_DOCUMENT },
       ],
       [],
     ]);
-    expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
+    expect(loopRecord()?.queue).toEqual([]);
     expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
   });
 
@@ -348,7 +359,6 @@ describe("the pass", () => {
   it("executes a retire against the writer's lorebook, then clears the queue", async () => {
     // The pass no longer logs and forgets: it acts. A drain that cleared the
     // queue without executing leaves this entry enabled and this thread open.
-    installStoryStorageFake();
     configure({ enabled: true });
     const lorebook = installLorebookFake();
     lorebook.seed({
@@ -369,7 +379,7 @@ describe("the pass", () => {
     expect(h.store.getState().world.threads[0].status).toBe("satisfied");
     // A switch, not a rewrite: the writer's own words are still there.
     expect(lorebook.read("lb-thread")?.text).toBe("Kael owes the guild.");
-    expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
+    expect(loopRecord()?.queue).toEqual([]);
     expect(h.store.getState().engine.phase).toBe("idle");
   });
 
@@ -377,7 +387,6 @@ describe("the pass", () => {
     // The pass has to hand the drain two things it did not need for a retire:
     // the generation queue, and the prose the pass assessed. Drop either and
     // the revise cannot happen at all.
-    installStoryStorageFake();
     configure({ enabled: true });
     const lorebook = installLorebookFake();
     lorebook.seed({
@@ -409,12 +418,11 @@ describe("the pass", () => {
     );
     // §9.1's ∆ leaves 0 for the first time.
     expect(h.store.getState().engine.touched).toBe(1);
-    expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
+    expect(loopRecord()?.queue).toEqual([]);
     expect(h.store.getState().engine.phase).toBe("idle");
   });
 
   it("shows the revise the same prose it showed triage", async () => {
-    installStoryStorageFake();
     configure({ enabled: true });
     const lorebook = installLorebookFake();
     lorebook.seed({
@@ -453,7 +461,7 @@ describe("the pass", () => {
 
     await h.runPass();
 
-    expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([
+    expect(loopRecord()?.queue).toEqual([
       { kind: "revise", entityId: "e1", prose: WHOLE_DOCUMENT },
     ]);
     expect(h.store.getState().engine.phase).toBe("held");
@@ -465,7 +473,6 @@ describe("the pass", () => {
     // sentences that made her entry wrong. An arm reading the RUNNING pass's
     // prose rewrites her whole entry against the harbour, under a prompt that
     // says what it leaves out is deleted.
-    installStoryStorageFake();
     configure({ enabled: true });
     const lorebook = installLorebookFake();
     lorebook.seed({
@@ -506,7 +513,6 @@ describe("the pass", () => {
     // prose to run it against and the running pass's is the wrong answer, so
     // the queue read refuses it — triage names the entry again the next time
     // the story makes it wrong.
-    installStoryStorageFake();
     configure({ enabled: true });
     const lorebook = installLorebookFake();
     lorebook.seed({
@@ -516,11 +522,9 @@ describe("the pass", () => {
       enabled: true,
     });
     const h = harness([{ ...entity("e1", "Ada"), lorebookEntryId: "lb-ada" }]);
-    await api.v1.historyStorage.set(
-      QUEUE_KEY,
-      [{ kind: "revise", entityId: "e1" }],
-      history.current(),
-    );
+    seedLoopRecord({
+      queue: [{ kind: "revise", entityId: "e1" }] as EngineRecord["queue"],
+    });
     triageReturns(h, "");
 
     await h.runPass();
@@ -533,7 +537,6 @@ describe("the pass", () => {
   it("drains work an earlier pass deferred, even when triage names nothing new", async () => {
     // A queue that only drains on passes where triage speaks would strand a
     // deferred rewrite until the model happened to mention it again.
-    installStoryStorageFake();
     configure({ enabled: true });
     const lorebook = installLorebookFake();
     lorebook.seed({ id: "lb-thread", displayName: "The debt", enabled: true });
@@ -541,17 +544,17 @@ describe("the pass", () => {
       [entity("e1", "Ada")],
       [thread("The debt", { lorebookEntryId: "lb-thread" })],
     );
-    await api.v1.historyStorage.set(
-      QUEUE_KEY,
-      [{ kind: "retire", threadId: "The debt" }],
-      history.current(),
-    );
+    seedLoopRecord({
+      queue: [
+        { kind: "retire", threadId: "The debt" },
+      ] as EngineRecord["queue"],
+    });
     triageReturns(h, "");
 
     await h.runPass();
 
     expect(lorebook.read("lb-thread")?.enabled).toBe(false);
-    expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
+    expect(loopRecord()?.queue).toEqual([]);
   });
 
   // ─────────────────────── the free condense trigger ───────────────────────
@@ -578,7 +581,6 @@ describe("the pass", () => {
     // §5.1: an entry's length is measurable in assess, which is free, so the
     // intent is enqueued directly. Triage returns nothing here and the pass
     // still acts.
-    installStoryStorageFake();
     configure({ enabled: true, condenseAtChars: 800 });
     const lorebook = installLorebookFake();
     const text = bloated(1600);
@@ -594,7 +596,7 @@ describe("the pass", () => {
     expect((lorebook.read("lb-ada")?.text ?? "").length).toBeLessThan(
       text.length,
     );
-    expect(await api.v1.historyStorage.get(QUEUE_KEY)).toEqual([]);
+    expect(loopRecord()?.queue).toEqual([]);
   });
 
   it("offers one entry per pass, so a World full of long entries cannot bury the revises", async () => {
@@ -602,7 +604,6 @@ describe("the pass", () => {
     // oversized entry at once would leave the next pass's revise queued behind
     // a backlog of maintenance work, in FIFO, for as many passes as there are
     // long entries — the counterweight starving what it is a counterweight to.
-    installStoryStorageFake();
     configure({ enabled: true, condenseAtChars: 800 });
     const lorebook = installLorebookFake();
     lorebook.seed({
@@ -626,7 +627,7 @@ describe("the pass", () => {
     await h.runPass();
 
     // The longest one — the entry costing the most context.
-    expect(writesTo(QUEUE_KEY)[0]).toEqual([
+    expect(queueWrites()[0]).toEqual([
       { kind: "condense", entryId: "lb-large" },
     ]);
   });
@@ -635,7 +636,6 @@ describe("the pass", () => {
     // Maintenance is safe indefinitely (§3.3: prose does not un-happen), while
     // a revise records something the story just made true. FIFO in the drain
     // then means the revise is the one that gets the pass's rewrite.
-    installStoryStorageFake();
     configure({ enabled: true, condenseAtChars: 800 });
     const lorebook = installLorebookFake();
     lorebook.seed({
@@ -653,7 +653,7 @@ describe("the pass", () => {
 
     await h.runPass();
 
-    expect(writesTo(QUEUE_KEY)[0]).toEqual([
+    expect(queueWrites()[0]).toEqual([
       { kind: "revise", entityId: "e1", prose: WHOLE_DOCUMENT },
       { kind: "condense", entryId: "lb-ada" },
     ]);
@@ -673,7 +673,6 @@ describe("the pass", () => {
     // Expiry is measured, not generated: `isThreadExpired` is free, so the
     // retire is enqueued directly. Triage says nothing here and the pass still
     // acts — and retire costs 0 output tokens (§3.3), so it never waits.
-    installStoryStorageFake();
     configure({ enabled: true });
     const lorebook = installLorebookFake();
     lorebook.seed({ id: "lb-t1", displayName: "t1", text: "", enabled: true });
@@ -696,7 +695,6 @@ describe("the pass", () => {
   it("leaves a thread the writer made by hand alone, however long the story runs", async () => {
     // The asymmetry §4.5 names: no anchor, no expiry. A defaulted 0 would
     // retire it on the first pass instead.
-    installStoryStorageFake();
     configure({ enabled: true });
     const lorebook = installLorebookFake();
     lorebook.seed({ id: "lb-t1", displayName: "t1", text: "", enabled: true });
@@ -718,16 +716,16 @@ describe("the pass", () => {
     // branch of hundreds, and expiry is a question about the branch — measuring
     // it against the backlog would mean nothing ever ages out of a story the
     // Engine is keeping up with, which is every story it is switched on for.
-    installStoryStorageFake();
     configure({ enabled: true });
     const lorebook = installLorebookFake();
     lorebook.seed({ id: "lb-t1", displayName: "t1", text: "", enabled: true });
     longDocument(120);
-    await api.v1.historyStorage.set(
-      WATERMARK_KEY,
-      { sectionId: sectionIdAt(118), offset: "Paragraph 118.".length },
-      history.current(),
-    );
+    seedLoopRecord({
+      watermark: {
+        sectionId: sectionIdAt(118),
+        offset: "Paragraph 118.".length,
+      },
+    });
     const h = harness(
       [entity("e1", "Ada")],
       [thread("t1", { anchorParagraph: 0, lorebookEntryId: "lb-t1" })],
@@ -739,7 +737,6 @@ describe("the pass", () => {
   });
 
   it("holds a thread still inside its own patience", async () => {
-    installStoryStorageFake();
     configure({ enabled: true });
     installLorebookFake();
     longDocument(60);
@@ -750,11 +747,10 @@ describe("the pass", () => {
 
     await h.runPass();
 
-    expect(writesTo(QUEUE_KEY)[0] ?? []).toEqual([]);
+    expect(queueWrites()[0] ?? []).toEqual([]);
   });
 
   it("enqueues every expired thread, because a retire costs nothing", async () => {
-    installStoryStorageFake();
     configure({ enabled: true });
     installLorebookFake();
     longDocument(120);
@@ -769,7 +765,7 @@ describe("the pass", () => {
 
     await h.runPass();
 
-    expect(writesTo(QUEUE_KEY)[0]).toEqual([
+    expect(queueWrites()[0]).toEqual([
       { kind: "retire", why: "abandoned", threadId: "t1" },
       { kind: "retire", why: "abandoned", threadId: "t2" },
     ]);
@@ -779,7 +775,6 @@ describe("the pass", () => {
     // The one place the distinction is observable: `ThreadStatus` has no third
     // value, so the World will show this thread as satisfied — which an
     // abandoned commitment is not.
-    installStoryStorageFake();
     configure({ enabled: true });
     installLorebookFake();
     longDocument(120);
@@ -797,7 +792,6 @@ describe("the pass", () => {
   // ───────────────────── prose-grounded renewal (§4.5) ─────────────────────
 
   it("renews a thread whose cast the pass just read", async () => {
-    installStoryStorageFake();
     configure({ enabled: true });
     installLorebookFake();
     documentOf("The lock clicked.", "Ada pocketed the letter.");
@@ -812,7 +806,6 @@ describe("the pass", () => {
   });
 
   it("leaves a thread the prose said nothing about where it was", async () => {
-    installStoryStorageFake();
     configure({ enabled: true });
     installLorebookFake();
     documentOf("The lock clicked.", "Brennan pocketed the letter.");
@@ -831,18 +824,18 @@ describe("the pass", () => {
     // has a backlog of one and a branch of hundreds. An anchor recorded as the
     // backlog would sit near paragraph 0 forever and expire the thread it just
     // renewed.
-    installStoryStorageFake();
     configure({ enabled: true });
     installLorebookFake();
     documentOf(
       ...Array.from({ length: 119 }, (_, i) => `Paragraph ${i}.`),
       "Ada pocketed the letter.",
     );
-    await api.v1.historyStorage.set(
-      WATERMARK_KEY,
-      { sectionId: sectionIdAt(118), offset: "Paragraph 118.".length },
-      history.current(),
-    );
+    seedLoopRecord({
+      watermark: {
+        sectionId: sectionIdAt(118),
+        offset: "Paragraph 118.".length,
+      },
+    });
     const h = harness(
       [entity("e1", "Ada")],
       [thread("t1", { entityIds: ["e1"], anchorParagraph: 0 })],
@@ -860,7 +853,6 @@ describe("the pass", () => {
     // retiring it would be the opposite of "an end the story quietly
     // abandoned". Renewal dispatches first and expiry reads the moved anchor,
     // so this is the ordering rather than a special case.
-    installStoryStorageFake();
     configure({ enabled: true });
     const lorebook = installLorebookFake();
     lorebook.seed({ id: "lb-t1", displayName: "t1", text: "", enabled: true });
@@ -881,13 +873,12 @@ describe("the pass", () => {
 
     await h.runPass();
 
-    expect(writesTo(QUEUE_KEY)[0] ?? []).toEqual([]);
+    expect(queueWrites()[0] ?? []).toEqual([]);
     expect(lorebook.read("lb-t1")?.enabled).toBe(true);
     expect(h.store.getState().world.threads[0].status).toBe("open");
   });
 
   it("still expires a thread the prose walked away from while renewing another", async () => {
-    installStoryStorageFake();
     configure({ enabled: true });
     installLorebookFake();
     documentOf(
@@ -904,7 +895,7 @@ describe("the pass", () => {
 
     await h.runPass();
 
-    expect(writesTo(QUEUE_KEY)[0]).toEqual([
+    expect(queueWrites()[0]).toEqual([
       { kind: "retire", why: "abandoned", threadId: "gone" },
     ]);
   });
@@ -912,7 +903,6 @@ describe("the pass", () => {
   it("does not re-enqueue a thread it already retired", async () => {
     // `isThreadExpired` never expires a satisfied thread, so the trigger is
     // self-clearing — no mark of the kind the condense trigger needs.
-    installStoryStorageFake();
     configure({ enabled: true });
     installLorebookFake();
     longDocument(120);
@@ -923,14 +913,13 @@ describe("the pass", () => {
 
     await h.runPass();
 
-    expect(writesTo(QUEUE_KEY)[0] ?? []).toEqual([]);
+    expect(queueWrites()[0] ?? []).toEqual([]);
   });
 
   it("leaves a long entry no entity of ours is bound to alone", async () => {
     // The Engine condenses what it manages. A lorebook the writer keeps by hand
     // is not sprawl the Engine created, and rewriting it is not something they
     // asked for by switching the loop on.
-    installStoryStorageFake();
     configure({ enabled: true, condenseAtChars: 800 });
     const lorebook = installLorebookFake();
     lorebook.seed({
@@ -951,7 +940,6 @@ describe("the pass", () => {
   it("leaves a disabled entry alone, because it is costing no context", async () => {
     // A retired thread's entry, or one the writer switched off: it injects
     // nothing, so compacting it is a lossy rewrite with nothing to gain.
-    installStoryStorageFake();
     configure({ enabled: true, condenseAtChars: 800 });
     const lorebook = installLorebookFake();
     lorebook.seed({
@@ -970,7 +958,6 @@ describe("the pass", () => {
   });
 
   it("reads the threshold from the setting, not from a constant", async () => {
-    installStoryStorageFake();
     configure({ enabled: true, condenseAtChars: 4000 });
     const lorebook = installLorebookFake();
     lorebook.seed({
@@ -1015,35 +1002,20 @@ describe("the pass", () => {
     expect(h.store.getState().engine.backlog).toBe(2);
   });
 
-  it("writes the watermark and the queue as two separate records", async () => {
-    // historyStorage is copy-on-write per key per node: one blob would snapshot
-    // the queue onto every node the watermark touches.
+  it("writes the watermark and the queue as one record", async () => {
+    // A split would be a second thing to keep in step: a write that advanced
+    // the watermark without carrying the queue it was triaged from.
     const h = harness();
     triageReturns(h, "REVISE Ada");
     await h.runPass();
 
-    const keys = vi
-      .mocked(api.v1.historyStorage.set)
-      .mock.calls.map((c) => c[0]);
-    expect(new Set(keys)).toEqual(new Set([WATERMARK_KEY, QUEUE_KEY]));
-    for (const [, value] of vi.mocked(api.v1.historyStorage.set).mock.calls) {
-      expect(value).not.toHaveProperty("watermark");
-      expect(value).not.toHaveProperty("queue");
-    }
-  });
-
-  it("stamps every write with the node it captured when the pass began", async () => {
-    // §6.3: the writer keeps typing while triage runs, and a set() without an
-    // explicit node has been measured landing two nodes away.
-    const started = history.current();
-    const h = harness();
-    triageReturns(h, "REVISE Ada");
-    const pass = h.runPass();
-    history.push(); // the writer commits another paragraph mid-pass
-    await pass;
-
-    for (const call of vi.mocked(api.v1.historyStorage.set).mock.calls) {
-      expect(call[2]).toBe(started);
+    const written = vi
+      .mocked(api.v1.storyStorage.set)
+      .mock.calls.filter((c) => c[0] === ENGINE_LOOP_KEY);
+    expect(written.length).toBeGreaterThan(0);
+    for (const [, value] of written) {
+      expect(value).toHaveProperty("watermark");
+      expect(value).toHaveProperty("queue");
     }
   });
 
@@ -1122,7 +1094,7 @@ describe("the pass", () => {
     expect(h.generate).not.toHaveBeenCalled();
     expect(h.store.getState().engine.backlog).toBe(2);
     expect(h.store.getState().engine.phase).toBe("idle");
-    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toBeUndefined();
+    expect(loopRecord()).toBeUndefined();
   });
 
   it("runs the pass once the backlog reaches the threshold", async () => {
@@ -1145,7 +1117,7 @@ describe("the pass", () => {
     expect(h.generate).not.toHaveBeenCalled();
     expect(h.store.getState().engine.phase).toBe("held");
     // A hold is not a completed pass: the prose stays unread.
-    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toBeUndefined();
+    expect(loopRecord()).toBeUndefined();
     // ...and the HUD still gets the real backlog to weigh against it.
     expect(h.store.getState().engine.backlog).toBe(2);
   });
@@ -1160,7 +1132,7 @@ describe("the pass", () => {
     vi.mocked(api.v1.script.getAllowedOutput).mockReturnValue(2048);
     await h.runPass();
     expect(h.store.getState().engine.phase).toBe("idle");
-    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toEqual({
+    expect(loopRecord()?.watermark).toEqual({
       sectionId: sectionIdAt(1),
       offset: "Ada pocketed the letter.".length,
     });
@@ -1174,9 +1146,7 @@ describe("the pass", () => {
 
     await h.runPass();
 
-    expect(vi.mocked(api.v1.historyStorage.set)).not.toHaveBeenCalled();
-    expect(await api.v1.historyStorage.get(WATERMARK_KEY)).toBeUndefined();
-    expect(await api.v1.historyStorage.get(QUEUE_KEY)).toBeUndefined();
+    expect(loopRecord()).toBeUndefined();
   });
 
   it("retries a refusal a bounded number of times, counting from one", async () => {
@@ -1282,7 +1252,7 @@ describe("the pass", () => {
     await h.runPass();
 
     expect(h.generate).not.toHaveBeenCalled();
-    expect(vi.mocked(api.v1.historyStorage.set)).not.toHaveBeenCalled();
+    expect(loopRecord()).toBeUndefined();
     expect(h.store.getState().engine.phase).toBe("idle");
   });
 
@@ -1380,7 +1350,7 @@ describe("the pass", () => {
       expect(api.v1.log).not.toHaveBeenCalled();
       // …and the pass did everything it does. The flag gates the account of the
       // work, never the work.
-      expect(writesTo(QUEUE_KEY)).toEqual([
+      expect(queueWrites()).toEqual([
         [
           { kind: "revise", entityId: "e1", prose: WHOLE_DOCUMENT },
           { kind: "open", subject: "the sealed letter", prose: WHOLE_DOCUMENT },
@@ -1525,13 +1495,9 @@ describe("the pass", () => {
 
 describe("the trigger's other job", () => {
   beforeEach(() => {
+    story = installStoryStorageFake();
     vi.mocked(api.v1.hooks.register).mockClear();
     configure({ enabled: false });
-  });
-
-  afterEach(() => {
-    vi.mocked(api.v1.storyStorage.get).mockReset();
-    vi.mocked(api.v1.storyStorage.get).mockResolvedValue(null);
   });
 
   it("forwards a user generation to GenX, whose own hook this one replaced", async () => {

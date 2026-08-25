@@ -47,7 +47,11 @@ import {
 } from "../../engine/assess";
 import { readEngineSettings } from "../../engine/settings";
 import { canStartPass, type Intent } from "../../engine/loop-machine";
-import { dedupe, QUEUE_KEY, WATERMARK_KEY } from "../../engine/intents";
+import {
+  dedupe,
+  ENGINE_LOOP_KEY,
+  type EngineRecord,
+} from "../../engine/intents";
 import { drain, revisionsIn } from "../../engine/execute";
 import { readCondenseMark, worthCondensing } from "../../engine/condense";
 import { expiredThreads, renewedThreads } from "../../engine/thread-cap";
@@ -64,7 +68,6 @@ import {
   TRIAGE_MAX_TOKENS,
   type TriageManifest,
 } from "../../engine/triage-strategy";
-import { captureNode, saveRecords } from "../persistence/history-store";
 import {
   engineBacklogObserved,
   engineLoopEvent,
@@ -115,13 +118,10 @@ export type EngineLoopDeps = {
 //   3. `retryable` comes from the classifier, never from the callsite. Hardcode
 //      false and ordinary writing lights the HUD's ⚠; hardcode true and ⚠
 //      becomes unreachable.
-//   4. `watermark` and `queue` are two records, never one blob — historyStorage
-//      is copy-on-write per key per node (§6.2), the watermark moves every pass
-//      and the queue usually does not, and merging them would snapshot the
-//      queue onto every node the watermark touches.
-//   5. The node is captured at the START of the pass and passed to every write
-//      (§6.3). Triage takes seconds, the writer keeps typing, and a `set()`
-//      without an explicit node has been measured landing two nodes away.
+//   4. `watermark` and `queue` are ONE storyStorage record, read once at the
+//      start of the pass and written at the two points below. They are the
+//      loop's memory of the story rather than of a point in it, so nothing
+//      here reverts when the writer undoes — see intents.ts.
 
 /** The HUD's ⚡: run a pass now. Carries no payload — everything the pass needs
  *  it reads for itself — and is ignored while one is already running. */
@@ -132,15 +132,14 @@ export const enginePassRequested = () => ({
 });
 enginePassRequested.type = ENGINE_PASS_REQUESTED;
 
-/** The watermark record: how far the Engine has read on this branch — which
- *  section, and how much of it — or null on a branch it has never looked at.
+/** The watermark: how far the Engine has read — which section, and how much of
+ *  it — or null in a story it has never looked at.
  *
- *  Anything that is not that shape reads as null, which re-reads the branch. The
- *  0.15 alpha wrote a bare section id here (Story Engine is alpha, so there is
- *  no migration); a bare number therefore lands on the same path a dangling
+ *  Anything that is not that shape reads as null, which re-reads the story. The
+ *  0.15 alpha wrote a bare section id (Story Engine is alpha, so there is no
+ *  migration); a bare number therefore lands on the same path a dangling
  *  watermark already takes, and costs input tokens rather than skipped prose. */
-async function readWatermark(nodeId: number): Promise<Watermark | null> {
-  const value: unknown = await api.v1.historyStorage.get(WATERMARK_KEY, nodeId);
+function readWatermark(value: unknown): Watermark | null {
   if (typeof value !== "object" || value === null) return null;
   const { sectionId, offset } = value as Partial<Watermark>;
   return typeof sectionId === "number" && typeof offset === "number"
@@ -148,9 +147,9 @@ async function readWatermark(nodeId: number): Promise<Watermark | null> {
     : null;
 }
 
-/** The queue record. Persisted JSON is trusted no further than its shape: a
- *  missing or malformed record reads as an empty queue rather than throwing
- *  inside the pass it was meant to feed.
+/** The queue. Persisted JSON is trusted no further than its shape: a missing or
+ *  malformed record reads as an empty queue rather than throwing inside the
+ *  pass it was meant to feed.
  *
  *  **The one element-level check is the prose a text-dependent intent must
  *  carry**, and it is here because this is the only door persisted intents come
@@ -161,14 +160,30 @@ async function readWatermark(nodeId: number): Promise<Watermark | null> {
  *  is precisely the failure the field exists to prevent. The work is lost, and
  *  losing it costs the writer nothing they can see — triage names an entry the
  *  story has made wrong again the next time the story says so. */
-async function readQueue(nodeId: number): Promise<Intent[]> {
-  const value: unknown = await api.v1.historyStorage.get(QUEUE_KEY, nodeId);
+function readQueue(value: unknown): Intent[] {
   if (!Array.isArray(value)) return [];
   return (value as Intent[]).filter(
     (intent) =>
       (intent.kind !== "revise" && intent.kind !== "open") ||
       (typeof intent.prose === "string" && intent.prose.length > 0),
   );
+}
+
+/** The loop's one record, hydrated. Both halves default independently, so a
+ *  record holding a usable watermark and a corrupt queue keeps the watermark. */
+async function readEngineRecord(): Promise<EngineRecord> {
+  const stored: unknown = await api.v1.storyStorage.get(ENGINE_LOOP_KEY);
+  const record = (
+    typeof stored === "object" && stored !== null ? stored : {}
+  ) as Partial<EngineRecord>;
+  return {
+    watermark: readWatermark(record.watermark),
+    queue: readQueue(record.queue),
+  };
+}
+
+async function saveEngineRecord(record: EngineRecord): Promise<void> {
+  await api.v1.storyStorage.set(ENGINE_LOOP_KEY, record);
 }
 
 /** What triage is allowed to name: the entities the new prose plausibly
@@ -441,10 +456,6 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
     inFlight = true;
 
     try {
-      // Captured first, before anything that can await, and handed to every
-      // write below (§6.3). Nothing else in the pass may read "current" again.
-      const nodeId = await captureNode();
-
       const settings = await readEngineSettings();
       // Mirrored on EVERY pass, not only the refusing one: the store is what the
       // HUD and the Setup form render from, and a story opened in a second tab —
@@ -464,9 +475,8 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // *wakeup*, not the writer's decision to switch the Engine off.
       if (!settings.enabled) return;
       const { minProse } = settings;
-      const [watermark, queue, sections] = await Promise.all([
-        readWatermark(nodeId),
-        readQueue(nodeId),
+      const [{ watermark, queue }, sections] = await Promise.all([
+        readEngineRecord(),
         api.v1.document.scan(),
       ]);
 
@@ -611,16 +621,15 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       dispatch(engineLoopEvent({ type: "triaged", intents: enqueued }));
 
       // Rule 1: the pass got its answer, so the prose behind it has been read.
-      // Rule 4: its own record, its own write.
+      // Rule 4: one record, so the watermark and the queue it was triaged from
+      // are written together.
       const advanced: Watermark = {
         sectionId: reached.sectionId,
         offset: reached.section.text.length,
       };
-      await saveRecords({ [WATERMARK_KEY]: advanced }, nodeId);
+      await saveEngineRecord({ watermark: advanced, queue: enqueued });
 
       if (enqueued.length === 0) return;
-
-      await saveRecords({ [QUEUE_KEY]: enqueued }, nodeId);
 
       // Drain: execute, THEN clear. The write above is what lets a reload
       // between the two find the queue rather than nothing (§11), and it is
@@ -628,15 +637,14 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       //
       // Only what the budget could not afford is written back. Everything the
       // drain reached is forgotten, executed or not: dedupe bounds one
-      // commitment's repeats, not the queue's length, so a queue that kept
-      // what it could not use would grow all session and be copied onto every
-      // node that writes. A deferred intent is the one exception, and §3.3 is
-      // explicit about why — prose does not un-happen, so the work is still
-      // wanted and rediscovering it would cost another triage call.
+      // commitment's repeats, not the queue's length, so a queue that kept what
+      // it could not use would grow all session. A deferred intent is the one
+      // exception, and §3.3 is explicit about why — prose does not un-happen,
+      // so the work is still wanted and rediscovering it would cost another
+      // triage call.
       const { executed, remaining } = await drain(enqueued, {
         dispatch,
         getState,
-        nodeId,
         // The same assessment triage was built from, entire. A revise rewrites
         // an entry to carry what the story has NEWLY made true (§5) and an
         // `open` anchors a thread at the paragraph it was raised in (§4.5);
@@ -646,7 +654,7 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
         genX,
         log,
       });
-      await saveRecords({ [QUEUE_KEY]: remaining }, nodeId);
+      await saveEngineRecord({ watermark: advanced, queue: remaining });
 
       // §9.1's ∆, and the first phase in which it can be anything but zero.
       // Dispatched before the resting event rather than folded into it: a drain

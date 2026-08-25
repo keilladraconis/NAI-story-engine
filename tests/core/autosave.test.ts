@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { installHistoryFake } from "../helpers/history-fake";
+import { installStoryStorageFake } from "../helpers/story-storage-fake";
 import { registerAutosaveEffects } from "../../src/core/store/effects/autosave";
-import { loadBranchState } from "../../src/core/store/persistence/history-store";
+import { loadWorldRecord } from "../../src/core/store/persistence/story-store";
 import { initialStoryState } from "../../src/core/store/slices/story";
 import { initialWorldState } from "../../src/core/store/slices/world";
 import { initialFoundationState } from "../../src/core/store/slices/foundation";
@@ -9,6 +9,7 @@ import { initialUIState } from "../../src/core/store/slices/ui";
 import { initialRuntimeState } from "../../src/core/store/slices/runtime";
 import { initialForgeState } from "../../src/core/store/slices/forge";
 import { initialEngineState } from "../../src/core/store/slices/engine";
+import { STORAGE_KEYS } from "../../src/core/keys";
 import type { RootState, WorldEntity } from "../../src/core/store/types";
 import type { Action } from "nai-store";
 
@@ -22,9 +23,10 @@ function entity(id: string): WorldEntity {
   };
 }
 
-/** As `harness`, but the state can change between actions — the shape a burst
- *  spanning a node boundary actually has. */
-function mutableHarness(getState: () => RootState) {
+/** Minimal stand-in for the store's subscribeEffect: captures the predicate and
+ *  handler so the test can fire actions synchronously. The state is read
+ *  through a getter, so a burst can change it between actions. */
+function harness(getState: () => RootState) {
   const handlers: Array<{
     match: (a: Action) => boolean;
     run: (a: Action) => void;
@@ -40,25 +42,6 @@ function mutableHarness(getState: () => RootState) {
       for (const h of handlers) if (h.match(action)) h.run(action);
     },
   };
-}
-
-/** Minimal stand-in for the store's subscribeEffect: captures the predicate and
- *  handler so the test can fire actions synchronously. */
-function harness(state: RootState) {
-  const handlers: Array<{
-    match: (a: Action) => boolean;
-    run: (a: Action) => void;
-  }> = [];
-  const subscribeEffect = ((match: never, run: never) => {
-    handlers.push({ match, run });
-    return () => {};
-  }) as never;
-  const fire = (type: string) => {
-    const action = { type } as Action;
-    for (const h of handlers) if (h.match(action)) h.run(action);
-  };
-  registerAutosaveEffects(subscribeEffect, () => state);
-  return { fire };
 }
 
 function baseState(entityIds: string[] = []): RootState {
@@ -78,82 +61,86 @@ function baseState(entityIds: string[] = []): RootState {
 
 describe("autosave", () => {
   beforeEach(() => {
-    installHistoryFake();
+    installStoryStorageFake();
     vi.useFakeTimers();
   });
 
-  it("writes branch-scoped records after the debounce", async () => {
-    const { fire } = harness(baseState(["a"]));
+  it("writes the World record after the debounce", async () => {
+    const state = baseState(["a"]);
+    const { fire } = harness(() => state);
     fire("world/entityForged");
     await vi.runAllTimersAsync();
-    expect((await loadBranchState()).world.entityIds).toEqual(["a"]);
+    expect((await loadWorldRecord()).world.entityIds).toEqual(["a"]);
   });
 
   it("does not write before the debounce elapses", async () => {
-    const { fire } = harness(baseState(["a"]));
+    const state = baseState(["a"]);
+    const { fire } = harness(() => state);
     fire("world/entityForged");
-    expect(api.v1.historyStorage.set).not.toHaveBeenCalled();
+    expect(api.v1.storyStorage.set).not.toHaveBeenCalled();
   });
 
-  it("writes chat to storyStorage, never to historyStorage", async () => {
-    const { fire } = harness(baseState());
+  it("writes chat to its own record", async () => {
+    const state = baseState();
+    const { fire } = harness(() => state);
     fire("chat/messageAdded");
     await vi.runAllTimersAsync();
     expect(api.v1.storyStorage.set).toHaveBeenCalledWith(
-      "kse-chat",
+      STORAGE_KEYS.CHAT,
       expect.anything(),
     );
   });
 
-  it("writes the Foundation to storyStorage, never to historyStorage", async () => {
-    // Foundation is the story's premise, not a property of a point in it. If it
-    // ever lands in historyStorage, undo starts reverting it while Memory and
-    // Author's Note — which is what actually reaches the model — keep the newer
-    // text.
-    const { fire } = harness(baseState());
+  it("writes the Foundation to its own record", async () => {
+    // Its own record rather than a field of the World's: the Foundation is the
+    // story's premise, and it changes on a different rhythm from the notebook
+    // the Engine keeps.
+    const state = baseState();
+    const { fire } = harness(() => state);
     fire("foundation/intentSet");
     await vi.runAllTimersAsync();
     expect(api.v1.storyStorage.set).toHaveBeenCalledWith(
-      "kse-foundation",
+      STORAGE_KEYS.FOUNDATION,
       expect.anything(),
     );
-    expect(api.v1.historyStorage.set).not.toHaveBeenCalled();
   });
 
   it("ignores actions from slices it does not persist", async () => {
-    const { fire } = harness(baseState(["a"]));
+    const state = baseState(["a"]);
+    const { fire } = harness(() => state);
     fire("ui/uiEditableActivate");
     fire("runtime/requestQueued");
     await vi.runAllTimersAsync();
-    expect(api.v1.historyStorage.set).not.toHaveBeenCalled();
+    expect(api.v1.storyStorage.set).not.toHaveBeenCalled();
   });
 
-  it("keeps the whole burst on the node it started at", async () => {
-    // Two edits either side of a node boundary both land on the earlier node.
-    // That is the deliberate trade: re-capturing per action would stamp the
-    // window with the later node instead, and undoing back across the boundary
-    // would then lose the first edit outright. A later edit leaking backwards
-    // is recoverable; a lost one is not. Do not "fix" this without reading the
-    // comment on pendingNode.
-    const h = installHistoryFake();
-    const n1 = h.current();
+  it("writes the state as it stands when the debounce fires, not when it started", async () => {
+    // The whole burst collapses into one write, and that write is the current
+    // state — an edit arriving inside the window is carried, not deferred to
+    // the next one.
     let state = baseState(["E1"]);
-    const { fire } = mutableHarness(() => state);
+    const { fire } = harness(() => state);
 
-    fire("world/entityForged"); // arms pendingNode = n1
-    h.push(); // the writer generates a paragraph; the cursor moves
+    fire("world/entityForged");
     state = baseState(["E1", "E2"]);
-    fire("world/entityForged"); // extends the debounce, does NOT re-stamp
+    fire("world/entityForged");
     await vi.runAllTimersAsync();
 
-    h.goto(n1);
-    expect((await loadBranchState(n1)).world.entityIds).toEqual(["E1", "E2"]);
+    expect((await loadWorldRecord()).world.entityIds).toEqual(["E1", "E2"]);
   });
 
-  it("never removes a record key", async () => {
-    const { fire } = harness(baseState(["a"]));
+  it("persists a deletion by writing what is left", async () => {
+    // No index and no tombstone: the record is the whole World, so an entity
+    // that is gone from the state is gone from the next write.
+    let state = baseState(["a", "b"]);
+    const { fire } = harness(() => state);
+    fire("world/entityForged");
+    await vi.runAllTimersAsync();
+
+    state = baseState(["a"]);
     fire("world/entityDeleted");
     await vi.runAllTimersAsync();
-    expect(api.v1.historyStorage.remove).not.toHaveBeenCalled();
+
+    expect((await loadWorldRecord()).world.entityIds).toEqual(["a"]);
   });
 });

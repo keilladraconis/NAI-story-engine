@@ -173,6 +173,43 @@ say in your report whether anything else used it.
 
 ### Task 4: The Engine's own records
 
+**Task 3 handoff: this task is already done, and what is left is a sweep.**
+Task 3 could not leave it: `engine-loop.ts` imported `captureNode` and
+`saveRecords` **from `history-store.ts`**, so deleting that module — Task 3's
+whole deliverable — took the watermark and the queue with it or left the
+`tsc --noEmit` gate red. Leaving `history-store.ts` alive as a two-function stub
+is precisely the hollowed-out module the Global Constraints forbid. So, done in
+Task 3:
+
+- The watermark and the queue are **one storyStorage record**, `ENGINE_LOOP_KEY`
+  (`"kse-engine-loop"`) in `intents.ts`, holding the `EngineRecord` type that
+  already described them. One rather than two because the copy-on-write argument
+  for the split does not survive the move, and what is left argues the other way:
+  both halves are written by the same code at the same two points in a pass and
+  read together at its start, so a split is only a second thing to keep in step.
+  `WATERMARK_KEY` and `QUEUE_KEY` are gone; `intents.ts`'s header is rewritten.
+- `readWatermark` / `readQueue` became pure validators over one hydrated record
+  (`readEngineRecord`), and the three `saveRecords` calls became two
+  `saveEngineRecord` calls — the pre-drain write now carries the advanced
+  watermark alongside the queue, so §11's "a reload between the two finds the
+  work" is one write instead of two.
+- **`nodeId` is out of `DrainDeps`** and out of the drain callsite. This was
+  forced, not opportunistic: `captureNode()` was the only supplier, so deleting
+  it left the required property unprovided — a hard `tsc` error, and an excess
+  property in `execute.test.ts`'s deps literal besides. Nothing in `src/` now
+  mentions `nodeId`, `historyStorage`, `captureNode` or `loadBranchState`.
+- **The watermark's self-degradation is confirmed and untouched.** `assess.ts`
+  resolves the watermark through `sectionIds.indexOf(watermark.sectionId)`, so a
+  section the document no longer holds yields `at === -1`, an empty tail and every
+  section as fresh — identical to `watermark === null`. `tests/core/engine/assess.test.ts`
+  pins it ("treats a watermark that no longer exists as unseen"). Left as it is.
+
+**What is left for Task 4** is the comment sweep §14 and §12.1 need, if Task 6
+does not cover it. `tests/core/engine/pass.test.ts` was rewritten onto the
+storyStorage fake — `configure()` now writes settings into the fake rather than
+mocking `storyStorage.get`, because the loop's record shares that store and a
+key-specific `get` mock made the queue unseedable.
+
 **Task 2 handoff: three of these threads are already pulled.**
 `rebuildThreadCondition`, `applyThreadStatus` and `disableDeletedThreadEntry`
 have **already lost their `nodeId` parameter**, along with the `captureNode()`

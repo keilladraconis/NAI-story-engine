@@ -66,10 +66,6 @@ import { buildLorebookPrefillFromEntry } from "../utils/lorebook-strategy";
 export type DrainDeps = {
   dispatch: AppDispatch;
   getState: () => RootState;
-  /** The node the pass started at. Nothing below reads it any more — the door
-   *  writes only to the lorebook now, and the Engine's own records are the next
-   *  thing to stop being branch-scoped. */
-  nodeId: number;
   /** What the pass saw, whole — the same value triage was built from.
    *
    *  **The assessment rather than a field of it**, which Task 3 predicted and

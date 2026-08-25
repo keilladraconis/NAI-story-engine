@@ -76,12 +76,12 @@ export function rootReducer(
   // one of the Engine's per-story settings and phase 4b already mirrored those
   // into the engine slice: a slice reducer cannot read another slice, and the
   // root is the only reducer that sees both. Mirroring the number a second time
-  // into `WorldState` would have put a storyStorage setting inside the
-  // branch-persisted world, where `applyRecords` resets it on every undo.
+  // into `WorldState` would have put a setting the Setup form owns inside the
+  // World record, where every load would overwrite whatever the form last said.
   //
-  // Only on a create. Lowering the cap deletes nothing by itself, and a branch
-  // load is not a create — trimming there would spend a writer's threads on
-  // pressing undo.
+  // Only on a create. Lowering the cap deletes nothing by itself, and loading
+  // the World is not a create — trimming there would spend a writer's threads
+  // on opening the story.
   if (action.type === threadCreated.type) {
     const threads = enforceThreadCap(
       next.world.threads,

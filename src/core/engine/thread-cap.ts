@@ -20,7 +20,7 @@
 // last touched it. Two of the three signals below are read off the type;
 // the third, age, is read off the *array position*, which is a real signal
 // (`threadCreated` appends, `threadDeleted` filters, nothing reorders, and the
-// persistence index round-trips the order — `persistence/keyspace.ts`) but a
+// World record round-trips the order — `persistence/story-store.ts`) but a
 // weak one: it says which thread is older, never how much older, and never how
 // long ago the prose last mentioned either.
 //
