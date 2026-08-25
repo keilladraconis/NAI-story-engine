@@ -747,7 +747,7 @@ describe("the pass", () => {
 
     await h.runPass();
 
-    expect(queueWrites()[0] ?? []).toEqual([]);
+    expect(queueWrites()[0]).toEqual([]);
   });
 
   it("enqueues every expired thread, because a retire costs nothing", async () => {
@@ -873,7 +873,7 @@ describe("the pass", () => {
 
     await h.runPass();
 
-    expect(queueWrites()[0] ?? []).toEqual([]);
+    expect(queueWrites()[0]).toEqual([]);
     expect(lorebook.read("lb-t1")?.enabled).toBe(true);
     expect(h.store.getState().world.threads[0].status).toBe("open");
   });
@@ -913,7 +913,7 @@ describe("the pass", () => {
 
     await h.runPass();
 
-    expect(queueWrites()[0] ?? []).toEqual([]);
+    expect(queueWrites()[0]).toEqual([]);
   });
 
   it("leaves a long entry no entity of ours is bound to alone", async () => {
