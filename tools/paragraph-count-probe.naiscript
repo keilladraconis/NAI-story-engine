@@ -2,7 +2,7 @@
 compatibilityVersion: naiscript-1.0
 id: 3a7c1f95-6b28-4d03-9e14-c5f8a2b70d61
 name: Paragraph Count Probe
-version: 0.1.0
+version: 0.2.0
 description: Does NovelAI's paragraphCount condition variable count what document.scan() counts?
 memoryLimit: 8
 ---*/
@@ -21,26 +21,28 @@ memoryLimit: 8
 // TRUE only degrades to the old always-on, which is survivable.)
 //
 // No generation, no output budget. `buildContext()` runs the real context builder
-// and our own `onContextBuilt` hook sees each entry's `active` flag — which is the
-// answer, read directly rather than inferred from what the model wrote.
+// and our own `onContextBuilt` hook sees the entry's `active` flag — the answer read
+// directly, rather than inferred from what a model wrote.
 //
-// METHOD. Mint one probe entry per candidate k, each always-on and gated on
-// `paragraphCount >= k`. Build the context once. Every k whose entry came back
-// active satisfies `paragraphCount >= k`, so the largest active k IS NovelAI's
-// paragraph count. One call, exact answer, no search.
+// METHOD. **One** probe entry, gated on `paragraphCount >= k` in the same
+// single-term shape `paceGate` emits in production. Binary search k by rewriting
+// that one entry's target and rebuilding the context — about eight rounds for any
+// realistic story. v0.1 minted one entry per candidate instead, which meant a
+// hundred-odd `createEntry` round trips into the writer's own lorebook before a
+// single answer came back. One entry is lighter, faster, and leaves far less behind
+// if the run is interrupted.
 //
 // Run:
 //   1. Open a story with some prose in it (20+ paragraphs is a better test than 3).
-//   2. Probe    — mints the entries, builds context, reports.
-//   3. Clean up — deletes every entry it made. Do not skip this.
+//   2. Probe    — searches and reports.
+//   3. Clean up — removes the entry and its category.
 
 const CATEGORY = "PROBE: paragraphCount";
 const LEDGER = "paragraph-count-probe";
 
-// Above any plausible story. 400 entries is a lot to mint, but they are empty,
-// they live for one context build, and a ceiling the story can exceed would report
-// the ceiling as the answer and look like agreement.
-const MAX_K = 400;
+// `createEntry` and `createCategory` are gated on this. v0.1 omitted the request
+// and every run died inside `ensureCategory` with the report frozen two lines in.
+api.v1.permissions.request(["lorebookEdit"]);
 
 let report = "";
 
@@ -50,22 +52,48 @@ function log(line) {
   void api.v1.ui.updateParts([{ id: "report", text: report }]);
 }
 
-// The hook is how we read activation. `api.v1.hooks.register` holds ONE callback
-// per hook name, so a probe script must be the only thing registering this one —
-// which it is, running alone in a scratch story.
+// The hook is how activation is read. `api.v1.hooks.register` holds ONE callback
+// per hook name, so a probe must be the only thing registering it — which it is,
+// running alone in a scratch story.
 let seen = null;
 api.v1.hooks.register("onContextBuilt", (params) => {
   seen = params.lorebookEntries;
 });
 
+function gate(k) {
+  return [
+    {
+      type: "equation",
+      terms: [{ value: "paragraphCount" }],
+      comparison: ">=",
+      target: k,
+    },
+  ];
+}
+
+/** Is `paragraphCount >= k`? Rewrites the probe's gate and rebuilds. */
+async function holdsAt(entryId, k) {
+  await api.v1.lorebook.updateEntry(entryId, { advancedConditions: gate(k) });
+  seen = null;
+  await api.v1.buildContext();
+  if (!seen) throw new Error("onContextBuilt did not fire");
+  const row = seen.find(([id]) => id === entryId);
+  if (!row) throw new Error("the probe entry was not in the built context");
+  return row[1].active === true;
+}
+
 async function ensureCategory() {
   const categories = await api.v1.lorebook.categories();
   const found = categories.find((c) => c.name === CATEGORY);
   if (found) return found.id;
-  return await api.v1.lorebook.createCategory({ name: CATEGORY });
+  return await api.v1.lorebook.createCategory({
+    id: api.v1.uuid(),
+    name: CATEGORY,
+    enabled: true,
+  });
 }
 
-async function probe() {
+async function run() {
   report = "";
 
   const sections = await api.v1.document.scan();
@@ -79,7 +107,7 @@ async function probe() {
   );
 
   log(`document.scan(): ${scanTotal} sections, ${scanNonEmpty} with prose`);
-  log(`               ${scanChars} characters total`);
+  log(`                ${scanChars} characters total`);
 
   if (scanTotal === 0) {
     log("");
@@ -88,86 +116,60 @@ async function probe() {
   }
 
   const categoryId = await ensureCategory();
-  const ids = [];
-
-  // k from 1: `paragraphCount >= 0` is true for any count and proves nothing.
-  const ceiling = Math.min(MAX_K, scanTotal + 50);
+  const entryId = await api.v1.lorebook.createEntry({
+    id: api.v1.uuid(),
+    displayName: "paragraphCount probe",
+    text: "paragraphCount probe",
+    keys: [],
+    enabled: true,
+    forceActivation: true,
+    category: categoryId,
+    advancedConditions: gate(1),
+  });
+  await api.v1.storyStorage.set(LEDGER, { entryId });
   log("");
-  log(`minting ${ceiling} probe entries (k = 1..${ceiling})…`);
+  log("searching…");
 
-  for (let k = 1; k <= ceiling; k++) {
-    const id = await api.v1.lorebook.createEntry({
-      displayName: `probe-${k}`,
-      text: `probe-${k}`,
-      keys: [],
-      enabled: true,
-      forceActivation: true,
-      category: categoryId,
-      advancedConditions: [
-        {
-          type: "equation",
-          terms: [{ value: "paragraphCount" }],
-          comparison: ">=",
-          target: k,
-        },
-      ],
-    });
-    ids.push([k, id]);
+  // `paragraphCount >= 0` is true of any count and proves nothing, so the search
+  // starts at 1. `hi` climbs until the gate fails, which also catches a count far
+  // larger than the document (context-scoped counters can only be smaller, but a
+  // surprise is what this is for).
+  let hi = 1;
+  while (await holdsAt(entryId, hi)) {
+    if (hi > scanTotal * 4 + 100) break;
+    hi *= 2;
   }
-  await api.v1.storyStorage.set(LEDGER, { ids: ids.map(([, id]) => id) });
-
-  seen = null;
-  await api.v1.buildContext();
-
-  if (!seen) {
-    log("");
-    log("onContextBuilt did not fire — cannot read activation. Clean up and stop.");
-    return;
+  let lo = Math.floor(hi / 2);
+  while (lo + 1 < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (await holdsAt(entryId, mid)) lo = mid;
+    else hi = mid;
   }
-
-  const active = new Map(seen.map(([id, state]) => [id, state.active]));
-
-  let highest = 0;
-  for (const [k, id] of ids) {
-    if (active.get(id) === true) highest = Math.max(highest, k);
-  }
-
-  // A gate is monotonic in k: if `paragraphCount >= 12` holds then so does
-  // `>= 11`. Any inactive k below the highest active one means the answer is not
-  // a simple >= on one number, and the verdict below would be reading a
-  // coincidence.
-  const gaps = ids
-    .filter(([k, id]) => k < highest && active.get(id) === false)
-    .map(([k]) => k);
+  // `lo` holds and `lo + 1` does not, so the count is exactly `lo` — unless the
+  // gate never held at all, which means a count below 1.
+  const count = (await holdsAt(entryId, 1)) ? lo : 0;
 
   log("");
-  log(`NovelAI paragraphCount = ${highest}   (largest k whose gate was active)`);
+  log(`NovelAI paragraphCount = ${count}`);
   log(`document.scan() total  = ${scanTotal}`);
   log(`document.scan() prose  = ${scanNonEmpty}`);
-
-  if (gaps.length > 0) {
-    log("");
-    log(`WARNING: non-monotonic — these k below ${highest} were inactive:`);
-    log(`  ${gaps.slice(0, 20).join(", ")}${gaps.length > 20 ? " …" : ""}`);
-    log("The gate is not a simple >= on a single number. Read before trusting.");
-  }
-
   log("");
-  if (highest === scanTotal) {
+
+  if (count === scanTotal) {
     log("VERDICT: AGREES with document.scan().length.");
     log("Assessment.paragraphCount is the right unit. Nothing to change.");
-  } else if (highest === scanNonEmpty) {
+  } else if (count === scanNonEmpty) {
     log("VERDICT: counts only paragraphs with prose in them.");
     log("Assessment.paragraphCount counts every section, so it runs AHEAD.");
     log("An anchor would sit in the future and its gate would never open —");
     log("threads go silent. assess.ts must count non-empty sections instead.");
-  } else if (highest < scanTotal) {
-    log(`VERDICT: DISAGREES — NovelAI counts ${scanTotal - highest} fewer.`);
+  } else if (count < scanTotal) {
+    log(`VERDICT: DISAGREES — NovelAI counts ${scanTotal - count} fewer.`);
     log("Likely context-scoped rather than document-scoped. Our anchor would sit");
     log("in the future and gated threads would never fire. This is the failure");
     log("direction §4.3 refuses; the anchor needs to be in NovelAI's unit.");
   } else {
-    log(`VERDICT: DISAGREES — NovelAI counts ${highest - scanTotal} MORE.`);
+    log(`VERDICT: DISAGREES — NovelAI counts ${count - scanTotal} MORE.`);
     log("Gates open early. Survivable (degrades toward always-on), but the grace");
     log("window is not the length it claims to be.");
   }
@@ -178,19 +180,37 @@ async function probe() {
 
 async function cleanUp() {
   const ledger = await api.v1.storyStorage.get(LEDGER);
-  const ids = (ledger && ledger.ids) || [];
-  let removed = 0;
-  for (const id of ids) {
-    await api.v1.lorebook.removeEntry(id);
-    removed++;
+  report = "";
+  if (ledger && ledger.entryId) {
+    await api.v1.lorebook.removeEntry(ledger.entryId);
+    log("removed the probe entry");
   }
   const categories = await api.v1.lorebook.categories();
   const category = categories.find((c) => c.name === CATEGORY);
-  if (category) await api.v1.lorebook.removeCategory(category.id);
+  if (category) {
+    await api.v1.lorebook.removeCategory(category.id);
+    log(`removed the ${CATEGORY} category`);
+  }
   await api.v1.storyStorage.remove(LEDGER);
+  log("done");
+}
 
-  report = "";
-  log(`removed ${removed} probe entries and the ${CATEGORY} category`);
+/** Nothing here may fail silently. v0.1 called `run()` bare, so the permission
+ *  error surfaced as a report that simply stopped mid-way — indistinguishable
+ *  from a slow run, and the one thing a probe must never be is quiet about its
+ *  own failure. */
+function guard(fn) {
+  return () => {
+    void (async () => {
+      try {
+        await fn();
+      } catch (error) {
+        log("");
+        log(`FAILED: ${(error && error.message) || String(error)}`);
+        log("Press Clean up, then read the script log.");
+      }
+    })();
+  };
 }
 
 api.v1.ui.register([
@@ -201,12 +221,12 @@ api.v1.ui.register([
         content: [
           api.v1.ui.part.button({
             text: "1. Probe",
-            callback: () => void probe(),
+            callback: guard(run),
             disabledWhileCallbackRunning: true,
           }),
           api.v1.ui.part.button({
             text: "2. Clean up",
-            callback: () => void cleanUp(),
+            callback: guard(cleanUp),
             disabledWhileCallbackRunning: true,
           }),
           api.v1.ui.part.text({
