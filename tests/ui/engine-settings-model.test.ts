@@ -42,6 +42,7 @@ const CONFIGURED: EngineSettings = {
   minProse: 4,
   threadCap: 5,
   condenseAtChars: 1600,
+  creativeModel: "xialong-v1",
 };
 
 /** The delay's bounds in the unit the box shows them in: 1s and 300s. Derived,
@@ -217,15 +218,14 @@ describe("the other settings are carried across untouched", () => {
   it("returns a whole settings object, which is what the save writes", () => {
     // The commit path writes and dispatches this value entire, so a missing
     // field here would be a field wiped in storage.
+    // Derived from ENGINE_DEFAULTS rather than listed, so a setting added to
+    // the record is covered here the day it lands. A hardcoded list passes for
+    // every field it was written before.
+    const expected = Object.keys(ENGINE_DEFAULTS).sort();
+    expect(expected.length).toBeGreaterThan(4);
     expect(
       Object.keys(resolveTypedSetting(CONFIGURED, "delayMs", "9")).sort(),
-    ).toEqual([
-      "condenseAtChars",
-      "delayMs",
-      "enabled",
-      "minProse",
-      "threadCap",
-    ]);
+    ).toEqual(expected);
   });
 });
 

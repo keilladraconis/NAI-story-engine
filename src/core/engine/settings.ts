@@ -21,6 +21,11 @@
 // a hostile value all yield a settings object a pass can actually use.
 
 import { STORAGE_KEYS } from "../keys";
+// Type-only, and deliberately so: `config.ts` imports `readEngineSettings` from
+// this module at runtime, so a value import back the other way would close a
+// cycle. The model IDs the normalizer validates against are duplicated below
+// with a test holding the two lists in step.
+import type { CreativeModel } from "../utils/config";
 import { PARAGRAPH_CHARS } from "./thread-horizon";
 
 export type EngineSettings = {
@@ -45,6 +50,18 @@ export type EngineSettings = {
    *  much of my context is one entry eating"; `engine-settings-model.ts` owns
    *  that conversion, the same way it owns seconds↔milliseconds. */
   condenseAtChars: number;
+  /** Which model creative generation runs on for this story — prose, chat, the
+   *  Forge, lorebook entry text, the Engine's own rewrites.
+   *
+   *  Here rather than in `project.yaml` for the reason the rest of this record
+   *  is: `api.v1.config` is read-only, so a Setup control could never write one
+   *  back. Per story rather than per install because access is not the only
+   *  reason to change it — a writer with Opus may still want a story's chat to
+   *  follow instructions rather than improvise.
+   *
+   *  Extraction work (keys, summaries, triage) ignores this and always runs on
+   *  GLM; see `Capability` in `src/core/utils/config.ts`. */
+  creativeModel: CreativeModel;
 };
 
 /** What a story that has never been configured gets.
@@ -64,6 +81,10 @@ export const ENGINE_DEFAULTS: EngineSettings = {
   // by the revisions §5 keeps adding — and ~500 tokens of standing injection
   // is a sixth of an Erato context spent on one subject.
   condenseAtChars: 5 * PARAGRAPH_CHARS,
+  // GLM, because it is the model every subscription can reach. Defaulting to
+  // Xialong would give a writer without Opus a story whose every generation
+  // fails until they find this setting.
+  creativeModel: "glm-4-6",
 };
 
 // ───────────────────────────────── the bounds ─────────────────────────────────
@@ -162,6 +183,27 @@ function readBoolean(value: unknown, fallback: boolean): boolean {
  *  `round` runs after the clamp so the stored number means exactly what it does:
  *  the loop compares an integer backlog against `minProse` and hands `delayMs`
  *  straight to a timer. */
+/** The model ids `normalizeEngineSettings` will accept.
+ *
+ *  Spelled out rather than imported from `CREATIVE_MODELS` because that import
+ *  would be a runtime edge back into `config.ts`, which already depends on this
+ *  module. `tests/core/engine/settings.test.ts` asserts the two lists match, so
+ *  a model added to the picker and not to here fails the suite rather than
+ *  silently normalising away every time a story is loaded. */
+const CREATIVE_MODEL_IDS: readonly string[] = ["glm-4-6", "xialong-v1"];
+
+/** A stored model id, or the default. No coercion and no nearest-match: an id
+ *  this build does not know is either a typo or a model from a version that had
+ *  one, and generating against it would fail at the API rather than here. */
+function readCreativeModel(
+  value: unknown,
+  fallback: CreativeModel,
+): CreativeModel {
+  return typeof value === "string" && CREATIVE_MODEL_IDS.includes(value)
+    ? (value as CreativeModel)
+    : fallback;
+}
+
 function readNumber(
   value: unknown,
   fallback: number,
@@ -225,6 +267,10 @@ export function normalizeEngineSettings(value: unknown): EngineSettings {
       CONDENSE_AT_CHARS_MIN,
       CONDENSE_AT_CHARS_MAX,
       Math.round,
+    ),
+    creativeModel: readCreativeModel(
+      record.creativeModel,
+      ENGINE_DEFAULTS.creativeModel,
     ),
   };
 }

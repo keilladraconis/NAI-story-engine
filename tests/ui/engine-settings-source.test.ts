@@ -9,6 +9,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { NUMERIC_SETTINGS } from "../../src/ui/panels/setup/engine-settings-model";
+import { CREATIVE_MODELS } from "../../src/core/utils/config";
 
 const SETUP_DIR = join(__dirname, "../../src/ui/panels/setup");
 const SECTION = join(SETUP_DIR, "EngineSettings.tsx");
@@ -292,5 +293,33 @@ describe("every numeric setting has a field", () => {
     expect(src).toContain("THREAD_CAP_MIN");
     expect(src).toContain("THREAD_CAP_MAX");
     expect(src).not.toContain('toTyped("threadCap"');
+  });
+});
+
+describe("the creative model picker", () => {
+  it("is rendered, and offers every model CREATIVE_MODELS names", () => {
+    // The picker is the only way to reach `creativeModel`. Storage normalises
+    // an unknown id back to the default, so a model in the list with no button
+    // is a setting a writer can never choose — the same failure `threadCap`
+    // shipped with, which is why NUMERIC_SETTINGS is counted above.
+    const src = code(sectionSrc());
+    expect(src).toContain("<ModelPicker");
+    expect(src).toContain("settings.creativeModel");
+    // Rendered from the list rather than hardcoded, so adding a model adds a
+    // button. A literal per model would pass this and still miss the next one.
+    expect(src).toContain("CREATIVE_MODELS.map");
+    expect(CREATIVE_MODELS.length).toBeGreaterThan(1);
+  });
+
+  it("mounts every model rather than swapping a chosen one in", () => {
+    // CLAUDE.md: this section re-renders from a store subscription, so a
+    // component whose *type* changes at a fixed position leaves the old element
+    // behind. The picker marks the chosen model with style, never by rendering
+    // a different thing in its place.
+    const src = code(sectionSrc());
+    const picker = src.slice(src.indexOf("function ModelPicker"));
+    const body = picker.slice(0, picker.indexOf("\nfunction "));
+    expect(body.length).toBeGreaterThan(0);
+    expect(body).toContain("key={model.id}");
   });
 });

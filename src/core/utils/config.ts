@@ -1,5 +1,7 @@
-const GLM_MODEL = "glm-4-6";
-const XIALONG_MODEL = "xialong-v1";
+import { readEngineSettings } from "../engine/settings";
+
+export const GLM_MODEL = "glm-4-6";
+export const XIALONG_MODEL = "xialong-v1";
 
 // Stop sequences applied to all lorebook content/refine generation to prevent
 // the model from chaining multiple entries in a single response.
@@ -53,16 +55,49 @@ export function applyEratoPrefix(content: string, erato: boolean): string {
   return content;
 }
 
+/** The models a creative generation may run on.
+ *
+ *  Two, because these are the two `api.v1.generate()` accepts — it is a
+ *  chat-completion API, and NovelAI's prose models (Erato, Kayra, Clio) are not
+ *  reachable through it. The list is the shape it is so that a third entry is a
+ *  list entry and nothing else: the picker renders it, `normalizeCreativeModel`
+ *  validates against it, and no callsite names a model directly.
+ *
+ *  `note` is what the picker shows under a choice a writer may not be able to
+ *  make. There is no API that reports which models a subscription covers, so the
+ *  UI cannot grey Xialong out for a writer without Opus — it can only say so. */
+export const CREATIVE_MODELS = [
+  {
+    id: GLM_MODEL,
+    label: "GLM 4.6",
+    note: "Available to everyone. Follows instructions closely.",
+  },
+  {
+    id: XIALONG_MODEL,
+    label: "Xialong v1",
+    note: "A creative-writing fine-tune of GLM. Requires an Opus subscription.",
+  },
+] as const;
+
+export type CreativeModel = (typeof CREATIVE_MODELS)[number]["id"];
+
+/** True when this story's creative work runs on Xialong — which is a question
+ *  about message shaping, not only about params. Xialong takes a `[ Style: ... ]`
+ *  block and emits `<think>` tags; GLM does neither, and handing it Xialong's
+ *  scaffolding is how a callsite ends up prompting one model in another's
+ *  dialect. */
 export async function isXialongMode(): Promise<boolean> {
-  return Boolean(await api.v1.config.get("xialong_mode"));
+  const { creativeModel } = await readEngineSettings();
+  return creativeModel === XIALONG_MODEL;
 }
 
 /** What a generation needs from a model.
  *
  *  `glm-4-6` follows instructions markedly more reliably; `xialong-v1` is a
- *  creative-writing fine-tune of it. Splitting the two means `xialong_mode`
- *  finally says what it always meant — use Xialong for prose — rather than
- *  "use Xialong for literally every call, including comma-separated key lists".
+ *  creative-writing fine-tune of it. Splitting the two means the creative-model
+ *  choice says what it always meant — use it for prose — rather than "use it for
+ *  literally every call, including comma-separated key lists". Extraction work
+ *  goes to GLM whatever the writer picked.
  *
  *  Everything defaults to "creative", so a callsite that does not care keeps
  *  exactly the behaviour it had before this existed. */
@@ -76,8 +111,12 @@ export type Capability = "creative" | "instruct";
 export async function resolveModel(
   capability: Capability = "creative",
 ): Promise<{ model: string; xialong: boolean }> {
-  const xialong = capability === "creative" && (await isXialongMode());
-  return { model: xialong ? XIALONG_MODEL : GLM_MODEL, xialong };
+  if (capability !== "creative") return { model: GLM_MODEL, xialong: false };
+  const { creativeModel } = await readEngineSettings();
+  return {
+    model: creativeModel,
+    xialong: creativeModel === XIALONG_MODEL,
+  };
 }
 
 /**

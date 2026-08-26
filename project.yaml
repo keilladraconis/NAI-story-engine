@@ -8,13 +8,6 @@ description: A helper for writing stories
 memoryLimit: 8
 updatedAt: 1787340902
 config:
-  - name: xialong_mode
-    prettyName: Xialong Mode
-    description: >-
-      Use Xialong v1 for all generation. Requires an Opus subscription. When
-      disabled, all generation uses GLM 4.6.
-    type: boolean
-    default: false
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
     description: >-

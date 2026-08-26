@@ -60,6 +60,10 @@ import {
   writeEngineSettings,
   type EngineSettings,
 } from "../../../core/engine/settings";
+import {
+  CREATIVE_MODELS,
+  type CreativeModel,
+} from "../../../core/utils/config";
 import { SP, T } from "../../style";
 import { SectionHeader } from "./SectionHeader";
 import {
@@ -82,6 +86,54 @@ const FIELD_STYLE = {
 } as const;
 
 const HELP_STYLE = { fontSize: "0.8em", opacity: 0.7 } as const;
+
+/** The creative-model picker.
+ *
+ *  A row of buttons rather than a `<select>`: each model needs a line of prose
+ *  under it saying who can use it, and a native option list has nowhere to put
+ *  one. There is no API that reports which models a subscription covers, so
+ *  Xialong cannot be greyed out for a writer without Opus — the note is the only
+ *  honest signal available.
+ *
+ *  Every model is mounted and `background`/`color` mark the chosen one. Nothing
+ *  is swapped for anything at a fixed position: this section re-renders from a
+ *  store subscription, and a component whose *type* changes there leaves the old
+ *  element behind (CLAUDE.md). */
+function ModelPicker(props: {
+  value: CreativeModel;
+  onPick: (model: CreativeModel) => void;
+}): JSX.Element {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: SP.sm }}>
+      <span style={{ fontFamily: T.fontDefault }}>Creative model</span>
+      <div style={{ display: "flex", gap: SP.sm, flexWrap: "wrap" }}>
+        {CREATIVE_MODELS.map((model) => (
+          <button
+            key={model.id}
+            onClick={() => props.onPick(model.id)}
+            title={model.note}
+            style={{
+              background: props.value === model.id ? T.bg3 : "none",
+              color: props.value === model.id ? T.textHeadings : T.textDisabled,
+              border: `1px solid ${T.bg3}`,
+              fontFamily: T.fontDefault,
+              fontWeight: props.value === model.id ? "bold" : "normal",
+              padding: SP.sm,
+              cursor: "pointer",
+            }}
+          >
+            {model.label}
+          </button>
+        ))}
+      </div>
+      <span style={HELP_STYLE}>
+        {CREATIVE_MODELS.find((model) => model.id === props.value)?.note}{" "}
+        Whichever you pick, activation keys and the short internal summaries
+        behind each entity and Thread are extraction work and always run on GLM.
+      </span>
+    </div>
+  );
+}
 
 /** One labelled number field. The label, the input and the note under it are one
  *  unit so the two fields cannot drift apart, and so neither can reach for its
@@ -248,14 +300,21 @@ export function EngineSettings() {
           whatever prose has appeared since it last looked, and acts on what
           your story has made wrong, left hanging, or settled: it rewrites the
           lorebook entry of an entity the prose changed, condenses one that has
-          sprawled, and switches off a Thread the story has resolved. The
-          original text of any entry it edits is kept, but there is no restore
-          button yet — your recourse is the editor's own undo, which moves the
-          World with it. Each pass spends from the same output budget as
-          everything else, and skips itself when there is nothing new to read.
-          Prose you type yourself wakes nothing, so use the ⚡ on the Engine HUD
-          to run a pass on the spot.
+          sprawled, and switches off a Thread the story has resolved. It keeps
+          no copy of the entry text it replaces, and undo will not bring it
+          back, so export your lorebook first if the exact wording matters to
+          you. Each pass spends from the same output budget as everything else,
+          and skips itself when there is nothing new to read. Prose you type
+          yourself wakes nothing, so use the ⚡ on the Engine HUD to run a pass
+          on the spot.
         </span>
+
+        <ModelPicker
+          value={settings.creativeModel}
+          onPick={(creativeModel) =>
+            save((current) => ({ ...current, creativeModel }))
+          }
+        />
 
         <NumberField
           label="Delay (seconds)"

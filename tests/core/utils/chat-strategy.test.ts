@@ -4,6 +4,7 @@ import type { Chat } from "../../../src/core/chat-types/types";
 import type { RootState } from "../../../src/core/store/types";
 import { buildBrainstormPrompt } from "../../../src/core/utils/prompts";
 import { refineBudgetFor } from "../../../src/core/utils/refine-strategy";
+import { useCreativeModel } from "../../helpers/creative-model";
 
 describe("buildChatStrategy", () => {
   it("returns a strategy with chat target type for a saved chat", async () => {
@@ -42,9 +43,7 @@ describe("buildChatStrategy", () => {
     });
 
     function xialongOn(): void {
-      vi.mocked(api.v1.config.get).mockImplementation(async (key: string) =>
-        key === "xialong_mode" ? true : undefined,
-      );
+      useCreativeModel("xialong-v1");
     }
 
     // Real replies a brainstorm partner gives, and their lengths.

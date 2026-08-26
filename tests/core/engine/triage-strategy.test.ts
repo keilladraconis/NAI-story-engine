@@ -6,6 +6,7 @@ import {
   type TriageManifest,
 } from "../../../src/core/engine/triage-strategy";
 import type { Assessment } from "../../../src/core/engine/assess";
+import { useCreativeModel } from "../../helpers/creative-model";
 
 const MANIFEST: TriageManifest = {
   entities: [
@@ -397,10 +398,9 @@ function styleBlocks(messages: Message[]): Message[] {
 describe("createTriageFactory", () => {
   beforeEach(() => {
     vi.mocked(api.v1.config.get).mockReset();
-    // Xialong Mode ON throughout: triage must stay on the instruct model anyway.
-    vi.mocked(api.v1.config.get).mockImplementation(async (key: string) =>
-      key === "xialong_mode" ? true : undefined,
-    );
+    // The story is on Xialong throughout: triage must stay on the instruct
+    // model anyway.
+    useCreativeModel("xialong-v1");
   });
 
   it("runs on the instruct model even in Xialong Mode", async () => {

@@ -1292,6 +1292,7 @@ describe("the pass", () => {
       minProse: 4,
       threadCap: 3,
       condenseAtChars: 1600,
+      creativeModel: ENGINE_DEFAULTS.creativeModel,
     });
   });
 

@@ -10,12 +10,12 @@ import { makeTestStore } from "../store/helpers/store-helpers";
 import { registerGenerationEngineEffects } from "../../../src/core/store/effects/generation-engine";
 import { generationSubmitted } from "../../../src/core/store/slices/ui";
 import type { RootState, AppDispatch } from "../../../src/core/store/types";
+import { useCreativeModel } from "../../helpers/creative-model";
 
-/** xialong_mode is the only config key these functions read. */
+/** Put the story on Xialong, or on GLM. The choice is a storyStorage record
+ *  now, not a `config.get` — see `useCreativeModel`. */
 function xialongMode(on: boolean) {
-  vi.mocked(api.v1.config.get).mockImplementation(async (key: string) =>
-    key === "xialong_mode" ? on : undefined,
-  );
+  useCreativeModel(on ? "xialong-v1" : "glm-4-6");
 }
 
 describe("resolveModel", () => {

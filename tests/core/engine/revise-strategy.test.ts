@@ -10,6 +10,7 @@ import {
   ENGINE_REVISE_SYSTEM,
   ENGINE_REVISE_INSTRUCTION,
 } from "../../../src/core/utils/prompts";
+import { useCreativeModel } from "../../helpers/creative-model";
 
 // ─────────────────────────────── the harness ───────────────────────────────
 
@@ -112,16 +113,12 @@ describe("the revise params", () => {
   it("stays on the instruct model even in Xialong mode", async () => {
     // §8: a creative fine-tune's failure mode is embellishment, and an
     // unattended rewrite of the writer's lorebook is the worst place for it.
-    vi.mocked(api.v1.config.get).mockImplementation(async (key: string) =>
-      key === "xialong_mode" ? true : undefined,
-    );
+    useCreativeModel("xialong-v1");
     expect((await reviseParams()).model).toBe("glm-4-6");
   });
 
   it("carries no Xialong style block", async () => {
-    vi.mocked(api.v1.config.get).mockImplementation(async (key: string) =>
-      key === "xialong_mode" ? true : undefined,
-    );
+    useCreativeModel("xialong-v1");
     const { messages } = await resolve();
     expect(messages.some((m) => m.content?.includes("[ Style"))).toBe(false);
   });

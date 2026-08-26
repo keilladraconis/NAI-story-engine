@@ -11,6 +11,7 @@ import {
 import { buildForgeCleanupStrategy } from "../../../src/core/utils/forge-chat-strategy";
 import type { RootState } from "../../../src/core/store";
 import type { Chat } from "../../../src/core/chat-types/types";
+import { useCreativeModel } from "../../helpers/creative-model";
 
 // Minimal RootState the flipped factories actually read: one live entity bound
 // to a lorebook entry, one thread holding it, and the empty foundation/chat
@@ -67,9 +68,7 @@ const forgeChat: Chat = {
 };
 
 function xialongOn() {
-  vi.mocked(api.v1.config.get).mockImplementation(async (key: string) =>
-    key === "xialong_mode" ? true : undefined,
-  );
+  useCreativeModel("xialong-v1");
 }
 
 /** A Xialong style block is recognisable by its opening token. */

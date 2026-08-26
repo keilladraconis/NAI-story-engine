@@ -7,6 +7,7 @@
 // api.v1.timers.setTimeout, a threshold no backlog can ever reach — so each one
 // is asserted to come back usable rather than propagated.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { CREATIVE_MODELS } from "../../../src/core/utils/config";
 import {
   CONDENSE_AT_CHARS_MAX,
   CONDENSE_AT_CHARS_MIN,
@@ -97,6 +98,7 @@ describe("readEngineSettings — a partial record", () => {
       minProse: ENGINE_DEFAULTS.minProse,
       threadCap: ENGINE_DEFAULTS.threadCap,
       condenseAtChars: ENGINE_DEFAULTS.condenseAtChars,
+      creativeModel: ENGINE_DEFAULTS.creativeModel,
     });
   });
 
@@ -117,6 +119,7 @@ describe("readEngineSettings — a partial record", () => {
       minProse: 2,
       threadCap: 5,
       condenseAtChars: 2000,
+      creativeModel: ENGINE_DEFAULTS.creativeModel,
     });
   });
 
@@ -127,6 +130,7 @@ describe("readEngineSettings — a partial record", () => {
       minProse: 4,
       threadCap: 12,
       condenseAtChars: 1600,
+      creativeModel: "xialong-v1",
     });
     expect(await readEngineSettings()).toEqual({
       enabled: true,
@@ -134,6 +138,7 @@ describe("readEngineSettings — a partial record", () => {
       minProse: 4,
       threadCap: 12,
       condenseAtChars: 1600,
+      creativeModel: "xialong-v1",
     });
   });
 
@@ -293,6 +298,7 @@ describe("writeEngineSettings", () => {
       minProse: 3,
       threadCap: 5,
       condenseAtChars: 1600,
+      creativeModel: "xialong-v1",
     };
     await writeEngineSettings(next);
     expect(await readEngineSettings()).toEqual(next);
@@ -305,6 +311,7 @@ describe("writeEngineSettings", () => {
       minProse: 3,
       threadCap: 5,
       condenseAtChars: 1600,
+      creativeModel: "xialong-v1",
     });
     const keys = vi
       .mocked(api.v1.storyStorage.set)
@@ -318,6 +325,7 @@ describe("writeEngineSettings", () => {
       delayMs: -1,
       minProse: 0,
       threadCap: 999,
+      creativeModel: "xialong-v1",
       condenseAtChars: 0,
     });
     expect(slots.get(STORAGE_KEYS.ENGINE_SETTINGS)).toEqual({
@@ -326,6 +334,7 @@ describe("writeEngineSettings", () => {
       minProse: MIN_PROSE_MIN,
       threadCap: THREAD_CAP_MAX,
       condenseAtChars: CONDENSE_AT_CHARS_MIN,
+      creativeModel: "xialong-v1",
     });
   });
 });
@@ -385,5 +394,36 @@ describe("the condense threshold is a size in characters", () => {
     expect((await readEngineSettings()).condenseAtChars).toBe(
       ENGINE_DEFAULTS.condenseAtChars,
     );
+  });
+});
+
+describe("the creative model", () => {
+  // settings.ts cannot import CREATIVE_MODELS: config.ts imports
+  // readEngineSettings from settings.ts, so a value import back would close a
+  // cycle. The id list is therefore duplicated, and this is what stops the two
+  // copies drifting — a model added to the picker but not to the normalizer
+  // would be silently reset to the default on every load.
+  it("normalizes every model the picker offers", async () => {
+    expect(CREATIVE_MODELS.length).toBeGreaterThan(1);
+    for (const model of CREATIVE_MODELS) {
+      stored({ creativeModel: model.id });
+      expect((await readEngineSettings()).creativeModel).toBe(model.id);
+    }
+  });
+
+  it("refuses an id this build does not know", async () => {
+    // Not a nearest match: generating against an unknown id fails at the API,
+    // and a story silently switched to a model the writer did not pick is
+    // worse than one that reads as unconfigured.
+    stored({ creativeModel: "erato-v3" });
+    expect((await readEngineSettings()).creativeModel).toBe(
+      ENGINE_DEFAULTS.creativeModel,
+    );
+  });
+
+  it("defaults to a model every subscription can reach", async () => {
+    // Defaulting to Xialong would hand a writer without Opus a story whose
+    // every generation fails until they find this setting.
+    expect(ENGINE_DEFAULTS.creativeModel).toBe("glm-4-6");
   });
 });

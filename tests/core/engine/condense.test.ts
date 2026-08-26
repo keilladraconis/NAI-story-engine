@@ -30,6 +30,7 @@ import {
   installStoryStorageFake,
   type StoryStorageFake,
 } from "../../helpers/story-storage-fake";
+import { useCreativeModel } from "../../helpers/creative-model";
 
 // ─────────────────────────────── the harness ───────────────────────────────
 
@@ -111,9 +112,7 @@ describe("the condense params", () => {
 
   it("asks for the instruct model, in Xialong mode too", async () => {
     expect((await condenseParams()).model).toBe("glm-4-6");
-    vi.mocked(api.v1.config.get).mockImplementation(async (key: string) =>
-      key === "xialong_mode" ? true : undefined,
-    );
+    useCreativeModel("xialong-v1");
     expect((await condenseParams()).model).toBe("glm-4-6");
   });
 

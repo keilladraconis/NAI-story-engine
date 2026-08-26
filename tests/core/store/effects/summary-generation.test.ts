@@ -19,6 +19,7 @@ import {
   entitySummaryRequestId,
   lorebookContentRequestId,
 } from "../../../../src/core/keys";
+import { useCreativeModel } from "../../../helpers/creative-model";
 
 // Isolate the effect's branching from real strategy construction.
 vi.mock("../../../../src/core/utils/lorebook-strategy", () => ({
@@ -313,9 +314,7 @@ describe("uiThreadSummaryGenerationRequested effect", () => {
 // ask for instruct.
 describe("summary dispatch sites resolve the instruct model", () => {
   beforeEach(() => {
-    vi.mocked(api.v1.config.get).mockImplementation(async (key: string) =>
-      key === "xialong_mode" ? true : undefined,
-    );
+    useCreativeModel("xialong-v1");
     vi.mocked(api.v1.lorebook.entry).mockReset();
     vi.mocked(api.v1.lorebook.entry).mockResolvedValue({
       id: "lb-1",
