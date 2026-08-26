@@ -1,11 +1,11 @@
-// The Setup tab's collapsible-section header: a chevron and a label, as one
-// button that toggles the section below it.
+// A collapsible-section header: a chevron and a label, as one button that
+// toggles the section below it.
 //
-// Extracted from Setup.tsx when the Engine section became the second collapsible
-// on the tab. Two hand-rolled copies of this row would be two places to keep the
+// Shared: Setup's Foundation section and the Engine's settings section on the
+// Engine tab. Two hand-rolled copies of this row would be two places to keep the
 // chevron rule (below) and one style block that drifts.
 
-import { SP, T } from "../../style";
+import { SP, T } from "../style";
 import { ChevronDown, ChevronRight } from "nai:icons/feather";
 
 const ICON_SIZE = 14;

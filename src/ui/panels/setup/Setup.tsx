@@ -25,8 +25,7 @@ import { FIELD_DESCRIPTORS } from "../foundation/fields";
 import { ImportWizard } from "../import/ImportWizard";
 import { BootstrapButton } from "./BootstrapButton";
 import { BrainstormCta } from "./BrainstormCta";
-import { EngineSettings } from "./EngineSettings";
-import { SectionHeader } from "./SectionHeader";
+import { SectionHeader } from "../../components/SectionHeader";
 import { deriveSetup, setupSignature } from "./setup-model";
 import { Download } from "nai:icons/feather";
 
@@ -116,10 +115,6 @@ export function Setup(props: {
       <div style={{ display: model.showBootstrap ? "block" : "none" }}>
         <BootstrapButton disabled={model.bootstrapDisabled} />
       </div>
-
-      {/* Last on the tab: the Engine is a tuning surface, not a step in the
-          staged nudge above it, and it is the only way to switch the Engine on. */}
-      <EngineSettings />
     </div>
   );
 }

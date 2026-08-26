@@ -1,9 +1,16 @@
-// The Engine section — the only way to switch the Engine on.
+// The Engine section on the Engine tab — the only way to switch the Engine on.
 //
-// The settings behind it used to be `project.yaml` entries, which
-// `api.v1.config` can only read; they now live in Story Engine's own storage,
-// per story (see `src/core/engine/settings.ts`). This section is what writes
-// them — every one of them. A numeric setting with no field here is reachable
+// The settings live in Story Engine's own storage, per story (see
+// `src/core/engine/settings.ts`), because `api.v1.config` can only be read and a
+// control that cannot write its own setting is not a control. This section is
+// what writes them — every one of them.
+//
+// **One mount, and the toggle is outside the collapsible.** Mounted twice, the
+// two copies would be two independent write queues over one record: `save`
+// reads the store, edits and writes, so a toggle on one and a number committed
+// on the other interleave and lose a field. The toggle sits above the section
+// header rather than inside the body because a writer who has collapsed the
+// settings still has to see that the Engine is running, and be able to stop it. A numeric setting with no field here is reachable
 // only by hand-editing storyStorage, which is the presentation these settings
 // left `project.yaml` to escape; `NUMERIC_SETTINGS` is the list, and
 // `engine-settings-source.test.ts` counts the fields against it.
@@ -65,7 +72,7 @@ import {
   type CreativeModel,
 } from "../../../core/utils/config";
 import { SP, T } from "../../style";
-import { SectionHeader } from "./SectionHeader";
+import { SectionHeader } from "../../components/SectionHeader";
 import {
   draftFor,
   resolveTypedSetting,
@@ -244,6 +251,57 @@ export function EngineSettings() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: SP.md }}>
+      {/* Outside the collapsible on purpose: switching the Engine on is the
+          decision and the settings under it are tuning. A writer who has
+          collapsed the section still has to be able to see that the Engine is
+          running, and to stop it, without opening anything first. */}
+      <button
+        onClick={() =>
+          save((current) => ({ ...current, enabled: !current.enabled }))
+        }
+        title="Switch the Engine on or off for this story"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: SP.sm,
+          alignSelf: "flex-start",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: settings.enabled ? T.textHeadings : T.textDisabled,
+          fontFamily: T.fontDefault,
+          fontWeight: "bold",
+          padding: 0,
+        }}
+      >
+        {/* Both states mounted, `display` picks: swapping one component type
+            for another at a fixed position leaves the old svg behind when the
+            re-render arrives from a store subscription, which is every render
+            this section does. */}
+        <ToggleRight
+          size={ICON_SIZE}
+          style={{ display: settings.enabled ? "inline-flex" : "none" }}
+        />
+        <ToggleLeft
+          size={ICON_SIZE}
+          style={{ display: settings.enabled ? "none" : "inline-flex" }}
+        />
+        {settings.enabled ? "On" : "Off"}
+      </button>
+
+      <span style={{ fontSize: "0.85em", opacity: 0.8 }}>
+        On, the Engine wakes a few seconds after each generation, reads whatever
+        prose has appeared since it last looked, and acts on what your story has
+        made wrong, left hanging, or settled: it rewrites the lorebook entry of
+        an entity the prose changed, condenses one that has sprawled, and
+        switches off a Thread the story has resolved. It keeps no copy of the
+        entry text it replaces, and undo will not bring it back, so export your
+        lorebook first if the exact wording matters to you. Each pass spends
+        from the same output budget as everything else, and skips itself when
+        there is nothing new to read. Prose you type yourself wakes nothing, so
+        use the ⚡ on the Engine HUD to run a pass on the spot.
+      </span>
+
       <SectionHeader
         label="Engine"
         open={open}
@@ -261,54 +319,6 @@ export function EngineSettings() {
           padding: SP.md,
         }}
       >
-        <button
-          onClick={() =>
-            save((current) => ({ ...current, enabled: !current.enabled }))
-          }
-          title="Switch the Engine on or off for this story"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: SP.sm,
-            alignSelf: "flex-start",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: settings.enabled ? T.textHeadings : T.textDisabled,
-            fontFamily: T.fontDefault,
-            fontWeight: "bold",
-            padding: 0,
-          }}
-        >
-          {/* Both states mounted, `display` picks: swapping one component type
-              for another at a fixed position leaves the old svg behind when the
-              re-render arrives from a store subscription, which is every render
-              this section does. */}
-          <ToggleRight
-            size={ICON_SIZE}
-            style={{ display: settings.enabled ? "inline-flex" : "none" }}
-          />
-          <ToggleLeft
-            size={ICON_SIZE}
-            style={{ display: settings.enabled ? "none" : "inline-flex" }}
-          />
-          {settings.enabled ? "On" : "Off"}
-        </button>
-
-        <span style={{ fontSize: "0.85em", opacity: 0.8 }}>
-          On, the Engine wakes a few seconds after each generation, reads
-          whatever prose has appeared since it last looked, and acts on what
-          your story has made wrong, left hanging, or settled: it rewrites the
-          lorebook entry of an entity the prose changed, condenses one that has
-          sprawled, and switches off a Thread the story has resolved. It keeps
-          no copy of the entry text it replaces, and undo will not bring it
-          back, so export your lorebook first if the exact wording matters to
-          you. Each pass spends from the same output budget as everything else,
-          and skips itself when there is nothing new to read. Prose you type
-          yourself wakes nothing, so use the ⚡ on the Engine HUD to run a pass
-          on the spot.
-        </span>
-
         <ModelPicker
           value={settings.creativeModel}
           onPick={(creativeModel) =>

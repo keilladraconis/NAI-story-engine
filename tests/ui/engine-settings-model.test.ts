@@ -19,7 +19,7 @@ import {
   draftFor,
   resolveTypedSetting,
   toTyped,
-} from "../../src/ui/panels/setup/engine-settings-model";
+} from "../../src/ui/panels/settings/engine-settings-model";
 import {
   CONDENSE_AT_CHARS_MAX,
   CONDENSE_AT_CHARS_MIN,

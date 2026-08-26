@@ -8,13 +8,14 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { NUMERIC_SETTINGS } from "../../src/ui/panels/setup/engine-settings-model";
+import { NUMERIC_SETTINGS } from "../../src/ui/panels/settings/engine-settings-model";
 import { CREATIVE_MODELS } from "../../src/core/utils/config";
 
-const SETUP_DIR = join(__dirname, "../../src/ui/panels/setup");
-const SECTION = join(SETUP_DIR, "EngineSettings.tsx");
-const HEADER = join(SETUP_DIR, "SectionHeader.tsx");
-const SETUP = join(SETUP_DIR, "Setup.tsx");
+const PANELS = join(__dirname, "../../src/ui/panels");
+const SECTION = join(PANELS, "settings/EngineSettings.tsx");
+const HEADER = join(__dirname, "../../src/ui/components/SectionHeader.tsx");
+const ENGINE_TAB = join(PANELS, "Engine.tsx");
+const SETUP = join(PANELS, "setup/Setup.tsx");
 
 const sectionSrc = () => readFileSync(SECTION, "utf8");
 
@@ -239,20 +240,48 @@ describe("the box speaks seconds; storage keeps milliseconds", () => {
   });
 });
 
-describe("the section is on the Setup tab", () => {
-  it("is imported and mounted by Setup.tsx", () => {
+describe("the section is on the Engine tab", () => {
+  it("is imported and mounted by Engine.tsx", () => {
     // Without this the settings have no surface at all: `project.yaml` lost the
-    // three entries, and `api.v1.config` could never have written them back.
-    const src = readFileSync(SETUP, "utf8");
-    expect(src).toContain('from "./EngineSettings"');
+    // entries, and `api.v1.config` could never have written them back.
+    const src = readFileSync(ENGINE_TAB, "utf8");
+    expect(src).toContain('from "./settings/EngineSettings"');
     expect(src).toContain("<EngineSettings />");
   });
 
-  it("sits below the opening-scene card", () => {
+  it("sits between the Forge and the World", () => {
+    // The Engine acts on the World listed below it, and the Forge above it is
+    // the other thing on this tab that writes to the World.
+    const src = readFileSync(ENGINE_TAB, "utf8");
+    const forge = src.indexOf("<ForgeSection />");
+    const settings = src.indexOf("<EngineSettings />");
+    const world = src.indexOf("<World />");
+    expect(forge).toBeGreaterThan(-1);
+    expect(world).toBeGreaterThan(-1);
+    expect(settings).toBeGreaterThan(forge);
+    expect(world).toBeGreaterThan(settings);
+  });
+
+  it("is gone from the Setup tab, rather than mounted on both", () => {
+    // Two mounts would be two independent write queues over one storyStorage
+    // record: each `save` reads the store, edits and writes, so a toggle on one
+    // tab and a number committed on the other can interleave and lose a field.
     const src = readFileSync(SETUP, "utf8");
-    expect(src.indexOf("<EngineSettings />")).toBeGreaterThan(
-      src.indexOf("<BootstrapButton"),
-    );
+    expect(src).not.toContain("EngineSettings");
+  });
+
+  it("puts the on/off toggle outside the collapsible", () => {
+    // A writer who has collapsed the section still has to be able to see that
+    // the Engine is running, and stop it, without opening anything.
+    const src = code(sectionSrc());
+    const toggle = src.indexOf("enabled: !current.enabled");
+    const header = src.indexOf("<SectionHeader");
+    const body = src.indexOf('display: open ? "flex" : "none"');
+    expect(toggle).toBeGreaterThan(-1);
+    expect(header).toBeGreaterThan(-1);
+    expect(body).toBeGreaterThan(-1);
+    expect(toggle).toBeLessThan(header);
+    expect(toggle).toBeLessThan(body);
   });
 });
 
