@@ -28,6 +28,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Retrying a Forge turn re-runs the Forge, instead of answering as ordinary chat.** Retry rebuilt the turn as a normal chat message, so the reply came back in perfect command format and nothing happened: no entities were created, no cards appeared, and Commit stayed greyed out because there was nothing to cast. A retry now re-runs the current phase, the same as an empty send.
 - **The Forge runs on the instruction-following model, and finishes its turn.** A Forge pass emits commands in a strict bracket format, and every one that misses the format is a card you do not get — so it now always goes to GLM, whichever creative model the story is set to, the same way keys and summaries do. It also continues when it is cut off by the token limit instead of stopping mid-command, which chat and refine have always done.
 - **Changing the creative model or the condense threshold now shows up immediately.** Both were written to storage correctly but left the controls displaying the old value until the story was reloaded.
 - **Refining a field no longer commits the refiner's own scaffolding.** A refine shows the model the field wrapped in `=== REFINE TARGET ===` markers; shown a delimited block and asked to rewrite it, the model sometimes returned a delimited block, and those marker lines were committed as part of your ATTG or Style. They are stripped now, and the instructions say plainly that the markers are framing rather than content.
