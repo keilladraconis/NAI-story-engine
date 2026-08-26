@@ -28,6 +28,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **The Forge runs on the instruction-following model, and finishes its turn.** A Forge pass emits commands in a strict bracket format, and every one that misses the format is a card you do not get — so it now always goes to GLM, whichever creative model the story is set to, the same way keys and summaries do. It also continues when it is cut off by the token limit instead of stopping mid-command, which chat and refine have always done.
 - **Changing the creative model or the condense threshold now shows up immediately.** Both were written to storage correctly but left the controls displaying the old value until the story was reloaded.
 - **Refining a field no longer commits the refiner's own scaffolding.** A refine shows the model the field wrapped in `=== REFINE TARGET ===` markers; shown a delimited block and asked to rewrite it, the model sometimes returned a delimited block, and those marker lines were committed as part of your ATTG or Style. They are stripped now, and the instructions say plainly that the markers are framing rather than content.
 - **A short answer in Brainstorm is no longer thrown away and asked again.** On Xialong, any reply under 40 characters was treated as a failed generation: the message you were reading was cleared and regenerated, up to three times. "Cut the prologue." is 17 characters, and a co-writer is allowed to be brief. Only an empty response is re-rolled now.

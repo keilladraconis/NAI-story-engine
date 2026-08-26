@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { useCreativeModel } from "../../helpers/creative-model";
 import {
   buildForgeChatStrategy,
   buildForgeCleanupStrategy,
@@ -105,6 +106,51 @@ describe("buildForgeChatStrategy", () => {
     ],
     seed: { kind: "blank" },
   };
+
+  describe("a forge pass is instruction-following work", () => {
+    afterEach(() => vi.mocked(api.v1.config.get).mockReset());
+
+    it("runs on the instruct model even when the story is on Xialong", async () => {
+      // The pass emits a strict bracket grammar — `[CREATE CHARACTER "X" | …]`
+      // — and every command that misses it is a card the writer does not get.
+      // That is the split `Capability` exists for: prose to the creative model,
+      // format-following to GLM. Observed failing the other way: a pass on
+      // Xialong answered conversationally and created nothing.
+      useCreativeModel("xialong-v1");
+      const strat = buildForgeChatStrategy(
+        () => makeState(),
+        chat,
+        "asst-pending",
+      );
+      const built = await strat.messageFactory!();
+      expect(built.params?.model).toBe("glm-4-6");
+    });
+
+    it("carries no Xialong style block, since it is not going to Xialong", async () => {
+      // Prompting one model in another's dialect is worse than either choice.
+      useCreativeModel("xialong-v1");
+      const strat = buildForgeChatStrategy(
+        () => makeState(),
+        chat,
+        "asst-pending",
+      );
+      const built = await strat.messageFactory!();
+      expect(
+        built.messages.some((m) => m.content?.startsWith("[ Style:")),
+      ).toBe(false);
+    });
+
+    it("continues when the model is cut off by the token cap", () => {
+      // Without this a pass that runs out of room simply stops, mid-command:
+      // the bracket never closes, so the last action is lost and the turn reads
+      // as an unfinished thought. Chats and refines have always continued.
+      expect(strat0().continuation?.maxCalls).toBeGreaterThan(1);
+    });
+
+    function strat0() {
+      return buildForgeChatStrategy(() => makeState(), chat, "asst-pending");
+    }
+  });
 
   it("produces a strategy with forgeChat target", () => {
     const getState = () => makeState();
