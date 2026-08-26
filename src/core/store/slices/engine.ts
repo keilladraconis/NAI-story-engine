@@ -41,14 +41,21 @@ export const initialEngineState: EngineSliceState = {
 };
 
 /** Whether two settings objects say the same thing, so a re-read that changed
- *  nothing returns the same state and the HUD does not repaint for it. */
+ *  nothing returns the same state and the HUD does not repaint for it.
+ *
+ *  Compared over the object's own keys rather than a written-out list. The list
+ *  version forgot two fields as they were added, and a forgotten field is not a
+ *  missed optimisation — it is a change the store never notifies about, so the
+ *  form that renders from the store keeps showing the old value until the next
+ *  reload. That shipped for `condenseAtChars` and again for `creativeModel`.
+ *
+ *  Every field is a primitive, so `===` per key is the whole comparison. The
+ *  key-count check catches a partial object reaching here without a
+ *  `normalizeEngineSettings` on the way in. */
 function same(a: EngineSettings, b: EngineSettings): boolean {
-  return (
-    a.enabled === b.enabled &&
-    a.delayMs === b.delayMs &&
-    a.minProse === b.minProse &&
-    a.threadCap === b.threadCap
-  );
+  const keys = Object.keys(a) as (keyof EngineSettings)[];
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((key) => a[key] === b[key]);
 }
 
 export const engineSlice = createSlice({

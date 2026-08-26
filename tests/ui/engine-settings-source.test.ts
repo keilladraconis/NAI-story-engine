@@ -270,18 +270,19 @@ describe("the section is on the Engine tab", () => {
     expect(src).not.toContain("EngineSettings");
   });
 
-  it("puts the on/off toggle outside the collapsible", () => {
-    // A writer who has collapsed the section still has to be able to see that
-    // the Engine is running, and stop it, without opening anything.
+  it("puts the on/off toggle inside the collapsible, first", () => {
+    // A bare toggle above the section header read as an anomaly — nothing said
+    // what was being switched on. Under the "Engine" header the label does that
+    // work, and the toggle leads the settings it governs.
     const src = code(sectionSrc());
-    const toggle = src.indexOf("enabled: !current.enabled");
     const header = src.indexOf("<SectionHeader");
     const body = src.indexOf('display: open ? "flex" : "none"');
-    expect(toggle).toBeGreaterThan(-1);
+    const toggle = src.indexOf("enabled: !current.enabled");
+    const picker = src.indexOf("<ModelPicker");
     expect(header).toBeGreaterThan(-1);
-    expect(body).toBeGreaterThan(-1);
-    expect(toggle).toBeLessThan(header);
-    expect(toggle).toBeLessThan(body);
+    expect(picker).toBeGreaterThan(-1);
+    expect(toggle).toBeGreaterThan(body);
+    expect(toggle).toBeLessThan(picker);
   });
 });
 

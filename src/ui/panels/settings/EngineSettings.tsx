@@ -5,12 +5,21 @@
 // control that cannot write its own setting is not a control. This section is
 // what writes them — every one of them.
 //
-// **One mount, and the toggle is outside the collapsible.** Mounted twice, the
-// two copies would be two independent write queues over one record: `save`
-// reads the store, edits and writes, so a toggle on one and a number committed
-// on the other interleave and lose a field. The toggle sits above the section
-// header rather than inside the body because a writer who has collapsed the
-// settings still has to see that the Engine is running, and be able to stop it. A numeric setting with no field here is reachable
+// **One mount.** Mounted twice, the two copies would be two independent write
+// queues over one record: `save` reads the store, edits and writes, so a toggle
+// on one and a number committed on the other interleave and lose a field.
+//
+// **The On/Off toggle is the first thing inside the collapsible.** It briefly
+// sat above the section header, on the theory that a collapsed section should
+// still show whether the Engine was running. That read as an anomaly — a bare
+// toggle with nothing naming what it switched on. Under the "Engine" header the
+// label does that work, and the toggle leads the settings it governs.
+//
+// **The notes are short on purpose.** Every control here used to carry a
+// paragraph, and seven paragraphs is a wall that buries the controls it means
+// to explain. What belongs on screen is what a writer needs to answer "what
+// does this do, and what may I type"; the reasoning behind each bound lives in
+// `settings.ts`, next to the bound. A numeric setting with no field here is reachable
 // only by hand-editing storyStorage, which is the presentation these settings
 // left `project.yaml` to escape; `NUMERIC_SETTINGS` is the list, and
 // `engine-settings-source.test.ts` counts the fields against it.
@@ -134,9 +143,8 @@ function ModelPicker(props: {
         ))}
       </div>
       <span style={HELP_STYLE}>
-        {CREATIVE_MODELS.find((model) => model.id === props.value)?.note}{" "}
-        Whichever you pick, activation keys and the short internal summaries
-        behind each entity and Thread are extraction work and always run on GLM.
+        {CREATIVE_MODELS.find((model) => model.id === props.value)?.note} Keys
+        and summaries always run on GLM.
       </span>
     </div>
   );
@@ -251,57 +259,6 @@ export function EngineSettings() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: SP.md }}>
-      {/* Outside the collapsible on purpose: switching the Engine on is the
-          decision and the settings under it are tuning. A writer who has
-          collapsed the section still has to be able to see that the Engine is
-          running, and to stop it, without opening anything first. */}
-      <button
-        onClick={() =>
-          save((current) => ({ ...current, enabled: !current.enabled }))
-        }
-        title="Switch the Engine on or off for this story"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: SP.sm,
-          alignSelf: "flex-start",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          color: settings.enabled ? T.textHeadings : T.textDisabled,
-          fontFamily: T.fontDefault,
-          fontWeight: "bold",
-          padding: 0,
-        }}
-      >
-        {/* Both states mounted, `display` picks: swapping one component type
-            for another at a fixed position leaves the old svg behind when the
-            re-render arrives from a store subscription, which is every render
-            this section does. */}
-        <ToggleRight
-          size={ICON_SIZE}
-          style={{ display: settings.enabled ? "inline-flex" : "none" }}
-        />
-        <ToggleLeft
-          size={ICON_SIZE}
-          style={{ display: settings.enabled ? "none" : "inline-flex" }}
-        />
-        {settings.enabled ? "On" : "Off"}
-      </button>
-
-      <span style={{ fontSize: "0.85em", opacity: 0.8 }}>
-        On, the Engine wakes a few seconds after each generation, reads whatever
-        prose has appeared since it last looked, and acts on what your story has
-        made wrong, left hanging, or settled: it rewrites the lorebook entry of
-        an entity the prose changed, condenses one that has sprawled, and
-        switches off a Thread the story has resolved. It keeps no copy of the
-        entry text it replaces, and undo will not bring it back, so export your
-        lorebook first if the exact wording matters to you. Each pass spends
-        from the same output budget as everything else, and skips itself when
-        there is nothing new to read. Prose you type yourself wakes nothing, so
-        use the ⚡ on the Engine HUD to run a pass on the spot.
-      </span>
-
       <SectionHeader
         label="Engine"
         open={open}
@@ -319,6 +276,49 @@ export function EngineSettings() {
           padding: SP.md,
         }}
       >
+        <button
+          onClick={() =>
+            save((current) => ({ ...current, enabled: !current.enabled }))
+          }
+          title="Switch the Engine on or off for this story"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: SP.sm,
+            alignSelf: "flex-start",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: settings.enabled ? T.textHeadings : T.textDisabled,
+            fontFamily: T.fontDefault,
+            fontWeight: "bold",
+            padding: 0,
+          }}
+        >
+          {/* Both states mounted, `display` picks: swapping one component type
+              for another at a fixed position leaves the old svg behind when the
+              re-render arrives from a store subscription, which is every render
+              this section does. */}
+          <ToggleRight
+            size={ICON_SIZE}
+            style={{ display: settings.enabled ? "inline-flex" : "none" }}
+          />
+          <ToggleLeft
+            size={ICON_SIZE}
+            style={{ display: settings.enabled ? "none" : "inline-flex" }}
+          />
+          {settings.enabled ? "On" : "Off"}
+        </button>
+
+        <span style={HELP_STYLE}>
+          Reads the prose you have written since it last looked, then updates
+          the World: rewriting an entity’s lorebook entry, opening or retiring a
+          Thread, condensing an entry that has sprawled. It rewrites entries in
+          place and keeps no copy — export your lorebook first if the exact
+          wording matters. Typing wakes nothing; use ⚡ on the HUD to run a pass
+          by hand.
+        </span>
+
         <ModelPicker
           value={settings.creativeModel}
           onPick={(creativeModel) =>
@@ -328,7 +328,7 @@ export function EngineSettings() {
 
         <NumberField
           label="Delay (seconds)"
-          help={`How long after a generation starts the Engine looks. ${toTyped("delayMs", DELAY_MS_MIN)}–${toTyped("delayMs", DELAY_MS_MAX)}.`}
+          help={`How long after a generation the Engine looks. ${toTyped("delayMs", DELAY_MS_MIN)}–${toTyped("delayMs", DELAY_MS_MAX)}.`}
           value={delayDraft}
           min={toTyped("delayMs", DELAY_MS_MIN)}
           max={toTyped("delayMs", DELAY_MS_MAX)}
@@ -339,7 +339,7 @@ export function EngineSettings() {
 
         <NumberField
           label="Minimum new paragraphs"
-          help={`How much new prose is worth a pass. Below this the Engine keeps counting and waits. ${MIN_PROSE_MIN}–${MIN_PROSE_MAX}.`}
+          help={`New paragraphs needed before a pass runs. ${MIN_PROSE_MIN}–${MIN_PROSE_MAX}.`}
           value={proseDraft}
           min={MIN_PROSE_MIN}
           max={MIN_PROSE_MAX}
@@ -350,7 +350,7 @@ export function EngineSettings() {
 
         <NumberField
           label="Thread limit"
-          help={`How many Threads this story may hold. At the limit a new Thread displaces the weakest one — satisfied first, then the shortest horizon, then the oldest — rather than adding. Its lorebook entry stays in your lorebook. ${THREAD_CAP_MIN}–${THREAD_CAP_MAX}.`}
+          help={`How many Threads this story may hold. At the limit a new one displaces the weakest instead of adding. ${THREAD_CAP_MIN}–${THREAD_CAP_MAX}.`}
           value={capDraft}
           min={THREAD_CAP_MIN}
           max={THREAD_CAP_MAX}
@@ -361,7 +361,7 @@ export function EngineSettings() {
 
         <NumberField
           label="Condense entries over (paragraphs)"
-          help={`How long one lorebook entry may get before the Engine rewrites it tighter, measured in paragraphs of prose — an entry that long is taking that much context away from your story. Condensing is the one thing the Engine does that can lose a detail, so raise this if you would rather it left your entries alone. ${toTyped("condenseAtChars", CONDENSE_AT_CHARS_MIN)}–${toTyped("condenseAtChars", CONDENSE_AT_CHARS_MAX)}.`}
+          help={`Paragraphs an entry may reach before the Engine rewrites it tighter. Condensing can lose a detail, so raise it to leave entries alone. ${toTyped("condenseAtChars", CONDENSE_AT_CHARS_MIN)}–${toTyped("condenseAtChars", CONDENSE_AT_CHARS_MAX)}.`}
           value={condenseDraft}
           min={toTyped("condenseAtChars", CONDENSE_AT_CHARS_MIN)}
           max={toTyped("condenseAtChars", CONDENSE_AT_CHARS_MAX)}
@@ -373,11 +373,8 @@ export function EngineSettings() {
         />
 
         <span style={HELP_STYLE}>
-          The delay, the minimum and the condense threshold take effect on the
-          next generation, the Thread limit on the next Thread created. A number
-          outside its range is clamped, and one that is not a number at all
-          leaves the setting alone — either way the number left in the box is
-          the number in use.
+          Changes take effect on the next generation. Out-of-range numbers are
+          clamped; the number left in the box is the number in use.
         </span>
       </div>
     </div>
