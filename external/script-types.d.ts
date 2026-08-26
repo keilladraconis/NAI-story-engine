@@ -238,7 +238,7 @@ type LorebookAdvancedConditionOr = {
  */
 type LorebookAdvancedConditionRandom = {
     type: 'random'
-    /** Probability of being true (0.0 to 1.0) */
+    /** Probability of being true (0 to 100) */
     chance: number
 }
 
