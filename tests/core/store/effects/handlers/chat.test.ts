@@ -76,6 +76,25 @@ describe("chatHandler.completion", () => {
 });
 
 describe("chatRefineHandler.completion", () => {
+  it("commits the field without the refine framing around it", async () => {
+    // Observed on an ATTG refine: the model reproduced the `=== REFINE TARGET
+    // ===` header it was shown and the header was committed as part of the
+    // field. Nothing downstream would catch it — a candidate with scaffolding
+    // in it looks exactly like a candidate.
+    const ctx = makeRefineCtx({
+      accumulatedText:
+        "=== REFINE TARGET (attg) ===\n[ Fantasy; Ada; adventure ]\n=== END TARGET ===",
+    });
+    await chatRefineHandler.completion(ctx);
+    const updated = (
+      ctx.dispatch as unknown as ReturnType<typeof vi.fn>
+    ).mock.calls
+      .map((c) => c[0])
+      .find((a) => a.type === "chat/messageUpdated");
+    expect(updated).toBeDefined();
+    expect(updated.payload.content).toBe("[ Fantasy; Ada; adventure ]");
+  });
+
   it("dispatches messageUpdated (routed to refine slot via chatId) and refineCandidateMarked", async () => {
     const ctx = makeRefineCtx({
       accumulatedText: "</think>cleaned candidate",

@@ -28,6 +28,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Refining a field no longer commits the refiner's own scaffolding.** A refine shows the model the field wrapped in `=== REFINE TARGET ===` markers; shown a delimited block and asked to rewrite it, the model sometimes returned a delimited block, and those marker lines were committed as part of your ATTG or Style. They are stripped now, and the instructions say plainly that the markers are framing rather than content.
 - **A short answer in Brainstorm is no longer thrown away and asked again.** On Xialong, any reply under 40 characters was treated as a failed generation: the message you were reading was cleared and regenerated, up to three times. "Cut the prologue." is 17 characters, and a co-writer is allowed to be brief. Only an empty response is re-rolled now.
 
 ### Removed

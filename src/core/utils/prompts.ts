@@ -172,8 +172,13 @@ export const REFINE_SYSTEM_PROMPT = `You are a field editor. Rewrite the REFINE 
 
 Output the rewritten text immediately — no EDITOR: prefix, no "Here is the revised text:", no explanation before or after. Start with the first word of the rewritten content itself.
 
+The === REFINE TARGET === and === END TARGET === lines are how the target is marked out for you. They are not part of it. Do not repeat them.
+
 BAD: EDITOR: I've updated the style to include more sensory detail...
 BAD: Here is the revised style guideline: Jeff VanderMeer's...
+BAD: === REFINE TARGET (style) ===
+Jeff VanderMeer's surreal...
+=== END TARGET ===
 GOOD: Jeff VanderMeer's surreal...
 
 Preserve any required template structure (field labels, line format) unless the user asks otherwise.`;

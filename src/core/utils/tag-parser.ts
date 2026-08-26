@@ -113,3 +113,33 @@ export function splitSections(text: string, sep = "+++"): string[] {
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
+
+/** Strip the `=== REFINE TARGET (field) ===` / `=== END TARGET ===` framing a
+ *  refine puts around the text it asks the model to rewrite.
+ *
+ *  The framing is prompt scaffolding, never content. But a model shown a
+ *  delimited block and told to rewrite it will reasonably return a delimited
+ *  block, and the ATTG the writer then commits carries the scaffolding into
+ *  their story. `REFINE_SYSTEM_PROMPT` now says not to; this is what holds when
+ *  it does anyway, because a wrong commit is silent — the candidate looks like
+ *  a candidate.
+ *
+ *  Matched per line rather than as a header/footer pair, because the model
+ *  imitates rather than quotes: it drops the field name, changes the rule
+ *  length, loses a space, or emits one marker and not the other. The two names
+ *  are what identify a marker; everything else about the line is allowed to
+ *  vary. A bare rule of equals signs is left alone — a field may legitimately
+ *  contain one. */
+export function stripRefineMarkers(text: string): string {
+  const stripped = text.replace(
+    /^[ \t]*=+[ \t]*(?:REFINE TARGET|END TARGET)\b[^\n]*$/gim,
+    "",
+  );
+  // Only tidy when something was actually removed. Removing a marker line
+  // leaves the newline that followed it, so the result needs trimming — but
+  // trimming text that had no markers would make this a whitespace policy
+  // rather than a stripper, and it is not the only thing writing here:
+  // continuation joins chunks on a trailing space, and a generation that ends
+  // in one is committed with it.
+  return stripped === text ? text : stripped.trim();
+}

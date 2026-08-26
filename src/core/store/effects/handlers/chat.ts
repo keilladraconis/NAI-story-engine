@@ -2,6 +2,7 @@ import { messageUpdated, refineCandidateMarked } from "../../slices/chat";
 import {
   stripThinkingTags,
   stripStyleBrackets,
+  stripRefineMarkers,
 } from "../../../utils/tag-parser";
 import { appendStream, clearStream } from "../../stream-buffer";
 import {
@@ -45,7 +46,10 @@ export const chatRefineHandler: GenerationHandlers<ChatRefineTarget> = {
 
   async completion(ctx: CompletionContext<ChatRefineTarget>): Promise<void> {
     if (ctx.accumulatedText) {
-      let cleaned = stripThinkingTags(ctx.accumulatedText);
+      // Order matters: the thinking tags come off first, because a marker can
+      // sit inside one, and the refine framing comes off before any per-field
+      // cleanup so that cleanup sees the field and not the scaffolding.
+      let cleaned = stripRefineMarkers(stripThinkingTags(ctx.accumulatedText));
       if (ctx.target.fieldId === "style") {
         cleaned = stripStyleBrackets(cleaned);
       }

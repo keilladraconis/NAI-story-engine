@@ -6,6 +6,7 @@ import {
   formatTagsWithEmoji,
   restoreTagsFromEmoji,
   stripStyleBrackets,
+  stripRefineMarkers,
 } from "../../../src/core/utils/tag-parser";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -187,5 +188,61 @@ describe("stripStyleBrackets", () => {
   it("handles missing closing bracket (stop sequence stripped it)", () => {
     const input = "[ Style: no closing bracket";
     expect(stripStyleBrackets(input)).toBe("no closing bracket");
+  });
+});
+
+describe("stripRefineMarkers", () => {
+  // A refine shows the model its target inside `=== REFINE TARGET (attg) ===`
+  // / `=== END TARGET ===` framing. Shown a delimited block and asked to
+  // rewrite it, a model reasonably reproduces the delimiters — so the ATTG a
+  // writer commits arrives with the scaffolding still attached. The framing is
+  // never content, whatever surrounds it.
+  it("removes the header the model copied from its own prompt", () => {
+    expect(
+      stripRefineMarkers(
+        "=== REFINE TARGET (attg) ===\n[ Fantasy; Ada; adventure ]",
+      ),
+    ).toBe("[ Fantasy; Ada; adventure ]");
+  });
+
+  it("removes the footer as well as the header", () => {
+    expect(
+      stripRefineMarkers(
+        "=== REFINE TARGET (style) ===\nTerse and cold.\n=== END TARGET ===",
+      ),
+    ).toBe("Terse and cold.");
+  });
+
+  it("removes a footer that arrived without a header", () => {
+    expect(stripRefineMarkers("Terse and cold.\n=== END TARGET ===")).toBe(
+      "Terse and cold.",
+    );
+  });
+
+  it("does not need the field name, or the spacing, to match", () => {
+    // The model is imitating, not quoting: it drops the field, changes the
+    // rule length, loses a space. A matcher that only knows the exact string
+    // the prompt used catches the one case nobody would have shipped.
+    expect(
+      stripRefineMarkers(
+        "==== REFINE TARGET ====\nAda, alone.\n==END TARGET==",
+      ),
+    ).toBe("Ada, alone.");
+  });
+
+  it("returns text with no markers exactly as it arrived", () => {
+    // Not a whitespace policy. Continuation joins chunks on a trailing space,
+    // and a generation that legitimately ends in one is committed with it —
+    // an unconditional trim here silently rewrote every refine that had no
+    // markers to remove.
+    const text = "  Ada, alone.\nThe city, after. ";
+    expect(stripRefineMarkers(text)).toBe(text);
+  });
+
+  it("leaves ordinary content alone, rules included", () => {
+    // A field may legitimately contain a rule of equals signs; only the two
+    // named markers are framing.
+    const text = "Ada, alone.\n===\nThe city, after.";
+    expect(stripRefineMarkers(text)).toBe(text);
   });
 });
