@@ -13,6 +13,19 @@ import { isXialongMode, buildModelParams } from "./config";
 import { buildRefineTail, refineBudgetFor } from "./refine-strategy";
 import { getFieldStrategy } from "./field-strategy-registry";
 
+// The floor beneath which a Xialong response is treated as a failed generation
+// rather than a short one, and re-rolled. Xialong sometimes returns an empty
+// `<think></think>` block and nothing else; that is what the retry is for.
+//
+// The two numbers are different because a short answer means different things
+// in the two places. A field rewrite that comes back in under 40 characters has
+// essentially always failed — the field it is replacing is longer than that. A
+// conversational turn has not: "Cut the prologue." is a real answer at 17
+// characters, and a floor above it makes the writer watch a good reply appear
+// and vanish, three times, before the fourth one sticks.
+const REWRITE_MIN_RESPONSE = 40;
+const CHAT_MIN_RESPONSE = 4;
+
 // Returns sections to omit from buildStoryEnginePrefix so the field being
 // refined is not present in context above ----, avoiding double-injection.
 function excludeSectionsForRefine(
@@ -119,7 +132,7 @@ export async function buildChatStrategy(
         fieldId,
       },
       prefillBehavior: "trim" as const,
-      minResponseLength: xialong ? 40 : undefined,
+      minResponseLength: xialong ? REWRITE_MIN_RESPONSE : undefined,
       // Auto-continue when the rewrite is cut off by the token cap rather than
       // by a stop sequence. Without this a long field — a lorebook entry above
       // all — commits a candidate that ends mid-sentence.
@@ -177,7 +190,11 @@ export async function buildChatStrategy(
     assistantPrefill: prefill,
     // Skip the short-response retry for continuations — its reset path clears
     // the visible message and would erase the original turn we're extending.
-    minResponseLength: isContinuation ? undefined : xialong ? 40 : undefined,
+    minResponseLength: isContinuation
+      ? undefined
+      : xialong
+        ? CHAT_MIN_RESPONSE
+        : undefined,
     // Auto-continue when the model hits max_tokens. Initial call is small
     // (512) so it clears the token-budget bucket; up to 5 continuations
     // approximate the throughput of a single 2048-token request without
