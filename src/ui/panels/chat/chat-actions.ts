@@ -24,3 +24,30 @@ export function hasBrainstormContent(
 ): boolean {
   return chats.some((c) => c.type === "brainstorm" && c.messages.length > 0);
 }
+
+/** The brainstorm "Talk it through" should open, or null to start a fresh one.
+ *
+ *  The store seeds an empty "Brainstorm 1" and selects it, so the CTA's first
+ *  click used to mint "Brainstorm 2" and leave the seeded one sitting empty
+ *  beside it in Sessions. A chat with nothing said in it, already open, is the
+ *  chat to talk in.
+ *
+ *  Scoped to the SELECTED chat rather than "any empty brainstorm": adopting some
+ *  other idle session would move the writer somewhere they did not choose. And
+ *  gated on type, because an empty forge or refine session is still that kind of
+ *  session — its type drives the phase pills, the commit bar and whether the
+ *  turn's text is parsed as commands. */
+export function reusableBrainstormId(
+  chats: ReadonlyArray<{
+    id: string;
+    type: string;
+    messages: ReadonlyArray<unknown>;
+  }>,
+  activeChatId: string | null,
+): string | null {
+  if (!activeChatId) return null;
+  const active = chats.find((c) => c.id === activeChatId);
+  if (!active) return null;
+  if (active.type !== "brainstorm") return null;
+  return active.messages.length === 0 ? active.id : null;
+}

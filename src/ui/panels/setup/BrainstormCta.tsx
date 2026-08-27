@@ -14,7 +14,10 @@
 import { store, chatCreated, chatSwitched } from "../../../core/store";
 import { useSlice } from "../../bridge";
 import { SP, T } from "../../style";
-import { nextBrainstormTitle } from "../chat/chat-actions";
+import {
+  nextBrainstormTitle,
+  reusableBrainstormId,
+} from "../chat/chat-actions";
 import type { Chat as ChatT } from "../../../core/chat-types/types";
 import { ArrowUp, MessageSquare } from "nai:icons/feather";
 
@@ -54,7 +57,16 @@ export function BrainstormCta(props: { onOpenChat: () => void }) {
   // and the first click switches to the Chat tab — which unmounts this button.
   const start = () => {
     if (!ready) return;
-    const chats = store.getState().chat.chats;
+    const { chats, activeChatId } = store.getState().chat;
+    // An empty brainstorm that is already selected is the one to talk in. The
+    // store seeds "Brainstorm 1" and selects it, so minting a chat regardless
+    // left a writer's first click in "Brainstorm 2" with an untouched
+    // "Brainstorm 1" beside it in Sessions.
+    const reusable = reusableBrainstormId(chats, activeChatId);
+    if (reusable) {
+      props.onOpenChat();
+      return;
+    }
     const chat: ChatT = {
       id: api.v1.uuid(),
       type: "brainstorm",
