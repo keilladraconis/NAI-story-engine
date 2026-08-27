@@ -33,11 +33,16 @@ function code(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 }
 
-/** The feather icons a file imports. Read off the import rather than listed
- *  here, so a scan cannot go quietly out of date when a file swaps a glyph. */
+/** The feather icons a file imports, or none when it imports no icons at all.
+ *
+ *  This used to assert the import existed, as its own guard against a scan that
+ *  silently covered nothing. That made a file with no icons a FAILURE rather
+ *  than a file with nothing to get wrong — which is what `ThreadItem` became
+ *  once it stopped rendering a chevron and a layers glyph. The non-empty check
+ *  belongs at the callsite that needs one, not here. */
 function featherIcons(src: string): string[] {
   const imports = /import \{([^{}]*)\} from "nai:icons\/feather";/.exec(src);
-  expect(imports).not.toBeNull();
+  if (!imports) return [];
   return (imports as RegExpExecArray)[1]
     .split(",")
     .map((name) => name.trim())
@@ -273,6 +278,10 @@ describe("the World panel and the thread row swap no icon types", () => {
   // with another at a fixed position. §14.2 fixed `MemberToggle` two files away
   // on exactly this argument, so these are the same rule's remaining cases.
   it("renders no icon behind a conditional", () => {
+    // Positive control: `conditionalIcons` returns [] both for a clean file and
+    // for one with no icons to scan, so at least one file under test must
+    // actually import some — otherwise this passes by covering nothing.
+    expect(featherIcons(read(PANEL)).length).toBeGreaterThan(0);
     for (const file of [PANEL, ITEM]) {
       expect(conditionalIcons(read(file))).toEqual([]);
     }
@@ -295,14 +304,12 @@ describe("the World panel and the thread row swap no icon types", () => {
       );
     }
 
-    // The row's chevron is driven by its own `useState` from its own click, so
-    // its render is attached and no failure could be constructed — but a
-    // component's structure should not depend on which callback happens to
-    // repaint it today, and phase 6 gives the World plenty of detached renders.
-    const item = code(read(ITEM));
+    // The retired fold's chevron, in the panel. The row's own expand/collapse
+    // pair is gone: a thread no longer wraps its cast, so there is nothing left
+    // beneath it to collapse.
     for (const icon of ["ChevronDown", "ChevronRight"]) {
-      expect(item).toMatch(
-        new RegExp(`<${icon}[^>]*display: collapsed \\?`, "s"),
+      expect(panel).toMatch(
+        new RegExp(`<${icon}[^>]*display: retiredOpen \\?`, "s"),
       );
     }
   });

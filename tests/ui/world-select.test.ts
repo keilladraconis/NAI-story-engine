@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   selectWorldBody,
+  partitionThreads,
   entityRequestIds,
   entityPending,
   entityBorderKind,
@@ -39,13 +40,17 @@ describe("selectWorldBody", () => {
     expect(loose.map((e) => e.id).sort()).toEqual(["a", "b"]);
   });
 
-  it("threaded entities are excluded from loose", () => {
+  it("lists an entity in the World even when a thread casts it", () => {
+    // Threads stopped being a GROUPING of the World and became a section beside
+    // it. An entity hidden from the World because some thread happened to cast
+    // it was findable only by expanding the right thread, and a thread's cast is
+    // now a detector input rather than a place entities live.
     const entitiesById = { a: ent("a"), b: ent("b") };
     const { threads, loose } = selectWorldBody(entitiesById, [
       thread("g1", ["a"]),
     ]);
     expect(threads.map((g) => g.id)).toEqual(["g1"]);
-    expect(loose.map((e) => e.id)).toEqual(["b"]);
+    expect(loose.map((e) => e.id).sort()).toEqual(["a", "b"]);
   });
 
   it("keeps an empty thread (rendered so it stays editable/deletable)", () => {
@@ -164,5 +169,50 @@ describe("isRequestActive", () => {
     expect(
       isRequestActive(rt({ queue: [{ id: "other" } as never] }), "req-1"),
     ).toBe(false);
+  });
+});
+
+describe("partitionThreads", () => {
+  // Threads accumulate, and a story that has resolved twenty commitments should
+  // not show twenty rows. Open ones are the working set; satisfied and abandoned
+  // are history, one click away rather than gone — reopening one means finding
+  // it first.
+  const withStatus = (id: string, status: Thread["status"]): Thread => ({
+    ...thread(id, []),
+    status,
+  });
+
+  it("puts open threads first and retires the rest", () => {
+    const { open, retired } = partitionThreads([
+      withStatus("a", "open"),
+      withStatus("b", "satisfied"),
+      withStatus("c", "abandoned"),
+      withStatus("d", "open"),
+    ]);
+    expect(open.map((t) => t.id)).toEqual(["a", "d"]);
+    expect(retired.map((t) => t.id)).toEqual(["b", "c"]);
+  });
+
+  it("counts abandoned as retired, not as a third list", () => {
+    // Abandoned is a distinct READING — it says the story walked away rather
+    // than resolved — but it behaves as satisfied does everywhere else, so it
+    // belongs in the same fold.
+    const { open, retired } = partitionThreads([withStatus("x", "abandoned")]);
+    expect(open).toEqual([]);
+    expect(retired.map((t) => t.id)).toEqual(["x"]);
+  });
+
+  it("preserves the stored order within each list", () => {
+    // The World renders threads in creation order; partitioning must not sort.
+    const { open } = partitionThreads([
+      withStatus("z", "open"),
+      withStatus("y", "satisfied"),
+      withStatus("x", "open"),
+    ]);
+    expect(open.map((t) => t.id)).toEqual(["z", "x"]);
+  });
+
+  it("returns two empty lists for no threads", () => {
+    expect(partitionThreads([])).toEqual({ open: [], retired: [] });
   });
 });

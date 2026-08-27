@@ -34,7 +34,7 @@ import {
   threadCreated,
 } from "../../../core/store";
 import { FieldID } from "../../../config/field-definitions";
-import { selectWorldBody } from "./world-select";
+import { partitionThreads, selectWorldBody } from "./world-select";
 import { threadAddModel } from "./thread-display";
 import { ThreadItem } from "./ThreadItem";
 import { EntityCard } from "./EntityCard";
@@ -47,6 +47,8 @@ import {
   FastForward,
   Minimize2,
   Maximize2,
+  ChevronDown,
+  ChevronRight,
 } from "nai:icons/feather";
 
 const ICON_SIZE = 16;
@@ -65,11 +67,11 @@ export function World() {
   const threadCap = useSlice((s) => s.engine.settings.threadCap);
   const [collapsed, setCollapsed] = useState(false);
 
-  const { threads: visibleThreads, loose } = selectWorldBody(
-    entitiesById,
-    threads,
-  );
-  const isEmpty = visibleThreads.length === 0 && loose.length === 0;
+  const { threads: allThreads, loose } = selectWorldBody(entitiesById, threads);
+  const { open: openThreads, retired: retiredThreads } =
+    partitionThreads(allThreads);
+  const [retiredOpen, setRetiredOpen] = useState(false);
+  const isEmpty = allThreads.length === 0 && loose.length === 0;
   // Every thread the cap counts, not just the ones this panel is showing:
   // `selectWorldBody` may hide a forge draft's thread, and the reducer counts
   // it all the same.
@@ -186,12 +188,86 @@ export function World() {
 
       {!collapsed ? (
         <div style={{ display: "flex", flexDirection: "column", gap: SP.xs }}>
-          {visibleThreads.map((t) => (
-            <ThreadItem key={t.id} threadId={t.id} />
-          ))}
           {loose.map((e) => (
             <EntityCard key={e.id} entityId={e.id} />
           ))}
+
+          {/* Threads are a section beside the World, not a grouping of it. They
+              used to wrap their cast, which hid those entities from the list
+              above and made a thread the only way to reach them. A thread's
+              cast is what its detector probes for (thread-condition.ts), which
+              is a different job from filing. */}
+          {allThreads.length > 0 ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: SP.xs,
+                marginTop: SP.sm,
+                paddingTop: SP.sm,
+                borderTop: `1px solid ${T.bg2}`,
+              }}
+            >
+              {openThreads.map((t) => (
+                <ThreadItem key={t.id} threadId={t.id} />
+              ))}
+
+              {/* Retired threads fold rather than vanish. Satisfied and
+                  abandoned accumulate, and twenty finished rows bury the three
+                  the story still owes — but reopening one means finding it
+                  first, so they stay one click away. */}
+              {retiredThreads.length > 0 ? (
+                <Fragment>
+                  <button
+                    onClick={() => setRetiredOpen(!retiredOpen)}
+                    title="Threads the story has settled or walked away from"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: SP.sm,
+                      alignSelf: "flex-start",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: T.textDisabled,
+                      fontFamily: T.fontDefault,
+                      fontSize: "0.85em",
+                      padding: 0,
+                    }}
+                  >
+                    {/* Both chevrons mounted, `display` picks: this list
+                        re-renders from a store subscription, where swapping one
+                        component type for another at a fixed position leaves
+                        the old svg behind. */}
+                    <ChevronDown
+                      size={14}
+                      style={{
+                        display: retiredOpen ? "inline-flex" : "none",
+                      }}
+                    />
+                    <ChevronRight
+                      size={14}
+                      style={{
+                        display: retiredOpen ? "none" : "inline-flex",
+                      }}
+                    />
+                    Retired ({retiredThreads.length})
+                  </button>
+                  <div
+                    style={{
+                      display: retiredOpen ? "flex" : "none",
+                      flexDirection: "column",
+                      gap: SP.xs,
+                    }}
+                  >
+                    {retiredThreads.map((t) => (
+                      <ThreadItem key={t.id} threadId={t.id} />
+                    ))}
+                  </div>
+                </Fragment>
+              ) : null}
+            </div>
+          ) : null}
           {isEmpty ? (
             <div
               style={{
