@@ -104,15 +104,22 @@ export function createEntitySummaryFactory(
     const userContent = `Generate a summary for ${nameLabel} (${categoryLabel}).`;
 
     messages.push({ role: "user", content: userContent });
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.summary);
+    await appendXialongStyleMessage(
+      messages,
+      XIALONG_STYLE.summary,
+      "instruct",
+    );
 
     return {
       messages,
-      params: await buildModelParams({
-        max_tokens: 150,
-        temperature: 0.9,
-        min_p: 0.05,
-      }),
+      params: await buildModelParams(
+        {
+          max_tokens: 150,
+          temperature: 0.9,
+          min_p: 0.05,
+        },
+        "instruct",
+      ),
     };
   };
 }
@@ -127,7 +134,7 @@ export function createEntitySummaryFromLorebookFactory(
     if (!entity?.lorebookEntryId) {
       return {
         messages: [],
-        params: await buildModelParams({ max_tokens: 150 }),
+        params: await buildModelParams({ max_tokens: 150 }, "instruct"),
       };
     }
 
@@ -142,26 +149,33 @@ export function createEntitySummaryFromLorebookFactory(
       },
     ];
 
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.summary);
+    await appendXialongStyleMessage(
+      messages,
+      XIALONG_STYLE.summary,
+      "instruct",
+    );
 
     return {
       messages,
-      params: await buildModelParams({
-        max_tokens: 150,
-        temperature: 0.8,
-        min_p: 0.05,
-      }),
+      params: await buildModelParams(
+        {
+          max_tokens: 150,
+          temperature: 0.8,
+          min_p: 0.05,
+        },
+        "instruct",
+      ),
     };
   };
 }
 
 export function createThreadSummaryFactory(
   getState: () => RootState,
-  groupId: string,
+  threadId: string,
 ): MessageFactory {
   return async () => {
     const state = getState();
-    const group = state.world.groups.find((g) => g.id === groupId);
+    const thread = state.world.threads.find((t) => t.id === threadId);
     const { foundation } = state;
 
     const messages: Message[] = [];
@@ -182,7 +196,7 @@ export function createThreadSummaryFactory(
       });
     }
 
-    const members = (group?.entityIds ?? [])
+    const members = (thread?.entityIds ?? [])
       .map((id) => state.world.entitiesById[id])
       .filter((e): e is NonNullable<typeof e> => e !== undefined);
 
@@ -190,7 +204,7 @@ export function createThreadSummaryFactory(
       .map((e) => (e.summary ? `- ${e.name}: ${e.summary}` : `- ${e.name}`))
       .join("\n");
 
-    const titleLabel = group?.title ? `"${group.title}"` : "this thread";
+    const titleLabel = thread?.title ? `"${thread.title}"` : "this thread";
 
     const userLines: string[] = [];
     userLines.push(`Thread: ${titleLabel}`);
@@ -200,15 +214,22 @@ export function createThreadSummaryFactory(
     userLines.push("Generate a summary describing this thread's dynamic.");
 
     messages.push({ role: "user", content: userLines.join("\n") });
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.summary);
+    await appendXialongStyleMessage(
+      messages,
+      XIALONG_STYLE.summary,
+      "instruct",
+    );
 
     return {
       messages,
-      params: await buildModelParams({
-        max_tokens: 100,
-        temperature: 0.9,
-        min_p: 0.05,
-      }),
+      params: await buildModelParams(
+        {
+          max_tokens: 100,
+          temperature: 0.9,
+          min_p: 0.05,
+        },
+        "instruct",
+      ),
     };
   };
 }

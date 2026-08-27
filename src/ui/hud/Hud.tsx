@@ -1,0 +1,269 @@
+// The Engine HUD (design §9.1): one modeline in a scriptPanel, reporting only,
+// plus a single control.
+//
+// Fixed slots, always present, always in the same position, read as a shape
+// rather than parsed as words:
+//
+//   [eye] [lines]14 [flag]5 [commit]23 ▮▮▮▯ ⚡
+//
+// Every slot is a feather icon and a number, and every slot carries a `title`
+// saying in words what its number means. The line started out mixing icons for
+// the state with bare unicode for the counts — `12¶ ⚑5 ∆0` — and the unicode
+// half was unreadable: a modeline teaches nothing on its own, so the tooltip is
+// the only place its vocabulary can be learned. Icons and tooltips are what make
+// it teachable without turning it into a sentence.
+//
+// NO ICON APPEARS TWICE. §9.1's own example line spends ✎ once as the acting
+// state and again as the touched count, which reads as two pencils on a line
+// meant to be read as a shape. The state slot keeps the pencil (it is the state
+// §9.1 names) and touched takes `GitCommit` — a recorded change, and a
+// silhouette nothing else on the line shares. `hud-source.test.ts` counts the
+// uses of every icon this file imports, so a second one cannot creep back in.
+//
+// The budget stays four bars rather than becoming a sixth icon: it is the one
+// slot that reports a LEVEL, and no single glyph can show how full something is.
+//
+// It never narrates individual actions — the journal and the log do that. What it
+// rewards is watching it over time, which is why every slot is drawn on every
+// render even when its number is 0: a slot that appears later is a modeline that
+// changes shape.
+//
+// Every decision lives in `hud-model.ts`'s `deriveHud`, the one reader of the
+// loop's phase. This file renders the model it hands back and branches on
+// nothing else — the same split `Header.tsx` keeps with `header-model.ts`.
+//
+// Two structural rules, both from CLAUDE.md and both load-bearing here:
+//
+//   1. EVERY state icon stays mounted and toggles `display`. Never swap a
+//      component *type* at a fixed position: when the re-render comes from a
+//      detached callback the old svg is left behind in the DOM — and every
+//      render this component does is detached, arriving from a store
+//      subscription or a timer tick, never from a JSX event handler. Same
+//      workaround as `Header.tsx`'s `WidgetIcon` and `ConfirmButton`.
+//   2. The ⚡ carries NO re-entry guard of its own — not `disabled`, which is a
+//      render-time value a press arriving before the re-render slips past, and
+//      not a tap-timestamp window, which CLAUDE.md forbids reintroducing. It
+//      dispatches `enginePassRequested()` and stops. The guard that matters is
+//      inside the pass effect, where a second press actually lands.
+
+import { store, enginePassRequested } from "../../core/store";
+import { useSlice } from "../bridge";
+import { useTick } from "../hooks";
+import { SP, T } from "../style";
+import {
+  BUDGET_BARS,
+  deriveHud,
+  hudSignature,
+  type HudState,
+} from "./hud-model";
+import {
+  AlertTriangle,
+  AlignLeft,
+  BookOpen,
+  Edit3,
+  Eye,
+  EyeOff,
+  Flag,
+  GitCommit,
+  Pause,
+  Zap,
+} from "nai:icons/feather";
+
+const ICON_SIZE = 13;
+
+/** The budget is the only slot no store change can move — `getAllowedOutput()`
+ *  is the runtime's number, and the bucket refills on a clock. 5s is the
+ *  header's idle cadence, and this is the same job: notice the refill. */
+const TICK_MS = 5000;
+
+/** One icon, one colour and one tooltip per reading, kept in a single table so a
+ *  new `HudState` has to answer for all three in one place. Colour is the second
+ *  channel the modeline reads on — `⚠` in the warning colour is the only slot
+ *  that ever shouts, because it is the only one that means something is wrong. */
+const STATE_ICONS: ReadonlyArray<
+  readonly [HudState, IconComponent, string, string]
+> = [
+  // Off is first because it outranks every phase: the setting is off, so
+  // whatever the machine's last pass left behind is not what the writer needs
+  // to know. EyeOff rather than a dimmed Eye — "not running" and "running,
+  // nothing to do" must not be two shades of the same glyph.
+  ["off", EyeOff, T.textDisabled, "Off — the Engine is not running"],
+  ["watching", Eye, T.text, "Watching — nothing new to read"],
+  [
+    "reading",
+    BookOpen,
+    T.textHeadings,
+    "Reading — working out what needs attention",
+  ],
+  ["acting", Edit3, T.textHeadings, "Acting — carrying out what it decided"],
+  [
+    "held",
+    Pause,
+    T.textDisabled,
+    "Held — the output budget will not cover the next step",
+  ],
+  [
+    "stalled",
+    AlertTriangle,
+    T.warning,
+    "Stalled — the loop cannot make progress",
+  ],
+];
+
+/** Fixed bar positions. Only each bar's colour changes, so the row keeps its
+ *  width and the line never reflows as the bucket drains. */
+const BAR_SLOTS: ReadonlyArray<number> = Array.from(
+  { length: BUDGET_BARS },
+  (_, i) => i,
+);
+
+const slot = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: SP.xs,
+  whiteSpace: "nowrap",
+} as const;
+
+/**
+ * All five glyphs stay mounted; `display` picks the one that is true right now.
+ * See rule 1 in the file header — this is not a style preference, it is the only
+ * arrangement that survives a re-render from a detached callback.
+ */
+function StateIcon(props: { state: HudState }) {
+  return (
+    <Fragment>
+      {STATE_ICONS.map(([state, Icon, color, title]) => (
+        <span
+          key={state}
+          title={title}
+          style={{
+            ...slot,
+            display: props.state === state ? "inline-flex" : "none",
+            color,
+          }}
+        >
+          <Icon size={ICON_SIZE} color={color} />
+        </span>
+      ))}
+    </Fragment>
+  );
+}
+
+/** One count: an icon, its number, and the tooltip that says what the number
+ *  means. All three together — the icon is what the eye finds, the number is the
+ *  reading, and the tooltip is the only teacher this line has.
+ *
+ *  Written once rather than three times so a fourth count cannot arrive with a
+ *  different spacing, a different icon size, or no tooltip at all. */
+function CountSlot(props: {
+  icon: IconComponent;
+  value: number;
+  title: string;
+}) {
+  const Icon = props.icon;
+  return (
+    <span style={slot} title={props.title}>
+      <Icon size={ICON_SIZE} />
+      {props.value}
+    </span>
+  );
+}
+
+function BudgetBars(props: { filled: number; allowedOutput: number }) {
+  return (
+    <span
+      style={{ ...slot, gap: "2px" }}
+      title={`Output budget — ${props.allowedOutput} tokens left of the bucket`}
+    >
+      {BAR_SLOTS.map((index) => (
+        <span
+          key={index}
+          style={{
+            width: "3px",
+            height: "11px",
+            borderRadius: "1px",
+            background: index < props.filled ? T.textHeadings : T.bg3,
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** Appearance only. `zapEnabled` says whether a press would do anything right
+ *  now; it is deliberately NOT wired to `disabled` — see rule 2. A disabled
+ *  button also fires no event, so it would clear no FlagB, and the runtime needs
+ *  that flag cleared before it will refill the output bucket at all. */
+function zapStyle(enabled: boolean): Record<string, string> {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    background: "transparent",
+    border: "none",
+    padding: "0",
+    cursor: "pointer",
+    color: enabled ? T.textHeadings : T.textDisabled,
+    opacity: enabled ? "1" : "0.6",
+  };
+}
+
+export function Hud() {
+  // A primitive covering exactly the store fields deriveHud reads, so any change
+  // that moves a slot repaints the line — and nothing else does.
+  useSlice(hudSignature);
+  useTick(TICK_MS);
+
+  const allowedOutput = api.v1.script.getAllowedOutput();
+  const model = deriveHud(store.getState(), { allowedOutput });
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: SP.md,
+        padding: SP.md,
+        fontSize: "0.85em",
+        fontFamily: T.fontDefault,
+        color: T.text,
+      }}
+    >
+      <StateIcon state={model.stateIcon} />
+      <CountSlot
+        icon={AlignLeft}
+        value={model.backlog}
+        title={`Backlog — ${model.backlog} new paragraph(s) the Engine has not read yet; climbing means it is falling behind`}
+      />
+      <CountSlot
+        icon={Flag}
+        value={model.threads}
+        title={`Threads — ${model.threads} open of ${model.threadsTotal} the story is carrying; context pressure, so climbing means go close some`}
+      />
+      <CountSlot
+        icon={GitCommit}
+        value={model.touched}
+        // "On this branch" was a promise the number never kept, and there is no
+        // branch to keep it on any more: Story Engine's records move forward
+        // only. What is left is what it always was between navigations — a
+        // session accumulator fed from the drain, counting INTENTS rather than
+        // distinct entries, condenses as well as revises, reset by a reload and
+        // by nothing else. The tooltip says that and claims nothing further,
+        // because a slot whose only explanation is wrong is worse than one with
+        // none.
+        title={`Rewrites — ${model.touched} lorebook entry rewrite(s), revises and condenses alike, since this story was opened; undo does not take them back`}
+      />
+      <BudgetBars filled={model.budgetBars} allowedOutput={allowedOutput} />
+      {/* Never disabled, never debounced: the dispatch is the whole handler and
+          the pass effect owns the refusal. */}
+      <button
+        onClick={() => store.dispatch(enginePassRequested())}
+        title="Run a pass now"
+        aria-label="Run an Engine pass now"
+        style={zapStyle(model.zapEnabled)}
+      >
+        <Zap size={ICON_SIZE} />
+      </button>
+    </div>
+  );
+}

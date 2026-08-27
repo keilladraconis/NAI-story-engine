@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   worldSlice,
+  initialWorldState,
   entityForged,
   entityDeleted,
   entitySummaryUpdated,
@@ -8,13 +9,28 @@ import {
   entityBound,
   entitiesBoundBatch,
   entityUnbound,
-  groupCreated,
-  groupDeleted,
-  groupRenamed,
-  groupSummaryUpdated,
-  entityGroupToggled,
+  threadCreated,
+  threadDeleted,
+  threadRenamed,
+  threadTextUpdated,
+  threadMemberToggled,
+  threadHorizonSet,
+  threadStatusSet,
+  threadAnchorSet,
+  DEFAULT_THREAD_ANCHOR,
 } from "../../../../src/core/store/slices/world";
-import { WorldState, WorldEntity } from "../../../../src/core/store/types";
+import {
+  Thread,
+  ThreadHorizon,
+  WorldState,
+  WorldEntity,
+} from "../../../../src/core/store/types";
+import { persistedDataLoaded, rootReducer } from "../../../../src/core/store";
+import { engineSettingsChanged } from "../../../../src/core/store/slices/engine";
+import {
+  ENGINE_DEFAULTS,
+  type EngineSettings,
+} from "../../../../src/core/engine/settings";
 import {
   FieldID,
   DulfsFieldID,
@@ -26,7 +42,7 @@ const reduce = (
 ) => worldSlice.reducer(state, action as any);
 
 const makeState = (overrides: Partial<WorldState> = {}): WorldState => ({
-  groups: [],
+  threads: [],
   entitiesById: {},
   entityIds: [],
   ...overrides,
@@ -40,71 +56,376 @@ const ENTITY: WorldEntity = {
   lifecycle: "live" as const,
 };
 
-const GROUP = {
-  id: "g1",
+const THREAD: Thread = {
+  id: "t1",
   title: "Main Circle",
-  summary: "Core cast",
+  text: "Core cast",
+  horizon: "plot",
   entityIds: [],
+  status: "open",
+  anchorParagraph: null,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Group (Thread) actions
+// Thread actions
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("groupCreated", () => {
-  it("adds a group", () => {
-    const state = reduce(makeState(), groupCreated({ group: GROUP }));
-    expect(state.groups).toHaveLength(1);
-    expect(state.groups[0].title).toBe("Main Circle");
+describe("threadCreated", () => {
+  it("adds a thread", () => {
+    const state = reduce(makeState(), threadCreated({ thread: THREAD }));
+    expect(state.threads).toHaveLength(1);
+    expect(state.threads[0].title).toBe("Main Circle");
+  });
+
+  it("defaults horizon and status when the payload omits them", () => {
+    const state = reduce(
+      makeState(),
+      threadCreated({
+        thread: { id: "t2", title: "Bare", text: "", entityIds: [] },
+      }),
+    );
+    expect(state.threads[0].horizon).toBe("plot");
+    expect(state.threads[0].status).toBe("open");
+  });
+
+  it("leaves a thread nobody anchored unanchored, rather than at paragraph 0", () => {
+    // The World's "+ New Thread" cannot know the branch's paragraph count — the
+    // dispatch is synchronous and the count needs a document scan — and a
+    // defaulted 0 would read as "abandoned since the story began", which is a
+    // destructive verdict on a thread the writer just made. `null` says what is
+    // true: nobody has anchored this.
+    const state = reduce(
+      makeState(),
+      threadCreated({
+        thread: { id: "t2", title: "Bare", text: "", entityIds: [] },
+      }),
+    );
+    expect(state.threads[0].anchorParagraph).toBe(DEFAULT_THREAD_ANCHOR);
+    expect(DEFAULT_THREAD_ANCHOR).toBeNull();
+  });
+
+  it("keeps an anchor the Engine recorded at creation", () => {
+    const state = reduce(
+      makeState(),
+      threadCreated({
+        thread: {
+          id: "t2",
+          title: "Bare",
+          text: "",
+          entityIds: [],
+          anchorParagraph: 41,
+        },
+      }),
+    );
+    expect(state.threads[0].anchorParagraph).toBe(41);
+  });
+
+  it("keeps an explicit horizon and status", () => {
+    const state = reduce(
+      makeState(),
+      threadCreated({
+        thread: { ...THREAD, horizon: "arc", status: "satisfied" },
+      }),
+    );
+    expect(state.threads[0].horizon).toBe("arc");
+    expect(state.threads[0].status).toBe("satisfied");
   });
 });
 
-describe("groupDeleted", () => {
-  it("removes a group by id", () => {
-    const state = reduce(
-      makeState({ groups: [GROUP] }),
-      groupDeleted({ groupId: "g1" }),
+// ─────────────────────────────────────────────────────────────────────────────
+// The cap
+//
+// Through `rootReducer`, not `worldSlice.reducer`: the cap value lives in the
+// engine slice (it is one of the Engine's per-story settings, already mirrored
+// into the store by phase 4b) and a slice reducer cannot see another slice, so
+// the root is the only reducer that can hold this invariant. It is still a
+// reducer invariant — no callsite can dispatch its way around it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const thread = (id: string, horizon: ThreadHorizon = "plot"): Thread => ({
+  id,
+  title: id,
+  text: "",
+  horizon,
+  entityIds: [],
+  status: "open",
+  anchorParagraph: null,
+});
+
+/** A store state with `threads` already in it, as a branch load leaves it. */
+function withThreads(threads: Thread[], settings?: Partial<EngineSettings>) {
+  let state = rootReducer(undefined, { type: "@@INIT" });
+  if (settings) {
+    state = rootReducer(
+      state,
+      engineSettingsChanged({ ...ENGINE_DEFAULTS, ...settings }),
     );
-    expect(state.groups).toHaveLength(0);
+  }
+  return rootReducer(
+    state,
+    persistedDataLoaded({ world: { ...initialWorldState, threads } }),
+  );
+}
+
+const threadIds = (state: { world: WorldState }): string[] =>
+  state.world.threads.map((t) => t.id);
+
+describe("the thread cap", () => {
+  it("displaces rather than adds once the cap is reached", () => {
+    const before = withThreads(
+      Array.from({ length: 8 }, (_, i) => thread(`t${i}`)),
+    );
+    const after = rootReducer(before, threadCreated({ thread: THREAD }));
+    expect(after.world.threads).toHaveLength(8);
+    expect(threadIds(after)).toContain("t1");
+    expect(threadIds(after)).not.toContain("t0");
+  });
+
+  it("adds without displacing while there is room", () => {
+    const before = withThreads([thread("a"), thread("b")]);
+    const after = rootReducer(before, threadCreated({ thread: THREAD }));
+    expect(threadIds(after)).toEqual(["a", "b", "t1"]);
+  });
+
+  it("uses the cap this story is set to, not the default", () => {
+    const before = withThreads([thread("a"), thread("b"), thread("c")], {
+      threadCap: 2,
+    });
+    const after = rootReducer(before, threadCreated({ thread: THREAD }));
+    expect(threadIds(after)).toEqual(["c", "t1"]);
+  });
+
+  it("holds across a run of creates, whichever callsite dispatched them", () => {
+    // The invariant is on the action, not on a caller — which is the whole
+    // reason it lives here rather than in the Forge's [THREAD] handler or in
+    // the World panel. That the Forge and the World panel are in fact the two
+    // callsites is a source-level fact this test cannot see;
+    // `tests/ui/thread-source.test.ts` names them and checks neither trims the
+    // list itself.
+    let state = withThreads([], { threadCap: 2 });
+    for (const id of ["a", "b", "c", "d"]) {
+      state = rootReducer(state, threadCreated({ thread: thread(id) }));
+    }
+    expect(threadIds(state)).toEqual(["c", "d"]);
+  });
+
+  it("leaves a branch load alone, however many threads it carries", () => {
+    // Navigating history is not creating a thread. Trimming here would delete
+    // a writer's threads for the crime of pressing undo.
+    const state = withThreads(
+      Array.from({ length: 12 }, (_, i) => thread(`t${i}`)),
+      { threadCap: 3 },
+    );
+    expect(state.world.threads).toHaveLength(12);
+  });
+
+  it("does not trim on any other thread action", () => {
+    const before = withThreads(
+      Array.from({ length: 12 }, (_, i) => thread(`t${i}`)),
+      { threadCap: 3 },
+    );
+    const after = rootReducer(
+      before,
+      threadRenamed({ threadId: "t0", title: "renamed" }),
+    );
+    expect(after.world.threads).toHaveLength(12);
+    expect(after.world.threads[0].title).toBe("renamed");
+
+    // The two actions phase 5 adds go the same way: editing a thread over an
+    // over-full list (a cap lowered after the fact, or a branch load) must not
+    // silently spend one of the writer's threads.
+    for (const action of [
+      threadHorizonSet({ threadId: "t0", horizon: "arc" }),
+      threadStatusSet({ threadId: "t0", status: "satisfied" }),
+    ]) {
+      expect(rootReducer(before, action).world.threads).toHaveLength(12);
+    }
+  });
+
+  it("touches nothing but the thread list when it displaces", () => {
+    const before = withThreads([thread("a"), thread("b")], { threadCap: 2 });
+    const after = rootReducer(before, threadCreated({ thread: THREAD }));
+    expect(after.world.threads).toHaveLength(2);
+    expect(after.world.entitiesById).toBe(before.world.entitiesById);
+    expect(after.world.entityIds).toBe(before.world.entityIds);
+    expect(after.story).toBe(before.story);
+    expect(after.engine).toBe(before.engine);
+  });
+
+  it("mirrors a cap-only settings change into the store", () => {
+    // The engine slice returns the same object when a re-read changed nothing,
+    // so a settings comparison that forgot `threadCap` would leave the cap at
+    // whatever it was when the delay last moved.
+    const state = rootReducer(
+      rootReducer(undefined, { type: "@@INIT" }),
+      engineSettingsChanged({ ...ENGINE_DEFAULTS, threadCap: 3 }),
+    );
+    expect(state.engine.settings.threadCap).toBe(3);
   });
 });
 
-describe("groupRenamed", () => {
-  it("renames a group by id", () => {
+describe("threadDeleted", () => {
+  it("removes a thread by id", () => {
     const state = reduce(
-      makeState({ groups: [GROUP] }),
-      groupRenamed({ groupId: "g1", title: "Inner Ring" }),
+      makeState({ threads: [THREAD] }),
+      threadDeleted({ threadId: "t1", lorebookEntryId: undefined }),
     );
-    expect(state.groups[0].title).toBe("Inner Ring");
+    expect(state.threads).toHaveLength(0);
   });
 });
 
-describe("groupSummaryUpdated", () => {
-  it("updates the group summary", () => {
+describe("threadRenamed", () => {
+  it("renames a thread by id", () => {
     const state = reduce(
-      makeState({ groups: [GROUP] }),
-      groupSummaryUpdated({ groupId: "g1", summary: "Bound by oaths" }),
+      makeState({ threads: [THREAD] }),
+      threadRenamed({ threadId: "t1", title: "Inner Ring" }),
     );
-    expect(state.groups[0].summary).toBe("Bound by oaths");
+    expect(state.threads[0].title).toBe("Inner Ring");
   });
 });
 
-describe("entityGroupToggled", () => {
-  it("adds entity to group when not a member", () => {
+describe("threadTextUpdated", () => {
+  it("updates the thread text", () => {
     const state = reduce(
-      makeState({ groups: [GROUP] }),
-      entityGroupToggled({ groupId: "g1", entityId: "e1" }),
+      makeState({ threads: [THREAD] }),
+      threadTextUpdated({ threadId: "t1", text: "Bound by oaths" }),
     );
-    expect(state.groups[0].entityIds).toContain("e1");
+    expect(state.threads[0].text).toBe("Bound by oaths");
+  });
+});
+
+describe("threadMemberToggled", () => {
+  it("adds entity to thread when not a member", () => {
+    const state = reduce(
+      makeState({ threads: [THREAD] }),
+      threadMemberToggled({ threadId: "t1", entityId: "e1" }),
+    );
+    expect(state.threads[0].entityIds).toContain("e1");
   });
 
-  it("removes entity from group when already a member", () => {
-    const groupWithMember = { ...GROUP, entityIds: ["e1"] };
+  it("removes entity from thread when already a member", () => {
+    const threadWithMember = { ...THREAD, entityIds: ["e1"] };
     const state = reduce(
-      makeState({ groups: [groupWithMember] }),
-      entityGroupToggled({ groupId: "g1", entityId: "e1" }),
+      makeState({ threads: [threadWithMember] }),
+      threadMemberToggled({ threadId: "t1", entityId: "e1" }),
     );
-    expect(state.groups[0].entityIds).not.toContain("e1");
+    expect(state.threads[0].entityIds).not.toContain("e1");
+  });
+});
+
+describe("threadHorizonSet", () => {
+  it("sets the horizon of the thread named, and nothing else about it", () => {
+    const state = reduce(
+      makeState({ threads: [{ ...THREAD, entityIds: ["e1"] }] }),
+      threadHorizonSet({ threadId: "t1", horizon: "arc" }),
+    );
+    expect(state.threads[0]).toEqual({
+      ...THREAD,
+      entityIds: ["e1"],
+      horizon: "arc",
+    });
+  });
+
+  it("leaves the other threads where they were", () => {
+    const other: Thread = { ...THREAD, id: "t2", horizon: "point" };
+    const state = reduce(
+      makeState({ threads: [THREAD, other] }),
+      threadHorizonSet({ threadId: "t1", horizon: "arc" }),
+    );
+    expect(state.threads.map((t) => t.horizon)).toEqual(["arc", "point"]);
+  });
+
+  it("is a setter, not a cycle: the same payload twice lands the same value", () => {
+    // Idempotence is the guard, not a tap window (CLAUDE.md). The pane sends
+    // the horizon it means, so a second press of the same button cannot walk
+    // the value on to the next one.
+    const once = reduce(
+      makeState({ threads: [THREAD] }),
+      threadHorizonSet({ threadId: "t1", horizon: "point" }),
+    );
+    const twice = reduce(
+      once,
+      threadHorizonSet({ threadId: "t1", horizon: "point" }),
+    );
+    expect(twice.threads).toEqual(once.threads);
+  });
+
+  it("no-ops on an id no thread has", () => {
+    const state = reduce(
+      makeState({ threads: [THREAD] }),
+      threadHorizonSet({ threadId: "nope", horizon: "arc" }),
+    );
+    expect(state.threads).toEqual([THREAD]);
+  });
+});
+
+describe("threadStatusSet", () => {
+  it("marks a thread satisfied without touching the rest of it", () => {
+    const state = reduce(
+      makeState({ threads: [{ ...THREAD, entityIds: ["e1"] }] }),
+      threadStatusSet({ threadId: "t1", status: "satisfied" }),
+    );
+    expect(state.threads[0]).toEqual({
+      ...THREAD,
+      entityIds: ["e1"],
+      status: "satisfied",
+    });
+  });
+
+  it("reopens a satisfied thread", () => {
+    const satisfied: Thread = { ...THREAD, status: "satisfied" };
+    const state = reduce(
+      makeState({ threads: [satisfied] }),
+      threadStatusSet({ threadId: "t1", status: "open" }),
+    );
+    expect(state.threads[0].status).toBe("open");
+  });
+
+  it("is a setter, not a toggle: the same payload twice lands the same value", () => {
+    const once = reduce(
+      makeState({ threads: [THREAD] }),
+      threadStatusSet({ threadId: "t1", status: "satisfied" }),
+    );
+    const twice = reduce(
+      once,
+      threadStatusSet({ threadId: "t1", status: "satisfied" }),
+    );
+    expect(twice.threads[0].status).toBe("satisfied");
+    expect(twice.threads).toEqual(once.threads);
+  });
+
+  it("no-ops on an id no thread has", () => {
+    const state = reduce(
+      makeState({ threads: [THREAD] }),
+      threadStatusSet({ threadId: "nope", status: "satisfied" }),
+    );
+    expect(state.threads).toEqual([THREAD]);
+  });
+});
+
+describe("threadAnchorSet", () => {
+  it("records the paragraph the Engine last touched the thread at", () => {
+    const state = reduce(
+      makeState({ threads: [THREAD] }),
+      threadAnchorSet({ threadId: "t1", paragraph: 120 }),
+    );
+    expect(state.threads[0]).toEqual({ ...THREAD, anchorParagraph: 120 });
+  });
+
+  it("moves an anchor that was already set — a renewal, not a first write", () => {
+    const state = reduce(
+      makeState({ threads: [{ ...THREAD, anchorParagraph: 12 }] }),
+      threadAnchorSet({ threadId: "t1", paragraph: 120 }),
+    );
+    expect(state.threads[0].anchorParagraph).toBe(120);
+  });
+
+  it("no-ops on an id no thread has", () => {
+    const state = reduce(
+      makeState({ threads: [THREAD] }),
+      threadAnchorSet({ threadId: "nope", paragraph: 9 }),
+    );
+    expect(state.threads).toEqual([THREAD]);
   });
 });
 
@@ -122,19 +443,19 @@ describe("entityForged", () => {
 });
 
 describe("entityDeleted", () => {
-  it("removes the entity and cleans up group membership", () => {
-    const groupWithMember = { ...GROUP, entityIds: ["e1"] };
+  it("removes the entity and cleans up thread membership", () => {
+    const threadWithMember = { ...THREAD, entityIds: ["e1"] };
     const state = reduce(
       makeState({
         entitiesById: { e1: ENTITY },
         entityIds: ["e1"],
-        groups: [groupWithMember],
+        threads: [threadWithMember],
       }),
       entityDeleted({ entityId: "e1" }),
     );
     expect(state.entityIds).toHaveLength(0);
     expect(state.entitiesById["e1"]).toBeUndefined();
-    expect(state.groups[0].entityIds).toHaveLength(0);
+    expect(state.threads[0].entityIds).toHaveLength(0);
   });
 });
 

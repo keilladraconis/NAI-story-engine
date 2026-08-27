@@ -81,7 +81,7 @@ function makeThreadCtx(
   over: Partial<CompletionContext<ThreadSummaryTarget>> = {},
 ): CompletionContext<ThreadSummaryTarget> {
   return {
-    target: { type: "threadSummary", groupId: "g1" },
+    target: { type: "threadSummary", threadId: "g1" },
     getState: () => ({ ui: { activeEditId: "g1" } }),
     accumulatedText: "",
     generationSucceeded: true,

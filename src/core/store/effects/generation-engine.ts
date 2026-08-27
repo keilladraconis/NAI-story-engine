@@ -19,7 +19,6 @@ import {
 } from "../index";
 import { getHandler } from "./generation-handlers";
 import { recordEntry, JournalEntry } from "../../generation-journal";
-import { getModel } from "../../utils/config";
 import { stripThinkingTags } from "../../utils/tag-parser";
 import { messageUpdated } from "../slices/chat";
 import { clearStream } from "../stream-buffer";
@@ -33,7 +32,14 @@ import { continuationTaskId, isRequestOrContinuation } from "../request-ids";
  * Maps a strategy target to the { type, targetId } needed for requestQueued.
  * Used to register continuation tasks in the runtime so the UI can track them.
  */
-function targetToQueueEntry(target: GenerationStrategy["target"]): {
+/** A generation target as the runtime queue records it.
+ *
+ *  Exported for test: the switch below is only REACHED from the continuation
+ *  path, so a missing case stays invisible until some continuing strategy uses
+ *  that target. That is exactly what happened — the Forge gained `continuation`
+ *  and every pass then died on "Unhandled target type: forgeChat", after the
+ *  model had already been paid for. */
+export function targetToQueueEntry(target: GenerationStrategy["target"]): {
   type: GenerationRequest["type"];
   targetId: string;
 } {
@@ -55,14 +61,22 @@ function targetToQueueEntry(target: GenerationStrategy["target"]): {
     case "entitySummaryBind":
       return { type: "entitySummaryBind", targetId: target.entityId };
     case "threadSummary":
-      return { type: "threadSummary", targetId: target.groupId };
+      return { type: "threadSummary", targetId: target.threadId };
     case "bootstrap":
       return { type: "bootstrap", targetId: "bootstrap" };
-    case "bootstrapContinue":
-      return { type: "bootstrapContinue", targetId: String(target.iteration) };
+    case "forgeChat":
+      return { type: "forgeChat", targetId: target.messageId };
+    case "forgeCleanup":
+      return { type: "forgeCleanup", targetId: target.messageId };
   }
-  // Unreachable — satisfies noImplicitReturns for exhaustive switch
-  throw new Error(`Unhandled target type: ${(target as any).type}`);
+  // Exhaustiveness, checked by the compiler rather than asserted in a comment.
+  // The previous version threw here and called itself unreachable; it was not,
+  // and nothing failed until a forge pass hit it at runtime. Assigning to
+  // `never` makes the next unhandled target a build error instead.
+  const unhandled: never = target;
+  throw new Error(
+    `Unhandled target type: ${(unhandled as { type: string }).type}`,
+  );
 }
 
 /**
@@ -154,11 +168,9 @@ export function cacheLabel(target: GenerationStrategy["target"]) {
     case "entitySummaryBind":
       return `entity-summary-bind:${target.entityId.slice(0, 8)}`;
     case "threadSummary":
-      return `thread-summary:${target.groupId.slice(0, 8)}`;
+      return `thread-summary:${target.threadId.slice(0, 8)}`;
     case "bootstrap":
       return "bootstrap";
-    case "bootstrapContinue":
-      return `bootstrap-continue:${target.iteration}`;
     case "chat":
       return `chat:${target.messageId}`;
     case "chatRefine":
@@ -221,7 +233,7 @@ export function registerGenerationEngineEffects(
         if (result.params) Object.assign(apiParams, result.params);
         const uncached = await api.v1.script.countUncachedInputTokens(
           result.messages,
-          await getModel(),
+          apiParams.model,
         );
         pendingUncached = uncached;
         api.v1.log(
@@ -233,7 +245,7 @@ export function registerGenerationEngineEffects(
       resolvedMessages = messages;
       const uncached = await api.v1.script.countUncachedInputTokens(
         messages,
-        await getModel(),
+        apiParams.model,
       );
       pendingUncached = uncached;
       api.v1.log(`[cache] ${cacheLabel(target)}: ${uncached} uncached tokens`);

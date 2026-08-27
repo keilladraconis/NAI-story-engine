@@ -23,6 +23,17 @@ function tsxFiles(dir: string): string[] {
 }
 
 describe("text input events", () => {
+  // A filtered scan that asserts an empty result passes just as happily when
+  // there was nothing to filter. If every composer moved behind a wrapper
+  // component tomorrow, the guard below would stay green while covering
+  // nothing — so pin that the scan still finds text entry to check.
+  it("finds text-entry elements to check", () => {
+    const elements = tsxFiles(UI_DIR).filter((file) =>
+      /<(textarea|input)\b/s.test(readFileSync(file, "utf8")),
+    );
+    expect(elements.length).toBeGreaterThan(0);
+  });
+
   it("no text-entry element binds onChange (use onInput)", () => {
     const offenders = tsxFiles(UI_DIR).filter((file) =>
       /<(textarea|input)\b[^>]*\bonChange=/s.test(readFileSync(file, "utf8")),

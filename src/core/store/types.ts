@@ -34,8 +34,6 @@ export interface StoryField {
 
 export interface StoryState {
   fields: Record<string, StoryField>;
-  attgEnabled: boolean;
-  styleEnabled: boolean;
 }
 
 export interface LorebookUIState {
@@ -48,7 +46,10 @@ export interface UIState {
   inputs: Record<string, string>;
   lorebook: LorebookUIState;
   worldExpanded: boolean | null;
-  // The Import wizard is shown over the Story Engine tab. Store-driven so the
+  // null = the writer has not touched the Foundation toggle, so it follows the
+  // flow (collapsed until a brainstorm has content). Once set it is theirs.
+  foundationExpanded: boolean | null;
+  // The Import wizard is shown over the Setup tab. Store-driven so the
   // cold-start bootstrap can open it once on first run (foundation empty +
   // existing unmanaged content to pull in).
   importWizardOpen: boolean;
@@ -74,8 +75,7 @@ export interface GenerationRequest {
     | "entitySummary"
     | "entitySummaryBind"
     | "threadSummary"
-    | "bootstrap"
-    | "bootstrapContinue";
+    | "bootstrap";
   targetId: string;
   status: GenerationRequestStatus;
   prompt?: string;
@@ -110,9 +110,8 @@ export interface GenerationStrategy {
       }
     | { type: "entitySummary"; entityId: string }
     | { type: "entitySummaryBind"; entityId: string }
-    | { type: "threadSummary"; groupId: string }
-    | { type: "bootstrap" }
-    | { type: "bootstrapContinue"; iteration: number };
+    | { type: "threadSummary"; threadId: string }
+    | { type: "bootstrap" };
   prefillBehavior: "keep" | "trim";
   assistantPrefill?: string;
   continuation?: { maxCalls: number };
@@ -127,21 +126,74 @@ export interface RuntimeState {
   status: GenerationStatus;
   genx: GenerationState;
   budgetTimeRemaining: number;
-  /** Bumped whenever the user navigates document history (undo/redo/jump). UI
-   *  that derives from document content — e.g. the bootstrap stage button —
-   *  watches this to re-derive after an undo. */
-  historyEpoch: number;
 }
 
 // World Types (v13)
 
-export interface WorldGroup {
+/** How far out a thread's terminus sits. An attribute, not three categories:
+ *  arc, plot and unresolved point differ in scope and lifetime, not in kind —
+ *  all three are "something is open and wants closing". Splitting them would
+ *  mean three prompts, three sidebar sections and permanent arguments about
+ *  whether a hidden letter is a plot or a point. One attribute drives the
+ *  differences that genuinely exist: condition range, whether it gets a pacing
+ *  gate, and how eagerly triage proposes retiring it. */
+export type ThreadHorizon = "arc" | "plot" | "point";
+
+/** Satisfaction is a flag flip, not a deletion — the entry is disabled rather
+ *  than the model being told the plot is over. */
+/** Three readings, two behaviours.
+ *
+ *  `satisfied` and `abandoned` are identical to every mechanism — both disable
+ *  the entry (§4.4), both sort first for displacement (§4.5), both stop triage
+ *  proposing the thread, and neither can expire again. The distinction is for
+ *  the writer alone, and it is worth a member because the alternative was
+ *  telling them a commitment was *settled* when the story had walked away from
+ *  it: a check mark on a thread they never resolved, asserting something false
+ *  about their own story on the surface built to be scanned. */
+export type ThreadStatus = "open" | "satisfied" | "abandoned";
+
+export interface Thread {
   id: string;
   title: string; // display name — e.g. "Thieves' Guild Inner Circle"
-  summary: string; // narrative description — fed into [GROUPS] generation context
-  entityIds: string[];
-  lorebookEntryId?: string; // optional: group summary synced as a lorebook entry
+  /** The reminder prose injected when the thread's condition fires — not a
+   *  description of a grouping. Also fed into [GROUPS] generation context. */
+  text: string;
+  horizon: ThreadHorizon;
+  entityIds: string[]; // the cast the thread drags into context
+  lorebookEntryId?: string; // optional: thread text synced as a lorebook entry
+  status: ThreadStatus;
+  /** The paragraph the Engine last opened or renewed this thread at, or `null`
+   *  for one nobody has anchored (design §4.3, §4.5).
+   *
+   *  Two deferred features wanted the same missing field: the arc pacing gate
+   *  ("how long since this thread last fired") and expiry ("how long since the
+   *  story last touched it"). It is a paragraph INDEX rather than a timestamp
+   *  because both are specified in paragraphs, and because an index compares
+   *  against the branch's own paragraph count — so undo moves it correctly,
+   *  which no wall clock does.
+   *
+   *  **`null` is not zero, and the difference is a destructive verdict.** A
+   *  thread the writer creates by hand is never anchored: the dispatch is
+   *  synchronous and the count needs a document scan, and a defaulted 0 would
+   *  read as "abandoned since paragraph 0" — which is exactly the persisted lie
+   *  `isThreadExpired`'s comment refuses to reach a verdict on. `null` says
+   *  what is true, survives JSON where `undefined` would vanish from the record
+   *  entirely, and leaves the count untrustworthy in the one direction that
+   *  never destroys anything. */
+  anchorParagraph: number | null;
 }
+
+/** A thread as a callsite hands it to `threadCreated`. `horizon` and `status`
+ *  are the reducer's to default (see slices/world.ts), so no callsite — the
+ *  Forge's [THREAD] command, the World's "+ New Thread", the Engine's own
+ *  `open` — has to remember them, and none of them can disagree about what the
+ *  default is. The Engine is the only caller that passes `anchorParagraph`,
+ *  because it is the only one that knows the paragraph it is acting at. */
+export type ThreadDraft = Omit<
+  Thread,
+  "horizon" | "status" | "anchorParagraph"
+> &
+  Partial<Pick<Thread, "horizon" | "status" | "anchorParagraph">>;
 
 export type EntityLifecycle = "draft" | "live";
 
@@ -158,7 +210,7 @@ export interface WorldEntity {
 }
 
 export interface WorldState {
-  groups: WorldGroup[];
+  threads: Thread[];
   entitiesById: Record<string, WorldEntity>;
   entityIds: string[];
 }
@@ -201,4 +253,7 @@ export interface RootState {
   world: WorldState;
   foundation: FoundationState;
   forge: import("./slices/forge").ForgeSliceState;
+  /** The Engine loop's own state, mirrored from the pass machine so the HUD can
+   *  subscribe. Not persisted: a pass is a moment, not a fact about the story. */
+  engine: import("./slices/engine").EngineSliceState;
 }

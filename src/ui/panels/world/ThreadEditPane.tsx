@@ -1,28 +1,72 @@
-// ThreadEditPane — edit pane for a WorldGroup (Thread), counterpart to
-// EntityEditPane and SUI's SeThreadEditPane. Title + summary are local drafts
-// committed on Save (groupRenamed + groupSummaryUpdated); the summary has a
-// generate zap that streams into the draft via the shared stream-buffer.
-// Membership toggles dispatch entityGroupToggled immediately (not part of the
-// draft). No Delete (that lives on the ThreadItem card) and no lorebook toggle
-// (a later slice) — matching SUI scope.
+// ThreadEditPane — edit pane for a Thread, counterpart to EntityEditPane and
+// SUI's SeThreadEditPane. Title + text are local drafts committed on Save
+// (threadRenamed + threadTextUpdated); the text has a generate zap that
+// streams into the draft via the shared stream-buffer.
+// Membership toggles, the horizon picker and the status control dispatch
+// immediately (not part of the draft). No Delete (that lives on the ThreadItem
+// card) and no lorebook toggle (a later slice) — matching SUI scope.
+//
+// **Drafted vs immediate is a split with a reason.** Title and text are typed,
+// so they draft locally and commit on Save — a dispatch per keystroke is
+// reducer overhead for a value nobody has finished typing. The horizon, the
+// status and the membership toggles are presses: one press, one value, and the
+// same split EntityEditPane already makes for its category bar.
+//
+// **Every intent carries its value.** `threadHorizonSet` takes a horizon and
+// `threadStatusSet` takes a status — never "next" or "toggle" — so a press
+// delivered twice sets the same value twice. That is the idempotence CLAUDE.md
+// asks for in place of the tap debounce it forbids, and `disabled` would not
+// have covered it either (a render-time value the second press arrives ahead
+// of).
 
 import { useSlice, useStream } from "../../bridge";
 import { useDraftField } from "../../hooks";
 import { T, SP } from "../../style";
 import {
   store,
-  groupRenamed,
-  groupSummaryUpdated,
-  entityGroupToggled,
+  threadRenamed,
+  threadTextUpdated,
+  threadMemberToggled,
+  threadHorizonSet,
+  threadStatusSet,
   uiThreadSummaryGenerationRequested,
   uiEditableDeactivate,
 } from "../../../core/store";
+import type { ThreadHorizon } from "../../../core/store/types";
 import { isRequestActive } from "./world-select";
 import { clearStream } from "../../../core/store/stream-buffer";
 import { CATEGORIES } from "./EntityEditPane";
-import { ArrowLeft, Zap, ToggleLeft, ToggleRight } from "nai:icons/feather";
+import { ThreadStatusIcon } from "./ThreadStatusIcon";
+import {
+  HORIZON_OPTIONS,
+  horizonOption,
+  nextStatus,
+  statusOption,
+} from "./thread-display";
+import {
+  ArrowLeft,
+  Zap,
+  ToggleLeft,
+  ToggleRight,
+  Crosshair,
+  GitBranch,
+  TrendingUp,
+} from "nai:icons/feather";
 
 const ICON_SIZE = 16;
+
+// All feather icons share one component type; deriving from `Crosshair` keeps
+// the map values valid JSX elements, the way EntityCard's CATEGORY_ICON does.
+// A `Record` over the union so a fourth horizon cannot arrive without a glyph.
+//
+// Each icon renders at its own KEYED position inside the picker's map, which is
+// what makes a per-option component type legal here: the rule forbids a type
+// that changes at a FIXED position (see ThreadStatusIcon, where it does).
+const HORIZON_ICONS: Record<ThreadHorizon, typeof Crosshair> = {
+  point: Crosshair,
+  plot: GitBranch,
+  arc: TrendingUp,
+};
 
 const inputStyle = {
   background: T.bg2,
@@ -46,7 +90,7 @@ const genZapStyle = (pending: boolean) =>
 
 // One membership row.
 function MemberToggle(props: {
-  groupId: string;
+  threadId: string;
   entityId: string;
   name: string;
   isMember: boolean;
@@ -55,8 +99,8 @@ function MemberToggle(props: {
     <button
       onClick={() =>
         store.dispatch(
-          entityGroupToggled({
-            groupId: props.groupId,
+          threadMemberToggled({
+            threadId: props.threadId,
             entityId: props.entityId,
           }),
         )
@@ -77,26 +121,36 @@ function MemberToggle(props: {
         textAlign: "left",
       }}
     >
-      {props.isMember ? (
-        <ToggleRight size={ICON_SIZE} />
-      ) : (
-        <ToggleLeft size={ICON_SIZE} />
-      )}
+      {/* Both states mounted, `display` picks. This row re-renders from the
+          store — the dispatch below lands as a subscription update, not as the
+          click's own render — and swapping one component type for another at a
+          fixed position leaves both svgs in the DOM when the render is
+          detached. */}
+      <ToggleRight
+        size={ICON_SIZE}
+        style={{ display: props.isMember ? "inline-flex" : "none" }}
+      />
+      <ToggleLeft
+        size={ICON_SIZE}
+        style={{ display: props.isMember ? "none" : "inline-flex" }}
+      />
       <span style={{ flex: 1 }}>{props.name || "(unnamed)"}</span>
     </button>
   );
 }
 
-export function ThreadEditPane(props: { groupId: string }) {
-  const { groupId } = props;
-  const group = useSlice((s) => s.world.groups.find((g) => g.id === groupId));
+export function ThreadEditPane(props: { threadId: string }) {
+  const { threadId } = props;
+  const thread = useSlice((s) =>
+    s.world.threads.find((t) => t.id === threadId),
+  );
   const entitiesById = useSlice((s) => s.world.entitiesById);
 
-  const title = useDraftField(group?.title ?? "");
-  const summary = useDraftField(group?.summary ?? "");
+  const title = useDraftField(thread?.title ?? "");
+  const text = useDraftField(thread?.text ?? "");
 
-  const reqId = `se-thread-summary-${groupId}`;
-  const bufferKey = `thread-summary:${groupId}`;
+  const reqId = `se-thread-summary-${threadId}`;
+  const bufferKey = `thread-summary:${threadId}`;
   const pending = useSlice((s) => isRequestActive(s.runtime, reqId));
   const live = useStream(bufferKey);
   const genRef = useRef(false);
@@ -113,29 +167,27 @@ export function ThreadEditPane(props: { groupId: string }) {
   // handler cleared the buffer, so nothing stages).
   useEffect(() => {
     if (!genRef.current || pending) return;
-    if (live !== undefined) summary.setValue(live);
+    if (live !== undefined) text.setValue(live);
     clearStream(bufferKey);
     genRef.current = false;
   }, [pending, live]);
 
-  if (!group) return null;
+  if (!thread) return null;
 
   const onGenerate = () => {
     if (pending || genRef.current) return;
     genRef.current = true;
     clearStream(bufferKey);
     store.dispatch(
-      uiThreadSummaryGenerationRequested({ groupId, requestId: reqId }),
+      uiThreadSummaryGenerationRequested({ threadId, requestId: reqId }),
     );
   };
 
   const close = () => store.dispatch(uiEditableDeactivate());
 
   const onSave = () => {
-    store.dispatch(groupRenamed({ groupId, title: title.value.trim() }));
-    store.dispatch(
-      groupSummaryUpdated({ groupId, summary: summary.value.trim() }),
-    );
+    store.dispatch(threadRenamed({ threadId, title: title.value.trim() }));
+    store.dispatch(threadTextUpdated({ threadId, text: text.value.trim() }));
     close();
   };
 
@@ -181,6 +233,77 @@ export function ThreadEditPane(props: { groupId: string }) {
         style={inputStyle}
       />
 
+      {/* Horizon — the same shape of choice as EntityEditPane's category bar,
+          and deliberately the same idiom: a row of buttons over an exported
+          table, each keyed, the selected one lit. */}
+      <span style={sectionLabel}>Horizon</span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: SP.sm }}>
+        {HORIZON_OPTIONS.map((option) => {
+          const selected = option.id === thread.horizon;
+          const Icon = HORIZON_ICONS[option.id];
+          return (
+            <button
+              key={option.id}
+              title={option.help}
+              onClick={() =>
+                store.dispatch(
+                  threadHorizonSet({ threadId, horizon: option.id }),
+                )
+              }
+              style={{
+                border: "none",
+                cursor: "pointer",
+                padding: "4px 8px",
+                fontSize: "0.775rem",
+                borderRadius: "3px",
+                display: "flex",
+                alignItems: "center",
+                gap: SP.xs,
+                background: selected ? T.bg3 : "transparent",
+                color: selected ? T.textHeadings : T.textDisabled,
+                opacity: selected ? 1 : 0.5,
+              }}
+            >
+              <Icon size={ICON_SIZE} />
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      <span style={{ fontSize: "0.75em", color: T.textDisabled }}>
+        {horizonOption(thread.horizon).help}
+      </span>
+
+      {/* Status. A labelled section like the rest of the pane; inside it the
+          icon and the word change, and the button itself does not. */}
+      <span style={sectionLabel}>Status</span>
+      <button
+        title={statusOption(thread.status).action}
+        onClick={() =>
+          store.dispatch(
+            threadStatusSet({
+              threadId,
+              status: nextStatus(thread.status),
+            }),
+          )
+        }
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: SP.sm,
+          alignSelf: "flex-start",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: T.text,
+          fontFamily: T.fontDefault,
+          padding: 0,
+        }}
+      >
+        <ThreadStatusIcon status={thread.status} size={ICON_SIZE} />
+        {statusOption(thread.status).label}
+      </button>
+
       {/* Summary */}
       <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
         <span style={{ ...sectionLabel, flex: 1 }}>Summary</span>
@@ -195,9 +318,9 @@ export function ThreadEditPane(props: { groupId: string }) {
       </div>
       <textarea
         placeholder="What is this thread's dynamic?"
-        value={live ?? summary.value}
+        value={live ?? text.value}
         disabled={pending}
-        onInput={(e) => summary.setValue(e.target.value ?? "")}
+        onInput={(e) => text.setValue(e.target.value ?? "")}
         style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }}
       />
 
@@ -219,10 +342,10 @@ export function ThreadEditPane(props: { groupId: string }) {
             {members.map((e) => (
               <MemberToggle
                 key={e.id}
-                groupId={groupId}
+                threadId={threadId}
                 entityId={e.id}
                 name={e.name}
-                isMember={group.entityIds.includes(e.id)}
+                isMember={thread.entityIds.includes(e.id)}
               />
             ))}
           </div>

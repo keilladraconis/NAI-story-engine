@@ -1,20 +1,13 @@
 compatibilityVersion: naiscript-1.0
 id: e6c35faa-e4f2-4c3b-af4a-d56e4c992d87
 name: Story Engine
-version: 0.14.2
+version: 0.15.0
 createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories
 memoryLimit: 8
-updatedAt: 1786885623
+updatedAt: 1787340902
 config:
-  - name: xialong_mode
-    prettyName: Xialong Mode
-    description: >-
-      Use Xialong v1 for all generation. Requires an Opus subscription. When
-      disabled, all generation uses GLM 4.6.
-    type: boolean
-    default: false
   - name: sega_skip_lorebook_keys
     prettyName: Skip Lorebook Keys (SEGA)
     description: >-
@@ -51,6 +44,17 @@ config:
     default: false
   - name: story_engine_debug
     prettyName: Story Engine Debug
-    description: Enable debug logging for Story Engine
+    description: >-
+      Write Story Engine's own detail to the script log — one line per Engine
+      pass and one per intent it records. Leave off and the Engine says nothing;
+      the Engine HUD is the whole surface.
+    type: boolean
+    default: false
+  - name: store_action_log
+    prettyName: Log every store action
+    description: >-
+      Diagnostic firehose: one NAISTORE line for every action Story Engine
+      dispatches, which is many per keystroke. Drowns everything else in the
+      script log, so leave it off unless you are debugging state.
     type: boolean
     default: false

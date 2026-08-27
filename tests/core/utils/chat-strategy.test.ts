@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { buildChatStrategy } from "../../../src/core/utils/chat-strategy";
 import type { Chat } from "../../../src/core/chat-types/types";
 import type { RootState } from "../../../src/core/store/types";
 import { buildBrainstormPrompt } from "../../../src/core/utils/prompts";
 import { refineBudgetFor } from "../../../src/core/utils/refine-strategy";
+import { useCreativeModel } from "../../helpers/creative-model";
 
 describe("buildChatStrategy", () => {
   it("returns a strategy with chat target type for a saved chat", async () => {
@@ -28,6 +29,76 @@ describe("buildChatStrategy", () => {
     expect(strategy.requestId).toContain(chat.id);
     // Saved chats auto-continue when the model hits max_tokens.
     expect(strategy.continuation).toEqual({ maxCalls: 5 });
+  });
+
+  // A conversational reply is allowed to be short. The retry that
+  // `minResponseLength` drives exists to catch Xialong returning an empty
+  // `<think></think>` block and nothing else — it clears the visible message
+  // and re-rolls up to three times, so any floor it enforces is a floor on
+  // what the writer is allowed to receive. Set above a real co-writer turn it
+  // discards good replies and re-rolls them in front of the writer.
+  describe("the short-response floor in Xialong Mode", () => {
+    afterEach(() => {
+      vi.mocked(api.v1.config.get).mockReset();
+    });
+
+    function xialongOn(): void {
+      useCreativeModel("xialong-v1");
+    }
+
+    // Real replies a brainstorm partner gives, and their lengths.
+    const SHORT_REPLIES = [
+      "Say more about the sister.", // 26
+      "Which thread do you want first?", // 31
+      "Cut the prologue.", // 17
+    ];
+
+    it("accepts a co-writer turn that is only a sentence long", async () => {
+      xialongOn();
+      const chat: Chat = {
+        id: "c1",
+        type: "brainstorm",
+        title: "x",
+        subMode: "cowriter",
+        messages: [{ id: "u", role: "user", content: "hi" }],
+        seed: { kind: "blank" },
+      };
+      const getState = () =>
+        ({
+          chat: { chats: [chat], activeChatId: chat.id, refineChat: null },
+        }) as unknown as RootState;
+
+      const strategy = await buildChatStrategy(getState, chat, "asst");
+      const floor = strategy.minResponseLength ?? 0;
+
+      // The floor must sit under every one of these, or the writer watches a
+      // real answer appear and vanish.
+      expect(SHORT_REPLIES.length).toBeGreaterThan(0);
+      for (const reply of SHORT_REPLIES) {
+        expect(reply.length).toBeGreaterThanOrEqual(floor);
+      }
+    });
+
+    it("still re-rolls an empty response", async () => {
+      xialongOn();
+      const chat: Chat = {
+        id: "c1",
+        type: "brainstorm",
+        title: "x",
+        subMode: "cowriter",
+        messages: [{ id: "u", role: "user", content: "hi" }],
+        seed: { kind: "blank" },
+      };
+      const getState = () =>
+        ({
+          chat: { chats: [chat], activeChatId: chat.id, refineChat: null },
+        }) as unknown as RootState;
+
+      const strategy = await buildChatStrategy(getState, chat, "asst");
+
+      // An empty <think></think> strips to "", which must still fail the floor.
+      expect(strategy.minResponseLength).toBeGreaterThan(0);
+    });
   });
 
   it("returns a chatRefine target with refineContext applied for a refine chat", async () => {
@@ -86,7 +157,7 @@ describe("buildChatStrategy", () => {
       ({
         chat: { chats: [], activeChatId: null, refineChat: refine },
         foundation: {},
-        world: { entitiesById: {}, entityIds: [], groups: [] },
+        world: { entitiesById: {}, entityIds: [], threads: [] },
         brainstorm: { chats: [], currentChatIndex: 0 },
       }) as unknown as RootState;
     const budget = refineBudgetFor("lorebookContent");

@@ -40,11 +40,23 @@ Do not also enable the superpowers plugin in `.claude/settings.json` — the plu
 
 - `slices/story.ts` — Field contents and World Entry items (DULFS)
 - `slices/world.ts` — `WorldEntity` records, `WorldGroup` (Threads), forge loop flag
-- `slices/brainstorm.ts` — Chat messages
+- `slices/chat.ts` — Chat messages (brainstorm and forge sessions)
 - `slices/foundation.ts` — Shape, intent, ATTG, style fields
 - `slices/ui.ts` — Edit modes, lorebook selection state
 - `slices/runtime.ts` — Generation queue status, GenX state
-- Data persisted via `api.v1.storyStorage` under key `"kse-persist"`
+- **Persistence is split by what the data belongs to.** Branch-scoped state —
+  `world` and story fields — lives in `api.v1.historyStorage`, sharded one
+  record per entity/group/field behind an `index` record, so undo and redo move
+  the World with the story (`src/core/store/persistence/`). Story-scoped state
+  stays in `api.v1.storyStorage`: `chat` under `STORAGE_KEYS.CHAT`, because
+  brainstorms follow the writer rather than the branch, and `foundation` under
+  `STORAGE_KEYS.FOUNDATION`, because it is the story's premise rather than a
+  property of a point in it — and because its ATTG/Style mirror into Memory and
+  Author's Note, which undo does not move either. Branch-scoping the Foundation
+  meant undo reverted what the writer saw while Memory kept the newer text the
+  model actually read. Deleting a branch record means rewriting the index, never
+  `historyStorage.remove()` — a removal uncovers the ancestor node's copy and
+  resurrects it.
 
 **Config:** `src/config/field-definitions.ts` — `FIELD_CONFIGS` array defines all field metadata, layouts, and generation prompts. Uses `FieldID` enum and `DulfsFieldID` union type throughout.
 
@@ -81,7 +93,7 @@ Do not also enable the superpowers plugin in `.claude/settings.json` — the plu
 - World Entries use two-phase generation: Phase 1 generates a list of names, Phase 2 generates detailed content per item
 - S.E.G.A. (Story Engine Generate All) fills blank fields using round-robin queueing across categories
 - Lorebook sync (`src/core/store/effects/lorebook-sync.ts`) manages SE-category creation and DULFS item→lorebook binding. It does **not** sync entity summaries in either direction — summaries are SE-internal only.
-- **Information hierarchy for lorebook generation: DRAFT > LOREBOOK > STATE** for the fields that actually have all three layers (notably `displayName`): prefer in-pane draft values (storyStorage slots like `EDIT_PANE_TITLE`) first, then the lorebook API entry (so imported/user-edited lorebooks override whatever Redux thinks), and only then fall back to Redux world state. **Category is a deliberate exception** — it's an SE-side classification, so managed entities resolve through `entity.categoryId` and only unmanaged entries fall back to `entry.category`. `resolveDisplayName` / `resolveCategoryName` in `src/core/utils/lorebook-strategy.ts` are the canonical implementations.
+- **Information hierarchy for lorebook generation: DRAFT > LOREBOOK > STATE** for the fields that actually have all three layers (notably `displayName`): prefer in-pane draft values (storyStorage slots like `EDIT_PANE_TITLE`) first, then the lorebook API entry (so imported/user-edited lorebooks override whatever Redux thinks), and only then fall back to Redux world state. **Category is a deliberate exception** — it's an SE-side classification, so managed entities resolve through `entity.categoryId` and only unmanaged entries fall back to `entry.category`. `resolveDisplayName` / `resolveCategoryName` in `src/core/utils/lorebook-strategy.ts` are the canonical implementations. **The DRAFT layer belongs to an attended caller only.** `EDIT_PANE_TITLE` is mirrored on every keystroke, so it is the name the writer is part-way through typing — right for a button they just pressed and are watching, wrong for anything writing on its own, where a half-typed name becomes an entry's header or a thread probe the prose can never match. `resolveDisplayName` therefore takes a required `NameAudience` (`"attended"` / `"unattended"`); the Engine passes `"unattended"` and starts at LOREBOOK.
 
 ## Coding Guidelines
 

@@ -1,0 +1,101 @@
+/*---
+compatibilityVersion: naiscript-1.0
+id: fe28e9a5-58ad-40bb-8e1b-219bc1ad343e
+name: Budget Probe
+version: 0.2.0
+description: What does a refused concurrent generation cost from the script output budget?
+memoryLimit: 8
+---*/
+
+// A: one generation, max_tokens far above what the prompt can return.
+//      delta ~= returned        -> budget debited on delivery
+//      delta ~= MAX             -> debited on request
+// B: two generations at once, one should be refused.
+//      delta ~= returned        -> refusal is free
+//      delta ~= returned + MAX  -> refusal charged its max_tokens
+
+const MAX = 512;
+const PROMPT = [{ role: "user", content: "Count to ten in words." }];
+const PARAMS = { model: "glm-4-6", max_tokens: MAX };
+
+const allowedOutput = () => api.v1.script.getAllowedOutput();
+
+const tokensReturned = (response) =>
+  response.choices.reduce((total, choice) => total + choice.token_ids.length, 0);
+
+function describeError(error) {
+  const fields = Object.getOwnPropertyNames(Object(error))
+    .filter((key) => key !== "stack")
+    .map((key) => `${key}=${error[key]}`);
+  return fields.length ? fields.join(" | ") : String(error);
+}
+
+let report = "";
+
+function log(line) {
+  report += line + "\n";
+  api.v1.log(line);
+  void api.v1.ui.updateParts([{ id: "report", text: report }]);
+}
+
+async function singleGeneration() {
+  const before = allowedOutput();
+  const response = await api.v1.generate(PROMPT, PARAMS);
+  const after = allowedOutput();
+
+  log(`A  requested=${MAX} returned=${tokensReturned(response)}`);
+  log(`   budget ${before} -> ${after}   delta=${before - after}`);
+}
+
+async function concurrentGenerations() {
+  const before = allowedOutput();
+  const results = await Promise.allSettled([
+    api.v1.generate(PROMPT, PARAMS),
+    api.v1.generate(PROMPT, PARAMS),
+  ]);
+  const after = allowedOutput();
+
+  const succeeded = results.filter((result) => result.status === "fulfilled");
+  const refused = results.length - succeeded.length;
+  const returned = succeeded.reduce(
+    (total, result) => total + tokensReturned(result.value),
+    0,
+  );
+
+  log(`B  succeeded=${succeeded.length} refused=${refused} returned=${returned}`);
+  log(`   budget ${before} -> ${after}   delta=${before - after}`);
+  log(`   free ~${returned}   charged ~${returned + refused * MAX}`);
+
+  results
+    .filter((result) => result.status === "rejected")
+    .forEach((result) => log(`   error: ${describeError(result.reason)}`));
+}
+
+async function run() {
+  await singleGeneration();
+  await concurrentGenerations();
+  log("");
+}
+
+api.v1.ui.register([
+  api.v1.ui.extension.scriptPanel({
+    name: "Budget Probe",
+    content: [
+      api.v1.ui.part.column({
+        content: [
+          api.v1.ui.part.button({
+            text: "Run",
+            callback: () => void run(),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.text({
+            id: "report",
+            text: "Budget refills as you interact — run twice and compare.",
+            noTemplate: true,
+            style: { whiteSpace: "pre-wrap", userSelect: "text" },
+          }),
+        ],
+      }),
+    ],
+  }),
+]);

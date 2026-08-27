@@ -16,7 +16,7 @@ function makeState(entityName: string, activeEditId: string | null): RootState {
           lifecycle: "live",
         },
       },
-      groups: [],
+      threads: [],
     },
     foundation: { shape: null, intent: "", worldState: "" },
     ui: { activeEditId },

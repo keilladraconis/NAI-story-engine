@@ -68,31 +68,76 @@ async function resolveCategoryName(
 }
 
 /**
- * Resolve the display name for a lorebook entry. Prefers the unsaved draft
- * in the edit pane (storyStorage EDIT_PANE_TITLE) when this entry is the one
- * currently open, so generation reflects what the user typed even before
- * they click Save. Falls back to the persisted names.
+ * What `resolveDisplayName` answers when every layer is blank.
+ *
+ * Exported because it is a placeholder rather than a name, and one caller has
+ * to be able to tell the two apart: a thread's forgetting detector probes the
+ * prose for its members' names, and probing for "Unnamed Entry" watches for a
+ * string no story contains — the negation is then always true and the thread
+ * reminds forever (`resolveThreadMembers` in `core/engine/thread-bind.ts`).
  */
-async function resolveDisplayName(
+export const UNNAMED_ENTRY = "Unnamed Entry";
+
+/**
+ * Whether a person is looking at the result of this generation.
+ *
+ * The distinction exists because of the DRAFT layer and nothing else.
+ * `EDIT_PANE_TITLE` is mirrored on **every keystroke**, so it is not "the name
+ * the writer chose" — it is the name they are part-way through typing. That is
+ * exactly right for a button they just pressed and are watching, and exactly
+ * wrong for the Engine, which writes unattended: a pass landing on `Adal`
+ * makes it the entry's header, or builds a thread's forgetting detector out of
+ * a key the prose will never contain — and a detector that never matches
+ * reminds forever, which is the failure `resolveThreadMembers` already guards
+ * against from the other side.
+ *
+ * Required rather than defaulted. The Engine inherited this layer unexamined
+ * because it was the default and there was no question to answer; a caller
+ * that has to say which it is has to notice.
+ */
+export type NameAudience =
+  /** A control the writer pressed and is watching — honour the pane draft. */
+  | "attended"
+  /** The Engine, or anything else writing on its own — committed layers only. */
+  | "unattended";
+
+/**
+ * Resolve the display name for a lorebook entry, DRAFT > LOREBOOK > STATE.
+ *
+ * For an `attended` caller, prefers the unsaved draft in the edit pane
+ * (storyStorage EDIT_PANE_TITLE) when this entry is the one currently open, so
+ * generation reflects what the user typed even before they click Save. An
+ * `unattended` caller skips that layer and starts at LOREBOOK — see
+ * `NameAudience`. Everything below DRAFT is the same for both: the lorebook
+ * entry outranks Redux, because Story Engine does not chase a rename the
+ * writer made in their own lorebook and `entity.name` is the layer CLAUDE.md
+ * allows to be stale.
+ *
+ * Exported for the Engine's thread binding, which must resolve a member's name
+ * through this order rather than reading `entity.name` directly.
+ */
+export async function resolveDisplayName(
   state: RootState,
   entryId: string,
   entryDisplayName: string | undefined,
+  audience: NameAudience,
 ): Promise<string> {
   const entity = findEntityForEntry(state, entryId);
   const isCurrentlySelected = state.ui.lorebook.selectedEntryId === entryId;
-  const liveName = isCurrentlySelected
-    ? String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "").trim()
-    : "";
-  return liveName || entryDisplayName || entity?.name || "Unnamed Entry";
+  const liveName =
+    audience === "attended" && isCurrentlySelected
+      ? String((await api.v1.storyStorage.get(EDIT_PANE_TITLE)) || "").trim()
+      : "";
+  return liveName || entryDisplayName || entity?.name || UNNAMED_ENTRY;
 }
 
-/** Format the Threads (groups) an entity belongs to as context text. */
-function formatEntityGroups(state: RootState, entityId: string): string {
-  const groups = state.world.groups.filter((g) =>
-    g.entityIds.includes(entityId),
+/** Format the Threads an entity belongs to as context text. */
+function formatEntityThreads(state: RootState, entityId: string): string {
+  const threads = state.world.threads.filter((t) =>
+    t.entityIds.includes(entityId),
   );
-  if (groups.length === 0) return "";
-  return groups.map((g) => `- ${g.title}: ${g.summary}`).join("\n");
+  if (threads.length === 0) return "";
+  return threads.map((t) => `- ${t.title}: ${t.text}`).join("\n");
 }
 
 // --- Factory Builders for JIT Strategy Building ---
@@ -107,7 +152,7 @@ function formatEntityGroups(state: RootState, entityId: string): string {
  * Volatile tail structure (after `buildStoryEnginePrefix`):
  *   - Archivist instructions (LOREBOOK_GENERATE_PROMPT, name-personalized)
  *   - Category template (conditional)
- *   - Thread groups for this entity (conditional)
+ *   - Thread threads for this entity (conditional)
  *   - User entity summary (immediate context before prefill)
  *   - Xialong style block (Xialong mode only)
  *   - Assistant Name / Type / Setting prefill
@@ -138,10 +183,12 @@ export const createLorebookContentFactory = (
     // Pull name and summary from live input fields only when this entry is
     // currently open in the edit pane — avoids contaminating SEGA batch
     // generation with stale data from whatever entity was last edited.
+    // A button the writer pressed, and is watching stream in.
     const displayName = await resolveDisplayName(
       state,
       entryId,
       entry.displayName,
+      "attended",
     );
     const isCurrentlySelected = state.ui.lorebook.selectedEntryId === entryId;
     const liveSummary = isCurrentlySelected
@@ -166,9 +213,9 @@ export const createLorebookContentFactory = (
       messages.push({ role: "system", content: `TEMPLATE:\n${template}` });
     }
 
-    const groupContext = entity ? formatEntityGroups(state, entity.id) : "";
-    if (groupContext) {
-      messages.push({ role: "system", content: `[GROUPS]\n${groupContext}` });
+    const threadContext = entity ? formatEntityThreads(state, entity.id) : "";
+    if (threadContext) {
+      messages.push({ role: "system", content: `[GROUPS]\n${threadContext}` });
     }
 
     messages.push({
@@ -217,13 +264,13 @@ export const createLorebookKeysFactory = (
 
     const prefix = await buildStoryEnginePrefix(getState);
 
-    // Thread (group) context for this entry
+    // Thread (thread) context for this entry
     const state = getState();
     const entity = findEntityForEntry(state, entryId);
-    const groupContext = entity ? formatEntityGroups(state, entity.id) : "";
+    const threadContext = entity ? formatEntityThreads(state, entity.id) : "";
 
-    const contextContent = groupContext
-      ? `${entryText}\n\n${groupContext}`
+    const contextContent = threadContext
+      ? `${entryText}\n\n${threadContext}`
       : entryText;
 
     const messages: Message[] = [
@@ -238,17 +285,24 @@ export const createLorebookKeysFactory = (
       },
     ];
 
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.lorebookKeys);
+    await appendXialongStyleMessage(
+      messages,
+      XIALONG_STYLE.lorebookKeys,
+      "instruct",
+    );
     messages.push({ role: "assistant", content: `REJECTED:\n` });
 
     return {
       messages,
-      params: await buildModelParams({
-        max_tokens: 256,
-        temperature: 0.8,
-        min_p: 0.1,
-        stop: ["\n---", "---", "\n***", "\n⁂", "[ Style", "</think>"],
-      }),
+      params: await buildModelParams(
+        {
+          max_tokens: 256,
+          temperature: 0.8,
+          min_p: 0.1,
+          stop: ["\n---", "---", "\n***", "\n⁂", "[ Style", "</think>"],
+        },
+        "instruct",
+      ),
       contextPinning: { head: 1, tail: 3 },
     };
   };
@@ -273,7 +327,7 @@ export const buildLorebookKeysPayload = async (
   return {
     requestId,
     messageFactory: createLorebookKeysFactory(getState, entryId),
-    params: await buildModelParams({ max_tokens: 256 }),
+    params: await buildModelParams({ max_tokens: 256 }, "instruct"),
     target: { type: "lorebookKeys", entryId },
     prefillBehavior: "keep",
     assistantPrefill: `REJECTED:\n`,
@@ -289,17 +343,39 @@ export const buildLorebookPrefill = async (
   entryId: string,
 ): Promise<string> => {
   const entry = await api.v1.lorebook.entry(entryId);
-  if (!entry) return "";
+  // The hand-driven generation handlers are this function's only callers, so
+  // the audience is fixed here rather than passed through. The Engine reads
+  // `buildLorebookPrefillFromEntry` directly, having already been handed the
+  // entry by the write door.
+  return entry
+    ? buildLorebookPrefillFromEntry(getState, entry, "attended")
+    : "";
+};
 
+/**
+ * The same prefill, from an entry the caller has ALREADY read.
+ *
+ * The Engine's revise (design §5) is handed the live entry by the write door
+ * and may not fetch it again — read-then-write is the door's property, and a
+ * second read is a second answer to "what does this entry say". Splitting the
+ * fetch off keeps one implementation of the Name/Type/Setting header rather
+ * than a copy that drifts.
+ */
+export const buildLorebookPrefillFromEntry = async (
+  getState: () => RootState,
+  entry: LorebookEntry,
+  audience: NameAudience,
+): Promise<string> => {
   const state = getState();
   const displayName = await resolveDisplayName(
     state,
-    entryId,
+    entry.id,
     entry.displayName,
+    audience,
   );
   const categoryName = await resolveCategoryName(
     state,
-    entryId,
+    entry.id,
     entry.category,
   );
   const entryType = getEntryType(categoryName);

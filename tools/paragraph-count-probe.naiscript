@@ -1,0 +1,498 @@
+/*---
+compatibilityVersion: naiscript-1.0
+id: 3a7c1f95-6b28-4d03-9e14-c5f8a2b70d61
+name: Paragraph Count Probe
+version: 0.7.0
+description: Does NovelAI's paragraphCount condition variable count what document.scan() counts?
+memoryLimit: 8
+---*/
+
+// Story Engine's thread anchor is a paragraph INDEX, and both things that read it
+// compare it against NovelAI's own `paragraphCount`:
+//
+//   * the pacing gate baked into every thread entry's advancedConditions —
+//     `paragraphCount >= anchor + grace`
+//   * expiry, which measures `Assessment.paragraphCount - thread.anchorParagraph`
+//
+// `Assessment.paragraphCount` is `api.v1.document.scan().length`. Nothing has ever
+// checked that NovelAI counts the same way. If its `paragraphCount` is smaller —
+// context-scoped, say, or skipping blanks — every gate reads as not-yet-reached and
+// the threads go SILENT, which §4.3 says never to accept. (A gate that is always
+// TRUE only degrades to the old always-on, which is survivable.)
+//
+// No generation, no output budget. `buildContext()` runs the real context builder
+// and RETURNS the messages, so an active entry's text is simply in them.
+//
+// v0.2 read the `active` flag out of an `onContextBuilt` hook instead, and the hook
+// never fired — `buildContext` documents `suppressScriptHooks: 'self' | 'all'`,
+// which only means anything if it normally runs those hooks, so either the typings
+// and the runtime disagree here or a dry-run build skips them. Either way the hook
+// was a dependency this probe never needed: the returned messages are the same
+// answer, read one layer lower, with nothing to fire or miss.
+//
+// METHOD. **One** probe entry, gated on `paragraphCount >= k` in the same
+// single-term shape `paceGate` emits in production. Binary search k by rewriting
+// that one entry's target and rebuilding the context — about eight rounds for any
+// realistic story. v0.1 minted one entry per candidate instead, which meant a
+// hundred-odd `createEntry` round trips into the writer's own lorebook before a
+// single answer came back. One entry is lighter, faster, and leaves far less behind
+// if the run is interrupted.
+//
+// Run:
+//   1. Open a story with some prose in it (20+ paragraphs is a better test than 3).
+//   2. Probe    — searches and reports.
+//   3. Clean up — removes the entry and its category.
+
+const CATEGORY = "PROBE: paragraphCount";
+const LEDGER = "paragraph-count-probe";
+
+// `createEntry` and `createCategory` are gated on this. v0.1 omitted the request
+// and every run died inside `ensureCategory` with the report frozen two lines in.
+api.v1.permissions.request(["lorebookEdit"]);
+
+let report = "";
+
+function log(line) {
+  report += line + "\n";
+  api.v1.log(line);
+  void api.v1.ui.updateParts([{ id: "report", text: report }]);
+}
+
+// A string the story could not contain by accident. Its presence in the built
+// context IS the activation signal.
+const SENTINEL = "PARAGRAPH-COUNT-PROBE-3a7c1f95";
+
+function gate(variable, k) {
+  return [
+    {
+      type: "equation",
+      terms: [{ value: variable }],
+      comparison: ">=",
+      target: k,
+    },
+  ];
+}
+
+/** Is `paragraphCount >= k`? Rewrites the probe's gate, rebuilds, and looks for
+ *  the sentinel in the result. An entry whose condition fails is not inserted, so
+ *  the sentinel's presence and the gate's truth are the same fact.
+ *
+ *  `forGeneration: true` because that is the build the writer actually gets, and
+ *  the doc warns it can change behaviour — measuring the other one would answer a
+ *  question nobody asked. */
+/** Does the entry reach context under this exact shape? */
+async function reaches(entryId, patch) {
+  await api.v1.lorebook.updateEntry(entryId, patch);
+  const messages = await api.v1.buildContext({ forGeneration: true });
+  if (!messages || messages.length === 0) {
+    throw new Error("buildContext returned nothing");
+  }
+  return messages.some((m) => (m.content || "").includes(SENTINEL));
+}
+
+async function holdsAt(entryId, variable, k) {
+  await api.v1.lorebook.updateEntry(entryId, {
+    advancedConditions: gate(variable, k),
+  });
+  const messages = await api.v1.buildContext({ forGeneration: true });
+  if (!messages || messages.length === 0) {
+    throw new Error("buildContext returned nothing");
+  }
+  return messages.some((m) => (m.content || "").includes(SENTINEL));
+}
+
+async function ensureCategory() {
+  const categories = await api.v1.lorebook.categories();
+  const found = categories.find((c) => c.name === CATEGORY);
+  if (found) return found.id;
+  return await api.v1.lorebook.createCategory({
+    id: api.v1.uuid(),
+    name: CATEGORY,
+    enabled: true,
+  });
+}
+
+async function run() {
+  report = "";
+
+  const sections = await api.v1.document.scan();
+  const scanTotal = sections.length;
+  const scanNonEmpty = sections.filter(
+    (s) => (s.section.text || "").trim().length > 0,
+  ).length;
+  const scanChars = sections.reduce(
+    (n, s) => n + (s.section.text || "").length,
+    0,
+  );
+
+  log(`document.scan(): ${scanTotal} sections, ${scanNonEmpty} with prose`);
+  log(`                ${scanChars} characters total`);
+
+  if (scanTotal === 0) {
+    log("");
+    log("Nothing written. Open a story with prose in it and run again.");
+    return;
+  }
+
+  const categoryId = await ensureCategory();
+  const entryId = await api.v1.lorebook.createEntry({
+    id: api.v1.uuid(),
+    displayName: "paragraphCount probe",
+    text: SENTINEL,
+    keys: [],
+    enabled: true,
+    forceActivation: false,
+    category: categoryId,
+    advancedConditions: gate("paragraphCount", 1),
+  });
+  await api.v1.storyStorage.set(LEDGER, { entryId });
+
+  // Prove the sentinel channel works before trusting a negative from it. An
+  // always-true gate must be visible; if it is not, every later "no" would be a
+  // false negative and the search would report 0 with total confidence.
+  await api.v1.lorebook.updateEntry(entryId, {
+    advancedConditions: [{ type: "true" }],
+  });
+  const visible = (await api.v1.buildContext({ forGeneration: true })).some(
+    (m) => (m.content || "").includes(SENTINEL),
+  );
+  if (!visible) {
+    log("");
+    log("An unconditional probe entry did NOT reach the built context.");
+    log("Something upstream of the gate is dropping it — a token limit, or");
+    log("lorebook entries not being included in this build. The search would");
+    log("read every gate as false, so it is not run. Press Clean up.");
+    return;
+  }
+  log("");
+  log("sentinel visible with an always-true gate — the channel works");
+
+  // ── what a section actually is ────────────────────────────────────────────
+  //
+  // The anchor is an index into `document.scan()`, and the design has been
+  // calling those "paragraphs" on the strength of the `.d.ts` glossing
+  // `sectionId` as "the section (paragraph) ID". Elsewhere the same file
+  // describes sections as the unit history steps are keyed by, which is a
+  // different claim. A section holding more than one paragraph would contain a
+  // newline, so this settles it with data rather than with a doc phrase.
+
+  const multiline = sections.filter((sec) =>
+    (sec.section.text || "").trim().includes("\n"),
+  ).length;
+  log("");
+  log(`sections containing a newline: ${multiline} of ${scanTotal}`);
+  log(`mean section length: ${(scanChars / scanTotal).toFixed(0)} chars`);
+  if (multiline > 0) {
+    log("So a section is NOT a paragraph — it can hold several. An anchor");
+    log("counted in sections is not counted in the unit paragraphCount uses.");
+  } else {
+    log("No section holds more than one paragraph in this story.");
+  }
+
+  // ── does forceActivation override the condition? ──────────────────────────
+  //
+  // This is the question the v0.4 control could not separate from "the equation
+  // is broken", because the probe entry was Always On the whole time —
+  // `forceActivation` is documented as "the entry should always be considered
+  // active". If it bypasses conditions, then the entry Story Engine creates for
+  // every thread (thread-bind.ts: forceActivation TRUE plus a condition) is
+  // simply always on, and the forgetting detector phase 5 built does nothing.
+
+  const IMPOSSIBLE = [
+    { type: "equation", terms: [{ value: "characterCount" }], comparison: ">=", target: 1000000 },
+  ];
+
+  log("");
+  log("does Always On override the condition?");
+  const onImpossible = await reaches(entryId, {
+    forceActivation: true,
+    keys: [],
+    advancedConditions: IMPOSSIBLE,
+  });
+  const offImpossible = await reaches(entryId, {
+    forceActivation: false,
+    keys: [],
+    advancedConditions: IMPOSSIBLE,
+  });
+  const offTrue = await reaches(entryId, {
+    forceActivation: false,
+    keys: [],
+    advancedConditions: [{ type: "true" }],
+  });
+  log(`  Always On + impossible condition   ${onImpossible ? "ACTIVE" : "inactive"}`);
+  log(`  not On    + impossible condition   ${offImpossible ? "ACTIVE" : "inactive"}`);
+  log(`  not On    + always-true condition  ${offTrue ? "ACTIVE" : "inactive"}`);
+  log("");
+
+  if (onImpossible && !offImpossible && offTrue) {
+    log("ANSWER: Always On OVERRIDES the condition, and a condition activates");
+    log("an entry perfectly well on its own. This is what phases 5 and 6 got");
+    log("wrong — they shipped forceActivation TRUE beside the detector, so it");
+    log("never fired once. Fixed: createThreadEntry now sets it false with no");
+    log("keys, and the condition does the activating. Carrying on.");
+  } else if (onImpossible && offImpossible) {
+    log("ANSWER: the condition is ignored either way — an impossible gate still");
+    log("reaches context with Always On OFF. Conditions are not being evaluated");
+    log("at all here. Nothing built on advancedConditions can work; read the");
+    log("script log and check the condition shape against the .d.ts.");
+    return;
+  } else if (!offTrue) {
+    log("ANSWER: an always-true condition with Always On off does NOT activate,");
+    log("so a condition cannot activate an entry by itself — it can only filter");
+    log("one that some other mechanism already selected. That is phase 5's");
+    log("dead end arriving for real: keys cannot select it (the detector negates");
+    log("them) and Always On overrides it. The detector needs a new design.");
+    return;
+  } else {
+    log("ANSWER: Always On does not override the condition. Carrying on.");
+  }
+
+  // ── the control ──────────────────────────────────────────────────────────
+  //
+  // v0.3 reported 511 and called it a measurement. It was not: the climb loop
+  // exited at hi = 512 whether the gate FAILED there or the runaway break
+  // tripped, with no way to tell those apart, and the search then treated 512 as
+  // a known-failing bound and converged on 511. 2^9 − 1 is the signature of a
+  // gate that held at every k it was asked.
+  //
+  // So before measuring anything, establish that the equation discriminates at
+  // all — against `characterCount`, whose true value `document.scan()` already
+  // gave us. A gate that cannot answer a question we know the answer to cannot
+  // be trusted with one we do not.
+
+  const ABSURD = 1000000;
+
+  log("");
+  log("control: characterCount, whose answer we already know");
+  await api.v1.lorebook.updateEntry(entryId, { forceActivation: false });
+  const charLow = await holdsAt(entryId, "characterCount", 1);
+  const charAt = await holdsAt(entryId, "characterCount", scanChars);
+  const charOver = await holdsAt(entryId, "characterCount", ABSURD);
+  log(`  >= 1          ${charLow ? "active" : "inactive"}   (expect active)`);
+  log(`  >= ${scanChars}      ${charAt ? "active" : "inactive"}   (expect active)`);
+  log(`  >= ${ABSURD}    ${charOver ? "active" : "inactive"}   (expect INACTIVE)`);
+
+  if (charOver || !charLow) {
+    log("");
+    log("CONTROL FAILED — the equation condition does not discriminate.");
+    if (charOver) {
+      log(`A gate demanding ${ABSURD} characters fired on a ${scanChars}-character`);
+      log("story, so it is TRUE regardless of its target. That means the pacing");
+      log("gate phase 6 bakes into every thread entry gates nothing at all:");
+      log("`paragraphCount >= anchor + grace` is simply always satisfied.");
+      log("");
+      log("Not a disaster — an always-true gate ANDed with the detector leaves");
+      log("the detector doing the work, which is what phase 5 shipped. But the");
+      log("grace window does not exist, and §14.3 must stop claiming it does.");
+    } else {
+      log("A gate demanding 1 character did NOT fire, so the condition is");
+      log("always FALSE and every thread entry is silent — the failure §4.3");
+      log("refuses. Threads would never remind at all.");
+    }
+    log("");
+    log("Either way, paragraphCount cannot be measured this way. Press Clean up.");
+    return;
+  }
+
+  log("  control passed — the equation discriminates");
+
+  // ── the measurement ──────────────────────────────────────────────────────
+
+  log("");
+  log("searching paragraphCount…");
+
+  // Climb until the gate genuinely fails, and say so when it never does rather
+  // than letting a ceiling masquerade as an answer.
+  const CEILING = ABSURD;
+  let hi = 1;
+  let failed = false;
+  while (hi <= CEILING) {
+    if (!(await holdsAt(entryId, "paragraphCount", hi))) {
+      failed = true;
+      break;
+    }
+    hi *= 2;
+  }
+  if (!failed) {
+    log("");
+    log(`paragraphCount >= ${CEILING} is still active, yet characterCount`);
+    log("discriminated correctly. The two variables do not behave alike —");
+    log("read the script log and treat paragraphCount as unusable for now.");
+    return;
+  }
+
+  let lo = Math.floor(hi / 2);
+  while (lo + 1 < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (await holdsAt(entryId, "paragraphCount", mid)) lo = mid;
+    else hi = mid;
+  }
+  const count = (await holdsAt(entryId, "paragraphCount", 1)) ? lo : 0;
+
+  log("");
+  log(`NovelAI paragraphCount = ${count}`);
+  log(`document.scan() total  = ${scanTotal}`);
+  log(`document.scan() prose  = ${scanNonEmpty}`);
+  log(`characters             = ${scanChars}`);
+  log("");
+
+  if (count === scanTotal) {
+    log("VERDICT: AGREES with document.scan().length.");
+    log("Assessment.paragraphCount is the right unit. Nothing to change.");
+  } else if (count === scanNonEmpty) {
+    log("VERDICT: counts only paragraphs with prose in them.");
+    log("Assessment.paragraphCount counts every section, so it runs AHEAD.");
+    log("An anchor would sit in the future and its gate would never open —");
+    log("threads go silent. assess.ts must count non-empty sections instead.");
+  } else if (count < scanTotal) {
+    log(`VERDICT: DISAGREES — NovelAI counts ${scanTotal - count} fewer.`);
+    log("Likely context-scoped rather than document-scoped. Our anchor would sit");
+    log("in the future and gated threads would never fire. This is the failure");
+    log("direction §4.3 refuses; the anchor needs to be in NovelAI's unit.");
+  } else {
+    log(`VERDICT: DISAGREES — NovelAI counts ${count - scanTotal} MORE.`);
+    log(`That is ${(scanChars / count).toFixed(1)} characters per unit — compare`);
+    log("~400 for a paragraph. If it is far below that, the variable is counting");
+    log("something smaller than a paragraph (lines? sentences?) and the anchor");
+    log("must be recorded in THAT unit, not in sections.");
+  }
+
+  // ── the forgetting detector itself ───────────────────────────────────────
+  //
+  // Everything above is about the pacing gate. This is the mechanism the whole
+  // design rests on: `not( key <subject> in ['story'] within range N )`, which
+  // must be SILENT while the subject is on the page and ACTIVE once it is gone.
+  // Nothing had ever exercised it against the real matcher — the unit tests
+  // assert the shape we emit, which is a different claim entirely.
+
+  log("");
+  log("the forgetting detector, against the real matcher:");
+
+  // `range` is "how far back to search in characters" (the .d.ts is explicit),
+  // so the test word must come from the END of the prose. v0.6 took the middle
+  // of the word list — roughly 6700 characters back in this story — and asked a
+  // 4000-character range to find it. It reported the detector broken when the
+  // subject was simply out of range, which is the probe being wrong about the
+  // product for the third time. Take the last long word, and measure at the
+  // production range AND at one large enough to cover the whole document, so
+  // "out of range" and "not matching at all" cannot be confused.
+  const words = sections
+    .map((sec) => (sec.section.text || "").match(/[A-Za-z]{6,}/g) || [])
+    .reduce((a, b) => a.concat(b), []);
+  if (words.length === 0) {
+    log("  no word of 6+ letters in the prose — skipping");
+  } else {
+    const present = words[words.length - 1].toLowerCase();
+    const absent = "zqxjkv" + SENTINEL.slice(-6).toLowerCase();
+    const WIDE = scanChars + 1000;
+
+    const detector = (key, range) => [
+      { type: "not", condition: { type: "key", key, in: ["story"], range } },
+    ];
+    const shape = (key, range) => ({
+      forceActivation: false,
+      keys: [],
+      advancedConditions: detector(key, range),
+    });
+
+    const onPresent = await reaches(entryId, shape(present, 4000));
+    const onPresentWide = await reaches(entryId, shape(present, WIDE));
+    const onAbsent = await reaches(entryId, shape(absent, WIDE));
+
+    log(`  "${present}" (last word) range 4000    ${onPresent ? "ACTIVE" : "silent"}   (expect silent)`);
+    log(`  "${present}" range ${WIDE}          ${onPresentWide ? "ACTIVE" : "silent"}   (expect silent)`);
+    log(`  "${absent}" range ${WIDE}   ${onAbsent ? "ACTIVE" : "silent"}   (expect ACTIVE)`);
+    log("");
+    if (onPresent && !onPresentWide) {
+      log("  DETECTOR WORKS, and `range` really is a character window: the same");
+      log("  subject is found at a wide range and missed at 4000. That is the");
+      log("  mechanism behaving exactly as §4.3 designs it.");
+    } else if (!onPresentWide && onAbsent) {
+      log("  DETECTOR WORKS. Quiet while the story carries the subject, and it");
+      log("  speaks once the subject goes missing — which is the whole design.");
+    } else if (onPresentWide && onAbsent) {
+      log("  DETECTOR ALWAYS FIRES — the `key` condition is not matching, so");
+      log("  `not(...)` is always true. Every thread would remind constantly.");
+      log("  Check `in: ['story']` and the range against the .d.ts.");
+    } else if (!onPresentWide && !onAbsent) {
+      log("  DETECTOR NEVER FIRES — `not(...)` is always false, so no thread");
+      log("  would ever remind. This is the silence §4.3 refuses.");
+    } else {
+      log("  DETECTOR INVERTED — it fires while the subject is present and goes");
+      log("  quiet when it is absent, which is exactly backwards.");
+    }
+  }
+
+  log("");
+  log("Now press Clean up.");
+}
+
+/** Sweep the whole category, not just the id the ledger happens to hold.
+ *
+ *  A run that died before writing the ledger — or v0.1, which minted one entry
+ *  per candidate — left entries behind that no later cleanup could name. Every
+ *  probe entry is in this category and nothing else is, so the category IS the
+ *  ledger. */
+async function cleanUp() {
+  report = "";
+  const categories = await api.v1.lorebook.categories();
+  const mine = categories.find((c) => c.name === CATEGORY);
+  if (mine) {
+    const all = await api.v1.lorebook.entries();
+    const strays = all.filter((e) => e.category === mine.id);
+    for (const entry of strays) await api.v1.lorebook.removeEntry(entry.id);
+    log(`removed ${strays.length} probe entr${strays.length === 1 ? "y" : "ies"}`);
+  }
+  if (mine) {
+    await api.v1.lorebook.removeCategory(mine.id);
+    log(`removed the ${CATEGORY} category`);
+  }
+  await api.v1.storyStorage.remove(LEDGER);
+  log("done");
+}
+
+/** Nothing here may fail silently. v0.1 called `run()` bare, so the permission
+ *  error surfaced as a report that simply stopped mid-way — indistinguishable
+ *  from a slow run, and the one thing a probe must never be is quiet about its
+ *  own failure. */
+function guard(fn) {
+  return () => {
+    void (async () => {
+      try {
+        await fn();
+      } catch (error) {
+        log("");
+        log(`FAILED: ${(error && error.message) || String(error)}`);
+        log("Press Clean up, then read the script log.");
+      }
+    })();
+  };
+}
+
+api.v1.ui.register([
+  api.v1.ui.extension.scriptPanel({
+    name: "Paragraph Count Probe",
+    content: [
+      api.v1.ui.part.column({
+        content: [
+          api.v1.ui.part.button({
+            text: "1. Probe",
+            callback: guard(run),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.button({
+            text: "2. Clean up",
+            callback: guard(cleanUp),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.text({
+            id: "report",
+            text: "Open a story with prose, then Probe. Clean up afterwards.",
+            noTemplate: true,
+            style: { whiteSpace: "pre-wrap", userSelect: "text" },
+          }),
+        ],
+      }),
+    ],
+  }),
+]);

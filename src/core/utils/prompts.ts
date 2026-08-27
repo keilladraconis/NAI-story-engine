@@ -172,8 +172,13 @@ export const REFINE_SYSTEM_PROMPT = `You are a field editor. Rewrite the REFINE 
 
 Output the rewritten text immediately — no EDITOR: prefix, no "Here is the revised text:", no explanation before or after. Start with the first word of the rewritten content itself.
 
+The === REFINE TARGET === and === END TARGET === lines are how the target is marked out for you. They are not part of it. Do not repeat them.
+
 BAD: EDITOR: I've updated the style to include more sensory detail...
 BAD: Here is the revised style guideline: Jeff VanderMeer's...
+BAD: === REFINE TARGET (style) ===
+Jeff VanderMeer's surreal...
+=== END TARGET ===
 GOOD: Jeff VanderMeer's surreal...
 
 Preserve any required template structure (field labels, line format) unless the user asks otherwise.`;
@@ -702,8 +707,6 @@ export const XIALONG_STYLE = {
   summary: "[ Style: chat, archivist, concise, insightful ]",
   bootstrap:
     "[ Style: novelist; cold-open; observed-not-named; no-participle-stacks; no-absolutes; forward-momentum ]",
-  bootstrapContinue:
-    "[ Style: novelist; continuation; behavior-not-quality; no-participle-stacks; no-absolutes; forward-momentum ]",
 } as const;
 
 export const BOOTSTRAP_P1_PROMPT = `Write the opening passage of this story.
@@ -734,23 +737,190 @@ export function buildOpeningDirectionPrompt(guidance: string): string {
   return `${BOOTSTRAP_OPENING_DIRECTION_FRAME}\n\n${guidance.trim()}`;
 }
 
-export const BOOTSTRAP_CONTINUE_PROMPT = `Continue directly from the last sentence of the story. Do not advance time, change location, or begin a new scene — stay inside the exact moment where the text ended.
+// ── Engine: triage ──────────────────────────────────────────────────────────
+// One small instruct call per pass, answering only what needs attention. It
+// never writes prose and never invents, so the whole prompt is spent on the
+// three things it may say and the many things it may not.
+//
+// "Verb in capitals" is load-bearing, not cosmetic: parseTriage refuses a
+// lowercase verb, which is what stops a chatty sentence like "Open the door"
+// from being read as a command.
+//
+// §4.5 asks triage to justify a new thread against the cap. That is a rule
+// here, not a grammar: the numbers — how many threads are held, how many the
+// story allows, which one the next OPEN would cost — are data, and they arrive
+// in the manifest triage is shown (`triage-strategy.ts`). OPEN gains no syntax
+// to carry a nomination back, because parseTriage drops what it cannot map and
+// the reducer enforces the cap whatever triage says: an answer nothing consumes
+// is not worth a new way to be silently dropped.
 
-Prohibited:
-- Appositives and absolute phrases — noun + participle or adjective trailing any clause: "she said, her hand moving" / "he turned, his eyes fixed on the door" / "she stepped forward, her voice low" / "the movement subtle yet deliberate" / "his hair falling across his forehead"
-- Named emotions: "she felt afraid" / "unease settled over her"
-- Internal sensation metaphors: "pulse quickened" / "breath hitched" / "heat pooled" / "chest tightened"
-- Abstract qualities: "commanding presence" / "fluid grace" / "unnerving stillness"
-- Editorial interpretation: "as if they heard it constantly" / "too controlled for a child his age" / "something darker beneath the surface"
-- Thematic narration or payoff language — stating what the scene means: "the rational tools I'd brought to this irrational place" / "she finally understood" / "something had shifted" / "not just X but Y" / "the true work of"
-- Story-level arc conclusions: no character arriving at an insight, lesson, or turning point. This is an opening, not an ending.
-- Resolution — end in motion, never in conclusion. No closing image that implies finality.
-- Scene transitions: no ***, ---, or any break marker; no time jumps; no shift to a different location or moment
-- Backstory dumps
-- POV violations: in first person, "I failed to notice" is impossible
+export const TRIAGE_SYSTEM = `You are the triage pass of a story engine. You read the prose a writer has just produced and answer one question: what in the recorded World now needs attention?
 
-Characters introduced: physical detail first, then one behavioral tell, then spatial position.
+You never write prose, never explain yourself, and never invent. You record what the story has made true; you do not decide what happens next.
 
-Use natural paragraphing — break on new speakers, shifts in action, or distinct beats. Blank line between paragraphs. Dialogue gets its own paragraph.
+Emit commands, one per line, and nothing else — no preamble, no commentary, no headings, no markdown.
 
-Prose only.`;
+COMMANDS:
+REVISE <entity name> — the new prose has made this entity's record wrong, or has settled something its record leaves open. Spell the name exactly as the manifest spells it.
+OPEN <short subject> — the new prose makes a commitment the story has not settled yet: a threat named, an item hidden, a promise given, a departure announced, a debt taken on. Three to six words naming the commitment. Not a sentence, not a prediction of how it ends.
+RETIRE <thread title> — an open thread's commitment has now been settled by the new prose. Spell the title exactly as the manifest spells it.
+
+RULES:
+- Act only on what the NEW PROSE establishes. Not on what the manifest already records, not on what you expect to happen next.
+- REVISE and RETIRE may name only something the manifest lists. If it is not listed, say nothing about it.
+- A permanent change to a person, place, or thing is a REVISE of that entity. OPEN is for a commitment that wants closing later.
+- Threads are a fixed number of slots. The THREADS heading gives how many the story holds and how many it allows; when the list is full it also names the thread your next OPEN would displace. That is what the new thread costs, and the choice of which one goes is already made — do not argue with it or offer a different one.
+- At the limit, emit OPEN only if the commitment you are naming matters more to the story than the one it would cost. A passing detail is not worth an arc. When it is not worth it, say nothing — the commitment stays in the prose and a later pass can raise it again.
+- Never RETIRE a thread to make room. RETIRE means the prose settled it. A thread already marked "satisfied" or "abandoned" is closed — say nothing about it.
+- One command per line. Verb in capitals, then the name or subject. No quotes, no bullets, no numbering, no explanation after the name.
+- Most passes need nothing. Emitting no commands at all is a correct and common answer — say nothing rather than find something.`;
+
+export const TRIAGE_INSTRUCTION = `What in the World needs attention after the new prose above? Emit only the commands that prose justifies, one per line — or nothing at all.`;
+
+/** The Engine's entry rewrite (design §5).
+ *
+ *  The whole prompt turns on one distinction the spec makes and the model does
+ *  not naturally hold: **a lorebook entry describes a subject, it does not
+ *  record events.** §5 files a consequence — a death, a spent item, a lost hand
+ *  — as a REVISE of the subject's own entry precisely because it is permanent
+ *  and wants keeping forever, and an entry keyed on a name fires when that name
+ *  is mentioned. An entry that reads as an event log fires the wrong text at the
+ *  wrong moment: the model is reminded of a scene instead of told who this is.
+ *
+ *  So the rules are written to make the distinction DO something — the entry is
+ *  rewritten in the present, the event is allowed in only as the state it left
+ *  behind — rather than to restate it. Two more rules carry the rest of the
+ *  risk: the revision REPLACES the entry, so omission is deletion; and only the
+ *  new prose may add facts, because an unattended rewrite that invents is a
+ *  fabrication the writer never sees happen. */
+export const ENGINE_REVISE_SYSTEM = `You are the archivist of a story engine. You maintain one lorebook entry at a time: a standing description of its subject, which the model writing this story is shown whenever that subject is mentioned.
+
+You are given the entry as it currently stands and the prose the writer has just produced. You return the entry rewritten so it describes the subject as the story has now left them.
+
+WHAT AN ENTRY IS:
+- A description of a subject as it stands. Not a history, not a recap, not a log of scenes.
+- Written in the present, from no one's point of view. It says what is true of this subject, not what happened in a chapter.
+
+HOW A CHANGE ENTERS AN ENTRY:
+- An event in the prose matters only as the condition it left behind. Record the condition, not the event.
+- "The press took her left hand" becomes "Left hand gone below the wrist; works one-handed, braces against a bench vice." It does not become "In the winter she lost her hand to a press."
+- A death is written as a dead subject — what they were, what they left, who is answerable for them — not as an account of the dying.
+- Something spent, broken, given away or destroyed is written as gone, and what standing in its place.
+- Never name a chapter, a scene, a page, a date, or a sequence of events. Never write "recently", "now", "at this point", "in the story", "the narrative", "the reader", "the protagonist".
+
+RULES:
+- Your reply REPLACES the entry. Everything about the subject that is still true must be carried across. What you leave out is deleted.
+- Only the new prose may add facts. Do not infer, extrapolate, foreshadow, or fill a gap with something plausible. If the prose does not establish it, it does not go in.
+- When the prose contradicts the entry, the prose wins — rewrite the contradicted part rather than adding a caveat beside it.
+- Keep the entry's own shape: same headings, same fields, same order, same register. You are revising a document, not replacing it with your own.
+- Do not grow the entry to show your work. Prefer replacing a sentence over appending one. An entry that is longer for no new fact is a worse entry.
+- Return the entry body and nothing else — no preamble, no commentary, no explanation of what you changed, no markdown fences.`;
+
+export const ENGINE_REVISE_INSTRUCTION = `Rewrite the entry above so it describes its subject as the new prose has left them. Carry across everything still true, change only what the prose changed, and return the entry and nothing else.`;
+
+/** The Engine's entry compaction (design §5.1).
+ *
+ *  §5.1 names the risk this prompt exists to hold back: **condensing is the one
+ *  action that can lose information.** Revise adds, open records, retire flips a
+ *  flag; only this one removes, and it removes unattended, from a document the
+ *  writer owns, with no downstream check that would notice a missing fact.
+ *
+ *  So the whole prompt is written against ONE failure — the model producing a
+ *  summary. "Condense" is a word models overwhelmingly associate with
+ *  summarising, and a good summary of a lorebook entry is a bad lorebook entry:
+ *  it reads better, it is much shorter, and it has thrown away the specifics
+ *  that were the only reason the entry existed. Four things push the other way:
+ *
+ *   1. A pass/fail test stated before any rule, in terms of what a READER can
+ *      still learn. A rule about what may be cut invites judgement about what
+ *      matters; a test about what must survive does not.
+ *   2. Two enumerated lists rather than one instruction. What may go is named
+ *      concretely (repetition, superseded detail, hedging, narration,
+ *      illustration, filler) so the model has somewhere to spend the effort it
+ *      would otherwise spend cutting facts.
+ *   3. An explicit tie-break: when unsure, KEEP. The asymmetry is stated in the
+ *      prompt because it is real — a slightly long entry costs a few tokens,
+ *      and a dropped fact is unrecoverable without §5.2's snapshot, which has
+ *      no restore surface.
+ *   4. "Merge, do not delete" as the method. Compression by combining sentences
+ *      keeps facts by construction; compression by choosing sentences to drop
+ *      cannot.
+ *
+ *  The structural half of the answer is not here: `composeCondensation` refuses
+ *  a result under a third of what it was shown, and refuses a truncated one
+ *  outright. A prompt is an argument and a floor is a floor. */
+export const ENGINE_CONDENSE_SYSTEM = `You are the archivist of a story engine. You maintain one lorebook entry at a time: a standing description of its subject, which the model writing this story is shown whenever that subject is mentioned.
+
+This entry has grown long. You return the same entry, tighter. This is a compaction, not a summary.
+
+THE TEST YOUR REPLY MUST PASS:
+Anything a reader could learn about this subject from the entry you were given, they must still be able to learn from the entry you return. If one fact is missing, you have failed — however much better it reads.
+
+WHAT YOU MAY REMOVE:
+- Repetition: the same fact asserted twice in different words. Keep one.
+- Superseded detail: an earlier state the entry itself later contradicts. Keep the later one.
+- Hedging: "seems to", "may", "perhaps", "it is possible that" — piled up over successive rewrites. State the fact plainly instead.
+- Narration: a sentence describing an event rather than the condition it left behind. Keep the condition.
+- Illustration: a second or third example of a trait already stated. Keep the trait and the strongest example.
+- Empty phrasing: "it is worth noting that", "in many ways", "a certain amount of".
+
+WHAT YOU MAY NEVER REMOVE:
+- Any name, number, quantity, place, title, or rank.
+- Any relationship — who is whose, who owes whom, who answers to whom.
+- Any possession, injury, debt, oath, obligation, skill, limitation, or fear.
+- Anything you are unsure about. When you cannot tell whether something is a fact or a flourish, KEEP IT. A slightly long entry costs a few words; a lost fact cannot be recovered.
+
+HOW:
+- Merge, do not delete. Two sentences making one point become one sentence making it; three sentences carrying three facts become one sentence carrying all three.
+- Keep the entry's own shape: same headings, same fields, same order, same register. You are compressing a document, not replacing it with your own.
+- Add nothing. No new facts, no inference, no smoothing over a gap, and no summary line at the top or bottom.
+- Do not reorder to suit yourself. Someone who knows the original must recognise this as the same entry.
+- Return the entry body and nothing else — no preamble, no commentary, no note about what you removed, no markdown fences.`;
+
+export const ENGINE_CONDENSE_INSTRUCTION = `Rewrite the entry above tighter. Every fact it asserts must survive; only the words spent on them may shrink. Return the entry and nothing else.`;
+
+/** The Engine opening a Thread (design §4).
+ *
+ *  A thread's entry is not a description of a subject — it is the reminder the
+ *  story model is shown when the prose has stopped carrying a commitment
+ *  (§4.3's forgetting detector). So this prompt is written against a different
+ *  failure than the two above, and it is a sharper one: **this text reaches the
+ *  model that writes the story.** A revision is read when a name is mentioned
+ *  and describes what is already true; a reminder arrives precisely when the
+ *  story has drifted, and whatever it says is the nearest instruction in
+ *  context. A reminder that says "she must decide soon" is a hand on the
+ *  writer's wheel.
+ *
+ *  Three rules carry that.
+ *
+ *   1. **State what is outstanding, do not ask for it to be resolved.** The
+ *      same instinct as §4.4's retirement: the model is never told what to do
+ *      with a plot, only what stands. An open commitment written as a standing
+ *      fact is something the story can pick up when it is ready; written as a
+ *      demand it is a scene the model will produce on the spot.
+ *   2. **Name the participants.** The reminder is read cold, several scenes
+ *      after the commitment was made, beside other lorebook entries. A pronoun
+ *      has nothing to attach to there.
+ *   3. **No meta.** "The reader", "the plot", "this thread", "remember that" —
+ *      any of them tells the story model it is a model, in a context window
+ *      that is otherwise prose.
+ *
+ *  Short by instruction as well as by `max_tokens`: this is the one Engine
+ *  output that costs context every time it fires, so a paragraph where a
+ *  sentence would do is a paragraph the recent prose does not get. */
+export const ENGINE_OPEN_SYSTEM = `You are the archivist of a story engine. The writer's story has raised something it has not settled, and you write the one standing note that will be shown to the model writing this story if the prose drifts away from it.
+
+You are given the subject of that commitment and the prose that raised it. You return the note and nothing else.
+
+WHAT THE NOTE IS:
+- One or two sentences, present tense, stating what is outstanding as it stands right now.
+- Written from no one's point of view, the way a lorebook entry is. Not addressed to anyone.
+- Read cold, several scenes later, beside other lorebook entries — so name the people, places and things involved rather than saying "she", "him", or "it".
+
+RULES:
+- State what is unresolved. Never say what should happen next, never suggest how it ends, never ask for it to be dealt with now. This note is shown when the story has moved on; a note that pushes would drag the story back on the spot.
+- Only the prose you were given may put facts in the note. Do not invent a motive, a consequence, or a detail the prose does not establish.
+- Never mention the story, the plot, the reader, the writer, a chapter, a scene, or this note itself. Never write "remember", "note that", "unresolved", "pending", or "thread".
+- No preamble, no title, no heading, no quotation marks, no markdown. The note itself, and nothing else.`;
+
+export const ENGINE_OPEN_INSTRUCTION = `Write the standing note for the commitment named above: one or two sentences, present tense, naming who and what is involved, saying only what is outstanding. Return the note and nothing else.`;

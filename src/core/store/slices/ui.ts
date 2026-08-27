@@ -11,6 +11,7 @@ export const initialUIState: UIState = {
   inputs: {},
   lorebook: initialLorebookState,
   worldExpanded: null,
+  foundationExpanded: null,
   importWizardOpen: false,
 };
 
@@ -63,8 +64,8 @@ export const uiSlice = createSlice({
     generationSubmitted: (state, _strategy: any) => state,
     uiCancelRequest: (state, _payload: { requestId: string }) => state,
     // Editable singleton — at most one editor active at a time. `id` is an
-    // entity id, a world group id, or a Foundation field id ("shape", "intent",
-    // …); StoryEngine routes the open pane by membership.
+    // entity id, a Thread id, or a Foundation field id ("shape", "intent",
+    // …); the Setup and Engine tabs route the open pane by membership.
     uiEditableActivate: (state, payload: { id: string }) => ({
       ...state,
       activeEditId: payload.id,
@@ -107,7 +108,13 @@ export const uiSlice = createSlice({
       ...state,
       worldExpanded: payload.expanded,
     }),
-    // Import wizard visibility (shown over the Story Engine tab)
+    // Foundation collapse/expand on the Setup tab. Distinct from worldExpanded:
+    // that one defaults open, this one defaults to following the flow.
+    foundationExpansionSet: (state, payload: { expanded: boolean }) => ({
+      ...state,
+      foundationExpanded: payload.expanded,
+    }),
+    // Import wizard visibility (shown over the Setup tab)
     importWizardOpened: (state) => ({ ...state, importWizardOpen: true }),
     importWizardClosed: (state) => ({ ...state, importWizardOpen: false }),
     // Summary generation intents
@@ -117,7 +124,7 @@ export const uiSlice = createSlice({
     ) => state,
     uiThreadSummaryGenerationRequested: (
       state,
-      _payload: { groupId: string; requestId: string },
+      _payload: { threadId: string; requestId: string },
     ) => state,
   },
 });
@@ -125,6 +132,7 @@ export const uiSlice = createSlice({
 export const {
   uiInputChanged,
   worldExpansionSet,
+  foundationExpansionSet,
   importWizardOpened,
   importWizardClosed,
   uiRequestCancellation,

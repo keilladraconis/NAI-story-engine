@@ -1,4 +1,4 @@
-// Import wizard shell — a full-view takeover of the Story Engine tab. Header
+// Import wizard shell — a full-view takeover of the Setup tab. Header
 // (Back / title / Refresh / Import All) over the foundation + lorebook sections.
 // Import All batches ATTG+Style+bind-all-unmanaged+Shape+Intent, then closes.
 

@@ -85,6 +85,7 @@ const apiMock = {
     storyStorage: {
       get: vi.fn().mockResolvedValue(null),
       set: vi.fn().mockResolvedValue(undefined),
+      remove: vi.fn().mockResolvedValue(undefined),
     },
     lorebook: {
       categories: vi.fn().mockResolvedValue([]),
@@ -137,6 +138,7 @@ const apiMock = {
     },
     document: {
       sectionIds: vi.fn().mockResolvedValue([]),
+      scan: vi.fn().mockResolvedValue([]),
     },
     generate: vi.fn(),
     buildContext: vi.fn().mockResolvedValue([]),

@@ -1,12 +1,14 @@
 // Bootstrap + mount for the JSX/Preact Story Engine.
 //
 // `start()` is the single entry point (called from src/index.ts). It wires the
-// store (GenX, effects, persistence, migrations, lorebook sync), then registers
-// the sidebar panel — and, when enabled, the Generation Journal panel — in ONE
-// `api.v1.ui.register()` call (NAI requires a single call; multiple overwrite
-// each other). All UI is Preact rendered into a jsx part.
+// store (GenX, effects, persistence, lorebook sync), then registers
+// the sidebar panel and the Engine HUD — and, when enabled, the Generation
+// Journal panel — in ONE `api.v1.ui.register()` call (NAI requires a single
+// call; multiple overwrite each other). All UI is Preact rendered into a jsx
+// part.
 
 import { App } from "./App";
+import { Hud } from "./hud/Hud";
 import { JournalPanel } from "./panels/journal/JournalPanel";
 import { GenX } from "nai-gen-x";
 
@@ -25,7 +27,9 @@ import {
   migrateLorebookCategories,
   registerLorebookSyncHooks,
 } from "../core/store/effects/lorebook-sync";
-import { migrateBrainstormToChat } from "../core/store/migrations/brainstorm-to-chat";
+import { loadWorldRecord } from "../core/store/persistence/story-store";
+import type { ChatSliceState } from "../core/store/slices/chat";
+import type { FoundationState } from "../core/store/types";
 import { loadJournal } from "../core/generation-journal";
 import { STORAGE_KEYS } from "../core/keys";
 import { hydrateComposerDrafts } from "./panels/chat/composer-draft";
@@ -73,8 +77,8 @@ function buildSidebarPanel(hasDocumentContent: boolean): UIExtension {
         "100%";
       (elem as unknown as { style: Record<string, string> }).style.minHeight =
         "0";
-      // hasDocumentContent is read before register() so the header's bootstrap
-      // button carries the right label on its first paint.
+      // hasDocumentContent is read before register() so the Setup tab's
+      // bootstrap button carries the right label on its first paint.
       render(h(App, { initialHasDocumentContent: hasDocumentContent }), elem);
     },
   });
@@ -84,6 +88,27 @@ function buildSidebarPanel(hasDocumentContent: boolean): UIExtension {
     name: "Story Engine",
     iconId: "lightning",
     content: [buildRoot(jsxPart)],
+  });
+}
+
+// The Engine HUD (design §9.1): one modeline, always registered. A scriptPanel
+// can be minimized but never dismissed, which is what lets the HUD carry the
+// trust burden — the Engine can never be quietly running behind a surface the
+// writer closed and forgot. Registered unconditionally for the same reason: with
+// the Engine switched off the line simply reports a loop that never moves, and
+// the writer can still see that nothing is happening.
+function buildHudPanel(): UIExtension {
+  const jsxPart = api.v1.ui.part.jsx({
+    id: "kse-jsx-hud-root",
+    onMount: (elem) => {
+      render(h(Hud, null), elem);
+    },
+  });
+
+  return scriptPanel({
+    id: "kse-hud",
+    name: "Engine HUD",
+    content: [jsxPart],
   });
 }
 
@@ -154,16 +179,32 @@ export async function start(): Promise<void> {
 
   registerEffects(store, genX);
 
-  // ── Persistence + migrations ─────────────────────────────────────────────
-  const persisted = await api.v1.storyStorage.get(STORAGE_KEYS.PERSIST);
-  const migrated = migrateBrainstormToChat(persisted ?? {});
-  if (migrated.touched) {
-    await api.v1.storyStorage.set(STORAGE_KEYS.PERSIST, migrated.data);
-    api.v1.ui.toast("Brainstorm chats migrated to new chat system.", {
-      type: "info",
-    });
-  }
-  if (persisted) store.dispatch(persistedDataLoaded(migrated.data));
+  // ── Persistence ───────────────────────────────────────────────────────────
+  // Three storyStorage records, all of them story-scoped: what Story Engine has
+  // recorded moves forward with the writer and does not revert when they undo.
+  // No migration path: Story Engine is alpha and upgrading drops Engine state —
+  // previously managed lorebook entries simply become unmanaged, and the Import
+  // wizard's Bind is the way back.
+  // storyStorage.get is typed `any`; name the shapes here rather than letting
+  // them flow unchecked into PersistedData, the way story-store.ts does for the
+  // World record.
+  const [persisted, chat, foundation] = (await Promise.all([
+    loadWorldRecord(),
+    api.v1.storyStorage.get(STORAGE_KEYS.CHAT),
+    api.v1.storyStorage.get(STORAGE_KEYS.FOUNDATION),
+  ])) as [
+    Awaited<ReturnType<typeof loadWorldRecord>>,
+    ChatSliceState | null,
+    FoundationState | null,
+  ];
+  store.dispatch(
+    persistedDataLoaded({
+      story: persisted.story,
+      world: persisted.world,
+      ...(chat ? { chat } : {}),
+      ...(foundation ? { foundation } : {}),
+    }),
+  );
 
   // After persistedDataLoaded so the prune sees the real chat list, and before
   // register() so the composer's first render already carries its unsent text.
@@ -175,7 +216,10 @@ export async function start(): Promise<void> {
 
   // ── Panels (single register call) ────────────────────────────────────────
   const hasDocumentContent = (await api.v1.document.sectionIds()).length > 0;
-  const panels: UIExtension[] = [buildSidebarPanel(hasDocumentContent)];
+  const panels: UIExtension[] = [
+    buildSidebarPanel(hasDocumentContent),
+    buildHudPanel(),
+  ];
 
   const journalEnabled = await api.v1.config.get("generation_journal");
   if (journalEnabled) {

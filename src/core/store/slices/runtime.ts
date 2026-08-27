@@ -25,7 +25,6 @@ export const initialRuntimeState: RuntimeState = {
     status: "idle",
     queueLength: 0,
   },
-  historyEpoch: 0,
 };
 
 export const runtimeSlice = createSlice({
@@ -187,11 +186,6 @@ export const runtimeSlice = createSlice({
     // `guidance` is the writer's free-text answer to "Open the story with:" —
     // empty string when they generated without typing anything.
     bootstrapRequested: (state, _payload: { guidance: string }) => state,
-    bootstrapContinueRequested: (state) => state,
-    documentHistoryNavigated: (state) => ({
-      ...state,
-      historyEpoch: state.historyEpoch + 1,
-    }),
   },
 });
 
@@ -213,6 +207,4 @@ export const {
   segaStatusUpdated,
   segaKeysCompleted,
   bootstrapRequested,
-  bootstrapContinueRequested,
-  documentHistoryNavigated,
 } = runtimeSlice.actions;

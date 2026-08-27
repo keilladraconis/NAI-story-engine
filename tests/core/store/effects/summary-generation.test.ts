@@ -6,6 +6,8 @@ import {
 import {
   uiEntitySummaryGenerationRequested,
   uiThreadSummaryGenerationRequested,
+  entityBound,
+  entitiesBoundBatch,
 } from "../../../../src/core/store/index";
 import type {
   RootState,
@@ -17,6 +19,7 @@ import {
   entitySummaryRequestId,
   lorebookContentRequestId,
 } from "../../../../src/core/keys";
+import { useCreativeModel } from "../../../helpers/creative-model";
 
 // Isolate the effect's branching from real strategy construction.
 vi.mock("../../../../src/core/utils/lorebook-strategy", () => ({
@@ -101,7 +104,11 @@ function makeHarness(state: RootState) {
     dispatch.mock.calls
       .filter(([a]) => a.type === "ui/generationSubmitted")
       .map(([a]) => (a.payload as { target: { type: string } }).target.type);
-  return { dispatch, fire, queuedTypes, submittedTargets };
+  const submittedParams = () =>
+    dispatch.mock.calls
+      .filter(([a]) => a.type === "ui/generationSubmitted")
+      .map(([a]) => (a.payload as { params: GenerationParams }).params);
+  return { dispatch, fire, queuedTypes, submittedTargets, submittedParams };
 }
 
 describe("entityRegenRequested effect", () => {
@@ -261,7 +268,7 @@ describe("uiThreadSummaryGenerationRequested effect", () => {
     const { fire, dispatch } = makeHarness(makeState());
     await fire(
       uiThreadSummaryGenerationRequested({
-        groupId: "g1",
+        threadId: "g1",
         requestId: "se-thread-summary-g1",
       }),
     );
@@ -290,12 +297,74 @@ describe("uiThreadSummaryGenerationRequested effect", () => {
     const { fire, dispatch } = makeHarness(state);
     await fire(
       uiThreadSummaryGenerationRequested({
-        groupId: "g1",
+        threadId: "g1",
         requestId: "se-thread-summary-g1",
       }),
     );
     expect(
       dispatch.mock.calls.some(([a]) => a.type === "runtime/requestQueued"),
     ).toBe(false);
+  });
+});
+
+// The three summary strategies build params twice — once in the factory, once
+// here at the dispatch site — and generation-engine merges them per-key. Keys
+// the factory never sets survive from this outer object, so an outer object
+// still on "creative" would hand GLM Xialong's top_k/top_p. Both halves must
+// ask for instruct.
+describe("summary dispatch sites resolve the instruct model", () => {
+  beforeEach(() => {
+    useCreativeModel("xialong-v1");
+    vi.mocked(api.v1.lorebook.entry).mockReset();
+    vi.mocked(api.v1.lorebook.entry).mockResolvedValue({
+      id: "lb-1",
+      displayName: "Ada",
+      text: "rich lore",
+      keys: [],
+    });
+  });
+
+  function expectInstruct(params: GenerationParams) {
+    expect(params.model).toBe("glm-4-6");
+    expect(params.top_k).toBeUndefined();
+    expect(params.top_p).toBeUndefined();
+    expect(params.min_p).toBe(0.05);
+  }
+
+  it("submits an entity summary on GLM with no Xialong sampler leak", async () => {
+    const live = makeEntity({ lorebookEntryId: "lb-1" });
+    const { fire, submittedParams } = makeHarness(makeState(live));
+    await fire(
+      uiEntitySummaryGenerationRequested({
+        entityId: "e1",
+        requestId: "se-entity-summary-e1",
+      }),
+    );
+    expectInstruct(submittedParams()[0]);
+  });
+
+  it("submits a bind-time summary on GLM", async () => {
+    const live = makeEntity({ lorebookEntryId: "lb-1" });
+    const { fire, submittedParams } = makeHarness(makeState(live));
+    await fire(entityBound({ entity: live }));
+    expectInstruct(submittedParams()[0]);
+  });
+
+  it("submits every batch-bound summary on GLM", async () => {
+    const live = makeEntity({ lorebookEntryId: "lb-1" });
+    const { fire, submittedParams } = makeHarness(makeState(live));
+    await fire(entitiesBoundBatch([live]));
+    expectInstruct(submittedParams()[0]);
+  });
+
+  it("submits a thread summary on GLM", async () => {
+    const { fire, submittedParams } = makeHarness(makeState());
+    await fire(
+      uiThreadSummaryGenerationRequested({
+        threadId: "g1",
+        requestId: "se-thread-summary-g1",
+      }),
+    );
+    expectInstruct(submittedParams()[0]);
   });
 });

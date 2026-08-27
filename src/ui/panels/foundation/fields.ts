@@ -215,3 +215,11 @@ export const FIELD_DESCRIPTORS: FieldDescriptor[] = [
     },
   },
 ];
+
+/** Is every Foundation field card still blank? Drives the brainstorm CTA, which
+ *  only earns its space while there is nothing to show yet. Intensity is
+ *  deliberately excluded — it is a picker, not a card, and choosing a register
+ *  is exactly the moment the CTA becomes the obvious next step. */
+export function foundationFieldsEmpty(s: RootState): boolean {
+  return FIELD_DESCRIPTORS.every((d) => d.display(s).trim() === "");
+}

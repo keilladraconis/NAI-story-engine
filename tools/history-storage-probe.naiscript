@@ -1,0 +1,180 @@
+/*---
+compatibilityVersion: naiscript-1.0
+id: 02187497-3d1d-4675-9b32-56782994db3c
+name: History Storage Probe
+version: 0.2.0
+description: Does historyStorage.list() return inherited ancestor keys, or only keys written at that exact node?
+memoryLimit: 8
+---*/
+
+// Press Write markers, add a generation or two in the editor, press Write markers
+// again, then press Check.
+//
+// v0.1 gave a contradictory reading: list() at the current node showed a marker,
+// while list(theNodeItWasWrittenAt) came back empty. So this version pins down the
+// things v0.1 assumed.
+//
+//   - writes pass an EXPLICIT nodeId, so we know where the value went rather than
+//     trusting that set() and currentNodeId() agree about "current"
+//   - it verifies straight after writing that list(node) can see what we just put
+//     there, which tells us whether the nodeId argument works at all
+//   - it compares list() against list(currentNodeId()) — same node, two call
+//     forms. If those disagree, the argument is the problem, not inheritance
+//   - it walks parents from the current node so we can see whether a marker's node
+//     is genuinely an ancestor
+//
+// The ledger lives in storyStorage on purpose. historyStorage is what we are
+// testing, so keeping our own bookkeeping there would bury the result.
+
+const LEDGER = "history-probe-ledger";
+const MAX_ANCESTORS = 12;
+
+const currentNode = () => api.v1.document.history.currentNodeId();
+
+let report = "";
+
+function log(line) {
+  report += line + "\n";
+  api.v1.log(line);
+  void api.v1.ui.updateParts([{ id: "report", text: report }]);
+}
+
+const readLedger = async () =>
+  (await api.v1.storyStorage.get(LEDGER)) || [];
+
+// Read-only inspection. nodeState() is documented as reporting the path to a node;
+// jump() is the call that actually navigates. If the document moves while this
+// runs, that assumption is wrong and worth knowing.
+async function ancestry(node) {
+  const chain = [];
+  let id = node;
+  for (let i = 0; i < MAX_ANCESTORS && id !== undefined && id !== null; i++) {
+    chain.push(id);
+    const state = await api.v1.document.history.nodeState(id);
+    id = state && state.targetNode ? state.targetNode.parent : undefined;
+  }
+  return chain;
+}
+
+async function writeMarkers() {
+  const node = await currentNode();
+  const ledger = await readLedger();
+  const key = `marker-${ledger.length + 1}`;
+
+  await api.v1.historyStorage.set(key, { writtenAt: node }, node);
+  await api.v1.historyStorage.set("shared", { writtenAt: node }, node);
+  await api.v1.storyStorage.set(LEDGER, ledger.concat([{ key, node }]));
+
+  const atNode = await api.v1.historyStorage.list(node);
+  const bare = await api.v1.historyStorage.list();
+
+  log(`\nwrote ${key} at node ${node} (${typeof node})`);
+  log(`  list(${node}) right after = ${JSON.stringify(atNode)}`);
+  log(`  list() right after       = ${JSON.stringify(bare)}`);
+  if (!atNode.includes(key)) {
+    log("  !! the explicit nodeId argument did not see its own write");
+  }
+}
+
+async function check() {
+  const node = await currentNode();
+  const ledger = await readLedger();
+  const bare = await api.v1.historyStorage.list();
+  const explicit = await api.v1.historyStorage.list(node);
+
+  log(`\n--- check at node ${node} ---`);
+  log(`list()      = ${JSON.stringify(bare)}`);
+  log(`list(${node}) = ${JSON.stringify(explicit)}`);
+  if (JSON.stringify(bare) !== JSON.stringify(explicit)) {
+    log("  !! list() and list(currentNodeId()) disagree — the argument is suspect");
+  }
+
+  const chain = await ancestry(node);
+  log(`ancestry: ${JSON.stringify(chain)}`);
+
+  for (const entry of ledger) {
+    const value = await api.v1.historyStorage.get(entry.key);
+    const atNode = await api.v1.historyStorage.list(entry.node);
+    const where = chain.indexOf(entry.node);
+    log(
+      `  ${entry.key} written@${entry.node}` +
+        `  get=${value ? `writtenAt ${value.writtenAt}` : "MISSING"}` +
+        `  list@node=${JSON.stringify(atNode)}` +
+        `  ancestor=${where === 0 ? "current" : where > 0 ? `yes(+${where})` : "NO"}`,
+    );
+  }
+
+  const shared = await api.v1.historyStorage.get("shared");
+  log(`  shared resolves to node ${shared ? shared.writtenAt : "MISSING"}`);
+
+  const ancestors = ledger.filter(
+    (entry) => entry.node !== node && chain.indexOf(entry.node) > 0,
+  );
+  if (ancestors.length === 0) {
+    log("verdict: no marker sits on a confirmed ancestor yet — write, generate, check");
+    return;
+  }
+  const visible = ancestors.filter((entry) => bare.includes(entry.key));
+  if (visible.length === ancestors.length) {
+    log("verdict: list() INHERITS ancestor keys");
+  } else if (visible.length === 0) {
+    log("verdict: list() is NODE-LOCAL");
+  } else {
+    log(`verdict: mixed — ${visible.length}/${ancestors.length} ancestor keys listed`);
+  }
+}
+
+async function clear() {
+  const ledger = await readLedger();
+  for (const entry of ledger) {
+    await api.v1.historyStorage.remove(entry.key, entry.node);
+    await api.v1.historyStorage.remove(entry.key);
+  }
+  await api.v1.historyStorage.remove("shared");
+  await api.v1.storyStorage.remove(LEDGER);
+  report = "";
+  log("cleared");
+}
+
+// Also settles whether nodeId is a string or a number: the hook types it as
+// string, while currentNodeId() returns number.
+api.v1.hooks.register("onHistoryNavigated", async (params) => {
+  const node = await currentNode();
+  log(
+    `\nnavigated ${params.cause}: hook nodeId=${params.nodeId} (${typeof params.nodeId})` +
+      `  currentNodeId=${node} (${typeof node})`,
+  );
+});
+
+api.v1.ui.register([
+  api.v1.ui.extension.scriptPanel({
+    name: "History Storage Probe",
+    content: [
+      api.v1.ui.part.column({
+        content: [
+          api.v1.ui.part.button({
+            text: "Write markers",
+            callback: () => void writeMarkers(),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.button({
+            text: "Check",
+            callback: () => void check(),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.button({
+            text: "Clear",
+            callback: () => void clear(),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.text({
+            id: "report",
+            text: "Write markers, generate a paragraph, write markers again, check.",
+            noTemplate: true,
+            style: { whiteSpace: "pre-wrap", userSelect: "text" },
+          }),
+        ],
+      }),
+    ],
+  }),
+]);

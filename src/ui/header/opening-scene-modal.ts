@@ -1,6 +1,6 @@
 // The Opening Scene modal — asks the writer how the story should open before
-// anything is generated. "Continue Scene" is untouched: it still fires on the
-// click, because there is nothing to ask once the story has a first page.
+// anything is generated. It is the only bootstrap path now: Continue Scene was
+// dropped in 0.15.0, so nothing generates prose from Setup without asking first.
 //
 // UIParts, not JSX: api.v1.ui.modal.open takes a UIPart[], so this is an API
 // constraint rather than a leftover of the old UIPart header. Construction is

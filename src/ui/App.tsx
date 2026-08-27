@@ -1,10 +1,19 @@
 // Root of the JSX/Preact Story Engine UI. Rendered into the sidebar jsx part.
 // h/Fragment are NAI-runtime globals (see external/jsx-typings.d.ts) — no import.
 
-import { StoryEngine } from "./panels/StoryEngine";
+import { Setup } from "./panels/setup/Setup";
+import { Engine } from "./panels/Engine";
 import { Chat } from "./panels/chat/Chat";
 import { Header } from "./header/Header";
+import { useHasDocumentContent } from "./panels/setup/use-document-content";
 import { T, SP } from "./style";
+import {
+  TAB_ORDER,
+  TAB_LABELS,
+  initialTab,
+  tabForActiveEdit,
+  type Tab,
+} from "./tabs";
 import {
   store,
   chatCreated,
@@ -19,8 +28,6 @@ import {
   forgeDiscardAllRequested,
 } from "../core/store/effects/forge-chat-effects";
 import { matchesAction } from "nai-store";
-
-type Tab = "chat" | "engine";
 
 function tabButtonStyle(active: boolean) {
   return {
@@ -38,10 +45,22 @@ function tabButtonStyle(active: boolean) {
 }
 
 export function App(props: { initialHasDocumentContent: boolean }) {
-  const [tab, setTab] = useState<Tab>("engine");
+  // The wizard's cold-start auto-open dispatches importWizardOpened from
+  // mount.ts, which can land before this component's subscriptions exist — so
+  // the flag also seeds the initial tab. Lazy initialiser: the store is read
+  // once on mount, not on every render.
+  const [tab, setTab] = useState<Tab>(() =>
+    store.getState().ui.importWizardOpen
+      ? "setup"
+      : initialTab(props.initialHasDocumentContent),
+  );
 
-  // Mirror the SUI plugin's tab-switch effects, local to the JSX panel:
-  // a refine opening surfaces the Chat tab; commit/discard returns to Engine.
+  // Hoisted out of Setup, which unmounts on every tab switch — a remount would
+  // reset the seed to the startup value and briefly mislabel the button.
+  const hasDocumentContent = useHasDocumentContent(
+    props.initialHasDocumentContent,
+  );
+
   useEffect(() => {
     const unsubs = [
       store.subscribeEffect(matchesAction(chatCreated), (action) => {
@@ -60,26 +79,33 @@ export function App(props: { initialHasDocumentContent: boolean }) {
           if (c?.type === "refine" || c?.type === "forge") setTab("chat");
         },
       ),
-      store.subscribeEffect(matchesAction(uiChatRefineCommitted), () =>
-        setTab("engine"),
+      // A refine returns to whichever tab its edit pane lives on: Foundation
+      // fields are edited in Setup, entities and threads in Engine. No effect
+      // clears ui.activeEditId, so it still names the pane the writer came from.
+      store.subscribeEffect(
+        matchesAction(uiChatRefineCommitted),
+        (_action, { getState }) => {
+          setTab(tabForActiveEdit(getState().ui.activeEditId));
+        },
       ),
-      store.subscribeEffect(matchesAction(uiChatRefineDiscarded), () =>
-        setTab("engine"),
+      store.subscribeEffect(
+        matchesAction(uiChatRefineDiscarded),
+        (_action, { getState }) => {
+          setTab(tabForActiveEdit(getState().ui.activeEditId));
+        },
       ),
-      // Cast All closes the forge session — land on the Story Engine tab with
-      // the World expanded so the freshly-cast entities are right there.
+      // Cast All closes the forge session — land on the Engine tab with the
+      // World expanded so the freshly-cast entities are right there.
       store.subscribeEffect(matchesAction(forgeCastAllRequested), () => {
         setTab("engine");
         store.dispatch(worldExpansionSet({ expanded: true }));
       }),
-      // Discard All also closes the session — return to the Story Engine tab.
       store.subscribeEffect(matchesAction(forgeDiscardAllRequested), () =>
         setTab("engine"),
       ),
-      // The Import icon lives in the always-visible header, but the wizard
-      // itself only renders inside the Story Engine tab — surface it.
+      // The wizard renders inside Setup now — surface that tab, not Engine.
       store.subscribeEffect(matchesAction(importWizardOpened), () =>
-        setTab("engine"),
+        setTab("setup"),
       ),
     ];
     return () => unsubs.forEach((u) => u());
@@ -100,23 +126,20 @@ export function App(props: { initialHasDocumentContent: boolean }) {
         scrollbarColor: `${T.bg3} transparent`,
       }}
     >
-      <Header initialHasDocumentContent={props.initialHasDocumentContent} />
+      <Header />
       <div style={{ display: "flex", flexShrink: 0 }}>
-        <button
-          style={tabButtonStyle(tab === "chat")}
-          onClick={() => setTab("chat")}
-        >
-          Chat
-        </button>
-        <button
-          style={tabButtonStyle(tab === "engine")}
-          onClick={() => setTab("engine")}
-        >
-          Story Engine
-        </button>
+        {TAB_ORDER.map((t) => (
+          <button
+            key={t}
+            style={tabButtonStyle(tab === t)}
+            onClick={() => setTab(t)}
+          >
+            {TAB_LABELS[t]}
+          </button>
+        ))}
       </div>
       {/* Chat manages its own scroll + pins its composer, so it gets an
-          unpadded bounded flex box; the Story Engine tab keeps padding/scroll. */}
+          unpadded bounded flex box; the other tabs keep padding/scroll. */}
       {tab === "chat" ? (
         <div
           style={{
@@ -126,11 +149,25 @@ export function App(props: { initialHasDocumentContent: boolean }) {
             flexDirection: "column",
           }}
         >
-          <Chat onBack={() => setTab("engine")} />
+          {/* Back keeps the refine alive, so it must land on the tab that owns
+              the still-open edit pane — same rule the commit/discard effects
+              above use. */}
+          <Chat
+            onBack={() =>
+              setTab(tabForActiveEdit(store.getState().ui.activeEditId))
+            }
+          />
         </div>
       ) : (
         <div style={{ flex: 1, overflow: "auto", padding: SP.md }}>
-          <StoryEngine />
+          {tab === "setup" ? (
+            <Setup
+              hasDocumentContent={hasDocumentContent}
+              onOpenChat={() => setTab("chat")}
+            />
+          ) : (
+            <Engine />
+          )}
         </div>
       )}
     </div>

@@ -4,17 +4,12 @@ import type { ChatSliceState } from "./slices/chat";
 import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
 import { storySlice, initialStoryState } from "./slices/story";
-import { worldSlice, initialWorldState } from "./slices/world";
+import { worldSlice, threadCreated } from "./slices/world";
 import { foundationSlice, initialFoundationState } from "./slices/foundation";
-import { forgeSlice, initialForgeState } from "./slices/forge";
-import type { ForgeSliceState } from "./slices/forge";
-import {
-  RootState,
-  StoryState,
-  WorldState,
-  WorldEntity,
-  FoundationState,
-} from "./types";
+import { forgeSlice } from "./slices/forge";
+import { engineSlice } from "./slices/engine";
+import { RootState, StoryState, WorldState, FoundationState } from "./types";
+import { enforceThreadCap } from "../engine/thread-cap";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Persisted data loaded action
@@ -25,7 +20,6 @@ export interface PersistedData {
   chat?: ChatSliceState;
   world?: WorldState;
   foundation?: FoundationState;
-  forge?: ForgeSliceState;
 }
 
 const PERSISTED_DATA_LOADED = "persist/loaded";
@@ -35,45 +29,6 @@ export const persistedDataLoaded = (data: PersistedData) => ({
   payload: data,
 });
 persistedDataLoaded.type = PERSISTED_DATA_LOADED;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// World state migration (v11 entities[] → v12 entitiesById/entityIds)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function backfillLifecycle(e: WorldEntity): WorldEntity {
-  return e.lifecycle
-    ? e
-    : { ...e, lifecycle: e.lorebookEntryId ? "live" : "draft" };
-}
-
-export function migrateWorldState(
-  raw: WorldState | (Record<string, unknown> & { entities?: WorldEntity[] }),
-): WorldState {
-  // v12+ format: already has entitiesById
-  if ("entitiesById" in raw && raw.entitiesById) {
-    const src = raw as WorldState;
-    const entitiesById: Record<string, WorldEntity> = {};
-    for (const [id, e] of Object.entries(src.entitiesById)) {
-      entitiesById[id] = backfillLifecycle(e);
-    }
-    return { ...initialWorldState, ...src, entitiesById };
-  }
-  // v11 format: has entities array — convert
-  const entities = (raw as { entities?: WorldEntity[] }).entities ?? [];
-  const entitiesById: Record<string, WorldEntity> = {};
-  const entityIds: string[] = [];
-  for (const e of entities) {
-    const filled = backfillLifecycle(e);
-    entitiesById[filled.id] = filled;
-    entityIds.push(filled.id);
-  }
-  return {
-    ...initialWorldState,
-    groups: (raw as { groups?: WorldState["groups"] }).groups ?? [],
-    entitiesById,
-    entityIds,
-  };
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root reducer with persist/loaded interception
@@ -87,9 +42,15 @@ const sliceReducer = combineReducers({
   world: worldSlice.reducer,
   foundation: foundationSlice.reducer,
   forge: forgeSlice.reducer,
+  engine: engineSlice.reducer,
 });
 
-function rootReducer(state: RootState | undefined, action: Action): RootState {
+/** Exported for tests: the persist/loaded replace semantics are load-bearing
+ *  and deserve a direct test rather than one mediated by the store singleton. */
+export function rootReducer(
+  state: RootState | undefined,
+  action: Action,
+): RootState {
   if (action.type === PERSISTED_DATA_LOADED) {
     const data = action.payload as PersistedData;
     const current = state ?? sliceReducer(undefined, { type: "@@INIT" });
@@ -100,24 +61,48 @@ function rootReducer(state: RootState | undefined, action: Action): RootState {
         ? { ...initialStoryState, ...data.story }
         : current.story,
       chat: data.chat ?? current.chat,
-      world: data.world
-        ? migrateWorldState(data.world as WorldState)
-        : current.world,
+      world: data.world ?? current.world,
       foundation: data.foundation
         ? { ...initialFoundationState, ...data.foundation }
         : current.foundation,
-      forge: data.forge
-        ? { ...initialForgeState, ...data.forge }
-        : current.forge,
     };
   }
 
-  return sliceReducer(state, action);
+  const next = sliceReducer(state, action);
+
+  // The thread cap (§4.5), enforced where no callsite can dispatch around it —
+  // the same argument as one-entity-per-lorebook-entry in slices/world.ts, one
+  // level up. It is here rather than inside `threadCreated` because the cap is
+  // one of the Engine's per-story settings and phase 4b already mirrored those
+  // into the engine slice: a slice reducer cannot read another slice, and the
+  // root is the only reducer that sees both. Mirroring the number a second time
+  // into `WorldState` would have put a setting the Setup form owns inside the
+  // World record, where every load would overwrite whatever the form last said.
+  //
+  // Only on a create. Lowering the cap deletes nothing by itself, and loading
+  // the World is not a create — trimming there would spend a writer's threads
+  // on opening the story.
+  if (action.type === threadCreated.type) {
+    const threads = enforceThreadCap(
+      next.world.threads,
+      next.engine.settings.threadCap,
+    );
+    if (threads !== next.world.threads) {
+      return { ...next, world: { ...next.world, threads } };
+    }
+  }
+
+  return next;
 }
 
-const debug = (await api.v1.config.get("story_engine_debug")) || false;
+// nai-store logs `NAISTORE <action>` on EVERY dispatch when this is on, which is
+// many lines per keystroke. It has its own setting rather than riding on
+// story_engine_debug: that flag also gates the Engine's log lines, and sharing
+// one switch meant reading what the Engine decided required turning on a
+// firehose that buried it.
+const logActions = (await api.v1.config.get("store_action_log")) || false;
 
-export const store = createStore<RootState>(rootReducer, debug);
+export const store = createStore<RootState>(rootReducer, logActions);
 
 // Export types
 export * from "./types";
@@ -129,8 +114,12 @@ export * from "./slices/story";
 export * from "./slices/world";
 export * from "./slices/foundation";
 export * from "./slices/forge";
+export * from "./slices/engine";
 export {
   forgeChatContinueRequested,
   entityDiscardRequested,
   forgeChatNewSessionRequested,
 } from "./effects/forge-chat-effects";
+// The HUD's ⚡ dispatches this; the engine effect runs the pass. The real
+// re-entry guard is in the effect, not in the button (CLAUDE.md).
+export { enginePassRequested } from "./effects/engine-loop";

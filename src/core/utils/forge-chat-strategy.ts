@@ -173,15 +173,24 @@ export function buildForgeChatStrategy(
       ...conversation,
     ];
 
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.forge);
+    // "instruct", so this stays on GLM whatever the story's creative model is,
+    // and `appendXialongStyleMessage` therefore adds nothing. A pass emits a
+    // strict bracket grammar and every command that misses it is a card the
+    // writer does not get — that is format-following, not prose, which is the
+    // whole reason `Capability` splits the two. Observed the other way round:
+    // a pass on Xialong answered conversationally and created nothing.
+    await appendXialongStyleMessage(messages, XIALONG_STYLE.forge, "instruct");
 
     return {
       messages,
-      params: await buildModelParams({
-        max_tokens: maxTokens,
-        temperature,
-        min_p: 0.05,
-      }),
+      params: await buildModelParams(
+        {
+          max_tokens: maxTokens,
+          temperature,
+          min_p: 0.05,
+        },
+        "instruct",
+      ),
     };
   };
 
@@ -195,6 +204,13 @@ export function buildForgeChatStrategy(
     },
     prefillBehavior: "trim",
     assistantPrefill: "[",
+    // Cut off by the token cap, a forge turn stops mid-command: the bracket
+    // never closes, so the last action is lost and the turn reads as an
+    // unfinished thought. Chats and refines have continued since they shipped;
+    // the Forge did not, and a sketch emitting six commands is exactly the
+    // length that runs out of room. The engine folds the "[" prefill into the
+    // continuation turn, so the model resumes from all it has written.
+    continuation: { maxCalls: 4 },
   };
 }
 
@@ -263,6 +279,13 @@ export function buildForgeDiscussStrategy(
     },
     prefillBehavior: "trim",
     // No assistantPrefill: a discuss reply starts as prose, not a command.
+    // Cut off by the token cap, a forge turn stops mid-command: the bracket
+    // never closes, so the last action is lost and the turn reads as an
+    // unfinished thought. Chats and refines have continued since they shipped;
+    // the Forge did not, and a sketch emitting six commands is exactly the
+    // length that runs out of room. The engine folds the "[" prefill into the
+    // continuation turn, so the model resumes from all it has written.
+    continuation: { maxCalls: 4 },
   };
 }
 
@@ -299,11 +322,14 @@ export function buildForgeCleanupStrategy(
 
     return {
       messages,
-      params: await buildModelParams({
-        max_tokens: 400,
-        temperature: 0.6,
-        min_p: 0.05,
-      }),
+      params: await buildModelParams(
+        {
+          max_tokens: 400,
+          temperature: 0.6,
+          min_p: 0.05,
+        },
+        "instruct",
+      ),
     };
   };
 
@@ -318,6 +344,13 @@ export function buildForgeCleanupStrategy(
     },
     prefillBehavior: "trim",
     assistantPrefill: "[",
+    // Cut off by the token cap, a forge turn stops mid-command: the bracket
+    // never closes, so the last action is lost and the turn reads as an
+    // unfinished thought. Chats and refines have continued since they shipped;
+    // the Forge did not, and a sketch emitting six commands is exactly the
+    // length that runs out of room. The engine folds the "[" prefill into the
+    // continuation turn, so the model resumes from all it has written.
+    continuation: { maxCalls: 4 },
   };
 }
 

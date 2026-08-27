@@ -356,8 +356,9 @@ export function EntityEditPane(props: { entityId: string }) {
 
   // Populated-content Zap: flush the pane (persist name/summary/content/keys and
   // promote a draft), then open the refine chat on the entry's lorebook content.
-  // The Chat tab unmounts StoryEngine; on return the pane remounts and re-seeds
-  // the refined content from the lorebook (no stale clobber).
+  // Switching to the Chat tab unmounts this pane along with the rest of Engine;
+  // on return it remounts and re-seeds the refined content from the lorebook (no
+  // stale clobber).
   const onRefineContent = () => {
     void (async () => {
       const liveId = await flushToStore();

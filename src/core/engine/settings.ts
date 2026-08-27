@@ -1,0 +1,295 @@
+// The Engine's settings, and the storyStorage record that holds them.
+//
+// They used to be `project.yaml` entries read through `api.v1.config.get`. That
+// API is read-only — `get`, no `set` — so a Setup-tab control could never write
+// one back. Moving them into Story Engine's own storage makes them **per story**,
+// which is the right granularity rather than a consolation: the Engine is for a
+// writer steering an autonomous story, and the same person may hand-write the
+// next one.
+//
+// One record, not one key per setting. All of them are read together on every
+// pass and written together from one form, so there is nothing a shard would buy
+// — the same argument the loop's own record makes in intents.ts.
+//
+// Its own record rather than a corner of the World's: these are the writer's
+// answers to a form, and the World is what the Engine has recorded. Nothing
+// should be able to overwrite "is the Engine on" by saving a character.
+//
+// **The slot is not trusted.** It is JSON some previous version wrote, and once
+// the Setup form lands a writer can reach it through a text field. Every read
+// goes through `normalizeEngineSettings`, so a missing record, a partial one, or
+// a hostile value all yield a settings object a pass can actually use.
+
+import { STORAGE_KEYS } from "../keys";
+// Type-only, and deliberately so: `config.ts` imports `readEngineSettings` from
+// this module at runtime, so a value import back the other way would close a
+// cycle. The model IDs the normalizer validates against are duplicated below
+// with a test holding the two lists in step.
+import type { CreativeModel } from "../utils/config";
+import { PARAGRAPH_CHARS } from "./thread-horizon";
+
+export type EngineSettings = {
+  enabled: boolean;
+  delayMs: number;
+  minProse: number;
+  /** How many Threads a story may hold at once (§4.5). Enforced where it
+   *  cannot be bypassed — the reducer, see `src/core/engine/thread-cap.ts` —
+   *  rather than at the callsites that create threads. */
+  threadCap: number;
+  /** How long a managed lorebook entry may get, in **characters**, before the
+   *  Engine condenses it (§5.1).
+   *
+   *  Characters because that is the unit the house already reasons entry and
+   *  window sizes in (`THREAD_RANGE_CHARS`, `PARAGRAPH_CHARS`) and the unit
+   *  `LorebookEntry.text` is measurable in for free. Tokens would be truer to
+   *  the context cost this setting protects, but tokenising every entry on
+   *  every pass costs a model and a pass over the whole World to buy a
+   *  refinement of a threshold that is already a judgement call.
+   *
+   *  The Setup box shows it in PARAGRAPHS, since the writer's question is "how
+   *  much of my context is one entry eating"; `engine-settings-model.ts` owns
+   *  that conversion, the same way it owns seconds↔milliseconds. */
+  condenseAtChars: number;
+  /** Which model creative generation runs on for this story — prose, chat, the
+   *  Forge, lorebook entry text, the Engine's own rewrites.
+   *
+   *  Here rather than in `project.yaml` for the reason the rest of this record
+   *  is: `api.v1.config` is read-only, so a Setup control could never write one
+   *  back. Per story rather than per install because access is not the only
+   *  reason to change it — a writer with Opus may still want a story's chat to
+   *  follow instructions rather than improvise.
+   *
+   *  Extraction work (keys, summaries, triage) ignores this and always runs on
+   *  GLM; see `Capability` in `src/core/utils/config.ts`. */
+  creativeModel: CreativeModel;
+};
+
+/** What a story that has never been configured gets.
+ *
+ *  `enabled` is false on purpose: a loop that only watches has not earned the
+ *  right to spend the script's output budget on every generation. Opting in is
+ *  a decision, per story. */
+export const ENGINE_DEFAULTS: EngineSettings = {
+  enabled: false,
+  delayMs: 8000,
+  minProse: 1,
+  threadCap: 8,
+  // Five paragraphs. See CONDENSE_AT_CHARS_MIN/MAX for the ends; the middle is
+  // where one entry starts costing what a whole scene of recent prose costs.
+  // A generated entry is one or two paragraphs, so an entry at five has
+  // roughly tripled since it was written — which is §5.1's sprawl, arrived at
+  // by the revisions §5 keeps adding — and ~500 tokens of standing injection
+  // is a sixth of an Erato context spent on one subject.
+  condenseAtChars: 5 * PARAGRAPH_CHARS,
+  // GLM, because it is the model every subscription can reach. Defaulting to
+  // Xialong would give a writer without Opus a story whose every generation
+  // fails until they find this setting.
+  creativeModel: "glm-4-6",
+};
+
+// ───────────────────────────────── the bounds ─────────────────────────────────
+//
+// Each one is here because something breaks outside it. A bound that cannot be
+// justified is one the next person will change arbitrarily, so none are round
+// numbers for their own sake.
+
+/** The wakeup is armed when a generation STARTS (engine-loop.ts §3.1), so the
+ *  delay is measured against the writer's own stream. Under a second the wakeup
+ *  lands before that generation has produced its first tokens, the backend lock
+ *  refuses the pass, and an Engine that reports itself on never actually reads
+ *  anything. Zero and negative are the same failure at its worst — the timer
+ *  fires on the next tick, every time, forever. */
+export const DELAY_MS_MIN = 1000;
+
+/** The wakeup is one-shot and `pending` stays true until it fires: no generation
+ *  during the wait arms another. A delay longer than a stretch of writing
+ *  therefore buys one pass per session at best, and a mistyped extra zero
+ *  (80000000ms, twenty-two hours) buys none at all while the HUD still says the
+ *  Engine is on. Five minutes is already far past any useful "read what I just
+ *  wrote" latency, so nothing legitimate is lost above it. */
+export const DELAY_MS_MAX = 300_000;
+
+/** Below 1 the threshold asserts that a pass is worth running on no new prose —
+ *  a triage generation spent on nothing. 1 is also the default, at which the
+ *  gate is a no-op and every non-empty backlog runs. */
+export const MIN_PROSE_MIN = 1;
+
+/** A threshold no backlog reaches is an Engine that never fires, which is the
+ *  same silent failure as a delay of a day. It costs twice over: the pass holds
+ *  every unread paragraph until the threshold is met, and those paragraphs are
+ *  the volatile tail of the triage prompt when it finally is — so a threshold in
+ *  the thousands defers the pass indefinitely and then sends a chapter as input.
+ *  A hundred paragraphs is already several scenes. */
+export const MIN_PROSE_MAX = 100;
+
+/** Below 1 no thread may exist at all: the Forge's `[THREAD]` command and the
+ *  World's "+ New Thread" would both accept a click and leave nothing behind,
+ *  which reads as a broken feature rather than as a setting. 1 is the smallest
+ *  cap the mechanism still works at — each new commitment displaces the last. */
+export const THREAD_CAP_MIN = 1;
+
+/** A cap has to be low enough to still be capping. Every thread is a lorebook
+ *  entry whose reminder prose injects when the story stops carrying it
+ *  (`thread-condition.ts`), and phase 5's triage manifest lists every thread on
+ *  every pass — so the ceiling is where the cap stops being proliferation
+ *  control and becomes permission to poison the context the Engine exists to
+ *  improve. Forty simultaneous reminders is on the order of two to three
+ *  thousand tokens of injection, a third of an Erato context, plus forty lines
+ *  in the prompt of every pass. It is also five times the default, so a writer
+ *  who genuinely runs a crowded story has room to say so. */
+export const THREAD_CAP_MAX = 40;
+
+/** Below two paragraphs the threshold is under the size entries are BORN at:
+ *  `createLorebookContentFactory` writes them at up to 1024 tokens and a
+ *  typical one lands at one to two paragraphs. Set lower and every managed
+ *  entity is a standing condense candidate the moment it is generated, so every
+ *  pass queues a 1024-token rewrite — and since §3.3's bucket covers one entry
+ *  rewrite per pass, the revises that record what the story actually did queue
+ *  behind maintenance work forever. The counterweight would starve the thing it
+ *  is a counterweight to. */
+export const CONDENSE_AT_CHARS_MIN = 2 * PARAGRAPH_CHARS;
+
+/** Ten paragraphs — about 1024 tokens, which is what a condense may emit
+ *  (`CONDENSE_MAX_TOKENS`, §3.3). At the ceiling the action can still restate
+ *  the entry it was handed; above it, an entry could cross the threshold and
+ *  yet be too long for its own rewrite to reproduce, so every attempt would run
+ *  to the token limit and be refused (`composeCondensation` declines a
+ *  truncated condense). A threshold whose crossings can never be acted on is
+ *  the same silent failure as a delay of a day: the setting reads as on and
+ *  does nothing. */
+export const CONDENSE_AT_CHARS_MAX = 10 * PARAGRAPH_CHARS;
+
+/** A stored record as it may actually be: every field optional, every field of
+ *  unknown type. `storyStorage.get` is typed `Promise<any>`, so the shape is
+ *  named here at the boundary rather than let loose, the way mount.ts names what
+ *  it loads. */
+type StoredEngineSettings = Partial<Record<keyof EngineSettings, unknown>>;
+
+function readBoolean(value: unknown, fallback: boolean): boolean {
+  // No coercion. `"false"` is truthy and `"true"` is a form that failed to parse
+  // its input — both should show the writer a default they can see and re-enter,
+  // not a setting that quietly means the opposite of what it says.
+  return typeof value === "boolean" ? value : fallback;
+}
+
+/** Clamp a stored number into a range, or fall back when it is not a usable
+ *  number at all.
+ *
+ *  The two paths are different on purpose. A finite number outside the range is
+ *  a writer's intent, expressed too far — clamping keeps it. `NaN`, `Infinity`,
+ *  a string, an object: those carry no intent to preserve, and `Math.min`/`max`
+ *  propagate `NaN` rather than repairing it, so they take the default instead.
+ *
+ *  `round` runs after the clamp so the stored number means exactly what it does:
+ *  the loop compares an integer backlog against `minProse` and hands `delayMs`
+ *  straight to a timer. */
+/** The model ids `normalizeEngineSettings` will accept.
+ *
+ *  Spelled out rather than imported from `CREATIVE_MODELS` because that import
+ *  would be a runtime edge back into `config.ts`, which already depends on this
+ *  module. `tests/core/engine/settings.test.ts` asserts the two lists match, so
+ *  a model added to the picker and not to here fails the suite rather than
+ *  silently normalising away every time a story is loaded. */
+const CREATIVE_MODEL_IDS: readonly string[] = ["glm-4-6", "xialong-v1"];
+
+/** A stored model id, or the default. No coercion and no nearest-match: an id
+ *  this build does not know is either a typo or a model from a version that had
+ *  one, and generating against it would fail at the API rather than here. */
+function readCreativeModel(
+  value: unknown,
+  fallback: CreativeModel,
+): CreativeModel {
+  return typeof value === "string" && CREATIVE_MODEL_IDS.includes(value)
+    ? (value as CreativeModel)
+    : fallback;
+}
+
+function readNumber(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+  round: (n: number) => number,
+): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return round(Math.min(Math.max(value, min), max));
+}
+
+/** Everything above, applied to one stored value of any shape.
+ *
+ *  Exported because the Setup form writes through the same funnel and should be
+ *  able to show what a value became without a round-trip through storage. */
+export function normalizeEngineSettings(value: unknown): EngineSettings {
+  // Anything that is not a record — null, a string, an array from some earlier
+  // three-value shape — has no fields to read, so it reads as a fresh install.
+  const record: StoredEngineSettings =
+    typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as StoredEngineSettings)
+      : {};
+
+  return {
+    enabled: readBoolean(record.enabled, ENGINE_DEFAULTS.enabled),
+    delayMs: readNumber(
+      record.delayMs,
+      ENGINE_DEFAULTS.delayMs,
+      DELAY_MS_MIN,
+      DELAY_MS_MAX,
+      Math.round,
+    ),
+    // Rounded UP, not to nearest: the gate skips while `backlog < minProse`, so
+    // 2.5 already behaves as 3. Rounding up normalises the number without
+    // changing what it does; rounding down would quietly lower the threshold.
+    minProse: readNumber(
+      record.minProse,
+      ENGINE_DEFAULTS.minProse,
+      MIN_PROSE_MIN,
+      MIN_PROSE_MAX,
+      Math.ceil,
+    ),
+    // Rounded DOWN, the mirror of `minProse` and for the same reason: the cap
+    // admits a thread while the list is shorter than it, so 8.5 already behaves
+    // as 8. Rounding down normalises the number without changing what it does;
+    // rounding up would quietly raise the ceiling by one.
+    threadCap: readNumber(
+      record.threadCap,
+      ENGINE_DEFAULTS.threadCap,
+      THREAD_CAP_MIN,
+      THREAD_CAP_MAX,
+      Math.floor,
+    ),
+    // Rounded to NEAREST, unlike the two above, because neither direction
+    // changes what the number does: the trigger compares an integer character
+    // count against it, so half a character is not a threshold anyone can
+    // cross either way. Nearest is then simply the smallest correction.
+    condenseAtChars: readNumber(
+      record.condenseAtChars,
+      ENGINE_DEFAULTS.condenseAtChars,
+      CONDENSE_AT_CHARS_MIN,
+      CONDENSE_AT_CHARS_MAX,
+      Math.round,
+    ),
+    creativeModel: readCreativeModel(
+      record.creativeModel,
+      ENGINE_DEFAULTS.creativeModel,
+    ),
+  };
+}
+
+/** The Engine's settings, read fresh each time so switching the Engine off takes
+ *  effect on the next generation rather than the next session. */
+export async function readEngineSettings(): Promise<EngineSettings> {
+  const stored: unknown = await api.v1.storyStorage.get(
+    STORAGE_KEYS.ENGINE_SETTINGS,
+  );
+  return normalizeEngineSettings(stored);
+}
+
+/** Persist the settings. Normalised on the way in as well as on the way out, so
+ *  the slot never holds a value the next read has to repair — and so what the
+ *  form shows after a save is what the loop will act on. */
+export async function writeEngineSettings(next: EngineSettings): Promise<void> {
+  await api.v1.storyStorage.set(
+    STORAGE_KEYS.ENGINE_SETTINGS,
+    normalizeEngineSettings(next),
+  );
+}
