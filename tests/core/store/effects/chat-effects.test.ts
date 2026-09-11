@@ -10,11 +10,13 @@ import {
   uiChatRefineRequested,
   uiChatSubmitUserMessage,
   uiChatSummarizeRequested,
+  uiChatRetryGeneration,
 } from "../../../../src/core/store/slices/ui";
 import {
   chatCreated,
   chatSwitched,
 } from "../../../../src/core/store/slices/chat";
+import { forgeChatContinueRequested } from "../../../../src/core/store/effects/forge-chat-actions";
 import type { Chat } from "../../../../src/core/chat-types/types";
 import type { Action } from "nai-store";
 import type { RootState, AppDispatch } from "../../../../src/core/store/types";
@@ -336,5 +338,94 @@ describe("chatHasPendingRequest", () => {
         "c1",
       ),
     ).toBe(false);
+  });
+});
+
+describe("retrying a forge turn", () => {
+  // Reported against 0.14.2: a Forge pass answered conversationally, the writer
+  // retried the turn, the retry came back in perfect command format — and
+  // produced no entity cards and a Commit button that stayed disabled.
+  //
+  // The generic retry builds its strategy with `buildChatStrategy`, which knows
+  // the refine path and the saved-chat path and nothing about the Forge. A
+  // forge turn therefore retried as an ORDINARY CHAT: target `{type: "chat"}`,
+  // routed to `chatHandler`, which writes the message text and stops. Nothing
+  // parsed the commands, nothing dispatched `entityForged`, so no draft existed
+  // to render as an inline card or for Commit to count — while the text on
+  // screen looked exactly right.
+  //
+  // `forgeChatContinueRequested({advancePhase: false})` is the path that was
+  // always meant to serve this; forge-chat-effects documents that case as
+  // "empty-send / retry", and not advancing re-runs the CURRENT phase, which is
+  // what a retry means.
+  function forgeChat(): Chat {
+    return {
+      id: "fc-1",
+      type: "forge",
+      title: "Forge",
+      subMode: "sketch",
+      messages: [
+        { id: "u1", role: "user", content: "build it" },
+        { id: "a1", role: "assistant", content: "sure, let's chat about it" },
+      ],
+      seed: { kind: "blank" },
+    } as Chat;
+  }
+
+  it("re-runs the forge pass rather than an ordinary chat turn", async () => {
+    const h = makeHarness();
+    h.store.dispatch(chatCreated({ chat: forgeChat() }));
+    h.store.dispatch(chatSwitched({ id: "fc-1" }));
+
+    const seen: string[] = [];
+    h.store.subscribeEffect(
+      () => true,
+      (action: Action) => {
+        seen.push(action.type);
+      },
+    );
+
+    await h.dispatchAndWait(
+      uiChatRetryGeneration({ chatId: "fc-1", messageId: "a1" }),
+    );
+
+    expect(seen).toContain(forgeChatContinueRequested.type);
+    expect(seen).not.toContain("ui/generationSubmitted");
+  });
+
+  it("does not re-run the forge pass for an ordinary chat", async () => {
+    // The branch must be on chat type, not on "is there a forge chat anywhere".
+    const h = makeHarness();
+    h.store.dispatch(
+      chatCreated({
+        chat: {
+          id: "bs-1",
+          type: "brainstorm",
+          title: "Brainstorm",
+          subMode: "cowriter",
+          messages: [
+            { id: "u1", role: "user", content: "hi" },
+            { id: "a1", role: "assistant", content: "hello" },
+          ],
+          seed: { kind: "blank" },
+        } as Chat,
+      }),
+    );
+    h.store.dispatch(chatSwitched({ id: "bs-1" }));
+
+    const seen: string[] = [];
+    h.store.subscribeEffect(
+      () => true,
+      (action: Action) => {
+        seen.push(action.type);
+      },
+    );
+
+    await h.dispatchAndWait(
+      uiChatRetryGeneration({ chatId: "bs-1", messageId: "a1" }),
+    );
+
+    expect(seen).not.toContain(forgeChatContinueRequested.type);
+    expect(seen).toContain("ui/generationSubmitted");
   });
 });

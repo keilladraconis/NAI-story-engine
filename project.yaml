@@ -1,12 +1,12 @@
 compatibilityVersion: naiscript-1.0
 id: e6c35faa-e4f2-4c3b-af4a-d56e4c992d87
 name: Story Engine
-version: 0.14.2
+version: 0.14.3
 createdAt: 1765374901
 author: Keilla
 description: A helper for writing stories
 memoryLimit: 8
-updatedAt: 1786885623
+updatedAt: 1787838208
 config:
   - name: xialong_mode
     prettyName: Xialong Mode

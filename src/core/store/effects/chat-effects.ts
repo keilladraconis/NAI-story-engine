@@ -24,6 +24,7 @@ import { getChatTypeSpec } from "../../chat-types";
 import type { Chat, ChatSeed } from "../../chat-types/types";
 import { buildChatStrategy } from "../../utils/chat-strategy";
 import { buildModelParams } from "../../utils/config";
+import { forgeChatContinueRequested } from "./forge-chat-actions";
 
 function findChat(state: RootState, id: string): Chat | undefined {
   return state.chat.chats.find((c) => c.id === id);
@@ -150,6 +151,22 @@ export function registerChatEffects(
       dispatch(messagesPrunedAfter({ chatId, id: messageId }));
       const chat = findChat(latest(), chatId);
       if (!chat) return;
+      // A forge turn is not an ordinary chat turn, and retrying it as one fails
+      // silently: `buildChatStrategy` knows the refine path and the saved-chat
+      // path and nothing about the Forge, so a forge retry came back as
+      // `target: {type: "chat"}` and routed to `chatHandler`, which writes the
+      // message text and stops. The commands were never parsed, `entityForged`
+      // was never dispatched, so no draft existed to render as an inline card
+      // or for Commit to count — while the text on screen looked exactly right.
+      //
+      // `forgeChatContinueRequested` with `advancePhase: false` is the path
+      // that was always meant to serve this — forge-chat-effects documents that
+      // case as "empty-send / retry" — and not advancing re-runs the CURRENT
+      // phase, which is what a retry means.
+      if (chat.type === "forge") {
+        dispatch(forgeChatContinueRequested({ chatId, advancePhase: false }));
+        return;
+      }
       const assistantId = api.v1.uuid();
       dispatch(
         messageAdded({

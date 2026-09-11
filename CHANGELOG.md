@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.3] - 2026-08-27
+
+### Fixed
+
+- **Retrying a Forge turn re-runs the Forge, instead of answering as ordinary chat.** Retry rebuilt the turn as a normal chat message, so the reply came back in perfect command format and nothing happened: no entities were created, no cards appeared under the turn, and Commit stayed greyed out because there was nothing to cast. A retry now re-runs the current phase, the same as an empty send. Starting a fresh Forge Ahead was always unaffected.
+
 ## [0.14.2] - 2026-08-16
 
 ### Changed
