@@ -27,6 +27,9 @@ const ALLOWED = [
   "src/ui/panels/world/ThreadEditPane.tsx",
 ];
 
+// This scan follows the identifier. A value travelling as plain text — a Forge
+// transcript quoting its own `[THREAD …]` command — is invisible to it; that
+// half is checked by sentinel in `private-notes-sinks.test.ts`.
 describe("a Thread's private notes never reach the story model", () => {
   const offenders = sourcesUnder("src")
     .filter((path) => !ALLOWED.includes(path.split("\\").join("/")))

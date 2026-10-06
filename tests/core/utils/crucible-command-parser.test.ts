@@ -3,6 +3,7 @@ import {
   parseCommands,
   serializeForgeCommand,
   canonicalizeForgeCommands,
+  redactThreadPrivateNotes,
   walkForgeLines,
   parseForgeStream,
   describeForgeCommand,
@@ -524,5 +525,50 @@ describe("parseForgeStream", () => {
       segments: [],
       pending: { kind: "none" },
     });
+  });
+});
+
+describe("redactThreadPrivateNotes", () => {
+  const SENTINEL = "ZZ-PRIVATE-SENTINEL-7781";
+
+  it("drops the fourth segment of a THREAD command", () => {
+    expect(
+      redactThreadPrivateNotes(
+        `[THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary | ${SENTINEL}]`,
+      ),
+    ).toBe(
+      '[THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary]',
+    );
+  });
+
+  it("leaves a three-segment THREAD and a non-THREAD line exactly as written", () => {
+    const three =
+      '[THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary]';
+    expect(redactThreadPrivateNotes(three)).toBe(three);
+    // Not canonical on purpose: only THREAD commands are ever rewritten.
+    const other = '[SYSTEM: "Smoke Rota" | who lights the smoker, and when]';
+    expect(redactThreadPrivateNotes(other)).toBe(other);
+    expect(redactThreadPrivateNotes("Just prose | with a bar.")).toBe(
+      "Just prose | with a bar.",
+    );
+  });
+
+  it("rewrites a THREAD line among other lines and touches nothing else", () => {
+    const input = [
+      "Two things to record.",
+      '[CREATE CHARACTER "Ines" | keeps the upper hives]',
+      `  [THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary | ${SENTINEL}]`,
+      "",
+      "Anything else?",
+    ].join("\n");
+    const out = redactThreadPrivateNotes(input);
+    expect(out).not.toContain(SENTINEL);
+    expect(out.split("\n")).toEqual([
+      "Two things to record.",
+      '[CREATE CHARACTER "Ines" | keeps the upper hives]',
+      '[THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary]',
+      "",
+      "Anything else?",
+    ]);
   });
 });

@@ -27,6 +27,7 @@ import {
   DulfsFieldID,
 } from "../../config/field-definitions";
 import { STORAGE_KEYS } from "../keys";
+import { redactThreadPrivateNotes } from "./crucible-command-parser";
 // --- Helpers ---
 
 /**
@@ -343,6 +344,15 @@ export async function formatSettingBlock(): Promise<string> {
   return setting ? `[SETTING]\n${setting}` : "";
 }
 
+/**
+ * The active chat's transcript as a `[BRAINSTORM]` block.
+ *
+ * This is where a chat stops being a conversation and becomes context for
+ * models whose output the story reads (lorebook entries, the opening scene),
+ * so it is also where a Thread's private notes are cut out: a Forge chat holds
+ * them as the last segment of its own `[THREAD …]` commands. The stored chat is
+ * untouched, and the Forge reads `chat.messages` directly, never this block.
+ */
 export function formatBrainstormBlock(getState: () => RootState): string {
   const state = getState();
   const active = activeSavedChat(state.chat);
@@ -350,7 +360,9 @@ export function formatBrainstormBlock(getState: () => RootState): string {
   const ctx: SpecCtx = { getState, dispatch: () => {} };
   const messages = getChatTypeSpec(active.type).contextSlice(active, ctx);
   const chatText = messages
-    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+    .map(
+      (m) => `${m.role.toUpperCase()}: ${redactThreadPrivateNotes(m.content)}`,
+    )
     .join("\n");
   return chatText ? `[BRAINSTORM]\n${chatText}` : "";
 }

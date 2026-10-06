@@ -182,3 +182,47 @@ describe("buildForgeBriefing", () => {
     expect(briefing).toBe("");
   });
 });
+
+describe("a Forge transcript entering the Story Engine prefix", () => {
+  const SENTINEL = "ZZ-PRIVATE-SENTINEL-7781";
+  const STATE_TEXT = "Ines and Pell share the upper apiary";
+  const forgeChat: Chat = {
+    id: "f1",
+    type: "forge",
+    title: "Forge",
+    subMode: "sketch",
+    messages: [
+      { id: "u", role: "user", content: "Tie the two keepers together." },
+      {
+        id: "a",
+        role: "assistant",
+        content: [
+          "Recording how they stand.",
+          `[THREAD "The Split Hive" | "Ines", "Pell" | ${STATE_TEXT} | ${SENTINEL}]`,
+        ].join("\n"),
+      },
+    ],
+    seed: { kind: "blank" },
+  };
+  const getState = () => makeState({ activeChat: forgeChat });
+
+  it("carries a Thread's state but never its private notes", async () => {
+    const prefix = await buildStoryEnginePrefix(getState);
+    expect(prefix.length).toBeGreaterThan(0);
+    for (const message of prefix) {
+      expect(message.content).not.toContain(SENTINEL);
+    }
+    expect(prefix.map((m) => m.content).join("\n")).toContain(STATE_TEXT);
+  });
+
+  it("keeps them out of the next Forge session's briefing too", async () => {
+    const briefing = await buildForgeBriefing(getState);
+    expect(briefing).toContain(STATE_TEXT);
+    expect(briefing).not.toContain(SENTINEL);
+  });
+
+  it("leaves the stored chat as the Forge wrote it", async () => {
+    await buildStoryEnginePrefix(getState);
+    expect(forgeChat.messages[1].content).toContain(SENTINEL);
+  });
+});
