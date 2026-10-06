@@ -1,5 +1,5 @@
 // Static guards over the World's thread surfaces: the status indicator, the
-// thread row in the World list, and the edit pane's horizon and status controls.
+// thread row in the World list, and the edit pane's fields and status control.
 //
 // `.tsx` is never collected by vitest here, so none of these can be
 // render-tested; what a source scan can hold is their structure, and every
@@ -248,6 +248,28 @@ describe("the edit pane keeps the private half private", () => {
   it("saves both halves in one action", () => {
     expect(pane).toMatch(
       /threadLedgerUpdated\(\{\s*threadId,\s*state: state\.value\.trim\(\),\s*latent: latent\.value\.trim\(\),/,
+    );
+  });
+
+  it("writes the ledger back only when the writer changed it", () => {
+    // The drafts are seeded once, at mount, and the Engine rewrites ledgers in
+    // the background. A Save that always dispatched would put the stale seed
+    // back over whatever a review wrote while the pane was open.
+    const src = code(pane);
+    expect(src).toMatch(
+      /if \(\s*state\.value !== seeded\.state \|\|\s*latent\.value !== seeded\.latent\s*\) \{\s*store\.dispatch\(\s*threadLedgerUpdated\(/,
+    );
+    expect(src).toMatch(
+      /if \(title\.value !== seeded\.title\) \{\s*store\.dispatch\(\s*threadRenamed\(/,
+    );
+    // Exactly one of each, so there is no second, unguarded path.
+    expect([...src.matchAll(/threadLedgerUpdated\(/g)]).toHaveLength(1);
+    expect([...src.matchAll(/threadRenamed\(/g)]).toHaveLength(1);
+  });
+
+  it("takes the seed once, from the same values the drafts start with", () => {
+    expect(code(pane)).toMatch(
+      /const seeded = useRef\(\{\s*title: thread\?\.title \?\? "",\s*state: thread\?\.state \?\? "",\s*latent: thread\?\.latent \?\? "",\s*\}\)\.current;/,
     );
   });
 

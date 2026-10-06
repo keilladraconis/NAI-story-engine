@@ -968,6 +968,17 @@ describe("the admit arm", () => {
     expect(h.store.getState().world.threads).toHaveLength(1);
   });
 
+  it("sees that twin through a cast id the World no longer holds", async () => {
+    const h = harness(
+      [thread("t0", { entityIds: ["b", "gone", "a"] })],
+      cast(),
+    );
+    h.generate.mockImplementation(says(WRITE));
+    await drain([admit], h.deps);
+    expect(h.generate).not.toHaveBeenCalled();
+    expect(h.store.getState().world.threads).toHaveLength(1);
+  });
+
   it("drops cast members the World no longer holds, and admits nothing if none are left", async () => {
     const h = harness([], []);
     await drain([admit], h.deps);

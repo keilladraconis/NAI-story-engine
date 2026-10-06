@@ -206,7 +206,7 @@ export function World() {
                 <Fragment>
                   <button
                     onClick={() => setConcludedOpen(!concludedOpen)}
-                    title="Threads whose state has settled into their cast's entries"
+                    title="Threads that have settled; their entries are switched off"
                     style={{
                       display: "inline-flex",
                       alignItems: "center",

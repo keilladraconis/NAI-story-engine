@@ -342,6 +342,9 @@ export type FloorContext = {
   paragraphs: string[];
   aliases: Aliases;
   threadCap: number;
+  /** The ids of the entities the World holds now. A Thread's cast can keep the
+   *  id of one that has since gone; a cast is compared by who is still in it. */
+  knownEntityIds: ReadonlySet<string>;
 };
 
 export type FloorResult = {
@@ -358,8 +361,9 @@ function sameCast(a: readonly string[], b: readonly string[]): boolean {
 /** What code checks before anything is queued.
  *
  *  1. UPDATE and CONCLUDE must name a Thread that is still open.
- *  2. An ADMIT whose cast is exactly an open Thread's cast is that Thread
- *     again under another title; it becomes an UPDATE of it.
+ *  2. An ADMIT whose cast is exactly an open Thread's live cast — the members
+ *     the World still holds — is that Thread again under another title; it
+ *     becomes an UPDATE of it.
  *  3. One ADMIT per review.
  *  4. Every admitted cast member is named in at least `ADMIT_MIN_PARAGRAPHS`
  *     separate paragraphs of the window.
@@ -394,7 +398,10 @@ export function applyFloors(
     }
 
     const twin = open.find((thread) =>
-      sameCast(thread.entityIds, decision.entityIds),
+      sameCast(
+        thread.entityIds.filter((id) => context.knownEntityIds.has(id)),
+        decision.entityIds,
+      ),
     );
     if (twin) {
       touch({ kind: "update", threadId: twin.id });

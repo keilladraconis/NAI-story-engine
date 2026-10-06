@@ -366,9 +366,13 @@ function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
     };
   }
 
+  // Four segments first, and its third may be empty: a Thread with private
+  // notes and no state serializes as `| | notes`, and read by the three-segment
+  // form those notes would come back as the state — the half the story model
+  // is shown.
   const threadMatch =
     line.match(
-      /^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^|]+?)\|([^\]]+?)\]?\s*$/,
+      /^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^|]*?)\|([^\]]+?)\]?\s*$/,
     ) ??
     line.match(/^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^\]]+?)\]?\s*$/) ??
     line.match(/^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\]?\s*$/);
@@ -460,10 +464,15 @@ export function serializeForgeCommand(cmd: ParsedCommand): string {
       return `[RENAME "${cmd.oldName}" → "${cmd.newName}"]`;
     case "THREAD": {
       const members = cmd.memberNames.map((n) => `"${n}"`).join(", ");
-      const tail = [cmd.state, cmd.latent].filter(Boolean).join(" | ");
-      return tail
-        ? `[THREAD "${cmd.title}" | ${members} | ${tail}]`
-        : `[THREAD "${cmd.title}" | ${members}]`;
+      // Position is meaning here: the third segment is `state`, the fourth
+      // `latent`. So a private half always gets both bars, even around an
+      // empty state — dropping the empty one would promote it to state on the
+      // next parse.
+      const head = `[THREAD "${cmd.title}" | ${members}`;
+      if (cmd.latent) {
+        return `${head} |${cmd.state ? ` ${cmd.state}` : ""} | ${cmd.latent}]`;
+      }
+      return cmd.state ? `${head} | ${cmd.state}]` : `${head}]`;
     }
     case "CRITIQUE":
       return `[CRITIQUE | ${cmd.text}]`;

@@ -32,7 +32,7 @@ const STATUS_TEXT: Record<ThreadStatus, StatusOption> = {
   concluded: {
     id: "concluded",
     label: "Concluded",
-    help: "Concluded — settled, and written into its cast's own entries",
+    help: "Concluded — settled; its lorebook entry is switched off",
     action: "Reopen",
   },
 };

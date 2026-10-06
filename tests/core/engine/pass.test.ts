@@ -1005,6 +1005,34 @@ describe("the pass", () => {
     });
   });
 
+  describe("a queue holding an intent missing what its arm reads", () => {
+    it("drops it and completes the pass instead of failing the same way forever", async () => {
+      // `intentKey` sorts an admission's cast; without one it throws inside
+      // `dedupe`, before the record is saved — so the bad intent is still
+      // there on the next pass, and the one after.
+      const h = harness();
+      documentOf("Ada counted the frames.");
+      seedLoopRecord({
+        queue: [
+          { kind: "admit", prose: "x" },
+          { kind: "admit", title: "The Levy", entityIds: "e1", prose: "x" },
+          { kind: "admit", title: "The Levy", entityIds: [7], prose: "x" },
+          { kind: "revise", prose: "x" },
+          { kind: "condense" },
+          { kind: "threadWrite", prose: "x" },
+          { kind: "conclude", threadId: 3, prose: "x" },
+        ] as unknown as EngineRecord["queue"],
+      });
+      triageReturns(h, "");
+
+      await expect(h.runPass()).resolves.toBeUndefined();
+
+      expect(loopRecord()?.queue).toEqual([]);
+      expect(h.store.getState().engine.phase).toBe("idle");
+      expect(h.store.getState().engine.consecutiveFailures).toBe(0);
+    });
+  });
+
   // ───────────────────── the log, behind story_engine_debug ─────────────────────
   //
   // §9.1's HUD is the always-on surface and these lines are the detail behind

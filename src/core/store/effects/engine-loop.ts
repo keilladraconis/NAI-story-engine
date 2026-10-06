@@ -192,15 +192,42 @@ const KNOWN_KINDS: ReadonlySet<string> = new Set([
  *  entry rewrite on whatever prose the running pass happens to hold, which is
  *  precisely the failure the field exists to prevent. The work is lost, and
  *  losing it costs the writer nothing they can see — triage names an entry the
- *  story has made wrong again the next time the story says so. */
+ *  story has made wrong again the next time the story says so.
+ *
+ *  **And each kind must carry what its arm reads** (`hasSubject`). An `admit`
+ *  with no cast throws in `intentKey`, inside `dedupe`, before the record is
+ *  saved — so the same intent is there to throw on the next pass, and every
+ *  pass after it. */
 function readQueue(value: unknown): Intent[] {
   if (!Array.isArray(value)) return [];
   return (value as Intent[]).filter(
     (intent) =>
       KNOWN_KINDS.has(intent?.kind) &&
+      hasSubject(intent) &&
       (intent.kind === "condense" ||
         (typeof intent.prose === "string" && intent.prose.length > 0)),
   );
+}
+
+/** Whether a persisted intent names what it acts on, in the type its arm and
+ *  `intentKey` expect. Exhaustive with no `default`, so a new kind has to
+ *  answer here before it can be read back. */
+function hasSubject(intent: Intent): boolean {
+  switch (intent.kind) {
+    case "revise":
+      return typeof intent.entityId === "string";
+    case "condense":
+      return typeof intent.entryId === "string";
+    case "threadWrite":
+    case "conclude":
+      return typeof intent.threadId === "string";
+    case "admit":
+      return (
+        typeof intent.title === "string" &&
+        Array.isArray(intent.entityIds) &&
+        intent.entityIds.every((id) => typeof id === "string")
+      );
+  }
 }
 
 /** The loop's one record, hydrated. Both halves default independently, so a
@@ -449,6 +476,7 @@ async function runReview(
     paragraphs: window.paragraphs,
     aliases,
     threadCap: settings.threadCap,
+    knownEntityIds: new Set(state.world.entityIds),
   });
   for (const { decision, reason } of refused) {
     await log(

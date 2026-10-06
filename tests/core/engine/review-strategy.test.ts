@@ -323,6 +323,7 @@ describe("the floors", () => {
     paragraphs: sustained,
     aliases,
     threadCap: 8,
+    knownEntityIds: new Set(["a", "b", "c"]),
   };
   const admit = (entityIds: string[]) => ({
     kind: "admit" as const,
@@ -351,6 +352,20 @@ describe("the floors", () => {
     const paragraphs = ["Ines and Pell.", "Pell and Ines.", "Ines, Pell."];
     expect(
       applyFloors([admit(["b", "a"])], { ...context, paragraphs }).accepted,
+    ).toEqual([{ kind: "update", threadId: "t1" }]);
+  });
+
+  it("sees the twin through a cast id the World no longer holds", () => {
+    // A Thread can keep the id of an entity that has since gone. Compared raw,
+    // its cast is three long and the admission's is two, so the same arc is
+    // admitted a second time under another title.
+    const paragraphs = ["Ines and Pell.", "Pell and Ines.", "Ines, Pell."];
+    expect(
+      applyFloors([admit(["a", "b"])], {
+        ...context,
+        threads: [thread({ entityIds: ["a", "gone", "b"] })],
+        paragraphs,
+      }).accepted,
     ).toEqual([{ kind: "update", threadId: "t1" }]);
   });
 

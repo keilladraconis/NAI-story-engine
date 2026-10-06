@@ -572,3 +572,40 @@ describe("redactThreadPrivateNotes", () => {
     ]);
   });
 });
+
+describe("a THREAD command survives serialize → parse", () => {
+  const base = {
+    kind: "THREAD" as const,
+    title: "The Split Hive",
+    memberNames: ["Ines", "Pell"],
+  };
+  const cases = [
+    ["both", "they share the apiary", "Pell means to sell"],
+    ["state only", "they share the apiary", ""],
+    ["notes only", "", "Pell means to sell"],
+    ["neither", "", ""],
+  ] as const;
+
+  for (const [name, state, latent] of cases) {
+    it(`round-trips with ${name}`, () => {
+      const command = { ...base, state, latent };
+      const line = serializeForgeCommand(command);
+      expect(parseCommands(line)).toEqual([command]);
+      expect(canonicalizeForgeCommands(line)).toBe(line);
+    });
+  }
+
+  it("never lets private notes re-parse as the state the story model reads", () => {
+    const SENTINEL = "ZZ-PRIVATE-SENTINEL-7781";
+    const line = serializeForgeCommand({
+      ...base,
+      state: "",
+      latent: SENTINEL,
+    });
+    const [parsed] = parseCommands(line);
+    expect(parsed).toMatchObject({ state: "", latent: SENTINEL });
+    expect(redactThreadPrivateNotes(line)).toBe(
+      '[THREAD "The Split Hive" | "Ines", "Pell"]',
+    );
+  });
+});

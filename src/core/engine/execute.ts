@@ -476,12 +476,13 @@ async function admissible(
     await deps.log(`[engine] admit "${title}": thread limit reached, refused`);
     return null;
   }
-  const twin = state.world.threads.find(
-    (t) =>
-      t.status === "open" &&
-      t.entityIds.length === cast.length &&
-      cast.every((id) => t.entityIds.includes(id)),
-  );
+  // Against each Thread's live cast, as `cast` itself is: an id the World no
+  // longer holds must not make the same arc look like a different one.
+  const twin = state.world.threads.find((t) => {
+    if (t.status !== "open") return false;
+    const live = t.entityIds.filter((id) => state.world.entitiesById[id]);
+    return live.length === cast.length && cast.every((id) => live.includes(id));
+  });
   if (twin) {
     await deps.log(
       `[engine] admit "${title}": "${twin.title}" already has this cast, refused`,

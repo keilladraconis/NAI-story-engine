@@ -120,6 +120,15 @@ export function ThreadEditPane(props: { threadId: string }) {
   const title = useDraftField(thread?.title ?? "");
   const state = useDraftField(thread?.state ?? "");
   const latent = useDraftField(thread?.latent ?? "");
+  // What the drafts started as. The Engine rewrites a Thread's ledger in the
+  // background, so by the time Save is pressed the store may hold something
+  // newer than this pane was opened on; Save compares against these to tell an
+  // edit from a draft nobody touched.
+  const seeded = useRef({
+    title: thread?.title ?? "",
+    state: thread?.state ?? "",
+    latent: thread?.latent ?? "",
+  }).current;
 
   const reqId = `se-thread-summary-${threadId}`;
   const bufferKey = `thread-summary:${threadId}`;
@@ -157,15 +166,23 @@ export function ThreadEditPane(props: { threadId: string }) {
 
   const close = () => store.dispatch(uiEditableDeactivate());
 
+  // Only what the writer changed is written back. An untouched draft is the
+  // value from when the pane opened, and dispatching it would undo an update
+  // the Engine made since. Both halves still travel in one action: an edit to
+  // either is the writer's word on the whole ledger.
   const onSave = () => {
-    store.dispatch(threadRenamed({ threadId, title: title.value.trim() }));
-    store.dispatch(
-      threadLedgerUpdated({
-        threadId,
-        state: state.value.trim(),
-        latent: latent.value.trim(),
-      }),
-    );
+    if (title.value !== seeded.title) {
+      store.dispatch(threadRenamed({ threadId, title: title.value.trim() }));
+    }
+    if (state.value !== seeded.state || latent.value !== seeded.latent) {
+      store.dispatch(
+        threadLedgerUpdated({
+          threadId,
+          state: state.value.trim(),
+          latent: latent.value.trim(),
+        }),
+      );
+    }
     close();
   };
 
