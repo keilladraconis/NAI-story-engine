@@ -308,4 +308,55 @@ describe("the review step", () => {
     expect(h.seen).not.toContain("write");
     expect(h.store.getState().world.threads).toEqual([]);
   });
+  it("keeps reading window after window while the unread prose does not fit one", async () => {
+    // Five paragraphs of 7000 characters: one to a window, so the unread count
+    // falls 5 -> 4 -> 3 on successive passes and a trigger that only watched
+    // `reviewEvery` would stop at four and trail the story for good.
+    settings({ reviewEvery: 5 });
+    const long = (n: number) => `Ines counted frame ${n}. `.repeat(300);
+    documentOf(long(1), long(2), long(3), long(4), long(5));
+    const h = harness([], { review: "" });
+
+    await h.runPass();
+    expect(h.seen.filter((x) => x === "review")).toHaveLength(1);
+    expect(record().reviewWatermark?.sectionId).toBe(500);
+    expect(h.store.getState().engine.reviewBacklog).toBe(4);
+
+    await h.runPass();
+    expect(h.seen.filter((x) => x === "review")).toHaveLength(2);
+    expect(record().reviewWatermark?.sectionId).toBe(501);
+    expect(h.store.getState().engine.reviewBacklog).toBe(3);
+
+    await h.runPass();
+    await h.runPass();
+    // The last paragraph fits a window and is under the threshold: it waits for
+    // the ordinary trigger rather than being read alone.
+    expect(h.seen.filter((x) => x === "review")).toHaveLength(4);
+    expect(record().reviewWatermark?.sectionId).toBe(503);
+    expect(h.store.getState().engine.reviewBacklog).toBe(1);
+  });
+
+  it("reports the real untriaged backlog when triage waits on minProse and the review runs", async () => {
+    settings({ reviewEvery: 5, minProse: 10 });
+    documentOf(...SCENE);
+    const h = harness([], { review: "" });
+
+    await h.runPass();
+
+    expect(h.seen).toEqual(["review"]);
+    expect(record().watermark).toBeNull();
+    expect(h.store.getState().engine.backlog).toBe(5);
+  });
+
+  it("keeps that backlog through a drain the review fed", async () => {
+    settings({ reviewEvery: 5, minProse: 10 });
+    documentOf(...SCENE);
+    const h = harness([], { review: ADMIT, write: WRITE });
+
+    await h.runPass();
+
+    expect(h.seen).toEqual(["review", "write"]);
+    expect(record().watermark).toBeNull();
+    expect(h.store.getState().engine.backlog).toBe(5);
+  });
 });

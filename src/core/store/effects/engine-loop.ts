@@ -530,10 +530,16 @@ export function createEnginePass(
         textBySection,
       });
       dispatch(engineReviewBacklogObserved({ backlog: window.backlog }));
+      // Also due while the unread prose does not fit one window: a window
+      // reads oldest-first and leaves the rest, and without this the review
+      // would stop catching up once the remainder fell under `reviewEvery`,
+      // trailing the story by however much the window could not hold. Catch-up
+      // continues on successive passes until the remainder fits.
       const reviewDue =
         window.paragraphs.length > 0 &&
         (options.forceReview === true ||
-          window.backlog >= settings.reviewEvery);
+          window.backlog >= settings.reviewEvery ||
+          window.backlog > window.paragraphs.length);
 
       // Measured from the SAME scan assess just read, not from a later one.
       // The offset's whole job is to say how much of that section this pass
@@ -690,6 +696,16 @@ export function createEnginePass(
         ...condense,
       ]);
       dispatch(engineLoopEvent({ type: "triaged", intents: enqueued }));
+      // `triaged` zeroes the backlog because triage read it; when triage was
+      // skipped for the minimum, nothing was read and the real count stands
+      // (rule 2). The drain's resting events zero it again, so this is repeated
+      // after them.
+      const restoreBacklog = (): void => {
+        if (belowMinimum) {
+          dispatch(engineBacklogObserved({ backlog: assessment.backlog }));
+        }
+      };
+      restoreBacklog();
 
       // Rule 4: one record, so the watermarks and the queue they were triaged
       // from are written together.
@@ -743,6 +759,7 @@ export function createEnginePass(
             : { type: "drained" },
         ),
       );
+      restoreBacklog();
     } catch (error) {
       // A budget hold is not a failure. GenX's `fastRejection` refuses rather
       // than parking (§3.5), and "the bucket could not cover this" is exactly
