@@ -29,8 +29,13 @@ export const ENGINE_LOOP_KEY = "kse-engine-loop";
  *
  *  Two watermarks, because there are two readers. `watermark` is how far the
  *  fast pass has triaged; `reviewWatermark` is how far the review pass has
- *  read. The review trails the fast pass by up to `reviewEvery` paragraphs and
- *  never leads it. */
+ *  read. The review usually trails the fast pass, by up to `reviewEvery`
+ *  paragraphs — but each moves on its own trigger, so the review's can lead
+ *  when triage is waiting on its minimum of new prose and a review is due.
+ *
+ *  A null `reviewWatermark`, or one naming a section the document no longer
+ *  holds, does not mean "review the story from page one": `reviewWindow`
+ *  starts such a story from its latest scene. */
 export type EngineRecord = {
   watermark: Watermark | null;
   reviewWatermark: Watermark | null;

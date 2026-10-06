@@ -66,7 +66,10 @@ describe("the review window", () => {
 
   it("stops at a paragraph boundary when the limit is reached, and counts the rest as backlog", () => {
     const w = reviewWindow(
-      { ...sections("aaaa", "bbbb", "cccc"), watermark: null },
+      {
+        ...sections("aaaa", "bbbb", "cccc"),
+        watermark: { sectionId: 100, offset: 0 },
+      },
       9,
     );
     expect(w.paragraphs).toEqual(["aaaa", "bbbb"]);
@@ -76,10 +79,46 @@ describe("the review window", () => {
 
   it("takes one oversized paragraph whole rather than cutting it", () => {
     const w = reviewWindow(
-      { ...sections("a".repeat(50), "b"), watermark: null },
+      {
+        ...sections("a".repeat(50), "b"),
+        watermark: { sectionId: 100, offset: 0 },
+      },
       9,
     );
     expect(w.paragraphs).toEqual(["a".repeat(50)]);
+  });
+
+  it("starts a story never reviewed from its latest prose, not its first page", () => {
+    const w = reviewWindow(
+      { ...sections("aaaa", "bbbb", "cccc"), watermark: null },
+      9,
+    );
+    expect(w.paragraphs).toEqual(["bbbb", "cccc"]);
+    expect(w.backlog).toBe(2);
+    expect(w.reached).toEqual({ sectionId: 102, offset: 4 });
+  });
+
+  it("does the same when the watermark's section is gone from a long story", () => {
+    const w = reviewWindow(
+      {
+        ...sections("aaaa", "bbbb", "cccc"),
+        watermark: { sectionId: 999, offset: 2 },
+      },
+      9,
+    );
+    expect(w.paragraphs).toEqual(["bbbb", "cccc"]);
+    expect(w.backlog).toBe(2);
+    expect(w.reached).toEqual({ sectionId: 102, offset: 4 });
+  });
+
+  it("takes an oversized last paragraph whole, and reaches past a blank tail", () => {
+    const w = reviewWindow(
+      { ...sections("b", "a".repeat(50), ""), watermark: null },
+      9,
+    );
+    expect(w.paragraphs).toEqual(["a".repeat(50)]);
+    expect(w.backlog).toBe(1);
+    expect(w.reached).toEqual({ sectionId: 102, offset: 0 });
   });
 
   it("re-reads from the start when the watermark's section is gone", () => {

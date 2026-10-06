@@ -49,22 +49,33 @@ export type ReviewWindow = {
    *  the last section the window covers. Null when there is nothing past the
    *  watermark at all. */
   reached: Watermark | null;
-  /** Every unread paragraph past the watermark, including those this window
-   *  did not reach — what the trigger and the HUD count. */
+  /** The unread paragraphs the review still owes — what the trigger and the
+   *  HUD count. Past a watermark, every one of them, including those this
+   *  window did not reach. With no usable watermark, only the window's own:
+   *  the story before it is not owed a read. */
   backlog: number;
 };
 
-/** The prose past the review watermark, up to `limitChars`, whole paragraphs
- *  only.
+/** The prose the next review reads, up to `limitChars`, whole paragraphs only.
  *
- *  Same reading of a watermark as `assess`: an offset inside its section, so
- *  prose appended to a paragraph already reviewed is picked up; and a watermark
- *  naming a section the document no longer holds reads as none.
+ *  **Past a watermark the document still holds, oldest first.** Same reading of
+ *  a watermark as `assess`: an offset inside its section, so prose appended to
+ *  a paragraph already reviewed is picked up. What does not fit stays as
+ *  backlog and the trigger keeps reviewing until it does.
+ *
+ *  **With no usable watermark, the story's latest scene** — the last whole
+ *  paragraphs that fit, and nothing before them. That is every story the review
+ *  has never read (one written before the review existed, or with the Engine
+ *  switched on part-way) and every story whose watermarked section is gone
+ *  (undo, retry, a paragraph merge). Reading those from the first page would
+ *  spend a review on every pass for the length of the story, and judge today's
+ *  Threads by chapter one. So the watermark lands on the document's end and the
+ *  backlog is only what the window holds.
  *
  *  **The window never cuts a paragraph and never cuts the middle out.** It
- *  stops BEFORE the paragraph that would cross the limit and leaves the rest as
- *  backlog. A single paragraph larger than the limit is taken whole, because
- *  the alternative is a review that can never get past it. */
+ *  stops at the paragraph that would cross the limit. A single paragraph larger
+ *  than the limit is taken whole, because the alternative is a review that can
+ *  never get past it. */
 export function reviewWindow(
   input: {
     sectionIds: number[];
@@ -76,18 +87,38 @@ export function reviewWindow(
   const { sectionIds, watermark, textBySection } = input;
   const at = watermark === null ? -1 : sectionIds.indexOf(watermark.sectionId);
 
-  const pieces: { sectionId: number; text: string; end: number }[] = [];
-  if (watermark !== null && at !== -1) {
-    const full = textBySection.get(watermark.sectionId) ?? "";
-    pieces.push({
+  if (watermark === null || at === -1) {
+    const paragraphs: string[] = [];
+    let size = 0;
+    for (let i = sectionIds.length - 1; i >= 0; i--) {
+      const text = (textBySection.get(sectionIds[i]) ?? "").trim();
+      if (text.length === 0) continue;
+      if (paragraphs.length > 0 && size + text.length > limitChars) break;
+      paragraphs.unshift(text);
+      size += text.length;
+    }
+    const last = sectionIds.at(-1);
+    return {
+      paragraphs,
+      reached:
+        last === undefined
+          ? null
+          : { sectionId: last, offset: (textBySection.get(last) ?? "").length },
+      backlog: paragraphs.length,
+    };
+  }
+
+  const full = textBySection.get(watermark.sectionId) ?? "";
+  const pieces: { sectionId: number; text: string; end: number }[] = [
+    {
       sectionId: watermark.sectionId,
       text: full.slice(watermark.offset).trim(),
       end: full.length,
-    });
-  }
+    },
+  ];
   for (const sectionId of sectionIds.slice(at + 1)) {
-    const full = textBySection.get(sectionId) ?? "";
-    pieces.push({ sectionId, text: full.trim(), end: full.length });
+    const text = textBySection.get(sectionId) ?? "";
+    pieces.push({ sectionId, text: text.trim(), end: text.length });
   }
 
   const backlog = pieces.filter((piece) => piece.text.length > 0).length;

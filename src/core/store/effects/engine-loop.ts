@@ -522,19 +522,21 @@ export function createEnginePass(
         entities: Object.values(getState().world.entitiesById),
       });
 
-      // The review pass's own reading of the same scan. It trails the fast
-      // pass: its watermark moves only when a review completes.
+      // The review pass's own reading of the same scan. Its watermark moves
+      // only when a review completes. A story with no usable review watermark
+      // is read from its latest scene (`reviewWindow`), so its backlog is one
+      // window at most and the catch-up term below never fires for it.
       const window = reviewWindow({
         sectionIds,
         watermark: reviewWatermark,
         textBySection,
       });
       dispatch(engineReviewBacklogObserved({ backlog: window.backlog }));
-      // Also due while the unread prose does not fit one window: a window
-      // reads oldest-first and leaves the rest, and without this the review
-      // would stop catching up once the remainder fell under `reviewEvery`,
-      // trailing the story by however much the window could not hold. Catch-up
-      // continues on successive passes until the remainder fits.
+      // Also due while the unread prose does not fit one window: past a
+      // watermark a window reads oldest-first and leaves the rest, and without
+      // this the review would stop catching up once the remainder fell under
+      // `reviewEvery`, trailing the story by however much the window could not
+      // hold. Catch-up continues on successive passes until the remainder fits.
       const reviewDue =
         window.paragraphs.length > 0 &&
         (options.forceReview === true ||

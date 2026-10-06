@@ -315,6 +315,13 @@ describe("the review step", () => {
     settings({ reviewEvery: 5 });
     const long = (n: number) => `Ines counted frame ${n}. `.repeat(300);
     documentOf(long(1), long(2), long(3), long(4), long(5));
+    // From a watermark the document still holds: a story never reviewed starts
+    // at its latest scene instead (the next test).
+    story.set(ENGINE_LOOP_KEY, {
+      watermark: null,
+      reviewWatermark: { sectionId: 500, offset: 0 },
+      queue: [],
+    });
     const h = harness([], { review: "" });
 
     await h.runPass();
@@ -334,6 +341,33 @@ describe("the review step", () => {
     expect(h.seen.filter((x) => x === "review")).toHaveLength(4);
     expect(record().reviewWatermark?.sectionId).toBe(503);
     expect(h.store.getState().engine.reviewBacklog).toBe(1);
+  });
+
+  it("reviews a long story it has never reviewed once, from its latest scene", async () => {
+    // Forty paragraphs of about a thousand characters: several windows. Read
+    // head-first, catching up would spend a review on every pass and judge
+    // today's Threads by chapter one.
+    settings({ reviewEvery: 5 });
+    const paragraphs = Array.from({ length: 40 }, (_, n) =>
+      `Ines counted frame ${n}. `.repeat(40),
+    );
+    documentOf(...paragraphs);
+    story.set(ENGINE_LOOP_KEY, {
+      watermark: null,
+      reviewWatermark: null,
+      queue: [],
+    });
+    const h = harness([], { review: "" });
+
+    await h.runPass();
+    await h.runPass();
+
+    expect(h.seen.filter((x) => x === "review")).toHaveLength(1);
+    expect(record().reviewWatermark).toEqual({
+      sectionId: 539,
+      offset: paragraphs[39].length,
+    });
+    expect(h.store.getState().engine.reviewBacklog).toBe(0);
   });
 
   it("reports the real untriaged backlog when triage waits on minProse and the review runs", async () => {
