@@ -34,15 +34,25 @@ const INPUTS: HudInputs = { allowedOutput: OUTPUT_BUCKET };
  *  so the cases below stay about the one field they are testing rather than
  *  restating the whole settings record. */
 function state(
-  engine: Partial<LoopState> & { enabled?: boolean } = {},
+  engine: Partial<LoopState> & {
+    enabled?: boolean;
+    reviewBacklog?: number;
+    reviewEvery?: number;
+  } = {},
   world: Partial<WorldState> = {},
 ): RootState {
-  const { enabled = true, ...loop } = engine;
+  const {
+    enabled = true,
+    reviewBacklog = 0,
+    reviewEvery = ENGINE_DEFAULTS.reviewEvery,
+    ...loop
+  } = engine;
   return {
     engine: {
       ...initialLoopState,
       ...loop,
-      settings: { ...ENGINE_DEFAULTS, enabled },
+      reviewBacklog,
+      settings: { ...ENGINE_DEFAULTS, enabled, reviewEvery },
     },
     world: { ...initialWorldState, ...world },
   } as RootState;
@@ -391,6 +401,31 @@ describe("deriveHud — switched off", () => {
   it("moves the signature when the setting changes", () => {
     expect(hudSignature(state({ enabled: false }))).not.toBe(
       hudSignature(state({ enabled: true })),
+    );
+  });
+});
+
+describe("the review reading", () => {
+  it("counts down from the setting to zero", () => {
+    expect(
+      deriveHud(state({ reviewBacklog: 10, reviewEvery: 25 }), INPUTS).reviewIn,
+    ).toBe(15);
+    expect(
+      deriveHud(state({ reviewBacklog: 40, reviewEvery: 25 }), INPUTS).reviewIn,
+    ).toBe(0);
+  });
+
+  it("offers the review control exactly when the pass control is offered", () => {
+    const model = deriveHud(state({ enabled: false }), INPUTS);
+    expect(model.reviewEnabled).toBe(model.zapEnabled);
+  });
+
+  it("repaints when either number moves", () => {
+    expect(hudSignature(state({ reviewBacklog: 1 }))).not.toBe(
+      hudSignature(state({ reviewBacklog: 2 })),
+    );
+    expect(hudSignature(state({ reviewEvery: 10 }))).not.toBe(
+      hudSignature(state({ reviewEvery: 20 })),
     );
   });
 });

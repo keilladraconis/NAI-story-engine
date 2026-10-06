@@ -70,7 +70,15 @@ export type LoopState = {
 
 export type LoopEvent =
   | { type: "passRequested" }
-  | { type: "assessed"; backlog: number; candidateIds: string[] }
+  /** `reviewDue` keeps the pass alive when triage has nothing new but the
+   *  review pass does — a manual review, or one an earlier pass could not
+   *  afford. */
+  | {
+      type: "assessed";
+      backlog: number;
+      candidateIds: string[];
+      reviewDue?: boolean;
+    }
   | { type: "triaged"; intents: Intent[] }
   | { type: "drained" }
   /** How many entity entries the drain rewrote. Separate from `drained`
@@ -117,7 +125,7 @@ export function loopReducer(state: LoopState, event: LoopEvent): LoopState {
       const assessed = { ...state, backlog: event.backlog };
       // Nothing new worth a generation: the pass ends here having spent
       // nothing, and ending is completing — so the counter clears.
-      if (event.backlog === 0) {
+      if (event.backlog === 0 && !event.reviewDue) {
         return { ...assessed, phase: "idle", consecutiveFailures: 0 };
       }
       // Still mid-pass. Deliberately does NOT clear consecutiveFailures: see

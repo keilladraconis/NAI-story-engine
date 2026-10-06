@@ -19,6 +19,7 @@ import {
   THREAD_CAP_MAX,
   THREAD_CAP_MIN,
   PARAGRAPH_CHARS,
+  normalizeEngineSettings,
   readEngineSettings,
   writeEngineSettings,
   type EngineSettings,
@@ -97,6 +98,7 @@ describe("readEngineSettings — a partial record", () => {
       delayMs: ENGINE_DEFAULTS.delayMs,
       minProse: ENGINE_DEFAULTS.minProse,
       threadCap: ENGINE_DEFAULTS.threadCap,
+      reviewEvery: ENGINE_DEFAULTS.reviewEvery,
       condenseAtChars: ENGINE_DEFAULTS.condenseAtChars,
       creativeModel: ENGINE_DEFAULTS.creativeModel,
     });
@@ -118,6 +120,7 @@ describe("readEngineSettings — a partial record", () => {
       delayMs: 3000,
       minProse: 2,
       threadCap: 5,
+      reviewEvery: ENGINE_DEFAULTS.reviewEvery,
       condenseAtChars: 2000,
       creativeModel: ENGINE_DEFAULTS.creativeModel,
     });
@@ -137,6 +140,7 @@ describe("readEngineSettings — a partial record", () => {
       delayMs: 3000,
       minProse: 4,
       threadCap: 12,
+      reviewEvery: ENGINE_DEFAULTS.reviewEvery,
       condenseAtChars: 1600,
       creativeModel: "xialong-v1",
     });
@@ -297,6 +301,7 @@ describe("writeEngineSettings", () => {
       delayMs: 12_000,
       minProse: 3,
       threadCap: 5,
+      reviewEvery: ENGINE_DEFAULTS.reviewEvery,
       condenseAtChars: 1600,
       creativeModel: "xialong-v1",
     };
@@ -310,6 +315,7 @@ describe("writeEngineSettings", () => {
       delayMs: 12_000,
       minProse: 3,
       threadCap: 5,
+      reviewEvery: ENGINE_DEFAULTS.reviewEvery,
       condenseAtChars: 1600,
       creativeModel: "xialong-v1",
     });
@@ -325,6 +331,7 @@ describe("writeEngineSettings", () => {
       delayMs: -1,
       minProse: 0,
       threadCap: 999,
+      reviewEvery: ENGINE_DEFAULTS.reviewEvery,
       creativeModel: "xialong-v1",
       condenseAtChars: 0,
     });
@@ -333,6 +340,7 @@ describe("writeEngineSettings", () => {
       delayMs: DELAY_MS_MIN,
       minProse: MIN_PROSE_MIN,
       threadCap: THREAD_CAP_MAX,
+      reviewEvery: ENGINE_DEFAULTS.reviewEvery,
       condenseAtChars: CONDENSE_AT_CHARS_MIN,
       creativeModel: "xialong-v1",
     });
@@ -425,5 +433,18 @@ describe("the creative model", () => {
     // Defaulting to Xialong would hand a writer without Opus a story whose
     // every generation fails until they find this setting.
     expect(ENGINE_DEFAULTS.creativeModel).toBe("glm-4-6");
+  });
+});
+
+describe("reviewEvery", () => {
+  it("defaults to 25 paragraphs", () => {
+    expect(normalizeEngineSettings({}).reviewEvery).toBe(25);
+  });
+  it("is clamped to 5–200 and rounded", () => {
+    expect(normalizeEngineSettings({ reviewEvery: 1 }).reviewEvery).toBe(5);
+    expect(normalizeEngineSettings({ reviewEvery: 9000 }).reviewEvery).toBe(
+      200,
+    );
+    expect(normalizeEngineSettings({ reviewEvery: 30.4 }).reviewEvery).toBe(30);
   });
 });

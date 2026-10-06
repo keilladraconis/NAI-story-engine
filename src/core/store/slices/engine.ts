@@ -31,13 +31,20 @@ import {
  *  read because `readEngineSettings` is async and a component cannot await —
  *  mirroring them here lets the HUD and the Setup form read them synchronously
  *  and repaint when they change. */
-export type EngineSliceState = LoopState & { settings: EngineSettings };
+export type EngineSliceState = LoopState & {
+  settings: EngineSettings;
+  /** Unread paragraphs past the REVIEW watermark, as of the last pass. Beside
+   *  the machine rather than in it, like `settings`: the HUD draws how far off
+   *  the next review is, and the lifecycle has no use for the number. */
+  reviewBacklog: number;
+};
 
 export const initialEngineState: EngineSliceState = {
   ...initialLoopState,
   // The defaults — Engine off — until the effect's startup read lands. That is
   // the honest reading before we know, and it is corrected within a tick.
   settings: ENGINE_DEFAULTS,
+  reviewBacklog: 0,
 };
 
 /** Whether two settings objects say the same thing, so a re-read that changed
@@ -67,6 +74,7 @@ export const engineSlice = createSlice({
     engineLoopEvent: (state, payload: LoopEvent) => ({
       ...loopReducer(state, payload),
       settings: state.settings,
+      reviewBacklog: state.reviewBacklog,
     }),
 
     /** The whole settings object, as the effect last read it — or as the Setup
@@ -84,9 +92,19 @@ export const engineSlice = createSlice({
       state.backlog === payload.backlog
         ? state
         : { ...state, backlog: payload.backlog },
+
+    /** How much prose the review pass has not read. Touches nothing else. */
+    engineReviewBacklogObserved: (state, payload: { backlog: number }) =>
+      state.reviewBacklog === payload.backlog
+        ? state
+        : { ...state, reviewBacklog: payload.backlog },
   },
 });
 
 export const engineSliceReducer = engineSlice.reducer;
-export const { engineLoopEvent, engineBacklogObserved, engineSettingsChanged } =
-  engineSlice.actions;
+export const {
+  engineLoopEvent,
+  engineBacklogObserved,
+  engineReviewBacklogObserved,
+  engineSettingsChanged,
+} = engineSlice.actions;

@@ -70,6 +70,8 @@ import {
   DELAY_MS_MIN,
   MIN_PROSE_MAX,
   MIN_PROSE_MIN,
+  REVIEW_EVERY_MAX,
+  REVIEW_EVERY_MIN,
   THREAD_CAP_MAX,
   THREAD_CAP_MIN,
   normalizeEngineSettings,
@@ -202,6 +204,9 @@ export function EngineSettings() {
   const [delayDraft, setDelayDraft] = useState(draftFor(settings, "delayMs"));
   const [proseDraft, setProseDraft] = useState(draftFor(settings, "minProse"));
   const [capDraft, setCapDraft] = useState(draftFor(settings, "threadCap"));
+  const [reviewDraft, setReviewDraft] = useState(
+    draftFor(settings, "reviewEvery"),
+  );
   const [condenseDraft, setCondenseDraft] = useState(
     draftFor(settings, "condenseAtChars"),
   );
@@ -221,6 +226,10 @@ export function EngineSettings() {
   useEffect(
     () => setCapDraft(draftFor(settings, "threadCap")),
     [settings.threadCap],
+  );
+  useEffect(
+    () => setReviewDraft(draftFor(settings, "reviewEvery")),
+    [settings.reviewEvery],
   );
   useEffect(
     () => setCondenseDraft(draftFor(settings, "condenseAtChars")),
@@ -350,13 +359,24 @@ export function EngineSettings() {
 
         <NumberField
           label="Thread limit"
-          help={`How many Threads this story may hold. At the limit a new one displaces the weakest instead of adding. ${THREAD_CAP_MIN}–${THREAD_CAP_MAX}.`}
+          help={`The Engine admits no new Thread past this many open ones. You and the Forge still can. ${THREAD_CAP_MIN}–${THREAD_CAP_MAX}.`}
           value={capDraft}
           min={THREAD_CAP_MIN}
           max={THREAD_CAP_MAX}
           step="1"
           onInput={setCapDraft}
           onCommit={() => commit("threadCap", capDraft, setCapDraft)}
+        />
+
+        <NumberField
+          label="Review every (paragraphs)"
+          help={`New paragraphs before the Engine reads back over a scene to update its Threads. ${REVIEW_EVERY_MIN}–${REVIEW_EVERY_MAX}.`}
+          value={reviewDraft}
+          min={REVIEW_EVERY_MIN}
+          max={REVIEW_EVERY_MAX}
+          step="1"
+          onInput={setReviewDraft}
+          onCommit={() => commit("reviewEvery", reviewDraft, setReviewDraft)}
         />
 
         <NumberField

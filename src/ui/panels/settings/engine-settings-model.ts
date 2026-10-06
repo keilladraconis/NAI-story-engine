@@ -54,6 +54,7 @@ export const NUMERIC_SETTINGS = [
   "delayMs",
   "minProse",
   "threadCap",
+  "reviewEvery",
   "condenseAtChars",
 ] as const;
 
@@ -70,6 +71,7 @@ const STORED_PER_TYPED: Record<NumericSetting, number> = {
   delayMs: 1000,
   minProse: 1,
   threadCap: 1,
+  reviewEvery: 1,
   condenseAtChars: PARAGRAPH_CHARS,
 };
 

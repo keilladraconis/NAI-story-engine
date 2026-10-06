@@ -235,3 +235,19 @@ describe("canStartPass", () => {
     expect(again).toBe(assessing);
   });
 });
+
+it("goes on to read when a review is due even with nothing new for triage", () => {
+  const assessing = loopReducer(initialLoopState, { type: "passRequested" });
+  expect(
+    loopReducer(assessing, {
+      type: "assessed",
+      backlog: 0,
+      candidateIds: [],
+      reviewDue: true,
+    }).phase,
+  ).toBe("triaging");
+  expect(
+    loopReducer(assessing, { type: "assessed", backlog: 0, candidateIds: [] })
+      .phase,
+  ).toBe("idle");
+});

@@ -35,9 +35,14 @@ export type EngineSettings = {
   enabled: boolean;
   delayMs: number;
   minProse: number;
-  /** How many Threads may be open at once (§4.5). It restrains the Engine's
-   *  admissions only — see `src/core/engine/thread-cap.ts`. */
+  /** The number of open Threads past which the Engine admits no more. The
+   *  writer and the Forge are not bound by it. Each open Thread is a lorebook
+   *  entry in context whenever its cast is on stage, so this is also a bound on
+   *  how much standing state the Engine can put in front of the model. */
   threadCap: number;
+  /** How many unread paragraphs trigger a review pass — the slow read that
+   *  keeps Threads true. About a scene: an arc is not visible in less. */
+  reviewEvery: number;
   /** How long a managed lorebook entry may get, in **characters**, before the
    *  Engine condenses it (§5.1).
    *
@@ -76,6 +81,7 @@ export const ENGINE_DEFAULTS: EngineSettings = {
   delayMs: 8000,
   minProse: 1,
   threadCap: 8,
+  reviewEvery: 25,
   // Five paragraphs. See CONDENSE_AT_CHARS_MIN/MAX for the ends; the middle is
   // where one entry starts costing what a whole scene of recent prose costs.
   // A generated entry is one or two paragraphs, so an entry at five has
@@ -124,19 +130,31 @@ export const MIN_PROSE_MIN = 1;
  *  A hundred paragraphs is already several scenes. */
 export const MIN_PROSE_MAX = 100;
 
-/** Below 1 the Engine could admit no thread at all, which reads as a broken
+/** Below 1 the Engine could admit no Thread at all, which reads as a broken
  *  feature rather than as a setting. 1 is the smallest cap the mechanism still
- *  works at — one open thread, and no more admitted until it concludes. */
+ *  works at — one open Thread, and no more admitted until it concludes. */
 export const THREAD_CAP_MIN = 1;
 
-/** A cap has to be low enough to still be capping. Every open thread is a
- *  lorebook entry whose state injects when its cast is on stage
- *  (`thread-condition.ts`), so the ceiling is where the cap stops being
- *  proliferation control and becomes permission to poison the context the
- *  Engine exists to improve. Forty open threads is a lot of potential
- *  injection in a crowded scene. It is also five times the default, so a writer
- *  who genuinely runs a crowded story has room to say so. */
+/** The cap is a bound on standing state: every open Thread is a lorebook entry
+ *  that injects whenever its cast is on stage, so the ceiling is where the cap
+ *  stops limiting what the Engine adds and becomes permission to crowd the
+ *  context it exists to improve. Forty is a lot of potential injection in a
+ *  crowded scene, and five times the default, so a writer who genuinely runs a
+ *  crowded story has room to say so. The writer and the Forge are not bound by
+ *  it at any value. */
 export const THREAD_CAP_MAX = 40;
+
+/** Below five paragraphs the review is reading at the grain the fast pass
+ *  already reads at, where every unsettled detail looks like an arc — the
+ *  flood the review pass exists to end. It also could not admit anything: the
+ *  admission floor wants a cast named in three separate paragraphs. */
+export const REVIEW_EVERY_MIN = 5;
+
+/** A review window holds about thirty paragraphs (`REVIEW_WINDOW_CHARS`), and
+ *  what does not fit waits for the next pass. Two hundred is already six or
+ *  seven windows of catching up each time the trigger fires; past that the
+ *  setting reads as on while Threads go stale for a novella at a time. */
+export const REVIEW_EVERY_MAX = 200;
 
 /** Below two paragraphs the threshold is under the size entries are BORN at:
  *  `createLorebookContentFactory` writes them at up to 1024 tokens and a
@@ -255,6 +273,13 @@ export function normalizeEngineSettings(value: unknown): EngineSettings {
       THREAD_CAP_MIN,
       THREAD_CAP_MAX,
       Math.floor,
+    ),
+    reviewEvery: readNumber(
+      record.reviewEvery,
+      ENGINE_DEFAULTS.reviewEvery,
+      REVIEW_EVERY_MIN,
+      REVIEW_EVERY_MAX,
+      Math.round,
     ),
     // Rounded to NEAREST, unlike the two above, because neither direction
     // changes what the number does: the trigger compares an integer character

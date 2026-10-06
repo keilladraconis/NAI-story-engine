@@ -4,7 +4,7 @@
 // Fixed slots, always present, always in the same position, read as a shape
 // rather than parsed as words:
 //
-//   [eye] [lines]14 [flag]5 [commit]23 ▮▮▮▯ ⚡
+//   [eye] [lines]14 [flag]5 [commit]23 ▮▮▮▯ [review]9 ⚡
 //
 // Every slot is a feather icon and a number, and every slot carries a `title`
 // saying in words what its number means. The line started out mixing icons for
@@ -40,13 +40,18 @@
 //      render this component does is detached, arriving from a store
 //      subscription or a timer tick, never from a JSX event handler. Same
 //      workaround as `Header.tsx`'s `WidgetIcon` and `ConfirmButton`.
-//   2. The ⚡ carries NO re-entry guard of its own — not `disabled`, which is a
+//   2. The ⚡ and the review control carry NO re-entry guard of their own — not `disabled`, which is a
 //      render-time value a press arriving before the re-render slips past, and
-//      not a tap-timestamp window, which CLAUDE.md forbids reintroducing. It
-//      dispatches `enginePassRequested()` and stops. The guard that matters is
+//      not a tap-timestamp window, which CLAUDE.md forbids reintroducing. Each
+//      dispatches its request (`enginePassRequested()`,
+//      `engineReviewRequested()`) and stops. The guard that matters is
 //      inside the pass effect, where a second press actually lands.
 
-import { store, enginePassRequested } from "../../core/store";
+import {
+  store,
+  enginePassRequested,
+  engineReviewRequested,
+} from "../../core/store";
 import { useSlice } from "../bridge";
 import { useTick } from "../hooks";
 import { SP, T } from "../style";
@@ -66,6 +71,7 @@ import {
   Flag,
   GitCommit,
   Pause,
+  RefreshCw,
   Zap,
 } from "nai:icons/feather";
 
@@ -238,7 +244,7 @@ export function Hud() {
       <CountSlot
         icon={Flag}
         value={model.threads}
-        title={`Threads — ${model.threads} open of ${model.threadsTotal} the story is carrying; context pressure, so climbing means go close some`}
+        title={`Threads — ${model.threads} open of ${model.threadsTotal}; each open Thread is in context while its cast is on stage`}
       />
       <CountSlot
         icon={GitCommit}
@@ -256,6 +262,15 @@ export function Hud() {
       <BudgetBars filled={model.budgetBars} allowedOutput={allowedOutput} />
       {/* Never disabled, never debounced: the dispatch is the whole handler and
           the pass effect owns the refusal. */}
+      <button
+        onClick={() => store.dispatch(engineReviewRequested())}
+        title={`Review — the Engine reads back over the story to update its Threads in ${model.reviewIn} more paragraph(s); press to review now`}
+        aria-label="Review the story's Threads now"
+        style={zapStyle(model.reviewEnabled)}
+      >
+        <RefreshCw size={ICON_SIZE} />
+        <span style={{ fontSize: "0.75em" }}>{model.reviewIn}</span>
+      </button>
       <button
         onClick={() => store.dispatch(enginePassRequested())}
         title="Run a pass now"

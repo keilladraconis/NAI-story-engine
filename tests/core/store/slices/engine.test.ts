@@ -22,6 +22,7 @@ const CHANGED: EngineSettings = {
   delayMs: ENGINE_DEFAULTS.delayMs + 1000,
   minProse: ENGINE_DEFAULTS.minProse + 1,
   threadCap: ENGINE_DEFAULTS.threadCap + 1,
+  reviewEvery: ENGINE_DEFAULTS.reviewEvery + 5,
   condenseAtChars: ENGINE_DEFAULTS.condenseAtChars + 400,
   creativeModel: "xialong-v1",
 };

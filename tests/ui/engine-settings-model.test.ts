@@ -41,6 +41,7 @@ const CONFIGURED: EngineSettings = {
   delayMs: 3000,
   minProse: 4,
   threadCap: 5,
+  reviewEvery: 40,
   condenseAtChars: 1600,
   creativeModel: "xialong-v1",
 };

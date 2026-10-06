@@ -169,7 +169,12 @@ function configure(settings: Partial<EngineSettings> = {}): void {
 
 /** Seed the loop's record, as a reload mid-queue finds it. */
 function seedLoopRecord(record: Partial<EngineRecord>): void {
-  story.set(ENGINE_LOOP_KEY, { watermark: null, queue: [], ...record });
+  story.set(ENGINE_LOOP_KEY, {
+    watermark: null,
+    reviewWatermark: null,
+    queue: [],
+    ...record,
+  });
 }
 
 /** The loop's record as it stands, or undefined if the pass never wrote one. */
@@ -939,6 +944,7 @@ describe("the pass", () => {
       delayMs: 3000,
       minProse: 4,
       threadCap: 3,
+      reviewEvery: ENGINE_DEFAULTS.reviewEvery,
       condenseAtChars: 1600,
       creativeModel: ENGINE_DEFAULTS.creativeModel,
     });

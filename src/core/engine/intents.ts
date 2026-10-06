@@ -25,9 +25,15 @@ import type { Intent } from "./loop-machine";
  *  next pass re-reads rather than skips. */
 export const ENGINE_LOOP_KEY = "kse-engine-loop";
 
-/** The loop's persisted state, as the effect holds it in memory. */
+/** The loop's persisted state, as the effect holds it in memory.
+ *
+ *  Two watermarks, because there are two readers. `watermark` is how far the
+ *  fast pass has triaged; `reviewWatermark` is how far the review pass has
+ *  read. The review trails the fast pass by up to `reviewEvery` paragraphs and
+ *  never leads it. */
 export type EngineRecord = {
   watermark: Watermark | null;
+  reviewWatermark: Watermark | null;
   queue: Intent[];
 };
 

@@ -34,10 +34,11 @@ export type HudModel = {
   stateIcon: HudState;
   /** Unread paragraphs past the watermark. Climbing = falling behind. */
   backlog: number;
-  /** Open threads — context pressure, and the number the slot draws. */
+  /** Open Threads — each a lorebook entry in context while its cast is on
+   *  stage, and the number the slot draws. */
   threads: number;
-  /** Every thread, satisfied ones included — what the cap counts (§4.5). The
-   *  tooltip says both; the slot draws only `threads`. */
+  /** Every Thread, concluded ones included. The tooltip says both; the slot
+   *  draws only `threads`. */
   threadsTotal: number;
   /** Entity entries the Engine has rewritten — see `LoopState.touched` for why
    *  this is a count for the session and only for the session. */
@@ -49,6 +50,11 @@ export type HudModel = {
    *  value and a press arriving before the re-render that sets it still gets
    *  through (CLAUDE.md; §9.1). */
   zapEnabled: boolean;
+  /** Paragraphs until the next review pass; 0 means one is due. */
+  reviewIn: number;
+  /** Whether the review control should read as available. Presentation only,
+   *  like `zapEnabled` — the guard is in the pass effect. */
+  reviewEnabled: boolean;
 };
 
 export type HudInputs = {
@@ -119,6 +125,7 @@ function stateOf(phase: LoopPhase): HudState {
 
 export function deriveHud(state: RootState, inputs: HudInputs): HudModel {
   const { engine, world } = state;
+  const zapEnabled = engine.settings.enabled && canStartPass(engine);
 
   return {
     // Off outranks every phase: a switched-off Engine is not watching, however
@@ -128,17 +135,11 @@ export function deriveHud(state: RootState, inputs: HudInputs): HudModel {
     // surface §9.1 builds to carry trust.
     stateIcon: engine.settings.enabled ? stateOf(engine.phase) : "off",
     backlog: engine.backlog,
-    // OPEN threads, which is what §9.1 says this slot counts: context
-    // pressure, "climbing means go close some". A comment here used to say
-    // nothing sets `satisfied` until phase 6, so filtering on status would
-    // filter on a constant — phase 5's own status control made that false, and
-    // counting every thread left the slot unmoved by the one action it asks
-    // for. §4.4 retires a satisfied thread by disabling its entry, so it costs
-    // no context and does not belong in a pressure reading.
-    //
-    // The whole list rides along for the tooltip rather than replacing this
-    // number: the cap counts satisfied threads and the slot does not, and one
-    // number cannot be both without the label lying about one of them.
+    // OPEN Threads: each is a lorebook entry that injects whenever its cast is
+    // on stage, so the open count is the standing context the Engine is
+    // carrying. A concluded Thread's entry is disabled and costs none, so it
+    // does not belong in that reading — the total rides along for the tooltip
+    // instead.
     threads: world.threads.filter((t) => t.status === "open").length,
     threadsTotal: world.threads.length,
     // Entity entries the Engine has rewritten this session. Zero until the
@@ -148,9 +149,12 @@ export function deriveHud(state: RootState, inputs: HudInputs): HudModel {
     // the same position).
     touched: engine.touched,
     budgetBars: budgetBarsOf(inputs.allowedOutput),
-    // The ⚡ is inert when the Engine is off — the effect refuses the pass for
-    // the same reason, so the appearance and the behaviour agree.
-    zapEnabled: engine.settings.enabled && canStartPass(engine),
+    // The ⚡ and the review control are inert when the Engine is off — the
+    // effect refuses the pass for the same reason, so the appearance and the
+    // behaviour agree.
+    zapEnabled,
+    reviewEnabled: zapEnabled,
+    reviewIn: Math.max(0, engine.settings.reviewEvery - engine.reviewBacklog),
   };
 }
 
@@ -173,5 +177,7 @@ export function hudSignature(state: RootState): string {
     // when a thread is satisfied — which changes the number on the line.
     world.threads.filter((t) => t.status === "open").length,
     world.threads.length,
+    engine.reviewBacklog,
+    engine.settings.reviewEvery,
   ].join("|");
 }

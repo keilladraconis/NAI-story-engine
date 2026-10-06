@@ -37,7 +37,7 @@
 // wakeup — the `pending` flag below is the whole of the bookkeeping.
 
 import { matchesAction, type Store } from "nai-store";
-import type { GenX } from "nai-gen-x";
+import type { GenX, MessageFactory } from "nai-gen-x";
 import type { AppDispatch, RootState, WorldEntity } from "../types";
 import {
   assess,
@@ -45,7 +45,7 @@ import {
   type EntrySize,
   type Watermark,
 } from "../../engine/assess";
-import { readEngineSettings } from "../../engine/settings";
+import { readEngineSettings, type EngineSettings } from "../../engine/settings";
 import { canStartPass, type Intent } from "../../engine/loop-machine";
 import {
   dedupe,
@@ -68,8 +68,22 @@ import {
   type TriageManifest,
 } from "../../engine/triage-strategy";
 import {
+  applyFloors,
+  buildReviewManifest,
+  createReviewFactory,
+  parseReview,
+  reviewParams,
+  reviewWindow,
+  REVIEW_MAX_TOKENS,
+  type ReviewDecision,
+  type ReviewWindow,
+} from "../../engine/review-strategy";
+import { entityAliases, syncOpenThreadEntries } from "../../engine/thread-bind";
+import { formatFoundationBlock } from "../../utils/context-builder";
+import {
   engineBacklogObserved,
   engineLoopEvent,
+  engineReviewBacklogObserved,
   engineSettingsChanged,
 } from "../slices/engine";
 import { FIELD_CONFIGS } from "../../../config/field-definitions";
@@ -116,8 +130,8 @@ export type EngineLoopDeps = {
 //   3. `retryable` comes from the classifier, never from the callsite. Hardcode
 //      false and ordinary writing lights the HUD's ⚠; hardcode true and ⚠
 //      becomes unreachable.
-//   4. `watermark` and `queue` are ONE storyStorage record, read once at the
-//      start of the pass and written at the two points below. They are the
+//   4. Both watermarks and the queue are ONE storyStorage record, read once at
+//      the start of the pass and written at the two points below. They are the
 //      loop's memory of the story rather than of a point in it, so nothing
 //      here reverts when the writer undoes — see intents.ts.
 
@@ -129,6 +143,15 @@ export const enginePassRequested = () => ({
   payload: undefined,
 });
 enginePassRequested.type = ENGINE_PASS_REQUESTED;
+
+/** The HUD's review control: run a pass now and review whatever is unread,
+ *  whether or not the threshold has been reached. */
+const ENGINE_REVIEW_REQUESTED = "engine/reviewRequested";
+export const engineReviewRequested = () => ({
+  type: ENGINE_REVIEW_REQUESTED as typeof ENGINE_REVIEW_REQUESTED,
+  payload: undefined,
+});
+engineReviewRequested.type = ENGINE_REVIEW_REQUESTED;
 
 /** The watermark: how far the Engine has read — which section, and how much of
  *  it — or null in a story it has never looked at.
@@ -189,6 +212,7 @@ async function readEngineRecord(): Promise<EngineRecord> {
   ) as Partial<EngineRecord>;
   return {
     watermark: readWatermark(record.watermark),
+    reviewWatermark: readWatermark(record.reviewWatermark),
     queue: readQueue(record.queue),
   };
 }
@@ -279,7 +303,9 @@ async function nextCondense(
   return [];
 }
 
-/** The one generation a pass spends, with the bounded backoff from §3.4.
+/** One generation a pass spends, with the bounded backoff from §3.4. Triage and
+ *  the review share it: both are background calls that hand a collision back to
+ *  the next wakeup rather than wait on it.
  *
  *  Attempts are numbered from 1 (refusal.ts's contract): `backoffMs(0)` is null,
  *  so a loop counting from 0 would perform no retries at all instead of failing
@@ -290,10 +316,11 @@ async function nextCondense(
  *  attempts of exponential backoff — over a minute of a pass holding its node
  *  and its re-entry guard, inside a loop whose whole retry policy is supposed to
  *  be "a few hundred milliseconds, then hand the work back to the next wakeup". */
-async function generateTriage(
+async function generateWithBackoff(
   genX: GenX,
-  manifest: TriageManifest,
-  assessment: ReturnType<typeof assess>,
+  factory: MessageFactory,
+  baseParams: GenerationParams,
+  label: string,
   log: EngineLog,
 ): Promise<string> {
   // `fastRejection` (GenX 0.5.0): refuse rather than queue or park. §3.5 says a
@@ -303,17 +330,13 @@ async function generateTriage(
   // Rejecting instead hands the decision back here, where the next wakeup is
   // the retry. `maxRetries: 0` is now GenX's own default for such a task; it
   // stays explicit because the reason is ours (see the revise arm).
-  const params = {
-    ...(await triageParams()),
-    maxRetries: 0,
-    fastRejection: true,
-  };
+  const params = { ...baseParams, maxRetries: 0, fastRejection: true };
 
   for (let attempt = 1; ; attempt++) {
     try {
       const response = await genX.generate(
-        createTriageFactory({ manifest, assessment }),
-        { ...params, taskId: `engine-triage-${api.v1.uuid()}` },
+        factory,
+        { ...params, taskId: `engine-${label}-${api.v1.uuid()}` },
         undefined,
         "background",
         // No cancellation signal. One is only worth creating when something can
@@ -331,11 +354,112 @@ async function generateTriage(
       const wait = isConcurrencyRefusal(error) ? backoffMs(attempt) : null;
       if (wait === null) throw error;
       await log(
-        `[engine] triage refused, retry ${attempt}/${MAX_ATTEMPTS - 1} in ${wait}ms`,
+        `[engine] ${label} refused, retry ${attempt}/${MAX_ATTEMPTS - 1} in ${wait}ms`,
       );
       await api.v1.timers.sleep(wait);
     }
   }
+}
+
+/** A review decision as the intent the drain runs. Each carries the window the
+ *  review read, for the reason `revise` carries its prose. */
+function toIntent(decision: ReviewDecision, prose: string): Intent {
+  switch (decision.kind) {
+    case "update":
+      return { kind: "threadWrite", threadId: decision.threadId, prose };
+    case "conclude":
+      return { kind: "conclude", threadId: decision.threadId, prose };
+    case "admit":
+      return {
+        kind: "admit",
+        title: decision.title,
+        entityIds: decision.entityIds,
+        prose,
+      };
+  }
+}
+
+/** The review step: one generation over a scene's worth of unread prose, read
+ *  into intents. Returns null when the review did not happen, so the caller
+ *  leaves the review watermark where it was and the same prose is offered
+ *  again.
+ *
+ *  **It never fails the pass.** By the time this runs triage has answered, and
+ *  an exception here would throw that answer away with the watermark unsaved.
+ *  A short bucket, a collision with the writer and a budget hold are all
+ *  routine; each skips the review and lets the pass finish. Anything else is a
+ *  real fault and is rethrown for the pass to classify.
+ *
+ *  Open Thread entries are re-synced first: a member's lorebook keys are edited
+ *  outside the store, and this bounds how long a condition can lag them. */
+async function runReview(
+  deps: EngineLoopDeps,
+  window: ReviewWindow,
+  settings: EngineSettings,
+  log: EngineLog,
+): Promise<Intent[] | null> {
+  const { genX, getState } = deps;
+
+  // The call itself, plus the reserve every Engine spend leaves for the next
+  // triage.
+  if (
+    api.v1.script.getAllowedOutput() <
+    REVIEW_MAX_TOKENS + TRIAGE_MAX_TOKENS
+  ) {
+    await log("[engine] review due, budget short — left for the next pass");
+    return null;
+  }
+
+  await syncOpenThreadEntries(getState);
+
+  const state = getState();
+  const aliases = await entityAliases(state, state.world.entityIds);
+  const label = (entity: WorldEntity): string =>
+    FIELD_CONFIGS.find((c) => c.id === entity.categoryId)?.label ?? "";
+  const manifest = buildReviewManifest({
+    foundation: formatFoundationBlock(state),
+    entities: Object.values(state.world.entitiesById).map((entity) => ({
+      id: entity.id,
+      name: entity.name,
+      category: label(entity),
+      summary: entity.summary,
+    })),
+    threads: state.world.threads,
+    aliases,
+    paragraphs: window.paragraphs,
+  });
+
+  let text: string;
+  try {
+    text = await generateWithBackoff(
+      genX,
+      createReviewFactory(manifest, window.paragraphs),
+      await reviewParams(),
+      "review",
+      log,
+    );
+  } catch (error) {
+    if (!isConcurrencyRefusal(error) && !isBudgetHold(error)) throw error;
+    await log("[engine] review could not run — left for the next pass");
+    return null;
+  }
+
+  const { accepted, refused } = applyFloors(parseReview(text, manifest), {
+    threads: state.world.threads,
+    paragraphs: window.paragraphs,
+    aliases,
+    threadCap: settings.threadCap,
+  });
+  for (const { decision, reason } of refused) {
+    await log(
+      `[engine] review: refused ${decision.kind}${
+        decision.kind === "admit" ? ` "${decision.title}"` : ""
+      } — ${reason}`,
+    );
+  }
+
+  const prose = window.paragraphs.join("\n\n");
+  return accepted.map((decision) => toIntent(decision, prose));
 }
 
 /** Build the pass, with its own re-entry guard.
@@ -348,12 +472,16 @@ async function generateTriage(
  *
  *  Exported for tests: the pass is worth driving directly, without a hook
  *  registration in the way. */
-export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
+export function createEnginePass(
+  deps: EngineLoopDeps,
+): (options?: { forceReview?: boolean }) => Promise<void> {
   const { dispatch, getState, genX } = deps;
   const log = createEngineLog();
   let inFlight = false;
 
-  return async function runPass(): Promise<void> {
+  return async function runPass(
+    options: { forceReview?: boolean } = {},
+  ): Promise<void> {
     if (inFlight) return;
     // The machine's own answer to "may a pass start", checked here rather than
     // in whatever pressed the button.
@@ -380,20 +508,32 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // *wakeup*, not the writer's decision to switch the Engine off.
       if (!settings.enabled) return;
       const { minProse } = settings;
-      const [{ watermark, queue }, sections] = await Promise.all([
-        readEngineRecord(),
-        api.v1.document.scan(),
-      ]);
+      const [{ watermark, reviewWatermark, queue }, sections] =
+        await Promise.all([readEngineRecord(), api.v1.document.scan()]);
 
       const sectionIds = sections.map((s) => s.sectionId);
+      const textBySection = new Map(
+        sections.map((s) => [s.sectionId, s.section.text]),
+      );
       const assessment = assess({
         sectionIds,
         watermark,
-        textBySection: new Map(
-          sections.map((s) => [s.sectionId, s.section.text]),
-        ),
+        textBySection,
         entities: Object.values(getState().world.entitiesById),
       });
+
+      // The review pass's own reading of the same scan. It trails the fast
+      // pass: its watermark moves only when a review completes.
+      const window = reviewWindow({
+        sectionIds,
+        watermark: reviewWatermark,
+        textBySection,
+      });
+      dispatch(engineReviewBacklogObserved({ backlog: window.backlog }));
+      const reviewDue =
+        window.paragraphs.length > 0 &&
+        (options.forceReview === true ||
+          window.backlog >= settings.reviewEvery);
 
       // Measured from the SAME scan assess just read, not from a later one.
       // The offset's whole job is to say how much of that section this pass
@@ -404,90 +544,127 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // Rule 2. A positive backlog under the threshold is real unread prose:
       // report it, start nothing, spend nothing. At the default of 1 this is a
       // no-op and a genuinely empty backlog falls through to the machine, which
-      // ends the pass at `assessed` having generated nothing.
-      if (assessment.backlog > 0 && assessment.backlog < minProse) {
+      // ends the pass at `assessed` having generated nothing. A due review
+      // still runs — it reads at its own threshold, not triage's.
+      const belowMinimum =
+        assessment.backlog > 0 && assessment.backlog < minProse;
+      if (belowMinimum) {
         dispatch(engineBacklogObserved({ backlog: assessment.backlog }));
         await log(
           `[engine] ${assessment.backlog} new paragraph(s), below the minimum of ${minProse} — skipping`,
         );
-        return;
+        if (!reviewDue) return;
       }
+      const triageNow = assessment.backlog > 0 && !belowMinimum;
 
       dispatch(engineLoopEvent({ type: "passRequested" }));
       dispatch(
         engineLoopEvent({
           type: "assessed",
-          backlog: assessment.backlog,
+          backlog: triageNow ? assessment.backlog : 0,
           candidateIds: assessment.candidateIds,
+          reviewDue,
         }),
       );
-      if (assessment.backlog === 0) return;
+      if (!triageNow && !reviewDue) return;
 
-      // The reserve is the triage call itself; the drain then checks the same
-      // bucket again before each action it runs (`INTENT_MAX_TOKENS`, plus this
-      // same reserve so the NEXT pass can still triage). Checked here rather
-      // than left to GenX, which would park the pass waiting for the bucket to
-      // refill instead of reporting a hold.
-      //
-      // **This check is output-only, and cannot be made complete here (§14.1's
-      // deferred `waiting_for_user` gap).** GenX's `ensureBudget` blocks on
-      // input budget as well, and when it blocks it sets its status to
-      // `waiting_for_user` — which the header renders as a Continue widget, for
-      // work the writer never asked for and which §3.5 says a background loop
-      // has no business demanding. Four facts, read out of
-      // `node_modules/nai-gen-x/src/gen-x.ts`, close every route to fixing it
-      // from this side:
-      //
-      //   1. The park is unconditional and per-instance. `ensureBudget` ignores
-      //      `behaviour`, so a background task parks exactly like a foreground
-      //      one, and the status it sets belongs to the GenX instance rather
-      //      than to the task — there is no per-task opt-out to pass.
-      //   2. A parked task cannot be abandoned. `waitForAllowedInput` and
-      //      `waitForAllowedOutput` take no cancellation signal, and GenX only
-      //      re-reads `signal.cancelled` after they resolve; `cancelQueued` is a
-      //      no-op once the task is the one executing. §3.5 wants the work
-      //      abandoned, and abandoning it is exactly what is unavailable.
-      //   3. The one lever, `userInteraction()`, relabels rather than unparks —
-      //      `waiting_for_user` becomes `waiting_for_budget` and the same await
-      //      continues. (The loop already forwards it on every writer
-      //      generation, below, so the widget does clear when the writer
-      //      generates — which is also the only thing that refills the bucket.)
-      //   4. A pre-check here cannot predict the park either, which is what
-      //      rules out the obvious patch. GenX compares the TOTAL input tokens
-      //      (`Σ tokenizer.encode`) against `getAllowedInput()`, which is the
-      //      UNCACHED allowance. Any reserve we compute must either reproduce
-      //      that mismatch — inheriting spurious holds on a prefix the backend
-      //      has cached, on every pass, forever — or measure the honest
-      //      `countUncachedInputTokens` and fail to predict GenX at all.
-      //
-      // So §14.1's framing ("a question about how the Engine's tasks are queued
-      // in GenX rather than a patch to the pass") has no answer at the queuing
-      // layer: the only queuing-level fix is a second GenX instance whose state
-      // is never mirrored into the store, which would cost the serialisation
-      // that currently keeps the Engine from colliding with SEGA and the Forge,
-      // and would put a second `onGenerationRequested` registration in a
-      // codebase where one callback per hook name has already bitten us twice.
-      // Closing this needs an upstream change — a per-task "do not park" that
-      // rejects instead of waiting — and until then the residual is a Continue
-      // widget that appears only while the Engine is genuinely blocked, clears
-      // on the writer's next generation, and does the right thing if pressed.
-      // Revisit on any nai-gen-x upgrade.
-      if (api.v1.script.getAllowedOutput() < TRIAGE_MAX_TOKENS) {
-        dispatch(engineLoopEvent({ type: "budgetExhausted" }));
-        await log("[engine] holding — budget below the triage reserve");
-        return;
+      let intents: Intent[] = [];
+      let advanced = watermark;
+      if (triageNow) {
+        // The reserve is the triage call itself; the drain then checks the same
+        // bucket again before each action it runs (`INTENT_MAX_TOKENS`, plus this
+        // same reserve so the NEXT pass can still triage). Checked here rather
+        // than left to GenX, which would park the pass waiting for the bucket to
+        // refill instead of reporting a hold.
+        //
+        // **This check is output-only, and cannot be made complete here (§14.1's
+        // deferred `waiting_for_user` gap).** GenX's `ensureBudget` blocks on
+        // input budget as well, and when it blocks it sets its status to
+        // `waiting_for_user` — which the header renders as a Continue widget, for
+        // work the writer never asked for and which §3.5 says a background loop
+        // has no business demanding. Four facts, read out of
+        // `node_modules/nai-gen-x/src/gen-x.ts`, close every route to fixing it
+        // from this side:
+        //
+        //   1. The park is unconditional and per-instance. `ensureBudget` ignores
+        //      `behaviour`, so a background task parks exactly like a foreground
+        //      one, and the status it sets belongs to the GenX instance rather
+        //      than to the task — there is no per-task opt-out to pass.
+        //   2. A parked task cannot be abandoned. `waitForAllowedInput` and
+        //      `waitForAllowedOutput` take no cancellation signal, and GenX only
+        //      re-reads `signal.cancelled` after they resolve; `cancelQueued` is a
+        //      no-op once the task is the one executing. §3.5 wants the work
+        //      abandoned, and abandoning it is exactly what is unavailable.
+        //   3. The one lever, `userInteraction()`, relabels rather than unparks —
+        //      `waiting_for_user` becomes `waiting_for_budget` and the same await
+        //      continues. (The loop already forwards it on every writer
+        //      generation, below, so the widget does clear when the writer
+        //      generates — which is also the only thing that refills the bucket.)
+        //   4. A pre-check here cannot predict the park either, which is what
+        //      rules out the obvious patch. GenX compares the TOTAL input tokens
+        //      (`Σ tokenizer.encode`) against `getAllowedInput()`, which is the
+        //      UNCACHED allowance. Any reserve we compute must either reproduce
+        //      that mismatch — inheriting spurious holds on a prefix the backend
+        //      has cached, on every pass, forever — or measure the honest
+        //      `countUncachedInputTokens` and fail to predict GenX at all.
+        //
+        // So §14.1's framing ("a question about how the Engine's tasks are queued
+        // in GenX rather than a patch to the pass") has no answer at the queuing
+        // layer: the only queuing-level fix is a second GenX instance whose state
+        // is never mirrored into the store, which would cost the serialisation
+        // that currently keeps the Engine from colliding with SEGA and the Forge,
+        // and would put a second `onGenerationRequested` registration in a
+        // codebase where one callback per hook name has already bitten us twice.
+        // Closing this needs an upstream change — a per-task "do not park" that
+        // rejects instead of waiting — and until then the residual is a Continue
+        // widget that appears only while the Engine is genuinely blocked, clears
+        // on the writer's next generation, and does the right thing if pressed.
+        // Revisit on any nai-gen-x upgrade.
+        if (api.v1.script.getAllowedOutput() < TRIAGE_MAX_TOKENS) {
+          dispatch(engineLoopEvent({ type: "budgetExhausted" }));
+          await log("[engine] holding — budget below the triage reserve");
+          return;
+        }
+
+        const manifest = buildManifest(getState(), assessment.candidateIds);
+        intents = parseTriage(
+          await generateWithBackoff(
+            genX,
+            createTriageFactory({ manifest, assessment }),
+            await triageParams(),
+            "triage",
+            log,
+          ),
+          manifest,
+          // The prose that raised whatever triage just named, carried on the
+          // intents whose input it is. A `revise` the budget defers
+          // runs on a later pass, past a watermark that has already moved — see
+          // `Intent` in loop-machine.ts.
+          assessment.newText,
+        );
+        // Rule 1: triage got its answer, so the prose behind it has been read.
+        advanced = {
+          sectionId: reached.sectionId,
+          offset: reached.section.text.length,
+        };
       }
 
-      const manifest = buildManifest(getState(), assessment.candidateIds);
-      const intents = parseTriage(
-        await generateTriage(genX, manifest, assessment, log),
-        manifest,
-        // The prose that raised whatever triage just named, carried on the
-        // intents whose input it is. A `revise` the budget defers
-        // runs on a later pass, past a watermark that has already moved — see
-        // `Intent` in loop-machine.ts.
-        assessment.newText,
-      );
+      // The slow read, after the fast one. It moves its own watermark and only
+      // when it actually ran.
+      let reviewed = reviewWatermark;
+      let reviewIntents: Intent[] = [];
+      if (reviewDue) {
+        const outcome = await runReview(deps, window, settings, log);
+        if (outcome) {
+          reviewIntents = outcome;
+          reviewed = window.reached;
+          dispatch(
+            engineReviewBacklogObserved({
+              backlog: window.backlog - window.paragraphs.length,
+            }),
+          );
+        }
+      }
 
       // §5.1's condense, appended AFTER what triage named rather than before
       // it. Both cost 1024 and the drain is FIFO among costly intents, so the
@@ -504,17 +681,23 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // machine the empty `intents` would leave the HUD reading `idle` through
       // a drain that is editing the writer's lorebook. `acting` is the one
       // phase §9.1 spends the pencil on, so it must not be skipped.
-      const enqueued = dedupe(queue, [...intents, ...condense]);
+      // Triage's revises first, then the review's Thread work, then the
+      // condense: the drain is FIFO among costly intents, and an entity record
+      // the story has just made wrong outranks tidying.
+      const enqueued = dedupe(queue, [
+        ...intents,
+        ...reviewIntents,
+        ...condense,
+      ]);
       dispatch(engineLoopEvent({ type: "triaged", intents: enqueued }));
 
-      // Rule 1: the pass got its answer, so the prose behind it has been read.
-      // Rule 4: one record, so the watermark and the queue it was triaged from
-      // are written together.
-      const advanced: Watermark = {
-        sectionId: reached.sectionId,
-        offset: reached.section.text.length,
-      };
-      await saveEngineRecord({ watermark: advanced, queue: enqueued });
+      // Rule 4: one record, so the watermarks and the queue they were triaged
+      // from are written together.
+      await saveEngineRecord({
+        watermark: advanced,
+        reviewWatermark: reviewed,
+        queue: enqueued,
+      });
 
       if (enqueued.length === 0) return;
 
@@ -535,7 +718,11 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
         genX,
         log,
       });
-      await saveEngineRecord({ watermark: advanced, queue: remaining });
+      await saveEngineRecord({
+        watermark: advanced,
+        reviewWatermark: reviewed,
+        queue: remaining,
+      });
 
       // §9.1's ∆, and the first phase in which it can be anything but zero.
       // Dispatched before the resting event rather than folded into it: a drain
@@ -600,6 +787,12 @@ export function registerEngineLoopEffects(deps: EngineLoopDeps): void {
   // HUD repaints from the store when it lands.
   void readEngineSettings().then((settings) => {
     deps.dispatch(engineSettingsChanged(settings));
+  });
+
+  // The review control. Same runner, same guards; it only asks the pass to
+  // review whatever is unread without waiting for the threshold.
+  deps.subscribeEffect(matchesAction(engineReviewRequested), async () => {
+    await runPass({ forceReview: true });
   });
 
   // The ⚡. Both of its guards live inside runPass: the in-flight/canStartPass

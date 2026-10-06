@@ -145,7 +145,7 @@ describe("Hud.tsx is a line of icons with tooltips, not glyphs", () => {
     // sentence, because the cap counts that instead.
     const src = code(hudSrc());
     expect(src).toMatch(
-      /\$\{model\.threads\} open of \$\{model\.threadsTotal\}/,
+      /\$\{model\.threads\} open of \$\{model\.threadsTotal\}; each open Thread is in context while its cast is on stage/,
     );
   });
 
@@ -204,8 +204,15 @@ describe("Hud.tsx obeys the input rules", () => {
     expect(src).not.toContain("Date.now(");
   });
 
-  it("dispatches the pass request and nothing else", () => {
-    expect(hudSrc()).toContain("store.dispatch(enginePassRequested())");
+  it("dispatches the pass request and the review request, and nothing else", () => {
+    const src = hudSrc();
+    expect(src).toContain("store.dispatch(enginePassRequested())");
+    expect(src).toContain("store.dispatch(engineReviewRequested())");
+    expect(code(src).match(/store\.dispatch\(/g)).toHaveLength(2);
+  });
+
+  it("gives the review control a tooltip that says what its number means", () => {
+    expect(hudSrc()).toContain("more paragraph(s); press to review now");
   });
 });
 
