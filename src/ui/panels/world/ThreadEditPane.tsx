@@ -1,19 +1,18 @@
 // ThreadEditPane — edit pane for a Thread, counterpart to EntityEditPane and
-// SUI's SeThreadEditPane. Title + text are local drafts committed on Save
-// (threadRenamed + threadTextUpdated); the text has a generate zap that
-// streams into the draft via the shared stream-buffer.
-// Membership toggles, the horizon picker and the status control dispatch
-// immediately (not part of the draft). No Delete (that lives on the ThreadItem
-// card) and no lorebook toggle (a later slice) — matching SUI scope.
+// SUI's SeThreadEditPane. Title, state and private notes are local drafts
+// committed on Save (threadRenamed + threadLedgerUpdated); the state has a
+// generate zap that streams into the draft via the shared stream-buffer.
+// Membership toggles and the status control dispatch immediately (not part of
+// the draft). No Delete (that lives on the ThreadItem card) and no lorebook
+// toggle (a later slice) — matching SUI scope.
 //
-// **Drafted vs immediate is a split with a reason.** Title and text are typed,
-// so they draft locally and commit on Save — a dispatch per keystroke is
-// reducer overhead for a value nobody has finished typing. The horizon, the
-// status and the membership toggles are presses: one press, one value, and the
-// same split EntityEditPane already makes for its category bar.
+// **Drafted vs immediate is a split with a reason.** Title, state and notes are
+// typed, so they draft locally and commit on Save — a dispatch per keystroke is
+// reducer overhead for a value nobody has finished typing. The status and the
+// membership toggles are presses: one press, one value, and the same split
+// EntityEditPane already makes for its category bar.
 //
-// **Every intent carries its value.** `threadHorizonSet` takes a horizon and
-// `threadStatusSet` takes a status — never "next" or "toggle" — so a press
+// **Every intent carries its value.** `threadStatusSet` takes a status — never "next" or "toggle" — so a press
 // delivered twice sets the same value twice. That is the idempotence CLAUDE.md
 // asks for in place of the tap debounce it forbids, and `disabled` would not
 // have covered it either (a render-time value the second press arrives ahead
@@ -25,48 +24,20 @@ import { T, SP } from "../../style";
 import {
   store,
   threadRenamed,
-  threadTextUpdated,
+  threadLedgerUpdated,
   threadMemberToggled,
-  threadHorizonSet,
   threadStatusSet,
   uiThreadSummaryGenerationRequested,
   uiEditableDeactivate,
 } from "../../../core/store";
-import type { ThreadHorizon } from "../../../core/store/types";
 import { isRequestActive } from "./world-select";
 import { clearStream } from "../../../core/store/stream-buffer";
 import { CATEGORIES } from "./EntityEditPane";
 import { ThreadStatusIcon } from "./ThreadStatusIcon";
-import {
-  HORIZON_OPTIONS,
-  horizonOption,
-  nextStatus,
-  statusOption,
-} from "./thread-display";
-import {
-  ArrowLeft,
-  Zap,
-  ToggleLeft,
-  ToggleRight,
-  Crosshair,
-  GitBranch,
-  TrendingUp,
-} from "nai:icons/feather";
+import { nextStatus, statusOption } from "./thread-display";
+import { ArrowLeft, Zap, ToggleLeft, ToggleRight } from "nai:icons/feather";
 
 const ICON_SIZE = 16;
-
-// All feather icons share one component type; deriving from `Crosshair` keeps
-// the map values valid JSX elements, the way EntityCard's CATEGORY_ICON does.
-// A `Record` over the union so a fourth horizon cannot arrive without a glyph.
-//
-// Each icon renders at its own KEYED position inside the picker's map, which is
-// what makes a per-option component type legal here: the rule forbids a type
-// that changes at a FIXED position (see ThreadStatusIcon, where it does).
-const HORIZON_ICONS: Record<ThreadHorizon, typeof Crosshair> = {
-  point: Crosshair,
-  plot: GitBranch,
-  arc: TrendingUp,
-};
 
 const inputStyle = {
   background: T.bg2,
@@ -147,7 +118,8 @@ export function ThreadEditPane(props: { threadId: string }) {
   const entitiesById = useSlice((s) => s.world.entitiesById);
 
   const title = useDraftField(thread?.title ?? "");
-  const text = useDraftField(thread?.text ?? "");
+  const state = useDraftField(thread?.state ?? "");
+  const latent = useDraftField(thread?.latent ?? "");
 
   const reqId = `se-thread-summary-${threadId}`;
   const bufferKey = `thread-summary:${threadId}`;
@@ -167,7 +139,7 @@ export function ThreadEditPane(props: { threadId: string }) {
   // handler cleared the buffer, so nothing stages).
   useEffect(() => {
     if (!genRef.current || pending) return;
-    if (live !== undefined) text.setValue(live);
+    if (live !== undefined) state.setValue(live);
     clearStream(bufferKey);
     genRef.current = false;
   }, [pending, live]);
@@ -187,7 +159,13 @@ export function ThreadEditPane(props: { threadId: string }) {
 
   const onSave = () => {
     store.dispatch(threadRenamed({ threadId, title: title.value.trim() }));
-    store.dispatch(threadTextUpdated({ threadId, text: text.value.trim() }));
+    store.dispatch(
+      threadLedgerUpdated({
+        threadId,
+        state: state.value.trim(),
+        latent: latent.value.trim(),
+      }),
+    );
     close();
   };
 
@@ -233,47 +211,6 @@ export function ThreadEditPane(props: { threadId: string }) {
         style={inputStyle}
       />
 
-      {/* Horizon — the same shape of choice as EntityEditPane's category bar,
-          and deliberately the same idiom: a row of buttons over an exported
-          table, each keyed, the selected one lit. */}
-      <span style={sectionLabel}>Horizon</span>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: SP.sm }}>
-        {HORIZON_OPTIONS.map((option) => {
-          const selected = option.id === thread.horizon;
-          const Icon = HORIZON_ICONS[option.id];
-          return (
-            <button
-              key={option.id}
-              title={option.help}
-              onClick={() =>
-                store.dispatch(
-                  threadHorizonSet({ threadId, horizon: option.id }),
-                )
-              }
-              style={{
-                border: "none",
-                cursor: "pointer",
-                padding: "4px 8px",
-                fontSize: "0.775rem",
-                borderRadius: "3px",
-                display: "flex",
-                alignItems: "center",
-                gap: SP.xs,
-                background: selected ? T.bg3 : "transparent",
-                color: selected ? T.textHeadings : T.textDisabled,
-                opacity: selected ? 1 : 0.5,
-              }}
-            >
-              <Icon size={ICON_SIZE} />
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
-      <span style={{ fontSize: "0.75em", color: T.textDisabled }}>
-        {horizonOption(thread.horizon).help}
-      </span>
-
       {/* Status. A labelled section like the rest of the pane; inside it the
           icon and the word change, and the button itself does not. */}
       <span style={sectionLabel}>Status</span>
@@ -304,11 +241,11 @@ export function ThreadEditPane(props: { threadId: string }) {
         {statusOption(thread.status).label}
       </button>
 
-      {/* Summary */}
+      {/* State — what the story model reads. */}
       <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
-        <span style={{ ...sectionLabel, flex: 1 }}>Summary</span>
+        <span style={{ ...sectionLabel, flex: 1 }}>State</span>
         <button
-          title="Generate summary"
+          title="Generate state"
           onClick={onGenerate}
           disabled={pending}
           style={genZapStyle(pending)}
@@ -316,12 +253,29 @@ export function ThreadEditPane(props: { threadId: string }) {
           <Zap size={ICON_SIZE} />
         </button>
       </div>
+      <span style={{ fontSize: "0.75em", color: T.textDisabled }}>
+        What the story model sees when this cast is on the page. Say only what
+        is already so.
+      </span>
       <textarea
-        placeholder="What is this thread's dynamic?"
-        value={live ?? text.value}
+        placeholder="How do things stand between them right now?"
+        value={live ?? state.value}
         disabled={pending}
-        onInput={(e) => text.setValue(e.target.value ?? "")}
+        onInput={(e) => state.setValue(e.target.value ?? "")}
         style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }}
+      />
+
+      {/* Private notes — never leave Story Engine. */}
+      <span style={sectionLabel}>Private notes</span>
+      <span style={{ fontSize: "0.75em", color: T.textDisabled }}>
+        Never shown to the story model. What is unspoken, owed or concealed goes
+        here.
+      </span>
+      <textarea
+        placeholder="What is unsaid or unsettled between them?"
+        value={latent.value}
+        onInput={(e) => latent.setValue(e.target.value ?? "")}
+        style={{ ...inputStyle, minHeight: "60px", resize: "vertical" }}
       />
 
       {/* Members */}

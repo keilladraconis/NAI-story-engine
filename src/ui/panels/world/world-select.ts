@@ -35,27 +35,23 @@ export function selectWorldBody(
 
 /** Threads split into the working set and the fold.
  *
- *  Open threads are what the story still owes; satisfied and abandoned are what
- *  it has settled or walked away from. They accumulate — a long story resolves
- *  many — and twenty finished rows bury the three that matter.
- *
- *  Both retired readings share one fold. `abandoned` is a distinct READING, and
- *  deliberately so (a check against a commitment nobody resolved would tell the
- *  writer something untrue), but it behaves exactly as satisfied does elsewhere:
- *  the entry goes quiet, the slot frees, reopening is one press.
+ *  Open threads are what the story can still change; concluded ones have
+ *  settled into their cast's own entries. They accumulate — a long story
+ *  concludes many — and twenty finished rows bury the three that matter, so
+ *  they fold under their own heading, one click away.
  *
  *  Order within each list is the stored order. The World lists threads as they
  *  were created and partitioning must not re-sort them under a reaching finger. */
 export function partitionThreads(threads: Thread[]): {
   open: Thread[];
-  retired: Thread[];
+  concluded: Thread[];
 } {
   const open: Thread[] = [];
-  const retired: Thread[] = [];
+  const concluded: Thread[] = [];
   for (const thread of threads) {
-    (thread.status === "open" ? open : retired).push(thread);
+    (thread.status === "open" ? open : concluded).push(thread);
   }
-  return { open, retired };
+  return { open, concluded };
 }
 
 /** The four request ids that represent in-flight work for an entity — all keyed

@@ -8,10 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  HORIZON_OPTIONS,
-  STATUS_OPTIONS,
-} from "../../src/ui/panels/world/thread-display";
+import { STATUS_OPTIONS } from "../../src/ui/panels/world/thread-display";
 
 const WORLD_DIR = join(__dirname, "../../src/ui/panels/world");
 const ICON = join(WORLD_DIR, "ThreadStatusIcon.tsx");
@@ -82,11 +79,10 @@ describe("the status indicator swaps no component types", () => {
     // The rule and its failure: swapping one component type for another at a
     // fixed position leaves BOTH svgs in the DOM when the re-render arrives
     // from a detached callback rather than a JSX event handler. Every render
-    // here is detached — the status moves when the store moves, and phase 6
-    // moves it from the Engine's own pass, with no press anywhere near it.
+    // here is detached — the status moves when the store moves, and it
+    // moves during the Engine's own pass, with no press anywhere near it.
     const src = read(ICON);
     expect(src).toContain("<CheckCircle");
-    expect(src).toContain("<MinusCircle");
     expect(src).toContain("<Circle");
 
     // One `display` toggle per reading, derived from STATUS_OPTIONS rather
@@ -109,11 +105,11 @@ describe("the status indicator swaps no component types", () => {
   });
 });
 
-describe("a satisfied thread reads as satisfied in the World list", () => {
+describe("a concluded thread reads as concluded in the World list", () => {
   it("gives every thread row the same status slot, in the same place", () => {
     // §9.1's instinct, applied to a list: fixed slots, always present, always
     // in the same position, so the column is scanned rather than decoded. A
-    // slot that appeared only on satisfied threads would be a second list in
+    // slot that appeared only on concluded threads would be a second list in
     // disguise — and would move every title left or right by a row.
     const src = code(read(ITEM));
     const uses = [...src.matchAll(/<ThreadStatusIcon\b/g)];
@@ -131,10 +127,8 @@ describe("a satisfied thread reads as satisfied in the World list", () => {
     // too, so the row as a whole reads finished at a glance — a style value,
     // never a swapped element.
     const src = code(read(ITEM));
-    // Either retired reading dims the row: what the dimming says is "closed",
-    // which is true of a thread the writer settled and one the story left.
-    expect(src).toMatch(/const retired = thread\.status !== "open"/);
-    expect(src).toMatch(/opacity: retired \?/);
+    expect(src).toMatch(/const concluded = thread\.status !== "open"/);
+    expect(src).toMatch(/opacity: concluded \?/);
   });
 
   it("shows status without filtering or reordering the list", () => {
@@ -151,32 +145,7 @@ describe("a satisfied thread reads as satisfied in the World list", () => {
   });
 });
 
-describe("the edit pane offers the horizon as a choice, like a category", () => {
-  it("builds one button per horizon, from the model's own list", () => {
-    // The established shape for this kind of choice is EntityEditPane's
-    // category bar: a row of buttons over an exported table, each keyed, the
-    // selected one lit. A thread's horizon is the same shape of choice and does
-    // not get a second idiom.
-    const src = code(read(PANE));
-    expect(src).toContain("HORIZON_OPTIONS.map(");
-    expect(src).toMatch(/key=\{(?:option|opt|h)\.id\}/);
-  });
-
-  it("keys every horizon icon to its own position", () => {
-    // Icons differ per horizon, which is a component type varying by position —
-    // legal only because each one has its own key in a list, exactly as the
-    // category bar does it. What is forbidden is a type that changes at a FIXED
-    // position, which is what the status indicator above avoids.
-    const src = code(read(PANE));
-    expect(src).toMatch(/HORIZON_ICONS\s*:\s*Record<ThreadHorizon,/);
-    expect(conditionalElements(read(PANE))).toEqual([]);
-  });
-
-  it("dispatches the horizon it means, not a step to the next one", () => {
-    const src = code(read(PANE));
-    expect(src).toMatch(/threadHorizonSet\(\{\s*threadId,\s*horizon:/);
-  });
-
+describe("the edit pane's presses and typing", () => {
   it("sets status from an explicit value, so a second press is harmless", () => {
     // No tap debounce (CLAUDE.md), and `disabled` is not a re-entry guard. What
     // makes a repeated press safe here is that the payload is computed from the
@@ -188,68 +157,16 @@ describe("the edit pane offers the horizon as a choice, like a category", () => 
   });
 
   it("dispatches nothing from a text handler", () => {
-    // Reducer overhead at keystroke frequency. Title and text draft locally and
-    // commit on Save; the pickers are presses, which is the same split
-    // EntityEditPane makes for its category bar.
+    // Reducer overhead at keystroke frequency. Title, state and notes draft
+    // locally and commit on Save.
     const src = code(read(PANE));
     const handlers = [...src.matchAll(/onInput=\{([^}]*)\}/g)].map((m) => m[1]);
     expect(handlers.length).toBeGreaterThan(0);
     for (const handler of handlers) expect(handler).not.toContain("dispatch");
   });
 
-  it("names every horizon option's help where the writer can read it", () => {
-    // The picker's labels are three words; what they cost in context is not
-    // guessable from them. The help line is the only place that is said.
-    const src = code(read(PANE));
-    expect(src).toMatch(/\.help/);
-    expect(HORIZON_OPTIONS.length).toBeGreaterThan(1);
-  });
-});
-
-describe("the World panel refuses a hand create at the cap", () => {
-  // The reducer displaces the weakest thread to make room, which is §4.5's
-  // trade for *triage* — the Engine chose to spend something. A writer pressing
-  // "+" has chosen nothing, and one unconfirmed click destroying an authored
-  // thread is the opposite of the two-click confirm the delete on the same
-  // panel asks for. The reducer invariant stays (it is the backstop for the
-  // Forge and for phase 6's triage); the refusal is here.
-  it("reads its whole appearance off the model, so the panel states no second cap", () => {
-    const src = code(read(PANEL));
-    expect(src).toContain("threadAddModel(");
-    expect(src).toMatch(/title=\{addThread\.title\}/);
-    expect(src).toContain("{addThread.count}");
-    // The old literal, which said nothing about where the writer stands.
-    expect(src).not.toContain('title="Add thread"');
-  });
-
-  it("refuses in the handler, not in a `disabled` prop", () => {
-    // CLAUDE.md: `disabled` is a render-time value, so a press arriving before
-    // the re-render that sets it still gets through — and a disabled button
-    // swallows the hover that shows the tooltip explaining why nothing
-    // happened. `aria-disabled` says unavailable without either cost.
-    const src = code(read(PANEL));
-    expect(src).toMatch(/if \(!addThread\.enabled\) return;/);
-    expect(src).toMatch(/aria-disabled=\{!addThread\.enabled\}/);
-    expect(src).not.toMatch(/(?<!aria-)disabled=\{/);
-  });
-
-  it("keeps the count visible before the ceiling, not only at it", () => {
-    // "Show the writer where they stand" — the limit lives on the Setup tab,
-    // so a panel that only spoke up at the boundary would be the first mention
-    // of a number that has been true all along. `count` is rendered
-    // unconditionally, never behind a ternary.
-    const src = code(read(PANEL));
-    expect(
-      [...src.matchAll(/(?:[?:]|&&|\|\|)\s*\{?\s*addThread\.count/g)].length,
-    ).toBe(0);
-  });
-
-  it("counts every thread the cap counts, not the ones the body renders", () => {
-    // `selectWorldBody` drops a forge draft's thread from the list; the reducer
-    // counts it all the same, so reading `visibleThreads.length` here would
-    // promise room the create does not have.
-    const src = code(read(PANEL));
-    expect(src).toMatch(/threadAddModel\(threads\.length, threadCap\)/);
+  it("renders no element behind a condition", () => {
+    expect(conditionalElements(read(PANE))).toEqual([]);
   });
 });
 
@@ -260,14 +177,6 @@ describe("both thread creators go through the one action", () => {
   it("names the World panel and the Forge, and nothing else", () => {
     for (const file of [PANEL, FORGE]) {
       expect(code(read(file))).toMatch(/dispatch\(\s*threadCreated\(/);
-    }
-  });
-
-  it("leaves the cap to the reducer — neither trims the list itself", () => {
-    for (const file of [PANEL, FORGE]) {
-      const src = code(read(file));
-      expect(src).not.toContain("enforceThreadCap");
-      expect(src).not.toContain("displacementOrder");
     }
   });
 });
@@ -304,13 +213,57 @@ describe("the World panel and the thread row swap no icon types", () => {
       );
     }
 
-    // The retired fold's chevron, in the panel. The row's own expand/collapse
+    // The concluded fold's chevron, in the panel. The row's own expand/collapse
     // pair is gone: a thread no longer wraps its cast, so there is nothing left
     // beneath it to collapse.
     for (const icon of ["ChevronDown", "ChevronRight"]) {
       expect(panel).toMatch(
-        new RegExp(`<${icon}[^>]*display: retiredOpen \\?`, "s"),
+        new RegExp(`<${icon}[^>]*display: concludedOpen \\?`, "s"),
       );
     }
+  });
+});
+
+describe("the World panel's add-thread control never refuses", () => {
+  it("reads its whole appearance off the model, so the panel states no second cap", () => {
+    const src = code(read(PANEL));
+    expect(src).toContain("threadAddModel(openThreads.length, threadCap)");
+    expect(src).toMatch(/title=\{addThread\.title\}/);
+    expect(src).toContain("{addThread.count}");
+    expect(src).not.toContain("aria-disabled");
+    expect(src).not.toMatch(/(?<!aria-)disabled=\{/);
+  });
+});
+
+describe("the edit pane keeps the private half private", () => {
+  const pane = readFileSync("src/ui/panels/world/ThreadEditPane.tsx", "utf8");
+
+  it("labels each field with who reads it", () => {
+    expect(pane).toContain(
+      "What the story model sees when this cast is on the page.",
+    );
+    expect(pane).toContain("Never shown to the story model.");
+  });
+
+  it("saves both halves in one action", () => {
+    expect(pane).toMatch(
+      /threadLedgerUpdated\(\{\s*threadId,\s*state: state\.value\.trim\(\),\s*latent: latent\.value\.trim\(\),/,
+    );
+  });
+
+  it("never stages a generation into the private notes", () => {
+    expect(pane).not.toMatch(/latent\.setValue\(live\)/);
+  });
+});
+
+describe("the World list shows a Thread's state and nothing private", () => {
+  const item = readFileSync("src/ui/panels/world/ThreadItem.tsx", "utf8");
+
+  it("renders state", () => {
+    expect(item).toContain("{thread.state}");
+  });
+
+  it("never reads the private notes", () => {
+    expect(item).not.toContain("latent");
   });
 });

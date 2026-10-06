@@ -1,5 +1,5 @@
 // One Thread row: status icon + title button (opens ThreadEditPane) + two-click
-// confirm delete. One line, and deliberately so.
+// confirm delete, then its state.
 //
 // **A thread no longer wraps its cast.** It used to render its members as
 // entity cards beneath it, which hid those entities from the World list and
@@ -12,7 +12,7 @@
 //
 // **Status is still a slot, not a section.** Every row carries the indicator in
 // the same position, whatever the status — a reader scans a shape rather than
-// decoding one. This file used to argue from that against hiding retired
+// decoding one. This file used to argue from that against hiding concluded
 // threads at all, on the grounds that reopening one means finding it first.
 // That objection was right about the danger and wrong about the remedy: the
 // fold in `World.tsx` keeps them findable, one click away, instead of leaving
@@ -36,9 +36,7 @@ export function ThreadItem(props: { threadId: string }) {
 
   if (!thread) return null;
 
-  // Either retired reading dims the title: the point of the dimming is "this
-  // one is closed", which is true of both.
-  const retired = thread.status !== "open";
+  const concluded = thread.status !== "open";
 
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
@@ -61,7 +59,7 @@ export function ThreadItem(props: { threadId: string }) {
             border: "none",
             cursor: "pointer",
             color: T.textHeadings,
-            opacity: retired ? 0.55 : 1,
+            opacity: concluded ? 0.55 : 1,
             padding: 0,
           }}
         >
@@ -82,6 +80,32 @@ export function ThreadItem(props: { threadId: string }) {
           }
         />
       </div>
+      {/* What the story model is shown for this Thread. Always mounted; an
+          empty state renders an empty line rather than removing the element. */}
+      <span
+        style={{
+          padding: `0 ${SP.sm} ${SP.sm}`,
+          background: T.bg2,
+          fontSize: "0.85em",
+          color: T.text,
+          opacity: concluded ? 0.55 : 0.85,
+          display: thread.state ? "block" : "none",
+        }}
+      >
+        {thread.state}
+      </span>
+      <span
+        title="A Thread reaches the story model only when its cast is on stage, so one with no cast has no lorebook entry"
+        style={{
+          padding: `0 ${SP.sm} ${SP.sm}`,
+          background: T.bg2,
+          fontSize: "0.75em",
+          color: T.textDisabled,
+          display: thread.entityIds.length === 0 ? "block" : "none",
+        }}
+      >
+        Not in the lorebook: add a cast
+      </span>
     </div>
   );
 }

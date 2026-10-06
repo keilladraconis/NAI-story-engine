@@ -11,16 +11,11 @@
 // its own icon back with no press anywhere near it. Same workaround as
 // `ThreadStatusIcon`, `ConfirmButton` and `Header.tsx`'s WidgetIcon.
 //
-// **add-thread carries the cap, and refuses rather than displaces.** The
-// reducer's `enforceThreadCap` drops the weakest thread to make room for a new
-// one, which is the right trade for triage — the Engine chose to spend
-// something — and the wrong one for a writer who has pressed a button and
-// chosen nothing yet. So the button shows where the writer stands (`3/8`) on
-// every render, and at the ceiling it says why it will not create and what to
-// do about it, instead of silently eating an authored thread. `threadAddModel`
-// (thread-display.ts) owns all three readings; the handler refuses on the same
-// `enabled` the appearance reads, because `disabled` is a render-time value and
-// not a guard (CLAUDE.md) — and the reducer stays the backstop underneath both.
+// **add-thread shows the open count against the Engine's limit and never
+// refuses.** The limit restrains the Engine's admissions only; a writer who has
+// pressed the button has chosen, so the press always creates. The count is
+// there so a writer at the limit knows why the Engine has stopped proposing
+// Threads. `threadAddModel` (thread-display.ts) owns both readings.
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
@@ -68,14 +63,11 @@ export function World() {
   const [collapsed, setCollapsed] = useState(false);
 
   const { threads: allThreads, loose } = selectWorldBody(entitiesById, threads);
-  const { open: openThreads, retired: retiredThreads } =
+  const { open: openThreads, concluded: concludedThreads } =
     partitionThreads(allThreads);
-  const [retiredOpen, setRetiredOpen] = useState(false);
+  const [concludedOpen, setConcludedOpen] = useState(false);
   const isEmpty = allThreads.length === 0 && loose.length === 0;
-  // Every thread the cap counts, not just the ones this panel is showing:
-  // `selectWorldBody` may hide a forge draft's thread, and the reducer counts
-  // it all the same.
-  const addThread = threadAddModel(threads.length, threadCap);
+  const addThread = threadAddModel(openThreads.length, threadCap);
 
   const onAddEntity = () => {
     const id = api.v1.uuid();
@@ -94,14 +86,9 @@ export function World() {
   };
 
   const onAddThread = () => {
-    // The refusal, where a press actually lands. Not `disabled`: that is a
-    // render-time value a press arriving before the re-render slips past, and
-    // a disabled button also swallows the hover that shows the tooltip saying
-    // why (see the `aria-disabled` below).
-    if (!addThread.enabled) return;
     const id = api.v1.uuid();
     store.dispatch(
-      threadCreated({ thread: { id, title: "", text: "", entityIds: [] } }),
+      threadCreated({ thread: { id, title: "", state: "", entityIds: [] } }),
     );
     store.dispatch(uiEditableActivate({ id }));
   };
@@ -166,15 +153,14 @@ export function World() {
         </button>
         <button
           title={addThread.title}
-          aria-disabled={!addThread.enabled}
           onClick={onAddThread}
           style={{
             ...ICON_BTN,
             display: "flex",
             alignItems: "center",
             gap: SP.xs,
-            color: addThread.enabled ? T.text : T.textDisabled,
-            opacity: addThread.enabled ? 0.6 : 0.35,
+            color: T.text,
+            opacity: 0.6,
           }}
         >
           <Layers size={ICON_SIZE} />
@@ -212,15 +198,15 @@ export function World() {
                 <ThreadItem key={t.id} threadId={t.id} />
               ))}
 
-              {/* Retired threads fold rather than vanish. Satisfied and
-                  abandoned accumulate, and twenty finished rows bury the three
-                  the story still owes — but reopening one means finding it
-                  first, so they stay one click away. */}
-              {retiredThreads.length > 0 ? (
+              {/* Concluded threads fold rather than vanish. They accumulate,
+                  and twenty finished rows bury the three still in play — but
+                  reopening one means finding it first, so they stay one click
+                  away. */}
+              {concludedThreads.length > 0 ? (
                 <Fragment>
                   <button
-                    onClick={() => setRetiredOpen(!retiredOpen)}
-                    title="Threads the story has settled or walked away from"
+                    onClick={() => setConcludedOpen(!concludedOpen)}
+                    title="Threads whose state has settled into their cast's entries"
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
@@ -242,25 +228,25 @@ export function World() {
                     <ChevronDown
                       size={14}
                       style={{
-                        display: retiredOpen ? "inline-flex" : "none",
+                        display: concludedOpen ? "inline-flex" : "none",
                       }}
                     />
                     <ChevronRight
                       size={14}
                       style={{
-                        display: retiredOpen ? "none" : "inline-flex",
+                        display: concludedOpen ? "none" : "inline-flex",
                       }}
                     />
-                    Retired ({retiredThreads.length})
+                    Concluded ({concludedThreads.length})
                   </button>
                   <div
                     style={{
-                      display: retiredOpen ? "flex" : "none",
+                      display: concludedOpen ? "flex" : "none",
                       flexDirection: "column",
                       gap: SP.xs,
                     }}
                   >
-                    {retiredThreads.map((t) => (
+                    {concludedThreads.map((t) => (
                       <ThreadItem key={t.id} threadId={t.id} />
                     ))}
                   </div>
