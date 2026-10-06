@@ -19,6 +19,7 @@ import {
   threadDeleted,
   threadLedgerUpdated,
   threadMemberToggled,
+  threadRenamed,
   threadStatusSet,
 } from "../../../src/core/store/slices/world";
 import {
@@ -267,6 +268,42 @@ describe("a Thread's lorebook entry", () => {
     await syncThreadEntry(store.getState, "t1");
     expect(lorebook.read(entryId)?.text).toBe(
       "Ines Corbel and Pell work the east hives together.",
+    );
+  });
+
+  it("is created once when several actions land before the first create finishes", async () => {
+    const store = storeOf(cast());
+    store.dispatch(threadCreated({ thread: thread({ entityIds: [] }) }));
+    store.dispatch(threadMemberToggled({ threadId: "t1", entityId: "a" }));
+    store.dispatch(
+      threadLedgerUpdated({
+        threadId: "t1",
+        state: "Ines Corbel works the east hives alone.",
+        latent: "",
+      }),
+    );
+    await settle();
+    await settle();
+
+    expect(lorebook.created()).toHaveLength(1);
+    const [created] = lorebook.created();
+    const bound = store.getState().world.threads[0];
+    expect(bound.lorebookEntryId).toBe(created.id);
+    expect(lorebook.read(created.id)?.text).toBe(
+      "Ines Corbel works the east hives alone.",
+    );
+  });
+
+  it("is created once when a rename follows the create immediately", async () => {
+    const store = storeOf(cast());
+    store.dispatch(threadCreated({ thread: thread() }));
+    store.dispatch(threadRenamed({ threadId: "t1", title: "The East Hives" }));
+    await settle();
+    await settle();
+
+    expect(lorebook.created()).toHaveLength(1);
+    expect(store.getState().world.threads[0].lorebookEntryId).toBe(
+      lorebook.created()[0].id,
     );
   });
 });

@@ -272,8 +272,15 @@ export function registerThreadConditionEffects(
   getState: () => RootState,
   dispatch: Store<RootState>["dispatch"],
 ): void {
+  // One settle at a time per Thread. Two actions on a Thread with no entry yet
+  // would each read `lorebookEntryId` as unset across the awaits and each
+  // create one, orphaning the loser. Chaining the second onto the first lets
+  // it find the entry and sync it (CLAUDE.md: refuse re-entry across an
+  // `await`). The map lives in this closure, not the module.
+  const running = new Map<string, Promise<void>>();
   const settle = (threadId: string): void => {
-    void (async () => {
+    const previous = running.get(threadId) ?? Promise.resolve();
+    const next: Promise<void> = previous.then(async () => {
       try {
         if (!(await ensureThreadEntry(getState, dispatch, threadId))) {
           await syncThreadEntry(getState, threadId);
@@ -281,7 +288,9 @@ export function registerThreadConditionEffects(
       } catch (error) {
         api.v1.log("[engine] thread entry sync failed:", error);
       }
-    })();
+      if (running.get(threadId) === next) running.delete(threadId);
+    });
+    running.set(threadId, next);
   };
 
   subscribeEffect(matchesAction(threadCreated), (action) =>
