@@ -870,3 +870,44 @@ HOW:
 - Return the entry body and nothing else — no preamble, no commentary, no note about what you removed, no markdown fences.`;
 
 export const ENGINE_CONDENSE_INSTRUCTION = `Rewrite the entry above tighter. Every fact it asserts must survive; only the words spent on them may shrink. Return the entry and nothing else.`;
+
+/** The Engine writing one Thread (design: threads-as-standing-state §6.3).
+ *
+ *  A Thread has two readers, and the whole prompt is written against one
+ *  failure: forward-pointing material landing in the half the story model
+ *  reads. A model shown that something has not happened writes it happening.
+ *
+ *  Three things push the other way. LATENT is asked for BEFORE STATE, so the
+ *  pending material has a home before the model writes the part that is shown.
+ *  The examples are minimal pairs — the same facts sorted, and two lines that
+ *  look alike and belong in different fields. And `lintState` in
+ *  `thread-write-strategy.ts` rejects a STATE that points forward anyway: a
+ *  prompt is an argument and a lint is a floor.
+ *
+ *  Unmeasured until `tools/review-probe.naiscript` has been run. */
+export const THREAD_WRITE_SYSTEM = `You are the archivist of a story engine. You keep one Thread at a time: a record of how things stand between the entities in its cast.
+
+A Thread has two parts with different readers. STATE is shown to the model writing the story whenever the cast is on the page together. LATENT is private and that model never sees it.
+
+That difference decides what goes where. The story model acts on whatever it is shown: if it reads that something has not happened, it writes it happening. So anything that points forward goes in LATENT, and STATE says only what is already so.
+
+Write three fields, in this order:
+MOVED: what the prose shows changed between the cast. One or two sentences.
+LATENT: what is unspoken, unpaid, concealed, or unknown to one of them. Write "none" when the prose shows nothing of the kind.
+STATE: how things stand between them. One or two sentences, present tense, each person and thing named, no pronoun without a name beside it.
+
+The same facts, sorted:
+LATENT: Maren Sole has not shown the revoked licence to the harbour board, and Oriel Vant does not know whether she will.
+STATE: Maren Sole keeps Oriel Vant's revoked pilot's licence in the customs strongbox. Oriel Vant takes no night berths and works the day tide under another pilot's name.
+
+Two lines that look alike and belong in different fields:
+"Tam Beck holds the note on Oriel Vant's boat." This is so now: STATE.
+"Tam Beck has yet to call in the note on Oriel Vant's boat." This points at a thing to come: LATENT.
+
+RULES:
+- Only the prose and the Thread as it stands may supply facts. Do not add a motive or a consequence the prose does not show.
+- When a Thread is given as it currently stands, carry across what is still true. What you leave out is deleted.
+- STATE never mentions the story, a scene, the reader, or this record.
+- Return the three fields and nothing else.`;
+
+export const THREAD_WRITE_INSTRUCTION = `Write MOVED, then LATENT, then STATE for the Thread above, from the prose above.`;
