@@ -7,11 +7,7 @@ import {
   type EngineLoopDeps,
 } from "../../../src/core/store/effects/engine-loop";
 import { rootReducer } from "../../../src/core/store";
-import type {
-  RootState,
-  Thread,
-  WorldEntity,
-} from "../../../src/core/store/types";
+import type { RootState, WorldEntity } from "../../../src/core/store/types";
 import { persistedDataLoaded } from "../../../src/core/store";
 import { initialWorldState } from "../../../src/core/store/slices/world";
 import {
@@ -66,23 +62,7 @@ type Harness = {
   runPass: () => Promise<void>;
 };
 
-function thread(id: string, over: Partial<Thread> = {}): Thread {
-  return {
-    id,
-    title: id,
-    text: `The commitment called ${id}.`,
-    horizon: "plot",
-    entityIds: [],
-    status: "open",
-    anchorParagraph: null,
-    ...over,
-  };
-}
-
-function harness(
-  entities: WorldEntity[] = [entity("e1", "Ada")],
-  threads: Thread[] = [],
-): Harness {
+function harness(entities: WorldEntity[] = [entity("e1", "Ada")]): Harness {
   const store = createStore<RootState>(rootReducer);
   store.dispatch(
     persistedDataLoaded({
@@ -90,7 +70,6 @@ function harness(
         ...initialWorldState,
         entityIds: entities.map((e) => e.id),
         entitiesById: Object.fromEntries(entities.map((e) => [e.id, e])),
-        threads,
       },
     }),
   );
@@ -227,6 +206,11 @@ function queueWrites(): unknown[] {
  *  `open` intents it raises carry away with them (see `Intent`). */
 const WHOLE_DOCUMENT = "The lock clicked.\n\nAda pocketed the letter.";
 
+/** Two entities the same paragraph names, so one pass queues two intents and
+ *  logs two lines. */
+const TWO_ENTITIES = [entity("e1", "Ada"), entity("e2", "Brennan")];
+const TWO_ENTITIES_PROSE = "Ada met Brennan at the apiary.";
+
 let story: StoryStorageFake;
 
 describe("the pass", () => {
@@ -336,18 +320,15 @@ describe("the pass", () => {
 
   it("enqueues what triage named and clears the queue", async () => {
     // The queue is written before the drain and re-written after it (§11), so
-    // a reload between the two finds the work. The budget covers both intents,
+    // a reload between the two finds the work. The budget covers the intent,
     // so what is written back is empty — the revise finds a draft entity with
-    // no entry to rewrite, and the open opens its thread.
+    // no entry to rewrite.
     const h = harness();
-    triageReturns(h, "REVISE Ada\nOPEN the sealed letter");
+    triageReturns(h, "REVISE Ada");
     await h.runPass();
 
     expect(queueWrites()).toEqual([
-      [
-        { kind: "revise", entityId: "e1", prose: WHOLE_DOCUMENT },
-        { kind: "open", subject: "the sealed letter", prose: WHOLE_DOCUMENT },
-      ],
+      [{ kind: "revise", entityId: "e1", prose: WHOLE_DOCUMENT }],
       [],
     ]);
     expect(loopRecord()?.queue).toEqual([]);
@@ -355,33 +336,6 @@ describe("the pass", () => {
   });
 
   // ─────────────────────────────── the drain ───────────────────────────────
-
-  it("executes a retire against the writer's lorebook, then clears the queue", async () => {
-    // The pass no longer logs and forgets: it acts. A drain that cleared the
-    // queue without executing leaves this entry enabled and this thread open.
-    configure({ enabled: true });
-    const lorebook = installLorebookFake();
-    lorebook.seed({
-      id: "lb-thread",
-      displayName: "The debt",
-      text: "Kael owes the guild.",
-      enabled: true,
-    });
-    const h = harness(
-      [entity("e1", "Ada")],
-      [thread("The debt", { lorebookEntryId: "lb-thread" })],
-    );
-    triageReturns(h, "RETIRE The debt");
-
-    await h.runPass();
-
-    expect(lorebook.read("lb-thread")?.enabled).toBe(false);
-    expect(h.store.getState().world.threads[0].status).toBe("satisfied");
-    // A switch, not a rewrite: the writer's own words are still there.
-    expect(lorebook.read("lb-thread")?.text).toBe("Kael owes the guild.");
-    expect(loopRecord()?.queue).toEqual([]);
-    expect(h.store.getState().engine.phase).toBe("idle");
-  });
 
   it("executes a revise against the writer's lorebook, and counts it", async () => {
     // The pass has to hand the drain two things it did not need for a retire:
@@ -534,29 +488,6 @@ describe("the pass", () => {
     expect(lorebook.read("lb-ada")?.text).toBe("x");
   });
 
-  it("drains work an earlier pass deferred, even when triage names nothing new", async () => {
-    // A queue that only drains on passes where triage speaks would strand a
-    // deferred rewrite until the model happened to mention it again.
-    configure({ enabled: true });
-    const lorebook = installLorebookFake();
-    lorebook.seed({ id: "lb-thread", displayName: "The debt", enabled: true });
-    const h = harness(
-      [entity("e1", "Ada")],
-      [thread("The debt", { lorebookEntryId: "lb-thread" })],
-    );
-    seedLoopRecord({
-      queue: [
-        { kind: "retire", threadId: "The debt" },
-      ] as EngineRecord["queue"],
-    });
-    triageReturns(h, "");
-
-    await h.runPass();
-
-    expect(lorebook.read("lb-thread")?.enabled).toBe(false);
-    expect(loopRecord()?.queue).toEqual([]);
-  });
-
   // ─────────────────────── the free condense trigger ───────────────────────
 
   /** A managed entity whose lorebook entry has sprawled. */
@@ -657,263 +588,6 @@ describe("the pass", () => {
       { kind: "revise", entityId: "e1", prose: WHOLE_DOCUMENT },
       { kind: "condense", entryId: "lb-ada" },
     ]);
-  });
-
-  // ─────────────────────── the free expiry trigger (§4.5) ───────────────────────
-
-  /** A document long enough for a plot thread anchored at 0 to have aged out:
-   *  §4.5's ten forgetting windows are 100 paragraphs for a plot. */
-  function longDocument(paragraphs: number): void {
-    documentOf(
-      ...Array.from({ length: paragraphs }, (_, i) => `Paragraph ${i}.`),
-    );
-  }
-
-  it("retires a thread the story walked away from, without asking triage", async () => {
-    // Expiry is measured, not generated: `isThreadExpired` is free, so the
-    // retire is enqueued directly. Triage says nothing here and the pass still
-    // acts — and retire costs 0 output tokens (§3.3), so it never waits.
-    configure({ enabled: true });
-    const lorebook = installLorebookFake();
-    lorebook.seed({ id: "lb-t1", displayName: "t1", text: "", enabled: true });
-    longDocument(120);
-    const h = harness(
-      [entity("e1", "Ada")],
-      [thread("t1", { anchorParagraph: 0, lorebookEntryId: "lb-t1" })],
-    );
-
-    await h.runPass();
-
-    expect(lorebook.read("lb-t1")?.enabled).toBe(false);
-    // `abandoned`, not `satisfied`. Both switch the entry off and both are
-    // closed to every mechanism, but the World is about to show the writer a
-    // reading of a commitment they never resolved — and a check mark there
-    // would assert something false about their own story.
-    expect(h.store.getState().world.threads[0].status).toBe("abandoned");
-  });
-
-  it("leaves a thread the writer made by hand alone, however long the story runs", async () => {
-    // The asymmetry §4.5 names: no anchor, no expiry. A defaulted 0 would
-    // retire it on the first pass instead.
-    configure({ enabled: true });
-    const lorebook = installLorebookFake();
-    lorebook.seed({ id: "lb-t1", displayName: "t1", text: "", enabled: true });
-    longDocument(400);
-    const h = harness(
-      [entity("e1", "Ada")],
-      [thread("t1", { anchorParagraph: null, lorebookEntryId: "lb-t1" })],
-    );
-
-    await h.runPass();
-
-    expect(lorebook.read("lb-t1")?.enabled).toBe(true);
-    expect(h.store.getState().world.threads[0].status).toBe("open");
-  });
-
-  it("measures against the branch's whole count, not this pass's backlog", async () => {
-    // `paragraphCount` counts every section; `backlog` counts only the unread
-    // ones. An Engine that has been reading along has a backlog of one and a
-    // branch of hundreds, and expiry is a question about the branch — measuring
-    // it against the backlog would mean nothing ever ages out of a story the
-    // Engine is keeping up with, which is every story it is switched on for.
-    configure({ enabled: true });
-    const lorebook = installLorebookFake();
-    lorebook.seed({ id: "lb-t1", displayName: "t1", text: "", enabled: true });
-    longDocument(120);
-    seedLoopRecord({
-      watermark: {
-        sectionId: sectionIdAt(118),
-        offset: "Paragraph 118.".length,
-      },
-    });
-    const h = harness(
-      [entity("e1", "Ada")],
-      [thread("t1", { anchorParagraph: 0, lorebookEntryId: "lb-t1" })],
-    );
-
-    await h.runPass();
-
-    expect(lorebook.read("lb-t1")?.enabled).toBe(false);
-  });
-
-  it("holds a thread still inside its own patience", async () => {
-    configure({ enabled: true });
-    installLorebookFake();
-    longDocument(60);
-    const h = harness(
-      [entity("e1", "Ada")],
-      [thread("t1", { anchorParagraph: 0 })],
-    );
-
-    await h.runPass();
-
-    expect(queueWrites()[0]).toEqual([]);
-  });
-
-  it("enqueues every expired thread, because a retire costs nothing", async () => {
-    configure({ enabled: true });
-    installLorebookFake();
-    longDocument(120);
-    const h = harness(
-      [entity("e1", "Ada")],
-      [
-        thread("t1", { anchorParagraph: 0 }),
-        thread("t2", { anchorParagraph: 0, horizon: "point" }),
-        thread("t3", { anchorParagraph: 0, horizon: "arc" }),
-      ],
-    );
-
-    await h.runPass();
-
-    expect(queueWrites()[0]).toEqual([
-      { kind: "retire", why: "abandoned", threadId: "t1" },
-      { kind: "retire", why: "abandoned", threadId: "t2" },
-    ]);
-  });
-
-  it("says expired rather than settled in the log", async () => {
-    // The one place the distinction is observable: `ThreadStatus` has no third
-    // value, so the World will show this thread as satisfied — which an
-    // abandoned commitment is not.
-    configure({ enabled: true });
-    installLorebookFake();
-    longDocument(120);
-    debugLogging(true);
-    const h = harness(
-      [entity("e1", "Ada")],
-      [thread("t1", { anchorParagraph: 0 })],
-    );
-
-    await h.runPass();
-
-    expect(logged().join("\n")).toContain("expired");
-  });
-
-  // ───────────────────── prose-grounded renewal (§4.5) ─────────────────────
-
-  it("renews a thread whose cast the pass just read", async () => {
-    configure({ enabled: true });
-    installLorebookFake();
-    documentOf("The lock clicked.", "Ada pocketed the letter.");
-    const h = harness(
-      [entity("e1", "Ada")],
-      [thread("t1", { entityIds: ["e1"], anchorParagraph: 0 })],
-    );
-
-    await h.runPass();
-
-    expect(h.store.getState().world.threads[0].anchorParagraph).toBe(2);
-  });
-
-  it("leaves a thread the prose said nothing about where it was", async () => {
-    configure({ enabled: true });
-    installLorebookFake();
-    documentOf("The lock clicked.", "Brennan pocketed the letter.");
-    const h = harness(
-      [entity("e1", "Ada")],
-      [thread("t1", { entityIds: ["e1"], anchorParagraph: 0 })],
-    );
-
-    await h.runPass();
-
-    expect(h.store.getState().world.threads[0].anchorParagraph).toBe(0);
-  });
-
-  it("anchors at the branch's paragraph count, not this pass's backlog", async () => {
-    // The same distinction expiry makes: an Engine that has been reading along
-    // has a backlog of one and a branch of hundreds. An anchor recorded as the
-    // backlog would sit near paragraph 0 forever and expire the thread it just
-    // renewed.
-    configure({ enabled: true });
-    installLorebookFake();
-    documentOf(
-      ...Array.from({ length: 119 }, (_, i) => `Paragraph ${i}.`),
-      "Ada pocketed the letter.",
-    );
-    seedLoopRecord({
-      watermark: {
-        sectionId: sectionIdAt(118),
-        offset: "Paragraph 118.".length,
-      },
-    });
-    const h = harness(
-      [entity("e1", "Ada")],
-      [thread("t1", { entityIds: ["e1"], anchorParagraph: 0 })],
-    );
-
-    await h.runPass();
-
-    expect(h.store.getState().world.threads[0].anchorParagraph).toBe(120);
-  });
-
-  it("renewal beats expiry in the same pass", async () => {
-    // The whole reason renewal exists. A plot thread anchored at 0 in a
-    // 120-paragraph branch is past its ten windows — but the prose the pass
-    // just read names its cast, so the story is plainly still carrying it and
-    // retiring it would be the opposite of "an end the story quietly
-    // abandoned". Renewal dispatches first and expiry reads the moved anchor,
-    // so this is the ordering rather than a special case.
-    configure({ enabled: true });
-    const lorebook = installLorebookFake();
-    lorebook.seed({ id: "lb-t1", displayName: "t1", text: "", enabled: true });
-    documentOf(
-      ...Array.from({ length: 119 }, (_, i) => `Paragraph ${i}.`),
-      "Ada pocketed the letter.",
-    );
-    const h = harness(
-      [entity("e1", "Ada")],
-      [
-        thread("t1", {
-          entityIds: ["e1"],
-          anchorParagraph: 0,
-          lorebookEntryId: "lb-t1",
-        }),
-      ],
-    );
-
-    await h.runPass();
-
-    expect(queueWrites()[0]).toEqual([]);
-    expect(lorebook.read("lb-t1")?.enabled).toBe(true);
-    expect(h.store.getState().world.threads[0].status).toBe("open");
-  });
-
-  it("still expires a thread the prose walked away from while renewing another", async () => {
-    configure({ enabled: true });
-    installLorebookFake();
-    documentOf(
-      ...Array.from({ length: 119 }, (_, i) => `Paragraph ${i}.`),
-      "Ada pocketed the letter.",
-    );
-    const h = harness(
-      [entity("e1", "Ada"), entity("e2", "Brennan")],
-      [
-        thread("alive", { entityIds: ["e1"], anchorParagraph: 0 }),
-        thread("gone", { entityIds: ["e2"], anchorParagraph: 0 }),
-      ],
-    );
-
-    await h.runPass();
-
-    expect(queueWrites()[0]).toEqual([
-      { kind: "retire", why: "abandoned", threadId: "gone" },
-    ]);
-  });
-
-  it("does not re-enqueue a thread it already retired", async () => {
-    // `isThreadExpired` never expires a satisfied thread, so the trigger is
-    // self-clearing — no mark of the kind the condense trigger needs.
-    configure({ enabled: true });
-    installLorebookFake();
-    longDocument(120);
-    const h = harness(
-      [entity("e1", "Ada")],
-      [thread("t1", { anchorParagraph: 0, status: "satisfied" })],
-    );
-
-    await h.runPass();
-
-    expect(queueWrites()[0]).toEqual([]);
   });
 
   it("leaves a long entry no entity of ours is bound to alone", async () => {
@@ -1019,7 +693,7 @@ describe("the pass", () => {
     }
   });
 
-  it("shows triage only the candidates and the story's threads", async () => {
+  it("shows triage only the candidates", async () => {
     // Not every live entity: assess is generous, and a manifest of the whole
     // World would cost input tokens on every pass forever.
     const h = harness([entity("e1", "Ada"), entity("e2", "Brennan")]);
@@ -1034,32 +708,6 @@ describe("the pass", () => {
       .join("\n");
     expect(text).toContain("Ada");
     expect(text).not.toContain("Brennan");
-  });
-
-  it("shows triage the cap, each thread's horizon, and what an OPEN costs", async () => {
-    // §4.5: triage cannot justify a new thread against a ceiling it was never
-    // told about, and it must not be left inventing its own answer to which
-    // thread a create would take.
-    configure({ enabled: true, threadCap: 2 });
-    const h = harness(
-      [entity("e1", "Ada")],
-      [thread("Older debt", { horizon: "arc" }), thread("A dropped glove")],
-    );
-    triageReturns(h, "");
-    await h.runPass();
-
-    const factory = h.generate.mock.calls[0][0] as () => Promise<{
-      messages: Message[];
-    }>;
-    const block = (await factory()).messages
-      .map((m) => m.content ?? "")
-      .find((c) => c.startsWith("=== THREADS"));
-    expect(block).toContain("=== THREADS (2 of 2) ===");
-    expect(block).toContain("- Older debt [arc]:");
-    expect(block).toContain("- A dropped glove [plot]:");
-    expect(block).toContain(
-      "The list is full. Opening another displaces: A dropped glove",
-    );
   });
 
   // ──────────────────────── nothing new to look at ────────────────────────
@@ -1332,6 +980,25 @@ describe("the pass", () => {
     expect(h.generate).toHaveBeenCalledTimes(1);
   });
 
+  describe("a queue written by 0.15", () => {
+    it("drops intents of a kind this build no longer has", async () => {
+      const h = harness();
+      documentOf("Ada counted the frames.");
+      seedLoopRecord({
+        queue: [
+          { kind: "open", subject: "the levy", prose: "x" },
+          { kind: "retire", threadId: "t1", why: "satisfied" },
+        ] as unknown as EngineRecord["queue"],
+      });
+      triageReturns(h, "");
+
+      await h.runPass();
+
+      expect(loopRecord()?.queue).toEqual([]);
+      expect(h.store.getState().engine.phase).toBe("idle");
+    });
+  });
+
   // ───────────────────── the log, behind story_engine_debug ─────────────────────
   //
   // §9.1's HUD is the always-on surface and these lines are the detail behind
@@ -1343,8 +1010,9 @@ describe("the pass", () => {
   describe("its log", () => {
     it("says nothing at all with the flag off", async () => {
       debugLogging(false);
-      const h = harness();
-      triageReturns(h, "REVISE Ada\nOPEN the sealed letter");
+      const h = harness(TWO_ENTITIES);
+      documentOf(TWO_ENTITIES_PROSE);
+      triageReturns(h, "REVISE Ada\nREVISE Brennan");
 
       await h.runPass();
 
@@ -1353,26 +1021,30 @@ describe("the pass", () => {
       // work, never the work.
       expect(queueWrites()).toEqual([
         [
-          { kind: "revise", entityId: "e1", prose: WHOLE_DOCUMENT },
-          { kind: "open", subject: "the sealed letter", prose: WHOLE_DOCUMENT },
+          { kind: "revise", entityId: "e1", prose: TWO_ENTITIES_PROSE },
+          { kind: "revise", entityId: "e2", prose: TWO_ENTITIES_PROSE },
         ],
-        [],
+        // One entry rewrite per pass: the second revise waits for the next.
+        [{ kind: "revise", entityId: "e2", prose: TWO_ENTITIES_PROSE }],
       ]);
     });
 
     it("names every intent with the flag on", async () => {
       debugLogging(true);
-      const h = harness();
-      triageReturns(h, "REVISE Ada\nOPEN the sealed letter");
+      const h = harness(TWO_ENTITIES);
+      documentOf(TWO_ENTITIES_PROSE);
+      triageReturns(h, "REVISE Ada\nREVISE Brennan");
 
       await h.runPass();
 
-      // The revise reaches its arm and finds a draft entity with no entry to
-      // rewrite; the open reaches its own and opens a thread.
+      // The first revise reaches its arm and finds a draft entity with no
+      // entry to rewrite; the second is deferred behind the pass's one rewrite.
       expect(logged()).toContain(
         "[engine] revise Ada: no lorebook entry, skipped",
       );
-      expect(logged()).toContain("[engine] executed open:the sealed letter");
+      expect(logged()).toContain(
+        "[engine] deferring revise:e2 — this pass has already spent its entry rewrite",
+      );
     });
 
     it("gates the skip line too, not only the drain", async () => {
@@ -1432,8 +1104,9 @@ describe("the pass", () => {
       // up as more than one read here. A single-intent pass would pass this
       // test against a per-line read — verified, which is why it names two.
       debugLogging(true);
-      const h = harness();
-      triageReturns(h, "REVISE Ada\nOPEN the sealed letter");
+      const h = harness(TWO_ENTITIES);
+      documentOf(TWO_ENTITIES_PROSE);
+      triageReturns(h, "REVISE Ada\nREVISE Brennan");
 
       await h.runPass();
       await h.runPass();

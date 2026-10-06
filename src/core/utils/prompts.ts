@@ -738,44 +738,36 @@ export function buildOpeningDirectionPrompt(guidance: string): string {
 }
 
 // ── Engine: triage ──────────────────────────────────────────────────────────
-// One small instruct call per pass, answering only what needs attention. It
-// never writes prose and never invents, so the whole prompt is spent on the
-// three things it may say and the many things it may not.
+// One small instruct call per pass, answering only which recorded entities the
+// new prose has made wrong. It never writes prose and never invents.
 //
-// "Verb in capitals" is load-bearing, not cosmetic: parseTriage refuses a
-// lowercase verb, which is what stops a chatty sentence like "Open the door"
-// from being read as a command.
+// Written as a chain, fact before verdict: the model states what the prose
+// shows about an entity before it may answer. The capitalised verb at the start
+// of a line is the only thing parseTriage reads, so a reasoning line that ENDS
+// in the verb is not a command.
 //
-// §4.5 asks triage to justify a new thread against the cap. That is a rule
-// here, not a grammar: the numbers — how many threads are held, how many the
-// story allows, which one the next OPEN would cost — are data, and they arrive
-// in the manifest triage is shown (`triage-strategy.ts`). OPEN gains no syntax
-// to carry a nomination back, because parseTriage drops what it cannot map and
-// the reducer enforces the cap whatever triage says: an answer nothing consumes
-// is not worth a new way to be silently dropped.
+// Triage cannot create or close anything. Threads belong to the review pass
+// (REVIEW_SYSTEM), which reads at the scale an arc exists at.
 
-export const TRIAGE_SYSTEM = `You are the triage pass of a story engine. You read the prose a writer has just produced and answer one question: what in the recorded World now needs attention?
+export const TRIAGE_SYSTEM = `You are the triage pass of a story engine. You read the prose a writer has just produced and answer one question: which recorded entities does that prose make wrong?
 
-You never write prose, never explain yourself, and never invent. You record what the story has made true; you do not decide what happens next.
+You never write prose and never invent. You record what the story has made true; you do not decide what happens next.
 
-Emit commands, one per line, and nothing else — no preamble, no commentary, no headings, no markdown.
+For each entity under KNOWN ENTITIES that the NEW PROSE names, answer in order:
+1. What does the new prose show about this entity? Write it in one short line. If the prose only mentions the entity and shows nothing about it, stop: no command.
+2. Does the entity's record say otherwise, or leave out a lasting condition the prose has now set? YES: REVISE. NO: no command.
 
-COMMANDS:
-REVISE <entity name> — the new prose has made this entity's record wrong, or has settled something its record leaves open. Spell the name exactly as the manifest spells it.
-OPEN <short subject> — the new prose makes a commitment the story has not settled yet: a threat named, an item hidden, a promise given, a departure announced, a debt taken on. Three to six words naming the commitment. Not a sentence, not a prediction of how it ends.
-RETIRE <thread title> — an open thread's commitment has now been settled by the new prose. Spell the title exactly as the manifest spells it.
+Example:
+Oriel Vant: the prose shows her pilot's licence is revoked, and her record calls her the harbour's senior pilot: REVISE
+Tam Beck: the prose has him pour two cups and sit down, which leaves no lasting condition: no command
+REVISE Oriel Vant
 
-RULES:
-- Act only on what the NEW PROSE establishes. Not on what the manifest already records, not on what you expect to happen next.
-- REVISE and RETIRE may name only something the manifest lists. If it is not listed, say nothing about it.
-- A permanent change to a person, place, or thing is a REVISE of that entity. OPEN is for a commitment that wants closing later.
-- Threads are a fixed number of slots. The THREADS heading gives how many the story holds and how many it allows; when the list is full it also names the thread your next OPEN would displace. That is what the new thread costs, and the choice of which one goes is already made — do not argue with it or offer a different one.
-- At the limit, emit OPEN only if the commitment you are naming matters more to the story than the one it would cost. A passing detail is not worth an arc. When it is not worth it, say nothing — the commitment stays in the prose and a later pass can raise it again.
-- Never RETIRE a thread to make room. RETIRE means the prose settled it. A thread already marked "satisfied" or "abandoned" is closed — say nothing about it.
-- One command per line. Verb in capitals, then the name or subject. No quotes, no bullets, no numbering, no explanation after the name.
-- Most passes need nothing. Emitting no commands at all is a correct and common answer — say nothing rather than find something.`;
+OUTPUT:
+- One reasoning line per entity the prose names, then the commands, one per line.
+- A command is the word REVISE in capitals, then the entity's name spelled exactly as KNOWN ENTITIES spells it.
+- Most passes need no command. Writing none is a correct and common answer.`;
 
-export const TRIAGE_INSTRUCTION = `What in the World needs attention after the new prose above? Emit only the commands that prose justifies, one per line — or nothing at all.`;
+export const TRIAGE_INSTRUCTION = `Which entities does the new prose above make wrong? Walk each one the prose names, then write the commands, or none.`;
 
 /** The Engine's entry rewrite (design §5).
  *
@@ -878,49 +870,3 @@ HOW:
 - Return the entry body and nothing else — no preamble, no commentary, no note about what you removed, no markdown fences.`;
 
 export const ENGINE_CONDENSE_INSTRUCTION = `Rewrite the entry above tighter. Every fact it asserts must survive; only the words spent on them may shrink. Return the entry and nothing else.`;
-
-/** The Engine opening a Thread (design §4).
- *
- *  A thread's entry is not a description of a subject — it is the reminder the
- *  story model is shown when the prose has stopped carrying a commitment
- *  (§4.3's forgetting detector). So this prompt is written against a different
- *  failure than the two above, and it is a sharper one: **this text reaches the
- *  model that writes the story.** A revision is read when a name is mentioned
- *  and describes what is already true; a reminder arrives precisely when the
- *  story has drifted, and whatever it says is the nearest instruction in
- *  context. A reminder that says "she must decide soon" is a hand on the
- *  writer's wheel.
- *
- *  Three rules carry that.
- *
- *   1. **State what is outstanding, do not ask for it to be resolved.** The
- *      same instinct as §4.4's retirement: the model is never told what to do
- *      with a plot, only what stands. An open commitment written as a standing
- *      fact is something the story can pick up when it is ready; written as a
- *      demand it is a scene the model will produce on the spot.
- *   2. **Name the participants.** The reminder is read cold, several scenes
- *      after the commitment was made, beside other lorebook entries. A pronoun
- *      has nothing to attach to there.
- *   3. **No meta.** "The reader", "the plot", "this thread", "remember that" —
- *      any of them tells the story model it is a model, in a context window
- *      that is otherwise prose.
- *
- *  Short by instruction as well as by `max_tokens`: this is the one Engine
- *  output that costs context every time it fires, so a paragraph where a
- *  sentence would do is a paragraph the recent prose does not get. */
-export const ENGINE_OPEN_SYSTEM = `You are the archivist of a story engine. The writer's story has raised something it has not settled, and you write the one standing note that will be shown to the model writing this story if the prose drifts away from it.
-
-You are given the subject of that commitment and the prose that raised it. You return the note and nothing else.
-
-WHAT THE NOTE IS:
-- One or two sentences, present tense, stating what is outstanding as it stands right now.
-- Written from no one's point of view, the way a lorebook entry is. Not addressed to anyone.
-- Read cold, several scenes later, beside other lorebook entries — so name the people, places and things involved rather than saying "she", "him", or "it".
-
-RULES:
-- State what is unresolved. Never say what should happen next, never suggest how it ends, never ask for it to be dealt with now. This note is shown when the story has moved on; a note that pushes would drag the story back on the spot.
-- Only the prose you were given may put facts in the note. Do not invent a motive, a consequence, or a detail the prose does not establish.
-- Never mention the story, the plot, the reader, the writer, a chapter, a scene, or this note itself. Never write "remember", "note that", "unresolved", "pending", or "thread".
-- No preamble, no title, no heading, no quotation marks, no markdown. The note itself, and nothing else.`;
-
-export const ENGINE_OPEN_INSTRUCTION = `Write the standing note for the commitment named above: one or two sentences, present tense, naming who and what is involved, saying only what is outstanding. Return the note and nothing else.`;

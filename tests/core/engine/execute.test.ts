@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createStore, type Store } from "nai-store";
-import { registerThreadConditionEffects } from "../../../src/core/engine/thread-bind";
 import { rootReducer, persistedDataLoaded } from "../../../src/core/store";
 import type {
   RootState,
@@ -22,9 +21,6 @@ import { EDIT_PANE_TITLE, lorebookCondensedKey } from "../../../src/core/keys";
 import { uiLorebookEntrySelected } from "../../../src/core/store/slices/ui";
 import { REVISE_MAX_TOKENS } from "../../../src/core/engine/revise-strategy";
 import { CONDENSE_MAX_TOKENS } from "../../../src/core/engine/condense";
-import { THREAD_GRACE_PARAGRAPHS } from "../../../src/core/engine/thread-horizon";
-import { engineSettingsChanged } from "../../../src/core/store/slices/engine";
-import { ENGINE_DEFAULTS } from "../../../src/core/engine/settings";
 import {
   installLorebookFake,
   type LorebookFake,
@@ -35,21 +31,6 @@ import {
 } from "../../helpers/story-storage-fake";
 
 // ─────────────────────────────── the harness ───────────────────────────────
-
-const ENTRY = "thread-entry-1";
-
-function thread(id: string, over: Partial<Thread> = {}): Thread {
-  return {
-    id,
-    title: id,
-    text: `The commitment called ${id}.`,
-    horizon: "plot",
-    entityIds: [],
-    status: "open",
-    anchorParagraph: null,
-    ...over,
-  };
-}
 
 function entity(id: string, over: Partial<WorldEntity> = {}): WorldEntity {
   return {
@@ -79,15 +60,6 @@ function says(text: string, finish_reason = "stop") {
   });
 }
 
-/** Let the fire-and-forget effects behind a dispatch finish.
- *
- *  The entry is minted by an effect now, not by the `open` arm, so it appears
- *  one microtask chain after the drain returns rather than inside it. That is
- *  the real behaviour and worth asserting through rather than around: a caller
- *  who reads `world.threads[0].lorebookEntryId` the instant `drain` resolves
- *  will not see it yet. */
-const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-
 function harness(
   threads: Thread[] = [],
   entities: WorldEntity[] = [],
@@ -103,15 +75,6 @@ function harness(
       },
     }),
   );
-  // The `open` arm no longer mints the entry itself — one creator serves every
-  // thread, whoever made it (thread-bind.ts). Registering the real effect keeps
-  // these tests end to end rather than asserting against a step the arm stopped
-  // taking.
-  registerThreadConditionEffects(
-    store.subscribeEffect,
-    store.getState,
-    store.dispatch,
-  );
   const generate = vi.fn(says("One-handed now."));
   return {
     store,
@@ -119,12 +82,6 @@ function harness(
     deps: {
       dispatch: store.dispatch,
       getState: store.getState,
-      assessment: {
-        backlog: 1,
-        newText: PASS_PROSE,
-        candidateIds: [],
-        paragraphCount: 90,
-      },
       genX: { generate } as unknown as DrainDeps["genX"],
       log: async (...messages: unknown[]) => {
         logged.push(messages.map(String).join(" "));
@@ -152,351 +109,11 @@ beforeEach(() => {
   budget(2048);
 });
 
-// ───────────────────────────────── retire ─────────────────────────────────
-
-describe("drain — retire", () => {
-  it("disables the thread's lorebook entry and marks the thread satisfied", async () => {
-    lorebook.seed({
-      id: ENTRY,
-      displayName: "The debt",
-      text: "owed",
-      enabled: true,
-    });
-    const h = harness([thread("t1", { lorebookEntryId: ENTRY })]);
-
-    const outcome = await drain(
-      [{ kind: "retire" as const, why: "satisfied" as const, threadId: "t1" }],
-      h.deps,
-    );
-
-    expect(lorebook.read(ENTRY)?.enabled).toBe(false);
-    expect(h.store.getState().world.threads[0].status).toBe("satisfied");
-    expect(outcome.remaining).toEqual([]);
-    expect(outcome.executed).toEqual([
-      { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
-    ]);
-  });
-
-  it("flips the flag and touches nothing else in the entry", async () => {
-    // A retire is a switch, not a rewrite: the reminder stops firing and the
-    // writer's own words stay where they left them. The source scan below
-    // proves it went through the door; this proves what it wrote when it did.
-    lorebook.seed({
-      id: ENTRY,
-      displayName: "The debt",
-      text: "owed",
-      enabled: true,
-    });
-    const h = harness([thread("t1", { lorebookEntryId: ENTRY })]);
-
-    await drain(
-      [{ kind: "retire" as const, why: "satisfied" as const, threadId: "t1" }],
-      h.deps,
-    );
-
-    expect(lorebook.updates()).toEqual([
-      { id: ENTRY, patch: { enabled: false } },
-    ]);
-    expect(lorebook.read(ENTRY)).toMatchObject({
-      displayName: "The debt",
-      text: "owed",
-      enabled: false,
-    });
-  });
-
-  it("marks a thread with no lorebook entry satisfied and writes nothing", async () => {
-    const h = harness([thread("t1")]);
-
-    const outcome = await drain(
-      [{ kind: "retire" as const, why: "satisfied" as const, threadId: "t1" }],
-      h.deps,
-    );
-
-    expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
-    expect(h.store.getState().world.threads[0].status).toBe("satisfied");
-    expect(outcome.executed).toHaveLength(1);
-  });
-
-  it("skips a thread the World no longer holds, and does not requeue it", async () => {
-    const h = harness([]);
-
-    const outcome = await drain(
-      [
-        {
-          kind: "retire" as const,
-          why: "satisfied" as const,
-          threadId: "gone",
-        },
-      ],
-      h.deps,
-    );
-
-    expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
-    expect(outcome.executed).toEqual([]);
-    expect(outcome.remaining).toEqual([]);
-  });
-});
-
-// ────────────────────────────────── open ──────────────────────────────────
-
-/** The prose the pass fed the drain, as every harness below assesses it. An
- *  intent carries its own copy (§3.3's "a queued intent does not go stale"), so
- *  the two agree for an intent drained on the pass that raised it and diverge
- *  for one an earlier pass deferred. */
-const PASS_PROSE = "The press took Ada's left hand.";
-
-const OPEN: Intent = {
-  kind: "open",
-  subject: "the letter under the board",
-  prose: PASS_PROSE,
-};
-
-describe("drain — open", () => {
-  it("creates the thread and binds a lorebook entry to it", async () => {
-    // `threadLorebookEntrySet` has had no caller since phase 5 built it. This
-    // is it: the thread lands first, the entry is created from the thread the
-    // reducer actually kept, and the id is bound back.
-    const h = harness();
-
-    const outcome = await drain([OPEN], h.deps);
-    await settle();
-
-    const [thread] = h.store.getState().world.threads;
-    expect(thread.title).toBe("the letter under the board");
-    expect(thread.text).toBe("One-handed now.");
-    expect(thread.lorebookEntryId).toBe(lorebook.created()[0].id);
-    expect(outcome.executed).toEqual([OPEN]);
-  });
-
-  it("is shown the prose the INTENT carries, not the prose this pass read", async () => {
-    // Worse here than in a revise: an `open` deferred for budget would write
-    // its standing reminder from prose that never raised the commitment, or
-    // come back with nothing to say at all.
-    const h = harness();
-    const deferred: Intent = {
-      kind: "open",
-      subject: "the letter under the board",
-      prose: "She prised the board up and left the letter there.",
-    };
-
-    await drain([deferred], h.deps);
-
-    expect(await shownTo(h)).toContain("She prised the board up");
-    expect(await shownTo(h)).not.toContain(PASS_PROSE);
-  });
-
-  it("gives the entry the forgetting detector, not a set of keys", async () => {
-    const h = harness();
-
-    await drain([OPEN], h.deps);
-    await settle();
-
-    const entry = lorebook.created()[0];
-    // The thread is anchored at creation, so §4.3's pacing gate is part of the
-    // condition from the first moment the entry exists: `and(detector, gate)`.
-    const [condition] = entry.advancedConditions ?? [];
-    expect(condition.type).toBe("and");
-    const [detector, gate] =
-      condition.type === "and" ? condition.conditions : [];
-    expect(detector.type).toBe("not");
-    expect(JSON.stringify(gate)).toContain("paragraphCount");
-    // Never always-on: forceActivation overrides advancedConditions, so an
-    // always-on thread entry is one whose detector never fires.
-    expect(entry.forceActivation).toBe(false);
-    expect(entry.text).toBe("One-handed now.");
-  });
-
-  it("gates the new entry from the paragraph the thread was opened at", async () => {
-    // The grace: a detector with a 4000-character memory attached to a thread
-    // three paragraphs old is reporting on prose written before the commitment
-    // existed. `assessment.paragraphCount` is 90 here.
-    const h = harness();
-
-    await drain([OPEN], h.deps);
-    await settle();
-
-    expect(JSON.stringify(lorebook.created()[0].advancedConditions)).toContain(
-      String(90 + THREAD_GRACE_PARAGRAPHS.plot),
-    );
-  });
-
-  it("anchors the thread at the paragraph the pass read to", async () => {
-    // §4.5's anchor. `assessment.paragraphCount` is the branch's own count, so
-    // undo moves the comparison with it — which is why the anchor is a
-    // paragraph index rather than a clock reading.
-    const h = harness();
-
-    await drain([OPEN], h.deps);
-
-    expect(h.store.getState().world.threads[0].anchorParagraph).toBe(90);
-  });
-
-  it("casts the entities the subject names", async () => {
-    // Without a cast the detector probes only for the title, which is prose and
-    // rarely appears verbatim — so the negation is always true and every
-    // Engine-opened thread would be the always-on entry it exists to replace.
-    const h = harness([], [entity("e1")]);
-
-    await drain(
-      [
-        {
-          kind: "open",
-          subject: "Ada's promise to the guild",
-          prose: PASS_PROSE,
-        },
-      ],
-      h.deps,
-    );
-
-    expect(h.store.getState().world.threads[0].entityIds).toEqual(["e1"]);
-  });
-
-  it("asks for §3.3's price and no retries", async () => {
-    const h = harness();
-
-    await drain([OPEN], h.deps);
-
-    const [, options] = h.generate.mock.calls[0];
-    expect(options.max_tokens).toBe(INTENT_MAX_TOKENS.open);
-    expect(options.maxRetries).toBe(0);
-  });
-
-  it("shows the model the prose the pass assessed", async () => {
-    const h = harness();
-
-    await drain([OPEN], h.deps);
-
-    const [factory] = h.generate.mock.calls[0];
-    const { messages } = await factory();
-    const text = messages.map((m: Message) => m.content).join("\n");
-    expect(text).toContain("The press took Ada's left hand.");
-    expect(text).toContain("the letter under the board");
-  });
-
-  it("opens nothing when the model returns nothing usable", async () => {
-    const h = harness();
-    h.generate.mockImplementation(says("   "));
-
-    const outcome = await drain([OPEN], h.deps);
-
-    expect(h.store.getState().world.threads).toEqual([]);
-    expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
-    expect(outcome.executed).toEqual([]);
-    expect(outcome.remaining).toEqual([]);
-  });
-
-  it("renews a thread the subject already names instead of opening a second", async () => {
-    // Triage runs hot (§3.3) and will keep naming the same commitment while it
-    // is unsettled. Dedupe bounds that within one queue; across passes it is
-    // this that stops the World growing a duplicate thread — and a duplicate
-    // lorebook entry — for one commitment.
-    const h = harness([
-      thread("t1", {
-        title: "The Letter Under The Board",
-        lorebookEntryId: ENTRY,
-        anchorParagraph: 4,
-      }),
-    ]);
-
-    const outcome = await drain([OPEN], h.deps);
-
-    expect(h.store.getState().world.threads).toHaveLength(1);
-    expect(h.store.getState().world.threads[0].anchorParagraph).toBe(90);
-    expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
-    expect(h.generate).not.toHaveBeenCalled();
-    expect(outcome.executed).toEqual([OPEN]);
-  });
-
-  it("switches off the entry of a thread the cap displaced", async () => {
-    // §4.5's orphan, answered where the information is. The reducer drops the
-    // weakest OTHER thread and cannot touch its lorebook entry, which would
-    // otherwise survive unmanaged and STILL ENABLED — going on injecting a
-    // reminder for a commitment nothing records any more. That is "the cap
-    // bounds the list, not the context": proliferation control increasing
-    // proliferation.
-    const h = harness([thread("old", { lorebookEntryId: ENTRY })]);
-    h.store.dispatch(
-      engineSettingsChanged({ ...ENGINE_DEFAULTS, threadCap: 1 }),
-    );
-    lorebook.seed({
-      id: ENTRY,
-      displayName: "old",
-      text: "Somebody promised something.",
-      enabled: true,
-    });
-
-    await drain([OPEN], h.deps);
-
-    expect(h.store.getState().world.threads.map((t) => t.title)).toEqual([
-      "the letter under the board",
-    ]);
-    expect(lorebook.read(ENTRY)?.enabled).toBe(false);
-  });
-
-  it("disables the orphan rather than deleting it, and snapshots it first", async () => {
-    // §5.2 forbids destroying the writer's lorebook, and §4.4 already
-    // establishes the flag flip as the non-destructive way to stop a reminder.
-    // Through the door, so the original is kept.
-    const h = harness([thread("old", { lorebookEntryId: ENTRY })]);
-    h.store.dispatch(
-      engineSettingsChanged({ ...ENGINE_DEFAULTS, threadCap: 1 }),
-    );
-    lorebook.seed({
-      id: ENTRY,
-      displayName: "old",
-      text: "Somebody promised something.",
-      enabled: true,
-    });
-
-    await drain([OPEN], h.deps);
-
-    expect(lorebook.read(ENTRY)?.text).toBe("Somebody promised something.");
-  });
-
-  it("leaves the threads it did not displace alone", async () => {
-    // The flip is for the thread the cap DROPPED. Every other thread the World
-    // held before this open is still open and still wants its reminder.
-    const h = harness([thread("old", { lorebookEntryId: ENTRY })]);
-    lorebook.seed({ id: ENTRY, displayName: "old", text: "x", enabled: true });
-
-    await drain([OPEN], h.deps);
-
-    expect(h.store.getState().world.threads).toHaveLength(2);
-    expect(lorebook.read(ENTRY)?.enabled).toBe(true);
-  });
-
-  it("displaces a thread that never had an entry without writing anything", async () => {
-    const h = harness([thread("old")]);
-    h.store.dispatch(
-      engineSettingsChanged({ ...ENGINE_DEFAULTS, threadCap: 1 }),
-    );
-
-    await drain([OPEN], h.deps);
-
-    expect(api.v1.lorebook.updateEntry).not.toHaveBeenCalled();
-    expect(h.store.getState().world.threads).toHaveLength(1);
-  });
-
-  it("does not count as an entry rewrite", () => {
-    // §9.1's ∆ is entries the Engine rewrote. Opening a thread writes a new
-    // entry rather than rewriting one of the writer's.
-    expect(revisionsIn([OPEN])).toBe(0);
-  });
-
-  it("requeues an open the writer collided with", async () => {
-    const h = harness();
-    h.generate.mockRejectedValue(
-      new Error("A generation is already in progress"),
-    );
-
-    const outcome = await drain([OPEN], h.deps);
-
-    expect(outcome.remaining).toEqual([OPEN]);
-    expect(h.store.getState().world.threads).toEqual([]);
-  });
-});
-
 // ───────────────────────────────── revise ─────────────────────────────────
+
+/** The prose a revise intent carries, which is what it is shown (§3.3's "a
+ *  queued intent does not go stale"). */
+const PASS_PROSE = "The press took Ada's left hand.";
 
 const ENTITY_ENTRY = "entity-entry-1";
 
@@ -848,11 +465,7 @@ describe("drain — condense", () => {
     // §9.1's ∆ is an activity level, and a condense is a rewrite of the
     // writer's entry — exactly what they would want to know happened.
     expect(revisionsIn([CONDENSE, REVISE])).toBe(2);
-    expect(
-      revisionsIn([
-        { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
-      ]),
-    ).toBe(0);
+    expect(revisionsIn([])).toBe(0);
   });
 
   it("marks how long it left the entry, so the next pass does not do it again", async () => {
@@ -921,8 +534,6 @@ describe("drain — condense", () => {
 describe("drain — the budget", () => {
   it("prices every intent kind from §3.3", () => {
     expect(INTENT_MAX_TOKENS).toEqual({
-      retire: 0,
-      open: 150,
       revise: 1024,
       condense: 1024,
     });
@@ -1022,98 +633,6 @@ describe("drain — the budget", () => {
     expect(h.generate).toHaveBeenCalledTimes(1);
     expect(outcome.executed).toEqual([]);
     expect(outcome.remaining).toEqual([{ kind: "condense", entryId: "lb1" }]);
-  });
-
-  it("does not count the cheap actions against the rewrite cap", async () => {
-    // The cap is over ENTRY REWRITES, which are the scarce operation. An open
-    // is ~150 tokens and a retire is free, and §3.3 affords several of those
-    // beside one rewrite.
-    budget(2048);
-    lorebook.seed({
-      id: ENTRY,
-      displayName: "The debt",
-      text: "owed",
-      enabled: true,
-    });
-    const h = harness([thread("t1", { lorebookEntryId: ENTRY })], []);
-    const queue: Intent[] = [
-      { kind: "open", subject: "the sealed letter", prose: PASS_PROSE },
-      { kind: "open", subject: "the debt at midwinter", prose: PASS_PROSE },
-      { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
-    ];
-
-    const outcome = await drain(queue, h.deps);
-
-    expect(outcome.executed).toEqual(queue);
-    expect(outcome.remaining).toEqual([]);
-  });
-
-  it("never holds a free action behind the rewrite cap", async () => {
-    // The same exemption the budget check makes, for the same reason: a
-    // resolved plot left in the writer's context costs them something and
-    // costs us nothing to remove.
-    budget(2048);
-    lorebook.seed({
-      id: ENTRY,
-      displayName: "The debt",
-      text: "owed",
-      enabled: true,
-    });
-    const h = harness([thread("t1", { lorebookEntryId: ENTRY })], []);
-    const queue: Intent[] = [
-      { kind: "condense", entryId: "lb0" },
-      { kind: "condense", entryId: "lb1" },
-      { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
-    ];
-
-    const outcome = await drain(queue, h.deps);
-
-    expect(outcome.executed).toEqual([
-      { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
-    ]);
-    expect(outcome.remaining).toEqual([{ kind: "condense", entryId: "lb1" }]);
-    expect(lorebook.read(ENTRY)?.enabled).toBe(false);
-  });
-
-  it("does not let a cheap action jump the queue ahead of a deferred one", async () => {
-    // FIFO among the costly actions: skipping ahead would starve the expensive
-    // ones indefinitely, and those are the scarce operation §3.3 cares about.
-    budget(500);
-    const h = harness();
-    const queue: Intent[] = [
-      REVISE,
-      { kind: "open", subject: "the sealed letter", prose: PASS_PROSE },
-    ];
-
-    const outcome = await drain(queue, h.deps);
-
-    expect(outcome.executed).toEqual([]);
-    expect(outcome.remaining).toEqual(queue);
-  });
-
-  it("never blocks a free action behind a deferred one", async () => {
-    // §3.3: "Retiring a satisfied thread never queues, because it costs zero
-    // output tokens. The action that most protects context health is free."
-    budget(0);
-    lorebook.seed({
-      id: ENTRY,
-      displayName: "The debt",
-      text: "owed",
-      enabled: true,
-    });
-    const h = harness([thread("t1", { lorebookEntryId: ENTRY })]);
-    const queue: Intent[] = [
-      REVISE,
-      { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
-    ];
-
-    const outcome = await drain(queue, h.deps);
-
-    expect(outcome.executed).toEqual([
-      { kind: "retire" as const, why: "satisfied" as const, threadId: "t1" },
-    ]);
-    expect(outcome.remaining).toEqual([REVISE]);
-    expect(lorebook.read(ENTRY)?.enabled).toBe(false);
   });
 });
 

@@ -40,12 +40,6 @@ export function intentKey(intent: Intent): string {
   switch (intent.kind) {
     case "revise":
       return `revise:${intent.entityId}`;
-    case "open":
-      // The only free-text subject in the union — triage writes it, so the same
-      // thread arrives spelled differently across passes.
-      return `open:${intent.subject.trim().toLowerCase()}`;
-    case "retire":
-      return `retire:${intent.threadId}`;
     case "condense":
       return `condense:${intent.entryId}`;
   }

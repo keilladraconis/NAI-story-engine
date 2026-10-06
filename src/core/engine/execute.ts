@@ -24,7 +24,6 @@
 // silently does nothing. `intentKey` in intents.ts is the house precedent.
 
 import type { GenX } from "nai-gen-x";
-import type { Assessment } from "./assess";
 import type { AppDispatch, RootState } from "../store/types";
 import type { Intent } from "./loop-machine";
 import { intentKey } from "./intents";
@@ -43,18 +42,6 @@ import {
   CONDENSE_MAX_TOKENS,
   writeCondenseMark,
 } from "./condense";
-import {
-  composeReminder,
-  createOpenFactory,
-  openParams,
-  OPEN_MAX_TOKENS,
-} from "./open-strategy";
-import { castFromSubject, findThreadBySubject } from "./thread-bind";
-import {
-  threadAnchorSet,
-  threadCreated,
-  threadStatusSet,
-} from "../store/slices/world";
 import { TRIAGE_MAX_TOKENS } from "./triage-strategy";
 import { buildLorebookPrefillFromEntry } from "../utils/lorebook-strategy";
 
@@ -66,27 +53,6 @@ import { buildLorebookPrefillFromEntry } from "../utils/lorebook-strategy";
 export type DrainDeps = {
   dispatch: AppDispatch;
   getState: () => RootState;
-  /** What the pass saw, whole — the same value triage was built from.
-   *
-   *  **The assessment rather than a field of it**, which Task 3 predicted and
-   *  Task 5 acts on: this started as `newText` because a revision is a function
-   *  of what the story has newly made true (§5), and the anchor an `open`
-   *  records needs `paragraphCount` as well. Two à-la-carte fields would have
-   *  become three, and each one is a decision about which half of one coherent
-   *  answer the drain is allowed to see. The assessment is already built,
-   *  already passed to triage, and already the definition of "what this pass
-   *  read"; passing it entire is what stops the deps growing a field per arm.
-   *
-   *  **`newText` is deliberately not read from here, and no arm below may.**
-   *  A drain runs intents this pass raised AND intents an earlier pass
-   *  deferred, and only the first group has anything to do with the prose in
-   *  this field — so an arm taking its input from the running pass rewrites a
-   *  deferred intent's entry against a scene its subject was never in. The
-   *  prose an intent acts on rides on the intent (`Intent` in
-   *  `loop-machine.ts`). `paragraphCount` is a property of the BRANCH rather
-   *  than of any one intent's prose, so the anchor an `open` records is still
-   *  read from here. */
-  assessment: Assessment;
   /** The pass's generation queue. Injected rather than reached for (CLAUDE.md:
    *  no singletons), and the same instance triage used, so the Engine's own
    *  calls stay serialised behind one queue. */
@@ -127,8 +93,6 @@ export type DrainOutcome = {
  *  Pricing an unimplemented kind at 0 would leave the policy untested until the
  *  task that depends on it. */
 export const INTENT_MAX_TOKENS: Record<Intent["kind"], number> = {
-  retire: 0,
-  open: OPEN_MAX_TOKENS,
   // Each arm's own ceiling, imported rather than restated: the number the
   // drain refuses to start without must be the number `max_tokens` then bounds
   // the call at, or the pass promises one price and pays another.
@@ -184,52 +148,6 @@ type IntentResult = "executed" | "skipped";
  *  afford two rewrites out of a bucket that covers one. */
 function affords(cost: number): boolean {
   return api.v1.script.getAllowedOutput() >= cost + TRIAGE_MAX_TOKENS;
-}
-
-/** Retirement is a flag flip (§4.4), and the reasoning is why it must stay one:
- *  the model is never TOLD a plot is over. Telling it "this is resolved" spends
- *  context asserting a negative; disabling the entry simply removes the
- *  reminder.
- *
- *  Two flags, not one. The lorebook entry's `enabled` is what stops the
- *  reminder reaching the model; the thread's `status` is what stops triage
- *  proposing the same retirement on every pass — the manifest lists satisfied
- *  threads with their status, and a retirement the World never recorded would be
- *  re-proposed forever, at ~150 tokens a pass.
- *
- *  The lorebook write comes first and the status flip second, so a failure
- *  converges. Fail after the write and the thread is still open: triage
- *  re-proposes it, and disabling an already-disabled entry is a no-op. Fail in
- *  the other order and the thread reads satisfied while its reminder is still in
- *  the writer's context, with nothing left to notice.
- *
- *  A thread whose status is already `satisfied` is retired anyway rather than
- *  skipped. Phase 5 shipped a status a writer could set by hand with nothing
- *  disabling the entry behind it, so "already satisfied" does not mean "already
- *  retired", and the flip is free and idempotent. */
-async function retire(
-  threadId: string,
-  why: "satisfied" | "abandoned",
-  deps: DrainDeps,
-): Promise<IntentResult> {
-  const thread = deps.getState().world.threads.find((t) => t.id === threadId);
-  // Deleted between triage naming it and the drain reaching it. Nothing to
-  // retire and nothing to come back for.
-  if (!thread) return "skipped";
-
-  if (thread.lorebookEntryId) {
-    await writeLorebookEntry(
-      thread.lorebookEntryId,
-      // The producer ignores the live entry because a flag flip is not a
-      // function of the text — but it still comes through the door, because
-      // "every Engine write to an entry goes through here" is a rule the
-      // source scan can hold and "every write that reads text" is not.
-      () => ({ enabled: false }),
-    );
-  }
-
-  deps.dispatch(threadStatusSet({ threadId, status: why }));
-  return "executed";
 }
 
 /** §5's entry rewrite: the entry as it stands, plus the prose that changed it,
@@ -409,157 +327,14 @@ async function condense(
   return written ? "executed" : "skipped";
 }
 
-/** §4's thread, opened: a commitment the prose raised, recorded with a
- *  lorebook entry that reminds the story model only once the prose has stopped
- *  carrying it (§4.3).
- *
- *  **A repeat renews rather than opens.** `findThreadBySubject` explains the
- *  reasoning; what matters here is that the free path comes first, so a
- *  commitment triage keeps naming costs a dispatch rather than a generation.
- *
- *  **The thread is created before its entry, and read back before it is
- *  bound.** The cap is a reducer invariant (§4.5) enforced one level up in
- *  `rootReducer`, so what the store kept is the authority on what exists — and
- *  the entry is built from that rather than from the draft this function sent
- *  in, which is also how the reducer's `horizon` and `status` defaults reach the
- *  condition. The other order — entry first, thread second — would leave an
- *  always-on entry in the writer's lorebook with no thread behind it if
- *  anything failed in between, which is precisely §4.5's orphan.
- *
- *  **Opening at the ceiling displaces, and does not refuse.** §4.5 designed the
- *  cap for exactly this path: the reducer drops the weakest OTHER thread and
- *  keeps the newcomer, because a create that silently undid itself would read
- *  as a broken Engine. The displaced thread's own lorebook entry survives,
- *  unmanaged and still enabled — the Engine never deletes an entry — so this
- *  arm disables it and says so in the log. */
-async function open(
-  subject: string,
-  prose: string,
-  deps: DrainDeps,
-): Promise<IntentResult> {
-  const before = deps.getState().world.threads;
-  const paragraph = deps.assessment.paragraphCount;
-
-  const existing = findThreadBySubject(before, subject);
-  if (existing) {
-    deps.dispatch(threadAnchorSet({ threadId: existing.id, paragraph }));
-    await deps.log(
-      `[engine] open ${subject}: already open as "${existing.title}" — renewed at paragraph ${paragraph}`,
-    );
-    return "executed";
-  }
-
-  const response = await deps.genX.generate(
-    createOpenFactory({ subject, newText: prose }),
-    {
-      ...(await openParams()),
-      maxRetries: 0,
-      // §3.5: a background loop has no business demanding a Continue click.
-      // Without this GenX parks on a short bucket, and its parked status is
-      // instance-wide — one held Engine call flags the whole queue, which the
-      // header renders as a Continue widget for work nobody asked for.
-      fastRejection: true,
-      taskId: `engine-open-${api.v1.uuid()}`,
-    },
-    undefined,
-    "background",
-  );
-
-  const choice = response.choices?.[0];
-  const text = composeReminder(choice?.text ?? "", choice?.finish_reason);
-  if (!text) {
-    // Nothing is created. Unlike a revise, which declines a write and leaves an
-    // entry standing, this declines the whole thing — a thread with a blank
-    // reminder is an always-on entry with nothing to say.
-    await deps.log(
-      `[engine] open ${subject}: nothing usable in the response, no thread opened`,
-    );
-    return "skipped";
-  }
-
-  const threadId = api.v1.uuid();
-  deps.dispatch(
-    threadCreated({
-      thread: {
-        id: threadId,
-        // The subject IS the title. Triage wrote it, `intentKey` dedupes on it,
-        // and `findThreadBySubject` renews on it — a title from anywhere else
-        // would break the identity that keeps one commitment to one thread.
-        title: subject.trim(),
-        text,
-        entityIds: castFromSubject(
-          subject,
-          Object.values(deps.getState().world.entitiesById),
-        ),
-        anchorParagraph: paragraph,
-      },
-    }),
-  );
-
-  const state = deps.getState();
-  const created = state.world.threads.find((t) => t.id === threadId);
-  // The cap keeps the newcomer by construction (`enforceThreadCap`), so this is
-  // the invariant holding rather than a case to handle — but an entry created
-  // for a thread the store does not hold is exactly the unmanaged always-on
-  // orphan §4.5 is about, and that is not a risk worth taking on an assertion.
-  if (!created) return "skipped";
-
-  for (const gone of before.filter(
-    (t) => !state.world.threads.some((kept) => kept.id === t.id),
-  )) {
-    // §4.5's orphan, and this is the only place it is answered. The store
-    // dropped the thread and the reducer cannot touch its lorebook entry,
-    // which would otherwise survive unmanaged and STILL ENABLED — going on
-    // injecting a reminder for a commitment nothing records any more. §4.5
-    // names that
-    // exactly: "the cap bounds the list, not the context", so a story that
-    // repeatedly hit the ceiling would accumulate strictly more always-on
-    // injections than the cap ever permitted threads. Proliferation control
-    // increasing proliferation.
-    //
-    // **Here, because here is where the entry is attributably ours.** We are
-    // holding the thread that owned it. §7's reconciliation used to cover the
-    // same case from the other side — disabling any `SE: Threads` entry no
-    // thread named — but it could only attribute by category, it only ran on a
-    // navigation, and it is gone with the rest of history tracking. There is no
-    // second pass behind this one: miss the orphan here and it injects forever.
-    //
-    // **Disabled, never deleted**, through the door like every other Engine
-    // write. The entry stays in the writer's lorebook and one switch brings it
-    // back — which is the whole of the writer's recourse now that nothing
-    // switches it on again on their behalf.
-    await deps.log(
-      `[engine] thread cap displaced "${gone.title}" — its lorebook entry ${gone.lorebookEntryId ?? "(none)"} is no longer managed by a thread`,
-    );
-    if (gone.lorebookEntryId) {
-      await writeLorebookEntry(gone.lorebookEntryId, () => ({
-        enabled: false,
-      }));
-    }
-  }
-
-  // The entry is not minted here. `registerThreadConditionEffects` subscribes
-  // to `threadCreated` and gives every named thread one — the Forge's and the
-  // writer's as well as this — and two creators racing the same dispatch would
-  // be two entries for one thread. Opening the thread is the work this arm
-  // reports; binding an entry to it is the same job for every creator.
-  return "executed";
-}
-
 /** The branch. One arm per intent kind, no `default`. */
 async function execute(intent: Intent, deps: DrainDeps): Promise<IntentResult> {
   switch (intent.kind) {
-    case "retire":
-      return retire(intent.threadId, intent.why, deps);
-
     case "revise":
       return revise(intent.entityId, intent.prose, deps);
 
     case "condense":
       return condense(intent.entryId, deps);
-
-    case "open":
-      return open(intent.subject, intent.prose, deps);
   }
 }
 

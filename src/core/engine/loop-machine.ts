@@ -43,17 +43,10 @@ export type LoopPhase =
  *  Bounded by `clampProse` at the one place intents are minted, so a queue
  *  record holds at most the same window of prose the prompt would have been
  *  given anyway — never a second, smaller clamp, which would let a revise act
- *  on prose triage never saw. `retire` and `condense` carry none of it and
- *  defer for free, which is what deferral was designed for. */
+ *  on prose triage never saw. `condense` carries none of it and defers for
+ *  free, which is what deferral was designed for. */
 export type Intent =
   | { kind: "revise"; entityId: string; prose: string }
-  | { kind: "open"; subject: string; prose: string }
-  /** `why` is the STATUS to write, not a log label: expiry and triage both
-   *  retire, and telling a writer their abandoned commitment was "satisfied"
-   *  is the one thing the third status exists to stop. It is deliberately not
-   *  part of `intentKey` — the same thread is the same work however it was
-   *  named, and a queue holding both would retire it twice. */
-  | { kind: "retire"; threadId: string; why: "satisfied" | "abandoned" }
   | { kind: "condense"; entryId: string };
 
 export type LoopState = {

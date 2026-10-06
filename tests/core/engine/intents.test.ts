@@ -16,12 +16,6 @@ const revise = (id: string): Intent => ({
   entityId: id,
   prose: PROSE,
 });
-const open = (subject: string): Intent => ({
-  kind: "open",
-  subject,
-  prose: PROSE,
-});
-
 describe("intentKey", () => {
   it("distinguishes kinds acting on the same subject", () => {
     expect(intentKey({ kind: "revise", entityId: "x", prose: PROSE })).not.toBe(
@@ -30,45 +24,14 @@ describe("intentKey", () => {
   });
 
   it("gives every kind its own key for one shared id string", () => {
-    // Entity ids, thread ids and lorebook entry ids are all UUIDs from the same
+    // Entity ids and lorebook entry ids are both UUIDs from the same
     // generator, so "same string, different kind" is reachable in practice.
-    // Four kinds naming "x" must be four distinct pieces of work.
+    // Two kinds naming "x" must be two distinct pieces of work.
     const keys = [
       intentKey({ kind: "revise", entityId: "x", prose: PROSE }),
-      intentKey({ kind: "open", subject: "x", prose: PROSE }),
-      intentKey({
-        kind: "retire" as const,
-        why: "satisfied" as const,
-        threadId: "x",
-      }),
       intentKey({ kind: "condense", entryId: "x" }),
     ];
-    expect(new Set(keys).size).toBe(4);
-  });
-
-  it("keeps a subject that contains the separator decodable as its own kind", () => {
-    // Triage writes the subject; nothing sanitises it. A subject of
-    // "revise:x" must not become the key for revising entity x.
-    expect(intentKey(open("revise:x"))).not.toBe(intentKey(revise("x")));
-  });
-
-  it("collapses subjects differing only in case", () => {
-    expect(intentKey(open("The Sealed Door"))).toBe(
-      intentKey(open("the sealed door")),
-    );
-  });
-
-  it("collapses subjects differing only in surrounding whitespace", () => {
-    // Triage returns model-authored prose; a trailing newline is not new work.
-    expect(intentKey(open("  the sealed door\n"))).toBe(
-      intentKey(open("the sealed door")),
-    );
-  });
-
-  it("does not collapse genuinely different subjects", () => {
-    expect(intentKey(open("the sealed door"))).not.toBe(
-      intentKey(open("the sealed gate")),
-    );
+    expect(new Set(keys).size).toBe(2);
   });
 });
 
@@ -89,18 +52,6 @@ describe("dedupe", () => {
 
   it("drops duplicates within one incoming batch", () => {
     expect(dedupe([], [revise("a"), revise("a")])).toEqual([revise("a")]);
-  });
-
-  it("treats subjects differing only in case or spacing as already queued", () => {
-    // The same door named twice by two triage passes is one thread to open.
-    expect(
-      dedupe([open("the sealed door")], [open("  The Sealed Door ")]),
-    ).toEqual([open("the sealed door")]);
-  });
-
-  it("keeps the subject as first queued rather than the later spelling", () => {
-    const out = dedupe([open("the sealed door")], [open("The Sealed Door")]);
-    expect(out).toEqual([open("the sealed door")]);
   });
 
   it("preserves queue order — oldest first", () => {

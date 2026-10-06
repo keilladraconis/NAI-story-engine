@@ -54,7 +54,6 @@ import {
 } from "../../engine/intents";
 import { drain, revisionsIn } from "../../engine/execute";
 import { readCondenseMark, worthCondensing } from "../../engine/condense";
-import { expiredThreads, renewedThreads } from "../../engine/thread-cap";
 import {
   backoffMs,
   isBudgetHold,
@@ -73,7 +72,6 @@ import {
   engineLoopEvent,
   engineSettingsChanged,
 } from "../slices/engine";
-import { threadAnchorSet } from "../slices/world";
 import { FIELD_CONFIGS } from "../../../config/field-definitions";
 import { createEngineLog, type EngineLog } from "../../engine/log";
 
@@ -147,25 +145,32 @@ function readWatermark(value: unknown): Watermark | null {
     : null;
 }
 
+/** The intent kinds this build can run. A record written by an older build may
+ *  hold others (`open`, `retire`); they are dropped here, at the one door
+ *  persisted intents come through, so the drain's exhaustive switch never meets
+ *  a kind it has no arm for. */
+const KNOWN_KINDS: ReadonlySet<string> = new Set(["revise", "condense"]);
+
 /** The queue. Persisted JSON is trusted no further than its shape: a missing or
  *  malformed record reads as an empty queue rather than throwing inside the
  *  pass it was meant to feed.
  *
- *  **The one element-level check is the prose a text-dependent intent must
- *  carry**, and it is here because this is the only door persisted intents come
- *  through — `parseTriage` always attaches it, so an intent arriving without
- *  one was written by an older build or by a hand-edited record. Dropping it is
- *  the safe direction and the only honest one: the alternative is running a
- *  full entry rewrite on whatever prose the running pass happens to hold, which
- *  is precisely the failure the field exists to prevent. The work is lost, and
+ *  **The element-level check on the prose a text-dependent intent must carry**
+ *  is here because this is the only door persisted intents come through —
+ *  `parseTriage` always attaches it, so a `revise` arriving without one was
+ *  written by an older build or by a hand-edited record. Dropping it is the
+ *  safe direction and the only honest one: the alternative is running a full
+ *  entry rewrite on whatever prose the running pass happens to hold, which is
+ *  precisely the failure the field exists to prevent. The work is lost, and
  *  losing it costs the writer nothing they can see — triage names an entry the
  *  story has made wrong again the next time the story says so. */
 function readQueue(value: unknown): Intent[] {
   if (!Array.isArray(value)) return [];
   return (value as Intent[]).filter(
     (intent) =>
-      (intent.kind !== "revise" && intent.kind !== "open") ||
-      (typeof intent.prose === "string" && intent.prose.length > 0),
+      KNOWN_KINDS.has(intent?.kind) &&
+      (intent.kind !== "revise" ||
+        (typeof intent.prose === "string" && intent.prose.length > 0)),
   );
 }
 
@@ -187,7 +192,7 @@ async function saveEngineRecord(record: EngineRecord): Promise<void> {
 }
 
 /** What triage is allowed to name: the entities the new prose plausibly
- *  mentions, plus every thread the story has open.
+ *  mentions.
  *
  *  NOT every live entity. Assess is deliberately generous and triage's
  *  precision is what makes that affordable; a manifest of the whole World would
@@ -198,7 +203,6 @@ async function saveEngineRecord(record: EngineRecord): Promise<void> {
 function buildManifest(
   state: RootState,
   candidateIds: string[],
-  threadCap: number,
 ): TriageManifest {
   const label = (entity: WorldEntity): string =>
     FIELD_CONFIGS.find((c) => c.id === entity.categoryId)?.label ?? "";
@@ -213,112 +217,7 @@ function buildManifest(
       summary: entity.summary,
     }));
 
-  // Every thread, not only the open ones, and `status` rides along rather than
-  // filtering: §4.5's cap is over the whole list, so a manifest that hid the
-  // satisfied ones would show triage a fill the reducer does not agree with.
-  // The prompt marks them instead, which also tells the model that the cheapest
-  // slot to spend is already standing (`triage-strategy.ts`).
-  const threads = state.world.threads.map((thread) => ({
-    id: thread.id,
-    title: thread.title,
-    text: thread.text,
-    horizon: thread.horizon,
-    status: thread.status,
-  }));
-
-  return { entities, threads, threadCap };
-}
-
-/** §4.5's renewal, as dispatches: every thread the prose this pass read is
- *  demonstrably still carrying, re-anchored at the branch's paragraph count.
- *
- *  **This runs immediately before `expiredRetires`, and the order is the
- *  mechanism.** Renewal is positive evidence — the story named this thread's
- *  subject — while expiry is an inference from absence, so a thread the prose
- *  just touched must not be offered for retirement on the strength of an anchor
- *  the same pass was about to move. Dispatch is synchronous, `expiredRetires`
- *  re-reads the state, and the renewed thread's `paragraphsSinceTouched` is
- *  therefore 0 by the time expiry asks. Renewal wins, with no special case to
- *  keep in step.
- *
- *  **And it runs in the same region of the pass as expiry**, after triage has
- *  answered, rather than up beside `assess`. Both are free, both read the same
- *  assessment, and the property worth having is that expiry can never run on
- *  prose renewal did not get to see. A pass that ends early — below the minimum,
- *  budget under the triage reserve, triage refused — leaves the watermark where
- *  it was, so the same prose is re-read next pass and renewal gets its chance
- *  then (§3.3's "advance only on a completed pass", doing its other job).
- *
- *  Nothing is dispatched when nothing moves: `renewedThreads` already drops a
- *  thread anchored at this very paragraph, so a pass that extends the trailing
- *  section without adding one writes no record and rebuilds no condition. The
- *  cost of a renewal that does move is a `t:` record copied onto this node
- *  (§6.2) and one lorebook condition rebuild — `threadAnchorSet` is the fourth
- *  rebuild trigger, because the pace gate bakes the anchor into the stored
- *  condition — which is exactly why only the threads the prose touched are
- *  renewed rather than all of them. */
-async function renewTouchedThreads(
-  state: RootState,
-  assessment: ReturnType<typeof assess>,
-  dispatch: AppDispatch,
-  log: EngineLog,
-): Promise<void> {
-  const paragraph = assessment.paragraphCount;
-  for (const thread of renewedThreads(
-    state.world.threads,
-    assessment,
-    paragraph,
-  )) {
-    dispatch(threadAnchorSet({ threadId: thread.id, paragraph }));
-    await log(
-      `[engine] thread "${thread.title}" is still in the prose — renewed at paragraph ${paragraph}`,
-    );
-  }
-}
-
-/** §4.5's expiry, as intents: every thread the story has walked away from,
- *  offered to the drain as §4.4's flag flip.
- *
- *  **Free, so it is decided here rather than asked of triage.** The same
- *  argument §5.1 makes for the condense trigger, and here it is stronger: the
- *  triage prompt forbids the answer outright ("Never RETIRE a thread to make
- *  room. RETIRE means the prose settled it"), so spending ~150 tokens to ask
- *  would be spending them on a question the model is instructed to refuse.
- *
- *  **Retire, not delete.** `expiredThreads` argues that where the policy lives.
- *  What is decided HERE is only that the verdict becomes an ordinary intent:
- *  the drain's retire arm already flips the entry through Task 1's door, flips
- *  the status second so a failure converges, and `intentKey` already collapses
- *  a repeat — so expiry adds no new way to write to a writer's lorebook.
- *
- *  **No mark, unlike the condense trigger.** That one is memoryless and would
- *  re-offer the same entry every pass; this one clears itself, because a
- *  retired thread is `satisfied` and `isThreadExpired` never expires one.
- *
- *  The log line says "expired" and the World now says "Abandoned" too. A
- *  commitment the story abandoned is not one it settled, and `ThreadStatus` has
- *  no third value to say so — see the report on this task. A third status would
- *  have to disable the entry, sort first in `displacementOrder`, and stop triage
- *  proposing it, which is precisely what `satisfied` already does, so it would
- *  be a label with no behaviour behind it. */
-async function expiredRetires(
-  state: RootState,
-  paragraphCount: number,
-  log: EngineLog,
-): Promise<Intent[]> {
-  const expired = expiredThreads(state.world.threads, paragraphCount);
-  for (const thread of expired) {
-    await log(
-      `[engine] thread "${thread.title}" expired — untouched since paragraph ${thread.anchorParagraph} of ${paragraphCount}, retiring`,
-    );
-  }
-  // `abandoned`, not `satisfied`: the story walked away from these, and the
-  // World is about to show the writer a reading of their own commitment.
-  return expired.map((thread) => ({
-    kind: "retire" as const,
-    why: "abandoned" as const,
-    threadId: thread.id,
-  }));
+  return { entities };
 }
 
 /** §5.1's trigger: the one entry, if any, this pass should offer to condense.
@@ -573,16 +472,12 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
         return;
       }
 
-      const manifest = buildManifest(
-        getState(),
-        assessment.candidateIds,
-        settings.threadCap,
-      );
+      const manifest = buildManifest(getState(), assessment.candidateIds);
       const intents = parseTriage(
         await generateTriage(genX, manifest, assessment, log),
         manifest,
         // The prose that raised whatever triage just named, carried on the
-        // intents whose input it is. A `revise` or an `open` the budget defers
+        // intents whose input it is. A `revise` the budget defers
         // runs on a later pass, past a watermark that has already moved — see
         // `Intent` in loop-machine.ts.
         assessment.newText,
@@ -596,20 +491,6 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // and will still be long next pass.
       const condense = await nextCondense(getState(), settings.condenseAtChars);
 
-      // §4.5's renewal, before expiry reads the anchors it moves. Free, and
-      // the only thing that keeps expiry from being a fixed TTL from creation
-      // — see `renewTouchedThreads`.
-      await renewTouchedThreads(getState(), assessment, dispatch, log);
-
-      // §4.5's expiry, appended last and unordered against the rest: a retire
-      // costs 0 output tokens (§3.3) and the drain never defers a free intent,
-      // so where it sits in the queue cannot starve it or be starved by it.
-      const expired = await expiredRetires(
-        getState(),
-        assessment.paragraphCount,
-        log,
-      );
-
       // What the pass is about to act on: what triage just named, PLUS anything
       // an earlier pass deferred for budget. The machine is told this rather
       // than `intents` alone, and it has to be: once the drain can defer, a
@@ -617,7 +498,7 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       // machine the empty `intents` would leave the HUD reading `idle` through
       // a drain that is editing the writer's lorebook. `acting` is the one
       // phase §9.1 spends the pencil on, so it must not be skipped.
-      const enqueued = dedupe(queue, [...intents, ...condense, ...expired]);
+      const enqueued = dedupe(queue, [...intents, ...condense]);
       dispatch(engineLoopEvent({ type: "triaged", intents: enqueued }));
 
       // Rule 1: the pass got its answer, so the prose behind it has been read.
@@ -645,12 +526,6 @@ export function createEnginePass(deps: EngineLoopDeps): () => Promise<void> {
       const { executed, remaining } = await drain(enqueued, {
         dispatch,
         getState,
-        // The same assessment triage was built from, entire. A revise rewrites
-        // an entry to carry what the story has NEWLY made true (§5) and an
-        // `open` anchors a thread at the paragraph it was raised in (§4.5);
-        // re-deriving either here — or handing the drain the whole document —
-        // would be a different question than the one triage answered.
-        assessment,
         genX,
         log,
       });
