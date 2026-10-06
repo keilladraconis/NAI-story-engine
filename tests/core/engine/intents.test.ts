@@ -120,4 +120,42 @@ describe("Thread intents", () => {
     expect(dedupe([plain], [settled])).toEqual([settled]);
     expect(dedupe([settled], [plain])).toEqual([settled]);
   });
+
+  it("merges the ledgers when both revises carry a settled fact", () => {
+    // One beekeeper leaves and every Thread they were in concludes in the same
+    // review. Each conclusion is already final, so a ledger dropped here is
+    // never offered again.
+    const first = {
+      kind: "revise" as const,
+      entityId: "e1",
+      prose: "first",
+      established: "The Split Hive\nPell has sold his half.",
+    };
+    const second = {
+      kind: "revise" as const,
+      entityId: "e1",
+      prose: "second",
+      established: "The Swarm Ledger\nPell has handed the ledger over.",
+    };
+    expect(dedupe([revise("x"), first], [second])).toEqual([
+      revise("x"),
+      {
+        ...first,
+        established: `${first.established}\n\n${second.established}`,
+      },
+    ]);
+  });
+
+  it("does not grow a ledger on a repeat of the same settled fact", () => {
+    const settled = {
+      kind: "revise" as const,
+      entityId: "e1",
+      prose: "p",
+      established: "The Split Hive\nPell has sold his half.",
+    };
+    expect(dedupe([settled], [{ ...settled, prose: "again" }])).toEqual([
+      settled,
+    ]);
+    expect(dedupe([], [settled, settled, settled])).toEqual([settled]);
+  });
 });

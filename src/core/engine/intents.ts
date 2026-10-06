@@ -65,8 +65,18 @@ export function intentKey(intent: Intent): string {
 }
 
 /** Append the incoming intents the queue does not already hold, oldest first.
- *  One exception to "first one wins": a `revise` carrying a settled fact
- *  replaces, in place, a queued `revise` of the same entity that carries none.
+ *  One exception to "first one wins", and it is about a `revise`'s settled
+ *  fact, which nothing will ever offer again — the Thread it came from is
+ *  already concluded:
+ *
+ *    - a `revise` carrying one replaces, in place, a queued `revise` of the
+ *      same entity that carries none;
+ *    - when both carry one, the queued intent keeps its place and its prose
+ *      and takes the incoming ledger after its own. A character who leaves the
+ *      story concludes every Thread they were in at once, and their entry has
+ *      to hear all of them. A ledger the queued one already holds is not added
+ *      twice.
+ *
  *  Returns a new array; the queue passed in is never mutated. */
 export function dedupe(existing: Intent[], incoming: Intent[]): Intent[] {
   const out = [...existing];
@@ -81,12 +91,19 @@ export function dedupe(existing: Intent[], incoming: Intent[]): Intent[] {
     }
     const held = out[index];
     if (
-      intent.kind === "revise" &&
-      held.kind === "revise" &&
-      intent.established &&
-      !held.established
+      intent.kind !== "revise" ||
+      held.kind !== "revise" ||
+      !intent.established
     ) {
+      continue;
+    }
+    if (!held.established) {
       out[index] = intent;
+    } else if (!held.established.includes(intent.established)) {
+      out[index] = {
+        ...held,
+        established: `${held.established}\n\n${intent.established}`,
+      };
     }
   }
   return out;

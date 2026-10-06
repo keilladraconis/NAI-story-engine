@@ -1129,6 +1129,59 @@ describe("the conclude arm", () => {
     }
   });
 
+  it("gives a shared cast member one rewrite carrying every Thread concluded in the drain", async () => {
+    lorebook.seed({
+      id: "la",
+      displayName: "Pell",
+      text: "Name: Pell\nKeeps bees.",
+      keys: ["pell"],
+    } as LorebookEntry);
+    const h = harness(
+      [
+        thread("The Split Hive", {
+          entityIds: ["a", "b"],
+          state: "Pell has sold his half.",
+        }),
+        thread("The Swarm Ledger", {
+          entityIds: ["a", "c"],
+          state: "Pell has handed the ledger over.",
+        }),
+      ],
+      [
+        entity("a", { name: "Pell", lorebookEntryId: "la" }),
+        entity("b", { name: "Ines Corbel" }),
+        entity("c", { name: "The Cooperative" }),
+      ],
+    );
+    h.generate.mockImplementation(says("Gone from the cooperative."));
+
+    const { executed, remaining } = await drain(
+      [
+        { kind: "conclude", threadId: "The Split Hive", prose: "p" },
+        { kind: "conclude", threadId: "The Swarm Ledger", prose: "p" },
+      ],
+      h.deps,
+    );
+
+    expect(executed.map((i) => i.kind)).toEqual([
+      "conclude",
+      "conclude",
+      "revise",
+    ]);
+    expect(remaining).toEqual([]);
+    expect(h.generate).toHaveBeenCalledTimes(1);
+    const prompt = await (
+      h.generate.mock.calls[0][0] as () => Promise<{ messages: Message[] }>
+    )();
+    const settled = prompt.messages
+      .map((m) => m.content ?? "")
+      .find((content) => content.startsWith("=== NOW SETTLED ==="));
+    expect(settled).toContain("The Split Hive\nPell has sold his half.");
+    expect(settled).toContain(
+      "The Swarm Ledger\nPell has handed the ledger over.",
+    );
+  });
+
   it("skips a Thread that is already concluded or gone", async () => {
     const h = harness([thread("t1", { status: "concluded" })], []);
     const { executed } = await drain(

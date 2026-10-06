@@ -33,10 +33,12 @@ export type LoopPhase =
  *  makes the payload self-contained, so deferring changes nothing about what it
  *  will do. `condense` is a function of an entry's length alone.
  *
- *  `established` on a `revise` is a Thread's concluded ledger: the settled fact
- *  the entity's entry must now carry. It is not part of `intentKey` — the same
- *  entity is the same rewrite — but `dedupe` lets a revise that has one replace
- *  a queued revise that does not, or the settled fact would be lost. */
+ *  `established` on a `revise` is a concluded Thread's ledger: the settled fact
+ *  the entity's entry must now carry — or several, blank-line separated, when
+ *  more than one of the entity's Threads concluded before the rewrite ran. It
+ *  is not part of `intentKey` — the same entity is the same rewrite — so
+ *  `dedupe` is what keeps it from being lost: a revise that has one replaces a
+ *  queued revise that does not, and two that both have one are merged. */
 export type Intent =
   | { kind: "revise"; entityId: string; prose: string; established?: string }
   | { kind: "condense"; entryId: string }
