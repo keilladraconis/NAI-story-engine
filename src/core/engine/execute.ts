@@ -7,9 +7,11 @@
 // patch from a copy of the entry it fetched before the generation ran, which is
 // exactly the staleness §5's read-then-write exists to rule out.
 //
-// The two arms, REVISE and CONDENSE, are deliberately the same shape: the same
-// price, the same read-then-write, the same door and the same record (§5.1), and
-// they differ only where §5.1 says they must.
+// The two entry arms, REVISE and CONDENSE, are deliberately the same shape: the
+// same price, the same read-then-write, the same door and the same record
+// (§5.1), and they differ only where §5.1 says they must. The Thread arms
+// (WRITE, ADMIT, CONCLUDE) rewrite the World's own record of an arc rather than
+// a lorebook entry; the entry follows through `thread-bind.ts`.
 //
 // The switch has no `default`, and `INTENT_MAX_TOKENS` is a `Record` over the
 // union's `kind`. A new intent is therefore two compile errors — a missing arm
@@ -19,7 +21,7 @@
 import type { GenX } from "nai-gen-x";
 import type { AppDispatch, RootState } from "../store/types";
 import type { Intent } from "./loop-machine";
-import { intentKey } from "./intents";
+import { dedupe, intentKey } from "./intents";
 import { writeLorebookEntry } from "./lorebook-write";
 import { isConcurrencyRefusal } from "./refusal";
 import {
@@ -35,7 +37,23 @@ import {
   CONDENSE_MAX_TOKENS,
   writeCondenseMark,
 } from "./condense";
+import {
+  createThreadWriteFactory,
+  lintState,
+  parseThreadWrite,
+  threadWriteParams,
+  THREAD_WRITE_MAX_TOKENS,
+  type ThreadRecord,
+  type ThreadWriteInput,
+} from "./thread-write-strategy";
+import { syncThreadEntry } from "./thread-bind";
+import { atThreadCap } from "./thread-cap";
 import { TRIAGE_MAX_TOKENS } from "./triage-strategy";
+import {
+  threadCreated,
+  threadLedgerUpdated,
+  threadStatusSet,
+} from "../store/slices/world";
 import { buildLorebookPrefillFromEntry } from "../utils/lorebook-strategy";
 
 /** What the pass hands the drain.
@@ -80,13 +98,19 @@ export type DrainOutcome = {
  *  same 1024, which is what makes them compete for the same scarce slot.
  *
  *  Every intent kind is priced, because the price is the budget policy and the
- *  arm is the work: a kind priced at 0 would skip the budget check entirely. */
+ *  arm is the work: a kind priced at 0 skips the budget check entirely, so
+ *  `conclude` is the only one that may be, and says why below. */
 export const INTENT_MAX_TOKENS: Record<Intent["kind"], number> = {
   // Each arm's own ceiling, imported rather than restated: the number the
   // drain refuses to start without must be the number `max_tokens` then bounds
   // the call at, or the pass promises one price and pays another.
   revise: REVISE_MAX_TOKENS,
   condense: CONDENSE_MAX_TOKENS,
+  threadWrite: THREAD_WRITE_MAX_TOKENS,
+  admit: THREAD_WRITE_MAX_TOKENS,
+  // Free: a status flip and a disabled entry. The rewrites it queues are
+  // priced as the `revise` intents they are.
+  conclude: 0,
 };
 
 /** How many full entry rewrites one pass may start (§3.3).
@@ -163,6 +187,7 @@ function affords(cost: number): boolean {
 async function revise(
   entityId: string,
   prose: string,
+  established: string | undefined,
   deps: DrainDeps,
 ): Promise<IntentResult> {
   const entity = deps.getState().world.entitiesById[entityId];
@@ -192,6 +217,7 @@ async function revise(
         entry: live,
         prefill,
         newText: prose,
+        established,
       }),
       {
         ...(await reviseParams()),
@@ -315,14 +341,232 @@ async function condense(
   return written ? "executed" : "skipped";
 }
 
-/** The branch. One arm per intent kind, no `default`. */
-async function execute(intent: Intent, deps: DrainDeps): Promise<IntentResult> {
+/** The cast as the Thread write prompt is shown it. Members the World no
+ *  longer holds are left out. */
+function castOf(
+  deps: DrainDeps,
+  entityIds: readonly string[],
+): ThreadWriteInput["cast"] {
+  const { entitiesById } = deps.getState().world;
+  return entityIds
+    .map((id) => entitiesById[id])
+    .filter((entity) => entity !== undefined)
+    .map((entity) => ({ name: entity.name, summary: entity.summary }));
+}
+
+/** One Thread write, with the lint and its single retry.
+ *
+ *  The retry is the same conversation with the model's own answer and the
+ *  rejection appended, so the generation whose output was refused is the one
+ *  that sees why. It runs only if the bucket still covers it — the drain
+ *  priced this intent at ONE call, and a retry that overdrew would be taken
+ *  out of the writer's next generation.
+ *
+ *  Null declines: nothing usable came back, or STATE pointed forward twice.
+ *  The caller leaves the World exactly as it was. */
+async function writeThread(
+  input: ThreadWriteInput,
+  label: string,
+  deps: DrainDeps,
+): Promise<ThreadRecord | null> {
+  const ask = async (rejection?: { reply: string; phrase: string }) => {
+    const response = await deps.genX.generate(
+      createThreadWriteFactory(input, rejection),
+      {
+        ...(await threadWriteParams()),
+        maxRetries: 0,
+        // §3.5 of the Engine design: a background loop must not demand a
+        // Continue click, and GenX's parked status is instance-wide.
+        fastRejection: true,
+        taskId: `engine-thread-${api.v1.uuid()}`,
+      },
+      undefined,
+      "background",
+    );
+    const choice = response.choices?.[0];
+    const reply = choice?.text ?? "";
+    return { reply, record: parseThreadWrite(reply, choice?.finish_reason) };
+  };
+
+  const first = await ask();
+  if (!first.record) {
+    await deps.log(`[engine] ${label}: nothing usable in the response`);
+    return null;
+  }
+  const phrase = lintState(first.record.state);
+  if (!phrase) return first.record;
+
+  await deps.log(
+    `[engine] ${label}: STATE pointed forward ("${phrase}") — asking again`,
+  );
+  if (!affords(THREAD_WRITE_MAX_TOKENS)) {
+    await deps.log(`[engine] ${label}: no budget for the retry, declined`);
+    return null;
+  }
+
+  const second = await ask({ reply: first.reply, phrase });
+  const again = second.record ? lintState(second.record.state) : "";
+  if (!second.record || again) {
+    await deps.log(
+      `[engine] ${label}: declined after the retry${again ? ` ("${again}")` : ""}`,
+    );
+    return null;
+  }
+  return second.record;
+}
+
+/** Rewrite an open Thread's ledger from the prose a review read.
+ *
+ *  Skipped when the Thread is gone or no longer open: the writer deleted or
+ *  concluded it while this was queued, and writing would resurrect it. The
+ *  lorebook entry follows through `thread-bind.ts`'s effect on
+ *  `threadLedgerUpdated`. */
+async function threadWrite(
+  threadId: string,
+  prose: string,
+  deps: DrainDeps,
+): Promise<IntentResult> {
+  const thread = deps.getState().world.threads.find((t) => t.id === threadId);
+  if (!thread || thread.status !== "open") return "skipped";
+
+  const record = await writeThread(
+    {
+      title: thread.title,
+      cast: castOf(deps, thread.entityIds),
+      current: { state: thread.state, latent: thread.latent },
+      prose,
+    },
+    `thread "${thread.title}"`,
+    deps,
+  );
+  if (!record) return "skipped";
+
+  deps.dispatch(
+    threadLedgerUpdated({
+      threadId,
+      state: record.state,
+      latent: record.latent,
+    }),
+  );
+  await deps.log(`[engine] thread "${thread.title}" updated: ${record.moved}`);
+  return "executed";
+}
+
+/** Admit a new Thread.
+ *
+ *  The floors already passed when the review ran; the two that the World can
+ *  have changed since are checked again here, before anything is spent. The
+ *  Thread is created only once the model has returned a clean `state`, so a
+ *  declined admission leaves no Thread and no lorebook entry. The entry itself
+ *  is minted by `thread-bind.ts`'s effect on `threadCreated`. */
+async function admit(
+  title: string,
+  entityIds: string[],
+  prose: string,
+  deps: DrainDeps,
+): Promise<IntentResult> {
+  const state = deps.getState();
+  const cast = entityIds.filter((id) => state.world.entitiesById[id]);
+  if (cast.length === 0) return "skipped";
+
+  if (atThreadCap(state.world.threads, state.engine.settings.threadCap)) {
+    await deps.log(`[engine] admit "${title}": thread limit reached, refused`);
+    return "skipped";
+  }
+  const twin = state.world.threads.find(
+    (t) =>
+      t.status === "open" &&
+      t.entityIds.length === cast.length &&
+      cast.every((id) => t.entityIds.includes(id)),
+  );
+  if (twin) {
+    await deps.log(
+      `[engine] admit "${title}": "${twin.title}" already has this cast, refused`,
+    );
+    return "skipped";
+  }
+
+  const record = await writeThread(
+    { title, cast: castOf(deps, cast), current: null, prose },
+    `admit "${title}"`,
+    deps,
+  );
+  if (!record) return "skipped";
+
+  deps.dispatch(
+    threadCreated({
+      thread: {
+        id: api.v1.uuid(),
+        title: title.trim(),
+        state: record.state,
+        latent: record.latent,
+        entityIds: cast,
+      },
+    }),
+  );
+  await deps.log(`[engine] admitted thread "${title}"`);
+  return "executed";
+}
+
+/** Conclude a Thread: its state has become a permanent fact.
+ *
+ *  Free. The status flips, the entry is disabled, and one `revise` is spawned
+ *  for each cast member that has a lorebook entry, carrying the Thread's whole
+ *  ledger as `established`. That is how the settled arc reaches the
+ *  characters' own entries — and it is the one route by which `latent` is ever
+ *  written toward the lorebook, after the thing it held back has happened.
+ *
+ *  The entry is synced here as well as by the effect: the effect is
+ *  fire-and-forget, and a pass that reports this intent executed should have
+ *  the entry off by the time it does. */
+async function conclude(
+  threadId: string,
+  prose: string,
+  deps: DrainDeps,
+  spawn: (intents: Intent[]) => void,
+): Promise<IntentResult> {
+  const thread = deps.getState().world.threads.find((t) => t.id === threadId);
+  if (!thread || thread.status !== "open") return "skipped";
+
+  deps.dispatch(threadStatusSet({ threadId, status: "concluded" }));
+  await syncThreadEntry(deps.getState, threadId);
+
+  const established = [thread.title, thread.state, thread.latent]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("\n");
+  const { entitiesById } = deps.getState().world;
+  spawn(
+    thread.entityIds
+      .filter((id) => entitiesById[id]?.lorebookEntryId)
+      .map((entityId) => ({ kind: "revise", entityId, prose, established })),
+  );
+  await deps.log(`[engine] thread "${thread.title}" concluded`);
+  return "executed";
+}
+
+/** The branch. One arm per intent kind, no `default`. `spawn` is how an arm
+ *  hands the drain follow-up work without reaching for the queue itself. */
+async function execute(
+  intent: Intent,
+  deps: DrainDeps,
+  spawn: (intents: Intent[]) => void,
+): Promise<IntentResult> {
   switch (intent.kind) {
     case "revise":
-      return revise(intent.entityId, intent.prose, deps);
+      return revise(intent.entityId, intent.prose, intent.established, deps);
 
     case "condense":
       return condense(intent.entryId, deps);
+
+    case "threadWrite":
+      return threadWrite(intent.threadId, intent.prose, deps);
+
+    case "admit":
+      return admit(intent.title, intent.entityIds, intent.prose, deps);
+
+    case "conclude":
+      return conclude(intent.threadId, intent.prose, deps, spawn);
   }
 }
 
@@ -350,10 +594,10 @@ async function execute(intent: Intent, deps: DrainDeps): Promise<IntentResult> {
  *  intent is deferred with it rather than jumping ahead: entry rewrites are the
  *  scarce operation §3.3 is built around, and letting cheaper work overtake them
  *  would starve them. An intent kind priced at zero spends no generation, so it
- *  is exempt from both the budget check and the deferral. No kind is priced at
- *  zero at present; the exemption is how one would be treated if added.
+ *  is exempt from both the budget check and the deferral. Only `conclude` is
+ *  priced at zero: it is a status flip and a disabled entry.
  *
- *  The queue is never mutated. The caller writes `remaining` back to the record
+ *  The queue passed in is never mutated. The caller writes `remaining` back to the record
  *  (§6.2) at the node it captured. */
 export async function drain(
   queue: Intent[],
@@ -364,7 +608,14 @@ export async function drain(
   let blocked = false;
   let rewrites = 0;
 
-  for (const intent of queue) {
+  // A working copy, because an arm may spawn follow-up intents (a conclusion
+  // queues its cast's rewrites). They join what is still PENDING, through the
+  // queue's own dedupe — never what has already run, or a spawned revise would
+  // collide with one this pass just executed and never run.
+  let pending = [...queue];
+
+  while (pending.length > 0) {
+    const intent = pending.shift() as Intent;
     const cost = INTENT_MAX_TOKENS[intent.kind];
     const rewrite = isEntryRewrite(intent);
     const capped = rewrite && rewrites >= ENTRY_REWRITES_PER_PASS;
@@ -390,7 +641,10 @@ export async function drain(
     if (rewrite) rewrites++;
 
     try {
-      if ((await execute(intent, deps)) === "executed") {
+      const result = await execute(intent, deps, (spawned) => {
+        pending = dedupe(pending, spawned);
+      });
+      if (result === "executed") {
         executed.push(intent);
         await deps.log(`[engine] executed ${intentKey(intent)}`);
       }

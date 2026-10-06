@@ -57,6 +57,9 @@ export type ReviseInput = {
   prefill: string;
   /** The prose since the watermark, as the pass assessed it. */
   newText: string;
+  /** A concluded Thread's ledger: a fact about this subject that is now
+   *  settled. Present only on the rewrites a `conclude` queues. */
+  established?: string;
 };
 
 /** Params for the revise call.
@@ -93,7 +96,7 @@ export function reviseParams(): Promise<GenerationParams> {
  *  putting a possibly-stale note beside the authoritative text invites the
  *  model to reconcile toward the note. */
 export function createReviseFactory(input: ReviseInput): MessageFactory {
-  const { entry, prefill, newText } = input;
+  const { entry, prefill, newText, established } = input;
 
   return async () => {
     const prose = clampProse(newText.trim());
@@ -104,6 +107,16 @@ export function createReviseFactory(input: ReviseInput): MessageFactory {
       // Volatile-but-shared: the reason this pass exists, identical for every
       // revise it drains, and the only block the rollover may trim.
       { role: "assistant", content: `=== NEW PROSE ===\n${prose}` },
+    ];
+    // Beside the prose, in the trimmable middle: it is the other thing the
+    // entry may learn from, and the entry stays in the pinned tail.
+    if (established?.trim()) {
+      messages.push({
+        role: "assistant",
+        content: `=== NOW SETTLED ===\n${established.trim()}`,
+      });
+    }
+    messages.push(
       {
         role: "assistant",
         // An empty entry is LABELLED empty rather than shown as a blank block:
@@ -114,7 +127,7 @@ export function createReviseFactory(input: ReviseInput): MessageFactory {
       },
       { role: "user", content: ENGINE_REVISE_INSTRUCTION },
       { role: "assistant", content: prefill },
-    ];
+    );
 
     return {
       messages,

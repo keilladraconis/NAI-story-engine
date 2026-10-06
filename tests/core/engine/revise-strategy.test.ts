@@ -100,6 +100,29 @@ describe("the revise prompt", () => {
   });
 });
 
+describe("a concluding revise", () => {
+  it("puts the settled fact between the prose and the entry", async () => {
+    const { messages, contextPinning } = await resolve({
+      newText: "Pell signed the hives over.",
+      established: "The Shared Apiary\nPell has sold the east hives.",
+    });
+    const blocks = messages.map((m) => m.content ?? "");
+    expect(blocks[1]).toMatch(/^=== NEW PROSE ===/);
+    expect(blocks[2]).toBe(
+      "=== NOW SETTLED ===\nThe Shared Apiary\nPell has sold the east hives.",
+    );
+    expect(blocks[3]).toMatch(/^=== CURRENT ENTRY ===/);
+    expect(contextPinning).toEqual({ head: 1, tail: 3 });
+  });
+
+  it("adds no block when nothing is settled", async () => {
+    const { messages } = await resolve({ newText: "x" });
+    expect(
+      messages.some((m) => (m.content ?? "").includes("=== NOW SETTLED ===")),
+    ).toBe(false);
+  });
+});
+
 // ──────────────────────────────── the params ────────────────────────────────
 
 describe("the revise params", () => {

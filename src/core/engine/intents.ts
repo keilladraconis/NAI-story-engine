@@ -42,19 +42,41 @@ export function intentKey(intent: Intent): string {
       return `revise:${intent.entityId}`;
     case "condense":
       return `condense:${intent.entryId}`;
+    case "threadWrite":
+      return `thread:${intent.threadId}`;
+    case "admit":
+      // By cast, not title: the model titles the same arc differently on
+      // different reviews, and its cast is what makes it the same Thread.
+      return `admit:${[...intent.entityIds].sort().join(",")}`;
+    case "conclude":
+      return `conclude:${intent.threadId}`;
   }
 }
 
 /** Append the incoming intents the queue does not already hold, oldest first.
+ *  One exception to "first one wins": a `revise` carrying a settled fact
+ *  replaces, in place, a queued `revise` of the same entity that carries none.
  *  Returns a new array; the queue passed in is never mutated. */
 export function dedupe(existing: Intent[], incoming: Intent[]): Intent[] {
-  const seen = new Set(existing.map(intentKey));
   const out = [...existing];
+  const at = new Map(out.map((intent, index) => [intentKey(intent), index]));
   for (const intent of incoming) {
     const key = intentKey(intent);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(intent);
+    const index = at.get(key);
+    if (index === undefined) {
+      at.set(key, out.length);
+      out.push(intent);
+      continue;
+    }
+    const held = out[index];
+    if (
+      intent.kind === "revise" &&
+      held.kind === "revise" &&
+      intent.established &&
+      !held.established
+    ) {
+      out[index] = intent;
+    }
   }
   return out;
 }

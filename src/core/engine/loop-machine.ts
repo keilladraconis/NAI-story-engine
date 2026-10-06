@@ -27,27 +27,22 @@ export type LoopPhase =
 
 /** The queue's unit of work.
  *
- *  **Two of the four carry the prose that raised them, and that is not
- *  duplication.** §3.3 says a queued intent does not go stale because "prose
- *  does not un-happen" — true of `retire` (settled stays settled) and
- *  `condense` (length is length), and false of exactly the two whose INPUT is
- *  defined as the prose since the watermark. An intent the budget defers runs
- *  on a later pass, whose prose is different and whose watermark has already
- *  moved past the sentences that motivated it, so a `revise` reading the
- *  running pass's prose rewrites an entry against a scene its subject was never
- *  in — under a prompt that says what it leaves out is deleted. Carrying the
- *  prose is what makes §3.3's sentence true rather than aspirational: the
- *  payload is self-contained, so deferring it changes nothing about what it
- *  will do.
+ *  Every kind but `condense` carries the prose that raised it. An intent the
+ *  budget defers runs on a later pass, whose prose is different and whose
+ *  watermark has moved past the sentences that motivated it; carrying the prose
+ *  makes the payload self-contained, so deferring changes nothing about what it
+ *  will do. `condense` is a function of an entry's length alone.
  *
- *  Bounded by `clampProse` at the one place intents are minted, so a queue
- *  record holds at most the same window of prose the prompt would have been
- *  given anyway — never a second, smaller clamp, which would let a revise act
- *  on prose triage never saw. `condense` carries none of it and defers for
- *  free, which is what deferral was designed for. */
+ *  `established` on a `revise` is a Thread's concluded ledger: the settled fact
+ *  the entity's entry must now carry. It is not part of `intentKey` — the same
+ *  entity is the same rewrite — but `dedupe` lets a revise that has one replace
+ *  a queued revise that does not, or the settled fact would be lost. */
 export type Intent =
-  | { kind: "revise"; entityId: string; prose: string }
-  | { kind: "condense"; entryId: string };
+  | { kind: "revise"; entityId: string; prose: string; established?: string }
+  | { kind: "condense"; entryId: string }
+  | { kind: "threadWrite"; threadId: string; prose: string }
+  | { kind: "admit"; title: string; entityIds: string[]; prose: string }
+  | { kind: "conclude"; threadId: string; prose: string };
 
 export type LoopState = {
   phase: LoopPhase;

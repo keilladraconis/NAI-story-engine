@@ -802,7 +802,8 @@ HOW A CHANGE ENTERS AN ENTRY:
 
 RULES:
 - Your reply REPLACES the entry. Everything about the subject that is still true must be carried across. What you leave out is deleted.
-- Only the new prose may add facts. Do not infer, extrapolate, foreshadow, or fill a gap with something plausible. If the prose does not establish it, it does not go in.
+- Only the new prose, and a NOW SETTLED block when one is given, may add facts. Do not infer, extrapolate, foreshadow, or fill a gap with something plausible. If neither establishes it, it does not go in.
+- When a NOW SETTLED block is given, what it states is established. It may enter the entry, as the condition it left behind.
 - When the prose contradicts the entry, the prose wins — rewrite the contradicted part rather than adding a caveat beside it.
 - Keep the entry's own shape: same headings, same fields, same order, same register. You are revising a document, not replacing it with your own.
 - Do not grow the entry to show your work. Prefer replacing a sentence over appending one. An entry that is longer for no new fact is a worse entry.

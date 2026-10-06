@@ -21,6 +21,9 @@ import { EDIT_PANE_TITLE, lorebookCondensedKey } from "../../../src/core/keys";
 import { uiLorebookEntrySelected } from "../../../src/core/store/slices/ui";
 import { REVISE_MAX_TOKENS } from "../../../src/core/engine/revise-strategy";
 import { CONDENSE_MAX_TOKENS } from "../../../src/core/engine/condense";
+import { registerThreadConditionEffects } from "../../../src/core/engine/thread-bind";
+import { engineSettingsChanged } from "../../../src/core/store/slices/engine";
+import { ENGINE_DEFAULTS } from "../../../src/core/engine/settings";
 import {
   installLorebookFake,
   type LorebookFake,
@@ -39,6 +42,19 @@ function entity(id: string, over: Partial<WorldEntity> = {}): WorldEntity {
     lifecycle: "live",
     name: "Ada",
     summary: "A locksmith.",
+    ...over,
+  };
+}
+
+/** An open Thread over the beekeeping cooperative's east hives. */
+function thread(id: string, over: Partial<Thread> = {}): Thread {
+  return {
+    id,
+    title: id,
+    state: "Pell and Ines work the east hives together.",
+    latent: "Pell has not told Ines the cooperative means to sell them.",
+    entityIds: [],
+    status: "open",
     ...over,
   };
 }
@@ -74,6 +90,13 @@ function harness(
         entitiesById: Object.fromEntries(entities.map((e) => [e.id, e])),
       },
     }),
+  );
+  // The drain dispatches Thread actions and leaves the Thread's entry to the
+  // effects, as it is wired in `src/index.ts`.
+  registerThreadConditionEffects(
+    store.subscribeEffect,
+    store.getState,
+    store.dispatch,
   );
   const generate = vi.fn(says("One-handed now."));
   return {
@@ -536,6 +559,9 @@ describe("drain — the budget", () => {
     expect(INTENT_MAX_TOKENS).toEqual({
       revise: 1024,
       condense: 1024,
+      threadWrite: 300,
+      admit: 300,
+      conclude: 0,
     });
   });
 
@@ -733,5 +759,270 @@ describe("every Engine generation refuses rather than parks (§3.5)", () => {
       "utf8",
     );
     expect(src).toContain("fastRejection: true");
+  });
+});
+
+// ───────────────────────────────── Threads ─────────────────────────────────
+
+const WRITE =
+  "MOVED: Pell signed the hives over.\nLATENT: Ines does not know the price.\nSTATE: Pell has sold the east hives to the Cooperative.";
+
+describe("the threadWrite arm", () => {
+  it("writes both halves of the ledger from the model's answer", async () => {
+    const h = harness(
+      [thread("t1", { entityIds: ["a"] })],
+      [entity("a", { name: "Pell" })],
+    );
+    h.generate.mockImplementation(says(WRITE));
+
+    const { executed } = await drain(
+      [{ kind: "threadWrite", threadId: "t1", prose: "p" }],
+      h.deps,
+    );
+
+    expect(executed).toHaveLength(1);
+    expect(h.store.getState().world.threads[0]).toMatchObject({
+      state: "Pell has sold the east hives to the Cooperative.",
+      latent: "Ines does not know the price.",
+    });
+  });
+
+  it("retries once when STATE points forward, showing the model its own answer and the repair", async () => {
+    const h = harness(
+      [thread("t1", { entityIds: ["a"] })],
+      [entity("a", { name: "Pell" })],
+    );
+    h.generate
+      .mockImplementationOnce(
+        says("LATENT: none\nSTATE: Pell will sell the east hives."),
+      )
+      .mockImplementationOnce(says(WRITE));
+
+    await drain([{ kind: "threadWrite", threadId: "t1", prose: "p" }], h.deps);
+
+    expect(h.generate).toHaveBeenCalledTimes(2);
+    const retry = await (
+      h.generate.mock.calls[1][0] as () => Promise<{ messages: Message[] }>
+    )();
+    expect(retry.messages.at(-1)?.content).toContain('STATE contains "will"');
+    expect(h.store.getState().world.threads[0].state).toBe(
+      "Pell has sold the east hives to the Cooperative.",
+    );
+  });
+
+  it("keeps the previous ledger when the retry points forward too", async () => {
+    const h = harness(
+      [thread("t1", { entityIds: ["a"], state: "Before." })],
+      [entity("a", { name: "Pell" })],
+    );
+    h.generate.mockImplementation(
+      says("LATENT: none\nSTATE: Pell must sell soon."),
+    );
+
+    const { executed } = await drain(
+      [{ kind: "threadWrite", threadId: "t1", prose: "p" }],
+      h.deps,
+    );
+
+    expect(h.generate).toHaveBeenCalledTimes(2);
+    expect(executed).toEqual([]);
+    expect(h.store.getState().world.threads[0].state).toBe("Before.");
+  });
+
+  it("does not retry when the budget cannot cover a second call", async () => {
+    // `beforeEach` re-arms `budget(2048)`, so lowering it here cannot leak.
+    const h = harness(
+      [thread("t1", { entityIds: ["a"] })],
+      [entity("a", { name: "Pell" })],
+    );
+    h.generate.mockImplementation(async () => {
+      budget(100);
+      return {
+        choices: [
+          {
+            text: "STATE: Pell will sell.",
+            index: 0,
+            token_ids: [],
+            finish_reason: "stop",
+          },
+        ],
+      };
+    });
+
+    await drain([{ kind: "threadWrite", threadId: "t1", prose: "p" }], h.deps);
+    expect(h.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips a Thread the writer deleted or concluded while the write was queued", async () => {
+    const h = harness([thread("t1", { status: "concluded" })], []);
+    const { executed, remaining } = await drain(
+      [
+        { kind: "threadWrite", threadId: "t1", prose: "p" },
+        { kind: "threadWrite", threadId: "gone", prose: "p" },
+      ],
+      h.deps,
+    );
+    expect(h.generate).not.toHaveBeenCalled();
+    expect(executed).toEqual([]);
+    expect(remaining).toEqual([]);
+    expect(h.store.getState().world.threads).toHaveLength(1);
+  });
+});
+
+describe("the admit arm", () => {
+  const admit = {
+    kind: "admit" as const,
+    title: "The Sold Hives",
+    entityIds: ["a", "b"],
+    prose: "p",
+  };
+  const cast = () => [
+    entity("a", { name: "Pell" }),
+    entity("b", { name: "Ines Corbel" }),
+  ];
+
+  it("creates the Thread only once the model has written a clean state", async () => {
+    const h = harness([], cast());
+    h.generate.mockImplementation(says(WRITE));
+
+    await drain([admit], h.deps);
+
+    expect(h.store.getState().world.threads[0]).toMatchObject({
+      title: "The Sold Hives",
+      entityIds: ["a", "b"],
+      state: "Pell has sold the east hives to the Cooperative.",
+      latent: "Ines does not know the price.",
+      status: "open",
+    });
+  });
+
+  it("creates nothing when the model's answer is unusable", async () => {
+    const h = harness([], cast());
+    h.generate.mockImplementation(says("I cannot help with that."));
+    await drain([admit], h.deps);
+    expect(h.store.getState().world.threads).toEqual([]);
+    expect(lorebook.created()).toEqual([]);
+  });
+
+  it("creates nothing at the thread limit, without spending a generation", async () => {
+    const h = harness([thread("t0")], cast());
+    h.store.dispatch(
+      engineSettingsChanged({ ...ENGINE_DEFAULTS, threadCap: 1 }),
+    );
+    await drain([admit], h.deps);
+    expect(h.generate).not.toHaveBeenCalled();
+    expect(h.store.getState().world.threads).toHaveLength(1);
+  });
+
+  it("creates nothing when an open Thread already has that cast", async () => {
+    const h = harness([thread("t0", { entityIds: ["b", "a"] })], cast());
+    await drain([admit], h.deps);
+    expect(h.generate).not.toHaveBeenCalled();
+    expect(h.store.getState().world.threads).toHaveLength(1);
+  });
+
+  it("drops cast members the World no longer holds, and admits nothing if none are left", async () => {
+    const h = harness([], []);
+    await drain([admit], h.deps);
+    expect(h.generate).not.toHaveBeenCalled();
+    expect(h.store.getState().world.threads).toEqual([]);
+  });
+});
+
+describe("the conclude arm", () => {
+  it("concludes the Thread, disables its entry, and queues a settled revise for each cast member with an entry", async () => {
+    lorebook.seed({
+      id: "la",
+      displayName: "Pell",
+      text: "Name: Pell\nKeeps bees.",
+      keys: ["pell"],
+    } as LorebookEntry);
+    // The Thread arrives through `persistedDataLoaded`, which fires no
+    // `threadCreated`, so its entry is seeded rather than minted by the effect.
+    const entryId = "lt";
+    lorebook.seed({
+      id: entryId,
+      displayName: "t1",
+      text: "Pell has sold the hives.",
+      keys: [],
+      enabled: true,
+    } as LorebookEntry);
+    const h = harness(
+      [
+        thread("t1", {
+          entityIds: ["a", "b"],
+          state: "Pell has sold the hives.",
+          latent: "For half their worth.",
+          lorebookEntryId: entryId,
+        }),
+      ],
+      [
+        entity("a", { name: "Pell", lorebookEntryId: "la" }),
+        entity("b", { name: "Ines Corbel" }),
+      ],
+    );
+    h.generate.mockImplementation(
+      says("Sold the east hives for half their worth."),
+    );
+
+    const { executed } = await drain(
+      [{ kind: "conclude", threadId: "t1", prose: "p" }],
+      h.deps,
+    );
+
+    expect(h.store.getState().world.threads[0].status).toBe("concluded");
+    expect(lorebook.read(entryId)?.enabled).toBe(false);
+    expect(executed.map((i) => i.kind)).toEqual(["conclude", "revise"]);
+    const prompt = await (
+      h.generate.mock.calls[0][0] as () => Promise<{ messages: Message[] }>
+    )();
+    expect(prompt.messages.map((m) => m.content).join("\n")).toContain(
+      "=== NOW SETTLED ===\nt1\nPell has sold the hives.\nFor half their worth.",
+    );
+  });
+
+  it("defers the second cast member's rewrite to a later pass", async () => {
+    lorebook.seed({
+      id: "la",
+      displayName: "Pell",
+      text: "x",
+      keys: [],
+    } as LorebookEntry);
+    lorebook.seed({
+      id: "lb",
+      displayName: "Ines Corbel",
+      text: "y",
+      keys: [],
+    } as LorebookEntry);
+    const h = harness(
+      [thread("t1", { entityIds: ["a", "b"] })],
+      [
+        entity("a", { name: "Pell", lorebookEntryId: "la" }),
+        entity("b", { name: "Ines Corbel", lorebookEntryId: "lb" }),
+      ],
+    );
+    h.generate.mockImplementation(says("Rewritten."));
+
+    const { remaining } = await drain(
+      [{ kind: "conclude", threadId: "t1", prose: "p" }],
+      h.deps,
+    );
+
+    expect(remaining).toEqual([
+      expect.objectContaining({
+        kind: "revise",
+        entityId: "b",
+        established: expect.any(String),
+      }),
+    ]);
+  });
+
+  it("skips a Thread that is already concluded or gone", async () => {
+    const h = harness([thread("t1", { status: "concluded" })], []);
+    const { executed } = await drain(
+      [{ kind: "conclude", threadId: "t1", prose: "p" }],
+      h.deps,
+    );
+    expect(executed).toEqual([]);
   });
 });

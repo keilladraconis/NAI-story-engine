@@ -90,3 +90,34 @@ describe("the loop's record key", () => {
     expect(new Set(others).size).toBe(others.length);
   });
 });
+
+describe("Thread intents", () => {
+  it("key a write by its Thread, an admission by its cast, a conclusion by its Thread", () => {
+    expect(intentKey({ kind: "threadWrite", threadId: "t1", prose: "p" })).toBe(
+      "thread:t1",
+    );
+    expect(intentKey({ kind: "conclude", threadId: "t1", prose: "p" })).toBe(
+      "conclude:t1",
+    );
+    expect(
+      intentKey({
+        kind: "admit",
+        title: "X",
+        entityIds: ["b", "a"],
+        prose: "p",
+      }),
+    ).toBe("admit:a,b");
+  });
+
+  it("lets a revise that carries a settled fact replace a queued one that does not", () => {
+    const plain = { kind: "revise" as const, entityId: "e1", prose: "old" };
+    const settled = {
+      kind: "revise" as const,
+      entityId: "e1",
+      prose: "new",
+      established: "The debt is paid.",
+    };
+    expect(dedupe([plain], [settled])).toEqual([settled]);
+    expect(dedupe([settled], [plain])).toEqual([settled]);
+  });
+});

@@ -149,7 +149,13 @@ function readWatermark(value: unknown): Watermark | null {
  *  hold others (`open`, `retire`); they are dropped here, at the one door
  *  persisted intents come through, so the drain's exhaustive switch never meets
  *  a kind it has no arm for. */
-const KNOWN_KINDS: ReadonlySet<string> = new Set(["revise", "condense"]);
+const KNOWN_KINDS: ReadonlySet<string> = new Set([
+  "revise",
+  "condense",
+  "threadWrite",
+  "admit",
+  "conclude",
+]);
 
 /** The queue. Persisted JSON is trusted no further than its shape: a missing or
  *  malformed record reads as an empty queue rather than throwing inside the
@@ -169,7 +175,7 @@ function readQueue(value: unknown): Intent[] {
   return (value as Intent[]).filter(
     (intent) =>
       KNOWN_KINDS.has(intent?.kind) &&
-      (intent.kind !== "revise" ||
+      (intent.kind === "condense" ||
         (typeof intent.prose === "string" && intent.prose.length > 0)),
   );
 }
