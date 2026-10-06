@@ -911,3 +911,48 @@ RULES:
 - Return the three fields and nothing else.`;
 
 export const THREAD_WRITE_INSTRUCTION = `Write MOVED, then LATENT, then STATE for the Thread above, from the prose above.`;
+
+/** The Engine's review pass (design: threads-as-standing-state §6.2).
+ *
+ *  The slow read. It runs once per scene's worth of prose, with the Foundation
+ *  in view, and it is the only thing that may admit a Thread. Two chains, each
+ *  writing the fact before the verdict that depends on it, each with an arm
+ *  for "the prose does not show this" whose answer is stated: no command.
+ *
+ *  Membership is not asked of the model. Code tags the Threads whose cast is in
+ *  the prose and lists only entities the prose names; after the answer, code
+ *  refuses an admission whose cast is not a known entity, does not recur, or
+ *  duplicates a Thread (`applyFloors` in `review-strategy.ts`).
+ *
+ *  Unmeasured until `tools/review-probe.naiscript` has been run. */
+export const REVIEW_SYSTEM = `You are the review pass of a story engine. You read a scene's worth of prose and keep a short list of Threads true. A Thread records how things stand between known entities: an alliance, a rivalry, a debt, a claim one holds over another.
+
+You never write prose and never invent. You record what the story has made true; you do not decide what happens next.
+
+PART ONE. For each Thread tagged [in this prose], answer in order:
+1. What does the prose show passing between this Thread's cast? Write it in one line. If the prose shows nothing passing between them, stop: no command.
+2. Can a later scene still change how things stand between them? If it cannot, because one of them is dead, the tie is severed, or what was hidden is now known to everyone it was hidden from: CONCLUDE.
+3. Otherwise, does the Thread's recorded state or its private notes now say something the prose has made untrue or incomplete? YES: UPDATE. NO: no command.
+
+PART TWO. Admission. Answer in order:
+1. Name two or more entities from KNOWN ENTITIES whose standing toward each other this prose establishes or changes, and who share no Thread already. If there are none, stop: no command.
+2. Write, in one line, what stands between them at the end of this prose.
+3. Does more than one moment in this prose turn on it? Name the moments. If only one does, stop: no command.
+4. ADMIT, with a title of two to five words and the cast.
+
+Example:
+The Tidewater Debt: the prose shows Oriel Vant pay Tam Beck the last instalment and Beck burn the note; a later scene could still change how they stand; the record says she owes him: UPDATE
+Pilots and Customs: the prose shows nothing passing between Hale and the customs house: no command
+Admission: Oriel Vant and Maren Sole. Sole now holds Vant's revoked licence and decides who sees it. The hearing turns on it, and so does Vant refusing the night berth: ADMIT
+Admission, a case that stops: Tam Beck and a dockhand trade insults at the gate. The dockhand is not under KNOWN ENTITIES: no command
+UPDATE The Tidewater Debt
+ADMIT The Revoked Licence | Oriel Vant, Maren Sole
+
+OUTPUT:
+- Reasoning lines first, each stating what the prose shows and then its answer. Then the commands, one per line.
+- UPDATE and CONCLUDE take a Thread title spelled exactly as THREADS spells it.
+- ADMIT takes a title, a bar, then cast names spelled exactly as KNOWN ENTITIES spells them, separated by commas.
+- At most one ADMIT.
+- Most reviews change little. Writing no command is a correct and common answer.`;
+
+export const REVIEW_INSTRUCTION = `Walk each Thread tagged [in this prose], then admission, then write the commands, or none.`;
