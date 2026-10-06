@@ -90,9 +90,18 @@ const FORWARD = [
   /\bsoon\b/i, /\bwill\b/, /\babout\s+to\b/i, /\buntil\b/i, /\bmust\b/i,
   /\bwaiting\b/i, /\bsooner\s+or\s+later\b/i, /\bone\s+day\b/i, /\beventually\b/i,
 ];
+// Like parseThreadWrite: a field runs until the next MOVED / LATENT / STATE label.
+const LABEL = /^\s*(?:[-*•]\s*)?\**\s*(MOVED|LATENT|STATE)\s*\**\s*:\s*\**\s*(.*)$/;
 const stateOf = (text) => {
-  const line = text.split(/\r\n|\r|\n/).find((l) => /^\s*\**\s*STATE\b/.test(l));
-  return line ? line.replace(/^[^:]*:\s*/, "") : "";
+  let current = "";
+  const parts = [];
+  for (const line of text.split(/\r\n|\r|\n/)) {
+    const match = LABEL.exec(line);
+    if (match) current = match[1];
+    if (current === "STATE") parts.push(match ? match[2] : line.trim());
+  }
+  // Curly apostrophes normalised first, as the shipped lintState does.
+  return parts.join(" ").trim().replace(/[\u2018\u2019]/g, "'");
 };
 
 const REVIEW_PARAMS = { model: MODEL, max_tokens: 400, temperature: 0.3 };
@@ -133,6 +142,7 @@ const FIXTURES = [
   },
   {
     name: "Pending",
+    // First attempt only: the shipped write retries once, so this count is not the shipped failure rate.
     contract: "a STATE written from prose dense with pending material points at nothing to come",
     messages: writeMessages(PENDING),
     params: WRITE_PARAMS,
