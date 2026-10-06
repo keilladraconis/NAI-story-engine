@@ -128,7 +128,7 @@ describe("the STATE lint", () => {
   it.each([
     ["Pell has not yet sold the hives.", "yet"],
     ["Pell hasn't told her.", "hasn't"],
-    ["Pell hasn't told her.", "hasn't"],
+    ["Pell hasn\u2019t told her.", "hasn't"],
     ["Ines must decide.", "must"],
     ["The sale happens soon.", "soon"],
     ["Pell is about to leave.", "about to"],
