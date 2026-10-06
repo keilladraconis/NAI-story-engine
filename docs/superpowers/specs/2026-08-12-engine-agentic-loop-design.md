@@ -295,6 +295,8 @@ loop has no business demanding a Continue click.
 
 ## 4. Threads
 
+> **Superseded by `2026-10-05-threads-as-standing-state-design.md`.** Threads are no longer commitments with a forgetting detector, a horizon, a cap that displaces and an expiry. This section is kept for the reasoning behind what was built in 0.15.
+
 ### 4.1 The concept
 
 **Threads keep their name; their role grows.** A Thread's purpose was always to keep

@@ -39,7 +39,7 @@ Do not also enable the superpowers plugin in `.claude/settings.json` — the plu
 **State (`src/core/store/`):**
 
 - `slices/story.ts` — Field contents and World Entry items (DULFS)
-- `slices/world.ts` — `WorldEntity` records, `WorldGroup` (Threads), forge loop flag
+- `slices/world.ts` — `WorldEntity` records, `Thread`s, forge loop flag
 - `slices/chat.ts` — Chat messages (brainstorm and forge sessions)
 - `slices/foundation.ts` — Shape, intent, ATTG, style fields
 - `slices/ui.ts` — Edit modes, lorebook selection state
@@ -78,6 +78,16 @@ Do not also enable the superpowers plugin in `.claude/settings.json` — the plu
 - **One entity per lorebook entry**: `entityBound` / `entitiesBoundBatch` drop any entity whose `lorebookEntryId` is already bound. Two entities over one entry would generate into it twice and list it twice in the World, and the Import wizard's Bind mints a fresh entity id per click — so the invariant is enforced in the reducer, not at the callsites.
 - **Cast**: `castAllRequested` / `entityCastRequested` effects first look for an existing unmanaged lorebook entry with a matching `displayName` (case-insensitive) and bind to it. If none found, a new entry is created in the appropriate `SE: <Category>` lorebook category with empty text (summary is not seeded into lorebook).
 - **Category**: `entity.categoryId` is a Story Engine concept — it drives sidebar organization, template selection, and the prefill `Type:` line. It is **independent of the lorebook entry's own category**: the lorebook category is where the entry lives in the user's lorebook, only assigned at creation time (`SeEntityEditPane` on save; cast/forge effects at bind time). Users commonly reorganize imported or long-running entries in their lorebook for their own preferences; Story Engine does **not** chase those moves, and `entityCategoryChanged` only updates Redux — it does not rewrite `entry.category`. `SeEntityEditPane` shows a category picker (SuiActionBar) for all entities.
+
+**Threads (`src/core/engine/thread-*.ts`, `review-strategy.ts`):**
+
+- A `Thread` is the standing state of an arc or relationship between known entities: `title`, `state`, `latent`, `entityIds`, optional `lorebookEntryId`, `status` (`"open" | "concluded"`).
+- **`state` is what the story model sees; `latent` never leaves Story Engine.** `state` is the Thread's lorebook entry text. `latent` holds what is unspoken, owed or concealed — a model shown that something has not happened writes it happening. `tests/core/engine/latent-privacy.test.ts` lists the only files that may name `latent`; a failure there is a leak, not a list to extend.
+- **A Thread's entry activates when its cast is on stage** (`thread-condition.ts`): `keys: []`, `forceActivation: false`, one advanced condition over the cast's aliases — each member's own lorebook keys plus its display name. Both members of a pair, any two of a larger cast. No cast, no entry.
+- **`syncThreadEntry` is the only thing that writes a Thread's entry**, and `state` is the authority for its text (unlike an entity's entry, where the lorebook outranks the store).
+- **Only the review pass admits a Thread.** The per-generation triage can only `REVISE` an entity. The review runs every `reviewEvery` paragraphs, emits `UPDATE` / `ADMIT` / `CONCLUDE`, and `applyFloors` refuses an admission whose cast is not known entities, does not recur across three paragraphs, duplicates a Thread, or exceeds the thread limit. The limit binds the Engine only.
+- **Concluding** disables the entry and queues an entity `revise` per cast member carrying the Thread's ledger as `established`.
+- The review and Thread write prompts are measured with `tools/review-probe.naiscript` (twenty runs per fixture, in NovelAI), not by unit tests.
 
 **Prompts:** All generation prompts are hard-coded constants in `src/core/utils/prompts.ts`. They are **not** configurable via `project.yaml`. `project.yaml` contains only non-prompt settings (model, feature flags).
 

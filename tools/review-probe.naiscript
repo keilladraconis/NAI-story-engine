@@ -1,0 +1,198 @@
+/*---
+compatibilityVersion: naiscript-1.0
+id: f48c3f5a-34d3-4431-b832-5799fbf18465
+name: Review Probe
+version: 0.1.0
+description: How often do the review and Thread write prompts keep their contracts, at twenty runs per fixture?
+memoryLimit: 8
+---*/
+
+// These four constants are copies of the shipped prompts in
+// src/core/utils/prompts.ts; tests/tools/review-probe.test.ts fails if they drift.
+const REVIEW_SYSTEM = "You are the review pass of a story engine. You read a scene's worth of prose and keep a short list of Threads true. A Thread records how things stand between known entities: an alliance, a rivalry, a debt, a claim one holds over another.\n\nYou never write prose and never invent. You record what the story has made true; you do not decide what happens next.\n\nPART ONE. For each Thread tagged [in this prose], answer in order:\n1. What does the prose show passing between this Thread's cast? Write it in one line. If the prose shows nothing passing between them, stop: no command.\n2. Can a later scene still change how things stand between them? If it cannot, because one of them is dead, the tie is severed, or what was hidden is now known to everyone it was hidden from: CONCLUDE.\n3. Otherwise, does the Thread's recorded state or its private notes now say something the prose has made untrue or incomplete? YES: UPDATE. NO: no command.\n\nPART TWO. Admission. Answer in order:\n1. Name two or more entities from KNOWN ENTITIES whose standing toward each other this prose establishes or changes, and who share no Thread already. If there are none, stop: no command.\n2. Write, in one line, what stands between them at the end of this prose.\n3. Does more than one moment in this prose turn on it? Name the moments. If only one does, stop: no command.\n4. ADMIT, with a title of two to five words and the cast.\n\nExample:\nThe Tidewater Debt: the prose shows Oriel Vant pay Tam Beck the last instalment and Beck burn the note; a later scene could still change how they stand; the record says she owes him: UPDATE\nPilots and Customs: the prose shows nothing passing between Hale and the customs house: no command\nAdmission: Oriel Vant and Maren Sole. Sole now holds Vant's revoked licence and decides who sees it. The hearing turns on it, and so does Vant refusing the night berth: ADMIT\nAdmission, a case that stops: Tam Beck and a dockhand trade insults at the gate. The dockhand is not under KNOWN ENTITIES: no command\nUPDATE The Tidewater Debt\nADMIT The Revoked Licence | Oriel Vant, Maren Sole\n\nOUTPUT:\n- Reasoning lines first, each stating what the prose shows and then its answer. Then the commands, one per line.\n- UPDATE and CONCLUDE take a Thread title spelled exactly as THREADS spells it.\n- ADMIT takes a title, a bar, then cast names spelled exactly as KNOWN ENTITIES spells them, separated by commas.\n- At most one ADMIT.\n- Most reviews change little. Writing no command is a correct and common answer.";
+const REVIEW_INSTRUCTION = "Walk each Thread tagged [in this prose], then admission, then write the commands, or none.";
+const THREAD_WRITE_SYSTEM = "You are the archivist of a story engine. You keep one Thread at a time: a record of how things stand between the entities in its cast.\n\nA Thread has two parts with different readers. STATE is shown to the model writing the story whenever the cast is on the page together. LATENT is private and that model never sees it.\n\nThat difference decides what goes where. The story model acts on whatever it is shown: if it reads that something has not happened, it writes it happening. So anything that points forward goes in LATENT, and STATE says only what is already so.\n\nWrite three fields, in this order:\nMOVED: what the prose shows changed between the cast. One or two sentences.\nLATENT: what is unspoken, unpaid, concealed, or unknown to one of them. Write \"none\" when the prose shows nothing of the kind.\nSTATE: how things stand between them. One or two sentences, present tense, each person and thing named, no pronoun without a name beside it.\n\nThe same facts, sorted:\nLATENT: Maren Sole has not shown the revoked licence to the harbour board, and Oriel Vant does not know whether she will.\nSTATE: Maren Sole keeps Oriel Vant's revoked pilot's licence in the customs strongbox. Oriel Vant takes no night berths and works the day tide under another pilot's name.\n\nTwo lines that look alike and belong in different fields:\n\"Tam Beck holds the note on Oriel Vant's boat.\" This is so now: STATE.\n\"Tam Beck has yet to call in the note on Oriel Vant's boat.\" This points at a thing to come: LATENT.\n\nRULES:\n- Only the prose and the Thread as it stands may supply facts. Do not add a motive or a consequence the prose does not show.\n- When a Thread is given as it currently stands, carry across what is still true. What you leave out is deleted.\n- STATE never mentions the story, a scene, the reader, or this record.\n- Return the three fields and nothing else.";
+const THREAD_WRITE_INSTRUCTION = "Write MOVED, then LATENT, then STATE for the Thread above, from the prose above.";
+
+// The whole suite is 100 generations against a 2048-token-per-240s output
+// bucket, so it takes a while and will pause for budget. Read every count with
+// its denominator: one suite cannot rank two fixtures a run or two apart.
+const RUNS = 20;
+const MODEL = "glm-4-6";
+
+// Fixtures use a watch-repair shop: unlike the prompts' harbour and unlike the
+// unit tests' apiary, so no fixture is a copy of an example the prompt carries.
+const ENTITIES = [
+  "- Odile Marsh [Character]: Owns the shop and does the fine work.",
+  "- Bram Tulloch [Character]: Her apprentice of two years.",
+].join("\n");
+
+const THREAD_NONE = "=== THREADS ===\n(none yet)";
+const THREAD_BENCH =
+  "=== THREADS ===\n- The Second Bench [in this prose] | cast: Odile Marsh, Bram Tulloch\n  STATE: Bram Tulloch works the second bench under Odile Marsh and takes the simple repairs.\n  PRIVATE: none";
+
+const INCIDENTAL = [
+  "Odile Marsh set a loupe on the bench and wound the regulator.",
+  "A glass of water stood on the sill, leaving a ring.",
+  "Bram Tulloch swept filings into a tin.",
+  "A couple passed the window and looked in, then walked on.",
+  "A nail had worked loose above the door; the sign hung a little crooked.",
+  "Odile Marsh oiled a mainspring. Bram Tulloch labelled three envelopes.",
+].join("\n\n");
+
+const SHIFT = [
+  "Odile Marsh found the Hartley chronometer open on Bram Tulloch's bench, its balance staff snapped.",
+  "Bram Tulloch said he had only meant to clean it. Odile Marsh said nothing and took the movement to her own bench.",
+  "By noon Odile Marsh had moved the fine work to the locked drawer and kept the key on her belt.",
+  "Bram Tulloch asked for the Hartley job back. Odile Marsh gave him a box of alarm clocks instead.",
+  "When the Hartley's owner came, Odile Marsh told him the delay was hers, and Bram Tulloch heard her say it.",
+  "Bram Tulloch worked the alarm clocks until closing and did not ask again.",
+].join("\n\n");
+
+const NOTHING_BETWEEN = [
+  "Odile Marsh spent the morning on a carriage clock.",
+  "Bram Tulloch was out at the supplier's until three.",
+  "Odile Marsh ate at the bench. Bram Tulloch came back with the mainsprings and shelved them.",
+].join("\n\n");
+
+const PENDING = [
+  "Odile Marsh had drafted the letter ending Bram Tulloch's apprenticeship and had not sent it.",
+  "Bram Tulloch had an offer from the shop on Kiln Street and had told no one.",
+  "Odile Marsh moved the fine work to the locked drawer. Bram Tulloch took the alarm clocks without a word.",
+].join("\n\n");
+
+const reviewMessages = (threads, prose) => [
+  { role: "system", content: REVIEW_SYSTEM },
+  { role: "assistant", content: `=== KNOWN ENTITIES ===\n${ENTITIES}` },
+  { role: "assistant", content: threads },
+  { role: "assistant", content: `=== PROSE ===\n${prose}` },
+  { role: "user", content: REVIEW_INSTRUCTION },
+];
+
+const writeMessages = (prose) => [
+  { role: "system", content: THREAD_WRITE_SYSTEM },
+  { role: "assistant", content: `=== CAST ===\n${ENTITIES.replace(/ \[Character\]/g, "")}` },
+  {
+    role: "assistant",
+    content:
+      "=== THREAD ===\nTitle: The Second Bench\nCast: Odile Marsh, Bram Tulloch\n(new: no record yet)",
+  },
+  { role: "assistant", content: `=== PROSE ===\n${prose}` },
+  { role: "user", content: THREAD_WRITE_INSTRUCTION },
+];
+
+const commands = (text, verb) =>
+  text.split(/\r\n|\r|\n/).filter((line) => new RegExp(`^\\s*${verb}\\b`).test(line));
+
+// Mirrors FORWARD_PHRASES in src/core/engine/thread-write-strategy.ts.
+const FORWARD = [
+  /\byet\b/i, /\bhasn't\b/i, /\bhas\s+not\b/i, /\bhaven't\b/i, /\bhave\s+not\b/i,
+  /\bsoon\b/i, /\bwill\b/, /\babout\s+to\b/i, /\buntil\b/i, /\bmust\b/i,
+  /\bwaiting\b/i, /\bsooner\s+or\s+later\b/i, /\bone\s+day\b/i, /\beventually\b/i,
+];
+const stateOf = (text) => {
+  const line = text.split(/\r\n|\r|\n/).find((l) => /^\s*\**\s*STATE\b/.test(l));
+  return line ? line.replace(/^[^:]*:\s*/, "") : "";
+};
+
+const REVIEW_PARAMS = { model: MODEL, max_tokens: 400, temperature: 0.3 };
+const WRITE_PARAMS = { model: MODEL, max_tokens: 300, temperature: 0.4, min_p: 0.05 };
+
+// Each fixture states its contract in one sentence; `holds` is that sentence.
+const FIXTURES = [
+  {
+    name: "Incidental",
+    contract: "a window of incidental detail admits nothing",
+    messages: reviewMessages(THREAD_NONE, INCIDENTAL),
+    params: REVIEW_PARAMS,
+    holds: (text) => commands(text, "ADMIT").length === 0,
+  },
+  {
+    name: "Shift",
+    contract: "a standing that shifts across several paragraphs is admitted once, naming both",
+    messages: reviewMessages(THREAD_NONE, SHIFT),
+    params: REVIEW_PARAMS,
+    holds: (text) => {
+      const admits = commands(text, "ADMIT");
+      return admits.length === 1 && /Odile Marsh/.test(admits[0]) && /Bram Tulloch/.test(admits[0]);
+    },
+  },
+  {
+    name: "NothingBetween",
+    contract: "a cast on stage with nothing passing between them is not updated",
+    messages: reviewMessages(THREAD_BENCH, NOTHING_BETWEEN),
+    params: REVIEW_PARAMS,
+    holds: (text) => commands(text, "UPDATE").length === 0 && commands(text, "CONCLUDE").length === 0,
+  },
+  {
+    name: "Reversed",
+    contract: "a Thread whose recorded state the prose reverses is updated",
+    messages: reviewMessages(THREAD_BENCH, SHIFT),
+    params: REVIEW_PARAMS,
+    holds: (text) => commands(text, "UPDATE").length === 1,
+  },
+  {
+    name: "Pending",
+    contract: "a STATE written from prose dense with pending material points at nothing to come",
+    messages: writeMessages(PENDING),
+    params: WRITE_PARAMS,
+    holds: (text) => {
+      const state = stateOf(text);
+      return state.length > 0 && !FORWARD.some((pattern) => pattern.test(state));
+    },
+  },
+];
+
+let report = "";
+
+function log(line) {
+  report += line + "\n";
+  api.v1.log(line);
+  void api.v1.ui.updateParts([{ id: "report", text: report }]);
+}
+
+async function runFixture(fixture) {
+  let failing = 0;
+  let firstFailure = "";
+  for (let run = 0; run < RUNS; run++) {
+    // One at a time: concurrent script generations are refused.
+    const response = await api.v1.generate(fixture.messages, fixture.params);
+    const text = response.choices?.[0]?.text ?? "";
+    if (!fixture.holds(text)) {
+      failing++;
+      if (!firstFailure) firstFailure = text;
+    }
+  }
+  log(`${fixture.name}: ${failing} failing runs of ${RUNS} — ${fixture.contract}`);
+  if (firstFailure) log(`  first failing output:\n${firstFailure}`);
+}
+
+async function runAll() {
+  report = "";
+  log(`Review probe — ${RUNS} runs per fixture on ${MODEL}`);
+  for (const fixture of FIXTURES) await runFixture(fixture);
+  log("done");
+}
+
+api.v1.ui.register([
+  api.v1.ui.extension.scriptPanel({
+    name: "Review Probe",
+    content: [
+      api.v1.ui.part.column({
+        content: [
+          api.v1.ui.part.button({
+            text: "Run",
+            callback: () => void runAll(),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.text({
+            id: "report",
+            text: "Press Run. Report each line as N failing runs of 20.",
+            noTemplate: true,
+            style: { whiteSpace: "pre-wrap", userSelect: "text" },
+          }),
+        ],
+      }),
+    ],
+  }),
+]);
