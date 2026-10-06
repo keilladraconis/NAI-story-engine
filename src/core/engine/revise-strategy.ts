@@ -151,8 +151,8 @@ function lastSentenceEnd(text: string): number {
  *  `Age: 34` field lines every entry template opens with. Taking whichever is
  *  further along keeps the most text without ever keeping half of anything.
  *
- *  Exported for `open-strategy.ts`, which answers a truncated reminder the same
- *  way for the same reason. A second implementation of "where does this text
+ *  Exported so any Engine generation that answers a truncated reply can do it
+ *  the same way for the same reason. A second implementation of "where does this text
  *  stop being complete" is a second set of edge cases about closing quotes and
  *  abbreviations, and the one that got it wrong would write half a word into
  *  the writer's lorebook. */

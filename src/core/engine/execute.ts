@@ -7,19 +7,12 @@
 // patch from a copy of the entry it fetched before the generation ran, which is
 // exactly the staleness §5's read-then-write exists to rule out.
 //
-// Phase 6 filled the arms in price order. Task 2 took RETIRE, which §3.3 prices
-// at zero output tokens, so the skeleton — the branch, the budget policy, the
-// queue write-back — was provable end to end before anything cost 1024. Task 3
-// added REVISE, the first arm that spends a generation, and Task 4 CONDENSE,
-// which §5.1 says is the same price, the same read-then-write, the same door
-// and the same record — so the two arms below are deliberately the same shape,
-// and differ only where §5.1 says they must. Task 5 added OPEN, the only arm
-// that CREATES rather than rewrites: it is the one that hands work to
-// `thread-bind.ts`, because a thread's lorebook entry is a shape rather than a
-// text and the door is not in front of a create (see there).
+// The two arms, REVISE and CONDENSE, are deliberately the same shape: the same
+// price, the same read-then-write, the same door and the same record (§5.1), and
+// they differ only where §5.1 says they must.
 //
 // The switch has no `default`, and `INTENT_MAX_TOKENS` is a `Record` over the
-// union's `kind`. A fifth intent is therefore two compile errors — a missing arm
+// union's `kind`. A new intent is therefore two compile errors — a missing arm
 // and a missing price — rather than an action that silently costs nothing and
 // silently does nothing. `intentKey` in intents.ts is the house precedent.
 
@@ -83,15 +76,11 @@ export type DrainOutcome = {
  *  point is to decide affordability BEFORE starting, and `max_tokens` is what
  *  actually bounds consumption.
  *
- *  Retire is 0 because it is the `{enabled: false}` flag flip of §4.4 and spends
- *  no generation at all. Open is ~150 (a title and a sentence of reminder
- *  prose); revise and condense are full lorebook entry rewrites and are priced
- *  at the same 1024, which is what makes them compete for the same scarce slot.
+ *  Revise and condense are full lorebook entry rewrites and are priced at the
+ *  same 1024, which is what makes them compete for the same scarce slot.
  *
- *  Priced from day one even for the three kinds that do not act yet: the price
- *  is the budget policy and the arm is the work, and Tasks 3–5 change the arm.
- *  Pricing an unimplemented kind at 0 would leave the policy untested until the
- *  task that depends on it. */
+ *  Every intent kind is priced, because the price is the budget policy and the
+ *  arm is the work: a kind priced at 0 would skip the budget check entirely. */
 export const INTENT_MAX_TOKENS: Record<Intent["kind"], number> = {
   // Each arm's own ceiling, imported rather than restated: the number the
   // drain refuses to start without must be the number `max_tokens` then bounds
@@ -123,10 +112,9 @@ export const ENTRY_REWRITES_PER_PASS = 1;
 /** The intents that spend a full 1024-token entry rewrite.
  *
  *  Same two `revisionsIn` counts, and for the same reason: revise and condense
- *  are the arms that rewrite a lorebook entry, and `open`'s ~150 tokens and
- *  `retire`'s zero are not what §3.3 calls the scarce operation. One predicate
- *  rather than two lists, so a fifth intent priced at 1024 cannot be capped
- *  here and uncounted there. */
+ *  are the arms that rewrite a lorebook entry, which §3.3 calls the scarce
+ *  operation. One predicate rather than two lists, so a new intent priced at
+ *  1024 cannot be capped here and uncounted there. */
 function isEntryRewrite(intent: Intent): boolean {
   return intent.kind === "revise" || intent.kind === "condense";
 }
@@ -357,15 +345,13 @@ async function execute(intent: Intent, deps: DrainDeps): Promise<IntentResult> {
  *  drawing on, which is exactly what §3.5 and the changelog promise it will
  *  not. See `ENTRY_REWRITES_PER_PASS`.
  *
- *  **FIFO among the costly actions, and free actions are never blocked.** When
- *  an intent the budget cannot afford is reached, every later costly intent is
- *  deferred with it rather than jumping ahead: entry rewrites are the scarce
- *  operation §3.3 is built around, and letting cheaper work overtake them would
- *  starve them for as long as triage keeps finding cheap work. Zero-cost intents
- *  are the exception, and §3.3 says so in as many words — "retiring a satisfied
- *  thread never queues, because it costs zero output tokens; the action that
- *  most protects context health is free." A retire held behind an unaffordable
- *  revise would leave a resolved plot in the writer's context for no reason.
+ *  **FIFO among the costly actions, and a zero-priced kind is never blocked.**
+ *  When an intent the budget cannot afford is reached, every later costly
+ *  intent is deferred with it rather than jumping ahead: entry rewrites are the
+ *  scarce operation §3.3 is built around, and letting cheaper work overtake them
+ *  would starve them. An intent kind priced at zero spends no generation, so it
+ *  is exempt from both the budget check and the deferral. No kind is priced at
+ *  zero at present; the exemption is how one would be treated if added.
  *
  *  The queue is never mutated. The caller writes `remaining` back to the record
  *  (§6.2) at the node it captured. */
@@ -418,8 +404,8 @@ export async function drain(
       // A collision is routine and self-clearing (§3.4). The work is still
       // wanted — prose does not un-happen (§3.3) — so the intent is requeued
       // rather than consumed, and the drain stops paying for costly work while
-      // the writer is plainly mid-generation. Free intents still run: a retire
-      // spends no generation and so cannot collide with one.
+      // the writer is plainly mid-generation. A zero-priced intent would still
+      // run: it spends no generation and so cannot collide with one.
       blocked = true;
       remaining.push(intent);
       await deps.log(
