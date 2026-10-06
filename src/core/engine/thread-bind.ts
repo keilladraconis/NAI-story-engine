@@ -174,6 +174,44 @@ export async function disableDeletedThreadEntry(
   );
 }
 
+/** Clean up after Threads dropped on load (`loadWorldRecord` hands back the
+ *  ids of the entries they owned): switch each entry off, then save.
+ *
+ *  **Never throws.** It is awaited on the way to mounting the panel, from a
+ *  bare `void start()`; a lorebook error let through here means no sidebar and
+ *  no HUD, on every load. So each entry is tried on its own, and one that fails
+ *  is logged and left — an entry still injecting is a nuisance the writer can
+ *  see and switch off; a script that will not mount is not.
+ *
+ *  **The save is what makes this happen once.** Loading drops the Threads from
+ *  the store but not from the record, and nothing else writes the record until
+ *  the World next changes. Without it every load would find the same Threads
+ *  and switch the same entries off again, including any the writer had since
+ *  switched back on. `save` is injected: this module does not own the record.
+ */
+export async function disableDroppedThreadEntries(
+  entryIds: readonly string[],
+  getState: () => RootState,
+  save: (state: RootState) => Promise<void>,
+): Promise<void> {
+  if (entryIds.length === 0) return;
+  for (const entryId of entryIds) {
+    try {
+      await disableDeletedThreadEntry(entryId);
+    } catch (error) {
+      api.v1.log(
+        `[engine] could not switch off entry ${entryId} of a dropped Thread:`,
+        error,
+      );
+    }
+  }
+  try {
+    await save(getState());
+  } catch (error) {
+    api.v1.log("[engine] could not save after dropping old Threads:", error);
+  }
+}
+
 /** Give a Thread its lorebook entry, once.
  *
  *  Two things must be true first. A title: the World's "+" makes an untitled
