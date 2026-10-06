@@ -1,5 +1,5 @@
 // The Engine HUD (design §9.1): one modeline in a scriptPanel, reporting only,
-// plus a single control.
+// plus two controls: run a pass now, and review now.
 //
 // Fixed slots, always present, always in the same position, read as a shape
 // rather than parsed as words:

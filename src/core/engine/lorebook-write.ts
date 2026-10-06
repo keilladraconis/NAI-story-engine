@@ -29,7 +29,8 @@ export type LorebookEdit = (
 /** Read live, then write. Returns whether a write actually landed.
  *
  *  Everything the Engine writes to a lorebook entry goes through here — revise,
- *  condense, the condition rebuild and the retire flag flip alike. A path that
+ *  condense, a Thread's entry sync and the switch-off of a concluded or deleted
+ *  Thread's entry alike. A path that
  *  called `updateEntry` itself would be free to produce its patch from a copy
  *  of the entry fetched before a generation ran, which is the one thing §5
  *  forbids: the entry the model is shown must be the entry as it stands.

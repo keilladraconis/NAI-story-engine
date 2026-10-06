@@ -78,7 +78,7 @@ export const OUTPUT_BUCKET = 2048;
  *    ▮▮▮▮  1537+      a rewrite plus the triage that has to precede it
  *    ▮▮▮▯  1025-1536  a rewrite
  *    ▮▮▯▯  513-1024   a rewrite at the top of the band, or several cheap actions
- *    ▮▯▯▯  1-512      cheap actions only — triage, open, retire
+ *    ▮▯▯▯  1-512      cheap actions only — triage, a review, a Thread write
  *    ▯▯▯▯  0          nothing at all
  *
  *  Rounded up rather than down so that an empty bar means literally nothing
@@ -174,7 +174,7 @@ export function hudSignature(state: RootState): string {
     engine.backlog,
     engine.touched,
     // Both numbers the thread slot reads. The length alone would hold still
-    // when a thread is satisfied — which changes the number on the line.
+    // when a thread is concluded — which changes the number on the line.
     world.threads.filter((t) => t.status === "open").length,
     world.threads.length,
     engine.reviewBacklog,

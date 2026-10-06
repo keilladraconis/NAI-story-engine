@@ -226,6 +226,8 @@ export function buildReviewManifest(input: {
 
 // ──────────────────────────────── the prompt ────────────────────────────────
 
+/** The review's sampling: the instruct model at a low temperature, because the
+ *  review judges what the prose shows and writes nothing the story will read. */
 export function reviewParams(): Promise<GenerationParams> {
   return buildModelParams(
     { max_tokens: REVIEW_MAX_TOKENS, temperature: 0.3 },

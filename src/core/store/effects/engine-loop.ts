@@ -111,7 +111,7 @@ export type EngineLoopDeps = {
 // dedupe, the refusal classifier and the triage parser are all pure and are
 // tested without any of this.
 //
-// Five rules are load-bearing and each is a way this goes quietly wrong:
+// Four rules are load-bearing and each is a way this goes quietly wrong:
 //
 //   1. The watermark advances ONLY on a completed pass. A failed or refused
 //      pass that moved it would mark prose the Engine never read as seen, and
@@ -121,12 +121,14 @@ export type EngineLoopDeps = {
 //      everything later appended to that paragraph as read (see assess.ts's
 //      `Watermark`).
 //   2. The minimum-new-prose setting gates BEFORE the machine starts, because
-//      the machine
-//      only ends a pass early at `backlog === 0` and any positive backlog goes
-//      on to spend the generation. Faking `assessed { backlog: 0 }` instead
-//      would terminate correctly and lie to the HUD about how far behind the
-//      Engine is — so the skip reports the real number via
-//      `engineBacklogObserved` and dispatches no machine event at all.
+//      the machine only ends a pass early at `backlog === 0` and any positive
+//      backlog goes on to spend the generation. Faking `assessed { backlog: 0 }`
+//      alone would terminate correctly and lie to the HUD about how far behind
+//      the Engine is — so the skip reports the real number via
+//      `engineBacklogObserved`. With no review due that is all it does: no
+//      machine event at all. With one due the pass goes on without triage — the
+//      machine is told there is nothing to triage, and the real backlog is
+//      reported again once the pass is over.
 //   3. `retryable` comes from the classifier, never from the callsite. Hardcode
 //      false and ordinary writing lights the HUD's ⚠; hardcode true and ⚠
 //      becomes unreachable.
@@ -581,7 +583,8 @@ export function createEnginePass(
       // report it, start nothing, spend nothing. At the default of 1 this is a
       // no-op and a genuinely empty backlog falls through to the machine, which
       // ends the pass at `assessed` having generated nothing. A due review
-      // still runs — it reads at its own threshold, not triage's.
+      // still runs — it reads at its own threshold, not triage's — so the
+      // "skipping" in the line below is triage's skip, not always the pass's.
       const belowMinimum =
         assessment.backlog > 0 && assessment.backlog < minProse;
       if (belowMinimum) {

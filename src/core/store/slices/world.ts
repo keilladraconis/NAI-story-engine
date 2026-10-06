@@ -2,8 +2,8 @@ import { createSlice } from "nai-store";
 import { WorldState, ThreadDraft, ThreadStatus, WorldEntity } from "../types";
 import { DulfsFieldID } from "../../../config/field-definitions";
 
-/** Threads are created because something is unresolved; nothing creates a
- *  concluded one. */
+/** A Thread is created to record how things stand while they can still
+ *  change; nothing creates a concluded one. */
 export const DEFAULT_THREAD_STATUS: ThreadStatus = "open";
 
 export const initialWorldState: WorldState = {
@@ -205,8 +205,9 @@ export const worldSlice = createSlice({
     // `lorebookEntryId` rides on the payload because the effect cannot get it
     // any other way: effects run AFTER the reducer, so by then the thread is
     // gone and with it the only record of which entry it owned. Left behind,
-    // that entry is an always-on note nothing will ever name again on any
-    // branch — §4.5's orphan, arriving through the writer's own delete button.
+    // that entry goes on activating whenever its cast is on stage, speaking
+    // for a Thread nothing names any more — an orphan arriving through the
+    // writer's own delete button.
     // `string | undefined` rather than optional, so a caller has to answer:
     // a hand-made thread genuinely has no entry, and the two cases must not be
     // told apart by whether someone remembered to pass the field.

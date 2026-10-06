@@ -23,7 +23,7 @@ function categoryNameFor(fieldId: DulfsFieldID): string {
  * Where a Thread's lorebook entry lives (design §4).
  *
  * Its own category rather than a DULFS one, because a Thread is not an entity:
- * it is a commitment with a lifecycle, its entry carries a condition instead of
+ * it is the standing state of an arc, its entry carries a condition instead of
  * keys, and a writer scanning their lorebook should be able to see the Engine's
  * open threads as a group. Named through `SE_CATEGORY_PREFIX` so
  * `mergeDuplicateCategories` treats it like every other Story Engine category

@@ -496,10 +496,10 @@ async function admissible(
  *
  *  The floors already passed when the review ran; the two that the World can
  *  have changed since are checked again here, before anything is spent and
- *  again before anything is created. The
- *  Thread is created only once the model has returned a clean `state`, so a
- *  declined admission leaves no Thread and no lorebook entry. The entry itself
- *  is minted by `thread-bind.ts`'s effect on `threadCreated`. */
+ *  again before anything is created. The Thread is created only once the model
+ *  has returned a clean `state`, so a declined admission leaves no Thread and
+ *  no lorebook entry. The entry itself is minted by `thread-bind.ts`'s effect
+ *  on `threadCreated`. */
 async function admit(
   title: string,
   entityIds: string[],

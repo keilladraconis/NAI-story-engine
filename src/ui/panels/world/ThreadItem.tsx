@@ -3,12 +3,13 @@
 //
 // **A thread no longer wraps its cast.** It used to render its members as
 // entity cards beneath it, which hid those entities from the World list and
-// made the thread the only way to reach them. A thread's cast is what its
-// detector probes for (`thread-condition.ts`) — a different job from filing —
-// so membership is edited in `ThreadEditPane` and the World lists every entity
-// once, in one place. With the members gone the per-thread collapse chevron had
-// nothing left to collapse, and the disabled "lorebook sync (coming soon)"
-// toggle was a placeholder for always-on threads, which the condition replaced.
+// made the thread the only way to reach them. A thread's cast is who has to be
+// on stage for its entry to activate (`thread-condition.ts`) — a different job
+// from filing — so membership is edited in `ThreadEditPane` and the World lists
+// every entity once, in one place. With the members gone the per-thread
+// collapse chevron had nothing left to collapse, and the disabled "lorebook
+// sync (coming soon)" toggle was a placeholder for always-on threads, which the
+// condition replaced.
 //
 // **Status is still a slot, not a section.** Every row carries the indicator in
 // the same position, whatever the status — a reader scans a shape rather than
@@ -70,8 +71,8 @@ export function ThreadItem(props: { threadId: string }) {
           onConfirm={() =>
             store.dispatch(
               // The entry id travels with the delete: the effect that switches
-              // the orphaned always-on note off runs after the reducer, by
-              // which time the thread that owned it is gone.
+              // the orphaned entry off runs after the reducer, by which time
+              // the thread that owned it is gone.
               threadDeleted({
                 threadId,
                 lorebookEntryId: thread.lorebookEntryId,
@@ -80,8 +81,8 @@ export function ThreadItem(props: { threadId: string }) {
           }
         />
       </div>
-      {/* What the story model is shown for this Thread. Always mounted; an
-          empty state renders an empty line rather than removing the element. */}
+      {/* What the story model is shown for this Thread. Stays mounted, hidden
+          when empty, rather than removing the element. */}
       <span
         style={{
           padding: `0 ${SP.sm} ${SP.sm}`,

@@ -16,9 +16,9 @@ import type { RootState, WorldEntity, Thread } from "../../../core/store";
  *
  *  **Threads no longer group the World.** An entity used to be hidden from the
  *  list whenever some thread cast it, which made it findable only by expanding
- *  the right thread — and a thread's cast is a detector input (the subjects its
- *  `advancedConditions` probe for, see `thread-condition.ts`), not a place
- *  entities live. Casting Ada in "the succession" should not remove Ada from the
+ *  the right thread — and a thread's cast is an activation input (who its
+ *  entry's `advancedConditions` wait to see on stage, see
+ *  `thread-condition.ts`), not a place entities live. Casting Ada in "the succession" should not remove Ada from the
  *  World. So `loose` is now simply the entities the World lists; the name is
  *  kept because every caller reads it positionally and the meaning it carries —
  *  "what the World shows" — is the one it always should have had.

@@ -181,8 +181,8 @@ export function World() {
           {/* Threads are a section beside the World, not a grouping of it. They
               used to wrap their cast, which hid those entities from the list
               above and made a thread the only way to reach them. A thread's
-              cast is what its detector probes for (thread-condition.ts), which
-              is a different job from filing. */}
+              cast is who has to be on stage for its entry to activate
+              (thread-condition.ts), which is a different job from filing. */}
           {allThreads.length > 0 ? (
             <div
               style={{

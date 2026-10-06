@@ -814,8 +814,8 @@ export const ENGINE_REVISE_INSTRUCTION = `Rewrite the entry above so it describe
 /** The Engine's entry compaction (design §5.1).
  *
  *  §5.1 names the risk this prompt exists to hold back: **condensing is the one
- *  action that can lose information.** Revise adds, open records, retire flips a
- *  flag; only this one removes, and it removes unattended, from a document the
+ *  action that can lose information.** Revise adds, a Thread write records, a
+ *  conclusion flips a flag; only this one removes, and it removes unattended, from a document the
  *  writer owns, with no downstream check that would notice a missing fact.
  *
  *  So the whole prompt is written against ONE failure — the model producing a

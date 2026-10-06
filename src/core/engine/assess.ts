@@ -26,18 +26,6 @@ export type Assessment = {
   newText: string;
   /** Entities the new prose plausibly mentions. */
   candidateIds: string[];
-  /** How many paragraphs the branch holds in total — the position an
-   *  Engine-opened thread's anchor is an index into (§4.5), and the unit
-   *  NovelAI's own `paragraphCount` condition variable is in.
-   *
-   *  **Every section, including the blank ones**, where `backlog` counts only
-   *  the sections carrying prose. The two really are different questions: a
-   *  blank paragraph is not unread writing, but it is a paragraph the document
-   *  and the lorebook's own counter both hold, and an anchor that disagreed
-   *  with them would drift a little further from the truth every time the
-   *  writer left a gap. `GenerationPosition.sectionId` is documented as "the
-   *  section (paragraph) ID", so one section is one paragraph. */
-  paragraphCount: number;
 };
 
 /** How far the Engine has read: which section, and how much of it.
@@ -75,11 +63,11 @@ function escape(literal: string): string {
  *
  *  Exported because two different questions want exactly this answer and must
  *  not drift into two matchers: which entities the new prose plausibly mentions
- *  (below), and which entities a triage subject names — the cast an
- *  Engine-opened thread starts with (`castFromSubject` in `thread-bind.ts`). A
- *  second implementation would be a second answer to "is Ada in this string",
- *  and the one that got it wrong would build a thread whose detector watches
- *  for the wrong person.
+ *  (below), and which paragraphs of a review window name a cast member, by any
+ *  alias (`review-strategy.ts` — the admission floor and the "on stage" tag).
+ *  A second implementation would be a second answer to
+ *  "is Ada in this string", and the one that got it wrong would admit a Thread
+ *  for a cast the prose never put together.
  *
  *  A blank name matches nothing rather than everything: an empty pattern tests
  *  true against any string, and draft entities can be nameless. */
@@ -143,7 +131,6 @@ export function assess(input: AssessInput): Assessment {
     backlog: pieces.length,
     newText,
     candidateIds,
-    paragraphCount: sectionIds.length,
   };
 }
 
