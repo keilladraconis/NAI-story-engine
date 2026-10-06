@@ -75,3 +75,28 @@ Home.
     expect(parseCommands("   ")).toHaveLength(0);
   });
 });
+
+describe("THREAD carries a state and a private note", () => {
+  it("reads four segments", () => {
+    const commands = parseCommands(
+      '[THREAD "The Shared Apiary" | "Ines Corbel", "Pell" | Ines Corbel and Pell work the east hives together. | Pell means to sell them.]',
+    );
+    expect(commands[0]).toEqual({
+      kind: "THREAD",
+      title: "The Shared Apiary",
+      memberNames: ["Ines Corbel", "Pell"],
+      state: "Ines Corbel and Pell work the east hives together.",
+      latent: "Pell means to sell them.",
+    });
+  });
+
+  it("reads three segments as a state with no private note", () => {
+    const commands = parseCommands(
+      '[THREAD "The Shared Apiary" | "Ines Corbel", "Pell" | They work the east hives together.]',
+    );
+    expect(commands[0]).toMatchObject({
+      state: "They work the east hives together.",
+      latent: "",
+    });
+  });
+});

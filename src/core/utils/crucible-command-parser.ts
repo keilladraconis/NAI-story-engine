@@ -6,7 +6,7 @@
  *   [REVISE "<Name>" | description]               — update existing element
  *   [RENAME "<Old>" → "<New>"]                    — rename an element
  *   [DELETE "<Name>"]                             — remove element
- *   [THREAD "<Title>" | "<A>", "<B>" | desc]      — group related elements
+ *   [THREAD "<Title>" | "<A>", "<B>" | state | latent] — record how elements stand
  *   [CRITIQUE | text]                             — running self-assessment
  *   [DONE]                                        — signal pass complete
  *
@@ -64,7 +64,10 @@ export interface ThreadCommand {
   kind: "THREAD";
   title: string;
   memberNames: string[];
-  description: string;
+  /** How things stand between the members now — shown to the story model. */
+  state: string;
+  /** What is unspoken or unsettled between them — private. */
+  latent: string;
 }
 
 export interface RenameCommand {
@@ -364,12 +367,16 @@ function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
   }
 
   const threadMatch =
+    line.match(
+      /^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^|]+?)\|([^\]]+?)\]?\s*$/,
+    ) ??
     line.match(/^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^\]]+?)\]?\s*$/) ??
     line.match(/^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\]?\s*$/);
   if (threadMatch) {
     const title = threadMatch[1].trim();
     const membersRaw = threadMatch[2];
-    const description = (threadMatch[3] ?? "").trim();
+    const state = (threadMatch[3] ?? "").trim();
+    const latent = (threadMatch[4] ?? "").trim();
     const memberNames: string[] = [];
     const nameRe = /"([^"]+)"/g;
     let m: RegExpExecArray | null;
@@ -378,7 +385,7 @@ function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
     }
     if (memberNames.length > 0) {
       return {
-        command: { kind: "THREAD", title, memberNames, description },
+        command: { kind: "THREAD", title, memberNames, state, latent },
         consumed: 0,
       };
     }
@@ -453,8 +460,9 @@ export function serializeForgeCommand(cmd: ParsedCommand): string {
       return `[RENAME "${cmd.oldName}" → "${cmd.newName}"]`;
     case "THREAD": {
       const members = cmd.memberNames.map((n) => `"${n}"`).join(", ");
-      return cmd.description
-        ? `[THREAD "${cmd.title}" | ${members} | ${cmd.description}]`
+      const tail = [cmd.state, cmd.latent].filter(Boolean).join(" | ");
+      return tail
+        ? `[THREAD "${cmd.title}" | ${members} | ${tail}]`
         : `[THREAD "${cmd.title}" | ${members}]`;
     }
     case "CRITIQUE":

@@ -26,21 +26,23 @@ import { STORAGE_KEYS } from "../keys";
 // cycle. The model IDs the normalizer validates against are duplicated below
 // with a test holding the two lists in step.
 import type { CreativeModel } from "../utils/config";
-import { PARAGRAPH_CHARS } from "./thread-horizon";
+
+/** The prose paragraph the Engine's sizes are reasoned in: ~400 characters,
+ *  ~65 words, which is what NovelAI's editor produces at a comfortable line. */
+export const PARAGRAPH_CHARS = 400;
 
 export type EngineSettings = {
   enabled: boolean;
   delayMs: number;
   minProse: number;
-  /** How many Threads a story may hold at once (§4.5). Enforced where it
-   *  cannot be bypassed — the reducer, see `src/core/engine/thread-cap.ts` —
-   *  rather than at the callsites that create threads. */
+  /** How many Threads may be open at once (§4.5). It restrains the Engine's
+   *  admissions only — see `src/core/engine/thread-cap.ts`. */
   threadCap: number;
   /** How long a managed lorebook entry may get, in **characters**, before the
    *  Engine condenses it (§5.1).
    *
    *  Characters because that is the unit the house already reasons entry and
-   *  window sizes in (`THREAD_RANGE_CHARS`, `PARAGRAPH_CHARS`) and the unit
+   *  window sizes in (`THREAD_PRESENCE_RANGE_CHARS`, `PARAGRAPH_CHARS`) and the unit
    *  `LorebookEntry.text` is measurable in for free. Tokens would be truer to
    *  the context cost this setting protects, but tokenising every entry on
    *  every pass costs a model and a pass over the whole World to buy a
@@ -122,20 +124,17 @@ export const MIN_PROSE_MIN = 1;
  *  A hundred paragraphs is already several scenes. */
 export const MIN_PROSE_MAX = 100;
 
-/** Below 1 no thread may exist at all: the Forge's `[THREAD]` command and the
- *  World's "+ New Thread" would both accept a click and leave nothing behind,
- *  which reads as a broken feature rather than as a setting. 1 is the smallest
- *  cap the mechanism still works at — each new commitment displaces the last. */
+/** Below 1 the Engine could admit no thread at all, which reads as a broken
+ *  feature rather than as a setting. 1 is the smallest cap the mechanism still
+ *  works at — one open thread, and no more admitted until it concludes. */
 export const THREAD_CAP_MIN = 1;
 
-/** A cap has to be low enough to still be capping. Every thread is a lorebook
- *  entry whose reminder prose injects when the story stops carrying it
- *  (`thread-condition.ts`), and phase 5's triage manifest lists every thread on
- *  every pass — so the ceiling is where the cap stops being proliferation
- *  control and becomes permission to poison the context the Engine exists to
- *  improve. Forty simultaneous reminders is on the order of two to three
- *  thousand tokens of injection, a third of an Erato context, plus forty lines
- *  in the prompt of every pass. It is also five times the default, so a writer
+/** A cap has to be low enough to still be capping. Every open thread is a
+ *  lorebook entry whose state injects when its cast is on stage
+ *  (`thread-condition.ts`), so the ceiling is where the cap stops being
+ *  proliferation control and becomes permission to poison the context the
+ *  Engine exists to improve. Forty open threads is a lot of potential
+ *  injection in a crowded scene. It is also five times the default, so a writer
  *  who genuinely runs a crowded story has room to say so. */
 export const THREAD_CAP_MAX = 40;
 

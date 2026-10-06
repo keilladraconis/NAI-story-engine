@@ -292,13 +292,12 @@ function executeForgeCommand(
           reason: "needs ≥2 members",
         };
       }
-      // No horizon or status: `threadCreated` defaults them (world.ts). The
-      // Forge's grammar has no vocabulary for either, and inventing one here
-      // would put the default in a second place.
+      // No status: `threadCreated` defaults it (world.ts).
       const thread: ThreadDraft = {
         id: api.v1.uuid(),
         title: cmd.title,
-        text: cmd.description,
+        state: cmd.state,
+        latent: cmd.latent,
         entityIds: memberIds,
       };
       dispatch(threadCreated({ thread }));

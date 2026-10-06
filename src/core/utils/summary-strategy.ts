@@ -2,7 +2,7 @@
  * Summary generation strategies.
  *
  * Entity summary: brief internal SE description with forge-style world context.
- * Thread summary: description of the thread's narrative dynamic from its members.
+ * Thread summary: how things stand between the thread's members right now.
  *
  * Both stream to EDIT_PANE_CONTENT storyStorage key so the open edit pane
  * displays the result in real time.
@@ -211,7 +211,7 @@ export function createThreadSummaryFactory(
     if (memberLines) {
       userLines.push(`Members:\n${memberLines}`);
     }
-    userLines.push("Generate a summary describing this thread's dynamic.");
+    userLines.push("Write how things stand between these members.");
 
     messages.push({ role: "user", content: userLines.join("\n") });
     await appendXialongStyleMessage(

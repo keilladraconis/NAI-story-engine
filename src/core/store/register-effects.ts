@@ -31,10 +31,9 @@ export function registerEffects(store: Store<RootState>, genX: GenX): void {
   // The Engine's wakeup. Off unless the story's settings say otherwise, so
   // registering it costs nothing until the writer opts in.
   registerEngineLoopEffects({ subscribeEffect, dispatch, getState, genX });
-  // A thread's forgetting detector is built from its title, its cast and its
-  // horizon (§4.3), so the three actions that change any of them have to
-  // rebuild it — a detector left probing a renamed thread's old name never
-  // matches and reminds forever. Registered whether or not the Engine is on:
-  // the writer can edit a thread the Engine opened before switching it off.
+  // A thread's entry follows its title, its cast, its state and its status,
+  // so every action that changes one re-syncs it (`syncThreadEntry`).
+  // Registered whether or not the Engine is on: the writer can edit a thread
+  // the Engine opened before switching it off.
   registerThreadConditionEffects(subscribeEffect, getState, dispatch);
 }

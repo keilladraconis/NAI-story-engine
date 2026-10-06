@@ -37,9 +37,9 @@
 
 import {
   normalizeEngineSettings,
+  PARAGRAPH_CHARS,
   type EngineSettings,
 } from "../../../core/engine/settings";
-import { PARAGRAPH_CHARS } from "../../../core/engine/thread-horizon";
 
 /** The numeric settings — the ones the form exposes as text a writer can type
  *  anything into. `enabled` is a button and has no draft.

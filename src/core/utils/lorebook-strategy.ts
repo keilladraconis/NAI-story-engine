@@ -71,10 +71,10 @@ async function resolveCategoryName(
  * What `resolveDisplayName` answers when every layer is blank.
  *
  * Exported because it is a placeholder rather than a name, and one caller has
- * to be able to tell the two apart: a thread's forgetting detector probes the
- * prose for its members' names, and probing for "Unnamed Entry" watches for a
- * string no story contains — the negation is then always true and the thread
- * reminds forever (`resolveThreadMembers` in `core/engine/thread-bind.ts`).
+ * to be able to tell the two apart: a thread's cast-presence probe looks in the
+ * prose for its members' names, and probing for "Unnamed Entry" looks for a
+ * string no story contains — the thread then never activates
+ * (`resolveThreadMembers` in `core/engine/thread-bind.ts`).
  */
 export const UNNAMED_ENTRY = "Unnamed Entry";
 
@@ -86,10 +86,10 @@ export const UNNAMED_ENTRY = "Unnamed Entry";
  * the writer chose" — it is the name they are part-way through typing. That is
  * exactly right for a button they just pressed and are watching, and exactly
  * wrong for the Engine, which writes unattended: a pass landing on `Adal`
- * makes it the entry's header, or builds a thread's forgetting detector out of
- * a key the prose will never contain — and a detector that never matches
- * reminds forever, which is the failure `resolveThreadMembers` already guards
- * against from the other side.
+ * makes it the entry's header, or builds a thread's cast-presence probe out of
+ * a key the prose will never contain — and a probe that never matches leaves
+ * the thread forever inactive, which is the failure `resolveThreadMembers`
+ * already guards against from the other side.
  *
  * Required rather than defaulted. The Engine inherited this layer unexamined
  * because it was the default and there was no question to answer; a caller
@@ -131,13 +131,17 @@ export async function resolveDisplayName(
   return liveName || entryDisplayName || entity?.name || UNNAMED_ENTRY;
 }
 
-/** Format the Threads an entity belongs to as context text. */
+/** Format the open Threads an entity belongs to as context text.
+ *
+ *  `state` only. This block feeds lorebook entry generation, whose output the
+ *  story model reads — so a Thread's private notes must never be in it. A
+ *  concluded Thread is left out: its state is already in its cast's entries. */
 function formatEntityThreads(state: RootState, entityId: string): string {
-  const threads = state.world.threads.filter((t) =>
-    t.entityIds.includes(entityId),
+  const threads = state.world.threads.filter(
+    (t) => t.status === "open" && t.entityIds.includes(entityId),
   );
   if (threads.length === 0) return "";
-  return threads.map((t) => `- ${t.title}: ${t.text}`).join("\n");
+  return threads.map((t) => `- ${t.title}: ${t.state}`).join("\n");
 }
 
 // --- Factory Builders for JIT Strategy Building ---

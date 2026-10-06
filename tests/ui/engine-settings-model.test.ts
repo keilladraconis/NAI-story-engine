@@ -30,9 +30,9 @@ import {
   MIN_PROSE_MIN,
   THREAD_CAP_MAX,
   THREAD_CAP_MIN,
+  PARAGRAPH_CHARS,
   type EngineSettings,
 } from "../../src/core/engine/settings";
-import { PARAGRAPH_CHARS } from "../../src/core/engine/thread-horizon";
 
 /** A configured story: every field away from its default, so a test that gets
  *  back a default is unambiguously getting back a default. */

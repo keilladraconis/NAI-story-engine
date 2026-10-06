@@ -18,11 +18,11 @@ import {
   MIN_PROSE_MIN,
   THREAD_CAP_MAX,
   THREAD_CAP_MIN,
+  PARAGRAPH_CHARS,
   readEngineSettings,
   writeEngineSettings,
   type EngineSettings,
 } from "../../../src/core/engine/settings";
-import { PARAGRAPH_CHARS } from "../../../src/core/engine/thread-horizon";
 import { STORAGE_KEYS } from "../../../src/core/keys";
 
 /** A real storyStorage, in a Map. Round-trips go through this rather than

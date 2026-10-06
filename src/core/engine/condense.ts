@@ -31,7 +31,7 @@
 
 import type { MessageFactory } from "nai-gen-x";
 import { lorebookCondensedKey } from "../keys";
-import { PARAGRAPH_CHARS } from "./thread-horizon";
+import { PARAGRAPH_CHARS } from "./settings";
 import { composeRevision, REVISE_MAX_TOKENS } from "./revise-strategy";
 import {
   buildModelParams,

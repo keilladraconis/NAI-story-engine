@@ -55,11 +55,10 @@ function thread(id: string, status: ThreadStatus = "open"): Thread {
   return {
     id,
     title: id,
-    text: "",
-    horizon: "plot",
+    state: `How things stand for ${id}.`,
+    latent: "",
     entityIds: [],
     status,
-    anchorParagraph: null,
   };
 }
 
@@ -176,9 +175,9 @@ describe("deriveHud — the counting slots", () => {
         {
           threads: [
             thread("a"),
-            thread("b", "satisfied"),
+            thread("b", "concluded"),
             thread("c"),
-            thread("d", "satisfied"),
+            thread("d", "concluded"),
           ],
         },
       ),
@@ -192,7 +191,7 @@ describe("deriveHud — the counting slots", () => {
     // tooltip says both — "2 open of 4 the story is carrying". The slot shows
     // one number; the sentence is where the other belongs.
     const m = deriveHud(
-      state({}, { threads: [thread("a"), thread("b", "satisfied")] }),
+      state({}, { threads: [thread("a"), thread("b", "concluded")] }),
       INPUTS,
     );
     expect(m.threads).toBe(1);
@@ -203,7 +202,7 @@ describe("deriveHud — the counting slots", () => {
     // The phase-4 defect this repeats otherwise: a counter that never reads 0
     // however much work the writer does.
     const m = deriveHud(
-      state({}, { threads: [thread("a", "satisfied")] }),
+      state({}, { threads: [thread("a", "concluded")] }),
       INPUTS,
     );
     expect(m.threads).toBe(0);
@@ -277,7 +276,7 @@ describe("hudSignature", () => {
     // the list length is unchanged, and a signature reading only that would
     // leave the line stale until something else repainted it.
     expect(
-      hudSignature(state({}, { threads: [thread("a", "satisfied")] })),
+      hudSignature(state({}, { threads: [thread("a", "concluded")] })),
     ).not.toBe(hudSignature(state({}, { threads: [thread("a")] })));
   });
 

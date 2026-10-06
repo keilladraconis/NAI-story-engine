@@ -576,7 +576,7 @@ describe("forgeCleanupHandler.completion — reviseOnly", () => {
 });
 
 describe("forgeChatHandler.completion — THREAD", () => {
-  it("lands a thread with the default horizon and status, not undefined", async () => {
+  it("lands a thread with its state, a blank private note and the default status", async () => {
     const dispatch = vi.fn();
     const ctx: CompletionContext<ForgeChatTarget> = {
       target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
@@ -587,7 +587,7 @@ describe("forgeChatHandler.completion — THREAD", () => {
         ]),
       dispatch,
       accumulatedText:
-        '[THREAD "The hidden letter" | "Ada", "Bram" | Ada pocketed a letter she has not read]',
+        '[THREAD "The hidden letter" | "Ada", "Bram" | Ada keeps a sealed letter from Bram.]',
       generationSucceeded: true,
     };
     await forgeChatHandler.completion(ctx);
@@ -598,17 +598,13 @@ describe("forgeChatHandler.completion — THREAD", () => {
     expect(created).toBeDefined();
 
     // Asserted through the reducer, because that is where the defaults live.
-    // The Forge's grammar has no vocabulary for horizon or status, so its
-    // payload legitimately omits both — and the thread must still land
-    // complete. Tasks 2 and 3 branch on `horizon`; an undefined one would not
-    // throw, it would just quietly pick the wrong condition range forever.
+    // The Forge's grammar has no vocabulary for status, so its payload
+    // legitimately omits it — and the thread must still land complete.
     const state = worldSlice.reducer(initialWorldState, created![0]);
     expect(state.threads).toHaveLength(1);
-    expect(state.threads[0].horizon).toBe("plot");
     expect(state.threads[0].status).toBe("open");
-    expect(state.threads[0].text).toBe(
-      "Ada pocketed a letter she has not read",
-    );
+    expect(state.threads[0].state).toBe("Ada keeps a sealed letter from Bram.");
+    expect(state.threads[0].latent).toBe("");
     expect(state.threads[0].entityIds).toEqual(["e1", "e2"]);
   });
 });

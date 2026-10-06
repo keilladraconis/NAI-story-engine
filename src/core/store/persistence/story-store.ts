@@ -12,8 +12,8 @@
 // Persisted JSON is still hydrated rather than trusted. The record is whatever
 // some build of Story Engine wrote, and this is the one path by which a `Thread`
 // enters the store without passing through `threadCreated`'s defaults — a thread
-// reaching the World list without a `status` takes `statusOption(undefined).help`
-// down with it. Hydration drops and defaults; it never converts (alpha, §10).
+// reaching the World list without a `latent` or a `status` takes the pane down
+// with it. Hydration drops and defaults; it never converts (alpha, §10).
 
 import type {
   RootState,
@@ -25,12 +25,7 @@ import type {
 } from "../types";
 import { STORAGE_KEYS } from "../../keys";
 import { initialStoryState } from "../slices/story";
-import {
-  DEFAULT_THREAD_ANCHOR,
-  DEFAULT_THREAD_HORIZON,
-  DEFAULT_THREAD_STATUS,
-  initialWorldState,
-} from "../slices/world";
+import { DEFAULT_THREAD_STATUS, initialWorldState } from "../slices/world";
 
 /** What the record holds: the two slices derived from what the writer and the
  *  Engine have put in the notebook. `chat` and `foundation` are storyStorage
@@ -38,6 +33,9 @@ import {
 export type WorldRecord = {
   story: StoryState;
   world: WorldState;
+  /** Lorebook entry ids owned by Threads dropped on load, for the caller to
+   *  switch off. Not persisted: it describes this load, not the record. */
+  droppedThreadEntryIds: string[];
 };
 
 /** A record as it may actually be on disk: every field optional, every field of
@@ -54,7 +52,11 @@ type StoredWorldRecord = {
 
 function hydrate(value: unknown): WorldRecord {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return { story: initialStoryState, world: initialWorldState };
+    return {
+      story: initialStoryState,
+      world: initialWorldState,
+      droppedThreadEntryIds: [],
+    };
   }
   const record = value as StoredWorldRecord;
 
@@ -70,15 +72,28 @@ function hydrate(value: unknown): WorldRecord {
   const entitiesById: Record<string, WorldEntity> = {};
   for (const id of entityIds) entitiesById[id] = stored[id];
 
-  const threads: Thread[] = (record.world?.threads ?? []).map((thread) => ({
-    ...(thread as Thread),
-    horizon: thread.horizon ?? DEFAULT_THREAD_HORIZON,
-    status: thread.status ?? DEFAULT_THREAD_STATUS,
-    // `??`, never `||`: paragraph 0 is a real anchor — a thread opened in the
-    // story's first paragraph — and reading it as missing would hand expiry an
-    // unanchored thread that has in fact been touched.
-    anchorParagraph: thread.anchorParagraph ?? DEFAULT_THREAD_ANCHOR,
-  }));
+  // A Thread without a `state` string was written before 0.16, when a Thread
+  // was a commitment with a reminder. Those are the flood this model replaces,
+  // so they are dropped rather than converted — and the ids of the lorebook
+  // entries they owned are handed back, because an entry nothing manages any
+  // more would otherwise go on injecting.
+  const threads: Thread[] = [];
+  const droppedThreadEntryIds: string[] = [];
+  for (const stored of record.world?.threads ?? []) {
+    if (typeof stored.state !== "string") {
+      if (stored.lorebookEntryId) {
+        droppedThreadEntryIds.push(stored.lorebookEntryId);
+      }
+      continue;
+    }
+    threads.push({
+      ...(stored as Thread),
+      latent: typeof stored.latent === "string" ? stored.latent : "",
+      entityIds: stored.entityIds ?? [],
+      status:
+        stored.status === "concluded" ? "concluded" : DEFAULT_THREAD_STATUS,
+    });
+  }
 
   return {
     story: {
@@ -90,6 +105,7 @@ function hydrate(value: unknown): WorldRecord {
       fields: { ...initialStoryState.fields, ...(record.story?.fields ?? {}) },
     },
     world: { ...initialWorldState, entitiesById, entityIds, threads },
+    droppedThreadEntryIds,
   };
 }
 
@@ -97,7 +113,7 @@ export async function saveWorldRecord(state: RootState): Promise<void> {
   await api.v1.storyStorage.set(STORAGE_KEYS.WORLD, {
     story: state.story,
     world: state.world,
-  } satisfies WorldRecord);
+  } satisfies Omit<WorldRecord, "droppedThreadEntryIds">);
 }
 
 /** The World as this story last left it, or a pristine one for a story that has

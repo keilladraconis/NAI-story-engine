@@ -28,6 +28,7 @@ import {
   registerLorebookSyncHooks,
 } from "../core/store/effects/lorebook-sync";
 import { loadWorldRecord } from "../core/store/persistence/story-store";
+import { disableDeletedThreadEntry } from "../core/engine/thread-bind";
 import type { ChatSliceState } from "../core/store/slices/chat";
 import type { FoundationState } from "../core/store/types";
 import { loadJournal } from "../core/generation-journal";
@@ -205,6 +206,12 @@ export async function start(): Promise<void> {
       ...(foundation ? { foundation } : {}),
     }),
   );
+
+  // Threads from before 0.16 were dropped on load; switch their entries off so
+  // nothing unmanaged goes on injecting. Disabled, never deleted.
+  for (const entryId of persisted.droppedThreadEntryIds) {
+    await disableDeletedThreadEntry(entryId);
+  }
 
   // After persistedDataLoaded so the prune sees the real chat list, and before
   // register() so the composer's first render already carries its unsent text.

@@ -257,7 +257,7 @@ export function formatForgeDigest(): string {
               break;
             case "THREAD":
               lines.push(
-                `  ✓ THREAD "${cmd.title}" [${cmd.memberNames.join(", ")}]${cmd.description ? ` — ${cmd.description}` : ""}`,
+                `  ✓ THREAD "${cmd.title}" [${cmd.memberNames.join(", ")}]${cmd.state ? ` — ${cmd.state}` : ""}`,
               );
               break;
             case "DONE":

@@ -9,12 +9,7 @@ import {
 } from "../../src/core/store/persistence/story-store";
 import { STORAGE_KEYS } from "../../src/core/keys";
 import { initialStoryState } from "../../src/core/store/slices/story";
-import {
-  DEFAULT_THREAD_ANCHOR,
-  DEFAULT_THREAD_HORIZON,
-  DEFAULT_THREAD_STATUS,
-  initialWorldState,
-} from "../../src/core/store/slices/world";
+import { initialWorldState } from "../../src/core/store/slices/world";
 import { initialFoundationState } from "../../src/core/store/slices/foundation";
 import type { RootState, WorldEntity } from "../../src/core/store/types";
 
@@ -42,11 +37,10 @@ function state(over: Partial<RootState> = {}): RootState {
         {
           id: "g1",
           title: "The Guild",
-          text: "unsettled",
-          horizon: "plot",
+          state: "The guild holds the harbour.",
+          latent: "",
           status: "open",
           entityIds: ["e1"],
-          anchorParagraph: 7,
         },
       ],
     },
@@ -137,67 +131,54 @@ describe("the World record defends the store from a record it did not write", ()
     expect(out.world.entitiesById).toEqual({});
   });
 
-  it("defaults a thread written before horizon and status existed", async () => {
-    // `statusOption(undefined).help` and `horizonOption(undefined).help` throw
-    // on `undefined.help`, in the World list and in the edit pane — so a record
-    // from an earlier build would reach the UI and take it down.
-    story.set(STORAGE_KEYS.WORLD, {
-      world: {
-        threads: [{ id: "g1", title: "The Guild", text: "", entityIds: [] }],
-      },
-    });
-    expect((await loadWorldRecord()).world.threads).toEqual([
-      {
-        id: "g1",
-        title: "The Guild",
-        text: "",
-        entityIds: [],
-        horizon: DEFAULT_THREAD_HORIZON,
-        status: DEFAULT_THREAD_STATUS,
-        anchorParagraph: DEFAULT_THREAD_ANCHOR,
-      },
-    ]);
-  });
-
-  it("keeps an anchor of zero, which is a real anchor", async () => {
-    // A thread opened in the story's first paragraph. A `||` here would read it
-    // as missing and hand expiry a thread that has in fact been touched.
+  it("drops Threads written before 0.16 and hands back their entry ids", async () => {
     story.set(STORAGE_KEYS.WORLD, {
       world: {
         threads: [
           {
-            id: "g1",
-            title: "The Guild",
-            text: "",
-            entityIds: [],
-            horizon: "arc",
-            status: "open",
-            anchorParagraph: 0,
+            id: "old",
+            title: "The glass",
+            text: "x",
+            horizon: "plot",
+            lorebookEntryId: "le-old",
           },
+          { id: "old2", title: "No entry", text: "y" },
+          { id: "new", title: "Kept", state: "Stands.", entityIds: [] },
         ],
       },
     });
-    expect((await loadWorldRecord()).world.threads[0].anchorParagraph).toBe(0);
+
+    const record = await loadWorldRecord();
+
+    expect(record.world.threads).toEqual([
+      {
+        id: "new",
+        title: "Kept",
+        state: "Stands.",
+        latent: "",
+        entityIds: [],
+        status: "open",
+      },
+    ]);
+    expect(record.droppedThreadEntryIds).toEqual(["le-old"]);
   });
 
-  it("keeps what a thread record does carry", async () => {
+  it("reads an unknown status as open", async () => {
     story.set(STORAGE_KEYS.WORLD, {
       world: {
         threads: [
           {
-            id: "g1",
-            title: "The Guild",
-            text: "",
+            id: "t",
+            title: "T",
+            state: "s",
+            latent: "l",
             entityIds: [],
-            horizon: "arc",
             status: "satisfied",
           },
         ],
       },
     });
-    const thread = (await loadWorldRecord()).world.threads[0];
-    expect(thread.horizon).toBe("arc");
-    expect(thread.status).toBe("satisfied");
+    expect((await loadWorldRecord()).world.threads[0].status).toBe("open");
   });
 
   it("seeds the fields a record does not carry", async () => {

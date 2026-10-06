@@ -558,11 +558,11 @@ The summary is a Story Engine–internal field used for context and forge genera
 Focus on: who/what the entity is, their essential nature or role, and the hook that makes them narratively useful.
 Be specific and concrete. Avoid generic adjectives. Output only the summary — no preamble, no labels.`;
 
-export const THREAD_SUMMARY_PROMPT = `Write a 1–2 sentence description of this thread's narrative dynamic.
+export const THREAD_SUMMARY_PROMPT = `Write one or two sentences saying how things stand between this thread's members right now.
 
-A thread groups world entities that share a direct structural bond — a conflict, alliance, dependency, or shared situation.
-Describe what connects these entities and the tension or energy that dynamic creates.
-Output only the summary — no preamble, no labels.`;
+This text is shown to the model writing the story whenever the members are on the page together, and that model acts on whatever it reads. So say only what is already so: present tense, each member named, no pronoun without a name beside it. Leave out anything that has not happened, anything a member intends, and anything one member is keeping from another.
+
+Return the sentences and nothing else.`;
 
 export const FORGE_PROMPT = `You are a world-building assistant operating in a phased forge loop.
 
@@ -573,16 +573,16 @@ Command vocabulary:
   [REVISE "<Name>" | updated description 1–3 sentences]                       — rewrite an existing draft element
   [RENAME "<OldName>" → "<NewName>"]                                          — rename an existing element (also updates its lorebook entry)
   [DELETE "<Name>"]                                                            — remove a draft element
-  [THREAD "<Title>" | "Name1", "Name2" | 1-sentence description]              — group 2–4 elements with a genuine shared dynamic into a thread
+  [THREAD "<Title>" | "Name1", "Name2" | how things stand between them now | what is unspoken or unsettled between them]  — record how 2–4 elements stand toward each other
   [CRITIQUE | 2–4 sentences: what is working, what is still missing, what to address next]  — running self-assessment; include one per step
 
 For all commands, write content inline after the | separator, before the closing ].
-For THREAD, list only the members who share a direct structural bond — not every element tangentially related.
+For THREAD, list only the members who share a direct structural bond — not every element tangentially related. A THREAD has two descriptions. The first says how things stand between the members right now, in the present tense, and is shown to the story model. The second holds what is concealed, owed or undecided between them; it is private and the story model never sees it. Anything that points at a future event belongs in the second.
 
 EXAMPLE:
 [CREATE CHARACTER "Mira Voss" | Gloves on before she's through the door, eyes on the work not the patient. Scar tissue along the left thumb from a clamp that slipped. Runs a debt she can only service by taking jobs she can't refuse.]
 [CREATE LOCATION "The Sunken Arcade" | Reeks of salt water and old smoke — the flood line is still visible three meters up the wall. Smugglers use it because the exits outnumber the entrances and no one asks questions. The only place in the district where someone with the wrong face can broker a deal with someone from the right side of the city.]
-[THREAD "Black-Market Bay" | "Mira Voss", "The Sunken Arcade" | The physical space that makes Mira's work possible and visible to the wrong people.]
+[THREAD "Black-Market Bay" | "Mira Voss", "The Sunken Arcade" | Mira Voss runs her trade out of the Sunken Arcade's back bays, in plain sight of its regulars. | The Arcade's owner does not know what Mira moves through his building.]
 [CRITIQUE | The cast has friction but the locations are generic containers — they need to be sites of specific pressure, not just backdrop. The arcade works; the hospital does not yet.]
 
 The === BRAINSTORM === section is source material — extract characters, locations, factions, systems, situations, and topics from it and CREATE them as world elements.
@@ -639,7 +639,7 @@ export const FORGE_WEAVE_PROMPT = `You are a world-building assistant in the WEA
 Your goal this turn: bind the drafts into relational and situational coherence. Build threads where genuine structural bonds exist. Author SITUATIONAL DYNAMICS entries for collision points — where one character's goal threatens another's position, where knowledge is asymmetric, where loyalties strain.
 
 Command vocabulary you may use this phase:
-  [THREAD "<Title>" | "<A>", "<B>" | 1-sentence description]   — group 2-4 drafts with a real shared dynamic
+  [THREAD "<Title>" | "<A>", "<B>" | how things stand now | what is unspoken between them]   — record how 2-4 drafts stand toward each other
   [CREATE SITUATION "<Name>" | 2-3 sentences of collision]      — author a situational dynamics entry
   [REVISE "<Name>" | updated description]                       — sharpen a draft's connections
   [DELETE "<Name>"]                                              — remove a draft that no longer fits the web
@@ -679,7 +679,7 @@ When the author explicitly asks you to create, change, remove, rename, or group 
 [REVISE "<Name>" | revised description]
 [DELETE "<Name>"]
 [RENAME "<Old>" → "<New>"]
-[THREAD "<Title>" | "<A>", "<B>" | description]
+[THREAD "<Title>" | "<A>", "<B>" | state | private notes]
 where <TYPE> is one of CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION, TOPIC.
 
 Emit a command only for a change the author actually requested; otherwise just talk. You may end with a short [CRITIQUE | ...] note if you have a concern.`;

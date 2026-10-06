@@ -285,13 +285,14 @@ describe("serializeForgeCommand", () => {
     expect(serializeForgeCommand({ kind: "DONE" })).toBe("[DONE]");
   });
 
-  it("serializes THREAD with and without a description", () => {
+  it("serializes THREAD with and without a state", () => {
     expect(
       serializeForgeCommand({
         kind: "THREAD",
         title: "Crew",
         memberNames: ["A", "B"],
-        description: "dock hands",
+        state: "dock hands",
+        latent: "",
       }),
     ).toBe('[THREAD "Crew" | "A", "B" | dock hands]');
     expect(
@@ -299,7 +300,8 @@ describe("serializeForgeCommand", () => {
         kind: "THREAD",
         title: "Crew",
         memberNames: ["A", "B"],
-        description: "",
+        state: "",
+        latent: "",
       }),
     ).toBe('[THREAD "Crew" | "A", "B"]');
   });
