@@ -8,7 +8,12 @@ import type {
   Thread,
   WorldEntity,
 } from "../../../src/core/store/types";
-import { initialWorldState } from "../../../src/core/store/slices/world";
+import {
+  initialWorldState,
+  threadCreated,
+  threadDeleted,
+  threadStatusSet,
+} from "../../../src/core/store/slices/world";
 import {
   drain,
   INTENT_MAX_TOKENS,
@@ -869,6 +874,48 @@ describe("the threadWrite arm", () => {
   });
 });
 
+describe("the threadWrite arm — the writer acts mid-generation", () => {
+  const write: Intent = { kind: "threadWrite", threadId: "t1", prose: "p" };
+  const open = () =>
+    harness(
+      [thread("t1", { entityIds: ["a"], state: "Before." })],
+      [entity("a", { name: "Pell" })],
+    );
+
+  it("does not write onto a Thread the writer concluded while the call was in flight", async () => {
+    const h = open();
+    h.generate.mockImplementation(async () => {
+      h.store.dispatch(
+        threadStatusSet({ threadId: "t1", status: "concluded" }),
+      );
+      return says(WRITE)();
+    });
+
+    const { executed } = await drain([write], h.deps);
+
+    expect(executed).toEqual([]);
+    expect(h.store.getState().world.threads[0]).toMatchObject({
+      status: "concluded",
+      state: "Before.",
+    });
+  });
+
+  it("does not resurrect a Thread the writer deleted while the call was in flight", async () => {
+    const h = open();
+    h.generate.mockImplementation(async () => {
+      h.store.dispatch(
+        threadDeleted({ threadId: "t1", lorebookEntryId: undefined }),
+      );
+      return says(WRITE)();
+    });
+
+    const { executed } = await drain([write], h.deps);
+
+    expect(executed).toEqual([]);
+    expect(h.store.getState().world.threads).toEqual([]);
+  });
+});
+
 describe("the admit arm", () => {
   const admit = {
     kind: "admit" as const,
@@ -926,6 +973,30 @@ describe("the admit arm", () => {
     await drain([admit], h.deps);
     expect(h.generate).not.toHaveBeenCalled();
     expect(h.store.getState().world.threads).toEqual([]);
+  });
+  it("declines when an open Thread with that cast appeared during the generation", async () => {
+    const h = harness([], cast());
+    h.generate.mockImplementation(async () => {
+      h.store.dispatch(
+        threadCreated({
+          thread: {
+            id: "rival",
+            title: "Rival",
+            state: "Pell and Ines keep the hives.",
+            latent: "",
+            entityIds: ["b", "a"],
+          },
+        }),
+      );
+      return says(WRITE)();
+    });
+
+    const { executed } = await drain([admit], h.deps);
+
+    expect(executed).toEqual([]);
+    expect(h.store.getState().world.threads.map((t) => t.id)).toEqual([
+      "rival",
+    ]);
   });
 });
 
@@ -1015,6 +1086,47 @@ describe("the conclude arm", () => {
         established: expect.any(String),
       }),
     ]);
+  });
+
+  it("replaces a revise already deferred this pass rather than queueing a second one", async () => {
+    lorebook.seed({
+      id: "la",
+      displayName: "Pell",
+      text: "x",
+      keys: [],
+    } as LorebookEntry);
+    lorebook.seed({
+      id: "lb",
+      displayName: "Ines Corbel",
+      text: "y",
+      keys: [],
+    } as LorebookEntry);
+    const h = harness(
+      [thread("t1", { entityIds: ["a", "b"] })],
+      [
+        entity("a", { name: "Pell", lorebookEntryId: "la" }),
+        entity("b", { name: "Ines Corbel", lorebookEntryId: "lb" }),
+      ],
+    );
+    h.generate.mockImplementation(says("Rewritten."));
+
+    const { remaining } = await drain(
+      [
+        { kind: "revise", entityId: "a", prose: "p" },
+        { kind: "revise", entityId: "b", prose: "p" },
+        { kind: "conclude", threadId: "t1", prose: "p" },
+      ],
+      h.deps,
+    );
+
+    const revises = remaining.filter((i) => i.kind === "revise");
+    expect(revises).toHaveLength(remaining.length);
+    expect(
+      revises.map((i) => (i as { entityId: string }).entityId).sort(),
+    ).toEqual(["a", "b"]);
+    for (const intent of revises) {
+      expect(intent).toMatchObject({ established: expect.any(String) });
+    }
   });
 
   it("skips a Thread that is already concluded or gone", async () => {

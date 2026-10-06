@@ -441,6 +441,11 @@ async function threadWrite(
   );
   if (!record) return "skipped";
 
+  // The call took time, and the reducer does not check status: a Thread the
+  // writer concluded or deleted meanwhile must stay as they left it.
+  const now = deps.getState().world.threads.find((t) => t.id === threadId);
+  if (!now || now.status !== "open") return "skipped";
+
   deps.dispatch(
     threadLedgerUpdated({
       threadId,
@@ -452,26 +457,24 @@ async function threadWrite(
   return "executed";
 }
 
-/** Admit a new Thread.
- *
- *  The floors already passed when the review ran; the two that the World can
- *  have changed since are checked again here, before anything is spent. The
- *  Thread is created only once the model has returned a clean `state`, so a
- *  declined admission leaves no Thread and no lorebook entry. The entry itself
- *  is minted by `thread-bind.ts`'s effect on `threadCreated`. */
-async function admit(
+/** The admission floors the World can change after a review ran, read against
+ *  the state as it stands now: the cast it still holds, and whether the Thread
+ *  limit or an open Thread with that same cast rules the admission out. Used
+ *  both before the generation, so nothing is spent on a refusal, and after it,
+ *  so nothing is created from a stale decision. Null refuses; the reason is
+ *  logged. */
+async function admissible(
   title: string,
   entityIds: string[],
-  prose: string,
   deps: DrainDeps,
-): Promise<IntentResult> {
+): Promise<string[] | null> {
   const state = deps.getState();
   const cast = entityIds.filter((id) => state.world.entitiesById[id]);
-  if (cast.length === 0) return "skipped";
+  if (cast.length === 0) return null;
 
   if (atThreadCap(state.world.threads, state.engine.settings.threadCap)) {
     await deps.log(`[engine] admit "${title}": thread limit reached, refused`);
-    return "skipped";
+    return null;
   }
   const twin = state.world.threads.find(
     (t) =>
@@ -483,8 +486,27 @@ async function admit(
     await deps.log(
       `[engine] admit "${title}": "${twin.title}" already has this cast, refused`,
     );
-    return "skipped";
+    return null;
   }
+  return cast;
+}
+
+/** Admit a new Thread.
+ *
+ *  The floors already passed when the review ran; the two that the World can
+ *  have changed since are checked again here, before anything is spent and
+ *  again before anything is created. The
+ *  Thread is created only once the model has returned a clean `state`, so a
+ *  declined admission leaves no Thread and no lorebook entry. The entry itself
+ *  is minted by `thread-bind.ts`'s effect on `threadCreated`. */
+async function admit(
+  title: string,
+  entityIds: string[],
+  prose: string,
+  deps: DrainDeps,
+): Promise<IntentResult> {
+  const cast = await admissible(title, entityIds, deps);
+  if (!cast) return "skipped";
 
   const record = await writeThread(
     { title, cast: castOf(deps, cast), current: null, prose },
@@ -493,6 +515,12 @@ async function admit(
   );
   if (!record) return "skipped";
 
+  // The World may have moved during the generation — the writer or a Forge
+  // can have created a Thread, or deleted a cast member — so the floors that
+  // gated the spend gate the write too.
+  const finalCast = await admissible(title, cast, deps);
+  if (!finalCast) return "skipped";
+
   deps.dispatch(
     threadCreated({
       thread: {
@@ -500,7 +528,7 @@ async function admit(
         title: title.trim(),
         state: record.state,
         latent: record.latent,
-        entityIds: cast,
+        entityIds: finalCast,
       },
     }),
   );
@@ -642,7 +670,16 @@ export async function drain(
 
     try {
       const result = await execute(intent, deps, (spawned) => {
-        pending = dedupe(pending, spawned);
+        // Against what was deferred earlier in this pass as well as what is
+        // still pending, so a settled revise replaces a plain one of the same
+        // entity wherever it waits, instead of queueing a second rewrite.
+        // `dedupe` keeps the existing prefix in place, so the two halves split
+        // back apart. Never against `executed`: that rewrite has run, and the
+        // settled one still has to.
+        const held = remaining.length;
+        const merged = dedupe([...remaining, ...pending], spawned);
+        remaining.splice(0, held, ...merged.slice(0, held));
+        pending = merged.slice(held);
       });
       if (result === "executed") {
         executed.push(intent);
