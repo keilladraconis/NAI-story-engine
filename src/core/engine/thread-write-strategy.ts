@@ -173,7 +173,7 @@ const FORWARD_PHRASES: readonly { phrase: string; flags: string }[] = [
 
 /** The first forward-pointing phrase in a STATE, or null when it is clean. */
 export function lintState(state: string): string | null {
-  const text = state.replace(/['']/g, "'");
+  const text = state.replace(/[\u2018\u2019]/g, "'");
   for (const { phrase, flags } of FORWARD_PHRASES) {
     const pattern = new RegExp(`\\b${phrase.replace(/ /g, "\\s+")}\\b`, flags);
     if (pattern.test(text)) return phrase;
