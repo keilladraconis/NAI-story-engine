@@ -370,6 +370,61 @@ describe("the review step", () => {
     expect(h.store.getState().engine.reviewBacklog).toBe(0);
   });
 
+  describe("a story with no review watermark, in ordinary 600-character paragraphs", () => {
+    // Twenty of these fill one window exactly, and the default threshold is
+    // twenty-five — so a count of the window alone could never reach it.
+    const paragraph = (n: number): string =>
+      `Ines counted frame ${n} again. `.repeat(30).slice(0, 599) + ".";
+    const story600 = (count: number): string[] =>
+      Array.from({ length: count }, (_, n) => paragraph(n));
+    const reviews = (h: { seen: string[] }): number =>
+      h.seen.filter((x) => x === "review").length;
+
+    it("gets its first review by itself, as soon as it outgrows one window", async () => {
+      settings({ reviewEvery: ENGINE_DEFAULTS.reviewEvery });
+      expect(ENGINE_DEFAULTS.reviewEvery).toBe(25);
+      const h = harness([], { review: "" });
+
+      let firstReviewAt = 0;
+      for (let size = 1; size <= 30 && firstReviewAt === 0; size++) {
+        documentOf(...story600(size));
+        await h.runPass();
+        if (reviews(h) > 0) firstReviewAt = size;
+      }
+
+      // Twenty fit the window; the twenty-first is the first that does not,
+      // which comes before the threshold of twenty-five.
+      expect(firstReviewAt).toBe(21);
+      expect(record().reviewWatermark).toEqual({
+        sectionId: 520,
+        offset: 600,
+      });
+      expect(h.store.getState().engine.reviewBacklog).toBe(0);
+    });
+
+    it("reviews a 400-paragraph story once, and then owes nothing", async () => {
+      settings({ reviewEvery: ENGINE_DEFAULTS.reviewEvery });
+      documentOf(...story600(400));
+      story.set(ENGINE_LOOP_KEY, {
+        watermark: null,
+        reviewWatermark: null,
+        queue: [],
+      });
+      const h = harness([], { review: "" });
+
+      await h.runPass();
+      await h.runPass();
+      await h.runPass();
+
+      expect(reviews(h)).toBe(1);
+      expect(record().reviewWatermark).toEqual({
+        sectionId: 899,
+        offset: 600,
+      });
+      expect(h.store.getState().engine.reviewBacklog).toBe(0);
+    });
+  });
+
   it("reports the real untriaged backlog when triage waits on minProse and the review runs", async () => {
     settings({ reviewEvery: 5, minProse: 10 });
     documentOf(...SCENE);

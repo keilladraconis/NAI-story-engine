@@ -42,8 +42,9 @@ export type EngineSettings = {
   threadCap: number;
   /** How many unread paragraphs trigger a review pass — the slow read that
    *  keeps Threads true. About a scene: an arc is not visible in less. Counted
-   *  from where the last review stopped; a story never reviewed is counted
-   *  from its latest scene, not from its first page. */
+   *  from where the last review stopped. A story never reviewed counts every
+   *  paragraph it has, and is then reviewed once, from its latest scene rather
+   *  than from its first page. */
   reviewEvery: number;
   /** How long a managed lorebook entry may get, in **characters**, before the
    *  Engine condenses it (§5.1).

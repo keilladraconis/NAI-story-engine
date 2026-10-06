@@ -554,8 +554,9 @@ export function createEnginePass(
 
       // The review pass's own reading of the same scan. Its watermark moves
       // only when a review completes. A story with no usable review watermark
-      // is read from its latest scene (`reviewWindow`), so its backlog is one
-      // window at most and the catch-up term below never fires for it.
+      // is read from its latest scene only (`reviewWindow`), but counted
+      // whole — so it becomes due at `reviewEvery` paragraphs or as soon as it
+      // outgrows one window, and that one review settles it.
       const window = reviewWindow({
         sectionIds,
         watermark: reviewWatermark,
@@ -697,9 +698,17 @@ export function createEnginePass(
         if (outcome) {
           reviewIntents = outcome;
           reviewed = window.reached;
+          // Counted again from where the watermark now stands, not by
+          // subtracting what was read: a story with no usable watermark is
+          // read from its latest scene only, and the chapters before it are
+          // behind the new watermark, not still pending.
           dispatch(
             engineReviewBacklogObserved({
-              backlog: window.backlog - window.paragraphs.length,
+              backlog: reviewWindow({
+                sectionIds,
+                watermark: reviewed,
+                textBySection,
+              }).backlog,
             }),
           );
         }

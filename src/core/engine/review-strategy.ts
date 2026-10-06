@@ -49,10 +49,13 @@ export type ReviewWindow = {
    *  the last section the window covers. Null when there is nothing past the
    *  watermark at all. */
   reached: Watermark | null;
-  /** The unread paragraphs the review still owes — what the trigger and the
-   *  HUD count. Past a watermark, every one of them, including those this
-   *  window did not reach. With no usable watermark, only the window's own:
-   *  the story before it is not owed a read. */
+  /** Every paragraph the review has not read — what the trigger and the HUD
+   *  count — including those this window does not hold. Past a watermark, the
+   *  rest wait for later windows. With no usable watermark it is the whole
+   *  document's count, although only the window's paragraphs will ever be
+   *  read: unread is what they are, and saying so is what lets the trigger
+   *  fire at all. Once that review completes the watermark is at the
+   *  document's end and they stop being counted. */
   backlog: number;
 };
 
@@ -69,8 +72,14 @@ export type ReviewWindow = {
  *  switched on part-way) and every story whose watermarked section is gone
  *  (undo, retry, a paragraph merge). Reading those from the first page would
  *  spend a review on every pass for the length of the story, and judge today's
- *  Threads by chapter one. So the watermark lands on the document's end and the
- *  backlog is only what the window holds.
+ *  Threads by chapter one. So `reached` is the document's end, and what is
+ *  not in the tail is deliberately never read.
+ *
+ *  `backlog` still counts the whole document in that case. None of it has been
+ *  reviewed, and the trigger has to hear that: counting the tail alone, a
+ *  story whose paragraphs are too long for `reviewEvery` of them to fit one
+ *  window would never become due. The count is honest for one pass at most —
+ *  the review it triggers moves the watermark past all of it.
  *
  *  **The window never cuts a paragraph and never cuts the middle out.** It
  *  stops at the paragraph that would cross the limit. A single paragraph larger
@@ -90,10 +99,17 @@ export function reviewWindow(
   if (watermark === null || at === -1) {
     const paragraphs: string[] = [];
     let size = 0;
+    let backlog = 0;
+    let full = false;
     for (let i = sectionIds.length - 1; i >= 0; i--) {
       const text = (textBySection.get(sectionIds[i]) ?? "").trim();
       if (text.length === 0) continue;
-      if (paragraphs.length > 0 && size + text.length > limitChars) break;
+      backlog++;
+      if (full) continue;
+      if (paragraphs.length > 0 && size + text.length > limitChars) {
+        full = true;
+        continue;
+      }
       paragraphs.unshift(text);
       size += text.length;
     }
@@ -104,7 +120,7 @@ export function reviewWindow(
         last === undefined
           ? null
           : { sectionId: last, offset: (textBySection.get(last) ?? "").length },
-      backlog: paragraphs.length,
+      backlog,
     };
   }
 

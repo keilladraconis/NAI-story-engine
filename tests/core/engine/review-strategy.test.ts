@@ -94,7 +94,9 @@ describe("the review window", () => {
       9,
     );
     expect(w.paragraphs).toEqual(["bbbb", "cccc"]);
-    expect(w.backlog).toBe(2);
+    // All of it is unread by the review, and saying so is what lets the
+    // trigger fire; what is not in the tail is still never read.
+    expect(w.backlog).toBe(3);
     expect(w.reached).toEqual({ sectionId: 102, offset: 4 });
   });
 
@@ -107,7 +109,7 @@ describe("the review window", () => {
       9,
     );
     expect(w.paragraphs).toEqual(["bbbb", "cccc"]);
-    expect(w.backlog).toBe(2);
+    expect(w.backlog).toBe(3);
     expect(w.reached).toEqual({ sectionId: 102, offset: 4 });
   });
 
@@ -117,7 +119,7 @@ describe("the review window", () => {
       9,
     );
     expect(w.paragraphs).toEqual(["a".repeat(50)]);
-    expect(w.backlog).toBe(1);
+    expect(w.backlog).toBe(2);
     expect(w.reached).toEqual({ sectionId: 102, offset: 0 });
   });
 
