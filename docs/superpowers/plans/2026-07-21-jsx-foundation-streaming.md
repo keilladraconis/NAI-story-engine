@@ -30,10 +30,12 @@
 ### Task 1: `foundation.ts` handler dual-write (TDD)
 
 **Files:**
+
 - Modify: `src/core/store/effects/handlers/foundation.ts`
 - Test: `tests/core/store/effects/handlers/foundation.test.ts`
 
 **Interfaces:**
+
 - Consumes: `writeStream`, `clearStream`, `readStream` from `../../stream-buffer` (handler imports the first two; the test imports `readStream`/`clearStream`).
 - Produces: no signature change — `foundationHandler.streaming` now also writes `ctx.accumulatedText` to `` `foundation:${field}` ``; `foundationHandler.completion` clears that key in a `finally`.
 
@@ -97,7 +99,10 @@ describe("foundationHandler.completion", () => {
 
   it("clears the buffer and does not dispatch when generation failed", async () => {
     clearStream("foundation:intent");
-    foundationHandler.streaming(makeCtx({ accumulatedText: "partial" }), "partial");
+    foundationHandler.streaming(
+      makeCtx({ accumulatedText: "partial" }),
+      "partial",
+    );
     const ctx = makeCtx({
       accumulatedText: "partial",
       generationSucceeded: false,
@@ -276,9 +281,11 @@ git commit -m "feat(jsx): foundation handler dual-writes streaming to the JSX bu
 ### Task 2: `FieldCard.tsx` — read the live stream buffer
 
 **Files:**
+
 - Modify: `src/ui-jsx/panels/foundation/FieldCard.tsx`
 
 **Interfaces:**
+
 - Consumes: `useStream` from `../../bridge`; the `foundation:<id>` buffer written by Task 1.
 
 > Verified by `npx tsc --noEmit` + `npm run build`; then the final live pass (CONTROLLER + user). No component render harness — the implementer stops after build.
@@ -302,18 +309,18 @@ import { useSlice, useStream } from "../../bridge";
 Replace:
 
 ```tsx
-  const value = useSlice((s) => d.display(s));
+const value = useSlice((s) => d.display(s));
 ```
 
 with:
 
 ```tsx
-  // While generating, show the live per-token text from the effect-free buffer;
-  // on completion the handler clears it and we fall back to the committed
-  // (formatted) store value. Mirrors the chat bubble.
-  const storeValue = useSlice((s) => d.display(s));
-  const live = useStream(`foundation:${d.id}`);
-  const value = live ?? storeValue;
+// While generating, show the live per-token text from the effect-free buffer;
+// on completion the handler clears it and we fall back to the committed
+// (formatted) store value. Mirrors the chat bubble.
+const storeValue = useSlice((s) => d.display(s));
+const live = useStream(`foundation:${d.id}`);
+const value = live ?? storeValue;
 ```
 
 (The render already uses `value` — no further change.)

@@ -34,10 +34,12 @@
 ### Task 1: `summary.ts` — `entitySummaryHandler` dual-write (TDD)
 
 **Files:**
+
 - Modify: `src/core/store/effects/handlers/summary.ts`
 - Test: `tests/core/store/effects/handlers/summary.test.ts`
 
 **Interfaces:**
+
 - Consumes: `writeStream` from `../../stream-buffer` (handler); `readStream`/`clearStream` (test).
 - Produces: no signature change — `entitySummaryHandler.streaming` also writes `ctx.accumulatedText` to `entity-summary:<entityId>`; `completion` writes the trimmed final to the same key (in addition to the existing storyStorage-stage / store-dispatch branch).
 
@@ -195,10 +197,12 @@ git commit -m "feat(jsx): entity summary handler dual-writes streaming to the JS
 ### Task 2: `world-select.ts` — `isRequestActive` helper (TDD)
 
 **Files:**
+
 - Modify: `src/ui-jsx/panels/world/world-select.ts`
 - Test: `tests/ui-jsx/world-select.test.ts` (extend)
 
 **Interfaces:**
+
 - Produces: `isRequestActive(runtime: RootState["runtime"], requestId: string): boolean`. `entityPending` is refactored onto it (behavior-preserving).
 
 - [ ] **Step 1: Add the failing test**
@@ -223,7 +227,10 @@ describe("isRequestActive", () => {
       isRequestActive(rt({ queue: [{ id: "req-1" } as never] }), "req-1"),
     ).toBe(true);
     expect(
-      isRequestActive(rt({ sega: { activeRequestIds: ["req-1"] } as never }), "req-1"),
+      isRequestActive(
+        rt({ sega: { activeRequestIds: ["req-1"] } as never }),
+        "req-1",
+      ),
     ).toBe(true);
   });
 
@@ -291,9 +298,11 @@ git commit -m "feat(jsx): isRequestActive helper (single-id pending)"
 ### Task 3: `EntityEditPane.tsx` — enable the Summary generate button
 
 **Files:**
+
 - Modify: `src/ui-jsx/panels/world/EntityEditPane.tsx`
 
 **Interfaces:**
+
 - Consumes: `useStream` (bridge); `uiEntitySummaryGenerationRequested` (core/store barrel); `clearStream` (core/store/stream-buffer); `isRequestActive` (Task 2).
 
 > Verified by `npx tsc --noEmit` + `npm run build`; then the final live pass (CONTROLLER + user). The implementer stops after build.
@@ -341,32 +350,32 @@ import { isRequestActive } from "./world-select";
 In `EntityEditPane`, immediately after the seed `useEffect` (which ends `}, []);` at line 138) and BEFORE `if (!entity) return null;` (line 140), insert:
 
 ```tsx
-  const summaryReqId = `se-entity-summary-${entityId}`;
-  const summaryKey = `entity-summary:${entityId}`;
-  const summaryPending = useSlice((s) =>
-    isRequestActive(s.runtime, summaryReqId),
-  );
-  const summaryLive = useStream(summaryKey);
-  const genRef = useRef(false);
+const summaryReqId = `se-entity-summary-${entityId}`;
+const summaryKey = `entity-summary:${entityId}`;
+const summaryPending = useSlice((s) =>
+  isRequestActive(s.runtime, summaryReqId),
+);
+const summaryLive = useStream(summaryKey);
+const genRef = useRef(false);
 
-  // Wipe a stale background buffer on open (so the display shows the seeded
-  // draft, not a leftover from a card-regen) and clean up on unmount.
-  useEffect(() => {
+// Wipe a stale background buffer on open (so the display shows the seeded
+// draft, not a leftover from a card-regen) and clean up on unmount.
+useEffect(() => {
+  clearStream(summaryKey);
+  return () => clearStream(summaryKey);
+}, []);
+
+// Stage the final streamed summary into the editable draft when a
+// pane-triggered generation finishes. genRef guards against mount/stale
+// auto-transfer; the [pending, live] deps make it order-independent (fires
+// once both the request has cleared and the final text is in the buffer).
+useEffect(() => {
+  if (genRef.current && !summaryPending && summaryLive !== undefined) {
+    summary.setValue(summaryLive);
     clearStream(summaryKey);
-    return () => clearStream(summaryKey);
-  }, []);
-
-  // Stage the final streamed summary into the editable draft when a
-  // pane-triggered generation finishes. genRef guards against mount/stale
-  // auto-transfer; the [pending, live] deps make it order-independent (fires
-  // once both the request has cleared and the final text is in the buffer).
-  useEffect(() => {
-    if (genRef.current && !summaryPending && summaryLive !== undefined) {
-      summary.setValue(summaryLive);
-      clearStream(summaryKey);
-      genRef.current = false;
-    }
-  }, [summaryPending, summaryLive]);
+    genRef.current = false;
+  }
+}, [summaryPending, summaryLive]);
 ```
 
 - [ ] **Step 3: Add the `onGenerateSummary` handler**
@@ -374,14 +383,14 @@ In `EntityEditPane`, immediately after the seed `useEffect` (which ends `}, []);
 After the `onCategory` handler (which ends `};` at line 147), insert:
 
 ```tsx
-  const onGenerateSummary = () => {
-    if (summaryPending) return;
-    genRef.current = true;
-    clearStream(summaryKey);
-    store.dispatch(
-      uiEntitySummaryGenerationRequested({ entityId, requestId: summaryReqId }),
-    );
-  };
+const onGenerateSummary = () => {
+  if (summaryPending) return;
+  genRef.current = true;
+  clearStream(summaryKey);
+  store.dispatch(
+    uiEntitySummaryGenerationRequested({ entityId, requestId: summaryReqId }),
+  );
+};
 ```
 
 - [ ] **Step 4: Enable the Summary button + stream into the textarea**

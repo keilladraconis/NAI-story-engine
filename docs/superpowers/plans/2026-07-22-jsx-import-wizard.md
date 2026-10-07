@@ -20,6 +20,7 @@
 - Verify live on the **Story Engine (JSX)** tab only (icon-only S.E.G.A.; the legacy SUI panel shows the text "S.E.G.A.").
 
 Exact action/API signatures (verbatim):
+
 - `attgUpdated({ attg })`, `attgSyncSet({ enabled })`, `styleUpdated({ style })`, `styleSyncSet({ enabled })`, `shapeGenerationRequested()`, `intentGenerationRequested()` (foundation slice, `core/store` barrel).
 - `entityBound({ entity })`, `entitiesBoundBatch(entities)` (world slice, barrel). `entitiesBoundBatch` takes an array (not an object).
 - `detectCategory(text): DulfsFieldID`, `cycleDulfsCategory(current): DulfsFieldID` (`core/utils/category-detect`).
@@ -34,15 +35,18 @@ Exact action/API signatures (verbatim):
 Pure grouping/filtering helpers (unit-tested) + the async data hook.
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/import/import-data.ts`
 - Test: `tests/ui-jsx/import-data.test.ts`
 
 **Interfaces:**
+
 - Produces: `DULFS_SHORT`; `unmanagedEntries(entries, managedIds): LorebookEntry[]`; `groupAndSortEntries(entries, categoryNames): { key; label; entries }[]`; `useImportData(): { memText; anText; entries; categoryNames; loading; refresh }`.
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/ui-jsx/import-data.test.ts`:
+
 ```ts
 import { describe, it, expect } from "vitest";
 import {
@@ -61,12 +65,18 @@ describe("unmanagedEntries", () => {
   it("drops entries whose id is in the managed set, keeps the rest", () => {
     const entries = [e("a"), e("b"), e("c")];
     const managed = new Set(["b"]);
-    expect(unmanagedEntries(entries, managed).map((x) => x.id)).toEqual(["a", "c"]);
+    expect(unmanagedEntries(entries, managed).map((x) => x.id)).toEqual([
+      "a",
+      "c",
+    ]);
   });
 
   it("returns all when nothing is managed", () => {
     const entries = [e("a"), e("b")];
-    expect(unmanagedEntries(entries, new Set()).map((x) => x.id)).toEqual(["a", "b"]);
+    expect(unmanagedEntries(entries, new Set()).map((x) => x.id)).toEqual([
+      "a",
+      "b",
+    ]);
   });
 });
 
@@ -83,13 +93,20 @@ describe("groupAndSortEntries", () => {
       ["cat-a", "Alpha"],
     ]);
     const groups = groupAndSortEntries(entries, names);
-    expect(groups.map((g) => g.label)).toEqual(["Alpha", "Zeta", "Uncategorized"]);
+    expect(groups.map((g) => g.label)).toEqual([
+      "Alpha",
+      "Zeta",
+      "Uncategorized",
+    ]);
     expect(groups[0].entries.map((x) => x.id)).toEqual(["2", "4"]);
     expect(groups[2].entries.map((x) => x.id)).toEqual(["3"]);
   });
 
   it("falls back to the category key when no display name is known", () => {
-    const groups = groupAndSortEntries([e("1", { category: "raw-key" })], new Map());
+    const groups = groupAndSortEntries(
+      [e("1", { category: "raw-key" })],
+      new Map(),
+    );
     expect(groups[0].label).toBe("raw-key");
   });
 });
@@ -103,6 +120,7 @@ Expected: FAIL.
 - [ ] **Step 3: Implement `import-data.ts`**
 
 Create `src/ui-jsx/panels/import/import-data.ts`:
+
 ```ts
 // Data layer for the JSX Import wizard: pure grouping/filtering helpers (unit-
 // tested) + a loader hook that reads memory, A/N, and the lorebook. NAI runtime
@@ -236,9 +254,11 @@ git commit -m "feat(jsx): import wizard data layer — helpers + useImportData h
 The three foundation-import rows.
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/import/ImportFoundation.tsx`
 
 **Interfaces:**
+
 - Consumes: `store`, `attgUpdated`, `attgSyncSet`, `styleUpdated`, `styleSyncSet`, `shapeGenerationRequested`, `intentGenerationRequested` (`../../../core/store`); `T`, `SP` (`../../style`).
 - Produces: `ImportFoundation({ memText, anText })`.
 
@@ -259,7 +279,8 @@ import {
   intentGenerationRequested,
 } from "../../../core/store";
 
-const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
+const truncate = (s: string, n: number) =>
+  s.length > n ? s.slice(0, n) + "…" : s;
 
 const row = {
   display: "flex",
@@ -376,9 +397,11 @@ git commit -m "feat(jsx): import wizard foundation rows (ATTG/Style/Shape+Intent
 Unmanaged lorebook entries grouped by category, each with a DULFS picker + Bind. Reactive to binds.
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/import/ImportLorebook.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSlice` (`../../bridge`); `store`, `entityBound` (`../../../core/store`); `detectCategory`, `cycleDulfsCategory` (`../../../core/utils/category-detect`); `DULFS_SHORT`, `groupAndSortEntries`, `unmanagedEntries`, `LorebookEntry` (`./import-data`); `DulfsFieldID` (`../../../config/field-definitions`); `T`, `SP` (`../../style`).
 - Produces: `ImportLorebook({ entries, categoryNames })`.
 
@@ -478,7 +501,9 @@ export function ImportLorebook(props: {
             const cat = catFor(entry);
             return (
               <div key={entry.id} style={entryRow}>
-                <span style={entryName}>{entry.displayName || "(unnamed)"}</span>
+                <span style={entryName}>
+                  {entry.displayName || "(unnamed)"}
+                </span>
                 <button
                   style={{ ...smallBtn, opacity: 0.7 }}
                   title="Cycle category"
@@ -543,11 +568,13 @@ git commit -m "feat(jsx): import wizard lorebook binding (grouped, category cycl
 Assemble the wizard, add the header Import button, and wire open/close.
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/import/ImportWizard.tsx`
 - Modify: `src/ui-jsx/panels/header/Header.tsx`
 - Modify: `src/ui-jsx/panels/StoryEngine.tsx`
 
 **Interfaces:**
+
 - Consumes: `useImportData`, `unmanagedEntries` (`./import-data`); `store`, `attgUpdated`, `attgSyncSet`, `styleUpdated`, `styleSyncSet`, `shapeGenerationRequested`, `intentGenerationRequested`, `entitiesBoundBatch` (`../../../core/store`); `detectCategory` (`../../../core/utils/category-detect`); `ImportFoundation`, `ImportLorebook`; `T`, `SP`; feather `ArrowLeft`, `RefreshCw`, `Download`.
 
 - [ ] **Step 1: Create `ImportWizard.tsx`**
@@ -632,7 +659,14 @@ export function ImportWizard(props: { onClose: () => void }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: SP.xs, paddingBottom: "32px" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: SP.xs,
+        paddingBottom: "32px",
+      }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
         <button title="Back" onClick={props.onClose} style={iconBtn}>
           <ArrowLeft size={16} />
@@ -672,7 +706,10 @@ export function ImportWizard(props: { onClose: () => void }) {
       <ImportFoundation memText={data.memText} anText={data.anText} />
 
       <span style={sectionLabel}>Lorebook Entries</span>
-      <ImportLorebook entries={data.entries} categoryNames={data.categoryNames} />
+      <ImportLorebook
+        entries={data.entries}
+        categoryNames={data.categoryNames}
+      />
     </div>
   );
 }
@@ -681,6 +718,7 @@ export function ImportWizard(props: { onClose: () => void }) {
 - [ ] **Step 2: Add the Import button to `Header.tsx`**
 
 Change `Header` to accept `onOpenImport` and render a Download button next to the bootstrap button:
+
 ```tsx
 import { SP, T } from "../../style";
 import { GenxStatus } from "./GenxStatus";
@@ -689,14 +727,31 @@ import { Download } from "nai:icons/feather";
 
 export function Header(props: { onOpenImport: () => void }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: SP.sm, paddingBottom: SP.sm }}>
-      <div style={{ flex: 1, minWidth: 0, overflow: "hidden", display: "flex" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: SP.sm,
+        paddingBottom: SP.sm,
+      }}
+    >
+      <div
+        style={{ flex: 1, minWidth: 0, overflow: "hidden", display: "flex" }}
+      >
         <GenxStatus />
       </div>
       <button
         title="Import existing content"
         onClick={props.onOpenImport}
-        style={{ background: "none", border: "none", cursor: "pointer", color: T.text, display: "flex", alignItems: "center", padding: "2px" }}
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: T.text,
+          display: "flex",
+          alignItems: "center",
+          padding: "2px",
+        }}
       >
         <Download size={16} />
       </button>
@@ -705,11 +760,13 @@ export function Header(props: { onOpenImport: () => void }) {
   );
 }
 ```
+
 (Add `T` to the `../../style` import if not present.)
 
 - [ ] **Step 3: Wire open/close in `StoryEngine.tsx`**
 
 Add import + local state + the early-return takeover (after the edit-pane returns so an open edit pane still wins), and pass `onOpenImport` to `Header`:
+
 ```tsx
 import { ImportWizard } from "./import/ImportWizard";
 ...
@@ -728,6 +785,7 @@ import { ImportWizard } from "./import/ImportWizard";
     </div>
   );
 ```
+
 (`useState` must precede the early returns — place it with the other hooks.)
 
 - [ ] **Step 4: tsc + build + full suite**

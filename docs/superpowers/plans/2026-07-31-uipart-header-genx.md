@@ -19,7 +19,7 @@
 - `api.v1.ui.updateParts` **replaces style wholesale** — any pushed `style` object must contain every CSS property that part needs, not a delta.
 - Colours come from `T` in `src/ui/style.ts` (all `var(--theme-*)` refs). Never a literal hex.
 - Spacing comes from `SP` in `src/ui/style.ts`.
-- **Do not bump `project.yaml` `version`.** It is already at `0.14.0`, bumped earlier on this branch (`v14`); CLAUDE.md permits at most one bump per pull request. Update the existing `## [0.14.0]` CHANGELOG section instead. *If 0.14.0 has actually shipped, stop and ask before proceeding to Task 6.*
+- **Do not bump `project.yaml` `version`.** It is already at `0.14.0`, bumped earlier on this branch (`v14`); CLAUDE.md permits at most one bump per pull request. Update the existing `## [0.14.0]` CHANGELOG section instead. _If 0.14.0 has actually shipped, stop and ask before proceeding to Task 6._
 - Commands: `npm test` (vitest run), `npm run build` (nibs → `dist/NAI-story-engine.naiscript`), `npm run format` (prettier).
 - Typecheck with `npx tsc --noEmit`.
 
@@ -27,34 +27,36 @@
 
 ## File Structure
 
-| Path | Responsibility | Status |
-|---|---|---|
-| `src/ui/header/header-model.ts` | `derive`, `storeSignature`, `formatOutputBudget` — all pure | create (Task 2) |
-| `src/ui/header/header-parts.ts` | `buildRoot`, `buildHeader`, `patch`, style helpers — all pure | create (Task 1, extended Task 3) |
-| `src/ui/header/header-driver.ts` | `createHeaderDriver` — subscription, timer, `updateParts` | create (Task 4) |
-| `src/ui/header/countdown.ts` | `remainingSeconds`, `waitLabel` | moved (Task 2), trimmed (Task 5) |
-| `src/ui/mount.ts` | panel construction + driver lifecycle | modify (Tasks 1, 4) |
-| `src/ui/panels/StoryEngine.tsx` | drop `<Header>` | modify (Task 4) |
-| `src/ui/panels/chat/SendButton.tsx` | idle/disabled only | modify (Task 5) |
-| `src/ui/panels/header/` | whole directory | delete (Tasks 2, 4) |
-| `tests/setup.ts` | API mocks | modify (Task 1) |
-| `tests/ui/header-model.test.ts` | model + signature coverage | create (Task 2) |
-| `tests/ui/header-parts.test.ts` | spec + diff coverage | create (Tasks 1, 3) |
-| `tests/ui/countdown.test.ts` | inverted state-machine guard | modify (Tasks 2, 5) |
+| Path                                | Responsibility                                                | Status                           |
+| ----------------------------------- | ------------------------------------------------------------- | -------------------------------- |
+| `src/ui/header/header-model.ts`     | `derive`, `storeSignature`, `formatOutputBudget` — all pure   | create (Task 2)                  |
+| `src/ui/header/header-parts.ts`     | `buildRoot`, `buildHeader`, `patch`, style helpers — all pure | create (Task 1, extended Task 3) |
+| `src/ui/header/header-driver.ts`    | `createHeaderDriver` — subscription, timer, `updateParts`     | create (Task 4)                  |
+| `src/ui/header/countdown.ts`        | `remainingSeconds`, `waitLabel`                               | moved (Task 2), trimmed (Task 5) |
+| `src/ui/mount.ts`                   | panel construction + driver lifecycle                         | modify (Tasks 1, 4)              |
+| `src/ui/panels/StoryEngine.tsx`     | drop `<Header>`                                               | modify (Task 4)                  |
+| `src/ui/panels/chat/SendButton.tsx` | idle/disabled only                                            | modify (Task 5)                  |
+| `src/ui/panels/header/`             | whole directory                                               | delete (Tasks 2, 4)              |
+| `tests/setup.ts`                    | API mocks                                                     | modify (Task 1)                  |
+| `tests/ui/header-model.test.ts`     | model + signature coverage                                    | create (Task 2)                  |
+| `tests/ui/header-parts.test.ts`     | spec + diff coverage                                          | create (Tasks 1, 3)              |
+| `tests/ui/countdown.test.ts`        | inverted state-machine guard                                  | modify (Tasks 2, 5)              |
 
 ---
 
 ### Task 1: Grid root and the height contract
 
-The sidebar currently relies on the jsx part's own `display:grid / gridTemplateRows:minmax(0,1fr) / height:100%` wrapper so the chat list scrolls internally and the composer pins to the bottom. Introducing a parent means that contract must survive one more level. This task does *only* that, with a placeholder header, so the layout can be verified live before anything is built on top of it.
+The sidebar currently relies on the jsx part's own `display:grid / gridTemplateRows:minmax(0,1fr) / height:100%` wrapper so the chat list scrolls internally and the composer pins to the bottom. Introducing a parent means that contract must survive one more level. This task does _only_ that, with a placeholder header, so the layout can be verified live before anything is built on top of it.
 
 **Files:**
+
 - Create: `src/ui/header/header-parts.ts`
 - Create: `tests/ui/header-parts.test.ts`
 - Modify: `tests/setup.ts`
 - Modify: `src/ui/mount.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `HEADER_IDS` (frozen id map), `buildRoot(header: UIPart, body: UIPart): UIPart`.
 
@@ -168,24 +170,24 @@ import { buildRoot, HEADER_IDS } from "./header/header-parts";
 Then in `buildSidebarPanel()`, replace the `return sidebarPanel({ ... })` block with:
 
 ```ts
-  // Placeholder until Task 3 builds the real header. Present now so the grid
-  // height contract can be verified live with a real occupied top row.
-  const placeholderHeader = api.v1.ui.part.text({
-    id: HEADER_IDS.status,
-    text: "header placeholder",
-    noTemplate: true,
-    style: { fontSize: "0.8em", opacity: "0.8", padding: "4px 8px" },
-  });
+// Placeholder until Task 3 builds the real header. Present now so the grid
+// height contract can be verified live with a real occupied top row.
+const placeholderHeader = api.v1.ui.part.text({
+  id: HEADER_IDS.status,
+  text: "header placeholder",
+  noTemplate: true,
+  style: { fontSize: "0.8em", opacity: "0.8", padding: "4px 8px" },
+});
 
-  return sidebarPanel({
-    id: "kse-sidebar",
-    name: "Story Engine",
-    iconId: "lightning",
-    content: [buildRoot(placeholderHeader, jsxPart)],
-  });
+return sidebarPanel({
+  id: "kse-sidebar",
+  name: "Story Engine",
+  iconId: "lightning",
+  content: [buildRoot(placeholderHeader, jsxPart)],
+});
 ```
 
-Leave the `jsxPart` definition, including its own `style` block, exactly as it is — it is now a grid *item* and still needs its internal `minmax(0, 1fr)`.
+Leave the `jsxPart` definition, including its own `style` block, exactly as it is — it is now a grid _item_ and still needs its internal `minmax(0, 1fr)`.
 
 - [ ] **Step 7: Typecheck, test, build**
 
@@ -217,6 +219,7 @@ git commit -m "feat(ui): add UIPart grid root above the JSX sidebar panel"
 The pure derivation: one function that turns store state plus three external inputs into everything the header displays. This is the file that owns the generation state machine.
 
 **Files:**
+
 - Move: `src/ui/panels/header/countdown.ts` → `src/ui/header/countdown.ts`
 - Modify: `src/ui/panels/chat/SendButton.tsx` (import path only)
 - Modify: `src/ui/panels/header/GenxStatus.tsx` (import path only)
@@ -225,6 +228,7 @@ The pure derivation: one function that turns store state plus three external inp
 - Create: `tests/ui/header-model.test.ts`
 
 **Interfaces:**
+
 - Consumes: `remainingSeconds`, `waitLabel` from `./countdown`.
 - Produces:
   - `type WidgetMode = "budget" | "cancel" | "continue" | "wait"`
@@ -275,10 +279,7 @@ const INPUTS: DeriveInputs = {
   now: 1_000_000,
 };
 
-function req(
-  type: GenerationRequest["type"],
-  id: string,
-): GenerationRequest {
+function req(type: GenerationRequest["type"], id: string): GenerationRequest {
   return { id, type, targetId: "t", status: "queued" };
 }
 
@@ -363,7 +364,10 @@ describe("derive — bootstrap, status text, import", () => {
   it("disables bootstrap while its request is active", () => {
     const m = derive(
       state({
-        activeRequest: { ...req("bootstrapContinue", "b2"), status: "processing" },
+        activeRequest: {
+          ...req("bootstrapContinue", "b2"),
+          status: "processing",
+        },
       }),
       INPUTS,
     );
@@ -509,7 +513,9 @@ export function derive(state: RootState, inputs: DeriveInputs): HeaderModel {
     widget: deriveWidget(state, inputs),
     statusText: sega.statusText,
     bootstrap: {
-      text: inputs.hasDocumentContent ? "⚡ Continue Scene" : "⚡ Opening Scene",
+      text: inputs.hasDocumentContent
+        ? "⚡ Continue Scene"
+        : "⚡ Opening Scene",
       disabled: bootstrapPending,
     },
     importDisabled: state.ui.importWizardOpen,
@@ -556,10 +562,12 @@ git commit -m "feat(ui): add pure header model deriving the GenX state machine"
 Turn a `HeaderModel` into UIPart specs, and turn two models into the minimal `updateParts` payload.
 
 **Files:**
+
 - Modify: `src/ui/header/header-parts.ts`
 - Modify: `tests/ui/header-parts.test.ts`
 
 **Interfaces:**
+
 - Consumes: `HeaderModel`, `WidgetMode` from `./header-model`; `T`, `SP` from `../style`.
 - Produces:
   - `type HeaderHandlers = { onWidget: () => void; onImport: () => void; onBootstrap: () => void }`
@@ -653,8 +661,9 @@ describe("buildHeader", () => {
       ...MODEL,
       widget: { mode: "cancel", text: "🚫 Cancel" },
     };
-    expect(findPart(buildHeader(busy, HANDLERS), HEADER_IDS.widget)!.disabled)
-      .toBeUndefined();
+    expect(
+      findPart(buildHeader(busy, HANDLERS), HEADER_IDS.widget)!.disabled,
+    ).toBeUndefined();
   });
 
   it("marks the status text as non-templated", () => {
@@ -941,12 +950,14 @@ git commit -m "feat(ui): build header UIPart specs and diff from the header mode
 Wire the model and parts to the live store, then delete the three JSX components they replace. After this task the header is fully functional.
 
 **Files:**
+
 - Create: `src/ui/header/header-driver.ts`
 - Modify: `src/ui/mount.ts`
 - Modify: `src/ui/panels/StoryEngine.tsx`
 - Delete: `src/ui/panels/header/GenxStatus.tsx`, `src/ui/panels/header/Header.tsx`, `src/ui/panels/header/BootstrapButton.tsx`
 
 **Interfaces:**
+
 - Consumes: `derive`, `storeSignature`, `HeaderModel` from `./header-model`; `buildHeader`, `patch`, `HeaderHandlers` from `./header-parts`; `store` and the action creators from `../../core/store`.
 - Produces: `createHeaderDriver(store: Store): { initialModel(): HeaderModel; handlers: HeaderHandlers; start(): void; stop(): void }`
 
@@ -991,9 +1002,7 @@ export type HeaderDriver = {
   stop(): void;
 };
 
-export function createHeaderDriver(
-  store: typeof storeInstance,
-): HeaderDriver {
+export function createHeaderDriver(store: typeof storeInstance): HeaderDriver {
   let lastModel: HeaderModel | null = null;
   let hasDocumentContent = false;
   let bootstrapWasPending = false;
@@ -1013,9 +1022,7 @@ export function createHeaderDriver(
     const parts = patch(lastModel, model);
     lastModel = model;
     if (parts.length > 0) {
-      void api.v1.ui.updateParts(
-        parts as Partial<UIPart>[] & { id: string }[],
-      );
+      void api.v1.ui.updateParts(parts as Partial<UIPart>[] & { id: string }[]);
     }
   }
 
@@ -1031,7 +1038,8 @@ export function createHeaderDriver(
     if (stopped) return;
     const model = currentModel();
     // A bootstrap that just settled changed the document — re-derive its label.
-    if (bootstrapWasPending && !model.bootstrap.disabled) void refreshDocument();
+    if (bootstrapWasPending && !model.bootstrap.disabled)
+      void refreshDocument();
     bootstrapWasPending = model.bootstrap.disabled;
     push(model);
   }
@@ -1067,7 +1075,9 @@ export function createHeaderDriver(
     onImport: () => store.dispatch(importWizardOpened()),
     onBootstrap: () =>
       store.dispatch(
-        hasDocumentContent ? bootstrapContinueRequested() : bootstrapRequested(),
+        hasDocumentContent
+          ? bootstrapContinueRequested()
+          : bootstrapRequested(),
       ),
   };
 
@@ -1122,9 +1132,7 @@ import { createHeaderDriver, type HeaderDriver } from "./header/header-driver";
 
 ```ts
 function buildSidebarPanel(driver: HeaderDriver): UIExtension {
-  const jsxPart = api.v1.ui.part.jsx({
-    /* ...unchanged... */
-  });
+  const jsxPart = api.v1.ui.part.jsx({/* ...unchanged... */});
 
   return sidebarPanel({
     id: "kse-sidebar",
@@ -1140,16 +1148,16 @@ function buildSidebarPanel(driver: HeaderDriver): UIExtension {
 3. In `start()`, create the driver before building panels and start it after registering:
 
 ```ts
-  const headerDriver = createHeaderDriver(store);
-  const panels: UIExtension[] = [buildSidebarPanel(headerDriver)];
+const headerDriver = createHeaderDriver(store);
+const panels: UIExtension[] = [buildSidebarPanel(headerDriver)];
 ```
 
 and immediately after `await api.v1.ui.register(panels);`:
 
 ```ts
-  // Only after register(): updateParts is a no-op on a part React has not
-  // mounted yet. The first paint is already correct via initialModel().
-  headerDriver.start();
+// Only after register(): updateParts is a no-op on a part React has not
+// mounted yet. The first paint is already correct via initialModel().
+headerDriver.start();
 ```
 
 - [ ] **Step 3: Drop the JSX header from StoryEngine.tsx**
@@ -1193,7 +1201,7 @@ Burn the output budget, then idle for 240s without touching anything. The idle r
 - Click a **JSX** button (e.g. a Foundation card) → readout stays frozen.
 - Click the **header widget** → readout resumes climbing.
 
-`dist/jsx-click-budget-flag.tsx` is the standalone probe if you want the instrumented version. If the header click does *not* resume replenishment, stop — the design's core premise is wrong and the spec needs revisiting before Task 5.
+`dist/jsx-click-budget-flag.tsx` is the standalone probe if you want the instrumented version. If the header click does _not_ resume replenishment, stop — the design's core premise is wrong and the spec needs revisiting before Task 5.
 
 - [ ] **Step 8: Commit**
 
@@ -1209,11 +1217,13 @@ git commit -m "feat(ui): drive the UIPart header from the store and retire the J
 The chat composer's five-mode state machine is now redundant — and its Continue/Cancel branches were never functional in JSX anyway.
 
 **Files:**
+
 - Modify: `src/ui/panels/chat/SendButton.tsx`
 - Modify: `src/ui/header/countdown.ts`
 - Modify: `tests/ui/countdown.test.ts`
 
 **Interfaces:**
+
 - Consumes: `HeaderModel` machinery from Tasks 2–4 (already live).
 - Produces: nothing new; `useCountdown` is removed from `countdown.ts`, leaving `remainingSeconds` and `waitLabel`.
 
@@ -1357,6 +1367,7 @@ git commit -m "refactor(ui): reduce SendButton to send/disabled, guard the state
 ### Task 6: Changelog and documentation
 
 **Files:**
+
 - Modify: `CHANGELOG.md`
 - Modify: `CLAUDE.md`
 

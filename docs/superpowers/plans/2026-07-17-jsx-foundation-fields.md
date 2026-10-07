@@ -35,10 +35,12 @@
 ### Task 1: `fields.ts` — config table + pure helpers (TDD)
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/foundation/fields.ts`
 - Test: `tests/ui-jsx/foundation-fields.test.ts`
 
 **Interfaces:**
+
 - Consumes: store barrel `../../../core/store` — actions `shapeUpdated`, `intentUpdated`, `contractUpdated`, `attgUpdated`, `styleUpdated`, `attgSyncToggled`, `styleSyncToggled`, `shapeGenerationRequested`, `intentGenerationRequested`, `contractGenerationRequested`, `attgGenerationRequested`, `styleGenerationRequested`; types `RootState`, `ContractData`; `store`.
 - Produces:
   - `type FoundationFieldId = "shape" | "intent" | "contract" | "attg" | "style"`
@@ -193,11 +195,7 @@ import {
 } from "../../../core/store";
 
 export type FoundationFieldId =
-  | "shape"
-  | "intent"
-  | "contract"
-  | "attg"
-  | "style";
+  "shape" | "intent" | "contract" | "attg" | "style";
 
 export type IntensityLevelDef = { level: string; description: string };
 
@@ -340,7 +338,10 @@ export const FIELD_DESCRIPTORS: FieldDescriptor[] = [
     hasRefine: true,
     cardLabel: () => "Story Contract",
     display: (s) => displayContract(s.foundation.contract),
-    seed: (s) => ({ title: "", content: formatContract(s.foundation.contract) }),
+    seed: (s) => ({
+      title: "",
+      content: formatContract(s.foundation.contract),
+    }),
     commit: ({ content }) =>
       store.dispatch(contractUpdated({ contract: parseContract(content) })),
     generate: () => store.dispatch(contractGenerationRequested()),
@@ -415,9 +416,11 @@ git commit -m "feat(jsx): Foundation field config table + pure helpers"
 ### Task 2: `FieldEditor.tsx` — single/titled edit pane
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/foundation/FieldEditor.tsx`
 
 **Interfaces:**
+
 - Consumes: `useDraftField` from `../../hooks`; `T`, `SP` from `../../style`; `ArrowLeft` from `nai:icons/feather`; `FieldDraft` from `./fields`.
 - Produces: `FieldEditor(props: FieldEditorProps)` where
   ```ts
@@ -557,9 +560,11 @@ git commit -m "feat(jsx): titled Foundation field editor"
 ### Task 3: `FieldCard.tsx` — generic card with generating-aware zap
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/foundation/FieldCard.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSlice` from `../../bridge`; `T`, `SP` from `../../style`; `Zap`, `Edit`, `ToggleLeft`, `ToggleRight` from `nai:icons/feather`; `store`, `uiChatRefineRequested` from `../../../core/store`; `decideFieldAction` from `../chat/chat-actions`; `FieldDescriptor`, `isFoundationGenerating` from `./fields`.
 - Produces: `FieldCard(props: { descriptor: FieldDescriptor; onEdit: () => void })`.
 
@@ -586,12 +591,17 @@ import { type FieldDescriptor, isFoundationGenerating } from "./fields";
 
 const ICON_SIZE = 16;
 
-export function FieldCard(props: { descriptor: FieldDescriptor; onEdit: () => void }) {
+export function FieldCard(props: {
+  descriptor: FieldDescriptor;
+  onEdit: () => void;
+}) {
   const d = props.descriptor;
   const label = useSlice((s) => d.cardLabel(s));
   const value = useSlice((s) => d.display(s));
   const generating = useSlice((s) => isFoundationGenerating(s, d.id));
-  const syncEnabled = useSlice((s) => (d.syncEnabled ? d.syncEnabled(s) : false));
+  const syncEnabled = useSlice((s) =>
+    d.syncEnabled ? d.syncEnabled(s) : false,
+  );
 
   const onZap = () => {
     if (generating) return;
@@ -696,9 +706,11 @@ git commit -m "feat(jsx): generic Foundation field card + generating zap"
 ### Task 4: `IntensityPicker.tsx` — level picker
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/foundation/IntensityPicker.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSlice` from `../../bridge`; `T`, `SP` from `../../style`; `store`, `intensityUpdated` from `../../../core/store`; `INTENSITY_LEVELS` from `./fields`.
 - Produces: `IntensityPicker()`.
 
@@ -797,11 +809,13 @@ git commit -m "feat(jsx): Intensity level picker"
 ### Task 5: `Foundation.tsx` orchestrator + App wiring + delete old panel
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/foundation/Foundation.tsx`
 - Modify: `src/ui-jsx/App.tsx:4`
 - Delete: `src/ui-jsx/panels/Foundation.tsx`
 
 **Interfaces:**
+
 - Consumes: `useState` (runtime global); `store` from `../../../core/store`; `SP` from `../../style`; `IntensityPicker` from `./IntensityPicker`; `FieldCard` from `./FieldCard`; `FieldEditor` from `./FieldEditor`; `FIELD_DESCRIPTORS`, `FoundationFieldId` from `./fields`.
 - Produces: `Foundation()` (same export name/shape App already imports).
 
@@ -851,11 +865,7 @@ export function Foundation() {
     <div style={{ display: "flex", flexDirection: "column", gap: SP.md }}>
       <IntensityPicker />
       {FIELD_DESCRIPTORS.map((d) => (
-        <FieldCard
-          key={d.id}
-          descriptor={d}
-          onEdit={() => setEditing(d.id)}
-        />
+        <FieldCard key={d.id} descriptor={d} onEdit={() => setEditing(d.id)} />
       ))}
     </div>
   );
@@ -894,6 +904,7 @@ Expected: builds `dist/NAI-story-engine.naiscript` with no errors.
 - [ ] **Step 6: Manual harness verification**
 
 Load the built script in NovelAI, open the Story Engine tab, and confirm:
+
 1. All six fields render in order: Intensity, Shape, Intent, Contract, ATTG, Style.
 2. Intensity: clicking each level highlights it (header color on `bg3` chip) and shows its description; selection persists across a tab switch.
 3. Each card's **Edit** opens the pane; Shape shows a Name input + Description textarea; Save writes back and the card updates. Cancel (Back) discards.

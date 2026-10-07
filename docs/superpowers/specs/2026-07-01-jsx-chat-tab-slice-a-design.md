@@ -85,7 +85,7 @@ The JSX panel root gains a two-tab shell mirroring SUI:
 - The `useEffect` returns a cleanup that disposes the subscriptions.
 
 Tab switching is user-controllable (you can look at brainstorm while a refine is
-open); the subscriptions only *nudge*, they do not force a derived value.
+open); the subscriptions only _nudge_, they do not force a derived value.
 
 ### Components (`src/ui-jsx/panels/chat/`)
 
@@ -96,7 +96,7 @@ Each is a small, focused function component. All state reads go through
    - Resolves the visible chat: `useSlice(s => activeSavedChat(s.chat))` (id +
      message-id sequence as the re-render key).
    - Renders: `<ChatHeader>`, a scrollable message list (`flex-direction:
-     column-reverse`, built in source order then reversed), `<ChatInput>`, and —
+column-reverse`, built in source order then reversed), `<ChatInput>`, and —
      when `chat.type === "refine"` — `<RefineCommitBar>`.
    - When `showSessions` (local state) is on, renders `<Sessions>` instead of the
      header+list+input.
@@ -218,7 +218,7 @@ commit: RefineCommitBar → uiChatRefineCommitted → spec.onCommit writes field
   new messages pin to the bottom without scroll math (as SUI does). Verify it
   behaves inside the JSX shadow tree during the parity check.
 - **Editable bubble vs streaming**: the uncontrolled-textarea seed (child text,
-  not `value`) means editing a bubble *while* a stream lands on it is an edge
+  not `value`) means editing a bubble _while_ a stream lands on it is an edge
   case. SUI avoids it because streaming turns aren't in edit mode; we mirror that
   — edit mode is user-initiated and streaming targets non-edited bubbles.
 - **Input handoff** is the one integration detail to pin down against the

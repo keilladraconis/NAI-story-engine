@@ -39,14 +39,14 @@ user's ability to poke the harness and resume. That capability is currently abse
 
 ## Decisions taken
 
-| Question | Decision |
-|---|---|
-| Verify FlagB premise first? | No — treated as settled from prior SUI-era observation. |
-| What lifts to UIParts? | The full header: status widget, import button, bootstrap button. |
-| Where does SEGA status text go? | Its own full-width text part on a second row. |
-| What do other buttons disable on? | Their own target only. Queueing stays possible. |
-| Budget readout liveness? | Adaptive timer: 1s while waiting for budget, 5s otherwise. |
-| Root part type? | `container`, not `column` — see Architecture. |
+| Question                          | Decision                                                         |
+| --------------------------------- | ---------------------------------------------------------------- |
+| Verify FlagB premise first?       | No — treated as settled from prior SUI-era observation.          |
+| What lifts to UIParts?            | The full header: status widget, import button, bootstrap button. |
+| Where does SEGA status text go?   | Its own full-width text part on a second row.                    |
+| What do other buttons disable on? | Their own target only. Queueing stays possible.                  |
+| Budget readout liveness?          | Adaptive timer: 1s while waiting for budget, 5s otherwise.       |
+| Root part type?                   | `container`, not `column` — see Architecture.                    |
 
 ## Architecture
 
@@ -85,18 +85,18 @@ The root is a `container` rather than a `column`. `column` renders as a flex box
 its own spacing and alignment defaults; the root needs to impose a two-row grid height
 contract without fighting them. `container` is documented as a plain div with no styling
 of its own, so our `style` is the only styling in play. `row` and `column` are still used
-*inside* the header, where their flex defaults are what we want.
+_inside_ the header, where their flex defaults are what we want.
 
 ### Files
 
 New directory `src/ui/header/`, replacing `src/ui/panels/header/`:
 
-| File | Role | Tested |
-|---|---|---|
-| `header-model.ts` | `derive(state, inputs) → HeaderModel` | yes, pure |
-| `header-parts.ts` | `build(model) → UIPart`, `patch(prev, next) → Partial<UIPart>[]` | yes, pure |
-| `header-driver.ts` | store subscription + adaptive timer + `updateParts` | no, I/O shell |
-| `countdown.ts` | `remainingSeconds`, `waitLabel` (moved; `useCountdown` deleted) | yes, existing |
+| File               | Role                                                             | Tested        |
+| ------------------ | ---------------------------------------------------------------- | ------------- |
+| `header-model.ts`  | `derive(state, inputs) → HeaderModel`                            | yes, pure     |
+| `header-parts.ts`  | `build(model) → UIPart`, `patch(prev, next) → Partial<UIPart>[]` | yes, pure     |
+| `header-driver.ts` | store subscription + adaptive timer + `updateParts`              | no, I/O shell |
+| `countdown.ts`     | `remainingSeconds`, `waitLabel` (moved; `useCountdown` deleted)  | yes, existing |
 
 This is the same split `countdown.ts` already uses, where `remainingSeconds` is unit
 tested and the I/O shell around it is not.
@@ -108,15 +108,15 @@ type WidgetMode = "budget" | "cancel" | "continue" | "wait";
 
 type HeaderModel = {
   widget: { mode: WidgetMode; text: string };
-  statusText: string;                    // "" ⇒ row 2 collapses to display:none
+  statusText: string; // "" ⇒ row 2 collapses to display:none
   bootstrap: { text: string; disabled: boolean };
   importDisabled: boolean;
 };
 
 type DeriveInputs = {
-  allowedOutput: number;                 // api.v1.script.getAllowedOutput()
-  hasDocumentContent: boolean;           // cached; see Data flow
-  now: number;                           // Date.now()
+  allowedOutput: number; // api.v1.script.getAllowedOutput()
+  hasDocumentContent: boolean; // cached; see Data flow
+  now: number; // Date.now()
 };
 
 function derive(state: RootState, inputs: DeriveInputs): HeaderModel;
@@ -131,12 +131,12 @@ than a visible failure.
 
 Widget mode, from `state.runtime.genx.status`:
 
-| status | mode | text |
-|---|---|---|
-| `waiting_for_user` | `continue` | `⚠️ Continue` |
-| `waiting_for_budget` | `wait` | `waitLabel(remainingSeconds(budgetWaitEndTime, now))` |
-| `queued`, `generating` | `cancel` | `🚫 Cancel` |
-| `idle`, `completed`, `failed` | `budget` | `formatOutputBudget(allowedOutput)` |
+| status                        | mode       | text                                                  |
+| ----------------------------- | ---------- | ----------------------------------------------------- |
+| `waiting_for_user`            | `continue` | `⚠️ Continue`                                         |
+| `waiting_for_budget`          | `wait`     | `waitLabel(remainingSeconds(budgetWaitEndTime, now))` |
+| `queued`, `generating`        | `cancel`   | `🚫 Cancel`                                           |
+| `idle`, `completed`, `failed` | `budget`   | `formatOutputBudget(allowedOutput)`                   |
 
 `formatOutputBudget(n)` returns `"412 out"` below 1000 and `"1.2k out"` at or above it
 (one decimal place). No leading bolt — the bolt is reserved for action buttons, so the
@@ -165,12 +165,12 @@ Each callback reads `store.getState()` at click time and switches on the current
 The widget's four behaviours are four branches inside one handler, not four part specs —
 the DRY-in-UI rule, with the difference pushed into the leaf.
 
-| Mode | Widget click |
-|---|---|
-| `budget` | no-op (the click itself is the feature) |
-| `cancel` | `uiRequestCancellation()` |
-| `continue` | `uiUserPresenceConfirmed()` |
-| `wait` | `uiRequestCancellation()` |
+| Mode       | Widget click                            |
+| ---------- | --------------------------------------- |
+| `budget`   | no-op (the click itself is the feature) |
+| `cancel`   | `uiRequestCancellation()`               |
+| `continue` | `uiUserPresenceConfirmed()`             |
+| `wait`     | `uiRequestCancellation()`               |
 
 `uiRequestCancellation` already calls `genX.cancelAll()` and dispatches `requestCancelled`
 for the active request, so a single dispatch gives correct global-cancel semantics. The
@@ -226,7 +226,7 @@ chains; only a timer-triggered tick arms the next one.
 `hasDocumentContent` stays asynchronous and cached. The driver re-reads
 `api.v1.document.sectionIds()` when `historyEpoch` changes or when a bootstrap request
 settles — the same dependencies as today's `useEffect` in `BootstrapButton` — and passes
-the cached boolean *into* `derive`, keeping `derive` pure and synchronous.
+the cached boolean _into_ `derive`, keeping `derive` pure and synchronous.
 
 Full round trip: click → dispatch → effect → GenX → `onStateChange` → store → signature
 change → tick → `updateParts`. One hop longer than the JSX path, same shape.
@@ -265,7 +265,7 @@ exists in exactly three components, all of which are deleted or simplified above
 - Timer teardown carries over `countdown.ts`'s existing discipline: the `.then(id)` guard
   that clears a timer whose creation promise resolved after cancellation.
 - A dropped or ignored `updateParts` is self-healing. The driver diffs against its own last
-  *model*, not against rendered output, so the next tick recomputes and pushes again.
+  _model_, not against rendered output, so the next tick recomputes and pushes again.
 - `disabledWhileCallbackRunning` on the bootstrap button guards against the known
   double-`click`-per-tap behaviour on mobile for the one non-idempotent header action.
   Continue and Cancel are idempotent and need no guard.

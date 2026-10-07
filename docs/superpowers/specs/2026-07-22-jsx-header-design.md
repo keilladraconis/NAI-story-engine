@@ -14,6 +14,7 @@ JSX panel. The **Import** wizard (the SUI header's third feature) is deferred to
 its own slice.
 
 This is **pure JSX presentation** — every action and all state already exist:
+
 - `bootstrapRequested()` / `bootstrapContinueRequested()` (runtime slice).
 - `uiUserPresenceConfirmed()`, `uiRequestCancellation()`, `uiCancelRequest({ requestId })` (ui slice).
 - `runtime.genx.status` (`"idle" | "waiting_for_user" | "waiting_for_budget" | …`),
@@ -46,7 +47,7 @@ into a few reactive components driven by `useSlice`.
   marquee was imperative-timer eye-candy; truncation is adequate and far simpler.
 - **Waiting states live in the center `GenxStatus`, decoupled from the bootstrap
   button.** SUI merges Continue/Wait onto the bootstrap button (to avoid mobile
-  wrap) and suppresses the center. JSX keeps Continue/Wait in one place for *any*
+  wrap) and suppresses the center. JSX keeps Continue/Wait in one place for _any_
   active generation; during a bootstrap wait, the bootstrap button is simply
   dimmed/active and the center shows Continue/Wait. Functionally equivalent, no
   duplicated waiting logic.
@@ -94,12 +95,21 @@ Reactive to a small slice of runtime + local document-content state:
   primitive** (a single object-returning selector would fail the Object.is
   comparison and loop):
   ```ts
-  const queuedId = useSlice((s) =>
-    s.runtime.queue.find((r) => r.type === "bootstrap" || r.type === "bootstrapContinue")?.id ?? "");
+  const queuedId = useSlice(
+    (s) =>
+      s.runtime.queue.find(
+        (r) => r.type === "bootstrap" || r.type === "bootstrapContinue",
+      )?.id ?? "",
+  );
   const pendingType = useSlice((s) => {
-    const q = s.runtime.queue.find((r) => r.type === "bootstrap" || r.type === "bootstrapContinue");
+    const q = s.runtime.queue.find(
+      (r) => r.type === "bootstrap" || r.type === "bootstrapContinue",
+    );
     const a = s.runtime.activeRequest;
-    return q?.type ?? (a?.type === "bootstrap" || a?.type === "bootstrapContinue" ? a.type : "");
+    return (
+      q?.type ??
+      (a?.type === "bootstrap" || a?.type === "bootstrapContinue" ? a.type : "")
+    );
   });
   const active = useSlice((s) => {
     const t = s.runtime.activeRequest?.type;

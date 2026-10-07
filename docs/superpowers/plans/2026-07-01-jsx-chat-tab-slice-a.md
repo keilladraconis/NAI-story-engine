@@ -26,10 +26,12 @@
 ### Task 1: Pure chat-action helpers
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/chat/chat-actions.ts`
 - Test: `tests/ui-jsx/chat-actions.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `CHAT_INPUT_KEY: string` — `"se-bs-input"` (must equal `IDS.BRAINSTORM.INPUT`, the key the `uiChatSubmitUserMessage` effect reads).
   - `decideFieldAction(text: string): "generate" | "refine"` — whitespace-only → `"generate"`, otherwise `"refine"`.
@@ -124,9 +126,11 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 2: Panel tab shell (Chat | Story Engine) + tab-switch subscriptions
 
 **Files:**
+
 - Modify: `src/ui-jsx/App.tsx` (currently renders `<Foundation/>` only)
 
 **Interfaces:**
+
 - Consumes: `Foundation` from `./panels/Foundation`; `T`, `SP` from `./style`; `store`, `chatCreated`, `chatSwitched`, `uiChatRefineCommitted`, `uiChatRefineDiscarded`, `activeSavedChat` from `./`-relative `../core/store`… (App is at `src/ui-jsx/App.tsx`, so `./core` is `../core` — App imports core via `../core/store`). `matchesAction` from `nai-store`.
 - Produces: the JSX panel root with an internal two-tab shell. The Chat tab renders a placeholder until Task 3.
 
@@ -173,10 +177,15 @@ export function App() {
       store.subscribeEffect(matchesAction(chatCreated), (action) => {
         if (action.payload.chat.type === "refine") setTab("chat");
       }),
-      store.subscribeEffect(matchesAction(chatSwitched), (action, { getState }) => {
-        const c = getState().chat.chats.find((x) => x.id === action.payload.id);
-        if (c?.type === "refine") setTab("chat");
-      }),
+      store.subscribeEffect(
+        matchesAction(chatSwitched),
+        (action, { getState }) => {
+          const c = getState().chat.chats.find(
+            (x) => x.id === action.payload.id,
+          );
+          if (c?.type === "refine") setTab("chat");
+        },
+      ),
       store.subscribeEffect(matchesAction(uiChatRefineCommitted), () =>
         setTab("engine"),
       ),
@@ -198,7 +207,10 @@ export function App() {
       }}
     >
       <div style={{ display: "flex" }}>
-        <button style={tabButtonStyle(tab === "chat")} onClick={() => setTab("chat")}>
+        <button
+          style={tabButtonStyle(tab === "chat")}
+          onClick={() => setTab("chat")}
+        >
           Chat
         </button>
         <button
@@ -248,12 +260,14 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 3: Chat shell + message bubbles + composer (brainstorm send/stream)
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/chat/Chat.tsx`
 - Create: `src/ui-jsx/panels/chat/Message.tsx`
 - Create: `src/ui-jsx/panels/chat/ChatInput.tsx`
 - Modify: `src/ui-jsx/App.tsx` (render `<Chat/>` in the Chat tab)
 
 **Interfaces:**
+
 - Consumes: `useSlice` (`../../bridge`), `T`/`SP` (`../../style`), `store` + actions + `activeSavedChat` (`../../../core/store`), `getChatTypeSpec` (`../../../core/chat-types`), `CHAT_INPUT_KEY` (`./chat-actions`), types `Chat`/`ChatMessage` (`../../../core/chat-types/types`).
 - Produces:
   - `Chat(): VNode` — the chat shell (header title + scrollable message list + composer). Header controls land in Task 4; for now the header is just the chat title.
@@ -379,7 +393,14 @@ export function ChatInput() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: SP.sm, padding: SP.md }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: SP.sm,
+        padding: SP.md,
+      }}
+    >
       <textarea
         key={nonce}
         rows={3}
@@ -444,7 +465,9 @@ export function Chat() {
         justifyContent: "space-between",
       }}
     >
-      <div style={{ color: T.textHeadings, fontWeight: "bold", padding: SP.md }}>
+      <div
+        style={{ color: T.textHeadings, fontWeight: "bold", padding: SP.md }}
+      >
         {chat.title}
       </div>
       <div
@@ -473,7 +496,9 @@ export function Chat() {
 In `src/ui-jsx/App.tsx`: add `import { Chat } from "./panels/chat/Chat";` and replace the placeholder:
 
 ```tsx
-        {tab === "chat" ? <Chat /> : <Foundation />}
+{
+  tab === "chat" ? <Chat /> : <Foundation />;
+}
 ```
 
 - [ ] **Step 5: Typecheck and build**
@@ -501,9 +526,11 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 4: Message controls (edit / retry / delete) + system Context collapse
 
 **Files:**
+
 - Modify: `src/ui-jsx/panels/chat/Message.tsx`
 
 **Interfaces:**
+
 - Consumes: `useDraftField` (`../../hooks`); icons `Edit`, `RotateCw`, `Trash`, `X`, `Check` from the `nai:icons/feather` virtual module (nibs-provided; trust the generated types); `messageUpdated`, `messageRemoved`, `uiChatRetryGeneration` from `../../../core/store`.
 - Produces: `Message` now supports inline edit (→ `messageUpdated`), retry (assistant, → `uiChatRetryGeneration`), delete (→ `messageRemoved`); system messages render collapsed with a "Context" header.
 
@@ -576,7 +603,12 @@ const iconBtn = {
   alignItems: "center",
 } as const;
 
-function EditBody(props: { chatId: string; message: ChatMessage; content: string; onDone: () => void }) {
+function EditBody(props: {
+  chatId: string;
+  message: ChatMessage;
+  content: string;
+  onDone: () => void;
+}) {
   const { value, setValue } = useDraftField(props.content);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: SP.sm }}>
@@ -600,7 +632,11 @@ function EditBody(props: { chatId: string; message: ChatMessage; content: string
           title="Save"
           onClick={() => {
             store.dispatch(
-              messageUpdated({ chatId: props.chatId, id: props.message.id, content: value }),
+              messageUpdated({
+                chatId: props.chatId,
+                id: props.message.id,
+                content: value,
+              }),
             );
             props.onDone();
           }}
@@ -623,7 +659,11 @@ export function Message(props: MessageProps) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
 
-  const rowStyle = isSystem ? BUBBLE.rowSystem : isUser ? BUBBLE.rowUser : BUBBLE.rowAsst;
+  const rowStyle = isSystem
+    ? BUBBLE.rowSystem
+    : isUser
+      ? BUBBLE.rowUser
+      : BUBBLE.rowAsst;
   const bubbleStyle = isSystem
     ? BUBBLE.bubbleSystem
     : isUser
@@ -635,7 +675,13 @@ export function Message(props: MessageProps) {
     return (
       <div style={rowStyle}>
         <div style={{ ...bubbleStyle, color: T.text }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <button
               style={{ ...iconBtn, fontStyle: "italic" }}
               onClick={() => setCollapsed((c) => !c)}
@@ -645,7 +691,9 @@ export function Message(props: MessageProps) {
             <button
               style={iconBtn}
               title="Delete"
-              onClick={() => store.dispatch(messageRemoved({ chatId, id: message.id }))}
+              onClick={() =>
+                store.dispatch(messageRemoved({ chatId, id: message.id }))
+              }
             >
               <Trash size={ICON} />
             </button>
@@ -660,12 +708,27 @@ export function Message(props: MessageProps) {
     <div style={rowStyle}>
       <div style={{ ...bubbleStyle, color: T.text }}>
         {editing ? (
-          <EditBody chatId={chatId} message={message} content={content} onDone={() => setEditing(false)} />
+          <EditBody
+            chatId={chatId}
+            message={message}
+            content={content}
+            onDone={() => setEditing(false)}
+          />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: SP.sm }}>
             <div>{content || "…"}</div>
-            <div style={{ display: "flex", gap: SP.sm, justifyContent: "flex-end" }}>
-              <button style={iconBtn} title="Edit" onClick={() => setEditing(true)}>
+            <div
+              style={{
+                display: "flex",
+                gap: SP.sm,
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                style={iconBtn}
+                title="Edit"
+                onClick={() => setEditing(true)}
+              >
                 <Edit size={ICON} />
               </button>
               {message.role === "assistant" && (
@@ -673,7 +736,9 @@ export function Message(props: MessageProps) {
                   style={iconBtn}
                   title="Retry"
                   onClick={() =>
-                    store.dispatch(uiChatRetryGeneration({ chatId, messageId: message.id }))
+                    store.dispatch(
+                      uiChatRetryGeneration({ chatId, messageId: message.id }),
+                    )
                   }
                 >
                   <RotateCw size={ICON} />
@@ -682,7 +747,9 @@ export function Message(props: MessageProps) {
               <button
                 style={iconBtn}
                 title="Delete"
-                onClick={() => store.dispatch(messageRemoved({ chatId, id: message.id }))}
+                onClick={() =>
+                  store.dispatch(messageRemoved({ chatId, id: message.id }))
+                }
               >
                 <Trash size={ICON} />
               </button>
@@ -722,11 +789,13 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 5: Chat header controls (sub-mode, summarize, new, sessions, back)
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/chat/ChatHeader.tsx`
 - Modify: `src/ui-jsx/panels/chat/Chat.tsx` (replace the title-only header with `<ChatHeader>`; add sessions toggle state and an `onBack` prop)
 - Modify: `src/ui-jsx/App.tsx` (pass `onBack` that switches to the Story Engine tab)
 
 **Interfaces:**
+
 - Consumes: `useSlice`; `store`, `chatCreated`, `chatSwitched`, `subModeChanged`, `uiChatSummarizeRequested`, `activeSavedChat` from `../../../core/store`; `getChatTypeSpec` from `../../../core/chat-types`; `nextBrainstormTitle` from `./chat-actions`; icons `Plus`, `Folder`, `ArrowLeft` from the `nai:icons/feather` virtual module; type `Chat as ChatT`, `HeaderControl` from `../../../core/chat-types/types`.
 - Produces: `ChatHeader(props: { onBack: () => void; onOpenSessions: () => void }): VNode` — renders `spec.headerControls()` for the active chat. `Chat` now accepts `props: { onBack: () => void }` and manages `showSessions` state (Sessions view lands in Task 6; for now the sessions button toggles a placeholder).
 
@@ -769,7 +838,9 @@ function modeBtnStyle(active: boolean, color: string) {
     fontSize: "0.75em",
     borderRadius: "4px",
     background: active ? color : "transparent",
-    border: active ? "1px solid rgba(255,255,255,0.2)" : "1px solid rgba(255,255,255,0.08)",
+    border: active
+      ? "1px solid rgba(255,255,255,0.2)"
+      : "1px solid rgba(255,255,255,0.08)",
     opacity: active ? 1 : 0.5,
     cursor: "pointer",
     color: T.text,
@@ -801,13 +872,21 @@ export function ChatHeader(props: ChatHeaderProps) {
           <div style={{ display: "flex", gap: SP.xs }}>
             <button
               style={modeBtnStyle(chat.subMode === "cowriter", MODE_COWRITER)}
-              onClick={() => store.dispatch(subModeChanged({ id: chat.id, subMode: "cowriter" }))}
+              onClick={() =>
+                store.dispatch(
+                  subModeChanged({ id: chat.id, subMode: "cowriter" }),
+                )
+              }
             >
               Co
             </button>
             <button
               style={modeBtnStyle(chat.subMode === "critic", MODE_CRITIC)}
-              onClick={() => store.dispatch(subModeChanged({ id: chat.id, subMode: "critic" }))}
+              onClick={() =>
+                store.dispatch(
+                  subModeChanged({ id: chat.id, subMode: "critic" }),
+                )
+              }
             >
               Crit
             </button>
@@ -819,7 +898,9 @@ export function ChatHeader(props: ChatHeaderProps) {
             style={{ ...modeBtnStyle(false, "transparent"), opacity: 1 }}
             onClick={() =>
               store.dispatch(
-                uiChatSummarizeRequested({ seed: { kind: "fromChat", sourceChatId: chat.id } }),
+                uiChatSummarizeRequested({
+                  seed: { kind: "fromChat", sourceChatId: chat.id },
+                }),
               )
             }
           >
@@ -849,7 +930,11 @@ export function ChatHeader(props: ChatHeaderProps) {
         );
       case "sessionsButton":
         return (
-          <button style={iconBtn} title="Sessions" onClick={props.onOpenSessions}>
+          <button
+            style={iconBtn}
+            title="Sessions"
+            onClick={props.onOpenSessions}
+          >
             <Folder size={ICON} />
           </button>
         );
@@ -860,13 +945,27 @@ export function ChatHeader(props: ChatHeaderProps) {
   });
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: SP.sm, padding: SP.md }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: SP.sm,
+        padding: SP.md,
+      }}
+    >
       {hasBack && (
         <button style={iconBtn} title="Back" onClick={props.onBack}>
           <ArrowLeft size={ICON} />
         </button>
       )}
-      <span style={{ flex: 1, color: T.textHeadings, fontWeight: "bold", fontSize: "0.85em" }}>
+      <span
+        style={{
+          flex: 1,
+          color: T.textHeadings,
+          fontWeight: "bold",
+          fontSize: "0.85em",
+        }}
+      >
         {chat.title}
       </span>
       {trailing}
@@ -902,8 +1001,18 @@ export function Chat(props: { onBack: () => void }) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", justifyContent: "space-between" }}>
-      <ChatHeader onBack={props.onBack} onOpenSessions={() => setShowSessions(true)} />
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        justifyContent: "space-between",
+      }}
+    >
+      <ChatHeader
+        onBack={props.onBack}
+        onOpenSessions={() => setShowSessions(true)}
+      />
       <div
         style={{
           flex: 1,
@@ -915,7 +1024,9 @@ export function Chat(props: { onBack: () => void }) {
           padding: SP.md,
         }}
       >
-        {chat.messages.map((m) => <Message key={m.id} chatId={chat.id} message={m} />).reverse()}
+        {chat.messages
+          .map((m) => <Message key={m.id} chatId={chat.id} message={m} />)
+          .reverse()}
       </div>
       <ChatInput />
     </div>
@@ -954,10 +1065,12 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 6: Sessions in-panel view
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/chat/Sessions.tsx`
 - Modify: `src/ui-jsx/panels/chat/Chat.tsx` (render `<Sessions>` when `showSessions`)
 
 **Interfaces:**
+
 - Consumes: `useSlice`; `store`, `chatCreated`, `chatSwitched`, `chatRenamed`, `chatDeleted`, `activeSavedChat` from `../../../core/store`; `nextBrainstormTitle` from `./chat-actions`; type `Chat as ChatT`; icons `Plus`, `Trash`, `ArrowLeft` from the `nai:icons/feather` virtual module.
 - Produces: `Sessions(props: { onBack: () => void }): VNode` — chat list with New / switch / rename / delete.
 
@@ -990,8 +1103,11 @@ const iconBtn = {
 } as const;
 
 export function Sessions(props: { onBack: () => void }) {
-  const stamp = useSlice((s) =>
-    s.chat.chats.map((c) => `${c.id}:${c.title}`).join("|") + "#" + (s.chat.activeChatId ?? ""),
+  const stamp = useSlice(
+    (s) =>
+      s.chat.chats.map((c) => `${c.id}:${c.title}`).join("|") +
+      "#" +
+      (s.chat.activeChatId ?? ""),
   );
   void stamp; // re-render trigger
   const chats = store.getState().chat.chats;
@@ -1012,17 +1128,34 @@ export function Sessions(props: { onBack: () => void }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: SP.sm, padding: SP.md, height: "100%" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: SP.sm,
+        padding: SP.md,
+        height: "100%",
+      }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
         <button style={iconBtn} title="Back" onClick={props.onBack}>
           <ArrowLeft size={16} />
         </button>
-        <span style={{ flex: 1, color: T.textHeadings, fontWeight: "bold" }}>Sessions</span>
+        <span style={{ flex: 1, color: T.textHeadings, fontWeight: "bold" }}>
+          Sessions
+        </span>
         <button style={iconBtn} title="New chat" onClick={newChat}>
           <Plus size={16} />
         </button>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: SP.xs, overflow: "auto" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: SP.xs,
+          overflow: "auto",
+        }}
+      >
         {chats.map((c) => (
           <div
             key={c.id}
@@ -1084,9 +1217,9 @@ Add a `renamingId` state to `Sessions` and a small inline editor row. Concretely
 Replace the `showSessions` placeholder block with:
 
 ```tsx
-  if (showSessions) {
-    return <Sessions onBack={() => setShowSessions(false)} />;
-  }
+if (showSessions) {
+  return <Sessions onBack={() => setShowSessions(false)} />;
+}
 ```
 
 Add `import { Sessions } from "./Sessions";` to `Chat.tsx`.
@@ -1118,12 +1251,14 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ### Task 7: Refine loop — adaptive Foundation zap + RefineCommitBar
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/chat/RefineCommitBar.tsx`
 - Modify: `src/ui-jsx/panels/chat/Chat.tsx` (show `<RefineCommitBar>` for refine chats)
 - Modify: `src/ui-jsx/panels/Foundation.tsx` (adaptive zap: empty → generate, non-empty → `uiChatRefineRequested`)
 - Modify: `CHANGELOG.md`
 
 **Interfaces:**
+
 - Consumes: `decideFieldAction` (`./chat-actions`); `uiChatRefineRequested`, `uiChatRefineCommitted`, `uiChatRefineDiscarded`, `activeSavedChat`, `store` from core; existing `attgGenerationRequested`/`styleGenerationRequested` in Foundation.
 - Produces: `RefineCommitBar(): VNode` — Commit / Discard bar for refine chats. Foundation's ATTG/Style zap becomes adaptive.
 
@@ -1132,11 +1267,22 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```tsx
 // src/ui-jsx/panels/chat/RefineCommitBar.tsx
 import { T, SP } from "../../style";
-import { store, uiChatRefineCommitted, uiChatRefineDiscarded } from "../../../core/store";
+import {
+  store,
+  uiChatRefineCommitted,
+  uiChatRefineDiscarded,
+} from "../../../core/store";
 
 export function RefineCommitBar() {
   return (
-    <div style={{ display: "flex", gap: SP.sm, padding: SP.md, borderTop: `1px solid ${T.bg2}` }}>
+    <div
+      style={{
+        display: "flex",
+        gap: SP.sm,
+        padding: SP.md,
+        borderTop: `1px solid ${T.bg2}`,
+      }}
+    >
       <button
         style={{ flex: 1, padding: "6px", color: T.midIntensity }}
         onClick={() => store.dispatch(uiChatRefineCommitted())}
@@ -1161,8 +1307,10 @@ In `Chat.tsx`, after `<ChatInput />`, conditionally render the bar:
 ```tsx
 import { RefineCommitBar } from "./RefineCommitBar";
 // ...
-      <ChatInput />
-      {chat.type === "refine" && <RefineCommitBar />}
+<ChatInput />;
+{
+  chat.type === "refine" && <RefineCommitBar />;
+}
 ```
 
 - [ ] **Step 3: Make the Foundation zap adaptive**
@@ -1254,6 +1402,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Self-Review
 
 **Spec coverage:**
+
 - Panel tab shell + store-driven switching → Task 2. ✓
 - Chat shell (header + list + input + optional commit bar) → Tasks 3, 5, 7. ✓
 - ChatHeader polymorphic controls → Task 5. ✓

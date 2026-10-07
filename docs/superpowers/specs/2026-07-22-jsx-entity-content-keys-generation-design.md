@@ -12,7 +12,7 @@ generate buttons — **lorebook Content** and **Keys** — completing the entity
 pane's generation surface. They share the summary's buffer→draft mechanism but
 add lorebook specifics: **draft→live promotion**, **`selectedEntryId` gating**,
 a **prefill** header (content streams prefill + body), and **commit-to-lorebook**
-on completion (so content/keys generation is *sticky*, unlike summary).
+on completion (so content/keys generation is _sticky_, unlike summary).
 
 The three near-identical generate blocks (summary/content/keys) are unified into
 a shared `useGenField` hook.
@@ -57,10 +57,10 @@ a shared `useGenField` hook.
 
 ```ts
 function useGenField(opts: {
-  requestId: string;   // "" until available (draft with no entry) → not pending
-  bufferKey: string;   // "" until available
+  requestId: string; // "" until available (draft with no entry) → not pending
+  bufferKey: string; // "" until available
   draft: { value: string; setValue: (v: string) => void };
-  arm: () => void;     // field-specific dispatch (+ promote/select for lorebook)
+  arm: () => void; // field-specific dispatch (+ promote/select for lorebook)
 }): { pending: boolean; live: string | undefined; onGenerate: () => void } {
   const pending = useSlice((s) =>
     opts.requestId ? isRequestActive(s.runtime, opts.requestId) : false,
@@ -71,7 +71,9 @@ function useGenField(opts: {
   // Wipe stale buffer on open / when the key changes (post-promotion) + unmount.
   useEffect(() => {
     if (opts.bufferKey) clearStream(opts.bufferKey);
-    return () => { if (opts.bufferKey) clearStream(opts.bufferKey); };
+    return () => {
+      if (opts.bufferKey) clearStream(opts.bufferKey);
+    };
   }, [opts.bufferKey]);
 
   // Stage the final into the editable draft when a pane-triggered generation
@@ -98,11 +100,11 @@ Three call sites (unconditional, before the `if (!entity) return null` guard):
 
 - **Summary**: `requestId: \`se-entity-summary-${entityId}\``,
   `bufferKey: \`entity-summary:${entityId}\``, `draft: summary`,
-  `arm: () => store.dispatch(uiEntitySummaryGenerationRequested({ entityId, requestId: \`se-entity-summary-${entityId}\` }))`.
+`arm: () => store.dispatch(uiEntitySummaryGenerationRequested({ entityId, requestId: \`se-entity-summary-${entityId}\` }))`.
 - **Content**: `eid = entity?.lorebookEntryId ?? ""`;
   `requestId: eid ? \`lb-item-${eid}-content\` : ""`,
   `bufferKey: eid ? \`lb-content:${eid}\` : ""`, `draft: content`,
-  `arm: () => void (async () => { const id = await ensureLiveEntryId(entityId); if (!id) return; store.dispatch(uiLorebookEntrySelected({ entryId: id, categoryId: null })); store.dispatch(uiLorebookContentGenerationRequested({ requestId: \`lb-item-${id}-content\` })); })()`.
+`arm: () => void (async () => { const id = await ensureLiveEntryId(entityId); if (!id) return; store.dispatch(uiLorebookEntrySelected({ entryId: id, categoryId: null })); store.dispatch(uiLorebookContentGenerationRequested({ requestId: \`lb-item-${id}-content\` })); })()`.
 - **Keys**: analogous with `lb-item-${id}-keys` / `lb-keys:${id}` and
   `uiLorebookKeysGenerationRequested`.
 
@@ -122,8 +124,8 @@ correctly. `genRef` (a ref) survives the re-render.
 Import `writeStream`, `clearStream` from `../../stream-buffer`.
 
 - `lorebookContentHandler.streaming`: after `storyStorage.set(CONTENT_DRAFT_RAW, displayContent)`, add
-  `writeStream(\`lb-content:${ctx.target.entryId}\`, displayContent)` (still inside
-  the `selectedEntryId === entryId` gate).
+  `writeStream(\`lb-content:${ctx.target.entryId}\`, displayContent)`(still inside
+the`selectedEntryId === entryId` gate).
 - `lorebookContentHandler.completion`: in the success branch, after
   `const fullContent = prefill + cleaned;`, add
   `writeStream(\`lb-content:${entryId}\`, fullContent)` (pre-erato — the editable

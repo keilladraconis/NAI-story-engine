@@ -11,7 +11,7 @@ edit pane. Generation streaming into the JSX panel is solved only for **chat**
 (via the effect-free `stream-buffer` + `useStream`); the `jsx-streaming-flush`
 memory lists foundation/lorebook/list as TODO.
 
-Foundation generation already *works* in JSX — the completion handler commits to
+Foundation generation already _works_ in JSX — the completion handler commits to
 the store (`attgUpdated`, etc.) and the JSX card reads the store, so the result
 appears on completion. What's missing is **live per-token streaming** into the
 card: today the card is blank during generation, then the result pops in.
@@ -52,11 +52,11 @@ attg, style} (the FoundationTarget.field values the JSX panel renders).
 - `streaming(ctx)`: keep the SUI line
   `api.v1.ui.updateParts([{ id: viewId, text: escapeForMarkdown(ctx.accumulatedText) }])`,
   and **add** `writeStream(\`foundation:${ctx.target.field}\`, ctx.accumulatedText)`.
-  The SUI path escapes for markdown; the JSX path stores raw text (JSX renders
-  plain with `whiteSpace: pre-wrap`).
+The SUI path escapes for markdown; the JSX path stores raw text (JSX renders
+plain with `whiteSpace: pre-wrap`).
 - `completion(ctx)`: keep the existing store dispatches; wrap the body in
-  `try { … } finally { clearStream(\`foundation:${field}\`) }` so the buffer is
-  cleared even on failure/empty (early `return`), letting the card fall back to
+  `try { … } finally { clearStream(\`foundation:${field}\`) }`so the buffer is
+cleared even on failure/empty (early`return`), letting the card fall back to
   the committed store value.
 
 ## JSX change — `src/ui-jsx/panels/foundation/FieldCard.tsx`

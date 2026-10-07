@@ -20,14 +20,17 @@
 ### Task 1: Adaptive Content Zap (generate ⇄ refine)
 
 **Files:**
+
 - Modify: `src/ui-jsx/panels/world/EntityEditPane.tsx`
 
 **Interfaces:**
+
 - Consumes: `uiChatRefineRequested` (`../../../core/store`) — payload `{ fieldId: string; sourceText: string; entryId?: string }`. Existing `ensureLiveEntryId`, `applyEratoPrefix`, `withNameKeyFirst`, `parseKeys`, `propagateNameInSummaries`, `entityEdited`, `entitySummaryUpdated`.
 
 - [ ] **Step 1: Import `uiChatRefineRequested`**
 
 Add it to the existing `../../../core/store` import block (after `uiLorebookKeysGenerationRequested`):
+
 ```ts
   uiLorebookKeysGenerationRequested,
   uiChatRefineRequested,
@@ -37,49 +40,10 @@ Add it to the existing `../../../core/store` import block (after `uiLorebookKeys
 - [ ] **Step 2: Extract `flushToStore` from `onSave`**
 
 Current `onSave` (≈ lines 287–318):
+
 ```tsx
-  const onSave = () => {
-    void (async () => {
-      const newName = name.value.trim() || entity.name;
-      const newSummary = summary.value.trim();
-      const oldName = entity.name;
-      store.dispatch(
-        entityEdited({ entityId, name: newName, summary: newSummary }),
-      );
-
-      for (const u of propagateNameInSummaries(
-        Object.values(store.getState().world.entitiesById),
-        entityId,
-        oldName,
-        newName,
-      )) {
-        store.dispatch(
-          entitySummaryUpdated({ entityId: u.entityId, summary: u.summary }),
-        );
-      }
-
-      const liveId = await ensureLiveEntryId(entityId);
-      if (liveId) {
-        const erato = (await api.v1.config.get("erato_compatibility")) || false;
-        await api.v1.lorebook.updateEntry(liveId, {
-          displayName: newName,
-          text: applyEratoPrefix(content.value, !!erato),
-          keys: withNameKeyFirst(parseKeys(keys.value), newName),
-          forceActivation: alwaysOn,
-        });
-      }
-      close();
-    })();
-  };
-```
-
-Replace it with a `flushToStore` helper (the commit body, returning the live id, **no** `close()`) plus a thin `onSave` and the new `onRefineContent`:
-```tsx
-  // Commit the pane's current edits to the store + lorebook (the Save body
-  // without closing). Returns the live lorebook entry id (promoting a draft if
-  // needed). Used by Save and by content-refine (which must persist drafts
-  // before the Chat tab unmounts this pane).
-  const flushToStore = async (): Promise<string | undefined> => {
+const onSave = () => {
+  void (async () => {
     const newName = name.value.trim() || entity.name;
     const newSummary = summary.value.trim();
     const oldName = entity.name;
@@ -108,67 +72,110 @@ Replace it with a `flushToStore` helper (the commit body, returning the live id,
         forceActivation: alwaysOn,
       });
     }
-    return liveId;
-  };
+    close();
+  })();
+};
+```
 
-  const onSave = () => {
-    void (async () => {
-      await flushToStore();
-      close();
-    })();
-  };
+Replace it with a `flushToStore` helper (the commit body, returning the live id, **no** `close()`) plus a thin `onSave` and the new `onRefineContent`:
 
-  // Populated-content Zap: flush the pane (persist name/summary/content/keys and
-  // promote a draft), then open the refine chat on the entry's lorebook content.
-  // The Chat tab unmounts StoryEngine; on return the pane remounts and re-seeds
-  // the refined content from the lorebook (no stale clobber).
-  const onRefineContent = () => {
-    void (async () => {
-      const liveId = await flushToStore();
-      if (!liveId) return;
-      store.dispatch(
-        uiChatRefineRequested({
-          fieldId: "lorebookContent",
-          sourceText: content.value,
-          entryId: liveId,
-        }),
-      );
-    })();
-  };
+```tsx
+// Commit the pane's current edits to the store + lorebook (the Save body
+// without closing). Returns the live lorebook entry id (promoting a draft if
+// needed). Used by Save and by content-refine (which must persist drafts
+// before the Chat tab unmounts this pane).
+const flushToStore = async (): Promise<string | undefined> => {
+  const newName = name.value.trim() || entity.name;
+  const newSummary = summary.value.trim();
+  const oldName = entity.name;
+  store.dispatch(
+    entityEdited({ entityId, name: newName, summary: newSummary }),
+  );
+
+  for (const u of propagateNameInSummaries(
+    Object.values(store.getState().world.entitiesById),
+    entityId,
+    oldName,
+    newName,
+  )) {
+    store.dispatch(
+      entitySummaryUpdated({ entityId: u.entityId, summary: u.summary }),
+    );
+  }
+
+  const liveId = await ensureLiveEntryId(entityId);
+  if (liveId) {
+    const erato = (await api.v1.config.get("erato_compatibility")) || false;
+    await api.v1.lorebook.updateEntry(liveId, {
+      displayName: newName,
+      text: applyEratoPrefix(content.value, !!erato),
+      keys: withNameKeyFirst(parseKeys(keys.value), newName),
+      forceActivation: alwaysOn,
+    });
+  }
+  return liveId;
+};
+
+const onSave = () => {
+  void (async () => {
+    await flushToStore();
+    close();
+  })();
+};
+
+// Populated-content Zap: flush the pane (persist name/summary/content/keys and
+// promote a draft), then open the refine chat on the entry's lorebook content.
+// The Chat tab unmounts StoryEngine; on return the pane remounts and re-seeds
+// the refined content from the lorebook (no stale clobber).
+const onRefineContent = () => {
+  void (async () => {
+    const liveId = await flushToStore();
+    if (!liveId) return;
+    store.dispatch(
+      uiChatRefineRequested({
+        fieldId: "lorebookContent",
+        sourceText: content.value,
+        entryId: liveId,
+      }),
+    );
+  })();
+};
 ```
 
 - [ ] **Step 3: Make the Content Zap adaptive**
 
 Replace the Content generate button (≈ lines 436–443):
+
 ```tsx
-          <button
-            title={contentGen.pending ? "Generating…" : "Generate content"}
-            onClick={contentGen.onGenerate}
-            disabled={contentGen.pending}
-            style={genZapStyle(contentGen.pending)}
-          >
-            <Zap size={ICON_SIZE} />
-          </button>
+<button
+  title={contentGen.pending ? "Generating…" : "Generate content"}
+  onClick={contentGen.onGenerate}
+  disabled={contentGen.pending}
+  style={genZapStyle(contentGen.pending)}
+>
+  <Zap size={ICON_SIZE} />
+</button>
 ```
+
 with:
+
 ```tsx
-          <button
-            title={
-              contentGen.pending
-                ? "Generating…"
-                : content.value.trim()
-                  ? "Refine content"
-                  : "Generate content"
-            }
-            onClick={
-              content.value.trim() ? onRefineContent : contentGen.onGenerate
-            }
-            disabled={loading || contentGen.pending}
-            style={genZapStyle(contentGen.pending)}
-          >
-            <Zap size={ICON_SIZE} />
-          </button>
+<button
+  title={
+    contentGen.pending
+      ? "Generating…"
+      : content.value.trim()
+        ? "Refine content"
+        : "Generate content"
+  }
+  onClick={content.value.trim() ? onRefineContent : contentGen.onGenerate}
+  disabled={loading || contentGen.pending}
+  style={genZapStyle(contentGen.pending)}
+>
+  <Zap size={ICON_SIZE} />
+</button>
 ```
+
 (`disabled={loading || contentGen.pending}` guards the pre-seed window: while
 `loading`, `content.value` is `""`, so without it the Zap would read as
 "Generate" and could overwrite the entry's real content before it loads.)

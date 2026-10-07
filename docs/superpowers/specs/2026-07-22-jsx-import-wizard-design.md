@@ -22,7 +22,7 @@ This is the first JSX component to load lorebook data (`api.v1.lorebook.entries(
   Engine view (Back closes it).
 - **Foundation import**: Memory→ATTG, A/N→Style (each with a preview + one-click
   import, marked done), and Story→Shape+Intent generation triggers.
-- **Lorebook binding**: list *unmanaged* lorebook entries grouped by category,
+- **Lorebook binding**: list _unmanaged_ lorebook entries grouped by category,
   each with a DULFS category picker and a Bind action; bound entries drop out
   live. Plus **Import All** (batch everything, close) and **Refresh**.
 
@@ -48,10 +48,10 @@ This is the first JSX component to load lorebook data (`api.v1.lorebook.entries(
     `intentGenerationRequested()`.
 - Lorebook body: unmanaged grouped by `entry.category` (named categories
   alphabetical by name, "uncategorized" last). Each entry: `displayName ||
-  "(unnamed)"`, a DULFS cycle button (`${DULFS_SHORT[catId]} ▶`, seeded by
+"(unnamed)"`, a DULFS cycle button (`${DULFS_SHORT[catId]} ▶`, seeded by
   `detectCategory(entry.text)`, cycled via `cycleDulfsCategory`), and a **⚡ Bind**
   button → `entityBound({ entity: { id: uuid, categoryId: catId, lorebookEntryId,
-  name: displayName || "Unknown", summary: "", lifecycle: "live" } })` + a success
+name: displayName || "Unknown", summary: "", lifecycle: "live" } })` + a success
   toast. Empty states: "No lorebook entries found." vs "All lorebook entries are
   already bound…".
 - Header: Back (close), title, Refresh (reload lorebook + toast), **Import All**:
@@ -87,14 +87,22 @@ recompute `unmanaged = entries.filter((e) => !managedSet.has(e.id))` from
 ### `import-data.ts` — pure helpers + loader hook
 
 Pure (unit-tested):
+
 ```ts
 export const DULFS_SHORT: Record<DulfsFieldID, string> = {
-  dramatisPersonae: "Char", universeSystems: "Sys", locations: "Loc",
-  factions: "Fac", situationalDynamics: "Dyn", topics: "Topic",
+  dramatisPersonae: "Char",
+  universeSystems: "Sys",
+  locations: "Loc",
+  factions: "Fac",
+  situationalDynamics: "Dyn",
+  topics: "Topic",
 };
 
 /** Entries not bound to any SE entity (managedIds = set of bound lorebookEntryIds). */
-export function unmanagedEntries(entries: LorebookEntry[], managedIds: Set<string>): LorebookEntry[];
+export function unmanagedEntries(
+  entries: LorebookEntry[],
+  managedIds: Set<string>,
+): LorebookEntry[];
 
 /** Grouped by entry.category, named categories alphabetical by display name,
  *  "uncategorized" last. Returns [{ key, label, entries }]. */
@@ -112,6 +120,7 @@ that reloads lorebook (entries+categories) and re-sets state. `categoryNames` is
 ### `ImportFoundation.tsx`
 
 Props `{ memText: string; anText: string }`. Local `useState` `attgDone`/`styleDone`.
+
 - Memory→ATTG row (only if `memText.trim()`): label, truncated preview, Import
   button (dispatches attg actions + `api.v1.memory.set` + `setAttgDone(true)`);
   when done → dimmed + "Imported ✓".
@@ -122,6 +131,7 @@ Props `{ memText: string; anText: string }`. Local `useState` `attgDone`/`styleD
 ### `ImportLorebook.tsx`
 
 Props `{ entries: LorebookEntry[]; categoryNames: Map<string,string>; onBound: () => void }`.
+
 - `managedKey` via `useSlice` (above) → `managedSet` → `unmanaged`.
 - Local `dulfsMap` state: `Record<entryId, DulfsFieldID>`; `catFor(entry)` returns
   `dulfsMap[id] ?? detectCategory(entry.text ?? "")`.
@@ -137,6 +147,7 @@ Props `{ entries: LorebookEntry[]; categoryNames: Map<string,string>; onBound: (
 ### `ImportWizard.tsx`
 
 Props `{ onClose: () => void }`. Calls `useImportData()`. Renders:
+
 - Header row: Back (`onClose`), "Import Existing Content" title, Refresh
   (`data.refresh()` + toast), **Import All** button.
 - `ImportFoundation` (memText/anText), then `ImportLorebook` (entries/categoryNames).

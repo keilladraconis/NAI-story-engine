@@ -39,10 +39,12 @@
 ### Task 1: `entity-edit.ts` — pure Save helpers (TDD)
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/world/entity-edit.ts`
 - Test: `tests/ui-jsx/entity-edit.test.ts`
 
 **Interfaces:**
+
 - Consumes: type `WorldEntity` from `../../../core/store`.
 - Produces:
   - `parseKeys(raw: string): string[]`
@@ -140,7 +142,8 @@ export function parseKeys(raw: string): string[] {
 /** Prepend the erato "----\n" divider to non-empty content when erato mode is on
  *  and it isn't already prefixed. */
 export function applyEratoPrefix(content: string, erato: boolean): string {
-  if (content && erato && !content.startsWith("----\n")) return "----\n" + content;
+  if (content && erato && !content.startsWith("----\n"))
+    return "----\n" + content;
   return content;
 }
 
@@ -153,7 +156,10 @@ export function propagateNameInSummaries(
   newName: string,
 ): Array<{ entityId: string; summary: string }> {
   if (!oldName || oldName === newName) return [];
-  const pattern = new RegExp(oldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  const pattern = new RegExp(
+    oldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    "gi",
+  );
   const updates: Array<{ entityId: string; summary: string }> = [];
   for (const other of entities) {
     if (other.id === entityId) continue;
@@ -189,10 +195,12 @@ git commit -m "feat(jsx): entity-edit pure Save helpers (keys/erato/name-propaga
 ### Task 2: `world-select.ts` — `entityBorderKind` gains `complete` (TDD)
 
 **Files:**
+
 - Modify: `src/ui-jsx/panels/world/world-select.ts`
 - Test: `tests/ui-jsx/world-select.test.ts` (extend)
 
 **Interfaces:**
+
 - Produces: `type BorderKind = "draft" | "pending" | "incomplete" | "complete"`;
   `entityBorderKind(entity: WorldEntity, pending: boolean, complete?: boolean): BorderKind`.
 
@@ -205,7 +213,9 @@ In `tests/ui-jsx/world-select.test.ts`, replace the existing `describe("entityBo
 ```ts
 describe("entityBorderKind", () => {
   it("draft → draft (regardless of pending/complete)", () => {
-    expect(entityBorderKind(ent("a", { lifecycle: "draft" }), true, true)).toBe("draft");
+    expect(entityBorderKind(ent("a", { lifecycle: "draft" }), true, true)).toBe(
+      "draft",
+    );
   });
   it("live + pending → pending (pending wins over complete)", () => {
     expect(entityBorderKind(ent("a"), true, true)).toBe("pending");
@@ -271,9 +281,11 @@ git commit -m "feat(jsx): entityBorderKind complete kind"
 ### Task 3: `ConfirmButton.tsx` — optional `label`
 
 **Files:**
+
 - Modify: `src/ui-jsx/components/ConfirmButton.tsx`
 
 **Interfaces:**
+
 - Produces: `ConfirmButton(props: { title: string; onConfirm: () => void; timeoutMs?: number; label?: string })`. When `label` is set, the button also renders the label text (idle) / "Confirm?" (armed). Existing icon-only callers omit `label` and are unchanged.
 
 > Verified by `npx tsc --noEmit`; behavior in the final live pass.
@@ -294,12 +306,16 @@ export function ConfirmButton(props: {
 Then replace the `return (...)` button body's children (the single icon expression) so the icon is followed by an optional label span:
 
 ```tsx
-      {armed ? <AlertTriangle size={ICON_SIZE} /> : <Trash2 size={ICON_SIZE} />}
-      {props.label ? (
-        <span style={{ marginLeft: "4px", fontSize: "0.85em" }}>
-          {armed ? "Confirm?" : props.label}
-        </span>
-      ) : null}
+{
+  armed ? <AlertTriangle size={ICON_SIZE} /> : <Trash2 size={ICON_SIZE} />;
+}
+{
+  props.label ? (
+    <span style={{ marginLeft: "4px", fontSize: "0.85em" }}>
+      {armed ? "Confirm?" : props.label}
+    </span>
+  ) : null;
+}
 ```
 
 Also add `display: "inline-flex"` and `alignItems: "center"` to the button's existing `style` object so the icon + label align:
@@ -334,9 +350,11 @@ git commit -m "feat(jsx): ConfirmButton optional label"
 ### Task 4: `EntityEditPane.tsx` — the editor
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/world/EntityEditPane.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSlice` from `../../bridge`; `useDraftField` from `../../hooks`; `T`, `SP` from `../../style`; `store`, `entityEdited`, `entityCategoryChanged`, `entityLorebookEntryBound`, `entitySummaryUpdated`, `entityDeleted`, `uiEditableDeactivate` from `../../../core/store`; `ensureCategory` from `../../../core/store/effects/lorebook-sync`; `nameKey`, `withNameKeyFirst` from `../../../core/store/effects/handlers/lorebook`; `FieldID`, `type DulfsFieldID` from `../../../config/field-definitions`; `parseKeys`, `applyEratoPrefix`, `propagateNameInSummaries` from `./entity-edit`; `ConfirmButton` from `../../components/ConfirmButton`; `ArrowLeft`, `Zap`, `User`, `Cpu`, `MapPin`, `Shield`, `Activity`, `Hash` from `nai:icons/feather`.
 - Produces: `EntityEditPane(props: { entityId: string })`.
 
@@ -407,7 +425,11 @@ const inputStyle = {
   padding: SP.md,
   border: "none",
 } as const;
-const sectionRow = { display: "flex", alignItems: "center", gap: SP.sm } as const;
+const sectionRow = {
+  display: "flex",
+  alignItems: "center",
+  gap: SP.sm,
+} as const;
 const sectionLabel = {
   flex: 1,
   fontSize: "0.8em",
@@ -423,7 +445,9 @@ const disabledZap = {
 
 /** Resolve, or create+bind, the lorebook entry for this entity. Idempotent —
  *  returns the existing id for live entities, lazily promotes drafts. */
-async function ensureLiveEntryId(entityId: string): Promise<string | undefined> {
+async function ensureLiveEntryId(
+  entityId: string,
+): Promise<string | undefined> {
   const existing =
     store.getState().world.entitiesById[entityId]?.lorebookEntryId;
   if (existing) return existing;
@@ -463,7 +487,8 @@ export function EntityEditPane(props: { entityId: string }) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const eid = store.getState().world.entitiesById[entityId]?.lorebookEntryId;
+      const eid =
+        store.getState().world.entitiesById[entityId]?.lorebookEntryId;
       if (eid) {
         const entry = await api.v1.lorebook.entry(eid);
         if (!cancelled && entry) {
@@ -493,7 +518,9 @@ export function EntityEditPane(props: { entityId: string }) {
       const newName = name.value.trim() || entity.name;
       const newSummary = summary.value.trim();
       const oldName = entity.name;
-      store.dispatch(entityEdited({ entityId, name: newName, summary: newSummary }));
+      store.dispatch(
+        entityEdited({ entityId, name: newName, summary: newSummary }),
+      );
 
       for (const u of propagateNameInSummaries(
         Object.values(store.getState().world.entitiesById),
@@ -554,7 +581,11 @@ export function EntityEditPane(props: { entityId: string }) {
         <span style={{ flex: 1, color: T.textHeadings, fontWeight: "bold" }}>
           {name.value || "(unnamed)"}
         </span>
-        <ConfirmButton title="Delete entity" label="Delete" onConfirm={onDelete} />
+        <ConfirmButton
+          title="Delete entity"
+          label="Delete"
+          onConfirm={onDelete}
+        />
         <button onClick={onSave} style={{ padding: "4px 16px" }}>
           Save
         </button>
@@ -689,9 +720,11 @@ git commit -m "feat(jsx): entity edit pane — category/name/summary/lorebook + 
 ### Task 5: `EntityCard.tsx` — completeness border + clickable name
 
 **Files:**
+
 - Modify: `src/ui-jsx/panels/world/EntityCard.tsx`
 
 **Interfaces:**
+
 - Consumes: adds `uiEditableActivate` from `../../../core/store`.
 
 > Verified by `npx tsc --noEmit`; behavior in the final live pass.
@@ -701,7 +734,11 @@ git commit -m "feat(jsx): entity edit pane — category/name/summary/lorebook + 
 In `src/ui-jsx/panels/world/EntityCard.tsx`, change the core-store import line:
 
 ```tsx
-import { store, entityDiscardRequested, uiEditableActivate } from "../../../core/store";
+import {
+  store,
+  entityDiscardRequested,
+  uiEditableActivate,
+} from "../../../core/store";
 ```
 
 - [ ] **Step 2: Extend `borderColor` for the `complete` kind**
@@ -722,35 +759,35 @@ function borderColor(kind: BorderKind): string {
 Inside `EntityCard`, after the existing `pending` selector line, add the completeness state + effect:
 
 ```tsx
-  const [complete, setComplete] = useState(false);
+const [complete, setComplete] = useState(false);
 
-  // Green "complete" needs a lorebook read (text + keys). Re-fetch when the
-  // entity object changes (a Save produces a new object) or a regen settles.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const eid = entity?.lorebookEntryId;
-      if (!entity || entity.lifecycle === "draft" || !eid) {
-        if (!cancelled) setComplete(false);
-        return;
-      }
-      const entry = await api.v1.lorebook.entry(eid);
-      const keysOk =
-        !!entry?.forceActivation || !!(entry?.keys && entry.keys.length > 0);
-      if (!cancelled) {
-        setComplete(!!entity.summary && !!entry?.text && keysOk);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [entity, pending]);
+// Green "complete" needs a lorebook read (text + keys). Re-fetch when the
+// entity object changes (a Save produces a new object) or a regen settles.
+useEffect(() => {
+  let cancelled = false;
+  void (async () => {
+    const eid = entity?.lorebookEntryId;
+    if (!entity || entity.lifecycle === "draft" || !eid) {
+      if (!cancelled) setComplete(false);
+      return;
+    }
+    const entry = await api.v1.lorebook.entry(eid);
+    const keysOk =
+      !!entry?.forceActivation || !!(entry?.keys && entry.keys.length > 0);
+    if (!cancelled) {
+      setComplete(!!entity.summary && !!entry?.text && keysOk);
+    }
+  })();
+  return () => {
+    cancelled = true;
+  };
+}, [entity, pending]);
 ```
 
 Then change the `kind` line to pass `complete`:
 
 ```tsx
-  const kind = entityBorderKind(entity, pending, complete);
+const kind = entityBorderKind(entity, pending, complete);
 ```
 
 - [ ] **Step 4: Make the name clickable (opens the edit pane)**
@@ -758,22 +795,22 @@ Then change the `kind` line to pass `complete`:
 Replace the name `<span>` with a name button that opens the editor:
 
 ```tsx
-        <button
-          title="Edit entity"
-          onClick={() => store.dispatch(uiEditableActivate({ id: entityId }))}
-          style={{
-            flex: 1,
-            textAlign: "left",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: T.text,
-            padding: 0,
-            font: "inherit",
-          }}
-        >
-          {entity.name || "(unnamed)"}
-        </button>
+<button
+  title="Edit entity"
+  onClick={() => store.dispatch(uiEditableActivate({ id: entityId }))}
+  style={{
+    flex: 1,
+    textAlign: "left",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    color: T.text,
+    padding: 0,
+    font: "inherit",
+  }}
+>
+  {entity.name || "(unnamed)"}
+</button>
 ```
 
 Update the file's top comment to drop the "non-interactive / deferred" note (the name now opens the editor and the green border is live):
@@ -802,9 +839,11 @@ git commit -m "feat(jsx): entity card complete border + clickable name"
 ### Task 6: `World.tsx` — enable add-entity
 
 **Files:**
+
 - Modify: `src/ui-jsx/panels/world/World.tsx`
 
 **Interfaces:**
+
 - Consumes: adds `entityForged`, `uiEditableActivate` from `../../../core/store`; `FieldID` from `../../../config/field-definitions`.
 
 > Verified by `npx tsc --noEmit`; behavior in the final live pass. Only add-entity is enabled; add-thread stays disabled (thread edit pane is a later slice).
@@ -830,21 +869,21 @@ import { FieldID } from "../../../config/field-definitions";
 Inside `World`, before the `return`, add:
 
 ```tsx
-  const onAddEntity = () => {
-    const id = api.v1.uuid();
-    store.dispatch(
-      entityForged({
-        entity: {
-          id,
-          categoryId: FieldID.DramatisPersonae,
-          name: "",
-          summary: "",
-          lifecycle: "draft",
-        },
-      }),
-    );
-    store.dispatch(uiEditableActivate({ id }));
-  };
+const onAddEntity = () => {
+  const id = api.v1.uuid();
+  store.dispatch(
+    entityForged({
+      entity: {
+        id,
+        categoryId: FieldID.DramatisPersonae,
+        name: "",
+        summary: "",
+        lifecycle: "draft",
+      },
+    }),
+  );
+  store.dispatch(uiEditableActivate({ id }));
+};
 ```
 
 - [ ] **Step 3: Wire the add-entity button (replace the disabled one)**
@@ -852,17 +891,17 @@ Inside `World`, before the `return`, add:
 Replace the disabled add-entity button:
 
 ```tsx
-        <button title="Add entity (coming soon)" disabled style={DISABLED_BTN}>
-          <Plus size={ICON_SIZE} />
-        </button>
+<button title="Add entity (coming soon)" disabled style={DISABLED_BTN}>
+  <Plus size={ICON_SIZE} />
+</button>
 ```
 
 with an enabled one:
 
 ```tsx
-        <button title="Add entity" onClick={onAddEntity} style={ICON_BTN}>
-          <Plus size={ICON_SIZE} />
-        </button>
+<button title="Add entity" onClick={onAddEntity} style={ICON_BTN}>
+  <Plus size={ICON_SIZE} />
+</button>
 ```
 
 (Leave the add-thread button disabled — unchanged.)
@@ -885,10 +924,12 @@ git commit -m "feat(jsx): enable add-entity (create draft + open edit pane)"
 ### Task 7: `StoryEngine.tsx` orchestrator + App wiring
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/StoryEngine.tsx`
 - Modify: `src/ui-jsx/App.tsx`
 
 **Interfaces:**
+
 - `StoryEngine.tsx` consumes: `useSlice` from `../bridge`; `SP` from `../style`; `Foundation` from `./foundation/Foundation`; `World` from `./world/World`; `EntityEditPane` from `./world/EntityEditPane`.
 - Produces: `StoryEngine()`.
 

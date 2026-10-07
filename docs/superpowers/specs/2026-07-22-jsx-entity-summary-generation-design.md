@@ -9,7 +9,7 @@
 The JSX entity edit pane (`EntityEditPane`) has three generate buttons rendered
 disabled (summary / lorebook content / lorebook keys) — streaming into the open
 pane was unsolved. The foundation-streaming slice proved the shared-handler →
-`stream-buffer` → `useStream` pattern for *display*. This slice applies it to the
+`stream-buffer` → `useStream` pattern for _display_. This slice applies it to the
 first, simplest pane generate button — **Summary** — which additionally requires
 **draft-staging** (the pane holds an editable draft, and "Back discards" must
 hold, so generation must not commit to the store; the buffer carries the final
@@ -65,10 +65,7 @@ Foundation cards clear the buffer on completion and fall back to the **store**
 - `streaming`: keep the `storyStorage.set(EDIT_PANE_CONTENT, …)`; add
   `writeStream(\`entity-summary:${ctx.target.entityId}\`, ctx.accumulatedText)`.
 - `completion` (inside the existing `if (succeeded && accumulatedText)`): compute
-  `trimmed`; add `writeStream(\`entity-summary:${ctx.target.entityId}\`, trimmed)`
-  **before** the existing pane-open branch (storyStorage stage vs
-  `entitySummaryUpdated`). Do not clear the buffer here. (Only `entitySummaryHandler`
-  changes; `entitySummaryBindHandler` / `threadSummaryHandler` are untouched.)
+  `trimmed`; add `writeStream(\`entity-summary:${ctx.target.entityId}\`, trimmed)`**before** the existing pane-open branch (storyStorage stage vs`entitySummaryUpdated`). Do not clear the buffer here. (Only `entitySummaryHandler`changes;`entitySummaryBindHandler`/`threadSummaryHandler` are untouched.)
 
 ## Helper — `src/ui-jsx/panels/world/world-select.ts`
 
@@ -100,7 +97,9 @@ Hooks (placed with the other hooks, before the `if (!entity) return null` guard)
 ```ts
 const summaryReqId = `se-entity-summary-${entityId}`;
 const summaryKey = `entity-summary:${entityId}`;
-const summaryPending = useSlice((s) => isRequestActive(s.runtime, summaryReqId));
+const summaryPending = useSlice((s) =>
+  isRequestActive(s.runtime, summaryReqId),
+);
 const summaryLive = useStream(summaryKey);
 const genRef = useRef(false);
 

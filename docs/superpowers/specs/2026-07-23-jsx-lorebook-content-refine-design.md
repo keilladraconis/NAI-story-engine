@@ -66,16 +66,24 @@ the existing Content `Zap` is reused.
 
 1. **Extract a flush helper** from `onSave`. Move the async commit body of
    `onSave` into:
+
    ```ts
    const flushToStore = async (): Promise<string | undefined> => {
      const newName = name.value.trim() || entity.name;
      const newSummary = summary.value.trim();
      const oldName = entity.name;
-     store.dispatch(entityEdited({ entityId, name: newName, summary: newSummary }));
+     store.dispatch(
+       entityEdited({ entityId, name: newName, summary: newSummary }),
+     );
      for (const u of propagateNameInSummaries(
-       Object.values(store.getState().world.entitiesById), entityId, oldName, newName,
+       Object.values(store.getState().world.entitiesById),
+       entityId,
+       oldName,
+       newName,
      )) {
-       store.dispatch(entitySummaryUpdated({ entityId: u.entityId, summary: u.summary }));
+       store.dispatch(
+         entitySummaryUpdated({ entityId: u.entityId, summary: u.summary }),
+       );
      }
      const liveId = await ensureLiveEntryId(entityId);
      if (liveId) {
@@ -90,10 +98,12 @@ the existing Content `Zap` is reused.
      return liveId;
    };
    ```
+
    `onSave` becomes `void (async () => { await flushToStore(); close(); })();`
    (behavior-preserving).
 
 2. **Refine handler**:
+
    ```ts
    const onRefineContent = () => {
      void (async () => {

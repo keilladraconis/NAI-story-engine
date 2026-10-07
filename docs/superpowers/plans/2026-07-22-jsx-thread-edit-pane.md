@@ -26,12 +26,14 @@
 Make thread-summary generation safe for the pane: the handler writes the live/final text to the effect-free stream buffer (so the pane can stage it), and the effect registers the request in the runtime queue (so `isRequestActive` is true for the whole stream — without this, the pane's transfer fires on the first token and Save loses all but the first token, exactly as it did for entity summary).
 
 **Files:**
+
 - Modify: `src/core/store/effects/handlers/summary.ts` (`threadSummaryHandler`, ~lines 85–101)
 - Modify: `src/core/store/effects/summary-generation.ts` (`uiThreadSummaryGenerationRequested` handler, ~lines 220–238)
 - Test: `tests/core/store/effects/handlers/summary.test.ts` (extend)
 - Test: `tests/core/store/effects/summary-generation.test.ts` (extend)
 
 **Interfaces:**
+
 - Consumes: `writeStream`, `clearStream`, `readStream` (`src/core/store/stream-buffer`); `requestQueued` (already imported in `summary-generation.ts`); target type `{ type: "threadSummary"; groupId: string }` (`types.ts`).
 - Produces: buffer key `` `thread-summary:${groupId}` `` carrying live tokens then the final trimmed summary; a `runtime/requestQueued` dispatch with `{ id: requestId, type: "threadSummary", targetId: groupId }` before `generationSubmitted`.
 
@@ -234,10 +236,12 @@ git commit -m "feat(thread): buffer-backed + queue-registered thread summary gen
 Build the JSX thread edit pane: title + summary drafts (Save commits), summary generation via `useGenField`, and a member toggle list. Also export `CATEGORIES` from `EntityEditPane` so the member list reuses the canonical category order/labels (one-word, behavior-preserving change to the entity pane).
 
 **Files:**
+
 - Modify: `src/ui-jsx/panels/world/EntityEditPane.tsx:59` (add `export` to `const CATEGORIES`)
 - Create: `src/ui-jsx/panels/world/ThreadEditPane.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSlice`, `useStream` (`../../bridge`); `useDraftField` (`../../hooks`); `store`, `groupRenamed`, `groupSummaryUpdated`, `entityGroupToggled`, `uiThreadSummaryGenerationRequested`, `uiEditableDeactivate` (`../../../core/store`); `isRequestActive` (`./world-select`); `clearStream` (`../../../core/store/stream-buffer`); `CATEGORIES` (`./EntityEditPane`); `T`, `SP` (`../../style`); feather icons.
 - Produces: `export function ThreadEditPane(props: { groupId: string })` — used by `StoryEngine.tsx` in Task 3.
 - Reuses the `useGenField` pattern (copied minimal inline, see below — the entity pane's `useGenField` is module-private; this pane needs only the summary variant).
@@ -444,9 +448,7 @@ export function ThreadEditPane(props: { groupId: string }) {
             key={cat.id}
             style={{ display: "flex", flexDirection: "column", gap: SP.xs }}
           >
-            <span
-              style={{ fontSize: "0.75em", color: T.textDisabled }}
-            >
+            <span style={{ fontSize: "0.75em", color: T.textDisabled }}>
               {cat.label}
             </span>
             {members.map((e) => {
@@ -514,11 +516,13 @@ git commit -m "feat(jsx): ThreadEditPane — title/summary drafts, summary gen, 
 Connect the pane: enable the World add-thread button (create group + open pane), route `activeEditId` to `ThreadEditPane` when it names a group, and make the `ThreadItem` title open the pane.
 
 **Files:**
+
 - Modify: `src/ui-jsx/panels/world/World.tsx` (add-thread button + import)
 - Modify: `src/ui-jsx/panels/StoryEngine.tsx` (group routing)
 - Modify: `src/ui-jsx/panels/world/ThreadItem.tsx` (title opens pane + import)
 
 **Interfaces:**
+
 - Consumes: `groupCreated`, `uiEditableActivate` (`../../../core/store`); `ThreadEditPane` (`./world/ThreadEditPane`).
 - Produces: no new exports.
 

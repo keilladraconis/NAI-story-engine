@@ -40,7 +40,7 @@ entity summary generation.
 ## Reference behavior (verified)
 
 - **SUI add-thread** (`SeWorldSection.ts:228`): `groupCreated({ group: { id,
-  title: "", summary: "", entityIds: [] } })` then opens `SeThreadEditPane`. No
+title: "", summary: "", entityIds: [] } })` then opens `SeThreadEditPane`. No
   draft lifecycle — the group is committed immediately (matches how JSX draft
   entities persist on Back).
 - **SUI `SeThreadEditPane`**: header (back, title, save), title `textInput`,
@@ -76,8 +76,7 @@ entity summary generation.
 - `completion`: keep the success `storyStorage.set(EDIT_PANE_CONTENT, trimmed)`;
   add `writeStream(\`thread-summary:${ctx.target.groupId}\`, trimmed)` in the
   success branch, and an `else` branch calling
-  `clearStream(\`thread-summary:${ctx.target.groupId}\`)` on failure. (Mirror of
-  `entitySummaryHandler`, minus the pane-open/`...Updated` split — thread summary
+  `clearStream(\`thread-summary:${ctx.target.groupId}\`)`on failure. (Mirror of`entitySummaryHandler`, minus the pane-open/`...Updated` split — thread summary
   always stages.)
 
 ## Effect change — `src/core/store/effects/summary-generation.ts`
@@ -92,7 +91,9 @@ const alreadyTracked =
   rt.activeRequest?.id === requestId ||
   rt.queue.some((r) => r.id === requestId);
 if (!alreadyTracked) {
-  dispatch(requestQueued({ id: requestId, type: "threadSummary", targetId: groupId }));
+  dispatch(
+    requestQueued({ id: requestId, type: "threadSummary", targetId: groupId }),
+  );
 }
 ```
 
@@ -109,14 +110,14 @@ Mirror `EntityEditPane` structure. Props `{ groupId: string }`.
   store.dispatch(uiThreadSummaryGenerationRequested({ groupId, requestId:
   \`se-thread-summary-${groupId}\` })) })`.
 - Header: Back (`close`), title text shown, Save. `close = () =>
-  store.dispatch(uiEditableDeactivate())`. No Delete button.
+store.dispatch(uiEditableDeactivate())`. No Delete button.
 - Title `<input>` (draft), Summary `<textarea>` (draft) with the summary
   generate zap (`onClick={summaryGen.onGenerate}`, dim while `summaryGen.pending`,
   `value={summaryGen.live ?? summary.value}`, `disabled={summaryGen.pending}`).
 - **Members**: read all entities from `useSlice((s) => s.world.entitiesById)`
   and show **every** entity (`Object.values`) grouped by category — no forge-draft
   filter, matching SUI `SeThreadEditPane` (which passes `Object.values(
-  state.world.entitiesById)`; the forge-draft exclusion is a `ThreadItem` *display*
+state.world.entitiesById)`; the forge-draft exclusion is a `ThreadItem` _display_
   concern only). For each category with ≥1 entity, render a header + each entity as
   a row with a toggle button reflecting `group.entityIds.includes(entity.id)`; on
   click dispatch `entityGroupToggled({ groupId, entityId })` (immediate). Category
@@ -135,7 +136,9 @@ Enable the add-thread button (replace the disabled stub):
 ```ts
 const onAddThread = () => {
   const id = api.v1.uuid();
-  store.dispatch(groupCreated({ group: { id, title: "", summary: "", entityIds: [] } }));
+  store.dispatch(
+    groupCreated({ group: { id, title: "", summary: "", entityIds: [] } }),
+  );
   store.dispatch(uiEditableActivate({ id }));
 };
 ```

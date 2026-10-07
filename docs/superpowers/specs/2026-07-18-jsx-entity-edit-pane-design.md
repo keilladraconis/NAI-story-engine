@@ -14,13 +14,14 @@ can be created and authored, and wires the two deferred entity affordances
 (add-entity, card-name-click) to open it.
 
 `SeEntityEditPane` has two halves:
+
 - **Static editing** (this slice): category, name, summary, lorebook content,
   keys, Always-On, Delete, Save (incl. draft→live promotion + name propagation).
 - **Generate buttons** (deferred): 3 zap buttons (summary/content/keys) that
   **stream** generated text into the open pane. Streaming lorebook/summary text
   into JSX is an unsolved TODO (only chat streaming is done — see the
   `jsx-streaming-flush` memory). These render **shown-disabled** here; the card's
-  regen bolt already generates for *live* entities, so the authoring loop is
+  regen bolt already generates for _live_ entities, so the authoring loop is
   complete without them.
 
 ## Goals
@@ -61,15 +62,15 @@ can be created and authored, and wires the two deferred entity affordances
   `KEYS_DRAFT_KEY`) + keys gen zap + "Always On" toggle.
 - **`_ensureLiveEntryId`** (draft→live): if `lorebookEntryId` exists → return it;
   else `ensureCategory(entity.categoryId)` → `api.v1.lorebook.createEntry({ id,
-  displayName, text:"", keys:[nameKey(name)], enabled:true, category })` →
+displayName, text:"", keys:[nameKey(name)], enabled:true, category })` →
   `entityLorebookEntryBound({ entityId, lorebookEntryId })`. (SUI also dispatches
   `uiLorebookEntrySelected` for streaming routing — **omitted here** since
   generation is deferred; the generation slice re-adds it.)
 - **Save** (`_save`): read name/summary; `entityEdited({ entityId, name, summary })`;
-  if name changed, regex-replace old name → new in every *other* entity's summary
+  if name changed, regex-replace old name → new in every _other_ entity's summary
   via `entitySummaryUpdated`; `_ensureLiveEntryId`; then `updateEntry(liveId, {
-  displayName, text: erato ? "----\n"+content : content, keys:
-  withNameKeyFirst(enteredKeys, name), forceActivation: alwaysOn })`. `erato` =
+displayName, text: erato ? "----\n"+content : content, keys:
+withNameKeyFirst(enteredKeys, name), forceActivation: alwaysOn })`. `erato` =
   `api.v1.config.get("erato_compatibility")`.
 - **Delete**: `entityDeleted({ entityId })` + close.
 - **On open**: seed name/summary from the entity (store); if `lorebookEntryId`,
@@ -83,7 +84,7 @@ can be created and authored, and wires the two deferred entity affordances
   - `applyEratoPrefix(content: string, erato: boolean): string` — prepend
     `"----\n"` when erato and content is non-empty and not already prefixed.
   - `propagateNameInSummaries(entities: WorldEntity[], entityId: string, oldName:
-    string, newName: string): Array<{ entityId: string; summary: string }>` —
+string, newName: string): Array<{ entityId: string; summary: string }>` —
     the regex name-replacement, returning only the entities whose summary changed
     (excludes the edited entity). Case-insensitive, regex-escaped old name.
 - Create `src/ui-jsx/panels/world/EntityEditPane.tsx` — the pane.
@@ -116,7 +117,7 @@ inside the existing `overflow:auto` box; the tab shell / Chat branch are untouch
 
 - **World add-entity** (no longer disabled): dispatch
   `entityForged({ entity: { id: uuid, categoryId: DramatisPersonae, name:"",
-  summary:"", lifecycle:"draft" } })` then `uiEditableActivate({ id })`.
+summary:"", lifecycle:"draft" } })` then `uiEditableActivate({ id })`.
 - **EntityCard name** (now clickable): `uiEditableActivate({ id: entityId })`.
 - **Pane back/save/delete**: `uiEditableDeactivate()`.
 - Back on a never-saved fresh draft leaves the draft (matches SUI; discardable
@@ -140,6 +141,7 @@ Always-On "on" uses `T.midIntensity`.
 ## Complete Border
 
 `world-select.entityBorderKind(entity, pending, complete)`:
+
 - draft → `"draft"`; else pending → `"pending"`; else complete → `"complete"`;
   else `"incomplete"`.
 

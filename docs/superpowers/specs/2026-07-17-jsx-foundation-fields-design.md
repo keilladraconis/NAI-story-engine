@@ -82,31 +82,31 @@ type FoundationFieldId = "shape" | "intent" | "contract" | "attg" | "style";
 
 type FieldDescriptor = {
   id: FoundationFieldId;
-  label: string;                 // card label; Shape overrides with the shape name
-  titled?: boolean;              // Shape only — editor shows a title input
-  hasRefine: boolean;            // false for Shape (generate-only); true otherwise
-  hasSync?: boolean;             // ATTG, Style
-  display: (s: RootState) => string;        // derived card text
-  cardLabel?: (s: RootState) => string;     // Shape: name || "Shape"; else label
+  label: string; // card label; Shape overrides with the shape name
+  titled?: boolean; // Shape only — editor shows a title input
+  hasRefine: boolean; // false for Shape (generate-only); true otherwise
+  hasSync?: boolean; // ATTG, Style
+  display: (s: RootState) => string; // derived card text
+  cardLabel?: (s: RootState) => string; // Shape: name || "Shape"; else label
   seed: (s: RootState) => { title: string; content: string }; // opens editor
   commit: (draft: { title: string; content: string }) => void; // dispatch + sync
-  generate: () => void;          // dispatch <field>GenerationRequested
-  refineSource: (s: RootState) => string;   // text handed to refine
+  generate: () => void; // dispatch <field>GenerationRequested
+  refineSource: (s: RootState) => string; // text handed to refine
   placeholder: string;
-  titlePlaceholder?: string;     // Shape only
+  titlePlaceholder?: string; // Shape only
 };
 ```
 
 Per-field specifics captured by the descriptor:
 
 - **Shape**: `titled: true`, `hasRefine: false`. `cardLabel` = `shape?.name ||
-  "Shape"`. `display` = `shape?.description || "(empty)"`. `seed` =
+"Shape"`. `display` = `shape?.description || "(empty)"`. `seed` =
   `{ title: shape?.name ?? "", content: shape?.description ?? "" }`. `commit` =
   dispatch `shapeUpdated` with `{ name: title || "STORY", description: content }`
   when either is non-empty, else `null`.
 - **Intent**: single field. `commit` → `intentUpdated`. `refineSource` = intent.
 - **Contract**: single textarea seeded/displayed as the `REQUIRED:/PROHIBITED:/
-  EMPHASIS:` triple. `seed` formats the current `ContractData` (empty string if
+EMPHASIS:` triple. `seed` formats the current `ContractData` (empty string if
   null). `commit` parses the three lines (regex `^REQUIRED:\s*(.+)$` etc., same
   as SUI) → `contractUpdated`, or `null` on empty. `display` formats as
   `Required: … Prohibited: … Emphasis: …`. `refineSource` = the R/P/E block.
@@ -122,7 +122,10 @@ and after a sync-toggle flip. It lives in `fields.ts` or a shared helper module.
 One selector, mirroring SUI's `foundationProjection`:
 
 ```ts
-function isFoundationGenerating(s: RootState, fieldId: FoundationFieldId): boolean {
+function isFoundationGenerating(
+  s: RootState,
+  fieldId: FoundationFieldId,
+): boolean {
   const inQueue = s.runtime.queue.some(
     (r) => r.type === "foundation" && r.targetId === fieldId,
   );

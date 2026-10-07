@@ -17,6 +17,7 @@ of Threads and entity cards below Foundation. The two edit panes
 section are deferred to following slices.
 
 Reference SUI components:
+
 - `src/ui/components/SeWorldSection.ts` (400) — collapsible "World" section.
 - `src/ui/components/SeEntityCard.ts` (382) — entity card.
 - `src/ui/components/SeThreadItem.ts` (438) — thread card.
@@ -49,9 +50,9 @@ Reference SUI components:
 
 - **`SeWorldSection`**: header (World + globe icon; actions SEGA start/stop,
   expand/collapse, add-entity `+`, add-thread `layers`, clear `trash-2` confirm)
-  + body (SeThreadItem per visible group, SeEntityCard per loose live entity).
-  `_selectBody`: groups with ≥1 non-forge-draft member; loose = live entities
-  not in any group and not forge drafts.
+  - body (SeThreadItem per visible group, SeEntityCard per loose live entity).
+    `_selectBody`: groups with ≥1 non-forge-draft member; loose = live entities
+    not in any group and not forge drafts.
 - **`SeEntityCard`**: category icon + name (click → edit pane) + collapsible
   summary + status border. Border: draft (blue), else pending (orange) /
   complete (green) / incomplete (grey), where complete needs summary **and**
@@ -182,9 +183,9 @@ faithful to SUI while the edit panes and creation flows land next slice.
   - `entityBorderKind`: draft entity → "draft"; live+pending → "pending";
     live+not-pending → "incomplete".
 - Components: `npx tsc --noEmit` gate + live-harness verification (render Threads
-  + loose entities from an existing world side-by-side with SUI; expand/collapse;
-  SEGA toggle; clear/discard confirm arm→fire; regen bolt dims while pending;
-  disabled affordances inert).
+  - loose entities from an existing world side-by-side with SUI; expand/collapse;
+    SEGA toggle; clear/discard confirm arm→fire; regen bolt dims while pending;
+    disabled affordances inert).
 
 ## Risks / Notes
 

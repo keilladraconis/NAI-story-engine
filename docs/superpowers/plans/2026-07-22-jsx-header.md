@@ -27,15 +27,18 @@
 A 1-second tick hook for the budget-wait countdown, plus a pure, unit-tested seconds helper.
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/header/countdown.ts`
 - Test: `tests/ui-jsx/countdown.test.ts`
 
 **Interfaces:**
+
 - Produces: `remainingSeconds(endTime: number | null, now: number): number`; `useCountdown(endTime: number | null): number`.
 
 - [ ] **Step 1: Write the failing test**
 
 Create `tests/ui-jsx/countdown.test.ts`:
+
 ```ts
 import { describe, it, expect } from "vitest";
 import { remainingSeconds } from "../../src/ui-jsx/panels/header/countdown";
@@ -69,6 +72,7 @@ Expected: FAIL (import/undefined).
 - [ ] **Step 3: Implement `countdown.ts`**
 
 Create `src/ui-jsx/panels/header/countdown.ts`:
+
 ```ts
 // Budget-wait countdown for the JSX header. `remainingSeconds` is a pure helper
 // (unit-tested); `useCountdown` re-renders every second while an endTime is
@@ -143,9 +147,11 @@ git commit -m "feat(jsx): useCountdown hook + remainingSeconds helper for header
 The Opening/Continue Scene button: label derived from document content (undo-reactive), with queued/active states.
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/header/BootstrapButton.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSlice` (`../../bridge`); `store`, `bootstrapRequested`, `bootstrapContinueRequested`, `uiCancelRequest` (`../../../core/store`).
 - Produces: `BootstrapButton()`.
 
@@ -276,11 +282,13 @@ git commit -m "feat(jsx): BootstrapButton — Opening/Continue Scene, undo-react
 The live-status surface + the header row, placed atop the Story Engine view.
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/header/GenxStatus.tsx`
 - Create: `src/ui-jsx/panels/header/Header.tsx`
 - Modify: `src/ui-jsx/panels/StoryEngine.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSlice` (`../../bridge`); `store`, `uiUserPresenceConfirmed`, `uiRequestCancellation` (`../../../core/store`); `useCountdown` (`./countdown`); `BootstrapButton` (`./BootstrapButton`); `GenxStatus` (`./GenxStatus`); `T`, `SP` (`../../style` / `../../../ui-jsx/style` as used elsewhere — match sibling imports).
 
 - [ ] **Step 1: Create `GenxStatus.tsx`**
@@ -383,7 +391,9 @@ export function Header() {
         paddingBottom: SP.sm,
       }}
     >
-      <div style={{ flex: 1, minWidth: 0, overflow: "hidden", display: "flex" }}>
+      <div
+        style={{ flex: 1, minWidth: 0, overflow: "hidden", display: "flex" }}
+      >
         <GenxStatus />
       </div>
       <BootstrapButton />
@@ -395,6 +405,7 @@ export function Header() {
 - [ ] **Step 3: Place `<Header />` in StoryEngine.tsx**
 
 In `src/ui-jsx/panels/StoryEngine.tsx`, import `Header` and render it at the top of the main-view stack (above `<Foundation />`):
+
 ```tsx
 import { Header } from "./header/Header";
 ...
@@ -407,6 +418,7 @@ import { Header } from "./header/Header";
     </div>
   );
 ```
+
 (Leave the entity/thread edit-pane early returns unchanged, so the header shows only on the main view.)
 
 - [ ] **Step 4: tsc + build + full suite**

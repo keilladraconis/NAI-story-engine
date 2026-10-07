@@ -30,19 +30,19 @@ Threads are few and long-lived. They change far more often than they end.
 
 ### 1.4 The constraint that shapes everything
 
-GLM and Xialong tend to fulfil an implication once it is stated in context. A note saying "Ada has not told Marek about the letter" produces a confession within a few paragraphs. So what the Engine *knows* about an arc and what the story model is *shown* must be separate.
+GLM and Xialong tend to fulfil an implication once it is stated in context. A note saying "Ada has not told Marek about the letter" produces a confession within a few paragraphs. So what the Engine _knows_ about an arc and what the story model is _shown_ must be separate.
 
 ## 2. Decisions
 
-| Question | Decision |
-| --- | --- |
-| What is a Thread? | Standing state of an arc or relationship, revised as it moves |
-| What does the story model see? | Only a present-tense statement of how things stand (`state`) |
-| Where does pending material live? | In a private field (`latent`) that never reaches the story model |
-| Where do Threads come from? | Seeded at setup by the Forge or the writer; admitted mid-story only by a slow review pass |
-| When is a Thread in context? | When its cast is on stage |
-| When does a Thread end? | When its state has become a permanent fact, which is then written into its cast's own entries |
-| How does the slow pass work? | One call decides; code checks; each surviving decision is a queued intent with its own small write call |
+| Question                          | Decision                                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| What is a Thread?                 | Standing state of an arc or relationship, revised as it moves                                           |
+| What does the story model see?    | Only a present-tense statement of how things stand (`state`)                                            |
+| Where does pending material live? | In a private field (`latent`) that never reaches the story model                                        |
+| Where do Threads come from?       | Seeded at setup by the Forge or the writer; admitted mid-story only by a slow review pass               |
+| When is a Thread in context?      | When its cast is on stage                                                                               |
+| When does a Thread end?           | When its state has become a permanent fact, which is then written into its cast's own entries           |
+| How does the slow pass work?      | One call decides; code checks; each surviving decision is a queued intent with its own small write call |
 
 ## 3. Data model
 
@@ -86,12 +86,12 @@ No migration. Persisted Threads that lack a `state` field are dropped on load. T
 
 A Thread's entry keeps `keys: []` and `forceActivation: false`. It activates through a single advanced condition, as it does today, but the condition becomes positive: the cast is present in recent story text.
 
-| Cast size | Condition |
-| --- | --- |
-| 0 | No lorebook entry. The Thread is ledger-only. |
-| 1 | `key(A)` |
-| 2 | `and(key(A), key(B))` |
-| 3 or more | `or` over every pair `and(key(X), key(Y))` |
+| Cast size | Condition                                     |
+| --------- | --------------------------------------------- |
+| 0         | No lorebook entry. The Thread is ledger-only. |
+| 1         | `key(A)`                                      |
+| 2         | `and(key(A), key(B))`                         |
+| 3 or more | `or` over every pair `and(key(X), key(Y))`    |
 
 - In the table, `key(A)` stands for "A is on stage": an `or` over A's **aliases**, each a `key` probe `in: ["story"]` with `range: 4000` characters, roughly one scene. This is a single constant, replacing the three horizon ranges.
 - A member's aliases are its lorebook entry's own `keys` plus its resolved display name (`nameKey`'d). Prose says "Oriel" far more often than "Oriel Vant", and the entry's keys are the writer's own statement of what counts as a mention. A draft entity has only its name.
@@ -185,12 +185,12 @@ When a queued `revise` for the same entity already exists, the incoming one repl
 
 ### 5.6 Budget
 
-| Step | Output tokens |
-| --- | --- |
-| Review decisions | up to 400 |
-| Thread write, each | up to 300 |
-| Lint retry, each | up to 300 |
-| Conclude | 0, plus one entity rewrite per cast member |
+| Step               | Output tokens                              |
+| ------------------ | ------------------------------------------ |
+| Review decisions   | up to 400                                  |
+| Thread write, each | up to 300                                  |
+| Lint retry, each   | up to 300                                  |
+| Conclude           | 0, plus one entity rewrite per cast member |
 
 A review that updates two Threads costs up to about 1000 tokens, once per 25 paragraphs, against 2048 per 240 seconds. The drain defers what the bucket cannot cover, as it does now.
 
@@ -374,13 +374,13 @@ And the existing rule "Only the new prose may add facts" becomes "Only the new p
 
 `tools/review-probe.naiscript`, in the style of the existing probes. It runs each fixture 20 times against the real instruct model at the shipped sampling and logs denominated counts.
 
-| Fixture | Contract |
-| --- | --- |
-| A window of incidental detail among known entities | No `ADMIT` in any run |
-| Two known entities whose standing shifts across several paragraphs | Exactly one `ADMIT`, naming both |
-| An open Thread whose cast appears but nothing passes between them | No `UPDATE` |
-| An open Thread whose state the prose reverses | `UPDATE` in every run |
-| A Thread write whose prose is dense with pending material | `STATE` passes the lint on the first attempt |
+| Fixture                                                            | Contract                                     |
+| ------------------------------------------------------------------ | -------------------------------------------- |
+| A window of incidental detail among known entities                 | No `ADMIT` in any run                        |
+| Two known entities whose standing shifts across several paragraphs | Exactly one `ADMIT`, naming both             |
+| An open Thread whose cast appears but nothing passes between them  | No `UPDATE`                                  |
+| An open Thread whose state the prose reverses                      | `UPDATE` in every run                        |
+| A Thread write whose prose is dense with pending material          | `STATE` passes the lint on the first attempt |
 
 Fixture nouns come from a domain that neither the prompts' examples nor real stories use. The harness is run by the writer inside NovelAI. Prompt text is revised by the fixing procedure in the principles document, measured by distribution, not by a single run.
 

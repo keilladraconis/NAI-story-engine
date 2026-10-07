@@ -43,8 +43,16 @@ Clear — replacing `SeJournalPanel` in `plugin.ts`.
   if (journalEnabled) {
     api.v1.permissions.request(["clipboardWrite"]);
     loadJournal();
-    const journalPart = await new SeJournalPanel({ id: "kse-journal-root" }).build();
-    panels.push(scriptPanel({ id: "kse-journal", name: "Generation Journal", content: [journalPart] }));
+    const journalPart = await new SeJournalPanel({
+      id: "kse-journal-root",
+    }).build();
+    panels.push(
+      scriptPanel({
+        id: "kse-journal",
+        name: "Generation Journal",
+        content: [journalPart],
+      }),
+    );
   }
   ```
 - JSX panels mount via a `jsx` part rendered into a shadow host and wrapped in a
@@ -69,17 +77,31 @@ export function JournalPanel() {
   };
 
   return (
-    <div style={/* row: count (flex:1) + Full/SEGA/Bootstrap/Forge/Clear buttons, wrap */}>
+    <div
+      style={/* row: count (flex:1) + Full/SEGA/Bootstrap/Forge/Clear buttons, wrap */}
+    >
       <span>{count} entries recorded</span>
       <button onClick={() => copy(formatJournal, "Journal")}>Full</button>
       <button onClick={() => copy(formatDigest, "SEGA digest")}>SEGA</button>
-      <button onClick={() => copy(formatBootstrapDigest, "Bootstrap digest")}>Bootstrap</button>
-      <button onClick={() => copy(formatForgeDigest, "Forge digest")}>Forge</button>
-      <button onClick={() => { clearJournal(); force((n) => n + 1); }}>Clear</button>
+      <button onClick={() => copy(formatBootstrapDigest, "Bootstrap digest")}>
+        Bootstrap
+      </button>
+      <button onClick={() => copy(formatForgeDigest, "Forge digest")}>
+        Forge
+      </button>
+      <button
+        onClick={() => {
+          clearJournal();
+          force((n) => n + 1);
+        }}
+      >
+        Clear
+      </button>
     </div>
   );
 }
 ```
+
 - Imports the six journal-module functions from `../../../core/generation-journal`;
   `useSlice` from `../../bridge`; `T`/`SP` from `../../style`.
 - Styling: a small padded flex row with wrap; count `flex: 1`; buttons compact.
@@ -90,6 +112,7 @@ export function JournalPanel() {
 Mirror `buildJsxSidebarPanel`, but render `<JournalPanel/>` into a **`scriptPanel`**
 named "Generation Journal" (a short, non-scrolling panel — a simple `jsx` part,
 no grid-height constraint needed):
+
 ```ts
 export function buildJsxJournalPanel(): UIExtension {
   const jsxPart = api.v1.ui.part.jsx({
@@ -105,12 +128,14 @@ export function buildJsxJournalPanel(): UIExtension {
   });
 }
 ```
+
 (`scriptPanel` from `api.v1.ui.extension`; import `JournalPanel`.)
 
 ### `plugin.ts` swap
 
 Replace the `SeJournalPanel` block with the JSX builder, keeping the gate,
 `loadJournal()`, and the clipboard permission:
+
 ```ts
 const journalEnabled = await api.v1.config.get("generation_journal");
 if (journalEnabled) {
@@ -119,6 +144,7 @@ if (journalEnabled) {
   panels.push(buildJsxJournalPanel());
 }
 ```
+
 - Remove `import { SeJournalPanel } from "./components/SeJournalPanel";`.
 - Add `buildJsxJournalPanel` to the existing `../ui-jsx/mount` import.
 - `loadJournal()` stays in `plugin.ts` (runs before `register()` mounts the part,

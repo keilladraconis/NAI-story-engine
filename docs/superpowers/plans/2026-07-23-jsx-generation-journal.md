@@ -21,9 +21,11 @@
 ### Task 1: `JournalPanel` component
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/journal/JournalPanel.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSlice` (`../../bridge`); `T`, `SP` (`../../style`); `getJournalCount`, `formatJournal`, `formatDigest`, `formatBootstrapDigest`, `formatForgeDigest`, `clearJournal` (`../../../core/generation-journal`).
 - Produces: `JournalPanel()`.
 
@@ -98,7 +100,10 @@ export function JournalPanel() {
       >
         Bootstrap
       </button>
-      <button style={btn} onClick={() => copy(formatForgeDigest, "Forge digest")}>
+      <button
+        style={btn}
+        onClick={() => copy(formatForgeDigest, "Forge digest")}
+      >
         Forge
       </button>
       <button
@@ -131,25 +136,30 @@ git commit -m "feat(jsx): JournalPanel component (count + copy digests + clear)"
 ### Task 2: Mount builder + `plugin.ts` swap
 
 **Files:**
+
 - Modify: `src/ui-jsx/mount.ts`
 - Modify: `src/ui/plugin.ts`
 
 **Interfaces:**
+
 - Consumes: `JournalPanel` (`./panels/journal/JournalPanel`); `scriptPanel` (`api.v1.ui.extension`); `buildJsxJournalPanel` (in `plugin.ts`).
 - Produces: `buildJsxJournalPanel(): UIExtension`.
 
 - [ ] **Step 1: Add `buildJsxJournalPanel` to `mount.ts`**
 
 Add the import and destructure `scriptPanel`, and the builder. At the top of `mount.ts`, alongside `import { App } from "./App";`:
+
 ```ts
 import { App } from "./App";
 import { JournalPanel } from "./panels/journal/JournalPanel";
 
 const { sidebarPanel, scriptPanel } = api.v1.ui.extension;
 ```
+
 (Replace the existing `const { sidebarPanel } = api.v1.ui.extension;` line with the destructure above.)
 
 Add the builder after `buildJsxSidebarPanel`:
+
 ```ts
 // The Generation Journal panel (gated by `generation_journal` in plugin.ts).
 // A short, non-scrolling panel — a plain jsx part, no grid-height constraint.
@@ -172,40 +182,48 @@ export function buildJsxJournalPanel(): UIExtension {
 - [ ] **Step 2: Swap the journal registration in `plugin.ts`**
 
 Remove the SUI import:
+
 ```ts
 import { SeJournalPanel } from "./components/SeJournalPanel";
 ```
+
 Add `buildJsxJournalPanel` to the existing `../ui-jsx/mount` import:
+
 ```ts
 import { buildJsxSidebarPanel, buildJsxJournalPanel } from "../ui-jsx/mount";
 ```
+
 Replace the journal block:
+
 ```ts
-    const journalEnabled = await api.v1.config.get("generation_journal");
-    if (journalEnabled) {
-      api.v1.permissions.request(["clipboardWrite"]);
-      loadJournal();
-      const journalPart = await new SeJournalPanel({
-        id: "kse-journal-root",
-      }).build();
-      panels.push(
-        scriptPanel({
-          id: "kse-journal",
-          name: "Generation Journal",
-          content: [journalPart],
-        }),
-      );
-    }
+const journalEnabled = await api.v1.config.get("generation_journal");
+if (journalEnabled) {
+  api.v1.permissions.request(["clipboardWrite"]);
+  loadJournal();
+  const journalPart = await new SeJournalPanel({
+    id: "kse-journal-root",
+  }).build();
+  panels.push(
+    scriptPanel({
+      id: "kse-journal",
+      name: "Generation Journal",
+      content: [journalPart],
+    }),
+  );
+}
 ```
+
 with:
+
 ```ts
-    const journalEnabled = await api.v1.config.get("generation_journal");
-    if (journalEnabled) {
-      api.v1.permissions.request(["clipboardWrite"]);
-      loadJournal();
-      panels.push(buildJsxJournalPanel());
-    }
+const journalEnabled = await api.v1.config.get("generation_journal");
+if (journalEnabled) {
+  api.v1.permissions.request(["clipboardWrite"]);
+  loadJournal();
+  panels.push(buildJsxJournalPanel());
+}
 ```
+
 (If `scriptPanel` is now unused in `plugin.ts` after this — check: the SUI sidebar panel uses `sidebarPanel`, and the journal was the only `scriptPanel` user — remove `scriptPanel` from the `const { sidebarPanel, scriptPanel } = api.v1.ui.extension;` destructure to satisfy `noUnusedLocals`. `loadJournal` stays used.)
 
 - [ ] **Step 3: tsc + build + full suite**

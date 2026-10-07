@@ -24,7 +24,7 @@ The JSX `ChatHeader` was pre-staged for this: its control switch already has a
 - Render forge chats in the Chat tab: an **interactive phase indicator**, a
   **scrub indicator**, **inline draft-entity cards** under each forge turn, and a
   **Commit/Discard** bar.
-- Make the phase indicator show *the phase that will fire next* and let the user
+- Make the phase indicator show _the phase that will fire next_ and let the user
   **pin** it; auto-advance remains the default when the user doesn't interact.
 
 ## Non-Goals
@@ -44,7 +44,7 @@ between the click and the next send. Add a per-chat pin:
   state + initial. Actions:
   - `forgeNextPhasePinned({ chatId, phase })` — set the key.
   - `forgeNextPhaseCleared({ chatId })` — delete the key (guard: no-op if absent).
-  Export both.
+    Export both.
 - **Continue effect** (`forge-chat-effects.ts`): read
   `const pinned = state.forge.pinnedNextPhaseByChatId[chatId];` and change the
   advancing branch to `pool.length === 0 ? "sketch" : (pinned ?? nextPhase(chat.subMode))`
@@ -79,6 +79,7 @@ Add two cases to the existing control switch:
   `chat` variable is resolved, so the new `useSlice` reads must precede that guard
   and **resolve the active chat internally** (via `activeSavedChat`), not via the
   later `chat` variable:
+
   ```ts
   const nextPhase = useSlice((s) => {
     const c = activeSavedChat(s.chat);
@@ -93,8 +94,10 @@ Add two cases to the existing control switch:
     return !!c && (s.forge.pendingScrubByChatId[c.id]?.length ?? 0) > 0;
   });
   ```
+
   These sit with the existing `stamp` useSlice (all before the early return), and
   are consumed only inside the `phaseIndicator` / `scrubIndicator` cases.
+
 - **`case "scrubIndicator"`**: when `scrubbing` (the useSlice read above), show a
   small italic "scrubbing…" hint; otherwise render nothing.
 
@@ -107,7 +110,12 @@ Add two cases to the existing control switch:
   ```ts
   const inlineKey = useSlice((s) => {
     const spec = getChatTypeSpec(chat.type);
-    return (spec.inlineEntityIdsFor?.(message, chat, { getState: () => s, dispatch: store.dispatch }) ?? []).join(",");
+    return (
+      spec.inlineEntityIdsFor?.(message, chat, {
+        getState: () => s,
+        dispatch: store.dispatch,
+      }) ?? []
+    ).join(",");
   });
   const inlineIds = inlineKey ? inlineKey.split(",") : [];
   ```
@@ -138,16 +146,23 @@ Mirror `RefineCommitBar`. Props `{ onEnd: () => void }`.
   matching SUI `STORAGE_KEYS.FORGE_GUIDANCE_UI`) and a **Forge** button.
 - Button behavior (mirror `SeForgeSection`):
   ```ts
-  const guidance = (await api.v1.storyStorage.get("se-forge-guidance")) as string || "";
+  const guidance =
+    ((await api.v1.storyStorage.get("se-forge-guidance")) as string) || "";
   const activeId = selectActiveForgeChatId(store.getState());
   if (activeId) {
     store.dispatch(chatSwitched({ id: activeId }));
     if (guidance.trim()) {
       const chat = store.getState().chat.chats.find((c) => c.id === activeId);
-      if (chat) getChatTypeSpec("forge").handleSend?.(chat, guidance, { getState: store.getState, dispatch: store.dispatch });
+      if (chat)
+        getChatTypeSpec("forge").handleSend?.(chat, guidance, {
+          getState: store.getState,
+          dispatch: store.dispatch,
+        });
     }
   } else {
-    store.dispatch(forgeChatNewSessionRequested({ initialUserMessage: guidance }));
+    store.dispatch(
+      forgeChatNewSessionRequested({ initialUserMessage: guidance }),
+    );
   }
   if (guidance.trim()) await api.v1.storyStorage.remove("se-forge-guidance");
   ```
@@ -163,7 +178,7 @@ Mirror `RefineCommitBar`. Props `{ onEnd: () => void }`.
    honor/consume, `closeForgeSession` clear, `selectForgeNextPhase` +
    `selectForgeDraftPoolCount`. Tests.
 2. **Phase + scrub indicators** — ChatHeader `phaseIndicator` (interactive pills)
-   + `scrubIndicator`.
+   - `scrubIndicator`.
 3. **Inline draft-entity cards** — Message (+ Chat passes `chat`).
 4. **ForgeCommitBar** — new bar + Chat wiring (forge type, return to engine).
 5. **Forge entry section** — ForgeSection + StoryEngine placement + App forge

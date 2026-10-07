@@ -38,10 +38,12 @@
 ### Task 1: `world-select.ts` — pure helpers (TDD)
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/world/world-select.ts`
 - Test: `tests/ui-jsx/world-select.test.ts`
 
 **Interfaces:**
+
 - Consumes: `isForgeDraft` from `../../../core/store/selectors/forge`; types `RootState`, `WorldEntity`, `WorldGroup` from `../../../core/store`.
 - Produces:
   - `selectWorldBody(entitiesById: Record<string, WorldEntity>, groups: WorldGroup[]): { groups: WorldGroup[]; loose: WorldEntity[] }`
@@ -94,7 +96,9 @@ describe("selectWorldBody", () => {
 
   it("grouped entities are excluded from loose", () => {
     const entitiesById = { a: ent("a"), b: ent("b") };
-    const { groups, loose } = selectWorldBody(entitiesById, [group("g1", ["a"])]);
+    const { groups, loose } = selectWorldBody(entitiesById, [
+      group("g1", ["a"]),
+    ]);
     expect(groups.map((g) => g.id)).toEqual(["g1"]);
     expect(loose.map((e) => e.id)).toEqual(["b"]);
   });
@@ -103,7 +107,9 @@ describe("selectWorldBody", () => {
     const entitiesById = {
       d: ent("d", { lifecycle: "draft", sourceChatId: "c" }),
     };
-    expect(selectWorldBody(entitiesById, [group("g", ["d"])]).groups).toEqual([]);
+    expect(selectWorldBody(entitiesById, [group("g", ["d"])]).groups).toEqual(
+      [],
+    );
   });
 });
 
@@ -118,22 +124,40 @@ describe("entityPending", () => {
 
   it("true when active/queued/sega id matches; false otherwise", () => {
     expect(
-      entityPending(rt({ activeRequest: { id: "lb-entity-x-content" } as never }), "x"),
+      entityPending(
+        rt({ activeRequest: { id: "lb-entity-x-content" } as never }),
+        "x",
+      ),
     ).toBe(true);
     expect(
-      entityPending(rt({ queue: [{ id: "se-entity-summary-x" } as never] }), "x"),
+      entityPending(
+        rt({ queue: [{ id: "se-entity-summary-x" } as never] }),
+        "x",
+      ),
     ).toBe(true);
     expect(
-      entityPending(rt({ sega: { activeRequestIds: ["lb-entity-x-keys"] } as never }), "x"),
+      entityPending(
+        rt({ sega: { activeRequestIds: ["lb-entity-x-keys"] } as never }),
+        "x",
+      ),
     ).toBe(true);
-    expect(entityPending(rt({ queue: [{ id: "other" } as never] }), "x")).toBe(false);
-    expect(entityPending(rt({ activeRequest: { id: "lb-entity-x-content" } as never }), "y")).toBe(false);
+    expect(entityPending(rt({ queue: [{ id: "other" } as never] }), "x")).toBe(
+      false,
+    );
+    expect(
+      entityPending(
+        rt({ activeRequest: { id: "lb-entity-x-content" } as never }),
+        "y",
+      ),
+    ).toBe(false);
   });
 });
 
 describe("entityBorderKind", () => {
   it("draft → draft (even if pending); live+pending → pending; live+idle → incomplete", () => {
-    expect(entityBorderKind(ent("a", { lifecycle: "draft" }), true)).toBe("draft");
+    expect(entityBorderKind(ent("a", { lifecycle: "draft" }), true)).toBe(
+      "draft",
+    );
     expect(entityBorderKind(ent("a"), true)).toBe("pending");
     expect(entityBorderKind(ent("a"), false)).toBe("incomplete");
   });
@@ -245,9 +269,11 @@ git commit -m "feat(jsx): World display selectors + pure helpers"
 ### Task 2: `ConfirmButton.tsx` — shared arm→confirm button
 
 **Files:**
+
 - Create: `src/ui-jsx/components/ConfirmButton.tsx`
 
 **Interfaces:**
+
 - Consumes: `T` from `../style`; `Trash2`, `AlertTriangle` from `nai:icons/feather`.
 - Produces: `ConfirmButton(props: { title: string; onConfirm: () => void; timeoutMs?: number })`.
 
@@ -336,10 +362,12 @@ git commit -m "feat(jsx): shared arm→confirm trash button"
 ### Task 3: `EntityCard.tsx` — entity card
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/world/EntityCard.tsx`
 - Modify: `src/ui-jsx/style.ts` (add `lowIntensity` token)
 
 **Interfaces:**
+
 - Consumes: `useSlice` from `../../bridge`; `T`, `SP` from `../../style`; `store`, `entityDiscardRequested` (from `../../../core/store` barrel — re-exported), `entityRegenRequested` from `../../../core/store/effects/summary-generation`; `entityPending`, `entityBorderKind`, `type BorderKind` from `./world-select`; `ConfirmButton` from `../../components/ConfirmButton`; `User`, `Cpu`, `MapPin`, `Shield`, `Activity`, `Hash`, `Zap` from `nai:icons/feather`.
 - Produces: `EntityCard(props: { entityId: string })`.
 
@@ -369,9 +397,21 @@ import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
 import { store, entityDiscardRequested } from "../../../core/store";
 import { entityRegenRequested } from "../../../core/store/effects/summary-generation";
-import { entityPending, entityBorderKind, type BorderKind } from "./world-select";
+import {
+  entityPending,
+  entityBorderKind,
+  type BorderKind,
+} from "./world-select";
 import { ConfirmButton } from "../../components/ConfirmButton";
-import { User, Cpu, MapPin, Shield, Activity, Hash, Zap } from "nai:icons/feather";
+import {
+  User,
+  Cpu,
+  MapPin,
+  Shield,
+  Activity,
+  Hash,
+  Zap,
+} from "nai:icons/feather";
 
 const ICON_SIZE = 16;
 
@@ -415,13 +455,24 @@ export function EntityCard(props: { entityId: string }) {
         background: T.bg2,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: SP.sm, padding: SP.sm }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: SP.sm,
+          padding: SP.sm,
+        }}
+      >
         {Icon ? <Icon size={ICON_SIZE} /> : null}
-        <span style={{ flex: 1, color: T.text }}>{entity.name || "(unnamed)"}</span>
+        <span style={{ flex: 1, color: T.text }}>
+          {entity.name || "(unnamed)"}
+        </span>
         {isDraft ? (
           <ConfirmButton
             title="Discard entity"
-            onConfirm={() => store.dispatch(entityDiscardRequested({ entityId }))}
+            onConfirm={() =>
+              store.dispatch(entityDiscardRequested({ entityId }))
+            }
           />
         ) : (
           <button
@@ -478,9 +529,11 @@ git commit -m "feat(jsx): World entity card (store-only border, regen/discard)"
 ### Task 4: `ThreadItem.tsx` — thread card + member cards
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/world/ThreadItem.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSlice` from `../../bridge`; `T`, `SP` from `../../style`; `store`, `groupDeleted` from `../../../core/store`; `isForgeDraft` from `../../../core/store/selectors/forge`; `EntityCard` from `./EntityCard`; `Layers`, `Trash2`, `ToggleLeft` from `nai:icons/feather`.
 - Produces: `ThreadItem(props: { groupId: string })`.
 
@@ -536,19 +589,36 @@ export function ThreadItem(props: { groupId: string }) {
         <button
           title="Lorebook sync (coming soon)"
           disabled
-          style={{ background: "none", border: "none", cursor: "default", opacity: 0.35 }}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "default",
+            opacity: 0.35,
+          }}
         >
           <ToggleLeft size={ICON_SIZE} />
         </button>
         <button
           title="Delete thread"
           onClick={() => store.dispatch(groupDeleted({ groupId }))}
-          style={{ background: "none", border: "none", cursor: "pointer", opacity: 0.6 }}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            opacity: 0.6,
+          }}
         >
           <Trash2 size={ICON_SIZE} />
         </button>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: SP.xs, paddingLeft: SP.sm }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: SP.xs,
+          paddingLeft: SP.sm,
+        }}
+      >
         {memberIds.map((id) => (
           <EntityCard key={`${groupId}:${id}`} entityId={id} />
         ))}
@@ -576,10 +646,12 @@ git commit -m "feat(jsx): World thread item + member cards"
 ### Task 5: `World.tsx` section + App integration
 
 **Files:**
+
 - Create: `src/ui-jsx/panels/world/World.tsx`
 - Modify: `src/ui-jsx/App.tsx`
 
 **Interfaces:**
+
 - Consumes: `useSlice` from `../../bridge`; `T`, `SP` from `../../style`; `store`, `segaToggled`, `worldExpansionSet`, `worldCleared` from `../../../core/store`; `selectWorldBody` from `./world-select`; `ThreadItem` from `./ThreadItem`; `EntityCard` from `./EntityCard`; `ConfirmButton` from `../../components/ConfirmButton`; `Globe`, `Layers`, `Plus`, `PlayCircle`, `FastForward`, `Minimize2`, `Maximize2` from `nai:icons/feather`. `useState` is a runtime global.
 - Produces: `World()`.
 
@@ -598,16 +670,39 @@ Create `src/ui-jsx/panels/world/World.tsx`:
 
 import { useSlice } from "../../bridge";
 import { T, SP } from "../../style";
-import { store, segaToggled, worldExpansionSet, worldCleared } from "../../../core/store";
+import {
+  store,
+  segaToggled,
+  worldExpansionSet,
+  worldCleared,
+} from "../../../core/store";
 import { selectWorldBody } from "./world-select";
 import { ThreadItem } from "./ThreadItem";
 import { EntityCard } from "./EntityCard";
 import { ConfirmButton } from "../../components/ConfirmButton";
-import { Globe, Layers, Plus, PlayCircle, FastForward, Minimize2, Maximize2 } from "nai:icons/feather";
+import {
+  Globe,
+  Layers,
+  Plus,
+  PlayCircle,
+  FastForward,
+  Minimize2,
+  Maximize2,
+} from "nai:icons/feather";
 
 const ICON_SIZE = 16;
-const ICON_BTN = { background: "none", border: "none", cursor: "pointer", opacity: 0.6 } as const;
-const DISABLED_BTN = { background: "none", border: "none", cursor: "default", opacity: 0.35 } as const;
+const ICON_BTN = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  opacity: 0.6,
+} as const;
+const DISABLED_BTN = {
+  background: "none",
+  border: "none",
+  cursor: "default",
+  opacity: 0.35,
+} as const;
 
 export function World() {
   const entitiesById = useSlice((s) => s.world.entitiesById);
@@ -616,7 +711,10 @@ export function World() {
   const segaRunning = useSlice((s) => s.runtime.segaRunning);
   const [collapsed, setCollapsed] = useState(false);
 
-  const { groups: visibleGroups, loose } = selectWorldBody(entitiesById, groups);
+  const { groups: visibleGroups, loose } = selectWorldBody(
+    entitiesById,
+    groups,
+  );
   const isEmpty = visibleGroups.length === 0 && loose.length === 0;
 
   return (
@@ -641,17 +739,27 @@ export function World() {
         </button>
         <button
           title={worldExpanded ? "Collapse all" : "Expand all"}
-          onClick={() => store.dispatch(worldExpansionSet({ expanded: !worldExpanded }))}
+          onClick={() =>
+            store.dispatch(worldExpansionSet({ expanded: !worldExpanded }))
+          }
           style={ICON_BTN}
         >
-          {worldExpanded ? <Minimize2 size={ICON_SIZE} /> : <Maximize2 size={ICON_SIZE} />}
+          {worldExpanded ? (
+            <Minimize2 size={ICON_SIZE} />
+          ) : (
+            <Maximize2 size={ICON_SIZE} />
+          )}
         </button>
         <button
           title="S.E.G.A."
           onClick={() => store.dispatch(segaToggled())}
           style={{ ...ICON_BTN, color: segaRunning ? T.warning : T.text }}
         >
-          {segaRunning ? <FastForward size={ICON_SIZE} /> : <PlayCircle size={ICON_SIZE} />}
+          {segaRunning ? (
+            <FastForward size={ICON_SIZE} />
+          ) : (
+            <PlayCircle size={ICON_SIZE} />
+          )}
         </button>
         {/* Deferred: creation — shown disabled. */}
         <button title="Add entity (coming soon)" disabled style={DISABLED_BTN}>
@@ -660,7 +768,10 @@ export function World() {
         <button title="Add thread (coming soon)" disabled style={DISABLED_BTN}>
           <Layers size={ICON_SIZE} />
         </button>
-        <ConfirmButton title="Clear world" onConfirm={() => store.dispatch(worldCleared())} />
+        <ConfirmButton
+          title="Clear world"
+          onConfirm={() => store.dispatch(worldCleared())}
+        />
       </div>
 
       {!collapsed ? (
@@ -672,7 +783,13 @@ export function World() {
             <EntityCard key={e.id} entityId={e.id} />
           ))}
           {isEmpty ? (
-            <div style={{ color: T.textDisabled, fontSize: "0.85em", padding: SP.sm }}>
+            <div
+              style={{
+                color: T.textDisabled,
+                fontSize: "0.85em",
+                padding: SP.sm,
+              }}
+            >
               No world entities yet.
             </div>
           ) : null}

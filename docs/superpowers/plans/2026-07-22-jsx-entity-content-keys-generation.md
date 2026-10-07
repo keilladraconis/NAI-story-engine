@@ -32,10 +32,12 @@
 ### Task 1: `lorebookContentHandler` dual-write (TDD)
 
 **Files:**
+
 - Modify: `src/core/store/effects/handlers/lorebook.ts`
 - Test: `tests/core/store/effects/handlers/lorebook.test.ts`
 
 **Interfaces:**
+
 - Consumes: `writeStream`, `clearStream` from `../../stream-buffer` (handler); `readStream`, `clearStream` (test).
 - Produces: `lorebookContentHandler.streaming` also writes `prefill+accumulated` to `lb-content:<entryId>`; `completion` writes `fullContent` (success) / clears (failure).
 
@@ -71,10 +73,7 @@ describe("lorebookContentHandler dual-write", () => {
       accumulatedText,
     }) as unknown as StreamingContext<never>;
 
-  const completeCtx = (
-    entryId: string,
-    over: Record<string, unknown> = {},
-  ) =>
+  const completeCtx = (entryId: string, over: Record<string, unknown> = {}) =>
     ({
       target: { type: "lorebookContent", entryId },
       getState: () => ({ ui: { lorebook: { selectedEntryId: entryId } } }),
@@ -132,20 +131,20 @@ In `streaming`, after the existing line
 `api.v1.storyStorage.set(IDS.LOREBOOK.CONTENT_DRAFT_RAW, displayContent);`, add:
 
 ```ts
-      writeStream(`lb-content:${ctx.target.entryId}`, displayContent);
+writeStream(`lb-content:${ctx.target.entryId}`, displayContent);
 ```
 
 In `completion`, after the existing line `const fullContent = prefill + cleaned;`, add:
 
 ```ts
-        // JSX pane reads the editable (pre-erato) content from the buffer.
-        writeStream(`lb-content:${entryId}`, fullContent);
+// JSX pane reads the editable (pre-erato) content from the buffer.
+writeStream(`lb-content:${entryId}`, fullContent);
 ```
 
 In the same `completion`, inside the `else` branch (the `// Cancelled or failed` block, after the `if (entryId === currentSelected) { … }`), add:
 
 ```ts
-        clearStream(`lb-content:${entryId}`);
+clearStream(`lb-content:${entryId}`);
 ```
 
 - [ ] **Step 5: Run tests to verify they pass**
@@ -174,10 +173,12 @@ git commit -m "feat(jsx): lorebook content handler dual-writes streaming to the 
 ### Task 2: `lorebookKeysHandler` dual-write (TDD)
 
 **Files:**
+
 - Modify: `src/core/store/effects/handlers/lorebook.ts`
 - Test: `tests/core/store/effects/handlers/lorebook.test.ts`
 
 **Interfaces:**
+
 - Consumes: `writeStream`/`clearStream` (imported by Task 1); `readStream`/`clearStream` (test, imported by Task 1).
 - Produces: `lorebookKeysHandler.completion` writes the joined final keys to `lb-keys:<entryId>` (success) / clears (failure).
 
@@ -187,10 +188,7 @@ In `tests/core/store/effects/handlers/lorebook.test.ts`, append:
 
 ```ts
 describe("lorebookKeysHandler dual-write", () => {
-  const completeCtx = (
-    entryId: string,
-    over: Record<string, unknown> = {},
-  ) =>
+  const completeCtx = (entryId: string, over: Record<string, unknown> = {}) =>
     ({
       target: { type: "lorebookKeys", entryId },
       getState: () => ({ ui: { lorebook: { selectedEntryId: entryId } } }),
@@ -233,14 +231,14 @@ In `lorebookKeysHandler.completion`, in the success branch after the existing
 `await api.v1.lorebook.updateEntry(ctx.target.entryId, { keys: finalKeys });`, add:
 
 ```ts
-      writeStream(`lb-keys:${ctx.target.entryId}`, finalKeys.join(", "));
+writeStream(`lb-keys:${ctx.target.entryId}`, finalKeys.join(", "));
 ```
 
 In the same `completion`, inside the `else` branch (the `// Cancelled or failed`
 block, after the `if (ctx.target.entryId === currentSelected) { … }`), add:
 
 ```ts
-      clearStream(`lb-keys:${ctx.target.entryId}`);
+clearStream(`lb-keys:${ctx.target.entryId}`);
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -266,9 +264,11 @@ git commit -m "feat(jsx): lorebook keys handler dual-writes final keys to the JS
 ### Task 3: `EntityEditPane` — extract `useGenField`, refactor Summary
 
 **Files:**
+
 - Modify: `src/ui-jsx/panels/world/EntityEditPane.tsx`
 
 **Interfaces:**
+
 - Produces: `useGenField({ requestId, bufferKey, draft, arm }): { pending, live, onGenerate }` — reused for Content/Keys in Task 4.
 
 > Behavior-preserving for Summary. Verified by `npx tsc --noEmit` + `npm run build`; Summary re-confirmed in the final live pass.
@@ -349,23 +349,24 @@ below `onCategory`). Replace the deleted hooks block (keep it among the hooks,
 before `if (!entity) return null;`) with:
 
 ```tsx
-  const summaryGen = useGenField({
-    requestId: `se-entity-summary-${entityId}`,
-    bufferKey: `entity-summary:${entityId}`,
-    draft: summary,
-    arm: () =>
-      store.dispatch(
-        uiEntitySummaryGenerationRequested({
-          entityId,
-          requestId: `se-entity-summary-${entityId}`,
-        }),
-      ),
-  });
+const summaryGen = useGenField({
+  requestId: `se-entity-summary-${entityId}`,
+  bufferKey: `entity-summary:${entityId}`,
+  draft: summary,
+  arm: () =>
+    store.dispatch(
+      uiEntitySummaryGenerationRequested({
+        entityId,
+        requestId: `se-entity-summary-${entityId}`,
+      }),
+    ),
+});
 ```
 
 - [ ] **Step 3: Point the Summary button + textarea at `summaryGen`**
 
 In the Summary section, update the button and textarea references:
+
 - Button: `title={summaryGen.pending ? "Generating…" : "Generate summary"}`,
   `onClick={summaryGen.onGenerate}`, `disabled={summaryGen.pending}`,
   `style={genZapStyle(summaryGen.pending)}`.
@@ -394,9 +395,11 @@ git commit -m "refactor(jsx): extract useGenField hook, refactor Summary onto it
 ### Task 4: `EntityEditPane` — enable Content + Keys generation
 
 **Files:**
+
 - Modify: `src/ui-jsx/panels/world/EntityEditPane.tsx`
 
 **Interfaces:**
+
 - Consumes: `useGenField` (Task 3); `uiLorebookEntrySelected`, `uiLorebookContentGenerationRequested`, `uiLorebookKeysGenerationRequested` (core/store barrel).
 
 > Verified by `npx tsc --noEmit` + `npm run build`; then the final manual harness pass (CONTROLLER + user — the implementer stops after build).
@@ -416,50 +419,52 @@ Add these three to the `../../../core/store` import list in `EntityEditPane.tsx`
 Among the hooks (after `summaryGen`, before `if (!entity) return null;`), add:
 
 ```tsx
-  const eid = entity?.lorebookEntryId ?? "";
-  const contentGen = useGenField({
-    requestId: eid ? `lb-item-${eid}-content` : "",
-    bufferKey: eid ? `lb-content:${eid}` : "",
-    draft: content,
-    arm: () =>
-      void (async () => {
-        const liveId = await ensureLiveEntryId(entityId);
-        if (!liveId) return;
-        store.dispatch(
-          uiLorebookEntrySelected({ entryId: liveId, categoryId: null }),
-        );
-        store.dispatch(
-          uiLorebookContentGenerationRequested({
-            requestId: `lb-item-${liveId}-content`,
-          }),
-        );
-      })(),
-  });
-  const keysGen = useGenField({
-    requestId: eid ? `lb-item-${eid}-keys` : "",
-    bufferKey: eid ? `lb-keys:${eid}` : "",
-    draft: keys,
-    arm: () =>
-      void (async () => {
-        const liveId = await ensureLiveEntryId(entityId);
-        if (!liveId) return;
-        store.dispatch(
-          uiLorebookEntrySelected({ entryId: liveId, categoryId: null }),
-        );
-        store.dispatch(
-          uiLorebookKeysGenerationRequested({
-            requestId: `lb-item-${liveId}-keys`,
-          }),
-        );
-      })(),
-  });
+const eid = entity?.lorebookEntryId ?? "";
+const contentGen = useGenField({
+  requestId: eid ? `lb-item-${eid}-content` : "",
+  bufferKey: eid ? `lb-content:${eid}` : "",
+  draft: content,
+  arm: () =>
+    void (async () => {
+      const liveId = await ensureLiveEntryId(entityId);
+      if (!liveId) return;
+      store.dispatch(
+        uiLorebookEntrySelected({ entryId: liveId, categoryId: null }),
+      );
+      store.dispatch(
+        uiLorebookContentGenerationRequested({
+          requestId: `lb-item-${liveId}-content`,
+        }),
+      );
+    })(),
+});
+const keysGen = useGenField({
+  requestId: eid ? `lb-item-${eid}-keys` : "",
+  bufferKey: eid ? `lb-keys:${eid}` : "",
+  draft: keys,
+  arm: () =>
+    void (async () => {
+      const liveId = await ensureLiveEntryId(entityId);
+      if (!liveId) return;
+      store.dispatch(
+        uiLorebookEntrySelected({ entryId: liveId, categoryId: null }),
+      );
+      store.dispatch(
+        uiLorebookKeysGenerationRequested({
+          requestId: `lb-item-${liveId}-keys`,
+        }),
+      );
+    })(),
+});
 
-  // Release the shared lorebook selection when the pane closes.
-  useEffect(
-    () => () =>
-      store.dispatch(uiLorebookEntrySelected({ entryId: null, categoryId: null })),
-    [],
-  );
+// Release the shared lorebook selection when the pane closes.
+useEffect(
+  () => () =>
+    store.dispatch(
+      uiLorebookEntrySelected({ entryId: null, categoryId: null }),
+    ),
+  [],
+);
 ```
 
 - [ ] **Step 3: Enable the Content button + textarea**
@@ -467,14 +472,14 @@ Among the hooks (after `summaryGen`, before `if (!entity) return null;`), add:
 Replace the Content generate button (currently `title="Generate (coming soon)" disabled style={disabledZap}`) with:
 
 ```tsx
-          <button
-            title={contentGen.pending ? "Generating…" : "Generate content"}
-            onClick={contentGen.onGenerate}
-            disabled={contentGen.pending}
-            style={genZapStyle(contentGen.pending)}
-          >
-            <Zap size={ICON_SIZE} />
-          </button>
+<button
+  title={contentGen.pending ? "Generating…" : "Generate content"}
+  onClick={contentGen.onGenerate}
+  disabled={contentGen.pending}
+  style={genZapStyle(contentGen.pending)}
+>
+  <Zap size={ICON_SIZE} />
+</button>
 ```
 
 And update the Content textarea: `disabled={loading || contentGen.pending}`,
@@ -486,14 +491,14 @@ And update the Content textarea: `disabled={loading || contentGen.pending}`,
 Replace the Keys generate button (currently `title="Generate (coming soon)" disabled style={disabledZap}`) with:
 
 ```tsx
-          <button
-            title={keysGen.pending ? "Generating…" : "Generate keys"}
-            onClick={keysGen.onGenerate}
-            disabled={keysGen.pending}
-            style={genZapStyle(keysGen.pending)}
-          >
-            <Zap size={ICON_SIZE} />
-          </button>
+<button
+  title={keysGen.pending ? "Generating…" : "Generate keys"}
+  onClick={keysGen.onGenerate}
+  disabled={keysGen.pending}
+  style={genZapStyle(keysGen.pending)}
+>
+  <Zap size={ICON_SIZE} />
+</button>
 ```
 
 And update the Keys input: `disabled={loading || keysGen.pending}`,
