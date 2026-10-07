@@ -397,8 +397,17 @@ describe("forgeDiscardAllRequested effect", () => {
 });
 
 describe("chatDeleted effect", () => {
-  it("releases the chat's drafts and clears its tombstones and scrub", async () => {
+  it("does nothing when the chat is still there: the last chat is never deleted", async () => {
     const { dispatch, fire } = makeHarness(makeState([makeChat()], []));
+    await fire({ type: "chat/chatDeleted", payload: { id: "fc-1" } });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("releases the chat's drafts and clears its tombstones and scrub", async () => {
+    // The state an effect reads is the one the reducer left: the chat is gone.
+    const { dispatch, fire } = makeHarness(
+      makeState([makeChat({ id: "other" })], []),
+    );
     await fire({ type: "chat/chatDeleted", payload: { id: "fc-1" } });
 
     const dispatched = dispatch.mock.calls.map(([a]) => a);

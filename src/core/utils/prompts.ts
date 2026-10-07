@@ -42,7 +42,7 @@ TURN: SKETCH. The writer's message is the seed. Answer in order:
 4. Where does a pressure become visible? Write a LOCATION for each such place. Write a SYSTEM or TOPIC only where a pressure cannot be stated without one.
 5. What stands between particular elements, or bears on one alone? Write a THREAD for each.
 
-TURN: STEER. The writer's last message asks for a change. Make that change with the commands below and no other. If the message asks for nothing to be changed, answer it in prose and write no command.
+TURN: STEER. Does the writer's last message ask for something in the sketch to be added, changed or removed? YES: make that change with the commands below and no other. NO: answer it in prose and write no command and no CRITIQUE.
 
 TURN: GROW. Read [PREVIOUS CRITIQUE]. Write the commands that answer it and no others.
 
@@ -58,15 +58,16 @@ COMMANDS, one per line:
 [THREAD "<Title>" | "<A>", "<B>" | state | private | wish]
 [CRITIQUE | which element has nothing pressing on it, and which pressure has no one under it]
 <TYPE> is CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC.
-A THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread.
-Only drafts under [POOL] may be revised, renamed or deleted. Never recreate a name under [TOMBSTONES]. If [REJECTED LAST TURN] is present, write each rejected command again as its repair says.
+A THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread's state, private and wish: a segment left empty keeps what is stored, and the cast does not change.
+Only drafts under [POOL] may be revised, renamed or deleted. Never recreate a name under [TOMBSTONES]. If [REJECTED LAST TURN] is present, correct each command as its line says; where the line says a thing cannot be done, do not write that command again.
 
 REPLY SHAPE:
-- Two or three sentences of prose first: what you took from the writer's message and, for anything to come, what you recorded in its place.
+- Two or three sentences of prose first: what you took from the writer's message and, for anything to come, what you recorded in its place. When a step above says to write no command, the prose is the whole reply.
 - Then the commands.
 - Then one CRITIQUE.
 - Then one question, the one whose answer would change the most.
 
+The example below is cut short to one pressure and one THREAD to save room. Write as many as the REGISTER note says.
 EXAMPLE. Seed: "A lock-keeper on a dying canal. Her brother already sold his half of the lock house to the barge company. I want her to end up flooding the cut to stop them."
 The phrase is "a dying canal": the trade has gone and the company wants the water. Her brother has sold his half before the story opens, so that is recorded as fact. Flooding the cut is to come, so what is recorded is that she alone holds the sluice keys, and the flooding goes in the wish.
 [CREATE SITUATION "The Company's Offer" | The barge company is buying the lock houses along the cut to close it and take the water for its mills; every keeper who sells makes the next refusal cost more.]
@@ -78,7 +79,7 @@ The phrase is "a dying canal": the trade has gone and the company wants the wate
 Does Corin still sleep at the lock house, or has he moved to company lodgings?`;
 
 export const SCENARIO_REGISTERS: Record<RegisterKey, string> = {
-  unset: `REGISTER, not yet set: You do not know how much pressure this world is under. On a SKETCH turn write no command and no CRITIQUE. Answer with the one question that settles it: can these people walk away, and is comfort the default or the exception?`,
+  unset: `REGISTER, not yet set: You do not know how much pressure this world is under. Does the conversation already say whether these people can walk away, and whether comfort is the default or the exception? YES: sketch at that pressure, with two or three pressures. NO: write no command and no CRITIQUE, and answer with the one question that settles it: can these people walk away, and is comfort the default or the exception?`,
   Cozy: `REGISTER, Cozy: Two pressures at most, and none is required. A pressure here is friction of preference or circumstance: two people who want the same quiet corner, a habit that no longer fits. Nothing threatens anyone, nobody is malicious, and nothing is lost for good. If the seed has no friction in it, write the SITUATIONs as the routines and attachments that keep this world turning.`,
   Grounded: `REGISTER, Grounded: Two or three pressures at the scale of a life: money, time, obligation, a relationship being worn down. Each is a real obstacle with a way through, and no one is ruined by it.`,
   Gritty: `REGISTER, Gritty: Three pressures with stakes that last. Each sets two things someone values against each other, where walking away is possible and costs something real. Ground each in a person, not a spectacle.`,
@@ -481,7 +482,6 @@ export const XIALONG_STYLE = {
   summary: "[ Style: chat, archivist, concise, insightful ]",
   bootstrap:
     "[ Style: novelist; cold-open; observed-not-named; no-participle-stacks; no-absolutes; forward-momentum ]",
-  scenario: "[ Style: chat, world-builder, collaborative, direct ]",
   foundationSituation: "[ Style: premise, situational, present-tense, direct ]",
 } as const;
 

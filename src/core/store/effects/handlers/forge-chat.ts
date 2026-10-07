@@ -60,6 +60,21 @@ function isTombstoned(state: RootState, chatId: string, name: string): boolean {
   return tombs.some((t) => t.name.toLowerCase() === name.toLowerCase());
 }
 
+/** Why a command was not applied. The next turn's context shows the model
+ *  each of these beside the command it refused, so each reads as the repair:
+ *  what to write instead, or that the thing cannot be done. */
+const REASON = {
+  exists: "already exists; REVISE it instead",
+  discarded: "was discarded; do not recreate it",
+  noSummary: "needs a summary after the bar",
+  unknownType:
+    "unknown type; use CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC",
+  live: "is live and cannot be changed from the chat",
+  notFound: "not found; name a draft under [POOL], spelled exactly",
+  noNewName: "needs a new name after the arrow",
+  concluded: "is concluded and cannot be rewritten",
+} as const;
+
 /** Execute a single parsed command and return its outcome record. With
  *  reviseOnly (cleanup pass), any non-REVISE command is rejected unexecuted. */
 export function executeForgeCommand(
@@ -98,7 +113,7 @@ export function executeForgeCommand(
           status: "rejected",
           elementType,
           name: cmd.name,
-          reason: "empty content",
+          reason: REASON.noSummary,
         };
       }
       const fieldId = TYPE_TO_FIELD[elementType] as DulfsFieldID | undefined;
@@ -108,7 +123,7 @@ export function executeForgeCommand(
           status: "rejected",
           elementType,
           name: cmd.name,
-          reason: "unknown type",
+          reason: REASON.unknownType,
         };
       }
       if (findEntityByName(getState(), cmd.name)) {
@@ -117,7 +132,7 @@ export function executeForgeCommand(
           status: "rejected",
           elementType,
           name: cmd.name,
-          reason: "duplicate",
+          reason: REASON.exists,
         };
       }
       if (isTombstoned(getState(), chatId, cmd.name)) {
@@ -126,7 +141,7 @@ export function executeForgeCommand(
           status: "rejected",
           elementType,
           name: cmd.name,
-          reason: "removed this session",
+          reason: REASON.discarded,
         };
       }
       const entity: WorldEntity = {
@@ -148,7 +163,7 @@ export function executeForgeCommand(
           kind: "REVISE",
           status: "rejected",
           name: cmd.name,
-          reason: "empty content",
+          reason: REASON.noSummary,
         };
       }
       const target = findEntityByName(getState(), cmd.name);
@@ -158,7 +173,7 @@ export function executeForgeCommand(
             kind: "REVISE",
             status: "rejected",
             name: cmd.name,
-            reason: "live entity",
+            reason: REASON.live,
           };
         }
         dispatch(
@@ -176,7 +191,7 @@ export function executeForgeCommand(
           kind: "REVISE",
           status: "rejected",
           name: cmd.name,
-          reason: "removed this session",
+          reason: REASON.discarded,
         };
       }
       const created: WorldEntity = {
@@ -204,7 +219,7 @@ export function executeForgeCommand(
           kind: "DELETE",
           status: "rejected",
           name: cmd.name,
-          reason: "not found",
+          reason: REASON.notFound,
         };
       }
       if (target.lifecycle === "live") {
@@ -212,7 +227,7 @@ export function executeForgeCommand(
           kind: "DELETE",
           status: "rejected",
           name: cmd.name,
-          reason: "live entity",
+          reason: REASON.live,
         };
       }
       dispatch(entityDeleted({ entityId: target.id }));
@@ -236,7 +251,7 @@ export function executeForgeCommand(
           kind: "RENAME",
           status: "rejected",
           name: cmd.oldName,
-          reason: "not found",
+          reason: REASON.notFound,
         };
       }
       if (target.lifecycle === "live") {
@@ -244,7 +259,7 @@ export function executeForgeCommand(
           kind: "RENAME",
           status: "rejected",
           name: target.name,
-          reason: "live entity",
+          reason: REASON.live,
         };
       }
       if (!cmd.newName.trim()) {
@@ -252,7 +267,7 @@ export function executeForgeCommand(
           kind: "RENAME",
           status: "rejected",
           name: target.name,
-          reason: "empty new name",
+          reason: REASON.noNewName,
         };
       }
       dispatch(
@@ -281,7 +296,7 @@ export function executeForgeCommand(
             kind: "THREAD",
             status: "rejected",
             name: cmd.title,
-            reason: "concluded",
+            reason: REASON.concluded,
           };
         }
         // A rewrite replaces what it supplies. An empty segment means "no
@@ -299,17 +314,25 @@ export function executeForgeCommand(
         }
         return { kind: "THREAD", status: "applied", name: existing.title };
       }
-      const memberIds = cmd.memberNames
-        .map((name) => findEntityByName(state, name)?.id)
-        .filter((id): id is string => !!id);
-      if (memberIds.length === 0) {
+      // Every named member must be a known element (the parser admits no
+      // THREAD without one). A Thread made from the names that happen to
+      // resolve stands between a different cast than its state was written for.
+      const members = cmd.memberNames.map((name) => ({
+        name,
+        id: findEntityByName(state, name)?.id,
+      }));
+      const unknown = members.find((m) => !m.id);
+      if (unknown) {
         return {
           kind: "THREAD",
           status: "rejected",
           name: cmd.title,
-          reason: "no known members",
+          reason: `unknown member "${unknown.name}"; name only elements under [POOL] or [LIVE], spelled exactly`,
         };
       }
+      const memberIds = members
+        .map((m) => m.id)
+        .filter((id): id is string => !!id);
       // No status: `threadCreated` defaults it (world.ts).
       const thread: ThreadDraft = {
         id: api.v1.uuid(),

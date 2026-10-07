@@ -285,7 +285,8 @@ describe("the edit pane keeps the private half private", () => {
   });
 
   it("says who reads the wish", () => {
-    expect(pane).toContain("Never shown to any model.");
+    expect(pane).toContain("Never shown to the story model.");
+    expect(pane).not.toContain("any model");
   });
 });
 

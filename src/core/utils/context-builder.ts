@@ -92,7 +92,9 @@ export function buildXialongNarrativeStyleBlock(state: RootState): string {
 }
 
 /**
- * Gets existing WorldEntity summaries for a field, joined with newlines.
+ * Gets a field's existing WorldEntities as `Name: summary` lines. A summary
+ * alone does not say whose it is, and a model that cannot tell names a new
+ * element for one that exists. An entity with no summary is left out.
  * Returns empty string if no entities exist for the given field.
  */
 export const getExistingEntityItems = (
@@ -105,7 +107,7 @@ export const getExistingEntityItems = (
   if (entities.length === 0) return "";
   return entities
     .filter((e) => e.summary)
-    .map((e) => e.summary)
+    .map((e) => (e.name ? `${e.name}: ${e.summary}` : e.summary))
     .join("\n");
 };
 

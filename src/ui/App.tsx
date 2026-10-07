@@ -23,10 +23,7 @@ import {
   worldExpansionSet,
   importWizardOpened,
 } from "../core/store";
-import {
-  forgeCastAllRequested,
-  forgeDiscardAllRequested,
-} from "../core/store/effects/forge-chat-effects";
+import { forgeCastAllRequested } from "../core/store/effects/forge-chat-effects";
 import { matchesAction } from "nai-store";
 
 function tabButtonStyle(active: boolean) {
@@ -96,9 +93,6 @@ export function App(props: { initialHasDocumentContent: boolean }) {
         setTab("engine");
         store.dispatch(worldExpansionSet({ expanded: true }));
       }),
-      store.subscribeEffect(matchesAction(forgeDiscardAllRequested), () =>
-        setTab("engine"),
-      ),
       // The wizard renders inside Setup now — surface that tab, not Engine.
       store.subscribeEffect(matchesAction(importWizardOpened), () =>
         setTab("setup"),

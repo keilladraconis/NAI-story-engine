@@ -301,12 +301,12 @@ export function ThreadEditPane(props: { threadId: string }) {
         style={{ ...inputStyle, minHeight: "60px", resize: "vertical" }}
       />
 
-      {/* The writer's wish — read by no model at all. */}
+      {/* The writer's wish — never shown to the story model. */}
       <span style={sectionLabel}>What you want to come of this</span>
       <span style={{ fontSize: "0.75em", color: T.textDisabled }}>
-        Never shown to any model. A model told that something will happen writes
-        it happening, so the Engine records the conditions for it and keeps the
-        wish itself here.
+        Never shown to the story model. A model told that something will happen
+        writes it happening, so the Engine records the conditions for it and
+        keeps the wish itself here.
       </span>
       <textarea
         placeholder="What would you like to see happen?"

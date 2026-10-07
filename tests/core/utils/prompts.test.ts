@@ -63,6 +63,33 @@ describe("the Scenario prompt", () => {
     }
   });
 
+  it("has no newline inside a register", () => {
+    for (const text of Object.values(SCENARIO_REGISTERS)) {
+      expect(text).not.toContain("\n");
+    }
+  });
+
+  it("lets an unset register sketch once the conversation has settled the pressure", () => {
+    expect(SCENARIO_REGISTERS.unset).toMatch(/YES: sketch at that pressure/);
+    expect(SCENARIO_REGISTERS.unset).toMatch(
+      /NO: write no command and no CRITIQUE/,
+    );
+  });
+
+  it("says before its example that the example is shorter than a sketch", () => {
+    const lines = SCENARIO_PROMPT.split("\n");
+    const example = lines.findIndex((l) => l.startsWith("EXAMPLE. Seed:"));
+    expect(lines[example - 1]).toBe(
+      "The example below is cut short to one pressure and one THREAD to save room. Write as many as the REGISTER note says.",
+    );
+  });
+
+  it("tells the model to correct a rejected command, or drop one that cannot be done", () => {
+    expect(SCENARIO_PROMPT).toContain(
+      "If [REJECTED LAST TURN] is present, correct each command as its line says; where the line says a thing cannot be done, do not write that command again.",
+    );
+  });
+
   it("exports the grow instruction", () => {
     expect(SCENARIO_GROW_INSTRUCTION).toContain("critique");
   });

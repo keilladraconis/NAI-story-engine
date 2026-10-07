@@ -35,44 +35,74 @@ import { parseCommands } from "./crucible-command-parser";
 
 export type ScenarioTurn = "sketch" | "steer" | "grow";
 
+/** The conversation as the Scenario model should see it: the chat's messages
+ *  without the placeholder about to be filled, without reference scrubs, and
+ *  without anything empty. A scrub is bookkeeping queued ahead of a turn, so it
+ *  is neither a reply nor the last thing said. */
+function conversation(
+  messages: ChatMessage[],
+  placeholderId?: string,
+): ChatMessage[] {
+  return messages.filter(
+    (m) =>
+      m.id !== placeholderId &&
+      m.messageKind !== "cleanup" &&
+      m.content.trim() !== "",
+  );
+}
+
 /** Which kind of turn the placeholder `assistantMessageId` is about to hold.
- *  Read from the transcript, so a retry after a prune asks the right thing. */
+ *  Read from the transcript, so a retry after a prune asks the right thing.
+ *
+ *  It is a sketch until some reply has applied a command other than CRITIQUE:
+ *  a reply that only asked a question has built nothing, and the writer's
+ *  answer to it is still the seed being settled. After that, a turn the writer
+ *  spoke before is a steer, and any other a grow. */
 export function scenarioTurn(
   chat: Chat,
   assistantMessageId: string,
 ): ScenarioTurn {
-  const prior = chat.messages.filter((m) => m.id !== assistantMessageId);
-  const answered = prior.some(
-    (m) => m.role === "assistant" && m.content.trim() !== "",
+  const prior = conversation(chat.messages, assistantMessageId);
+  const sketched = prior.some(
+    (m) =>
+      m.role === "assistant" &&
+      (m.forgeSegments ?? []).some(
+        (s) =>
+          s.kind === "action" &&
+          s.action.status === "applied" &&
+          s.action.kind !== "CRITIQUE",
+      ),
   );
-  if (!answered) return "sketch";
+  if (!sketched) return "sketch";
   return prior[prior.length - 1]?.role === "user" ? "steer" : "grow";
 }
 
-function lastReply(messages: ChatMessage[]): ChatMessage | undefined {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role === "assistant" && m.content.trim() !== "") return m;
-  }
-  return undefined;
+/** The Engine's replies, oldest first. */
+function replies(messages: ChatMessage[]): ChatMessage[] {
+  return conversation(messages).filter((m) => m.role === "assistant");
 }
 
-/** The critique in the most recent reply, or null. Parsed with the command
- *  parser, so it is found wherever in the reply it sits. */
+/** The most recent critique, or null. Not only the last reply's: a reply that
+ *  answered a question in prose wrote none, and a grow still needs one to
+ *  answer. Parsed with the command parser, so it is found wherever in a reply
+ *  it sits. */
 export function extractLastCritique(messages: ChatMessage[]): string | null {
-  const reply = lastReply(messages);
-  if (!reply) return null;
-  const critiques = parseCommands(reply.content).filter(
-    (c) => c.kind === "CRITIQUE",
-  );
-  const last = critiques[critiques.length - 1];
-  return last?.kind === "CRITIQUE" ? last.text : null;
+  const all = replies(messages);
+  for (let i = all.length - 1; i >= 0; i--) {
+    const critiques = parseCommands(all[i].content).filter(
+      (c) => c.kind === "CRITIQUE",
+    );
+    const last = critiques[critiques.length - 1];
+    if (last?.kind === "CRITIQUE") return last.text;
+  }
+  return null;
 }
 
 /** The commands the most recent reply wrote that were not applied, each with
  *  the reason. A rejection the model never sees is one it repeats. */
 export function formatRejections(messages: ChatMessage[]): string {
-  const lines = (lastReply(messages)?.forgeSegments ?? []).flatMap((s) => {
+  const all = replies(messages);
+  const lines = (all[all.length - 1]?.forgeSegments ?? []).flatMap((s) => {
     if (s.kind !== "action" || s.action.status === "applied") return [];
     const { kind, name, reason } = s.action;
     return [
@@ -82,10 +112,7 @@ export function formatRejections(messages: ChatMessage[]): string {
     ];
   });
   if (lines.length === 0) return "";
-  return [
-    "[REJECTED LAST TURN] (not applied; write each again as its repair says)",
-    ...lines,
-  ].join("\n");
+  return ["[REJECTED LAST TURN] (not applied)", ...lines].join("\n");
 }
 
 // --- Context block formatters ---
@@ -143,13 +170,17 @@ function formatTombstones(state: RootState, chatId: string): string {
 
 export function buildScenarioTurnStrategy(
   getState: () => RootState,
-  chat: Chat,
+  queuedChat: Chat,
   assistantMessageId: string,
 ): GenerationStrategy {
   const factory = async () => {
     const state = getState();
+    // The chat as it stands now: a scrub queued ahead of this turn, or a
+    // message pruned while it waited, changed it after the strategy was built.
+    const chat =
+      state.chat.chats.find((c) => c.id === queuedChat.id) ?? queuedChat;
     const turn = scenarioTurn(chat, assistantMessageId);
-    const prior = chat.messages.filter((m) => m.id !== assistantMessageId);
+    const prior = conversation(chat.messages, assistantMessageId);
 
     const premise = [formatFoundationBlock(state), await formatSettingBlock()]
       .filter((b) => b.length > 0)
@@ -197,11 +228,11 @@ export function buildScenarioTurnStrategy(
   };
 
   return {
-    requestId: `scenario-${chat.id}-${assistantMessageId}`,
+    requestId: `scenario-${queuedChat.id}-${assistantMessageId}`,
     messageFactory: factory,
     target: {
       type: "forgeChat",
-      chatId: chat.id,
+      chatId: queuedChat.id,
       messageId: assistantMessageId,
     },
     prefillBehavior: "trim",

@@ -62,6 +62,15 @@ const chatOf = (messages: ReturnType<typeof msg>[]): Chat => ({
   seed: { kind: "blank" },
 });
 
+/** A reply's applied commands, as the handler records them at completion. */
+const applied = (...kinds: string[]) => ({
+  forgeSegments: kinds.map((kind) => ({
+    kind: "action",
+    action: { kind, status: "applied", name: "X" },
+  })),
+});
+const sketched = applied("CREATE", "CRITIQUE");
+
 describe("which kind of turn this is", () => {
   it("is a sketch while no reply has been written", () => {
     expect(
@@ -71,10 +80,30 @@ describe("which kind of turn this is", () => {
       ),
     ).toBe("sketch");
   });
-  it("is a steer when the writer spoke last", () => {
+  it("is still a sketch when the only reply was prose and the writer answered it", () => {
     const chat = chatOf([
       msg("u", "user", "seed"),
-      msg("a", "assistant", "sketch"),
+      msg("a", "assistant", "Can these people walk away?", {
+        forgeSegments: [{ kind: "prose", text: "Can these people walk away?" }],
+      }),
+      msg("u2", "user", "No, and comfort is the exception."),
+      msg("p", "assistant", ""),
+    ]);
+    expect(scenarioTurn(chat, "p")).toBe("sketch");
+  });
+  it("is still a sketch when the only reply applied nothing but a critique", () => {
+    const chat = chatOf([
+      msg("u", "user", "seed"),
+      msg("a", "assistant", "[CRITIQUE | nothing yet]", applied("CRITIQUE")),
+      msg("u2", "user", "go on"),
+      msg("p", "assistant", ""),
+    ]);
+    expect(scenarioTurn(chat, "p")).toBe("sketch");
+  });
+  it("is a steer when the writer spoke last after a reply that applied one CREATE", () => {
+    const chat = chatOf([
+      msg("u", "user", "seed"),
+      msg("a", "assistant", "sketch", applied("CREATE")),
       msg("u2", "user", "make her older"),
       msg("p", "assistant", ""),
     ]);
@@ -83,11 +112,55 @@ describe("which kind of turn this is", () => {
   it("is a grow when the Engine spoke last", () => {
     const chat = chatOf([
       msg("u", "user", "seed"),
-      msg("a", "assistant", "sketch"),
+      msg("a", "assistant", "sketch", sketched),
       msg("p", "assistant", ""),
     ]);
     expect(scenarioTurn(chat, "p")).toBe("grow");
   });
+  it("is a steer when a reference scrub is queued between the writer's message and the turn", () => {
+    const chat = chatOf([
+      msg("u", "user", "seed"),
+      msg("a", "assistant", "sketch", sketched),
+      msg("u2", "user", "make her older"),
+      msg("k", "assistant", "", { messageKind: "cleanup" }),
+      msg("p", "assistant", ""),
+    ]);
+    expect(scenarioTurn(chat, "p")).toBe("steer");
+  });
+  it("is a steer when the scrub ahead of it has already written its reply", () => {
+    const chat = chatOf([
+      msg("u", "user", "seed"),
+      msg("a", "assistant", "sketch", sketched),
+      msg("u2", "user", "make her older"),
+      msg("k", "assistant", '[REVISE "X" | y]', {
+        messageKind: "cleanup",
+        ...applied("REVISE"),
+      }),
+      msg("p", "assistant", ""),
+    ]);
+    expect(scenarioTurn(chat, "p")).toBe("steer");
+  });
+  it("does not count a scrub's commands as a sketch", () => {
+    const chat = chatOf([
+      msg("u", "user", "seed"),
+      msg("k", "assistant", '[REVISE "X" | y]', {
+        messageKind: "cleanup",
+        ...applied("REVISE"),
+      }),
+      msg("p", "assistant", ""),
+    ]);
+    expect(scenarioTurn(chat, "p")).toBe("sketch");
+  });
+});
+
+const rejectedCleanup = msg("k", "assistant", "[CRITIQUE | from the scrub]", {
+  messageKind: "cleanup",
+  forgeSegments: [
+    {
+      kind: "action",
+      action: { kind: "CRITIQUE", status: "rejected", reason: "cleanup pass" },
+    },
+  ],
 });
 
 describe("the last critique", () => {
@@ -101,50 +174,68 @@ describe("the last critique", () => {
     ];
     expect(extractLastCritique(messages)).toBe("the lock has no witness");
   });
-  it("is null when the last reply has none", () => {
+  it("is null when no reply has one", () => {
     expect(
       extractLastCritique([msg("a", "assistant", "just prose")]),
     ).toBeNull();
   });
+  it("is the most recent one when a prose-only reply came after it", () => {
+    const messages = [
+      msg("a", "assistant", "[CRITIQUE | older]"),
+      msg("a2", "assistant", "[CRITIQUE | the lock has no witness]"),
+      msg("u", "user", "what does Corin want?"),
+      msg("a3", "assistant", "He wants the water."),
+    ];
+    expect(extractLastCritique(messages)).toBe("the lock has no witness");
+  });
+  it("skips a reference scrub that came after it", () => {
+    const messages = [
+      msg("a", "assistant", "[CRITIQUE | the lock has no witness]"),
+      rejectedCleanup,
+    ];
+    expect(extractLastCritique(messages)).toBe("the lock has no witness");
+  });
 });
 
 describe("what the last turn had rejected", () => {
+  const withRejection = msg("a", "assistant", "x", {
+    forgeSegments: [
+      {
+        kind: "action",
+        action: { kind: "CREATE", status: "applied", name: "Ok" },
+      },
+      {
+        kind: "action",
+        action: {
+          kind: "THREAD",
+          status: "rejected",
+          name: "T",
+          reason: "is concluded and cannot be rewritten",
+        },
+      },
+      {
+        kind: "action",
+        action: {
+          kind: "UNKNOWN",
+          status: "unrecognized",
+          reason: "REPAIR",
+        },
+      },
+    ],
+  });
+  const expected =
+    '[REJECTED LAST TURN] (not applied)\n- THREAD "T": is concluded and cannot be rewritten\n- REPAIR';
+
   it("lists each command that was not applied, with its reason", () => {
-    const messages = [
-      msg("a", "assistant", "x", {
-        forgeSegments: [
-          {
-            kind: "action",
-            action: { kind: "CREATE", status: "applied", name: "Ok" },
-          },
-          {
-            kind: "action",
-            action: {
-              kind: "THREAD",
-              status: "rejected",
-              name: "T",
-              reason: "no known members",
-            },
-          },
-          {
-            kind: "action",
-            action: {
-              kind: "UNKNOWN",
-              status: "unrecognized",
-              reason: "REPAIR",
-            },
-          },
-        ],
-      }),
-    ];
-    expect(formatRejections(messages)).toBe(
-      '[REJECTED LAST TURN] (not applied; write each again as its repair says)\n- THREAD "T": no known members\n- REPAIR',
-    );
+    expect(formatRejections([withRejection])).toBe(expected);
   });
   it("is empty when everything was applied", () => {
     expect(
       formatRejections([msg("a", "assistant", "x", { forgeSegments: [] })]),
     ).toBe("");
+  });
+  it("reports the last turn's, not those of a reference scrub that came after it", () => {
+    expect(formatRejections([withRejection, rejectedCleanup])).toBe(expected);
   });
 });
 
@@ -183,12 +274,13 @@ describe("a Scenario turn's messages", () => {
       ],
     },
     forge: { tombstonesByChatId: {}, pendingScrubByChatId: {} },
+    chat: { chats: [], activeChatId: null, refineChat: null },
   } as unknown as RootState;
 
   it("gives the turn, the pool and the Threads' state, and ends on the grow instruction", async () => {
     const chat = chatOf([
       msg("u", "user", "seed"),
-      msg("a", "assistant", "sketch\n[CRITIQUE | no witness]"),
+      msg("a", "assistant", "sketch\n[CRITIQUE | no witness]", sketched),
       msg("p", "assistant", ""),
     ]);
     const built = await buildScenarioTurnStrategy(() => state, chat, "p")
@@ -203,6 +295,64 @@ describe("a Scenario turn's messages", () => {
       role: "user",
       content: SCENARIO_GROW_INSTRUCTION,
     });
+  });
+
+  it("reads the chat as it stands when the turn is built, not as it stood when it was queued", async () => {
+    const queued = chatOf([
+      msg("u", "user", "seed"),
+      msg("a", "assistant", "sketch", sketched),
+      msg("p", "assistant", ""),
+    ]);
+    const strat = buildScenarioTurnStrategy(
+      () => ({
+        ...state,
+        chat: {
+          chats: [
+            {
+              ...queued,
+              messages: [
+                msg("u", "user", "seed"),
+                msg("a", "assistant", "sketch", sketched),
+                msg("u2", "user", "ZZ-ADDED-LATER"),
+                msg("p", "assistant", ""),
+              ],
+            },
+          ],
+          activeChatId: "c1",
+          refineChat: null,
+        },
+      }),
+      queued,
+      "p",
+    );
+    const built = await strat.messageFactory!();
+    const text = built.messages.map((m) => m.content).join("\n---\n");
+    expect(text).toContain("TURN: STEER");
+    expect(built.messages.at(-1)).toEqual({
+      role: "user",
+      content: "ZZ-ADDED-LATER",
+    });
+  });
+
+  it("sends neither a reference scrub nor an empty message as conversation", async () => {
+    const chat = chatOf([
+      msg("u", "user", "seed"),
+      msg("a", "assistant", "sketch", sketched),
+      msg("u2", "user", "make her older"),
+      msg("k", "assistant", "ZZ-SCRUB", { messageKind: "cleanup" }),
+      msg("e", "assistant", "  "),
+      msg("p", "assistant", ""),
+    ]);
+    const built = await buildScenarioTurnStrategy(() => state, chat, "p")
+      .messageFactory!();
+    expect(built.messages.map((m) => m.content).join("\n")).not.toContain(
+      "ZZ-SCRUB",
+    );
+    expect(built.messages.slice(-3).map((m) => m.content)).toEqual([
+      "seed",
+      "sketch",
+      "make her older",
+    ]);
   });
 
   it("reads a Thread's private halves from the transcript only, never the store", async () => {

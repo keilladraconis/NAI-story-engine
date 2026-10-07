@@ -2,9 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   buildStoryEnginePrefix,
   formatFoundationBlock,
+  getAllWorldEntityContext,
+  getExistingEntityItems,
 } from "../../../src/core/utils/context-builder";
 import type { RootState } from "../../../src/core/store/types";
 import type { Chat } from "../../../src/core/chat-types/types";
+import { FieldID } from "../../../src/config/field-definitions";
 
 const ACTIVE_PROBE = "PROBE_TOKEN_42";
 
@@ -133,5 +136,54 @@ describe("the Foundation block", () => {
       "Situation: The company is buying the lock houses.",
     );
     expect(block).not.toMatch(/Shape:|Intent:/);
+  });
+});
+
+describe("the World block", () => {
+  const entity = (
+    id: string,
+    name: string,
+    summary: string,
+    categoryId = FieldID.DramatisPersonae,
+  ) => ({ id, name, summary, categoryId, lifecycle: "draft" as const });
+  const state = {
+    ...makeState(),
+    world: {
+      threads: [],
+      entitiesById: {
+        h: entity("h", "Hesper Vane", "Keeps Tolland Lock."),
+        c: entity("c", "Corin Vane", ""),
+        n: entity("n", "", "A keeper nobody has named."),
+        l: entity(
+          "l",
+          "Tolland Lock House",
+          "Damp plaster.",
+          FieldID.Locations,
+        ),
+      },
+      entityIds: ["h", "c", "n", "l"],
+    },
+  } as unknown as RootState;
+
+  it("names each element beside its summary", () => {
+    expect(getExistingEntityItems(state, FieldID.Locations)).toBe(
+      "Tolland Lock House: Damp plaster.",
+    );
+  });
+
+  it("leaves out an element with no summary, and keeps a nameless one's bare", () => {
+    expect(getExistingEntityItems(state, FieldID.DramatisPersonae)).toBe(
+      "Hesper Vane: Keeps Tolland Lock.\nA keeper nobody has named.",
+    );
+  });
+
+  it("carries the names into the shared prefix", async () => {
+    expect(getAllWorldEntityContext(state)).toContain(
+      "Hesper Vane: Keeps Tolland Lock.",
+    );
+    const prefix = await buildStoryEnginePrefix(() => state);
+    expect(prefix.map((m) => m.content).join("\n")).toContain(
+      "Tolland Lock House: Damp plaster.",
+    );
   });
 });

@@ -242,12 +242,18 @@ export function registerForgeChatEffects(
   // Deleting the chat is the only way a Scenario ends. Its drafts are hidden
   // from the World because the chat shows them, so without this they would be
   // unreachable; the tombstones and pending scrub belong to the chat alone.
-  subscribeEffect(matchesAction(chatDeleted), async (action) => {
-    const chatId = action.payload.id;
-    dispatch(draftsReleasedFromChat({ chatId }));
-    dispatch(tombstonesClearedForChat({ chatId }));
-    dispatch(scrubCleared({ chatId }));
-  });
+  subscribeEffect(
+    matchesAction(chatDeleted),
+    async (action, { getState: latest }) => {
+      const chatId = action.payload.id;
+      // The reducer refuses to delete the last chat. A chat still here was not
+      // deleted, and keeps its drafts and its bookkeeping.
+      if (latest().chat.chats.some((c) => c.id === chatId)) return;
+      dispatch(draftsReleasedFromChat({ chatId }));
+      dispatch(tombstonesClearedForChat({ chatId }));
+      dispatch(scrubCleared({ chatId }));
+    },
+  );
 
   // ─── Entity Discard (user-initiated draft removal) ──────────────────────────
   subscribeEffect(

@@ -18,7 +18,10 @@ import {
 } from "../../../../../src/core/store/slices/world";
 import { FieldID } from "../../../../../src/config/field-definitions";
 import type { ForgeSegment } from "../../../../../src/core/chat-types/types";
-import { THREAD_REPAIR } from "../../../../../src/core/utils/crucible-command-parser";
+import {
+  THREAD_REPAIR,
+  type ParsedCommand,
+} from "../../../../../src/core/utils/crucible-command-parser";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function segmentsFromCompletion(calls: any[][]): ForgeSegment[] {
@@ -177,7 +180,7 @@ describe("forgeChatHandler.completion", () => {
           kind: "REVISE",
           status: "rejected",
           name: "OldQuay",
-          reason: "live entity",
+          reason: "is live and cannot be changed from the chat",
         },
       },
     ]);
@@ -212,7 +215,7 @@ describe("forgeChatHandler.completion", () => {
           kind: "DELETE",
           status: "rejected",
           name: "OldQuay",
-          reason: "live entity",
+          reason: "is live and cannot be changed from the chat",
         },
       },
     ]);
@@ -247,7 +250,7 @@ describe("forgeChatHandler.completion", () => {
           kind: "RENAME",
           status: "rejected",
           name: "OldQuay",
-          reason: "live entity",
+          reason: "is live and cannot be changed from the chat",
         },
       },
     ]);
@@ -706,14 +709,30 @@ describe("a THREAD command, applied", () => {
     expect(record.status).toBe("applied");
   });
 
-  it("rejects a Thread none of whose members is known", () => {
+  it("rejects a new Thread naming someone who is not a known element, though the others are", () => {
+    const { dispatch, record } = run(stateWith([]), {
+      ...cmd,
+      memberNames: ["Hesper Vane", "Nobody", "No One Else"],
+    });
+    expect(record).toMatchObject({
+      kind: "THREAD",
+      status: "rejected",
+      name: "Half the House",
+      reason:
+        'unknown member "Nobody"; name only elements under [POOL] or [LIVE], spelled exactly',
+    });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a new Thread none of whose members is known, for the same reason", () => {
     const { dispatch, record } = run(stateWith([]), {
       ...cmd,
       memberNames: ["Nobody"],
     });
     expect(record).toMatchObject({
       status: "rejected",
-      reason: "no known members",
+      reason:
+        'unknown member "Nobody"; name only elements under [POOL] or [LIVE], spelled exactly',
     });
     expect(dispatch).not.toHaveBeenCalled();
   });
@@ -764,7 +783,81 @@ describe("a THREAD command, applied", () => {
       stateWith([{ ...existing, status: "concluded" }]),
       cmd,
     );
-    expect(record).toMatchObject({ status: "rejected", reason: "concluded" });
+    expect(record).toMatchObject({
+      status: "rejected",
+      reason: "is concluded and cannot be rewritten",
+    });
     expect(dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("a rejection says how to repair it", () => {
+  const draft = makeEntity({ id: "d", name: "Vesper" });
+  const live = makeEntity({ id: "l", name: "Ilsa", lifecycle: "live" });
+  const tombs = {
+    c1: [{ name: "Gone", category: "Character", reason: "user" as const }],
+  };
+  const reasonFor = (command: ParsedCommand): string | undefined => {
+    const dispatch = vi.fn();
+    const state = makeState([draft, live], tombs);
+    const record = executeForgeCommand(
+      command,
+      "c1",
+      "m1",
+      () => state,
+      dispatch,
+      { reviseOnly: false },
+    );
+    expect(record.status).toBe("rejected");
+    expect(dispatch).not.toHaveBeenCalled();
+    return record.reason;
+  };
+  const create = (
+    name: string,
+    content = "x",
+    elementType = "CHARACTER",
+  ): ParsedCommand => ({ kind: "CREATE", elementType, name, content });
+  const revise = (name: string, content = "x"): ParsedCommand => ({
+    kind: "REVISE",
+    name,
+    content,
+  });
+  const rename = (oldName: string, newName: string): ParsedCommand => ({
+    kind: "RENAME",
+    oldName,
+    newName,
+  });
+  const LIVE = "is live and cannot be changed from the chat";
+  const NOT_FOUND = "not found; name a draft under [POOL], spelled exactly";
+  const DISCARDED = "was discarded; do not recreate it";
+  const NO_SUMMARY = "needs a summary after the bar";
+
+  it.each<[string, ParsedCommand, string]>([
+    [
+      "CREATE of a name that exists",
+      create("Vesper"),
+      "already exists; REVISE it instead",
+    ],
+    ["CREATE of a discarded name", create("Gone"), DISCARDED],
+    ["REVISE of a discarded name", revise("Gone"), DISCARDED],
+    ["CREATE with no summary", create("New", " "), NO_SUMMARY],
+    ["REVISE with no summary", revise("Vesper", " "), NO_SUMMARY],
+    [
+      "CREATE of an unknown type",
+      create("New", "x", "WIDGET"),
+      "unknown type; use CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC",
+    ],
+    ["REVISE of a live element", revise("Ilsa"), LIVE],
+    ["DELETE of a live element", { kind: "DELETE", name: "Ilsa" }, LIVE],
+    ["RENAME of a live element", rename("Ilsa", "Elsa"), LIVE],
+    ["DELETE of no one", { kind: "DELETE", name: "Nobody" }, NOT_FOUND],
+    ["RENAME of no one", rename("Nobody", "Somebody"), NOT_FOUND],
+    [
+      "RENAME to nothing",
+      rename("Vesper", " "),
+      "needs a new name after the arrow",
+    ],
+  ])("%s", (_case, command, reason) => {
+    expect(reasonFor(command)).toBe(reason);
   });
 });
