@@ -1,4 +1,4 @@
-// "Talk it through" — the obvious next step once a register is chosen and the
+// "Sketch the scenario" — the obvious next step once a register is chosen and the
 // Foundation is still blank. Sits directly under the Intensity picker and only
 // while every field card is empty (Setup owns that condition), so it is a
 // starting prompt rather than permanent furniture.
@@ -7,17 +7,14 @@
 // its own padding. A small text link would read as an afterthought in the one
 // place where it is the primary action.
 //
-// Two states, because the brainstorm reads Intensity for its register: until one
+// Two states, because the Scenario reads Intensity for its register: until one
 // is picked the box points back up at the picker instead of offering a chat that
 // would start without a tone.
 
 import { store, chatCreated, chatSwitched } from "../../../core/store";
 import { useSlice } from "../../bridge";
 import { SP, T } from "../../style";
-import {
-  nextBrainstormTitle,
-  reusableBrainstormId,
-} from "../chat/chat-actions";
+import { nextScenarioTitle, reusableScenarioId } from "../chat/chat-actions";
 import type { Chat as ChatT } from "../../../core/chat-types/types";
 import { ArrowUp, MessageSquare } from "nai:icons/feather";
 
@@ -41,7 +38,7 @@ function CtaIcon(props: { ready: boolean }) {
   );
 }
 
-export function BrainstormCta(props: { onOpenChat: () => void }) {
+export function ScenarioCta(props: { onOpenChat: () => void }) {
   // The level string, not the object: useSlice compares snapshots with Object.is
   // and a fresh object each read would loop.
   const level = useSlice((s) => s.foundation.intensity?.level ?? "");
@@ -58,20 +55,19 @@ export function BrainstormCta(props: { onOpenChat: () => void }) {
   const start = () => {
     if (!ready) return;
     const { chats, activeChatId } = store.getState().chat;
-    // An empty brainstorm that is already selected is the one to talk in. The
-    // store seeds "Brainstorm 1" and selects it, so minting a chat regardless
-    // left a writer's first click in "Brainstorm 2" with an untouched
-    // "Brainstorm 1" beside it in Sessions.
-    const reusable = reusableBrainstormId(chats, activeChatId);
+    // An empty Scenario that is already selected is the one to talk in. The
+    // store seeds "Scenario 1" and selects it, so minting a chat regardless
+    // left a writer's first click in "Scenario 2" with an untouched
+    // "Scenario 1" beside it in Sessions.
+    const reusable = reusableScenarioId(chats, activeChatId);
     if (reusable) {
       props.onOpenChat();
       return;
     }
     const chat: ChatT = {
       id: api.v1.uuid(),
-      type: "brainstorm",
-      title: nextBrainstormTitle(chats),
-      subMode: "cowriter",
+      type: "scenario",
+      title: nextScenarioTitle(chats),
       messages: [],
       seed: { kind: "blank" },
     };
@@ -113,12 +109,12 @@ export function BrainstormCta(props: { onOpenChat: () => void }) {
         }}
       >
         <CtaIcon ready={ready} />
-        {ready ? "Talk it through" : "Choose an Intensity first"}
+        {ready ? "Sketch the scenario" : "Choose an Intensity first"}
       </span>
       <span style={{ fontSize: "0.85em", opacity: ready ? 0.8 : 1 }}>
         {ready
-          ? "Not sure where to start? Brainstorm the story and fill the Foundation from the conversation."
-          : "Pick a register above. The brainstorm writes in the tone you set, so it is worth choosing before you start talking."}
+          ? "Not sure where to start? Say what you want to see, and the Engine builds the pressures, people and places it can grow from."
+          : "Pick a register above. The sketch is built at the pressure you set, so it is worth choosing before you start."}
       </span>
     </button>
   );

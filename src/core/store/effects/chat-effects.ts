@@ -40,9 +40,6 @@ function findChat(state: RootState, id: string): Chat | undefined {
  * nothing to compare, so nothing to call a repeat.
  */
 export function sameSummarySource(a: ChatSeed, b: ChatSeed): boolean {
-  if (a.kind === "fromChat" && b.kind === "fromChat") {
-    return a.sourceChatId === b.sourceChatId;
-  }
   if (a.kind === "fromStoryText" && b.kind === "fromStoryText") {
     return a.sourceText === b.sourceText;
   }

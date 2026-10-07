@@ -101,21 +101,6 @@ export const FOUNDATION_SITUATION_PROMPT = `Write the story's Situation: one or 
 
 Write the sentences on one line. No preamble.`;
 
-export const BRAINSTORM_SUMMARIZE_PROMPT = `You produce an author's working notes document for a story project.
-
-Given a brainstorm transcript, write only what is currently true and settled. You are not summarizing a conversation — you are recording the state of the story as it stands now.
-
-FORBIDDEN — never write these or anything like them:
-- "The conversation explored...", "They discussed...", "It was decided..."
-- "Initially they considered...", "One rejected idea was...", "After some back-and-forth..."
-- Any reference to the deliberation process, discarded versions, or how ideas evolved
-
-REQUIRED — write only declarative present-tense facts:
-- WRONG: "After debating settings, they landed on a near-future dystopia."
-- RIGHT: "The setting is a near-future dystopia where..."
-
-If something was proposed then revised, write only the final version. If nothing was settled in a category, omit that section entirely.`;
-
 export const STORY_TEXT_SUMMARIZE_PROMPT = `Read the story text below and produce dense declarative present-tense notes capturing setting, characters, situations, and unresolved tensions. Output the notes only — no preamble, no headers.`;
 
 export const REFINE_SYSTEM_PROMPT = `You are a field editor. Rewrite the REFINE TARGET below per the user's instructions.

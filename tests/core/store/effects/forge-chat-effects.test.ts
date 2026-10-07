@@ -396,6 +396,27 @@ describe("forgeDiscardAllRequested effect", () => {
   });
 });
 
+describe("chatDeleted effect", () => {
+  it("releases the chat's drafts and clears its tombstones and scrub", async () => {
+    const { dispatch, fire } = makeHarness(makeState([makeChat()], []));
+    await fire({ type: "chat/chatDeleted", payload: { id: "fc-1" } });
+
+    const dispatched = dispatch.mock.calls.map(([a]) => a);
+    expect(dispatched).toContainEqual({
+      type: "world/draftsReleasedFromChat",
+      payload: { chatId: "fc-1" },
+    });
+    expect(dispatched).toContainEqual({
+      type: "forge/tombstonesClearedForChat",
+      payload: { chatId: "fc-1" },
+    });
+    expect(dispatched).toContainEqual({
+      type: "forge/scrubCleared",
+      payload: { chatId: "fc-1" },
+    });
+  });
+});
+
 describe("forgeScrubNowRequested effect", () => {
   it("submits a forgeCleanup and clears the scrub when drafts remain", async () => {
     const chat = makeChat();

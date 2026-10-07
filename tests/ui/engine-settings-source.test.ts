@@ -249,16 +249,12 @@ describe("the section is on the Engine tab", () => {
     expect(src).toContain("<EngineSettings />");
   });
 
-  it("sits between the Forge and the World", () => {
-    // The Engine acts on the World listed below it, and the Forge above it is
-    // the other thing on this tab that writes to the World.
+  it("sits above the World", () => {
+    // The Engine acts on the World listed below it.
     const src = readFileSync(ENGINE_TAB, "utf8");
-    const forge = src.indexOf("<ForgeSection />");
     const settings = src.indexOf("<EngineSettings />");
     const world = src.indexOf("<World />");
-    expect(forge).toBeGreaterThan(-1);
-    expect(world).toBeGreaterThan(-1);
-    expect(settings).toBeGreaterThan(forge);
+    expect(settings).toBeGreaterThan(-1);
     expect(world).toBeGreaterThan(settings);
   });
 

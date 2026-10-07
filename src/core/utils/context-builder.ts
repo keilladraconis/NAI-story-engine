@@ -7,7 +7,7 @@
  * prompt (persona + directives) after the prefix:
  *
  *   MSG 1 (SYSTEM): story state snapshot (ATTG, style,        [STABLE during SEGA]
- *                    setting, brainstorm, canon)
+ *                    setting, canon)
  *   MSG 2 (SYSTEM): World Entry items                         [GROWS during list stage]
  *   MSG 3 (SYSTEM): story text (rolling window)               [VOLATILE — at end]
  *   ─── cache boundary ───
@@ -18,16 +18,12 @@
  */
 
 import { RootState } from "../store/types";
-import type { SpecCtx } from "../chat-types/types";
-import { activeSavedChat } from "../store/slices/chat";
-import { getChatTypeSpec } from "../chat-types";
 import {
   FieldID,
   FIELD_CONFIGS,
   DulfsFieldID,
 } from "../../config/field-definitions";
 import { STORAGE_KEYS } from "../keys";
-import { redactThreadPrivateNotes } from "./crucible-command-parser";
 // --- Helpers ---
 
 /**
@@ -159,19 +155,6 @@ export const getAllWorldEntityContext = (state: RootState): string => {
 };
 
 /**
- * Returns the active saved chat's transcript joined as plain text, suitable
- * for forge guidance fallback or other context consumers that don't want the
- * full prefix scaffolding. Empty string when no active chat is available.
- */
-export const getActiveChatTranscript = (state: RootState): string => {
-  const active = activeSavedChat(state.chat);
-  if (!active) return "";
-  return active.messages
-    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-    .join("\n");
-};
-
-/**
  * Options for getStoryContextMessages.
  */
 export interface StoryContextOptions {
@@ -275,11 +258,10 @@ export const getStoryContextMessages = async (
 
 /**
  * Builds the shared message prefix for all Story Engine generation strategies.
- * Brainstorm mode is excluded — it uses its own chat-based context.
  *
  * Prefix structure:
  *   MSG 1 (SYSTEM): story state snapshot (ATTG, style,        [STABLE during SEGA]
- *                    setting, brainstorm, canon)
+ *                    setting, canon)
  *   MSG 2 (SYSTEM): World Entry items                         [GROWS during list stage]
  *   MSG 3 (SYSTEM): story text (rolling window)               [VOLATILE — at end]
  *
@@ -289,21 +271,12 @@ export const getStoryContextMessages = async (
 export interface StoryEnginePrefixOptions {
   /** Snapshot sections to exclude (e.g., "foundation" when generating foundation fields) */
   excludeSections?: Array<
-    | "setting"
-    | "attg"
-    | "style"
-    | "brainstorm"
-    | "worldEntities"
-    | "storyText"
-    | "foundation"
+    "setting" | "attg" | "style" | "worldEntities" | "storyText" | "foundation"
   >;
-  /** Skip chat-transcript injection. Set by chat-strategy so it doesn't double-inject the active chat. */
-  excludeChat?: boolean;
 }
 
 // --- Stable story-state section builders ---
-// Shared by buildStoryEnginePrefix (which groups them into the cached MSG 2 /
-// MSG 4 messages) and buildForgeBriefing (which freezes them into one message).
+// Shared by buildStoryEnginePrefix, which groups them into the cached messages.
 // Each returns the formatted block, or "" when its source is empty.
 
 export function formatAttgBlock(state: RootState): string {
@@ -344,29 +317,6 @@ export async function formatSettingBlock(): Promise<string> {
   return setting ? `[SETTING]\n${setting}` : "";
 }
 
-/**
- * The active chat's transcript as a `[BRAINSTORM]` block.
- *
- * This is where a chat stops being a conversation and becomes context for
- * models whose output the story reads (lorebook entries, the opening scene),
- * so it is also where a Thread's private notes are cut out: a Forge chat holds
- * them as the last segment of its own `[THREAD …]` commands. The stored chat is
- * untouched, and the Forge reads `chat.messages` directly, never this block.
- */
-export function formatBrainstormBlock(getState: () => RootState): string {
-  const state = getState();
-  const active = activeSavedChat(state.chat);
-  if (!active) return "";
-  const ctx: SpecCtx = { getState, dispatch: () => {} };
-  const messages = getChatTypeSpec(active.type).contextSlice(active, ctx);
-  const chatText = messages
-    .map(
-      (m) => `${m.role.toUpperCase()}: ${redactThreadPrivateNotes(m.content)}`,
-    )
-    .join("\n");
-  return chatText ? `[BRAINSTORM]\n${chatText}` : "";
-}
-
 export async function formatStoryTextBlock(): Promise<string> {
   const storyMessages = await getStoryContextMessages({
     includeLorebookEntries: false,
@@ -380,31 +330,6 @@ export async function formatStoryTextBlock(): Promise<string> {
   return storyText ? `[STORY TEXT]\n${storyText}` : "";
 }
 
-const FORGE_BRIEFING_HEADER =
-  "STORY ENGINE BRIEFING — the source material for this forge session. Build the world from this premise.";
-
-/**
- * Assembles the frozen briefing seeded at the top of a forge session: the
- * static story-engine context (foundation, setting, brainstorm, story text).
- * World entities are deliberately excluded — live entities are injected per
- * turn via the strategy's [LIVE] block. Returns "" when there is nothing to say.
- */
-export async function buildForgeBriefing(
-  getState: () => RootState,
-): Promise<string> {
-  const state = getState();
-  const blocks = [
-    formatAttgBlock(state),
-    formatStyleBlock(state),
-    formatFoundationBlock(state),
-    await formatSettingBlock(),
-    formatBrainstormBlock(getState),
-    await formatStoryTextBlock(),
-  ].filter((b) => b.length > 0);
-  if (blocks.length === 0) return "";
-  return `${FORGE_BRIEFING_HEADER}\n\n${blocks.join("\n\n")}`;
-}
-
 export const buildStoryEnginePrefix = async (
   getState: () => RootState,
   options: StoryEnginePrefixOptions = {},
@@ -413,10 +338,9 @@ export const buildStoryEnginePrefix = async (
   const excluded = new Set(options.excludeSections || []);
 
   // --- MSG 1: Story state snapshot (STABLE sections) ---
-  // Order: Foundation (tone/intent anchors), then setting/brainstorm, then canon.
+  // Order: Foundation (tone/intent anchors), then setting.
   const stableSections: string[] = [];
 
-  // Order: Foundation (tone/intent anchors), then setting, then brainstorm.
   if (!excluded.has("attg")) {
     const b = formatAttgBlock(state);
     if (b) stableSections.push(b);
@@ -431,12 +355,6 @@ export const buildStoryEnginePrefix = async (
   }
   if (!excluded.has("setting")) {
     const b = await formatSettingBlock();
-    if (b) stableSections.push(b);
-  }
-  // Active chat transcript — the active chat's spec.contextSlice() decides
-  // which messages contribute to the prefix.
-  if (!excluded.has("brainstorm") && !options.excludeChat) {
-    const b = formatBrainstormBlock(getState);
     if (b) stableSections.push(b);
   }
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { buildChatStrategy } from "../../../src/core/utils/chat-strategy";
 import type { Chat } from "../../../src/core/chat-types/types";
 import type { RootState } from "../../../src/core/store/types";
-import { buildBrainstormPrompt } from "../../../src/core/utils/prompts";
+import { STORY_TEXT_SUMMARIZE_PROMPT } from "../../../src/core/utils/prompts";
 import { refineBudgetFor } from "../../../src/core/utils/refine-strategy";
 import { useCreativeModel } from "../../helpers/creative-model";
 
@@ -10,9 +10,8 @@ describe("buildChatStrategy", () => {
   it("returns a strategy with chat target type for a saved chat", async () => {
     const chat: Chat = {
       id: "c1",
-      type: "brainstorm",
+      type: "summary",
       title: "x",
-      subMode: "cowriter",
       messages: [{ id: "u", role: "user", content: "hi" }],
       seed: { kind: "blank" },
     };
@@ -35,7 +34,7 @@ describe("buildChatStrategy", () => {
   // `minResponseLength` drives exists to catch Xialong returning an empty
   // `<think></think>` block and nothing else — it clears the visible message
   // and re-rolls up to three times, so any floor it enforces is a floor on
-  // what the writer is allowed to receive. Set above a real co-writer turn it
+  // what the writer is allowed to receive. Set above a real short turn it
   // discards good replies and re-rolls them in front of the writer.
   describe("the short-response floor in Xialong Mode", () => {
     afterEach(() => {
@@ -46,20 +45,19 @@ describe("buildChatStrategy", () => {
       useCreativeModel("xialong-v1");
     }
 
-    // Real replies a brainstorm partner gives, and their lengths.
+    // Real replies a chat partner gives, and their lengths.
     const SHORT_REPLIES = [
       "Say more about the sister.", // 26
       "Which thread do you want first?", // 31
       "Cut the prologue.", // 17
     ];
 
-    it("accepts a co-writer turn that is only a sentence long", async () => {
+    it("accepts a short turn that is only a sentence long", async () => {
       xialongOn();
       const chat: Chat = {
         id: "c1",
-        type: "brainstorm",
+        type: "summary",
         title: "x",
-        subMode: "cowriter",
         messages: [{ id: "u", role: "user", content: "hi" }],
         seed: { kind: "blank" },
       };
@@ -83,9 +81,8 @@ describe("buildChatStrategy", () => {
       xialongOn();
       const chat: Chat = {
         id: "c1",
-        type: "brainstorm",
+        type: "summary",
         title: "x",
-        subMode: "cowriter",
         messages: [{ id: "u", role: "user", content: "hi" }],
         seed: { kind: "blank" },
       };
@@ -173,9 +170,8 @@ describe("buildChatStrategy", () => {
     const existingContent = "Half-written reply that hit the token cap.";
     const chat: Chat = {
       id: "c-cont",
-      type: "brainstorm",
+      type: "summary",
       title: "x",
-      subMode: "cowriter",
       messages: [
         { id: "u1", role: "user", content: "go" },
         { id: assistantId, role: "assistant", content: existingContent },
@@ -214,9 +210,8 @@ describe("buildChatStrategy", () => {
     const assistantId = "asst-pending";
     const chat: Chat = {
       id: "c-mf",
-      type: "brainstorm",
+      type: "summary",
       title: "x",
-      subMode: "cowriter",
       messages: [
         { id: "u1", role: "user", content: "first user message" },
         { id: assistantId, role: "assistant", content: "" },
@@ -242,11 +237,10 @@ describe("buildChatStrategy", () => {
     expect(
       messages.some(
         (m: Message) =>
-          m.role === "system" &&
-          m.content === buildBrainstormPrompt("cowriter", "unset"),
+          m.role === "system" && m.content === STORY_TEXT_SUMMARIZE_PROMPT,
       ),
     ).toBe(true);
-    // The brainstorm generation must not inherit the entity-generation bundle.
+    // The chat generation must not inherit the entity-generation bundle.
     const allText = messages.map((m: Message) => m.content).join("\n");
     expect(allText).not.toContain("You are a Story Engine Agent");
     expect(allText).not.toContain("Possibility over Plot");

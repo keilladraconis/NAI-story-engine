@@ -53,7 +53,6 @@ export interface ChatMessage {
 
 export type ChatSeed =
   | { kind: "blank" }
-  | { kind: "fromChat"; sourceChatId: string }
   | { kind: "fromStoryText"; sourceText: string }
   | { kind: "fromField"; sourceFieldId: string; sourceText: string };
 

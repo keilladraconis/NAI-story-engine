@@ -1,16 +1,16 @@
-// Static guard over the Setup tab's "Talk it through" button.
+// Static guard over the Setup tab's "Sketch the scenario" button.
 //
 // `.tsx` is never collected by vitest here, so the component cannot be
 // render-tested; what can be held is its structure. The decision itself lives in
-// `reusableBrainstormId` and is unit-tested in `chat-actions.test.ts` — this
+// `reusableScenarioId` and is unit-tested in `chat-actions.test.ts` — this
 // only pins that the button actually ASKS, because the bug was not a wrong
 // answer, it was never asking: the CTA minted a chat unconditionally while the
-// store's seeded, selected, empty "Brainstorm 1" sat unused beside it.
+// store's seeded, selected, empty "Scenario 1" sat unused beside it.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const CTA = join(__dirname, "../../src/ui/panels/setup/BrainstormCta.tsx");
+const CTA = join(__dirname, "../../src/ui/panels/setup/ScenarioCta.tsx");
 
 /** Comments out: this file explains itself in prose and names the very calls the
  *  scans below look for. */
@@ -31,10 +31,10 @@ function handler(): string {
   return body.slice(0, end);
 }
 
-describe("the brainstorm CTA", () => {
+describe("the Scenario CTA", () => {
   it("asks whether the selected chat can be reused before creating one", () => {
     const src = handler();
-    const asks = src.indexOf("reusableBrainstormId");
+    const asks = src.indexOf("reusableScenarioId");
     const creates = src.indexOf("chatCreated");
     expect(asks).toBeGreaterThan(-1);
     expect(creates).toBeGreaterThan(-1);

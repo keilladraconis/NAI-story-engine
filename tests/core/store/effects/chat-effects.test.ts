@@ -212,7 +212,7 @@ describe("chat-effects: summarize is one summary per tap", () => {
 
     const sum = () =>
       uiChatSummarizeRequested({
-        seed: { kind: "fromChat", sourceChatId: "bs-src" },
+        seed: { kind: "fromStoryText", sourceText: "story A" },
       });
     // Both taps land before the first has finished building its strategy.
     store.dispatch(sum());
@@ -227,7 +227,7 @@ describe("chat-effects: summarize is one summary per tap", () => {
 
     await dispatchAndWait(
       uiChatSummarizeRequested({
-        seed: { kind: "fromChat", sourceChatId: "bs-src" },
+        seed: { kind: "fromStoryText", sourceText: "story A" },
       }),
     );
     const first = summaries(store)[0];
@@ -237,7 +237,7 @@ describe("chat-effects: summarize is one summary per tap", () => {
     store.dispatch(chatSwitched({ id: "bs-src" }));
     await dispatchAndWait(
       uiChatSummarizeRequested({
-        seed: { kind: "fromChat", sourceChatId: "bs-src" },
+        seed: { kind: "fromStoryText", sourceText: "story A" },
       }),
     );
 
@@ -253,12 +253,12 @@ describe("chat-effects: summarize is one summary per tap", () => {
 
     await dispatchAndWait(
       uiChatSummarizeRequested({
-        seed: { kind: "fromChat", sourceChatId: "bs-src" },
+        seed: { kind: "fromStoryText", sourceText: "story A" },
       }),
     );
     await dispatchAndWait(
       uiChatSummarizeRequested({
-        seed: { kind: "fromChat", sourceChatId: "bs-other" },
+        seed: { kind: "fromStoryText", sourceText: "story B" },
       }),
     );
 
@@ -270,8 +270,8 @@ describe("sameSummarySource", () => {
   it("matches a repeat of the same source", () => {
     expect(
       sameSummarySource(
-        { kind: "fromChat", sourceChatId: "a" },
-        { kind: "fromChat", sourceChatId: "a" },
+        { kind: "fromStoryText", sourceText: "a" },
+        { kind: "fromStoryText", sourceText: "a" },
       ),
     ).toBe(true);
     expect(
@@ -285,14 +285,14 @@ describe("sameSummarySource", () => {
   it("does not match a different source, or a different kind", () => {
     expect(
       sameSummarySource(
-        { kind: "fromChat", sourceChatId: "a" },
-        { kind: "fromChat", sourceChatId: "b" },
+        { kind: "fromStoryText", sourceText: "a" },
+        { kind: "fromStoryText", sourceText: "b" },
       ),
     ).toBe(false);
     expect(
       sameSummarySource(
-        { kind: "fromChat", sourceChatId: "a" },
         { kind: "fromStoryText", sourceText: "a" },
+        { kind: "fromField", sourceFieldId: "attg", sourceText: "a" },
       ),
     ).toBe(false);
   });

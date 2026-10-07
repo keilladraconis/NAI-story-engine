@@ -3,6 +3,7 @@ import {
   worldSlice,
   entityForged,
   entityDeleted,
+  draftsReleasedFromChat,
   entitySummaryUpdated,
   entityLorebookEntryBound,
   entityBound,
@@ -264,6 +265,46 @@ describe("entityDeleted", () => {
     expect(state.entityIds).toHaveLength(0);
     expect(state.entitiesById["e1"]).toBeUndefined();
     expect(state.threads[0].entityIds).toHaveLength(0);
+  });
+});
+
+describe("draftsReleasedFromChat", () => {
+  const draft = (id: string, sourceChatId?: string): WorldEntity => ({
+    ...ENTITY,
+    id,
+    lifecycle: "draft",
+    sourceChatId,
+  });
+
+  it("clears the source chat of that chat's drafts and no one else's", () => {
+    const before = makeState({
+      entitiesById: {
+        a: draft("a", "c1"),
+        b: draft("b", "c1"),
+        c: draft("c", "c2"),
+        d: draft("d"),
+        e1: ENTITY,
+      },
+      entityIds: ["a", "b", "c", "d", "e1"],
+    });
+    const after = reduce(before, draftsReleasedFromChat({ chatId: "c1" }));
+    expect(after.entitiesById["a"].sourceChatId).toBeUndefined();
+    expect(after.entitiesById["b"].sourceChatId).toBeUndefined();
+    expect(after.entitiesById["a"].lifecycle).toBe("draft");
+    expect(after.entitiesById["c"].sourceChatId).toBe("c2");
+    expect(after.entitiesById["d"]).toBe(before.entitiesById["d"]);
+    expect(after.entitiesById["e1"]).toBe(ENTITY);
+    expect(after.entityIds).toEqual(before.entityIds);
+  });
+
+  it("returns the same state when no entity belongs to the chat", () => {
+    const before = makeState({
+      entitiesById: { c: draft("c", "c2") },
+      entityIds: ["c"],
+    });
+    expect(reduce(before, draftsReleasedFromChat({ chatId: "c1" }))).toBe(
+      before,
+    );
   });
 });
 

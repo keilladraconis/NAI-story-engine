@@ -44,9 +44,7 @@ export const uiSlice = createSlice({
     uiChatSummarizeRequested: (
       state,
       _payload: {
-        seed:
-          | { kind: "fromChat"; sourceChatId: string }
-          | { kind: "fromStoryText"; sourceText: string };
+        seed: { kind: "fromStoryText"; sourceText: string };
       },
     ) => state,
     uiChatRefineRequested: (

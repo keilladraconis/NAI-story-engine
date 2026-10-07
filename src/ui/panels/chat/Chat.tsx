@@ -91,7 +91,7 @@ export function Chat(props: { onBack: () => void }) {
       <MessageList />
       <ChatInput />
       {chat.type === "refine" && <RefineCommitBar />}
-      {chat.type === "forge" && <ForgeCommitBar onEnd={props.onBack} />}
+      {chat.type === "scenario" && <ForgeCommitBar />}
     </div>
   );
 }

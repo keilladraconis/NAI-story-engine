@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  buildStoryEnginePrefix,
-  buildForgeBriefing,
-} from "../../../src/core/utils/context-builder";
+import { buildStoryEnginePrefix } from "../../../src/core/utils/context-builder";
 import type { RootState } from "../../../src/core/store/types";
 import type { Chat } from "../../../src/core/chat-types/types";
 
@@ -44,42 +41,33 @@ function makeState(
   } as unknown as RootState;
 }
 
-describe("buildStoryEnginePrefix chat injection", () => {
-  it("uses contextSlice from active chat's spec when chat slice has an active chat", async () => {
-    const chat: Chat = {
-      id: "c1",
-      type: "brainstorm",
-      title: "x",
-      subMode: "cowriter",
-      messages: [{ id: "u", role: "user", content: ACTIVE_PROBE }],
-      seed: { kind: "blank" },
-    };
-    const getState = () => makeState({ activeChat: chat });
+const scenarioChat: Chat = {
+  id: "c1",
+  type: "scenario",
+  title: "Scenario 1",
+  messages: [
+    { id: "u", role: "user", content: ACTIVE_PROBE },
+    {
+      id: "a",
+      role: "assistant",
+      content: `[THREAD "The Split Hive" | "Ines", "Pell" | shared apiary | ${ACTIVE_PROBE} | ${ACTIVE_PROBE}]`,
+    },
+  ],
+  seed: { kind: "blank" },
+};
+
+describe("buildStoryEnginePrefix and the chat transcript", () => {
+  it("never carries the active chat's transcript", async () => {
+    const getState = () => makeState({ activeChat: scenarioChat });
 
     const prefix = await buildStoryEnginePrefix(getState);
     const concat = prefix.map((m) => m.content).join("\n");
-    expect(concat).toContain(ACTIVE_PROBE);
-    expect(concat).toContain("[BRAINSTORM]");
-  });
-
-  it("omits the chat block entirely when no chat is active", async () => {
-    const getState = () => makeState();
-
-    const prefix = await buildStoryEnginePrefix(getState);
-    const concat = prefix.map((m) => m.content).join("\n");
+    expect(concat).not.toContain(ACTIVE_PROBE);
     expect(concat).not.toContain("[BRAINSTORM]");
   });
 
   it("emits no worldbuilding directives — the shared prefix is pure story-state context", async () => {
-    const chat: Chat = {
-      id: "c1",
-      type: "brainstorm",
-      title: "x",
-      subMode: "cowriter",
-      messages: [{ id: "u", role: "user", content: ACTIVE_PROBE }],
-      seed: { kind: "blank" },
-    };
-    const getState = () => makeState({ activeChat: chat });
+    const getState = () => makeState({ activeChat: scenarioChat });
 
     const prefix = await buildStoryEnginePrefix(getState);
     const concat = prefix.map((m) => m.content).join("\n");
@@ -90,61 +78,6 @@ describe("buildStoryEnginePrefix chat injection", () => {
     expect(concat).not.toContain("You are the **Archivist**");
   });
 
-  it("excludeChat suppresses chat injection entirely (active chat path)", async () => {
-    const chat: Chat = {
-      id: "c1",
-      type: "brainstorm",
-      title: "x",
-      subMode: "cowriter",
-      messages: [{ id: "u", role: "user", content: ACTIVE_PROBE }],
-      seed: { kind: "blank" },
-    };
-    const getState = () => makeState({ activeChat: chat });
-
-    const prefix = await buildStoryEnginePrefix(getState, {
-      excludeChat: true,
-    });
-    const concat = prefix.map((m) => m.content).join("\n");
-    expect(concat).not.toContain(ACTIVE_PROBE);
-    expect(concat).not.toContain("[BRAINSTORM]");
-  });
-
-  it("excludeSections 'brainstorm' continues to suppress chat injection (regression)", async () => {
-    const chat: Chat = {
-      id: "c1",
-      type: "brainstorm",
-      title: "x",
-      subMode: "cowriter",
-      messages: [{ id: "u", role: "user", content: ACTIVE_PROBE }],
-      seed: { kind: "blank" },
-    };
-    const getState = () => makeState({ activeChat: chat });
-
-    const prefix = await buildStoryEnginePrefix(getState, {
-      excludeSections: ["brainstorm"],
-    });
-    const concat = prefix.map((m) => m.content).join("\n");
-    expect(concat).not.toContain(ACTIVE_PROBE);
-    expect(concat).not.toContain("[BRAINSTORM]");
-  });
-});
-
-describe("buildForgeBriefing", () => {
-  it("includes the BRAINSTORM block from the active chat", async () => {
-    const chat: Chat = {
-      id: "c1",
-      type: "brainstorm",
-      title: "x",
-      subMode: "cowriter",
-      messages: [{ id: "u", role: "user", content: "a haunted lighthouse" }],
-      seed: { kind: "blank" },
-    };
-    const getState = () => makeState({ activeChat: chat });
-    const briefing = await buildForgeBriefing(getState);
-    expect(briefing).toContain("[BRAINSTORM]");
-    expect(briefing).toContain("a haunted lighthouse");
-  });
-
   it("includes ATTG / STYLE / NARRATIVE FOUNDATION when foundation is populated", async () => {
     const getState = () => {
       const s = makeState();
@@ -153,11 +86,13 @@ describe("buildForgeBriefing", () => {
       s.foundation.intent = "a slow unravelling";
       return s;
     };
-    const briefing = await buildForgeBriefing(getState);
-    expect(briefing).toContain("[ATTG]");
-    expect(briefing).toContain("[STYLE]");
-    expect(briefing).toContain("[NARRATIVE FOUNDATION]");
-    expect(briefing).toContain("a slow unravelling");
+    const concat = (await buildStoryEnginePrefix(getState))
+      .map((m) => m.content)
+      .join("\n");
+    expect(concat).toContain("[ATTG]");
+    expect(concat).toContain("[STYLE]");
+    expect(concat).toContain("[NARRATIVE FOUNDATION]");
+    expect(concat).toContain("a slow unravelling");
   });
 
   it("includes the Story Contract as binding constraints, with the Prohibited list", async () => {
@@ -170,59 +105,11 @@ describe("buildForgeBriefing", () => {
       } as RootState["foundation"]["contract"];
       return s;
     };
-    const briefing = await buildForgeBriefing(getState);
-    expect(briefing).toContain("Story Contract — binding");
-    expect(briefing).toContain("Prohibited (never introduce");
-    expect(briefing).toContain("death, betrayal, supernatural elements");
-  });
-
-  it("returns an empty string when there is no context at all", async () => {
-    const getState = () => makeState();
-    const briefing = await buildForgeBriefing(getState);
-    expect(briefing).toBe("");
-  });
-});
-
-describe("a Forge transcript entering the Story Engine prefix", () => {
-  const SENTINEL = "ZZ-PRIVATE-SENTINEL-7781";
-  const STATE_TEXT = "Ines and Pell share the upper apiary";
-  const forgeChat: Chat = {
-    id: "f1",
-    type: "forge",
-    title: "Forge",
-    subMode: "sketch",
-    messages: [
-      { id: "u", role: "user", content: "Tie the two keepers together." },
-      {
-        id: "a",
-        role: "assistant",
-        content: [
-          "Recording how they stand.",
-          `[THREAD "The Split Hive" | "Ines", "Pell" | ${STATE_TEXT} | ${SENTINEL} | ${SENTINEL}]`,
-        ].join("\n"),
-      },
-    ],
-    seed: { kind: "blank" },
-  };
-  const getState = () => makeState({ activeChat: forgeChat });
-
-  it("carries a Thread's state but never its private notes", async () => {
-    const prefix = await buildStoryEnginePrefix(getState);
-    expect(prefix.length).toBeGreaterThan(0);
-    for (const message of prefix) {
-      expect(message.content).not.toContain(SENTINEL);
-    }
-    expect(prefix.map((m) => m.content).join("\n")).toContain(STATE_TEXT);
-  });
-
-  it("keeps them out of the next Forge session's briefing too", async () => {
-    const briefing = await buildForgeBriefing(getState);
-    expect(briefing).toContain(STATE_TEXT);
-    expect(briefing).not.toContain(SENTINEL);
-  });
-
-  it("leaves the stored chat as the Forge wrote it", async () => {
-    await buildStoryEnginePrefix(getState);
-    expect(forgeChat.messages[1].content).toContain(SENTINEL);
+    const concat = (await buildStoryEnginePrefix(getState))
+      .map((m) => m.content)
+      .join("\n");
+    expect(concat).toContain("Story Contract — binding");
+    expect(concat).toContain("Prohibited (never introduce");
+    expect(concat).toContain("death, betrayal, supernatural elements");
   });
 });

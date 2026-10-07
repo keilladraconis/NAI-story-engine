@@ -37,8 +37,8 @@ export function ChatInput() {
     writeComposerDraft(chatId ?? "", next);
   };
 
-  // The active chat can change while the composer stays mounted (a refine or
-  // forge session opening switches it underneath us). Swap in that chat's own
+  // The active chat can change while the composer stays mounted (a refine
+  // session opening switches it underneath us). Swap in that chat's own
   // draft rather than leaving the previous chat's text in the box.
   useEffect(() => {
     setText(readComposerDraft(chatId ?? ""));

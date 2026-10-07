@@ -74,7 +74,6 @@ export async function buildChatStrategy(
 
     const rewriteFactory = async () => {
       const prefix = await buildStoryEnginePrefix(getState, {
-        excludeChat: true,
         excludeSections,
       });
       const messages = buildRefineTail(prefix, {
@@ -166,9 +165,7 @@ export async function buildChatStrategy(
   return {
     requestId: `chat-${chat.id}-${assistantMessageId}`,
     messageFactory: async () => {
-      const prefix = await buildStoryEnginePrefix(getState, {
-        excludeChat: true,
-      });
+      const prefix = await buildStoryEnginePrefix(getState);
       const system: Message = {
         role: "system",
         content: spec.systemPromptFor(chat, ctx),

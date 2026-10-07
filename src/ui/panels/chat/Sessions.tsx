@@ -9,7 +9,7 @@ import {
   chatDeleted,
 } from "../../../core/store";
 import type { Chat as ChatT } from "../../../core/chat-types/types";
-import { nextBrainstormTitle } from "./chat-actions";
+import { nextScenarioTitle } from "./chat-actions";
 import { Plus, Trash, ArrowLeft } from "nai:icons/feather";
 
 const ICON = 14;
@@ -126,9 +126,8 @@ export function Sessions(props: { onBack: () => void }) {
   const newChat = () => {
     const c: ChatT = {
       id: api.v1.uuid(),
-      type: "brainstorm",
-      title: nextBrainstormTitle(chats),
-      subMode: "cowriter",
+      type: "scenario",
+      title: nextScenarioTitle(chats),
       messages: [],
       seed: { kind: "blank" },
     };

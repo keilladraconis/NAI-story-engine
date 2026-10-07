@@ -64,11 +64,7 @@ export function App(props: { initialHasDocumentContent: boolean }) {
   useEffect(() => {
     const unsubs = [
       store.subscribeEffect(matchesAction(chatCreated), (action) => {
-        if (
-          action.payload.chat.type === "refine" ||
-          action.payload.chat.type === "forge"
-        )
-          setTab("chat");
+        if (action.payload.chat.type === "refine") setTab("chat");
       }),
       store.subscribeEffect(
         matchesAction(chatSwitched),
@@ -76,7 +72,7 @@ export function App(props: { initialHasDocumentContent: boolean }) {
           const c = getState().chat.chats.find(
             (x) => x.id === action.payload.id,
           );
-          if (c?.type === "refine" || c?.type === "forge") setTab("chat");
+          if (c?.type === "refine") setTab("chat");
         },
       ),
       // A refine returns to whichever tab its edit pane lives on: Foundation
@@ -94,8 +90,8 @@ export function App(props: { initialHasDocumentContent: boolean }) {
           setTab(tabForActiveEdit(getState().ui.activeEditId));
         },
       ),
-      // Cast All closes the forge session — land on the Engine tab with the
-      // World expanded so the freshly-cast entities are right there.
+      // Casting drafts lands on the Engine tab with the World expanded so the
+      // freshly-cast entities are right there.
       store.subscribeEffect(matchesAction(forgeCastAllRequested), () => {
         setTab("engine");
         store.dispatch(worldExpansionSet({ expanded: true }));

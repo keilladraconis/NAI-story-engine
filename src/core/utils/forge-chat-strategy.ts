@@ -218,9 +218,7 @@ export function buildForgeCleanupStrategy(
   discardedNames: string[],
 ): GenerationStrategy {
   const factory = async () => {
-    const prefix = await buildStoryEnginePrefix(getState, {
-      excludeChat: true,
-    });
+    const prefix = await buildStoryEnginePrefix(getState);
     const state = getState();
 
     const system: Message = { role: "system", content: FORGE_CLEANUP_PROMPT };

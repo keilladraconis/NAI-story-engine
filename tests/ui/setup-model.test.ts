@@ -24,12 +24,12 @@ function req(type: GenerationRequest["type"], id: string): GenerationRequest {
   return { id, type, targetId: "t", status: "queued" };
 }
 
-/** A brainstorm carrying `n` messages. */
-function brainstorm(n: number): Chat {
+/** A Scenario carrying `n` messages. */
+function scenario(n: number): Chat {
   return {
     id: "c1",
-    type: "brainstorm",
-    title: "Brainstorm 1",
+    type: "scenario",
+    title: "Scenario 1",
     messages: Array.from({ length: n }, (_, i) => ({
       id: String(i),
       role: "user" as const,
@@ -56,42 +56,42 @@ function state(
 /** Any Foundation content at all — one filled field is enough. */
 const FILLED: Partial<FoundationState> = { intent: "a premise" };
 
-describe("deriveSetup — the brainstorm prompt", () => {
+describe("deriveSetup — the Scenario prompt", () => {
   it("shows on a blank tab: nothing written, nothing discussed", () => {
-    expect(deriveSetup(state(), INPUTS).showBrainstormCta).toBe(true);
+    expect(deriveSetup(state(), INPUTS).showScenarioCta).toBe(true);
   });
 
-  it("steps aside once a brainstorm carries a message", () => {
-    const m = deriveSetup(state({}, {}, {}, [brainstorm(1)]), INPUTS);
-    expect(m.showBrainstormCta).toBe(false);
+  it("steps aside once a Scenario carries a message", () => {
+    const m = deriveSetup(state({}, {}, {}, [scenario(1)]), INPUTS);
+    expect(m.showScenarioCta).toBe(false);
   });
 
-  it("ignores a brainstorm that exists but has never been used", () => {
-    const m = deriveSetup(state({}, {}, {}, [brainstorm(0)]), INPUTS);
-    expect(m.showBrainstormCta).toBe(true);
+  it("ignores a Scenario that exists but has never been used", () => {
+    const m = deriveSetup(state({}, {}, {}, [scenario(0)]), INPUTS);
+    expect(m.showScenarioCta).toBe(true);
   });
 
   it("steps aside once any Foundation field is filled", () => {
-    expect(deriveSetup(state({}, {}, FILLED), INPUTS).showBrainstormCta).toBe(
+    expect(deriveSetup(state({}, {}, FILLED), INPUTS).showScenarioCta).toBe(
       false,
     );
   });
 });
 
 describe("foundationOpen", () => {
-  it("starts collapsed while no brainstorm has content", () => {
+  it("starts collapsed while no Scenario has content", () => {
     expect(foundationOpen(null, false)).toBe(false);
   });
 
-  it("opens itself once a brainstorm has content", () => {
+  it("opens itself once a Scenario has content", () => {
     expect(foundationOpen(null, true)).toBe(true);
   });
 
-  it("obeys the writer's collapse even after a brainstorm starts", () => {
+  it("obeys the writer's collapse even after a Scenario starts", () => {
     expect(foundationOpen(false, true)).toBe(false);
   });
 
-  it("obeys the writer's expand before any brainstorm exists", () => {
+  it("obeys the writer's expand before any Scenario exists", () => {
     expect(foundationOpen(true, false)).toBe(true);
   });
 });
@@ -100,13 +100,13 @@ describe("deriveSetup — foundation section", () => {
   it("follows the flow when untouched", () => {
     expect(deriveSetup(state(), INPUTS).foundationOpen).toBe(false);
     expect(
-      deriveSetup(state({}, {}, {}, [brainstorm(2)]), INPUTS).foundationOpen,
+      deriveSetup(state({}, {}, {}, [scenario(2)]), INPUTS).foundationOpen,
     ).toBe(true);
   });
 
   it("keeps the writer's choice once made", () => {
     const m = deriveSetup(
-      state({}, { foundationExpanded: false }, {}, [brainstorm(2)]),
+      state({}, { foundationExpanded: false }, {}, [scenario(2)]),
       INPUTS,
     );
     expect(m.foundationOpen).toBe(false);
@@ -195,7 +195,7 @@ describe("setupSignature", () => {
       state({}, { foundationExpanded: true }),
       state({}, { foundationExpanded: false }),
       state({}, {}, FILLED),
-      state({}, {}, {}, [brainstorm(1)]),
+      state({}, {}, {}, [scenario(1)]),
     ];
     for (const v of variants) {
       expect(setupSignature(v)).not.toBe(base);

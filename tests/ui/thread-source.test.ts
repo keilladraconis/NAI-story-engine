@@ -174,7 +174,7 @@ describe("both thread creators go through the one action", () => {
   // What the reducer-level cap test in `tests/core/store/slices/world.test.ts`
   // asserts about repeated creates is only worth anything if these two are in
   // fact the callsites. That test cannot see them; this can.
-  it("names the World panel and the Forge, and nothing else", () => {
+  it("names the World panel and the Scenario chat, and nothing else", () => {
     for (const file of [PANEL, FORGE]) {
       expect(code(read(file))).toMatch(/dispatch\(\s*threadCreated\(/);
     }

@@ -126,8 +126,8 @@ export function Message(props: MessageProps) {
   // committed store value once streaming clears the buffer on completion.
   const live = useStream(message.id);
   const content = live ?? committed;
-  // Draft-entity ids for this turn (e.g. forge chats), rendered as inline cards
-  // below the bubble. Non-forge chats have no `inlineEntityIdsFor`, so this is
+  // Draft-entity ids for this turn (Scenario chats), rendered as inline cards
+  // below the bubble. Other chats have no `inlineEntityIdsFor`, so this is
   // inert. Must return a primitive string from useSlice — a fresh array would
   // trigger a render loop — so join/split around the selector boundary.
   const inlineKey = useSlice((s) => {

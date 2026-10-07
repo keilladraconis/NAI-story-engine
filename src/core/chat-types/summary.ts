@@ -5,43 +5,14 @@ import type {
   ChatSeed,
   SpecCtx,
 } from "./types";
-import {
-  BRAINSTORM_SUMMARIZE_PROMPT,
-  STORY_TEXT_SUMMARIZE_PROMPT,
-  XIALONG_STYLE,
-} from "../utils/prompts";
-
-function findChatById(ctx: SpecCtx, id: string): Chat | undefined {
-  return ctx.getState().chat.chats.find((c) => c.id === id);
-}
-
-function transcriptToText(messages: ChatMessage[]): string {
-  return messages
-    .filter((m) => m.role !== "system")
-    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-    .join("\n");
-}
+import { STORY_TEXT_SUMMARIZE_PROMPT, XIALONG_STYLE } from "../utils/prompts";
 
 export const summarySpec: ChatTypeSpec = {
   id: "summary",
   displayName: "Summary",
   lifecycle: "save",
 
-  initialize(seed: ChatSeed, ctx: SpecCtx) {
-    if (seed.kind === "fromChat") {
-      const source = findChatById(ctx, seed.sourceChatId);
-      const transcript = source ? transcriptToText(source.messages) : "";
-      return {
-        title: source ? `Summary: ${source.title}` : "Summary",
-        initialMessages: [
-          {
-            id: api.v1.uuid(),
-            role: "system",
-            content: `Source brainstorm transcript:\n${transcript}`,
-          },
-        ],
-      };
-    }
+  initialize(seed: ChatSeed, _ctx: SpecCtx) {
     if (seed.kind === "fromStoryText") {
       return {
         title: "Summary: Story Text",
@@ -57,10 +28,8 @@ export const summarySpec: ChatTypeSpec = {
     return { title: "Summary", initialMessages: [] };
   },
 
-  systemPromptFor(chat: Chat, _ctx: SpecCtx): string {
-    return chat.seed.kind === "fromStoryText"
-      ? STORY_TEXT_SUMMARIZE_PROMPT
-      : BRAINSTORM_SUMMARIZE_PROMPT;
+  systemPromptFor(_chat: Chat, _ctx: SpecCtx): string {
+    return STORY_TEXT_SUMMARIZE_PROMPT;
   },
 
   xialongStyleFor(_chat: Chat, _ctx: SpecCtx): string {

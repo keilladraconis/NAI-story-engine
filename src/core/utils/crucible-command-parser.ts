@@ -506,33 +506,6 @@ export function canonicalizeForgeCommands(text: string): string {
   return out.join("\n");
 }
 
-/**
- * A transcript with every THREAD command cut back to title | members | state.
- *
- * The Forge writes a Thread's `latent` as the fourth segment of its own
- * command, and that command stays in the chat as text. Anything that quotes the
- * chat to a model whose output the story reads would hand it the private half
- * verbatim — as prose, where no scan for the field name can see it. The Forge
- * still reads its own transcript whole; this is for every other reader.
- *
- * A THREAD is always one line, so each line is parsed on its own with the same
- * parser and serializer the Forge uses: one grammar. Every other line —
- * prose, other commands, a THREAD with nothing private in it — is returned
- * exactly as written.
- */
-export function redactThreadPrivateNotes(text: string): string {
-  return text
-    .split("\n")
-    .map((line) => {
-      const command = parseCommandAt([line], 0)?.command;
-      if (command?.kind !== "THREAD" || (!command.latent && !command.wish)) {
-        return line;
-      }
-      return serializeForgeCommand({ ...command, latent: "", wish: "" });
-    })
-    .join("\n");
-}
-
 /** Collect non-command lines following a command as its content.
  *  `inline` captures any text on the same line as the command (after the `]`).
  */

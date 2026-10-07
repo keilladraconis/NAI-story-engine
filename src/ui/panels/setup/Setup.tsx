@@ -24,7 +24,7 @@ import { IntensityPicker } from "../foundation/IntensityPicker";
 import { FIELD_DESCRIPTORS } from "../foundation/fields";
 import { ImportWizard } from "../import/ImportWizard";
 import { BootstrapButton } from "./BootstrapButton";
-import { BrainstormCta } from "./BrainstormCta";
+import { ScenarioCta } from "./ScenarioCta";
 import { SectionHeader } from "../../components/SectionHeader";
 import { deriveSetup, setupSignature } from "./setup-model";
 import { Download } from "nai:icons/feather";
@@ -93,8 +93,8 @@ export function Setup(props: {
           These re-renders come from store subscriptions, not JSX event
           handlers, and a conditional that swaps an element for null in a
           detached render can leave the old one in the DOM. */}
-      <div style={{ display: model.showBrainstormCta ? "block" : "none" }}>
-        <BrainstormCta onOpenChat={props.onOpenChat} />
+      <div style={{ display: model.showScenarioCta ? "block" : "none" }}>
+        <ScenarioCta onOpenChat={props.onOpenChat} />
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: SP.md }}>

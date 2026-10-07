@@ -19,11 +19,20 @@
 import { Store, matchesAction } from "nai-store";
 import type { RootState, AppDispatch, WorldEntity } from "../types";
 import type { Chat } from "../../chat-types/types";
-import { messageAdded } from "../slices/chat";
+import { messageAdded, chatDeleted } from "../slices/chat";
 import { requestQueued } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
-import { tombstoneAdded, scrubQueued, scrubCleared } from "../slices/forge";
-import { entityDeleted, entityLorebookEntryBound } from "../slices/world";
+import {
+  tombstoneAdded,
+  tombstonesClearedForChat,
+  scrubQueued,
+  scrubCleared,
+} from "../slices/forge";
+import {
+  entityDeleted,
+  entityLorebookEntryBound,
+  draftsReleasedFromChat,
+} from "../slices/world";
 import { DULFS_CATEGORY_LABELS } from "../../utils/category-detect";
 import { ensureCategory } from "./lorebook-sync";
 import { nameKey } from "./handlers/lorebook";
@@ -117,8 +126,8 @@ function poolFor(state: RootState, chatId: string): WorldEntity[] {
   );
 }
 
-/** True if a forge generation (phase turn or reference scrub) is already queued
- *  or in flight — forge sends/advances guard on this so a second one is a no-op
+/** True if a Scenario generation (a turn or a reference scrub) is already queued
+ *  or in flight — Scenario sends guard on this so a second one is a no-op
  *  rather than another stacked empty assistant turn. */
 function forgeRequestPending(state: RootState): boolean {
   const isForge = (t: string): boolean =>
@@ -131,7 +140,7 @@ function forgeRequestPending(state: RootState): boolean {
 /**
  * Runs the deferred reference-scrub for a chat if one is pending: submit one
  * forgeCleanup turn over the discarded names (only if drafts remain to scrub),
- * then clear the pending list. Shared by the Forge Ahead lead-off and the
+ * then clear the pending list. Shared by the lead-off of a Scenario turn and the
  * on-demand scrub control.
  */
 function runPendingScrub(
@@ -228,6 +237,17 @@ export function registerForgeChatEffects(
       dispatch(generationSubmitted(strategy));
     },
   );
+
+  // ─── Chat deleted (release its drafts, forget its bookkeeping) ──────────────
+  // Deleting the chat is the only way a Scenario ends. Its drafts are hidden
+  // from the World because the chat shows them, so without this they would be
+  // unreachable; the tombstones and pending scrub belong to the chat alone.
+  subscribeEffect(matchesAction(chatDeleted), async (action) => {
+    const chatId = action.payload.id;
+    dispatch(draftsReleasedFromChat({ chatId }));
+    dispatch(tombstonesClearedForChat({ chatId }));
+    dispatch(scrubCleared({ chatId }));
+  });
 
   // ─── Entity Discard (user-initiated draft removal) ──────────────────────────
   subscribeEffect(

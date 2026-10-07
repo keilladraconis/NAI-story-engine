@@ -1,6 +1,6 @@
 // Pure derivation for the Setup tab.
 //
-// The tab is a staged nudge — brainstorm, then Foundation, then the opening
+// The tab is a staged nudge — Scenario, then Foundation, then the opening
 // scene — and every rule about what is showing lives here rather than as
 // conditions scattered through the JSX. One function, one set of tests, one
 // place to look when the flow is wrong.
@@ -11,11 +11,11 @@
 
 import type { RootState } from "../../../core/store";
 import { foundationFieldsEmpty } from "../foundation/fields";
-import { hasBrainstormContent } from "../chat/chat-actions";
+import { hasScenarioContent } from "../chat/chat-actions";
 
 export type SetupModel = {
-  /** The brainstorm prompt: only while there is nothing to work from at all. */
-  showBrainstormCta: boolean;
+  /** The Scenario prompt: only while there is nothing to work from at all. */
+  showScenarioCta: boolean;
   /** Foundation section open? Follows the flow until the writer overrides it. */
   foundationOpen: boolean;
   /** The opening-scene card: once the Foundation has content and the story is
@@ -42,26 +42,26 @@ export function selectBootstrapPending(state: RootState): boolean {
   );
 }
 
-/** Collapsed until a brainstorm has something in it, then open — but the
+/** Collapsed until a Scenario has something in it, then open — but the
  *  writer's own toggle wins from the first time they use it, forever after. */
 export function foundationOpen(
   expanded: boolean | null,
-  brainstormStarted: boolean,
+  scenarioStarted: boolean,
 ): boolean {
-  return expanded ?? brainstormStarted;
+  return expanded ?? scenarioStarted;
 }
 
 export function deriveSetup(state: RootState, inputs: SetupInputs): SetupModel {
   const fieldsEmpty = foundationFieldsEmpty(state);
-  const brainstormStarted = hasBrainstormContent(state.chat.chats);
+  const scenarioStarted = hasScenarioContent(state.chat.chats);
 
   return {
     // Both conditions matter: an untouched Foundation is what makes the prompt
-    // relevant, and a brainstorm already under way is what makes it redundant.
-    showBrainstormCta: fieldsEmpty && !brainstormStarted,
+    // relevant, and a Scenario already under way is what makes it redundant.
+    showScenarioCta: fieldsEmpty && !scenarioStarted,
     foundationOpen: foundationOpen(
       state.ui.foundationExpanded,
-      brainstormStarted,
+      scenarioStarted,
     ),
     showBootstrap: !fieldsEmpty && !inputs.hasDocumentContent,
     bootstrapDisabled: selectBootstrapPending(state),
@@ -87,6 +87,6 @@ export function setupSignature(state: RootState): string {
         ? "1"
         : "0",
     foundationFieldsEmpty(state) ? "1" : "0",
-    hasBrainstormContent(state.chat.chats) ? "1" : "0",
+    hasScenarioContent(state.chat.chats) ? "1" : "0",
   ].join("|");
 }

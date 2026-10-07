@@ -30,8 +30,6 @@ export const STORAGE_KEYS = {
   // and written through src/core/engine/settings.ts, never raw: the slot is
   // validated on every read.
   ENGINE_SETTINGS: "kse-engine",
-  // Forge guidance draft.
-  FORGE_GUIDANCE_UI: "se-forge-guidance",
   // Opening Scene direction draft (the modal's textarea).
   OPENING_GUIDANCE: "se-opening-guidance",
   // Unsent chat composer text, as a { [chatId]: string } blob.

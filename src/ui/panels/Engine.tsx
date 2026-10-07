@@ -1,5 +1,5 @@
-// Engine tab body: the Forge, the Engine's own controls, the World, plus the
-// entity and thread edit panes. Swaps between the Forge + World stack and whichever pane the shared
+// Engine tab body: the Engine's own controls and the World, plus the entity
+// and thread edit panes. Swaps between the controls + World stack and whichever pane the shared
 // ui.activeEditId singleton names — routed by membership over entitiesById and
 // world.threads. Foundation field ids belong to the Setup tab (Setup.tsx), which
 // also owns the Import wizard.
@@ -8,7 +8,6 @@
 
 import { useSlice } from "../bridge";
 import { SP } from "../style";
-import { ForgeSection } from "./forge/ForgeSection";
 import { EngineSettings } from "./settings/EngineSettings";
 import { World } from "./world/World";
 import { EntityEditPane } from "./world/EntityEditPane";
@@ -32,9 +31,7 @@ export function Engine() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: SP.md }}>
-      <ForgeSection />
-      {/* Between the Forge and the World: the Engine acts on the World below
-          it, and switching it on is a decision about this story rather than a
+      {/* Above the World: the Engine acts on the World below it, and switching it on is a decision about this story rather than a
           step in Setup's staged nudge, which is where these controls used to
           live. The toggle renders outside its own collapsible. */}
       <EngineSettings />
