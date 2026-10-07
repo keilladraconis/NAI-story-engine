@@ -281,10 +281,10 @@ COMMANDS, one per line:
 [REVISE "<Name>" | new summary]
 [RENAME "<Old>" → "<New>"]
 [DELETE "<Name>"]
-[THREAD "<Title>" | "<A>", "<B>" | state | latent | wish]
+[THREAD "<Title>" | "<A>", "<B>" | state | private | wish]
 [CRITIQUE | which element has nothing pressing on it, and which pressure has no one under it]
 <TYPE> is CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC.
-A THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. latent is what is true now and hidden, owed or unspoken; it is private. wish is what the writer wants to come about; it is private. Leave latent or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread.
+A THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread.
 Only drafts under [POOL] may be revised, renamed or deleted. Never recreate a name under [TOMBSTONES]. If [REJECTED LAST TURN] is present, write each rejected command again as its repair says.
 
 REPLY SHAPE:
@@ -304,7 +304,7 @@ The phrase is "a dying canal": the trade has gone and the company wants the wate
 Does Corin still sleep at the lock house, or has he moved to company lodgings?`;
 
 export const SCENARIO_REGISTERS: Record<RegisterKey, string> = {
-  unset: `REGISTER, not yet set: You do not know how much pressure this world is under. On a SKETCH turn write no command. Ask the one question that settles it: can these people walk away, and is comfort the default or the exception?`,
+  unset: `REGISTER, not yet set: You do not know how much pressure this world is under. On a SKETCH turn write no command and no CRITIQUE. Answer with the one question that settles it: can these people walk away, and is comfort the default or the exception?`,
   Cozy: `REGISTER, Cozy: Two pressures at most, and none is required. A pressure here is friction of preference or circumstance: two people who want the same quiet corner, a habit that no longer fits. Nothing threatens anyone, nobody is malicious, and nothing is lost for good. If the seed has no friction in it, write the SITUATIONs as the routines and attachments that keep this world turning.`,
   Grounded: `REGISTER, Grounded: Two or three pressures at the scale of a life: money, time, obligation, a relationship being worn down. Each is a real obstacle with a way through, and no one is ruined by it.`,
   Gritty: `REGISTER, Gritty: Three pressures with stakes that last. Each sets two things someone values against each other, where walking away is possible and costs something real. Ground each in a person, not a spectacle.`,
@@ -450,7 +450,7 @@ Add, above `parseCommandAt`:
  *  command, so a short one is never guessed at: read as four segments, a wish
  *  would land in `latent` and be written into an entry as fact on conclusion. */
 export const THREAD_REPAIR =
-  'a THREAD needs all five segments: [THREAD "Title" | "A", "B" | state | latent | wish]; leave latent or wish empty between its bars when there is none';
+  'a THREAD needs all five segments: [THREAD "Title" | "A", "B" | state | private | wish]; leave private or wish empty between its bars when there is none';
 ```
 
 Replace the whole `threadMatch` block (the comment above it, the three-regex chain and the `if (threadMatch) { … }` body) with:
