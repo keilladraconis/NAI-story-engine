@@ -140,3 +140,34 @@ describe("lorebook archivist prompt", () => {
     );
   });
 });
+
+import {
+  SCENARIO_PROMPT,
+  SCENARIO_REGISTERS,
+  SCENARIO_GROW_INSTRUCTION,
+  FOUNDATION_SITUATION_PROMPT,
+  buildScenarioPrompt,
+} from "../../../src/core/utils/prompts";
+
+describe("the Scenario prompt", () => {
+  it("has a register text for every intensity and for none", () => {
+    for (const level of [...INTENSITY_LEVEL_LABELS, "unset" as const]) {
+      expect(SCENARIO_REGISTERS[level].length).toBeGreaterThan(0);
+      expect(buildScenarioPrompt(level)).toBe(
+        `${SCENARIO_PROMPT}\n\n${SCENARIO_REGISTERS[level]}`,
+      );
+    }
+  });
+
+  it("has no newline inside a sentence", () => {
+    for (const text of [SCENARIO_PROMPT, FOUNDATION_SITUATION_PROMPT]) {
+      for (const line of text.split("\n")) {
+        expect(line).not.toMatch(/[a-z,]$/);
+      }
+    }
+  });
+
+  it("exports the grow instruction", () => {
+    expect(SCENARIO_GROW_INSTRUCTION).toContain("critique");
+  });
+});
