@@ -8,7 +8,10 @@ import {
   createEntitySummaryFromLorebookFactory,
   createThreadSummaryFactory,
 } from "../../../src/core/utils/summary-strategy";
-import { buildForgeCleanupStrategy } from "../../../src/core/utils/forge-chat-strategy";
+import {
+  buildForgeCleanupStrategy,
+  buildScenarioTurnStrategy,
+} from "../../../src/core/utils/forge-chat-strategy";
 import type { RootState } from "../../../src/core/store";
 import type { Chat } from "../../../src/core/chat-types/types";
 import { useCreativeModel } from "../../helpers/creative-model";
@@ -60,9 +63,8 @@ const getState = () => makeState();
 
 const forgeChat: Chat = {
   id: "fc-1",
-  type: "forge",
-  title: "Forge",
-  subMode: "sketch",
+  type: "scenario",
+  title: "Scenario 1",
   messages: [],
   seed: { kind: "blank" },
 };
@@ -156,5 +158,12 @@ describe("extraction callsites stay on the instruct model", () => {
     ]);
     const { params } = await strategy.messageFactory!();
     expect(params?.model).toBe("glm-4-6");
+  });
+
+  it("runs a Scenario turn on GLM, with no style block", async () => {
+    const strategy = buildScenarioTurnStrategy(getState, forgeChat, "asst-1");
+    const { messages, params } = await strategy.messageFactory!();
+    expect(params?.model).toBe("glm-4-6");
+    expect(styleBlocks(messages)).toEqual([]);
   });
 });

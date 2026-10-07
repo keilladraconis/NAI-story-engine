@@ -1,14 +1,12 @@
 /**
  * Forge Chat action creators — isolated from forge-chat-effects.ts so that
- * chat-types/forge.ts can import them without closing the cycle:
- *   forge.ts → forge-chat-effects.ts → forge-chat-strategy.ts
- *              → context-builder.ts → chat-types/index.ts → forge.ts
+ * chat-types/scenario.ts can import them without closing the cycle:
+ *   scenario.ts → forge-chat-effects.ts → forge-chat-strategy.ts
+ *              → context-builder.ts → chat-types/index.ts → scenario.ts
  */
 
 export interface ForgeChatContinueRequestedPayload {
   chatId: string;
-  /** When false, keep the current phase. Defaults to true (advance per loop logic). */
-  advancePhase?: boolean;
 }
 
 const FORGE_CHAT_CONTINUE_REQUESTED = "forgeChat/continueRequested";
@@ -19,16 +17,3 @@ export const forgeChatContinueRequested = (
   payload,
 });
 forgeChatContinueRequested.type = FORGE_CHAT_CONTINUE_REQUESTED;
-
-export interface ForgeChatDiscussRequestedPayload {
-  chatId: string;
-}
-
-const FORGE_CHAT_DISCUSS_REQUESTED = "forgeChat/discussRequested";
-export const forgeChatDiscussRequested = (
-  payload: ForgeChatDiscussRequestedPayload,
-) => ({
-  type: FORGE_CHAT_DISCUSS_REQUESTED as typeof FORGE_CHAT_DISCUSS_REQUESTED,
-  payload,
-});
-forgeChatDiscussRequested.type = FORGE_CHAT_DISCUSS_REQUESTED;

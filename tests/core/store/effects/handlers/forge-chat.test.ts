@@ -18,6 +18,7 @@ import {
 } from "../../../../../src/core/store/slices/world";
 import { FieldID } from "../../../../../src/config/field-definitions";
 import type { ForgeSegment } from "../../../../../src/core/chat-types/types";
+import { THREAD_REPAIR } from "../../../../../src/core/utils/crucible-command-parser";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function segmentsFromCompletion(calls: any[][]): ForgeSegment[] {
@@ -610,6 +611,33 @@ describe("forgeChatHandler.completion — THREAD", () => {
     expect(state.threads[0].state).toBe("Ada keeps a sealed letter from Bram.");
     expect(state.threads[0].latent).toBe("");
     expect(state.threads[0].entityIds).toEqual(["e1", "e2"]);
+  });
+
+  it("creates no Thread from the old four-segment form, and says how to write it", async () => {
+    const dispatch = vi.fn();
+    await forgeChatHandler.completion({
+      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
+      getState: () =>
+        makeState([
+          makeEntity({ id: "e1", name: "A" }),
+          makeEntity({ id: "e2", name: "B" }),
+        ]),
+      dispatch,
+      accumulatedText: '[THREAD "T" | "A", "B" | state | private]',
+      generationSucceeded: true,
+    } as CompletionContext<ForgeChatTarget>);
+
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === "world/threadCreated"),
+    ).toBe(false);
+    const actions = segmentsFromCompletion(dispatch.mock.calls).filter(
+      (seg) => seg.kind === "action",
+    );
+    expect(actions).toHaveLength(1);
+    expect(actions[0].action).toMatchObject({
+      status: "unrecognized",
+      reason: THREAD_REPAIR,
+    });
   });
 });
 

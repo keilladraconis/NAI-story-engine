@@ -1,14 +1,15 @@
 /**
- * Forge Chat Strategy — per-turn message factory for typed-chat Forge sessions.
+ * Scenario turn strategy — the per-turn message factory for the Scenario chat,
+ * plus the post-discard reference scrubber.
  *
- * Two strategies live here:
- *   1. buildForgeChatStrategy — primary per-phase generation (sketch/expand/weave).
- *   2. buildForgeCleanupStrategy — post-discard reference scrubber.
+ * A turn is: the Scenario system prompt (with the register), the Foundation
+ * and Setting, a context block code computes fresh each turn (TURN, [POOL],
+ * [LIVE], [THREADS], [TOMBSTONES], [REJECTED LAST TURN], [PREVIOUS CRITIQUE]),
+ * then the chat's own transcript. Nothing here is frozen at session start: the
+ * chat is long-lived and the Foundation changes under it.
  *
- * Both share the unified Story Engine prefix (with `excludeChat: true`, since
- * we inject the forge chat's own transcript directly), then layer phase-aware
- * system prompts, a [POOL]/[LIVE]/[TOMBSTONES]/[PREVIOUS CRITIQUE] context
- * block, and the chat transcript itself (minus the in-progress placeholder).
+ * [THREADS] carries title, cast and state only. A Thread's private halves reach
+ * this model the one way they may: as the commands in its own transcript.
  */
 
 import type { Chat, ChatMessage } from "../chat-types/types";
@@ -17,65 +18,81 @@ import type {
   RootState,
   WorldEntity,
 } from "../store/types";
-import { buildStoryEnginePrefix } from "./context-builder";
-import { buildModelParams, appendXialongStyleMessage } from "./config";
 import {
-  FORGE_SKETCH_PROMPT,
-  FORGE_EXPAND_PROMPT,
-  FORGE_WEAVE_PROMPT,
+  buildStoryEnginePrefix,
+  formatFoundationBlock,
+  formatSettingBlock,
+} from "./context-builder";
+import { buildModelParams } from "./config";
+import {
+  buildScenarioPrompt,
+  normalizeRegisterKey,
   FORGE_CLEANUP_PROMPT,
-  FORGE_DISCUSS_PROMPT,
-  XIALONG_STYLE,
+  SCENARIO_GROW_INSTRUCTION,
 } from "./prompts";
 import { DULFS_CATEGORY_LABELS } from "./category-detect";
+import { parseCommands } from "./crucible-command-parser";
 
-// --- Phase table ---
+export type ScenarioTurn = "sketch" | "steer" | "grow";
 
-type ForgePhase = "sketch" | "expand" | "weave";
-
-interface PhaseConfig {
-  prompt: string;
-  maxTokens: number;
-  temperature: number;
+/** Which kind of turn the placeholder `assistantMessageId` is about to hold.
+ *  Read from the transcript, so a retry after a prune asks the right thing. */
+export function scenarioTurn(
+  chat: Chat,
+  assistantMessageId: string,
+): ScenarioTurn {
+  const prior = chat.messages.filter((m) => m.id !== assistantMessageId);
+  const answered = prior.some(
+    (m) => m.role === "assistant" && m.content.trim() !== "",
+  );
+  if (!answered) return "sketch";
+  return prior[prior.length - 1]?.role === "user" ? "steer" : "grow";
 }
 
-const PHASE_TABLE: Record<ForgePhase, PhaseConfig> = {
-  sketch: { prompt: FORGE_SKETCH_PROMPT, maxTokens: 1536, temperature: 0.9 },
-  expand: { prompt: FORGE_EXPAND_PROMPT, maxTokens: 1280, temperature: 0.85 },
-  weave: { prompt: FORGE_WEAVE_PROMPT, maxTokens: 1536, temperature: 0.8 },
-};
-
-function resolvePhase(subMode: string | undefined): ForgePhase {
-  if (subMode === "expand") return "expand";
-  if (subMode === "weave") return "weave";
-  return "sketch";
-}
-
-// --- Critique extraction ---
-
-/**
- * Walks the transcript from end. On the first assistant message encountered,
- * checks for a `[CRITIQUE | ...]` trailing block and returns the trimmed body.
- * Earlier assistant messages are ignored once we've seen the most recent.
- */
-export function extractLastCritique(messages: ChatMessage[]): string | null {
+function lastReply(messages: ChatMessage[]): ChatMessage | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    if (m.role !== "assistant") continue;
-    if (!m.content) return null;
-    const match = m.content.match(/\[CRITIQUE\s*\|\s*([\s\S]+?)\]\s*$/);
-    if (!match) return null;
-    return match[1].trim();
+    if (m.role === "assistant" && m.content.trim() !== "") return m;
   }
-  return null;
+  return undefined;
+}
+
+/** The critique in the most recent reply, or null. Parsed with the command
+ *  parser, so it is found wherever in the reply it sits. */
+export function extractLastCritique(messages: ChatMessage[]): string | null {
+  const reply = lastReply(messages);
+  if (!reply) return null;
+  const critiques = parseCommands(reply.content).filter(
+    (c) => c.kind === "CRITIQUE",
+  );
+  const last = critiques[critiques.length - 1];
+  return last?.kind === "CRITIQUE" ? last.text : null;
+}
+
+/** The commands the most recent reply wrote that were not applied, each with
+ *  the reason. A rejection the model never sees is one it repeats. */
+export function formatRejections(messages: ChatMessage[]): string {
+  const lines = (lastReply(messages)?.forgeSegments ?? []).flatMap((s) => {
+    if (s.kind !== "action" || s.action.status === "applied") return [];
+    const { kind, name, reason } = s.action;
+    return [
+      kind === "UNKNOWN"
+        ? `- ${reason ?? "unrecognized command"}`
+        : `- ${kind}${name ? ` "${name}"` : ""}: ${reason ?? "rejected"}`,
+    ];
+  });
+  if (lines.length === 0) return "";
+  return [
+    "[REJECTED LAST TURN] (not applied; write each again as its repair says)",
+    ...lines,
+  ].join("\n");
 }
 
 // --- Context block formatters ---
 
-function formatEntityLine(e: WorldEntity, prefix: "D" | "L"): string {
+function formatEntityLine(e: WorldEntity): string {
   const label = DULFS_CATEGORY_LABELS[e.categoryId] ?? "Entity";
-  const summary = e.summary ? ` — ${e.summary.slice(0, 160)}` : "";
-  return `${prefix}:${e.id} — ${e.name} (${label})${summary}`;
+  return `- ${e.name} (${label})${e.summary ? ` — ${e.summary}` : ""}`;
 }
 
 function formatPool(state: RootState, chatId: string): string {
@@ -83,9 +100,10 @@ function formatPool(state: RootState, chatId: string): string {
     (e) => e.lifecycle === "draft" && e.sourceChatId === chatId,
   );
   if (drafts.length === 0) return "";
-  const lines = ["[POOL] (drafts you may modify; IDs prefix D:)"];
-  for (const e of drafts) lines.push(formatEntityLine(e, "D"));
-  return lines.join("\n");
+  return [
+    "[POOL] (drafts you may modify)",
+    ...drafts.map(formatEntityLine),
+  ].join("\n");
 }
 
 function formatLive(state: RootState): string {
@@ -93,109 +111,93 @@ function formatLive(state: RootState): string {
     (e) => e.lifecycle === "live",
   );
   if (live.length === 0) return "";
-  const lines = [
-    "[LIVE] (read-only context; never modify or delete; IDs prefix L:)",
-  ];
-  for (const e of live) lines.push(formatEntityLine(e, "L"));
-  return lines.join("\n");
+  return [
+    "[LIVE] (read-only; never modify or delete)",
+    ...live.map(formatEntityLine),
+  ].join("\n");
+}
+
+function formatThreads(state: RootState): string {
+  const open = state.world.threads.filter((t) => t.status === "open");
+  if (open.length === 0) return "";
+  const lines = open.map((t) => {
+    const cast = t.entityIds
+      .map((id) => state.world.entitiesById[id]?.name)
+      .filter((n): n is string => !!n)
+      .join(", ");
+    return `- ${t.title} | ${cast} | ${t.state.trim() || "(blank)"}`;
+  });
+  return ["[THREADS] (title | cast | state)", ...lines].join("\n");
 }
 
 function formatTombstones(state: RootState, chatId: string): string {
   const tombs = state.forge.tombstonesByChatId[chatId] ?? [];
   if (tombs.length === 0) return "";
-  const lines = [
-    "[TOMBSTONES] (discarded this session; do not recreate)",
-    ...tombs.map(
-      (t) => `- ${t.name} (${t.category}) — discarded by ${t.reason}`,
-    ),
-  ];
-  return lines.join("\n");
-}
-
-function formatPreviousCritique(messages: ChatMessage[]): string {
-  const critique = extractLastCritique(messages);
-  if (!critique) return "";
-  return `[PREVIOUS CRITIQUE]\n${critique}\n\nAddress this critique before adding new work.`;
-}
-
-function transcriptOf(chat: Chat, excludeMessageId: string): ChatMessage[] {
-  return chat.messages.filter((m) => m.id !== excludeMessageId);
+  return [
+    "[TOMBSTONES] (discarded; do not recreate)",
+    ...tombs.map((t) => `- ${t.name} (${t.category})`),
+  ].join("\n");
 }
 
 // --- Strategies ---
 
-export function buildForgeChatStrategy(
+export function buildScenarioTurnStrategy(
   getState: () => RootState,
   chat: Chat,
   assistantMessageId: string,
 ): GenerationStrategy {
   const factory = async () => {
-    const phase = resolvePhase(chat.subMode);
-    const { prompt, maxTokens, temperature } = PHASE_TABLE[phase];
     const state = getState();
+    const turn = scenarioTurn(chat, assistantMessageId);
+    const prior = chat.messages.filter((m) => m.id !== assistantMessageId);
 
-    const system: Message = { role: "system", content: prompt };
+    const premise = [formatFoundationBlock(state), await formatSettingBlock()]
+      .filter((b) => b.length > 0)
+      .join("\n\n");
 
-    // The frozen briefing is the leading system message of the transcript,
-    // seeded at session start. Anchor it right after the phase prompt; the rest
-    // of the transcript is the conversation. Legacy sessions with no leading
-    // system message simply have no briefing. Binding `briefing` to the narrowed
-    // message (not a boolean) lets TS know `.content` is safe.
-    const fullTranscript = transcriptOf(chat, assistantMessageId);
-    const first = fullTranscript[0];
-    const briefing = first && first.role === "system" ? first : null;
-    const briefingMsg: Message[] = briefing
-      ? [{ role: "system", content: briefing.content }]
-      : [];
-    const conversation: Message[] = (
-      briefing ? fullTranscript.slice(1) : fullTranscript
-    ).map((m) => ({ role: m.role, content: m.content }));
-
-    const blocks: string[] = [];
-    const pool = formatPool(state, chat.id);
-    if (pool) blocks.push(pool);
-    const live = formatLive(state);
-    if (live) blocks.push(live);
-    const tombs = formatTombstones(state, chat.id);
-    if (tombs) blocks.push(tombs);
-    const prevCritique = formatPreviousCritique(chat.messages);
-    if (prevCritique) blocks.push(prevCritique);
-
-    const contextBlock: Message[] =
-      blocks.length > 0
-        ? [{ role: "assistant", content: blocks.join("\n\n") }]
-        : [];
+    const critique = extractLastCritique(prior);
+    // No truncation anywhere in this block: a summary cut short is a draft the
+    // model revises from half its text.
+    const blocks = [
+      `TURN: ${turn.toUpperCase()}`,
+      formatPool(state, chat.id),
+      formatLive(state),
+      formatThreads(state),
+      formatTombstones(state, chat.id),
+      formatRejections(prior),
+      critique ? `[PREVIOUS CRITIQUE]\n${critique}` : "",
+    ].filter((b) => b.length > 0);
 
     const messages: Message[] = [
-      system,
-      ...briefingMsg,
-      ...contextBlock,
-      ...conversation,
+      {
+        role: "system",
+        content: buildScenarioPrompt(
+          normalizeRegisterKey(state.foundation.intensity?.level),
+        ),
+      },
+      ...(premise ? [{ role: "system" as const, content: premise }] : []),
+      { role: "assistant", content: blocks.join("\n\n") },
+      ...prior.map((m) => ({ role: m.role, content: m.content })),
+      ...(turn === "grow"
+        ? [{ role: "user" as const, content: SCENARIO_GROW_INSTRUCTION }]
+        : []),
     ];
-
-    // "instruct", so this stays on GLM whatever the story's creative model is,
-    // and `appendXialongStyleMessage` therefore adds nothing. A pass emits a
-    // strict bracket grammar and every command that misses it is a card the
-    // writer does not get — that is format-following, not prose, which is the
-    // whole reason `Capability` splits the two. Observed the other way round:
-    // a pass on Xialong answered conversationally and created nothing.
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.forge, "instruct");
 
     return {
       messages,
+      // "instruct": a turn emits a strict bracket grammar, and every command
+      // that misses it is a card the writer does not get. Observed the other
+      // way round on the Forge: on the creative model a pass answered
+      // conversationally and created nothing.
       params: await buildModelParams(
-        {
-          max_tokens: maxTokens,
-          temperature,
-          min_p: 0.05,
-        },
+        { max_tokens: 1536, temperature: 0.9, min_p: 0.05 },
         "instruct",
       ),
     };
   };
 
   return {
-    requestId: `forge-chat-${chat.id}-${assistantMessageId}`,
+    requestId: `scenario-${chat.id}-${assistantMessageId}`,
     messageFactory: factory,
     target: {
       type: "forgeChat",
@@ -203,88 +205,8 @@ export function buildForgeChatStrategy(
       messageId: assistantMessageId,
     },
     prefillBehavior: "trim",
-    assistantPrefill: "[",
-    // Cut off by the token cap, a forge turn stops mid-command: the bracket
-    // never closes, so the last action is lost and the turn reads as an
-    // unfinished thought. Chats and refines have continued since they shipped;
-    // the Forge did not, and a sketch emitting six commands is exactly the
-    // length that runs out of room. The engine folds the "[" prefill into the
-    // continuation turn, so the model resumes from all it has written.
-    continuation: { maxCalls: 4 },
-  };
-}
-
-export function buildForgeDiscussStrategy(
-  getState: () => RootState,
-  chat: Chat,
-  assistantMessageId: string,
-): GenerationStrategy {
-  const factory = async () => {
-    const state = getState();
-    const system: Message = { role: "system", content: FORGE_DISCUSS_PROMPT };
-
-    // Same briefing/dynamic-context layering as a forge pass, but conversational.
-    const fullTranscript = transcriptOf(chat, assistantMessageId);
-    const first = fullTranscript[0];
-    const briefing = first && first.role === "system" ? first : null;
-    const briefingMsg: Message[] = briefing
-      ? [{ role: "system", content: briefing.content }]
-      : [];
-    const conversation: Message[] = (
-      briefing ? fullTranscript.slice(1) : fullTranscript
-    ).map((m) => ({ role: m.role, content: m.content }));
-
-    const blocks: string[] = [];
-    const pool = formatPool(state, chat.id);
-    if (pool) blocks.push(pool);
-    const live = formatLive(state);
-    if (live) blocks.push(live);
-    const tombs = formatTombstones(state, chat.id);
-    if (tombs) blocks.push(tombs);
-    const prevCritique = formatPreviousCritique(chat.messages);
-    if (prevCritique) blocks.push(prevCritique);
-
-    const contextBlock: Message[] =
-      blocks.length > 0
-        ? [{ role: "assistant", content: blocks.join("\n\n") }]
-        : [];
-
-    const messages: Message[] = [
-      system,
-      ...briefingMsg,
-      ...contextBlock,
-      ...conversation,
-    ];
-
-    // Chat-voice steer (Phase 1.5 will tune this for reliable pseudo-tool use).
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.forgeDiscuss);
-
-    return {
-      messages,
-      params: await buildModelParams({
-        max_tokens: 768,
-        temperature: 0.85,
-        min_p: 0.05,
-      }),
-    };
-  };
-
-  return {
-    requestId: `forge-discuss-${chat.id}-${assistantMessageId}`,
-    messageFactory: factory,
-    target: {
-      type: "forgeChat",
-      chatId: chat.id,
-      messageId: assistantMessageId,
-    },
-    prefillBehavior: "trim",
-    // No assistantPrefill: a discuss reply starts as prose, not a command.
-    // Cut off by the token cap, a forge turn stops mid-command: the bracket
-    // never closes, so the last action is lost and the turn reads as an
-    // unfinished thought. Chats and refines have continued since they shipped;
-    // the Forge did not, and a sketch emitting six commands is exactly the
-    // length that runs out of room. The engine folds the "[" prefill into the
-    // continuation turn, so the model resumes from all it has written.
+    // No prefill: a reply opens with prose. Cut off by the token cap it stops
+    // mid-command and the last action is lost, so it continues.
     continuation: { maxCalls: 4 },
   };
 }

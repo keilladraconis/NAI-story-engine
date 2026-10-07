@@ -2,8 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import { scenarioSpec } from "../../../src/core/chat-types/scenario";
 import { forgeChatContinueRequested } from "../../../src/core/store/effects/forge-chat-actions";
 import { buildScenarioPrompt } from "../../../src/core/utils/prompts";
-import type { Chat } from "../../../src/core/chat-types/types";
-import type { RootState } from "../../../src/core/store/types";
+import type { Chat, ChatMessage } from "../../../src/core/chat-types/types";
+import type { RootState, WorldEntity } from "../../../src/core/store/types";
+import { FieldID } from "../../../src/config/field-definitions";
 
 const chatWith = (messages: Chat["messages"]): Chat => ({
   id: "c1",
@@ -75,5 +76,83 @@ describe("the Scenario chat type", () => {
       }) as unknown as RootState;
     scenarioSpec.handleSend!(chatWith([]), "seed", { ...ctx, getState: busy });
     expect(ctx.dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("the Scenario chat type's inline cards", () => {
+  const entity = (over: Partial<WorldEntity>): WorldEntity =>
+    ({
+      id: "d",
+      categoryId: FieldID.DramatisPersonae,
+      name: "X",
+      summary: "",
+      lifecycle: "draft",
+      ...over,
+    }) as WorldEntity;
+  const ctxWith = (entities: WorldEntity[]) => ({
+    dispatch: vi.fn(),
+    getState: () =>
+      ({
+        world: {
+          entitiesById: Object.fromEntries(entities.map((e) => [e.id, e])),
+          entityIds: entities.map((e) => e.id),
+        },
+      }) as unknown as RootState,
+  });
+  const assistantMsg: ChatMessage = {
+    id: "m-1",
+    role: "assistant",
+    content: "",
+  };
+  const userMsg: ChatMessage = { id: "m-u", role: "user", content: "hi" };
+
+  it("returns the drafts of this chat that the given assistant message last touched", () => {
+    const ctx = ctxWith([
+      entity({ id: "d1", sourceChatId: "c1", lastAffectingMessageId: "m-1" }),
+      entity({ id: "d2", sourceChatId: "c1", lastAffectingMessageId: "m-1" }),
+      entity({ id: "d3", sourceChatId: "c1", lastAffectingMessageId: "m-2" }),
+    ]);
+    const ids = scenarioSpec.inlineEntityIdsFor!(
+      assistantMsg,
+      chatWith([]),
+      ctx,
+    );
+    expect(ids.sort()).toEqual(["d1", "d2"]);
+  });
+
+  it("returns [] for a user message", () => {
+    const ctx = ctxWith([
+      entity({ id: "d1", sourceChatId: "c1", lastAffectingMessageId: "m-1" }),
+    ]);
+    expect(
+      scenarioSpec.inlineEntityIdsFor!(userMsg, chatWith([]), ctx),
+    ).toEqual([]);
+  });
+
+  it("excludes live entities", () => {
+    const ctx = ctxWith([
+      entity({
+        id: "d1",
+        sourceChatId: "c1",
+        lastAffectingMessageId: "m-1",
+        lifecycle: "live",
+      }),
+    ]);
+    expect(
+      scenarioSpec.inlineEntityIdsFor!(assistantMsg, chatWith([]), ctx),
+    ).toEqual([]);
+  });
+
+  it("excludes drafts of another chat", () => {
+    const ctx = ctxWith([
+      entity({
+        id: "d1",
+        sourceChatId: "c-OTHER",
+        lastAffectingMessageId: "m-1",
+      }),
+    ]);
+    expect(
+      scenarioSpec.inlineEntityIdsFor!(assistantMsg, chatWith([]), ctx),
+    ).toEqual([]);
   });
 });

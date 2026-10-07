@@ -6,8 +6,6 @@ import {
   tombstonesClearedForChat,
   scrubQueued,
   scrubCleared,
-  forgeNextPhasePinned,
-  forgeNextPhaseCleared,
   type ForgeSliceState,
   type Tombstone,
 } from "../../../../src/core/store/slices/forge";
@@ -29,7 +27,6 @@ function seedTombstones(
   return {
     tombstonesByChatId,
     pendingScrubByChatId: {},
-    pinnedNextPhaseByChatId: {},
   };
 }
 
@@ -38,7 +35,6 @@ describe("forgeSlice tombstones", () => {
     expect(initialForgeState).toEqual({
       tombstonesByChatId: {},
       pendingScrubByChatId: {},
-      pinnedNextPhaseByChatId: {},
     });
   });
 
@@ -120,7 +116,6 @@ describe("forgeSlice pending scrub", () => {
     const seeded: ForgeSliceState = {
       tombstonesByChatId: {},
       pendingScrubByChatId: { c1: ["Vesper"] },
-      pinnedNextPhaseByChatId: {},
     };
     const next = forgeSliceReducer(
       seeded,
@@ -133,39 +128,8 @@ describe("forgeSlice pending scrub", () => {
     const seeded: ForgeSliceState = {
       tombstonesByChatId: {},
       pendingScrubByChatId: { c1: ["Vesper"], c2: ["Felix"] },
-      pinnedNextPhaseByChatId: {},
     };
     const next = forgeSliceReducer(seeded, scrubCleared({ chatId: "c1" }));
     expect(next.pendingScrubByChatId).toEqual({ c2: ["Felix"] });
-  });
-});
-
-describe("forgeSlice next-phase pin", () => {
-  it("pins a phase for a chat", () => {
-    const s = forgeSliceReducer(
-      initialForgeState,
-      forgeNextPhasePinned({ chatId: "c1", phase: "weave" }),
-    );
-    expect(s.pinnedNextPhaseByChatId["c1"]).toBe("weave");
-  });
-
-  it("clears a chat's pin", () => {
-    const pinned = forgeSliceReducer(
-      initialForgeState,
-      forgeNextPhasePinned({ chatId: "c1", phase: "expand" }),
-    );
-    const s = forgeSliceReducer(
-      pinned,
-      forgeNextPhaseCleared({ chatId: "c1" }),
-    );
-    expect(s.pinnedNextPhaseByChatId["c1"]).toBeUndefined();
-  });
-
-  it("clear is a no-op when absent", () => {
-    const s = forgeSliceReducer(
-      initialForgeState,
-      forgeNextPhaseCleared({ chatId: "nope" }),
-    );
-    expect(s).toBe(initialForgeState);
   });
 });

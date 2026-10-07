@@ -151,19 +151,15 @@ export function registerChatEffects(
       dispatch(messagesPrunedAfter({ chatId, id: messageId }));
       const chat = findChat(latest(), chatId);
       if (!chat) return;
-      // A forge turn is not an ordinary chat turn, and retrying it as one is
+      // A Scenario turn is not an ordinary chat turn, and retrying it as one is
       // silent: `buildChatStrategy` knows refine and the saved-chat path only,
-      // so a forge retry came back as `target: {type: "chat"}` and routed to
+      // so the retry would come back as `target: {type: "chat"}` and route to
       // `chatHandler`, which writes the message text and stops. The commands
-      // were never parsed, no entity was forged, and the writer saw a perfectly
-      // formatted pass with no cards and a Commit button that stayed dead.
-      //
-      // `forgeChatContinueRequested` with `advancePhase: false` is the path
-      // that was always meant to serve this — forge-chat-effects calls it the
-      // "empty-send / retry" case — and it re-runs the CURRENT phase rather
-      // than advancing, which is what a retry means.
-      if (chat.type === "forge") {
-        dispatch(forgeChatContinueRequested({ chatId, advancePhase: false }));
+      // were never parsed and no entity was forged. The continue effect queues
+      // a real Scenario turn instead; its strategy re-reads which kind of turn
+      // it is (sketch, steer or grow) from the transcript just pruned.
+      if (chat.type === "scenario") {
+        dispatch(forgeChatContinueRequested({ chatId }));
         return;
       }
       const assistantId = api.v1.uuid();

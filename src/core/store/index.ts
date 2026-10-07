@@ -110,7 +110,6 @@ export * from "./slices/engine";
 export {
   forgeChatContinueRequested,
   entityDiscardRequested,
-  forgeChatNewSessionRequested,
 } from "./effects/forge-chat-effects";
 // The HUD's ⚡ dispatches this; the engine effect runs the pass. The real
 // re-entry guard is in the effect, not in the button (CLAUDE.md).

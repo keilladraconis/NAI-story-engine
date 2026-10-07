@@ -1,73 +1,49 @@
 /**
- * Forge Chat Effects — Signal handlers for the typed-chat Forge.
+ * Forge Chat Effects — Signal handlers for the Scenario chat.
  *
- * Three signal actions, each with a single handler:
- *   1. forgeChatContinueRequested  → advance subMode (sketch→expand→weave→sketch),
- *                                     force "sketch" if the draft pool is empty,
- *                                     append an assistant placeholder, submit a
- *                                     forgeChat generation.
+ * Three signals, each with a single handler:
+ *   1. forgeChatContinueRequested  → queue the next Scenario turn: lead with any
+ *                                     pending reference scrub, append an assistant
+ *                                     placeholder, submit a forgeChat generation.
+ *                                     The strategy reads which kind of turn it is.
  *   2. entityDiscardRequested      → user-initiated draft discard. Tombstone with
  *                                     reason="user", delete the entity, and (if
- *                                     other drafts remain) submit a forgeCleanup
- *                                     turn to scrub references.
- *   3. forgeChatNewSessionRequested → create a fresh forge chat, optionally seed
- *                                     a user message. With guidance, submit one
- *                                     discuss turn; with none, leave it idle (no
- *                                     placeholder, no generation).
+ *                                     other drafts remain) defer a reference scrub.
+ *   3. Cast / Cast All / Discard All → promote or drop drafts. The chat outlives
+ *                                     them; none of these ends it.
  *
- * All three actions are local to this module — declared with a static `.type`
+ * All actions are local to this module — declared with a static `.type`
  * field so `matchesAction` can subscribe.
  */
 
 import { Store, matchesAction } from "nai-store";
 import type { RootState, AppDispatch, WorldEntity } from "../types";
-import type { Chat, ChatMessage } from "../../chat-types/types";
-import { buildForgeBriefing } from "../../utils/context-builder";
-import {
-  chatCreated,
-  chatDeleted,
-  subModeChanged,
-  messageAdded,
-} from "../slices/chat";
+import type { Chat } from "../../chat-types/types";
+import { messageAdded } from "../slices/chat";
 import { requestQueued } from "../slices/runtime";
 import { generationSubmitted } from "../slices/ui";
-import { selectForgeNextPhase } from "../selectors/forge";
-import {
-  tombstoneAdded,
-  tombstonesClearedForChat,
-  scrubQueued,
-  scrubCleared,
-  forgeNextPhaseCleared,
-} from "../slices/forge";
+import { tombstoneAdded, scrubQueued, scrubCleared } from "../slices/forge";
 import { entityDeleted, entityLorebookEntryBound } from "../slices/world";
 import { DULFS_CATEGORY_LABELS } from "../../utils/category-detect";
 import { ensureCategory } from "./lorebook-sync";
 import { nameKey } from "./handlers/lorebook";
 import {
-  buildForgeChatStrategy,
+  buildScenarioTurnStrategy,
   buildForgeCleanupStrategy,
-  buildForgeDiscussStrategy,
 } from "../../utils/forge-chat-strategy";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Action creators — ForgeChatContinueRequested lives in forge-chat-actions.ts
-// (a cycle-free module) so that chat-types/forge.ts can import it without
-// pulling in forge-chat-strategy → context-builder → chat-types/index → forge.
+// (a cycle-free module) so that chat-types/scenario.ts can import it without
+// pulling in forge-chat-strategy → context-builder → chat-types/index → scenario.
 // Re-exported here for backward compatibility.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
   forgeChatContinueRequested,
   type ForgeChatContinueRequestedPayload,
-  forgeChatDiscussRequested,
-  type ForgeChatDiscussRequestedPayload,
 } from "./forge-chat-actions";
-export {
-  forgeChatContinueRequested,
-  type ForgeChatContinueRequestedPayload,
-  forgeChatDiscussRequested,
-  type ForgeChatDiscussRequestedPayload,
-};
+export { forgeChatContinueRequested, type ForgeChatContinueRequestedPayload };
 
 export interface ForgeScrubNowRequestedPayload {
   chatId: string;
@@ -127,18 +103,6 @@ export const forgeDiscardAllRequested = (
 });
 forgeDiscardAllRequested.type = FORGE_DISCARD_ALL_REQUESTED;
 
-export interface ForgeChatNewSessionRequestedPayload {
-  initialUserMessage?: string;
-}
-const FORGE_CHAT_NEW_SESSION_REQUESTED = "forgeChat/newSessionRequested";
-export const forgeChatNewSessionRequested = (
-  payload: ForgeChatNewSessionRequestedPayload,
-) => ({
-  type: FORGE_CHAT_NEW_SESSION_REQUESTED as typeof FORGE_CHAT_NEW_SESSION_REQUESTED,
-  payload,
-});
-forgeChatNewSessionRequested.type = FORGE_CHAT_NEW_SESSION_REQUESTED;
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -162,18 +126,6 @@ function forgeRequestPending(state: RootState): boolean {
   const active = state.runtime.activeRequest;
   if (active && isForge(active.type)) return true;
   return state.runtime.queue.some((r) => isForge(r.type));
-}
-
-/**
- * Ends a forge session (the explicit close performed by Cast All / Discard All):
- * drops the chat and its transient forge state so the Forge button starts a
- * fresh session next time instead of resuming this one.
- */
-function closeForgeSession(dispatch: AppDispatch, chatId: string): void {
-  dispatch(scrubCleared({ chatId }));
-  dispatch(tombstonesClearedForChat({ chatId }));
-  dispatch(forgeNextPhaseCleared({ chatId }));
-  dispatch(chatDeleted({ id: chatId }));
 }
 
 /**
@@ -233,42 +185,6 @@ export function registerForgeChatEffects(
   dispatch: AppDispatch,
   _getState: () => RootState,
 ): void {
-  // ─── Discuss (conversational turn; emits commands only on request) ──────────
-  subscribeEffect(
-    matchesAction(forgeChatDiscussRequested),
-    async (action, { getState: latest }) => {
-      const { chatId } = action.payload;
-      const chat = findChat(latest(), chatId);
-      if (!chat) return;
-      if (forgeRequestPending(latest())) return;
-
-      const assistantId = api.v1.uuid();
-      dispatch(
-        messageAdded({
-          chatId,
-          message: { id: assistantId, role: "assistant", content: "" },
-        }),
-      );
-
-      const updatedChat = findChat(latest(), chatId);
-      if (!updatedChat) return;
-
-      const strategy = buildForgeDiscussStrategy(
-        latest,
-        updatedChat,
-        assistantId,
-      );
-      dispatch(
-        requestQueued({
-          id: strategy.requestId,
-          type: "forgeChat",
-          targetId: assistantId,
-        }),
-      );
-      dispatch(generationSubmitted(strategy));
-    },
-  );
-
   // ─── Scrub Now (run the deferred reference-cleanup on demand) ───────────────
   subscribeEffect(
     matchesAction(forgeScrubNowRequested),
@@ -277,34 +193,19 @@ export function registerForgeChatEffects(
     },
   );
 
-  // ─── Continue (advance phase + submit next turn) ────────────────────────────
+  // ─── A Scenario turn (sketch, steer or grow — the strategy reads which) ─────
   subscribeEffect(
     matchesAction(forgeChatContinueRequested),
     async (action, { getState: latest }) => {
       const { chatId } = action.payload;
-      const chat = findChat(latest(), chatId);
-      if (!chat) return;
-      // No-op if a forge pass is already queued or running, so repeated Forge
-      // Ahead / empty sends can't stack empty turns + background generations.
+      if (!findChat(latest(), chatId)) return;
+      // No-op if a turn is already queued or running, so repeated sends cannot
+      // stack empty turns and background generations.
       if (forgeRequestPending(latest())) return;
 
-      // Lead off with the deferred references-cleanup (if any) before the phase
-      // turn. Queued first, so it runs and scrubs the pool before the phase
-      // turn's JIT factory builds its context.
+      // Lead with the deferred reference scrub, if any. Queued first, so it
+      // has scrubbed the pool before this turn's JIT factory builds context.
       runPendingScrub(latest, dispatch, chatId);
-
-      const state = latest();
-      const advance = action.payload.advancePhase !== false;
-      const pinned = state.forge.pinnedNextPhaseByChatId?.[chatId];
-      // Advancing continue: the phase (pool-empty→sketch, else pin, else
-      // auto-advance) comes from selectForgeNextPhase — the SAME selector the
-      // header pill reads, so the pill and the effect can't drift. A
-      // non-advancing continue (empty-send / retry) re-runs the current phase.
-      const target = advance
-        ? selectForgeNextPhase(state, chatId)
-        : (chat.subMode ?? "sketch");
-      dispatch(subModeChanged({ id: chatId, subMode: target }));
-      if (advance && pinned) dispatch(forgeNextPhaseCleared({ chatId }));
 
       const assistantId = api.v1.uuid();
       dispatch(
@@ -313,11 +214,10 @@ export function registerForgeChatEffects(
           message: { id: assistantId, role: "assistant", content: "" },
         }),
       );
+      const chat = findChat(latest(), chatId);
+      if (!chat) return;
 
-      const updatedChat = findChat(latest(), chatId);
-      if (!updatedChat) return;
-
-      const strategy = buildForgeChatStrategy(latest, updatedChat, assistantId);
+      const strategy = buildScenarioTurnStrategy(latest, chat, assistantId);
       dispatch(
         requestQueued({
           id: strategy.requestId,
@@ -373,82 +273,6 @@ export function registerForgeChatEffects(
     },
   );
 
-  // ─── New Session (fresh forge chat; discuss turn if seeded, else idle) ──────
-  //
-  // Re-entrancy guard. A new session only becomes observable when chatCreated
-  // lands, and that is AFTER `await buildForgeBriefing` below — so a caller
-  // that checks "is a forge already open?" (ForgeSection) still sees none
-  // during that window and asks for a second. Two sessions then generate side
-  // by side. That window is as long as the briefing takes to build, well past
-  // what a UI tap guard covers, so it has to be closed here.
-  let creatingSession = false;
-
-  subscribeEffect(
-    matchesAction(forgeChatNewSessionRequested),
-    async (action, { getState: latest }) => {
-      if (creatingSession) return;
-      creatingSession = true;
-      try {
-        const { initialUserMessage } = action.payload;
-        const seedText = initialUserMessage?.trim();
-
-        // Capture the frozen briefing BEFORE chatCreated fires — at this point
-        // activeSavedChat still resolves to the brainstorm the user came from,
-        // not the forge chat we are about to create.
-        const briefing = await buildForgeBriefing(latest);
-
-        const messages: ChatMessage[] = [];
-        if (briefing) {
-          messages.push({
-            id: api.v1.uuid(),
-            role: "system",
-            content: briefing,
-          });
-        }
-        if (seedText) {
-          messages.push({ id: api.v1.uuid(), role: "user", content: seedText });
-        }
-
-        const chat: Chat = {
-          id: api.v1.uuid(),
-          type: "forge",
-          title: "Forge",
-          subMode: "sketch",
-          messages,
-          seed: { kind: "blank" },
-        };
-        dispatch(chatCreated({ chat }));
-
-        // Opening a Forge no longer auto-runs a pass. With guidance, run one
-        // conversational discuss turn (emits commands only if explicitly asked);
-        // with no guidance, leave the session idle — the user sends empty to
-        // Forge Ahead or types to discuss. chatCreated already switched the tab.
-        if (!seedText) return;
-
-        const assistantId = api.v1.uuid();
-        dispatch(
-          messageAdded({
-            chatId: chat.id,
-            message: { id: assistantId, role: "assistant", content: "" },
-          }),
-        );
-
-        const seeded = findChat(latest(), chat.id) ?? chat;
-        const strategy = buildForgeDiscussStrategy(latest, seeded, assistantId);
-        dispatch(
-          requestQueued({
-            id: strategy.requestId,
-            type: "forgeChat",
-            targetId: assistantId,
-          }),
-        );
-        dispatch(generationSubmitted(strategy));
-      } finally {
-        creatingSession = false;
-      }
-    },
-  );
-
   // ─── Cast (promote a single draft to live by binding a lorebook entry) ──────
   subscribeEffect(
     matchesAction(entityCastRequested),
@@ -487,23 +311,20 @@ export function registerForgeChatEffects(
     },
   );
 
-  // ─── Cast All (promote every draft, then close the session) ─────────────────
+  // ─── Cast All (promote every draft) ─────────────────────────────────────────
   subscribeEffect(
     matchesAction(forgeCastAllRequested),
     async (action, { getState: latest }) => {
       const { chatId } = action.payload;
       const drafts = poolFor(latest(), chatId);
+      // Casting does not end the session: the chat is the story's, and outlives any one batch of drafts.
       for (const entity of drafts) {
         dispatch(entityCastRequested({ entityId: entity.id }));
       }
-      // Cast All is the explicit session close — drop the chat so a later Forge
-      // starts fresh. Per-entity casts run async off the dispatches above and
-      // reference entities, not the chat, so deleting it here is safe.
-      closeForgeSession(dispatch, chatId);
     },
   );
 
-  // ─── Discard All (tombstone + delete every draft, then close the session) ───
+  // ─── Discard All (tombstone + delete every draft) ───────────────────────────
   subscribeEffect(
     matchesAction(forgeDiscardAllRequested),
     async (action, { getState: latest }) => {
@@ -522,9 +343,8 @@ export function registerForgeChatEffects(
         );
         dispatch(entityDeleted({ entityId: entity.id }));
       }
-      // No cleanup turn: every draft is gone, so there is nothing left to scrub.
-      // Discard All also closes the session.
-      closeForgeSession(dispatch, chatId);
+      // Every draft is gone, so there is nothing left to scrub.
+      dispatch(scrubCleared({ chatId }));
     },
   );
 }

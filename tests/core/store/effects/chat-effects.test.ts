@@ -130,8 +130,8 @@ describe("chat-effects: user-message submit generates on first send", () => {
     const { store, dispatchAndWait } = makeHarness();
     const chat: Chat = {
       id: "bs1",
-      type: "brainstorm",
-      title: "Brainstorm",
+      type: "summary",
+      title: "Summary",
       messages: [],
       seed: { kind: "blank" },
     };
@@ -164,8 +164,8 @@ describe("chat-effects: user-message submit generates on first send", () => {
     const { store, dispatchAndWait } = makeHarness();
     const chat: Chat = {
       id: "bs2",
-      type: "brainstorm",
-      title: "Brainstorm",
+      type: "summary",
+      title: "Summary",
       messages: [],
       seed: { kind: "blank" },
     };
@@ -190,8 +190,8 @@ describe("chat-effects: user-message submit generates on first send", () => {
 describe("chat-effects: summarize is one summary per tap", () => {
   const sourceChat: Chat = {
     id: "bs-src",
-    type: "brainstorm",
-    title: "Brainstorm",
+    type: "scenario",
+    title: "Scenario 1",
     messages: [
       { id: "m1", role: "user", content: "an idea" },
       { id: "m2", role: "assistant", content: "a reply" },
@@ -341,27 +341,25 @@ describe("chatHasPendingRequest", () => {
   });
 });
 
-describe("retrying a forge turn", () => {
+describe("retrying a Scenario turn", () => {
   // Reported: the first pass answered conversationally, the writer retried the
   // turn, the retry came back in perfect command format — and produced no
   // entity cards and a dead Commit button.
   //
   // The generic retry builds its strategy with `buildChatStrategy`, which knows
-  // refine and the saved-chat path and nothing about the Forge. A forge turn
+  // refine and the saved-chat path and nothing about the Forge. A Scenario turn
   // therefore retried as an ORDINARY CHAT: target `{type: "chat"}`, routed to
   // `chatHandler`, which writes the message text and stops. Nothing parses the
   // commands, nothing dispatches `entityForged`, no draft exists to render as a
   // card or for Commit to count — while the text on screen looks perfect.
   //
-  // `forgeChatContinueRequested({advancePhase: false})` is the path that was
-  // always meant to serve this; its own comment in forge-chat-effects calls it
-  // "empty-send / retry".
+  // `forgeChatContinueRequested` is the path that serves this: it queues a real
+  // Scenario turn, and the strategy re-reads which kind of turn it is.
   function forgeChat(): Chat {
     return {
       id: "fc-1",
-      type: "forge",
-      title: "Forge",
-      subMode: "sketch",
+      type: "scenario",
+      title: "Scenario 1",
       messages: [
         { id: "u1", role: "user", content: "build it" },
         { id: "a1", role: "assistant", content: "sure, let's chat about it" },
@@ -370,7 +368,7 @@ describe("retrying a forge turn", () => {
     };
   }
 
-  it("re-runs the forge pass rather than an ordinary chat turn", async () => {
+  it("re-runs the Scenario turn rather than an ordinary chat turn", async () => {
     const h = makeHarness();
     h.store.dispatch(chatCreated({ chat: forgeChat() }));
     h.store.dispatch(chatSwitched({ id: "fc-1" }));
@@ -393,16 +391,15 @@ describe("retrying a forge turn", () => {
     expect(seen).not.toContain("ui/generationSubmitted");
   });
 
-  it("does not re-run the forge pass for an ordinary chat", async () => {
-    // The branch must be on chat type, not on "is there a forge chat anywhere".
+  it("does not re-run the Scenario turn for an ordinary chat", async () => {
+    // The branch must be on chat type, not on "is there a Scenario chat anywhere".
     const h = makeHarness();
     h.store.dispatch(
       chatCreated({
         chat: {
           id: "bs-1",
-          type: "brainstorm",
-          title: "Brainstorm",
-          subMode: "cowriter",
+          type: "summary",
+          title: "Summary",
           messages: [
             { id: "u1", role: "user", content: "hi" },
             { id: "a1", role: "assistant", content: "hello" },
