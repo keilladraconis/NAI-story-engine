@@ -13,8 +13,7 @@ function sourcesUnder(dir: string): string[] {
 
 /** The only files that may touch a Thread's private half. Each has a reason:
  *  the type, the reducer, the record, the two creators, the review prompt (never
- *  the story's context), the Thread write, the drain, the writer's pane, and the
- *  Scenario prompt (which names latent to describe it to the model). */
+ *  the story's context), the Thread write, the drain, and the writer's pane. */
 const ALLOWED = [
   "src/core/store/types.ts",
   "src/core/store/slices/world.ts",
@@ -25,7 +24,6 @@ const ALLOWED = [
   "src/core/engine/review-strategy.ts",
   "src/core/engine/thread-write-strategy.ts",
   "src/core/engine/execute.ts",
-  "src/core/utils/prompts.ts",
   "src/ui/panels/world/ThreadEditPane.tsx",
 ];
 
