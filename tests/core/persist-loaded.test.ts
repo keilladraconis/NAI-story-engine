@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { persistedDataLoaded, rootReducer } from "../../src/core/store";
+import { FieldID } from "../../src/config/field-definitions";
 import { initialWorldState } from "../../src/core/store/slices/world";
 import { initialStoryState } from "../../src/core/store/slices/story";
 import type {
@@ -27,11 +28,12 @@ function world(ids: string[]): WorldState {
   };
 }
 
-/** The partial seed is deliberate: persist/loaded spreads `current` and only
- *  rewrites the branch-scoped keys, so the slices a case does not name are
- *  never read. */
+/** Cases name only the slices they care about; the rest come from a fresh
+ *  store, because persist/loaded now reads `chat` and `world` to cut drafts
+ *  loose from chats it dropped. */
 function reduce(seed: Partial<RootState>, action: Action): RootState {
-  return rootReducer(seed as RootState, action);
+  const fresh = rootReducer(undefined, { type: "@@INIT" });
+  return rootReducer({ ...fresh, ...seed }, action);
 }
 
 describe("persist/loaded replaces branch-scoped slices", () => {
@@ -68,5 +70,40 @@ describe("persist/loaded replaces branch-scoped slices", () => {
     );
 
     expect(after.story.fields.dramatisPersonae).toBeUndefined();
+  });
+
+  it("returns drafts of a dropped chat to the World", () => {
+    const draft: WorldEntity = {
+      id: "e1",
+      name: "Hesper Vane",
+      summary: "",
+      categoryId: FieldID.DramatisPersonae,
+      lifecycle: "draft",
+      sourceChatId: "old-forge",
+    };
+    const next = rootReducer(
+      undefined,
+      persistedDataLoaded({
+        chat: {
+          chats: [
+            {
+              id: "old-forge",
+              type: "forge",
+              title: "Forge",
+              messages: [],
+              seed: { kind: "blank" },
+            },
+          ],
+          activeChatId: "old-forge",
+        },
+        world: {
+          ...initialWorldState,
+          entitiesById: { e1: draft },
+          entityIds: ["e1"],
+        },
+      }),
+    );
+    expect(next.chat.chats.every((c) => c.type === "scenario")).toBe(true);
+    expect(next.world.entitiesById.e1.sourceChatId).toBeUndefined();
   });
 });

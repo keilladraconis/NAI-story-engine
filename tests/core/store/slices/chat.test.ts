@@ -13,6 +13,7 @@ import {
   messageRemoved,
   messagesPrunedAfter,
   refineCandidateMarked,
+  keepKnownChats,
 } from "../../../../src/core/store/slices/chat";
 import type { Chat } from "../../../../src/core/chat-types/types";
 
@@ -27,9 +28,9 @@ const blankChat = (over: Partial<Chat> = {}): Chat => ({
 });
 
 describe("chat slice", () => {
-  it("starts with one default brainstorm chat", () => {
+  it("starts with one default Scenario chat", () => {
     expect(initialChatState.chats.length).toBe(1);
-    expect(initialChatState.chats[0].type).toBe("brainstorm");
+    expect(initialChatState.chats[0].type).toBe("scenario");
     expect(initialChatState.activeChatId).toBe(initialChatState.chats[0].id);
   });
 
@@ -212,5 +213,38 @@ describe("chat slice", () => {
       refineCandidateMarked({ chatId: "r1", messageId: "m1" }),
     );
     expect(next.chats[0].messages[0].refineCandidate).toBe(true);
+  });
+});
+
+describe("chats from before the Scenario chat", () => {
+  const chat = (id: string, type: string) => ({
+    id,
+    type,
+    title: id,
+    messages: [],
+    seed: { kind: "blank" as const },
+  });
+
+  it("drops chat types that no longer exist and keeps the rest", () => {
+    const kept = keepKnownChats({
+      chats: [
+        chat("b", "brainstorm"),
+        chat("s", "scenario"),
+        chat("f", "forge"),
+      ],
+      activeChatId: "f",
+    });
+    expect(kept.chats.map((c) => c.id)).toEqual(["s"]);
+    expect(kept.activeChatId).toBe("s");
+  });
+
+  it("seeds a Scenario chat when nothing survives", () => {
+    const kept = keepKnownChats({
+      chats: [chat("b", "brainstorm")],
+      activeChatId: "b",
+    });
+    expect(kept.chats).toHaveLength(1);
+    expect(kept.chats[0].type).toBe("scenario");
+    expect(kept.activeChatId).toBe(kept.chats[0].id);
   });
 });

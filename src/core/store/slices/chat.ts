@@ -6,18 +6,39 @@ export interface ChatSliceState {
   activeChatId: string | null;
 }
 
-function makeDefaultBrainstorm(): Chat {
+/** Every chat type the registry holds (`chat-types/index.ts`; a test keeps the
+ *  two in step). Named here, not imported, because the registry imports this
+ *  slice. */
+export const KNOWN_CHAT_TYPES: readonly string[] = [
+  "scenario",
+  "summary",
+  "refine",
+];
+
+export function makeDefaultScenario(): Chat {
   return {
     id: api.v1.uuid(),
-    type: "brainstorm",
-    title: "Brainstorm 1",
-    subMode: "cowriter",
+    type: "scenario",
+    title: "Scenario 1",
     messages: [],
     seed: { kind: "blank" },
   };
 }
 
-const seedChat = makeDefaultBrainstorm();
+/** A stored chat list with every chat of a type that no longer exists removed.
+ *  A chat whose type has no spec cannot be rendered at all, so a story saved
+ *  before the Scenario chat would otherwise open on an error. Nothing is
+ *  converted: there is always at least one chat, and an active one. */
+export function keepKnownChats(state: ChatSliceState): ChatSliceState {
+  const kept = state.chats.filter((c) => KNOWN_CHAT_TYPES.includes(c.type));
+  const chats = kept.length > 0 ? kept : [makeDefaultScenario()];
+  const activeChatId = chats.some((c) => c.id === state.activeChatId)
+    ? state.activeChatId
+    : chats[chats.length - 1].id;
+  return { chats, activeChatId };
+}
+
+const seedChat = makeDefaultScenario();
 export const initialChatState: ChatSliceState = {
   chats: [seedChat],
   activeChatId: seedChat.id,

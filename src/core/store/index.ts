@@ -1,5 +1,5 @@
 import { createStore, combineReducers, Action } from "nai-store";
-import { chatSlice } from "./slices/chat";
+import { chatSlice, keepKnownChats } from "./slices/chat";
 import type { ChatSliceState } from "./slices/chat";
 import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
@@ -54,13 +54,28 @@ export function rootReducer(
     const data = action.payload as PersistedData;
     const current = state ?? sliceReducer(undefined, { type: "@@INIT" });
 
+    const chat = data.chat ? keepKnownChats(data.chat) : current.chat;
+    const loadedWorld = data.world ?? current.world;
+    // A draft made in a chat that no longer exists is hidden from the World
+    // (it is shown inline in its chat) and so would be unreachable. Cut the
+    // tie and it is an ordinary draft again.
+    const chatIds = new Set(chat.chats.map((c) => c.id));
+    const entitiesById = Object.fromEntries(
+      Object.entries(loadedWorld.entitiesById).map(([id, e]) => [
+        id,
+        e.sourceChatId && !chatIds.has(e.sourceChatId)
+          ? { ...e, sourceChatId: undefined }
+          : e,
+      ]),
+    );
+
     return {
       ...current,
       story: data.story
         ? { ...initialStoryState, ...data.story }
         : current.story,
-      chat: data.chat ?? current.chat,
-      world: data.world ?? current.world,
+      chat,
+      world: { ...loadedWorld, entitiesById },
       foundation: data.foundation
         ? { ...initialFoundationState, ...data.foundation }
         : current.foundation,
