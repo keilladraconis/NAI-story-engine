@@ -6,7 +6,7 @@
  *   [REVISE "<Name>" | description]               — update existing element
  *   [RENAME "<Old>" → "<New>"]                    — rename an element
  *   [DELETE "<Name>"]                             — remove element
- *   [THREAD "<Title>" | "<A>", "<B>" | state | latent] — record how elements stand
+ *   [THREAD "<Title>" | "<A>", "<B>" | state | latent | wish] — record how elements stand
  *   [CRITIQUE | text]                             — running self-assessment
  *   [DONE]                                        — signal pass complete
  *
@@ -68,6 +68,8 @@ export interface ThreadCommand {
   state: string;
   /** What is unspoken or unsettled between them — private. */
   latent: string;
+  /** What the writer wants to come about — private, and never a fact. */
+  wish: string;
 }
 
 export interface RenameCommand {
@@ -261,6 +263,12 @@ interface ParsedCommandAt {
   consumed: number;
 }
 
+/** What a THREAD that did not parse is told. Position is meaning in this
+ *  command, so a short one is never guessed at: read as four segments, a wish
+ *  would land in `latent` and be written into an entry as fact on conclusion. */
+export const THREAD_REPAIR =
+  'a THREAD needs all five segments: [THREAD "Title" | "A", "B" | state | private | wish]; leave private or wish empty between its bars when there is none';
+
 /** Parse the command starting at lines[i], or null if that line is not a
  *  command. Returns how many *following* lines were consumed as content. */
 function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
@@ -366,30 +374,26 @@ function parseCommandAt(lines: string[], i: number): ParsedCommandAt | null {
     };
   }
 
-  // Four segments first, and its third may be empty: a Thread with private
-  // notes and no state serializes as `| | notes`, and read by the three-segment
-  // form those notes would come back as the state — the half the story model
-  // is shown.
-  const threadMatch =
-    line.match(
-      /^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^|]*?)\|([^\]]+?)\]?\s*$/,
-    ) ??
-    line.match(/^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^\]]+?)\]?\s*$/) ??
-    line.match(/^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\]?\s*$/);
+  const threadMatch = line.match(
+    /^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^|]*?)\|([^|]*?)\|([^|\]]*?)\]?\s*$/,
+  );
   if (threadMatch) {
-    const title = threadMatch[1].trim();
-    const membersRaw = threadMatch[2];
-    const state = (threadMatch[3] ?? "").trim();
-    const latent = (threadMatch[4] ?? "").trim();
     const memberNames: string[] = [];
     const nameRe = /"([^"]+)"/g;
     let m: RegExpExecArray | null;
-    while ((m = nameRe.exec(membersRaw)) !== null) {
+    while ((m = nameRe.exec(threadMatch[2])) !== null) {
       memberNames.push(m[1].trim());
     }
     if (memberNames.length > 0) {
       return {
-        command: { kind: "THREAD", title, memberNames, state, latent },
+        command: {
+          kind: "THREAD",
+          title: threadMatch[1].trim(),
+          memberNames,
+          state: threadMatch[3].trim(),
+          latent: threadMatch[4].trim(),
+          wish: threadMatch[5].trim(),
+        },
         consumed: 0,
       };
     }
@@ -464,15 +468,13 @@ export function serializeForgeCommand(cmd: ParsedCommand): string {
       return `[RENAME "${cmd.oldName}" → "${cmd.newName}"]`;
     case "THREAD": {
       const members = cmd.memberNames.map((n) => `"${n}"`).join(", ");
-      // Position is meaning here: the third segment is `state`, the fourth
-      // `latent`. So a private half always gets both bars, even around an
-      // empty state — dropping the empty one would promote it to state on the
-      // next parse.
-      const head = `[THREAD "${cmd.title}" | ${members}`;
-      if (cmd.latent) {
-        return `${head} |${cmd.state ? ` ${cmd.state}` : ""} | ${cmd.latent}]`;
-      }
-      return cmd.state ? `${head} | ${cmd.state}]` : `${head}]`;
+      // Always all five segments: position is meaning, so an empty one keeps
+      // its bars.
+      const tail = [cmd.state, cmd.latent, cmd.wish]
+        .map((x) => (x ? ` ${x} ` : " "))
+        .join("|")
+        .trimEnd();
+      return `[THREAD "${cmd.title}" | ${members} |${tail}]`;
     }
     case "CRITIQUE":
       return `[CRITIQUE | ${cmd.text}]`;
@@ -523,8 +525,10 @@ export function redactThreadPrivateNotes(text: string): string {
     .split("\n")
     .map((line) => {
       const command = parseCommandAt([line], 0)?.command;
-      if (command?.kind !== "THREAD" || !command.latent) return line;
-      return serializeForgeCommand({ ...command, latent: "" });
+      if (command?.kind !== "THREAD" || (!command.latent && !command.wish)) {
+        return line;
+      }
+      return serializeForgeCommand({ ...command, latent: "", wish: "" });
     })
     .join("\n");
 }

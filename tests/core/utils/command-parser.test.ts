@@ -76,10 +76,10 @@ Home.
   });
 });
 
-describe("THREAD carries a state and a private note", () => {
-  it("reads four segments", () => {
+describe("THREAD carries a state, a private note and a wish", () => {
+  it("reads five segments", () => {
     const commands = parseCommands(
-      '[THREAD "The Shared Apiary" | "Ines Corbel", "Pell" | Ines Corbel and Pell work the east hives together. | Pell means to sell them.]',
+      '[THREAD "The Shared Apiary" | "Ines Corbel", "Pell" | Ines Corbel and Pell work the east hives together. | Pell means to sell them. | Ines buys him out.]',
     );
     expect(commands[0]).toEqual({
       kind: "THREAD",
@@ -87,16 +87,18 @@ describe("THREAD carries a state and a private note", () => {
       memberNames: ["Ines Corbel", "Pell"],
       state: "Ines Corbel and Pell work the east hives together.",
       latent: "Pell means to sell them.",
+      wish: "Ines buys him out.",
     });
   });
 
-  it("reads three segments as a state with no private note", () => {
+  it("reads empty private segments as empty", () => {
     const commands = parseCommands(
-      '[THREAD "The Shared Apiary" | "Ines Corbel", "Pell" | They work the east hives together.]',
+      '[THREAD "The Shared Apiary" | "Ines Corbel", "Pell" | They work the east hives together. | | ]',
     );
     expect(commands[0]).toMatchObject({
       state: "They work the east hives together.",
       latent: "",
+      wish: "",
     });
   });
 });

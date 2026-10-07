@@ -198,7 +198,7 @@ describe("a Forge transcript entering the Story Engine prefix", () => {
         role: "assistant",
         content: [
           "Recording how they stand.",
-          `[THREAD "The Split Hive" | "Ines", "Pell" | ${STATE_TEXT} | ${SENTINEL}]`,
+          `[THREAD "The Split Hive" | "Ines", "Pell" | ${STATE_TEXT} | ${SENTINEL} | ${SENTINEL}]`,
         ].join("\n"),
       },
     ],

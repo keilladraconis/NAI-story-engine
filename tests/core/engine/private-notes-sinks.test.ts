@@ -76,7 +76,7 @@ const state = {
           {
             id: "a",
             role: "assistant",
-            content: `[THREAD "The Ledger" | "Ines", "Pell" | ${FORGE_STATE} | ${SENTINEL}]`,
+            content: `[THREAD "The Ledger" | "Ines", "Pell" | ${FORGE_STATE} | ${SENTINEL} | ${SENTINEL}]`,
           },
         ],
         seed: { kind: "blank" },

@@ -285,27 +285,6 @@ describe("serializeForgeCommand", () => {
     );
     expect(serializeForgeCommand({ kind: "DONE" })).toBe("[DONE]");
   });
-
-  it("serializes THREAD with and without a state", () => {
-    expect(
-      serializeForgeCommand({
-        kind: "THREAD",
-        title: "Crew",
-        memberNames: ["A", "B"],
-        state: "dock hands",
-        latent: "",
-      }),
-    ).toBe('[THREAD "Crew" | "A", "B" | dock hands]');
-    expect(
-      serializeForgeCommand({
-        kind: "THREAD",
-        title: "Crew",
-        memberNames: ["A", "B"],
-        state: "",
-        latent: "",
-      }),
-    ).toBe('[THREAD "Crew" | "A", "B"]');
-  });
 });
 
 describe("canonicalizeForgeCommands", () => {
@@ -531,19 +510,19 @@ describe("parseForgeStream", () => {
 describe("redactThreadPrivateNotes", () => {
   const SENTINEL = "ZZ-PRIVATE-SENTINEL-7781";
 
-  it("drops the fourth segment of a THREAD command", () => {
+  it("empties both private segments of a THREAD command", () => {
     expect(
       redactThreadPrivateNotes(
-        `[THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary | ${SENTINEL}]`,
+        `[THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary | ${SENTINEL} | ${SENTINEL}]`,
       ),
     ).toBe(
-      '[THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary]',
+      '[THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary | |]',
     );
   });
 
-  it("leaves a three-segment THREAD and a non-THREAD line exactly as written", () => {
+  it("leaves a THREAD with no private segments THREAD and a non-THREAD line exactly as written", () => {
     const three =
-      '[THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary]';
+      '[THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary |  |  ]';
     expect(redactThreadPrivateNotes(three)).toBe(three);
     // Not canonical on purpose: only THREAD commands are ever rewritten.
     const other = '[SYSTEM: "Smoke Rota" | who lights the smoker, and when]';
@@ -557,7 +536,7 @@ describe("redactThreadPrivateNotes", () => {
     const input = [
       "Two things to record.",
       '[CREATE CHARACTER "Ines" | keeps the upper hives]',
-      `  [THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary | ${SENTINEL}]`,
+      `  [THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary | ${SENTINEL} | ${SENTINEL}]`,
       "",
       "Anything else?",
     ].join("\n");
@@ -566,7 +545,7 @@ describe("redactThreadPrivateNotes", () => {
     expect(out.split("\n")).toEqual([
       "Two things to record.",
       '[CREATE CHARACTER "Ines" | keeps the upper hives]',
-      '[THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary]',
+      '[THREAD "The Split Hive" | "Ines", "Pell" | they share the apiary | |]',
       "",
       "Anything else?",
     ]);
@@ -579,21 +558,6 @@ describe("a THREAD command survives serialize → parse", () => {
     title: "The Split Hive",
     memberNames: ["Ines", "Pell"],
   };
-  const cases = [
-    ["both", "they share the apiary", "Pell means to sell"],
-    ["state only", "they share the apiary", ""],
-    ["notes only", "", "Pell means to sell"],
-    ["neither", "", ""],
-  ] as const;
-
-  for (const [name, state, latent] of cases) {
-    it(`round-trips with ${name}`, () => {
-      const command = { ...base, state, latent };
-      const line = serializeForgeCommand(command);
-      expect(parseCommands(line)).toEqual([command]);
-      expect(canonicalizeForgeCommands(line)).toBe(line);
-    });
-  }
 
   it("never lets private notes re-parse as the state the story model reads", () => {
     const SENTINEL = "ZZ-PRIVATE-SENTINEL-7781";
@@ -601,11 +565,71 @@ describe("a THREAD command survives serialize → parse", () => {
       ...base,
       state: "",
       latent: SENTINEL,
+      wish: "",
     });
     const [parsed] = parseCommands(line);
-    expect(parsed).toMatchObject({ state: "", latent: SENTINEL });
+    expect(parsed).toMatchObject({ state: "", latent: SENTINEL, wish: "" });
     expect(redactThreadPrivateNotes(line)).toBe(
-      '[THREAD "The Split Hive" | "Ines", "Pell"]',
+      '[THREAD "The Split Hive" | "Ines", "Pell" | | |]',
     );
+  });
+});
+
+describe("THREAD has exactly five segments", () => {
+  const full =
+    '[THREAD "Half the House" | "Hesper Vane", "Corin Vane" | He sold his half. | He was paid already. | She floods the cut.]';
+
+  it("parses state, latent and wish by position", () => {
+    expect(parseCommands(full)).toEqual([
+      {
+        kind: "THREAD",
+        title: "Half the House",
+        memberNames: ["Hesper Vane", "Corin Vane"],
+        state: "He sold his half.",
+        latent: "He was paid already.",
+        wish: "She floods the cut.",
+      },
+    ]);
+  });
+
+  it("accepts empty latent and wish, and one member", () => {
+    const [cmd] = parseCommands(
+      '[THREAD "The Keys" | "Hesper Vane" | She holds them. | | ]',
+    );
+    expect(cmd).toMatchObject({
+      memberNames: ["Hesper Vane"],
+      state: "She holds them.",
+      latent: "",
+      wish: "",
+    });
+  });
+
+  it.each([
+    '[THREAD "T" | "A", "B" | state | private]',
+    '[THREAD "T" | "A", "B" | state]',
+    '[THREAD "T" | "A", "B"]',
+  ])("does not parse a shorter form: %s", (line) => {
+    expect(parseCommands(line)).toEqual([]);
+    expect(walkForgeLines(line)).toEqual([{ kind: "unrecognized", raw: line }]);
+  });
+
+  it("round-trips through the serializer with any segment empty", () => {
+    for (const [state, latent, wish] of [
+      ["s", "l", "w"],
+      ["s", "", "w"],
+      ["s", "l", ""],
+      ["", "", "w"],
+      ["s", "", ""],
+    ]) {
+      const cmd = {
+        kind: "THREAD" as const,
+        title: "T",
+        memberNames: ["A", "B"],
+        state,
+        latent,
+        wish,
+      };
+      expect(parseCommands(serializeForgeCommand(cmd))).toEqual([cmd]);
+    }
   });
 });

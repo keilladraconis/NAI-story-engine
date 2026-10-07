@@ -10,6 +10,8 @@ import {
   entityEdited,
   entityDeleted,
   threadCreated,
+  threadLedgerUpdated,
+  threadWishSet,
 } from "../../slices/world";
 import {
   messageAppended,
@@ -23,6 +25,7 @@ import {
   walkForgeLines,
   canonicalizeForgeCommands,
   TYPE_TO_FIELD,
+  THREAD_REPAIR,
   type ParsedCommand,
 } from "../../../utils/crucible-command-parser";
 import type {
@@ -59,7 +62,7 @@ function isTombstoned(state: RootState, chatId: string, name: string): boolean {
 
 /** Execute a single parsed command and return its outcome record. With
  *  reviseOnly (cleanup pass), any non-REVISE command is rejected unexecuted. */
-function executeForgeCommand(
+export function executeForgeCommand(
   cmd: ParsedCommand,
   chatId: string,
   assistantMessageId: string,
@@ -269,27 +272,42 @@ function executeForgeCommand(
 
     case "THREAD": {
       const state = getState();
-      if (
-        state.world.threads.find(
-          (t) => t.title.toLowerCase() === cmd.title.toLowerCase(),
-        )
-      ) {
-        return {
-          kind: "THREAD",
-          status: "rejected",
-          name: cmd.title,
-          reason: "duplicate",
-        };
+      const existing = state.world.threads.find(
+        (t) => t.title.toLowerCase() === cmd.title.toLowerCase(),
+      );
+      if (existing) {
+        if (existing.status === "concluded") {
+          return {
+            kind: "THREAD",
+            status: "rejected",
+            name: cmd.title,
+            reason: "concluded",
+          };
+        }
+        // A rewrite replaces what it supplies. An empty segment means "no
+        // change", never "erase": the model re-emits a Thread to move its
+        // state, and must not be able to wipe the private half by omission.
+        dispatch(
+          threadLedgerUpdated({
+            threadId: existing.id,
+            state: cmd.state || existing.state,
+            latent: cmd.latent || existing.latent,
+          }),
+        );
+        if (cmd.wish) {
+          dispatch(threadWishSet({ threadId: existing.id, wish: cmd.wish }));
+        }
+        return { kind: "THREAD", status: "applied", name: existing.title };
       }
       const memberIds = cmd.memberNames
         .map((name) => findEntityByName(state, name)?.id)
         .filter((id): id is string => !!id);
-      if (memberIds.length < 2) {
+      if (memberIds.length === 0) {
         return {
           kind: "THREAD",
           status: "rejected",
           name: cmd.title,
-          reason: "needs ≥2 members",
+          reason: "no known members",
         };
       }
       // No status: `threadCreated` defaults it (world.ts).
@@ -298,6 +316,7 @@ function executeForgeCommand(
         title: cmd.title,
         state: cmd.state,
         latent: cmd.latent,
+        wish: cmd.wish,
         entityIds: memberIds,
       };
       dispatch(threadCreated({ thread }));
@@ -339,7 +358,11 @@ function buildForgeSegments(
       flush();
       segments.push({
         kind: "action",
-        action: { kind: "UNKNOWN", status: "unrecognized", reason: tok.raw },
+        action: {
+          kind: "UNKNOWN",
+          status: "unrecognized",
+          reason: /^\[\s*THREAD\b/i.test(tok.raw) ? THREAD_REPAIR : tok.raw,
+        },
       });
       continue;
     }

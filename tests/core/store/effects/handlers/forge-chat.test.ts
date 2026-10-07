@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   forgeChatHandler,
   forgeCleanupHandler,
+  executeForgeCommand,
 } from "../../../../../src/core/store/effects/handlers/forge-chat";
 import type { CompletionContext } from "../../../../../src/core/store/effects/generation-handlers";
 import type {
@@ -11,6 +12,9 @@ import type {
 import {
   worldSlice,
   initialWorldState,
+  threadCreated,
+  threadLedgerUpdated,
+  threadWishSet,
 } from "../../../../../src/core/store/slices/world";
 import { FieldID } from "../../../../../src/config/field-definitions";
 import type { ForgeSegment } from "../../../../../src/core/chat-types/types";
@@ -587,7 +591,7 @@ describe("forgeChatHandler.completion — THREAD", () => {
         ]),
       dispatch,
       accumulatedText:
-        '[THREAD "The hidden letter" | "Ada", "Bram" | Ada keeps a sealed letter from Bram.]',
+        '[THREAD "The hidden letter" | "Ada", "Bram" | Ada keeps a sealed letter from Bram. | | ]',
       generationSucceeded: true,
     };
     await forgeChatHandler.completion(ctx);
@@ -606,5 +610,133 @@ describe("forgeChatHandler.completion — THREAD", () => {
     expect(state.threads[0].state).toBe("Ada keeps a sealed letter from Bram.");
     expect(state.threads[0].latent).toBe("");
     expect(state.threads[0].entityIds).toEqual(["e1", "e2"]);
+  });
+});
+
+describe("a THREAD command, applied", () => {
+  const entity = (id: string, name: string) => ({
+    id,
+    name,
+    summary: "",
+    categoryId: FieldID.DramatisPersonae,
+    lifecycle: "draft" as const,
+  });
+  const stateWith = (threads: unknown[]) =>
+    ({
+      world: {
+        threads,
+        entitiesById: {
+          h: entity("h", "Hesper Vane"),
+          c: entity("c", "Corin Vane"),
+        },
+        entityIds: ["h", "c"],
+      },
+      forge: { tombstonesByChatId: {} },
+    }) as unknown as RootState;
+  const cmd = {
+    kind: "THREAD" as const,
+    title: "Half the House",
+    memberNames: ["Hesper Vane", "Corin Vane"],
+    state: "He sold his half.",
+    latent: "He was paid already.",
+    wish: "She floods the cut.",
+  };
+  const run = (state: RootState, command: typeof cmd) => {
+    const dispatch = vi.fn();
+    const record = executeForgeCommand(
+      command,
+      "chat",
+      "msg",
+      () => state,
+      dispatch,
+      {
+        reviseOnly: false,
+      },
+    );
+    return { dispatch, record };
+  };
+
+  it("creates a Thread carrying its wish", () => {
+    const { dispatch, record } = run(stateWith([]), cmd);
+    expect(record.status).toBe("applied");
+    const created = dispatch.mock.calls[0][0];
+    expect(created.type).toBe(threadCreated.type);
+    expect(created.payload.thread).toMatchObject({
+      title: "Half the House",
+      state: "He sold his half.",
+      latent: "He was paid already.",
+      wish: "She floods the cut.",
+      entityIds: ["h", "c"],
+    });
+  });
+
+  it("creates a Thread with one member", () => {
+    const { record } = run(stateWith([]), {
+      ...cmd,
+      memberNames: ["Hesper Vane"],
+    });
+    expect(record.status).toBe("applied");
+  });
+
+  it("rejects a Thread none of whose members is known", () => {
+    const { dispatch, record } = run(stateWith([]), {
+      ...cmd,
+      memberNames: ["Nobody"],
+    });
+    expect(record).toMatchObject({
+      status: "rejected",
+      reason: "no known members",
+    });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  const existing = {
+    id: "t1",
+    title: "half the house",
+    state: "old state",
+    latent: "old private",
+    wish: "old wish",
+    entityIds: ["h", "c"],
+    status: "open",
+  };
+
+  it("rewrites the open Thread with the same title", () => {
+    const { dispatch, record } = run(stateWith([existing]), cmd);
+    expect(record.status).toBe("applied");
+    expect(dispatch).toHaveBeenCalledWith(
+      threadLedgerUpdated({
+        threadId: "t1",
+        state: "He sold his half.",
+        latent: "He was paid already.",
+      }),
+    );
+    expect(dispatch).toHaveBeenCalledWith(
+      threadWishSet({ threadId: "t1", wish: "She floods the cut." }),
+    );
+  });
+
+  it("keeps the stored private notes and wish when the rewrite leaves them empty", () => {
+    const { dispatch } = run(stateWith([existing]), {
+      ...cmd,
+      latent: "",
+      wish: "",
+    });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith(
+      threadLedgerUpdated({
+        threadId: "t1",
+        state: "He sold his half.",
+        latent: "old private",
+      }),
+    );
+  });
+
+  it("does not rewrite a concluded Thread", () => {
+    const { dispatch, record } = run(
+      stateWith([{ ...existing, status: "concluded" }]),
+      cmd,
+    );
+    expect(record).toMatchObject({ status: "rejected", reason: "concluded" });
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });
