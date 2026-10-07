@@ -1,0 +1,153 @@
+/*---
+compatibilityVersion: naiscript-1.0
+id: 6d0e7c1b-2a54-4f0e-9b7d-3c5a8e21f4a9
+name: Scenario Probe
+version: 0.1.0
+description: How often does a Scenario sketch keep a thing to come out of everything the story model is shown, at twenty runs per fixture?
+memoryLimit: 8
+---*/
+
+// These two constants are copies of the shipped prompt and its Gritty register
+// in src/core/utils/prompts.ts; tests/tools/scenario-probe.test.ts fails if
+// they drift.
+const SCENARIO_PROMPT = "You are the Scenario Engine. A writer gives you a few sentences about a story they want, and you build the conditions it can grow from: pressures, the people and places under them, and how things stand between them. You never write a plot, an arc, a goal or an ending. Another model will continue this story from a blank page, and it acts on whatever it is shown: told that something will happen, it writes it happening at once, or as already done. So everything you record says only what is so when the story opens.\n\nThe context block above the conversation gives TURN, the drafts under [POOL], the cast under [LIVE], and [THREADS]. Answer by TURN.\n\nTURN: SKETCH. The writer's message is the seed. Answer in order:\n1. Quote the phrase in the seed the writer is most drawn to.\n2. What must be true of the world for that to be so? Write one SITUATION per pressure, as many as the REGISTER note says. Each reads \"what is happening; what keeps it from settling\", and stops there.\n3. Who stands where in those pressures? Write a CHARACTER or FACTION for each position, with at least two of them on different sides of one pressure.\n4. Where does a pressure become visible? Write a LOCATION for each such place. Write a SYSTEM or TOPIC only where a pressure cannot be stated without one.\n5. What stands between particular elements, or bears on one alone? Write a THREAD for each.\n\nTURN: STEER. The writer's last message asks for a change. Make that change with the commands below and no other. If the message asks for nothing to be changed, answer it in prose and write no command.\n\nTURN: GROW. Read [PREVIOUS CRITIQUE]. Write the commands that answer it and no others.\n\nOn every turn, for each thing the writer says they want, answer in order:\n1. Is it already so when the story opens? YES: record it as fact, in a summary or a THREAD's state. NO: continue.\n2. It is something to come. Record what is true now that makes it possible, in a summary, a SITUATION, or a THREAD's state. Then write the thing itself in the wish segment of the THREAD whose cast it concerns, and nowhere else.\n\nCOMMANDS, one per line:\n[CREATE <TYPE> \"<Name>\" | summary of one to three sentences]\n[REVISE \"<Name>\" | new summary]\n[RENAME \"<Old>\" → \"<New>\"]\n[DELETE \"<Name>\"]\n[THREAD \"<Title>\" | \"<A>\", \"<B>\" | state | private | wish]\n[CRITIQUE | which element has nothing pressing on it, and which pressure has no one under it]\n<TYPE> is CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC.\nA THREAD names one to four elements and always has all five segments. state is how things stand now, and it is shown to the story model. private is what is true now and hidden, owed or unspoken; the story model never sees it. wish is what the writer wants to come about; the story model never sees it. Leave private or wish empty between its bars when there is none. A THREAD whose title is already under [THREADS] rewrites that Thread.\nOnly drafts under [POOL] may be revised, renamed or deleted. Never recreate a name under [TOMBSTONES]. If [REJECTED LAST TURN] is present, write each rejected command again as its repair says.\n\nREPLY SHAPE:\n- Two or three sentences of prose first: what you took from the writer's message and, for anything to come, what you recorded in its place.\n- Then the commands.\n- Then one CRITIQUE.\n- Then one question, the one whose answer would change the most.\n\nEXAMPLE. Seed: \"A lock-keeper on a dying canal. Her brother already sold his half of the lock house to the barge company. I want her to end up flooding the cut to stop them.\"\nThe phrase is \"a dying canal\": the trade has gone and the company wants the water. Her brother has sold his half before the story opens, so that is recorded as fact. Flooding the cut is to come, so what is recorded is that she alone holds the sluice keys, and the flooding goes in the wish.\n[CREATE SITUATION \"The Company's Offer\" | The barge company is buying the lock houses along the cut to close it and take the water for its mills; every keeper who sells makes the next refusal cost more.]\n[CREATE CHARACTER \"Hesper Vane\" | Keeps Tolland Lock as her mother did. Rope-scarred palms, and a ring of sluice keys on her belt that she counts by touch.]\n[CREATE CHARACTER \"Corin Vane\" | Her brother. Clean boots on a towpath. Carries the company's survey book under his arm.]\n[CREATE LOCATION \"Tolland Lock House\" | Damp plaster and coal smoke; one kitchen and two owners. The sluice wheel stands in the yard where anyone on the towpath can see who turns it.]\n[THREAD \"Half the House\" | \"Hesper Vane\", \"Corin Vane\" | Corin Vane has sold his half of Tolland Lock House to the barge company. Hesper Vane holds the only set of sluice keys. | Corin Vane has not told Hesper Vane that the company has already paid him. | Hesper Vane floods the cut to stop the company.]\n[CRITIQUE | The Company's Offer has no one who speaks for the company at the lock. Tolland Lock House has no one on the towpath to see the sluice wheel turned.]\nDoes Corin still sleep at the lock house, or has he moved to company lodgings?";
+const REGISTER = "REGISTER, Gritty: Three pressures with stakes that last. Each sets two things someone values against each other, where walking away is possible and costs something real. Ground each in a person, not a spectacle.";
+
+// 60 generations against a 2048-token-per-240s output bucket: it takes a while
+// and will pause for budget. Read every count with its denominator.
+const RUNS = 20;
+const MODEL = "glm-4-6";
+const PARAMS = { model: MODEL, max_tokens: 1536, temperature: 0.9, min_p: 0.05 };
+
+// Fixtures use a glassworks and an observatory: unlike the prompt's canal, so
+// no fixture is a copy of the example the prompt carries. Each thing to come
+// carries an invented noun that nothing else in the seed uses.
+const SEEDS = {
+  ToCome:
+    "A glassblower's widow runs the furnace with her late husband's apprentice. I want the apprentice to eventually smash the vessel they call the Quillane.",
+  AlreadySo:
+    "A glassblower's widow runs the furnace with her late husband's apprentice. Last winter the apprentice smashed the vessel they called the Quillane, and she has not spoken of it.",
+  TwoWishes:
+    "Two astronomers share one telescope on a mountain. I want the younger to end up publishing the Vessarine survey under her own name, and I want the older to finally leave the mountain.",
+};
+
+const messages = (seed) => [
+  { role: "system", content: `${SCENARIO_PROMPT}\n\n${REGISTER}` },
+  { role: "assistant", content: "TURN: SKETCH" },
+  { role: "user", content: seed },
+];
+
+// Mirrors the five-segment THREAD regex in src/core/utils/crucible-command-parser.ts.
+const THREAD = /^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^|]*?)\|([^|]*?)\|([^|\]]*?)\]?\s*$/;
+const CREATE = /^\[\s*CREATE\s+[A-Z]+\s+"([^"]+)"\s*\|\s*(.+?)\]?\s*$/;
+
+// Everything the story model could be shown: every summary, and every state.
+// Everything private: every latent and wish.
+const read = (text) => {
+  const shown = [];
+  const wishes = [];
+  let threads = 0;
+  for (const raw of text.split(/\r\n|\r|\n/)) {
+    const line = raw.trim();
+    const t = THREAD.exec(line);
+    if (t) {
+      threads++;
+      shown.push(t[3]);
+      wishes.push(t[5]);
+      continue;
+    }
+    const c = CREATE.exec(line);
+    if (c) shown.push(c[2]);
+  }
+  return { shown: shown.join("\n"), wishes: wishes.join("\n"), threads };
+};
+
+// Each fixture states its contract in one sentence; `holds` is that sentence.
+const FIXTURES = [
+  {
+    name: "ToCome",
+    contract: "a thing to come is in a wish and in nothing the story model is shown",
+    seed: SEEDS.ToCome,
+    holds: (text) => {
+      const r = read(text);
+      return /Quillane/.test(r.wishes) && !/smash/i.test(r.shown);
+    },
+  },
+  {
+    name: "AlreadySo",
+    contract: "a thing already so is shown as fact and is in no wish",
+    seed: SEEDS.AlreadySo,
+    holds: (text) => {
+      const r = read(text);
+      return /Quillane/.test(r.shown) && !/Quillane/.test(r.wishes);
+    },
+  },
+  {
+    name: "TwoWishes",
+    contract: "two things to come are each in a wish and neither is shown",
+    seed: SEEDS.TwoWishes,
+    holds: (text) => {
+      const r = read(text);
+      return (
+        /Vessarine/.test(r.wishes) &&
+        /leave/i.test(r.wishes) &&
+        !/publish/i.test(r.shown) &&
+        !/leaves? the mountain|left the mountain/i.test(r.shown)
+      );
+    },
+  },
+];
+
+let report = "";
+
+function log(line) {
+  report += line + "\n";
+  api.v1.log(line);
+  void api.v1.ui.updateParts([{ id: "report", text: report }]);
+}
+
+async function runFixture(fixture) {
+  let failing = 0;
+  let firstFailure = "";
+  for (let run = 0; run < RUNS; run++) {
+    // One at a time: concurrent script generations are refused.
+    const response = await api.v1.generate(messages(fixture.seed), PARAMS);
+    const text = response.choices?.[0]?.text ?? "";
+    if (!fixture.holds(text)) {
+      failing++;
+      if (!firstFailure) firstFailure = text;
+    }
+  }
+  log(`${fixture.name}: ${failing} failing runs of ${RUNS} — ${fixture.contract}`);
+  if (firstFailure) log(`  first failing output:\n${firstFailure}`);
+}
+
+async function runAll() {
+  report = "";
+  log(`Scenario probe — ${RUNS} runs per fixture on ${MODEL}`);
+  for (const fixture of FIXTURES) await runFixture(fixture);
+  log("done");
+}
+
+api.v1.ui.register([
+  api.v1.ui.extension.scriptPanel({
+    name: "Scenario Probe",
+    content: [
+      api.v1.ui.part.column({
+        content: [
+          api.v1.ui.part.button({
+            text: "Run",
+            callback: () => void runAll(),
+            disabledWhileCallbackRunning: true,
+          }),
+          api.v1.ui.part.text({
+            id: "report",
+            text: "Press Run. Report each line as N failing runs of 20.",
+            noTemplate: true,
+            style: { whiteSpace: "pre-wrap", userSelect: "text" },
+          }),
+        ],
+      }),
+    ],
+  }),
+]);
