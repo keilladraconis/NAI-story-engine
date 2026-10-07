@@ -58,6 +58,7 @@ function thread(id: string, over: Partial<Thread> = {}): Thread {
     title: id,
     state: "Pell and Ines work the east hives together.",
     latent: "Pell has not told Ines the cooperative means to sell them.",
+    wish: "",
     entityIds: [],
     status: "open",
     ...over,
@@ -1060,6 +1061,40 @@ describe("the conclude arm", () => {
     )();
     expect(prompt.messages.map((m) => m.content).join("\n")).toContain(
       "=== NOW SETTLED ===\nt1\nPell has sold the hives.\nFor half their worth.",
+    );
+  });
+
+  it("never folds the writer's wish into a cast member's rewrite", async () => {
+    lorebook.seed({
+      id: "la",
+      displayName: "Pell",
+      text: "x",
+      keys: [],
+    } as LorebookEntry);
+    const h = harness(
+      [
+        thread("t1", {
+          entityIds: ["a"],
+          wish: "ZZ-WISH-SENTINEL-4410",
+        }),
+      ],
+      [entity("a", { name: "Pell", lorebookEntryId: "la" })],
+    );
+    h.generate.mockImplementation(says("Sold."));
+
+    const { executed } = await drain(
+      [{ kind: "conclude", threadId: "t1", prose: "p" }],
+      h.deps,
+    );
+
+    const revises = executed.filter((i) => i.kind === "revise");
+    expect(revises.length).toBeGreaterThan(0);
+    expect(JSON.stringify(revises)).not.toContain("ZZ-WISH-SENTINEL-4410");
+    const prompt = await (
+      h.generate.mock.calls[0][0] as () => Promise<{ messages: Message[] }>
+    )();
+    expect(prompt.messages.map((m) => m.content).join("\n")).not.toContain(
+      "ZZ-WISH-SENTINEL-4410",
     );
   });
 

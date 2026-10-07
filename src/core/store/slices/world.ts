@@ -197,6 +197,7 @@ export const worldSlice = createSlice({
         {
           ...payload.thread,
           latent: payload.thread.latent ?? "",
+          wish: payload.thread.wish ?? "",
           status: payload.thread.status ?? DEFAULT_THREAD_STATUS,
         },
       ],
@@ -240,6 +241,16 @@ export const worldSlice = createSlice({
         t.id === payload.threadId
           ? { ...t, state: payload.state, latent: payload.latent }
           : t,
+      ),
+    }),
+
+    /** The writer's wish for this Thread. Its own action because nothing that
+     *  rewrites the ledger may touch it, and `thread-bind.ts` does not
+     *  subscribe: a wish is never part of the lorebook entry. */
+    threadWishSet: (state, payload: { threadId: string; wish: string }) => ({
+      ...state,
+      threads: state.threads.map((t) =>
+        t.id === payload.threadId ? { ...t, wish: payload.wish } : t,
       ),
     }),
 
@@ -303,6 +314,7 @@ export const {
   threadDeleted,
   threadRenamed,
   threadLedgerUpdated,
+  threadWishSet,
   threadMemberToggled,
   threadStatusSet,
   threadLorebookEntrySet,

@@ -23,6 +23,7 @@ const thread = (id: string, entityIds: string[]): Thread => ({
   title: id,
   state: "",
   latent: "",
+  wish: "",
   entityIds,
   status: "open",
 });

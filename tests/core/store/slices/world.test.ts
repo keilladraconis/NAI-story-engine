@@ -12,6 +12,7 @@ import {
   threadDeleted,
   threadRenamed,
   threadLedgerUpdated,
+  threadWishSet,
   threadMemberToggled,
   threadStatusSet,
 } from "../../../../src/core/store/slices/world";
@@ -53,6 +54,7 @@ const THREAD: Thread = {
   title: "Main Circle",
   state: "The cooperative's keepers share the east hives.",
   latent: "",
+  wish: "",
   entityIds: [],
   status: "open",
 };
@@ -501,5 +503,41 @@ describe("WorldEntity.lastAffectingMessageId", () => {
     );
     expect(next.entitiesById["e1"].summary).toBe("revised");
     expect(next.entitiesById["e1"].lastAffectingMessageId).toBe("m-b");
+  });
+});
+
+describe("a Thread's wish", () => {
+  const draft = {
+    id: "t1",
+    title: "Half the House",
+    state: "s",
+    entityIds: [],
+  };
+
+  it("defaults to empty when a creator does not supply one", () => {
+    const next = reduce(makeState(), threadCreated({ thread: draft }));
+    expect(next.threads[0].wish).toBe("");
+  });
+
+  it("is kept when a creator supplies one", () => {
+    const next = reduce(
+      makeState(),
+      threadCreated({ thread: { ...draft, wish: "She floods the cut." } }),
+    );
+    expect(next.threads[0].wish).toBe("She floods the cut.");
+  });
+
+  it("is set by threadWishSet and survives a ledger update", () => {
+    let s = reduce(makeState(), threadCreated({ thread: draft }));
+    s = reduce(s, threadWishSet({ threadId: "t1", wish: "W" }));
+    s = reduce(
+      s,
+      threadLedgerUpdated({ threadId: "t1", state: "new", latent: "hidden" }),
+    );
+    expect(s.threads[0]).toMatchObject({
+      state: "new",
+      latent: "hidden",
+      wish: "W",
+    });
   });
 });

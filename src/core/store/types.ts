@@ -137,25 +137,28 @@ export type ThreadStatus = "open" | "concluded";
 
 /** The standing state of an arc or relationship between known entities.
  *
- *  Two texts with different readers. `state` is what is true now, and it is the
- *  Thread's lorebook entry text — the story model reads it whenever the cast is
- *  on stage. `latent` is what is unspoken, owed or concealed, and it never
- *  leaves Story Engine: a model shown that something has not happened writes
- *  it happening. */
+ *  Three texts with different readers. `state` is what is true now, and it is
+ *  the Thread's lorebook entry text — the story model reads it whenever the
+ *  cast is on stage. `latent` is what is true now and unspoken, owed or
+ *  concealed, and it never leaves Story Engine: a model shown that something
+ *  has not happened writes it happening. `wish` is what the writer wants to
+ *  come about. It is not a fact, so it is never folded into anything on
+ *  conclusion, and no generation reads it. */
 export interface Thread {
   id: string;
   title: string;
   state: string;
   latent: string;
+  wish: string;
   entityIds: string[];
   lorebookEntryId?: string;
   status: ThreadStatus;
 }
 
-/** A Thread as a callsite hands it to `threadCreated`. `status` and `latent`
- *  are the reducer's to default, so no creator has to remember them. */
-export type ThreadDraft = Omit<Thread, "status" | "latent"> &
-  Partial<Pick<Thread, "status" | "latent">>;
+/** A Thread as a callsite hands it to `threadCreated`. `status`, `latent` and
+ *  `wish` are the reducer's to default, so no creator has to remember them. */
+export type ThreadDraft = Omit<Thread, "status" | "latent" | "wish"> &
+  Partial<Pick<Thread, "status" | "latent" | "wish">>;
 
 export type EntityLifecycle = "draft" | "live";
 

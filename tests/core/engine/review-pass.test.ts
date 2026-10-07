@@ -254,6 +254,7 @@ describe("the review step", () => {
       title: "T",
       state: "S.",
       latent: "",
+      wish: "",
       entityIds: ["a"],
       status: "open",
       lorebookEntryId: "lt",

@@ -60,3 +60,27 @@ describe("a Thread's private notes never reach the story model", () => {
     );
   });
 });
+
+const WISH_ALLOWED = [
+  "src/core/store/types.ts",
+  "src/core/store/slices/world.ts",
+  "src/core/store/persistence/story-store.ts",
+  "src/core/utils/crucible-command-parser.ts",
+  "src/core/store/effects/handlers/forge-chat.ts",
+  "src/ui/panels/world/ThreadEditPane.tsx",
+  // The Scenario prompt names the segment so the model can fill it.
+  "src/core/utils/prompts.ts",
+];
+
+describe("a Thread's wish is read by no generation", () => {
+  it("is named in no file outside the allowed list", () => {
+    const offenders = sourcesUnder("src")
+      .filter((path) => !WISH_ALLOWED.includes(path.split("\\").join("/")))
+      .filter((path) => /\bwish\b/i.test(readFileSync(path, "utf8")));
+    expect(offenders).toEqual([]);
+  });
+
+  it("has a positive control: the scan finds the word where it is allowed", () => {
+    expect(readFileSync("src/core/store/types.ts", "utf8")).toMatch(/\bwish\b/);
+  });
+});

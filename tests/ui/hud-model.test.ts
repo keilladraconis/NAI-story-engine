@@ -67,6 +67,7 @@ function thread(id: string, status: ThreadStatus = "open"): Thread {
     title: id,
     state: `How things stand for ${id}.`,
     latent: "",
+    wish: "",
     entityIds: [],
     status,
   };

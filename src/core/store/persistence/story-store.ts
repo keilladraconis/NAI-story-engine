@@ -89,6 +89,7 @@ function hydrate(value: unknown): WorldRecord {
     threads.push({
       ...(stored as Thread),
       latent: typeof stored.latent === "string" ? stored.latent : "",
+      wish: typeof stored.wish === "string" ? stored.wish : "",
       entityIds: stored.entityIds ?? [],
       status:
         stored.status === "concluded" ? "concluded" : DEFAULT_THREAD_STATUS,

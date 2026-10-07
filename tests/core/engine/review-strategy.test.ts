@@ -23,6 +23,7 @@ function thread(over: Partial<Thread> = {}): Thread {
     title: "The Shared Apiary",
     state: "They work the hives together.",
     latent: "Pell means to sell.",
+    wish: "",
     entityIds: ["a", "b"],
     status: "open",
     ...over,

@@ -39,6 +39,7 @@ function state(over: Partial<RootState> = {}): RootState {
           title: "The Guild",
           state: "The guild holds the harbour.",
           latent: "",
+          wish: "",
           status: "open",
           entityIds: ["e1"],
         },
@@ -156,11 +157,25 @@ describe("the World record defends the store from a record it did not write", ()
         title: "Kept",
         state: "Stands.",
         latent: "",
+        wish: "",
         entityIds: [],
         status: "open",
       },
     ]);
     expect(record.droppedThreadEntryIds).toEqual(["le-old"]);
+  });
+
+  it("reads a Thread's wish, and defaults a record without one to empty", async () => {
+    story.set(STORAGE_KEYS.WORLD, {
+      world: {
+        threads: [
+          { id: "a", title: "A", state: "s", entityIds: [] },
+          { id: "b", title: "B", state: "s", wish: "W", entityIds: [] },
+        ],
+      },
+    });
+    const { threads } = (await loadWorldRecord()).world;
+    expect(threads.map((t) => t.wish)).toEqual(["", "W"]);
   });
 
   it("reads an unknown status as open", async () => {
