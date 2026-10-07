@@ -1,12 +1,13 @@
 /**
  * Foundation Effects — Generation for Narrative Foundation fields.
  *
- * Handles shapeGenerationRequested, intentGenerationRequested, worldStateGenerationRequested
- * by building a context-aware prompt and submitting to the generation engine.
+ * Handles situationGenerationRequested, worldStateGenerationRequested, and the
+ * contract/ATTG/style requests by building a context-aware prompt and
+ * submitting to the generation engine.
  *
- * All factories use buildStoryEnginePrefix for caching and brainstorm/canon/setting inclusion.
+ * All factories use buildStoryEnginePrefix for caching and canon/setting/World inclusion.
  * Foundation section is excluded from prefix when generating its own fields to prevent
- * self-referential bias (e.g. generating shape while shape is already in context).
+ * self-referential bias (e.g. generating the situation while it is already in context).
  */
 
 import { Store, matchesAction } from "nai-store";
@@ -16,8 +17,7 @@ import {
   appendXialongStyleMessage,
 } from "../../utils/config";
 import {
-  shapeGenerationRequested,
-  intentGenerationRequested,
+  situationGenerationRequested,
   worldStateGenerationRequested,
   contractGenerationRequested,
   attgGenerationRequested,
@@ -35,8 +35,7 @@ import {
   buildXialongNarrativeStyleBlock,
 } from "../../utils/context-builder";
 import {
-  CRUCIBLE_SHAPE_PROMPT,
-  FOUNDATION_INTENT_PROMPT,
+  FOUNDATION_SITUATION_PROMPT,
   FOUNDATION_WORLD_STATE_PROMPT,
   CONTRACT_GENERATE_PROMPT,
   CONTRACT_GENERATE_REQUEST,
@@ -51,63 +50,14 @@ import { buildRefineTail } from "../../utils/refine-strategy";
 // ─── Factories ────────────────────────────────────────────────────────────────
 
 /**
- * Shape: reads brainstorm + setting + canon, excludes foundation entirely.
- * If an existing shape name is in state, it is injected as an assistant prefill
- * so the model only regenerates the structural description.
- * Otherwise the model invents both name and description freely.
+ * Situation: reads setting, the World and the story so far, and excludes the
+ * Foundation. The World's Situational Dynamics are in the prefix already; the
+ * open Threads' `state` is added here, because how things stand between the
+ * cast is half of what a Situation says.
  */
-const createShapeFactory =
+const createSituationFactory =
   (getState: () => RootState): MessageFactory =>
   async () => {
-    const shapePrompt = CRUCIBLE_SHAPE_PROMPT;
-    const { shape: existingShape, intensity } = getState().foundation;
-    const existingName = existingShape?.name ?? "";
-
-    const [prefix, storyContext] = await Promise.all([
-      buildStoryEnginePrefix(getState, { excludeSections: ["foundation"] }),
-      api.v1.buildContext({ suppressScriptHooks: "self" }),
-    ]);
-
-    // If there's an existing name, anchor the model to it; otherwise let it invent freely.
-    const prefill = existingName ? `SHAPE: ${existingName}\n\n` : "SHAPE: ";
-
-    const messages: Message[] = [
-      ...prefix,
-      ...storyContext.slice(1), // drop NAI's story-writing system prompt
-    ];
-
-    if (intensity) {
-      messages.push({
-        role: "system" as const,
-        content: `Intensity: ${intensity.level} — ${intensity.description}`,
-      });
-    }
-
-    messages.push({ role: "system" as const, content: shapePrompt });
-
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.foundationShape);
-    messages.push({ role: "assistant" as const, content: prefill });
-
-    return {
-      messages,
-      params: await buildModelParams({
-        max_tokens: 128,
-        temperature: 0.7,
-        min_p: 0.05,
-        stop: ["</think>", "\n---", "---"],
-      }),
-    };
-  };
-
-/**
- * Intent: reads brainstorm + setting + canon, excludes foundation.
- * Injects shape separately if present — shape informs direction without making intent circular.
- */
-const createIntentFactory =
-  (getState: () => RootState): MessageFactory =>
-  async () => {
-    const intentPrompt = FOUNDATION_INTENT_PROMPT;
-
     const [prefix, storyContext] = await Promise.all([
       buildStoryEnginePrefix(getState, { excludeSections: ["foundation"] }),
       api.v1.buildContext({ suppressScriptHooks: "self" }),
@@ -118,27 +68,36 @@ const createIntentFactory =
       ...storyContext.slice(1), // drop NAI's story-writing system prompt
     ];
 
-    const { shape, intensity } = getState().foundation;
-    if (intensity) {
+    const { foundation, world } = getState();
+    if (foundation.intensity) {
       messages.push({
         role: "system" as const,
-        content: `Intensity: ${intensity.level} — ${intensity.description}`,
+        content: `Intensity: ${foundation.intensity.level} — ${foundation.intensity.description}`,
       });
     }
-    if (shape) {
+    const standing = world.threads
+      .filter((t) => t.status === "open" && t.state.trim() !== "")
+      .map((t) => `- ${t.title}: ${t.state.trim()}`);
+    if (standing.length > 0) {
       messages.push({
         role: "system" as const,
-        content: `[NARRATIVE SHAPE]\n${shape.name}: ${shape.description}`,
+        content: `[THREADS]\n${standing.join("\n")}`,
       });
     }
 
-    messages.push({ role: "system" as const, content: intentPrompt });
-    await appendXialongStyleMessage(messages, XIALONG_STYLE.foundationIntent);
+    messages.push({
+      role: "system" as const,
+      content: FOUNDATION_SITUATION_PROMPT,
+    });
+    await appendXialongStyleMessage(
+      messages,
+      XIALONG_STYLE.foundationSituation,
+    );
 
     return {
       messages,
       params: await buildModelParams({
-        max_tokens: 80,
+        max_tokens: 120,
         temperature: 1.0,
         min_p: 0.05,
         stop: ["</think>", "\n"],
@@ -147,8 +106,8 @@ const createIntentFactory =
   };
 
 /**
- * WorldState: reads brainstorm + setting + canon, excludes foundation.
- * Injects shape + intent separately so they anchor the world state without being repeated.
+ * WorldState: reads canon + setting + World, excludes foundation.
+ * Injects the situation separately so they anchor the world state without being repeated.
  */
 const createWorldStateFactory =
   (getState: () => RootState): MessageFactory =>
@@ -161,12 +120,11 @@ const createWorldStateFactory =
 
     const messages: Message[] = [...prefix];
 
-    const { shape, intent, intensity } = getState().foundation;
+    const { situation, intensity } = getState().foundation;
     const anchors: string[] = [];
     if (intensity)
       anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
-    if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
-    if (intent) anchors.push(`Intent: ${intent}`);
+    if (situation) anchors.push(`Situation: ${situation}`);
     if (anchors.length > 0) {
       messages.push({ role: "system" as const, content: anchors.join("\n") });
     }
@@ -189,10 +147,10 @@ const createWorldStateFactory =
   };
 
 /**
- * ATTG: reads foundation context (shape, intent, world state) and generates an ATTG block.
+ * ATTG: reads foundation context (situation, world state) and generates an ATTG block.
  *
  * `attg` is excluded alongside `foundation` so a re-generate sees only the
- * upstream anchors (shape/intent/worldState/intensity that we re-inject
+ * upstream anchors (situation/worldState/intensity that we re-inject
  * below), never the existing ATTG line — otherwise the model echoes it.
  */
 const createAttgFactory =
@@ -205,12 +163,11 @@ const createAttgFactory =
     });
     const messages: Message[] = [...prefix];
 
-    const { shape, intent, worldState, intensity } = getState().foundation;
+    const { situation, worldState, intensity } = getState().foundation;
     const anchors: string[] = [];
     if (intensity)
       anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
-    if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
-    if (intent) anchors.push(`Intent: ${intent}`);
+    if (situation) anchors.push(`Situation: ${situation}`);
     if (worldState) anchors.push(`World State: ${worldState}`);
     if (anchors.length > 0) {
       messages.push({ role: "system" as const, content: anchors.join("\n") });
@@ -231,10 +188,10 @@ const createAttgFactory =
   };
 
 /**
- * Style: reads foundation context (shape, intent, world state) and generates a Style block.
+ * Style: reads foundation context (situation, world state) and generates a Style block.
  *
  * `style` is excluded alongside `foundation` so a re-generate sees only the
- * upstream anchors (shape/intent/worldState/intensity that we re-inject
+ * upstream anchors (situation/worldState/intensity that we re-inject
  * below), never the existing Style block — otherwise the model echoes it.
  */
 const createStyleFactory =
@@ -247,12 +204,11 @@ const createStyleFactory =
     });
     const messages: Message[] = [...prefix];
 
-    const { shape, intent, worldState, intensity } = getState().foundation;
+    const { situation, worldState, intensity } = getState().foundation;
     const anchors: string[] = [];
     if (intensity)
       anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
-    if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
-    if (intent) anchors.push(`Intent: ${intent}`);
+    if (situation) anchors.push(`Situation: ${situation}`);
     if (worldState) anchors.push(`World State: ${worldState}`);
     if (anchors.length > 0) {
       messages.push({ role: "system" as const, content: anchors.join("\n") });
@@ -293,10 +249,9 @@ const createContractFactory =
 
     const messages: Message[] = [...prefix];
 
-    const { shape, intent, worldState, intensity } = getState().foundation;
+    const { situation, worldState, intensity } = getState().foundation;
     const anchors: string[] = [];
-    if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
-    if (intent) anchors.push(`Intent: ${intent}`);
+    if (situation) anchors.push(`Situation: ${situation}`);
     if (worldState) anchors.push(`World State: ${worldState}`);
     if (intensity)
       anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
@@ -338,11 +293,10 @@ const createContractFactory =
 
 function buildFoundationStrategy(
   getState: () => RootState,
-  field: "shape" | "intent" | "worldState" | "contract" | "attg" | "style",
+  field: "situation" | "worldState" | "contract" | "attg" | "style",
 ): GenerationStrategy {
   const factoryMap = {
-    shape: createShapeFactory,
-    intent: createIntentFactory,
+    situation: createSituationFactory,
     worldState: createWorldStateFactory,
     // Generate-from-scratch is the one contract path that ends in a prefill.
     contract: (gs: () => RootState) =>
@@ -364,7 +318,7 @@ function buildFoundationStrategy(
  *  parseContract a block whose first line no longer matches. The prose fields
  *  have no prefill to keep. */
 function foundationPrefill(
-  field: "shape" | "intent" | "worldState" | "contract" | "attg" | "style",
+  field: "situation" | "worldState" | "contract" | "attg" | "style",
 ): Pick<GenerationStrategy, "prefillBehavior" | "assistantPrefill"> {
   return field === "contract"
     ? {
@@ -376,7 +330,7 @@ function foundationPrefill(
 
 // ─── Refine strategy builders ────────────────────────────────────────────────
 
-export function buildIntentStrategy(
+export function buildSituationStrategy(
   getState: () => RootState,
   opts?: {
     refineContext?: RefineContext;
@@ -384,7 +338,7 @@ export function buildIntentStrategy(
     requestId?: string;
   },
 ): GenerationStrategy {
-  const baseFactory = createIntentFactory(getState);
+  const baseFactory = createSituationFactory(getState);
   const refineContext = opts?.refineContext;
   const messageFactory: MessageFactory = refineContext
     ? async () => {
@@ -398,7 +352,7 @@ export function buildIntentStrategy(
   return {
     requestId: opts?.requestId ?? api.v1.uuid(),
     messageFactory,
-    target: { type: "foundation", field: "intent" },
+    target: { type: "foundation", field: "situation" },
     prefillBehavior: "trim",
   };
 }
@@ -491,7 +445,7 @@ function submitFoundation(
   getState: () => RootState,
   field: FoundationTarget,
 ): void {
-  // One generation per field at a time. Import All dispatches Shape and Intent
+  // One generation per field at a time. Import All dispatches several fields
   // together, and a mobile tap arriving twice would otherwise submit each of
   // them twice under unrelated request ids.
   if (isFoundationRequestPending(getState(), field)) return;
@@ -511,12 +465,8 @@ export function registerFoundationEffects(
   dispatch: AppDispatch,
   getState: () => RootState,
 ): void {
-  subscribeEffect(matchesAction(shapeGenerationRequested), () => {
-    submitFoundation(dispatch, getState, "shape");
-  });
-
-  subscribeEffect(matchesAction(intentGenerationRequested), () => {
-    submitFoundation(dispatch, getState, "intent");
+  subscribeEffect(matchesAction(situationGenerationRequested), () => {
+    submitFoundation(dispatch, getState, "situation");
   });
 
   subscribeEffect(matchesAction(worldStateGenerationRequested), () => {

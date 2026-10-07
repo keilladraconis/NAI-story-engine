@@ -17,7 +17,7 @@ export interface RefineBudget {
   stop: string[];
 }
 
-// Short structured fields (attg, intent, style, contract) finish well inside
+// Short structured fields (attg, situation, style, contract) finish well inside
 // one call; the extra calls only ever fire if the model is genuinely mid-answer.
 const DEFAULT_REFINE_BUDGET: RefineBudget = {
   maxTokens: 400,

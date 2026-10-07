@@ -1,6 +1,6 @@
 // Import wizard shell — a full-view takeover of the Setup tab. Header
 // (Back / title / Refresh / Import All) over the foundation + lorebook sections.
-// Import All batches ATTG+Style+bind-all-unmanaged+Shape+Intent, then closes.
+// Import All batches ATTG+Style+bind-all-unmanaged+Situation, then closes.
 
 import { T, SP } from "../../style";
 import {
@@ -9,8 +9,7 @@ import {
   attgSyncSet,
   styleUpdated,
   styleSyncSet,
-  shapeGenerationRequested,
-  intentGenerationRequested,
+  situationGenerationRequested,
   contractGenerationRequested,
   entitiesBoundBatch,
 } from "../../../core/store";
@@ -83,11 +82,10 @@ export function ImportWizard(props: { onClose: () => void }) {
         ),
       );
     }
-    store.dispatch(shapeGenerationRequested());
-    store.dispatch(intentGenerationRequested());
-    // Last of the three: message factories resolve when the queued task runs, so
-    // the contract reads the Shape and Intent the two above have committed by
-    // then rather than the empty anchors they started from.
+    store.dispatch(situationGenerationRequested());
+    // Last of the two: message factories resolve when the queued task runs, so
+    // the contract reads the Situation the one above has committed by then
+    // rather than the empty anchor it started from.
     store.dispatch(contractGenerationRequested());
     props.onClose();
   };

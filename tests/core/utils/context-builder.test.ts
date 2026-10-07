@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { buildStoryEnginePrefix } from "../../../src/core/utils/context-builder";
+import {
+  buildStoryEnginePrefix,
+  formatFoundationBlock,
+} from "../../../src/core/utils/context-builder";
 import type { RootState } from "../../../src/core/store/types";
 import type { Chat } from "../../../src/core/chat-types/types";
 
@@ -16,8 +19,7 @@ function makeState(
   return {
     story: { fields: {}, attgEnabled: false, styleEnabled: false },
     foundation: {
-      shape: null,
-      intent: "",
+      situation: "",
       worldState: "",
       intensity: null,
       contract: null,
@@ -83,7 +85,7 @@ describe("buildStoryEnginePrefix and the chat transcript", () => {
       const s = makeState();
       s.foundation.attg = "Author: X; Title: Y";
       s.foundation.style = "terse, dread-soaked";
-      s.foundation.intent = "a slow unravelling";
+      s.foundation.situation = "a slow unravelling";
       return s;
     };
     const concat = (await buildStoryEnginePrefix(getState))
@@ -111,5 +113,25 @@ describe("buildStoryEnginePrefix and the chat transcript", () => {
     expect(concat).toContain("Story Contract — binding");
     expect(concat).toContain("Prohibited (never introduce");
     expect(concat).toContain("death, betrayal, supernatural elements");
+  });
+});
+
+describe("the Foundation block", () => {
+  const foundation = {
+    situation: "The company is buying the lock houses.",
+    worldState: "",
+    intensity: null,
+    contract: null,
+    attg: "",
+    style: "",
+    attgSyncEnabled: false,
+    styleSyncEnabled: false,
+  };
+  it("carries the Situation and names no Shape or Intent", () => {
+    const block = formatFoundationBlock({ foundation } as unknown as RootState);
+    expect(block).toContain(
+      "Situation: The company is buying the lock houses.",
+    );
+    expect(block).not.toMatch(/Shape:|Intent:/);
   });
 });

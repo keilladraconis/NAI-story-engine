@@ -16,11 +16,8 @@ export function FoundationEditPane(props: { descriptor: FieldDescriptor }) {
   return (
     <FieldEditor
       label={`Edit ${d.label}`}
-      titled={d.titled}
-      initialTitle={draft.title}
       initialContent={draft.content}
       placeholder={d.placeholder}
-      titlePlaceholder={d.titlePlaceholder}
       onBack={close}
       onCommit={(v) => {
         d.commit(v);

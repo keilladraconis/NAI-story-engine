@@ -1,8 +1,7 @@
-import { GenerationStrategy, ShapeData, ContractData } from "../../types";
+import { GenerationStrategy, ContractData } from "../../types";
 import { stripThinkingTags } from "../../../utils/tag-parser";
 import {
-  shapeUpdated,
-  intentUpdated,
+  situationUpdated,
   worldStateUpdated,
   contractUpdated,
   attgUpdated,
@@ -19,38 +18,6 @@ type FoundationTarget = Extract<
   GenerationStrategy["target"],
   { type: "foundation" }
 >;
-
-/**
- * Parses shape generation output into { name, description }.
- *
- * Two cases:
- *  - Existing shape name in state → model only generated the description.
- *    Output: { name: existingName, description: text }
- *
- *  - No existing shape → model invented both.
- *    Format: "Hero's Journey\n\nLean toward the moment of return..."
- *    Output: { name: firstLine, description: rest }
- */
-function parseShape(text: string, existingName: string): ShapeData {
-  if (existingName) {
-    // Name was pre-filled — entire output is the description
-    return { name: existingName, description: text.trim() };
-  }
-
-  // Model invented name + description: first line is name, rest is description
-  const lines = text.split("\n");
-  const name = lines[0].trim();
-  const blankIdx = lines.findIndex((l, i) => i > 0 && l.trim() === "");
-  const description =
-    blankIdx > 0
-      ? lines
-          .slice(blankIdx + 1)
-          .join("\n")
-          .trim()
-      : lines.slice(1).join("\n").trim();
-
-  return { name, description: description || text.trim() };
-}
 
 /**
  * Parses contract generation output into { required, prohibited, emphasis }.
@@ -82,14 +49,8 @@ export const foundationHandler: GenerationHandlers<FoundationTarget> = {
       const text = stripThinkingTags(ctx.accumulatedText).trim();
 
       switch (field) {
-        case "shape": {
-          const existingName = ctx.getState().foundation.shape?.name ?? "";
-          const shape = parseShape(text, existingName);
-          ctx.dispatch(shapeUpdated({ shape }));
-          break;
-        }
-        case "intent": {
-          ctx.dispatch(intentUpdated({ intent: text }));
+        case "situation": {
+          ctx.dispatch(situationUpdated({ situation: text }));
           break;
         }
         case "worldState": {

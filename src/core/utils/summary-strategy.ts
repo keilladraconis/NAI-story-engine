@@ -60,17 +60,10 @@ export function createEntitySummaryFactory(
 
     messages.push({ role: "system", content: ENTITY_SUMMARY_PROMPT });
 
-    if (foundation.shape) {
+    if (foundation.situation) {
       messages.push({
         role: "assistant",
-        content: `=== STORY SHAPE ===\n${foundation.shape.name}\n${foundation.shape.description}`,
-      });
-    }
-
-    if (foundation.intent) {
-      messages.push({
-        role: "assistant",
-        content: `=== STORY INTENT ===\n${foundation.intent}`,
+        content: `=== STORY SITUATION ===\n${foundation.situation}`,
       });
     }
 
@@ -182,17 +175,10 @@ export function createThreadSummaryFactory(
 
     messages.push({ role: "system", content: THREAD_SUMMARY_PROMPT });
 
-    if (foundation.shape) {
+    if (foundation.situation) {
       messages.push({
         role: "assistant",
-        content: `=== STORY SHAPE ===\n${foundation.shape.name}\n${foundation.shape.description}`,
-      });
-    }
-
-    if (foundation.intent) {
-      messages.push({
-        role: "assistant",
-        content: `=== STORY INTENT ===\n${foundation.intent}`,
+        content: `=== STORY SITUATION ===\n${foundation.situation}`,
       });
     }
 

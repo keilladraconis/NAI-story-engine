@@ -1,5 +1,5 @@
 // Foundation-import rows of the JSX Import wizard: Memory→ATTG, A/N→Style (each a
-// one-click import that marks itself done), and Story→Shape+Intent generation.
+// one-click import that marks itself done), and Story→Situation+Contract generation.
 
 import { T, SP } from "../../style";
 import {
@@ -8,8 +8,7 @@ import {
   attgSyncSet,
   styleUpdated,
   styleSyncSet,
-  shapeGenerationRequested,
-  intentGenerationRequested,
+  situationGenerationRequested,
   contractGenerationRequested,
 } from "../../../core/store";
 
@@ -94,22 +93,16 @@ export function ImportFoundation(props: { memText: string; anText: string }) {
       ) : null}
 
       <div style={row}>
-        <span style={label}>Story → Shape + Intent + Contract</span>
+        <span style={label}>Story → Situation + Contract</span>
         <span style={preview} />
         <button
           style={btn}
-          onClick={() => store.dispatch(shapeGenerationRequested())}
+          onClick={() => store.dispatch(situationGenerationRequested())}
         >
-          Shape
+          Situation
         </button>
-        <button
-          style={btn}
-          onClick={() => store.dispatch(intentGenerationRequested())}
-        >
-          Intent
-        </button>
-        {/* Contract reads Shape/Intent as anchors, and factories resolve when the
-            queued task runs — so pressing this after the other two picks them up. */}
+        {/* Contract reads the Situation as an anchor, and factories resolve when the
+            queued task runs — so pressing this after Situation picks it up. */}
         <button
           style={btn}
           onClick={() => store.dispatch(contractGenerationRequested())}

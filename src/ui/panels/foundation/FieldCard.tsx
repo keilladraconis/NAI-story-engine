@@ -1,8 +1,8 @@
 // One Foundation field row: label + derived display text + an actions row
 // (optional Sync toggle, generate/refine button, Edit). That button adapts:
 // empty field generates (⚡), filled field refines (quill) — decideFieldAction
-// picks both the glyph and the dispatch — except Shape which is generate-only
-// (descriptor.hasRefine === false). While a matching foundation request is
+// picks both the glyph and the dispatch — except a descriptor with
+// hasRefine === false, which is generate-only. While a matching foundation request is
 // queued/active the button is disabled and dimmed. All differences come from the
 // descriptor — one render path.
 

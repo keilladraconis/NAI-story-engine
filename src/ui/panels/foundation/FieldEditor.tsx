@@ -1,7 +1,6 @@
-// Foundation edit pane. Generalizes the original single-textarea editor to an
-// optional title input (Shape's name + description). Uncontrolled textareas:
-// child text seeds the display from the committed store value; onInput tracks
-// edits via useDraftField. Save hands back a { title, content } draft.
+// Foundation edit pane: one textarea. Uncontrolled: child text seeds the
+// display from the committed store value; onInput tracks edits via
+// useDraftField. Save hands back the draft (its title is always empty).
 // Layout mirrors EntityEditPane: the pane fills the panel height so the content
 // textarea can grow to the bottom.
 
@@ -14,17 +13,13 @@ const ICON_SIZE = 16;
 
 type FieldEditorProps = {
   label: string;
-  titled?: boolean;
-  initialTitle: string;
   initialContent: string;
   placeholder: string;
-  titlePlaceholder?: string;
   onCommit: (draft: FieldDraft) => void;
   onBack: () => void;
 };
 
 export function FieldEditor(props: FieldEditorProps) {
-  const title = useDraftField(props.initialTitle);
   const content = useDraftField(props.initialContent);
 
   return (
@@ -34,13 +29,13 @@ export function FieldEditor(props: FieldEditorProps) {
         flexDirection: "column",
         gap: SP.sm,
         // Fill the pane height so the content textarea can grow to the bottom.
-        // Grows past the panel if the header/title wrap (the engine tab
+        // Grows past the panel if the header wraps (the engine tab
         // scrolls); the textarea scrolls its own overflow.
         minHeight: "100%",
         paddingBottom: SP.sm,
       }}
     >
-      {/* Header row: [← Back] title [Save] */}
+      {/* Header row: [← Back] label [Save] */}
       <div style={{ display: "flex", alignItems: "center", gap: SP.sm }}>
         <button
           title="Back"
@@ -63,7 +58,7 @@ export function FieldEditor(props: FieldEditorProps) {
         <button
           onClick={() =>
             props.onCommit({
-              title: title.value.trim(),
+              title: "",
               content: content.value.trim(),
             })
           }
@@ -72,21 +67,6 @@ export function FieldEditor(props: FieldEditorProps) {
           Save
         </button>
       </div>
-
-      {props.titled ? (
-        <input
-          placeholder={props.titlePlaceholder ?? ""}
-          value={title.value}
-          onInput={(e) => title.setValue(e.target.value ?? "")}
-          style={{
-            background: T.bg2,
-            color: T.text,
-            fontFamily: T.fontDefault,
-            padding: SP.md,
-            border: "none",
-          }}
-        />
-      ) : null}
 
       <textarea
         placeholder={props.placeholder}

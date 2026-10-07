@@ -35,13 +35,12 @@ const createBootstrapP1Factory =
     const messages: Message[] = [...prefix];
 
     // Re-inject compact foundation anchors close to the instruction
-    const { shape, intent, worldState, intensity, contract } =
+    const { situation, worldState, intensity, contract } =
       getState().foundation;
     const anchors: string[] = [];
     if (intensity)
       anchors.push(`Intensity: ${intensity.level} — ${intensity.description}`);
-    if (shape) anchors.push(`Shape: ${shape.name}: ${shape.description}`);
-    if (intent) anchors.push(`Intent: ${intent}`);
+    if (situation) anchors.push(`Situation: ${situation}`);
     if (worldState) anchors.push(`World State: ${worldState}`);
     if (contract) {
       anchors.push(

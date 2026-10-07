@@ -5,7 +5,7 @@ import { uiSlice } from "./slices/ui";
 import { runtimeSlice } from "./slices/runtime";
 import { storySlice, initialStoryState } from "./slices/story";
 import { worldSlice } from "./slices/world";
-import { foundationSlice, initialFoundationState } from "./slices/foundation";
+import { foundationSlice, pickFoundation } from "./slices/foundation";
 import { forgeSlice } from "./slices/forge";
 import { engineSlice } from "./slices/engine";
 import { RootState, StoryState, WorldState, FoundationState } from "./types";
@@ -77,7 +77,7 @@ export function rootReducer(
       chat,
       world: { ...loadedWorld, entitiesById },
       foundation: data.foundation
-        ? { ...initialFoundationState, ...data.foundation }
+        ? pickFoundation(data.foundation)
         : current.foundation,
     };
   }

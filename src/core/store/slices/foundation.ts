@@ -1,14 +1,8 @@
 import { createSlice } from "nai-store";
-import {
-  FoundationState,
-  ShapeData,
-  IntensityData,
-  ContractData,
-} from "../types";
+import { FoundationState, IntensityData, ContractData } from "../types";
 
 export const initialFoundationState: FoundationState = {
-  shape: null,
-  intent: "",
+  situation: "",
   worldState: "",
   intensity: null,
   contract: null,
@@ -22,14 +16,9 @@ export const foundationSlice = createSlice({
   name: "foundation",
   initialState: initialFoundationState,
   reducers: {
-    shapeUpdated: (state, payload: { shape: ShapeData | null }) => ({
+    situationUpdated: (state, payload: { situation: string }) => ({
       ...state,
-      shape: payload.shape,
-    }),
-
-    intentUpdated: (state, payload: { intent: string }) => ({
-      ...state,
-      intent: payload.intent,
+      situation: payload.situation,
     }),
 
     worldStateUpdated: (state, payload: { worldState: string }) => ({
@@ -83,8 +72,7 @@ export const foundationSlice = createSlice({
     foundationCleared: () => initialFoundationState,
 
     // Signal actions — Phase 2/3 effects handle generation
-    shapeGenerationRequested: (state) => state,
-    intentGenerationRequested: (state) => state,
+    situationGenerationRequested: (state) => state,
     worldStateGenerationRequested: (state) => state,
     contractGenerationRequested: (state) => state,
     attgGenerationRequested: (state) => state,
@@ -94,8 +82,7 @@ export const foundationSlice = createSlice({
 
 export const {
   foundationCleared,
-  shapeUpdated,
-  intentUpdated,
+  situationUpdated,
   worldStateUpdated,
   intensityUpdated,
   contractUpdated,
@@ -105,10 +92,23 @@ export const {
   styleSyncToggled,
   attgSyncSet,
   styleSyncSet,
-  shapeGenerationRequested,
-  intentGenerationRequested,
+  situationGenerationRequested,
   worldStateGenerationRequested,
   contractGenerationRequested,
   attgGenerationRequested,
   styleGenerationRequested,
 } = foundationSlice.actions;
+
+/** A stored Foundation narrowed to the fields this build has. Shape and Intent
+ *  were removed; left in the object they would be saved back for ever. */
+export function pickFoundation(
+  stored: Partial<FoundationState>,
+): FoundationState {
+  const next = { ...initialFoundationState };
+  for (const key of Object.keys(next) as (keyof FoundationState)[]) {
+    if (stored[key] !== undefined) {
+      (next as Record<keyof FoundationState, unknown>)[key] = stored[key];
+    }
+  }
+  return next;
+}

@@ -2,7 +2,7 @@ import type { RootState, GenerationStrategy } from "../store/types";
 import type { RefineContext } from "../chat-types/types";
 import { buildLorebookContentStrategy } from "./lorebook-strategy";
 import {
-  buildIntentStrategy,
+  buildSituationStrategy,
   buildContractStrategy,
   buildAttgStrategy,
   buildStyleStrategy,
@@ -22,7 +22,7 @@ export type FieldStrategyFactory = (
 export const FIELD_STRATEGIES: Record<string, FieldStrategyFactory> = {
   attg: (gs, opts) => buildAttgStrategy(gs, opts),
   style: (gs, opts) => buildStyleStrategy(gs, opts),
-  intent: (gs, opts) => buildIntentStrategy(gs, opts),
+  situation: (gs, opts) => buildSituationStrategy(gs, opts),
   contract: (gs, opts) => buildContractStrategy(gs, opts),
   lorebookContent: (gs, opts) => buildLorebookContentStrategy(gs, opts),
 };

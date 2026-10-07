@@ -54,7 +54,7 @@ function state(
 }
 
 /** Any Foundation content at all — one filled field is enough. */
-const FILLED: Partial<FoundationState> = { intent: "a premise" };
+const FILLED: Partial<FoundationState> = { situation: "a premise" };
 
 describe("deriveSetup — the Scenario prompt", () => {
   it("shows on a blank tab: nothing written, nothing discussed", () => {

@@ -27,8 +27,7 @@ type EffectHandler = (
 const state = () =>
   ({
     foundation: {
-      shape: null,
-      intent: "",
+      situation: "",
       worldState: "",
       intensity: null,
       contract: null,

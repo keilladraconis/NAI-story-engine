@@ -20,8 +20,7 @@ function makeState(over: Partial<RootState> = {}): RootState {
   return {
     chat: { chats: [], activeChatId: null, refineChat: null },
     foundation: {
-      shape: null,
-      intent: "",
+      situation: "",
       worldState: "",
       intensity: null,
       contract: null,

@@ -18,7 +18,7 @@ function makeState(entityName: string, activeEditId: string | null): RootState {
       },
       threads: [],
     },
-    foundation: { shape: null, intent: "", worldState: "" },
+    foundation: { situation: "", worldState: "" },
     ui: { activeEditId },
   } as unknown as RootState;
 }

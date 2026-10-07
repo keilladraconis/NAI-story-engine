@@ -10,7 +10,7 @@ import { REFINE_SYSTEM_PROMPT } from "../utils/prompts";
 import {
   attgUpdated,
   styleUpdated,
-  intentUpdated,
+  situationUpdated,
   contractUpdated,
 } from "../store/slices/foundation";
 import { messageAdded, messageRemoved } from "../store/slices/chat";
@@ -29,7 +29,7 @@ function refinePending(ctx: SpecCtx): boolean {
 
 /**
  * Per-field commit dispatchers — applied when a refine session is committed.
- * Fields backed by the field-strategy registry (attg, style, intent, contract,
+ * Fields backed by the field-strategy registry (attg, style, situation, contract,
  * lorebookContent) can be refined end-to-end. lorebookKeys is intentionally
  * omitted — keys are short comma-separated tokens, refining them through a
  * chat is overkill versus typing them directly.
@@ -41,8 +41,8 @@ const FIELD_COMMIT_DISPATCHERS: Record<
   attg: (text, { dispatch }, _target) => dispatch(attgUpdated({ attg: text })),
   style: (text, { dispatch }, _target) =>
     dispatch(styleUpdated({ style: text })),
-  intent: (text, { dispatch }, _target) =>
-    dispatch(intentUpdated({ intent: text })),
+  situation: (text, { dispatch }, _target) =>
+    dispatch(situationUpdated({ situation: text })),
   contract: (text, { dispatch }, _target) => {
     const parsed = parseContract(text);
     dispatch(contractUpdated({ contract: parsed }));

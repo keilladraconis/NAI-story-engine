@@ -59,9 +59,9 @@ describe("foundation fields — generating selector", () => {
   });
 
   it("true when the active request matches the field", () => {
-    const s = base([], { type: "foundation", targetId: "shape" });
-    expect(isFoundationGenerating(s, "shape")).toBe(true);
-    expect(isFoundationGenerating(s, "intent")).toBe(false);
+    const s = base([], { type: "foundation", targetId: "situation" });
+    expect(isFoundationGenerating(s, "situation")).toBe(true);
+    expect(isFoundationGenerating(s, "contract")).toBe(false);
   });
 
   it("false when nothing matches", () => {
@@ -71,23 +71,20 @@ describe("foundation fields — generating selector", () => {
 });
 
 describe("foundation fields — descriptors", () => {
-  it("has exactly the five card-fields in SUI order", () => {
+  it("has exactly the four card-fields in SUI order", () => {
     expect(FIELD_DESCRIPTORS.map((d) => d.id)).toEqual([
-      "shape",
-      "intent",
+      "situation",
       "contract",
       "attg",
       "style",
     ]);
   });
 
-  it("shape is titled and generate-only; attg/style carry sync", () => {
+  it("situation refines; attg/style carry sync", () => {
     const byId = Object.fromEntries(FIELD_DESCRIPTORS.map((d) => [d.id, d]));
-    expect(byId.shape.titled).toBe(true);
-    expect(byId.shape.hasRefine).toBe(false);
+    expect(byId.situation.hasRefine).toBe(true);
     expect(byId.attg.hasSync).toBe(true);
     expect(byId.style.hasSync).toBe(true);
-    expect(byId.intent.hasRefine).toBe(true);
   });
 
   it("INTENSITY_LEVELS lists Cozy…Nightmare", () => {
@@ -122,12 +119,11 @@ describe("foundationFieldsEmpty", () => {
   });
 
   it("is false once any single field carries content", () => {
-    expect(foundationFieldsEmpty(state({ intent: "a premise" }))).toBe(false);
+    expect(foundationFieldsEmpty(state({ situation: "a premise" }))).toBe(
+      false,
+    );
     expect(foundationFieldsEmpty(state({ attg: "Author: X" }))).toBe(false);
     expect(foundationFieldsEmpty(state({ style: "terse" }))).toBe(false);
-    expect(
-      foundationFieldsEmpty(state({ shape: { name: "n", description: "d" } })),
-    ).toBe(false);
     expect(
       foundationFieldsEmpty(
         state({ contract: { required: "r", prohibited: "", emphasis: "" } }),
@@ -136,6 +132,6 @@ describe("foundationFieldsEmpty", () => {
   });
 
   it("treats whitespace-only content as empty", () => {
-    expect(foundationFieldsEmpty(state({ intent: "   \n\t " }))).toBe(true);
+    expect(foundationFieldsEmpty(state({ situation: "   \n\t " }))).toBe(true);
   });
 });

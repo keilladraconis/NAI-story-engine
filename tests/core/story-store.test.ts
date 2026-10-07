@@ -45,7 +45,7 @@ function state(over: Partial<RootState> = {}): RootState {
         },
       ],
     },
-    foundation: { ...initialFoundationState, intent: "a premise" },
+    foundation: { ...initialFoundationState, situation: "a premise" },
     ...over,
   } as RootState;
 }

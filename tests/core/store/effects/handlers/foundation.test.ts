@@ -16,7 +16,7 @@ function makeCtx(
   over: Partial<CompletionContext<FoundationTarget>> = {},
 ): CompletionContext<FoundationTarget> {
   return {
-    target: { type: "foundation", field: "intent" },
+    target: { type: "foundation", field: "situation" },
     getState: vi.fn(),
     accumulatedText: "",
     generationSucceeded: true,
@@ -27,32 +27,32 @@ function makeCtx(
 
 describe("foundationHandler.streaming", () => {
   it("writes accumulatedText to the foundation stream buffer, no dispatch", () => {
-    clearStream("foundation:intent");
+    clearStream("foundation:situation");
     const ctx = makeCtx({ accumulatedText: "Explore themes of" });
     foundationHandler.streaming(ctx, "of");
     expect(ctx.dispatch).not.toHaveBeenCalled();
-    expect(readStream("foundation:intent")).toBe("Explore themes of");
-    clearStream("foundation:intent");
+    expect(readStream("foundation:situation")).toBe("Explore themes of");
+    clearStream("foundation:situation");
   });
 });
 
 describe("foundationHandler.completion", () => {
-  it("dispatches intentUpdated and clears the buffer on success", async () => {
-    clearStream("foundation:intent");
+  it("dispatches situationUpdated, trimmed, and clears the buffer on success", async () => {
+    clearStream("foundation:situation");
     const streamCtx = makeCtx({ accumulatedText: "partial" });
     foundationHandler.streaming(streamCtx, "partial");
-    expect(readStream("foundation:intent")).toBe("partial");
-    const ctx = makeCtx({ accumulatedText: "Explore inherited trauma" });
+    expect(readStream("foundation:situation")).toBe("partial");
+    const ctx = makeCtx({ accumulatedText: "  The company is buying.  " });
     await foundationHandler.completion(ctx);
     expect(ctx.dispatch).toHaveBeenCalledWith({
-      type: "foundation/intentUpdated",
-      payload: { intent: "Explore inherited trauma" },
+      type: "foundation/situationUpdated",
+      payload: { situation: "The company is buying." },
     });
-    expect(readStream("foundation:intent")).toBeUndefined();
+    expect(readStream("foundation:situation")).toBeUndefined();
   });
 
   it("clears the buffer and does not dispatch when generation failed", async () => {
-    clearStream("foundation:intent");
+    clearStream("foundation:situation");
     foundationHandler.streaming(
       makeCtx({ accumulatedText: "partial" }),
       "partial",
@@ -63,6 +63,6 @@ describe("foundationHandler.completion", () => {
     });
     await foundationHandler.completion(ctx);
     expect(ctx.dispatch).not.toHaveBeenCalled();
-    expect(readStream("foundation:intent")).toBeUndefined();
+    expect(readStream("foundation:situation")).toBeUndefined();
   });
 });

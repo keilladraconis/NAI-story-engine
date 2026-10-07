@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { registerFoundationEffects } from "../../../../src/core/store/effects/foundation-effects";
 import {
   contractGenerationRequested,
-  intentGenerationRequested,
+  situationGenerationRequested,
 } from "../../../../src/core/store/slices/foundation";
 import { parseContract } from "../../../../src/core/store/effects/handlers/foundation";
 import {
@@ -17,8 +17,7 @@ import type {
 
 const state = {
   foundation: {
-    shape: { name: "Tragedy", description: "Falls from grace." },
-    intent: "A governess unravels.",
+    situation: "A governess unravels.",
     worldState: "The house is cold.",
     intensity: { level: "Grounded", description: "Real stakes." },
     contract: null,
@@ -85,7 +84,7 @@ describe("contract generation prompt", () => {
   });
 
   it("leaves the prose fields trimming, with no prefill of their own", () => {
-    const strategy = submit(intentGenerationRequested());
+    const strategy = submit(situationGenerationRequested());
     expect(strategy.prefillBehavior).toBe("trim");
     expect(strategy.assistantPrefill).toBeUndefined();
   });

@@ -13,7 +13,7 @@ import type {
 const request = (over: Partial<GenerationRequest> = {}): GenerationRequest => ({
   id: "r1",
   type: "foundation",
-  targetId: "shape",
+  targetId: "situation",
   status: "queued",
   ...over,
 });
@@ -23,32 +23,32 @@ const stateWith = (runtime: Partial<RuntimeState>): RootState =>
 
 describe("isFoundationRequestPending", () => {
   it("is false with an empty queue and nothing active", () => {
-    expect(isFoundationRequestPending(stateWith({}), "shape")).toBe(false);
+    expect(isFoundationRequestPending(stateWith({}), "situation")).toBe(false);
   });
 
   it("is true while a request for the field is queued", () => {
     const s = stateWith({ queue: [request()] });
-    expect(isFoundationRequestPending(s, "shape")).toBe(true);
+    expect(isFoundationRequestPending(s, "situation")).toBe(true);
   });
 
   it("is true while a request for the field is generating", () => {
     const s = stateWith({
       activeRequest: request({ status: "processing" }),
     });
-    expect(isFoundationRequestPending(s, "shape")).toBe(true);
+    expect(isFoundationRequestPending(s, "situation")).toBe(true);
   });
 
-  // Import All submits Shape and Intent together; neither may mask the other.
+  // Import All submits several fields together; neither may mask the other.
   it("does not confuse one foundation field with another", () => {
     const s = stateWith({ queue: [request()] });
-    expect(isFoundationRequestPending(s, "intent")).toBe(false);
+    expect(isFoundationRequestPending(s, "attg")).toBe(false);
   });
 
   it("ignores requests of other types with the same target id", () => {
     const s = stateWith({
       queue: [request({ type: "entitySummary" })],
     });
-    expect(isFoundationRequestPending(s, "shape")).toBe(false);
+    expect(isFoundationRequestPending(s, "situation")).toBe(false);
   });
 });
 

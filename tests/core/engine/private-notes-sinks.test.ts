@@ -25,8 +25,7 @@ const ENTRY_ID = "entry-ines";
 const state = {
   story: { fields: {}, attgEnabled: false, styleEnabled: false },
   foundation: {
-    shape: null,
-    intent: "",
+    situation: "",
     worldState: "",
     intensity: null,
     contract: null,

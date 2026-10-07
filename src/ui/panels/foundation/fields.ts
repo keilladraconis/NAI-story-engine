@@ -1,20 +1,18 @@
-// Config-driven Foundation field table + pure helpers. Drives the five
-// card-fields (Shape, Intent, Contract, ATTG, Style); Intensity has its own
+// Config-driven Foundation field table + pure helpers. Drives the four
+// card-fields (Situation, Contract, ATTG, Style); Intensity has its own
 // component. The pure helpers (parseContract / formatContract /
 // isFoundationGenerating) are framework-free and unit-tested; the descriptors
 // close over store dispatch, mirroring SUI's SeFoundationSection.
 
 import {
   store,
-  shapeUpdated,
-  intentUpdated,
+  situationUpdated,
   contractUpdated,
   attgUpdated,
   styleUpdated,
   attgSyncToggled,
   styleSyncToggled,
-  shapeGenerationRequested,
-  intentGenerationRequested,
+  situationGenerationRequested,
   contractGenerationRequested,
   attgGenerationRequested,
   styleGenerationRequested,
@@ -23,8 +21,7 @@ import {
 } from "../../../core/store";
 import { isFoundationRequestPending } from "../../../core/store/selectors/runtime";
 
-export type FoundationFieldId =
-  "shape" | "intent" | "contract" | "attg" | "style";
+export type FoundationFieldId = "situation" | "contract" | "attg" | "style";
 
 export type IntensityLevelDef = { level: string; description: string };
 
@@ -102,59 +99,33 @@ export type FieldDraft = { title: string; content: string };
 export type FieldDescriptor = {
   id: FoundationFieldId;
   label: string;
-  titled?: boolean; // Shape only — editor shows a title input
-  hasRefine: boolean; // false for Shape (generate-only)
+  hasRefine: boolean; // false = generate-only
   hasSync?: boolean; // ATTG, Style
-  cardLabel: (s: RootState) => string; // Shape shows the shape name
+  cardLabel: (s: RootState) => string;
   display: (s: RootState) => string; // derived card text
   seed: (s: RootState) => FieldDraft; // opens the editor
   commit: (draft: FieldDraft) => void; // dispatch + (attg/style) sync
   generate: () => void; // dispatch <field>GenerationRequested
   refineSource: (s: RootState) => string; // text handed to refine
   placeholder: string;
-  titlePlaceholder?: string;
   syncEnabled?: (s: RootState) => boolean;
   toggleSync?: () => void;
 };
 
 export const FIELD_DESCRIPTORS: FieldDescriptor[] = [
   {
-    id: "shape",
-    label: "Shape",
-    titled: true,
-    hasRefine: false,
-    cardLabel: (s) => s.foundation.shape?.name || "Shape",
-    display: (s) => s.foundation.shape?.description ?? "",
-    seed: (s) => ({
-      title: s.foundation.shape?.name ?? "",
-      content: s.foundation.shape?.description ?? "",
-    }),
-    commit: ({ title, content }) =>
-      store.dispatch(
-        shapeUpdated({
-          shape:
-            title || content
-              ? { name: title || "STORY", description: content }
-              : null,
-        }),
-      ),
-    generate: () => store.dispatch(shapeGenerationRequested()),
-    refineSource: (s) => s.foundation.shape?.description ?? "",
-    placeholder:
-      "Shape description — what structural moments this story leans toward.",
-    titlePlaceholder: "e.g. Slice of Life, Tragedy, Heist…",
-  },
-  {
-    id: "intent",
-    label: "Intent",
+    id: "situation",
+    label: "Situation",
     hasRefine: true,
-    cardLabel: () => "Intent",
-    display: (s) => s.foundation.intent,
-    seed: (s) => ({ title: "", content: s.foundation.intent }),
-    commit: ({ content }) => store.dispatch(intentUpdated({ intent: content })),
-    generate: () => store.dispatch(intentGenerationRequested()),
-    refineSource: (s) => s.foundation.intent,
-    placeholder: "What is this story about? What do you want to explore?",
+    cardLabel: () => "Situation",
+    display: (s) => s.foundation.situation,
+    seed: (s) => ({ title: "", content: s.foundation.situation }),
+    commit: ({ content }) =>
+      store.dispatch(situationUpdated({ situation: content })),
+    generate: () => store.dispatch(situationGenerationRequested()),
+    refineSource: (s) => s.foundation.situation,
+    placeholder:
+      "What is happening when the story opens, and what cannot both be kept?",
   },
   {
     id: "contract",

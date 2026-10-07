@@ -408,52 +408,6 @@ INSTRUCTION:
 - Total limit 100 words.
 - OUTPUT ONLY THE GUIDELINE.`;
 
-export const FOUNDATION_INTENT_PROMPT = `Write one sentence — the story's logline: who this protagonist is, what situation they're in, and what's at stake. Specific to this story; not a theme, not a question.
-
-"A Pokémon Ranger three years into a coastal posting that should feel like home — and doesn't."
-"A disgraced navigator hired to chart waters her old commander declared unmappable."
-"A woman who stayed in the house after the divorce because leaving would mean admitting it mattered."
-
-One sentence. No preamble.`;
-
-export const CRUCIBLE_SHAPE_PROMPT = `You are a story architect. Given the story material below, invent the narrative shape this story is leaning toward.
-
-A shape is a structural lens — not a genre, not a plot, but the kind of moment the story is building toward and the structural logic that governs its endpoint.
-
-RULE: If the story material explicitly names a shape, genre, or structural intent (e.g. "slice of life", "hero's journey", "romance"), use it directly — do not substitute a different shape.
-
-Otherwise, use one of these shapes when it fits, or invent a new one:
-
-SHAPE: Climactic Choice
-
-Lean toward moments where two things the protagonist values become irreconcilable. The endpoint is a configuration, not an event.
-
-SHAPE: Spiral Descent
-
-Lean toward moments of depth recognition — where the protagonist arrives somewhere structurally identical to where they began. Do not imply escape, recovery, or a choice between continuing and stopping.
-
-SHAPE: Hero's Journey
-
-Lean toward the moment of return — where the protagonist brings back something that cannot be unfelt: a capacity, a loss, or a changed relationship to the world they left. The journey's endpoint is not triumph but transformation made visible.
-
-SHAPE: Intimate Moment
-
-Lean toward a scene so specific to these particular people that it becomes unrepeatable — not because something changes, but because it captures exactly what this shared existence is.
-
-SHAPE: Threshold Crossing
-
-Lean toward the moment after which the protagonist cannot be what they were. The endpoint is not triumph or defeat but the irreversibility itself — a choice made or an action taken (including inaction) that closes off a prior self. The forces governing the structure are the before and after of that crossing.
-
-SHAPE: Slice of Life
-
-Lean toward scenes of ordinary continuity — the texture of how these specific people inhabit their world, not what disrupts or changes it. The story ends not because something resolves but because the window is fully inhabited.
-
-Match the shape to the material. Invent a new shape only when none of the examples fit.
-
-Respond with a shape name on the first line, then a blank line, then 2-4 sentences describing what structural moments this shape leans toward.
-
-CRITICAL: The description must be structural logic — the kind of moment the story leans toward and the forces that govern it. Not a plot summary, not a story pitch, not a list of events. If a shape name is already provided, describe the structural logic of THAT shape as it applies to the story material. Do not anchor to specific characters or plot events.`;
-
 export const CONTRACT_GENERATE_PROMPT = `You are drafting the Story Contract for this story — the implicit agreement with the reader about what kind of story this is.
 
 The contract has three components:
@@ -522,8 +476,6 @@ export const XIALONG_STYLE = {
   attg: "[ Style: critic, genre-savvy, metadata ]",
   style: "[ Style: literary-critic, prose-analyst ]",
   dulfsList: "[ Style: world-builder, inventive, catalog ]",
-  foundationShape: "[ Style: architect, visionary, dramatic ]",
-  foundationIntent: "[ Style: logline, premise, direct ]",
   foundationWorldState: "[ Style: narrator, situational, grounded ]",
   foundationContract: "[ Style: critic, genre-aware, contractual ]",
   summary: "[ Style: chat, archivist, concise, insightful ]",

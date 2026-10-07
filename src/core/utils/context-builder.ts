@@ -51,27 +51,14 @@ export const extractEntityName = (content: string, fieldId: string): string => {
 
 /**
  * Build a context-aware Xialong [ Style: ] guidance block for Style field generation.
- * Derives narrative style tags from shape, intent, and shape description — actual
+ * Derives narrative style tags from the situation — actual
  * writing-style descriptors (slow-burn, visceral, methodical) rather than role tags.
  */
 export function buildXialongNarrativeStyleBlock(state: RootState): string {
   const tags: string[] = [];
-  const { shape, intent } = state.foundation ?? {};
+  const { situation } = state.foundation ?? {};
 
-  // Shape name as primary style indicator
-  if (shape?.name) {
-    const shapeName = shape.name
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, "")
-      .replace(/\s+/g, "-")
-      .slice(0, 30);
-    if (shapeName) tags.push(shapeName);
-  }
-
-  // Derive additional tags from intent + shape description
-  const context = [intent ?? "", shape?.description ?? ""]
-    .join(" ")
-    .toLowerCase();
+  const context = (situation ?? "").toLowerCase();
 
   const markers: [RegExp, string][] = [
     [/slow.burn|deliberate|unhurried|gradual|patient/, "slow-burn"],
@@ -290,10 +277,9 @@ export function formatStyleBlock(state: RootState): string {
 }
 
 export function formatFoundationBlock(state: RootState): string {
-  const { shape, intent, worldState, intensity, contract } = state.foundation;
+  const { situation, worldState, intensity, contract } = state.foundation;
   const parts: string[] = [];
-  if (shape) parts.push(`Shape: ${shape.name}\n${shape.description}`);
-  if (intent) parts.push(`Intent: ${intent}`);
+  if (situation) parts.push(`Situation: ${situation}`);
   if (worldState) parts.push(`World State: ${worldState}`);
   if (intensity)
     parts.push(`Intensity: ${intensity.level} — ${intensity.description}`);
@@ -338,7 +324,7 @@ export const buildStoryEnginePrefix = async (
   const excluded = new Set(options.excludeSections || []);
 
   // --- MSG 1: Story state snapshot (STABLE sections) ---
-  // Order: Foundation (tone/intent anchors), then setting.
+  // Order: Foundation (tone/situation anchors), then setting.
   const stableSections: string[] = [];
 
   if (!excluded.has("attg")) {

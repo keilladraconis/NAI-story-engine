@@ -105,8 +105,7 @@ export interface GenerationStrategy {
       }
     | {
         type: "foundation";
-        field:
-          "shape" | "intent" | "worldState" | "attg" | "style" | "contract";
+        field: "situation" | "worldState" | "attg" | "style" | "contract";
       }
     | { type: "entitySummary"; entityId: string }
     | { type: "entitySummaryBind"; entityId: string }
@@ -182,11 +181,6 @@ export interface WorldState {
 
 // Foundation Types (v11)
 
-export interface ShapeData {
-  name: string; // Short label — e.g. "Slice of Life", "Tragedy"
-  description: string; // Structural logic — what this shape leans toward
-}
-
 export interface IntensityData {
   level: string; // Short label — e.g. "Grounded", "Noir", "Cozy"
   description: string; // What this level means for this story concretely
@@ -199,8 +193,7 @@ export interface ContractData {
 }
 
 export interface FoundationState {
-  shape: ShapeData | null;
-  intent: string;
+  situation: string;
   worldState: string;
   intensity: IntensityData | null;
   contract: ContractData | null;

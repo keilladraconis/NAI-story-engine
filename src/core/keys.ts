@@ -19,7 +19,7 @@ export const STORAGE_KEYS = {
   // World record on every keystroke's debounce.
   CHAT: "kse-chat",
   // Foundation — its own record too. It is the story's premise rather than
-  // something the Engine keeps notes about: Shape, Intent and Contract describe
+  // something the Engine keeps notes about: Situation and Contract describe
   // the whole thing, and ATTG/Style mirror into Memory and Author's Note.
   FOUNDATION: "kse-foundation",
   // Setting field.

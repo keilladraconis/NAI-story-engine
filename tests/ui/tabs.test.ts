@@ -35,9 +35,14 @@ describe("initialTab", () => {
 
 describe("isFoundationField", () => {
   it("recognises every Foundation field id", () => {
-    for (const id of ["shape", "intent", "contract", "attg", "style"]) {
+    for (const id of ["situation", "contract", "attg", "style"]) {
       expect(isFoundationField(id)).toBe(true);
     }
+  });
+
+  it("no longer recognises the removed Shape and Intent", () => {
+    expect(isFoundationField("shape")).toBe(false);
+    expect(isFoundationField("intent")).toBe(false);
   });
 
   it("rejects entity ids and null", () => {

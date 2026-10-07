@@ -22,7 +22,7 @@ export function isRequestActive(
 /** Every foundation field that can be generated on its own request. Wider than
  *  the UI's `FoundationFieldId` — `worldState` has no card, only an effect. */
 export type FoundationTarget =
-  "shape" | "intent" | "worldState" | "contract" | "attg" | "style";
+  "situation" | "worldState" | "contract" | "attg" | "style";
 
 /**
  * True while a foundation generation for `field` is queued or already running.

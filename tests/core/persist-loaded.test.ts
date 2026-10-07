@@ -3,7 +3,9 @@ import { persistedDataLoaded, rootReducer } from "../../src/core/store";
 import { FieldID } from "../../src/config/field-definitions";
 import { initialWorldState } from "../../src/core/store/slices/world";
 import { initialStoryState } from "../../src/core/store/slices/story";
+import { initialFoundationState } from "../../src/core/store/slices/foundation";
 import type {
+  FoundationState,
   RootState,
   WorldEntity,
   WorldState,
@@ -105,5 +107,23 @@ describe("persist/loaded replaces branch-scoped slices", () => {
     );
     expect(next.chat.chats.every((c) => c.type === "scenario")).toBe(true);
     expect(next.world.entitiesById.e1.sourceChatId).toBeUndefined();
+  });
+
+  it("drops a stored Shape and Intent", () => {
+    const next = rootReducer(
+      undefined,
+      persistedDataLoaded({
+        foundation: {
+          ...initialFoundationState,
+          attg: "kept",
+          shape: { name: "Tragedy", description: "x" },
+          intent: "a logline",
+        } as unknown as FoundationState,
+      }),
+    );
+    expect(next.foundation.attg).toBe("kept");
+    expect(next.foundation).not.toHaveProperty("shape");
+    expect(next.foundation).not.toHaveProperty("intent");
+    expect(next.foundation.situation).toBe("");
   });
 });
