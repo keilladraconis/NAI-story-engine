@@ -2529,13 +2529,25 @@ Three counts come back, each "N failing runs of 20". Read the first failing outp
 - **Generation pipeline:** the context layering line drops "Story Prompt" wording about brainstorm if present, and add: "The chat transcript is not part of the prefix."
 - **Memory quick-ref lines in `CLAUDE.md` do not exist; nothing else to change there.**
 
-- [ ] **Step 2: `CHANGELOG.md`**
+- [ ] **Step 2: `CHANGELOG.md` — one `[0.15.0]` section, written as a release note against 0.14.x**
 
-In the existing `[0.15.0]` section (the one the writer keeps; if a `[0.16.0]` section still sits above it, leave it and say so in the hand-off — merging it is the writer's call):
+0.15 has never been released, and 0.16 was never a version: everything since 0.14 ships as 0.15.0. Delete the `## [0.16.0]` heading and fold its content into `## [0.15.0]`, then rewrite that one section so it describes what a writer upgrading from 0.14.x actually gets. Keep the Keep-a-Changelog layout (`### Added / Changed / Fixed / Removed`) and the existing voice: bold lead sentence, plain explanation, UI labels in bold.
 
-- **Added:** "Scenario chat: say what you want to see and the Engine sketches the pressures, people, places and Threads it can grow from. Later messages steer the sketch; an empty send grows it." / "A Thread can hold what you want to come of it. No model is ever shown it." / "Long chats show 25 messages at a time, with Load older and Load newer."
-- **Changed:** "A Thread may have a single member." / "Foundation's Intent is now Situation: what is happening as the story opens, with no outcome named." / "Casting or discarding drafts no longer ends the chat."
-- **Removed:** "Brainstorm and Forge chats, the Critic mode and Summarize — the Scenario chat replaces them. Existing Brainstorm and Forge sessions are not carried over." / "Foundation's Shape."
+The rule: **a bullet survives only if it is true of the shipped build.** Something added during 0.15 and since removed or replaced is not "Added then Removed" — it was never released, so it is not mentioned at all. Apply it bullet by bullet:
+
+- **Threads:** describe them once, as they are now — standing state between entities, **State** and **Private notes**, in context when the cast is on stage, admitted only by the review, concluded and never expired, a Thread limit that binds the Engine only. Delete every bullet about horizons (Point/Plot/Arc), Satisfied/Abandoned, the forgetting window, ageing out, the "Retired (n)" row, and the limit displacing a Thread. Delete "Threads from 0.15 are dropped when a story is opened" and "A story … from 0.15" wording: no released story has them.
+- **The Engine:** keep the bullets on what it does, its budget behaviour, the creative-model picker, lorebook edits, forward-only records, condensing and the HUD, corrected where they mention opening Threads on every pass or Thread statuses: the quick pass only rewrites entries, the review handles Threads, and the HUD's count is open Threads.
+- **Brainstorm and the Forge:** delete every bullet about them, including the fixes ("Talk it through opens the empty brainstorm", "Retrying a Forge turn", "The Forge runs on the instruction-following model", "A short answer in Brainstorm"), and "The Forge's `[THREAD]` writes both halves". They are replaced by the Scenario chat bullets below. Under **Removed**, say once that Brainstorm, the Forge, the Critic mode and Summarize are gone and that saved sessions do not carry over (this folds into the existing "saved state does not carry over from 0.14.x" bullet).
+- **Setup tab:** keep, rewritten: the Foundation is Situation, Story Contract, ATTG, Style and Intensity (no Shape, no Intent); the prompt under Intensity is **Sketch the scenario**; the Engine tab no longer holds a Forge section.
+- **Keys and summaries / Story Engine Debug / refine scaffolding / creative model shows immediately / Continue Scene removed:** keep, with Forge and Brainstorm mentions cut.
+
+Add, in the same voice:
+
+- **Added:** "**Scenario chat.** Say what you want to see and the Engine sketches what it can grow from: the pressures on the world, the people and places under them, and how things stand between them. Later messages steer the sketch; an empty send grows it. It builds conditions, never a plot — ask for an arc and it records what would make that arc possible." / "**A Thread can hold what you want to come of it.** No model is ever shown it: a model told that something will happen writes it happening. It is in the Thread's edit pane and in the fifth segment of the chat's `[THREAD]` command." / "**Long chats show 25 messages at a time**, with **Load older** and **Load newer**; sending always returns to the end."
+- **Changed:** "**A Thread may have a single member** when you or the Scenario chat make it." / "**Casting or discarding drafts no longer ends the chat.**"
+- **Removed:** "**Foundation's Shape and Intent.** Situation replaces Intent: what is happening as the story opens, with no outcome named."
+
+The date on the `[0.15.0]` heading becomes today's date as `git log -1 --format=%cs` prints it. After the rewrite, `grep -n "0\.16\|Brainstorm\|Forge\|Shape\|horizon\|Satisfied\|Abandoned\|Retired" CHANGELOG.md` may match only inside the single Removed bullet that names what is gone, and in sections for 0.14.x and earlier.
 
 - [ ] **Step 3: Verify everything**
 
@@ -2556,4 +2568,4 @@ git add -A CLAUDE.md CHANGELOG.md src tests
 git commit -m "docs(scenario): CLAUDE.md and the 0.15.0 notes describe the Scenario chat"
 ```
 
-Hand-off must state, each on its own line: whether Task 8 Step 5 (long-chat measurement) was done and what it showed; whether Task 10 Step 4 (the probe) was run and its three counts; and whether `uiChatSummarizeRequested` still has a trigger (Task 6 Step 3).
+Hand-off must state, each on its own line: that `project.yaml` (set to 0.15.0 by the writer, uncommitted) was left untouched; whether Task 8 Step 5 (long-chat measurement) was done and what it showed; whether Task 10 Step 4 (the probe) was run and its three counts; and whether `uiChatSummarizeRequested` still has a trigger (Task 6 Step 3).
