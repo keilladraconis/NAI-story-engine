@@ -25,6 +25,7 @@ import {
   store,
   threadRenamed,
   threadLedgerUpdated,
+  threadWishSet,
   threadMemberToggled,
   threadStatusSet,
   uiThreadSummaryGenerationRequested,
@@ -120,6 +121,7 @@ export function ThreadEditPane(props: { threadId: string }) {
   const title = useDraftField(thread?.title ?? "");
   const state = useDraftField(thread?.state ?? "");
   const latent = useDraftField(thread?.latent ?? "");
+  const wish = useDraftField(thread?.wish ?? "");
   // What the drafts started as. The Engine rewrites a Thread's ledger in the
   // background, so by the time Save is pressed the store may hold something
   // newer than this pane was opened on; Save compares against these to tell an
@@ -128,6 +130,7 @@ export function ThreadEditPane(props: { threadId: string }) {
     title: thread?.title ?? "",
     state: thread?.state ?? "",
     latent: thread?.latent ?? "",
+    wish: thread?.wish ?? "",
   }).current;
 
   const reqId = `se-thread-summary-${threadId}`;
@@ -182,6 +185,9 @@ export function ThreadEditPane(props: { threadId: string }) {
           latent: latent.value.trim(),
         }),
       );
+    }
+    if (wish.value !== seeded.wish) {
+      store.dispatch(threadWishSet({ threadId, wish: wish.value.trim() }));
     }
     close();
   };
@@ -292,6 +298,20 @@ export function ThreadEditPane(props: { threadId: string }) {
         placeholder="What is unsaid or unsettled between them?"
         value={latent.value}
         onInput={(e) => latent.setValue(e.target.value ?? "")}
+        style={{ ...inputStyle, minHeight: "60px", resize: "vertical" }}
+      />
+
+      {/* The writer's wish — read by no model at all. */}
+      <span style={sectionLabel}>What you want to come of this</span>
+      <span style={{ fontSize: "0.75em", color: T.textDisabled }}>
+        Never shown to any model. A model told that something will happen writes
+        it happening, so the Engine records the conditions for it and keeps the
+        wish itself here.
+      </span>
+      <textarea
+        placeholder="What would you like to see happen?"
+        value={wish.value}
+        onInput={(e) => wish.setValue(e.target.value ?? "")}
         style={{ ...inputStyle, minHeight: "60px", resize: "vertical" }}
       />
 

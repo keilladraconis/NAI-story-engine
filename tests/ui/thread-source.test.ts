@@ -269,12 +269,23 @@ describe("the edit pane keeps the private half private", () => {
 
   it("takes the seed once, from the same values the drafts start with", () => {
     expect(code(pane)).toMatch(
-      /const seeded = useRef\(\{\s*title: thread\?\.title \?\? "",\s*state: thread\?\.state \?\? "",\s*latent: thread\?\.latent \?\? "",\s*\}\)\.current;/,
+      /const seeded = useRef\(\{\s*title: thread\?\.title \?\? "",\s*state: thread\?\.state \?\? "",\s*latent: thread\?\.latent \?\? "",\s*wish: thread\?\.wish \?\? "",\s*\}\)\.current;/,
     );
   });
 
   it("never stages a generation into the private notes", () => {
     expect(pane).not.toMatch(/latent\.setValue\(live\)/);
+  });
+
+  it("saves the wish through its own action, never the ledger's", () => {
+    expect(pane).toMatch(
+      /threadWishSet\(\{\s*threadId,\s*wish: wish\.value\.trim\(\)\s*\}\)/,
+    );
+    expect(pane).not.toMatch(/threadLedgerUpdated\(\{[^}]*wish/);
+  });
+
+  it("says who reads the wish", () => {
+    expect(pane).toContain("Never shown to any model.");
   });
 });
 
