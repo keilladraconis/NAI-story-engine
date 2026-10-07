@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-NAI Story Engine is a NovelAI script (.naiscript) that guides structured worldbuilding through an 8-stage pipeline: brainstorming → story prompt → world snapshot → World Entries (Characters, Systems, Locations, Factions, Situational Dynamics, Topics). Runs in NovelAI's web worker environment (QuickJS, no DOM).
+NAI Story Engine is a NovelAI script (.naiscript) that builds a Scenario — pressures, the entities under them and how things stand between them — from a few sentences, and keeps it true as the story is written. It authors conditions, never plots, arcs or goals: a model shown a destination writes the arrival. World Entries are Characters, Systems, Locations, Factions, Situational Dynamics and Topics. Runs in NovelAI's web worker environment (QuickJS, no DOM).
 
 ## Commands
 
@@ -39,9 +39,9 @@ Do not also enable the superpowers plugin in `.claude/settings.json` — the plu
 **State (`src/core/store/`):**
 
 - `slices/story.ts` — Field contents and World Entry items (DULFS)
-- `slices/world.ts` — `WorldEntity` records, `Thread`s, forge loop flag
-- `slices/chat.ts` — Chat messages (brainstorm and forge sessions)
-- `slices/foundation.ts` — Shape, intent, ATTG, style fields
+- `slices/world.ts` — `WorldEntity` records, `Thread`s
+- `slices/chat.ts` — Chat messages (Scenario, refine and summary sessions)
+- `slices/foundation.ts` — Situation, intensity, contract, ATTG, style fields
 - `slices/ui.ts` — Edit modes, lorebook selection state
 - `slices/runtime.ts` — Generation queue status, GenX state
 - **Persistence is split by what the data belongs to.** Branch-scoped state —
@@ -49,7 +49,7 @@ Do not also enable the superpowers plugin in `.claude/settings.json` — the plu
   record per entity/group/field behind an `index` record, so undo and redo move
   the World with the story (`src/core/store/persistence/`). Story-scoped state
   stays in `api.v1.storyStorage`: `chat` under `STORAGE_KEYS.CHAT`, because
-  brainstorms follow the writer rather than the branch, and `foundation` under
+  chats follow the writer rather than the branch, and `foundation` under
   `STORAGE_KEYS.FOUNDATION`, because it is the story's premise rather than a
   property of a point in it — and because its ATTG/Style mirror into Memory and
   Author's Note, which undo does not move either. Branch-scoping the Foundation
@@ -81,13 +81,23 @@ Do not also enable the superpowers plugin in `.claude/settings.json` — the plu
 
 **Threads (`src/core/engine/thread-*.ts`, `review-strategy.ts`):**
 
-- A `Thread` is the standing state of an arc or relationship between known entities: `title`, `state`, `latent`, `entityIds`, optional `lorebookEntryId`, `status` (`"open" | "concluded"`).
-- **`state` is what the story model sees; `latent` never reaches the story prefix, the Thread's own lorebook entry or lorebook-generation context while the Thread is open.** `state` is the Thread's lorebook entry text. `latent` holds what is unspoken, owed or concealed — a model shown that something has not happened writes it happening. The single exception is `conclude()`, which folds it into the `established` ledger of the cast's entity rewrites after the thing it held back has happened. `tests/core/engine/latent-privacy.test.ts` lists the only files that may name `latent`; a failure there is a leak, not a list to extend. That scan follows the identifier, so it cannot see the value travelling as text: the Forge's own `[THREAD … | state | latent]` command stays in its chat, and `formatBrainstormBlock` cuts it back to three segments (`redactThreadPrivateNotes`) as the transcript enters the Story Engine prefix. `private-notes-sinks.test.ts` checks the sinks by sentinel.
+- A `Thread` is the standing state of an arc or relationship between known entities: `title`, `state`, `latent`, `wish`, `entityIds`, optional `lorebookEntryId`, `status` (`"open" | "concluded"`).
+- **`state` is what the story model sees; `latent` never reaches the story prefix, the Thread's own lorebook entry or lorebook-generation context while the Thread is open.** `state` is the Thread's lorebook entry text. `latent` holds what is unspoken, owed or concealed — a model shown that something has not happened writes it happening. The single exception is `conclude()`, which folds it into the `established` ledger of the cast's entity rewrites after the thing it held back has happened. `tests/core/engine/latent-privacy.test.ts` lists the only files that may name `latent`; a failure there is a leak, not a list to extend. That scan follows the identifier, so it cannot see the value travelling as text: the Scenario chat's `[THREAD … | state | latent | wish]` command stays in its own transcript, and that transcript enters no other generation's prefix. `private-notes-sinks.test.ts` checks the sinks by sentinel.
+- **`wish` is what the writer wants to come about, and no generation reads it.** It is not a fact, so unlike `latent` it is never folded into `established` on conclusion. It is written by the Scenario chat's `THREAD` command and the Thread edit pane only (`threadWishSet`); `latent-privacy.test.ts` holds its allow-list (`WISH_ALLOWED`) and `private-notes-sinks.test.ts` its sentinel.
 - **A Thread's entry activates when its cast is on stage** (`thread-condition.ts`): `keys: []`, `forceActivation: false`, one advanced condition over the cast's aliases — each member's own lorebook keys plus its display name. Both members of a pair, any two of a larger cast. No cast, no entry.
 - **`syncThreadEntry` is the only thing that writes a Thread's entry**, and `state` is the authority for its text (unlike an entity's entry, where the lorebook outranks the store).
-- **Only the review pass admits a Thread.** The per-generation triage can only `REVISE` an entity. The review runs every `reviewEvery` paragraphs and emits `UPDATE` / `ADMIT` / `CONCLUDE`. `parseReview` drops an admission that names anyone who is not a known entity. `applyFloors` does the rest: it turns an admission whose cast is an open Thread's live cast into an `UPDATE` of that Thread, and refuses one that is the second in its review, whose cast is not each named in three separate paragraphs, or that would exceed the thread limit. The limit binds the Engine only. A story with no usable review watermark is reviewed from its latest scene, not from its first page (`reviewWindow`).
+- **Only the review pass admits a Thread.** The per-generation triage can only `REVISE` an entity. The review runs every `reviewEvery` paragraphs and emits `UPDATE` / `ADMIT` / `CONCLUDE`. `parseReview` drops an admission that names anyone who is not a known entity. `applyFloors` does the rest: it turns an admission whose cast is an open Thread's live cast into an `UPDATE` of that Thread, and refuses one that is the second in its review, whose cast is not each named in three separate paragraphs, or that would exceed the thread limit. The limit binds the Engine only. A story with no usable review watermark is reviewed from its latest scene, not from its first page (`reviewWindow`). A Thread may have a single member when the Scenario chat or the writer makes it; the review still admits only two or more.
 - **Concluding** disables the entry and queues an entity `revise` per cast member carrying the Thread's title, state and private notes as `established`.
 - The review and Thread write prompts are measured with `tools/review-probe.naiscript` (twenty runs per fixture, in NovelAI), not by unit tests.
+
+**Scenario chat (`src/core/chat-types/scenario.ts`, `handlers/forge-chat.ts`):**
+
+- **One chat type, `scenario`, replaces Brainstorm and the Forge.** It runs on the command mechanism in `handlers/forge-chat.ts`: a reply is prose plus bracketed commands, applied to draft entities and Threads when the turn completes. Internal names keep "forge" for the mechanism (`forgeChatContinueRequested`, `forge-chat-effects.ts`); the product word is Scenario.
+- **Three turn kinds, read from the transcript, not stored:** the first message is a sketch, a later message steers, an empty send grows (`scenarioTurn` in `forge-chat-strategy.ts`). One strategy (`buildScenarioTurnStrategy`), one effect.
+- **A `THREAD` has exactly five segments**, `[THREAD "<Title>" | "<A>", "<B>" | state | private | wish]` (the prompt calls the fourth `private`; in code it is `latent`). Position is meaning, so a shorter command is never guessed at: it is not parsed, its chip carries `THREAD_REPAIR`, and the next turn's context lists what was rejected (`formatRejections`). A `THREAD` whose title matches an open Thread rewrites it, and an empty segment never erases a stored value.
+- **Deleting a Scenario chat releases its drafts to the World** (`draftsReleasedFromChat`); casting or discarding drafts does not delete the chat. Chats of removed types are dropped on load (`keepKnownChats`).
+- The chat view pages 25 messages at a time (`ui/panels/chat/paging.ts`); that is view state, never stored.
+- The Scenario prompt is measured with `tools/scenario-probe.naiscript` (twenty runs per fixture, in NovelAI); `tests/tools/scenario-probe.test.ts` keeps its copy of the prompt in step.
 
 **Prompts:** All generation prompts are hard-coded constants in `src/core/utils/prompts.ts`. They are **not** configurable via `project.yaml`. `project.yaml` contains only non-prompt settings (model, feature flags).
 
@@ -99,7 +109,7 @@ Do not also enable the superpowers plugin in `.claude/settings.json` — the plu
 
 **Generation pipeline:**
 
-- Context is layered: System → Setting → Story Prompt → World Snapshot → Volatile Data
+- Context is layered (`buildStoryEnginePrefix`): Foundation (ATTG, Style, Situation, Contract) and Setting → World Entries → story text, with each task's own instructions after. The chat transcript is not part of the prefix.
 - World Entries use two-phase generation: Phase 1 generates a list of names, Phase 2 generates detailed content per item
 - S.E.G.A. (Story Engine Generate All) fills blank fields using round-robin queueing across categories
 - Lorebook sync (`src/core/store/effects/lorebook-sync.ts`) manages SE-category creation and DULFS item→lorebook binding. It does **not** sync entity summaries in either direction — summaries are SE-internal only.
