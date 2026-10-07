@@ -43,26 +43,35 @@ const messages = (seed) => [
 const THREAD = /^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^|]*?)\|([^|]*?)\|([^|\]]*?)\]?\s*$/;
 const CREATE = /^\[\s*CREATE\s+[A-Z]+\s+"([^"]+)"\s*\|\s*(.+?)\]?\s*$/;
 
-// Everything the story model could be shown: every summary, and every state.
-// Everything private that is inspected: every wish. The fourth segment (private)
-// is not inspected because the contract is about the wish.
+// Everything the story model could be shown: every element's name and summary,
+// and every Thread's title and state. A name or a title is shown as surely as a
+// summary is. The two private segments are kept apart: `wishes` is where a
+// thing to come belongs, and `privates` is where it must not be copied, because
+// the private segment is written into entries as fact when a Thread concludes.
 const read = (text) => {
   const shown = [];
   const wishes = [];
+  const privates = [];
   let threads = 0;
   for (const raw of text.split(/\r\n|\r|\n/)) {
     const line = raw.trim();
     const t = THREAD.exec(line);
     if (t) {
       threads++;
-      shown.push(t[3]);
+      shown.push(t[1], t[3]);
+      privates.push(t[4]);
       wishes.push(t[5]);
       continue;
     }
     const c = CREATE.exec(line);
-    if (c) shown.push(c[2]);
+    if (c) shown.push(c[1], c[2]);
   }
-  return { shown: shown.join("\n"), wishes: wishes.join("\n"), threads };
+  return {
+    shown: shown.join("\n"),
+    wishes: wishes.join("\n"),
+    privates: privates.join("\n"),
+    threads,
+  };
 };
 // --- read:end ---
 
@@ -72,9 +81,12 @@ const FIXTURES = [
   {
     name: "ToCome",
     contract:
-      "a thing to come is named in a wish and its name appears in nothing the story model is shown",
+      "a thing to come is named in a wish and its name appears in nothing the story model is shown, nor in a private segment",
     seed: SEEDS.ToCome,
-    holds: (r) => /Quillane/.test(r.wishes) && !/Quillane/.test(r.shown),
+    holds: (r) =>
+      /Quillane/.test(r.wishes) &&
+      !/Quillane/.test(r.shown) &&
+      !/Quillane/.test(r.privates),
   },
   {
     name: "AlreadySo",
@@ -86,13 +98,15 @@ const FIXTURES = [
   {
     name: "TwoWishes",
     contract:
-      "two things to come are each named in a wish and neither name appears in anything shown",
+      "two things to come are each named in a wish and neither name appears in anything shown, nor in a private segment",
     seed: SEEDS.TwoWishes,
     holds: (r) =>
       /Vessarine/.test(r.wishes) &&
       /Orrowmere/.test(r.wishes) &&
       !/Vessarine/.test(r.shown) &&
-      !/Orrowmere/.test(r.shown),
+      !/Orrowmere/.test(r.shown) &&
+      !/Vessarine/.test(r.privates) &&
+      !/Orrowmere/.test(r.privates),
   },
 ];
 
