@@ -1,7 +1,7 @@
 # The Scenario chat — Brainstorm and Forge become one, and the Engine stops naming destinations
 
 **Status:** design approved in conversation 2026-10-07; awaiting written-spec review
-**Target version:** 0.17.0
+**Target version:** 0.15.0 (the in-progress version; no new bump)
 **Supersedes:** the Brainstorm chat, the Forge chat and its phase loop, and the Foundation's Shape and Intent fields
 
 ## 1. Why
@@ -215,7 +215,7 @@ The sentinel catches a leaked noun. It does not catch a paraphrase that avoids t
 
 ## 9. Release
 
-Version 0.17.0: the chat types, the Foundation schema and the Thread schema all change. `CHANGELOG.md` gains a 0.17.0 section.
+No version bump. This work ships in 0.15.0, the version in progress since 0.14, and its user-visible changes are folded into that version's `CHANGELOG.md` section.
 
 ## 10. Out of scope
 
