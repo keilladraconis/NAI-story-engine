@@ -20,15 +20,16 @@ const MODEL = "glm-4-6";
 const PARAMS = { model: MODEL, max_tokens: 1536, temperature: 0.9, min_p: 0.05 };
 
 // Fixtures use a glassworks and an observatory: unlike the prompt's canal, so
-// no fixture is a copy of the example the prompt carries. Each thing to come
-// carries an invented noun that nothing else in the seed uses.
+// no fixture is a copy of the example the prompt carries. Each thing to come is
+// an event carrying an invented name that nothing can truthfully show before it
+// happens, so its absence from everything shown is checked on the name.
 const SEEDS = {
   ToCome:
-    "A glassblower's widow runs the furnace with her late husband's apprentice. I want the apprentice to eventually smash the vessel they call the Quillane.",
+    "A glassblower's widow runs the furnace with her late husband's apprentice. I want it to end in what the town will call the Quillane Fire, when the apprentice burns the furnace house down.",
   AlreadySo:
-    "A glassblower's widow runs the furnace with her late husband's apprentice. Last winter the apprentice smashed the vessel they called the Quillane, and she has not spoken of it.",
+    "A glassblower's widow runs the furnace with her late husband's apprentice. Two winters ago the apprentice burned the furnace house down in what the town calls the Quillane Fire, and she rebuilt it without a word.",
   TwoWishes:
-    "Two astronomers share one telescope on a mountain. I want the younger to end up publishing the Vessarine survey under her own name, and I want the older to finally leave the mountain.",
+    "Two astronomers share one telescope on a mountain. I want the younger to end up publishing, under her own name, what she will call the Vessarine Catalogue, and I want the older to finally leave for the post at Orrowmere.",
 };
 
 const messages = (seed) => [
@@ -37,12 +38,14 @@ const messages = (seed) => [
   { role: "user", content: seed },
 ];
 
+// --- read:start ---
 // Mirrors the five-segment THREAD regex in src/core/utils/crucible-command-parser.ts.
 const THREAD = /^\[\s*THREAD\s+"([^"]+)"\s*\|([^|]+?)\|([^|]*?)\|([^|]*?)\|([^|\]]*?)\]?\s*$/;
 const CREATE = /^\[\s*CREATE\s+[A-Z]+\s+"([^"]+)"\s*\|\s*(.+?)\]?\s*$/;
 
 // Everything the story model could be shown: every summary, and every state.
-// Everything private: every latent and wish.
+// Everything private that is inspected: every wish. The fourth segment (private)
+// is not inspected because the contract is about the wish.
 const read = (text) => {
   const shown = [];
   const wishes = [];
@@ -61,40 +64,35 @@ const read = (text) => {
   }
   return { shown: shown.join("\n"), wishes: wishes.join("\n"), threads };
 };
+// --- read:end ---
 
-// Each fixture states its contract in one sentence; `holds` is that sentence.
+// Each fixture states its contract in one sentence; `holds` is that sentence,
+// checked against the already-read reply.
 const FIXTURES = [
   {
     name: "ToCome",
-    contract: "a thing to come is in a wish and in nothing the story model is shown",
+    contract:
+      "a thing to come is named in a wish and its name appears in nothing the story model is shown",
     seed: SEEDS.ToCome,
-    holds: (text) => {
-      const r = read(text);
-      return /Quillane/.test(r.wishes) && !/smash/i.test(r.shown);
-    },
+    holds: (r) => /Quillane/.test(r.wishes) && !/Quillane/.test(r.shown),
   },
   {
     name: "AlreadySo",
-    contract: "a thing already so is shown as fact and is in no wish",
+    contract:
+      "a thing already so is named in what the story model is shown and in no wish",
     seed: SEEDS.AlreadySo,
-    holds: (text) => {
-      const r = read(text);
-      return /Quillane/.test(r.shown) && !/Quillane/.test(r.wishes);
-    },
+    holds: (r) => /Quillane/.test(r.shown) && !/Quillane/.test(r.wishes),
   },
   {
     name: "TwoWishes",
-    contract: "two things to come are each in a wish and neither is shown",
+    contract:
+      "two things to come are each named in a wish and neither name appears in anything shown",
     seed: SEEDS.TwoWishes,
-    holds: (text) => {
-      const r = read(text);
-      return (
-        /Vessarine/.test(r.wishes) &&
-        /leave/i.test(r.wishes) &&
-        !/publish/i.test(r.shown) &&
-        !/leaves? the mountain|left the mountain/i.test(r.shown)
-      );
-    },
+    holds: (r) =>
+      /Vessarine/.test(r.wishes) &&
+      /Orrowmere/.test(r.wishes) &&
+      !/Vessarine/.test(r.shown) &&
+      !/Orrowmere/.test(r.shown),
   },
 ];
 
@@ -108,17 +106,29 @@ function log(line) {
 
 async function runFixture(fixture) {
   let failing = 0;
+  let unparsed = 0;
   let firstFailure = "";
   for (let run = 0; run < RUNS; run++) {
-    // One at a time: concurrent script generations are refused.
-    const response = await api.v1.generate(messages(fixture.seed), PARAMS);
-    const text = response.choices?.[0]?.text ?? "";
-    if (!fixture.holds(text)) {
+    let text;
+    try {
+      // One at a time: concurrent script generations are refused.
+      const response = await api.v1.generate(messages(fixture.seed), PARAMS);
+      text = response.choices?.[0]?.text ?? "";
+    } catch (e) {
+      failing++;
+      if (!firstFailure) firstFailure = `generation threw: ${e?.message ?? e}`;
+      continue;
+    }
+    const r = read(text);
+    if (r.threads === 0) unparsed++;
+    if (r.threads === 0 || !fixture.holds(r)) {
       failing++;
       if (!firstFailure) firstFailure = text;
     }
   }
-  log(`${fixture.name}: ${failing} failing runs of ${RUNS} — ${fixture.contract}`);
+  log(
+    `${fixture.name}: ${failing} failing runs of ${RUNS} (${unparsed} with no THREAD parsed) — ${fixture.contract}`,
+  );
   if (firstFailure) log(`  first failing output:\n${firstFailure}`);
 }
 
