@@ -73,15 +73,19 @@ describe("the Scenario Plan prompt", () => {
     );
   });
 
-  it("lets a statement stand, and asks only when it must", () => {
+  it("converses: lets a statement stand, answers, and asks when it matters", () => {
     expect(SCENARIO_PLAN_PROMPT).toContain(
-      "What the writer states is settled.",
+      "What the writer states firmly is settled",
     );
     expect(SCENARIO_PLAN_PROMPT).toContain(
-      "Ask a question only when the scenario cannot go further without the writer's answer, and then ask one.",
+      "If they asked you something, answer it.",
     );
     expect(SCENARIO_PLAN_PROMPT).toContain(
-      "When there is enough to build from, say so in a few words and stop.",
+      "Ask a question when the answer would change what gets built: one at most, and not in every reply.",
+    );
+    expect(SCENARIO_PLAN_PROMPT).toContain("Offer facts, not mood");
+    expect(SCENARIO_PLAN_PROMPT).toContain(
+      "When there is enough to build from, say so in a few words.",
     );
     // No instruction to praise, and none to end every reply on a question.
     expect(SCENARIO_PLAN_PROMPT).not.toMatch(/enthusiastic/);
