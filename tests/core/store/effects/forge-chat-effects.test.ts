@@ -20,6 +20,7 @@ import { worldSlice } from "../../../../src/core/store/slices/world";
 import type { RootState, WorldEntity } from "../../../../src/core/store/types";
 import type { Chat } from "../../../../src/core/chat-types/types";
 import { FieldID } from "../../../../src/config/field-definitions";
+import { SCENARIO_BUILD_INSTRUCTION } from "../../../../src/core/utils/prompts";
 
 type EffectHandler = (
   action: { type: string; payload: unknown },
@@ -276,6 +277,68 @@ describe("forgeChatContinueRequested with a pending scrub", () => {
       ([a]) => a.type === "forge/scrubCleared",
     );
     expect(cleared).toBeDefined();
+  });
+});
+
+describe("a reference scrub's placeholder", () => {
+  it("is a cleanup message marked build, so it renders as pills", async () => {
+    const draft = makeEntity({
+      id: "d1",
+      name: "Marsh",
+      sourceChatId: "fc-1",
+      lifecycle: "draft",
+    });
+    const state = makeState([makeChat()], [draft]);
+    (state.forge as any).pendingScrubByChatId = { "fc-1": ["Vesper"] };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeScrubNowRequested({ chatId: "fc-1" }));
+    const added = dispatch.mock.calls
+      .map(([a]) => a)
+      .filter((a) => a.type === "chat/messageAdded");
+    expect(added).toHaveLength(1);
+    expect(added[0].payload.message).toMatchObject({
+      role: "assistant",
+      content: "",
+      messageKind: "cleanup",
+      mode: "build",
+    });
+  });
+});
+
+describe("whether a Build turn was directed", () => {
+  // The tail is the writer's own Plan message: a failed Plan turn left it
+  // there, and an empty Build send must still stand on the fixed instruction.
+  const chat = () =>
+    makeChat({
+      messages: [{ id: "u1", role: "user", content: "a lock-keeper" }],
+    });
+  const lastMessage = async (payload: {
+    chatId: string;
+    directed?: boolean;
+  }) => {
+    const state = makeState([chat()]);
+    (state as { foundation: unknown }).foundation = { intensity: null };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(forgeChatContinueRequested(payload));
+    const submitted = dispatch.mock.calls
+      .map(([a]) => a)
+      .find((a) => a.type === "ui/generationSubmitted");
+    const { messages } = await submitted.payload.messageFactory();
+    return messages[messages.length - 1] as Message;
+  };
+
+  it("carries an empty send to the strategy as not directed", async () => {
+    expect(await lastMessage({ chatId: "fc-1", directed: false })).toEqual({
+      role: "user",
+      content: SCENARIO_BUILD_INSTRUCTION,
+    });
+  });
+
+  it("carries a typed send to the strategy as directed", async () => {
+    expect(await lastMessage({ chatId: "fc-1", directed: true })).toEqual({
+      role: "user",
+      content: "a lock-keeper",
+    });
   });
 });
 
@@ -567,23 +630,51 @@ describe("scenarioPlanRequested effect", () => {
         a.type === "chat/messageAdded" && a.payload.message.mode === "plan",
     );
 
-  it("a second Plan request during the first's strategy build adds one placeholder", async () => {
+  /** A harness whose queue fills as requests are queued, as the store's does. */
+  const queueing = () => {
+    const state = makeState([withUser()]);
+    const harness = makeHarness(state);
+    harness.dispatch.mockImplementation(
+      (a: { type: string; payload: object }) => {
+        if (a.type !== "runtime/requestQueued") return;
+        (state.runtime as { queue: unknown[] }).queue.push({
+          ...a.payload,
+          status: "queued",
+        });
+      },
+    );
+    return harness;
+  };
+  const queuedOf = (calls: { type: string; payload?: any }[], type: string) =>
+    calls.filter(
+      (a) => a.type === "runtime/requestQueued" && a.payload.type === type,
+    );
+
+  it("adds its placeholder and queues its request before it yields", () => {
     const { dispatch, fire } = makeHarness(makeState([withUser()]));
+    void fire(scenarioPlanRequested({ chatId: "fc-1" }));
+    // Not awaited: everything the effect does, it has done by now.
+    const calls = dispatch.mock.calls.map(([a]) => a);
+    expect(planPlaceholders(calls)).toHaveLength(1);
+    expect(queuedOf(calls, "chat")).toHaveLength(1);
+    expect(
+      calls.filter((a) => a.type === "ui/generationSubmitted"),
+    ).toHaveLength(1);
+  });
+
+  it("two Plan requests back to back add one placeholder and one request", async () => {
+    const { dispatch, fire } = queueing();
     await Promise.all([
       fire(scenarioPlanRequested({ chatId: "fc-1" })),
       fire(scenarioPlanRequested({ chatId: "fc-1" })),
     ]);
     const calls = dispatch.mock.calls.map(([a]) => a);
     expect(planPlaceholders(calls)).toHaveLength(1);
-    expect(
-      calls.filter(
-        (a) => a.type === "runtime/requestQueued" && a.payload.type === "chat",
-      ),
-    ).toHaveLength(1);
+    expect(queuedOf(calls, "chat")).toHaveLength(1);
   });
 
-  it("a Build request during a Plan turn's strategy build is refused", async () => {
-    const { dispatch, fire } = makeHarness(makeState([withUser()]));
+  it("a Build request right after a Plan request is refused", async () => {
+    const { dispatch, fire } = queueing();
     await Promise.all([
       fire(scenarioPlanRequested({ chatId: "fc-1" })),
       fire(forgeChatContinueRequested({ chatId: "fc-1" })),
@@ -595,21 +686,7 @@ describe("scenarioPlanRequested effect", () => {
           a.type === "chat/messageAdded" && a.payload.message.mode === "build",
       ),
     ).toHaveLength(0);
-    expect(
-      calls.filter(
-        (a) =>
-          a.type === "runtime/requestQueued" && a.payload.type === "forgeChat",
-      ),
-    ).toHaveLength(0);
-  });
-
-  it("a Plan turn can be requested again once the first has been queued", async () => {
-    const { dispatch, fire } = makeHarness(makeState([withUser()]));
-    await fire(scenarioPlanRequested({ chatId: "fc-1" }));
-    await fire(scenarioPlanRequested({ chatId: "fc-1" }));
-    expect(planPlaceholders(dispatch.mock.calls.map(([a]) => a))).toHaveLength(
-      2,
-    );
+    expect(queuedOf(calls, "forgeChat")).toHaveLength(0);
   });
 
   it("a Plan reply with a command line applies nothing", async () => {

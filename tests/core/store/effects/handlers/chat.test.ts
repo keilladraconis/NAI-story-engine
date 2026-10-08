@@ -11,6 +11,7 @@ import {
   forgeSegmentsSet,
 } from "../../../../../src/core/store/slices/chat";
 import {
+  appendStream,
   readStream,
   clearStream,
 } from "../../../../../src/core/store/stream-buffer";
@@ -68,8 +69,45 @@ describe("chatHandler.completion", () => {
     });
   });
 
-  it("does nothing when accumulatedText is empty", async () => {
-    const ctx = makeChatCtx({ accumulatedText: "" });
+  const holding = (content: string) =>
+    vi.fn(() => ({
+      chat: {
+        chats: [
+          { id: "c1", messages: [{ id: "m1", role: "assistant", content }] },
+        ],
+      },
+    })) as unknown as CompletionContext<ChatTarget>["getState"];
+
+  it("removes an empty placeholder when nothing arrived, and clears the buffer", async () => {
+    appendStream("m1", "stale");
+    const ctx = makeChatCtx({ accumulatedText: "", getState: holding("") });
+    await chatHandler.completion(ctx);
+    expect(ctx.dispatch).toHaveBeenCalledTimes(1);
+    expect(ctx.dispatch).toHaveBeenCalledWith({
+      type: "chat/messageRemoved",
+      payload: { chatId: "c1", id: "m1" },
+    });
+    expect(readStream("m1")).toBeUndefined();
+  });
+
+  it("leaves a message that already has content when nothing arrived", async () => {
+    appendStream("m1", "stale");
+    const ctx = makeChatCtx({
+      accumulatedText: "",
+      getState: holding("She keeps the lock."),
+    });
+    await chatHandler.completion(ctx);
+    expect(ctx.dispatch).not.toHaveBeenCalled();
+    expect(readStream("m1")).toBeUndefined();
+  });
+
+  it("removes nothing when the message is already gone", async () => {
+    const ctx = makeChatCtx({
+      accumulatedText: "",
+      getState: vi.fn(() => ({
+        chat: { chats: [] },
+      })) as unknown as CompletionContext<ChatTarget>["getState"],
+    });
     await chatHandler.completion(ctx);
     expect(ctx.dispatch).not.toHaveBeenCalled();
   });

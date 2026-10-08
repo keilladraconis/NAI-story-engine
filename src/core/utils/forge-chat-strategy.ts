@@ -174,6 +174,7 @@ export function buildScenarioBuildStrategy(
   getState: () => RootState,
   queuedChat: Chat,
   assistantMessageId: string,
+  directed?: boolean,
 ): GenerationStrategy {
   const factory = async () => {
     const state = getState();
@@ -182,9 +183,11 @@ export function buildScenarioBuildStrategy(
     const chat =
       state.chat.chats.find((c) => c.id === queuedChat.id) ?? queuedChat;
     const prior = conversation(chat.messages, assistantMessageId);
-    // The writer's own last message directs the build. Anything else at the
-    // tail is an empty send, which stands for the fixed instruction.
-    const directed = prior[prior.length - 1]?.role === "user";
+    // A typed send directs the build; an empty one stands on the fixed
+    // instruction. The send says which. The tail cannot: after a failed Plan
+    // turn it is the writer's own Plan message, which directed nothing. Only
+    // a retry, which carries no send, is read from the tail.
+    const directs = directed ?? prior[prior.length - 1]?.role === "user";
 
     const messages: Message[] = [
       {
@@ -204,7 +207,7 @@ export function buildScenarioBuildStrategy(
         formatRejections(prior),
       ]),
       ...scenarioConversation(chat.messages, assistantMessageId),
-      ...(directed
+      ...(directs
         ? []
         : [{ role: "user" as const, content: SCENARIO_BUILD_INSTRUCTION }]),
     ];
@@ -239,16 +242,20 @@ export function buildScenarioBuildStrategy(
 }
 
 /** A Plan turn: a conversation on the creative model. It targets the ordinary
- *  chat handler, which commits the text and never reads it for commands. */
-export async function buildScenarioPlanStrategy(
+ *  chat handler, which commits the text and never reads it for commands.
+ *
+ *  Built without waiting on anything, so the effect can add the placeholder
+ *  and queue the request in the turn it was asked in. The creative model is
+ *  read by the factory instead: the engine takes a trimmed prefill from the
+ *  messages (the continuation folds the trailing assistant message in), never
+ *  from the strategy. */
+export function buildScenarioPlanStrategy(
   getState: () => RootState,
   queuedChat: Chat,
   assistantMessageId: string,
-): Promise<GenerationStrategy> {
-  const xialong = await isXialongMode();
-  const prefill = xialong ? XIALONG_STYLE.scenarioPlan : undefined;
-
+): GenerationStrategy {
   const factory = async () => {
+    const xialong = await isXialongMode();
     const state = getState();
     const chat =
       state.chat.chats.find((c) => c.id === queuedChat.id) ?? queuedChat;
@@ -266,7 +273,9 @@ export async function buildScenarioPlanStrategy(
         formatThreads(state),
       ]),
       ...scenarioConversation(chat.messages, assistantMessageId),
-      ...(prefill ? [{ role: "assistant" as const, content: prefill }] : []),
+      ...(xialong
+        ? [{ role: "assistant" as const, content: XIALONG_STYLE.scenarioPlan }]
+        : []),
     ];
     return {
       messages,
@@ -289,10 +298,10 @@ export async function buildScenarioPlanStrategy(
       messageId: assistantMessageId,
     },
     prefillBehavior: "trim",
-    assistantPrefill: prefill,
     // Xialong sometimes returns an empty think block and nothing else; a
     // reply under this floor is re-rolled. "Cut the prologue." is a real one.
-    minResponseLength: xialong ? 4 : undefined,
+    // On either model: no reply this short is one.
+    minResponseLength: 4,
     continuation: { maxCalls: 5 },
   };
 }
@@ -350,12 +359,10 @@ export function buildForgeCleanupStrategy(
     },
     prefillBehavior: "trim",
     assistantPrefill: "[",
-    // Cut off by the token cap, a forge turn stops mid-command: the bracket
-    // never closes, so the last action is lost and the turn reads as an
-    // unfinished thought. Chats and refines have continued since they shipped;
-    // the Forge did not, and a sketch emitting six commands is exactly the
-    // length that runs out of room. The engine folds the "[" prefill into the
-    // continuation turn, so the model resumes from all it has written.
+    // Cut off by the token cap, a scrub stops mid-command: the bracket never
+    // closes and the last REVISE is lost, so it continues. The engine folds
+    // the "[" prefill into the continuation turn, so the model resumes from
+    // all it has written.
     continuation: { maxCalls: 4 },
   };
 }

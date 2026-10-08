@@ -1,4 +1,8 @@
-import { messageUpdated, refineCandidateMarked } from "../../slices/chat";
+import {
+  messageRemoved,
+  messageUpdated,
+  refineCandidateMarked,
+} from "../../slices/chat";
 import {
   stripThinkingTags,
   stripStyleBrackets,
@@ -26,16 +30,28 @@ export const chatHandler: GenerationHandlers<ChatTarget> = {
   },
 
   async completion(ctx: CompletionContext<ChatTarget>): Promise<void> {
+    const { chatId, messageId } = ctx.target;
     if (ctx.accumulatedText) {
       ctx.dispatch(
         messageUpdated({
-          chatId: ctx.target.chatId,
-          id: ctx.target.messageId,
+          chatId,
+          id: messageId,
           content: stripThinkingTags(ctx.accumulatedText),
         }),
       );
+    } else {
+      // Cancelled or failed before anything arrived: drop the empty placeholder
+      // instead of leaving a blank bubble behind. A message that already has
+      // content is a turn being extended, and stays.
+      const stored = ctx
+        .getState()
+        .chat.chats.find((c) => c.id === chatId)
+        ?.messages.find((m) => m.id === messageId);
+      if (stored && stored.content === "") {
+        ctx.dispatch(messageRemoved({ chatId, id: messageId }));
+      }
     }
-    clearStream(ctx.target.messageId);
+    clearStream(messageId);
   },
 };
 

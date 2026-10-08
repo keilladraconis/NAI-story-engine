@@ -255,6 +255,44 @@ describe("a Build turn", () => {
     });
   });
 
+  describe("told by the send whether it was directed", () => {
+    // The tail is the writer's own Plan message, left there by a failed Plan
+    // turn or a deleted Plan reply: the transcript alone reads it as directed.
+    const tailIsUser = chatOf([
+      msg("u1", "user", "A lock-keeper on a dying canal."),
+      msg("p1", "assistant", "", { mode: "build" }),
+    ]);
+    const last = async (directed?: boolean) => {
+      const state = stateOf(tailIsUser);
+      const messages = await run(
+        buildScenarioBuildStrategy(() => state, tailIsUser, "p1", directed),
+      );
+      return messages[messages.length - 1];
+    };
+    const instruction = { role: "user", content: SCENARIO_BUILD_INSTRUCTION };
+    const own = { role: "user", content: "A lock-keeper on a dying canal." };
+
+    it("appends the instruction to an empty send whatever the tail is", async () => {
+      expect(await last(false)).toEqual(instruction);
+    });
+    it("appends nothing to a typed send", async () => {
+      expect(await last(true)).toEqual(own);
+    });
+    it("reads the tail when the send did not say (a retry)", async () => {
+      expect(await last(undefined)).toEqual(own);
+    });
+    it("appends nothing to a typed send even when the tail is a reply", async () => {
+      const state = stateOf(chat);
+      const messages = await run(
+        buildScenarioBuildStrategy(() => state, chat, "p1", true),
+      );
+      expect(messages[messages.length - 1]).toEqual({
+        role: "assistant",
+        content: "What does she owe her brother?",
+      });
+    });
+  });
+
   it("has no TURN line and no critique block", async () => {
     const state = stateOf(chat);
     const text = JSON.stringify(
@@ -287,10 +325,18 @@ describe("a Plan turn", () => {
       chat: { chats: [chat], activeChatId: "c1", refineChat: null },
     } as never);
 
-  it("opens with the Plan prompt and targets the ordinary chat handler", async () => {
-    const s = await buildScenarioPlanStrategy(state, chat, "p1");
+  it("is built without waiting, and carries no prefill of its own", () => {
+    const s = buildScenarioPlanStrategy(state, chat, "p1");
+    expect(s).not.toBeInstanceOf(Promise);
     expect(s.target).toEqual({ type: "chat", chatId: "c1", messageId: "p1" });
     expect(s.requestId).toBe("chat-c1-p1");
+    expect(s.prefillBehavior).toBe("trim");
+    expect(s.assistantPrefill).toBeUndefined();
+    expect(s.minResponseLength).toBe(4);
+  });
+
+  it("opens with the Plan prompt", async () => {
+    const s = buildScenarioPlanStrategy(state, chat, "p1");
     expect((await run(s))[0]).toEqual({
       role: "system",
       content: buildScenarioPlanPrompt("unset"),
@@ -299,7 +345,7 @@ describe("a Plan turn", () => {
 
   it("sees what Build wrote as commands, never its thinking, tombstones or rejections", async () => {
     const text = JSON.stringify(
-      await run(await buildScenarioPlanStrategy(state, chat, "p1")),
+      await run(buildScenarioPlanStrategy(state, chat, "p1")),
     );
     expect(text).toContain("Hesper Vane");
     expect(text).not.toContain("the flooding is to come");
@@ -308,20 +354,20 @@ describe("a Plan turn", () => {
   });
 
   it("ends on the writer's message when the creative model is GLM", async () => {
-    const messages = await run(
-      await buildScenarioPlanStrategy(state, chat, "p1"),
-    );
-    expect(messages[messages.length - 1]).toEqual({
+    const built = await buildScenarioPlanStrategy(state, chat, "p1")
+      .messageFactory!();
+    expect(built.messages[built.messages.length - 1]).toEqual({
       role: "user",
       content: "What about the mills?",
     });
+    expect(built.params?.stop).toBeUndefined();
   });
 
   describe("on Xialong", () => {
-    it("prefills the chat style and stops at the next style block", async () => {
+    it("prefills the chat style when it is built into messages, and stops at the next style block", async () => {
+      // Built before the model is known; the factory reads it when it runs.
+      const s = buildScenarioPlanStrategy(state, chat, "p1");
       useCreativeModel("xialong-v1");
-      const s = await buildScenarioPlanStrategy(state, chat, "p1");
-      expect(s.assistantPrefill).toBe(XIALONG_STYLE.scenarioPlan);
       const built = await s.messageFactory!();
       expect(built.messages[built.messages.length - 1]).toEqual({
         role: "assistant",
@@ -473,7 +519,7 @@ describe("what a Scenario turn reads from the store", () => {
     Build: async (get: () => RootState, chat: Chat) =>
       run(buildScenarioBuildStrategy(get, chat, "p1")),
     Plan: async (get: () => RootState, chat: Chat) =>
-      run(await buildScenarioPlanStrategy(get, chat, "p1")),
+      run(buildScenarioPlanStrategy(get, chat, "p1")),
   };
 
   for (const [name, build] of Object.entries(factories)) {

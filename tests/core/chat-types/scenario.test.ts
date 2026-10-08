@@ -107,18 +107,22 @@ describe("sending in the Scenario chat", () => {
     expect(ctx.dispatch).not.toHaveBeenCalled();
   });
 
-  it("build, text: adds the message and asks for a Build turn", () => {
+  it("build, text: adds the message and asks for a directed Build turn", () => {
     const ctx = ctxFor(null);
     scenarioSpec.handleSend!(inMode("build"), "just the sisters", ctx);
     expect(ctx.dispatch).toHaveBeenCalledTimes(2);
-    expect(lastCall(ctx)).toEqual(forgeChatContinueRequested({ chatId: "c1" }));
+    expect(lastCall(ctx)).toEqual(
+      forgeChatContinueRequested({ chatId: "c1", directed: true }),
+    );
   });
 
-  it("build, empty, something said: asks for a Build turn and adds no message", () => {
+  it("build, empty, something said: asks for an undirected Build turn and adds no message", () => {
     const ctx = ctxFor(null);
     scenarioSpec.handleSend!(inMode("build", said), "", ctx);
     expect(ctx.dispatch).toHaveBeenCalledTimes(1);
-    expect(lastCall(ctx)).toEqual(forgeChatContinueRequested({ chatId: "c1" }));
+    expect(lastCall(ctx)).toEqual(
+      forgeChatContinueRequested({ chatId: "c1", directed: false }),
+    );
   });
 
   it("build, empty, nothing said: does nothing", () => {

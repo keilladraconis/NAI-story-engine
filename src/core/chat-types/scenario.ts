@@ -120,7 +120,10 @@ export const scenarioSpec: ChatTypeSpec<ScenarioMode> = {
     ctx.dispatch(
       mode === "plan"
         ? scenarioPlanRequested({ chatId: chat.id })
-        : forgeChatContinueRequested({ chatId: chat.id }),
+        : forgeChatContinueRequested({
+            chatId: chat.id,
+            directed: trimmed.length > 0,
+          }),
     );
     return true;
   },

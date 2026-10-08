@@ -7,6 +7,9 @@
 
 export interface ForgeChatContinueRequestedPayload {
   chatId: string;
+  /** Whether the writer typed something with this send. Absent on a retry,
+   *  which carries no send; the strategy then reads the transcript's tail. */
+  directed?: boolean;
 }
 
 const FORGE_CHAT_CONTINUE_REQUESTED = "forgeChat/continueRequested";
