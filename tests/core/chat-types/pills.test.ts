@@ -135,12 +135,55 @@ describe("buildPills", () => {
     ]);
   });
 
-  it("parses a command out of content when nothing settled it", () => {
-    const pills = buildPills(
-      'Hm.\n[CREATE CHARACTER "Jimmy" | A boy.]',
-      undefined,
-      false,
-    );
-    expect(pills.map((p) => p.label)).toContain('create | "Jimmy"');
+  const unsettled = 'Hm.\n[CREATE CHARACTER "Jimmy" | A boy.]';
+  const notApplied = {
+    label: "Not applied",
+    text: "This turn did not finish, or the reply was edited after it ran.",
+  };
+
+  it("reads an unsettled command as not applied once the reply is not being generated", () => {
+    const pills = buildPills(unsettled, undefined, false);
+    expect(pills.map((p) => p.label)).toEqual(["thinking", 'create | "Jimmy"']);
+    expect(pills[0].tone).toBe("thinking");
+    expect(pills[1].tone).toBe("rejected");
+    expect(pills[1].body).toEqual([
+      notApplied,
+      { label: "Type", text: "CHARACTER" },
+      { label: "Summary", text: "A boy." },
+    ]);
+  });
+
+  it("leaves a command provisional while the reply is being generated", () => {
+    const pills = buildPills(unsettled, undefined, true);
+    expect(pills[1]).toEqual({
+      label: 'create | "Jimmy"',
+      tone: "applied",
+      body: [
+        { label: "Type", text: "CHARACTER" },
+        { label: "Summary", text: "A boy." },
+      ],
+    });
+  });
+
+  it("leaves settled segments as they were settled", () => {
+    expect(buildPills(unsettled, settled, false)[1]).toEqual({
+      label: 'create | "A"',
+      tone: "applied",
+      body: [],
+    });
+  });
+
+  it("says once why an unsettled unrecognised line was not applied", () => {
+    const pills = buildPills('[CREATE SYSTm "X" | d]', undefined, false);
+    expect(pills).toEqual([
+      {
+        label: "unrecognised",
+        tone: "rejected",
+        body: [
+          notApplied,
+          { label: "Written", text: '[CREATE SYSTm "X" | d]' },
+        ],
+      },
+    ]);
   });
 });

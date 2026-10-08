@@ -25,7 +25,7 @@ import {
   walkForgeLines,
   canonicalizeForgeCommands,
   TYPE_TO_FIELD,
-  THREAD_REPAIR,
+  unrecognizedAction,
   commandBody,
   type ParsedCommand,
 } from "../../../utils/crucible-command-parser";
@@ -377,14 +377,7 @@ function buildForgeSegments(
     }
     if (tok.kind === "unrecognized") {
       flush();
-      segments.push({
-        kind: "action",
-        action: {
-          kind: "UNKNOWN",
-          status: "unrecognized",
-          reason: /^\[\s*THREAD\b/i.test(tok.raw) ? THREAD_REPAIR : tok.raw,
-        },
-      });
+      segments.push({ kind: "action", action: unrecognizedAction(tok.raw) });
       continue;
     }
     if (tok.command.kind === "DONE" || tok.command.kind === "LINK") continue;

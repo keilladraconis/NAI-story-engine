@@ -170,26 +170,39 @@ describe("the conversation a Scenario turn is shown", () => {
 });
 
 describe("rejections survive a Plan reply", () => {
-  it("reads the last reply that has segments, not the last reply", () => {
-    const rejected = {
-      forgeSegments: [
-        {
-          kind: "action",
-          action: {
-            kind: "THREAD",
-            status: "rejected",
-            name: "T",
-            reason: "Name a known element.",
-          },
+  const rejected = {
+    forgeSegments: [
+      {
+        kind: "action",
+        action: {
+          kind: "THREAD",
+          status: "rejected",
+          name: "T",
+          reason: "Name a known element.",
         },
-      ],
-    };
+      },
+    ],
+  };
+
+  it("reads the last reply that was read for commands, not the last reply", () => {
     const text = formatRejections([
       msg("a1", "assistant", "[THREAD …]", { mode: "build", ...rejected }),
       msg("u1", "user", "Hm."),
       msg("a2", "assistant", "What about the mills?", { mode: "plan" }),
     ] as never);
     expect(text).toContain('- THREAD "T": Name a known element.');
+  });
+
+  it("does not outlive a later Build reply that settled nothing", () => {
+    const text = formatRejections([
+      msg("a1", "assistant", "[THREAD …]", { mode: "build", ...rejected }),
+      msg("u1", "user", "Again."),
+      // Edited, cancelled or failed: a Build reply with no segments.
+      msg("a2", "assistant", '[CREATE CHARACTER "Hesper Vane" | x]', {
+        mode: "build",
+      }),
+    ] as never);
+    expect(text).toBe("");
   });
 });
 

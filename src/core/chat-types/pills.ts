@@ -76,9 +76,14 @@ export function pillsFor(
   return pills;
 }
 
-/** The pills for one Build message. Settled segments win; without them the
- *  content is parsed provisionally, and only a reply being `generating` reads
- *  as still arriving (a failed, cancelled or edited one does not). */
+/** Why a command nothing settled was not applied. */
+const UNSETTLED =
+  "This turn did not finish, or the reply was edited after it ran.";
+
+/** The pills for one Build message. Settled segments win. Without them the
+ *  content is parsed provisionally: while the reply is `generating` its
+ *  commands read as arriving, and once it is not (cancelled, failed or edited)
+ *  nothing executed them, so each reads as not applied. */
 export function buildPills(
   content: string,
   segments: ForgeSegment[] | undefined,
@@ -86,9 +91,17 @@ export function buildPills(
 ): Pill[] {
   if (segments) return pillsFor(segments);
   const { segments: parsed, pending } = parseForgeStream(content);
+  const tail = pending.kind === "prose" ? pending.text : "";
+  if (generating) return pillsFor(parsed, tail, true);
   return pillsFor(
-    parsed,
-    pending.kind === "prose" ? pending.text : "",
-    generating,
+    parsed.map((s) =>
+      s.kind === "action"
+        ? {
+            ...s,
+            action: { ...s.action, status: "rejected", reason: UNSETTLED },
+          }
+        : s,
+    ),
+    tail,
   );
 }

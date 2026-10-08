@@ -85,7 +85,11 @@ function replies(messages: ChatMessage[]): ChatMessage[] {
 export function formatRejections(messages: ChatMessage[]): string {
   // The last reply that was read for commands, not the last reply: a Plan
   // reply after a Build has no segments, and the rejection must outlive it.
-  const built = replies(messages).filter((m) => m.forgeSegments);
+  // A Build reply counts with or without them: edited or unfinished, it
+  // settled nothing, and an older Build's rejections are not "last turn".
+  const built = replies(messages).filter(
+    (m) => m.mode === "build" || m.forgeSegments,
+  );
   const lines = (built[built.length - 1]?.forgeSegments ?? []).flatMap((s) => {
     if (s.kind !== "action" || s.action.status === "applied") return [];
     const { kind, name, reason } = s.action;

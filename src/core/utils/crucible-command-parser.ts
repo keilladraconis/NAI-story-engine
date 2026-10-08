@@ -185,6 +185,19 @@ export function commandBody(cmd: ParsedCommand): PillPart[] {
   }
 }
 
+/** The record of a line that was meant as a command and did not parse. The
+ *  reason is what the next turn's model is told: the repair for a THREAD, the
+ *  line itself otherwise. The body keeps what was written, so the writer can
+ *  recover it from the pill either way. */
+export function unrecognizedAction(raw: string): ForgeActionRecord {
+  return {
+    kind: "UNKNOWN",
+    status: "unrecognized",
+    reason: /^\[\s*THREAD\b/i.test(raw) ? THREAD_REPAIR : raw,
+    body: [{ label: "Written", text: raw }],
+  };
+}
+
 /** Map a parsed command to a provisional (status "applied") display record —
  *  no execution. DONE/LINK are filtered before this is called. */
 export function describeForgeCommand(cmd: ParsedCommand): ForgeActionRecord {
@@ -266,11 +279,7 @@ export function parseForgeStream(text: string): ForgeStreamParse {
         } else if (tok && tok.kind === "unrecognized") {
           segments.push({
             kind: "action",
-            action: {
-              kind: "UNKNOWN",
-              status: "unrecognized",
-              reason: tok.raw,
-            },
+            action: unrecognizedAction(tok.raw),
           });
         } else {
           segments.push({ kind: "prose", text: bracket });

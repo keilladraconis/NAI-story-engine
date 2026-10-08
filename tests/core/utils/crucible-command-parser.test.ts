@@ -7,6 +7,7 @@ import {
   walkForgeLines,
   parseForgeStream,
   describeForgeCommand,
+  THREAD_REPAIR,
 } from "../../../src/core/utils/crucible-command-parser";
 
 describe("parseCommands", () => {
@@ -476,11 +477,27 @@ describe("parseForgeStream", () => {
             kind: "UNKNOWN",
             status: "unrecognized",
             reason: '[CREATE SYSTm "X" | d]',
+            body: [{ label: "Written", text: '[CREATE SYSTm "X" | d]' }],
           },
         },
       ],
       pending: { kind: "none" },
     });
+  });
+
+  it("keeps what a malformed THREAD wrote beside the repair", () => {
+    const line = '[THREAD "T" | "A", "B" | where it stands]';
+    expect(parseForgeStream(line).segments).toEqual([
+      {
+        kind: "action",
+        action: {
+          kind: "UNKNOWN",
+          status: "unrecognized",
+          reason: THREAD_REPAIR,
+          body: [{ label: "Written", text: line }],
+        },
+      },
+    ]);
   });
 
   it("treats a closed prose bracket as prose, not a chip", () => {

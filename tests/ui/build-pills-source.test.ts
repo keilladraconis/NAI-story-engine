@@ -12,9 +12,19 @@ describe("BuildPills", () => {
     expect(pills).not.toMatch(/open\[i\]\s*&&\s*</);
   });
 
-  it("collapses everything when its instance is reused for another message", () => {
+  it("has nothing open when its instance is reused for another message", () => {
+    // The open set is held with the key it belongs to and compared during
+    // render, so a different `resetKey` reads as nothing open in that same
+    // render, and an unchanged one changes nothing.
     expect(pills).toMatch(
-      /useEffect\(\(\) => \{\s*setOpen\(\{\}\);\s*\}, \[props\.resetKey\]\)/,
+      /const open\s*=\s*held\.key === props\.resetKey \? held\.open : NONE;/,
+    );
+    expect(pills).not.toContain("useEffect");
+  });
+
+  it("opens a pill against the current key, never a reused instance's", () => {
+    expect(pills).toMatch(
+      /setHeld\(\(h\) => \{\s*const was = h\.key === props\.resetKey \? h\.open : NONE;\s*return \{ key: props\.resetKey, open: \{ \.\.\.was, \[i\]: !was\[i\] \} \};/,
     );
   });
 

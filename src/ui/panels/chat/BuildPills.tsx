@@ -12,20 +12,21 @@ const TONE = {
   rejected: { color: T.warning, opacity: 1, borderColor: T.warning },
 } as const;
 
+const NONE: Record<number, boolean> = {};
+
 /** A Build reply as a wrapping row of pills, each opening its body under the
  *  row. Every body is mounted once and its `display` toggled: a pill opened
  *  and closed by swapping elements leaves stale ones behind in this renderer.
- *  `resetKey` collapses everything when the instance is reused for another
- *  message (the message list is keyed by index and pages). */
+ *  The open set is held with the `resetKey` it belongs to, so an instance
+ *  reused for another message (the message list is keyed by index and pages)
+ *  shows nothing open in that same render, without an effect to reset it. */
 export function BuildPills(props: {
   pills: Pill[];
   resetKey: string;
   hidden: boolean;
 }) {
-  const [open, setOpen] = useState<Record<number, boolean>>({});
-  useEffect(() => {
-    setOpen({});
-  }, [props.resetKey]);
+  const [held, setHeld] = useState({ key: props.resetKey, open: NONE });
+  const open = held.key === props.resetKey ? held.open : NONE;
 
   return (
     <div
@@ -42,7 +43,10 @@ export function BuildPills(props: {
             title={pill.body.length > 0 ? "Show what it said" : undefined}
             onClick={() => {
               if (pill.body.length === 0) return;
-              setOpen((o) => ({ ...o, [i]: !o[i] }));
+              setHeld((h) => {
+                const was = h.key === props.resetKey ? h.open : NONE;
+                return { key: props.resetKey, open: { ...was, [i]: !was[i] } };
+              });
             }}
             style={{
               background: open[i] ? "rgba(255,255,255,0.08)" : "none",

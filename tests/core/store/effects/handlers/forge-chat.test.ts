@@ -531,6 +531,7 @@ describe("forgeChatHandler.completion — segments", () => {
           kind: "UNKNOWN",
           status: "unrecognized",
           reason: '[CREATE SYSTm "X" | desc]',
+          body: [{ label: "Written", text: '[CREATE SYSTm "X" | desc]' }],
         },
       },
     ]);
@@ -652,6 +653,9 @@ describe("forgeChatHandler.completion — THREAD", () => {
     expect(actions[0].action).toMatchObject({
       status: "unrecognized",
       reason: THREAD_REPAIR,
+      body: [
+        { label: "Written", text: '[THREAD "T" | "A", "B" | state | private]' },
+      ],
     });
   });
 });
