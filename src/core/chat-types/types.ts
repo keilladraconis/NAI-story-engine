@@ -160,12 +160,6 @@ export interface ChatTypeSpec<SubMode extends string = string> {
   onClear?(chat: Chat, ctx: SpecCtx): void;
 
   /**
-   * Returns ids of entities that should render inline beneath the given message.
-   * Called by `ChatPanel` once per message during rebuild. Default: no inline entities.
-   */
-  inlineEntityIdsFor?(message: ChatMessage, chat: Chat, ctx: SpecCtx): string[];
-
-  /**
    * Handles a user send action for this chat. Return true if the spec fully
    * handled the send (no fallback to the standard chat-strategy path). Called
    * by the `uiChatSubmitUserMessage` effect with the submitted text.

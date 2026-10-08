@@ -7,15 +7,15 @@ import {
   messageUpdated,
   messageRemoved,
   uiChatRetryGeneration,
+  scenarioTurnUndoRequested,
 } from "../../../core/store";
 import type { RootState } from "../../../core/store";
 import type { ChatMessage, Chat } from "../../../core/chat-types/types";
-import { getChatTypeSpec } from "../../../core/chat-types";
-import { EntityCard } from "../world/EntityCard";
+import { latestUndoable } from "../../../core/chat-types/undo";
 import { ConfirmButton } from "../../components/ConfirmButton";
 import { BuildPills } from "./BuildPills";
 import { buildPills } from "../../../core/chat-types/pills";
-import { Edit, RotateCw, X, Check } from "nai:icons/feather";
+import { Edit, RotateCw, RotateCcw, X, Check } from "nai:icons/feather";
 
 type MessageProps = { chatId: string; chat: Chat; message: ChatMessage };
 
@@ -131,7 +131,7 @@ function EditBody(props: {
 }
 
 export function Message(props: MessageProps) {
-  const { chatId, chat, message } = props;
+  const { chatId, message } = props;
   const committed = useSlice((s) => readContent(s, chatId, message));
   // While this message is generating, its text lives in the effect-free stream
   // buffer (per-token store dispatch wedges the render flush); fall back to the
@@ -145,6 +145,13 @@ export function Message(props: MessageProps) {
   const segments = useSlice(
     (s) => readMessage(s, chatId, message.id)?.forgeSegments,
   );
+  const undone = useSlice((s) => !!readMessage(s, chatId, message.id)?.undone);
+  // Only the latest Build reply still standing can be undone: later turns may
+  // have built on earlier ones.
+  const canUndo = useSlice((s) => {
+    const c = s.chat.chats.find((x) => x.id === chatId);
+    return !!c && latestUndoable(c.messages)?.id === message.id;
+  });
   const isBuild = message.role === "assistant" && mode === "build";
   // True only while this message is being generated: its request is the
   // active one or queued, and not cancelled. A failed, cancelled or edited
@@ -154,21 +161,16 @@ export function Message(props: MessageProps) {
       (r) => !!r && r.status !== "cancelled" && r.targetId === message.id,
     ),
   );
+  // Editing drops a reply's settled segments, and with them the record of how
+  // to undo it. A reply whose commands still stand is not offered for edit.
+  const canEdit = !(
+    isBuild &&
+    !undone &&
+    (segments ?? []).some(
+      (s) => s.kind === "action" && s.action.status === "applied",
+    )
+  );
   const pills = isBuild ? buildPills(content, segments, generating) : [];
-  // Draft-entity ids for this turn (Scenario chats), rendered as inline cards
-  // below the bubble. Other chats have no `inlineEntityIdsFor`, so this is
-  // inert. Must return a primitive string from useSlice — a fresh array would
-  // trigger a render loop — so join/split around the selector boundary.
-  const inlineKey = useSlice((s) => {
-    const spec = getChatTypeSpec(chat.type);
-    return (
-      spec.inlineEntityIdsFor?.(message, chat, {
-        getState: () => s,
-        dispatch: store.dispatch,
-      }) ?? []
-    ).join(",");
-  });
-  const inlineIds = inlineKey ? inlineKey.split(",") : [];
   const [editing, setEditing] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
   // Retry and Delete destroy data with no undo, so both are ConfirmButtons,
@@ -247,14 +249,32 @@ export function Message(props: MessageProps) {
                 {isUser
                   ? "You"
                   : mode === "build"
-                    ? "Build"
+                    ? undone
+                      ? "Build (undone)"
+                      : "Build"
                     : mode === "plan"
                       ? "Plan"
                       : "Assistant"}
               </span>
               <div style={{ display: "flex", gap: SP.xs }}>
+                <div style={{ display: canUndo ? "flex" : "none" }}>
+                  <ConfirmButton
+                    title="Undo this turn: removes what it built and restores what it changed. Separate from NovelAI's undo. Lorebook text generated since for something it built is lost."
+                    icon={RotateCcw}
+                    size={ICON}
+                    resetKey={message.id}
+                    onConfirm={() =>
+                      store.dispatch(
+                        scenarioTurnUndoRequested({
+                          chatId,
+                          messageId: message.id,
+                        }),
+                      )
+                    }
+                  />
+                </div>
                 <button
-                  style={iconBtn}
+                  style={{ ...iconBtn, display: canEdit ? "flex" : "none" }}
                   title="Edit"
                   onClick={() => setEditing(true)}
                 >
@@ -292,23 +312,6 @@ export function Message(props: MessageProps) {
               {content || "…"}
             </div>
             <BuildPills pills={pills} hidden={!isBuild} resetKey={message.id} />
-            {inlineIds.length > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: SP.xs,
-                  marginTop: SP.sm,
-                }}
-              >
-                {inlineIds.map((id) => (
-                  <EntityCard
-                    key={`inline-${message.id}-${id}`}
-                    entityId={id}
-                  />
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>

@@ -24,8 +24,22 @@ describe("BuildPills", () => {
 
   it("opens a pill against the current key, never a reused instance's", () => {
     expect(pills).toMatch(
-      /setHeld\(\(h\) => \{\s*const was = h\.key === props\.resetKey \? h\.open : NONE;\s*return \{\s*key: props\.resetKey,\s*open: \{ \.\.\.was, \[i\]: !was\[i\] \},\s*\};/,
+      /setHeld\(\(h\) => \{\s*const same = h\.key === props\.resetKey;\s*const was = same \? h\.open : NONE;\s*return \{\s*key: props\.resetKey,\s*open: \{ \.\.\.was, \[i\]: !was\[i\] \},\s*seen: \{ \.\.\.\(same \? h\.seen : NONE\), \[i\]: true \},\s*\};/,
     );
+  });
+
+  it("opens an entity pill into the World's card and a Thread pill into its row", () => {
+    expect(pills).toContain("<EntityCard");
+    expect(pills).toContain("<ThreadItem");
+  });
+
+  it("mounts a card the first time its pill is opened, then only hides it", () => {
+    expect(pills).toMatch(/seen\[i\]/);
+    expect(pills).toMatch(/display:\s*isOpen\s*\?\s*"block"\s*:\s*"none"/);
+  });
+
+  it("never names a Thread's private fields", () => {
+    expect(pills).not.toMatch(/latent|wish/i);
   });
 
   it("captions the private and wish parts", () => {

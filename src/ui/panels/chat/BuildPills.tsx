@@ -1,5 +1,8 @@
 // src/ui/panels/chat/BuildPills.tsx
 import { T, SP } from "../../style";
+import { useSlice } from "../../bridge";
+import { EntityCard } from "../world/EntityCard";
+import { ThreadItem } from "../world/ThreadItem";
 import type { Pill } from "../../../core/chat-types/pills";
 
 const TONE = {
@@ -14,20 +17,83 @@ const TONE = {
 
 const NONE: Record<number, boolean> = {};
 
+/** Body parts that are about the command, not a copy of the thing. */
+const NOTE_LABELS = new Set(["Replaced", "Not undone", "Undo failed"]);
+
+/** What an opened pill shows. A pill with a target shows the live card while
+ *  the thing exists, and what was written once it does not. Both are mounted
+ *  and one is hidden: swapping them would leave the old one behind. */
+function PillBody(props: { pill: Pill; mounted: boolean }) {
+  const { pill, mounted } = props;
+  const target = pill.target;
+  const exists = useSlice((s) =>
+    !target
+      ? false
+      : target.kind === "entity"
+        ? !!s.world.entitiesById[target.id]
+        : s.world.threads.some((t) => t.id === target.id),
+  );
+  return (
+    <div>
+      <div style={{ display: exists ? "block" : "none", marginTop: SP.xs }}>
+        {mounted && target?.kind === "entity" ? (
+          <EntityCard entityId={target.id} />
+        ) : null}
+        {mounted && target?.kind === "thread" ? (
+          <ThreadItem threadId={target.id} />
+        ) : null}
+      </div>
+      {pill.body.map((part, j) => (
+        <div
+          key={j}
+          style={{
+            // With a live card, only the notes about this command are shown
+            // beside it; the card itself is the content.
+            display: !exists || NOTE_LABELS.has(part.label) ? "block" : "none",
+            marginTop: SP.xs,
+          }}
+        >
+          <span
+            style={{ display: part.label ? "inline" : "none", opacity: 0.6 }}
+          >
+            {part.label}:{" "}
+          </span>
+          {part.text}
+          <div
+            style={{
+              display: part.unseen ? "block" : "none",
+              fontSize: "0.8em",
+              opacity: 0.5,
+            }}
+          >
+            Never shown to the story model.
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** A Build reply as a wrapping row of pills. A pill opens in place: it widens
- *  to the full row and shows its body inside its own border. Every body is
- *  mounted once and its `display` toggled: a pill opened and closed by
- *  swapping elements leaves stale ones behind in this renderer. The open set
- *  is held with the `resetKey` it belongs to, so an instance reused for
- *  another message (the message list is keyed by index and pages) shows
- *  nothing open in that same render, without an effect to reset it. */
+ *  to the full row and shows its body inside its own border. A pill that made
+ *  or changed something opens into the World's own card for it. The card is
+ *  mounted the first time its pill is opened (`seen`) and only hidden after:
+ *  swapping elements leaves stale ones behind in this renderer. The open and
+ *  seen sets are held with the `resetKey` they belong to, so an instance
+ *  reused for another message (the message list is keyed by index and pages)
+ *  shows nothing open in that same render, without an effect to reset it. */
 export function BuildPills(props: {
   pills: Pill[];
   resetKey: string;
   hidden: boolean;
 }) {
-  const [held, setHeld] = useState({ key: props.resetKey, open: NONE });
+  const [held, setHeld] = useState({
+    key: props.resetKey,
+    open: NONE,
+    seen: NONE,
+  });
   const open = held.key === props.resetKey ? held.open : NONE;
+  const seen = held.key === props.resetKey ? held.seen : NONE;
 
   return (
     <div
@@ -39,7 +105,7 @@ export function BuildPills(props: {
       }}
     >
       {props.pills.map((pill, i) => {
-        const opens = pill.body.length > 0;
+        const opens = pill.body.length > 0 || !!pill.target;
         const isOpen = opens && !!open[i];
         return (
           <div
@@ -57,10 +123,12 @@ export function BuildPills(props: {
               onClick={() => {
                 if (!opens) return;
                 setHeld((h) => {
-                  const was = h.key === props.resetKey ? h.open : NONE;
+                  const same = h.key === props.resetKey;
+                  const was = same ? h.open : NONE;
                   return {
                     key: props.resetKey,
                     open: { ...was, [i]: !was[i] },
+                    seen: { ...(same ? h.seen : NONE), [i]: true },
                   };
                 });
               }}
@@ -87,28 +155,7 @@ export function BuildPills(props: {
                 whiteSpace: "pre-wrap",
               }}
             >
-              {pill.body.map((part, j) => (
-                <div key={j} style={{ marginTop: SP.xs }}>
-                  <span
-                    style={{
-                      display: part.label ? "inline" : "none",
-                      opacity: 0.6,
-                    }}
-                  >
-                    {part.label}:{" "}
-                  </span>
-                  {part.text}
-                  <div
-                    style={{
-                      display: part.unseen ? "block" : "none",
-                      fontSize: "0.8em",
-                      opacity: 0.5,
-                    }}
-                  >
-                    Never shown to the story model.
-                  </div>
-                </div>
-              ))}
+              <PillBody pill={pill} mounted={!!seen[i]} />
             </div>
           </div>
         );

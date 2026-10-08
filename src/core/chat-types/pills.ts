@@ -5,20 +5,35 @@ import type { ForgeActionRecord, ForgeSegment, PillPart } from "./types";
 export interface Pill {
   label: string;
   tone: "thinking" | "applied" | "rejected";
-  /** Shown when the pill is opened. Empty means the pill does not open. */
+  /** Shown when the pill is opened. Empty means the pill does not open,
+   *  unless it has a target. */
   body: PillPart[];
+  /** The live thing this command made or changed. When it still exists the
+   *  opened pill shows its card; `body` is what was written, shown if not. */
+  target?: { kind: "entity" | "thread"; id: string };
 }
 
 const quoted = (s?: string): string => `"${s ?? ""}"`;
 
 export function pillLabel(action: ForgeActionRecord): string {
+  const name = action.name ?? "";
   switch (action.kind) {
+    case "CREATE":
+      return `+ ${(action.elementType ?? "entity").toLowerCase()} | ${name}`;
+    case "REVISE":
+      return `~ revised | ${name}`;
+    case "THREAD":
+      return action.undo?.op === "threadCreated"
+        ? `+ thread | ${name}`
+        : action.undo?.op === "threadRewritten"
+          ? `~ thread | ${name}`
+          : `thread | ${name}`;
     case "RENAME":
-      return `rename | ${quoted(action.name)} → ${quoted(action.newName)}`;
+      return `rename | ${quoted(action.name)} \u2192 ${quoted(action.newName)}`;
+    case "DELETE":
+      return `\u2212 deleted | ${name}`;
     case "UNKNOWN":
       return "unrecognised";
-    default:
-      return `${action.kind.toLowerCase()} | ${quoted(action.name)}`;
   }
 }
 
@@ -52,16 +67,43 @@ export function pillsFor(
       continue;
     }
     const { action } = segment;
-    const failed = action.status !== "applied";
+    const applied = action.status === "applied";
+    const reversed = action.undoResult === "undone";
+    const lead: PillPart[] = !applied
+      ? action.reason
+        ? [{ label: "Not applied", text: action.reason }]
+        : []
+      : reversed
+        ? [{ label: "Undone", text: "This turn was undone." }]
+        : action.undoResult === "skipped"
+          ? [
+              {
+                label: "Not undone",
+                text: "Changed since this turn wrote it, so undo left it alone.",
+              },
+            ]
+          : action.undoResult === "failed"
+            ? [
+                {
+                  label: "Undo failed",
+                  text: "The lorebook refused. Press Undo again.",
+                },
+              ]
+            : [];
+    const replaced: PillPart[] =
+      action.undo?.op === "summary"
+        ? [{ label: "Replaced", text: action.undo.before }]
+        : [];
+    const live = applied && !reversed;
     pills.push({
       label: pillLabel(action),
-      tone: failed ? "rejected" : "applied",
-      body: [
-        ...(failed && action.reason
-          ? [{ label: "Not applied", text: action.reason }]
-          : []),
-        ...(action.body ?? []),
-      ],
+      tone: live ? "applied" : "rejected",
+      body: [...lead, ...(action.body ?? []), ...replaced],
+      ...(live && action.entityId
+        ? { target: { kind: "entity" as const, id: action.entityId } }
+        : live && action.threadId
+          ? { target: { kind: "thread" as const, id: action.threadId } }
+          : {}),
     });
   }
   think(tail);
