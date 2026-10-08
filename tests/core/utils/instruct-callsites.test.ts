@@ -10,7 +10,7 @@ import {
 } from "../../../src/core/utils/summary-strategy";
 import {
   buildForgeCleanupStrategy,
-  buildScenarioTurnStrategy,
+  buildScenarioBuildStrategy,
 } from "../../../src/core/utils/forge-chat-strategy";
 import type { RootState } from "../../../src/core/store";
 import type { Chat } from "../../../src/core/chat-types/types";
@@ -160,7 +160,7 @@ describe("extraction callsites stay on the instruct model", () => {
   });
 
   it("runs a Scenario turn on GLM, with no style block", async () => {
-    const strategy = buildScenarioTurnStrategy(getState, forgeChat, "asst-1");
+    const strategy = buildScenarioBuildStrategy(getState, forgeChat, "asst-1");
     const { messages, params } = await strategy.messageFactory!();
     expect(params?.model).toBe("glm-4-6");
     expect(styleBlocks(messages)).toEqual([]);

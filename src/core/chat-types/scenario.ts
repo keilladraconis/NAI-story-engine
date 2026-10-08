@@ -5,14 +5,17 @@ import type {
   ChatSeed,
   SpecCtx,
 } from "./types";
-import { buildScenarioPrompt, normalizeRegisterKey } from "../utils/prompts";
+import {
+  buildScenarioBuildPrompt,
+  normalizeRegisterKey,
+} from "../utils/prompts";
 import { forgeChatContinueRequested } from "../store/effects/forge-chat-actions";
 import { messageAdded } from "../store/slices/chat";
 
 /** The one chat a story is built in. A reply is prose plus commands; the
  *  commands are applied to draft entities and Threads when the turn completes
  *  (handlers/forge-chat.ts). Three kinds of turn, told apart by the transcript
- *  (`scenarioTurn` in forge-chat-strategy.ts): every turn is a sketch until a
+ *  (see forge-chat-strategy.ts): every turn is a sketch until a
  *  reply has applied a command, and from then on a message steers and an empty
  *  send grows the sketch. */
 export const scenarioSpec: ChatTypeSpec = {
@@ -30,7 +33,7 @@ export const scenarioSpec: ChatTypeSpec = {
   },
 
   systemPromptFor(_chat: Chat, ctx: SpecCtx): string {
-    return buildScenarioPrompt(
+    return buildScenarioBuildPrompt(
       normalizeRegisterKey(ctx.getState().foundation.intensity?.level),
     );
   },

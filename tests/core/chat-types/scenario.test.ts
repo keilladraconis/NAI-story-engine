@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { scenarioSpec } from "../../../src/core/chat-types/scenario";
 import { forgeChatContinueRequested } from "../../../src/core/store/effects/forge-chat-actions";
-import { buildScenarioPrompt } from "../../../src/core/utils/prompts";
+import { buildScenarioBuildPrompt } from "../../../src/core/utils/prompts";
 import type { Chat, ChatMessage } from "../../../src/core/chat-types/types";
 import type { RootState, WorldEntity } from "../../../src/core/store/types";
 import { FieldID } from "../../../src/config/field-definitions";
@@ -27,10 +27,10 @@ const ctxFor = (level: string | null) => {
 describe("the Scenario chat type", () => {
   it("reads its register from the Foundation's intensity", () => {
     expect(scenarioSpec.systemPromptFor(chatWith([]), ctxFor("Noir"))).toBe(
-      buildScenarioPrompt("Noir"),
+      buildScenarioBuildPrompt("Noir"),
     );
     expect(scenarioSpec.systemPromptFor(chatWith([]), ctxFor(null))).toBe(
-      buildScenarioPrompt("unset"),
+      buildScenarioBuildPrompt("unset"),
     );
   });
 

@@ -2,18 +2,27 @@ import { describe, it, expect } from "vitest";
 import { useCreativeModel } from "../../helpers/creative-model";
 import {
   buildForgeCleanupStrategy,
-  buildScenarioTurnStrategy,
+  buildScenarioBuildStrategy,
+  buildScenarioPlanStrategy,
   formatRejections,
-  scenarioTurn,
+  scenarioConversation,
 } from "../../../src/core/utils/forge-chat-strategy";
-import type { Chat } from "../../../src/core/chat-types/types";
+import type { Chat, ChatMessage } from "../../../src/core/chat-types/types";
 import type { RootState } from "../../../src/core/store/types";
-import { FieldID } from "../../../src/config/field-definitions";
 import {
   FORGE_CLEANUP_PROMPT,
-  SCENARIO_GROW_INSTRUCTION,
-  buildScenarioPrompt,
+  SCENARIO_BUILD_INSTRUCTION,
+  XIALONG_STYLE,
+  buildScenarioBuildPrompt,
+  buildScenarioPlanPrompt,
 } from "../../../src/core/utils/prompts";
+
+const BUILT =
+  'So the sale is fact and the flooding is to come.\n[CREATE CHARACTER "Hesper Vane" | Keeps Tolland Lock.]\nAnd one thread.\n[THREAD "Half the House" | "Hesper Vane" | He sold his half. | He was paid. | She floods the cut.]';
+
+const run = async (strategy: {
+  messageFactory?: () => Promise<{ messages: Message[] }>;
+}) => (await strategy.messageFactory!()).messages;
 
 function makeState(over: Partial<RootState> = {}): RootState {
   return {
@@ -53,94 +62,12 @@ const msg = (
   content,
   ...extra,
 });
-const chatOf = (messages: ReturnType<typeof msg>[]): Chat => ({
+const chatOf = (messages: ChatMessage[]): Chat => ({
   id: "c1",
   type: "scenario",
   title: "Scenario 1",
   messages,
   seed: { kind: "blank" },
-});
-
-/** A reply's applied commands, as the handler records them at completion. */
-const applied = (...kinds: string[]) => ({
-  forgeSegments: kinds.map((kind) => ({
-    kind: "action",
-    action: { kind, status: "applied", name: "X" },
-  })),
-});
-const sketched = applied("CREATE");
-
-describe("which kind of turn this is", () => {
-  it("is a sketch while no reply has been written", () => {
-    expect(
-      scenarioTurn(
-        chatOf([msg("u", "user", "seed"), msg("p", "assistant", "")]),
-        "p",
-      ),
-    ).toBe("sketch");
-  });
-  it("is still a sketch when the only reply was prose and the writer answered it", () => {
-    const chat = chatOf([
-      msg("u", "user", "seed"),
-      msg("a", "assistant", "Can these people walk away?", {
-        forgeSegments: [{ kind: "prose", text: "Can these people walk away?" }],
-      }),
-      msg("u2", "user", "No, and comfort is the exception."),
-      msg("p", "assistant", ""),
-    ]);
-    expect(scenarioTurn(chat, "p")).toBe("sketch");
-  });
-  it("is a steer when the writer spoke last after a reply that applied one CREATE", () => {
-    const chat = chatOf([
-      msg("u", "user", "seed"),
-      msg("a", "assistant", "sketch", applied("CREATE")),
-      msg("u2", "user", "make her older"),
-      msg("p", "assistant", ""),
-    ]);
-    expect(scenarioTurn(chat, "p")).toBe("steer");
-  });
-  it("is a grow when the Engine spoke last", () => {
-    const chat = chatOf([
-      msg("u", "user", "seed"),
-      msg("a", "assistant", "sketch", sketched),
-      msg("p", "assistant", ""),
-    ]);
-    expect(scenarioTurn(chat, "p")).toBe("grow");
-  });
-  it("is a steer when a reference scrub is queued between the writer's message and the turn", () => {
-    const chat = chatOf([
-      msg("u", "user", "seed"),
-      msg("a", "assistant", "sketch", sketched),
-      msg("u2", "user", "make her older"),
-      msg("k", "assistant", "", { messageKind: "cleanup" }),
-      msg("p", "assistant", ""),
-    ]);
-    expect(scenarioTurn(chat, "p")).toBe("steer");
-  });
-  it("is a steer when the scrub ahead of it has already written its reply", () => {
-    const chat = chatOf([
-      msg("u", "user", "seed"),
-      msg("a", "assistant", "sketch", sketched),
-      msg("u2", "user", "make her older"),
-      msg("k", "assistant", '[REVISE "X" | y]', {
-        messageKind: "cleanup",
-        ...applied("REVISE"),
-      }),
-      msg("p", "assistant", ""),
-    ]);
-    expect(scenarioTurn(chat, "p")).toBe("steer");
-  });
-  it("does not count a scrub's commands as a sketch", () => {
-    const chat = chatOf([
-      msg("u", "user", "seed"),
-      msg("k", "assistant", '[REVISE "X" | y]', {
-        messageKind: "cleanup",
-        ...applied("REVISE"),
-      }),
-      msg("p", "assistant", ""),
-    ]);
-    expect(scenarioTurn(chat, "p")).toBe("sketch");
-  });
 });
 
 const rejectedCleanup = msg("k", "assistant", '[REVISE "X" | from the scrub]', {
@@ -195,143 +122,199 @@ describe("what the last turn had rejected", () => {
   });
 });
 
-describe("a Scenario turn's messages", () => {
-  const state = {
-    foundation: {
-      situation: "",
-      worldState: "",
-      intensity: { level: "Noir", description: "No clean exits." },
-      contract: null,
-      attg: "",
-      style: "",
-    },
-    world: {
-      entitiesById: {
-        h: {
-          id: "h",
-          name: "Hesper Vane",
-          summary: "Keeps the lock.",
-          categoryId: FieldID.DramatisPersonae,
-          lifecycle: "draft",
-          sourceChatId: "c1",
-        },
-      },
-      entityIds: ["h"],
-      threads: [
+describe("the conversation a Scenario turn is shown", () => {
+  it("reduces a Build reply to its commands", () => {
+    const out = scenarioConversation([
+      msg("u1", "user", "A lock-keeper."),
+      msg("a1", "assistant", BUILT, { mode: "build" }),
+    ]);
+    expect(out[1]).toEqual({
+      role: "assistant",
+      content:
+        '[CREATE CHARACTER "Hesper Vane" | Keeps Tolland Lock.]\n[THREAD "Half the House" | "Hesper Vane" | He sold his half. | He was paid. | She floods the cut.]',
+    });
+    expect(JSON.stringify(out)).not.toContain("the flooding is to come");
+  });
+
+  it("leaves out a Build reply that wrote no command", () => {
+    const out = scenarioConversation([
+      msg("u1", "user", "A lock-keeper."),
+      msg("a1", "assistant", "Nothing new to record.", { mode: "build" }),
+    ]);
+    expect(out).toEqual([{ role: "user", content: "A lock-keeper." }]);
+  });
+
+  it("keeps Plan replies and older replies whole", () => {
+    const out = scenarioConversation([
+      msg("a1", "assistant", "What does she owe him?", { mode: "plan" }),
+      msg("a2", "assistant", 'An old reply [CREATE CHARACTER "X" | y]'),
+    ]);
+    expect(out.map((m) => m.content)).toEqual([
+      "What does she owe him?",
+      'An old reply [CREATE CHARACTER "X" | y]',
+    ]);
+  });
+
+  it("drops the placeholder, scrubs and empty messages", () => {
+    const out = scenarioConversation(
+      [
+        msg("u1", "user", "A lock-keeper."),
+        msg("s1", "assistant", '[REVISE "X" | y]', { messageKind: "cleanup" }),
+        msg("e1", "assistant", "  "),
+        msg("p1", "assistant", "", { mode: "build" }),
+      ],
+      "p1",
+    );
+    expect(out).toEqual([{ role: "user", content: "A lock-keeper." }]);
+  });
+});
+
+describe("rejections survive a Plan reply", () => {
+  it("reads the last reply that has segments, not the last reply", () => {
+    const rejected = {
+      forgeSegments: [
         {
-          id: "t",
-          title: "The Keys",
-          state: "She holds them.",
-          latent: "ZZ-LATENT",
-          wish: "ZZ-WISH",
-          entityIds: ["h"],
-          status: "open",
+          kind: "action",
+          action: {
+            kind: "THREAD",
+            status: "rejected",
+            name: "T",
+            reason: "Name a known element.",
+          },
         },
       ],
-    },
-    forge: { tombstonesByChatId: {}, pendingScrubByChatId: {} },
-    chat: { chats: [], activeChatId: null, refineChat: null },
-  } as unknown as RootState;
+    };
+    const text = formatRejections([
+      msg("a1", "assistant", "[THREAD …]", { mode: "build", ...rejected }),
+      msg("u1", "user", "Hm."),
+      msg("a2", "assistant", "What about the mills?", { mode: "plan" }),
+    ] as never);
+    expect(text).toContain('- THREAD "T": Name a known element.');
+  });
+});
 
-  it("gives the turn, the pool and the Threads' state, and ends on the grow instruction", async () => {
-    const chat = chatOf([
-      msg("u", "user", "seed"),
-      msg("a", "assistant", "sketch", sketched),
-      msg("p", "assistant", ""),
-    ]);
-    const built = await buildScenarioTurnStrategy(() => state, chat, "p")
-      .messageFactory!();
-    const text = built.messages.map((m) => m.content).join("\n---\n");
-    expect(built.messages[0].content).toBe(buildScenarioPrompt("Noir"));
-    expect(text).toContain("TURN: GROW");
-    expect(text).toContain("Hesper Vane");
-    expect(text).toContain("- The Keys | Hesper Vane | She holds them.");
-    expect(built.messages.at(-1)).toEqual({
-      role: "user",
-      content: SCENARIO_GROW_INSTRUCTION,
+describe("a Build turn", () => {
+  const chat = chatOf([
+    msg("u1", "user", "A lock-keeper on a dying canal."),
+    msg("a1", "assistant", "What does she owe her brother?", { mode: "plan" }),
+    msg("p1", "assistant", "", { mode: "build" }),
+  ]);
+  const stateOf = (c: Chat) =>
+    makeState({
+      chat: { chats: [c], activeChatId: "c1", refineChat: null },
+    } as never);
+
+  it("opens with the Build prompt at the story's register", async () => {
+    const state = stateOf(chat);
+    const messages = await run(
+      buildScenarioBuildStrategy(() => state, chat, "p1"),
+    );
+    expect(messages[0]).toEqual({
+      role: "system",
+      content: buildScenarioBuildPrompt("unset"),
     });
   });
 
-  it("reads the chat as it stands when the turn is built, not as it stood when it was queued", async () => {
-    const queued = chatOf([
-      msg("u", "user", "seed"),
-      msg("a", "assistant", "sketch", sketched),
-      msg("p", "assistant", ""),
-    ]);
-    const strat = buildScenarioTurnStrategy(
-      () => ({
-        ...state,
-        chat: {
-          chats: [
-            {
-              ...queued,
-              messages: [
-                msg("u", "user", "seed"),
-                msg("a", "assistant", "sketch", sketched),
-                msg("u2", "user", "ZZ-ADDED-LATER"),
-                msg("p", "assistant", ""),
-              ],
-            },
-          ],
-          activeChatId: "c1",
-          refineChat: null,
-        },
-      }),
-      queued,
-      "p",
+  it("stands an empty send on the fixed instruction", async () => {
+    const state = stateOf(chat);
+    const messages = await run(
+      buildScenarioBuildStrategy(() => state, chat, "p1"),
     );
-    const built = await strat.messageFactory!();
-    const text = built.messages.map((m) => m.content).join("\n---\n");
-    expect(text).toContain("TURN: STEER");
-    expect(built.messages.at(-1)).toEqual({
+    expect(messages[messages.length - 1]).toEqual({
       role: "user",
-      content: "ZZ-ADDED-LATER",
+      content: SCENARIO_BUILD_INSTRUCTION,
     });
   });
 
-  it("sends neither a reference scrub nor an empty message as conversation", async () => {
-    const chat = chatOf([
-      msg("u", "user", "seed"),
-      msg("a", "assistant", "sketch", sketched),
-      msg("u2", "user", "make her older"),
-      msg("k", "assistant", "ZZ-SCRUB", { messageKind: "cleanup" }),
-      msg("e", "assistant", "  "),
-      msg("p", "assistant", ""),
+  it("lets the writer's own last message direct the build", async () => {
+    const directed = chatOf([
+      ...chat.messages.slice(0, 2),
+      msg("u2", "user", "Just the two of them for now."),
+      msg("p1", "assistant", "", { mode: "build" }),
     ]);
-    const built = await buildScenarioTurnStrategy(() => state, chat, "p")
-      .messageFactory!();
-    expect(built.messages.map((m) => m.content).join("\n")).not.toContain(
-      "ZZ-SCRUB",
+    const state = stateOf(directed);
+    const messages = await run(
+      buildScenarioBuildStrategy(() => state, directed, "p1"),
     );
-    expect(built.messages.slice(-3).map((m) => m.content)).toEqual([
-      "seed",
-      "sketch",
-      "make her older",
-    ]);
+    expect(messages[messages.length - 1]).toEqual({
+      role: "user",
+      content: "Just the two of them for now.",
+    });
   });
 
-  it("reads a Thread's private halves from the transcript only, never the store", async () => {
-    const chat = chatOf([msg("u", "user", "seed"), msg("p", "assistant", "")]);
-    const built = await buildScenarioTurnStrategy(() => state, chat, "p")
-      .messageFactory!();
-    const text = built.messages.map((m) => m.content).join("\n");
-    expect(text).not.toContain("ZZ-LATENT");
-    expect(text).not.toContain("ZZ-WISH");
-    expect(text).toContain("TURN: SKETCH");
+  it("has no TURN line and no critique block", async () => {
+    const state = stateOf(chat);
+    const text = JSON.stringify(
+      await run(buildScenarioBuildStrategy(() => state, chat, "p1")),
+    );
+    expect(text).not.toContain("TURN:");
+    expect(text).not.toContain("PREVIOUS CRITIQUE");
   });
 
-  it("runs on the instruct model even when the story is on Xialong", async () => {
-    useCreativeModel("xialong-v1");
-    const chat = chatOf([msg("u", "user", "seed"), msg("p", "assistant", "")]);
-    const strat = buildScenarioTurnStrategy(() => state, chat, "p");
-    const built = await strat.messageFactory!();
-    expect(built.params?.model).toBe("glm-4-6");
-    expect(strat.continuation?.maxCalls).toBeGreaterThan(1);
-    expect(strat.requestId).toBe("scenario-c1-p");
-    expect(strat.target).toEqual({
+  it("targets the command handler", () => {
+    const s = buildScenarioBuildStrategy(() => makeState(), chat, "p1");
+    expect(s.target).toEqual({
       type: "forgeChat",
       chatId: "c1",
-      messageId: "p",
+      messageId: "p1",
+    });
+    expect(s.requestId).toBe("scenario-c1-p1");
+  });
+});
+
+describe("a Plan turn", () => {
+  const chat = chatOf([
+    msg("u1", "user", "A lock-keeper on a dying canal."),
+    msg("a1", "assistant", BUILT, { mode: "build" }),
+    msg("u2", "user", "What about the mills?"),
+    msg("p1", "assistant", "", { mode: "plan" }),
+  ]);
+  const state = () =>
+    makeState({
+      chat: { chats: [chat], activeChatId: "c1", refineChat: null },
+    } as never);
+
+  it("opens with the Plan prompt and targets the ordinary chat handler", async () => {
+    const s = await buildScenarioPlanStrategy(state, chat, "p1");
+    expect(s.target).toEqual({ type: "chat", chatId: "c1", messageId: "p1" });
+    expect(s.requestId).toBe("chat-c1-p1");
+    expect((await run(s))[0]).toEqual({
+      role: "system",
+      content: buildScenarioPlanPrompt("unset"),
+    });
+  });
+
+  it("sees what Build wrote as commands, never its thinking, tombstones or rejections", async () => {
+    const text = JSON.stringify(
+      await run(await buildScenarioPlanStrategy(state, chat, "p1")),
+    );
+    expect(text).toContain("Hesper Vane");
+    expect(text).not.toContain("the flooding is to come");
+    expect(text).not.toContain("[TOMBSTONES]");
+    expect(text).not.toContain("[REJECTED LAST TURN]");
+  });
+
+  it("ends on the writer's message when the creative model is GLM", async () => {
+    const messages = await run(
+      await buildScenarioPlanStrategy(state, chat, "p1"),
+    );
+    expect(messages[messages.length - 1]).toEqual({
+      role: "user",
+      content: "What about the mills?",
+    });
+  });
+
+  describe("on Xialong", () => {
+    it("prefills the chat style and stops at the next style block", async () => {
+      useCreativeModel("xialong-v1");
+      const s = await buildScenarioPlanStrategy(state, chat, "p1");
+      expect(s.assistantPrefill).toBe(XIALONG_STYLE.scenarioPlan);
+      const built = await s.messageFactory!();
+      expect(built.messages[built.messages.length - 1]).toEqual({
+        role: "assistant",
+        content: XIALONG_STYLE.scenarioPlan,
+      });
+      expect(built.params?.stop).toEqual(["</think>", "\n[ Style"]);
     });
   });
 });

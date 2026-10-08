@@ -37,7 +37,7 @@ import { DULFS_CATEGORY_LABELS } from "../../utils/category-detect";
 import { ensureCategory } from "./lorebook-sync";
 import { nameKey } from "./handlers/lorebook";
 import {
-  buildScenarioTurnStrategy,
+  buildScenarioBuildStrategy,
   buildForgeCleanupStrategy,
 } from "../../utils/forge-chat-strategy";
 
@@ -226,7 +226,7 @@ export function registerForgeChatEffects(
       const chat = findChat(latest(), chatId);
       if (!chat) return;
 
-      const strategy = buildScenarioTurnStrategy(latest, chat, assistantId);
+      const strategy = buildScenarioBuildStrategy(latest, chat, assistantId);
       dispatch(
         requestQueued({
           id: strategy.requestId,

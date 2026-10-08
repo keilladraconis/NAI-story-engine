@@ -2,11 +2,13 @@
  * Scenario turn strategy — the per-turn message factory for the Scenario chat,
  * plus the post-discard reference scrubber.
  *
- * A turn is: the Scenario system prompt (with the register), the Foundation
- * and Setting, a context block code computes fresh each turn (TURN, [POOL],
- * [LIVE], [THREADS], [TOMBSTONES], [REJECTED LAST TURN]),
- * then the chat's own transcript. Nothing here is frozen at session start: the
- * chat is long-lived and the Foundation changes under it.
+ * Two kinds of turn share one chat. A Plan turn is a conversation: the Plan
+ * prompt, the Foundation and Setting, what is built so far, and the transcript;
+ * it targets the ordinary chat handler and applies nothing. A Build turn is the
+ * Build prompt, the same premise, a context block code computes fresh each turn
+ * ([POOL], [LIVE], [THREADS], [TOMBSTONES], [REJECTED LAST TURN]), then the
+ * transcript; its reply is thinking and commands. Neither turn is shown the
+ * thinking of an earlier Build reply (`scenarioConversation`).
  *
  * [THREADS] carries title, cast and state only. A Thread's private halves reach
  * this model the one way they may: as the commands in its own transcript.
@@ -23,16 +25,20 @@ import {
   formatFoundationBlock,
   formatSettingBlock,
 } from "./context-builder";
-import { buildModelParams } from "./config";
+import { buildModelParams, isXialongMode } from "./config";
 import {
-  buildScenarioPrompt,
+  parseCommands,
+  serializeForgeCommand,
+} from "./crucible-command-parser";
+import {
+  buildScenarioBuildPrompt,
+  buildScenarioPlanPrompt,
   normalizeRegisterKey,
   FORGE_CLEANUP_PROMPT,
-  SCENARIO_GROW_INSTRUCTION,
+  SCENARIO_BUILD_INSTRUCTION,
+  XIALONG_STYLE,
 } from "./prompts";
 import { DULFS_CATEGORY_LABELS } from "./category-detect";
-
-export type ScenarioTurn = "sketch" | "steer" | "grow";
 
 /** The conversation as the Scenario model should see it: the chat's messages
  *  without the placeholder about to be filled, without reference scrubs, and
@@ -50,27 +56,23 @@ function conversation(
   );
 }
 
-/** Which kind of turn the placeholder `assistantMessageId` is about to hold.
- *  Read from the transcript, so a retry after a prune asks the right thing.
- *
- *  It is a sketch until some reply has applied a command:
- *  a reply that only asked a question has built nothing, and the writer's
- *  answer to it is still the seed being settled. After that, a turn the writer
- *  spoke before is a steer, and any other a grow. */
-export function scenarioTurn(
-  chat: Chat,
-  assistantMessageId: string,
-): ScenarioTurn {
-  const prior = conversation(chat.messages, assistantMessageId);
-  const sketched = prior.some(
-    (m) =>
-      m.role === "assistant" &&
-      (m.forgeSegments ?? []).some(
-        (s) => s.kind === "action" && s.action.status === "applied",
-      ),
-  );
-  if (!sketched) return "sketch";
-  return prior[prior.length - 1]?.role === "user" ? "steer" : "grow";
+/** The conversation as a later turn is shown it. A Build reply is reduced to
+ *  the commands it wrote: its thinking is GLM's reasoning, which should steer
+ *  neither the next Build nor the voice Plan answers in. One that wrote no
+ *  command has nothing left and is left out. */
+export function scenarioConversation(
+  messages: ChatMessage[],
+  placeholderId?: string,
+): Message[] {
+  return conversation(messages, placeholderId).flatMap((m) => {
+    if (m.role === "assistant" && m.mode === "build") {
+      const commands = parseCommands(m.content)
+        .map(serializeForgeCommand)
+        .join("\n");
+      return commands ? [{ role: m.role, content: commands }] : [];
+    }
+    return [{ role: m.role, content: m.content }];
+  });
 }
 
 /** The Engine's replies, oldest first. */
@@ -81,8 +83,10 @@ function replies(messages: ChatMessage[]): ChatMessage[] {
 /** The commands the most recent reply wrote that were not applied, each with
  *  the reason. A rejection the model never sees is one it repeats. */
 export function formatRejections(messages: ChatMessage[]): string {
-  const all = replies(messages);
-  const lines = (all[all.length - 1]?.forgeSegments ?? []).flatMap((s) => {
+  // The last reply that was read for commands, not the last reply: a Plan
+  // reply after a Build has no segments, and the rejection must outlive it.
+  const built = replies(messages).filter((m) => m.forgeSegments);
+  const lines = (built[built.length - 1]?.forgeSegments ?? []).flatMap((s) => {
     if (s.kind !== "action" || s.action.status === "applied") return [];
     const { kind, name, reason } = s.action;
     return [
@@ -148,7 +152,21 @@ function formatTombstones(state: RootState, chatId: string): string {
 
 // --- Strategies ---
 
-export function buildScenarioTurnStrategy(
+async function premiseOf(state: RootState): Promise<Message[]> {
+  const premise = [formatFoundationBlock(state), await formatSettingBlock()]
+    .filter((b) => b.length > 0)
+    .join("\n\n");
+  return premise ? [{ role: "system", content: premise }] : [];
+}
+
+function contextBlock(blocks: string[]): Message[] {
+  const present = blocks.filter((b) => b.length > 0);
+  return present.length > 0
+    ? [{ role: "assistant", content: present.join("\n\n") }]
+    : [];
+}
+
+export function buildScenarioBuildStrategy(
   getState: () => RootState,
   queuedChat: Chat,
   assistantMessageId: string,
@@ -159,47 +177,43 @@ export function buildScenarioTurnStrategy(
     // message pruned while it waited, changed it after the strategy was built.
     const chat =
       state.chat.chats.find((c) => c.id === queuedChat.id) ?? queuedChat;
-    const turn = scenarioTurn(chat, assistantMessageId);
     const prior = conversation(chat.messages, assistantMessageId);
-
-    const premise = [formatFoundationBlock(state), await formatSettingBlock()]
-      .filter((b) => b.length > 0)
-      .join("\n\n");
-
-    // No truncation anywhere in this block: a summary cut short is a draft the
-    // model revises from half its text.
-    const blocks = [
-      `TURN: ${turn.toUpperCase()}`,
-      formatPool(state, chat.id),
-      formatLive(state),
-      formatThreads(state),
-      formatTombstones(state, chat.id),
-      formatRejections(prior),
-    ].filter((b) => b.length > 0);
+    // The writer's own last message directs the build. Anything else at the
+    // tail is an empty send, which stands for the fixed instruction.
+    const directed = prior[prior.length - 1]?.role === "user";
 
     const messages: Message[] = [
       {
         role: "system",
-        content: buildScenarioPrompt(
+        content: buildScenarioBuildPrompt(
           normalizeRegisterKey(state.foundation.intensity?.level),
         ),
       },
-      ...(premise ? [{ role: "system" as const, content: premise }] : []),
-      { role: "assistant", content: blocks.join("\n\n") },
-      ...prior.map((m) => ({ role: m.role, content: m.content })),
-      ...(turn === "grow"
-        ? [{ role: "user" as const, content: SCENARIO_GROW_INSTRUCTION }]
-        : []),
+      ...(await premiseOf(state)),
+      // No truncation anywhere in this block: a summary cut short is a draft
+      // the model revises from half its text.
+      ...contextBlock([
+        formatPool(state, chat.id),
+        formatLive(state),
+        formatThreads(state),
+        formatTombstones(state, chat.id),
+        formatRejections(prior),
+      ]),
+      ...scenarioConversation(chat.messages, assistantMessageId),
+      ...(directed
+        ? []
+        : [{ role: "user" as const, content: SCENARIO_BUILD_INSTRUCTION }]),
     ];
 
     return {
       messages,
-      // "instruct": a turn emits a strict bracket grammar, and every command
-      // that misses it is a card the writer does not get. Observed the other
-      // way round on the Forge: on the creative model a pass answered
-      // conversationally and created nothing.
+      // "instruct": a Build turn emits a strict bracket grammar, and every
+      // command that misses it is an entry the writer does not get.
+      // 1024 per call, not the whole 2048 bucket: a generation is refused
+      // until the bucket holds max_tokens, and the continuation below carries
+      // a reply that runs past one call.
       params: await buildModelParams(
-        { max_tokens: 1536, temperature: 0.9, min_p: 0.05 },
+        { max_tokens: 1024, temperature: 0.9, min_p: 0.05 },
         "instruct",
       ),
     };
@@ -214,9 +228,68 @@ export function buildScenarioTurnStrategy(
       messageId: assistantMessageId,
     },
     prefillBehavior: "trim",
-    // No prefill: a reply opens with prose. Cut off by the token cap it stops
-    // mid-command and the last action is lost, so it continues.
+    // No prefill: a reply opens with thinking. Cut off by the token cap it
+    // stops mid-command and the last action is lost, so it continues.
     continuation: { maxCalls: 4 },
+  };
+}
+
+/** A Plan turn: a conversation on the creative model. It targets the ordinary
+ *  chat handler, which commits the text and never reads it for commands. */
+export async function buildScenarioPlanStrategy(
+  getState: () => RootState,
+  queuedChat: Chat,
+  assistantMessageId: string,
+): Promise<GenerationStrategy> {
+  const xialong = await isXialongMode();
+  const prefill = xialong ? XIALONG_STYLE.scenarioPlan : undefined;
+
+  const factory = async () => {
+    const state = getState();
+    const chat =
+      state.chat.chats.find((c) => c.id === queuedChat.id) ?? queuedChat;
+    const messages: Message[] = [
+      {
+        role: "system",
+        content: buildScenarioPlanPrompt(
+          normalizeRegisterKey(state.foundation.intensity?.level),
+        ),
+      },
+      ...(await premiseOf(state)),
+      ...contextBlock([
+        formatPool(state, chat.id),
+        formatLive(state),
+        formatThreads(state),
+      ]),
+      ...scenarioConversation(chat.messages, assistantMessageId),
+      ...(prefill ? [{ role: "assistant" as const, content: prefill }] : []),
+    ];
+    return {
+      messages,
+      // Small first call so it clears the token bucket; the continuation
+      // below extends a reply that runs long.
+      params: await buildModelParams({
+        max_tokens: 512,
+        temperature: 1.0,
+        ...(xialong ? { stop: ["</think>", "\n[ Style"] } : {}),
+      }),
+    };
+  };
+
+  return {
+    requestId: `chat-${queuedChat.id}-${assistantMessageId}`,
+    messageFactory: factory,
+    target: {
+      type: "chat",
+      chatId: queuedChat.id,
+      messageId: assistantMessageId,
+    },
+    prefillBehavior: "trim",
+    assistantPrefill: prefill,
+    // Xialong sometimes returns an empty think block and nothing else; a
+    // reply under this floor is re-rolled. "Cut the prologue." is a real one.
+    minResponseLength: xialong ? 4 : undefined,
+    continuation: { maxCalls: 5 },
   };
 }
 
