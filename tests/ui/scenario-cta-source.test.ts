@@ -1,4 +1,4 @@
-// Static guard over the Setup tab's "Sketch the scenario" button.
+// Static guard over the Setup tab's "Plan the scenario" button.
 //
 // `.tsx` is never collected by vitest here, so the component cannot be
 // render-tested; what can be held is its structure. The decision itself lives in
@@ -57,5 +57,17 @@ describe("the Scenario CTA", () => {
     const src = handler();
     const opens = src.match(/props\.onOpenChat\(\)/g) ?? [];
     expect(opens.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("promises a conversation, not a build: the chat opens in Plan", () => {
+    const src = readFileSync(CTA, "utf8");
+    expect(src).toContain('"Plan the scenario"');
+    expect(src).toContain(
+      '"Not sure where to start? Say what you want to see and talk it through. Switch to Build when it has a shape, and the Engine records the pressures, people and places it can grow from."',
+    );
+    expect(src).toContain(
+      '"Pick a register above. The Scenario talks and builds at the pressure you set, so it is worth choosing before you start."',
+    );
+    expect(src).not.toMatch(/sketch/i);
   });
 });

@@ -59,7 +59,7 @@ describe("hasScenarioContent", () => {
 });
 
 describe("reusableScenarioId", () => {
-  // The store seeds an empty "Scenario 1" and selects it. "Sketch the scenario"
+  // The store seeds an empty "Scenario 1" and selects it. "Plan the scenario"
   // minted a second chat regardless, so a writer's first click left them in
   // "Scenario 2" with "Scenario 1" sitting empty beside it in Sessions.
   // An empty chat that is already open is the chat to talk in.

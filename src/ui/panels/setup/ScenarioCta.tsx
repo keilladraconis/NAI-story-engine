@@ -1,4 +1,4 @@
-// "Sketch the scenario" — the obvious next step once a register is chosen and the
+// "Plan the scenario" — the obvious next step once a register is chosen and the
 // Foundation is still blank. Sits directly under the Intensity picker and only
 // while every field card is empty (Setup owns that condition), so it is a
 // starting prompt rather than permanent furniture.
@@ -109,12 +109,12 @@ export function ScenarioCta(props: { onOpenChat: () => void }) {
         }}
       >
         <CtaIcon ready={ready} />
-        {ready ? "Sketch the scenario" : "Choose an Intensity first"}
+        {ready ? "Plan the scenario" : "Choose an Intensity first"}
       </span>
       <span style={{ fontSize: "0.85em", opacity: ready ? 0.8 : 1 }}>
         {ready
-          ? "Not sure where to start? Say what you want to see, and the Engine builds the pressures, people and places it can grow from."
-          : "Pick a register above. The sketch is built at the pressure you set, so it is worth choosing before you start."}
+          ? "Not sure where to start? Say what you want to see and talk it through. Switch to Build when it has a shape, and the Engine records the pressures, people and places it can grow from."
+          : "Pick a register above. The Scenario talks and builds at the pressure you set, so it is worth choosing before you start."}
       </span>
     </button>
   );

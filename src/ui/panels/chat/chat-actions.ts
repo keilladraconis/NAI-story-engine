@@ -25,7 +25,7 @@ export function hasScenarioContent(
   return chats.some((c) => c.type === "scenario" && c.messages.length > 0);
 }
 
-/** The Scenario "Sketch the scenario" should open, or null to start a fresh one.
+/** The Scenario "Plan the scenario" should open, or null to start a fresh one.
  *
  *  The store seeds an empty "Scenario 1" and selects it, so the CTA's first
  *  click used to mint "Scenario 2" and leave the seeded one sitting empty

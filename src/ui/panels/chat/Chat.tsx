@@ -41,8 +41,8 @@ function MessageList() {
   // without an effect to reset it.
   const [page, setPage] = useState({ chatId: "", back: 0 });
 
-  // Sending always returns to the end — including an empty send, which grows
-  // the sketch. Both go through this one action.
+  // Sending always returns to the end — including an empty send, which in
+  // Build builds what was discussed. Both go through this one action.
   useEffect(
     () =>
       store.subscribeEffect(matchesAction(uiChatSubmitUserMessage), () =>
