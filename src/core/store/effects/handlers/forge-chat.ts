@@ -32,6 +32,7 @@ import type {
   ForgeActionRecord,
   ForgeSegment,
 } from "../../../chat-types/types";
+import { bindEntryFor, renameEntry } from "../entity-entry";
 import { SCENARIO_BUILD_PREFILL } from "../../../utils/prompts";
 import { stripThinkingTags } from "../../../utils/tag-parser";
 import { DulfsFieldID, FieldID } from "../../../../config/field-definitions";
@@ -58,20 +59,73 @@ const REASON = {
   noSummary: "needs a summary after the bar",
   unknownType:
     "unknown type; use CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC",
-  live: "is live and cannot be changed from the chat",
-  notFound: "not found; name a draft under [POOL], spelled exactly",
+  notFound: "not found; name an element under [WORLD], spelled exactly",
   noNewName: "needs a new name after the arrow",
+  sameName: "is already its name; write no RENAME for it",
+  taken: "is the name of another element; choose a different name",
+  notBuiltHere: "was not built here and cannot be deleted from the chat",
   concluded: "is concluded and cannot be rewritten",
 } as const;
 
+function lorebookRefused(error: unknown): string {
+  return `the lorebook refused: ${error instanceof Error ? error.message : String(error)}`;
+}
+
+/** Make a live entity with its lorebook entry. A lorebook failure rejects the
+ *  command and makes nothing. */
+async function createLive(
+  kind: "CREATE",
+  elementType: string,
+  fieldId: DulfsFieldID,
+  name: string,
+  summary: string,
+  chatId: string,
+  dispatch: AppDispatch,
+): Promise<ForgeActionRecord> {
+  let bound: { entryId: string; created: boolean };
+  try {
+    bound = await bindEntryFor({ name, categoryId: fieldId });
+  } catch (error) {
+    return {
+      kind,
+      status: "rejected",
+      elementType,
+      name,
+      reason: lorebookRefused(error),
+    };
+  }
+  const entity: WorldEntity = {
+    id: api.v1.uuid(),
+    categoryId: fieldId,
+    name,
+    summary,
+    lifecycle: "live",
+    lorebookEntryId: bound.entryId,
+    sourceChatId: chatId,
+  };
+  dispatch(entityForged({ entity }));
+  return {
+    kind,
+    status: "applied",
+    elementType,
+    name,
+    entityId: entity.id,
+    undo: {
+      op: "entityCreated",
+      entityId: entity.id,
+      entryCreated: bound.created,
+    },
+  };
+}
+
 /** Execute a single parsed command and return its outcome record. */
-export function executeForgeCommand(
+export async function executeForgeCommand(
   cmd: ParsedCommand,
   chatId: string,
-  assistantMessageId: string,
+  _assistantMessageId: string,
   getState: () => RootState,
   dispatch: AppDispatch,
-): ForgeActionRecord {
+): Promise<ForgeActionRecord> {
   switch (cmd.kind) {
     case "CREATE": {
       const elementType = cmd.elementType.toUpperCase();
@@ -103,17 +157,15 @@ export function executeForgeCommand(
           reason: REASON.exists,
         };
       }
-      const entity: WorldEntity = {
-        id: api.v1.uuid(),
-        categoryId: fieldId,
-        name: cmd.name,
-        summary: cmd.content,
-        lifecycle: "draft",
-        sourceChatId: chatId,
-        lastAffectingMessageId: assistantMessageId,
-      };
-      dispatch(entityForged({ entity }));
-      return { kind: "CREATE", status: "applied", elementType, name: cmd.name };
+      return createLive(
+        "CREATE",
+        elementType,
+        fieldId,
+        cmd.name,
+        cmd.content,
+        chatId,
+        dispatch,
+      );
     }
 
     case "REVISE": {
@@ -127,40 +179,32 @@ export function executeForgeCommand(
       }
       const target = findEntityByName(getState(), cmd.name);
       if (target) {
-        if (target.lifecycle === "live") {
-          return {
-            kind: "REVISE",
-            status: "rejected",
-            name: cmd.name,
-            reason: REASON.live,
-          };
-        }
         dispatch(
-          entitySummaryUpdated({
-            entityId: target.id,
-            summary: cmd.content,
-            lastAffectingMessageId: assistantMessageId,
-          }),
+          entitySummaryUpdated({ entityId: target.id, summary: cmd.content }),
         );
-        return { kind: "REVISE", status: "applied", name: cmd.name };
+        return {
+          kind: "REVISE",
+          status: "applied",
+          name: cmd.name,
+          entityId: target.id,
+          undo: {
+            op: "summary",
+            entityId: target.id,
+            before: target.summary,
+            wrote: cmd.content,
+          },
+        };
       }
       // Find-or-create: the model routinely revises something it never created.
-      const created: WorldEntity = {
-        id: api.v1.uuid(),
-        categoryId: FieldID.DramatisPersonae,
-        name: cmd.name,
-        summary: cmd.content,
-        lifecycle: "draft",
-        sourceChatId: chatId,
-        lastAffectingMessageId: assistantMessageId,
-      };
-      dispatch(entityForged({ entity: created }));
-      return {
-        kind: "CREATE",
-        status: "applied",
-        elementType: "CHARACTER",
-        name: cmd.name,
-      };
+      return createLive(
+        "CREATE",
+        "CHARACTER",
+        FieldID.DramatisPersonae,
+        cmd.name,
+        cmd.content,
+        chatId,
+        dispatch,
+      );
     }
 
     case "DELETE": {
@@ -173,16 +217,38 @@ export function executeForgeCommand(
           reason: REASON.notFound,
         };
       }
-      if (target.lifecycle === "live") {
+      if (!target.sourceChatId) {
         return {
           kind: "DELETE",
           status: "rejected",
           name: cmd.name,
-          reason: REASON.live,
+          reason: REASON.notBuiltHere,
         };
       }
+      let entry: LorebookEntry | null;
+      try {
+        entry = target.lorebookEntryId
+          ? await api.v1.lorebook.entry(target.lorebookEntryId)
+          : null;
+        if (entry) await api.v1.lorebook.removeEntry(entry.id);
+      } catch (error) {
+        return {
+          kind: "DELETE",
+          status: "rejected",
+          name: target.name,
+          reason: lorebookRefused(error),
+        };
+      }
+      const threadIds = getState()
+        .world.threads.filter((t) => t.entityIds.includes(target.id))
+        .map((t) => t.id);
       dispatch(entityDeleted({ entityId: target.id }));
-      return { kind: "DELETE", status: "applied", name: target.name };
+      return {
+        kind: "DELETE",
+        status: "applied",
+        name: target.name,
+        undo: { op: "entityDeleted", entity: target, entry, threadIds },
+      };
     }
 
     case "RENAME": {
@@ -195,15 +261,8 @@ export function executeForgeCommand(
           reason: REASON.notFound,
         };
       }
-      if (target.lifecycle === "live") {
-        return {
-          kind: "RENAME",
-          status: "rejected",
-          name: target.name,
-          reason: REASON.live,
-        };
-      }
-      if (!cmd.newName.trim()) {
+      const newName = cmd.newName.trim();
+      if (!newName) {
         return {
           kind: "RENAME",
           status: "rejected",
@@ -211,10 +270,39 @@ export function executeForgeCommand(
           reason: REASON.noNewName,
         };
       }
+      if (newName === target.name) {
+        return {
+          kind: "RENAME",
+          status: "rejected",
+          name: target.name,
+          reason: REASON.sameName,
+        };
+      }
+      const clash = findEntityByName(getState(), newName);
+      if (clash && clash.id !== target.id) {
+        return {
+          kind: "RENAME",
+          status: "rejected",
+          name: target.name,
+          reason: REASON.taken,
+        };
+      }
+      if (target.lorebookEntryId) {
+        try {
+          await renameEntry(target.lorebookEntryId, target.name, newName);
+        } catch (error) {
+          return {
+            kind: "RENAME",
+            status: "rejected",
+            name: target.name,
+            reason: lorebookRefused(error),
+          };
+        }
+      }
       dispatch(
         entityEdited({
           entityId: target.id,
-          name: cmd.newName,
+          name: newName,
           summary: target.summary,
         }),
       );
@@ -222,7 +310,14 @@ export function executeForgeCommand(
         kind: "RENAME",
         status: "applied",
         name: cmd.oldName,
-        newName: cmd.newName,
+        newName,
+        entityId: target.id,
+        undo: {
+          op: "name",
+          entityId: target.id,
+          before: target.name,
+          wrote: newName,
+        },
       };
     }
 
@@ -243,17 +338,38 @@ export function executeForgeCommand(
         // A rewrite replaces what it supplies. An empty segment means "no
         // change", never "erase": the model re-emits a Thread to move its
         // state, and must not be able to wipe the private half by omission.
+        const before: [string, string, string] = [
+          existing.state,
+          existing.latent,
+          existing.wish,
+        ];
+        const wrote: [string, string, string] = [
+          cmd.state || existing.state,
+          cmd.latent || existing.latent,
+          cmd.wish || existing.wish,
+        ];
         dispatch(
           threadLedgerUpdated({
             threadId: existing.id,
-            state: cmd.state || existing.state,
-            latent: cmd.latent || existing.latent,
+            state: wrote[0],
+            latent: wrote[1],
           }),
         );
         if (cmd.wish) {
           dispatch(threadWishSet({ threadId: existing.id, wish: cmd.wish }));
         }
-        return { kind: "THREAD", status: "applied", name: existing.title };
+        return {
+          kind: "THREAD",
+          status: "applied",
+          name: existing.title,
+          threadId: existing.id,
+          undo: {
+            op: "threadRewritten",
+            threadId: existing.id,
+            before,
+            wrote,
+          },
+        };
       }
       // Every named member must be a known element (the parser admits no
       // THREAD without one). A Thread made from the names that happen to
@@ -268,7 +384,7 @@ export function executeForgeCommand(
           kind: "THREAD",
           status: "rejected",
           name: cmd.title,
-          reason: `unknown member "${unknown.name}"; name only elements under [POOL] or [LIVE], spelled exactly`,
+          reason: `unknown member "${unknown.name}"; name only elements under [WORLD], spelled exactly`,
         };
       }
       const memberIds = members
@@ -284,7 +400,13 @@ export function executeForgeCommand(
         entityIds: memberIds,
       };
       dispatch(threadCreated({ thread }));
-      return { kind: "THREAD", status: "applied", name: cmd.title };
+      return {
+        kind: "THREAD",
+        status: "applied",
+        name: cmd.title,
+        threadId: thread.id,
+        undo: { op: "threadCreated", threadId: thread.id },
+      };
     }
 
     case "LINK":
@@ -295,13 +417,13 @@ export function executeForgeCommand(
 
 /** Walk a finished turn into ordered display segments, executing each command
  *  as it is encountered. DONE/LINK produce no segment. */
-function buildForgeSegments(
+async function buildForgeSegments(
   text: string,
   chatId: string,
   messageId: string,
   getState: () => RootState,
   dispatch: AppDispatch,
-): ForgeSegment[] {
+): Promise<ForgeSegment[]> {
   const segments: ForgeSegment[] = [];
   let prose: string[] = [];
   const flush = () => {
@@ -321,7 +443,7 @@ function buildForgeSegments(
     }
     if (tok.command.kind === "DONE" || tok.command.kind === "LINK") continue;
     flush();
-    const action = executeForgeCommand(
+    const action = await executeForgeCommand(
       tok.command,
       chatId,
       messageId,
@@ -371,7 +493,7 @@ export const forgeChatHandler: GenerationHandlers<ForgeChatTarget> = {
     );
     if (!ctx.generationSucceeded) return;
 
-    const segments = buildForgeSegments(
+    const segments = await buildForgeSegments(
       cleaned,
       ctx.target.chatId,
       ctx.target.messageId,

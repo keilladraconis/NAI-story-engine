@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createStore, combineReducers } from "nai-store";
 import {
   forgeChatHandler,
   executeForgeCommand,
@@ -7,10 +8,13 @@ import type { CompletionContext } from "../../../../../src/core/store/effects/ge
 import type {
   RootState,
   WorldEntity,
+  Thread,
+  AppDispatch,
 } from "../../../../../src/core/store/types";
 import {
   worldSlice,
   initialWorldState,
+  entityForged,
   threadCreated,
   threadLedgerUpdated,
   threadWishSet,
@@ -48,6 +52,44 @@ function makeState(entities: WorldEntity[] = []): RootState {
     world: { threads: [], entitiesById, entityIds: entities.map((e) => e.id) },
   } as unknown as RootState;
 }
+
+function imported(name: string, summary: string, entryId?: string) {
+  return makeEntity({
+    id: `id-${name}`,
+    name,
+    summary,
+    lifecycle: "live",
+    ...(entryId ? { lorebookEntryId: entryId } : {}),
+  });
+}
+
+/** A real store (real world reducer) so the commands' effects can be read back. */
+function harness(seed: { entities?: WorldEntity[]; threads?: unknown[] } = {}) {
+  const entities = seed.entities ?? [];
+  const entitiesById: Record<string, WorldEntity> = {};
+  for (const e of entities) entitiesById[e.id] = e;
+  const store = createStore<{ world: typeof initialWorldState }>(
+    combineReducers({ world: worldSlice.reducer }),
+    false,
+  );
+  // Seed through the store's own reducer: forge each entity, create each thread.
+  for (const e of entities) store.dispatch(entityForged({ entity: e }));
+  for (const t of (seed.threads ?? []) as Thread[]) {
+    store.dispatch(threadCreated({ thread: t }));
+  }
+  return {
+    getState: () => store.getState() as unknown as RootState,
+    dispatch: store.dispatch as AppDispatch,
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(api.v1.lorebook.entries).mockResolvedValue([]);
+  vi.mocked(api.v1.lorebook.createEntry).mockResolvedValue("e-new");
+  vi.mocked(api.v1.lorebook.updateEntry).mockResolvedValue(undefined);
+  vi.mocked(api.v1.lorebook.removeEntry).mockResolvedValue(undefined);
+});
 
 describe("forgeChatHandler.streaming", () => {
   it("dispatches messageAppended with the delta", () => {
@@ -114,7 +156,7 @@ describe("forgeChatHandler.completion", () => {
     expect(updateCall![0].payload.content).toBe('[CREATE CHARACTER "A" | foo]');
   });
 
-  it("creates DRAFT entity (no lorebook call) on CREATE", async () => {
+  it("creates a LIVE entity bound to a lorebook entry on CREATE", async () => {
     const dispatch = vi.fn();
     const ctx: CompletionContext<ForgeChatTarget> = {
       target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
@@ -128,124 +170,13 @@ describe("forgeChatHandler.completion", () => {
       ([a]) => a.type === "world/entityForged",
     );
     expect(forged).toBeDefined();
-    expect(forged![0].payload.entity.lifecycle).toBe("draft");
+    expect(forged![0].payload.entity.lifecycle).toBe("live");
     expect(forged![0].payload.entity.sourceChatId).toBe("c1");
-    expect(forged![0].payload.entity.lorebookEntryId).toBeUndefined();
-    expect(api.v1.lorebook.createEntry).not.toHaveBeenCalled();
+    expect(forged![0].payload.entity.lorebookEntryId).toBe("e-new");
+    expect(api.v1.lorebook.createEntry).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects REVISE on a live entity with a rejected chip (no warning message)", async () => {
-    const dispatch = vi.fn();
-    const live = makeEntity({
-      id: "live-1",
-      name: "OldQuay",
-      lifecycle: "live",
-      lorebookEntryId: "lb-1",
-      categoryId: FieldID.Locations,
-    });
-    const ctx: CompletionContext<ForgeChatTarget> = {
-      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
-      getState: () => makeState([live]),
-      dispatch,
-      accumulatedText: '[REVISE "OldQuay" | rewritten]',
-      generationSucceeded: true,
-    };
-    await forgeChatHandler.completion(ctx);
-    expect(
-      dispatch.mock.calls.some(
-        ([a]) => a.type === "world/entitySummaryUpdated",
-      ),
-    ).toBe(false);
-    expect(
-      dispatch.mock.calls.some(([a]) => a.type === "chat/messageAdded"),
-    ).toBe(false);
-    expect(segmentsFromCompletion(dispatch.mock.calls)).toEqual([
-      {
-        kind: "action",
-        action: {
-          kind: "REVISE",
-          status: "rejected",
-          name: "OldQuay",
-          reason: "is live and cannot be changed from the chat",
-          body: [{ label: "Summary", text: "rewritten" }],
-        },
-      },
-    ]);
-  });
-
-  it("rejects DELETE on a live entity with a rejected chip (no warning message)", async () => {
-    const dispatch = vi.fn();
-    const live = makeEntity({
-      id: "live-1",
-      name: "OldQuay",
-      lifecycle: "live",
-      lorebookEntryId: "lb-1",
-    });
-    const ctx: CompletionContext<ForgeChatTarget> = {
-      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
-      getState: () => makeState([live]),
-      dispatch,
-      accumulatedText: '[DELETE "OldQuay"]',
-      generationSucceeded: true,
-    };
-    await forgeChatHandler.completion(ctx);
-    expect(
-      dispatch.mock.calls.some(([a]) => a.type === "world/entityDeleted"),
-    ).toBe(false);
-    expect(
-      dispatch.mock.calls.some(([a]) => a.type === "chat/messageAdded"),
-    ).toBe(false);
-    expect(segmentsFromCompletion(dispatch.mock.calls)).toEqual([
-      {
-        kind: "action",
-        action: {
-          kind: "DELETE",
-          status: "rejected",
-          name: "OldQuay",
-          reason: "is live and cannot be changed from the chat",
-          body: [],
-        },
-      },
-    ]);
-  });
-
-  it("rejects RENAME on a live entity with a rejected chip (no warning message)", async () => {
-    const dispatch = vi.fn();
-    const live = makeEntity({
-      id: "live-1",
-      name: "OldQuay",
-      lifecycle: "live",
-      lorebookEntryId: "lb-1",
-    });
-    const ctx: CompletionContext<ForgeChatTarget> = {
-      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
-      getState: () => makeState([live]),
-      dispatch,
-      accumulatedText: '[RENAME "OldQuay" → "NewQuay"]',
-      generationSucceeded: true,
-    };
-    await forgeChatHandler.completion(ctx);
-    expect(
-      dispatch.mock.calls.some(([a]) => a.type === "world/entityEdited"),
-    ).toBe(false);
-    expect(
-      dispatch.mock.calls.some(([a]) => a.type === "chat/messageAdded"),
-    ).toBe(false);
-    expect(segmentsFromCompletion(dispatch.mock.calls)).toEqual([
-      {
-        kind: "action",
-        action: {
-          kind: "RENAME",
-          status: "rejected",
-          name: "OldQuay",
-          reason: "is live and cannot be changed from the chat",
-          body: [],
-        },
-      },
-    ]);
-  });
-
-  it("REVISE on a non-existent name creates a draft Character (find-or-create)", async () => {
+  it("REVISE on a non-existent name creates a live Character (find-or-create)", async () => {
     const dispatch = vi.fn();
     const ctx: CompletionContext<ForgeChatTarget> = {
       target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
@@ -260,7 +191,7 @@ describe("forgeChatHandler.completion", () => {
     );
     expect(forged).toBeDefined();
     expect(forged![0].payload.entity.name).toBe("Wholly New");
-    expect(forged![0].payload.entity.lifecycle).toBe("draft");
+    expect(forged![0].payload.entity.lifecycle).toBe("live");
     expect(forged![0].payload.entity.categoryId).toBe(FieldID.DramatisPersonae);
     expect(forged![0].payload.entity.sourceChatId).toBe("c1");
   });
@@ -287,70 +218,6 @@ describe("forgeChatHandler.completion", () => {
     );
     expect(updated).toBeDefined();
     expect(updated![0].payload.summary).toBe("new summary");
-  });
-
-  it("sets lastAffectingMessageId on CREATE entity", async () => {
-    const dispatch = vi.fn();
-    const ctx: CompletionContext<ForgeChatTarget> = {
-      target: { type: "forgeChat", chatId: "c1", messageId: "m-42" },
-      getState: () => makeState(),
-      dispatch,
-      accumulatedText: '[CREATE CHARACTER "Vesper" | A lighthouse keeper.]',
-      generationSucceeded: true,
-    };
-    await forgeChatHandler.completion(ctx);
-    const forged = dispatch.mock.calls.find(
-      ([a]) => a.type === "world/entityForged",
-    );
-    expect(forged).toBeDefined();
-    expect(forged![0].payload.entity.lastAffectingMessageId).toBe("m-42");
-  });
-
-  it("sets lastAffectingMessageId on REVISE dispatch", async () => {
-    const dispatch = vi.fn();
-    const draft = makeEntity({
-      id: "d1",
-      name: "Vesper",
-      lifecycle: "draft",
-      summary: "old",
-      sourceChatId: "c1",
-    });
-    const ctx: CompletionContext<ForgeChatTarget> = {
-      target: { type: "forgeChat", chatId: "c1", messageId: "m-99" },
-      getState: () => makeState([draft]),
-      dispatch,
-      accumulatedText: '[REVISE "Vesper" | revised content]',
-      generationSucceeded: true,
-    };
-    await forgeChatHandler.completion(ctx);
-    const updated = dispatch.mock.calls.find(
-      ([a]) => a.type === "world/entitySummaryUpdated",
-    );
-    expect(updated).toBeDefined();
-    expect(updated![0].payload.lastAffectingMessageId).toBe("m-99");
-  });
-
-  it("DELETE on a draft deletes it", async () => {
-    const dispatch = vi.fn();
-    const draft = makeEntity({
-      id: "d1",
-      name: "Felix",
-      lifecycle: "draft",
-      sourceChatId: "c1",
-      categoryId: FieldID.DramatisPersonae,
-    });
-    const ctx: CompletionContext<ForgeChatTarget> = {
-      target: { type: "forgeChat", chatId: "c1", messageId: "m1" },
-      getState: () => makeState([draft]),
-      dispatch,
-      accumulatedText: '[DELETE "Felix"]',
-      generationSucceeded: true,
-    };
-    await forgeChatHandler.completion(ctx);
-    const deleted = dispatch.mock.calls.find(
-      ([a]) => a.type === "world/entityDeleted",
-    );
-    expect(deleted).toBeDefined();
   });
 
   it("removes the empty placeholder turn on empty accumulatedText", async () => {
@@ -394,6 +261,12 @@ describe("forgeChatHandler.completion — segments", () => {
         status: "applied",
         elementType: "SYSTEM",
         name: "Apartment Evolution",
+        entityId: expect.any(String),
+        undo: {
+          op: "entityCreated",
+          entityId: expect.any(String),
+          entryCreated: true,
+        },
         body: [
           { label: "Type", text: "SYSTEM" },
           { label: "Summary", text: "progressive transformation" },
@@ -440,6 +313,12 @@ describe("forgeChatHandler.completion — segments", () => {
         status: "applied",
         elementType: "CHARACTER",
         name: "Ghost",
+        entityId: expect.any(String),
+        undo: {
+          op: "entityCreated",
+          entityId: expect.any(String),
+          entryCreated: true,
+        },
         body: [{ label: "Summary", text: "flickers" }],
       },
     });
@@ -537,9 +416,9 @@ describe("a THREAD command, applied", () => {
     latent: "He was paid already.",
     wish: "She floods the cut.",
   };
-  const run = (state: RootState, command: typeof cmd) => {
+  const run = async (state: RootState, command: typeof cmd) => {
     const dispatch = vi.fn();
-    const record = executeForgeCommand(
+    const record = await executeForgeCommand(
       command,
       "chat",
       "msg",
@@ -549,8 +428,8 @@ describe("a THREAD command, applied", () => {
     return { dispatch, record };
   };
 
-  it("creates a Thread carrying its wish", () => {
-    const { dispatch, record } = run(stateWith([]), cmd);
+  it("creates a Thread carrying its wish", async () => {
+    const { dispatch, record } = await run(stateWith([]), cmd);
     expect(record.status).toBe("applied");
     const created = dispatch.mock.calls[0][0];
     expect(created.type).toBe(threadCreated.type);
@@ -563,16 +442,16 @@ describe("a THREAD command, applied", () => {
     });
   });
 
-  it("creates a Thread with one member", () => {
-    const { record } = run(stateWith([]), {
+  it("creates a Thread with one member", async () => {
+    const { record } = await run(stateWith([]), {
       ...cmd,
       memberNames: ["Hesper Vane"],
     });
     expect(record.status).toBe("applied");
   });
 
-  it("rejects a new Thread naming someone who is not a known element, though the others are", () => {
-    const { dispatch, record } = run(stateWith([]), {
+  it("rejects a new Thread naming someone who is not a known element, though the others are", async () => {
+    const { dispatch, record } = await run(stateWith([]), {
       ...cmd,
       memberNames: ["Hesper Vane", "Nobody", "No One Else"],
     });
@@ -581,20 +460,20 @@ describe("a THREAD command, applied", () => {
       status: "rejected",
       name: "Half the House",
       reason:
-        'unknown member "Nobody"; name only elements under [POOL] or [LIVE], spelled exactly',
+        'unknown member "Nobody"; name only elements under [WORLD], spelled exactly',
     });
     expect(dispatch).not.toHaveBeenCalled();
   });
 
-  it("rejects a new Thread none of whose members is known, for the same reason", () => {
-    const { dispatch, record } = run(stateWith([]), {
+  it("rejects a new Thread none of whose members is known, for the same reason", async () => {
+    const { dispatch, record } = await run(stateWith([]), {
       ...cmd,
       memberNames: ["Nobody"],
     });
     expect(record).toMatchObject({
       status: "rejected",
       reason:
-        'unknown member "Nobody"; name only elements under [POOL] or [LIVE], spelled exactly',
+        'unknown member "Nobody"; name only elements under [WORLD], spelled exactly',
     });
     expect(dispatch).not.toHaveBeenCalled();
   });
@@ -609,8 +488,8 @@ describe("a THREAD command, applied", () => {
     status: "open",
   };
 
-  it("rewrites the open Thread with the same title", () => {
-    const { dispatch, record } = run(stateWith([existing]), cmd);
+  it("rewrites the open Thread with the same title", async () => {
+    const { dispatch, record } = await run(stateWith([existing]), cmd);
     expect(record.status).toBe("applied");
     expect(dispatch).toHaveBeenCalledWith(
       threadLedgerUpdated({
@@ -624,8 +503,8 @@ describe("a THREAD command, applied", () => {
     );
   });
 
-  it("keeps the stored private notes and wish when the rewrite leaves them empty", () => {
-    const { dispatch } = run(stateWith([existing]), {
+  it("keeps the stored private notes and wish when the rewrite leaves them empty", async () => {
+    const { dispatch } = await run(stateWith([existing]), {
       ...cmd,
       latent: "",
       wish: "",
@@ -640,8 +519,8 @@ describe("a THREAD command, applied", () => {
     );
   });
 
-  it("does not rewrite a concluded Thread", () => {
-    const { dispatch, record } = run(
+  it("does not rewrite a concluded Thread", async () => {
+    const { dispatch, record } = await run(
       stateWith([{ ...existing, status: "concluded" }]),
       cmd,
     );
@@ -656,10 +535,12 @@ describe("a THREAD command, applied", () => {
 describe("a rejection says how to repair it", () => {
   const draft = makeEntity({ id: "d", name: "Vesper" });
   const live = makeEntity({ id: "l", name: "Ilsa", lifecycle: "live" });
-  const reasonFor = (command: ParsedCommand): string | undefined => {
+  const reasonFor = async (
+    command: ParsedCommand,
+  ): Promise<string | undefined> => {
     const dispatch = vi.fn();
     const state = makeState([draft, live]);
-    const record = executeForgeCommand(
+    const record = await executeForgeCommand(
       command,
       "c1",
       "m1",
@@ -685,8 +566,8 @@ describe("a rejection says how to repair it", () => {
     oldName,
     newName,
   });
-  const LIVE = "is live and cannot be changed from the chat";
-  const NOT_FOUND = "not found; name a draft under [POOL], spelled exactly";
+  const NOT_BUILT = "was not built here and cannot be deleted from the chat";
+  const NOT_FOUND = "not found; name an element under [WORLD], spelled exactly";
   const NO_SUMMARY = "needs a summary after the bar";
 
   it.each<[string, ParsedCommand, string]>([
@@ -702,9 +583,21 @@ describe("a rejection says how to repair it", () => {
       create("New", "x", "WIDGET"),
       "unknown type; use CHARACTER, LOCATION, FACTION, SYSTEM, SITUATION or TOPIC",
     ],
-    ["REVISE of a live element", revise("Ilsa"), LIVE],
-    ["DELETE of a live element", { kind: "DELETE", name: "Ilsa" }, LIVE],
-    ["RENAME of a live element", rename("Ilsa", "Elsa"), LIVE],
+    [
+      "DELETE of an element no chat built",
+      { kind: "DELETE", name: "Ilsa" },
+      NOT_BUILT,
+    ],
+    [
+      "RENAME to its own name",
+      rename("Ilsa", "Ilsa"),
+      "is already its name; write no RENAME for it",
+    ],
+    [
+      "RENAME to another element's name",
+      rename("Ilsa", "vesper"),
+      "is the name of another element; choose a different name",
+    ],
     ["DELETE of no one", { kind: "DELETE", name: "Nobody" }, NOT_FOUND],
     ["RENAME of no one", rename("Nobody", "Somebody"), NOT_FOUND],
     [
@@ -712,7 +605,240 @@ describe("a rejection says how to repair it", () => {
       rename("Vesper", " "),
       "needs a new name after the arrow",
     ],
-  ])("%s", (_case, command, reason) => {
-    expect(reasonFor(command)).toBe(reason);
+  ])("%s", async (_case, command, reason) => {
+    expect(await reasonFor(command)).toBe(reason);
+  });
+});
+
+describe("a Build command writes for real", () => {
+  const createMikki: ParsedCommand = {
+    kind: "CREATE",
+    elementType: "CHARACTER",
+    name: "Mikki",
+    content: "A fox.",
+  };
+
+  it("CREATE makes a live entity bound to an entry, and records how to undo it", async () => {
+    const { getState, dispatch } = harness();
+    const rec = await executeForgeCommand(
+      createMikki,
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    const made = Object.values(getState().world.entitiesById)[0];
+    expect(made).toMatchObject({
+      name: "Mikki",
+      summary: "A fox.",
+      lifecycle: "live",
+      lorebookEntryId: "e-new",
+      sourceChatId: "c1",
+    });
+    expect(rec).toMatchObject({
+      kind: "CREATE",
+      status: "applied",
+      entityId: made.id,
+      undo: { op: "entityCreated", entityId: made.id, entryCreated: true },
+    });
+  });
+
+  it("CREATE is rejected, and makes nothing, when the lorebook refuses", async () => {
+    vi.mocked(api.v1.lorebook.createEntry).mockRejectedValue(new Error("full"));
+    const { getState, dispatch } = harness();
+    const rec = await executeForgeCommand(
+      createMikki,
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    expect(rec.status).toBe("rejected");
+    expect(rec.reason).toContain("full");
+    expect(Object.keys(getState().world.entitiesById)).toHaveLength(0);
+  });
+
+  it("REVISE rewrites any entity's summary and records what it replaced", async () => {
+    const { getState, dispatch } = harness({
+      entities: [imported("Kei", "Old.")],
+    });
+    const rec = await executeForgeCommand(
+      { kind: "REVISE", name: "Kei", content: "New." },
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    const kei = Object.values(getState().world.entitiesById)[0];
+    expect(kei.summary).toBe("New.");
+    expect(rec.undo).toEqual({
+      op: "summary",
+      entityId: kei.id,
+      before: "Old.",
+      wrote: "New.",
+    });
+  });
+
+  it("RENAME renames the entity and its entry", async () => {
+    vi.mocked(api.v1.lorebook.entry).mockResolvedValue({
+      id: "e1",
+      displayName: "Kei",
+      keys: ["kei"],
+    });
+    const { getState, dispatch } = harness({
+      entities: [imported("Kei", "S.", "e1")],
+    });
+    const rec = await executeForgeCommand(
+      { kind: "RENAME", oldName: "Kei", newName: "Kay" },
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    const kay = Object.values(getState().world.entitiesById)[0];
+    expect(kay.name).toBe("Kay");
+    expect(api.v1.lorebook.updateEntry).toHaveBeenCalledWith(
+      "e1",
+      expect.objectContaining({ displayName: "Kay" }),
+    );
+    expect(rec.undo).toEqual({
+      op: "name",
+      entityId: kay.id,
+      before: "Kei",
+      wrote: "Kay",
+    });
+  });
+
+  it("RENAME to the same name, or to a name in use, is rejected", async () => {
+    const { getState, dispatch } = harness({
+      entities: [imported("Kei", "S."), imported("Mikki", "S.")],
+    });
+    const same = await executeForgeCommand(
+      { kind: "RENAME", oldName: "Kei", newName: "Kei" },
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    const taken = await executeForgeCommand(
+      { kind: "RENAME", oldName: "Kei", newName: "mikki" },
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    expect(same.status).toBe("rejected");
+    expect(taken.status).toBe("rejected");
+  });
+
+  it("DELETE removes an entity a Scenario chat built, with its entry", async () => {
+    const entry = {
+      id: "e1",
+      displayName: "Kei",
+      text: "Lore.",
+      keys: ["kei"],
+    };
+    vi.mocked(api.v1.lorebook.entry).mockResolvedValue(entry);
+    const built = { ...imported("Kei", "S.", "e1"), sourceChatId: "c0" };
+    const { getState, dispatch } = harness({ entities: [built] });
+    const rec = await executeForgeCommand(
+      { kind: "DELETE", name: "Kei" },
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    expect(getState().world.entitiesById[built.id]).toBeUndefined();
+    expect(api.v1.lorebook.removeEntry).toHaveBeenCalledWith("e1");
+    expect(rec.undo).toMatchObject({
+      op: "entityDeleted",
+      entity: built,
+      entry,
+      threadIds: [],
+    });
+  });
+
+  it("DELETE of an entity no Scenario chat built is rejected with the repair", async () => {
+    const { getState, dispatch } = harness({
+      entities: [imported("Kei", "S.", "e1")],
+    });
+    const rec = await executeForgeCommand(
+      { kind: "DELETE", name: "Kei" },
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    expect(rec).toMatchObject({
+      status: "rejected",
+      reason: "was not built here and cannot be deleted from the chat",
+    });
+    expect(api.v1.lorebook.removeEntry).not.toHaveBeenCalled();
+  });
+
+  it("a THREAD rewrite records the three texts before and after, positionally", async () => {
+    const { getState, dispatch } = harness({
+      entities: [imported("A", "s"), imported("B", "s")],
+      threads: [
+        {
+          id: "t1",
+          title: "Half",
+          state: "S0",
+          latent: "P0",
+          wish: "W0",
+          entityIds: [],
+          status: "open",
+        },
+      ],
+    });
+    const rec = await executeForgeCommand(
+      {
+        kind: "THREAD",
+        title: "half",
+        memberNames: ["A"],
+        state: "S1",
+        latent: "",
+        wish: "W1",
+      },
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    expect(rec).toMatchObject({
+      status: "applied",
+      threadId: "t1",
+      undo: {
+        op: "threadRewritten",
+        threadId: "t1",
+        before: ["S0", "P0", "W0"],
+        wrote: ["S1", "P0", "W1"],
+      },
+    });
+  });
+
+  it("a new THREAD records its id", async () => {
+    const { getState, dispatch } = harness({
+      entities: [imported("A", "s"), imported("B", "s")],
+    });
+    const rec = await executeForgeCommand(
+      {
+        kind: "THREAD",
+        title: "Half",
+        memberNames: ["A", "B"],
+        state: "S",
+        latent: "",
+        wish: "",
+      },
+      "c1",
+      "m1",
+      getState,
+      dispatch,
+    );
+    const t = getState().world.threads[0];
+    expect(rec).toMatchObject({
+      threadId: t.id,
+      undo: { op: "threadCreated", threadId: t.id },
+    });
   });
 });

@@ -1,4 +1,4 @@
-import type { AppDispatch, RootState } from "../store/types";
+import type { AppDispatch, RootState, WorldEntity } from "../store/types";
 
 export type ChatLifecycle = "save" | "commit-discard";
 
@@ -11,6 +11,27 @@ export interface PillPart {
   /** True when the story model is never shown this part. */
   unseen?: boolean;
 }
+
+/** How to reverse one applied Build command. Read and written only by
+ *  `handlers/forge-chat.ts`. A Thread's three texts are positional
+ *  (shown, private, wished) so this type names neither private field. */
+export type ForgeUndo =
+  | { op: "entityCreated"; entityId: string; entryCreated: boolean }
+  | { op: "summary"; entityId: string; before: string; wrote: string }
+  | { op: "name"; entityId: string; before: string; wrote: string }
+  | {
+      op: "entityDeleted";
+      entity: WorldEntity;
+      entry: LorebookEntry | null;
+      threadIds: string[];
+    }
+  | { op: "threadCreated"; threadId: string }
+  | {
+      op: "threadRewritten";
+      threadId: string;
+      before: [string, string, string];
+      wrote: [string, string, string];
+    };
 
 export interface ForgeActionRecord {
   kind: "CREATE" | "REVISE" | "DELETE" | "RENAME" | "THREAD" | "UNKNOWN";
@@ -26,6 +47,14 @@ export interface ForgeActionRecord {
   /** What the command carried, for display. Absent on records stored before
    *  pills existed. */
   body?: PillPart[];
+  /** The live entity this command made or changed, for the pill's card. */
+  entityId?: string;
+  /** The Thread this command made or rewrote, for the pill's row. */
+  threadId?: string;
+  /** How to reverse it. Present only on applied commands. */
+  undo?: ForgeUndo;
+  /** Set when the turn was undone: what happened to this command. */
+  undoResult?: "undone" | "skipped" | "failed";
 }
 
 export type ForgeSegment =

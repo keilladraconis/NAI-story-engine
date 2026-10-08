@@ -5,7 +5,7 @@
 // the rest of the path: the drafts reach the world slice, the chat's draft pool
 // counts them, and the segments the chat needs in order to draw anything are
 // actually recorded on the message.
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { forgeChatHandler } from "../../../../../src/core/store/effects/handlers/forge-chat";
 import type { CompletionContext } from "../../../../../src/core/store/effects/generation-handlers";
 import type {
@@ -26,7 +26,10 @@ const TEXT = `[CREATE CHARACTER "Cameron 'Cammie' Degrassi" | An 18-year-old hei
 [CREATE SITUATION "Abandoned Birthday" | Cammie sits alone at her own 18th birthday party in a rented water park.]`;
 
 /** A real world slice folded by the actions the handler dispatches. */
-function runPass(): { state: RootState; segments: ForgeSegment[] } {
+async function runPass(): Promise<{
+  state: RootState;
+  segments: ForgeSegment[];
+}> {
   // Through rootReducer, not the world slice alone: the thread cap and other
   // cross-slice rules live one level up, and a draft the slice accepts can
   // still be refused there.
@@ -53,7 +56,7 @@ function runPass(): { state: RootState; segments: ForgeSegment[] } {
     messageId: string;
   }>;
 
-  void forgeChatHandler.completion(ctx);
+  await forgeChatHandler.completion(ctx);
 
   const setCall = dispatch.mock.calls.find(
     ([a]) => (a as { type: string }).type === "chat/forgeSegmentsSet",
@@ -66,30 +69,38 @@ function runPass(): { state: RootState; segments: ForgeSegment[] } {
 }
 
 describe("a forge pass, end to end", () => {
-  it("lands five drafts in the world", () => {
-    const { state } = runPass();
-    const drafts = Object.values(state.world.entitiesById) as WorldEntity[];
-    expect(drafts.length).toBe(5);
-    expect(drafts.every((e) => e.lifecycle === "draft")).toBe(true);
+  beforeEach(() => {
+    let n = 0;
+    vi.mocked(api.v1.lorebook.entries).mockResolvedValue([]);
+    vi.mocked(api.v1.lorebook.createEntry).mockImplementation(async () => {
+      n += 1;
+      return `entry-${n}`;
+    });
+    vi.mocked(api.v1.lorebook.updateEntry).mockResolvedValue(undefined);
   });
 
-  it("stamps every draft with the chat that forged it", () => {
-    // `sourceChatId` is what the Commit button counts. A draft without it is
-    // invisible to the pool and uncastable — and also leaks into the World
-    // list, which hides forge drafts by exactly this field.
-    const { state } = runPass();
-    const drafts = Object.values(state.world.entitiesById) as WorldEntity[];
-    expect(drafts.length).toBeGreaterThan(0);
-    for (const e of drafts) expect(e.sourceChatId).toBe(CHAT_ID);
+  it("lands five live entities in the world, each bound to its own entry", async () => {
+    const { state } = await runPass();
+    const made = Object.values(state.world.entitiesById) as WorldEntity[];
+    expect(made.length).toBe(5);
+    expect(made.every((e) => e.lifecycle === "live")).toBe(true);
+    expect(new Set(made.map((e) => e.lorebookEntryId)).size).toBe(5);
   });
 
-  it("counts them in the draft pool, which is what enables Commit", () => {
-    const { state } = runPass();
-    expect(selectForgeDraftPoolCount(state, CHAT_ID)).toBe(5);
+  it("stamps every entity with the chat that built it", async () => {
+    const { state } = await runPass();
+    const made = Object.values(state.world.entitiesById) as WorldEntity[];
+    expect(made.length).toBeGreaterThan(0);
+    for (const e of made) expect(e.sourceChatId).toBe(CHAT_ID);
   });
 
-  it("records a segment per command, which is what the chat draws", () => {
-    const { segments } = runPass();
+  it("leaves nothing in the draft pool, since nothing is a draft", async () => {
+    const { state } = await runPass();
+    expect(selectForgeDraftPoolCount(state, CHAT_ID)).toBe(0);
+  });
+
+  it("records a segment per command, which is what the chat draws", async () => {
+    const { segments } = await runPass();
     const actions = segments.filter((s) => s.kind === "action");
     expect(actions.length).toBe(5);
     expect(
