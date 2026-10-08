@@ -1,11 +1,14 @@
 /**
  * Forge Chat Effects — Signal handlers for the Scenario chat.
  *
- * Three signals, each with a single handler:
- *   1. forgeChatContinueRequested  → queue the next Scenario turn: lead with any
- *                                     pending reference scrub, append an assistant
+ * Four signals, each with a single handler:
+ *   1. forgeChatContinueRequested  → queue a Build turn: lead with any pending
+ *                                     reference scrub, append an assistant
  *                                     placeholder, submit a forgeChat generation.
  *                                     The strategy reads which kind of turn it is.
+ *      scenarioPlanRequested       → queue a Plan turn: an assistant placeholder
+ *                                     and an ordinary chat generation. Nothing it
+ *                                     writes is applied.
  *   2. entityDiscardRequested      → user-initiated draft discard. Tombstone with
  *                                     reason="user", delete the entity, and (if
  *                                     other drafts remain) defer a reference scrub.
@@ -38,6 +41,7 @@ import { ensureCategory } from "./lorebook-sync";
 import { nameKey } from "./handlers/lorebook";
 import {
   buildScenarioBuildStrategy,
+  buildScenarioPlanStrategy,
   buildForgeCleanupStrategy,
 } from "../../utils/forge-chat-strategy";
 
@@ -50,9 +54,14 @@ import {
 
 import {
   forgeChatContinueRequested,
+  scenarioPlanRequested,
   type ForgeChatContinueRequestedPayload,
 } from "./forge-chat-actions";
-export { forgeChatContinueRequested, type ForgeChatContinueRequestedPayload };
+export {
+  forgeChatContinueRequested,
+  scenarioPlanRequested,
+  type ForgeChatContinueRequestedPayload,
+};
 
 export interface ForgeScrubNowRequestedPayload {
   chatId: string;
@@ -126,15 +135,19 @@ function poolFor(state: RootState, chatId: string): WorldEntity[] {
   );
 }
 
-/** True if a Scenario generation (a turn or a reference scrub) is already queued
- *  or in flight — Scenario sends guard on this so a second one is a no-op
- *  rather than another stacked empty assistant turn. */
-function forgeRequestPending(state: RootState): boolean {
-  const isForge = (t: string): boolean =>
-    t === "forgeChat" || t === "forgeCleanup";
-  const active = state.runtime.activeRequest;
-  if (active && isForge(active.type)) return true;
-  return state.runtime.queue.some((r) => isForge(r.type));
+/** True if a Scenario generation for this chat (a Build turn, a Plan turn or a
+ *  reference scrub) is already queued or in flight. Scenario sends guard on this
+ *  so a second one is a no-op rather than another stacked empty assistant turn.
+ *  A Plan turn is an ordinary chat request, told apart by its id. */
+function scenarioRequestPending(state: RootState, chatId: string): boolean {
+  return [state.runtime.activeRequest, ...state.runtime.queue].some(
+    (r) =>
+      !!r &&
+      r.status !== "cancelled" &&
+      (r.type === "forgeChat" ||
+        r.type === "forgeCleanup" ||
+        r.id.startsWith(`chat-${chatId}-`)),
+  );
 }
 
 /**
@@ -202,7 +215,7 @@ export function registerForgeChatEffects(
     },
   );
 
-  // ─── A Scenario turn (sketch, steer or grow — the strategy reads which) ─────
+  // ─── A Build turn ───────────────────────────────────────────────────────────
   subscribeEffect(
     matchesAction(forgeChatContinueRequested),
     async (action, { getState: latest }) => {
@@ -210,7 +223,7 @@ export function registerForgeChatEffects(
       if (!findChat(latest(), chatId)) return;
       // No-op if a turn is already queued or running, so repeated sends cannot
       // stack empty turns and background generations.
-      if (forgeRequestPending(latest())) return;
+      if (scenarioRequestPending(latest(), chatId)) return;
 
       // Lead with the deferred reference scrub, if any. Queued first, so it
       // has scrubbed the pool before this turn's JIT factory builds context.
@@ -220,7 +233,12 @@ export function registerForgeChatEffects(
       dispatch(
         messageAdded({
           chatId,
-          message: { id: assistantId, role: "assistant", content: "" },
+          message: {
+            id: assistantId,
+            role: "assistant",
+            content: "",
+            mode: "build",
+          },
         }),
       );
       const chat = findChat(latest(), chatId);
@@ -231,6 +249,45 @@ export function registerForgeChatEffects(
         requestQueued({
           id: strategy.requestId,
           type: "forgeChat",
+          targetId: assistantId,
+        }),
+      );
+      dispatch(generationSubmitted(strategy));
+    },
+  );
+
+  // ─── A Plan turn ────────────────────────────────────────────────────────────
+  subscribeEffect(
+    matchesAction(scenarioPlanRequested),
+    async (action, { getState: latest }) => {
+      const { chatId } = action.payload;
+      if (!findChat(latest(), chatId)) return;
+      if (scenarioRequestPending(latest(), chatId)) return;
+
+      const assistantId = api.v1.uuid();
+      dispatch(
+        messageAdded({
+          chatId,
+          message: {
+            id: assistantId,
+            role: "assistant",
+            content: "",
+            mode: "plan",
+          },
+        }),
+      );
+      const chat = findChat(latest(), chatId);
+      if (!chat) return;
+
+      const strategy = await buildScenarioPlanStrategy(
+        latest,
+        chat,
+        assistantId,
+      );
+      dispatch(
+        requestQueued({
+          id: strategy.requestId,
+          type: "chat",
           targetId: assistantId,
         }),
       );

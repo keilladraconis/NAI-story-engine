@@ -7,7 +7,16 @@ import {
   forgeCastAllRequested,
   forgeDiscardAllRequested,
   forgeScrubNowRequested,
+  scenarioPlanRequested,
 } from "../../../../src/core/store/effects/forge-chat-effects";
+import { chatHandler } from "../../../../src/core/store/effects/handlers/chat";
+import type {
+  ChatTarget,
+  CompletionContext,
+} from "../../../../src/core/store/effects/generation-handlers";
+import { createStore, combineReducers } from "nai-store";
+import { chatSlice } from "../../../../src/core/store/slices/chat";
+import { worldSlice } from "../../../../src/core/store/slices/world";
 import type { RootState, WorldEntity } from "../../../../src/core/store/types";
 import type { Chat } from "../../../../src/core/chat-types/types";
 import { FieldID } from "../../../../src/config/field-definitions";
@@ -463,5 +472,127 @@ describe("forgeScrubNowRequested effect", () => {
     expect(
       dispatch.mock.calls.some(([a]) => a.type === "forge/scrubCleared"),
     ).toBe(true);
+  });
+});
+
+describe("a Build turn's placeholder", () => {
+  it("is marked build and queued as a forgeChat request", async () => {
+    const chat = makeChat({
+      messages: [{ id: "u1", role: "user", content: "a lock-keeper" }],
+    });
+    const { dispatch, fire } = makeHarness(makeState([chat]));
+    await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
+
+    const added = dispatch.mock.calls
+      .map(([a]) => a)
+      .filter((a) => a.type === "chat/messageAdded");
+    expect(added[added.length - 1].payload.message).toMatchObject({
+      role: "assistant",
+      content: "",
+      mode: "build",
+    });
+    const queued = dispatch.mock.calls
+      .map(([a]) => a)
+      .filter((a) => a.type === "runtime/requestQueued");
+    expect(queued).toHaveLength(1);
+    expect(queued[0].payload.type).toBe("forgeChat");
+  });
+});
+
+describe("scenarioPlanRequested effect", () => {
+  const withUser = () =>
+    makeChat({
+      messages: [{ id: "u1", role: "user", content: "a lock-keeper" }],
+    });
+
+  it("marks the placeholder plan and queues an ordinary chat request", async () => {
+    const { dispatch, fire } = makeHarness(makeState([withUser()]));
+    await fire(scenarioPlanRequested({ chatId: "fc-1" }));
+
+    const calls = dispatch.mock.calls.map(([a]) => a);
+    const added = calls.filter((a) => a.type === "chat/messageAdded");
+    expect(added).toHaveLength(1);
+    const placeholder = added[0].payload.message;
+    expect(placeholder).toMatchObject({
+      role: "assistant",
+      content: "",
+      mode: "plan",
+    });
+    const queued = calls.filter((a) => a.type === "runtime/requestQueued");
+    expect(queued).toHaveLength(1);
+    expect(queued[0].payload).toMatchObject({
+      type: "chat",
+      id: `chat-fc-1-${placeholder.id}`,
+    });
+    expect(
+      calls.filter((a) => a.type === "ui/generationSubmitted"),
+    ).toHaveLength(1);
+  });
+
+  it("is refused while a Build turn is pending", async () => {
+    const state = makeState([withUser()]);
+    (state.runtime as { queue: unknown[] }).queue = [
+      { id: "scenario-fc-1-a0", type: "forgeChat", status: "queued" },
+    ];
+    const { dispatch, fire } = makeHarness(state);
+    await fire(scenarioPlanRequested({ chatId: "fc-1" }));
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("is refused while a Plan turn for this chat is pending", async () => {
+    const state = makeState([withUser()]);
+    (state.runtime as { activeRequest: unknown }).activeRequest = {
+      id: "chat-fc-1-a0",
+      type: "chat",
+      status: "processing",
+    };
+    const { dispatch, fire } = makeHarness(state);
+    await fire(scenarioPlanRequested({ chatId: "fc-1" }));
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("is not refused by a cancelled request", async () => {
+    const state = makeState([withUser()]);
+    (state.runtime as { queue: unknown[] }).queue = [
+      { id: "scenario-fc-1-a0", type: "forgeChat", status: "cancelled" },
+    ];
+    const { dispatch, fire } = makeHarness(state);
+    await fire(scenarioPlanRequested({ chatId: "fc-1" }));
+    expect(dispatch).toHaveBeenCalled();
+  });
+
+  it("a Plan reply with a command line applies nothing", async () => {
+    const store = createStore(
+      combineReducers({
+        chat: chatSlice.reducer,
+        world: worldSlice.reducer,
+      }),
+      false,
+    );
+    store.dispatch(
+      chatSlice.actions.chatCreated({
+        chat: makeChat({
+          messages: [
+            { id: "u1", role: "user", content: "a lock-keeper" },
+            { id: "a1", role: "assistant", content: "", mode: "plan" },
+          ],
+        }),
+      }),
+    );
+    const text =
+      'Try this.\n[CREATE CHARACTER "Hesper Vane" | Keeps the lock.]';
+    await chatHandler.completion({
+      target: { type: "chat", chatId: "fc-1", messageId: "a1" },
+      getState: store.getState,
+      accumulatedText: text,
+      generationSucceeded: true,
+      dispatch: store.dispatch,
+    } as unknown as CompletionContext<ChatTarget>);
+
+    const chat = store.getState().chat.chats.find((c) => c.id === "fc-1")!;
+    const reply = chat.messages.find((m) => m.id === "a1")!;
+    expect(reply.content).toBe(text);
+    expect(reply.forgeSegments).toBeUndefined();
+    expect(store.getState().world.entityIds).toEqual([]);
   });
 });

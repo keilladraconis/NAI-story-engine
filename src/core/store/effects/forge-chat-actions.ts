@@ -17,3 +17,16 @@ export const forgeChatContinueRequested = (
   payload,
 });
 forgeChatContinueRequested.type = FORGE_CHAT_CONTINUE_REQUESTED;
+
+export interface ScenarioPlanRequestedPayload {
+  chatId: string;
+}
+
+const SCENARIO_PLAN_REQUESTED = "forgeChat/planRequested";
+export const scenarioPlanRequested = (
+  payload: ScenarioPlanRequestedPayload,
+) => ({
+  type: SCENARIO_PLAN_REQUESTED as typeof SCENARIO_PLAN_REQUESTED,
+  payload,
+});
+scenarioPlanRequested.type = SCENARIO_PLAN_REQUESTED;

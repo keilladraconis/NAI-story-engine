@@ -7,35 +7,57 @@ import type {
 } from "./types";
 import {
   buildScenarioBuildPrompt,
+  buildScenarioPlanPrompt,
   normalizeRegisterKey,
 } from "../utils/prompts";
-import { forgeChatContinueRequested } from "../store/effects/forge-chat-actions";
+import {
+  forgeChatContinueRequested,
+  scenarioPlanRequested,
+} from "../store/effects/forge-chat-actions";
 import { messageAdded } from "../store/slices/chat";
 
-/** The one chat a story is built in. A reply is prose plus commands; the
- *  commands are applied to draft entities and Threads when the turn completes
- *  (handlers/forge-chat.ts). Three kinds of turn, told apart by the transcript
- *  (see forge-chat-strategy.ts): every turn is a sketch until a
- *  reply has applied a command, and from then on a message steers and an empty
- *  send grows the sketch. */
-export const scenarioSpec: ChatTypeSpec = {
+export type ScenarioMode = "plan" | "build";
+
+const MODES: readonly ScenarioMode[] = ["plan", "build"] as const;
+
+/** The mode a send in this chat runs in. Anything but "build" is plan, so a
+ *  chat saved before the modes existed opens talking, not building. */
+export function scenarioMode(chat: Chat): ScenarioMode {
+  return chat.subMode === "build" ? "build" : "plan";
+}
+
+/** The one chat a story is built in, in two modes. Plan is a conversation on
+ *  the creative model and applies nothing. Build reads that conversation and
+ *  writes commands, applied to draft entities and Threads when the turn
+ *  completes (handlers/forge-chat.ts). The mode in force when the writer sends
+ *  decides the turn. */
+export const scenarioSpec: ChatTypeSpec<ScenarioMode> = {
   id: "scenario",
   displayName: "Scenario",
   lifecycle: "save",
+  subModes: MODES,
+  defaultSubMode: "plan",
 
-  inputPlaceholder:
-    "Say what you want to see, steer the sketch, or send empty to grow it…",
   sendLabel: "Send",
   showClearButton: false,
 
-  initialize(_seed: ChatSeed, _ctx: SpecCtx) {
-    return { title: "Scenario", initialMessages: [] };
+  inputPlaceholderFor(chat: Chat): string {
+    return scenarioMode(chat) === "build"
+      ? "Say what to build, or send empty to build what you've discussed…"
+      : "Talk the scenario through…";
   },
 
-  systemPromptFor(_chat: Chat, ctx: SpecCtx): string {
-    return buildScenarioBuildPrompt(
-      normalizeRegisterKey(ctx.getState().foundation.intensity?.level),
+  initialize(_seed: ChatSeed, _ctx: SpecCtx) {
+    return { title: "Scenario", initialMessages: [], subMode: "plan" };
+  },
+
+  systemPromptFor(chat: Chat, ctx: SpecCtx): string {
+    const level = normalizeRegisterKey(
+      ctx.getState().foundation.intensity?.level,
     );
+    return scenarioMode(chat) === "build"
+      ? buildScenarioBuildPrompt(level)
+      : buildScenarioPlanPrompt(level);
   },
 
   contextSlice(chat: Chat, _ctx: SpecCtx): ChatMessage[] {
@@ -44,6 +66,7 @@ export const scenarioSpec: ChatTypeSpec = {
 
   headerControls(_chat: Chat, _ctx: SpecCtx) {
     return [
+      { id: "mode", kind: "modeToggle" },
       { id: "scrub", kind: "scrubIndicator" },
       { id: "new", kind: "newChatButton" },
       { id: "sessions", kind: "sessionsButton" },
@@ -63,21 +86,29 @@ export const scenarioSpec: ChatTypeSpec = {
   },
 
   handleSend(chat, content, ctx) {
-    // Refuse while a turn or a reference scrub is queued or running: a second
-    // send would only stack another empty assistant turn.
+    // Refuse while any turn for this chat, or a reference scrub, is queued or
+    // running: a second send would only stack another empty assistant turn.
     const rt = ctx.getState().runtime;
-    const isTurn = (t: string) => t === "forgeChat" || t === "forgeCleanup";
+    const busy = [rt.activeRequest, ...rt.queue].some(
+      (r) =>
+        !!r &&
+        r.status !== "cancelled" &&
+        (r.type === "forgeChat" ||
+          r.type === "forgeCleanup" ||
+          r.id.startsWith(`chat-${chat.id}-`)),
+    );
+    if (busy) return true;
+
+    const mode = scenarioMode(chat);
+    const trimmed = content.trim();
+    // Plan is a conversation and needs something said. An empty Build send
+    // means "build what we've discussed", which needs a discussion.
     if (
-      (rt.activeRequest && isTurn(rt.activeRequest.type)) ||
-      rt.queue.some((r) => isTurn(r.type))
+      trimmed.length === 0 &&
+      (mode === "plan" || chat.messages.length === 0)
     ) {
       return true;
     }
-
-    const trimmed = content.trim();
-    // An empty send grows the sketch. With nothing said yet there is nothing
-    // to grow, and a turn would have no seed to answer.
-    if (trimmed.length === 0 && chat.messages.length === 0) return true;
     if (trimmed.length > 0) {
       ctx.dispatch(
         messageAdded({
@@ -86,7 +117,11 @@ export const scenarioSpec: ChatTypeSpec = {
         }),
       );
     }
-    ctx.dispatch(forgeChatContinueRequested({ chatId: chat.id }));
+    ctx.dispatch(
+      mode === "plan"
+        ? scenarioPlanRequested({ chatId: chat.id })
+        : forgeChatContinueRequested({ chatId: chat.id }),
+    );
     return true;
   },
 };

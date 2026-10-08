@@ -89,7 +89,8 @@ export interface HeaderControl {
     | "newChatButton"
     | "label"
     | "backButton"
-    | "scrubIndicator";
+    | "scrubIndicator"
+    | "modeToggle";
 }
 
 export interface SpecCtx {
@@ -145,6 +146,9 @@ export interface ChatTypeSpec<SubMode extends string = string> {
    * and the Clear button shown.
    */
   inputPlaceholder?: string;
+  /** A placeholder that depends on the chat (its mode). Wins over
+   *  `inputPlaceholder` when present. */
+  inputPlaceholderFor?(chat: Chat): string;
   sendLabel?: string;
   showClearButton?: boolean;
 }

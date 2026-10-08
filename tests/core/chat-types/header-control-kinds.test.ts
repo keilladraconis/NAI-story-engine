@@ -9,6 +9,7 @@ describe("HeaderControl.kind union", () => {
       | "label"
       | "backButton"
       | "scrubIndicator"
+      | "modeToggle"
     >();
   });
 });

@@ -11,7 +11,10 @@ import {
   uiCancelRequest,
   generationSubmitted,
 } from "../slices/ui";
-import { forgeChatContinueRequested } from "./forge-chat-actions";
+import {
+  forgeChatContinueRequested,
+  scenarioPlanRequested,
+} from "./forge-chat-actions";
 import { requestQueued } from "../slices/runtime";
 import {
   chatCreated,
@@ -145,18 +148,24 @@ export function registerChatEffects(
     matchesAction(uiChatRetryGeneration),
     async (action, { getState: latest }) => {
       const { chatId, messageId } = action.payload;
+      // Read before the prune removes it: a reply is re-run in the mode that
+      // wrote it, whatever the toggle says now.
+      const retried = findChat(latest(), chatId)?.messages.find(
+        (m) => m.id === messageId,
+      );
       dispatch(messagesPrunedAfter({ chatId, id: messageId }));
       const chat = findChat(latest(), chatId);
       if (!chat) return;
-      // A Scenario turn is not an ordinary chat turn, and retrying it as one is
-      // silent: `buildChatStrategy` knows refine and the saved-chat path only,
-      // so the retry would come back as `target: {type: "chat"}` and route to
-      // `chatHandler`, which writes the message text and stops. The commands
-      // were never parsed and no entity was forged. The continue effect queues
-      // a real Scenario turn instead; its strategy re-reads which kind of turn
-      // it is (sketch, steer or grow) from the transcript just pruned.
+      // A Scenario turn is not an ordinary chat turn: `buildChatStrategy`
+      // knows refine and the saved-chat path only. A Build reply retried
+      // through it would have its commands written as text and never applied;
+      // a Plan reply would lose its context. Each has its own request.
       if (chat.type === "scenario") {
-        dispatch(forgeChatContinueRequested({ chatId }));
+        dispatch(
+          retried?.mode === "plan"
+            ? scenarioPlanRequested({ chatId })
+            : forgeChatContinueRequested({ chatId }),
+        );
         return;
       }
       const assistantId = api.v1.uuid();

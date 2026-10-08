@@ -16,7 +16,10 @@ import {
   chatCreated,
   chatSwitched,
 } from "../../../../src/core/store/slices/chat";
-import { forgeChatContinueRequested } from "../../../../src/core/store/effects/forge-chat-actions";
+import {
+  forgeChatContinueRequested,
+  scenarioPlanRequested,
+} from "../../../../src/core/store/effects/forge-chat-actions";
 import type { Chat } from "../../../../src/core/chat-types/types";
 import type { Action } from "nai-store";
 import type { RootState, AppDispatch } from "../../../../src/core/store/types";
@@ -389,6 +392,51 @@ describe("retrying a Scenario turn", () => {
     // `ui/generationSubmitted` carrying a `chat` target and no forge action.
     expect(seen).toContain(forgeChatContinueRequested.type);
     expect(seen).not.toContain("ui/generationSubmitted");
+  });
+
+  // The placeholder itself (and its `mode`) is made by the forge-chat effects,
+  // which this harness does not register; the mode of the retried reply decides
+  // which request the retry dispatches, and forge-chat-effects.test.ts covers
+  // what each request writes.
+  async function retryIn(
+    toggle: string,
+    replyMode: "plan" | "build" | undefined,
+  ) {
+    const h = makeHarness();
+    const chat = forgeChat();
+    chat.subMode = toggle;
+    chat.messages[1] = { ...chat.messages[1], mode: replyMode };
+    h.store.dispatch(chatCreated({ chat }));
+    h.store.dispatch(chatSwitched({ id: "fc-1" }));
+    const seen: string[] = [];
+    h.store.subscribeEffect(
+      () => true,
+      (action: Action) => {
+        seen.push(action.type);
+      },
+    );
+    await h.dispatchAndWait(
+      uiChatRetryGeneration({ chatId: "fc-1", messageId: "a1" }),
+    );
+    return seen;
+  }
+
+  it("re-runs a Plan reply as Plan with the toggle on Build", async () => {
+    const seen = await retryIn("build", "plan");
+    expect(seen).toContain(scenarioPlanRequested.type);
+    expect(seen).not.toContain(forgeChatContinueRequested.type);
+  });
+
+  it("re-runs a Build reply as Build with the toggle on Plan", async () => {
+    const seen = await retryIn("plan", "build");
+    expect(seen).toContain(forgeChatContinueRequested.type);
+    expect(seen).not.toContain(scenarioPlanRequested.type);
+  });
+
+  it("re-runs a reply from before the modes as Build", async () => {
+    const seen = await retryIn("plan", undefined);
+    expect(seen).toContain(forgeChatContinueRequested.type);
+    expect(seen).not.toContain(scenarioPlanRequested.type);
   });
 
   it("does not re-run the Scenario turn for an ordinary chat", async () => {
