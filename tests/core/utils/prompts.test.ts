@@ -4,6 +4,14 @@ import {
   LOREBOOK_GENERATE_PROMPT,
   normalizeRegisterKey,
   INTENSITY_LEVEL_LABELS,
+  SCENARIO_BUILD_INSTRUCTION,
+  SCENARIO_BUILD_PROMPT,
+  SCENARIO_BUILD_REGISTERS,
+  SCENARIO_PLAN_PROMPT,
+  SCENARIO_PLAN_REGISTERS,
+  XIALONG_STYLE,
+  buildScenarioBuildPrompt,
+  buildScenarioPlanPrompt,
 } from "../../../src/core/utils/prompts";
 
 describe("Forge cleanup prompt", () => {
@@ -92,5 +100,73 @@ describe("the Scenario prompt", () => {
 
   it("exports the grow instruction", () => {
     expect(SCENARIO_GROW_INSTRUCTION).toContain("critique");
+  });
+});
+
+describe("the Scenario Plan prompt", () => {
+  it("talks and writes no commands", () => {
+    expect(SCENARIO_PLAN_PROMPT).toContain("You are talking, not building.");
+    expect(SCENARIO_PLAN_PROMPT).not.toMatch(/\[(CREATE|REVISE|THREAD)\b/);
+  });
+
+  it("works backwards from an ending and proposes none", () => {
+    expect(SCENARIO_PLAN_PROMPT).toContain(
+      "what must already be true on the first page for that to be possible?",
+    );
+    expect(SCENARIO_PLAN_PROMPT).toContain(
+      "Do not propose plots, scenes in sequence or endings of your own.",
+    );
+  });
+
+  it("has a register for every intensity and for none", () => {
+    for (const level of [...INTENSITY_LEVEL_LABELS, "unset"] as const) {
+      expect(buildScenarioPlanPrompt(level)).toBe(
+        `${SCENARIO_PLAN_PROMPT}\n\n${SCENARIO_PLAN_REGISTERS[level]}`,
+      );
+    }
+  });
+
+  it("has a Xialong chat style", () => {
+    expect(XIALONG_STYLE.scenarioPlan).toMatch(/^\[ Style: .*chat.* \]$/);
+  });
+});
+
+describe("the Scenario Build prompt", () => {
+  it("thinks out loud before the commands", () => {
+    const think = SCENARIO_BUILD_PROMPT.indexOf("Think out loud first");
+    const commands = SCENARIO_BUILD_PROMPT.indexOf("COMMANDS:");
+    expect(think).toBeGreaterThan(-1);
+    expect(commands).toBeGreaterThan(think);
+  });
+
+  it("builds only what the conversation supports", () => {
+    expect(SCENARIO_BUILD_PROMPT).toContain(
+      "Build only what the conversation supports.",
+    );
+  });
+
+  it("has no critique and names the hidden segment private", () => {
+    expect(SCENARIO_BUILD_PROMPT).not.toContain("CRITIQUE");
+    expect(SCENARIO_BUILD_PROMPT).toContain("| state | private | wish]");
+    expect(SCENARIO_BUILD_PROMPT).not.toContain("latent");
+  });
+
+  it("tells the model to correct a rejected command", () => {
+    expect(SCENARIO_BUILD_PROMPT).toContain(
+      "If [REJECTED LAST TURN] is present, correct each command as its line says; where the line says a thing cannot be done, do not write that command again.",
+    );
+  });
+
+  it("treats the register as a ceiling", () => {
+    for (const level of [...INTENSITY_LEVEL_LABELS, "unset"] as const) {
+      expect(SCENARIO_BUILD_REGISTERS[level]).toMatch(/at most/);
+      expect(buildScenarioBuildPrompt(level)).toBe(
+        `${SCENARIO_BUILD_PROMPT}\n\n${SCENARIO_BUILD_REGISTERS[level]}`,
+      );
+    }
+  });
+
+  it("exports the instruction an empty send stands for", () => {
+    expect(SCENARIO_BUILD_INSTRUCTION).toBe("Build what we have discussed.");
   });
 });
