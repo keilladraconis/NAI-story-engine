@@ -86,16 +86,15 @@ describe("sending in the Scenario chat", () => {
   const lastCall = (ctx: ReturnType<typeof ctxFor>) =>
     ctx.dispatch.mock.calls[ctx.dispatch.mock.calls.length - 1]?.[0];
 
-  it("plan, text: adds the message and asks for a Plan turn", () => {
+  it("plan, text: asks for a Plan turn that carries the text", () => {
     const ctx = ctxFor(null);
     expect(scenarioSpec.handleSend!(inMode("plan"), "  hello  ", ctx)).toBe(
       true,
     );
-    expect(ctx.dispatch.mock.calls[0][0].payload.message).toMatchObject({
-      role: "user",
-      content: "hello",
-    });
-    expect(lastCall(ctx)).toEqual(scenarioPlanRequested({ chatId: "c1" }));
+    expect(ctx.dispatch).toHaveBeenCalledTimes(1);
+    expect(lastCall(ctx)).toEqual(
+      scenarioPlanRequested({ chatId: "c1", content: "hello" }),
+    );
   });
 
   it("plan, empty: does nothing", () => {
@@ -106,22 +105,27 @@ describe("sending in the Scenario chat", () => {
     expect(ctx.dispatch).not.toHaveBeenCalled();
   });
 
-  it("build, text: adds the message and asks for a directed Build turn", () => {
+  it("build, text: asks for a directed Build turn that carries the text", () => {
     const ctx = ctxFor(null);
-    scenarioSpec.handleSend!(inMode("build"), "just the sisters", ctx);
-    expect(ctx.dispatch).toHaveBeenCalledTimes(2);
+    scenarioSpec.handleSend!(inMode("build"), " just the sisters ", ctx);
+    expect(ctx.dispatch).toHaveBeenCalledTimes(1);
     expect(lastCall(ctx)).toEqual(
-      forgeChatContinueRequested({ chatId: "c1", directed: true }),
+      forgeChatContinueRequested({
+        chatId: "c1",
+        directed: true,
+        content: "just the sisters",
+      }),
     );
   });
 
-  it("build, empty, something said: asks for an undirected Build turn and adds no message", () => {
+  it("build, empty, something said: asks for an undirected Build turn with no text", () => {
     const ctx = ctxFor(null);
     scenarioSpec.handleSend!(inMode("build", said), "", ctx);
     expect(ctx.dispatch).toHaveBeenCalledTimes(1);
     expect(lastCall(ctx)).toEqual(
       forgeChatContinueRequested({ chatId: "c1", directed: false }),
     );
+    expect(lastCall(ctx).payload).not.toHaveProperty("content");
   });
 
   it("build, empty, nothing said: does nothing", () => {
@@ -130,45 +134,14 @@ describe("sending in the Scenario chat", () => {
     expect(ctx.dispatch).not.toHaveBeenCalled();
   });
 
-  const busyWith = (request: object) => {
+  it("adds no message itself: the effect does, once its guard has passed", () => {
+    // A send that the effect then refuses must leave nothing behind, and
+    // only the effect knows whether the chat is busy.
     const ctx = ctxFor(null);
-    const getState = () =>
-      ({
-        ...ctx.getState(),
-        runtime: { activeRequest: request, queue: [] },
-      }) as unknown as RootState;
-    return { dispatch: ctx.dispatch, getState };
-  };
-
-  it("refuses while a Build turn is queued or running", () => {
-    const ctx = busyWith({
-      id: "scenario-c1-a9",
-      type: "forgeChat",
-      status: "processing",
-    });
-    scenarioSpec.handleSend!(inMode("build"), "seed", ctx);
-    scenarioSpec.handleSend!(inMode("plan"), "seed", ctx);
-    expect(ctx.dispatch).not.toHaveBeenCalled();
-  });
-
-  it("refuses while a Plan turn for this chat is running", () => {
-    const ctx = busyWith({
-      id: "chat-c1-a9",
-      type: "chat",
-      status: "processing",
-    });
     scenarioSpec.handleSend!(inMode("plan"), "hello", ctx);
     scenarioSpec.handleSend!(inMode("build"), "hello", ctx);
-    expect(ctx.dispatch).not.toHaveBeenCalled();
-  });
-
-  it("is not held up by a cancelled request", () => {
-    const ctx = busyWith({
-      id: "chat-c1-a9",
-      type: "chat",
-      status: "cancelled",
-    });
-    scenarioSpec.handleSend!(inMode("plan"), "hello", ctx);
-    expect(ctx.dispatch).toHaveBeenCalledTimes(2);
+    expect(
+      ctx.dispatch.mock.calls.filter(([a]) => a.type === "chat/messageAdded"),
+    ).toEqual([]);
   });
 });

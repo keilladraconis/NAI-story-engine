@@ -2,15 +2,18 @@
  * Forge Chat Effects — Signal handlers for the Scenario chat.
  *
  * Four signals, each with a single handler:
- *   1. forgeChatContinueRequested  → queue a Build turn: append an assistant
- *                                     placeholder, submit a forgeChat generation.
- *                                     The request says whether the send was
- *                                     directed (typed) or empty.
- *   2. scenarioPlanRequested       → queue a Plan turn: an assistant placeholder
- *                                     and an ordinary chat generation. Nothing it
- *                                     writes is applied.
+ *   1. forgeChatContinueRequested  → queue a Build turn: append what the writer
+ *                                     typed and an assistant placeholder, submit
+ *                                     a forgeChat generation. The request says
+ *                                     whether the send was directed (typed) or
+ *                                     empty.
+ *   2. scenarioPlanRequested       → queue a Plan turn: what the writer typed,
+ *                                     an assistant placeholder and an ordinary
+ *                                     chat generation. Nothing it writes is
+ *                                     applied.
  *      Both do all of it before they yield, so the queue is what refuses a
- *      second send.
+ *      second send. The user's message is added here, after the guard, never
+ *      by the sender: a refused send leaves no message with no turn.
  *   3. scenarioTurnUndoRequested   → reverse the latest standing Build reply.
  *   4. entityDiscardRequested      → discard a manual draft ("+ Add Entity", not
  *                                     yet saved): delete the entity.
@@ -79,6 +82,14 @@ function findChat(state: RootState, id: string): Chat | undefined {
   return state.chat.chats.find((c) => c.id === id);
 }
 
+/** The writer's message for a send that carried text. */
+function userMessageAdded(chatId: string, content: string) {
+  return messageAdded({
+    chatId,
+    message: { id: api.v1.uuid(), role: "user", content },
+  });
+}
+
 /** True if a Scenario generation for this chat (a Build turn or a Plan
  *  turn) is already queued or in flight. Scenario sends guard on this
  *  so a second one is a no-op rather than another stacked empty assistant turn.
@@ -114,12 +125,13 @@ export function registerForgeChatEffects(
   subscribeEffect(
     matchesAction(forgeChatContinueRequested),
     async (action, { getState: latest }) => {
-      const { chatId, directed } = action.payload;
+      const { chatId, directed, content } = action.payload;
       if (!findChat(latest(), chatId)) return;
       // No-op if a turn is already queued or running, so repeated sends cannot
       // stack empty turns and background generations.
       if (busy(latest(), chatId)) return;
 
+      if (content) dispatch(userMessageAdded(chatId, content));
       const assistantId = api.v1.uuid();
       dispatch(
         messageAdded({
@@ -156,14 +168,17 @@ export function registerForgeChatEffects(
   subscribeEffect(
     matchesAction(scenarioPlanRequested),
     async (action, { getState: latest }) => {
-      const { chatId } = action.payload;
+      const { chatId, content } = action.payload;
       const chat = findChat(latest(), chatId);
       if (!chat) return;
       if (busy(latest(), chatId)) return;
 
-      // Nothing here is awaited: the placeholder is added in the turn the send
-      // arrived in, and the request is in the queue before a second send can
-      // be read, so the pending check above is the whole re-entry guard.
+      // Nothing here is awaited: the writer's message and the placeholder are
+      // added in the turn the send arrived in, and the request is in the queue
+      // before a second send can be read, so the pending check above is the
+      // whole re-entry guard. The strategy reads the chat when it runs, so it
+      // sees the message added here.
+      if (content) dispatch(userMessageAdded(chatId, content));
       const assistantId = api.v1.uuid();
       const strategy = buildScenarioPlanStrategy(latest, chat, assistantId);
       dispatch(

@@ -16,6 +16,7 @@ import { chatSlice } from "../../../../src/core/store/slices/chat";
 import {
   worldSlice,
   entityForged,
+  entityLorebookEntryBound,
 } from "../../../../src/core/store/slices/world";
 import {
   runtimeSlice,
@@ -415,6 +416,118 @@ describe("scenarioPlanRequested effect", () => {
   });
 });
 
+describe("a send carries its text, and the effect adds the message", () => {
+  const chat = () =>
+    makeChat({
+      messages: [{ id: "u1", role: "user", content: "a lock-keeper" }],
+    });
+  const sends = [
+    [
+      "Build",
+      forgeChatContinueRequested({
+        chatId: "fc-1",
+        directed: true,
+        content: "just the sisters",
+      }),
+      "build",
+    ],
+    [
+      "Plan",
+      scenarioPlanRequested({ chatId: "fc-1", content: "just the sisters" }),
+      "plan",
+    ],
+  ] as const;
+
+  it.each(sends)(
+    "%s: one user message, then one placeholder, then the request",
+    async (_mode, action, mode) => {
+      const { dispatch, fire } = makeHarness(makeState([chat()]));
+      await fire(action);
+      const calls = dispatch.mock.calls.map(([a]) => a);
+      const added = calls.filter((a) => a.type === "chat/messageAdded");
+      expect(added.map((a) => a.payload.message)).toMatchObject([
+        { role: "user", content: "just the sisters" },
+        { role: "assistant", content: "", mode },
+      ]);
+      expect(added).toHaveLength(2);
+      const types = calls.map((a) => a.type);
+      expect(types.lastIndexOf("chat/messageAdded")).toBeLessThan(
+        types.indexOf("runtime/requestQueued"),
+      );
+      expect(
+        calls.filter((a) => a.type === "runtime/requestQueued"),
+      ).toHaveLength(1);
+    },
+  );
+
+  it.each(sends)(
+    "%s: a send while a turn is pending adds no message and queues nothing",
+    async (_mode, action) => {
+      const state = makeState([chat()]);
+      (state.runtime as { queue: unknown[] }).queue = [
+        { id: "scenario-fc-1-a0", type: "forgeChat", status: "queued" },
+      ];
+      const { dispatch, fire } = makeHarness(state);
+      await fire(action);
+      expect(dispatch).not.toHaveBeenCalled();
+    },
+  );
+
+  it("Plan adds the message before it yields", () => {
+    const { dispatch, fire } = makeHarness(makeState([chat()]));
+    void fire(sends[1][1]);
+    const calls = dispatch.mock.calls.map(([a]) => a);
+    expect(calls.filter((a) => a.type === "chat/messageAdded")).toHaveLength(2);
+    expect(
+      calls.filter((a) => a.type === "runtime/requestQueued"),
+    ).toHaveLength(1);
+  });
+
+  it("a retry, which carries no text, adds only the placeholder", async () => {
+    const { dispatch, fire } = makeHarness(makeState([chat()]));
+    await fire(forgeChatContinueRequested({ chatId: "fc-1" }));
+    const added = dispatch.mock.calls
+      .map(([a]) => a)
+      .filter((a) => a.type === "chat/messageAdded");
+    expect(added.map((a) => a.payload.message.role)).toEqual(["assistant"]);
+  });
+
+  it("the Build strategy is built from the chat with the message in it", async () => {
+    // A real store: the strategy reads the conversation when it runs, and a
+    // directed Build turn ends on what the writer just typed.
+    const store = createStore(
+      combineReducers({
+        chat: chatSlice.reducer,
+        world: worldSlice.reducer,
+        runtime: runtimeSlice.reducer,
+      }),
+      false,
+    );
+    const submitted: { payload: { messageFactory: () => Promise<any> } }[] = [];
+    registerForgeChatEffects(
+      store.subscribeEffect as never,
+      ((a: { type: string; payload: never }) => {
+        if (a.type === "ui/generationSubmitted") submitted.push(a);
+        else store.dispatch(a);
+      }) as never,
+      store.getState as never,
+    );
+    store.dispatch(chatSlice.actions.chatCreated({ chat: chat() }));
+    store.dispatch(sends[0][1]);
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+
+    const messages = store
+      .getState()
+      .chat.chats.find((c) => c.id === "fc-1")!.messages;
+    expect(messages.map((m) => [m.role, m.content])).toEqual([
+      ["user", "a lock-keeper"],
+      ["user", "just the sisters"],
+      ["assistant", ""],
+    ]);
+    expect(submitted).toHaveLength(1);
+  });
+});
+
 describe("undoing a Build turn", () => {
   const applied = (
     name: string,
@@ -505,6 +618,68 @@ describe("undoing a Build turn", () => {
     expect(summary()).toBe("New.");
     expect(message("b-Kei").undone).toBeUndefined();
     expect(message("b2").undone).toBeUndefined();
+  });
+
+  it("a send that arrives while a reply is being reversed leaves no message", async () => {
+    // The reversal is held open on its lorebook read; the send arrives then.
+    const created: ChatMessage = {
+      id: "b-made",
+      role: "assistant",
+      content: "x",
+      mode: "build",
+      forgeSegments: [
+        {
+          kind: "action",
+          action: {
+            kind: "CREATE",
+            status: "applied",
+            name: "Kei",
+            entityId: "k",
+            undo: { op: "entityCreated", entityId: "k", entryCreated: true },
+          },
+        },
+      ],
+    };
+    const { store, flush, message } = arrange([created]);
+    store.dispatch(
+      chatSlice.actions.messageAdded({
+        chatId: "c1",
+        message: { id: "seed", role: "user", content: "seed" },
+      }),
+    );
+    // Kei has an entry, so the undo has a lorebook read to wait on.
+    store.dispatch(
+      entityLorebookEntryBound({ entityId: "k", lorebookEntryId: "e-k" }),
+    );
+    let letGo = (): void => {};
+    vi.mocked(api.v1.lorebook.entry).mockReturnValueOnce(
+      new Promise((resolve) => {
+        letGo = () => resolve(null);
+      }),
+    );
+    const count = () =>
+      store.getState().chat.chats.find((c) => c.id === "c1")!.messages.length;
+
+    store.dispatch(
+      scenarioTurnUndoRequested({ chatId: "c1", messageId: "b-made" }),
+    );
+    await flush();
+    const before = count();
+    store.dispatch(
+      forgeChatContinueRequested({
+        chatId: "c1",
+        directed: true,
+        content: "more",
+      }),
+    );
+    store.dispatch(scenarioPlanRequested({ chatId: "c1", content: "more" }));
+    await flush();
+    expect(count()).toBe(before);
+    expect(store.getState().runtime.queue).toEqual([]);
+
+    letGo();
+    await flush();
+    expect(message("b-made").undone).toBe(true);
   });
 
   it("refuses while a turn for the chat is queued or running", async () => {

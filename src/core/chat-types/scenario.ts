@@ -14,7 +14,6 @@ import {
   forgeChatContinueRequested,
   scenarioPlanRequested,
 } from "../store/effects/forge-chat-actions";
-import { messageAdded } from "../store/slices/chat";
 
 export type ScenarioMode = "plan" | "build";
 
@@ -73,17 +72,10 @@ export const scenarioSpec: ChatTypeSpec<ScenarioMode> = {
   },
 
   handleSend(chat, content, ctx) {
-    // Refuse while any turn for this chat is queued or
-    // running: a second send would only stack another empty assistant turn.
-    const rt = ctx.getState().runtime;
-    const busy = [rt.activeRequest, ...rt.queue].some(
-      (r) =>
-        !!r &&
-        r.status !== "cancelled" &&
-        (r.type === "forgeChat" || r.id.startsWith(`chat-${chat.id}-`)),
-    );
-    if (busy) return true;
-
+    // Only the empty-send rules are decided here. Whether the chat is free
+    // is the effect's to say (a queued turn, or a reversal in progress), so
+    // the text travels in the request and the effect adds the message once
+    // its guard has passed: a refused send leaves no message behind.
     const mode = scenarioMode(chat);
     const trimmed = content.trim();
     // Plan is a conversation and needs something said. An empty Build send
@@ -94,20 +86,14 @@ export const scenarioSpec: ChatTypeSpec<ScenarioMode> = {
     ) {
       return true;
     }
-    if (trimmed.length > 0) {
-      ctx.dispatch(
-        messageAdded({
-          chatId: chat.id,
-          message: { id: api.v1.uuid(), role: "user", content: trimmed },
-        }),
-      );
-    }
+    const text = trimmed.length > 0 ? { content: trimmed } : {};
     ctx.dispatch(
       mode === "plan"
-        ? scenarioPlanRequested({ chatId: chat.id })
+        ? scenarioPlanRequested({ chatId: chat.id, ...text })
         : forgeChatContinueRequested({
             chatId: chat.id,
             directed: trimmed.length > 0,
+            ...text,
           }),
     );
     return true;

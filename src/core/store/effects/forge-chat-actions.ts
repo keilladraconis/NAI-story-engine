@@ -10,6 +10,10 @@ export interface ForgeChatContinueRequestedPayload {
   /** Whether the writer typed something with this send. Absent on a retry,
    *  which carries no send; the strategy then reads the transcript's tail. */
   directed?: boolean;
+  /** What the writer typed, trimmed. The effect adds it as the user's message
+   *  once its guard has passed, so a refused send leaves nothing behind.
+   *  Absent on an empty send and on a retry. */
+  content?: string;
 }
 
 const FORGE_CHAT_CONTINUE_REQUESTED = "forgeChat/continueRequested";
@@ -23,6 +27,9 @@ forgeChatContinueRequested.type = FORGE_CHAT_CONTINUE_REQUESTED;
 
 export interface ScenarioPlanRequestedPayload {
   chatId: string;
+  /** What the writer typed, trimmed; the effect adds it as the user's
+   *  message. Absent on a retry. */
+  content?: string;
 }
 
 const SCENARIO_PLAN_REQUESTED = "forgeChat/planRequested";
